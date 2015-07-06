@@ -1,51 +1,71 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 6 Jul 2015 11:30:26 +0200
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <559A3C9C.6050302@arm.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com>
- <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com>
- <559A3C9C.6050302@arm.com>
-Message-ID: <20150706093026.GA11590@cbox>
+Date: Mon, 6 Jul 2015 11:31:14 +0200
+Subject: [PATCH v7 09/11] KVM: arm64: guest debug, HW assisted debug
+ support
+In-Reply-To: <20150706085140.GA30342@arm.com>
+References: <1435775343-20034-1-git-send-email-alex.bennee@linaro.org>
+ <1435775343-20034-10-git-send-email-alex.bennee@linaro.org>
+ <20150702084847.GB3418@arm.com> <87pp4asm6u.fsf@linaro.org>
+ <20150703092323.GA1588@arm.com> <87h9plrzqq.fsf@linaro.org>
+ <20150706085140.GA30342@arm.com>
+Message-ID: <20150706093114.GB11590@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 09:30:20AM +0100, Andre Przywara wrote:
-> Hi Pavel,
-> 
-> On 06/07/15 07:42, Pavel Fedin wrote:
-> >  Hello!
+On Mon, Jul 06, 2015 at 09:51:40AM +0100, Will Deacon wrote:
+> On Fri, Jul 03, 2015 at 05:07:41PM +0100, Alex Benn?e wrote:
+> > Will Deacon <will.deacon@arm.com> writes:
+> > > On Thu, Jul 02, 2015 at 02:50:33PM +0100, Alex Benn?e wrote:
+> > >> Are you happy with this?:
+> > >
+> > > [...]
+> > >
+> > >> +/**
+> > >> + * kvm_arch_dev_ioctl_check_extension
+> > >> + *
+> > >> + * We currently assume that the number of HW registers is uniform
+> > >> + * across all CPUs (see cpuinfo_sanity_check).
+> > >> + */
+> > >>  int kvm_arch_dev_ioctl_check_extension(long ext)
+> > >>  {
+> > >>         int r;
+> > >> @@ -64,6 +71,12 @@ int kvm_arch_dev_ioctl_check_extension(long ext)
+> > >>         case KVM_CAP_ARM_EL1_32BIT:
+> > >>                 r = cpu_has_32bit_el1();
+> > >>                 break;
+> > >> +       case KVM_CAP_GUEST_DEBUG_HW_BPS:
+> > >> +               r = hw_breakpoint_slots(TYPE_INST);
+> > >> +               break;
+> > >> +       case KVM_CAP_GUEST_DEBUG_HW_WPS:
+> > >> +               r  = hw_breakpoint_slots(TYPE_DATA);
+> > >> +               break;
+> > >
+> > > Whilst I much prefer this code, it actually adds an unwanted dependency
+> > > on PERF_EVENTS that I didn't think about to start with. Sorry to keep
+> > > messing you about -- I guess your original patch is the best thing after
+> > > all.
 > > 
-> >> I like this approach, but it runs into problems:
-> >> As you read above the current documentation says that the flags field
-> >> must be zero and the current KVM_SET_GSI_ROUTING handler bails out if it
-> >> isn't. So userland would need to know whether it's safe to set that
-> >> field.
+> > Everything looks to be in hw_breakpoint.[ch] which does depend on
+> > CONFIG_HAVE_HW_BREAKPOINT which depends on PERF_EVENTS to be built.
+> > However the previous code depended on this behaviour as well.
+> 
+> I think your original approach (of sticking stuff in the header file) works
+> regardless of the CONFIG option, no?
+> 
+> > It would seem weird to enable guest debug using HW debug registers to
+> > debug the guest yet not allowing the host kernel to use them? Of course
+> > this is the only code they would share as all the magic of guest
+> > debugging is already mostly there for dirty guest handling.
 > > 
-> >  This problem does not exist because:
-> > a) Older platforms do not need this flag, so they expect to get zero.
-> > b) ARM64 + GICv3 platform cannot work without this flag.
-> > 
-> >  This is perfectly OK combination IMO. Userland just knows, whether it needs to supply device ID or
-> > not. For example, my modified qemu now has kvm_msi_flags global variable which defaults to 0. ITS
-> > code, then, if activated, changes it to KVM_MSI_VALID_DEVID, and qemu starts supplying device IDs to
-> > the related calls.
+> > I'm not familiar with Kconfig but it looks like this is all part of
+> > arm64 defconfig. Are people really going to want to disable PERF_EVENTS
+> > but still debug their guests with HW support?
 > 
-> Well, I had this solution before in kvmtool: If ARM && ITS then set the
-> flag. But I wasn't really happy with this, as the IRQ routing, setup and
-> injection code is rather architecture agnostic (implementing the generic
-> KVM interface), so spraying in some architecture hacks sounded not very
-> elegant.
-> Also as the flag describes a rather generic feature (provide an unique
-> device ID), I'd rather avoid to make this an ARM hack.
+> Then it's your call. I just find the host dependency on perf a bit weird
+> to get guest debug working (especially as the dependency is completely
+> "fake" because we don't use any perf infrastructure at all).
 > 
-> That being said this is not a show stopper for me, so if the others are
-> happy with this, I will go down your road.
-> 
-There must be some way for userspace to discover if it's valid to set
-the flag or not; either through a well-defined error-code probing
-mechanism for KVM_SET_GSI_ROUTING or through advertising a capability.
+Agreed, let's see if we can avoid this.
 
+Thanks,
 -Christoffer
