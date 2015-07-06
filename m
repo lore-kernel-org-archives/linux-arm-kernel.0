@@ -1,112 +1,77 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon,  6 Jul 2015 16:24:18 +0530
-Subject: [PATCH 11/18] ARM/netx/time: Migrate to new 'set-state' interface
+Date: Mon,  6 Jul 2015 16:24:17 +0530
+Subject: [PATCH 10/18] ARM/mmp/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1436178990.git.viresh.kumar@linaro.org>
 References: <cover.1436178990.git.viresh.kumar@linaro.org>
-Message-ID: <a432603e24cec07ddd044810c56749acaf6a552b.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <70d153f4a34217ffa7cefd2b29000ee07618f2aa.1436178990.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate netx driver to the new 'set-state' interface provided by
+Migrate mmp driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-We aren't writing zero twice on the control register for shutdown or
-resume state now.
+We weren't doing anything in set_mode(RESUME) except of
+local_irq_{save|restore}(), which isn't required and so ->tick_resume
+isn't implemented.
 
-Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Eric Miao <eric.y.miao@gmail.com>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-netx/time.c | 61 +++++++++++++++++++++++++----------------------
- 1 file changed, 32 insertions(+), 29 deletions(-)
+ arch/arm/mach-mmp/time.c | 29 +++++++++++------------------
+ 1 file changed, 11 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/mach-netx/time.c b/arch/arm/mach-netx/time.c
-index 5fb2a590ec17..054a8a61e379 100644
---- a/arch/arm/mach-netx/time.c
-+++ b/arch/arm/mach-netx/time.c
-@@ -34,40 +34,40 @@
- #define TIMER_CLOCKEVENT 0
- #define TIMER_CLOCKSOURCE 1
+diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+index 10bfa03e58d4..dbc697b2fda1 100644
+--- a/arch/arm/mach-mmp/time.c
++++ b/arch/arm/mach-mmp/time.c
+@@ -124,32 +124,25 @@ static int timer_set_next_event(unsigned long delta,
+ 	return 0;
+ }
  
--static void netx_set_mode(enum clock_event_mode mode,
--		struct clock_event_device *clk)
-+static inline void timer_shutdown(struct clock_event_device *evt)
+-static void timer_set_mode(enum clock_event_mode mode,
+-			   struct clock_event_device *dev)
++static int timer_set_shutdown(struct clock_event_device *evt)
  {
--	u32 tmode;
--
- 	/* disable timer */
- 	writel(0, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
-+}
-+
-+static int netx_shutdown(struct clock_event_device *evt)
-+{
-+	timer_shutdown(evt);
-+
-+	return 0;
-+}
-+
-+static int netx_set_oneshot(struct clock_event_device *evt)
-+{
-+	u32 tmode = NETX_GPIO_COUNTER_CTRL_IRQ_EN | NETX_GPIO_COUNTER_CTRL_RUN;
-+
-+	timer_shutdown(evt);
-+	writel(0, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
-+	writel(tmode, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
+ 	unsigned long flags;
  
+ 	local_irq_save(flags);
 -	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		writel(NETX_LATCH, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
--		tmode = NETX_GPIO_COUNTER_CTRL_RST_EN |
--			NETX_GPIO_COUNTER_CTRL_IRQ_EN |
--			NETX_GPIO_COUNTER_CTRL_RUN;
--		break;
--
 -	case CLOCK_EVT_MODE_ONESHOT:
--		writel(0, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
--		tmode = NETX_GPIO_COUNTER_CTRL_IRQ_EN |
--			NETX_GPIO_COUNTER_CTRL_RUN;
--		break;
--
--	default:
--		WARN(1, "%s: unhandled mode %d\n", __func__, mode);
--		/* fall through */
--
--	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_UNUSED:
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		/* disable the matching interrupt */
+-		__raw_writel(0x00, mmp_timer_base + TMR_IER(0));
+-		break;
 -	case CLOCK_EVT_MODE_RESUME:
--		tmode = 0;
+-	case CLOCK_EVT_MODE_PERIODIC:
 -		break;
 -	}
-+	return 0;
-+}
- 
-+static int netx_set_periodic(struct clock_event_device *evt)
-+{
-+	u32 tmode = NETX_GPIO_COUNTER_CTRL_RST_EN |
-+		    NETX_GPIO_COUNTER_CTRL_IRQ_EN | NETX_GPIO_COUNTER_CTRL_RUN;
-+
-+	timer_shutdown(evt);
-+	writel(NETX_LATCH, NETX_GPIO_COUNTER_MAX(TIMER_CLOCKEVENT));
- 	writel(tmode, NETX_GPIO_COUNTER_CTRL(TIMER_CLOCKEVENT));
++	/* disable the matching interrupt */
++	__raw_writel(0x00, mmp_timer_base + TMR_IER(0));
+ 	local_irq_restore(flags);
 +
 +	return 0;
  }
  
- static int netx_set_next_event(unsigned long evt,
-@@ -81,7 +81,10 @@ static struct clock_event_device netx_clockevent = {
- 	.name = "netx-timer" __stringify(TIMER_CLOCKEVENT),
- 	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
- 	.set_next_event = netx_set_next_event,
--	.set_mode = netx_set_mode,
-+	.set_state_shutdown = netx_shutdown,
-+	.set_state_periodic = netx_set_periodic,
-+	.set_state_oneshot = netx_set_oneshot,
-+	.tick_resume = netx_shutdown,
+ static struct clock_event_device ckevt = {
+-	.name		= "clockevent",
+-	.features	= CLOCK_EVT_FEAT_ONESHOT,
+-	.rating		= 200,
+-	.set_next_event	= timer_set_next_event,
+-	.set_mode	= timer_set_mode,
++	.name			= "clockevent",
++	.features		= CLOCK_EVT_FEAT_ONESHOT,
++	.rating			= 200,
++	.set_next_event		= timer_set_next_event,
++	.set_state_shutdown	= timer_set_shutdown,
++	.set_state_oneshot	= timer_set_shutdown,
  };
  
- /*
+ static cycle_t clksrc_read(struct clocksource *cs)
 -- 
 2.4.0
