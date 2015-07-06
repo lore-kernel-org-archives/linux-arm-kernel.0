@@ -1,34 +1,79 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Jul 2015 08:56:15 +0200
-Subject: [PATCH] crypto: arm: ignore generated SHA2 assembly files
-In-Reply-To: <e9fad4b90e8d3aac883e2a5ac99b330653bcc354.1436155417.git.baruch@tkos.co.il>
-References: <e9fad4b90e8d3aac883e2a5ac99b330653bcc354.1436155417.git.baruch@tkos.co.il>
-Message-ID: <CAKv+Gu_CN1pH-4uEk0x6kScAvo_hBY-bZMcCeZNpKADYWGQFQQ@mail.gmail.com>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Mon, 06 Jul 2015 09:01:33 +0200
+Subject: [PATCH] thermal: exynos: Disable the regulator on probe failure
+In-Reply-To: <CAJKOXPfwSB03YQZA2HZHJLebxq7WTK2fObxHNegdYO+3MM_pfw@mail.gmail.com>
+References: <1433727349-23330-1-git-send-email-k.kozlowski@samsung.com>
+ <20150608181459.454c9067@amdc2363>
+ <CAJKOXPfwSB03YQZA2HZHJLebxq7WTK2fObxHNegdYO+3MM_pfw@mail.gmail.com>
+Message-ID: <20150706090133.71b4be9b@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 July 2015 at 06:03, Baruch Siach <baruch@tkos.co.il> wrote:
-> These files are generated since commits f2f770d74a8d (crypto: arm/sha256 - Add
-> optimized SHA-256/224, 2015-04-03) and c80ae7ca3726 (crypto: arm/sha512 -
-> accelerated SHA-512 using ARM generic ASM and NEON, 2015-05-08).
->
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Hi Krzysztof,
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 2015-06-09 1:14 GMT+09:00 Lukasz Majewski <l.majewski@samsung.com>:
+> > Hi Krzysztof,
+> >
+> >> During probe the regulator (if present) was enabled but not
+> >> disabled in case of failure. So an unsuccessful probe lead to
+> >> enabling the regulator which was actually not needed because the
+> >> device was not enabled.
+> >>
+> >> Additionally each deferred probe lead to increase of regulator
+> >> enable count so it would not be effectively disabled during
+> >> removal of the device.
+> >
+> > Thanks for catching this.
+> >
+> >>
+> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> Fixes: 498d22f616f6 ("thermal: exynos: Support for TMU regulator
+> >> defined at device tree") Cc: <stable@vger.kernel.org>
+> >>
+> >> ---
+> >>
+> >> I am not entirely convinced that this should go to stable. Leaving
+> >> a regulator enabled in case of probe failure (no exynos TMU
+> >> device) or after deferred probe (regulator won't be disabled
+> >> during device removal) is not a critical issue, just leaks power.
+> >> ---
+> >>  drivers/thermal/samsung/exynos_tmu.c | 2 ++
+> >>  1 file changed, 2 insertions(+)
+> >>
+> >> diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> >> b/drivers/thermal/samsung/exynos_tmu.c index
+> >> 531f4b179871..13c3aceed19d 100644 ---
+> >> a/drivers/thermal/samsung/exynos_tmu.c +++
+> >> b/drivers/thermal/samsung/exynos_tmu.c @@ -1392,6 +1392,8 @@
+> >> err_clk_sec: if (!IS_ERR(data->clk_sec))
+> >>               clk_unprepare(data->clk_sec);
+> >>  err_sensor:
+> >> +     if (!IS_ERR_OR_NULL(data->regulator))
+> >> +             regulator_disable(data->regulator);
+> >>       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
+> >>
+> >>       return ret;
+> >
+> > Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+> >
+> > I will test it and afterwards add to samsung-thermal tree.
+> 
+> Hi ?ukasz,
+> 
+> I can't find this patch in v4.2-rc1 or your tree. What happened?
 
-> ---
->  arch/arm/crypto/.gitignore | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/crypto/.gitignore b/arch/arm/crypto/.gitignore
-> index 6231d36b3635..31e1f538df7d 100644
-> --- a/arch/arm/crypto/.gitignore
-> +++ b/arch/arm/crypto/.gitignore
-> @@ -1 +1,3 @@
->  aesbs-core.S
-> +sha256-core.S
-> +sha512-core.S
-> --
-> 2.1.4
->
+I will got together with Chanowoo patches. I will send PR today to
+Eduardo.
+
+> 
+> Best regards,
+> Krzysztof
+
+
+
+-- 
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
