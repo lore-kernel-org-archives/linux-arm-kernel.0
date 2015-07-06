@@ -1,103 +1,78 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Mon, 6 Jul 2015 09:18:53 -0600
-Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
- domain power on/off
-In-Reply-To: <CAMuHMdWQRy2RMfyeyNz=6AgTDem67a1VogN3RWSJ1Y+9yNFx6g@mail.gmail.com>
-References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
- <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
- <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
- <20150629163201.GA1524@linaro.org>
- <CAMuHMdWL09Loe2EFUMc-kRML7Ckn7a6G1_hvPnaqkDYnhkXjog@mail.gmail.com>
- <20150702193826.GA885@linaro.org>
- <CAMuHMdWQRy2RMfyeyNz=6AgTDem67a1VogN3RWSJ1Y+9yNFx6g@mail.gmail.com>
-Message-ID: <20150706151853.GA1018@linaro.org>
+From: santosh.shilimkar@oracle.com (santosh shilimkar)
+Date: Mon, 6 Jul 2015 08:20:32 -0700
+Subject: [PATCH 12/18] ARM/omap1/time: Migrate to new 'set-state' interface
+In-Reply-To: <1680d1e2a6b9dd6b76e12c86bde5d84abcebe705.1436178990.git.viresh.kumar@linaro.org>
+References: <cover.1436178990.git.viresh.kumar@linaro.org>
+ <1680d1e2a6b9dd6b76e12c86bde5d84abcebe705.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <559A9CC0.5070808@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03 2015 at 05:36 -0600, Geert Uytterhoeven wrote:
->Hi Lina,
+On 7/6/2015 3:54 AM, Viresh Kumar wrote:
+> Migrate omap driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
 >
->On Thu, Jul 2, 2015 at 9:38 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->> On Tue, Jun 30 2015 at 09:10 -0600, Geert Uytterhoeven wrote:
->>> On Mon, Jun 29, 2015 at 6:32 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
->>>> On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
 
-[...]
-
->> With what you have suggested, the platform driver creates the genpd and
->> would pass the CPU genpd to the common code for common operations. (This
->> was what was done in [1]). The platform driver would set the power_on()
->> and power_off() callbacks and that would have to be overriden in order
->> handle common CPU domain suspend/resume activities. Overwriting members
->> of an object allocated by the platform driver, is something we should
->> avoid.
+>   arch/arm/mach-omap1/time.c | 35 ++++++++++++++++-------------------
+>   1 file changed, 16 insertions(+), 19 deletions(-)
 >
->Instead of letting the generic code override the .power_{on,off}() callbacks,
->the platform code could call the generic CPU-related methods from its own
->.power_{on,off}() callbacks?
+> diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+> index a7588cfd0286..524977a31a49 100644
+> --- a/arch/arm/mach-omap1/time.c
+> +++ b/arch/arm/mach-omap1/time.c
+> @@ -124,29 +124,26 @@ static int omap_mpu_set_next_event(unsigned long cycles,
+>   	return 0;
+>   }
 >
-We dont want to impose on platform drivers to call back into the CPU
-domain core code to do common domain power down activities. On a generic
-ARM CPU domain, we may not even need a platform specific domain
-callbacks. IMHO, this is not desirable.
-
->struct rmobile_pm_domain already has .suspend() and .resume() methods.
->The former is used to e.g. prevent the PM domains containing CPUs to be
->powered down (in the absence of cpuidle integration). That requires scanning
->the DT for CPUs, and it would indeed be good to have that scanning support
->in generic code.
->The latter became unused after the removal of sh7372 support, which did have
->some cpuidle integration.
+> -static void omap_mpu_set_mode(enum clock_event_mode mode,
+> -			      struct clock_event_device *evt)
+> +static int omap_mpu_set_oneshot(struct clock_event_device *evt)
+>   {
+> -	switch (mode) {
+> -	case CLOCK_EVT_MODE_PERIODIC:
+> -		omap_mpu_set_autoreset(0);
+> -		break;
+> -	case CLOCK_EVT_MODE_ONESHOT:
+> -		omap_mpu_timer_stop(0);
+> -		omap_mpu_remove_autoreset(0);
+> -		break;
+> -	case CLOCK_EVT_MODE_UNUSED:
+> -	case CLOCK_EVT_MODE_SHUTDOWN:
+> -	case CLOCK_EVT_MODE_RESUME:
+> -		break;
+> -	}
+> +	omap_mpu_timer_stop(0);
+> +	omap_mpu_remove_autoreset(0);
+> +	return 0;
+> +}
+> +
+> +static int omap_mpu_set_periodic(struct clock_event_device *evt)
+> +{
+> +	omap_mpu_set_autoreset(0);
+> +	return 0;
+>   }
 >
-The CPUs may still be attached to domain, even if they are not powered
-off by CPUIdle. The code increases the reference count for every online
-CPU and any CPUs that may come online. The reference count, only goes
-down when the CPU powers down through CPUIdle or hotplug. So, if a CPU
-is not integrated with CPUIdle, it would remain in use (unless powered
-off by hotplug) and the domain would not be powered down.
-
->> Or instead of allocating the memory in your platform driver for the CPU
->> genpd, you could query and get the genpd and then add your additions on
->> top. You could add other flags like GENPD_FLAG_PM_CLK, but *not*
->> overwrite the power on/off callbacks in the genpd. They still have to be
->> registered separately like in this patch. Again, not every elegant, IMO.
+>   static struct clock_event_device clockevent_mpu_timer1 = {
+> -	.name		= "mpu_timer1",
+> -	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> -	.set_next_event	= omap_mpu_set_next_event,
+> -	.set_mode	= omap_mpu_set_mode,
+> +	.name			= "mpu_timer1",
+> +	.features		= CLOCK_EVT_FEAT_PERIODIC |
+> +				  CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_next_event		= omap_mpu_set_next_event,
+> +	.set_state_periodic	= omap_mpu_set_periodic,
+> +	.set_state_oneshot	= omap_mpu_set_oneshot,
+>   };
 >
->Just wondering, can I set up the .attach_dev() and .detach_dev()?
+>   static irqreturn_t omap_mpu_timer1_interrupt(int irq, void *dev_id)
 >
-I am presuming, you are concerned with the fore mentioned case of CPUs
-not participating in CPUIdle. With pm_runtime_put_sync() not happening
-for CPUs that do not power down, you should not have to worry about the
-domain being powered down.
-
-Please correct me if I misunderstood your point.
-
->Actually, for R-Mobile hardware I don't have a need to set GENPD_FLAG_PM_CLK
->or .attach_dev() and .detach_dev() for CPU PM domains, as they are only
->needed for devices with MSTP clocks. CPU and L2 cache don't have these,
->and there are no other devices in e.g. a3sm and a2sl.
->
->The GIC has an MSTP clock, but it's part of a different power domain.
->
-Okay.
-
-[...]
-
->> This the common code would get its own callbacks and when that genpd
->> powers off, the platform genpd would power down. But no new code is
->> needed in your platform driver. The benefit is that platform code and
->> generic CPU domain code may exist and act in parallel and may only be
->> related if specified in the DT and the problem with that approach is
->> that this virtual PM domain is not a h/w domain, hence specifying in DT
->> is questionable.
->
->Indeed, I don't like this option, as the DT would no longer describe HW,
->but the Linux implementation.
->
->So let's continue with your approach, and see how it turns out. We can
->always change and improvide code, while changing DT is more complicated.
->
-Agreed.
-
-Thanks for your time, Geert.
-
--- Lina
