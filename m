@@ -1,27 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon,  6 Jul 2015 07:03:37 +0300
-Subject: [PATCH] crypto: arm: ignore generated SHA2 assembly files
-Message-ID: <e9fad4b90e8d3aac883e2a5ac99b330653bcc354.1436155417.git.baruch@tkos.co.il>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 6 Jul 2015 12:15:39 +0800
+Subject: [PATCH v3 0/2] irqchip: dw-apb-ictl: add irq_set_affinity support
+Message-ID: <1436156141-3674-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These files are generated since commits f2f770d74a8d (crypto: arm/sha256 - Add
-optimized SHA-256/224, 2015-04-03) and c80ae7ca3726 (crypto: arm/sha512 -
-accelerated SHA-512 using ARM generic ASM and NEON, 2015-05-08).
+On Marvell Berlin SoCs, the cpu's local timer is shutdown when the cpu
+goes to a deep idle state, then the timer framework will be notified to
+use a broadcast timer instead. In our case, the broadcast timer uses
+dw-apb-ictl as the interrupt chip. These patches try to add irq_set_affinity
+support so that the going to deep idle state cpu can set the interrupt
+affinity of the broadcast interrupt to avoid unnecessary wakeups and IPIs.
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- arch/arm/crypto/.gitignore | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/crypto/.gitignore b/arch/arm/crypto/.gitignore
-index 6231d36b3635..31e1f538df7d 100644
---- a/arch/arm/crypto/.gitignore
-+++ b/arch/arm/crypto/.gitignore
-@@ -1 +1,3 @@
- aesbs-core.S
-+sha256-core.S
-+sha512-core.S
+Changes since v2:
+ - Add a DT option to indicate whether we want to set the irq affinity.
+Changes since v1:
+ - Add a simple test and its result into the second patch's commit msg.
+
+Jisheng Zhang (2):
+  irqchip: dw-apb-ictl: add private data structure
+  irqchip: dw-apb-ictl: add irq_set_affinity support
+
+ .../interrupt-controller/snps,dw-apb-ictl.txt      |  5 +++
+ drivers/irqchip/irq-dw-apb-ictl.c                  | 51 +++++++++++++++++++---
+ 2 files changed, 51 insertions(+), 5 deletions(-)
+
 -- 
 2.1.4
