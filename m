@@ -1,54 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Jul 2015 11:33:55 +0100
-Subject: [PATCH v3 2/3] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
-In-Reply-To: <15297999.EvgjakjXbx@vostro.rjw.lan>
-References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
- <20150703140601.GL25907@e104818-lin.cambridge.arm.com>
- <5596E7C8.7040809@redhat.com> <15297999.EvgjakjXbx@vostro.rjw.lan>
-Message-ID: <20150706103355.GC27723@e104818-lin.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 6 Jul 2015 12:30:14 +0200
+Subject: [PATCH v3 3/4] mfd: axp20x: Add a cell for the usb power_supply
+ part of the axp20x PMICs
+In-Reply-To: <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
+References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
+ <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150706103014.GH3269@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 04, 2015 at 01:54:15AM +0200, Rafael J. Wysocki wrote:
-> On Friday, July 03, 2015 01:51:36 PM Al Stone wrote:
-> > Perhaps the sanity checking for the MADT subtables needs to be revisited
-> > and a more general solution provided -- this is not the only MADT subtable
-> > with this problem and it may occur again.
-> > 
-> > Even the versions above are not technically compliant with the spec.  If
-> > we implement what the spec currently says, it might look something like
-> > this:
-> > 
-> > #define ACPI_MADT_GICC_LENGTH ({					\
-> > 	u8 length;							\
-> > 	switch (ACPI_FADT_SPEC_VERSION) {				\
-> > 	case ACPI_FADT_SPEC_VERSION_5_0:				\
-> > 		length = 40;						\
-> > 		break;							\
-> > 	case ACPI_FADT_SPEC_VERSION_5_1:				\
-> > 		length = 76;						\
-> > 		break;							\
-> > 	default:	/* use 6.0 size */				\
-> > 		length = 80;						\
-> > 	}								\
-> > 	length;								\
-> > })
-> > 
-> > So it's just messy and there will be a need for change.  Let me think about
-> > making this a function instead of a macro; it may make sense to really fix
-> > BAD_MADT_ENTRY in general instead of just dealing with the GICC subtable,
-> > but it could also be overkill.
+On Fri, Jun 26, 2015 at 12:59:16PM +0200, Hans de Goede wrote:
+> Add a cell for the usb power_supply part of the axp20x PMICs.
 > 
-> So here's my suggestion.
+> Note that this cell is only for the usb power_supply part and not the
+> ac-power / battery-charger / rtc-backup-bat-charger bits.
 > 
-> First, make ARM64 boot with 4.2+ in the simplest way possible.
+> Depending on the board each of those must be enabled / disabled separately
+> in devicetree as most boards do not use all 4. So in dt each one needs its
+> own child-node of the axp20x node. Another reason for using separate child
+> nodes for each is so that other devicetree nodes can have a power-supply
+> property with a phandle referencing a node representing a single
+> power-supply.
 > 
-> Second, set out to fix BAD_MADT_ENTRY() etc.  Start with fixing ACPICA to
-> distinguish between the different formats depending on the spec version and
-> follow up from there.
+> The decision to use a separate devicetree node for each is reflected on
+> the kernel side by each getting its own mfd-cell / platform_device and
+> platform-driver.
+> 
+> Note this commit also makes some whitespace changes to the intialization
+> of existing cells in axp20x_cells, these are pure whitespace changes,
+> functionally nothing changes.
+> 
+> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-That's fine by me (as long as there is a plan to fix it properly,
-ideally in 4.3).
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks!
+Maxime
 
 -- 
-Catalin
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/70906e2c/attachment.sig>
