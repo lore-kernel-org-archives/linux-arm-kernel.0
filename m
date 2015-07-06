@@ -1,9 +1,9 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon,  6 Jul 2015 21:10:44 +0200
-Subject: [PATCH v10 1/5] ARM: sun4i: dt: Add Security System to A10 SoC DTS
+Date: Mon,  6 Jul 2015 21:10:45 +0200
+Subject: [PATCH v10 2/5] ARM: sun7i: dt: Add Security System to A20 SoC DTS
 In-Reply-To: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1436209848-16530-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1436209848-16530-3-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +11,25 @@ The Security System is a hardware cryptographic accelerator that support
 AES/MD5/SHA1/DES/3DES/PRNG algorithms.
 It could be found on many Allwinner SoC.
 
-This patch enable the Security System on the Allwinner A10 SoC Device-tree.
+This patch enable the Security System on the Allwinner A20 SoC Device-tree.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 8 ++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 61c03d1..551e3d1 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -643,6 +643,14 @@
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 6a63f30..ba049d3 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -731,6 +731,14 @@
  			status = "disabled";
  		};
  
 +		crypto: crypto-engine at 01c15000 {
 +			compatible = "allwinner,sun4i-a10-crypto";
 +			reg = <0x01c15000 0x1000>;
-+			interrupts = <86>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&ahb_gates 5>, <&ss_clk>;
 +			clock-names = "ahb", "mod";
 +		};
