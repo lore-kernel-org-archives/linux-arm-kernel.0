@@ -1,138 +1,88 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon,  6 Jul 2015 12:23:58 +0100
-Subject: [PATCHv3 6/9] arm64: perf: add Cortex-A57 support
+Date: Mon,  6 Jul 2015 12:23:59 +0100
+Subject: [PATCHv3 7/9] arm64: dts: juno: describe PMUs separately
 In-Reply-To: <1436181842-19402-1-git-send-email-mark.rutland@arm.com>
 References: <1436181842-19402-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1436181842-19402-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <1436181842-19402-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A57 PMU supports a few events outside of the required PMUv3
-set that are rather useful.
-
-This patch adds the event map data for said events.
+The A57 and A53 PMUs in support different events, so describe them
+separately in the Juno dts files.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- Documentation/devicetree/bindings/arm/pmu.txt |  1 +
- arch/arm64/kernel/perf_event_pmuv3.c          | 61 +++++++++++++++++++++++++++
- 2 files changed, 62 insertions(+)
+ arch/arm64/boot/dts/arm/juno-r1.dts | 18 +++++++++++-------
+ arch/arm64/boot/dts/arm/juno.dts    | 18 +++++++++++-------
+ 2 files changed, 22 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index a65e5cf..9a06761 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -8,6 +8,7 @@ Required properties:
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index c627511..734e127 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -91,17 +91,21 @@
+ 		};
+ 	};
  
- - compatible : should be one of
- 	"arm,armv8-pmuv3"
-+	"arm.cortex-a57-pmu"
- 	"arm.cortex-a53-pmu"
- 	"arm,cortex-a17-pmu"
- 	"arm,cortex-a15-pmu"
-diff --git a/arch/arm64/kernel/perf_event_pmuv3.c b/arch/arm64/kernel/perf_event_pmuv3.c
-index ea27db0..79b4011 100644
---- a/arch/arm64/kernel/perf_event_pmuv3.c
-+++ b/arch/arm64/kernel/perf_event_pmuv3.c
-@@ -74,6 +74,16 @@ enum armv8_a53_pmu_perf_types {
- 	ARMV8_A53_PERFCTR_PREFETCH_LINEFILL			= 0xC2,
- };
+-	pmu {
+-		compatible = "arm,armv8-pmuv3";
++	pmu_a57 {
++		compatible = "arm,cortex-a57-pmu";
+ 		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A57_0>,
++				     <&A57_1>;
++	};
++
++	pmu_a53 {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-affinity = <&A57_0>,
+-				     <&A57_1>,
+-				     <&A53_0>,
++		interrupt-affinity = <&A53_0>,
+ 				     <&A53_1>,
+ 				     <&A53_2>,
+ 				     <&A53_3>;
+diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+index d7cbdd4..ffa05ae 100644
+--- a/arch/arm64/boot/dts/arm/juno.dts
++++ b/arch/arm64/boot/dts/arm/juno.dts
+@@ -91,17 +91,21 @@
+ 		};
+ 	};
  
-+/* ARMv8 Cortex-A57 specific event types. */
-+enum armv8_a57_perf_types {
-+	ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD			= 0x40,
-+	ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST			= 0x41,
-+	ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD			= 0x42,
-+	ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST			= 0x43,
-+	ARMV8_A57_PERFCTR_DTLB_REFILL_LD			= 0x4c,
-+	ARMV8_A57_PERFCTR_DTLB_REFILL_ST			= 0x4d,
-+};
+-	pmu {
+-		compatible = "arm,armv8-pmuv3";
++	pmu_a57 {
++		compatible = "arm,cortex-a57-pmu";
+ 		interrupts = <GIC_SPI 02 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 06 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A57_0>,
++				     <&A57_1>;
++	};
 +
- /* PMUv3 HW events mapping. */
- static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
- 	PERF_MAP_ALL_UNSUPPORTED,
-@@ -96,6 +106,16 @@ static const unsigned armv8_a53_perf_map[PERF_COUNT_HW_MAX] = {
- 	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
- };
- 
-+static const unsigned armv8_a57_perf_map[PERF_COUNT_HW_MAX] = {
-+	PERF_MAP_ALL_UNSUPPORTED,
-+	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CLOCK_CYCLES,
-+	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INSTR_EXECUTED,
-+	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
-+	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
-+	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
-+};
-+
- static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 						[PERF_COUNT_HW_CACHE_OP_MAX]
- 						[PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-@@ -134,6 +154,31 @@ static const unsigned armv8_a53_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
- };
- 
-+static const unsigned armv8_a57_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
-+					      [PERF_COUNT_HW_CACHE_OP_MAX]
-+					      [PERF_COUNT_HW_CACHE_RESULT_MAX] = {
-+	PERF_CACHE_MAP_ALL_UNSUPPORTED,
-+
-+	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_LD,
-+	[C(L1D)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_LD,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_ACCESS_ST,
-+	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_L1_DCACHE_REFILL_ST,
-+
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_ACCESS,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_ICACHE_REFILL,
-+
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_DTLB_REFILL_LD,
-+	[C(DTLB)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_A57_PERFCTR_DTLB_REFILL_ST,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_ITLB_REFILL,
-+
-+	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
-+	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
-+};
-+
-+
- /*
-  * Perf Events' indices
-  */
-@@ -548,6 +593,13 @@ static int armv8_a53_map_event(struct perf_event *event)
- 				ARMV8_EVTYPE_EVENT);
- }
- 
-+static int armv8_a57_map_event(struct perf_event *event)
-+{
-+	return armpmu_map_event(event, &armv8_a57_perf_map,
-+				&armv8_a57_perf_cache_map,
-+				ARMV8_EVTYPE_EVENT);
-+}
-+
- static void armv8pmu_read_num_pmnc_events(void *info)
- {
- 	int *nb_cnt = info;
-@@ -597,9 +649,18 @@ static int armv8_a53_pmu_init(struct arm_pmu *cpu_pmu)
- 	return armv8pmu_probe_num_events(cpu_pmu);
- }
- 
-+static int armv8_a57_pmu_init(struct arm_pmu *cpu_pmu)
-+{
-+	armv8_pmu_init(cpu_pmu);
-+	cpu_pmu->name			= "armv8_cortex_a57";
-+	cpu_pmu->map_event		= armv8_a57_map_event;
-+	return armv8pmu_probe_num_events(cpu_pmu);
-+}
-+
- static const struct of_device_id armv8_pmu_of_device_ids[] = {
- 	{.compatible = "arm,armv8-pmuv3",	.data = armv8_pmuv3_init},
- 	{.compatible = "arm,cortex-a53-pmu",	.data = armv8_a53_pmu_init},
-+	{.compatible = "arm,cortex-a57-pmu",	.data = armv8_a57_pmu_init},
- 	{},
- };
- 
++	pmu_a53 {
++		compatible = "arm,cortex-a53-pmu";
++		interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
+-		interrupt-affinity = <&A57_0>,
+-				     <&A57_1>,
+-				     <&A53_0>,
++		interrupt-affinity = <&A53_0>,
+ 				     <&A53_1>,
+ 				     <&A53_2>,
+ 				     <&A53_3>;
 -- 
 1.9.1
