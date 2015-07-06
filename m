@@ -1,50 +1,38 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 6 Jul 2015 16:18:15 +0530
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <20150706090323.GB30342@arm.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
- <20150706090323.GB30342@arm.com>
-Message-ID: <20150706104815.GA17305@dhcppc13.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 6 Jul 2015 12:49:50 +0200
+Subject: [PATCH] ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
+ property
+In-Reply-To: <1980362.9qv8Mc7ut7@avalon>
+References: <1436176746-10995-1-git-send-email-geert+renesas@glider.be>
+ <1980362.9qv8Mc7ut7@avalon>
+Message-ID: <CAMuHMdWhSj5HZ+KYBkWbMpvUzFJGHS5-k8exhrxyCsAB+DJL3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2015:10:03:24 AM, Will Deacon wrote:
-> On Mon, Jul 06, 2015 at 06:03:21AM +0100, Pratyush Anand wrote:
-> > Add all function symbols which are called from do_debug_exception under
-> > NOKPROBE_SYMBOL, as they can not kprobed.
-> 
-> It's a shame this has to be so manual, but I suppose it's done on a
-> best-effort basis to catch broken probe placement.
-> 
-> If we miss a function and somebody probes it, do we just get stuck in a
-> recursive exception, or could we print something suggesting that a symbol
-> be annotated as NOKPROBE?
+On Mon, Jul 6, 2015 at 12:17 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+>> --- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
+>> +++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+>> @@ -206,7 +206,7 @@
+>>       };
+>>
+>>       accelerometer at 1d {
+>> -             compatible = "adi,adxl34x";
+>> +             compatible = "adi,adxl345", "adi,adxl34x";
+>
+> "adi,adxl34x" is deprecated and shouldn't be used in DT. You can just specify
+> "adi,adxl345".
 
-In some cases we land into a recursive reenter_kprobe:
+Right, we only care (sometimes ;-) about backward-compatibility,
+not about forward-compatibility.
 
-echo "p kfree" > /sys/kernel/debug/tracing/kprobe_events
-echo "p single_step_handler" >> /sys/kernel/debug/tracing/kprobe_events
-echo 1 >  /sys/kernel/debug/tracing/events/enable
+Gr{oetje,eeting}s,
 
-[  116.904194] BUG: failure at
-.../arch/arm64/kernel/kprobes.c:288/reenter_kprobe()!
+                        Geert
 
-In some other 
-echo "p kfree" > /sys/kernel/debug/tracing/kprobe_events
-echo "p el0_sync" >> /sys/kernel/debug/tracing/kprobe_events
-echo 1 >  /sys/kernel/debug/tracing/events/enable
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Infinite loop of:
-[  142.731336] Unexpected kernel single-step exception at EL1
-
-In 1st case currently only address is printed.
-pr_warn("Unrecoverable kprobe detected at %p.\n", p->addr);
-So, while in 1st case we may also print name of symbol, we can not do
-much in second case.
-
-Now, I am running some test with all the symbols in /proc/kallsyms and
-I noticed that there might be few more symbols which may not allow
-kprobing. So, may be I will resend this series with updates.
-
-~Pratyush
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
