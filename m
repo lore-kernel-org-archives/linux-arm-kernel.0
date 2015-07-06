@@ -1,32 +1,43 @@
-From: francescolavra.fl@gmail.com (Francesco Lavra)
-Date: Mon, 06 Jul 2015 19:59:39 +0200
-Subject: [PATCH] watchdog: sunxi: fix activation of system reset
-Message-ID: <559AC20B.4090601@gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Jul 2015 13:01:18 -0500
+Subject: [PATCH] base: power: wakeirq: don't leak dev->power.wakeirq
+Message-ID: <1436205678-31640-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit f2147de3 ("watchdog: sunxi: support parameterized compatible
-strings") introduced a regression in sunxi_wdt_start(), by which
-the system reset function of the watchdog is not enabled upon
-starting the watchdog. Fix it.
+on a first call to dev_pm_attach_wake_irq(), if it
+fails, it will leave dev->power.wakeirq set to a
+dangling pointer. Instead, let's clear it to make
+sure a subsequent call to dev_pm_attach_wake_irq()
+has chance to succeed.
 
-Signed-off-by: Francesco Lavra <francescolavra.fl@gmail.com>
+Cc: Tony Lindgren <tmlind@atomide.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
 ---
- drivers/watchdog/sunxi_wdt.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/base/power/wakeirq.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
-index a29afb3..47bd8a1 100644
---- a/drivers/watchdog/sunxi_wdt.c
-+++ b/drivers/watchdog/sunxi_wdt.c
-@@ -184,7 +184,7 @@ static int sunxi_wdt_start(struct watchdog_device *wdt_dev)
- 	/* Set system reset function */
- 	reg = readl(wdt_base + regs->wdt_cfg);
- 	reg &= ~(regs->wdt_reset_mask);
--	reg |= ~(regs->wdt_reset_val);
-+	reg |= regs->wdt_reset_val;
- 	writel(reg, wdt_base + regs->wdt_cfg);
+diff --git a/drivers/base/power/wakeirq.c b/drivers/base/power/wakeirq.c
+index 7470004ca810..394d250a1ad8 100644
+--- a/drivers/base/power/wakeirq.c
++++ b/drivers/base/power/wakeirq.c
+@@ -50,9 +50,16 @@ static int dev_pm_attach_wake_irq(struct device *dev, int irq,
  
- 	/* Enable watchdog */
+ 	err = device_wakeup_attach_irq(dev, wirq);
+ 	if (err)
+-		return err;
++		goto err_cleanup;
+ 
+ 	return 0;
++
++err_cleanup:
++	spin_lock_irqsave(&dev->power.lock, flags);
++	dev->power.wakeirq = NULL;
++	spin_unlock_irqrestore(&dev->power.lock, flags);
++
++	return err;
+ }
+ 
+ /**
 -- 
-1.9.1
+2.4.4
