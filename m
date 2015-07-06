@@ -1,291 +1,120 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 06 Jul 2015 20:11:19 +0900
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
-Message-ID: <559A6257.60608@hitachi.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 06 Jul 2015 13:19:46 +0200
+Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <E959C4978C3B6342920538CF579893F0025EB7C5@SHSMSX104.ccr.corp.intel.com>
+References: <1435843047-6327-1-git-send-email-eric.auger@linaro.org>
+ <1435843047-6327-17-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0025EB7C5@SHSMSX104.ccr.corp.intel.com>
+Message-ID: <559A6452.7030303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/07/06 14:03, Pratyush Anand wrote:
-> Add all function symbols which are called from do_debug_exception under
-> NOKPROBE_SYMBOL, as they can not kprobed.
+Hi Feng,
+On 07/06/2015 09:55 AM, Wu, Feng wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Eric Auger [mailto:eric.auger at linaro.org]
+>> Sent: Thursday, July 02, 2015 9:17 PM
+>> To: eric.auger at st.com; eric.auger at linaro.org;
+>> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+>> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+>> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+>> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+>> b.reynal at virtualopensystems.com
+>> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+>> Subject: [RFC 16/17] KVM: eventfd: add irq bypass consumer management
+>>
+>> This patch adds the registration/unregistration of an
+>> irq_bypass_consumer on irqfd assignment/deassignment.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  virt/kvm/eventfd.c | 22 +++++++++++++++++++---
+>>  1 file changed, 19 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+>> index f3da161..425a47b 100644
+>> --- a/virt/kvm/eventfd.c
+>> +++ b/virt/kvm/eventfd.c
+>> @@ -34,6 +34,7 @@
+>>  #include <linux/srcu.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/seqlock.h>
+>> +#include <linux/irqbypass.h>
+>>  #include <trace/events/kvm.h>
+>>
+>>  #include <kvm/iodev.h>
+>> @@ -93,6 +94,7 @@ struct _irqfd {
+>>  	struct list_head list;
+>>  	poll_table pt;
+>>  	struct work_struct shutdown;
+>> +	struct irq_bypass_consumer *cons;
+>>  };
+>>
+>>  static struct workqueue_struct *irqfd_cleanup_wq;
+>> @@ -429,7 +431,21 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  	 */
+>>  	fdput(f);
+>>
+>> -	/* irq_bypass_register_consumer(); */
+>> +	irqfd->cons = kzalloc(sizeof(struct irq_bypass_consumer),
+>> +			      GFP_KERNEL);
+>> +	if (!irqfd->cons) {
+>> +		ret = -ENOMEM;
+>> +		goto fail;
+>> +	}
+>> +	irqfd->cons->token = (void *)irqfd->eventfd;
+>> +	irqfd->cons->gsi = irqfd->gsi;
+>> +	irqfd->cons->kvm = kvm;
+>> +	irqfd->cons->add_producer = kvm_arch_add_producer;
+>> +	irqfd->cons->del_producer = kvm_arch_del_producer;
+>> +	irqfd->cons->stop_consumer = kvm_arch_stop_consumer;
+>> +	irqfd->cons->resume_consumer = kvm_arch_resume_consumer;
+>> +	ret = irq_bypass_register_consumer(irqfd->cons);
+>> +	WARN_ON(ret);
+>>
+>>  	return 0;
+>>
+>> @@ -530,8 +546,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  	struct _irqfd *irqfd, *tmp;
+>>  	struct eventfd_ctx *eventfd;
+>>
+>> -	/* irq_bypass_unregister_consumer() */
+>> -
+>>  	eventfd = eventfd_ctx_fdget(args->fd);
+>>  	if (IS_ERR(eventfd))
+>>  		return PTR_ERR(eventfd);
+>> @@ -550,6 +564,8 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  			irqfd->irq_entry.type = 0;
+>>  			write_seqcount_end(&irqfd->irq_entry_sc);
+>>  			irqfd_deactivate(irqfd);
+>> +			irq_bypass_unregister_consumer(irqfd->cons);
+>> +			kfree(irqfd->cons);
+> 
+> There may be an issue here. 'irqfd' is freed in irqfd_deactivate() --> ... --.>irqfd_shutdown(),
+> and irqfd_deactivate() can be called in the other two places below:
+> 	- irqfd_wakeup()
+> 	- kvm_irqfd_release()
+> I think we also need to call irq_bypass_unregister_consumer() there, right?
+yes you're right. what about doing the unregistration in irqfd_shutdown
+then?
 
-Could you tell me how you checked that? from the code?
+Thanks for spotting this.
 
-Thank you,
+Eric
 
 > 
-> Signed-off-by: Pratyush Anand <panand@redhat.com>
-> ---
->  arch/arm64/kernel/debug-monitors.c | 18 ++++++++++++++++++
->  arch/arm64/kernel/hw_breakpoint.c  |  8 ++++++++
->  arch/arm64/kernel/kgdb.c           |  4 ++++
->  arch/arm64/mm/fault.c              |  1 +
->  4 files changed, 31 insertions(+)
+> Thanks,
+> Feng
 > 
-> diff --git a/arch/arm64/kernel/debug-monitors.c b/arch/arm64/kernel/debug-monitors.c
-> index 237a21f675fd..6d356b2cc674 100644
-> --- a/arch/arm64/kernel/debug-monitors.c
-> +++ b/arch/arm64/kernel/debug-monitors.c
-> @@ -22,6 +22,7 @@
->  #include <linux/debugfs.h>
->  #include <linux/hardirq.h>
->  #include <linux/init.h>
-> +#include <linux/kprobes.h>
->  #include <linux/ptrace.h>
->  #include <linux/kprobes.h>
->  #include <linux/stat.h>
-> @@ -47,6 +48,7 @@ static void mdscr_write(u32 mdscr)
->  	asm volatile("msr mdscr_el1, %0" :: "r" (mdscr));
->  	local_dbg_restore(flags);
->  }
-> +NOKPROBE_SYMBOL(mdscr_write);
->  
->  static u32 mdscr_read(void)
->  {
-> @@ -54,6 +56,7 @@ static u32 mdscr_read(void)
->  	asm volatile("mrs %0, mdscr_el1" : "=r" (mdscr));
->  	return mdscr;
->  }
-> +NOKPROBE_SYMBOL(mdscr_read);
->  
->  /*
->   * Allow root to disable self-hosted debug from userspace.
-> @@ -102,6 +105,7 @@ void enable_debug_monitors(enum debug_elx el)
->  		mdscr_write(mdscr);
->  	}
->  }
-> +NOKPROBE_SYMBOL(enable_debug_monitors);
->  
->  void disable_debug_monitors(enum debug_elx el)
->  {
-> @@ -122,6 +126,7 @@ void disable_debug_monitors(enum debug_elx el)
->  		mdscr_write(mdscr);
->  	}
->  }
-> +NOKPROBE_SYMBOL(disable_debug_monitors);
->  
->  /*
->   * OS lock clearing.
-> @@ -173,6 +178,7 @@ static void set_regs_spsr_ss(struct pt_regs *regs)
->  	spsr |= DBG_SPSR_SS;
->  	regs->pstate = spsr;
->  }
-> +NOKPROBE_SYMBOL(set_regs_spsr_ss);
->  
->  static void clear_regs_spsr_ss(struct pt_regs *regs)
->  {
-> @@ -182,6 +188,7 @@ static void clear_regs_spsr_ss(struct pt_regs *regs)
->  	spsr &= ~DBG_SPSR_SS;
->  	regs->pstate = spsr;
->  }
-> +NOKPROBE_SYMBOL(clear_regs_spsr_ss);
->  
->  /* EL1 Single Step Handler hooks */
->  static LIST_HEAD(step_hook);
-> @@ -224,6 +231,7 @@ static int call_step_hook(struct pt_regs *regs, unsigned int esr)
->  
->  	return retval;
->  }
-> +NOKPROBE_SYMBOL(call_step_hook);
->  
->  static int single_step_handler(unsigned long addr, unsigned int esr,
->  			       struct pt_regs *regs)
-> @@ -270,6 +278,7 @@ static int single_step_handler(unsigned long addr, unsigned int esr,
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(single_step_handler);
->  
->  /*
->   * Breakpoint handler is re-entrant as another breakpoint can
-> @@ -306,6 +315,7 @@ static int call_break_hook(struct pt_regs *regs, unsigned int esr)
->  
->  	return fn ? fn(regs, esr) : DBG_HOOK_ERROR;
->  }
-> +NOKPROBE_SYMBOL(call_break_hook);
->  
->  static int brk_handler(unsigned long addr, unsigned int esr,
->  		       struct pt_regs *regs)
-> @@ -338,6 +348,7 @@ static int brk_handler(unsigned long addr, unsigned int esr,
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(brk_handler);
->  
->  int aarch32_break_handler(struct pt_regs *regs)
->  {
-> @@ -382,6 +393,7 @@ int aarch32_break_handler(struct pt_regs *regs)
->  	force_sig_info(SIGTRAP, &info, current);
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(aarch32_break_handler);
->  
->  static int __init debug_traps_init(void)
->  {
-> @@ -403,6 +415,7 @@ void user_rewind_single_step(struct task_struct *task)
->  	if (test_ti_thread_flag(task_thread_info(task), TIF_SINGLESTEP))
->  		set_regs_spsr_ss(task_pt_regs(task));
->  }
-> +NOKPROBE_SYMBOL(user_rewind_single_step);
->  
->  void user_fastforward_single_step(struct task_struct *task)
->  {
-> @@ -418,6 +431,7 @@ void kernel_enable_single_step(struct pt_regs *regs)
->  	mdscr_write(mdscr_read() | DBG_MDSCR_SS);
->  	enable_debug_monitors(DBG_ACTIVE_EL1);
->  }
-> +NOKPROBE_SYMBOL(kernel_enable_single_step);
->  
->  void kernel_disable_single_step(void)
->  {
-> @@ -425,12 +439,14 @@ void kernel_disable_single_step(void)
->  	mdscr_write(mdscr_read() & ~DBG_MDSCR_SS);
->  	disable_debug_monitors(DBG_ACTIVE_EL1);
->  }
-> +NOKPROBE_SYMBOL(kernel_disable_single_step);
->  
->  int kernel_active_single_step(void)
->  {
->  	WARN_ON(!irqs_disabled());
->  	return mdscr_read() & DBG_MDSCR_SS;
->  }
-> +NOKPROBE_SYMBOL(kernel_active_single_step);
->  
->  /* ptrace API */
->  void user_enable_single_step(struct task_struct *task)
-> @@ -438,8 +454,10 @@ void user_enable_single_step(struct task_struct *task)
->  	set_ti_thread_flag(task_thread_info(task), TIF_SINGLESTEP);
->  	set_regs_spsr_ss(task_pt_regs(task));
->  }
-> +NOKPROBE_SYMBOL(user_enable_single_step);
->  
->  void user_disable_single_step(struct task_struct *task)
->  {
->  	clear_ti_thread_flag(task_thread_info(task), TIF_SINGLESTEP);
->  }
-> +NOKPROBE_SYMBOL(user_disable_single_step);
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 43b74a3ddaef..91b4c418abcb 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -24,6 +24,7 @@
->  #include <linux/cpu_pm.h>
->  #include <linux/errno.h>
->  #include <linux/hw_breakpoint.h>
-> +#include <linux/kprobes.h>
->  #include <linux/perf_event.h>
->  #include <linux/ptrace.h>
->  #include <linux/smp.h>
-> @@ -139,6 +140,7 @@ static u64 read_wb_reg(int reg, int n)
->  
->  	return val;
->  }
-> +NOKPROBE_SYMBOL(read_wb_reg);
->  
->  static void write_wb_reg(int reg, int n, u64 val)
->  {
-> @@ -152,6 +154,7 @@ static void write_wb_reg(int reg, int n, u64 val)
->  	}
->  	isb();
->  }
-> +NOKPROBE_SYMBOL(write_wb_reg);
->  
->  /*
->   * Convert a breakpoint privilege level to the corresponding exception
-> @@ -169,6 +172,7 @@ static enum debug_elx debug_exception_level(int privilege)
->  		return -EINVAL;
->  	}
->  }
-> +NOKPROBE_SYMBOL(debug_exception_level);
->  
->  enum hw_breakpoint_ops {
->  	HW_BREAKPOINT_INSTALL,
-> @@ -573,6 +577,7 @@ static void toggle_bp_registers(int reg, enum debug_elx el, int enable)
->  		write_wb_reg(reg, i, ctrl);
->  	}
->  }
-> +NOKPROBE_SYMBOL(toggle_bp_registers);
->  
->  /*
->   * Debug exception handlers.
-> @@ -652,6 +657,7 @@ unlock:
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(breakpoint_handler);
->  
->  static int watchpoint_handler(unsigned long addr, unsigned int esr,
->  			      struct pt_regs *regs)
-> @@ -754,6 +760,7 @@ unlock:
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(watchpoint_handler);
->  
->  /*
->   * Handle single-step exception.
-> @@ -811,6 +818,7 @@ int reinstall_suspended_bps(struct pt_regs *regs)
->  
->  	return !handled_exception;
->  }
-> +NOKPROBE_SYMBOL(reinstall_suspended_bps);
->  
->  /*
->   * Context-switcher for restoring suspended breakpoints.
-> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-> index 9469465a5e03..faa4d442688c 100644
-> --- a/arch/arm64/kernel/kgdb.c
-> +++ b/arch/arm64/kernel/kgdb.c
-> @@ -22,6 +22,7 @@
->  #include <linux/irq.h>
->  #include <linux/kdebug.h>
->  #include <linux/kgdb.h>
-> +#include <linux/kprobes.h>
->  #include <asm/traps.h>
->  
->  struct dbg_reg_def_t dbg_reg_def[DBG_MAX_REG_NUM] = {
-> @@ -218,6 +219,7 @@ static int kgdb_brk_fn(struct pt_regs *regs, unsigned int esr)
->  	kgdb_handle_exception(1, SIGTRAP, 0, regs);
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(kgdb_brk_fn)
->  
->  static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
->  {
-> @@ -226,6 +228,7 @@ static int kgdb_compiled_brk_fn(struct pt_regs *regs, unsigned int esr)
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(kgdb_compiled_brk_fn);
->  
->  static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
->  {
-> @@ -235,6 +238,7 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
->  	kgdb_handle_exception(1, SIGTRAP, 0, regs);
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(kgdb_step_brk_fn);
->  
->  static struct break_hook kgdb_brkpt_hook = {
->  	.esr_mask	= 0xffffffff,
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 75750a91907a..0d0b02ce2074 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -561,3 +561,4 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
->  
->  	return 0;
->  }
-> +NOKPROBE_SYMBOL(do_debug_exception)
 > 
-
-
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+>>  		}
+>>  	}
+>>
+>> --
+>> 1.9.1
+> 
