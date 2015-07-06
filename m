@@ -1,40 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Jul 2015 17:26:45 +0100
-Subject: [PATCH] arm64: defconfig: Add Ceva ahci to the defconfig
-In-Reply-To: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
-References: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
-Message-ID: <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
+Date: Mon, 6 Jul 2015 18:36:03 +0200
+Subject: [RESEND] [PATCH v2 1/2] arm: devtree: Set system_rev from DT
+ revision
+In-Reply-To: <201507061820.35789@pali>
+References: <1430902142-17035-1-git-send-email-pali.rohar@gmail.com>
+ <CAL_Jsq+ysDqxTgfW1JvG5czHa4UkZQDv1BN63iK4jvV9kDXM8w@mail.gmail.com>
+ <201507061820.35789@pali>
+Message-ID: <201507061836.03293@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 07:02:08AM +0200, Michal Simek wrote:
-> From: Suneel Garapati <suneel.garapati@xilinx.com>
+On Monday 06 July 2015 18:20:35 Pali Roh?r wrote:
+> > > "/chosen/linux,atags"
+> > 
+> > This one. ATAGs are a Linux data struct.
+> > 
+> > Rob
 > 
-> The Ceva ahci controller is available on the Xilinx Zynq UltraScale+
-> MPSoC.
+> Ok, and how read that property "/chosen/linux,atags" in function
+> setup_machine_fdt() from file arch/arm/kernel/devtree.c ?
 > 
-> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
-> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
-> ---
+> of_get_flat_dt_prop() cannot be used unless somebody get me offset to
+> node "/chosen"...
 > 
->  arch/arm64/configs/defconfig | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> Any idea?
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index f38c94f1d898..ef5b5d27a226 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -82,7 +82,7 @@ CONFIG_BLK_DEV_SD=y
->  # CONFIG_SCSI_LOWLEVEL is not set
->  CONFIG_ATA=y
->  CONFIG_SATA_AHCI=y
-> -CONFIG_SATA_AHCI_PLATFORM=y
-> +CONFIG_AHCI_CEVA=y
 
-Any reason why CONFIG_SATA_AHCI_PLATFORM is removed by this patch?
+fdt_path_offset() from libfdt.h seems to work...
 
-I merged the patch but modified it to only add CONFIG_AHCI_CEVA without
-changing any other lines.
+Is solution like this one acceptable?
+
+#include <linux/libfdt.h>
+#include "atags.h"
+
+... setup_machine_fdt(unsigned int dt_phys) {
+
+dt_virt = phys_to_virt(dt_phys);
+dt_chosen = fdt_path_offset(dt_virt, "/chosen");
+atags = of_get_flat_dt_prop(dt_chosen, "linux,atags", NULL);
+save_atags(atags);
+
+}
+
+(this is without checks for errors)
 
 -- 
-Catalin
+Pali Roh?r
+pali.rohar at gmail.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150706/320d18e1/attachment.sig>
