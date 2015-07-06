@@ -1,33 +1,113 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Mon, 6 Jul 2015 23:04:45 +0200
-Subject: weird behavior of get/set_fiq_regs()
-In-Reply-To: <20150706160230.GG7557@n2100.arm.linux.org.uk>
-References: <CAOpc7mHkynAfmZKJhbwF0q0rco+3t7=wzh9owf6Brz6fmPRHsw@mail.gmail.com>
- <20150706160230.GG7557@n2100.arm.linux.org.uk>
-Message-ID: <CAOpc7mE5oJFzHXH2bOGRnEDfQ3Go-QpROSZ7KJeTsPxG0ibqZw@mail.gmail.com>
+From: ahs3@redhat.com (Al Stone)
+Date: Mon, 06 Jul 2015 15:20:22 -0600
+Subject: [PATCH v3 2/3] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
+In-Reply-To: <15297999.EvgjakjXbx@vostro.rjw.lan>
+References: <1435880916-2153-1-git-send-email-al.stone@linaro.org>
+ <20150703140601.GL25907@e104818-lin.cambridge.arm.com>
+ <5596E7C8.7040809@redhat.com> <15297999.EvgjakjXbx@vostro.rjw.lan>
+Message-ID: <559AF116.4030208@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We should probably make the FIQ code depend on !SMP, or at least complain
-> if num_online_cpus > 1 and if we're in a schedulable context,  because the
-> issue you're running into is precisely that.
+On 07/03/2015 05:54 PM, Rafael J. Wysocki wrote:
+> On Friday, July 03, 2015 01:51:36 PM Al Stone wrote:
+>> On 07/03/2015 08:06 AM, Catalin Marinas wrote:
+>>> On Thu, Jul 02, 2015 at 05:48:35PM -0600, Al Stone wrote:
+>>>> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+>>>> index 39248d3..a3c26a4 100644
+>>>> --- a/arch/arm64/include/asm/acpi.h
+>>>> +++ b/arch/arm64/include/asm/acpi.h
+>>>> @@ -19,6 +19,17 @@
+>>>>  #include <asm/psci.h>
+>>>>  #include <asm/smp_plat.h>
+>>>>  
+>>>> +/* Macros for consistency checks of the GICC subtable of MADT */
+>>>> +#define ACPI_MADT_GICC_51_LENGTH       76
+>>>> +#define ACPI_MADT_GICC_60_LENGTH       80
+>>>> +
+>>>> +#define BAD_MADT_GICC_ENTRY(entry, end) (                                   \
+>>>> +		(!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
+>>>> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_51) &&   \
+>>>> +		 (entry->header.length != ACPI_MADT_GICC_51_LENGTH))    ||  \
+>>>> +		((ACPI_FADT_SPEC_VERSION == ACPI_FADT_SPEC_VERSION_60) &&   \
+>>>> +		 (entry->header.length != ACPI_MADT_GICC_60_LENGTH)))
+>>>
+>>> This looks ugly but, well, we could live with this.
+>>
+>> Nod.  It's right at the hairy edge of becoming a function, I think.
+>>
+>>> However, I'd like to avoid having to extend this macro every time we get
+>>> a new spec released, like 6.1 defining another 80 or 84 etc. So, how
+>>> about we only update this when there is an actual change in the length?
+>>> Something like:
+>>>
+>>> #define ACPI_MADT_GICC_LENGTH	({					\
+>>> 	u8 length;							\
+>>> 	if (ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0)	\
+>>> 		length = 76;						\
+>>> 	else								\
+>>> 		length = 80;						\
+>>> 	length;								\
+>>> })
+>>>
+>>> or just:
+>>>
+>>> #define ACPI_MADT_GICC_LENGTH	\
+>>> 	(ACPI_FADT_SPEC_VERSION < ACPI_FADT_SPEC_VERSION_6_0 ? 76 : 80)
+>>>
+>>> (the latter is simpler but may not look nice if we change it again in
+>>> 6.1; though we could re-write this macro when needed, not a problem)
+>>>
+>>
+>> Perhaps the sanity checking for the MADT subtables needs to be revisited
+>> and a more general solution provided -- this is not the only MADT subtable
+>> with this problem and it may occur again.
+>>
+>> Even the versions above are not technically compliant with the spec.  If
+>> we implement what the spec currently says, it might look something like
+>> this:
+>>
+>> #define ACPI_MADT_GICC_LENGTH ({					\
+>> 	u8 length;							\
+>> 	switch (ACPI_FADT_SPEC_VERSION) {				\
+>> 	case ACPI_FADT_SPEC_VERSION_5_0:				\
+>> 		length = 40;						\
+>> 		break;							\
+>> 	case ACPI_FADT_SPEC_VERSION_5_1:				\
+>> 		length = 76;						\
+>> 		break;							\
+>> 	default:	/* use 6.0 size */				\
+>> 		length = 80;						\
+>> 	}								\
+>> 	length;								\
+>> })
+>>
+>> So it's just messy and there will be a need for change.  Let me think about
+>> making this a function instead of a macro; it may make sense to really fix
+>> BAD_MADT_ENTRY in general instead of just dealing with the GICC subtable,
+>> but it could also be overkill.
+> 
+> So here's my suggestion.
+> 
+> First, make ARM64 boot with 4.2+ in the simplest way possible.
 
-Oh. Or at least make the set_fiq_reqs depends on #ifndef CONFIG_SMP.
+ACK.
 
-The code in arch/arm/mach-imx/ssi-fiq.S should be SMP safe, because
-they don't use set_fiq_regs(), but define places for the variables:
+> Second, set out to fix BAD_MADT_ENTRY() etc.  Start with fixing ACPICA to
+> distinguish between the different formats depending on the spec version and
+> follow up from there.
+> 
+> Thanks,
+> Rafael
 
-imx_ssi_fiq_start:
-                ldr r12, .L_imx_ssi_fiq_base
-...
-.L_imx_ssi_fiq_base:
-imx_ssi_fiq_base:
-                .word 0x0
+Yup, that's what I was thinking.
 
-> Also note that you'll get into hot water if you try to have FIQ handlers
-> in module code.
-
-Why?  I was under the impression that the assembly code from my *.S
-routine get's copied directly after the exception vectors. Why would
-it matter if the bytes between myfiq_start and myfiq_end come from a
-module or from somewhere else?
+-- 
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
