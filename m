@@ -1,54 +1,65 @@
-From: gianlucarenzi@eurek.it (gianluca)
-Date: Tue, 07 Jul 2015 15:50:25 +0200
-Subject: Passing arguments to cmdline or changing the devicetree node??
-Message-ID: <559BD921.3080000@eurek.it>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Tue, 7 Jul 2015 09:00:02 -0500
+Subject: [PATCH 1/3] ARM: socfpga: dts: Fix adxl34x formating
+In-Reply-To: <CABxpGwASLHuXtTp--q8iu3FDCsOXT-03VRCsgL51JfnTaZ80sQ@mail.gmail.com>
+References: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
+ <20150626071656.GC26041@pengutronix.de>
+ <CABxpGwASLHuXtTp--q8iu3FDCsOXT-03VRCsgL51JfnTaZ80sQ@mail.gmail.com>
+Message-ID: <559BDB62.4060105@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello list,
-I was thinking which is the best method to ensure a fallback 
-compatibility to old boards when a single board has changed something in 
-hardware.
 
-I will explain better:
 
-I designed a board running linux (on iMX28) which had 128MB and the 
-first stage bootstrap is programming the DDR2 controller to match the 
-memory timings.
-The bootloader had the memory size hardcoded, but it is not a problem 
-because nothing on the bootloader is using it (maybe some atag for old 
-compatibility, I need to check this out)
-The bootloader now loads linux and the devicetree flattened blob and 
-pass it to the kernel.
-In the .dts I have a node called:
+On 6/26/15 5:36 AM, Walter Lozano wrote:
+> Hi Steffen
+> 
+> On Fri, Jun 26, 2015 at 4:16 AM, Steffen Trumtrar
+> <s.trumtrar@pengutronix.de> wrote:
+>> Hi Walter!
+>>
+>> On Thu, Jun 25, 2015 at 11:25:57PM -0300, Walter Lozano wrote:
+>>> This patch fixes the formating of DTS bindings for the adxl34x digital
+>>> accelerometer.
+>>>
+>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
+>>> ---
+>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    6 +++---
+>>>  1 file changed, 3 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>> index 71468a7..5b60692 100644
+>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
+>>> @@ -73,14 +73,14 @@
+>>>       status = "okay";
+>>>  };
+>>>
+>>> -&i2c1{
+>>> +&i2c1 {
+>>>       status = "okay";
+>>>
+>>> -     accel1: accel1 at 53{
+>>> +     accel1: accelerometer at 53 {
+>>>               compatible = "adxl34x";
+>>>               reg = <0x53>;
+>>>
+>>> -             interrupt-parent = < &portc >;
+>>> +             interrupt-parent = <&portc>;
+>>>               interrupts = <3 2>;
+>>>       };
+>>>  };
+>>
+>> I would personally squash 3/3 into this one, but otherwise:
+>>
+>> Whole series
+>>
+>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+>>
+> 
+> Thanks for your comments. I have no problem at all. Dinh?
 
-> 	memory {
-> 		reg = <0x40000000 0x08000000>;
-> 	};
+I've applied and squashed 1/3 and 3/3 together.
 
-and it is fixed.
-
-Now we need to update the memory onboard up to 256Mb or 512Mb, and if I 
-can test easily on the fist stage bootstrap (programming the DDR2 
-controller for 256Mb and writing on memory above 128Mb and if it works I 
-have could have 256Mb or more, for example) I need a procedure to change 
-the memory node on the dts.
-
-I was thinking of two ways:
-
-1- The bootloader can check the DDR2 registers and find out how much 
-memory is installed on board, and pass mem=128M, mem=256M or higher to 
-the kernel. But what about the node on the device tree?
-
-2- The bootloader can select the right .dts file from file-system 
-choosing one of the following: dts-128M, dts-256M or dts-512M.
-All those dts are EQUAL apart the memory descriptor values.
-
-Are there any other way to have this beahviour???
-
-Best regards,
--- 
-Eurek s.r.l.                          |
-Electronic Engineering                | http://www.eurek.it
-via Celletta 8/B, 40026 Imola, Italy  | Phone: +39-(0)542-609120
-p.iva 00690621206 - c.f. 04020030377  | Fax:   +39-(0)542-609212
+Thanks,
+Dinh
