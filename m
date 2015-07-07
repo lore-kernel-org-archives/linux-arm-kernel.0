@@ -1,32 +1,39 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 7 Jul 2015 09:53:03 -0500
-Subject: [PATCH 3/3] ARM: dts: UniPhier: add USB EHCI device nodes
-In-Reply-To: <1436154450-21102-4-git-send-email-yamada.masahiro@socionext.com>
-References: <1436154450-21102-1-git-send-email-yamada.masahiro@socionext.com>
- <1436154450-21102-4-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAL_JsqJ_5SvSqfhtTYKmj9f2E0w0XLkekdOksDY2VZf7r6ZB+g@mail.gmail.com>
+From: dan.carpenter@oracle.com (Dan Carpenter)
+Date: Tue, 7 Jul 2015 17:53:45 +0300
+Subject: [PATCH 1/5] usb: gadget: ffs: call functionfs_unbind() if
+ _ffs_func_bind() fails
+In-Reply-To: <1436277773-14274-2-git-send-email-r.baldyga@samsung.com>
+References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
+ <1436277773-14274-2-git-send-email-r.baldyga@samsung.com>
+Message-ID: <20150707145345.GD4341@mwanda>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 5, 2015 at 10:47 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Get USB 2.0 host controllers available with generic-ehci bindings.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+On Tue, Jul 07, 2015 at 04:02:49PM +0200, Robert Baldyga wrote: 
+> diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
+> index 6e7be91..966b214 100644
+> --- a/drivers/usb/gadget/function/f_fs.c
+> +++ b/drivers/usb/gadget/function/f_fs.c
+> @@ -2897,11 +2897,19 @@ static int ffs_func_bind(struct usb_configuration *c,
+>  			 struct usb_function *f)
+>  {
+>  	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
+> +	struct ffs_function *func = ffs_func_from_usb(f);
+> +	int ret;
+>  
+>  	if (IS_ERR(ffs_opts))
+>  		return PTR_ERR(ffs_opts);
+>  
+> -	return _ffs_func_bind(c, f);
+> +	ret = _ffs_func_bind(c, f);
+> +	if (ret) {
+> +		ffs_opts->refcnt--;
 
-> diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-> index 1261e6d..b042711 100644
-> --- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-> +++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-> @@ -127,6 +127,27 @@
->                         reg = <0x59800000 0x2000>;
->                 };
->
-> +               usb0: usb at 5a800100 {
-> +                       compatible = "generic-ehci";
+Wait, why are we decrementing here?  ffs_func_unbind() already has a
+decrement so this looks like a bug to me.  Add a comment if it's really
+needed.
 
-You should also have a chip specific compatible string in addition to
-generic-ehci.
+> +		functionfs_unbind(func->ffs);
 
-Rob
+regards,
+dan carpenter
