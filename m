@@ -1,68 +1,124 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 7 Jul 2015 11:49:48 +0200
-Subject: [linux-sunxi] Re: [PATCH v3 3/4] mfd: axp20x: Add a cell for the
- usb power_supply part of the axp20x PMICs
-In-Reply-To: <20150707070128.GI3182@x1>
-References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
- <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
- <20150707070128.GI3182@x1>
-Message-ID: <559BA0BC.9060409@redhat.com>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Tue, 7 Jul 2015 11:50:12 +0200
+Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <20150701072828.GA4881@lst.de>
+References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622161002.GB8240@lst.de>
+ <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
+ <20150701062352.GA3739@lst.de>
+ <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+ <20150701065948.GA4355@lst.de>
+ <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
+ <20150701072828.GA4881@lst.de>
+Message-ID: <20150707095012.GQ7021@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 01, 2015 at 09:28:28AM +0200, Christoph Hellwig wrote:
+> On Wed, Jul 01, 2015 at 09:19:29AM +0200, Geert Uytterhoeven wrote:
+> > >> So it would be the responsibility of the caller to fall back from
+> > >> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
+> > >> I.e. all drivers using it should be changed...
+> > >
+> > > All of the zero users we currently have will need to be changed, yes.
+> > 
+> > Good. Less work to convert all of these ;-)
+> 
+> And I didn't have enough coffee yet.  We of course have a few users of
+> ioremap_cache(), and two implememantions but no users of ioremap_cached().
+> Looks like the implementations can't even agree on the name.
 
-On 07-07-15 09:01, Lee Jones wrote:
-> On Fri, 26 Jun 2015, Hans de Goede wrote:
->
->> Add a cell for the usb power_supply part of the axp20x PMICs.
->>
->> Note that this cell is only for the usb power_supply part and not the
->> ac-power / battery-charger / rtc-backup-bat-charger bits.
->>
->> Depending on the board each of those must be enabled / disabled separately
->> in devicetree as most boards do not use all 4. So in dt each one needs its
->> own child-node of the axp20x node. Another reason for using separate child
->> nodes for each is so that other devicetree nodes can have a power-supply
->> property with a phandle referencing a node representing a single
->> power-supply.
->>
->> The decision to use a separate devicetree node for each is reflected on
->> the kernel side by each getting its own mfd-cell / platform_device and
->> platform-driver.
->>
->> Note this commit also makes some whitespace changes to the intialization
->> of existing cells in axp20x_cells, these are pure whitespace changes,
->> functionally nothing changes.
->>
->> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Use DEFINE_RES_IRQ_NAMED
->> -Change indentation of axp20x_cells initializers to avoid line wrapping
->> Changes in v3:
->> -Improve commit message
->> -Add Bruno's S-o-b
->> ---
->>   drivers/mfd/axp20x.c | 20 ++++++++++++++++----
->>   1 file changed, 16 insertions(+), 4 deletions(-)
->
-> For my own reference:
->    Acked-by: Lee Jones <lee.jones@linaro.org>
->
-> Are these two patches tied to any other in the set, or can I apply
-> them separately?
+Yies, that naming is icky... we also have quite a bit of ioremap_nocache() users:
 
-You can apply them seperately, thanks.
+mcgrof at ergon ~/linux-next (git::kill-mtrr)$ git grep ioremap_nocache drivers/| wc -l
+359
 
-I'm wondering who will take care of upstreaming the first patch of this
-set: "ARM: dts: Add binding documentation for AXP20x pmic usb power supply"
+On x86 the default ioremap() happens to map to ioremap_nocache() anyway as well.
 
-If you can take that one too that would be great.
+This is on purpose, there is an ongoing effort to streamline ioremap_nocache()
+for registers on the x86 front with the long term goal then of making PAT
+strong UC the default preference for both ioremap() and ioremap_nocache() for
+PAT enabled systems. This would prevent things like write-combining modifiers
+from having any effect on the area. This comes with a small architectural
+driver cost, it means all write-combining desired areas must be split out in
+drivers properly.  This is part of the work I've been doing lately. The
+eventual goal once we have the write-combing areas properly split with
+ioremap_wc() and using the new proper preferred architecture agnostic modifier
+(arch_phys_wc_add()) is to change the default ioremap behaviour on x86 to use
+strong UC for PAT enabled systems for *both* ioremap() and ioremap_nocache().
 
-Regards,
+This was aleady done once but reverted later due to the regression issues on
+video drivers not haveing the right ioremap_wc() calls. I'm finishing this
+effort and am about a few patches away...
 
-Hans
+Once done and once things cool down we should go back and may consider flipping
+the switch again to make strong UC default. For details refer to commit
+de33c442ed2a465 ("x86 PAT: fix performance drop for glx, use UC minus
+for ioremap(), ioremap_nocache() and pci_mmap_page_range()").
+
+All this is fine in theory -- but Benjamin Herrenschmidt recently also
+noted that on powerpc the write-combining may end up requiring each
+register read/write with its own specific API. That is, we'd lose the
+magic of having things being done behind the scenes, and that would
+also mean tons of reads/writes may need to be converted over to be
+explicit about write-combining preferences...
+
+I will note that upon discussions it seems that the above requirement
+may have been a slight mishap on not being explicit about our semantics
+and requirements on ioremap() variants, technically it may be possible
+that effectively PowerPC may not get any write-combining effects on
+infiniband / networking / anything not doing write-combining on
+userspace such as framebuffer... from what I gather that needs to
+be fixed. Because of these grammatical issues and the issues with
+unaligned access with ARM I think its important we put some effort
+to care a bit more about defining clear semantics through grammar
+for new APIs or as we rewrite APIs. We have tools to do this these
+days, best make use of them.
+
+While we're at it and reconsidering all this, a few items I wish for
+us to address as well then, most of them related to grammar, some
+procedural clarification:
+
+  * Document it as not supported to have overlapping ioremap() calls.
+    No one seems to have a clue if this should work, but clearly this
+    is just a bad idea. I don't see why we should support the complexity
+    of having this. It seems we can write grammar rules to prevent this.
+
+  * We seem to care about device drivers / kernel code doing unaligned
+    accesses with certain ioremap() variants. At least for ARM you should
+    not do unaligned accesses on ioremap_nocache() areas. I am not sure
+    if we can come up with grammar to vet for / warn for unaligned access
+    type of code in driver code on some memory area when some ioremap()
+    variant is used, but this could be looked into. I believe we may
+    want rules for unaligned access maybe in general, and not attached
+    to certain calls due to performance considerations, so this work
+    may be welcomed regardless (refer to
+    Documentation/unaligned-memory-access.txt)
+    
+  * We seem to want to be pedantic about adding new ioremap() variants, the
+    unaligned issue on ARM is one reason, do we ideally then want *all*
+    architecture maintainers to provide an Acked-by for any new ioremap
+    variants ? Are we going to have to sit and wait for a kumbaya every time
+    a helper comes along to see how it all fits well for all architectures?
+    The asm-generic io.h seemed to have set in place the ability to let
+    architectures define things *when* they get to it, that seems like a much
+    more fair approach *if* and *when possible*.  Can we not have and define
+    a *safe* ioremap() call to fall under ?  The unaligned access concerns seem
+    fair but.. again it seems we generally care about unaligned access anyway,
+    so the concern really should be to fix all driver code to not do unaligned
+    access, if possible no?
+
+  * There are helpers such as set_memory_wc() which should not be used
+    on IO memory, we should define grammar rules for these.
+
+  * There are ioremap() variants which may require helpers for architectures.
+    The only example I am aware of is ioremap_wc() requires arch_phys_wc_add()
+    so that on x86 PAT enabled systems this does nothing, but on x86 non-PAT
+    systems this will use MTRRs. The arch_phys_wc_add() API can be re-purposed
+    for other architectures if needed, maybe benh can look at this for powerpc?
+    But it seems those helpers were added mostly with a bias towards x86
+    requirements, do we again expect all architecture maintainers to provide
+    an Acked-by for ioremap() variants helpers ?
+
+  Luis
