@@ -1,24 +1,27 @@
-From: holgerschurig@gmail.com (Holger Schurig)
-Date: Tue, 7 Jul 2015 12:05:39 +0200
-Subject: [PATCH 4.2-rc1 v21 3/6] irqchip: gic: Introduce plumbing for IPI
- FIQ
-In-Reply-To: <1436188438-9478-4-git-send-email-daniel.thompson@linaro.org>
-References: <1436188438-9478-1-git-send-email-daniel.thompson@linaro.org>
- <1436188438-9478-4-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <CAOpc7mHS8QmpGu7jtzTj6GFU8p+JU9XB9E_vpQfL3e7vEZwT6A@mail.gmail.com>
+From: bintian.wang@huawei.com (Bintian)
+Date: Tue, 7 Jul 2015 18:07:00 +0800
+Subject: [PATCH] amba: Support clk parents and rates assigned in DT
+In-Reply-To: <20150707093343.GI7557@n2100.arm.linux.org.uk>
+References: <1432846332-17692-1-git-send-email-sboyd@codeaurora.org>
+ <559B15DE.7040200@codeaurora.org> <559B9225.6090607@huawei.com>
+ <20150707093343.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <559BA4C4.4070509@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Currently it is not possible to exploit FIQ for systems with a GIC, even
-> on systems are otherwise capable of it. This patch makes it possible
-> for IPIs to be delivered using FIQ.
+On 2015/7/7 17:33, Russell King - ARM Linux wrote:
+> On Tue, Jul 07, 2015 at 04:47:33PM +0800, Bintian wrote:
+>> Hi Russell,
+>>
+>> Could you spend several minutes to review Stephen's patch?
+>
+> Sorry, I'm busy this week, I need to sort out my git tree, get some fixes
+> out which should've been pushed during the merge window, and other stuff.
+> I'm not going to have much time to read email, let alone do reviews.
+> Please be patient.
+>
+No problem, just keep your own pace.
 
-I wonder if gic_set_group_irq() can easily be married with mxc_set_irq_fiq().
+Thanks,
 
-The driver sound/soc/fsl/imx-pcm-fiq.c uses mxc_set_irq_fiq() to
-connect an (assembly) FIQ handler with a hardware IRQ. However, the
-underlying implementation of mxc_set_irq_fiq() is only supported for
-TZIC and AVIC (see arch/arm/mach-imx/irq-common.c).
-
-On my i.MX6, which doesn't have an AVIC/TZIC but a GIC I could use a
-method to turn a normal IRQ into a FIQ :-)
+Bintian
