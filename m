@@ -1,148 +1,80 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jul 2015 11:40:28 +0100
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <559BA1AE.9050006@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
-Message-ID: <20150707104028.GR3182@x1>
+Date: Tue, 7 Jul 2015 11:42:25 +0100
+Subject: [linux-sunxi] Re: [PATCH v3 3/4] mfd: axp20x: Add a cell for the
+ usb power_supply part of the axp20x PMICs
+In-Reply-To: <559BA0BC.9060409@redhat.com>
+References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
+ <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
+ <20150707070128.GI3182@x1> <559BA0BC.9060409@redhat.com>
+Message-ID: <20150707104225.GS3182@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
-> >On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
+On Tue, 07 Jul 2015, Hans de Goede wrote:
+> On 07-07-15 09:01, Lee Jones wrote:
+> >On Fri, 26 Jun 2015, Hans de Goede wrote:
 > >
-> >>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
-> >>(page 0) controls the method of clearing interrupt
-> >>status of 88pm800 family of devices;
+> >>Add a cell for the usb power_supply part of the axp20x PMICs.
 > >>
-> >>   0: clear on read
-> >>   1: clear on write
+> >>Note that this cell is only for the usb power_supply part and not the
+> >>ac-power / battery-charger / rtc-backup-bat-charger bits.
 > >>
-> >>If pdata is not coming from board file, then set the
-> >>default irq clear method to "irq clear on write"
+> >>Depending on the board each of those must be enabled / disabled separately
+> >>in devicetree as most boards do not use all 4. So in dt each one needs its
+> >>own child-node of the axp20x node. Another reason for using separate child
+> >>nodes for each is so that other devicetree nodes can have a power-supply
+> >>property with a phandle referencing a node representing a single
+> >>power-supply.
 > >>
-> >>Also, as suggested by "Lee Jones" renaming variable field
-> >>to appropriate name.
+> >>The decision to use a separate devicetree node for each is reflected on
+> >>the kernel side by each getting its own mfd-cell / platform_device and
+> >>platform-driver.
 > >>
-> >>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
-> >>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>Note this commit also makes some whitespace changes to the intialization
+> >>of existing cells in axp20x_cells, these are pure whitespace changes,
+> >>functionally nothing changes.
+> >>
+> >>Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> >>Acked-by: Lee Jones <lee.jones@linaro.org>
+> >>Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > >>---
-> >>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
-> >>  include/linux/mfd/88pm80x.h | 10 ++++++++--
-> >>  2 files changed, 18 insertions(+), 7 deletions(-)
-> >>
-> >>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> >>index d495737..66347be 100644
-> >>--- a/drivers/mfd/88pm800.c
-> >>+++ b/drivers/mfd/88pm800.c
-> >>@@ -374,7 +374,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
-> >>  {
-> >>  	struct regmap *map = chip->regmap;
-> >>  	unsigned long flags = IRQF_ONESHOT;
-> >>-	int data, mask, ret = -EINVAL;
-> >>+	int irq_clr_mode, mask, ret = -EINVAL;
-> >>
-> >>  	if (!map || !chip->irq) {
-> >>  		dev_err(chip->dev, "incorrect parameters\n");
-> >>@@ -382,15 +382,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
-> >>  	}
-> >>
-> >>  	/*
-> >>-	 * irq_mode defines the way of clearing interrupt. it's read-clear by
-> >>-	 * default.
-> >>+	 * irq_clr_on_wr defines the way of clearing interrupt by
-> >>+	 * read/write(0/1).  It's read-clear by default.
-> >>  	 */
-> >>  	mask =
-> >>  	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
-> >>  	    PM800_WAKEUP2_INT_MASK;
-> >>
-> >>-	data = PM800_WAKEUP2_INT_CLEAR;
-> >>-	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
-> >>+	irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
-> >>+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
-> >>+	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+> >>Changes in v2:
+> >>-Use DEFINE_RES_IRQ_NAMED
+> >>-Change indentation of axp20x_cells initializers to avoid line wrapping
+> >>Changes in v3:
+> >>-Improve commit message
+> >>-Add Bruno's S-o-b
+> >>---
+> >>  drivers/mfd/axp20x.c | 20 ++++++++++++++++----
+> >>  1 file changed, 16 insertions(+), 4 deletions(-)
 > >
-> >What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
-> >PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
-> >directly without all of this faffing about.
+> >For my own reference:
+> >   Acked-by: Lee Jones <lee.jones@linaro.org>
 > >
-> >   regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
-> >
+> >Are these two patches tied to any other in the set, or can I apply
+> >them separately?
 > 
-> Because "irq_clr_method" is of boolean type.
-> And macros which you are referring to is,
+> You can apply them seperately, thanks.
 > 
-> #define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
-> #define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
+> I'm wondering who will take care of upstreaming the first patch of this
+> set: "ARM: dts: Add binding documentation for AXP20x pmic usb power supply"
 > 
-> 
-> And also, I feel it is more cleaner approach with the current code as
-> register definition and userflag are maintained separately.
+> If you can take that one too that would be great.
 
-I see your point, although it's a shame we have to have this code in
-its place.
+I can do, but I need an Ack from these guys:
 
-One thing I think you can do though is rid chip->irq_clr_method, just
-use the one you already have in pdata.
+POWER SUPPLY CLASS/SUBSYSTEM and DRIVERS
+M:      Sebastian Reichel <sre@kernel.org>
+M:      Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+M:      David Woodhouse <dwmw2@infradead.org>
+L:      linux-pm at vger.kernel.org
+T:      git git://git.infradead.org/battery-2.6.git
+S:      Maintained
+F:      include/linux/power_supply.h
+F:      drivers/power/
 
-> >>  	if (ret < 0)
-> >>  		goto out;
-> >>@@ -512,6 +513,7 @@ static int device_800_init(struct pm80x_chip *chip,
-> >>  	}
-> >>
-> >>  	chip->regmap_irq_chip = &pm800_irq_chip;
-> >>+	chip->irq_clr_method = pdata->irq_clr_method;
-> >>
-> >>  	ret = device_irq_init_800(chip);
-> >>  	if (ret < 0) {
-> >>@@ -564,6 +566,9 @@ static int pm800_probe(struct i2c_client *client,
-> >>  		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-> >>  		if (!pdata)
-> >>  			return -ENOMEM;
-> >>+
-> >>+		/* by default, set irq clear method on write */
-> >>+		pdata->irq_clr_method = PM800_IRQ_CLR_ON_WRITE;
-> >>  	}
-> >>
-> >>  	ret = pm80x_init(client);
-> >>diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-> >>index 8fcad63..648e01a 100644
-> >>--- a/include/linux/mfd/88pm80x.h
-> >>+++ b/include/linux/mfd/88pm80x.h
-> >>@@ -77,6 +77,8 @@ enum {
-> >>  #define PM800_WAKEUP2			(0x0E)
-> >>  #define PM800_WAKEUP2_INV_INT		BIT(0)
-> >>  #define PM800_WAKEUP2_INT_CLEAR		BIT(1)
-> >>+#define PM800_WAKEUP2_INT_READ_CLEAR	(0 << 1)
-> >>+#define PM800_WAKEUP2_INT_WRITE_CLEAR	(1 << 1)
-> >>  #define PM800_WAKEUP2_INT_MASK		BIT(2)
-> >>
-> >>  #define PM800_POWER_UP_LOG		(0x10)
-> >>@@ -300,7 +302,11 @@ struct pm80x_chip {
-> >>  	struct regmap_irq_chip_data *irq_data;
-> >>  	int type;
-> >>  	int irq;
-> >>-	int irq_mode;
-> >>+
-> >>+#define PM800_IRQ_CLR_ON_READ	0
-> >>+#define PM800_IRQ_CLR_ON_WRITE	1
-> >
-> >Defines in the middle of structs makes for ugly code.
-> >
-> 
-> Sorry, but kernel code is full of such implementations.
-> Infact it is right place in terms of readability.
-> 
-> If you still feel insist to fix it, please let me know whether you want
-> to submit V6 just for this. Or you will fix it while merging.
-> I am OK with anything here...
-> 
-> 
-> Thanks,
-> Vaibhav
+... failing that, they should take it.
 
 -- 
 Lee Jones
