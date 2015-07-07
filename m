@@ -1,93 +1,71 @@
-From: joel@porquet.org (Joel Porquet)
-Date: Tue,  7 Jul 2015 16:02:53 -0400
-Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
-Message-ID: <1436299411-12329-1-git-send-email-joel@porquet.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 07 Jul 2015 13:13:48 -0700
+Subject: [PATCH v3 1/7] dt/bindings: Add binding for the Raspberry Pi
+ clock provider
+In-Reply-To: <20150609100326.GQ2982@x1>
+References: <1433807940-15328-1-git-send-email-eric@anholt.net>
+ <20150609100326.GQ2982@x1>
+Message-ID: <87egkj914z.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
-globally accessible.
+Lee Jones <lee@kernel.org> writes:
 
-See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
-("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+> If I were the Clock Maintainer, I would have probably missed this
+> patch.  You _must_ intimate which subsystem you are submitting to.
+>
+>> The hardware clocks are not controllable by the ARM, so we have to
+>> make requests to the firmware to do so from the VPU side.  This will
+>> let us replace fixed clocks in our DT with actual clock control (and
+>> correct frequency information).
+>> 
+>> v2: Include the dt-bindings header in this commit instead of the next
+>>     one.  Make the clock indices match the firmware clock IDs.  Rename
+>>     the binding's compat string.  Move the firmware phandle to be
+>>     under a vendor-specific namespace.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  .../clock/raspberrypi,bcm2835-firmware-clocks.txt  | 25 ++++++++++++++++++++++
+>>  include/dt-bindings/clk/raspberrypi.h              | 23 ++++++++++++++++++++
+>>  2 files changed, 48 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+>>  create mode 100644 include/dt-bindings/clk/raspberrypi.h
+>> 
+>> diff --git a/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt b/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+>> new file mode 100644
+>> index 0000000..0972602
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/raspberrypi,bcm2835-firmware-clocks.txt
+>> @@ -0,0 +1,25 @@
+>> +Raspberry Pi firmware clock provider.
+>> +
+>> +The Raspberry Pi architecture doesn't provide direct access to the
+>> +CLOCKMAN peripheral from the ARM side, so Linux has to make requests
+>> +to the VPU firmware to program them.
+>> +
+>> +This binding uses the common clock binding:
+>> +Documentation/devicetree/bindings/clock/clock-bindings.txt
+>> +
+>> +Required properties:
+>> +- compatible:		Should be "raspberrypi,bcm2835-firmware-clocks"
+>> +
+>> +- #clock-cells:		Shall have value <1>.  The permitted clock-specifier
+>> +			  values can be found in
+>> +			  include/dt-bindings/clk/raspberrypi.h.
+>> +
+>> +- raspberrypi,firmware:	Phandle to the firmware driver node.
+>
+> I think 'firmware' is a candidate for a generic phandle name.
 
-This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses of
-macro OF_DECLARE_2 with IRQCHIP_DECLARE.
-
-Signed-off-by: Joel Porquet <joel@porquet.org>
----
- arch/arm/mach-exynos/suspend.c       | 3 ++-
- arch/arm/mach-imx/gpc.c              | 7 ++-----
- arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
- 3 files changed, 6 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-index f572219..78484ab 100644
---- a/arch/arm/mach-exynos/suspend.c
-+++ b/arch/arm/mach-exynos/suspend.c
-@@ -19,6 +19,7 @@
- #include <linux/cpu_pm.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/err.h>
-@@ -264,7 +265,7 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
- 	return 0;
- }
- 
--#define EXYNOS_PMU_IRQ(symbol, name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
-+#define EXYNOS_PMU_IRQ(symbol, name)	IRQCHIP_DECLARE(symbol, name, exynos_pmu_irq_init)
- 
- EXYNOS_PMU_IRQ(exynos3250_pmu_irq, "samsung,exynos3250-pmu");
- EXYNOS_PMU_IRQ(exynos4210_pmu_irq, "samsung,exynos4210-pmu");
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 80bad29..32c26f5 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -14,6 +14,7 @@
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-@@ -269,11 +270,7 @@ static int __init imx_gpc_init(struct device_node *node,
- 	return 0;
- }
- 
--/*
-- * We cannot use the IRQCHIP_DECLARE macro that lives in
-- * drivers/irqchip, so we're forced to roll our own. Not very nice.
-- */
--OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
-+IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
- 
- void __init imx_gpc_check_dt(void)
- {
-diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
-index 8e52621..e6a889f 100644
---- a/arch/arm/mach-omap2/omap-wakeupgen.c
-+++ b/arch/arm/mach-omap2/omap-wakeupgen.c
-@@ -20,6 +20,7 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/irqchip.h>
- #include <linux/irqdomain.h>
- #include <linux/of_address.h>
- #include <linux/platform_device.h>
-@@ -537,8 +538,4 @@ static int __init wakeupgen_init(struct device_node *node,
- 	return 0;
- }
- 
--/*
-- * We cannot use the IRQCHIP_DECLARE macro that lives in
-- * drivers/irqchip, so we're forced to roll our own. Not very nice.
-- */
--OF_DECLARE_2(irqchip, ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
-+IRQCHIP_DECLARE(ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
--- 
-2.4.5
+Stephen Warren asked in the last version that I change it from
+"firmware" to "raspberrypi,firmware", which made sense to me since we're
+not some core infrastructure using these references.  Which should it
+be?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/7c611a25/attachment.sig>
