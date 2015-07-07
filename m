@@ -1,45 +1,31 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 7 Jul 2015 15:10:34 +0800
-Subject: [PATCH 1/2] arm: berlin: use non-self-cleared reset register to reset
- cpu
-In-Reply-To: <1436253035-371-1-git-send-email-jszhang@marvell.com>
-References: <1436253035-371-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1436253035-371-2-git-send-email-jszhang@marvell.com>
+Date: Tue, 7 Jul 2015 15:10:33 +0800
+Subject: [PATCH 0/2] arm: berlin: add cpu hotplug support
+Message-ID: <1436253035-371-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Berlin SoCs, there are two kinds of cpu reset control registers: the
-first one's corresponding bits will be self-cleared after some cycles,
-while the second one's bits won't. Previously the first kind of reset
-control register is used, this patch uses the second kind one to prepare
-for the next hotplug commit.
+These patches try to add cpu hotplug support for Marvell BG2, BG2Q SoCs.
+These SoCs can't power off cpu independently, but we still want cpu hotplug
+support for them. However, we need to address "CPU still sat on kernel text"
+as pointed out by Mark Rutland[1]. We achieved this by putting the dying CPU
+in WFI state after the coherency is disabled, then asserting the dying CPU
+reset bit to put the CPU in reset state.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/mach-berlin/platsmp.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+patch1 use non-self-cleared control register to reset cpu. This is to prepare
+for the next cpu hotplug commit.
 
-diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
-index 34a3753..bde327b 100644
---- a/arch/arm/mach-berlin/platsmp.c
-+++ b/arch/arm/mach-berlin/platsmp.c
-@@ -17,7 +17,7 @@
- #include <asm/smp_plat.h>
- #include <asm/smp_scu.h>
- 
--#define CPU_RESET		0x00
-+#define CPU_RESET		0x20
- 
- #define RESET_VECT		0x00
- #define SW_RESET_ADDR		0x94
-@@ -31,6 +31,8 @@ static inline void berlin_perform_reset_cpu(unsigned int cpu)
- 	u32 val;
- 
- 	val = readl(cpu_ctrl + CPU_RESET);
-+	val &= ~BIT(cpu_logical_map(cpu));
-+	writel(val, cpu_ctrl + CPU_RESET);
- 	val |= BIT(cpu_logical_map(cpu));
- 	writel(val, cpu_ctrl + CPU_RESET);
- }
+patch2 adds the cpu hotplug support finally.
+
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342642.html
+
+Jisheng Zhang (2):
+  arm: berlin: use non-self-cleared reset register to reset cpu
+  arm: berlin: add CPU hotplug support
+
+ arch/arm/mach-berlin/platsmp.c | 29 ++++++++++++++++++++++++++++-
+ 1 file changed, 28 insertions(+), 1 deletion(-)
+
 -- 
 2.1.4
