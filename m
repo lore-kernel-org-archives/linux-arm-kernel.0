@@ -1,37 +1,40 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 07 Jul 2015 16:02:50 +0200
-Subject: [PATCH 2/5] usb: gadget: midi: avoid redundant f_midi_set_alt() call
-In-Reply-To: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
-References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436277773-14274-3-git-send-email-r.baldyga@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Jul 2015 16:01:39 +0200
+Subject: [PATCH v10 4/5] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20150707140139.GF28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function midi registers two interfaces with single set_alt() function
-which means that f_midi_set_alt() is called twice when configuration
-is set. That means that endpoint initialization and ep request allocation
-is done two times. To avoid this problem we do such things only once,
-for interface number 1 (MIDI Streaming interface).
+Hi Corentin,
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/function/f_midi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+On Mon, Jul 06, 2015 at 09:10:47PM +0200, LABBE Corentin wrote:
+> Add support for the Security System included in Allwinner SoC A20.
+> The Security System is a hardware cryptographic accelerator that support:
+> - MD5 and SHA1 hash algorithms
+> - AES block cipher in CBC/ECB mode with 128/196/256bits keys.
+> - DES and 3DES block cipher in CBC/ECB mode
+> 
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 
-diff --git a/drivers/usb/gadget/function/f_midi.c b/drivers/usb/gadget/function/f_midi.c
-index 6316aa5..4cef222 100644
---- a/drivers/usb/gadget/function/f_midi.c
-+++ b/drivers/usb/gadget/function/f_midi.c
-@@ -329,6 +329,10 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
- 	unsigned i;
- 	int err;
- 
-+	/* For Control Device interface we do nothing */
-+	if (intf == 0)
-+		return 0;
-+
- 	err = f_midi_start_ep(midi, f, midi->in_ep);
- 	if (err)
- 		return err;
+There's still a number of style issues.
+
+Make sure to run checkpatch with the --strict option, and fix
+everything that's reported.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/d35fa2a2/attachment.sig>
