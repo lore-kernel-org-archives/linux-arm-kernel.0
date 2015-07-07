@@ -1,120 +1,41 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 07 Jul 2015 16:21:15 +0530
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <20150707104028.GR3182@x1>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
- <20150707104028.GR3182@x1>
-Message-ID: <559BAF23.90002@linaro.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 07 Jul 2015 13:57:51 +0300
+Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
+In-Reply-To: <559BA3BD.60404@arm.com>
+References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
+ <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
+ <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
+ <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
+ <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
+ <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
+ <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
+ <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559AA0D6.7070703@arm.com>
+ <014c01d0b884$deff46d0$9cfdd470$@samsung.com> <559BA3BD.60404@arm.com>
+Message-ID: <023301d0b8a3$c5a30680$50e91380$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> I just don't want to end up with something like:
+> (GICV3 && ARM64) || (GICV3 && ARM && KERNEL>4.4) || (SuperIRQC && i986)
+> or
+> (ARM || ARM64) && HAS_IRQ_ROUTING
+> 
+> Instead: If the kernel needs it, it tells you. Full stop.
 
+ Agree.
 
-On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
-> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->> On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
->>> On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
->>>
->>>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->>>> (page 0) controls the method of clearing interrupt
->>>> status of 88pm800 family of devices;
->>>>
->>>>    0: clear on read
->>>>    1: clear on write
->>>>
->>>> If pdata is not coming from board file, then set the
->>>> default irq clear method to "irq clear on write"
->>>>
->>>> Also, as suggested by "Lee Jones" renaming variable field
->>>> to appropriate name.
->>>>
->>>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>> ---
->>>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
->>>>   include/linux/mfd/88pm80x.h | 10 ++++++++--
->>>>   2 files changed, 18 insertions(+), 7 deletions(-)
->>>>
->>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->>>> index d495737..66347be 100644
->>>> --- a/drivers/mfd/88pm800.c
->>>> +++ b/drivers/mfd/88pm800.c
->>>> @@ -374,7 +374,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
->>>>   {
->>>>   	struct regmap *map = chip->regmap;
->>>>   	unsigned long flags = IRQF_ONESHOT;
->>>> -	int data, mask, ret = -EINVAL;
->>>> +	int irq_clr_mode, mask, ret = -EINVAL;
->>>>
->>>>   	if (!map || !chip->irq) {
->>>>   		dev_err(chip->dev, "incorrect parameters\n");
->>>> @@ -382,15 +382,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
->>>>   	}
->>>>
->>>>   	/*
->>>> -	 * irq_mode defines the way of clearing interrupt. it's read-clear by
->>>> -	 * default.
->>>> +	 * irq_clr_on_wr defines the way of clearing interrupt by
->>>> +	 * read/write(0/1).  It's read-clear by default.
->>>>   	 */
->>>>   	mask =
->>>>   	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
->>>>   	    PM800_WAKEUP2_INT_MASK;
->>>>
->>>> -	data = PM800_WAKEUP2_INT_CLEAR;
->>>> -	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
->>>> +	irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
->>>> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
->>>> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
->>>
->>> What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
->>> PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
->>> directly without all of this faffing about.
->>>
->>>    regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
->>>
->>
->> Because "irq_clr_method" is of boolean type.
->> And macros which you are referring to is,
->>
->> #define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
->> #define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
->>
->>
->> And also, I feel it is more cleaner approach with the current code as
->> register definition and userflag are maintained separately.
->
-> I see your point, although it's a shame we have to have this code in
-> its place.
->
-> One thing I think you can do though is rid chip->irq_clr_method, just
-> use the one you already have in pdata.
->
+> To be honest it's me to blame here to not having introduced the
+> capability earlier. At the moment ARM has a different code path for
+> KVM_SIGNAL_MSI, which does not bail out if the flag field is set. With
+> Eric's patches this changes and we use the irqchip.c generic code, which
+> returns -EINVAL atm. So I plan to introduce this capability already with
+> the ITS emulation series, so we can just pick it up in the IRQ routing
+> series.
 
-Looking at the current code,
-Yes, this can be done, but I have to do some more changes around it,
-to make code cleaner,
+ Then may be you follow https://lkml.org/lkml/2015/7/7/115 and replace flag with something like
+KVM_SIGNAL_EXT_MSI ioctl ? After all you were one of people who voted against using flags.
 
-change the signature of
-
-static int device_irq_init_800(struct pm80x_chip *chip)
-
-TO
-
-static int device_irq_init_800(struct pm80x_chip *chip, struct 
-pm80x_platform_data *pdata)
-
-
-and then only use pdata->irq_clr_method.
-
-
-How do you want to get this inside? V6 version? or separate patch?
-
-I have one more cleanup patch in the queue, which I am planning to
-submit today, if you are ok then I can submit along with that.
-
-
-Thanks,
-Vaibhav
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
