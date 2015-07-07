@@ -1,62 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 7 Jul 2015 15:16:58 +0100
-Subject: [RFC PATCH 2/3] arm: psci: enable PSCI on UP systems
-In-Reply-To: <1436014910-1201-3-git-send-email-jszhang@marvell.com>
-References: <1436014910-1201-1-git-send-email-jszhang@marvell.com>
- <1436014910-1201-3-git-send-email-jszhang@marvell.com>
-Message-ID: <20150707141658.GF4379@red-moon>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 07 Jul 2015 17:23:10 +0300
+Subject: [PATCH/RFC 06/11] ARM: shmobile: r8a7790: Link CPG to RST using
+ "renesas, modemr"
+In-Reply-To: <1436278217-20522-7-git-send-email-geert+renesas@glider.be>
+References: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
+ <1436278217-20522-7-git-send-email-geert+renesas@glider.be>
+Message-ID: <3792169.nKlDE6xfl4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 04, 2015 at 02:01:49PM +0100, Jisheng Zhang wrote:
-> This is to make calls like eg cpu_suspend can be made functional on UP too.
+Hi Geert,
+
+Thank you for the patches.
+
+On Tuesday 07 July 2015 16:10:12 Geert Uytterhoeven wrote:
+> Add a link from the Clock Pulse Generator node to the Reset Controller
+> node, so the CPG can read the Mode Monitoring Register (MODEMR) to
+> obtain the MD pin values.x
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/arm/kernel/Makefile | 5 +----
->  arch/arm/kernel/psci.c   | 2 ++
->  2 files changed, 3 insertions(+), 4 deletions(-)
-
-You will have to rewrite the commit log (mostly because PSCI CPU suspend
-will move to drivers/firmware so it will become stale, I know what you
-mean but it might be unclear to others so please improve it).
-
-Patch (and intent) seems fine though:
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index c57b2c0..2b1a60c 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -88,9 +88,6 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
->  obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
->  
->  obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-> -ifeq ($(CONFIG_ARM_PSCI),y)
-> -obj-y				+= psci-call.o
-> -obj-$(CONFIG_SMP)		+= psci.o
-> -endif
-> +obj-$(CONFIG_ARM_PSCI)		+= psci-call.o psci.o
->  
->  extra-y := $(head-y) vmlinux.lds
-> diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
-> index 61c04b0..7f6ff02 100644
-> --- a/arch/arm/kernel/psci.c
-> +++ b/arch/arm/kernel/psci.c
-> @@ -47,6 +47,7 @@
->   *
->   */
->  
-> +#ifdef CONFIG_SMP
->  extern void secondary_startup(void);
->  
->  static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> @@ -128,3 +129,4 @@ struct smp_operations __initdata psci_smp_ops = {
->  	.cpu_kill		= psci_cpu_kill,
->  #endif
->  };
-> +#endif
-> -- 
-> 2.1.4
+>  arch/arm/boot/dts/r8a7790.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
+> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+> index 08067ae177643b8f..4ee5523fc3e13e12 100644
+> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> @@ -1115,6 +1115,7 @@
+>  					     "lb", "qspi", "sdh", "sd0", "sd1",
+>  					     "z", "rcan", "adsp";
+>  			#power-domain-cells = <0>;
+> +			renesas,modemr = <&rst 0x60>;
+
+I have mixed feelings about this as I don't think it really describes the 
+hardware.
+
+Wouldn't it make sense to instead add a standard kernel API to retrieve the 
+boot mode value ? It seems to be a pretty common feature of SoCs across all 
+vendors.
+
+>  		};
+> 
+>  		/* Variable factor clocks */
+
+-- 
+Regards,
+
+Laurent Pinchart
