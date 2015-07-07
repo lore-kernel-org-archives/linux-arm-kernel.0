@@ -1,72 +1,97 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 7 Jul 2015 17:53:59 +0300
-Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
- for bus recovery
-In-Reply-To: <20150707141312.GC3411@katana>
-References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
- <20141126160407.GN4431@pengutronix.de> <5476085B.40009@ti.com>
- <1436276269.3344.94.camel@pengutronix.de>
- <20150707134852.GE9671@pengutronix.de> <20150707141312.GC3411@katana>
-Message-ID: <559BE807.2030802@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jul 2015 15:57:56 +0100
+Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <559BE68B.3020801@linaro.org>
+References: <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
+ <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
+ <20150707111248.GU3182@x1> <559BB58E.9010406@linaro.org>
+ <559BB727.2070106@linaro.org> <20150707125439.GE3182@x1>
+ <559BE68B.3020801@linaro.org>
+Message-ID: <20150707145756.GJ3182@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2015 05:13 PM, Wolfram Sang wrote:
-> On Tue, Jul 07, 2015 at 03:48:52PM +0200, Uwe Kleine-K?nig wrote:
+On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
 
->> On Tue, Jul 07, 2015 at 03:37:49PM +0200, Jan L?bbe wrote:
->>> On Mi, 2014-11-26 at 19:05 +0200, Grygorii Strashko wrote:
->>>> On 11/26/2014 06:04 PM, Uwe Kleine-K?nig wrote:
->>>>> On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
->>>>>> Having a board where the I2C bus locks up occasionally made it clear
->>>>>> that the bus recovery in the i2c-davinci driver will only work on
->>>>>> some boards, because on regular boards, this will only toggle GPIO
->>>>>> lines that aren't muxed to the actual pins.
->>>>>>
->>>>>> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
->>>>>> built-in capability to bit-bang its lines by using the ICPFUNC registers
->>>>>> of the i2c controller.
->>>>>> Implement the suggested procedure by toggling SCL and checking SDA using
->>>>>> the ICPFUNC registers of the I2C controller when present. Allow platforms
->>>>>> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
->>>>>> data flag and add optional DT property "ti,has-pfunc" to indicate
->>>>>> the same in DT.
->>>>> On what does it depend if this pfunc stuff works or not? Only the SoC,
->>>>> or also on some board specific properties?
->>>>
->>>> SoC / set of SoCs. Also, similar feature is supported by OMAP and AM335x/AM437x SoCs
->>>> using I2C_SYSTEST register.
->>>>
->>>>> Given the former using the
->>>>> compatible string to detect its availability would be better. (In this
->>>>> case also sorry, didn't consider this case when requesting the property
->>>>> in the last round.)
->>>
->>> I only stumbled across this after it was merged, with the additional
->> I also wonder how it came to the Reviewed-by tag for me. The last thing
->> that I said about the patch was "On what does it depend if this pfunc
->> stuff works or not? Only the SoC, or also on some board specific
->> properties?" (see above) and "the patch looks ok". IMHO this hardly
->> justifies to add the Reviewed-by tag for the next round. :-(
 > 
-> That needs to be discussed with Grygorii. I can't verify the correctness
-> of tags for every patch, although I do try to keep an eye on it...
 > 
+> On Tuesday 07 July 2015 06:24 PM, Lee Jones wrote:
+> >On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+> >
+> >>
+> >>
+> >>On Tuesday 07 July 2015 04:48 PM, Vaibhav Hiremath wrote:
+> >>>
+> >>>
+> >>>On Tuesday 07 July 2015 04:42 PM, Lee Jones wrote:
+> >>>>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+> >>>>>On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
+> >>>>>>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+> >>>>>>>On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
+> >>>>>>>>On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
+> >>>>>>>>
+> >>>>>>>>>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+> >>>>>>>>>(page 0) controls the method of clearing interrupt
+> >>>>>>>>>status of 88pm800 family of devices;
+> >>>>>>>>>
+> >>>>>>>>>   0: clear on read
+> >>>>>>>>>   1: clear on write
+> >>>>>>>>>
+> >>>>>>>>>If pdata is not coming from board file, then set the
+> >>>>>>>>>default irq clear method to "irq clear on write"
+> >>>>>>>>>
+> >>>>>>>>>Also, as suggested by "Lee Jones" renaming variable field
+> >>>>>>>>>to appropriate name.
+> >>>>>>>>>
+> >>>>>>>>>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+> >>>>>>>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>>>>>>>>---
+> >>>>>>>>>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
+> >>>>>>>>>  include/linux/mfd/88pm80x.h | 10 ++++++++--
+> >>>>>>>>>  2 files changed, 18 insertions(+), 7 deletions(-)
+> >>>>>>>>>
+> 
+> <snip>
+> 
+> >>>
+> >>>Yes certainly, this is another option (rather preferred one).
+> >>>
+> >>>But to be consistent with other's I proposed this, please refer to the
+> >>>fn device_800_init(), where all xxx_init() are taking 2 arguments, and
+> >>>second argument is pdata.
+> >>>
+> >>>
+> >>>There is room for cleanup, I agree.
+> >>>I can put this too in the next cleanup series.
+> >>>
+> >>
+> >>Note that this is init function, called from probe.
+> >>
+> >>So both approach looks ok to me.
+> >
+> >Please clean up the other.  Function and put it at the front of the
+> >set when you re-submit.
+> >
+> 
+> Sorry for dumb question here :)
+> I did not understand what do you mean by "in front of the set"?
+> 
+> You want to see all the patches into one single series?
+> Or
+> have separate series,
+> 	1. existing DT addition series
+> 	2. new clean-up series
 
-Regarding "the patch looks ok" - sincerely sorry!
-This is not the first time I've treated "looks good.." as Reviewed-by and I got no complaints before :(
-Will take it into account.
-
-
-Regarding technical comments:
-OK. Seems I missed smth. or understood wrongly.
-So, I'll say what's people usually saying here - Sorry for that :(
-But, to be honest I don't feel guilty, because:
-- v4 of these patches was merged finally
-- that v4 missed >2 kernel releases
-- you were added in "TO:" for all versions of these patches.
+[PATCH v6 0/5] mfd: 88pm800: Add Device tree support
+?>[PATCH v6 1/5] mfd: 88pm800: Obtain pdata from 'device' rather than passing as parameter
+?>[PATCH v6 2/5] mfd: 88pm800: Add device tree support
+?>[PATCH v6 3/5] mfd: 88pm800: Remove unnecessary protection around pdata
+?>[PATCH v6 4/5] mfd: 88pm800: Set default interrupt clear method
+?>[PATCH v6 5/5] mfd: devicetree: bindings: Add new 88pm800 mfd binding
 
 -- 
-regards,
--grygorii
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
