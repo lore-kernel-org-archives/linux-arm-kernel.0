@@ -1,136 +1,29 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 7 Jul 2015 14:04:33 +0200
-Subject: [PATCH] drm/rockchip: use drm_gem_mmap helpers
-In-Reply-To: <1436259816-31090-1-git-send-email-djkurtz@chromium.org>
-References: <1436259816-31090-1-git-send-email-djkurtz@chromium.org>
-Message-ID: <20150707120433.GO7568@phenom.ffwll.local>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jul 2015 13:03:32 +0100
+Subject: [RESEND 00/10] regulator: pwm-regulator: Introduce continuous-mode
+In-Reply-To: <20150707065250.GF3182@x1>
+References: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
+ <20150706204812.GD11162@sirena.org.uk> <20150707065250.GF3182@x1>
+Message-ID: <20150707120332.GC2887@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 05:03:36PM +0800, Daniel Kurtz wrote:
-> Rather than (incompletely [0]) re-implementing drm_gem_mmap() and
-> drm_gem_mmap_obj() helpers, call them directly from the rockchip mmap
-> routines.
-> 
-> Once the core functions return successfully, the rockchip mmap routines
-> can still use dma_mmap_attrs() to simply mmap the entire buffer.
-> 
-> [0] Previously, we were performing the mmap() without first taking a
-> reference on the underlying gem buffer.  This could leak ptes if the gem
-> object is destroyed while userspace is still holding the mapping.
-> 
-> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> Cc: stable at vger.kernel.org
+On Tue, Jul 07, 2015 at 07:52:50AM +0100, Lee Jones wrote:
+> On Mon, 06 Jul 2015, Mark Brown wrote:
+> > On Mon, Jul 06, 2015 at 09:58:22AM +0100, Lee Jones wrote:
 
-Applied to topic/drm-fixes to make sure it won't get lost, but I expect
-rockchip maintainers to pick this one up.
--Daniel
+> > > This patch-set has been rebased on to v4.2-rc1.
 
-> 
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 67 +++++++++++++++--------------
->  1 file changed, 34 insertions(+), 33 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index eb2282c..eba5f8a 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -54,55 +54,56 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
->  		       &rk_obj->dma_attrs);
->  }
->  
-> -int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
-> -			  struct vm_area_struct *vma)
-> +static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
-> +					struct vm_area_struct *vma)
-> +
->  {
-> +	int ret;
->  	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
->  	struct drm_device *drm = obj->dev;
-> -	unsigned long vm_size;
->  
-> -	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
-> -	vm_size = vma->vm_end - vma->vm_start;
-> -
-> -	if (vm_size > obj->size)
-> -		return -EINVAL;
-> +	/*
-> +	 * dma_alloc_attrs() allocated a struct page table for rk_obj, so clear
-> +	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
-> +	 */
-> +	vma->vm_flags &= ~VM_PFNMAP;
->  
-> -	return dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
-> +	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
->  			     obj->size, &rk_obj->dma_attrs);
-> +	if (ret)
-> +		drm_gem_vm_close(vma);
-> +
-> +	return ret;
->  }
->  
-> -/* drm driver mmap file operations */
-> -int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
-> +int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
-> +			  struct vm_area_struct *vma)
->  {
-> -	struct drm_file *priv = filp->private_data;
-> -	struct drm_device *dev = priv->minor->dev;
-> -	struct drm_gem_object *obj;
-> -	struct drm_vma_offset_node *node;
-> +	struct drm_device *drm = obj->dev;
->  	int ret;
->  
-> -	if (drm_device_is_unplugged(dev))
-> -		return -ENODEV;
-> +	mutex_lock(&drm->struct_mutex);
-> +	ret = drm_gem_mmap_obj(obj, obj->size, vma);
-> +	mutex_unlock(&drm->struct_mutex);
-> +	if (ret)
-> +		return ret;
->  
-> -	mutex_lock(&dev->struct_mutex);
-> +	return rockchip_drm_gem_object_mmap(obj, vma);
-> +}
->  
-> -	node = drm_vma_offset_exact_lookup(dev->vma_offset_manager,
-> -					   vma->vm_pgoff,
-> -					   vma_pages(vma));
-> -	if (!node) {
-> -		mutex_unlock(&dev->struct_mutex);
-> -		DRM_ERROR("failed to find vma node.\n");
-> -		return -EINVAL;
-> -	} else if (!drm_vma_node_is_allowed(node, filp)) {
-> -		mutex_unlock(&dev->struct_mutex);
-> -		return -EACCES;
-> -	}
-> +/* drm driver mmap file operations */
-> +int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
-> +{
-> +	struct drm_gem_object *obj;
-> +	int ret;
->  
-> -	obj = container_of(node, struct drm_gem_object, vma_node);
-> -	ret = rockchip_gem_mmap_buf(obj, vma);
-> +	ret = drm_gem_mmap(filp, vma);
-> +	if (ret)
-> +		return ret;
->  
-> -	mutex_unlock(&dev->struct_mutex);
-> +	obj = vma->vm_private_data;
->  
-> -	return ret;
-> +	return rockchip_drm_gem_object_mmap(obj, vma);
->  }
->  
->  struct rockchip_gem_object *
-> -- 
-> 2.4.3.573.g4eafbef
-> 
+> > Is this just a rebase or has the code been changed as well - IIRC there
+> > were some bits in there that weren't supposed to be be there?
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+> This is a rebased resend with those couple of lines of debug removed.
+
+OK, so not actually a resend then :(
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/40d8fdda/attachment.sig>
