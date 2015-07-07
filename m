@@ -1,191 +1,123 @@
-From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Tue, 07 Jul 2015 18:06:57 +0800
-Subject: [PATCH v3 08/11] KVM: arm: implement dirty bit mechanism for
- debug registers
-In-Reply-To: <20150703115611.GB14220@lvm>
-References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
- <1434969694-7432-9-git-send-email-zhichao.huang@linaro.org>
- <20150630092020.GP11332@cbox>
- <B3B5AB0D-020C-483D-A6DE-76E355865010@linaro.org>
- <20150703115611.GB14220@lvm>
-Message-ID: <5A7DE9A0-E7A6-40B0-80F9-896F7DED0E47@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jul 2015 11:13:30 +0100
+Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <20150707095012.GQ7021@wotan.suse.de>
+References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
+ <20150622161002.GB8240@lst.de>
+ <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
+ <20150701062352.GA3739@lst.de>
+ <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
+ <20150701065948.GA4355@lst.de>
+ <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
+ <20150701072828.GA4881@lst.de>
+ <20150707095012.GQ7021@wotan.suse.de>
+Message-ID: <20150707101330.GJ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Will,
+On Tue, Jul 07, 2015 at 11:50:12AM +0200, Luis R. Rodriguez wrote:
+> mcgrof at ergon ~/linux-next (git::kill-mtrr)$ git grep ioremap_nocache drivers/| wc -l
+> 359
 
-Chazy and me are talking about how to reduce the saving/restoring
-overhead for debug registers.
-We want to add a state in hw_breakpoint.c to indicate whether the host
-enable any hwbrpts or not (might export a fuction that kvm can call),
-then we can read this state from memory instead of reading from real
-hardware registers, and to decide whether we need a world switch or
-not.
-Does it acceptable?
+Yes, it's because we have:
+(a) LDD telling people they should be using ioremap_nocache() for mapping
+    devices.
+(b) We have documentation in the Documentation/ subdirectory telling people
+    to use ioremap_nocache() for the same.
 
+> This is part of the work I've been doing lately. The
+> eventual goal once we have the write-combing areas properly split with
+> ioremap_wc() and using the new proper preferred architecture agnostic modifier
+> (arch_phys_wc_add()) is to change the default ioremap behaviour on x86 to use
+> strong UC for PAT enabled systems for *both* ioremap() and ioremap_nocache().
 
-On July 3, 2015 7:56:11 PM GMT+08:00, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->On Fri, Jul 03, 2015 at 05:54:47PM +0800, Zhichao Huang wrote:
->> 
->> 
->> On June 30, 2015 5:20:20 PM GMT+08:00, Christoffer Dall <christoffer.dall@linaro.org> wrote:
->> >On Mon, Jun 22, 2015 at 06:41:31PM +0800, Zhichao Huang wrote:
->> >> The trapping code keeps track of the state of the debug registers,
->> >> allowing for the switch code to implement a lazy switching strategy.
->> >> 
->> >> Signed-off-by: Zhichao Huang <zhichao.huang@linaro.org>
->> >> ---
->> >>  arch/arm/include/asm/kvm_asm.h  |  3 +++
->> >>  arch/arm/include/asm/kvm_host.h |  3 +++
->> >>  arch/arm/kernel/asm-offsets.c   |  1 +
->> >>  arch/arm/kvm/coproc.c           | 39 ++++++++++++++++++++++++++++++++++++--
->> >>  arch/arm/kvm/interrupts_head.S  | 42 +++++++++++++++++++++++++++++++++++++++++
->> >>  5 files changed, 86 insertions(+), 2 deletions(-)
->> >> 
->> >> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
->> >> index ba65e05..4fb64cf 100644
->> >> --- a/arch/arm/include/asm/kvm_asm.h
->> >> +++ b/arch/arm/include/asm/kvm_asm.h
->> >> @@ -64,6 +64,9 @@
->> >>  #define cp14_DBGDSCRext	65	/* Debug Status and Control external */
->> >>  #define NR_CP14_REGS	66	/* Number of regs (incl. invalid) */
->> >>  
->> >> +#define KVM_ARM_DEBUG_DIRTY_SHIFT	0
->> >> +#define KVM_ARM_DEBUG_DIRTY		(1 << KVM_ARM_DEBUG_DIRTY_SHIFT)
->> >> +
->> >>  #define ARM_EXCEPTION_RESET	  0
->> >>  #define ARM_EXCEPTION_UNDEFINED   1
->> >>  #define ARM_EXCEPTION_SOFTWARE    2
->> >> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> >> index 3d16820..09b54bf 100644
->> >> --- a/arch/arm/include/asm/kvm_host.h
->> >> +++ b/arch/arm/include/asm/kvm_host.h
->> >> @@ -127,6 +127,9 @@ struct kvm_vcpu_arch {
->> >>  	/* System control coprocessor (cp14) */
->> >>  	u32 cp14[NR_CP14_REGS];
->> >>  
->> >> +	/* Debug state */
->> >> +	u32 debug_flags;
->> >> +
->> >>  	/*
->> >>  	 * Anything that is not used directly from assembly code goes
->> >>  	 * here.
->> >> diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
->> >> index 9158de0..e876109 100644
->> >> --- a/arch/arm/kernel/asm-offsets.c
->> >> +++ b/arch/arm/kernel/asm-offsets.c
->> >> @@ -185,6 +185,7 @@ int main(void)
->> >>    DEFINE(VCPU_FIQ_REGS,		offsetof(struct kvm_vcpu,
->> >arch.regs.fiq_regs));
->> >>    DEFINE(VCPU_PC,		offsetof(struct kvm_vcpu,
->> >arch.regs.usr_regs.ARM_pc));
->> >>    DEFINE(VCPU_CPSR,		offsetof(struct kvm_vcpu,
->> >arch.regs.usr_regs.ARM_cpsr));
->> >> +  DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu,
->> >arch.debug_flags));
->> >>    DEFINE(VCPU_HCR,		offsetof(struct kvm_vcpu, arch.hcr));
->> >>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
->> >>    DEFINE(VCPU_HSR,		offsetof(struct kvm_vcpu, arch.fault.hsr));
->> >> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
->> >> index eeee648..fc0c2ef 100644
->> >> --- a/arch/arm/kvm/coproc.c
->> >> +++ b/arch/arm/kvm/coproc.c
->> >> @@ -220,14 +220,49 @@ bool access_vm_reg(struct kvm_vcpu *vcpu,
->> >>  	return true;
->> >>  }
->> >>  
->> >> +/*
->> >> + * We want to avoid world-switching all the DBG registers all the
->> >> + * time:
->> >> + *
->> >> + * - If we've touched any debug register, it is likely that we're
->> >> + *   going to touch more of them. It then makes sense to disable the
->> >> + *   traps and start doing the save/restore dance
->> >> + * - If debug is active (ARM_DSCR_MDBGEN set), it is then mandatory
->> >> + *   to save/restore the registers, as the guest depends on them.
->> >> + *
->> >> + * For this, we use a DIRTY bit, indicating the guest has modified the
->> >> + * debug registers, used as follow:
->> >> + *
->> >> + * On guest entry:
->> >> + * - If the dirty bit is set (because we're coming back from trapping),
->> >> + *   disable the traps, save host registers, restore guest registers.
->> >> + * - If debug is actively in use (ARM_DSCR_MDBGEN set),
->> >> + *   set the dirty bit, disable the traps, save host registers,
->> >> + *   restore guest registers.
->> >> + * - Otherwise, enable the traps
->> >> + *
->> >> + * On guest exit:
->> >> + * - If the dirty bit is set, save guest registers, restore host
->> >> + *   registers and clear the dirty bit. This ensure that the host can
->> >> + *   now use the debug registers.
->> >> + *
->> >> + * Notice:
->> >> + * - For ARMv7, if the CONFIG_HAVE_HW_BREAKPOINT is set in the guest,
->> >> + *   debug is always actively in use (ARM_DSCR_MDBGEN set).
->> >> + *   We have to do the save/restore dance in this case, because the
->> >> + *   host and the guest might use their respective debug registers
->> >> + *   at any moment.
->> >
->> >so doesn't this pretty much invalidate the whole saving/dirty effort?
->> >
->> >Guests configured from for example multi_v7_defconfig will then act
->> >like
->> >this and you will save/restore all these registers always.
->> >
->> >Wouldn't a better approach be to enable trapping to hyp mode most of
->> >the
->> >time, and simply clear the enabled bit of any host-used break- or
->> >wathcpoints upon guest entry, perhaps maintaining a bitmap of which
->> >ones
->> >must be re-set when exiting the guest, and thereby drastically
->reducing
->> >the amount of save/restore code you'd have to perform.
->> >
->> >Of course, you'd also have to keep track of whether the guest has any
->> >breakpoints or watchpoints enabled for when you do the full
->> >save/restore
->> >dance.
->> >
->> >That would also avoid all issues surrounding accesses to DBGDSCRext
->> >register I think.
->> 
->> I have thought about it, which means to say, "Since we can't find
->> whether the guest has any hwbrpts enabled from the DBGDSCR, why
->> don't we find it from the DBGBCR and DBGWCR?".
->> 
->> Case 1: The host and the guest enable all the hwbrpts.
->> It's necessary to world switch the debug registers all the time.
->> 
->> Case 2: The host and the guest enable some of the hwbrpts.
->> It's necessary to world switch the debug registers which are enabled.
->> But if we want skip thouse registers which aren't enabled, we have to
->> keep track of all the debug states both in the host and the guest.
->> We need to judge which debug registers we should switch, and which
->> not. It may bring in a complex logic in the assembly code. And if the
->> host or guest enabled almost all of the hwbrpts, this operation may
->> bring in the loss outweights the grain.
->> Is it acceptable and worthy? If yes, I will do it.
->> 
->> Case 3: Neither the host nor the guest enable any hwbrpts.
->> It's the case that we can skip the whole world switch thing.
->> The only problem is that we have to read all the debug registers on each
->> guest entry to find whether the host enable any hwbrpts or not.
->> But this case is a normal case, which is worthy to do the efforts to
->> reduce the saving/restoring overhead.
->> 
->I would never try to do a partial save/restore, just look at the
->control registers to see if anything is enabled as an indication of
->whether or not we need to do the save/restore of all the registers and
->disable trapping.
->
->Reading the guest control registers (from memory) only should be much
->faster than saving/restoring the whole lot.  Perhaps there's even a
->hook
->in Linux to figure out if any of the registers are being used?
->
->Thanks,
->-Christoffer
+Please note that on ARM, ioremap_wc() gives what's termed in ARM ARM
+speak "normal memory, non-cacheable" - which can be subject to speculation,
+write combining, multiple accesses, etc.  The important point is that
+such mapping is not suitable for device registers, but is suitable for
+device regions that have "memory like" properties (iow, a chunk of RAM,
+like video drivers.)  It does support unaligned accesses.
+
+> Because of these grammatical issues and the issues with
+> unaligned access with ARM I think its important we put some effort
+> to care a bit more about defining clear semantics through grammar
+> for new APIs or as we rewrite APIs. We have tools to do this these
+> days, best make use of them.
+
+I'm in support of anything which more clearly specifies the requirements
+for these APIs.
+
+> While we're at it and reconsidering all this, a few items I wish for
+> us to address as well then, most of them related to grammar, some
+> procedural clarification:
+> 
+>   * Document it as not supported to have overlapping ioremap() calls.
+>     No one seems to have a clue if this should work, but clearly this
+>     is just a bad idea. I don't see why we should support the complexity
+>     of having this. It seems we can write grammar rules to prevent this.
+
+On ARM, we (probably) have a lot of cases where ioremap() is used multiple
+times for the same physical address space, so we shouldn't rule out having
+multiple mappings of the same type.  However, differing types would be a
+problem on ARM.
+
+>   * We seem to care about device drivers / kernel code doing unaligned
+>     accesses with certain ioremap() variants. At least for ARM you should
+>     not do unaligned accesses on ioremap_nocache() areas.
+
+... and ioremap() areas.
+
+If we can stop the "abuse" of ioremap_nocache() to map device registers,
+then we could potentially switch ioremap_nocache() to be a normal-memory
+like mapping, which would allow it to support unaligned accesses.
+
+>     I am not sure
+>     if we can come up with grammar to vet for / warn for unaligned access
+>     type of code in driver code on some memory area when some ioremap()
+>     variant is used, but this could be looked into. I believe we may
+>     want rules for unaligned access maybe in general, and not attached
+>     to certain calls due to performance considerations, so this work
+>     may be welcomed regardless (refer to
+>     Documentation/unaligned-memory-access.txt)
+>     
+>   * We seem to want to be pedantic about adding new ioremap() variants, the
+>     unaligned issue on ARM is one reason, do we ideally then want *all*
+>     architecture maintainers to provide an Acked-by for any new ioremap
+>     variants ?
+
+/If/ we get the current mess sorted out so that we have a safe fallback,
+and we have understanding of the different architecture variants (iow,
+documented what the safe fallback is) I don't see any reason why we'd
+need acks from arch maintainers.  Unfortunately, we're not in that
+situation today, because of the poorly documented mess that ioremap*()
+currently is (and yes, I'm partly to blame for that too by not documenting
+ARMs behaviour here.)
+
+I have some patches (prepared last week, I was going to push them out
+towards the end of the merge window) which address that, but unfortunately
+the ARM autobuilders have been giving a number of seemingly random boot
+failures, and I'm not yet sure what's going on... so I'm holding that
+back until stuff has settled down.
+
+Another issue is... the use of memcpy()/memset() directly on memory
+returned from ioremap*().  The pmem driver does this.  This fails sparse
+checks.  However, years ago, x86 invented the memcpy_fromio()/memcpy_toio()
+memset_io() functions, which took a __iomem pointer (which /presumably/
+means they're supposed to operate on the memory associated with an
+ioremap'd region.)
+
+Should these functions always be used for mappings via ioremap*(), and
+the standard memcpy()/memset() be avoided?  To me, that sounds like a
+very good thing, because that gives us more control over the
+implementation of the functions used to access ioremap'd regions,
+and the arch can decide to prevent GCC inlining its own memset() or
+memcpy() code if desired.
+
+Note that on x86, these three functions are merely wrappers around
+standard memcpy()/memset(), so there should be no reason why pmem.c
+couldn't be updated to use these accessors instead.
 
 -- 
-Zhichao Huang
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
