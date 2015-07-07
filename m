@@ -1,199 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Jul 2015 16:06:51 +0100
-Subject: [PATCH v2 7/9] regulator: pwm-regulator: Add support for
- continuous-voltage
-In-Reply-To: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
-References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1436281613-899-8-git-send-email-lee.jones@linaro.org>
+From: ahs3@redhat.com (Al Stone)
+Date: Tue, 07 Jul 2015 09:07:56 -0600
+Subject: [PATCH v4 0/2] Correct for ACPI 5.1->6.0 spec changes in MADT
+ GICC entries
+In-Reply-To: <20150707133115.GB13228@e104818-lin.cambridge.arm.com>
+References: <1436224608-27754-1-git-send-email-al.stone@linaro.org>
+ <CAJZ5v0j+iKhOX4hw2XQEdo9CjpP2sfdxGwCz_vN5OVqithEv0Q@mail.gmail.com>
+ <20150707133115.GB13228@e104818-lin.cambridge.arm.com>
+Message-ID: <559BEB4C.90906@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current version of PWM regulator only supports a static table
-approach, where pre-calculated values are supplied by the vendor and
-obtained via DT.  The continuous-voltage method takes min_uV and
-max_uV, and divides the difference between them up into a number of
-slices.  The number of slices depend on how large the duty cycle
-register is.  This information is provided by a DT property.
+On 07/07/2015 07:31 AM, Catalin Marinas wrote:
+> On Tue, Jul 07, 2015 at 01:20:51AM +0200, Rafael J. Wysocki wrote:
+>> On Tue, Jul 7, 2015 at 1:16 AM, Al Stone <al.stone@linaro.org> wrote:
+>>> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
+>>> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
+>>> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+>>> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+>>> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+>>> subtable, it fails if 5.1 structs are in use, and there are systems in
+>>> the wild that have them.
+>>>
+>>> Note that this was found in linux-next and these patches apply against
+>>> that tree and the arm64 kernel tree; 4.1 does not appear to have this
+>>> problem since it still has the 5.1 struct definition.
+>>>
+>>> Though there is precedent in ia64 code for ignoring the changes in size,
+>>> this patch set instead verifies correctness.  The first patch adds the
+>>> BAD_MADT_GICC_ENTRY() macro to check the GICC subtable only, accounting
+>>> for the difference in specification versions that are possible.  The
+>>> second patch replaces BAD_MADT_ENTRY usage with the BAD_MADT_GICC_ENTRY
+>>> macro in arm64 code, which is currently the only architecture affected.
+>>> The BAD_MADT_ENTRY() will continue to work as is for all other MADT
+>>> subtables.
+>>>
+>>> I have tested these patches on an APM Mustang with version 1.15 firmware,
+>>> where the problem was found, and they fix the problem -- i.e., the system
+>>> will boot with either Linux 4.1 or linux-next kernels using the same ACPI
+>>> 5.1 compatible firmware.
+>>
+>> ACK for the series, but I guess it's better to let it go via ARM64, right?
+> 
+> Fine by me. I'll pick them up for 4.2-rc2.
+> 
+> Thanks.
+> 
 
-As the name alludes, this provides values for a continuous voltage
-range between min_uV and max_uV, which has obvious benefits over
-either limited voltage possibilities, or the requirement to provide
-a large voltage-table.
+Thanks, Catalin.  Holler if there's any problems.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/regulator/pwm-regulator.c | 114 +++++++++++++++++++++++++++++++++++---
- 1 file changed, 106 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 25560fc..dac145d 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -10,6 +10,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/delay.h>
- #include <linux/module.h>
- #include <linux/init.h>
- #include <linux/err.h>
-@@ -21,9 +22,16 @@
- #include <linux/pwm.h>
- 
- struct pwm_regulator_data {
--	struct pwm_voltages *duty_cycle_table;
-+	/*  Shared */
- 	struct pwm_device *pwm;
-+
-+	/* Voltage table */
-+	struct pwm_voltages *duty_cycle_table;
- 	int state;
-+
-+	/* Continuous voltage */
-+	u32 max_duty_cycle;
-+	int volt_uV;
- };
- 
- struct pwm_voltages {
-@@ -31,6 +39,9 @@ struct pwm_voltages {
- 	unsigned int dutycycle;
- };
- 
-+/**
-+ * Voltage table call-backs
-+ */
- static int pwm_regulator_get_voltage_sel(struct regulator_dev *rdev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-@@ -78,6 +89,71 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
- 
- 	return drvdata->duty_cycle_table[selector].uV;
- }
-+
-+/**
-+ * Continuous voltage call-backs
-+ */
-+static int pwm_voltage_to_duty_cycle(struct regulator_dev *rdev,
-+					int volt_mV)
-+{
-+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	int min_mV = rdev->constraints->min_uV / 1000;
-+	int max_mV = rdev->constraints->max_uV / 1000;
-+	int max_duty_cycle = drvdata->max_duty_cycle;
-+	int vdiff = min_mV - max_mV;
-+	int pwm_code;
-+	int tmp;
-+
-+	tmp = ((max_duty_cycle - min_mV) * max_duty_cycle) / vdiff;
-+	pwm_code = ((tmp + max_duty_cycle) * volt_mV) / vdiff;
-+
-+	if (pwm_code < 0)
-+		pwm_code = 0;
-+	if (pwm_code > max_duty_cycle)
-+		pwm_code = max_duty_cycle;
-+
-+	return pwm_code * 100 / max_duty_cycle;
-+}
-+
-+static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
-+{
-+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+
-+	return drvdata->volt_uV;
-+}
-+
-+static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-+					int min_uV, int max_uV,
-+					unsigned *selector)
-+{
-+	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	unsigned int ramp_delay = rdev->constraints->ramp_delay;
-+	int duty_cycle;
-+	int ret;
-+
-+	duty_cycle = pwm_voltage_to_duty_cycle(rdev, min_uV / 1000);
-+
-+	ret = pwm_config(drvdata->pwm,
-+			 (drvdata->pwm->period / 100) * duty_cycle,
-+			 drvdata->pwm->period);
-+	if (ret) {
-+		dev_err(&rdev->dev, "Failed to configure PWM\n");
-+		return ret;
-+	}
-+
-+	ret = pwm_enable(drvdata->pwm);
-+	if (ret) {
-+		dev_err(&rdev->dev, "Failed to enable PWM\n");
-+		return ret;
-+	}
-+	drvdata->volt_uV = min_uV;
-+
-+	/* Delay required by PWM regulator to settle to the new voltage */
-+	usleep_range(ramp_delay, ramp_delay + 1000);
-+
-+	return 0;
-+}
-+
- static struct regulator_ops pwm_regulator_voltage_table_ops = {
- 	.set_voltage_sel = pwm_regulator_set_voltage_sel,
- 	.get_voltage_sel = pwm_regulator_get_voltage_sel,
-@@ -85,6 +161,11 @@ static struct regulator_ops pwm_regulator_voltage_table_ops = {
- 	.map_voltage     = regulator_map_voltage_iterate,
- };
- 
-+static struct regulator_ops pwm_regulator_voltage_continuous_ops = {
-+	.get_voltage = pwm_regulator_get_voltage,
-+	.set_voltage = pwm_regulator_set_voltage,
-+};
-+
- static struct regulator_desc pwm_regulator_desc = {
- 	.name		= "pwm-regulator",
- 	.type		= REGULATOR_VOLTAGE,
-@@ -129,6 +210,25 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
- 	return 0;
- }
- 
-+static int pwm_regulator_init_continuous(struct platform_device *pdev,
-+					 struct pwm_regulator_data *drvdata)
-+{
-+	struct device_node *np = pdev->dev.of_node;
-+	int ret;
-+
-+	ret = of_property_read_u32(np, "max-duty-cycle",
-+				   &drvdata->max_duty_cycle);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Failed to read \"pwm-max-value\"\n");
-+		return ret;
-+	}
-+
-+	pwm_regulator_desc.ops = &pwm_regulator_voltage_continuous_ops;
-+	pwm_regulator_desc.continuous_voltage_range = true;
-+
-+	return 0;
-+}
-+
- static int pwm_regulator_probe(struct platform_device *pdev)
- {
- 	struct pwm_regulator_data *drvdata;
-@@ -146,14 +246,12 @@ static int pwm_regulator_probe(struct platform_device *pdev)
- 	if (!drvdata)
- 		return -ENOMEM;
- 
--	if (of_find_property(np, "voltage-table", NULL)) {
-+	if (of_find_property(np, "voltage-table", NULL))
- 		ret = pwm_regulator_init_table(pdev, drvdata);
--		if (ret)
--			return ret;
--	} else {
--		dev_err(&pdev->dev, "No \"voltage-table\" supplied\n");
--		return -EINVAL;
--	}
-+	else
-+		ret = pwm_regulator_init_continuous(pdev, drvdata);
-+	if (ret)
-+		return ret;
- 
- 	config.init_data = of_get_regulator_init_data(&pdev->dev, np,
- 						      &pwm_regulator_desc);
 -- 
-1.9.1
+ciao,
+al
+-----------------------------------
+Al Stone
+Software Engineer
+Red Hat, Inc.
+ahs3 at redhat.com
+-----------------------------------
