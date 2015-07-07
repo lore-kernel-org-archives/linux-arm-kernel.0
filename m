@@ -1,160 +1,58 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jul 2015 13:54:39 +0100
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <559BB727.2070106@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
- <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
- <20150707111248.GU3182@x1> <559BB58E.9010406@linaro.org>
- <559BB727.2070106@linaro.org>
-Message-ID: <20150707125439.GE3182@x1>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 Jul 2015 15:07:32 +0200
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <20150707130732.GD18561@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
+> Add clk_null, which represents clocks that can not / need not
+> controlled by software.
+> There are many clocks' parent set to clk_null.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+> Base on 4.1-rc1
+> 
+> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 924fdb6..4798f44 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -81,6 +81,12 @@
+>  		cpu_on	      = <0x84000003>;
+>  	};
+>  
+> +	clk_null: clk_null {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <0>;
+> +		#clock-cells = <0>;
+> +	};
 
-> 
-> 
-> On Tuesday 07 July 2015 04:48 PM, Vaibhav Hiremath wrote:
-> >
-> >
-> >On Tuesday 07 July 2015 04:42 PM, Lee Jones wrote:
-> >>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> >>>On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
-> >>>>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> >>>>>On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
-> >>>>>>On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
-> >>>>>>
-> >>>>>>>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
-> >>>>>>>(page 0) controls the method of clearing interrupt
-> >>>>>>>status of 88pm800 family of devices;
-> >>>>>>>
-> >>>>>>>   0: clear on read
-> >>>>>>>   1: clear on write
-> >>>>>>>
-> >>>>>>>If pdata is not coming from board file, then set the
-> >>>>>>>default irq clear method to "irq clear on write"
-> >>>>>>>
-> >>>>>>>Also, as suggested by "Lee Jones" renaming variable field
-> >>>>>>>to appropriate name.
-> >>>>>>>
-> >>>>>>>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
-> >>>>>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> >>>>>>>---
-> >>>>>>>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
-> >>>>>>>  include/linux/mfd/88pm80x.h | 10 ++++++++--
-> >>>>>>>  2 files changed, 18 insertions(+), 7 deletions(-)
-> >>>>>>>
-> >>>>>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> >>>>>>>index d495737..66347be 100644
-> >>>>>>>--- a/drivers/mfd/88pm800.c
-> >>>>>>>+++ b/drivers/mfd/88pm800.c
-> >>>>>>>@@ -374,7 +374,7 @@ static int device_irq_init_800(struct
-> >>>>>>>pm80x_chip *chip)
-> >>>>>>>  {
-> >>>>>>>      struct regmap *map = chip->regmap;
-> >>>>>>>      unsigned long flags = IRQF_ONESHOT;
-> >>>>>>>-    int data, mask, ret = -EINVAL;
-> >>>>>>>+    int irq_clr_mode, mask, ret = -EINVAL;
-> >>>>>>>
-> >>>>>>>      if (!map || !chip->irq) {
-> >>>>>>>          dev_err(chip->dev, "incorrect parameters\n");
-> >>>>>>>@@ -382,15 +382,16 @@ static int device_irq_init_800(struct
-> >>>>>>>pm80x_chip *chip)
-> >>>>>>>      }
-> >>>>>>>
-> >>>>>>>      /*
-> >>>>>>>-     * irq_mode defines the way of clearing interrupt. it's
-> >>>>>>>read-clear by
-> >>>>>>>-     * default.
-> >>>>>>>+     * irq_clr_on_wr defines the way of clearing interrupt by
-> >>>>>>>+     * read/write(0/1).  It's read-clear by default.
-> >>>>>>>       */
-> >>>>>>>      mask =
-> >>>>>>>          PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
-> >>>>>>>          PM800_WAKEUP2_INT_MASK;
-> >>>>>>>
-> >>>>>>>-    data = PM800_WAKEUP2_INT_CLEAR;
-> >>>>>>>-    ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
-> >>>>>>>+    irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
-> >>>>>>>+        PM800_WAKEUP2_INT_WRITE_CLEAR :
-> >>>>>>>PM800_WAKEUP2_INT_READ_CLEAR;
-> >>>>>>>+    ret = regmap_update_bits(map, PM800_WAKEUP2, mask,
-> >>>>>>>irq_clr_mode);
-> >>>>>>
-> >>>>>>What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
-> >>>>>>PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
-> >>>>>>directly without all of this faffing about.
-> >>>>>>
-> >>>>>>   regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
-> >>>>>>
-> >>>>>
-> >>>>>Because "irq_clr_method" is of boolean type.
-> >>>>>And macros which you are referring to is,
-> >>>>>
-> >>>>>#define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
-> >>>>>#define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
-> >>>>>
-> >>>>>
-> >>>>>And also, I feel it is more cleaner approach with the current code as
-> >>>>>register definition and userflag are maintained separately.
-> >>>>
-> >>>>I see your point, although it's a shame we have to have this code in
-> >>>>its place.
-> >>>>
-> >>>>One thing I think you can do though is rid chip->irq_clr_method, just
-> >>>>use the one you already have in pdata.
-> >>>>
-> >>>
-> >>>Looking at the current code,
-> >>>Yes, this can be done, but I have to do some more changes around it,
-> >>>to make code cleaner,
-> >>>
-> >>>change the signature of
-> >>>
-> >>>static int device_irq_init_800(struct pm80x_chip *chip)
-> >>>
-> >>>TO
-> >>>
-> >>>static int device_irq_init_800(struct pm80x_chip *chip, struct
-> >>>pm80x_platform_data *pdata)
-> >>>
-> >>>
-> >>>and then only use pdata->irq_clr_method.
-> >>>
-> >>>
-> >>>How do you want to get this inside? V6 version? or separate patch?
-> >>>
-> >>>I have one more cleanup patch in the queue, which I am planning to
-> >>>submit today, if you are ok then I can submit along with that.
-> >>
-> >>Ideally not.  Don't you save the 'struct device' into *chip?  You
-> >>should use that to fetch the pdata, like:
-> >>
-> >>pdata = dev_get_platdata(chip->dev);
-> >>
-> >
-> >Yes certainly, this is another option (rather preferred one).
-> >
-> >But to be consistent with other's I proposed this, please refer to the
-> >fn device_800_init(), where all xxx_init() are taking 2 arguments, and
-> >second argument is pdata.
-> >
-> >
-> >There is room for cleanup, I agree.
-> >I can put this too in the next cleanup series.
-> >
-> 
-> Note that this is init function, called from probe.
-> 
-> So both approach looks ok to me.
+The discussion around this patch shows that we don't want to have this
+clock in the device tree as it is not a hardware description.
 
-Please clean up the other.  Function and put it at the front of the
-set when you re-submit.
+Ok, fine. Eddie, you told us that the rate of the current clk_null children
+is not interesting. What's the motivation to send this patch anyway
+then? Why can't you keep its children on the orphan list where they are
+already now?
+
+Another possibility would be to instantiate the clk_null clock from C
+code rather than from the device tree. This way we wouldn't put any
+wrong descriptions into the device tree and still can implement the
+support for the real parent clocks when we actually need them.
+
+Sascha
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
