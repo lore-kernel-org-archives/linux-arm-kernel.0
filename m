@@ -1,32 +1,64 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:15 +0800
-Subject: [PATCH v2 2/9] iommu/arm-smmu: fix the index calculation of strtab
+Date: Tue, 7 Jul 2015 11:30:14 +0800
+Subject: [PATCH v2 1/9] iommu/arm-smmu: fix the assignment of L1 table
+ log2entries
 In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1436239822-14132-3-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1436239822-14132-2-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The element size of cfg->strtab is just one DWORD, should use multiply
-operation.
+Add a new local variable to store the value of L1 talbe size, so that it
+will not conflict with L1 talbe log2entries(stored in variable size).
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/iommu/arm-smmu-v3.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 56a1fbe..48be7eb 100644
+index f141301..56a1fbe 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1064,7 +1064,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
- 		return 0;
+@@ -2021,21 +2021,23 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ {
+ 	void *strtab;
+ 	u64 reg;
+-	u32 size;
++	u32 size, l1size;
+ 	int ret;
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
 
- 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
--	strtab = &cfg->strtab[sid >> STRTAB_SPLIT << STRTAB_L1_DESC_DWORDS];
-+	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+ 	/* Calculate the L1 size, capped to the SIDSIZE */
+ 	size = STRTAB_L1_SZ_SHIFT - (ilog2(STRTAB_L1_DESC_DWORDS) + 3);
+ 	size = min(size, smmu->sid_bits - STRTAB_SPLIT);
+-	if (size + STRTAB_SPLIT < smmu->sid_bits)
++	cfg->num_l1_ents = 1 << size;
++
++	size += STRTAB_SPLIT;
++	if (size < smmu->sid_bits)
+ 		dev_warn(smmu->dev,
+ 			 "2-level strtab only covers %u/%u bits of SID\n",
+-			 size + STRTAB_SPLIT, smmu->sid_bits);
++			 size, smmu->sid_bits);
 
- 	desc->span = STRTAB_SPLIT + 1;
- 	desc->l2ptr = dma_zalloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
+-	cfg->num_l1_ents = 1 << size;
+-	size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+-	strtab = dma_zalloc_coherent(smmu->dev, size, &cfg->strtab_dma,
++	l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
++	strtab = dma_zalloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+ 				     GFP_KERNEL);
+ 	if (!strtab) {
+ 		dev_err(smmu->dev,
+@@ -2056,8 +2058,7 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 	ret = arm_smmu_init_l1_strtab(smmu);
+ 	if (ret)
+ 		dma_free_coherent(smmu->dev,
+-				  cfg->num_l1_ents *
+-				  (STRTAB_L1_DESC_DWORDS << 3),
++				  l1size,
+ 				  strtab,
+ 				  cfg->strtab_dma);
+ 	return ret;
 --
 1.8.0
