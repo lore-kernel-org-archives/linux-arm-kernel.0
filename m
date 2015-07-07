@@ -1,58 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Jul 2015 12:32:13 +0100
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
-Message-ID: <20150707113213.GC7576@n2100.arm.linux.org.uk>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Tue, 7 Jul 2015 11:33:32 +0000
+Subject: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
+ control
+In-Reply-To: <E959C4978C3B6342920538CF579893F0025F35E1@SHSMSX104.ccr.corp.intel.com>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-4-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0025F342B@SHSMSX104.ccr.corp.intel.com>
+ <559BB167.1030603@redhat.com>
+ <E959C4978C3B6342920538CF579893F0025F34FC@SHSMSX104.ccr.corp.intel.com>
+ <559BB463.6090406@redhat.com>
+ <E959C4978C3B6342920538CF579893F0025F3568@SHSMSX104.ccr.corp.intel.com>
+ <559BB642.5010701@redhat.com>
+ <E959C4978C3B6342920538CF579893F0025F35E1@SHSMSX104.ccr.corp.intel.com>
+Message-ID: <E959C4978C3B6342920538CF579893F0025F3645@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:26:13PM +0200, Pali Roh?r wrote:
-> Legacy bootloaders can pass additional information for kernel or legacy
-> userspace applications. When booting DT kernel then ATAGs structure is not
-> more visible after running kernel uncompress code. This patch stores full
-> ATAGs structure into DT "/chosen/linux,atags" entry, so kernel can later
-> reuse it and export via /proc/atags to userspace.
 
-I think you need to go through your commit messages and improve them,
-especially the ones with "TODO" in them.  As long as there's still things
-to be done, they're obviously not ready for merging.
 
-Moreover, exporting the ATAGS is questionable, even _if_ there are non-
-kexec programs making use of this.  The ATAGs have _never_ been exported
-to userspace when kexec disabled is the kernel - it was introduced for
-kexec, and has always had this:
+> -----Original Message-----
+> From: Wu, Feng
+> Sent: Tuesday, July 07, 2015 7:24 PM
+> To: Paolo Bonzini; Eric Auger; eric.auger at st.com;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
+> joro at 8bytes.org; b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; Wu, Feng
+> Subject: RE: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
+> control
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Paolo Bonzini [mailto:pbonzini at redhat.com]
+> > Sent: Tuesday, July 07, 2015 7:22 PM
+> > To: Wu, Feng; Eric Auger; eric.auger at st.com;
+> > linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> > kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> > alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
+> > joro at 8bytes.org; b.reynal at virtualopensystems.com
+> > Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> > Subject: Re: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
+> > control
+> >
+> >
+> >
+> > On 07/07/2015 13:18, Wu, Feng wrote:
+> > > Then I still need assign prod and de-assign prod in
+> > > irq_bypass_register_consumer/irq_bypass_unregister_consumer, Right?
+> > > Would you please share why this is better.
+> >
+> > The need to store the consumer->producer link seems to be unique to
+> > posted interrupts.  It is difficult to say without seeing the PI code,
+> > but I prefer to keep the bypass manager as small as possible.
+> 
+> Fine. I will follow your suggestion!
 
-config ATAGS_PROC
-        bool "Export atags in procfs"
-        depends on ATAGS && KEXEC
-        default y
+If using the following changes, how can we assign 'prod', we need to use
+container_of to get struct kvm_kernel_irqfd and then refer to 'prod', but
+we cannot do this in irq_bypass_register_consumer(), right? It is a
+common API. But we can only get the associated producer info inside
+bypass manager, right?
 
-Now, the fact that someone decided to start using it is pretty sad,
-because it means that if you disable KEXEC, userspace breaks.  That's
-not a kernel regression in any shape or form, because /proc/atags has
-never been there without KEXEC enabled.  That's a userspace bug, plain
-and simple.
+Thanks,
+Feng
 
-Given that, I'm in two minds about whether to accept the last two
-patches which make this more than just "for KEXEC use to enable a KEXEC
-kernel to be booted."
+struct kvm_kernel_irqfd {
 
-Had it been provided without the KEXEC conditional, then I don't have
-a problem with these two patches.
+ 	......
 
-It also sets a precedent: by adding this into DT, it is creating a new
-DT ABI as well, and we'll end up seeing dts files with an ATAG block
-patched into them.
+ 	struct irq_bypass_consumer cons;
+ 	struct irq_bypass_producer *prod;
+};
 
-Are the ATAGs at a fixed address on the N900?  Can that be handled in
-some kind of legacy file for the N900 which calls save_atags() on it, so
-we don't end up introducing yet more stuff that we have to maintain into
-the distant future?  If not, what about copying a known working atag
-structure into a legacy file for the N900?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+> 
+> Thanks,
+> Feng
+> 
+> >
+> > Paolo
