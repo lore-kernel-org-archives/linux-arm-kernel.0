@@ -1,10 +1,10 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 07 Jul 2015 16:02:51 +0200
-Subject: [PATCH 3/5] usb: isp1760: udc: add missing
+Date: Tue, 07 Jul 2015 16:02:52 +0200
+Subject: [PATCH 4/5] staging: emxx_udc: add missing
  usb_ep_set_maxpacket_limit()
 In-Reply-To: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
 References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436277773-14274-4-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436277773-14274-5-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,26 +13,22 @@ maxpacket value manually.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/isp1760/isp1760-udc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/staging/emxx_udc/emxx_udc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
-index 18ebf5b1..3699962 100644
---- a/drivers/usb/isp1760/isp1760-udc.c
-+++ b/drivers/usb/isp1760/isp1760-udc.c
-@@ -1382,11 +1382,11 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
- 		 * This fits in the 8kB FIFO without double-buffering.
- 		 */
- 		if (ep_num == 0) {
--			ep->ep.maxpacket = 64;
-+			usb_ep_set_maxpacket_limit(&ep->ep, 64);
- 			ep->maxpacket = 64;
- 			udc->gadget.ep0 = &ep->ep;
- 		} else {
--			ep->ep.maxpacket = 512;
-+			usb_ep_set_maxpacket_limit(&ep->ep, 512);
- 			ep->maxpacket = 0;
- 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
- 		}
+diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
+index 4178d96..f50bf5d 100644
+--- a/drivers/staging/emxx_udc/emxx_udc.c
++++ b/drivers/staging/emxx_udc/emxx_udc.c
+@@ -3203,7 +3203,8 @@ static void __init nbu2ss_drv_ep_init(struct nbu2ss_udc *udc)
+ 		ep->ep.name = gp_ep_name[i];
+ 		ep->ep.ops = &nbu2ss_ep_ops;
+ 
+-		ep->ep.maxpacket = (i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
++		usb_ep_set_maxpacket_limit(&ep->ep,
++				(i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE));
+ 
+ 		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 		INIT_LIST_HEAD(&ep->queue);
 -- 
 1.9.1
