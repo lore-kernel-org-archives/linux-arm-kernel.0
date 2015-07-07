@@ -1,45 +1,38 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 07 Jul 2015 09:43:37 +0200
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <014d01d0b885$d3228380$79678a80$@samsung.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
- <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559A9854.2090607@linaro.org>
- <559AA449.80705@arm.com> <014d01d0b885$d3228380$79678a80$@samsung.com>
-Message-ID: <559B8329.9070105@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 07 Jul 2015 08:46:04 +0100
+Subject: [PATCH v5 1/2] arm64: kvm: allows kvm cpu hotplug
+In-Reply-To: <559B8308.4000200@linaro.org>
+References: <1432877920-12527-1-git-send-email-takahiro.akashi@linaro.org>	
+ <1432877920-12527-2-git-send-email-takahiro.akashi@linaro.org>	
+ <557729A0.1030700@arm.com> <559A964D.30500@arm.com>
+ <1436201874.22232.3.camel@infradead.org> <559B8308.4000200@linaro.org>
+Message-ID: <559B83BC.5080309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-On 07/07/2015 09:23 AM, Pavel Fedin wrote:
->  Hi!
+On 07/07/15 08:43, AKASHI Takahiro wrote:
+> On 07/07/2015 01:57 AM, Geoff Levand wrote:
+>> Hi Marc,
+>>
+>> On Mon, 2015-07-06 at 15:53 +0100, Marc Zyngier wrote:
+>>> So this has now been a whole month since I reviewed this, and I haven't
+>>> seen any repost of this series. Any hope to see this within a reasonable
+>>> time frame? Or is it considered dead already?
+>>
+>> I was hoping to do some work on updating the base kexec patches
+>> last week, but all my time was taken up but other things.  I'll
+>> try to start on it this week.
 > 
->> I guess not. But I prefer the new type anyway, as it also has a known
->> error path for older kernels.
-> 
->  flags != 0 has known error path too, and it's absolutely the same.
->  Sorry, read this after writing my previous reply, so this is a short addendum.
-> 
->  I see lots of people agreed on a new type. If my argument about reusing existing definitions is not
-> enough, you can ignore it. Three people beat one definitely. :)
-OK. let's move forward and use this new type. I will repost soon so
-everyone can re-check the fit at kvmtool/qemu.
+> I also have some update, and so will submit my patchset
+> after Geoff. Pratyush's patch should also be synced.
 
-Thanks
+Please coordinate between all of you and post a consistent series. It
+was painful enough to review the KVM stuff independently of the rest of
+the series, so I'd really really want to see a single series that
+addresses the issue end to end.
 
-Eric
->  And yes, since we are talking about it, actually KVM_MSI_VALID_DEVID flag is not yet a part of
-> mainline, so it's not set in stone. Then, perhaps you could throw it away completely and invent
-> KVM_SIGNAL_EXT_MSI ioctl for sending MSIs with device ID. This would also be consistent IMO.
-> 
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
-> 
-> 
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
