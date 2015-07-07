@@ -1,56 +1,58 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 7 Jul 2015 15:48:52 +0200
-Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
- for bus recovery
-In-Reply-To: <1436276269.3344.94.camel@pengutronix.de>
-References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
- <20141126160407.GN4431@pengutronix.de> <5476085B.40009@ti.com>
- <1436276269.3344.94.camel@pengutronix.de>
-Message-ID: <20150707134852.GE9671@pengutronix.de>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 7 Jul 2015 22:49:55 +0900
+Subject: Stack trace using ftrace
+In-Reply-To: <559B86CA.2060508@linaro.org>
+References: <5580ED65-69A0-40F9-9626-31A0D066C507@gmail.com>
+ <559A34B9.2020605@linaro.org>
+ <42A36D72-9621-4FEF-B977-7FC6E4421618@gmail.com>
+ <559B86CA.2060508@linaro.org>
+Message-ID: <6A4AA92F-8939-428C-8BAD-A1E6529F987C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Tue, Jul 07, 2015 at 03:37:49PM +0200, Jan L?bbe wrote:
-> On Mi, 2014-11-26 at 19:05 +0200, Grygorii Strashko wrote:
-> > On 11/26/2014 06:04 PM, Uwe Kleine-K?nig wrote:
-> > > On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
-> > >> Having a board where the I2C bus locks up occasionally made it clear
-> > >> that the bus recovery in the i2c-davinci driver will only work on
-> > >> some boards, because on regular boards, this will only toggle GPIO
-> > >> lines that aren't muxed to the actual pins.
-> > >>
-> > >> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
-> > >> built-in capability to bit-bang its lines by using the ICPFUNC registers
-> > >> of the i2c controller.
-> > >> Implement the suggested procedure by toggling SCL and checking SDA using
-> > >> the ICPFUNC registers of the I2C controller when present. Allow platforms
-> > >> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
-> > >> data flag and add optional DT property "ti,has-pfunc" to indicate
-> > >> the same in DT.
-> > > On what does it depend if this pfunc stuff works or not? Only the SoC,
-> > > or also on some board specific properties?
-> > 
-> > SoC / set of SoCs. Also, similar feature is supported by OMAP and AM335x/AM437x SoCs
-> > using I2C_SYSTEST register.
-> > 
-> > > Given the former using the
-> > > compatible string to detect its availability would be better. (In this
-> > > case also sorry, didn't consider this case when requesting the property
-> > > in the last round.)
+On Jul 7, 2015, at 4:59 PM, AKASHI Takahiro wrote:
+> On 07/06/2015 09:04 PM, Jungseok Lee wrote:
+>> On Jul 6, 2015, at 4:56 PM, AKASHI Takahiro wrote:
+>>> Hi,
+>> 
+>> Hi,
+>> 
+>>> Thank you for your bug report.
+>> 
+>> Thanks for taking care about this topic.
+>> 
+>>> This issue comes from the fact that ftrace, more specifically check_stack(),
+>>> goes over immediate values in the stack with each function's (bl instruction's) PC
+>>> which is returned by save_stack_trace() while save_stack_trace(), or unwind_frame(),
+>>> decrements the saved value of PC in the stack by 4. So mismatching can happen.
+>>> 
+>>> We can easily fix the problem by reverting the following commit:
+>>> 
+>>>> commit e306dfd06fcb44d21c80acb8e5a88d55f3d1cf63
+>>>> Author: Olof Johansson <olof@lixom.net>
+>>>> Date:   Fri Feb 14 19:35:15 2014 +0000
+>>>> 
+>>>>     ARM64: unwind: Fix PC calculation
+>>> 
+>>> But it will also resurrect the original problem.
+>> 
+>> IMHO, a current problem cannot be resolved by reverting the commit.
+>> Please refer to the following data. The result looks much better than before,
+>> but some entries still have 0 sizes.
 > 
-> I only stumbled across this after it was merged, with the additional
-I also wonder how it came to the Reviewed-by tag for me. The last thing
-that I said about the patch was "On what does it depend if this pfunc
-stuff works or not? Only the SoC, or also on some board specific
-properties?" (see above) and "the patch looks ok". IMHO this hardly
-justifies to add the Reviewed-by tag for the next round. :-(
+> Sorry for that.
 
-Best regards
-Uwe
+It's okay.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> There seem to be several problems.
+> The value in 'size' field should go one line up,
+> for example, 32 for arch_timer_handler and 64 for
+> handle_percpu_devid_irq.
+> 
+> I'm now looking into those issues.
+
+I can support a test with dragonboard410c. Please let me know if necessary.
+Thanks again!
+
+Best Regards
+Jungseok Lee
