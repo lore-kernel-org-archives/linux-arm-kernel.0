@@ -1,90 +1,324 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:17:55 +0100
-Subject: [PATCH v3 05/15] PCI/MSI: of: Add support for OF-provided msi_domain
+Date: Tue,  7 Jul 2015 18:17:59 +0100
+Subject: [PATCH v3 09/15] irqchip: gicv3-its: Split PCI/MSI code from the core
+ ITS driver
 In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
 References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436289485-28230-10-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to populate the PHB msi_domain, use the "msi-parent"
-attribute to lookup a corresponding irq domain. If found,
-this is our MSI domain.
+It is becoming obvious that having the PCI/MSI code in the same
+file as the the core ITS code is giving people implementing non-PCI
+MSI support the wrong kind of idea.
 
-This gets plugged into the core PCI code.
+In order to make things a bit clearer, let's move the PCI/MSI code
+out to its own file. Hopefully it will make it clear that whoever
+thinks of hooking into the core ITS better have a very strong point.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/of.c    | 19 +++++++++++++++++++
- drivers/pci/probe.c |  1 +
- include/linux/pci.h |  2 ++
- 3 files changed, 22 insertions(+)
+ drivers/irqchip/Makefile                 |   2 +-
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 105 +++++++++++++++++++++++++++++++
+ drivers/irqchip/irq-gic-v3-its.c         |  93 ++++-----------------------
+ include/linux/irqchip/arm-gic-v3.h       |   6 ++
+ 4 files changed, 123 insertions(+), 83 deletions(-)
+ create mode 100644 drivers/irqchip/irq-gic-v3-its-pci-msi.c
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index f092993..09df465 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -9,6 +9,7 @@
-  * 2 of the License, or (at your option) any later version.
-  */
- 
-+#include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/of.h>
-@@ -59,3 +60,21 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
- 		return of_node_get(bus->bridge->parent->of_node);
- 	return NULL;
- }
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index b8d4e96..0d5f2a9 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -22,7 +22,7 @@ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
+ obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
+ obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
+-obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o
++obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o
+ obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+new file mode 100644
+index 0000000..7614721
+--- /dev/null
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -0,0 +1,105 @@
++/*
++ * Copyright (C) 2013-2015 ARM Limited, All Rights Reserved.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus)
++#include <linux/msi.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_pci.h>
++
++#include <linux/irqchip/arm-gic-v3.h>
++
++static void its_mask_msi_irq(struct irq_data *d)
 +{
-+#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-+	struct device_node *np;
-+	struct irq_domain *d;
-+
-+	if (!bus->dev.of_node)
-+		return;
-+	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-+	if (!np)
-+		return;
-+	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
-+	if (!d)
-+		d = irq_find_host(np);
-+	dev_set_msi_domain(&bus->dev, d);
-+#endif
++	pci_msi_mask_irq(d);
++	irq_chip_mask_parent(d);
 +}
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 376f6fa..c80626f 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -663,6 +663,7 @@ static void pci_set_bus_speed(struct pci_bus *bus)
++
++static void its_unmask_msi_irq(struct irq_data *d)
++{
++	pci_msi_unmask_irq(d);
++	irq_chip_unmask_parent(d);
++}
++
++static struct irq_chip its_msi_irq_chip = {
++	.name			= "ITS-MSI",
++	.irq_unmask		= its_unmask_msi_irq,
++	.irq_mask		= its_mask_msi_irq,
++	.irq_eoi		= irq_chip_eoi_parent,
++	.irq_write_msi_msg	= pci_msi_domain_write_msg,
++};
++
++struct its_pci_alias {
++	struct pci_dev	*pdev;
++	u32		dev_id;
++	u32		count;
++};
++
++static int its_pci_msi_vec_count(struct pci_dev *pdev)
++{
++	int msi, msix;
++
++	msi = max(pci_msi_vec_count(pdev), 0);
++	msix = max(pci_msix_vec_count(pdev), 0);
++
++	return max(msi, msix);
++}
++
++static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
++{
++	struct its_pci_alias *dev_alias = data;
++
++	dev_alias->dev_id = alias;
++	if (pdev != dev_alias->pdev)
++		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
++
++	return 0;
++}
++
++static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
++			       int nvec, msi_alloc_info_t *info)
++{
++	struct pci_dev *pdev;
++	struct its_pci_alias dev_alias;
++
++	if (!dev_is_pci(dev))
++		return -EINVAL;
++
++	pdev = to_pci_dev(dev);
++	dev_alias.pdev = pdev;
++	dev_alias.count = nvec;
++
++	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
++
++	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
++}
++
++static struct msi_domain_ops its_pci_msi_ops = {
++	.msi_prepare	= its_pci_msi_prepare,
++};
++
++static struct msi_domain_info its_pci_msi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
++		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
++	.ops	= &its_pci_msi_ops,
++	.chip	= &its_msi_irq_chip,
++};
++
++struct irq_domain *its_pci_msi_alloc_domain(struct device_node *np,
++					    struct irq_domain *parent)
++{
++	return pci_msi_create_irq_domain(np, &its_pci_msi_domain_info, parent);
++}
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1b7e155..7c01fe4 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -611,26 +611,6 @@ static struct irq_chip its_irq_chip = {
+ 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+ };
  
- void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
- {
-+	pci_set_phb_of_msi_domain(bus);
+-static void its_mask_msi_irq(struct irq_data *d)
+-{
+-	pci_msi_mask_irq(d);
+-	irq_chip_mask_parent(d);
+-}
+-
+-static void its_unmask_msi_irq(struct irq_data *d)
+-{
+-	pci_msi_unmask_irq(d);
+-	irq_chip_unmask_parent(d);
+-}
+-
+-static struct irq_chip its_msi_irq_chip = {
+-	.name			= "ITS-MSI",
+-	.irq_unmask		= its_unmask_msi_irq,
+-	.irq_mask		= its_mask_msi_irq,
+-	.irq_eoi		= irq_chip_eoi_parent,
+-	.irq_write_msi_msg	= pci_msi_domain_write_msg,
+-};
+-
+ /*
+  * How we allocate LPIs:
+  *
+@@ -1173,85 +1153,34 @@ static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
+ 	return 0;
  }
  
- static void pci_set_bus_msi_domain(struct pci_bus *bus)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 3622453..ee3cdba 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1847,6 +1847,7 @@ void pci_set_of_node(struct pci_dev *dev);
- void pci_release_of_node(struct pci_dev *dev);
- void pci_set_bus_of_node(struct pci_bus *bus);
- void pci_release_bus_of_node(struct pci_bus *bus);
-+void pci_set_phb_of_msi_domain(struct pci_bus *bus);
+-struct its_pci_alias {
+-	struct pci_dev	*pdev;
+-	u32		dev_id;
+-	u32		count;
+-};
+-
+-static int its_pci_msi_vec_count(struct pci_dev *pdev)
+-{
+-	int msi, msix;
+-
+-	msi = max(pci_msi_vec_count(pdev), 0);
+-	msix = max(pci_msix_vec_count(pdev), 0);
+-
+-	return max(msi, msix);
+-}
+-
+-static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
++int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
++		    int nvec, msi_alloc_info_t *info)
+ {
+-	struct its_pci_alias *dev_alias = data;
+-
+-	dev_alias->dev_id = alias;
+-	if (pdev != dev_alias->pdev)
+-		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
+-
+-	return 0;
+-}
+-
+-static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
+-			   int nvec, msi_alloc_info_t *info)
+-{
+-	struct pci_dev *pdev;
+ 	struct its_node *its;
+ 	struct its_device *its_dev;
+-	struct its_pci_alias dev_alias;
+-
+-	if (!dev_is_pci(dev))
+-		return -EINVAL;
+-
+-	pdev = to_pci_dev(dev);
+-	dev_alias.pdev = pdev;
+-	dev_alias.count = nvec;
  
- /* Arch may override this (weak) */
- struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
-@@ -1869,6 +1870,7 @@ static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
- static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
- static inline struct device_node *
- pci_device_to_OF_node(const struct pci_dev *pdev) { return NULL; }
-+static inline void pci_set_phb_of_msi_domain(struct pci_bus *bus) { }
- #endif  /* CONFIG_OF */
+-	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+ 	its = domain->parent->host_data;
+-
+-	its_dev = its_find_device(its, dev_alias.dev_id);
++	its_dev = its_find_device(its, dev_id);
+ 	if (its_dev) {
+ 		/*
+ 		 * We already have seen this ID, probably through
+ 		 * another alias (PCI bridge of some sort). No need to
+ 		 * create the device.
+ 		 */
+-		dev_dbg(dev, "Reusing ITT for devID %x\n", dev_alias.dev_id);
++		pr_debug("Reusing ITT for devID %x\n", dev_id);
+ 		goto out;
+ 	}
  
- #ifdef CONFIG_EEH
+-	its_dev = its_create_device(its, dev_alias.dev_id, dev_alias.count);
++	its_dev = its_create_device(its, dev_id, nvec);
+ 	if (!its_dev)
+ 		return -ENOMEM;
+ 
+-	dev_dbg(&pdev->dev, "ITT %d entries, %d bits\n",
+-		dev_alias.count, ilog2(dev_alias.count));
++	pr_debug("ITT %d entries, %d bits\n", nvec, ilog2(nvec));
+ out:
+ 	info->scratchpad[0].ptr = its_dev;
+-	info->scratchpad[1].ptr = dev;
+ 	return 0;
+ }
+ 
+-static struct msi_domain_ops its_pci_msi_ops = {
+-	.msi_prepare	= its_msi_prepare,
+-};
+-
+-static struct msi_domain_info its_pci_msi_domain_info = {
+-	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS |
+-		   MSI_FLAG_MULTI_PCI_MSI | MSI_FLAG_PCI_MSIX),
+-	.ops	= &its_pci_msi_ops,
+-	.chip	= &its_msi_irq_chip,
+-};
+-
+ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+ 				    unsigned int virq,
+ 				    irq_hw_number_t hwirq)
+@@ -1287,8 +1216,9 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 
+ 		irq_domain_set_hwirq_and_chip(domain, virq + i,
+ 					      hwirq, &its_irq_chip, its_dev);
+-		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
+-			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
++		pr_debug("ID:%d pID:%d vID:%d\n",
++			 (int)(hwirq - its_dev->lpi_base),
++			 (int)hwirq, virq + i);
+ 	}
+ 
+ 	return 0;
+@@ -1485,9 +1415,8 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 
+ 		its->domain->parent = parent;
+ 
+-		its->msi_chip.domain = pci_msi_create_irq_domain(node,
+-								 &its_pci_msi_domain_info,
+-								 its->domain);
++		its->msi_chip.domain = its_pci_msi_alloc_domain(node,
++								its->domain);
+ 		if (!its->msi_chip.domain) {
+ 			err = -ENOMEM;
+ 			goto out_free_domains;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..d6149ba 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -360,6 +360,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/stringify.h>
++#include <asm/msi.h>
+ 
+ /*
+  * We need a value to serve as a irq-type for LPIs. Choose one that will
+@@ -388,6 +389,11 @@ struct irq_domain;
+ int its_cpu_init(void);
+ int its_init(struct device_node *node, struct rdists *rdists,
+ 	     struct irq_domain *domain);
++int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
++		    int nvec, msi_alloc_info_t *info);
++
++struct irq_domain *its_pci_msi_alloc_domain(struct device_node *node,
++					    struct irq_domain *parent);
+ 
+ #endif
+ 
 -- 
 2.1.4
