@@ -1,70 +1,126 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 7 Jul 2015 13:11:28 +0200
-Subject: [PATCH] base: power: wakeirq: don't leak dev->power.wakeirq
-In-Reply-To: <20150707081120.GA15545@saruman.tx.rr.com>
-References: <1436205678-31640-1-git-send-email-balbi@ti.com>
- <2783932.o7RC7vMDHB@vostro.rjw.lan>
- <20150707074053.GO10705@atomide.com>
- <20150707081120.GA15545@saruman.tx.rr.com>
-Message-ID: <CAJZ5v0jRaoTzLbCpgLoag0BvcQWCMc+Do9M=ajkM6+sGJRVE7A@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jul 2015 12:12:48 +0100
+Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <559BAF23.90002@linaro.org>
+References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
+ <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
+Message-ID: <20150707111248.GU3182@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 10:11 AM, Felipe Balbi <balbi@ti.com> wrote:
-> On Tue, Jul 07, 2015 at 12:40:53AM -0700, Tony Lindgren wrote:
->> * Rafael J. Wysocki <rjw@rjwysocki.net> [150706 15:49]:
->> > On Monday, July 06, 2015 01:01:18 PM Felipe Balbi wrote:
->> > > on a first call to dev_pm_attach_wake_irq(), if it
->> > > fails, it will leave dev->power.wakeirq set to a
->> > > dangling pointer. Instead, let's clear it to make
->> > > sure a subsequent call to dev_pm_attach_wake_irq()
->> > > has chance to succeed.
->> > >
->> > > Cc: Tony Lindgren <tmlind@atomide.com>
->> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
->> > > ---
->> > >  drivers/base/power/wakeirq.c | 9 ++++++++-
->> > >  1 file changed, 8 insertions(+), 1 deletion(-)
->> > >
->> > > diff --git a/drivers/base/power/wakeirq.c b/drivers/base/power/wakeirq.c
->> > > index 7470004ca810..394d250a1ad8 100644
->> > > --- a/drivers/base/power/wakeirq.c
->> > > +++ b/drivers/base/power/wakeirq.c
->> > > @@ -50,9 +50,16 @@ static int dev_pm_attach_wake_irq(struct device *dev, int irq,
->> > >
->> > >   err = device_wakeup_attach_irq(dev, wirq);
->> > >   if (err)
->> > > -         return err;
->> > > +         goto err_cleanup;
->> > >
->> > >   return 0;
->> > > +
->> > > +err_cleanup:
->> > > + spin_lock_irqsave(&dev->power.lock, flags);
->> > > + dev->power.wakeirq = NULL;
->> > > + spin_unlock_irqrestore(&dev->power.lock, flags);
->> > > +
->> > > + return err;
->> > >  }
->> >
->> > Too many labels for me and the fact that acquiring of the lock again in the error
->> > patch doesn't look good.
->> >
->> > However, we can do the entire device_wakeup_attach_irq() under the lock (after
->> > removing the locking from it), because we're its only caller.
->> >
->> > So what about the below instead (build-tested only)?
->>
->> Nice, still works for me and simplifies things:
->>
->> Tested-by: Tony Lindgren <tony@atomide.com>
->
-> Cool, thanks for testing Tony. Rafael, I'm fine with your version too.
-> FWIW:
->
-> Reported-by: Felipe Balbi <balbi@ti.com>
+On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+> On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
+> >On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+> >>On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
+> >>>On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
+> >>>
+> >>>>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+> >>>>(page 0) controls the method of clearing interrupt
+> >>>>status of 88pm800 family of devices;
+> >>>>
+> >>>>   0: clear on read
+> >>>>   1: clear on write
+> >>>>
+> >>>>If pdata is not coming from board file, then set the
+> >>>>default irq clear method to "irq clear on write"
+> >>>>
+> >>>>Also, as suggested by "Lee Jones" renaming variable field
+> >>>>to appropriate name.
+> >>>>
+> >>>>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+> >>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> >>>>---
+> >>>>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
+> >>>>  include/linux/mfd/88pm80x.h | 10 ++++++++--
+> >>>>  2 files changed, 18 insertions(+), 7 deletions(-)
+> >>>>
+> >>>>diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+> >>>>index d495737..66347be 100644
+> >>>>--- a/drivers/mfd/88pm800.c
+> >>>>+++ b/drivers/mfd/88pm800.c
+> >>>>@@ -374,7 +374,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+> >>>>  {
+> >>>>  	struct regmap *map = chip->regmap;
+> >>>>  	unsigned long flags = IRQF_ONESHOT;
+> >>>>-	int data, mask, ret = -EINVAL;
+> >>>>+	int irq_clr_mode, mask, ret = -EINVAL;
+> >>>>
+> >>>>  	if (!map || !chip->irq) {
+> >>>>  		dev_err(chip->dev, "incorrect parameters\n");
+> >>>>@@ -382,15 +382,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+> >>>>  	}
+> >>>>
+> >>>>  	/*
+> >>>>-	 * irq_mode defines the way of clearing interrupt. it's read-clear by
+> >>>>-	 * default.
+> >>>>+	 * irq_clr_on_wr defines the way of clearing interrupt by
+> >>>>+	 * read/write(0/1).  It's read-clear by default.
+> >>>>  	 */
+> >>>>  	mask =
+> >>>>  	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
+> >>>>  	    PM800_WAKEUP2_INT_MASK;
+> >>>>
+> >>>>-	data = PM800_WAKEUP2_INT_CLEAR;
+> >>>>-	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
+> >>>>+	irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
+> >>>>+		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+> >>>>+	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+> >>>
+> >>>What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
+> >>>PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
+> >>>directly without all of this faffing about.
+> >>>
+> >>>   regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
+> >>>
+> >>
+> >>Because "irq_clr_method" is of boolean type.
+> >>And macros which you are referring to is,
+> >>
+> >>#define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
+> >>#define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
+> >>
+> >>
+> >>And also, I feel it is more cleaner approach with the current code as
+> >>register definition and userflag are maintained separately.
+> >
+> >I see your point, although it's a shame we have to have this code in
+> >its place.
+> >
+> >One thing I think you can do though is rid chip->irq_clr_method, just
+> >use the one you already have in pdata.
+> >
+> 
+> Looking at the current code,
+> Yes, this can be done, but I have to do some more changes around it,
+> to make code cleaner,
+> 
+> change the signature of
+> 
+> static int device_irq_init_800(struct pm80x_chip *chip)
+> 
+> TO
+> 
+> static int device_irq_init_800(struct pm80x_chip *chip, struct
+> pm80x_platform_data *pdata)
+> 
+> 
+> and then only use pdata->irq_clr_method.
+> 
+> 
+> How do you want to get this inside? V6 version? or separate patch?
+> 
+> I have one more cleanup patch in the queue, which I am planning to
+> submit today, if you are ok then I can submit along with that.
 
-OK, applied.
+Ideally not.  Don't you save the 'struct device' into *chip?  You
+should use that to fetch the pdata, like:
 
-Thanks,
-Rafael
+pdata = dev_get_platdata(chip->dev);
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
