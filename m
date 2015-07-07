@@ -1,43 +1,33 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Jul 2015 17:27:22 +0200
-Subject: [PATCH v2 2/7] Documentation: bindings: document the clocks for
- pxa3xx-nand
+Date: Tue,  7 Jul 2015 17:27:24 +0200
+Subject: [PATCH v2 4/7] Documentation: bindings: add the Berlin nand
+ controller compatible
 In-Reply-To: <1436282847-21137-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1436282847-21137-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1436282847-21137-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1436282847-21137-5-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pxa3xx nand driver can optionally uses clocks if needed. Currently
-two clocks can be specified: 'nfc' and 'ecc'. Add the corresponding
+The Berlin nand controller support was introduced using the existing
+pxa3xx nand driver. Add the Berlin specific compatible into the
 documentation.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-index 4f833e3c4f51..d9aa0a6729a8 100644
+index d9aa0a6729a8..0d7163aa5ba0 100644
 --- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 +++ b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
-@@ -11,6 +11,8 @@ Required properties:
- 
- Optional properties:
- 
-+ - clocks:		A phandle to the clocks
-+ - clock-names:		'nfc' and 'ecc'
-  - marvell,nand-enable-arbiter:	Set to enable the bus arbiter
-  - marvell,nand-keep-config:	Set to keep the NAND controller config as set
- 				by the bootloader
-@@ -32,6 +34,8 @@ Example:
- 		compatible = "marvell,pxa3xx-nand";
- 		reg = <0x43100000 90>;
- 		interrupts = <45>;
-+		clocks = <&gateclk 11>;
-+		clock-names = "nfc";
- 		#address-cells = <1>;
- 
- 		marvell,nand-enable-arbiter;
+@@ -5,6 +5,7 @@ Required properties:
+  - compatible:		Should be set to one of the following:
+ 			marvell,pxa3xx-nand
+ 			marvell,armada370-nand
++			marvell,berlin2-nand
+  - reg: 		The register base for the controller
+  - interrupts:		The interrupt to map
+  - #address-cells:	Set to <1> if the node includes partitions
 -- 
 2.4.5
