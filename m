@@ -1,87 +1,68 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 7 Jul 2015 17:48:45 +0800
-Subject: [PATCH] clk: mediatek: Add MT8173 MMPLL change rate support
-In-Reply-To: <1618189.7QkIIkOn1c@diego>
-References: <1433222760-5924-1-git-send-email-jamesjj.liao@mediatek.com>
- <57452978.oOaMP89yJM@diego> <1436261318.3526.96.camel@mtksdaap41>
- <1618189.7QkIIkOn1c@diego>
-Message-ID: <1436262525.3526.103.camel@mtksdaap41>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue, 7 Jul 2015 11:49:48 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 3/4] mfd: axp20x: Add a cell for the
+ usb power_supply part of the axp20x PMICs
+In-Reply-To: <20150707070128.GI3182@x1>
+References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
+ <1435316357-26606-3-git-send-email-hdegoede@redhat.com>
+ <20150707070128.GI3182@x1>
+Message-ID: <559BA0BC.9060409@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi,
 
-On Tue, 2015-07-07 at 11:34 +0200, Heiko St?bner wrote:
-> > > > @@ -135,16 +138,26 @@ static void mtk_pll_calc_values(struct mtk_clk_pll
-> > > > *pll, u32 *pcw, u32 *postdiv, u32 freq, u32 fin)
-> > > > 
-> > > >  {
-> > > >  
-> > > >  	unsigned long fmin = 1000 * MHZ;
-> > > > 
-> > > > +	const unsigned long *div_rate = pll->data->div_rate;
-> > > > 
-> > > >  	u64 _pcw;
-> > > >  	u32 val;
-> > > >  	
-> > > >  	if (freq > pll->data->fmax)
-> > > >  	
-> > > >  		freq = pll->data->fmax;
-> > > > 
-> > > > -	for (val = 0; val < 4; val++) {
-> > > > +	if (div_rate) {
-> > > > +		for (val = 1; div_rate[val] != 0; val++) {
-> > > > +			if (freq > div_rate[val])
-> > > > +				break;
-> > > > +		}
-> > > > +		val--;
-> > > 
-> > > if you're changing the table struct, this of course also would need to be
-> > > adapted.
-> > > 
-> > > 
-> > > Hmm, what I don't understand is, what does MT8173_PLL_FMAX in the table,
-> > > if
-> > > you ignore it here all the time?
-> > > 
-> > > So the table should probably look more like [when using the concept from
-> > > above]
-> > > 
-> > > static const struct mtk_pll_div_table mmpll_div_rate[] = {
-> > > 
-> > > 	{ .freq = 1000000000, .div = 0 },
-> > > 	{ .freq = 702000000, .div = 1 },
-> > > 	{ .freq = 253500000, .div = 2 },
-> > > 	{ .freq = 126750000, .div = 3 },
-> > > 	{ /* sentinel */ },
-> > > 
-> > > };
-> > 
-> > The freq-div table describes the maximum frequency of each divider
-> > setting. Although the first element doesn't used in current
-> > implementation, I think it's better to keep freq-div table's
-> > completeness.
-> 
-> the issue I see is, that its value is currently 0 and the code substracts 1. 
-> So if anything would (accidentially) select MT8173_PLL_FMAX, the u32 val would 
-> wrap around, as you're subtracting 1 from 0 .
+On 07-07-15 09:01, Lee Jones wrote:
+> On Fri, 26 Jun 2015, Hans de Goede wrote:
+>
+>> Add a cell for the usb power_supply part of the axp20x PMICs.
+>>
+>> Note that this cell is only for the usb power_supply part and not the
+>> ac-power / battery-charger / rtc-backup-bat-charger bits.
+>>
+>> Depending on the board each of those must be enabled / disabled separately
+>> in devicetree as most boards do not use all 4. So in dt each one needs its
+>> own child-node of the axp20x node. Another reason for using separate child
+>> nodes for each is so that other devicetree nodes can have a power-supply
+>> property with a phandle referencing a node representing a single
+>> power-supply.
+>>
+>> The decision to use a separate devicetree node for each is reflected on
+>> the kernel side by each getting its own mfd-cell / platform_device and
+>> platform-driver.
+>>
+>> Note this commit also makes some whitespace changes to the intialization
+>> of existing cells in axp20x_cells, these are pure whitespace changes,
+>> functionally nothing changes.
+>>
+>> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Use DEFINE_RES_IRQ_NAMED
+>> -Change indentation of axp20x_cells initializers to avoid line wrapping
+>> Changes in v3:
+>> -Improve commit message
+>> -Add Bruno's S-o-b
+>> ---
+>>   drivers/mfd/axp20x.c | 20 ++++++++++++++++----
+>>   1 file changed, 16 insertions(+), 4 deletions(-)
+>
+> For my own reference:
+>    Acked-by: Lee Jones <lee.jones@linaro.org>
+>
+> Are these two patches tied to any other in the set, or can I apply
+> them separately?
 
-Subtracting 1 from val is safe now because it starts from 1:
+You can apply them seperately, thanks.
 
-  for (val = 1; div_rate[val] != 0; val++) {
-    ...
-  }
-  val--;
+I'm wondering who will take care of upstreaming the first patch of this
+set: "ARM: dts: Add binding documentation for AXP20x pmic usb power supply"
 
-I can change this implementation to a more readable one such as:
+If you can take that one too that would be great.
 
-  for (val = 0; div_rate[val + 1] != 0; val++) {
-    if (freq <= div_rate[val] && freq > div_rate[val + 1]) {
-      ...
+Regards,
 
-Do you think it is OK?
-
-
-Best regards,
-
-James
+Hans
