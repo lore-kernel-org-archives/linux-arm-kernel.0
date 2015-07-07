@@ -1,48 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Jul 2015 12:27:43 +0200
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150707101330.GJ7557@n2100.arm.linux.org.uk>
-References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
- <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
- <20150622161002.GB8240@lst.de>
- <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
- <20150701065948.GA4355@lst.de>
- <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
- <20150701072828.GA4881@lst.de>
- <20150707095012.GQ7021@wotan.suse.de>
- <20150707101330.GJ7557@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdX539+TRrZ+NtQNzJecVgT_Mc=CTZggixtcUg_GsFMjoQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 7 Jul 2015 15:57:44 +0530
+Subject: [PATCH] thermal: cpu_cooling: Iterate over all CPUs in clip_cpu
+ mask to get frequency table
+In-Reply-To: <1435723994-3882-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1435723647-3354-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1435723994-3882-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150707102744.GK14598@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 12:13 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Another issue is... the use of memcpy()/memset() directly on memory
-> returned from ioremap*().  The pmem driver does this.  This fails sparse
-> checks.  However, years ago, x86 invented the memcpy_fromio()/memcpy_toio()
-> memset_io() functions, which took a __iomem pointer (which /presumably/
-> means they're supposed to operate on the memory associated with an
-> ioremap'd region.)
->
-> Should these functions always be used for mappings via ioremap*(), and
-> the standard memcpy()/memset() be avoided?  To me, that sounds like a
-> very good thing, because that gives us more control over the
-> implementation of the functions used to access ioremap'd regions,
-> and the arch can decide to prevent GCC inlining its own memset() or
-> memcpy() code if desired.
+On 01-07-15, 12:13, Pi-Cheng Chen wrote:
+> Sorry for the mistake I made when cherry-picking the patch. Fix and resend
+> again.
 
-Yes they should. Not doing that is a typical portability bug (works on x86,
-not everywhere).
+You really want above to show up in git logs ?
 
-Gr{oetje,eeting}s,
+Any comments like this should be present:
+- in cover-letter
+- OR after the three dashes below ---
+- OR must be followed with a scissors line, like this:
+  --------------8<--------
 
-                        Geert
+> __cpufreq_cooling_register() might fail if some CPU other than first one in
+> clip_cpu mask is present earlier e.g. CPU hotplug. Iterate all CPUs in the mask
+> to handle this case.
+> 
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> ---
+>  drivers/thermal/cpu_cooling.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index 6509c61..5e90eb6 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -776,9 +776,14 @@ __cpufreq_cooling_register(struct device_node *np,
+>  	char dev_name[THERMAL_NAME_LENGTH];
+>  	struct cpufreq_frequency_table *pos, *table;
+>  	unsigned int freq, i, num_cpus;
+> -	int ret;
+> +	int ret, cpu;
+> +
+> +	for_each_cpu(cpu, clip_cpus) {
+> +		table = cpufreq_frequency_get_table(cpu);
+> +		if (table)
+> +			break;
+> +	}
+>  
+> -	table = cpufreq_frequency_get_table(cpumask_first(clip_cpus));
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Nah, that's wrong. I hope that's a hypothetical problem and not a real
+one. Would have been better if cpufreq maintainers were cc'd as they
+can provide more insight into this :)
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+cpufreq_frequency_get_table() does: policy->freq_table and so it
+doesn't matter if the cpu is online or not.
+
+cpufreq_cpu_data was getting unset earlier on hotplug, but that's not
+the case anymore. So nothing to worry about :)
+
+-- 
+viresh
