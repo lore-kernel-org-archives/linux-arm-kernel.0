@@ -1,84 +1,43 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:22 +0800
-Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
+Date: Tue, 7 Jul 2015 11:30:13 +0800
+Subject: [PATCH v2 0/9] bugfixs and add support for non-pci devices
+Message-ID: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch support a master with multiple stream IDs, but doesn't support a
-master behinds more than one SMMUs.
+Changelog:
+v1 -> v2:
+update the implementation of patch 1/9 according to Will Deacon's suggestion.
+update the comment of patch 3/9 and 4/9.
+use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
+patch 6/9 is base on Laurent's series, to support probe deferral.
+patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
+patch 9/9 add support for a master with multiple stream IDs.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 39 +++++++++++++++++++++++++++++++++++++--
- 1 file changed, 37 insertions(+), 2 deletions(-)
+Addition:
+scripts/checkpatch 6/9 reports a warning, this is temporary. I don't want
+patch 9/9 to display too many differences just because of add tabs.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 274d059..582cd1e 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -30,6 +30,7 @@
- #include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-+#include <linux/amba/bus.h>
- #include <linux/of_iommu.h>
- #include <linux/of_platform.h>
+scripts/checkpatch.pl 0006-iommu-arm-smmu-to-support-probe-deferral.patch
+WARNING: else is not generally useful after a break or return
+#161: FILE: drivers/iommu/arm-smmu-v3.c:1938:
++		return -ENODEV;
++	} else {
 
-@@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 		return -EINVAL;
- 	}
+Zhen Lei (9):
+  iommu/arm-smmu: fix the assignment of L1 table log2entries
+  iommu/arm-smmu: fix the index calculation of strtab
+  iommu/arm-smmu: fix the values of ARM64_TCR_IRGN0_SHIFT and
+    ARM64_TCR_ORGN0_SHIFT
+  iommu/arm-smmu: enlarge STRTAB_L1_SZ_SHIFT to support larger sidsize
+  iommu/arm-smmu: skip the execution of CMD_PREFETCH_CONFIG
+  iommu/arm-smmu: to support probe deferral
+  iommu/arm-smmu: remove arm_smmu_devices
+  iommu/arm-smmu: rename __arm_smmu_get_pci_sid
+  iommu/arm-smmu: add support for non-pci devices
 
--	/* We only support PCI, for now */
- 	if (!dev_is_pci(dev)) {
--		return -ENODEV;
-+		int i;
-+		struct iommu_group *group;
-+
-+		group = iommu_group_get(dev);
-+		if (!group) {
-+			group = iommu_group_alloc();
-+			if (IS_ERR(group)) {
-+				dev_err(dev, "failed to allocate IOMMU group\n");
-+				return PTR_ERR(group);
-+			}
-+
-+			ret = iommu_group_add_device(group, dev);
-+			if (ret) {
-+				dev_err(dev, "failed to add device into IOMMU group\n");
-+				return PTR_ERR(group);
-+			}
-+		}
-+		iommu_group_put(group);
-+
-+		for (i = 0; i < args->args_count; i++) {
-+			ret = arm_smmu_add_device(dev, args->args[i]);
-+			if (ret) {
-+				dev_err(dev,
-+					"failed to add sid=%d into SMMU\n",
-+					args->args[i]);
-+				return ret;
-+			}
-+		}
- 	} else {
- 		u32 sid;
- 		struct device_node *of_root;
-@@ -2725,6 +2752,14 @@ static int __init arm_smmu_init(void)
- 	if (ret)
- 		return ret;
-
-+	if (!iommu_present(&platform_bus_type))
-+		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
-+
-+#ifdef CONFIG_ARM_AMBA
-+	if (!iommu_present(&amba_bustype))
-+		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
-+#endif
-+
- 	return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
- }
+ drivers/iommu/arm-smmu-v3.c | 238 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 173 insertions(+), 65 deletions(-)
 
 --
 1.8.0
