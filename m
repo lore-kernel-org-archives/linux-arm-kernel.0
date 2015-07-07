@@ -1,70 +1,91 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 7 Jul 2015 14:56:46 +0800
-Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for clock controllers
-In-Reply-To: <CAGS+omAo-d_bK=2HDu98xHvqhnVgJUBy4jbYVGKqsfWRX-EfDA@mail.gmail.com>
-References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
- <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
- <1435805534.3526.23.camel@mtksdaap41>
- <CAGS+omCgNstb+NPmRdbngnLm754hDPLO28KRc4RanCD2Myv7dQ@mail.gmail.com>
- <5595CBDC.7090101@codeaurora.org>
- <CAGS+omAo-d_bK=2HDu98xHvqhnVgJUBy4jbYVGKqsfWRX-EfDA@mail.gmail.com>
-Message-ID: <1436252206.3526.80.camel@mtksdaap41>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jul 2015 08:01:13 +0100
+Subject: [PATCH v3 2/4] mfd: axp20x: Add missing registers, and mark more
+ registers volatile
+In-Reply-To: <1435316357-26606-2-git-send-email-hdegoede@redhat.com>
+References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
+ <1435316357-26606-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150707070113.GH3182@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Fri, 26 Jun 2015, Hans de Goede wrote:
 
-On Fri, 2015-07-03 at 18:46 +0800, Daniel Kurtz wrote:
-> On Fri, Jul 3, 2015 at 7:40 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > DT nodes typically have a reg property. Not having a reg property is a
-> > good indicator of a problem with the binding. A syscon is used when you
-> > have a DT node with a reg property and some driver attached to it, but
-> > you need to poke some bits in another register region that isn't part of
-> > the reg property. Instead of having multiple nodes with two reg
-> > properties where the second one is the same, we use a phandle and a syscon.
-> >
-> > If clock-controller isn't acceptable maybe clock-reset-contoller would
-> > work? Or "power-controller"? We certainly shouldn't be making up
-> > multiple nodes for one hardware block. Of course, the subject of the
-> > patch is "bindings for clock controllers", so it may be that the
-> > registers are predominantly clock related and so the name is appropriate
-> > already.
+> From: Bruno Pr?mont <bonbons@linux-vserver.org>
 > 
-> Using "clock-controller" seems to fit best with the bindings
-> introduced by this patch.
+> Add an extra set of registers which is necessary tu support the PMICs
+> battery charger function, and mark registers which contain status bits,
+> gpio status, and adc readings as volatile.
 > 
-> However, if these bindings are for hardware blocks that contain a grab
-> bag of various functionality that will be added in later patches, then
-> I think "syscon" might be best.
+> Cc: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Bruno Pr?mont <bonbons@linux-vserver.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Add a AXP20X_OCV_MAX define
+> Changes in v3:
+> -Add Bruno's S-o-b
+> ---
+>  drivers/mfd/axp20x.c       | 8 +++++++-
+>  include/linux/mfd/axp20x.h | 6 ++++++
+>  2 files changed, 13 insertions(+), 1 deletion(-)
 
-I referred some dt-binding documents that contain clock and reset
-controller in the same unit:
+For my own reference:
+  Acked-by: Lee Jones <lee.jones@linaro.org>
 
-qcom,gcc.txt:
+Are these two patches tied to any other in the set, or can I apply
+them separately?
 
-	clock-controller at 900000 {
-		compatible = "qcom,gcc-msm8960";
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6df9155..f9a3c2d 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -39,10 +39,16 @@ static const char * const axp20x_model_names[] = {
+>  static const struct regmap_range axp20x_writeable_ranges[] = {
+>  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
+>  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
+> +	regmap_reg_range(AXP20X_RDC_H, AXP20X_OCV(15)),
+>  };
+>  
+>  static const struct regmap_range axp20x_volatile_ranges[] = {
+> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_USB_OTG_STATUS),
+> +	regmap_reg_range(AXP20X_CHRG_CTRL1, AXP20X_CHRG_CTRL2),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP20X_ACIN_V_ADC_H, AXP20X_IPSOUT_V_HIGH_L),
+> +	regmap_reg_range(AXP20X_GPIO20_SS, AXP20X_GPIO3_CTRL),
+> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_RDC_L),
+>  };
+>  
+>  static const struct regmap_access_table axp20x_writeable_table = {
+> @@ -159,7 +165,7 @@ static const struct regmap_config axp20x_regmap_config = {
+>  	.val_bits	= 8,
+>  	.wr_table	= &axp20x_writeable_table,
+>  	.volatile_table	= &axp20x_volatile_table,
+> -	.max_register	= AXP20X_FG_RES,
+> +	.max_register	= AXP20X_OCV(AXP20X_OCV_MAX),
+>  	.cache_type	= REGCACHE_RBTREE,
+>  };
+>  
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 5275423..6d8b39a 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -151,6 +151,12 @@ enum {
+>  #define AXP20X_CC_CTRL			0xb8
+>  #define AXP20X_FG_RES			0xb9
+>  
+> +/* OCV */
+> +#define AXP20X_RDC_H			0xba
+> +#define AXP20X_RDC_L			0xbb
+> +#define AXP20X_OCV(m)			(0xc0 + (m))
+> +#define AXP20X_OCV_MAX			0xf
+> +
+>  /* AXP22X specific registers */
+>  #define AXP22X_BATLOW_THRES1		0xe6
+>  
 
-nvidia,tegra124-car.txt:
-
-	tegra_car: clock {
-		compatible = "nvidia,tegra124-car";
-
-rockchip,rk3188-cru.txt:
-
-	cru: cru at 20000000 {
-		compatible = "rockchip,rk3188-cru";
-
-Rockchip use "Clock and Reset Unit" as their controller's name. The
-other two use "clock" or "clock-controller" as their controller's name.
-
-It looks like "clock-controller" is also an acceptable name for
-clock/reset controllers. So I would like to keep this name in next
-patch.
-
-
-Best regards,
-
-James
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
