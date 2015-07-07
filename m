@@ -1,91 +1,136 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Tue, 7 Jul 2015 13:58:19 +0200
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20150707113213.GC7576@n2100.arm.linux.org.uk>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
- <20150707113213.GC7576@n2100.arm.linux.org.uk>
-Message-ID: <20150707115819.GF12087@pali>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 7 Jul 2015 14:04:33 +0200
+Subject: [PATCH] drm/rockchip: use drm_gem_mmap helpers
+In-Reply-To: <1436259816-31090-1-git-send-email-djkurtz@chromium.org>
+References: <1436259816-31090-1-git-send-email-djkurtz@chromium.org>
+Message-ID: <20150707120433.GO7568@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 July 2015 12:32:13 Russell King - ARM Linux wrote:
-> On Mon, Jul 06, 2015 at 10:26:13PM +0200, Pali Roh?r wrote:
-> > Legacy bootloaders can pass additional information for kernel or legacy
-> > userspace applications. When booting DT kernel then ATAGs structure is not
-> > more visible after running kernel uncompress code. This patch stores full
-> > ATAGs structure into DT "/chosen/linux,atags" entry, so kernel can later
-> > reuse it and export via /proc/atags to userspace.
+On Tue, Jul 07, 2015 at 05:03:36PM +0800, Daniel Kurtz wrote:
+> Rather than (incompletely [0]) re-implementing drm_gem_mmap() and
+> drm_gem_mmap_obj() helpers, call them directly from the rockchip mmap
+> routines.
 > 
-> I think you need to go through your commit messages and improve them,
-> especially the ones with "TODO" in them.  As long as there's still things
-> to be done, they're obviously not ready for merging.
+> Once the core functions return successfully, the rockchip mmap routines
+> can still use dma_mmap_attrs() to simply mmap the entire buffer.
 > 
-
-I know, in cover letter email I wrote that documentation is not ready...
-I send patches for review and comments (like yours). I think it is still
-better to send something and mark it as incomplete. It could prevent to
-work on something which will be again rewritten...
-
-> Moreover, exporting the ATAGS is questionable, even _if_ there are non-
-> kexec programs making use of this.  The ATAGs have _never_ been exported
-> to userspace when kexec disabled is the kernel - it was introduced for
-> kexec, and has always had this:
+> [0] Previously, we were performing the mmap() without first taking a
+> reference on the underlying gem buffer.  This could leak ptes if the gem
+> object is destroyed while userspace is still holding the mapping.
 > 
-> config ATAGS_PROC
->         bool "Export atags in procfs"
->         depends on ATAGS && KEXEC
->         default y
+> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+> Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Cc: stable at vger.kernel.org
+
+Applied to topic/drm-fixes to make sure it won't get lost, but I expect
+rockchip maintainers to pick this one up.
+-Daniel
+
 > 
-> Now, the fact that someone decided to start using it is pretty sad,
-> because it means that if you disable KEXEC, userspace breaks.  That's
-> not a kernel regression in any shape or form, because /proc/atags has
-> never been there without KEXEC enabled.  That's a userspace bug, plain
-> and simple.
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 67 +++++++++++++++--------------
+>  1 file changed, 34 insertions(+), 33 deletions(-)
 > 
-> Given that, I'm in two minds about whether to accept the last two
-> patches which make this more than just "for KEXEC use to enable a KEXEC
-> kernel to be booted."
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index eb2282c..eba5f8a 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -54,55 +54,56 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
+>  		       &rk_obj->dma_attrs);
+>  }
+>  
+> -int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
+> -			  struct vm_area_struct *vma)
+> +static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+> +					struct vm_area_struct *vma)
+> +
+>  {
+> +	int ret;
+>  	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
+>  	struct drm_device *drm = obj->dev;
+> -	unsigned long vm_size;
+>  
+> -	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
+> -	vm_size = vma->vm_end - vma->vm_start;
+> -
+> -	if (vm_size > obj->size)
+> -		return -EINVAL;
+> +	/*
+> +	 * dma_alloc_attrs() allocated a struct page table for rk_obj, so clear
+> +	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+> +	 */
+> +	vma->vm_flags &= ~VM_PFNMAP;
+>  
+> -	return dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+> +	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+>  			     obj->size, &rk_obj->dma_attrs);
+> +	if (ret)
+> +		drm_gem_vm_close(vma);
+> +
+> +	return ret;
+>  }
+>  
+> -/* drm driver mmap file operations */
+> -int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+> +int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
+> +			  struct vm_area_struct *vma)
+>  {
+> -	struct drm_file *priv = filp->private_data;
+> -	struct drm_device *dev = priv->minor->dev;
+> -	struct drm_gem_object *obj;
+> -	struct drm_vma_offset_node *node;
+> +	struct drm_device *drm = obj->dev;
+>  	int ret;
+>  
+> -	if (drm_device_is_unplugged(dev))
+> -		return -ENODEV;
+> +	mutex_lock(&drm->struct_mutex);
+> +	ret = drm_gem_mmap_obj(obj, obj->size, vma);
+> +	mutex_unlock(&drm->struct_mutex);
+> +	if (ret)
+> +		return ret;
+>  
+> -	mutex_lock(&dev->struct_mutex);
+> +	return rockchip_drm_gem_object_mmap(obj, vma);
+> +}
+>  
+> -	node = drm_vma_offset_exact_lookup(dev->vma_offset_manager,
+> -					   vma->vm_pgoff,
+> -					   vma_pages(vma));
+> -	if (!node) {
+> -		mutex_unlock(&dev->struct_mutex);
+> -		DRM_ERROR("failed to find vma node.\n");
+> -		return -EINVAL;
+> -	} else if (!drm_vma_node_is_allowed(node, filp)) {
+> -		mutex_unlock(&dev->struct_mutex);
+> -		return -EACCES;
+> -	}
+> +/* drm driver mmap file operations */
+> +int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+> +{
+> +	struct drm_gem_object *obj;
+> +	int ret;
+>  
+> -	obj = container_of(node, struct drm_gem_object, vma_node);
+> -	ret = rockchip_gem_mmap_buf(obj, vma);
+> +	ret = drm_gem_mmap(filp, vma);
+> +	if (ret)
+> +		return ret;
+>  
+> -	mutex_unlock(&dev->struct_mutex);
+> +	obj = vma->vm_private_data;
+>  
+> -	return ret;
+> +	return rockchip_drm_gem_object_mmap(obj, vma);
+>  }
+>  
+>  struct rockchip_gem_object *
+> -- 
+> 2.4.3.573.g4eafbef
 > 
-> Had it been provided without the KEXEC conditional, then I don't have
-> a problem with these two patches.
-> 
-
-I understand it. Nokia originally invented their own entries in /proc/
-which export needed ATAGs from kernel in human-readable form, but all
-those entries were non-standard and specific for Nokia's kernels.
-
-Do you have some other idea how to provide ATAGs information created
-dynamically by legacy closed proprietary bootloader to userspace from DT
-booted kernel?
-
-Anyway, for supporting kexec (with passing ATAGs) it is needed to have
-working /proc/atags file, right?
-
-> It also sets a precedent: by adding this into DT, it is creating a new
-> DT ABI as well, and we'll end up seeing dts files with an ATAG block
-> patched into them.
-> 
-> Are the ATAGs at a fixed address on the N900?
-
-Yes, in board-rx51.c is:
-
-.atag_offset	= 0x100
-
-and Nokia Bootloader (proprietary) store them to that address.
-
-> Can that be handled in
-> some kind of legacy file for the N900 which calls save_atags() on it, so
-> we don't end up introducing yet more stuff that we have to maintain into
-> the distant future?  If not, what about copying a known working atag
-> structure into a legacy file for the N900?
-> 
-
-I already asked question if it is possible to read ATAGs from DT booted
-kernel. And somebody (do not remember who) wrote to ML, that it is not
-possible and it can be done in that uncompress code.
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
