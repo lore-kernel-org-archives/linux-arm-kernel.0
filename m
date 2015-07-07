@@ -1,68 +1,162 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 07 Jul 2015 10:16:39 +0300
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <559AA0D6.7070703@arm.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
- <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559AA0D6.7070703@arm.com>
-Message-ID: <014c01d0b884$deff46d0$9cfdd470$@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 7 Jul 2015 15:17:45 +0800
+Subject: [PATCH] clk: mediatek: Add MT8173 MMPLL change rate support
+In-Reply-To: <1433222760-5924-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1433222760-5924-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1436253465.3526.85.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi,
 
-> Wouldn't:
->     if (kvm_vm_check_extension(s, KVM_CAP_MSI_DEVID)) {
->         kroute.flags = KVM_MSI_VALID_DEVID;
->         kroute.u.msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
->     }
+Does anyone have comments for this patch?
+
+
+Best regards,
+
+James
+
+On Tue, 2015-06-02 at 13:26 +0800, James Liao wrote:
+> MT8173 MMPLL frequency settings are different from common PLLs.
+> It needs different post divider settings for some ranges of frequency.
+> This patch add support for MT8173 MMPLL frequency setting, includes:
 > 
-> be saner (without a global variable)?
-
- No it would not, because:
-a) kvm_vm_check_extension() calls ioctl every time, therefore it's slow. But, well, doesn't really
-matter because it's possible to check for the capability once in generic code, and cache it.
-b) Capability is a global thing as far as i understand. The kernel either has it, or doesn't have.
-However, whether we want this flag or not, depends also on what GIC model we use. GICv2(m) doesn't
-want it, GICv3 does. qemu actually has two sets of flags: one set actually specifies capabilities,
-another set enables use of these capabilities.
- But, well, you can make GICv2 kernel code simply ignoring it instead of bailing out if flags != 0.
-And add the capability for ARM64 architecture (ARM32 can't use GICv3, can it?). And this will work
-and it'll be OK. So, i'm not against it, and if you want it, you can do it. I just want to point
-that it is not strictly necessary to add new APIs, because existing ones are pretty much enough.
-But, you are the architects here, so you of course can do it if you want. It's just me being not a
-big fan of adding APIs without which it's completely possible to live.
-
- Below i'm answering to Eric's comment, because my reply is tightly coupled with this one.
-
-> So not sure whether we eventually concluded;-)
-> - introduce a KVM_CAP_MSI_DEVID capability? All OK except Pavel not
->  convinced?
-
- See above. I'm not against it, i just don't think it's necessary. You can do it if you want, it
-actually won't change things much.
-
-> - userspaces puts the devid in struct kvm_irq_routing_msi pad field:
-> consensus (we do not intrduce a new kvm_irq_routing_ext_msi)
-
- Yes.
-
-> - userspace tells it conveyed a devid by setting
-> A) the kvm_irq_routing_entry's field?
-> B) the kvm_irq_routing_entry's type
-> no consensus. If there is a cap, does it really matter?
-
- It has absolutely nothing to do with the cap. My argument here is the same as above again - why
-adding new API's / definitions? We already have KVM_MSI_VALID_DEVID and we already have 'flags'
-field. Using them would just make the API more consistent because KVM_SIGNAL_MSI already uses them
-in absolutely the same manner. That's my point and nothing more.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> 1. Add div-rate table for PLLs.
+> 2. Increase the max ost divider setting from 3 (/8) to 4 (/16).
+> 3. Write postdiv and pcw settings at the same time.
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  drivers/clk/mediatek/clk-mt8173.c | 24 +++++++++++++++++++++---
+>  drivers/clk/mediatek/clk-mtk.h    |  1 +
+>  drivers/clk/mediatek/clk-pll.c    | 37 +++++++++++++++++++++++++------------
+>  3 files changed, 47 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> index 357b080..821de7d 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -779,8 +779,9 @@ CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8173-pericfg", mtk_pericfg_init);
+>  
+>  #define CON0_MT8173_RST_BAR	BIT(24)
+>  
+> -#define PLL(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits, _pd_reg, _pd_shift, \
+> -			_tuner_reg, _pcw_reg, _pcw_shift) { \
+> +#define PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits,	\
+> +			_pd_reg, _pd_shift, _tuner_reg, _pcw_reg,	\
+> +			_pcw_shift, _div_rate) {			\
+>  		.id = _id,						\
+>  		.name = _name,						\
+>  		.reg = _reg,						\
+> @@ -795,14 +796,31 @@ CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8173-pericfg", mtk_pericfg_init);
+>  		.tuner_reg = _tuner_reg,				\
+>  		.pcw_reg = _pcw_reg,					\
+>  		.pcw_shift = _pcw_shift,				\
+> +		.div_rate = _div_rate,					\
+>  	}
+>  
+> +#define PLL(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits,	\
+> +			_pd_reg, _pd_shift, _tuner_reg, _pcw_reg,	\
+> +			_pcw_shift)					\
+> +		PLL_B(_id, _name, _reg, _pwr_reg, _en_mask, _flags, _pcwbits, \
+> +			_pd_reg, _pd_shift, _tuner_reg, _pcw_reg, _pcw_shift, \
+> +			NULL)
+> +
+> +const unsigned long mmpll_div_rate[] = {
+> +	MT8173_PLL_FMAX,
+> +	1000000000,
+> +	702000000,
+> +	253500000,
+> +	126750000,
+> +	0,
+> +};
+> +
+>  static const struct mtk_pll_data plls[] = {
+>  	PLL(CLK_APMIXED_ARMCA15PLL, "armca15pll", 0x200, 0x20c, 0x00000001, 0, 21, 0x204, 24, 0x0, 0x204, 0),
+>  	PLL(CLK_APMIXED_ARMCA7PLL, "armca7pll", 0x210, 0x21c, 0x00000001, 0, 21, 0x214, 24, 0x0, 0x214, 0),
+>  	PLL(CLK_APMIXED_MAINPLL, "mainpll", 0x220, 0x22c, 0xf0000101, HAVE_RST_BAR, 21, 0x220, 4, 0x0, 0x224, 0),
+>  	PLL(CLK_APMIXED_UNIVPLL, "univpll", 0x230, 0x23c, 0xfe000001, HAVE_RST_BAR, 7, 0x230, 4, 0x0, 0x234, 14),
+> -	PLL(CLK_APMIXED_MMPLL, "mmpll", 0x240, 0x24c, 0x00000001, 0, 21, 0x244, 24, 0x0, 0x244, 0),
+> +	PLL_B(CLK_APMIXED_MMPLL, "mmpll", 0x240, 0x24c, 0x00000001, 0, 21, 0x244, 24, 0x0, 0x244, 0, mmpll_div_rate),
+>  	PLL(CLK_APMIXED_MSDCPLL, "msdcpll", 0x250, 0x25c, 0x00000001, 0, 21, 0x250, 4, 0x0, 0x254, 0),
+>  	PLL(CLK_APMIXED_VENCPLL, "vencpll", 0x260, 0x26c, 0x00000001, 0, 21, 0x260, 4, 0x0, 0x264, 0),
+>  	PLL(CLK_APMIXED_TVDPLL, "tvdpll", 0x270, 0x27c, 0x00000001, 0, 21, 0x270, 4, 0x0, 0x274, 0),
+> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
+> index 61035b9..645af7c 100644
+> --- a/drivers/clk/mediatek/clk-mtk.h
+> +++ b/drivers/clk/mediatek/clk-mtk.h
+> @@ -150,6 +150,7 @@ struct mtk_pll_data {
+>  	int pcwbits;
+>  	uint32_t pcw_reg;
+>  	int pcw_shift;
+> +	const unsigned long *div_rate;
+>  };
+>  
+>  void __init mtk_clk_register_plls(struct device_node *node,
+> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+> index 44409e9..4680a09 100644
+> --- a/drivers/clk/mediatek/clk-pll.c
+> +++ b/drivers/clk/mediatek/clk-pll.c
+> @@ -90,20 +90,23 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
+>  static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+>  		int postdiv)
+>  {
+> -	u32 con1, pd, val;
+> +	u32 con1, val;
+>  	int pll_en;
+>  
+> -	/* set postdiv */
+> -	pd = readl(pll->pd_addr);
+> -	pd &= ~(POSTDIV_MASK << pll->data->pd_shift);
+> -	pd |= (ffs(postdiv) - 1) << pll->data->pd_shift;
+> -	writel(pd, pll->pd_addr);
+> -
+>  	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+>  
+> -	/* set pcw */
+> -	val = readl(pll->pcw_addr);
+> +	/* set postdiv */
+> +	val = readl(pll->pd_addr);
+> +	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
+> +	val |= (ffs(postdiv) - 1) << pll->data->pd_shift;
+> +
+> +	/* postdiv and pcw need to set at the same time if on same register */
+> +	if (pll->pd_addr != pll->pcw_addr) {
+> +		writel(val, pll->pd_addr);
+> +		val = readl(pll->pcw_addr);
+> +	}
+>  
+> +	/* set pcw */
+>  	val &= ~GENMASK(pll->data->pcw_shift + pll->data->pcwbits - 1,
+>  			pll->data->pcw_shift);
+>  	val |= pcw << pll->data->pcw_shift;
+> @@ -135,16 +138,26 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
+>  		u32 freq, u32 fin)
+>  {
+>  	unsigned long fmin = 1000 * MHZ;
+> +	const unsigned long *div_rate = pll->data->div_rate;
+>  	u64 _pcw;
+>  	u32 val;
+>  
+>  	if (freq > pll->data->fmax)
+>  		freq = pll->data->fmax;
+>  
+> -	for (val = 0; val < 4; val++) {
+> +	if (div_rate) {
+> +		for (val = 1; div_rate[val] != 0; val++) {
+> +			if (freq > div_rate[val])
+> +				break;
+> +		}
+> +		val--;
+>  		*postdiv = 1 << val;
+> -		if (freq * *postdiv >= fmin)
+> -			break;
+> +	} else {
+> +		for (val = 0; val < 5; val++) {
+> +			*postdiv = 1 << val;
+> +			if ((u64)freq * *postdiv >= fmin)
+> +				break;
+> +		}
+>  	}
+>  
+>  	/* _pcw = freq * postdiv / fin * 2^pcwfbits */
