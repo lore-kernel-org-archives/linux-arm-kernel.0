@@ -1,57 +1,143 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 07 Jul 2015 23:30:48 +0900
-Subject: [PATCHv5] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-In-Reply-To: <559B2F0C.5010603@samsung.com>
-References: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
- <559B2F0C.5010603@samsung.com>
-Message-ID: <08c001d0b8c1$844d4600$8ce7d200$@kernel.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 07 Jul 2015 16:10:37 +0200
+Subject: [PATCH 2/2] kvm: arm/arm64: implement kvm_arm_[halt, resume]_guest
+In-Reply-To: <20150707134154.GG3381@hawk.localdomain>
+References: <1436186996-22528-1-git-send-email-eric.auger@linaro.org>
+ <1436186996-22528-3-git-send-email-eric.auger@linaro.org>
+ <20150707134154.GG3381@hawk.localdomain>
+Message-ID: <559BDDDD.90103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On 07/07/2015 03:41 PM, Andrew Jones wrote:
+> On Mon, Jul 06, 2015 at 02:49:56PM +0200, Eric Auger wrote:
+>> On halt, the guest is forced to exit and prevented from being
+>> re-entered. This is synchronous.
+>>
+>> Those two operations will be needed for IRQ forwarding setting.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>> RFC v1 -> v2:
+>> - add __maybe_unused
+>>
+>> RFC:
+>> - rename the function and this latter becomes static
+>> - remove __KVM_HAVE_ARCH_HALT_GUEST
+>>
+>> v4 -> v5: add arm64 support
+>> - also defines __KVM_HAVE_ARCH_HALT_GUEST for arm64
+>> - add pause field
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++---
+>>  arch/arm64/include/asm/kvm_host.h |  3 +++
+>>  3 files changed, 38 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index 304004d..899ae27 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -132,6 +132,9 @@ struct kvm_vcpu_arch {
+>>  	/* vcpu power-off state */
+>>  	bool power_off;
+>>  
+>> +	/* Don't run the guest */
+>> +	bool pause;
+>> +
+>>  	/* IO related fields */
+>>  	struct kvm_decode mmio_decode;
+>>  
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index 7537e68..46d4ef6 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -471,11 +471,39 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
+>>  	return vgic_initialized(kvm);
+>>  }
+>>  
+>> +static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
+>> +static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
+>> +
+>> +static void kvm_arm_halt_guest(struct kvm *kvm)
+>> +{
+>> +	int i;
+>> +	struct kvm_vcpu *vcpu;
+>> +
+>> +	kvm_for_each_vcpu(i, vcpu, kvm)
+>> +		vcpu->arch.pause = true;
+>> +	force_vm_exit(cpu_all_mask);
+>> +}
+>> +
+>> +static void kvm_arm_resume_guest(struct kvm *kvm)
+>> +{
+>> +	int i;
+>> +	struct kvm_vcpu *vcpu;
+>> +
+>> +	kvm_for_each_vcpu(i, vcpu, kvm) {
+>> +		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+>> +
+>> +		vcpu->arch.pause = false;
+>> +		wake_up_interruptible(wq);
+>> +	}
+>> +}
+>> +
+>> +
+>>  static void vcpu_pause(struct kvm_vcpu *vcpu)
+>>  {
+>>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+>>  
+>> -	wait_event_interruptible(*wq, !vcpu->arch.power_off);
+>> +	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
+>> +				       (!vcpu->arch.pause)));
+>>  }
+>>  
+>>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+>> @@ -525,7 +553,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  
+>>  		update_vttbr(vcpu->kvm);
+>>  
+>> -		if (vcpu->arch.power_off)
+>> +		if (vcpu->arch.power_off || vcpu->arch.pause)
+>>  			vcpu_pause(vcpu);
+>>  
+>>  		/*
+>> @@ -551,7 +579,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  			run->exit_reason = KVM_EXIT_INTR;
+>>  		}
+>>  
+>> -		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+>> +		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+>> +		    vcpu->arch.pause) {
+>>  			local_irq_enable();
+>>  			preempt_enable();
+>>  			kvm_vgic_sync_hwstate(vcpu);
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 009da6b..69e3785 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -125,6 +125,9 @@ struct kvm_vcpu_arch {
+>>  	/* vcpu power-off state */
+>>  	bool power_off;
+>>  
+>> +	/* Don't run the guest */
+>> +	bool pause;
+>> +
+>>  	/* IO related fields */
+>>  	struct kvm_decode mmio_decode;
 > 
-> On 06.07.2015 23:12, Chanho Park wrote:
-> > The odroid-xu3 board which is based on exynos5422 not exynos5800 is
-> > booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
-> > is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
-> > cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
-> > and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
-> > cpu4-7 are cortex-a15.
-> >
-> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> > ---
-> > Changes from v4:
-> >  - Remove temporal patch in e-mail body
-> >
-> > Changes from v3:
-> >  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
-> >
-> > Changes from v2:
-> >  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
-> >  - drop compatibles from exynos5422-cpus.dtsi
-> >
-> > Changes from v1:
-> >  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
-> >  - include the dtsi file top of the exynos5422-odroidxu3.dts
-> >
-> > Secondary cpu booting problem[1] is not resolved yet. Need more investigations
-> > to work booting 8 cores correctly.
-> >
-> > [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
-> >
-> >  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
-> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
-> >  2 files changed, 82 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
-> 
-> Thanks, applied to my tree. I'll sent it to Kukjin later for 4.3 unless
-> he picks it up from LKML.
-> 
-Hi Krzysztof,
+> So in the last patch, for cleanliness, maybe it would be better to
+> change the pause reference to a power_off reference in
+> kvm_arch_vcpu_ioctl_set_mpstate, and keep removing it. Or, maybe the
+> patch wouldn't look too bad if we just squashed this one into the
+> last one?
+yeah I need to think again about the patch structure and/or maybe adopt
+the lazy approach, putting both together.
 
-If you're OK, I'd like to pick this up into Samsung tree with your ack based on
-4.2-rc1.
+Thanks again
 
-Thanks,
-Kukjin
+Eric
+> 
+> drew
+> 
