@@ -1,143 +1,82 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Tue, 07 Jul 2015 16:10:37 +0200
-Subject: [PATCH 2/2] kvm: arm/arm64: implement kvm_arm_[halt, resume]_guest
-In-Reply-To: <20150707134154.GG3381@hawk.localdomain>
-References: <1436186996-22528-1-git-send-email-eric.auger@linaro.org>
- <1436186996-22528-3-git-send-email-eric.auger@linaro.org>
- <20150707134154.GG3381@hawk.localdomain>
-Message-ID: <559BDDDD.90103@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 Jul 2015 16:36:21 +0200
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <20150707130732.GD18561@pengutronix.de>
+ <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
+Message-ID: <20150707143621.GW18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2015 03:41 PM, Andrew Jones wrote:
-> On Mon, Jul 06, 2015 at 02:49:56PM +0200, Eric Auger wrote:
->> On halt, the guest is forced to exit and prevented from being
->> re-entered. This is synchronous.
->>
->> Those two operations will be needed for IRQ forwarding setting.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>
->> ---
->> RFC v1 -> v2:
->> - add __maybe_unused
->>
->> RFC:
->> - rename the function and this latter becomes static
->> - remove __KVM_HAVE_ARCH_HALT_GUEST
->>
->> v4 -> v5: add arm64 support
->> - also defines __KVM_HAVE_ARCH_HALT_GUEST for arm64
->> - add pause field
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  3 +++
->>  arch/arm/kvm/arm.c                | 35 ++++++++++++++++++++++++++++++++---
->>  arch/arm64/include/asm/kvm_host.h |  3 +++
->>  3 files changed, 38 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index 304004d..899ae27 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -132,6 +132,9 @@ struct kvm_vcpu_arch {
->>  	/* vcpu power-off state */
->>  	bool power_off;
->>  
->> +	/* Don't run the guest */
->> +	bool pause;
->> +
->>  	/* IO related fields */
->>  	struct kvm_decode mmio_decode;
->>  
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 7537e68..46d4ef6 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -471,11 +471,39 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
->>  	return vgic_initialized(kvm);
->>  }
->>  
->> +static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
->> +static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
->> +
->> +static void kvm_arm_halt_guest(struct kvm *kvm)
->> +{
->> +	int i;
->> +	struct kvm_vcpu *vcpu;
->> +
->> +	kvm_for_each_vcpu(i, vcpu, kvm)
->> +		vcpu->arch.pause = true;
->> +	force_vm_exit(cpu_all_mask);
->> +}
->> +
->> +static void kvm_arm_resume_guest(struct kvm *kvm)
->> +{
->> +	int i;
->> +	struct kvm_vcpu *vcpu;
->> +
->> +	kvm_for_each_vcpu(i, vcpu, kvm) {
->> +		wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
->> +
->> +		vcpu->arch.pause = false;
->> +		wake_up_interruptible(wq);
->> +	}
->> +}
->> +
->> +
->>  static void vcpu_pause(struct kvm_vcpu *vcpu)
->>  {
->>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
->>  
->> -	wait_event_interruptible(*wq, !vcpu->arch.power_off);
->> +	wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
->> +				       (!vcpu->arch.pause)));
->>  }
->>  
->>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
->> @@ -525,7 +553,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  
->>  		update_vttbr(vcpu->kvm);
->>  
->> -		if (vcpu->arch.power_off)
->> +		if (vcpu->arch.power_off || vcpu->arch.pause)
->>  			vcpu_pause(vcpu);
->>  
->>  		/*
->> @@ -551,7 +579,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>  			run->exit_reason = KVM_EXIT_INTR;
->>  		}
->>  
->> -		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
->> +		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
->> +		    vcpu->arch.pause) {
->>  			local_irq_enable();
->>  			preempt_enable();
->>  			kvm_vgic_sync_hwstate(vcpu);
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 009da6b..69e3785 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -125,6 +125,9 @@ struct kvm_vcpu_arch {
->>  	/* vcpu power-off state */
->>  	bool power_off;
->>  
->> +	/* Don't run the guest */
->> +	bool pause;
->> +
->>  	/* IO related fields */
->>  	struct kvm_decode mmio_decode;
+On Tue, Jul 07, 2015 at 10:15:29PM +0800, Daniel Kurtz wrote:
+> On Tue, Jul 7, 2015 at 9:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
+> >> Add clk_null, which represents clocks that can not / need not
+> >> controlled by software.
+> >> There are many clocks' parent set to clk_null.
+> >>
+> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> >> ---
+> >> Base on 4.1-rc1
+> >>
+> >> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
+> >> ---
+> >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
+> >>  1 file changed, 6 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> >> index 924fdb6..4798f44 100644
+> >> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> >> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> >> @@ -81,6 +81,12 @@
+> >>               cpu_on        = <0x84000003>;
+> >>       };
+> >>
+> >> +     clk_null: clk_null {
+> >> +             compatible = "fixed-clock";
+> >> +             clock-frequency = <0>;
+> >> +             #clock-cells = <0>;
+> >> +     };
+> >
+> > The discussion around this patch shows that we don't want to have this
+> > clock in the device tree as it is not a hardware description.
+> >
+> > Ok, fine. Eddie, you told us that the rate of the current clk_null children
+> > is not interesting. What's the motivation to send this patch anyway
+> > then? Why can't you keep its children on the orphan list where they are
+> > already now?
+> >
+> > Another possibility would be to instantiate the clk_null clock from C
+> > code rather than from the device tree. This way we wouldn't put any
+> > wrong descriptions into the device tree and still can implement the
+> > support for the real parent clocks when we actually need them.
 > 
-> So in the last patch, for cleanliness, maybe it would be better to
-> change the pause reference to a power_off reference in
-> kvm_arch_vcpu_ioctl_set_mpstate, and keep removing it. Or, maybe the
-> patch wouldn't look too bad if we just squashed this one into the
-> last one?
-yeah I need to think again about the patch structure and/or maybe adopt
-the lazy approach, putting both together.
+> Some device nodes, like mmc, use a clk_null phandle as one of their clocks:
+> 
+> mmc1: mmc at 11240000 {
+>         compatible = "mediatek,mt8173-mmc",
+>                      "mediatek,mt8135-mmc";
+>         reg = <0 0x11240000 0 0x1000>;
+>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
+>         clocks = <&pericfg CLK_PERI_MSDC30_1>,
+>                  <&clk_null>;
+>         clock-names = "source", "hclk";
+>         status = "disabled";
+> };
 
-Thanks again
+This is another case than the one we discussed about. In the case above
+I motivated using a dummy clock since the clock exists in the system,
+but is not software controllable. To abstract this from the driver
+(which needs this clock since it exists) we here have the dummy clock.
+However, of course I can't prove the clock is indeed not software
+controllable; that's only the information I have.
 
-Eric
-> 
-> drew
-> 
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
