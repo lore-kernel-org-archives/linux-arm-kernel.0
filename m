@@ -1,40 +1,36 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:18:00 +0100
-Subject: [PATCH v3 10/15] irqchip: gicv3-its: Register irq domain with
- platform MSI token
+Date: Tue,  7 Jul 2015 18:17:57 +0100
+Subject: [PATCH v3 07/15] PCI/MSI: Let pci_msi_get_domain use struct device's
+ msi_domain
 In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
 References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436289485-28230-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can distinguish between multiple domains carrying the
-same device_node, tag the raw ITS domain with DOMAIN_BUS_PLATFORM_MSI.
+Now that we can easily find which MSI domain a PCI device is
+using, use dev_get_msi_domain as a way to retrieve the information.
+
+The original code is still used as a fallback.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 3 ++-
+ drivers/pci/msi.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 7c01fe4..140224c 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1407,13 +1407,14 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 1e55935..5ffc340 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+ {
+ 	struct irq_domain *domain = NULL;
  
- 	if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
--		its->domain = irq_domain_add_tree(NULL, &its_domain_ops, its);
-+		its->domain = irq_domain_add_tree(node, &its_domain_ops, its);
- 		if (!its->domain) {
- 			err = -ENOMEM;
- 			goto out_free_tables;
- 		}
- 
- 		its->domain->parent = parent;
-+		its->domain->bus_token = DOMAIN_BUS_PLATFORM_MSI;
- 
- 		its->msi_chip.domain = its_pci_msi_alloc_domain(node,
- 								its->domain);
+-	if (dev->bus->msi)
++	domain = dev_get_msi_domain(&dev->dev);
++	if (!domain && dev->bus->msi)
+ 		domain = dev->bus->msi->domain;
+ 	if (!domain)
+ 		domain = arch_get_pci_msi_domain(dev);
 -- 
 2.1.4
