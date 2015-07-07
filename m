@@ -1,38 +1,32 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:17 +0800
-Subject: [PATCH v2 4/9] iommu/arm-smmu: enlarge STRTAB_L1_SZ_SHIFT to support
- larger sidsize
+Date: Tue, 7 Jul 2015 11:30:15 +0800
+Subject: [PATCH v2 2/9] iommu/arm-smmu: fix the index calculation of strtab
 In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1436239822-14132-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1436239822-14132-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because we will choose the minimum value between STRTAB_L1_SZ_SHIFT and
-IDR1.SIDSIZE, so enlarge STRTAB_L1_SZ_SHIFT will not impact the platforms
-whose IDR1.SIDSIZE is smaller than old STRTAB_L1_SZ_SHIFT value.
+The element size of cfg->strtab is just one DWORD, should use multiply
+operation.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 0723034..4e7fd4e 100644
+index 56a1fbe..48be7eb 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -199,9 +199,10 @@
-  * Stream table.
-  *
-  * Linear: Enough to cover 1 << IDR1.SIDSIZE entries
-- * 2lvl: 8k L1 entries, 256 lazy entries per table (each table covers a PCI bus)
-+ * 2lvl: 128k L1 entries,
-+ *       256 lazy entries per table (each table covers a PCI bus)
-  */
--#define STRTAB_L1_SZ_SHIFT		16
-+#define STRTAB_L1_SZ_SHIFT		20
- #define STRTAB_SPLIT			8
+@@ -1064,7 +1064,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+ 		return 0;
 
- #define STRTAB_L1_DESC_DWORDS		1
+ 	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
+-	strtab = &cfg->strtab[sid >> STRTAB_SPLIT << STRTAB_L1_DESC_DWORDS];
++	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+
+ 	desc->span = STRTAB_SPLIT + 1;
+ 	desc->l2ptr = dma_zalloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
 --
 1.8.0
