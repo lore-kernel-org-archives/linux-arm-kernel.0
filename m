@@ -1,226 +1,115 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:19 +0800
-Subject: [PATCH v2 6/9] iommu/arm-smmu: to support probe deferral
-In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1436239822-14132-7-git-send-email-thunder.leizhen@huawei.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Tue, 7 Jul 2015 11:44:14 +0800
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <5593F899.6050306@arm.com>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com>
+Message-ID: <559B4B0E.4060004@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For pci devices, only the root nodes have "iommus" property. So we
-should traverse all of its sub nodes in of_xlate.
+On 2015/7/1 22:26, James Morse wrote:
+> Zhou Wang wrote:
+>> I tested this patch on D02 board of Hisilicon. It works well.
+>> I have compiled the driver with multi_v7_defconfig. However, I don't
+>> have
+>> ARM32 PCIe related board to do test. It will be appreciated if someone
+>> could
+>> help to test it.
+>>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> Tested-by: James Morse <james.morse@arm.com>
+> 
+> Tests on this new series, using the same i.MX 6Quad board, are not working.
+> 
+> The network card is no longer detected, and I get a lockup when removing
+> the root bridge and rescanning.
+> 
+> Partial dmesg output below. Significantly, the lines:
+>> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+>> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using [bus
+> 00-ff]
+> are new.
+> 
+> Both series are applied to v4.1, use the same .config file, and the same dtb.
+> I will investigate further.
+> 
+> (Re-testing v2 works, so this isn't an interim hardware failure)
+> 
+> Thanks,
+> 
+> James
+>
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 119 +++++++++++++++++++++++++++++++++-----------
- 1 file changed, 89 insertions(+), 30 deletions(-)
+Hi James,
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index d6e3494..c569539 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -30,6 +30,8 @@
- #include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
-+#include <linux/of_iommu.h>
-+#include <linux/of_platform.h>
+There are something wrong with v3 patch.
 
- #include "io-pgtable.h"
+pp->io_mod_base = of_read_number(parser_range_end -
+		of_n_addr_cells(np) - 5 + na, ns);
+pp->mem_mod_base = of_read_number(parser_range_end -
+		of_n_addr_cells(np) - 5 + na, ns);
+pp->cfg0_mod_base = of_read_number(parser_range_end -
+		of_n_addr_cells(np) - 5 + na, ns);
+are wrong.
 
-@@ -1741,10 +1743,23 @@ static void __arm_smmu_release_pci_iommudata(void *data)
- 	kfree(data);
- }
+The ranges item in your dts is:
+ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000
+	  0x81000000 0x0 0x0  0x1f80000 0x0 0x10000
+	  0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
+parser_range_end points to the end of ranges(0xf00000) directly. In v2 patch,
+of_read_number is of_read_number(parser.range - parser.np + na, ns); parser.range
+points to the end of each line in ranges item.
 
--static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
-+static struct arm_smmu_device *find_smmu_by_node(struct device_node *np)
-+{
-+	struct platform_device *pdev;
-+
-+	/* to ensure np is a smmu device node */
-+	if (!of_iommu_get_ops(np))
-+		return NULL;
-+
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev)
-+		return NULL;
-+
-+	return platform_get_drvdata(pdev);
-+}
-+
-+static struct device_node *arm_smmu_get_pci_dev_root(struct pci_dev *pdev)
- {
--	struct device_node *of_node;
--	struct arm_smmu_device *curr, *smmu = NULL;
- 	struct pci_bus *bus = pdev->bus;
+When I did test on D02 board with intel82599 card, I set ranges item as:
+ranges = <0x03000000 0 0xb0000000 0x220 0x00000000 0 0xf000000>;
+It is just one line. In this case, parser_range_end is same with parser.range.
+That is why it happened to work well on D02 board.
 
- 	/* Walk up to the root bus */
-@@ -1752,21 +1767,7 @@ static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
- 		bus = bus->parent;
+very sorry to bother you about this problem.
 
- 	/* Follow the "iommus" phandle from the host controller */
--	of_node = of_parse_phandle(bus->bridge->parent->of_node, "iommus", 0);
--	if (!of_node)
--		return NULL;
--
--	/* See if we can find an SMMU corresponding to the phandle */
--	spin_lock(&arm_smmu_devices_lock);
--	list_for_each_entry(curr, &arm_smmu_devices, list) {
--		if (curr->dev->of_node == of_node) {
--			smmu = curr;
--			break;
--		}
--	}
--	spin_unlock(&arm_smmu_devices_lock);
--	of_node_put(of_node);
--	return smmu;
-+	return bus->bridge->parent->of_node;
- }
+Thanks,
+Zhou
 
- static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
-@@ -1779,27 +1780,21 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
- 	return sid < limit;
- }
-
--static int arm_smmu_add_device(struct device *dev)
-+static int arm_smmu_add_device(struct device *dev, u32 sid)
- {
- 	int i, ret;
--	u32 sid, *sids;
--	struct pci_dev *pdev;
-+	u32 *sids;
- 	struct iommu_group *group;
- 	struct arm_smmu_group *smmu_group;
- 	struct arm_smmu_device *smmu;
-
--	/* We only support PCI, for now */
--	if (!dev_is_pci(dev))
--		return -ENODEV;
--
--	pdev = to_pci_dev(dev);
- 	group = iommu_group_get_for_dev(dev);
- 	if (IS_ERR(group))
- 		return PTR_ERR(group);
-
- 	smmu_group = iommu_group_get_iommudata(group);
- 	if (!smmu_group) {
--		smmu = arm_smmu_get_for_pci_dev(pdev);
-+		smmu = dev->archdata.iommu;
- 		if (!smmu) {
- 			ret = -ENOENT;
- 			goto out_put_group;
-@@ -1819,8 +1814,6 @@ static int arm_smmu_add_device(struct device *dev)
- 		smmu = smmu_group->smmu;
- 	}
-
--	/* Assume SID == RID until firmware tells us otherwise */
--	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
- 	for (i = 0; i < smmu_group->num_sids; ++i) {
- 		/* If we already know about this SID, then we're done */
- 		if (smmu_group->sids[i] == sid)
-@@ -1862,6 +1855,7 @@ out_put_group:
-
- static void arm_smmu_remove_device(struct device *dev)
- {
-+	dev->archdata.iommu = NULL;
- 	iommu_group_remove_device(dev);
- }
-
-@@ -1909,7 +1903,68 @@ out_unlock:
- 	return ret;
- }
-
-+static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-+{
-+	int ret;
-+	struct arm_smmu_device *smmu;
-+
-+	/*
-+	 * We can sure that args->np is a smmu device node, because this
-+	 * function was called by of_xlate hook.
-+	 *
-+	 * And in arm_smmu_device_dt_probe:
-+	 *	platform_set_drvdata(pdev, smmu);
-+	 *	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
-+	 *
-+	 * It seems impossible return NULL in normal times.
-+	 */
-+	smmu = find_smmu_by_node(args->np);
-+	if (!smmu) {
-+		dev_err(dev, "unknown error caused smmu driver crashed\n");
-+		return -ENODEV;
-+	}
-+
-+	if (!dev->archdata.iommu)
-+		dev->archdata.iommu = smmu;
-+
-+	if (dev->archdata.iommu != smmu) {
-+		dev_err(dev, "behinds more than one smmu\n");
-+		return -EINVAL;
-+	}
-+
-+	/* We only support PCI, for now */
-+	if (!dev_is_pci(dev)) {
-+		return -ENODEV;
-+	} else {
-+		u32 sid;
-+		struct device_node *of_root;
-+		struct pci_dev *pdev = NULL;
-+
-+		for_each_pci_dev(pdev) {
-+			of_root = arm_smmu_get_pci_dev_root(pdev);
-+			if (of_root != dev->of_node)
-+				continue;
-+
-+			/*
-+			 * Assume SID == RID until firmware tells us otherwise
-+			 */
-+			pci_for_each_dma_alias(pdev,
-+					__arm_smmu_get_pci_sid, &sid);
-+
-+			pdev->dev.archdata.iommu = smmu;
-+			ret = arm_smmu_add_device(dev, sid);
-+			if (ret) {
-+				dev_err(dev, "failed to add into SMMU\n");
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static struct iommu_ops arm_smmu_ops = {
-+	.of_xlate		= arm_smmu_of_xlate,
- 	.capable		= arm_smmu_capable,
- 	.domain_alloc		= arm_smmu_domain_alloc,
- 	.domain_free		= arm_smmu_domain_free,
-@@ -1918,7 +1973,6 @@ static struct iommu_ops arm_smmu_ops = {
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
--	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
- 	.domain_get_attr	= arm_smmu_domain_get_attr,
- 	.domain_set_attr	= arm_smmu_domain_set_attr,
-@@ -2626,6 +2680,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	spin_lock(&arm_smmu_devices_lock);
- 	list_add(&smmu->list, &arm_smmu_devices);
- 	spin_unlock(&arm_smmu_devices_lock);
-+	platform_set_drvdata(pdev, smmu);
-+	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
-+
- 	return 0;
-
- out_free_structures:
-@@ -2697,6 +2754,8 @@ static void __exit arm_smmu_exit(void)
- subsys_initcall(arm_smmu_init);
- module_exit(arm_smmu_exit);
-
-+IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", NULL);
-+
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
---
-1.8.0
+> 
+> 
+> root at localhost:~# dmesg | grep -i pci
+> [    0.126184] PCI: CLS 0 bytes, default 64
+> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using [bus 00-ff]
+> [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus 0000:00
+> [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
+> [    0.154215] pci_bus 0000:00: root bus resource [???
+> 0x01f00000-0x01f7ffff flags 0x0]
+> [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+> [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-0x01efffff]
+> [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff pref]
+> [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for PCI
+> [    0.154429] pci 0000:00:00.0: supports D1
+> [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot D3cold
+> [    0.154683] PCI: bus0: Fast back to back transfers disabled
+> [    0.154806] PCI: bus1: Fast back to back transfers enabled
+> [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-0x010fffff]
+> [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-0x0110ffff
+> pref]
+> [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
+> [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME interrupt
+> [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme loaded
+> [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
+> [    1.188840] ehci-pci: EHCI PCI platform driver
+> [    1.232518] ohci-pci: OHCI PCI platform driver
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
