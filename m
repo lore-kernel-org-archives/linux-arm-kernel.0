@@ -1,66 +1,70 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 07 Jul 2015 09:56:29 +0300
-Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
- compatible property
-In-Reply-To: <20150707002621.GD13326@verge.net.au>
-References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
- <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
-Message-ID: <9389528.5qtaECVqX7@avalon>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 7 Jul 2015 14:56:46 +0800
+Subject: [PATCH v2 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for clock controllers
+In-Reply-To: <CAGS+omAo-d_bK=2HDu98xHvqhnVgJUBy4jbYVGKqsfWRX-EfDA@mail.gmail.com>
+References: <1435633127-31952-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1435633127-31952-3-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omD9Mvz0-RQMc5TsWCPct80S5fyqMn3+-zR7HB9yb7KoDQ@mail.gmail.com>
+ <1435805534.3526.23.camel@mtksdaap41>
+ <CAGS+omCgNstb+NPmRdbngnLm754hDPLO28KRc4RanCD2Myv7dQ@mail.gmail.com>
+ <5595CBDC.7090101@codeaurora.org>
+ <CAGS+omAo-d_bK=2HDu98xHvqhnVgJUBy4jbYVGKqsfWRX-EfDA@mail.gmail.com>
+Message-ID: <1436252206.3526.80.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Daniel,
 
-On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
-> On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
-> > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
-> > > Replace the deprecated generic "adi,adxl34x" compatible value by the
-> > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
-> > > i2c: Deprecate adi,adxl34x compatible string").
-> > > 
-> > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > 
-> > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > > ---
-> > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
-> > > support"), which is in v4.2-rc1.
-> > > 
-> > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
-> > > property".
+On Fri, 2015-07-03 at 18:46 +0800, Daniel Kurtz wrote:
+> On Fri, Jul 3, 2015 at 7:40 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > DT nodes typically have a reg property. Not having a reg property is a
+> > good indicator of a problem with the binding. A syscon is used when you
+> > have a DT node with a reg property and some driver attached to it, but
+> > you need to poke some bits in another register region that isn't part of
+> > the reg property. Instead of having multiple nodes with two reg
+> > properties where the second one is the same, we use a phandle and a syscon.
+> >
+> > If clock-controller isn't acceptable maybe clock-reset-contoller would
+> > work? Or "power-controller"? We certainly shouldn't be making up
+> > multiple nodes for one hardware block. Of course, the subject of the
+> > patch is "bindings for clock controllers", so it may be that the
+> > registers are predominantly clock related and so the name is appropriate
+> > already.
 > 
-> It appears to me that this will cause a regression when booting old kernels
-> with new dts blobs. For that reason think we should consider v1
-> of this change coupled with a schedule to remove use of the deprecated
-> compat string.
+> Using "clock-controller" seems to fit best with the bindings
+> introduced by this patch.
+> 
+> However, if these bindings are for hardware blocks that contain a grab
+> bag of various functionality that will be added in later patches, then
+> I think "syscon" might be best.
 
-That's the forward compatibility that Geert mentioned, is that really an 
-issue, especially on this board ?
+I referred some dt-binding documents that contain clock and reset
+controller in the same unit:
 
-> > > v2:
-> > >   - Drop deprecated "adi,adxl34x"
-> > > 
-> > > ---
-> > > 
-> > >  arch/arm/boot/dts/sh73a0-kzm9g.dts | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> > > b/arch/arm/boot/dts/sh73a0-kzm9g.dts index
-> > > 24b4cd24dceb2f9e..7fc5602810ad0da1 100644
-> > > --- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> > > +++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
-> > > @@ -206,7 +206,7 @@
-> > >  	};
-> > >  	
-> > >  	accelerometer at 1d {
-> > > -		compatible = "adi,adxl34x";
-> > > +		compatible = "adi,adxl345";
-> > >  		reg = <0x1d>;
-> > >  		interrupt-parent = <&irqpin3>;
-> > >  		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>,
+qcom,gcc.txt:
 
--- 
-Regards,
+	clock-controller at 900000 {
+		compatible = "qcom,gcc-msm8960";
 
-Laurent Pinchart
+nvidia,tegra124-car.txt:
+
+	tegra_car: clock {
+		compatible = "nvidia,tegra124-car";
+
+rockchip,rk3188-cru.txt:
+
+	cru: cru at 20000000 {
+		compatible = "rockchip,rk3188-cru";
+
+Rockchip use "Clock and Reset Unit" as their controller's name. The
+other two use "clock" or "clock-controller" as their controller's name.
+
+It looks like "clock-controller" is also an acceptable name for
+clock/reset controllers. So I would like to keep this name in next
+patch.
+
+
+Best regards,
+
+James
