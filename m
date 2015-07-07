@@ -1,58 +1,78 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 7 Jul 2015 22:49:55 +0900
-Subject: Stack trace using ftrace
-In-Reply-To: <559B86CA.2060508@linaro.org>
-References: <5580ED65-69A0-40F9-9626-31A0D066C507@gmail.com>
- <559A34B9.2020605@linaro.org>
- <42A36D72-9621-4FEF-B977-7FC6E4421618@gmail.com>
- <559B86CA.2060508@linaro.org>
-Message-ID: <6A4AA92F-8939-428C-8BAD-A1E6529F987C@gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 7 Jul 2015 21:49:36 +0800
+Subject: [PATCH v10 4/5] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20150707134936.GA2958@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 7, 2015, at 4:59 PM, AKASHI Takahiro wrote:
-> On 07/06/2015 09:04 PM, Jungseok Lee wrote:
->> On Jul 6, 2015, at 4:56 PM, AKASHI Takahiro wrote:
->>> Hi,
->> 
->> Hi,
->> 
->>> Thank you for your bug report.
->> 
->> Thanks for taking care about this topic.
->> 
->>> This issue comes from the fact that ftrace, more specifically check_stack(),
->>> goes over immediate values in the stack with each function's (bl instruction's) PC
->>> which is returned by save_stack_trace() while save_stack_trace(), or unwind_frame(),
->>> decrements the saved value of PC in the stack by 4. So mismatching can happen.
->>> 
->>> We can easily fix the problem by reverting the following commit:
->>> 
->>>> commit e306dfd06fcb44d21c80acb8e5a88d55f3d1cf63
->>>> Author: Olof Johansson <olof@lixom.net>
->>>> Date:   Fri Feb 14 19:35:15 2014 +0000
->>>> 
->>>>     ARM64: unwind: Fix PC calculation
->>> 
->>> But it will also resurrect the original problem.
->> 
->> IMHO, a current problem cannot be resolved by reverting the commit.
->> Please refer to the following data. The result looks much better than before,
->> but some entries still have 0 sizes.
-> 
-> Sorry for that.
+On Mon, Jul 06, 2015 at 09:10:47PM +0200, LABBE Corentin wrote:
+>
+> +int sun4i_hash_init(struct ahash_request *areq)
+> +{
+> +	const char *hash_type;
+> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> +	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+> +	struct ahash_alg *alg = __crypto_ahash_alg(tfm->base.__crt_alg);
+> +	struct sun4i_ss_alg_template *algt;
+> +	struct sun4i_ss_ctx *ss;
+> +
+> +	memset(op, 0, sizeof(struct sun4i_req_ctx));
+> +
+> +	algt = container_of(alg, struct sun4i_ss_alg_template, alg.hash);
+> +	ss = algt->ss;
+> +	op->ss = algt->ss;
+> +
+> +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
+> +
+> +	if (strcmp(hash_type, "sha1") == 0)
+> +		op->mode = SS_OP_SHA1;
+> +	else if (strcmp(hash_type, "md5") == 0)
+> +		op->mode = SS_OP_MD5;
 
-It's okay.
+Please store these modes in algt and then you wouldn't need to do
+the strcmp.
 
-> There seem to be several problems.
-> The value in 'size' field should go one line up,
-> for example, 32 for arch_timer_handler and 64 for
-> handle_percpu_devid_irq.
-> 
-> I'm now looking into those issues.
+> +int sun4i_hash_import_md5(struct ahash_request *areq, const void *in)
+> +{
+> +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> +	const struct md5_state *ictx = in;
+> +	int i;
 
-I can support a test with dragonboard410c. Please let me know if necessary.
-Thanks again!
+You need to initialise op->ss here.  Ditto for SHA.
 
-Best Regards
-Jungseok Lee
+> +	/* get the partial hash only if something was written */
+> +	if (op->mode == SS_OP_SHA1) {
+> +		for (i = 0; i < 5; i++)
+> +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> +	} else {
+> +		for (i = 0; i < 4; i++)
+> +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> +	}
+
+You can avoid the op->mode check by storing the hash size in algt.
+
+> +int sun4i_hash_finup(struct ahash_request *areq)
+> +{
+> +	int err;
+> +
+> +	err = sun4i_hash_update(areq);
+> +	if (err != 0)
+> +		return err;
+> +
+> +	return sun4i_hash_final(areq);
+
+You can drop finup since the API provides a default finup that's
+exactly the same as this.  You only need to provide finup if it
+can optimise on this.
+
+Ditto for digest.
+ 
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
