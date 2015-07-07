@@ -1,105 +1,109 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Jul 2015 16:06:48 +0100
-Subject: [PATCH v2 4/9] ARM: STi: STiH407: Move PWM nodes STiH407 =>
- STiH407-family
+Date: Tue,  7 Jul 2015 16:06:50 +0100
+Subject: [PATCH v2 6/9] regulator: pwm-regulator: Re-write bindings
 In-Reply-To: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
 References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1436281613-899-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <1436281613-899-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This also incorporates the STiH410.
+* Add support for continuous-voltage mode
+* Put more meat on the bones with regards to voltage-table mode
+* Sort out formatting for ease of consumption
 
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 30 ++++++++++++++++++++++++++++++
- arch/arm/boot/dts/stih407.dtsi        | 28 ----------------------------
- 2 files changed, 30 insertions(+), 28 deletions(-)
+ .../bindings/regulator/pwm-regulator.txt           | 68 ++++++++++++++++++----
+ 1 file changed, 56 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 838b812..64a1a26 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -539,6 +539,7 @@
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+index ce91f61..892b366 100644
+--- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+@@ -1,27 +1,71 @@
+-pwm regulator bindings
++Bindings for the Generic PWM Regulator
++======================================
++
++Currently supports 2 modes of operation:
++
++voltage-table:		When in this mode, a voltage table (See below) of
++			predefined voltage <=> duty-cycle values must be
++			provided via DT. Limitations are that the regulator can
++			only operate at the voltages supplied in the table.
++			Intermediary duty-cycle values which would normally
++			allow finer grained voltage selection are ignored and
++			rendered useless.  Although more control is given to
++			the user if the assumptions made in continuous-voltage
++			mode do not reign true.
++
++continuous-voltage:	This mode uses the regulator's maximum and minimum
++			supplied voltages specified in the
++			regulator-{min,max}-microvolt properties to calculate
++			appropriate duty-cycle values.  This allows for a much
++			more fine grained solution when compared with
++			voltage-table mode above.  This solution does make an
++			assumption that a %50 duty-cycle value will cause the
++			regulator voltage to run at half way between the
++			supplied max_uV and min_uV values.
  
+ Required properties:
+-- compatible: Should be "pwm-regulator"
+-- pwms: OF device-tree PWM specification (see PWM binding pwm.txt)
+-- voltage-table: voltage and duty table, include 2 members in each set of
+-  brackets, first one is voltage(unit: uv), the next is duty(unit: percent)
++--------------------
++- compatible:		Should be "pwm-regulator"
 +
- 		st_dwc3: dwc3 at 8f94000 {
- 			compatible	= "st,stih407-dwc3";
- 			reg		= <0x08f94000 0x1000>, <0x110 0x4>;
-@@ -565,5 +566,34 @@
- 						  <&phy_port2 PHY_TYPE_USB3>;
- 			};
- 		};
++- pwms:			PWM specification (See: ../pwm/pwm.txt)
 +
-+		/* COMMS PWM Module */
-+		pwm0: pwm at 9810000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "okay";
-+			#pwm-cells	= <2>;
-+			reg		= <0x9810000 0x68>;
-+			pinctrl-names	= "default";
-+			pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+			st,pwm-num-chan = <1>;
-+		};
++One of these must be provided:
++- voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
++			    First cell is voltage in microvolts (uV)
++			    Second cell is duty-cycle in percent (%)
 +
-+		/* SBC PWM Module */
-+		pwm1: pwm at 9510000 {
-+			compatible	= "st,sti-pwm";
-+			status		= "okay";
-+			#pwm-cells	= <2>;
-+			reg		= <0x9510000 0x68>;
-+			pinctrl-names	= "default";
-+			pinctrl-0	= <&pinctrl_pwm1_chan0_default
-+					&pinctrl_pwm1_chan1_default
-+					&pinctrl_pwm1_chan2_default
-+					&pinctrl_pwm1_chan3_default>;
-+			clock-names	= "pwm";
-+			clocks		= <&clk_sysin>;
-+			st,pwm-num-chan = <4>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index 2c560fc3..3efa3b2 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -147,33 +147,5 @@
- 				};
- 			};
- 		};
++- max-duty-cycle:	Maximum Duty-Cycle value -- this will normally be
++  			255 (0xff) for an 8 bit PWM device
+ 
+-Any property defined as part of the core regulator binding defined in
+-regulator.txt can also be used.
++If both are provided, the current default is voltage-table mode.
+ 
+-Example:
++Any property defined as part of the core regulator binding can also be used.
++(See: ../regulator/regulator.txt)
++
++Continuous Voltage Example:
+ 	pwm_regulator {
+ 		compatible = "pwm-regulator;
+ 		pwms = <&pwm1 0 8448 0>;
++		regulator-min-microvolt = <1016000>;
++		regulator-max-microvolt = <1114000>;
++		regulator-name = "vdd_logic";
++
++		max-duty-cycle = <255>; /* 8bit PWM */
++	};
+ 
++Voltage Table Example:
++	pwm_regulator {
++		compatible = "pwm-regulator;
++		pwms = <&pwm1 0 8448 0>;
++		regulator-min-microvolt = <1016000>;
++		regulator-max-microvolt = <1114000>;
++		regulator-name = "vdd_logic";
++
++			      /* Voltage Duty-Cycle */
+ 		voltage-table = <1114000 0>,
+ 				<1095000 10>,
+ 				<1076000 20>,
+ 				<1056000 30>,
+ 				<1036000 40>,
+ 				<1016000 50>;
 -
--		/* COMMS PWM Module */
--		pwm0: pwm at 9810000 {
--			compatible	= "st,sti-pwm";
--			status		= "disabled";
--			#pwm-cells	= <2>;
--			reg		= <0x9810000 0x68>;
--			pinctrl-names	= "default";
--			pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
--			clock-names	= "pwm";
--			clocks		= <&clk_sysin>;
--		};
--
--		/* SBC PWM Module */
--		pwm1: pwm at 9510000 {
--			compatible	= "st,sti-pwm";
--			status		= "disabled";
--			#pwm-cells	= <2>;
--			reg		= <0x9510000 0x68>;
--			pinctrl-names	= "default";
--			pinctrl-0	= <&pinctrl_pwm1_chan0_default
--					&pinctrl_pwm1_chan1_default
--					&pinctrl_pwm1_chan2_default
--					&pinctrl_pwm1_chan3_default>;
--			clock-names	= "pwm";
--			clocks		= <&clk_sysin>;
--			st,pwm-num-chan = <4>;
--		};
+-		regulator-min-microvolt = <1016000>;
+-		regulator-max-microvolt = <1114000>;
+-		regulator-name = "vdd_logic";
  	};
- };
 -- 
 1.9.1
