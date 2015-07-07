@@ -1,108 +1,115 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Tue,  7 Jul 2015 16:41:58 +0800
-Subject: [PATCH 5/5] coresight-etm4x: Support context-ID tracing when PID
- namespace is enabled
-In-Reply-To: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <1436258518-9339-6-git-send-email-zhang.chunyan@linaro.org>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Tue, 7 Jul 2015 08:47:55 +0000
+Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <1436184692-20927-7-git-send-email-eric.auger@linaro.org>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <E959C4978C3B6342920538CF579893F0025F2A47@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like ETTv3, ETMv4 also needs the similar modifications to support Context
-ID tracing when PID namespace is enabled.
 
-Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 21 +++++++++++++++------
- drivers/hwtracing/coresight/coresight-etm4x.h |  3 +++
- 2 files changed, 18 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 9afbda5..254a81a 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -506,8 +506,11 @@ static ssize_t reset_store(struct device *dev,
- 	}
- 
- 	drvdata->ctxid_idx = 0x0;
--	for (i = 0; i < drvdata->numcidc; i++)
-+	for (i = 0; i < drvdata->numcidc; i++) {
- 		drvdata->ctxid_pid[i] = 0x0;
-+		drvdata->ctxid_vpid[i] = 0x0;
-+	}
-+
- 	drvdata->ctxid_mask0 = 0x0;
- 	drvdata->ctxid_mask1 = 0x0;
- 
-@@ -1825,7 +1828,7 @@ static ssize_t ctxid_pid_show(struct device *dev,
- 
- 	spin_lock(&drvdata->spinlock);
- 	idx = drvdata->ctxid_idx;
--	val = (unsigned long)drvdata->ctxid_pid[idx];
-+	val = (unsigned long)drvdata->ctxid_vpid[idx];
- 	spin_unlock(&drvdata->spinlock);
- 	return scnprintf(buf, PAGE_SIZE, "%#lx\n", val);
- }
-@@ -1835,7 +1838,7 @@ static ssize_t ctxid_pid_store(struct device *dev,
- 			       const char *buf, size_t size)
- {
- 	u8 idx;
--	unsigned long val;
-+	unsigned long vpid, pid;
- 	struct etmv4_drvdata *drvdata = dev_get_drvdata(dev->parent);
- 
- 	/*
-@@ -1845,12 +1848,15 @@ static ssize_t ctxid_pid_store(struct device *dev,
- 	 */
- 	if (!drvdata->ctxid_size || !drvdata->numcidc)
- 		return -EINVAL;
--	if (kstrtoul(buf, 16, &val))
-+	if (kstrtoul(buf, 16, &vpid))
- 		return -EINVAL;
- 
-+	pid = coresight_vpid_to_pid(vpid);
-+
- 	spin_lock(&drvdata->spinlock);
- 	idx = drvdata->ctxid_idx;
--	drvdata->ctxid_pid[idx] = (u64)val;
-+	drvdata->ctxid_pid[idx] = (u64)pid;
-+	drvdata->ctxid_vpid[idx] = (u64)vpid;
- 	spin_unlock(&drvdata->spinlock);
- 	return size;
- }
-@@ -2513,8 +2519,11 @@ static void etm4_init_default_data(struct etmv4_drvdata *drvdata)
- 		drvdata->addr_type[1] = ETM_ADDR_TYPE_RANGE;
- 	}
- 
--	for (i = 0; i < drvdata->numcidc; i++)
-+	for (i = 0; i < drvdata->numcidc; i++) {
- 		drvdata->ctxid_pid[i] = 0x0;
-+		drvdata->ctxid_vpid[i] = 0x0;
-+	}
-+
- 	drvdata->ctxid_mask0 = 0x0;
- 	drvdata->ctxid_mask1 = 0x0;
- 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index 1e8fb36..c341002 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -266,6 +266,8 @@
-  * @ctxid_idx:	Context ID index selector.
-  * @ctxid_size:	Size of the context ID field to consider.
-  * @ctxid_pid:	Value of the context ID comparator.
-+ * @ctxid_vpid:	Virtual PID seen by users if PID namespace is enabled, otherwise
-+ *		the same value of ctxid_pid.
-  * @ctxid_mask0:Context ID comparator mask for comparator 0-3.
-  * @ctxid_mask1:Context ID comparator mask for comparator 4-7.
-  * @vmid_idx:	VM ID index selector.
-@@ -353,6 +355,7 @@ struct etmv4_drvdata {
- 	u8				ctxid_idx;
- 	u8				ctxid_size;
- 	u64				ctxid_pid[ETMv4_MAX_CTXID_CMP];
-+	u64				ctxid_vpid[ETMv4_MAX_CTXID_CMP];
- 	u32				ctxid_mask0;
- 	u32				ctxid_mask1;
- 	u8				vmid_idx;
--- 
-1.9.1
+> -----Original Message-----
+> From: Eric Auger [mailto:eric.auger at linaro.org]
+> Sent: Monday, July 06, 2015 8:12 PM
+> To: eric.auger at st.com; eric.auger at linaro.org;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+> b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
+> 
+> This patch adds the registration/unregistration of an
+> irq_bypass_consumer on irqfd assignment/deassignment.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> v1 -> v2:
+> - populate of kvm and gsi removed
+> - unregister the consumer on irqfd_shutdown
+> ---
+>  include/linux/kvm_irqfd.h |  1 +
+>  virt/kvm/eventfd.c        | 14 +++++++++++---
+>  2 files changed, 12 insertions(+), 3 deletions(-)
+> 
+> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
+> index f926b39..3c0bd07 100644
+> --- a/include/linux/kvm_irqfd.h
+> +++ b/include/linux/kvm_irqfd.h
+> @@ -64,6 +64,7 @@ struct kvm_kernel_irqfd {
+>  	struct list_head list;
+>  	poll_table pt;
+>  	struct work_struct shutdown;
+> +	struct irq_bypass_consumer consumer;
+>  };
+> 
+>  #endif /* __LINUX_KVM_IRQFD_H */
+> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+> index b79dc61..9452754 100644
+> --- a/virt/kvm/eventfd.c
+> +++ b/virt/kvm/eventfd.c
+> @@ -35,6 +35,7 @@
+>  #include <linux/srcu.h>
+>  #include <linux/slab.h>
+>  #include <linux/seqlock.h>
+> +#include <linux/irqbypass.h>
+>  #include <trace/events/kvm.h>
+> 
+>  #include <kvm/iodev.h>
+> @@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
+>  	/*
+>  	 * It is now safe to release the object's resources
+>  	 */
+> +	irq_bypass_unregister_consumer(&irqfd->consumer);
+>  	eventfd_ctx_put(irqfd->eventfd);
+>  	kfree(irqfd);
+>  }
+> @@ -380,7 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  	 */
+>  	fdput(f);
+> 
+> -	/* irq_bypass_register_consumer(); */
+> +	irqfd->consumer.token = (void *)irqfd->eventfd;
+> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
+> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
+> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
+> +	irqfd->consumer.resume = kvm_arch_irq_bypass_resume;
+> +	irqfd->consumer.update = kvm_arch_irq_bypass_update;
+> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
+> +	WARN_ON(ret);
+> 
+>  	return 0;
+> 
+> @@ -481,8 +490,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  	struct kvm_kernel_irqfd *irqfd, *tmp;
+>  	struct eventfd_ctx *eventfd;
+> 
+> -	/* irq_bypass_unregister_consumer() */
+> -
+>  	eventfd = eventfd_ctx_fdget(args->fd);
+>  	if (IS_ERR(eventfd))
+>  		return PTR_ERR(eventfd);
+> @@ -501,6 +508,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+> *args)
+>  			irqfd->irq_entry.type = 0;
+>  			write_seqcount_end(&irqfd->irq_entry_sc);
+>  			irqfd_deactivate(irqfd);
+> +			irq_bypass_unregister_consumer(&irqfd->consumer);
+
+consumer is unregistered in irqfd_shutdown(), why need we do it here?
+
+Thanks,
+Feng
+
+>  		}
+>  	}
+> 
+> --
+> 1.9.1
