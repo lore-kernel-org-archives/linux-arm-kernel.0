@@ -1,97 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jul 2015 15:57:56 +0100
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <559BE68B.3020801@linaro.org>
-References: <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
- <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
- <20150707111248.GU3182@x1> <559BB58E.9010406@linaro.org>
- <559BB727.2070106@linaro.org> <20150707125439.GE3182@x1>
- <559BE68B.3020801@linaro.org>
-Message-ID: <20150707145756.GJ3182@x1>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 7 Jul 2015 16:58:21 +0200
+Subject: [PATCH/RFC 06/11] ARM: shmobile: r8a7790: Link CPG to RST using
+ "renesas, modemr"
+In-Reply-To: <3792169.nKlDE6xfl4@avalon>
+References: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
+ <1436278217-20522-7-git-send-email-geert+renesas@glider.be>
+ <3792169.nKlDE6xfl4@avalon>
+Message-ID: <CAMuHMdWCXFbBAPS46d7+3o=FiLLzVacdiTiJq09tCHSCQPUfxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
+Hi Laurent,
 
-> 
-> 
-> On Tuesday 07 July 2015 06:24 PM, Lee Jones wrote:
-> >On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> >
-> >>
-> >>
-> >>On Tuesday 07 July 2015 04:48 PM, Vaibhav Hiremath wrote:
-> >>>
-> >>>
-> >>>On Tuesday 07 July 2015 04:42 PM, Lee Jones wrote:
-> >>>>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> >>>>>On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
-> >>>>>>On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
-> >>>>>>>On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
-> >>>>>>>>On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
-> >>>>>>>>
-> >>>>>>>>>As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
-> >>>>>>>>>(page 0) controls the method of clearing interrupt
-> >>>>>>>>>status of 88pm800 family of devices;
-> >>>>>>>>>
-> >>>>>>>>>   0: clear on read
-> >>>>>>>>>   1: clear on write
-> >>>>>>>>>
-> >>>>>>>>>If pdata is not coming from board file, then set the
-> >>>>>>>>>default irq clear method to "irq clear on write"
-> >>>>>>>>>
-> >>>>>>>>>Also, as suggested by "Lee Jones" renaming variable field
-> >>>>>>>>>to appropriate name.
-> >>>>>>>>>
-> >>>>>>>>>Signed-off-by: Zhao Ye <zhaoy@marvell.com>
-> >>>>>>>>>Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> >>>>>>>>>---
-> >>>>>>>>>  drivers/mfd/88pm800.c       | 15 ++++++++++-----
-> >>>>>>>>>  include/linux/mfd/88pm80x.h | 10 ++++++++--
-> >>>>>>>>>  2 files changed, 18 insertions(+), 7 deletions(-)
-> >>>>>>>>>
-> 
-> <snip>
-> 
-> >>>
-> >>>Yes certainly, this is another option (rather preferred one).
-> >>>
-> >>>But to be consistent with other's I proposed this, please refer to the
-> >>>fn device_800_init(), where all xxx_init() are taking 2 arguments, and
-> >>>second argument is pdata.
-> >>>
-> >>>
-> >>>There is room for cleanup, I agree.
-> >>>I can put this too in the next cleanup series.
-> >>>
-> >>
-> >>Note that this is init function, called from probe.
-> >>
-> >>So both approach looks ok to me.
-> >
-> >Please clean up the other.  Function and put it at the front of the
-> >set when you re-submit.
-> >
-> 
-> Sorry for dumb question here :)
-> I did not understand what do you mean by "in front of the set"?
-> 
-> You want to see all the patches into one single series?
-> Or
-> have separate series,
-> 	1. existing DT addition series
-> 	2. new clean-up series
+On Tue, Jul 7, 2015 at 4:23 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Tuesday 07 July 2015 16:10:12 Geert Uytterhoeven wrote:
+>> Add a link from the Clock Pulse Generator node to the Reset Controller
+>> node, so the CPG can read the Mode Monitoring Register (MODEMR) to
+>> obtain the MD pin values.x
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>>  arch/arm/boot/dts/r8a7790.dtsi | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+>> index 08067ae177643b8f..4ee5523fc3e13e12 100644
+>> --- a/arch/arm/boot/dts/r8a7790.dtsi
+>> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+>> @@ -1115,6 +1115,7 @@
+>>                                            "lb", "qspi", "sdh", "sd0", "sd1",
+>>                                            "z", "rcan", "adsp";
+>>                       #power-domain-cells = <0>;
+>> +                     renesas,modemr = <&rst 0x60>;
+>
+> I have mixed feelings about this as I don't think it really describes the
+> hardware.
 
-[PATCH v6 0/5] mfd: 88pm800: Add Device tree support
-?>[PATCH v6 1/5] mfd: 88pm800: Obtain pdata from 'device' rather than passing as parameter
-?>[PATCH v6 2/5] mfd: 88pm800: Add device tree support
-?>[PATCH v6 3/5] mfd: 88pm800: Remove unnecessary protection around pdata
-?>[PATCH v6 4/5] mfd: 88pm800: Set default interrupt clear method
-?>[PATCH v6 5/5] mfd: devicetree: bindings: Add new 88pm800 mfd binding
+>From the R-Car Gen2 manual:
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+8. Reset (RST)
+8.1 Features
+The following functions are implemented by RST.
+[...]
+Latching of the levels on mode pins when PRESET# is negated
+Mode monitoring register
+
+7. Clock Pulse Generator (CPG)
+7.2 Input/Output Pins
+Table 7.1 lists the CPG pin configuration.
+Table 7.1 Pin Configuration and Functions of CPG
+Pin Name Function I/O Description
+[...]
+MD0 Mode 0 ...
+
+Hence there definitely is a link between the (latched) values in the RST module
+and CPG configuration. This link is expressed using the "renesas,modemr"
+property, where the phandle provides the link to the RST block, and the
+register offset provides a way for software to read the configuration.
+
+> Wouldn't it make sense to instead add a standard kernel API to retrieve the
+> boot mode value ? It seems to be a pretty common feature of SoCs across all
+> vendors.
+
+What format would the boot mode value be in? One u32 word, an array
+of u32s?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
