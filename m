@@ -1,92 +1,127 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jul 2015 08:31:44 +0100
-Subject: [PATCH-V5 4/4] mfd: devicetree: bindings: Add new 88pm800 mfd
- binding
-In-Reply-To: <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150707073144.GQ3182@x1>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 7 Jul 2015 15:37:58 +0800
+Subject: [PATCH v2 2/4] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <5596BBD3.1040708@arm.com>
+References: <cover.1434036796.git.robin.murphy@arm.com>
+ <bf63d80c36533aa4dcc401b5a4b312ba00237e1c.1434036796.git.robin.murphy@arm.com>
+ <1435915649.21346.11.camel@mhfsdcap03> <5596BBD3.1040708@arm.com>
+Message-ID: <1436254678.18552.7.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
-
-> With addition of DT support to 88pm800 mfd driver, this patch
-> adds new DT binding documentation along with respective properties.
+On Fri, 2015-07-03 at 17:44 +0100, Robin Murphy wrote:
+> On 03/07/15 10:27, Yong Wu wrote:
+> [...]
+> >> +/**
+> >> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
+> >> + * @dev: Device to allocate memory for. Must be a real device
+> >> + *	 attached to an iommu_dma_domain
+> >> + * @size: Size of buffer in bytes
+> >> + * @gfp: Allocation flags
+> >> + * @prot: IOMMU mapping flags
+> >> + * @coherent: Which dma_mask to base IOVA allocation on
+> >> + * @handle: Out argument for allocated DMA handle
+> >> + * @flush_page: Arch callback to flush a single page from caches as
+> >> + *		necessary. May be NULL for coherent allocations
+> >> + *
+> >> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
+> >> + * but an IOMMU which supports smaller pages might not map the whole thing.
+> >> + * For now, the buffer is unconditionally zeroed for compatibility
+> >> + *
+> >> + * Return: Array of struct page pointers describing the buffer,
+> >> + *	   or NULL on failure.
+> >> + */
+> >> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
+> >> +		int prot, bool coherent, dma_addr_t *handle,
+> >> +		void (*flush_page)(const void *, phys_addr_t))
+> >> +{
+> >> +	struct iommu_dma_domain *dom = arch_get_dma_domain(dev);
+> >> +	struct iova_domain *iovad = dom->iovad;
+> >> +	struct iova *iova;
+> >> +	struct page **pages;
+> >> +	struct sg_table sgt;
+> >> +	struct sg_mapping_iter miter;
+> >> +	dma_addr_t dma_addr;
+> >> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> >> +
+> >> +	*handle = DMA_ERROR_CODE;
+> >
+> > Hi Robin,
+> >
+> >    Compare with the dma before, You delete this line here.
+> >
+> >            size = PAGE_ALIGN(size);
+> >
+> >    Do you expect the user should make sure the size must be aligned?
+> >
+> >    so do __iommu_free_attrs.
 > 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
->  1 file changed, 53 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+> Yeah, there is an oversight here due to some back-and-forth refactoring 
+> - both the page allocation and the IOVA allocation do get suitably 
+> aligned as they should, but the segments of the temporary scatterlist 
+> don't. Somehow I managed not to hit an iommu_map_sg failure due to that 
+> until some time after this posting (it seems most of the drivers I test 
+> with only make page-sized allocations...)
+> 
+> I've currently got the fixup below waiting for the next posting.
+> 
+> Robin.
 
-For my own reference:
-  Acked-by: Lee Jones <lee.jones@linaro.org>
+Hi Robin,
+    Could we know the status and ETA of the DMA next version.
+    We are preparing the mtk-iommu next patch as our project request.
+    We could help test it if you send the new patch.
+    Thanks.
 
-Yes, I plan to take this through the MFD tree.
-
-> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> new file mode 100644
-> index 0000000..dec842f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-> @@ -0,0 +1,53 @@
-> +* Marvell 88PM80x Power Management IC
-> +
-> +Required parent device properties:
-> +- compatible		: "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-> +- reg			: the I2C slave address for the 88pm80x family chip
-> +- interrupts		: IRQ line for the 88pm80x family chip
-> +- interrupt-controller	: describes the 88pm80x family chip as an interrupt
-> +			  controller
-> +- #interrupt-cells 	: should be 1.
-> +			  The cell is the 88pm80x local IRQ number
-> +
-> +88pm80x family of devices consists of varied group of sub-devices:
-> +
-> +Device		 	Supply Names	 Description
-> +------		 	------------	 -----------
-> +88pm80x-onkey		:		: On key
-> +88pm80x-rtc		:		: RTC
-> +88pm80x-regulator	:		: Regulators
-> +
-> +Example:
-> +
-> +	pmic: 88pm800 at 30 {
-> +		compatible = "marvell,88pm800";
-> +		reg = <0x30>;
-> +		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-parent = <&gic>;
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +
-> +		regulators {
-> +			compatible = "marvell,88pm80x-regulator";
-> +
-> +			buck1a: BUCK1A {
-> +				regulator-name = "BUCK1A";
-> +				regulator-min-microvolt = <600000>;
-> +				regulator-max-microvolt = <1800000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +
-> +			ldo1: LDO1 {
-> +				regulator-name = "LDO1";
-> +				regulator-min-microvolt = <1700000>;
-> +				regulator-max-microvolt = <3300000>;
-> +				regulator-boot-on;
-> +				regulator-always-on;
-> +			};
-> +		};
-> +
-> +		rtc {
-> +			compatible = "marvell,88pm80x-rtc";
-> +		};
-> +	};
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> >> +
+> >> +	/* IOMMU can map any pages, so himem can also be used here */
+> >> +	gfp |= __GFP_NOWARN | __GFP_HIGHMEM;
+> >> +	pages = __iommu_dma_alloc_pages(count, gfp);
+> >> +	if (!pages)
+> >> +		return NULL;
+> >> +
+> >> +	iova = __alloc_iova(dev, size, coherent);
+> >> +	if (!iova)
+> >> +		goto out_free_pages;
+> >> +
+> 
+> +	size = iova_align(iovad, size);
+> 
+> >> +	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
+> >> +		goto out_free_iova;
+> >> +
+> >> +	dma_addr = iova_dma_addr(iovad, iova);
+> >> +	if (iommu_map_sg(dom->domain, dma_addr, sgt.sgl, sgt.orig_nents, prot)
+> >> +			< size)
+> >> +		goto out_free_sg;
+> >> +
+> >> +	/* Using the non-flushing flag since we're doing our own */
+> >> +	sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
+> >> +	while (sg_miter_next(&miter)) {
+> >> +		memset(miter.addr, 0, PAGE_SIZE);
+> >> +		if (flush_page)
+> >> +			flush_page(miter.addr, page_to_phys(miter.page));
+> >> +	}
+> >> +	sg_miter_stop(&miter);
+> >> +	sg_free_table(&sgt);
+> >> +
+> >> +	*handle = dma_addr;
+> >> +	return pages;
+> >> +
+> >> +out_free_sg:
+> >> +	sg_free_table(&sgt);
+> >> +out_free_iova:
+> >> +	__free_iova(iovad, iova);
+> >> +out_free_pages:
+> >> +	__iommu_dma_free_pages(pages, count);
+> >> +	return NULL;
+> >> +}
+> >> +
+> > [...]
+> >> +
+> >> +#endif	/* __KERNEL__ */
+> >> +#endif	/* __DMA_IOMMU_H */
+> >
+> >
+> 
