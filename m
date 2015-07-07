@@ -1,62 +1,81 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 7 Jul 2015 16:13:12 +0200
-Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
- for bus recovery
-In-Reply-To: <20150707134852.GE9671@pengutronix.de>
-References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
- <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
- <20141126160407.GN4431@pengutronix.de> <5476085B.40009@ti.com>
- <1436276269.3344.94.camel@pengutronix.de>
- <20150707134852.GE9671@pengutronix.de>
-Message-ID: <20150707141312.GC3411@katana>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 7 Jul 2015 22:15:29 +0800
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <20150707130732.GD18561@pengutronix.de>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <20150707130732.GD18561@pengutronix.de>
+Message-ID: <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 03:48:52PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Tue, Jul 07, 2015 at 03:37:49PM +0200, Jan L?bbe wrote:
-> > On Mi, 2014-11-26 at 19:05 +0200, Grygorii Strashko wrote:
-> > > On 11/26/2014 06:04 PM, Uwe Kleine-K?nig wrote:
-> > > > On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
-> > > >> Having a board where the I2C bus locks up occasionally made it clear
-> > > >> that the bus recovery in the i2c-davinci driver will only work on
-> > > >> some boards, because on regular boards, this will only toggle GPIO
-> > > >> lines that aren't muxed to the actual pins.
-> > > >>
-> > > >> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
-> > > >> built-in capability to bit-bang its lines by using the ICPFUNC registers
-> > > >> of the i2c controller.
-> > > >> Implement the suggested procedure by toggling SCL and checking SDA using
-> > > >> the ICPFUNC registers of the I2C controller when present. Allow platforms
-> > > >> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
-> > > >> data flag and add optional DT property "ti,has-pfunc" to indicate
-> > > >> the same in DT.
-> > > > On what does it depend if this pfunc stuff works or not? Only the SoC,
-> > > > or also on some board specific properties?
-> > > 
-> > > SoC / set of SoCs. Also, similar feature is supported by OMAP and AM335x/AM437x SoCs
-> > > using I2C_SYSTEST register.
-> > > 
-> > > > Given the former using the
-> > > > compatible string to detect its availability would be better. (In this
-> > > > case also sorry, didn't consider this case when requesting the property
-> > > > in the last round.)
-> > 
-> > I only stumbled across this after it was merged, with the additional
-> I also wonder how it came to the Reviewed-by tag for me. The last thing
-> that I said about the patch was "On what does it depend if this pfunc
-> stuff works or not? Only the SoC, or also on some board specific
-> properties?" (see above) and "the patch looks ok". IMHO this hardly
-> justifies to add the Reviewed-by tag for the next round. :-(
+On Tue, Jul 7, 2015 at 9:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
+>> Add clk_null, which represents clocks that can not / need not
+>> controlled by software.
+>> There are many clocks' parent set to clk_null.
+>>
+>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> ---
+>> Base on 4.1-rc1
+>>
+>> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index 924fdb6..4798f44 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -81,6 +81,12 @@
+>>               cpu_on        = <0x84000003>;
+>>       };
+>>
+>> +     clk_null: clk_null {
+>> +             compatible = "fixed-clock";
+>> +             clock-frequency = <0>;
+>> +             #clock-cells = <0>;
+>> +     };
+>
+> The discussion around this patch shows that we don't want to have this
+> clock in the device tree as it is not a hardware description.
+>
+> Ok, fine. Eddie, you told us that the rate of the current clk_null children
+> is not interesting. What's the motivation to send this patch anyway
+> then? Why can't you keep its children on the orphan list where they are
+> already now?
+>
+> Another possibility would be to instantiate the clk_null clock from C
+> code rather than from the device tree. This way we wouldn't put any
+> wrong descriptions into the device tree and still can implement the
+> support for the real parent clocks when we actually need them.
 
-That needs to be discussed with Grygorii. I can't verify the correctness
-of tags for every patch, although I do try to keep an eye on it...
+Some device nodes, like mmc, use a clk_null phandle as one of their clocks:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/3244e034/attachment.sig>
+mmc1: mmc at 11240000 {
+        compatible = "mediatek,mt8173-mmc",
+                     "mediatek,mt8135-mmc";
+        reg = <0 0x11240000 0 0x1000>;
+        interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
+        clocks = <&pericfg CLK_PERI_MSDC30_1>,
+                 <&clk_null>;
+        clock-names = "source", "hclk";
+        status = "disabled";
+};
+
+-Dan
+
+
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
