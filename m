@@ -1,74 +1,115 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jul 2015 18:24:19 +0100
-Subject: [PATCH 3/9] locking/qrwlock: tidy up rspin_until_writer_unlock
+Date: Tue,  7 Jul 2015 18:24:23 +0100
+Subject: [PATCH 7/9] locking/qrwlock: expose internal lock structure in
+ qrwlock definition
 In-Reply-To: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
 References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436289865-2331-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1436289865-2331-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rspin_until_writer_unlock is used by readers to spin on a qrwlock until
-it is no longer held for write.
-
-This patch tidies up the function so that (a) the comments match the
-code and (b) we avoid passing the redundant initial lock value.
+In order for a writer to unlock correctly on big-endian machines, we
+need to expose the internal layout of the qrwlock structure so that
+we also zero the correct sub-field.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/locking/qrwlock.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ include/asm-generic/qrwlock.h       |  2 +-
+ include/asm-generic/qrwlock_types.h | 17 ++++++++++++++++-
+ kernel/locking/qrwlock.c            | 26 ++------------------------
+ 3 files changed, 19 insertions(+), 26 deletions(-)
 
+diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
+index dbaac5f2af8f..25e97942726a 100644
+--- a/include/asm-generic/qrwlock.h
++++ b/include/asm-generic/qrwlock.h
+@@ -143,7 +143,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
+ #ifndef queued_write_unlock
+ static inline void queued_write_unlock(struct qrwlock *lock)
+ {
+-	smp_store_release((u8 *)&lock->cnts, 0);
++	smp_store_release(&lock->wmode, 0);
+ }
+ #endif
+ 
+diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
+index 4d76f24df518..4c4f87fcf720 100644
+--- a/include/asm-generic/qrwlock_types.h
++++ b/include/asm-generic/qrwlock_types.h
+@@ -2,14 +2,29 @@
+ #define __ASM_GENERIC_QRWLOCK_TYPES_H
+ 
+ #include <linux/types.h>
++#include <asm/byteorder.h>
+ #include <asm/spinlock_types.h>
+ 
+ /*
+  * The queue read/write lock data structure
++ *
++ * The 32-bit count is divided into an 8-bit writer mode byte (least
++ * significant) and a 24-bit reader count.
+  */
+ 
+ typedef struct qrwlock {
+-	atomic_t		cnts;
++	union {
++		atomic_t	cnts;
++		struct {
++#ifdef __LITTLE_ENDIAN
++			u8	wmode;		/* Writer mode   */
++			u8	rcnts[3];	/* Reader counts */
++#else
++			u8	rcnts[3];	/* Reader counts */
++			u8	wmode;		/* Writer mode   */
++#endif
++		};
++	};
+ 	arch_spinlock_t		lock;
+ } arch_rwlock_t;
+ 
 diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index 4e29bef688ac..a1b63df19a04 100644
+index 45fbb48f83f6..6ae1ae321897 100644
 --- a/kernel/locking/qrwlock.c
 +++ b/kernel/locking/qrwlock.c
-@@ -44,16 +44,17 @@ struct __qrwlock {
- };
+@@ -27,26 +27,6 @@
+ # define arch_qrwlock_relax(lock)	cpu_relax_lowlatency()
+ #endif
  
+-/*
+- * This internal data structure is used for optimizing access to some of
+- * the subfields within the atomic_t cnts.
+- */
+-struct __qrwlock {
+-	union {
+-		atomic_t cnts;
+-		struct {
+-#ifdef __LITTLE_ENDIAN
+-			u8 wmode;	/* Writer mode   */
+-			u8 rcnts[3];	/* Reader counts */
+-#else
+-			u8 rcnts[3];	/* Reader counts */
+-			u8 wmode;	/* Writer mode   */
+-#endif
+-		};
+-	};
+-	arch_spinlock_t	lock;
+-};
+-
  /**
-- * rspin_until_writer_unlock - inc reader count & spin until writer is gone
-+ * rspin_until_writer_unlock - spin until writer is gone
+  * rspin_until_writer_unlock - spin until writer is gone
   * @lock  : Pointer to queue rwlock structure
-- * @writer: Current queue rwlock writer status byte
-  *
-  * In interrupt context or at the head of the queue, the reader will just
-- * increment the reader count & wait until the writer releases the lock.
-+ * wait until the writer releases the lock.
-  */
- static __always_inline void
--rspin_until_writer_unlock(struct qrwlock *lock, u32 cnts)
-+rspin_until_writer_unlock(struct qrwlock *lock)
- {
-+	u32 cnts = smp_load_acquire((u32 *)&lock->cnts);
-+
- 	while ((cnts & _QW_WMASK) == _QW_LOCKED) {
- 		cpu_relax_lowlatency();
- 		cnts = smp_load_acquire((u32 *)&lock->cnts);
-@@ -74,11 +75,11 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
- 		/*
- 		 * Readers in interrupt context will get the lock immediately
- 		 * if the writer is just waiting (not holding the lock yet).
--		 * The rspin_until_writer_unlock() function returns immediately
--		 * in this case. Otherwise, they will spin until the lock
--		 * is available without waiting in the queue.
-+		 * Otherwise, they will spin until the lock is available
-+		 * without waiting in the queue.
- 		 */
--		rspin_until_writer_unlock(lock, cnts);
-+		if ((cnts & _QW_WMASK) == _QW_LOCKED)
-+			rspin_until_writer_unlock(lock);
- 		return;
- 	}
- 	atomic_sub(_QR_BIAS, &lock->cnts);
-@@ -99,8 +100,7 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
- 		cpu_relax_lowlatency();
+@@ -138,10 +118,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
+ 	 * or wait for a previous writer to go away.
+ 	 */
+ 	for (;;) {
+-		struct __qrwlock *l = (struct __qrwlock *)lock;
+-
+-		if (!READ_ONCE(l->wmode) &&
+-		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
++		if (!READ_ONCE(lock->wmode) &&
++		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
+ 			break;
  
- 	atomic_add(_QR_BIAS, &lock->cnts);
--	cnts = smp_load_acquire((u32 *)&lock->cnts);
--	rspin_until_writer_unlock(lock, cnts);
-+	rspin_until_writer_unlock(lock);
- 
- 	/*
- 	 * Signal the next one in queue to become queue head
+ 		arch_qrwlock_relax(lock);
 -- 
 2.1.4
