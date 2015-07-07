@@ -1,64 +1,80 @@
-From: aalonso@freescale.com (Adrian Alonso)
-Date: Tue, 7 Jul 2015 14:17:10 -0500
-Subject: [PATCH 4/4][v3] ARM: imx: pinctrl-imx7d: add iomuxc-lpsr gpio group
- ids
-In-Reply-To: <1436296630-20296-1-git-send-email-aalonso@freescale.com>
-References: <1436296630-20296-1-git-send-email-aalonso@freescale.com>
-Message-ID: <1436296630-20296-4-git-send-email-aalonso@freescale.com>
+From: waiman.long@hp.com (Waiman Long)
+Date: Tue, 07 Jul 2015 15:28:13 -0400
+Subject: [PATCH 2/9] locking/qrwlock: avoid redundant atomic_add_return
+ on read_lock_slowpath
+In-Reply-To: <20150707181941.GL23879@arm.com>
+References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
+ <1436289865-2331-3-git-send-email-will.deacon@arm.com>
+ <559C11BA.1070309@hp.com> <20150707181941.GL23879@arm.com>
+Message-ID: <559C284D.4090907@hp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Add imx7d SoC iomuxc-lpsr gpio group id's
-* Add IOMUXC_LPSR_SUPPORT flag for pinctrl-imx driver to
-  support iomuxc-lpsr controller.
+On 07/07/2015 02:19 PM, Will Deacon wrote:
+> On Tue, Jul 07, 2015 at 06:51:54PM +0100, Waiman Long wrote:
+>> On 07/07/2015 01:24 PM, Will Deacon wrote:
+>>> When a slow-path reader gets to the front of the wait queue outside of
+>>> interrupt context, it waits for any writers to drain, increments the
+>>> reader count and again waits for any additional writers that may have
+>>> snuck in between the initial check and the increment.
+>>>
+>>> Given that this second check is performed with acquire semantics, there
+>>> is no need to perform the increment using atomic_add_return, which acts
+>>> as a full barrier.
+>>>
+>>> This patch changes the slow-path code to use smp_load_acquire and
+>>> atomic_add instead of atomic_add_return. Since the check only involves
+>>> the writer count, we can perform the acquire after the add.
+>>>
+>>> Signed-off-by: Will Deacon<will.deacon@arm.com>
+>>> ---
+>>>    kernel/locking/qrwlock.c | 3 ++-
+>>>    1 file changed, 2 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
+>>> index 96b77d1e0545..4e29bef688ac 100644
+>>> --- a/kernel/locking/qrwlock.c
+>>> +++ b/kernel/locking/qrwlock.c
+>>> @@ -98,7 +98,8 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
+>>>    	while (atomic_read(&lock->cnts)&   _QW_WMASK)
+>>>    		cpu_relax_lowlatency();
+>>>
+>>> -	cnts = atomic_add_return(_QR_BIAS,&lock->cnts) - _QR_BIAS;
+>>> +	atomic_add(_QR_BIAS,&lock->cnts);
+>>> +	cnts = smp_load_acquire((u32 *)&lock->cnts);
+>>>    	rspin_until_writer_unlock(lock, cnts);
+>>>
+>>>    	/*
+>> Atomic add in x86 is actually a full barrier too. The performance
+>> difference between "lock add" and "lock xadd" should be minor. The
+>> additional load, however, could potentially cause an additional
+>> cacheline load on a contended lock. So do you see actual performance
+>> benefit of this change in ARM?
+> I'd need to re-run the numbers, but atomic_add is significantly less
+> work on ARM than atomic_add_return, which basically has two full memory
+> barriers compared to none for the former.
+>
+> Will
 
-Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+I think a compromise is to encapsulate that in an inlined function that 
+can be overridden by architecture specific code. For example,
 
-- Change v1 to v3: resend patch
+#ifndef queued_inc_reader_return
+static inline u32 queued_inc_reader_return(struct qrwlock *lock)
+{
+     return atomic_add_return(_QR_BIAS, &lock->cnts) - _QR_BIAS;
+}
+#endif
 
----
- drivers/pinctrl/freescale/pinctrl-imx7d.c | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+:
 
-diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-index 1fa7530..cf89275 100644
---- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-+++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-@@ -172,6 +172,14 @@ enum imx7d_pads {
- 	MX7D_PAD_ENET1_RX_CLK = 152,
- 	MX7D_PAD_ENET1_CRS = 153,
- 	MX7D_PAD_ENET1_COL = 154,
-+	MX7D_PAD_GPIO1_IO00 = 155,
-+	MX7D_PAD_GPIO1_IO01 = 156,
-+	MX7D_PAD_GPIO1_IO02 = 157,
-+	MX7D_PAD_GPIO1_IO03 = 158,
-+	MX7D_PAD_GPIO1_IO04 = 159,
-+	MX7D_PAD_GPIO1_IO05 = 160,
-+	MX7D_PAD_GPIO1_IO06 = 161,
-+	MX7D_PAD_GPIO1_IO07 = 162,
- };
- 
- /* Pad names for the pinmux subsystem */
-@@ -331,11 +339,20 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RX_CLK),
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_CRS),
- 	IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-+	IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
- };
- 
- static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
- 	.pins = imx7d_pinctrl_pads,
- 	.npins = ARRAY_SIZE(imx7d_pinctrl_pads),
-+	.flags = IOMUXC_LPSR_SUPPORT,
- };
- 
- static struct of_device_id imx7d_pinctrl_of_match[] = {
--- 
-2.1.4
+cnts = queued_inc_reader_return(lock);
+
+This also means that you will need to keep the function prototype for 
+rspin_until_writer_unlock() in the later patch. Other than that, I don't 
+see any other issue in the patch series.
+
+BTW, are you also planning to use qspinlock in the ARM64 code?
+
+Cheers,
+Longman
