@@ -1,150 +1,55 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Tue, 7 Jul 2015 09:13:44 +0000
-Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
-In-Reply-To: <559B966F.4010508@linaro.org>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
- <1436184692-20927-7-git-send-email-eric.auger@linaro.org>
- <E959C4978C3B6342920538CF579893F0025F2A47@SHSMSX104.ccr.corp.intel.com>
- <559B966F.4010508@linaro.org>
-Message-ID: <E959C4978C3B6342920538CF579893F0025F2CF8@SHSMSX104.ccr.corp.intel.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Tue, 07 Jul 2015 11:14:32 +0200
+Subject: [PATCH 1/7] pinctrl: UniPhier: add UniPhier pinctrl core support
+In-Reply-To: <1436185763-4308-2-git-send-email-yamada.masahiro@socionext.com>
+References: <1436185763-4308-1-git-send-email-yamada.masahiro@socionext.com>
+ <1436185763-4308-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1436260472.20057.121.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+(I only comment on 1/7, because it's not useful to repeat one remark
+seven times.)
 
+On ma, 2015-07-06 at 21:29 +0900, Masahiro Yamada wrote:
+> --- /dev/null
+> +++ b/drivers/pinctrl/uniphier/Kconfig
 
-> -----Original Message-----
-> From: Eric Auger [mailto:eric.auger at linaro.org]
-> Sent: Tuesday, July 07, 2015 5:06 PM
-> To: Wu, Feng; eric.auger at st.com; linux-arm-kernel at lists.infradead.org;
-> kvmarm at lists.cs.columbia.edu; kvm at vger.kernel.org;
-> christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
-> mtosatti at redhat.com; joro at 8bytes.org; b.reynal at virtualopensystems.com
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> Subject: Re: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
-> 
-> Hi Feng,
-> On 07/07/2015 10:47 AM, Wu, Feng wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Eric Auger [mailto:eric.auger at linaro.org]
-> >> Sent: Monday, July 06, 2015 8:12 PM
-> >> To: eric.auger at st.com; eric.auger at linaro.org;
-> >> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> >> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> >> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
-> >> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
-> >> b.reynal at virtualopensystems.com
-> >> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> >> Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
-> >>
-> >> This patch adds the registration/unregistration of an
-> >> irq_bypass_consumer on irqfd assignment/deassignment.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >>
-> >> ---
-> >>
-> >> v1 -> v2:
-> >> - populate of kvm and gsi removed
-> >> - unregister the consumer on irqfd_shutdown
-> >> ---
-> >>  include/linux/kvm_irqfd.h |  1 +
-> >>  virt/kvm/eventfd.c        | 14 +++++++++++---
-> >>  2 files changed, 12 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
-> >> index f926b39..3c0bd07 100644
-> >> --- a/include/linux/kvm_irqfd.h
-> >> +++ b/include/linux/kvm_irqfd.h
-> >> @@ -64,6 +64,7 @@ struct kvm_kernel_irqfd {
-> >>  	struct list_head list;
-> >>  	poll_table pt;
-> >>  	struct work_struct shutdown;
-> >> +	struct irq_bypass_consumer consumer;
-> >>  };
-> >>
-> >>  #endif /* __LINUX_KVM_IRQFD_H */
-> >> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-> >> index b79dc61..9452754 100644
-> >> --- a/virt/kvm/eventfd.c
-> >> +++ b/virt/kvm/eventfd.c
-> >> @@ -35,6 +35,7 @@
-> >>  #include <linux/srcu.h>
-> >>  #include <linux/slab.h>
-> >>  #include <linux/seqlock.h>
-> >> +#include <linux/irqbypass.h>
-> >>  #include <trace/events/kvm.h>
-> >>
-> >>  #include <kvm/iodev.h>
-> >> @@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
-> >>  	/*
-> >>  	 * It is now safe to release the object's resources
-> >>  	 */
-> >> +	irq_bypass_unregister_consumer(&irqfd->consumer);
-> >>  	eventfd_ctx_put(irqfd->eventfd);
-> >>  	kfree(irqfd);
-> >>  }
-> >> @@ -380,7 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct
-> kvm_irqfd
-> >> *args)
-> >>  	 */
-> >>  	fdput(f);
-> >>
-> >> -	/* irq_bypass_register_consumer(); */
-> >> +	irqfd->consumer.token = (void *)irqfd->eventfd;
-> >> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
-> >> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
-> >> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
-> >> +	irqfd->consumer.resume = kvm_arch_irq_bypass_resume;
-> >> +	irqfd->consumer.update = kvm_arch_irq_bypass_update;
-> >> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
-> >> +	WARN_ON(ret);
-> >>
-> >>  	return 0;
-> >>
-> >> @@ -481,8 +490,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct
-> kvm_irqfd
-> >> *args)
-> >>  	struct kvm_kernel_irqfd *irqfd, *tmp;
-> >>  	struct eventfd_ctx *eventfd;
-> >>
-> >> -	/* irq_bypass_unregister_consumer() */
-> >> -
-> >>  	eventfd = eventfd_ctx_fdget(args->fd);
-> >>  	if (IS_ERR(eventfd))
-> >>  		return PTR_ERR(eventfd);
-> >> @@ -501,6 +508,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct
-> kvm_irqfd
-> >> *args)
-> >>  			irqfd->irq_entry.type = 0;
-> >>  			write_seqcount_end(&irqfd->irq_entry_sc);
-> >>  			irqfd_deactivate(irqfd);
-> >> +			irq_bypass_unregister_consumer(&irqfd->consumer);
-> >
-> > consumer is unregistered in irqfd_shutdown(), why need we do it here?
-> Yes you're right, this is not needed anymore. Did things too hastily :-(
-> 
-> Otherwise does that isolated series fit your needs for posted interrupts
-> and match your expectations with regards to split/reusability?
+> +config PINCTRL_UNIPHIER_CORE
+> +	bool
+> +	select PINMUX
+> +	select GENERIC_PINCONF
 
-Basically, they are fine. I am trying to rebase my patch on top of it. If I
-encounter any issues, I will discuss it here ASAP.
+> --- /dev/null
+> +++ b/drivers/pinctrl/uniphier/Makefile
+
+> +obj-$(CONFIG_PINCTRL_UNIPHIER_CORE)		+= pinctrl-uniphier-core.o
+
+> --- /dev/null
+> +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+
+> +#include <linux/module.h>
+
+> +int uniphier_pinctrl_probe(struct platform_device *pdev,
+> +			   struct pinctrl_desc *desc,
+> +			   struct uniphier_pinctrl_socdata *socdata)
+> +{
+> +	[...]
+
+> +	desc->owner = THIS_MODULE;
+
+> +	[...]
+> +}
+
+This series adds a number of bool Kconfig symbols. So, as far as I can
+see, the code it adds can only be built-in.
+
+This series also uses a number of module specific constructs (ie,
+THIS_MODULE, MODULE_DEVICE_TABLE, module_exit, MODULE_AUTHOR,
+MODULE_DESCRIPTION, and MODULE_LICENSE). So I wonder whether it was
+intended to make these new Kconfig symbols tristate instead?
 
 Thanks,
-Feng
 
-> 
-> Eric
-> 
-> >
-> > Thanks,
-> > Feng
-> >
-> >>  		}
-> >>  	}
-> >>
-> >> --
-> >> 1.9.1
-> >
+
+Paul Bolle
