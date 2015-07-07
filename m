@@ -1,64 +1,58 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 07 Jul 2015 12:07:14 +0530
-Subject: [rtc-linux] [PATCH-v2] rtc: 88pm80x: add device tree support
-In-Reply-To: <558BB1C1.2090400@linaro.org>
-References: <vaibhav.hiremath@linaro.org>
- <1434567488-6477-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1434567488-6477-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150620004354.GY27492@piout.net> <558BB1C1.2090400@linaro.org>
-Message-ID: <559B739A.3080300@linaro.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 7 Jul 2015 08:40:23 +0200 (CEST)
+Subject: [PATCH v4 0/2] Correct for ACPI 5.1->6.0 spec changes in MADT
+ GICC entries
+In-Reply-To: <559B1324.8000301@redhat.com>
+References: <1436224608-27754-1-git-send-email-al.stone@linaro.org>
+ <CAJZ5v0j+iKhOX4hw2XQEdo9CjpP2sfdxGwCz_vN5OVqithEv0Q@mail.gmail.com>
+ <559B1324.8000301@redhat.com>
+Message-ID: <alpine.DEB.2.11.1507070839590.3916@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 6 Jul 2015, Al Stone wrote:
+> On 07/06/2015 05:20 PM, Rafael J. Wysocki wrote:
+> > Hi Al,
+> > 
+> > On Tue, Jul 7, 2015 at 1:16 AM, Al Stone <al.stone@linaro.org> wrote:
+> >> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
+> >> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
+> >> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+> >> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+> >> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+> >> subtable, it fails if 5.1 structs are in use, and there are systems in
+> >> the wild that have them.
+> >>
+> >> Note that this was found in linux-next and these patches apply against
+> >> that tree and the arm64 kernel tree; 4.1 does not appear to have this
+> >> problem since it still has the 5.1 struct definition.
+> >>
+> >> Though there is precedent in ia64 code for ignoring the changes in size,
+> >> this patch set instead verifies correctness.  The first patch adds the
+> >> BAD_MADT_GICC_ENTRY() macro to check the GICC subtable only, accounting
+> >> for the difference in specification versions that are possible.  The
+> >> second patch replaces BAD_MADT_ENTRY usage with the BAD_MADT_GICC_ENTRY
+> >> macro in arm64 code, which is currently the only architecture affected.
+> >> The BAD_MADT_ENTRY() will continue to work as is for all other MADT
+> >> subtables.
+> >>
+> >> I have tested these patches on an APM Mustang with version 1.15 firmware,
+> >> where the problem was found, and they fix the problem -- i.e., the system
+> >> will boot with either Linux 4.1 or linux-next kernels using the same ACPI
+> >> 5.1 compatible firmware.
+> > 
+> > ACK for the series, but I guess it's better to let it go via ARM64, right?
+> > 
+> > Rafael
+> 
+> Thanks, Rafael.  Yeah, probably so.  Will has ACKd the one patch
+> (2/2); if he and/or Catalin ACK patch 1/2, then this seems like it
+> would pretty cleanly fit into ARM64.  The only question would be if
+> Will or Catalin would want an ACK from Thomas on the irq-gic.c part
+> in 2/2.
 
-
-On Thursday 25 June 2015 01:16 PM, Vaibhav Hiremath wrote:
->
->
-> On Saturday 20 June 2015 06:13 AM, Alexandre Belloni wrote:
->> Hi,
->>
->
-> Sorry I missed this email.
-> Just wanted to send reminder email and saw this :)
->
->> On 18/06/2015 at 00:28:06 +0530, Vaibhav Hiremath wrote :
->>> -    pdata = dev_get_platdata(&pdev->dev);
->>> -    if (pdata == NULL)
->>> -        dev_warn(&pdev->dev, "No platform data!\n");
->>> +    if (!pdata && !node) {
->>> +        dev_err(&pdev->dev,
->>> +            "pm80x-rtc requires platform data or of_node\n");
->>> +        return -EINVAL;
->>> +    }
->>> +
->>> +    if (!pdata) {
->>> +        pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
->>
->> I had troubles to follow the rtc_wakeup initialization cleanup but it
->> seems OK.
->
-> Probably, once we have complete PM support ready then it would be
-> easier to understand. I think as of now lets have this minimal code for
-> rtc_wakeup.
->
->> However, I'm wondering why you are adding DT support as this
->> will always be probed from the MFD driver which pass the platform_data
->> and avoids that allocation.
->>
->
-> You are right.
->
-> Originally, it was cleanup patch,
->
->   - remove pm80x_pdata
->   - Add check for pdata and np
->   - and around rtc_wakeup
->
-> While doing that I added this nice to have allocation.
->
-
-Any update/feedback on this?
+No objections from my side.
 
 Thanks,
-Vaibhav
+
+	tglx
