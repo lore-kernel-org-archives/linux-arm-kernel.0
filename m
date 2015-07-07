@@ -1,104 +1,89 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:17:54 +0100
-Subject: [PATCH v3 04/15] PCI/MSI: Add hooks to populate the msi_domain field
+Date: Tue,  7 Jul 2015 18:17:58 +0100
+Subject: [PATCH v3 08/15] platform: of: Assign MSI domain to platform device
 In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
 References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436289485-28230-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to populate the device msi_domain field,
-add the necesary hooks to propagate the host bridge msi_domain
-across secondary busses to devices.
-
-So far, nobody populates the initial msi_domain.
+As for PCI, we're able to populate the msi_domain field at probe time,
+provided that the device tree has an "msi-parent" property.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
- include/linux/pci.h |  1 +
- 2 files changed, 31 insertions(+)
+ drivers/of/irq.c          | 16 ++++++++++++++++
+ drivers/of/platform.c     |  1 +
+ include/linux/irqdomain.h |  1 +
+ include/linux/of_irq.h    |  1 +
+ 4 files changed, 19 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cefd636..376f6fa 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index 3cf7a01..64392a6 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -18,6 +18,7 @@
+  * driver.
+  */
+ 
++#include <linux/device.h>
+ #include <linux/errno.h>
+ #include <linux/list.h>
+ #include <linux/module.h>
+@@ -576,3 +577,18 @@ err:
+ 		kfree(desc);
  	}
  }
- 
-+void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
++
++void of_msi_configure(struct device *dev, struct device_node *np)
 +{
++	struct device_node *msi_np;
++	struct irq_domain *d;
++
++	msi_np = of_parse_phandle(np, "msi-parent", 0);
++	if (!msi_np)
++		return;
++
++	d = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
++	if (!d)
++		d = irq_find_host(msi_np);
++	dev_set_msi_domain(dev, d);
 +}
-+
-+static void pci_set_bus_msi_domain(struct pci_bus *bus)
-+{
-+	struct pci_dev *bridge = bus->self;
-+
-+	if (!bridge)
-+		pcibios_set_host_bridge_msi_domain(bus);
-+	else
-+		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
-+}
-+
- static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 					   struct pci_dev *bridge, int busnr)
- {
-@@ -714,6 +728,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	bridge->subordinate = child;
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index ddf8e42..8a002d6 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -184,6 +184,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 	of_dma_configure(&dev->dev, dev->dev.of_node);
++	of_msi_configure(&dev->dev, dev->dev.of_node);
  
- add_dev:
-+	pci_set_bus_msi_domain(child);
- 	ret = device_register(&child->dev);
- 	WARN_ON(ret < 0);
+ 	if (of_device_add(dev) != 0) {
+ 		of_dma_deconfigure(&dev->dev);
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 25e9e66..b4a74f7 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -55,6 +55,7 @@ struct irq_data;
+ enum irq_domain_bus_token {
+ 	DOMAIN_BUS_ANY		= 0,
+ 	DOMAIN_BUS_PCI_MSI,
++	DOMAIN_BUS_PLATFORM_MSI,
+ };
  
-@@ -1544,6 +1559,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
- 	pci_enable_acs(dev);
- }
+ /**
+diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+index d884929..4bcbd58 100644
+--- a/include/linux/of_irq.h
++++ b/include/linux/of_irq.h
+@@ -74,6 +74,7 @@ static inline int of_irq_to_resource_table(struct device_node *dev,
+  */
+ extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
+ extern struct device_node *of_irq_find_parent(struct device_node *child);
++extern void of_msi_configure(struct device *dev, struct device_node *np);
  
-+static void pci_set_msi_domain(struct pci_dev *dev)
-+{
-+	/*
-+	 * If no domain has been set through the pcibios callback,
-+	 * inherit the default from the bus device.
-+	 */
-+	if (!dev_get_msi_domain(&dev->dev))
-+		dev_set_msi_domain(&dev->dev,
-+				   dev_get_msi_domain(&dev->bus->dev));
-+}
-+
- void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- {
- 	int ret;
-@@ -1585,6 +1611,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	ret = pcibios_add_device(dev);
- 	WARN_ON(ret < 0);
- 
-+	/* Setup MSI irq domain */
-+	pci_set_msi_domain(dev);
-+
- 	/* Notifier could use PCI capabilities */
- 	dev->match_driver = false;
- 	ret = device_add(&dev->dev);
-@@ -1975,6 +2004,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
- 	pci_set_bus_of_node(b);
-+	pci_set_bus_msi_domain(b);
- 
- 	if (!parent)
- 		set_dev_node(b->bridge, pcibus_to_node(b));
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8a0321a..3622453 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1645,6 +1645,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
- int pcibios_add_device(struct pci_dev *dev);
- void pcibios_release_device(struct pci_dev *dev);
- void pcibios_penalize_isa_irq(int irq, int active);
-+void pcibios_set_host_bridge_msi_domain(struct pci_bus *bus);
- 
- #ifdef CONFIG_HIBERNATE_CALLBACKS
- extern struct dev_pm_ops pcibios_pm_ops;
+ #else /* !CONFIG_OF */
+ static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
 -- 
 2.1.4
