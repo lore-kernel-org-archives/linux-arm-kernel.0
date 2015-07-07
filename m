@@ -1,157 +1,94 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jul 2015 18:15:05 +0100
-Subject: [PATCH] ARM: perf: extend interrupt-affinity property for PPIs
-Message-ID: <1436289305-32467-1-git-send-email-will.deacon@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  7 Jul 2015 19:16:43 +0200
+Subject: [PATCH v3] mfd: atmel-hlcdc: implement config synchronization
+Message-ID: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems containing multiple, heterogeneous clusters we need a way to
-associate a PMU "device" with the CPU(s) on which it exists. For PMUs
-that signal overflow with SPIs, this relationship is determined via the
-"interrupt-affinity" property, which contains a list of phandles to CPU
-nodes for the PMU. For PMUs using PPIs, the per-cpu nature of the
-interrupt isn't enough to determine the set of CPUs which actually
-contain the device.
+Some HLCDC registers cannot be written until the hardware has finished
+applying the previous configuration request. If they are written while
+an action is still in progress, the new configuration might be silently
+ignored, resulting in unpredictable behavior.
 
-This patch allows the interrupt-affinity property to be specified on a
-PMU node irrespective of the interrupt type. For PPIs, it identifies
-the set of CPUs signalling the PPI in question.
+Hide the config synchronization stuff in a regmap implementation and use
+this implementation instead of the generic mmio one.
 
-Tested-by: Stephen Boyd <sboyd@codeaurora.org> # Krait PMU
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 ---
- Documentation/devicetree/bindings/arm/pmu.txt | 12 +++--
- arch/arm/kernel/perf_event.c                  | 65 ++++++++++++++++++---------
- 2 files changed, 53 insertions(+), 24 deletions(-)
+Changes since v2:
+ - reword the commit message
 
-diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
-index 3b5f5d1088c6..435251fa9ce0 100644
---- a/Documentation/devicetree/bindings/arm/pmu.txt
-+++ b/Documentation/devicetree/bindings/arm/pmu.txt
-@@ -26,13 +26,19 @@ Required properties:
+Changes since v1:
+ - add a 100 usec timeout
+---
+ drivers/mfd/atmel-hlcdc.c | 35 +++++++++++++++++++++++++++++++++--
+ 1 file changed, 33 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+index cfd58f4..04e01cc 100644
+--- a/drivers/mfd/atmel-hlcdc.c
++++ b/drivers/mfd/atmel-hlcdc.c
+@@ -18,6 +18,7 @@
+  */
  
- Optional properties:
+ #include <linux/clk.h>
++#include <linux/iopoll.h>
+ #include <linux/mfd/atmel-hlcdc.h>
+ #include <linux/mfd/core.h>
+ #include <linux/module.h>
+@@ -37,11 +38,41 @@ static const struct mfd_cell atmel_hlcdc_cells[] = {
+ 	},
+ };
  
--- interrupt-affinity : Valid only when using SPIs, specifies a list of phandles
--                       to CPU nodes corresponding directly to the affinity of
-+- interrupt-affinity : When using SPIs, specifies a list of phandles to CPU
-+                       nodes corresponding directly to the affinity of
- 		       the SPIs listed in the interrupts property.
- 
--		       This property should be present when there is more than
-+                       When using a PPI, specifies a list of phandles to CPU
-+		       nodes corresponding to the set of CPUs which have
-+		       a PMU of this type signalling the PPI listed in the
-+		       interrupts property.
++static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
++					unsigned int val)
++{
++	void __iomem *regs = context;
 +
-+                       This property should be present when there is more than
- 		       a single SPI.
- 
++	if (reg <= ATMEL_HLCDC_DIS) {
++		u32 status;
 +
- - qcom,no-pc-write : Indicates that this PMU doesn't support the 0xc and 0xd
-                      events.
- 
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 7d5379c1c443..5a8f17bfcc60 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -790,32 +790,39 @@ static int probe_current_pmu(struct arm_pmu *pmu,
- 
- static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- {
--	int i, irq, *irqs;
-+	int *irqs, i = 0;
-+	bool using_spi = false;
- 	struct platform_device *pdev = pmu->plat_device;
- 
--	/* Don't bother with PPIs; they're already affine */
--	irq = platform_get_irq(pdev, 0);
--	if (irq >= 0 && irq_is_percpu(irq)) {
--		cpumask_setall(&pmu->supported_cpus);
--		return 0;
--	}
--
- 	irqs = kcalloc(pdev->num_resources, sizeof(*irqs), GFP_KERNEL);
- 	if (!irqs)
- 		return -ENOMEM;
- 
--	for (i = 0; i < pdev->num_resources; ++i) {
-+	do {
- 		struct device_node *dn;
--		int cpu;
-+		int cpu, irq;
- 
--		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity",
--				      i);
--		if (!dn) {
--			pr_warn("Failed to parse %s/interrupt-affinity[%d]\n",
--				of_node_full_name(pdev->dev.of_node), i);
-+		/* See if we have an affinity entry */
-+		dn = of_parse_phandle(pdev->dev.of_node, "interrupt-affinity", i);
-+		if (!dn)
- 			break;
++		readl_poll_timeout(regs + ATMEL_HLCDC_SR, status,
++				   !(status & ATMEL_HLCDC_SIP), 1, 100);
++	}
 +
-+		/* Check the IRQ type and prohibit a mix of PPIs and SPIs */
-+		irq = platform_get_irq(pdev, i);
-+		if (irq >= 0) {
-+			bool spi = !irq_is_percpu(irq);
++	writel(val, regs + reg);
 +
-+			if (i > 0 && spi != using_spi) {
-+				pr_err("PPI/SPI IRQ type mismatch for %s!\n",
-+					dn->name);
-+				kfree(irqs);
-+				return -EINVAL;
-+			}
++	return 0;
++}
 +
-+			using_spi = spi;
- 		}
++static int regmap_atmel_hlcdc_reg_read(void *context, unsigned int reg,
++				       unsigned int *val)
++{
++	void __iomem *regs = context;
++
++	*val = readl(regs + reg);
++
++	return 0;
++}
++
+ static const struct regmap_config atmel_hlcdc_regmap_config = {
+ 	.reg_bits = 32,
+ 	.val_bits = 32,
+ 	.reg_stride = 4,
+ 	.max_register = ATMEL_HLCDC_REG_MAX,
++	.reg_write = regmap_atmel_hlcdc_reg_write,
++	.reg_read = regmap_atmel_hlcdc_reg_read,
++	.fast_io = true,
+ };
  
-+		/* Now look up the logical CPU number */
- 		for_each_possible_cpu(cpu)
- 			if (arch_find_n_match_cpu_physical_id(dn, cpu, NULL))
- 				break;
-@@ -824,20 +831,36 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 			pr_warn("Failed to find logical CPU for %s\n",
- 				dn->name);
- 			of_node_put(dn);
-+			cpumask_setall(&pmu->supported_cpus);
- 			break;
- 		}
- 		of_node_put(dn);
+ static int atmel_hlcdc_probe(struct platform_device *pdev)
+@@ -82,8 +113,8 @@ static int atmel_hlcdc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(hlcdc->slow_clk);
+ 	}
  
--		irqs[i] = cpu;
-+		/* For SPIs, we need to track the affinity per IRQ */
-+		if (using_spi) {
-+			if (i >= pdev->num_resources) {
-+				of_node_put(dn);
-+				break;
-+			}
-+
-+			irqs[i] = cpu;
-+		}
-+
-+		/* Keep track of the CPUs containing this PMU type */
- 		cpumask_set_cpu(cpu, &pmu->supported_cpus);
--	}
-+		of_node_put(dn);
-+		i++;
-+	} while (1);
+-	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
+-					      &atmel_hlcdc_regmap_config);
++	hlcdc->regmap = devm_regmap_init(dev, NULL, regs,
++					 &atmel_hlcdc_regmap_config);
+ 	if (IS_ERR(hlcdc->regmap))
+ 		return PTR_ERR(hlcdc->regmap);
  
--	if (i == pdev->num_resources) {
-+	/* If we didn't manage to parse anything, claim to support all CPUs */
-+	if (cpumask_weight(&pmu->supported_cpus) == 0)
-+		cpumask_setall(&pmu->supported_cpus);
-+
-+	/* If we matched up the IRQ affinities, use them to route the SPIs */
-+	if (using_spi && i == pdev->num_resources)
- 		pmu->irq_affinity = irqs;
--	} else {
-+	else
- 		kfree(irqs);
--		cpumask_setall(&pmu->supported_cpus);
--	}
- 
- 	return 0;
- }
 -- 
-2.1.4
+1.9.1
