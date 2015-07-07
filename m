@@ -1,43 +1,37 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:13 +0800
-Subject: [PATCH v2 0/9] bugfixs and add support for non-pci devices
-Message-ID: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+Date: Tue, 7 Jul 2015 11:30:16 +0800
+Subject: [PATCH v2 3/9] iommu/arm-smmu: fix the values of
+ ARM64_TCR_IRGN0_SHIFT and ARM64_TCR_ORGN0_SHIFT
+In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1436239822-14132-4-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v1 -> v2:
-update the implementation of patch 1/9 according to Will Deacon's suggestion.
-update the comment of patch 3/9 and 4/9.
-use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
-patch 6/9 is base on Laurent's series, to support probe deferral.
-patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
-patch 9/9 add support for a master with multiple stream IDs.
+In SMMU_CBn_TCR when LPAE enabled, the offset of IRGN0 is 8, the offset
+of ORGN0 is 10.
 
-Addition:
-scripts/checkpatch 6/9 reports a warning, this is temporary. I don't want
-patch 9/9 to display too many differences just because of add tabs.
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-scripts/checkpatch.pl 0006-iommu-arm-smmu-to-support-probe-deferral.patch
-WARNING: else is not generally useful after a break or return
-#161: FILE: drivers/iommu/arm-smmu-v3.c:1938:
-+		return -ENODEV;
-+	} else {
-
-Zhen Lei (9):
-  iommu/arm-smmu: fix the assignment of L1 table log2entries
-  iommu/arm-smmu: fix the index calculation of strtab
-  iommu/arm-smmu: fix the values of ARM64_TCR_IRGN0_SHIFT and
-    ARM64_TCR_ORGN0_SHIFT
-  iommu/arm-smmu: enlarge STRTAB_L1_SZ_SHIFT to support larger sidsize
-  iommu/arm-smmu: skip the execution of CMD_PREFETCH_CONFIG
-  iommu/arm-smmu: to support probe deferral
-  iommu/arm-smmu: remove arm_smmu_devices
-  iommu/arm-smmu: rename __arm_smmu_get_pci_sid
-  iommu/arm-smmu: add support for non-pci devices
-
- drivers/iommu/arm-smmu-v3.c | 238 ++++++++++++++++++++++++++++++++------------
- 1 file changed, 173 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 48be7eb..0723034 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -269,10 +269,10 @@
+ #define ARM64_TCR_TG0_SHIFT		14
+ #define ARM64_TCR_TG0_MASK		0x3UL
+ #define CTXDESC_CD_0_TCR_IRGN0_SHIFT	8
+-#define ARM64_TCR_IRGN0_SHIFT		24
++#define ARM64_TCR_IRGN0_SHIFT		8
+ #define ARM64_TCR_IRGN0_MASK		0x3UL
+ #define CTXDESC_CD_0_TCR_ORGN0_SHIFT	10
+-#define ARM64_TCR_ORGN0_SHIFT		26
++#define ARM64_TCR_ORGN0_SHIFT		10
+ #define ARM64_TCR_ORGN0_MASK		0x3UL
+ #define CTXDESC_CD_0_TCR_SH0_SHIFT	12
+ #define ARM64_TCR_SH0_SHIFT		12
 --
 1.8.0
