@@ -1,151 +1,58 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 07 Jul 2015 16:55:27 +0530
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <559BB58E.9010406@linaro.org>
-References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
- <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
- <20150707111248.GU3182@x1> <559BB58E.9010406@linaro.org>
-Message-ID: <559BB727.2070106@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jul 2015 12:32:13 +0100
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
+Message-ID: <20150707113213.GC7576@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jul 06, 2015 at 10:26:13PM +0200, Pali Roh?r wrote:
+> Legacy bootloaders can pass additional information for kernel or legacy
+> userspace applications. When booting DT kernel then ATAGs structure is not
+> more visible after running kernel uncompress code. This patch stores full
+> ATAGs structure into DT "/chosen/linux,atags" entry, so kernel can later
+> reuse it and export via /proc/atags to userspace.
 
+I think you need to go through your commit messages and improve them,
+especially the ones with "TODO" in them.  As long as there's still things
+to be done, they're obviously not ready for merging.
 
-On Tuesday 07 July 2015 04:48 PM, Vaibhav Hiremath wrote:
->
->
-> On Tuesday 07 July 2015 04:42 PM, Lee Jones wrote:
->> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->>> On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
->>>> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->>>>> On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
->>>>>> On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
->>>>>>
->>>>>>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->>>>>>> (page 0) controls the method of clearing interrupt
->>>>>>> status of 88pm800 family of devices;
->>>>>>>
->>>>>>>    0: clear on read
->>>>>>>    1: clear on write
->>>>>>>
->>>>>>> If pdata is not coming from board file, then set the
->>>>>>> default irq clear method to "irq clear on write"
->>>>>>>
->>>>>>> Also, as suggested by "Lee Jones" renaming variable field
->>>>>>> to appropriate name.
->>>>>>>
->>>>>>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->>>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>>>>> ---
->>>>>>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
->>>>>>>   include/linux/mfd/88pm80x.h | 10 ++++++++--
->>>>>>>   2 files changed, 18 insertions(+), 7 deletions(-)
->>>>>>>
->>>>>>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
->>>>>>> index d495737..66347be 100644
->>>>>>> --- a/drivers/mfd/88pm800.c
->>>>>>> +++ b/drivers/mfd/88pm800.c
->>>>>>> @@ -374,7 +374,7 @@ static int device_irq_init_800(struct
->>>>>>> pm80x_chip *chip)
->>>>>>>   {
->>>>>>>       struct regmap *map = chip->regmap;
->>>>>>>       unsigned long flags = IRQF_ONESHOT;
->>>>>>> -    int data, mask, ret = -EINVAL;
->>>>>>> +    int irq_clr_mode, mask, ret = -EINVAL;
->>>>>>>
->>>>>>>       if (!map || !chip->irq) {
->>>>>>>           dev_err(chip->dev, "incorrect parameters\n");
->>>>>>> @@ -382,15 +382,16 @@ static int device_irq_init_800(struct
->>>>>>> pm80x_chip *chip)
->>>>>>>       }
->>>>>>>
->>>>>>>       /*
->>>>>>> -     * irq_mode defines the way of clearing interrupt. it's
->>>>>>> read-clear by
->>>>>>> -     * default.
->>>>>>> +     * irq_clr_on_wr defines the way of clearing interrupt by
->>>>>>> +     * read/write(0/1).  It's read-clear by default.
->>>>>>>        */
->>>>>>>       mask =
->>>>>>>           PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
->>>>>>>           PM800_WAKEUP2_INT_MASK;
->>>>>>>
->>>>>>> -    data = PM800_WAKEUP2_INT_CLEAR;
->>>>>>> -    ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
->>>>>>> +    irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
->>>>>>> +        PM800_WAKEUP2_INT_WRITE_CLEAR :
->>>>>>> PM800_WAKEUP2_INT_READ_CLEAR;
->>>>>>> +    ret = regmap_update_bits(map, PM800_WAKEUP2, mask,
->>>>>>> irq_clr_mode);
->>>>>>
->>>>>> What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
->>>>>> PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
->>>>>> directly without all of this faffing about.
->>>>>>
->>>>>>    regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
->>>>>>
->>>>>
->>>>> Because "irq_clr_method" is of boolean type.
->>>>> And macros which you are referring to is,
->>>>>
->>>>> #define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
->>>>> #define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
->>>>>
->>>>>
->>>>> And also, I feel it is more cleaner approach with the current code as
->>>>> register definition and userflag are maintained separately.
->>>>
->>>> I see your point, although it's a shame we have to have this code in
->>>> its place.
->>>>
->>>> One thing I think you can do though is rid chip->irq_clr_method, just
->>>> use the one you already have in pdata.
->>>>
->>>
->>> Looking at the current code,
->>> Yes, this can be done, but I have to do some more changes around it,
->>> to make code cleaner,
->>>
->>> change the signature of
->>>
->>> static int device_irq_init_800(struct pm80x_chip *chip)
->>>
->>> TO
->>>
->>> static int device_irq_init_800(struct pm80x_chip *chip, struct
->>> pm80x_platform_data *pdata)
->>>
->>>
->>> and then only use pdata->irq_clr_method.
->>>
->>>
->>> How do you want to get this inside? V6 version? or separate patch?
->>>
->>> I have one more cleanup patch in the queue, which I am planning to
->>> submit today, if you are ok then I can submit along with that.
->>
->> Ideally not.  Don't you save the 'struct device' into *chip?  You
->> should use that to fetch the pdata, like:
->>
->> pdata = dev_get_platdata(chip->dev);
->>
->
-> Yes certainly, this is another option (rather preferred one).
->
-> But to be consistent with other's I proposed this, please refer to the
-> fn device_800_init(), where all xxx_init() are taking 2 arguments, and
-> second argument is pdata.
->
->
-> There is room for cleanup, I agree.
-> I can put this too in the next cleanup series.
->
+Moreover, exporting the ATAGS is questionable, even _if_ there are non-
+kexec programs making use of this.  The ATAGs have _never_ been exported
+to userspace when kexec disabled is the kernel - it was introduced for
+kexec, and has always had this:
 
-Note that this is init function, called from probe.
+config ATAGS_PROC
+        bool "Export atags in procfs"
+        depends on ATAGS && KEXEC
+        default y
 
-So both approach looks ok to me.
+Now, the fact that someone decided to start using it is pretty sad,
+because it means that if you disable KEXEC, userspace breaks.  That's
+not a kernel regression in any shape or form, because /proc/atags has
+never been there without KEXEC enabled.  That's a userspace bug, plain
+and simple.
 
-Thanks,
-Vaibhav
+Given that, I'm in two minds about whether to accept the last two
+patches which make this more than just "for KEXEC use to enable a KEXEC
+kernel to be booted."
+
+Had it been provided without the KEXEC conditional, then I don't have
+a problem with these two patches.
+
+It also sets a precedent: by adding this into DT, it is creating a new
+DT ABI as well, and we'll end up seeing dts files with an ATAG block
+patched into them.
+
+Are the ATAGs at a fixed address on the N900?  Can that be handled in
+some kind of legacy file for the N900 which calls save_atags() on it, so
+we don't end up introducing yet more stuff that we have to maintain into
+the distant future?  If not, what about copying a known working atag
+structure into a legacy file for the N900?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
