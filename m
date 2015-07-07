@@ -1,61 +1,51 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 07 Jul 2015 09:12:31 -0600
-Subject: [PATCH v4 1/2] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
-In-Reply-To: <20150707092516.GC23879@arm.com>
-References: <1436224608-27754-1-git-send-email-al.stone@linaro.org>
- <1436224608-27754-2-git-send-email-al.stone@linaro.org>
- <20150707092516.GC23879@arm.com>
-Message-ID: <559BEC5F.3070600@redhat.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  7 Jul 2015 17:27:20 +0200
+Subject: [PATCH v2 0/7] ARM: berlin: nand support
+Message-ID: <1436282847-21137-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2015 03:25 AM, Will Deacon wrote:
-> On Tue, Jul 07, 2015 at 12:16:47AM +0100, Al Stone wrote:
->> From: Al Stone <al.stone@.linaro.org>
->>
->> The BAD_MADT_ENTRY() macro is designed to work for all of the subtables
->> of the MADT.  In the ACPI 5.1 version of the spec, the struct for the
->> GICC subtable (struct acpi_madt_generic_interrupt) is 76 bytes long; in
->> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
->> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
->> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
->> subtable, it fails if 5.1 structs are in use, and there are systems in
->> the wild that have them.
->>
->> This patch adds the BAD_MADT_GICC_ENTRY() that checks the GICC subtable
->> only, accounting for the difference in specification versions that are
->> possible.  The BAD_MADT_ENTRY() will continue to work as is for all other
->> MADT subtables.
->>
->> This code is being added to an arm64 header file since that is currently
->> the only architecture using the GICC subtable of the MADT.  As a GIC is
->> specific to ARM, it is also unlikely the subtable will be used elsewhere.
->>
->> Fixes: aeb823bbacc2 (ACPICA: ACPI 6.0: Add changes for FADT table.)
->> Signed-off-by: Al Stone <al.stone@linaro.org>
->> ---
->>  arch/arm64/include/asm/acpi.h | 8 ++++++++
->>  1 file changed, 8 insertions(+)
-> 
-> Not the nicest patch I've ever seen, but if it gets things working again:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-> 
-> Catalin, I assume you're picking these two up for 4.2?
-> 
-> Will
+Hi,
 
-Yeah, not my favorite either, but it does work.  This will get
-cleaned up by fixing the larger problems, I believe, and then
-we should be able to remove this one.  That's the plan, at any
-rate.
+This series was part of a bigger one[1], which was split into smaller
+ones as asked by Ezequiel[2]. When we take this into account, this is
+v7. In addition, there was not comment for more than 1 month (since
+June, 3rd). So I'd like this series to go forward quickly.
+
+The support is added into the existing pxa3xx nand controller. Some
+additions were done in order to get this controller working:
+- Support for a non mandatory ECC clock has been added.
+- The Berlin nand controller needs to poll the status register.
+- Sequences of commands are quite different in order to perform write
+  operation.
+
+Based on [3].
+
+Since v1:
+	- Rebased on top of 4.2-rc1
+	- Fixed the documentation as suggested by Robert Jarzmik
+
+[1] https://lkml.org/lkml/2015/5/11/495
+[2] https://lkml.org/lkml/2015/5/16/309
+[3] https://lkml.org/lkml/2015/7/7/542
+
+Thanks!
+
+Antoine Tenart (7):
+  mtd: pxa3xx_nand: add a non mandatory ECC clock
+  Documentation: bindings: document the clocks for pxa3xx-nand
+  mtd: pxa3xx_nand: add support for the Marvell Berlin nand controller
+  Documentation: bindings: add the Berlin nand controller compatible
+  mtd: nand: let Marvell Berlin SoCs select the pxa3xx driver
+  ARM: berlin: add BG2Q node for the nand
+  ARM: berlin: enable flash on the BG2Q DMP
+
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        |   5 +
+ arch/arm/boot/dts/berlin2q-marvell-dmp.dts         |  25 +++
+ arch/arm/boot/dts/berlin2q.dtsi                    |  13 ++
+ drivers/mtd/nand/Kconfig                           |   4 +-
+ drivers/mtd/nand/pxa3xx_nand.c                     | 214 +++++++++++++++++++--
+ 5 files changed, 240 insertions(+), 21 deletions(-)
 
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+2.4.5
