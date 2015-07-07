@@ -1,29 +1,104 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jul 2015 13:03:32 +0100
-Subject: [RESEND 00/10] regulator: pwm-regulator: Introduce continuous-mode
-In-Reply-To: <20150707065250.GF3182@x1>
-References: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
- <20150706204812.GD11162@sirena.org.uk> <20150707065250.GF3182@x1>
-Message-ID: <20150707120332.GC2887@sirena.org.uk>
+From: gerg@uclinux.org (Greg Ungerer)
+Date: Tue, 07 Jul 2015 22:22:00 +1000
+Subject: [PATCH 08/18] ARM/ks8695/time: Migrate to new 'set-state'
+ interface
+In-Reply-To: <71a71657890f6b0aca50fd90f877668ccd796c1f.1436178990.git.viresh.kumar@linaro.org>
+References: <cover.1436178990.git.viresh.kumar@linaro.org>
+ <71a71657890f6b0aca50fd90f877668ccd796c1f.1436178990.git.viresh.kumar@linaro.org>
+Message-ID: <559BC468.5090305@uclinux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 07:52:50AM +0100, Lee Jones wrote:
-> On Mon, 06 Jul 2015, Mark Brown wrote:
-> > On Mon, Jul 06, 2015 at 09:58:22AM +0100, Lee Jones wrote:
+Hi Viresh,
 
-> > > This patch-set has been rebased on to v4.2-rc1.
+On 06/07/15 20:54, Viresh Kumar wrote:
+> Migrate ks8695 driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> There is nothing to be done for oneshot or shutdown states and so are
+> not implemented.
+>
+> Cc: Greg Ungerer <gerg@uclinux.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-> > Is this just a rebase or has the code been changed as well - IIRC there
-> > were some bits in there that weren't supposed to be be there?
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 
-> This is a rebased resend with those couple of lines of debug removed.
+Regards
+Greg
 
-OK, so not actually a resend then :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/40d8fdda/attachment.sig>
+
+
+> ---
+>   arch/arm/mach-ks8695/time.c | 43 +++++++++++++++++++++----------------------
+>   1 file changed, 21 insertions(+), 22 deletions(-)
+>
+> diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
+> index a197874bf382..18eb0fbd8d82 100644
+> --- a/arch/arm/mach-ks8695/time.c
+> +++ b/arch/arm/mach-ks8695/time.c
+> @@ -54,28 +54,25 @@
+>   /* Timer0 Timeout Counter Register */
+>   #define T0TC_WATCHDOG		(0xff)		/* Enable watchdog mode */
+>   
+> -static void ks8695_set_mode(enum clock_event_mode mode,
+> -			    struct clock_event_device *evt)
+> +static int ks8695_set_periodic(struct clock_event_device *evt)
+>   {
+> +	u32 rate = DIV_ROUND_CLOSEST(KS8695_CLOCK_RATE, HZ);
+> +	u32 half = DIV_ROUND_CLOSEST(rate, 2);
+>   	u32 tmcon;
+>   
+> -	if (mode == CLOCK_EVT_FEAT_PERIODIC) {
+> -		u32 rate = DIV_ROUND_CLOSEST(KS8695_CLOCK_RATE, HZ);
+> -		u32 half = DIV_ROUND_CLOSEST(rate, 2);
+> -
+> -		/* Disable timer 1 */
+> -		tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
+> -		tmcon &= ~TMCON_T1EN;
+> -		writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
+> +	/* Disable timer 1 */
+> +	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
+> +	tmcon &= ~TMCON_T1EN;
+> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
+>   
+> -		/* Both registers need to count down */
+> -		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
+> -		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
+> +	/* Both registers need to count down */
+> +	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
+> +	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
+>   
+> -		/* Re-enable timer1 */
+> -		tmcon |= TMCON_T1EN;
+> -		writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
+> -	}
+> +	/* Re-enable timer1 */
+> +	tmcon |= TMCON_T1EN;
+> +	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
+> +	return 0;
+>   }
+>   
+>   static int ks8695_set_next_event(unsigned long cycles,
+> @@ -102,11 +99,13 @@ static int ks8695_set_next_event(unsigned long cycles,
+>   }
+>   
+>   static struct clock_event_device clockevent_ks8695 = {
+> -	.name		= "ks8695_t1tc",
+> -	.rating		= 300, /* Reasonably fast and accurate clock event */
+> -	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+> -	.set_next_event	= ks8695_set_next_event,
+> -	.set_mode	= ks8695_set_mode,
+> +	.name			= "ks8695_t1tc",
+> +	/* Reasonably fast and accurate clock event */
+> +	.rating			= 300,
+> +	.features		= CLOCK_EVT_FEAT_ONESHOT |
+> +				  CLOCK_EVT_FEAT_PERIODIC,
+> +	.set_next_event		= ks8695_set_next_event,
+> +	.set_state_periodic	= ks8695_set_periodic,
+>   };
+>   
+>   /*
