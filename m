@@ -1,36 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Jul 2015 10:22:53 +0100
-Subject: [PATCH v2 0/9] bugfixs and add support for non-pci devices
-In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <20150707092253.GB23879@arm.com>
+Date: Tue, 7 Jul 2015 10:25:16 +0100
+Subject: [PATCH v4 1/2] ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
+In-Reply-To: <1436224608-27754-2-git-send-email-al.stone@linaro.org>
+References: <1436224608-27754-1-git-send-email-al.stone@linaro.org>
+ <1436224608-27754-2-git-send-email-al.stone@linaro.org>
+Message-ID: <20150707092516.GC23879@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhen Lei,
+On Tue, Jul 07, 2015 at 12:16:47AM +0100, Al Stone wrote:
+> From: Al Stone <al.stone@.linaro.org>
+> 
+> The BAD_MADT_ENTRY() macro is designed to work for all of the subtables
+> of the MADT.  In the ACPI 5.1 version of the spec, the struct for the
+> GICC subtable (struct acpi_madt_generic_interrupt) is 76 bytes long; in
+> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
+> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
+> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
+> subtable, it fails if 5.1 structs are in use, and there are systems in
+> the wild that have them.
+> 
+> This patch adds the BAD_MADT_GICC_ENTRY() that checks the GICC subtable
+> only, accounting for the difference in specification versions that are
+> possible.  The BAD_MADT_ENTRY() will continue to work as is for all other
+> MADT subtables.
+> 
+> This code is being added to an arm64 header file since that is currently
+> the only architecture using the GICC subtable of the MADT.  As a GIC is
+> specific to ARM, it is also unlikely the subtable will be used elsewhere.
+> 
+> Fixes: aeb823bbacc2 (ACPICA: ACPI 6.0: Add changes for FADT table.)
+> Signed-off-by: Al Stone <al.stone@linaro.org>
+> ---
+>  arch/arm64/include/asm/acpi.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-On Tue, Jul 07, 2015 at 04:30:13AM +0100, Zhen Lei wrote:
-> Changelog:
-> v1 -> v2:
-> update the implementation of patch 1/9 according to Will Deacon's suggestion.
-> update the comment of patch 3/9 and 4/9.
-> use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
-> patch 6/9 is base on Laurent's series, to support probe deferral.
-> patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
-> patch 9/9 add support for a master with multiple stream IDs.
+Not the nicest patch I've ever seen, but if it gets things working again:
 
-FYI, I already picked some of your previous series on my iommu/devel branch:
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=iommu/devel
-
-I'll go over your v2 today, but I'm mainly interested in getting fixes
-queued for 4.2 atm.
-
-> Addition:
-> scripts/checkpatch 6/9 reports a warning, this is temporary. I don't want
-> patch 9/9 to display too many differences just because of add tabs.
-
-That's fine. Whilst checkpatch can occassionally be a useful tool, it's
-usually far too noisy imo.
+Catalin, I assume you're picking these two up for 4.2?
 
 Will
