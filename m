@@ -1,40 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 7 Jul 2015 17:10:32 +0300
-Subject: [PATCH 4/5] staging: emxx_udc: add missing
- usb_ep_set_maxpacket_limit()
-In-Reply-To: <1436277773-14274-5-git-send-email-r.baldyga@samsung.com>
-References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
- <1436277773-14274-5-git-send-email-r.baldyga@samsung.com>
-Message-ID: <559BDDD8.1060902@cogentembedded.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 7 Jul 2015 16:13:12 +0200
+Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
+ for bus recovery
+In-Reply-To: <20150707134852.GE9671@pengutronix.de>
+References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
+ <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
+ <20141126160407.GN4431@pengutronix.de> <5476085B.40009@ti.com>
+ <1436276269.3344.94.camel@pengutronix.de>
+ <20150707134852.GE9671@pengutronix.de>
+Message-ID: <20150707141312.GC3411@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jul 07, 2015 at 03:48:52PM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Tue, Jul 07, 2015 at 03:37:49PM +0200, Jan L?bbe wrote:
+> > On Mi, 2014-11-26 at 19:05 +0200, Grygorii Strashko wrote:
+> > > On 11/26/2014 06:04 PM, Uwe Kleine-K?nig wrote:
+> > > > On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
+> > > >> Having a board where the I2C bus locks up occasionally made it clear
+> > > >> that the bus recovery in the i2c-davinci driver will only work on
+> > > >> some boards, because on regular boards, this will only toggle GPIO
+> > > >> lines that aren't muxed to the actual pins.
+> > > >>
+> > > >> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
+> > > >> built-in capability to bit-bang its lines by using the ICPFUNC registers
+> > > >> of the i2c controller.
+> > > >> Implement the suggested procedure by toggling SCL and checking SDA using
+> > > >> the ICPFUNC registers of the I2C controller when present. Allow platforms
+> > > >> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
+> > > >> data flag and add optional DT property "ti,has-pfunc" to indicate
+> > > >> the same in DT.
+> > > > On what does it depend if this pfunc stuff works or not? Only the SoC,
+> > > > or also on some board specific properties?
+> > > 
+> > > SoC / set of SoCs. Also, similar feature is supported by OMAP and AM335x/AM437x SoCs
+> > > using I2C_SYSTEST register.
+> > > 
+> > > > Given the former using the
+> > > > compatible string to detect its availability would be better. (In this
+> > > > case also sorry, didn't consider this case when requesting the property
+> > > > in the last round.)
+> > 
+> > I only stumbled across this after it was merged, with the additional
+> I also wonder how it came to the Reviewed-by tag for me. The last thing
+> that I said about the patch was "On what does it depend if this pfunc
+> stuff works or not? Only the SoC, or also on some board specific
+> properties?" (see above) and "the patch looks ok". IMHO this hardly
+> justifies to add the Reviewed-by tag for the next round. :-(
 
-On 7/7/2015 5:02 PM, Robert Baldyga wrote:
+That needs to be discussed with Grygorii. I can't verify the correctness
+of tags for every patch, although I do try to keep an eye on it...
 
-> Should use usb_ep_set_maxpacket_limit instead of setting
-> maxpacket value manually.
-
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->   drivers/staging/emxx_udc/emxx_udc.c | 3 ++-
->   1 file changed, 2 insertions(+), 1 deletion(-)
-
-> diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
-> index 4178d96..f50bf5d 100644
-> --- a/drivers/staging/emxx_udc/emxx_udc.c
-> +++ b/drivers/staging/emxx_udc/emxx_udc.c
-> @@ -3203,7 +3203,8 @@ static void __init nbu2ss_drv_ep_init(struct nbu2ss_udc *udc)
->   		ep->ep.name = gp_ep_name[i];
->   		ep->ep.ops = &nbu2ss_ep_ops;
->
-> -		ep->ep.maxpacket = (i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
-> +		usb_ep_set_maxpacket_limit(&ep->ep,
-> +				(i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE));
-
-    Inner () not needed.
-
-[...]
-
-WBR, Sergei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/3244e034/attachment.sig>
