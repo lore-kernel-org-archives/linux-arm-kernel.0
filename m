@@ -1,14 +1,17 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:18:02 +0100
-Subject: [PATCH v3 12/15] irqchip: gicv3-its: Get rid of struct msi_controller
+Date: Tue,  7 Jul 2015 18:18:04 +0100
+Subject: [PATCH v3 14/15] PCI/MSI: pci-xgene-msi: Get rid of struct
+ msi_controller
 In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
 References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436289485-28230-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 ITS only uses the msi_controller structure as a way
-to match the PHB with its MSI HW, and thus the msi_domain.
+The XGene MSI driver only uses the msi_controller structure as
+a way to match the host bridge  with its MSI HW, and thus the
+msi_domain.
+
 But now that we can directly associate an msi_domain with a device,
 there is no use keeping this msi_controller around.
 
@@ -16,127 +19,102 @@ Just remove all traces of msi_controller from the driver.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 38 ++++++++++++++++----------------------
- 1 file changed, 16 insertions(+), 22 deletions(-)
+ drivers/pci/host/pci-xgene-msi.c | 41 ++++++++++++++++------------------------
+ 1 file changed, 16 insertions(+), 25 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 140224c..c0b574e 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -54,13 +54,12 @@ struct its_collection {
+diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+index 2d31d4d..ec5a14b 100644
+--- a/drivers/pci/host/pci-xgene-msi.c
++++ b/drivers/pci/host/pci-xgene-msi.c
+@@ -40,8 +40,8 @@ struct xgene_msi_group {
  
- /*
-  * The ITS structure - contains most of the infrastructure, with the
-- * msi_controller, the command queue, the collections, and the list of
-- * devices writing to it.
-+ * top-level MSI domain, the command queue, the collections, and the
-+ * list of devices writing to it.
-  */
- struct its_node {
- 	raw_spinlock_t		lock;
- 	struct list_head	entry;
--	struct msi_controller	msi_chip;
- 	struct irq_domain	*domain;
- 	void __iomem		*base;
- 	unsigned long		phys_base;
-@@ -776,7 +775,7 @@ static void its_free_tables(struct its_node *its)
+ struct xgene_msi {
+ 	struct device_node	*node;
+-	struct msi_controller	mchip;
+-	struct irq_domain	*domain;
++	struct irq_domain	*inner_domain;
++	struct irq_domain	*msi_domain;
+ 	u64			msi_addr;
+ 	void __iomem		*msi_regs;
+ 	unsigned long		*bitmap;
+@@ -252,17 +252,17 @@ static const struct irq_domain_ops msi_domain_ops = {
+ 
+ static int xgene_allocate_domains(struct xgene_msi *msi)
+ {
+-	msi->domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+-					    &msi_domain_ops, msi);
+-	if (!msi->domain)
++	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
++						  &msi_domain_ops, msi);
++	if (!msi->inner_domain)
+ 		return -ENOMEM;
+ 
+-	msi->mchip.domain = pci_msi_create_irq_domain(msi->mchip.of_node,
+-						      &xgene_msi_domain_info,
+-						      msi->domain);
++	msi->msi_domain = pci_msi_create_irq_domain(msi->node,
++						    &xgene_msi_domain_info,
++						    msi->inner_domain);
+ 
+-	if (!msi->mchip.domain) {
+-		irq_domain_remove(msi->domain);
++	if (!msi->msi_domain) {
++		irq_domain_remove(msi->inner_domain);
+ 		return -ENOMEM;
  	}
+ 
+@@ -271,10 +271,10 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+ 
+ static void xgene_free_domains(struct xgene_msi *msi)
+ {
+-	if (msi->mchip.domain)
+-		irq_domain_remove(msi->mchip.domain);
+-	if (msi->domain)
+-		irq_domain_remove(msi->domain);
++	if (msi->msi_domain)
++		irq_domain_remove(msi->msi_domain);
++	if (msi->inner_domain)
++		irq_domain_remove(msi->inner_domain);
  }
  
--static int its_alloc_tables(struct its_node *its)
-+static int its_alloc_tables(const char *node_name, struct its_node *its)
- {
- 	int err;
- 	int i;
-@@ -819,7 +818,7 @@ static int its_alloc_tables(struct its_node *its)
- 			if (order >= MAX_ORDER) {
- 				order = MAX_ORDER - 1;
- 				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
--					its->msi_chip.of_node->full_name, order);
-+					node_name, order);
- 			}
- 		}
- 
-@@ -889,7 +888,7 @@ retry_baser:
- 
- 		if (val != tmp) {
- 			pr_err("ITS: %s: GITS_BASER%d doesn't stick: %lx %lx\n",
--			       its->msi_chip.of_node->full_name, i,
-+			       node_name, i,
- 			       (unsigned long) val, (unsigned long) tmp);
- 			err = -ENXIO;
- 			goto out_free;
-@@ -1317,6 +1316,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	struct resource res;
- 	struct its_node *its;
- 	void __iomem *its_base;
-+	struct irq_domain *inner_domain = NULL;
- 	u32 val;
- 	u64 baser, tmp;
- 	int err;
-@@ -1360,7 +1360,6 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	INIT_LIST_HEAD(&its->its_device_list);
- 	its->base = its_base;
- 	its->phys_base = res.start;
--	its->msi_chip.of_node = node;
- 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
-@@ -1370,7 +1369,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ static int xgene_msi_init_allocator(struct xgene_msi *xgene_msi)
+@@ -340,7 +340,7 @@ static void xgene_msi_isr(unsigned int irq, struct irq_desc *desc)
+ 			 * CPU0
+ 			 */
+ 			hw_irq = hwirq_to_canonical_hwirq(hw_irq);
+-			virq = irq_find_mapping(xgene_msi->domain, hw_irq);
++			virq = irq_find_mapping(xgene_msi->inner_domain, hw_irq);
+ 			WARN_ON(!virq);
+ 			if (virq != 0)
+ 				generic_handle_irq(virq);
+@@ -497,7 +497,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
+ 		goto error;
  	}
- 	its->cmd_write = its->cmd_base;
- 
--	err = its_alloc_tables(its);
-+	err = its_alloc_tables(node->full_name, its);
- 	if (err)
- 		goto out_free_cmd;
- 
-@@ -1406,26 +1405,21 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	writeq_relaxed(0, its->base + GITS_CWRITER);
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
--	if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
--		its->domain = irq_domain_add_tree(node, &its_domain_ops, its);
--		if (!its->domain) {
-+	if (of_property_read_bool(node, "msi-controller")) {
-+		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
-+		if (!inner_domain) {
- 			err = -ENOMEM;
- 			goto out_free_tables;
- 		}
- 
--		its->domain->parent = parent;
--		its->domain->bus_token = DOMAIN_BUS_PLATFORM_MSI;
-+		inner_domain->parent = parent;
-+		inner_domain->bus_token = DOMAIN_BUS_PLATFORM_MSI;
- 
--		its->msi_chip.domain = its_pci_msi_alloc_domain(node,
--								its->domain);
--		if (!its->msi_chip.domain) {
-+		its->domain = its_pci_msi_alloc_domain(node, inner_domain);
-+		if (!its->domain) {
- 			err = -ENOMEM;
- 			goto out_free_domains;
- 		}
+ 	xgene_msi->msi_addr = res->start;
 -
--		err = of_pci_msi_chip_add(&its->msi_chip);
--		if (err)
--			goto out_free_domains;
- 	}
++	xgene_msi->node = pdev->dev.of_node;
+ 	xgene_msi->num_cpus = num_possible_cpus();
  
- 	spin_lock(&its_lock);
-@@ -1435,10 +1429,10 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	rc = xgene_msi_init_allocator(xgene_msi);
+@@ -561,19 +561,10 @@ static int xgene_msi_probe(struct platform_device *pdev)
+ 
+ 	cpu_notifier_register_done();
+ 
+-	xgene_msi->mchip.of_node = pdev->dev.of_node;
+-	rc = of_pci_msi_chip_add(&xgene_msi->mchip);
+-	if (rc) {
+-		dev_err(&pdev->dev, "failed to add MSI controller chip\n");
+-		goto error_notifier;
+-	}
+-
+ 	dev_info(&pdev->dev, "APM X-Gene PCIe MSI driver loaded\n");
+ 
  	return 0;
  
- out_free_domains:
--	if (its->msi_chip.domain)
--		irq_domain_remove(its->msi_chip.domain);
- 	if (its->domain)
- 		irq_domain_remove(its->domain);
-+	if (inner_domain)
-+		irq_domain_remove(inner_domain);
- out_free_tables:
- 	its_free_tables(its);
- out_free_cmd:
+-error_notifier:
+-	unregister_hotcpu_notifier(&xgene_msi_cpu_notifier);
+ error:
+ 	xgene_msi_remove(pdev);
+ 	return rc;
 -- 
 2.1.4
