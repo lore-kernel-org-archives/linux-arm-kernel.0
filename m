@@ -1,49 +1,32 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jul 2015 18:24:21 +0100
-Subject: [PATCH 5/9] locking/qrwlock: remove redundant cmpxchg barriers on
- writer slow-path
+Date: Tue,  7 Jul 2015 18:24:17 +0100
+Subject: [PATCH 1/9] locking/qrwlock: include <linux/spinlock.h> for
+ arch_spin_{lock, unlock}
 In-Reply-To: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
 References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436289865-2331-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1436289865-2331-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When transitioning from unlocked - locked (for write), we notify readers
-of our presence by setting the _QW_WAITING flag using a cmpxchg.
-
-Given that we use another cmpxchg to transition to the _QW_LOCKED state,
-we can drop the barriers from the intermediate step by offering
-architectures the chance to implement cmpxchg_relaxed, in a similar
-manner to the cmpxchg64_relaxed macro in the lockref code.
+locking/qrwlock.c makes use of arch_spin_{lock,unlock}, so ensure that
+we #include <linux/spinlock.h> to get their definitions.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- kernel/locking/qrwlock.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ kernel/locking/qrwlock.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index a1b63df19a04..e3c51c4635d3 100644
+index d9c36c5f5711..96b77d1e0545 100644
 --- a/kernel/locking/qrwlock.c
 +++ b/kernel/locking/qrwlock.c
-@@ -113,6 +113,10 @@ EXPORT_SYMBOL(queued_read_lock_slowpath);
-  * queued_write_lock_slowpath - acquire write lock of a queue rwlock
-  * @lock : Pointer to queue rwlock structure
-  */
-+#ifndef cmpxchg_relaxed
-+# define cmpxchg_relaxed	cmpxchg
-+#endif
-+
- void queued_write_lock_slowpath(struct qrwlock *lock)
- {
- 	u32 cnts;
-@@ -133,7 +137,7 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 		struct __qrwlock *l = (struct __qrwlock *)lock;
+@@ -20,6 +20,7 @@
+ #include <linux/cpumask.h>
+ #include <linux/percpu.h>
+ #include <linux/hardirq.h>
++#include <linux/spinlock.h>
+ #include <asm/qrwlock.h>
  
- 		if (!READ_ONCE(l->wmode) &&
--		   (cmpxchg(&l->wmode, 0, _QW_WAITING) == 0))
-+		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
- 			break;
- 
- 		cpu_relax_lowlatency();
+ /*
 -- 
 2.1.4
