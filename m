@@ -1,36 +1,43 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:17:57 +0100
-Subject: [PATCH v3 07/15] PCI/MSI: Let pci_msi_get_domain use struct device's
- msi_domain
+Date: Tue,  7 Jul 2015 18:17:56 +0100
+Subject: [PATCH v3 06/15] PCI/MSI: of: Allow msi_domain lookup using the host
+ bridge node
 In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
 References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436289485-28230-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can easily find which MSI domain a PCI device is
-using, use dev_get_msi_domain as a way to retrieve the information.
+A number of platforms do not need to use the msi-parent property,
+as the host bridge itself provides the MSI controller.
 
-The original code is still used as a fallback.
+Allow this configuration by performing an irq domain lookup based
+on the host bridge node if it doesn't have a valid msi-parent property.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/msi.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/pci/of.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 1e55935..5ffc340 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
- {
- 	struct irq_domain *domain = NULL;
+diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+index 09df465..9d61cef 100644
+--- a/drivers/pci/of.c
++++ b/drivers/pci/of.c
+@@ -69,9 +69,14 @@ void pci_set_phb_of_msi_domain(struct pci_bus *bus)
  
--	if (dev->bus->msi)
-+	domain = dev_get_msi_domain(&dev->dev);
-+	if (!domain && dev->bus->msi)
- 		domain = dev->bus->msi->domain;
- 	if (!domain)
- 		domain = arch_get_pci_msi_domain(dev);
+ 	if (!bus->dev.of_node)
+ 		return;
++	/* Start looking for a phandle to an MSI controller. */
+ 	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
++	/*
++	 * If we don't have an msi-parent property, look for a domain
++	 * directly attached to the host bridge.
++	 */
+ 	if (!np)
+-		return;
++		np = bus->dev.of_node;
+ 	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
+ 	if (!d)
+ 		d = irq_find_host(np);
 -- 
 2.1.4
