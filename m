@@ -1,45 +1,35 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Jul 2015 17:27:26 +0200
-Subject: [PATCH v2 6/7] ARM: berlin: add BG2Q node for the nand
+Date: Tue,  7 Jul 2015 17:27:25 +0200
+Subject: [PATCH v2 5/7] mtd: nand: let Marvell Berlin SoCs select the pxa3xx
+ driver
 In-Reply-To: <1436282847-21137-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1436282847-21137-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1436282847-21137-7-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1436282847-21137-6-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node describing the nand controller of the Marvell Berlin BG2Q
-SoC. It uses the pxa3xx nand driver, with a dedicated compatible.
-
-Also add the corresponding pinmuxing configuration.
+Marvell Berlin nand controller support has been added in the pxa3xx nand
+driver. Let these SoCs select the driver.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/mtd/nand/Kconfig | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 63a48490e2f9..aeb2a68302ae 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -477,6 +477,19 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+index 5b2806a7e5f7..84bb5479a4a9 100644
+--- a/drivers/mtd/nand/Kconfig
++++ b/drivers/mtd/nand/Kconfig
+@@ -331,8 +331,8 @@ config MTD_NAND_ATMEL
+ 	  on Atmel AT91 and AVR32 processors.
  
-+		nand0: nand at f00000 {
-+			compatible = "marvell,berlin2-nand";
-+			reg = <0xf00000 0x10000>;
-+			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&chip_clk CLKID_NFC>,
-+				 <&chip_clk CLKID_NFC_ECC>;
-+			clock-names = "nfc", "ecc";
-+
-+			#address-cells = <1>;
-+
-+			status = "disabled";
-+		};
-+
- 		apb at fc0000 {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
+ config MTD_NAND_PXA3xx
+-	tristate "NAND support on PXA3xx and Armada 370/XP"
+-	depends on PXA3xx || ARCH_MMP || PLAT_ORION
++	tristate "NAND support on PXA3xx, Armada 370/XP and Marvell Berlin"
++	depends on PXA3xx || ARCH_MMP || PLAT_ORION || ARCH_BERLIN
+ 	help
+ 	  This enables the driver for the NAND flash device found on
+ 	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
 -- 
 2.4.5
