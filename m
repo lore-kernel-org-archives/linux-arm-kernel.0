@@ -1,70 +1,93 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 7 Jul 2015 14:36:34 -0500
-Subject: [PATCH 4/4][v3] ARM: imx: pinctrl-imx7d: add iomuxc-lpsr gpio
- group ids
-In-Reply-To: <1436296630-20296-4-git-send-email-aalonso@freescale.com>
-References: <1436296630-20296-1-git-send-email-aalonso@freescale.com>
- <1436296630-20296-4-git-send-email-aalonso@freescale.com>
-Message-ID: <CAHrpEqQBSkw5=wj_xd=MEDbA8yiCan0ExYc=FhCKVKBOSgh=Bg@mail.gmail.com>
+From: joel@porquet.org (Joel Porquet)
+Date: Tue,  7 Jul 2015 16:02:53 -0400
+Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
+Message-ID: <1436299411-12329-1-git-send-email-joel@porquet.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 2:17 PM, Adrian Alonso <aalonso@freescale.com> wrote:
-> * Add imx7d SoC iomuxc-lpsr gpio group id's
-> * Add IOMUXC_LPSR_SUPPORT flag for pinctrl-imx driver to
->   support iomuxc-lpsr controller.
->
-> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
+globally accessible.
 
-Acked-by: frank.li at freescale.com
+See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
+("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
 
->
-> - Change v1 to v3: resend patch
->
-> ---
->  drivers/pinctrl/freescale/pinctrl-imx7d.c | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx7d.c b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-> index 1fa7530..cf89275 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx7d.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx7d.c
-> @@ -172,6 +172,14 @@ enum imx7d_pads {
->         MX7D_PAD_ENET1_RX_CLK = 152,
->         MX7D_PAD_ENET1_CRS = 153,
->         MX7D_PAD_ENET1_COL = 154,
-> +       MX7D_PAD_GPIO1_IO00 = 155,
-> +       MX7D_PAD_GPIO1_IO01 = 156,
-> +       MX7D_PAD_GPIO1_IO02 = 157,
-> +       MX7D_PAD_GPIO1_IO03 = 158,
-> +       MX7D_PAD_GPIO1_IO04 = 159,
-> +       MX7D_PAD_GPIO1_IO05 = 160,
-> +       MX7D_PAD_GPIO1_IO06 = 161,
-> +       MX7D_PAD_GPIO1_IO07 = 162,
->  };
->
->  /* Pad names for the pinmux subsystem */
-> @@ -331,11 +339,20 @@ static const struct pinctrl_pin_desc imx7d_pinctrl_pads[] = {
->         IMX_PINCTRL_PIN(MX7D_PAD_ENET1_RX_CLK),
->         IMX_PINCTRL_PIN(MX7D_PAD_ENET1_CRS),
->         IMX_PINCTRL_PIN(MX7D_PAD_ENET1_COL),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO00),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO01),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO02),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO03),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO04),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO05),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO06),
-> +       IMX_PINCTRL_PIN(MX7D_PAD_GPIO1_IO07),
->  };
->
->  static struct imx_pinctrl_soc_info imx7d_pinctrl_info = {
->         .pins = imx7d_pinctrl_pads,
->         .npins = ARRAY_SIZE(imx7d_pinctrl_pads),
-> +       .flags = IOMUXC_LPSR_SUPPORT,
->  };
->
->  static struct of_device_id imx7d_pinctrl_of_match[] = {
-> --
-> 2.1.4
->
+This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses of
+macro OF_DECLARE_2 with IRQCHIP_DECLARE.
+
+Signed-off-by: Joel Porquet <joel@porquet.org>
+---
+ arch/arm/mach-exynos/suspend.c       | 3 ++-
+ arch/arm/mach-imx/gpc.c              | 7 ++-----
+ arch/arm/mach-omap2/omap-wakeupgen.c | 7 ++-----
+ 3 files changed, 6 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
+index f572219..78484ab 100644
+--- a/arch/arm/mach-exynos/suspend.c
++++ b/arch/arm/mach-exynos/suspend.c
+@@ -19,6 +19,7 @@
+ #include <linux/cpu_pm.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_address.h>
+ #include <linux/err.h>
+@@ -264,7 +265,7 @@ static int __init exynos_pmu_irq_init(struct device_node *node,
+ 	return 0;
+ }
+ 
+-#define EXYNOS_PMU_IRQ(symbol, name)	OF_DECLARE_2(irqchip, symbol, name, exynos_pmu_irq_init)
++#define EXYNOS_PMU_IRQ(symbol, name)	IRQCHIP_DECLARE(symbol, name, exynos_pmu_irq_init)
+ 
+ EXYNOS_PMU_IRQ(exynos3250_pmu_irq, "samsung,exynos3250-pmu");
+ EXYNOS_PMU_IRQ(exynos4210_pmu_irq, "samsung,exynos4210-pmu");
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 80bad29..32c26f5 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -14,6 +14,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+@@ -269,11 +270,7 @@ static int __init imx_gpc_init(struct device_node *node,
+ 	return 0;
+ }
+ 
+-/*
+- * We cannot use the IRQCHIP_DECLARE macro that lives in
+- * drivers/irqchip, so we're forced to roll our own. Not very nice.
+- */
+-OF_DECLARE_2(irqchip, imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
++IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
+ 
+ void __init imx_gpc_check_dt(void)
+ {
+diff --git a/arch/arm/mach-omap2/omap-wakeupgen.c b/arch/arm/mach-omap2/omap-wakeupgen.c
+index 8e52621..e6a889f 100644
+--- a/arch/arm/mach-omap2/omap-wakeupgen.c
++++ b/arch/arm/mach-omap2/omap-wakeupgen.c
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/irqchip.h>
+ #include <linux/irqdomain.h>
+ #include <linux/of_address.h>
+ #include <linux/platform_device.h>
+@@ -537,8 +538,4 @@ static int __init wakeupgen_init(struct device_node *node,
+ 	return 0;
+ }
+ 
+-/*
+- * We cannot use the IRQCHIP_DECLARE macro that lives in
+- * drivers/irqchip, so we're forced to roll our own. Not very nice.
+- */
+-OF_DECLARE_2(irqchip, ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
++IRQCHIP_DECLARE(ti_wakeupgen, "ti,omap4-wugen-mpu", wakeupgen_init);
+-- 
+2.4.5
