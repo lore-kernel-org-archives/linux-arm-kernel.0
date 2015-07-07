@@ -1,632 +1,284 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue,  7 Jul 2015 17:30:00 +0100
-Subject: [PATCH v8 08/11] KVM: arm64: introduce vcpu->arch.debug_ptr
+Date: Tue,  7 Jul 2015 17:29:56 +0100
+Subject: [PATCH v8 04/11] KVM: arm: introduce kvm_arm_init/setup/clear_debug
 In-Reply-To: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
 References: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1436286603-15192-9-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1436286603-15192-5-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces a level of indirection for the debug registers. Instead
-of using the sys_regs[] directly we store registers in a structure in
-the vcpu. The new kvm_arm_reset_debug_ptr() sets the debug ptr to the
-guest context.
+This is a precursor for later patches which will need to do more to
+setup debug state before entering the hyp.S switch code. The existing
+functionality for setting mdcr_el2 has been moved out of hyp.S and now
+uses the value kept in vcpu->arch.mdcr_el2.
 
-Because we no longer give the sys_regs offset for the sys_reg_desc->reg
-field, but instead the index into a debug-specific struct we need to
-add a number of additional trap functions for each register. Also as the
-generic generic user-space access code no longer works we have
-introduced a new pair of function pointers to the sys_reg_desc structure
-to override the generic code when needed.
+As the assembler used to previously mask and preserve MDCR_EL2.HPMN I've
+had to add a mechanism to save the value of mdcr_el2 as a per-cpu
+variable during the initialisation code. The kernel never sets this
+number so we are assuming the bootcode has set up the correct value
+here.
+
+This also moves the conditional setting of the TDA bit from the hyp code
+into the C code which is currently used for the lazy debug register
+context switch code.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 
 ---
-v6:
-  - fix up some ws issues
-  - correct clobber info
-  - re-word commentary in kvm_host.h
-  - fix endian access issues for aarch32 fields
-  - revert all KVM_GET/SET_ONE_REG to 64bit (also see ABI update)
-v7
-  - new fn kvm_arm_reset_debug_ptr(), stubbed for arm
-  - split trap fns into bcr,bvr,bcr,wvr and wxvr
-  - add set/get fns to sys_regs_desc
-  - reg_to_dbg/dbg_to_reg helpers for 32bit support
-v8
-  - rm #if 0 left over from re-factor
-  - re-word reset_ptr comment
-  - fix inadvertent whitespace changes
-  - rename get/set to get_user/set_user
-  - update commit wording
-  - re-factor dbg_to_reg/reg_to_dbg
-  - add newlines to keep checkpatch happy
-  - ensure 63:32 of debug registers untouched by aarch32
+v3
+  - rename fns from arch->arm
+  - preserve MDCR_EL2.HPMN setting
+  - re-word some of the comments
+  - fix some minor grammar nits
+  - merge setting of mdcr_el2
+  - introduce trap_debug flag
+  - move setup/clear within the irq lock section
+v4
+  - fix TDOSA desc
+  - rm un-needed else leg
+  - s/arch/arm/
+v6
+  - add s-o-b tag
 ---
- arch/arm/include/asm/kvm_host.h   |   1 +
- arch/arm/kvm/arm.c                |   2 +
- arch/arm64/include/asm/kvm_asm.h  |  24 ++--
- arch/arm64/include/asm/kvm_host.h |  17 ++-
- arch/arm64/kernel/asm-offsets.c   |   6 +
- arch/arm64/kvm/debug.c            |   9 ++
- arch/arm64/kvm/hyp.S              |  24 ++--
- arch/arm64/kvm/sys_regs.c         | 274 +++++++++++++++++++++++++++++++++++---
- arch/arm64/kvm/sys_regs.h         |   6 +
- 9 files changed, 316 insertions(+), 47 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  4 ++
+ arch/arm/kvm/arm.c                |  9 ++++-
+ arch/arm64/include/asm/kvm_asm.h  |  2 +
+ arch/arm64/include/asm/kvm_host.h |  5 +++
+ arch/arm64/kernel/asm-offsets.c   |  1 +
+ arch/arm64/kvm/Makefile           |  2 +-
+ arch/arm64/kvm/debug.c            | 81 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp.S              | 19 ++++-----
+ 8 files changed, 110 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm64/kvm/debug.c
 
 diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 746c0c69..825c337 100644
+index d71607c..746c0c69 100644
 --- a/arch/arm/include/asm/kvm_host.h
 +++ b/arch/arm/include/asm/kvm_host.h
-@@ -239,5 +239,6 @@ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+@@ -236,4 +236,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
  
++static inline void kvm_arm_init_debug(void) {}
++static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
++static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
++
  #endif /* __ARM_KVM_HOST_H__ */
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index af60e6f..525473f 100644
+index 92b80bc..af60e6f 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -279,6 +279,8 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
- 	/* Set up the timer */
- 	kvm_timer_vcpu_init(vcpu);
+@@ -542,6 +542,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 			continue;
+ 		}
  
-+	kvm_arm_reset_debug_ptr(vcpu);
++		kvm_arm_setup_debug(vcpu);
 +
- 	return 0;
+ 		/**************************************************************
+ 		 * Enter the guest
+ 		 */
+@@ -554,7 +556,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		vcpu->mode = OUTSIDE_GUEST_MODE;
+ 		kvm_guest_exit();
+ 		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+-		/*
++
++		kvm_arm_clear_debug(vcpu);
++
++                /*
+ 		 * We may have taken a host interrupt in HYP mode (ie
+ 		 * while executing the guest). This interrupt is still
+ 		 * pending, as we haven't serviced it yet!
+@@ -902,6 +907,8 @@ static void cpu_init_hyp_mode(void *dummy)
+ 	vector_ptr = (unsigned long)__kvm_hyp_vector;
+ 
+ 	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
++
++	kvm_arm_init_debug();
  }
  
+ static int hyp_init_cpu_notify(struct notifier_block *self,
 diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index d6b507e..e997404 100644
+index 4f7310f..d6b507e 100644
 --- a/arch/arm64/include/asm/kvm_asm.h
 +++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -46,24 +46,16 @@
- #define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
- #define	PAR_EL1		21	/* Physical Address Register */
- #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
--#define DBGBCR0_EL1	23	/* Debug Breakpoint Control Registers (0-15) */
--#define DBGBCR15_EL1	38
--#define DBGBVR0_EL1	39	/* Debug Breakpoint Value Registers (0-15) */
--#define DBGBVR15_EL1	54
--#define DBGWCR0_EL1	55	/* Debug Watchpoint Control Registers (0-15) */
--#define DBGWCR15_EL1	70
--#define DBGWVR0_EL1	71	/* Debug Watchpoint Value Registers (0-15) */
--#define DBGWVR15_EL1	86
--#define MDCCINT_EL1	87	/* Monitor Debug Comms Channel Interrupt Enable Reg */
-+#define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+@@ -137,6 +137,8 @@ extern char __restore_vgic_v2_state[];
+ extern char __save_vgic_v3_state[];
+ extern char __restore_vgic_v3_state[];
  
- /* 32bit specific registers. Keep them at the end of the range */
--#define	DACR32_EL2	88	/* Domain Access Control Register */
--#define	IFSR32_EL2	89	/* Instruction Fault Status Register */
--#define	FPEXC32_EL2	90	/* Floating-Point Exception Control Register */
--#define	DBGVCR32_EL2	91	/* Debug Vector Catch Register */
--#define	TEECR32_EL1	92	/* ThumbEE Configuration Register */
--#define	TEEHBR32_EL1	93	/* ThumbEE Handler Base Register */
--#define	NR_SYS_REGS	94
-+#define	DACR32_EL2	24	/* Domain Access Control Register */
-+#define	IFSR32_EL2	25	/* Instruction Fault Status Register */
-+#define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
-+#define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
-+#define	TEECR32_EL1	28	/* ThumbEE Configuration Register */
-+#define	TEEHBR32_EL1	29	/* ThumbEE Handler Base Register */
-+#define	NR_SYS_REGS	30
++extern u32 __kvm_get_mdcr_el2(void);
++
+ #endif
  
- /* 32bit mapping */
- #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+ #endif /* __ARM_KVM_ASM_H__ */
 diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e2db6a6..461d288 100644
+index f0f58c9..7cb99b5 100644
 --- a/arch/arm64/include/asm/kvm_host.h
 +++ b/arch/arm64/include/asm/kvm_host.h
-@@ -108,11 +108,25 @@ struct kvm_vcpu_arch {
+@@ -103,6 +103,7 @@ struct kvm_vcpu_arch {
+ 
+ 	/* HYP configuration */
+ 	u64 hcr_el2;
++	u32 mdcr_el2;
+ 
  	/* Exception Information */
  	struct kvm_vcpu_fault_info fault;
+@@ -250,4 +251,8 @@ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+ static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
  
--	/* Debug state */
-+	/* Guest debug state */
- 	u64 debug_flags;
- 
-+	/*
-+	 * We maintain more than a single set of debug registers to support
-+	 * debugging the guest from the host and to maintain separate host and
-+	 * guest state during world switches. vcpu_debug_state are the debug
-+	 * registers of the vcpu as the guest sees them.  host_debug_state are
-+	 * the host registers which are saved and restored during world switches.
-+	 *
-+	 * debug_ptr points to the set of debug registers that should be loaded
-+	 * onto the hardware when running the guest.
-+	 */
-+	struct kvm_guest_debug_arch *debug_ptr;
-+	struct kvm_guest_debug_arch vcpu_debug_state;
++void kvm_arm_init_debug(void);
++void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
++void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
 +
- 	/* Pointer to host CPU context */
- 	kvm_cpu_context_t *host_cpu_context;
-+	struct kvm_guest_debug_arch host_debug_state;
- 
- 	/* VGIC state */
- 	struct vgic_cpu vgic_cpu;
-@@ -265,5 +279,6 @@ static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
- void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
-+void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
- 
  #endif /* __ARM64_KVM_HOST_H__ */
 diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index dfb25a2..1a8e97c 100644
+index da675cc..dfb25a2 100644
 --- a/arch/arm64/kernel/asm-offsets.c
 +++ b/arch/arm64/kernel/asm-offsets.c
-@@ -116,10 +116,16 @@ int main(void)
-   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
+@@ -117,6 +117,7 @@ int main(void)
    DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
    DEFINE(VCPU_DEBUG_FLAGS,	offsetof(struct kvm_vcpu, arch.debug_flags));
-+  DEFINE(VCPU_DEBUG_PTR,	offsetof(struct kvm_vcpu, arch.debug_ptr));
-+  DEFINE(DEBUG_BCR, 		offsetof(struct kvm_guest_debug_arch, dbg_bcr));
-+  DEFINE(DEBUG_BVR, 		offsetof(struct kvm_guest_debug_arch, dbg_bvr));
-+  DEFINE(DEBUG_WCR, 		offsetof(struct kvm_guest_debug_arch, dbg_wcr));
-+  DEFINE(DEBUG_WVR, 		offsetof(struct kvm_guest_debug_arch, dbg_wvr));
    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-   DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
++  DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-+  DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-   DEFINE(VCPU_TIMER_CNTV_CVAL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_cval));
-   DEFINE(KVM_TIMER_CNTVOFF,	offsetof(struct kvm, arch.timer.cntvoff));
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index d439eb8..e0947b7 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -67,6 +67,15 @@ void kvm_arm_init_debug(void)
- }
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index d5904f8..90e3f39 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -17,7 +17,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(ARM)/psci.o $(ARM)/perf.o
  
- /**
-+ * kvm_arm_reset_debug_ptr - reset the debug ptr to point to the vcpu state
+ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
+-kvm-$(CONFIG_KVM_ARM_HOST) += guest.o reset.o sys_regs.o sys_regs_generic_v8.o
++kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
+ 
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+new file mode 100644
+index 0000000..faf0e1f
+--- /dev/null
++++ b/arch/arm64/kvm/debug.c
+@@ -0,0 +1,81 @@
++/*
++ * Debug and Guest Debug support
++ *
++ * Copyright (C) 2015 - Linaro Ltd
++ * Author: Alex Benn?e <alex.bennee@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
-+{
-+	vcpu->arch.debug_ptr = &vcpu->arch.vcpu_debug_state;
-+}
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_arm.h>
++
++static DEFINE_PER_CPU(u32, mdcr_el2);
 +
 +/**
-  * kvm_arm_setup_debug - set up debug related stuff
-  *
-  * @vcpu:	the vcpu pointer
++ * kvm_arm_init_debug - grab what we need for debug
++ *
++ * Currently the sole task of this function is to retrieve the initial
++ * value of mdcr_el2 so we can preserve MDCR_EL2.HPMN which has
++ * presumably been set-up by some knowledgeable bootcode.
++ *
++ * It is called once per-cpu during CPU hyp initialisation.
++ */
++
++void kvm_arm_init_debug(void)
++{
++	__this_cpu_write(mdcr_el2, kvm_call_hyp(__kvm_get_mdcr_el2));
++}
++
++
++/**
++ * kvm_arm_setup_debug - set up debug related stuff
++ *
++ * @vcpu:	the vcpu pointer
++ *
++ * This is called before each entry into the hypervisor to setup any
++ * debug related registers. Currently this just ensures we will trap
++ * access to:
++ *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
++ *  - Debug ROM Address (MDCR_EL2_TDRA)
++ *  - OS related registers (MDCR_EL2_TDOSA)
++ *
++ * Additionally, KVM only traps guest accesses to the debug registers if
++ * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
++ * flag on vcpu->arch.debug_flags).  Since the guest must not interfere
++ * with the hardware state when debugging the guest, we must ensure that
++ * trapping is enabled whenever we are debugging the guest using the
++ * debug registers.
++ */
++
++void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
++{
++	bool trap_debug = !(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY);
++
++	vcpu->arch.mdcr_el2 = __this_cpu_read(mdcr_el2) & MDCR_EL2_HPMN_MASK;
++	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM |
++				MDCR_EL2_TPMCR |
++				MDCR_EL2_TDRA |
++				MDCR_EL2_TDOSA);
++
++	/* Trap on access to debug registers? */
++	if (trap_debug)
++		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
++
++}
++
++void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
++{
++	/* Nothing to do yet */
++}
 diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 77c08df..f56e93f 100644
+index 5befd01..2c67a14 100644
 --- a/arch/arm64/kvm/hyp.S
 +++ b/arch/arm64/kvm/hyp.S
-@@ -600,6 +600,7 @@ __restore_sysregs:
- /* Save debug state */
- __save_debug:
- 	// x2: ptr to CPU context
-+	// x3: ptr to debug reg struct
- 	// x4/x5/x6-22/x24-26: trashed
+@@ -768,17 +768,8 @@
+ 	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+ 	msr	hstr_el2, x2
  
- 	mrs	x26, id_aa64dfr0_el1
-@@ -610,15 +611,15 @@ __save_debug:
- 	sub	w25, w26, w25		// How many WPs to skip
- 
- 	mov	x5, x24
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-+	add	x4, x3, #DEBUG_BCR
- 	save_debug dbgbcr
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-+	add	x4, x3, #DEBUG_BVR
- 	save_debug dbgbvr
- 
- 	mov	x5, x25
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-+	add	x4, x3, #DEBUG_WCR
- 	save_debug dbgwcr
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-+	add	x4, x3, #DEBUG_WVR
- 	save_debug dbgwvr
- 
- 	mrs	x21, mdccint_el1
-@@ -628,6 +629,7 @@ __save_debug:
- /* Restore debug state */
- __restore_debug:
- 	// x2: ptr to CPU context
-+	// x3: ptr to debug reg struct
- 	// x4/x5/x6-22/x24-26: trashed
- 
- 	mrs	x26, id_aa64dfr0_el1
-@@ -638,15 +640,15 @@ __restore_debug:
- 	sub	w25, w26, w25		// How many WPs to skip
- 
- 	mov	x5, x24
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBCR0_EL1)
-+	add	x4, x3, #DEBUG_BCR
- 	restore_debug dbgbcr
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGBVR0_EL1)
-+	add	x4, x3, #DEBUG_BVR
- 	restore_debug dbgbvr
- 
- 	mov	x5, x25
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWCR0_EL1)
-+	add	x4, x3, #DEBUG_WCR
- 	restore_debug dbgwcr
--	add	x4, x2, #CPU_SYSREG_OFFSET(DBGWVR0_EL1)
-+	add	x4, x3, #DEBUG_WVR
- 	restore_debug dbgwvr
- 
- 	ldr	x21, [x2, #CPU_SYSREG_OFFSET(MDCCINT_EL1)]
-@@ -686,6 +688,7 @@ ENTRY(__kvm_vcpu_run)
- 	bl __save_sysregs
- 
- 	compute_debug_state 1f
-+	add	x3, x0, #VCPU_HOST_DEBUG_STATE
- 	bl	__save_debug
- 1:
- 	activate_traps
-@@ -701,6 +704,8 @@ ENTRY(__kvm_vcpu_run)
- 	bl __restore_fpsimd
- 
- 	skip_debug_state x3, 1f
-+	ldr	x3, [x0, #VCPU_DEBUG_PTR]
-+	kern_hyp_va x3
- 	bl	__restore_debug
- 1:
- 	restore_guest_32bit_state
-@@ -721,6 +726,8 @@ __kvm_vcpu_return:
- 	bl __save_sysregs
- 
- 	skip_debug_state x3, 1f
-+	ldr	x3, [x0, #VCPU_DEBUG_PTR]
-+	kern_hyp_va x3
- 	bl	__save_debug
- 1:
- 	save_guest_32bit_state
-@@ -743,6 +750,7 @@ __kvm_vcpu_return:
- 	// already been saved. Note that we nuke the whole 64bit word.
- 	// If we ever add more flags, we'll have to be more careful...
- 	str	xzr, [x0, #VCPU_DEBUG_FLAGS]
-+	add	x3, x0, #VCPU_HOST_DEBUG_STATE
- 	bl	__restore_debug
- 1:
- 	restore_host_regs
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index c370b40..158bae7 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -211,6 +211,203 @@ static bool trap_debug_regs(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+/*
-+ * reg_to_dbg/dbg_to_reg
-+ *
-+ * A 32 bit write to a debug register leave top bits alone
-+ * A 32 bit read from a debug register only returns the bottom bits
-+ *
-+ * All writes will set the KVM_ARM64_DEBUG_DIRTY flag to ensure the
-+ * hyp.S code switches between host and guest values in future.
-+ */
-+static inline void reg_to_dbg(struct kvm_vcpu *vcpu,
-+			      const struct sys_reg_params *p,
-+			      u64 *dbg_reg)
-+{
-+	u64 val = *vcpu_reg(vcpu, p->Rt);
-+
-+	if (p->is_32bit) {
-+		val &= 0xffffffffUL;
-+		val |= ((*dbg_reg >> 32) << 32);
-+	}
-+
-+	*dbg_reg = val;
-+	vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+}
-+
-+static inline void dbg_to_reg(struct kvm_vcpu *vcpu,
-+			      const struct sys_reg_params *p,
-+			      u64 *dbg_reg)
-+{
-+	u64 val = *dbg_reg;
-+
-+	if (p->is_32bit)
-+		val &= 0xffffffffUL;
-+
-+	*vcpu_reg(vcpu, p->Rt) = val;
-+}
-+
-+static inline bool trap_bvr(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *rd)
-+{
-+	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+
-+	if (p->is_write)
-+		reg_to_dbg(vcpu, p, dbg_reg);
-+	else
-+		dbg_to_reg(vcpu, p, dbg_reg);
-+
-+	return true;
-+}
-+
-+static int set_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+		const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+
-+	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int get_bvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+	const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+
-+	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static inline void reset_bvr(struct kvm_vcpu *vcpu,
-+			     const struct sys_reg_desc *rd)
-+{
-+	vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg] = rd->val;
-+}
-+
-+static inline bool trap_bcr(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *rd)
-+{
-+	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
-+
-+	if (p->is_write)
-+		reg_to_dbg(vcpu, p, dbg_reg);
-+	else
-+		dbg_to_reg(vcpu, p, dbg_reg);
-+
-+	return true;
-+}
-+
-+static int set_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+		const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
-+
-+	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+static int get_bcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+	const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg];
-+
-+	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static inline void reset_bcr(struct kvm_vcpu *vcpu,
-+			     const struct sys_reg_desc *rd)
-+{
-+	vcpu->arch.vcpu_debug_state.dbg_bcr[rd->reg] = rd->val;
-+}
-+
-+static inline bool trap_wvr(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *rd)
-+{
-+	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
-+
-+	if (p->is_write)
-+		reg_to_dbg(vcpu, p, dbg_reg);
-+	else
-+		dbg_to_reg(vcpu, p, dbg_reg);
-+
-+	return true;
-+}
-+
-+static int set_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+		const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
-+
-+	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int get_wvr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+	const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg];
-+
-+	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static inline void reset_wvr(struct kvm_vcpu *vcpu,
-+			     const struct sys_reg_desc *rd)
-+{
-+	vcpu->arch.vcpu_debug_state.dbg_wvr[rd->reg] = rd->val;
-+}
-+
-+static inline bool trap_wcr(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *rd)
-+{
-+	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
-+
-+	if (p->is_write)
-+		reg_to_dbg(vcpu, p, dbg_reg);
-+	else
-+		dbg_to_reg(vcpu, p, dbg_reg);
-+
-+	return true;
-+}
-+
-+static int set_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+		const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
-+
-+	if (copy_from_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int get_wcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+	const struct kvm_one_reg *reg, void __user *uaddr)
-+{
-+	__u64 *r = &vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg];
-+
-+	if (copy_to_user(uaddr, r, KVM_REG_SIZE(reg->id)) != 0)
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static inline void reset_wcr(struct kvm_vcpu *vcpu,
-+			     const struct sys_reg_desc *rd)
-+{
-+	vcpu->arch.vcpu_debug_state.dbg_wcr[rd->reg] = rd->val;
-+}
-+
- static void reset_amair_el1(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- {
- 	u64 amair;
-@@ -240,16 +437,16 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b100),	\
--	  trap_debug_regs, reset_val, (DBGBVR0_EL1 + (n)), 0 },		\
-+	  trap_bvr, reset_bvr, n, 0, get_bvr, set_bvr },		\
- 	/* DBGBCRn_EL1 */						\
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b101),	\
--	  trap_debug_regs, reset_val, (DBGBCR0_EL1 + (n)), 0 },		\
-+	  trap_bcr, reset_bcr, n, 0, get_bcr, set_bcr },		\
- 	/* DBGWVRn_EL1 */						\
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b110),	\
--	  trap_debug_regs, reset_val, (DBGWVR0_EL1 + (n)), 0 },		\
-+	  trap_wvr, reset_wvr, n, 0,  get_wvr, set_wvr },		\
- 	/* DBGWCRn_EL1 */						\
- 	{ Op0(0b10), Op1(0b000), CRn(0b0000), CRm((n)), Op2(0b111),	\
--	  trap_debug_regs, reset_val, (DBGWCR0_EL1 + (n)), 0 }
-+	  trap_wcr, reset_wcr, n, 0,  get_wcr, set_wcr }
- 
- /*
-  * Architected system registers.
-@@ -516,28 +713,55 @@ static bool trap_debug32(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
--#define DBG_BCR_BVR_WCR_WVR(n)					\
--	/* DBGBVRn */						\
--	{ Op1( 0), CRn( 0), CRm((n)), Op2( 4), trap_debug32,	\
--	  NULL, (cp14_DBGBVR0 + (n) * 2) },			\
--	/* DBGBCRn */						\
--	{ Op1( 0), CRn( 0), CRm((n)), Op2( 5), trap_debug32,	\
--	  NULL, (cp14_DBGBCR0 + (n) * 2) },			\
--	/* DBGWVRn */						\
--	{ Op1( 0), CRn( 0), CRm((n)), Op2( 6), trap_debug32,	\
--	  NULL, (cp14_DBGWVR0 + (n) * 2) },			\
--	/* DBGWCRn */						\
--	{ Op1( 0), CRn( 0), CRm((n)), Op2( 7), trap_debug32,	\
--	  NULL, (cp14_DBGWCR0 + (n) * 2) }
+-	mrs	x2, mdcr_el2
+-	and	x2, x2, #MDCR_EL2_HPMN_MASK
+-	orr	x2, x2, #(MDCR_EL2_TPM | MDCR_EL2_TPMCR)
+-	orr	x2, x2, #(MDCR_EL2_TDRA | MDCR_EL2_TDOSA)
 -
--#define DBGBXVR(n)						\
--	{ Op1( 0), CRn( 1), CRm((n)), Op2( 1), trap_debug32,	\
--	  NULL, cp14_DBGBXVR0 + n * 2 }
-+/* AArch32 debug register mappings
-+ *
-+ * AArch32 DBGBVRn is mapped to DBGBVRn_EL1[31:0]
-+ * AArch32 DBGBXVRn is mapped to DBGBVRn_EL1[63:32]
-+ *
-+ * All control registers and watchpoint value registers are mapped to
-+ * the lower 32 bits of their AArch64 equivalents. We share the trap
-+ * handlers with the above AArch64 code which checks what mode the
-+ * system is in.
-+ */
-+
-+static inline bool trap_xvr(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *rd)
-+{
-+	u64 *dbg_reg = &vcpu->arch.vcpu_debug_state.dbg_bvr[rd->reg];
-+
-+	if (p->is_write) {
-+		u64 val = *dbg_reg;
-+
-+		val &= 0xffffffffUL;
-+		val |= *vcpu_reg(vcpu, p->Rt) << 32;
-+		*dbg_reg = val;
-+
-+		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-+	} else {
-+		*vcpu_reg(vcpu, p->Rt) = *dbg_reg >> 32;
-+	}
-+
-+	return true;
-+}
-+
-+#define DBG_BCR_BVR_WCR_WVR(n)						\
-+	/* DBGBVRn */							\
-+	{ Op1( 0), CRn( 0), CRm((n)), Op2( 4), trap_bvr, NULL, n }, 	\
-+	/* DBGBCRn */							\
-+	{ Op1( 0), CRn( 0), CRm((n)), Op2( 5), trap_bcr, NULL, n },	\
-+	/* DBGWVRn */							\
-+	{ Op1( 0), CRn( 0), CRm((n)), Op2( 6), trap_wvr, NULL, n },	\
-+	/* DBGWCRn */							\
-+	{ Op1( 0), CRn( 0), CRm((n)), Op2( 7), trap_wcr, NULL, n }
-+
-+#define DBGBXVR(n)							\
-+	{ Op1( 0), CRn( 1), CRm((n)), Op2( 1), trap_xvr, NULL, n }
+-	// Check for KVM_ARM64_DEBUG_DIRTY, and set debug to trap
+-	// if not dirty.
+-	ldr	x3, [x0, #VCPU_DEBUG_FLAGS]
+-	tbnz	x3, #KVM_ARM64_DEBUG_DIRTY_SHIFT, 1f
+-	orr	x2, x2,  #MDCR_EL2_TDA
+-1:
++	// Monitor Debug Config - see kvm_arm_setup_debug()
++	ldr	x2, [x0, #VCPU_MDCR_EL2]
+ 	msr	mdcr_el2, x2
+ .endm
  
- /*
-  * Trapped cp14 registers. We generally ignore most of the external
-  * debug, on the principle that they don't really make sense to a
-- * guest. Revisit this one day, whould this principle change.
-+ * guest. Revisit this one day, would this principle change.
-  */
- static const struct sys_reg_desc cp14_regs[] = {
- 	/* DBGIDR */
-@@ -1303,6 +1527,9 @@ int kvm_arm_sys_reg_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
- 	if (!r)
- 		return get_invariant_sys_reg(reg->id, uaddr);
+@@ -1295,4 +1286,10 @@ ENTRY(__kvm_hyp_vector)
+ 	ventry	el1_error_invalid		// Error 32-bit EL1
+ ENDPROC(__kvm_hyp_vector)
  
-+	if (r->get_user)
-+		return (r->get_user)(vcpu, r, reg, uaddr);
 +
- 	return reg_to_user(uaddr, &vcpu_sys_reg(vcpu, r->reg), reg->id);
- }
- 
-@@ -1321,6 +1548,9 @@ int kvm_arm_sys_reg_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg
- 	if (!r)
- 		return set_invariant_sys_reg(reg->id, uaddr);
- 
-+	if (r->set_user)
-+		return (r->set_user)(vcpu, r, reg, uaddr);
++ENTRY(__kvm_get_mdcr_el2)
++	mrs	x0, mdcr_el2
++	ret
++ENDPROC(__kvm_get_mdcr_el2)
 +
- 	return reg_from_user(&vcpu_sys_reg(vcpu, r->reg), uaddr, reg->id);
- }
- 
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index d411e25..eaa324e 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -55,6 +55,12 @@ struct sys_reg_desc {
- 
- 	/* Value (usually reset value) */
- 	u64 val;
-+
-+	/* Custom get/set_user functions, fallback to generic if NULL */
-+	int (*get_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+			const struct kvm_one_reg *reg, void __user *uaddr);
-+	int (*set_user)(struct kvm_vcpu *vcpu, const struct sys_reg_desc *rd,
-+			const struct kvm_one_reg *reg, void __user *uaddr);
- };
- 
- static inline void print_sys_reg_instr(const struct sys_reg_params *p)
+ 	.popsection
 -- 
 2.4.5
