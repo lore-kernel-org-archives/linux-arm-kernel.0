@@ -1,72 +1,170 @@
-From: walter@vanguardiasur.com.ar (Walter Lozano)
-Date: Tue, 7 Jul 2015 11:05:58 -0300
-Subject: [PATCH 1/3] ARM: socfpga: dts: Fix adxl34x formating
-In-Reply-To: <559BDB62.4060105@opensource.altera.com>
-References: <1435285559-11053-1-git-send-email-walter@vanguardiasur.com.ar>
- <20150626071656.GC26041@pengutronix.de>
- <CABxpGwASLHuXtTp--q8iu3FDCsOXT-03VRCsgL51JfnTaZ80sQ@mail.gmail.com>
- <559BDB62.4060105@opensource.altera.com>
-Message-ID: <CABxpGwCTMMNS-eq6+aeuTMod8c3n95wyj5-2W3R+y6J5N8_5jA@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 07 Jul 2015 16:08:55 +0200
+Subject: [PATCH 1/2] KVM: arm: rename pause into power_off
+In-Reply-To: <20150707133629.GF3381@hawk.localdomain>
+References: <1436186996-22528-1-git-send-email-eric.auger@linaro.org>
+ <1436186996-22528-2-git-send-email-eric.auger@linaro.org>
+ <20150707133629.GF3381@hawk.localdomain>
+Message-ID: <559BDD77.7050202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 11:00 AM, Dinh Nguyen
-<dinguyen@opensource.altera.com> wrote:
->
->
-> On 6/26/15 5:36 AM, Walter Lozano wrote:
->> Hi Steffen
+Hi Andrew,
+On 07/07/2015 03:36 PM, Andrew Jones wrote:
+> On Mon, Jul 06, 2015 at 02:49:55PM +0200, Eric Auger wrote:
+>> The kvm_vcpu_arch pause field is renamed into power_off to prepare
+>> for the introduction of a new pause field.
 >>
->> On Fri, Jun 26, 2015 at 4:16 AM, Steffen Trumtrar
->> <s.trumtrar@pengutronix.de> wrote:
->>> Hi Walter!
->>>
->>> On Thu, Jun 25, 2015 at 11:25:57PM -0300, Walter Lozano wrote:
->>>> This patch fixes the formating of DTS bindings for the adxl34x digital
->>>> accelerometer.
->>>>
->>>> Signed-off-by: Walter Lozano <walter@vanguardiasur.com.ar>
->>>> ---
->>>>  arch/arm/boot/dts/socfpga_cyclone5_sockit.dts |    6 +++---
->>>>  1 file changed, 3 insertions(+), 3 deletions(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> index 71468a7..5b60692 100644
->>>> --- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
->>>> @@ -73,14 +73,14 @@
->>>>       status = "okay";
->>>>  };
->>>>
->>>> -&i2c1{
->>>> +&i2c1 {
->>>>       status = "okay";
->>>>
->>>> -     accel1: accel1 at 53{
->>>> +     accel1: accelerometer at 53 {
->>>>               compatible = "adxl34x";
->>>>               reg = <0x53>;
->>>>
->>>> -             interrupt-parent = < &portc >;
->>>> +             interrupt-parent = <&portc>;
->>>>               interrupts = <3 2>;
->>>>       };
->>>>  };
->>>
->>> I would personally squash 3/3 into this one, but otherwise:
->>>
->>> Whole series
->>>
->>>         Acked-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
->>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 >>
->> Thanks for your comments. I have no problem at all. Dinh?
->
-> I've applied and squashed 1/3 and 3/3 together.
->
+>> v4 -> v5:
+>> - fix compilation issue on arm64 (add power_off field in kvm_host.h)
+>> ---
+>>  arch/arm/include/asm/kvm_host.h   |  4 ++--
+>>  arch/arm/kvm/arm.c                | 10 +++++-----
+>>  arch/arm/kvm/psci.c               | 10 +++++-----
+>>  arch/arm64/include/asm/kvm_host.h |  4 ++--
+>>  4 files changed, 14 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>> index e896d2c..304004d 100644
+>> --- a/arch/arm/include/asm/kvm_host.h
+>> +++ b/arch/arm/include/asm/kvm_host.h
+>> @@ -129,8 +129,8 @@ struct kvm_vcpu_arch {
+>>  	 * here.
+>>  	 */
+>>  
+>> -	/* Don't run the guest on this vcpu */
+>> -	bool pause;
+> 
+> This patch should leave pause in. kvm_arch_vcpu_ioctl_set_mpstate still
+> references it, compilation is broken until the next patch comes.
+Effectively that's definitively wrong.
+> 
+>> +	/* vcpu power-off state */
+>> +	bool power_off;
+>>  
+>>  	/* IO related fields */
+>>  	struct kvm_decode mmio_decode;
+>> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+>> index bcdf799..7537e68 100644
+>> --- a/arch/arm/kvm/arm.c
+>> +++ b/arch/arm/kvm/arm.c
+>> @@ -475,7 +475,7 @@ static void vcpu_pause(struct kvm_vcpu *vcpu)
+>>  {
+>>  	wait_queue_head_t *wq = kvm_arch_vcpu_wq(vcpu);
+>>  
+>> -	wait_event_interruptible(*wq, !vcpu->arch.pause);
+>> +	wait_event_interruptible(*wq, !vcpu->arch.power_off);
+> 
+> Leaving pause in would allow this to already be
+> 
+> +       wait_event_interruptible(*wq, ((!vcpu->arch.power_off) &&
+> +                                      (!vcpu->arch.pause)));
+> 
+> which feels better. The function name is vcpu_pause, so it's nice
+> to see state named 'pause' in there.
+agreed
 
-Great! Thanks!
+Thanks for the review!
 
--- 
-Walter Lozano, VanguardiaSur
-www.vanguardiasur.com.ar
+Eric
+> 
+>>  }
+>>  
+>>  static int kvm_vcpu_initialized(struct kvm_vcpu *vcpu)
+>> @@ -525,7 +525,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>>  
+>>  		update_vttbr(vcpu->kvm);
+>>  
+>> -		if (vcpu->arch.pause)
+>> +		if (vcpu->arch.power_off)
+>>  			vcpu_pause(vcpu);
+>>  
+>>  		/*
+>> @@ -766,12 +766,12 @@ static int kvm_arch_vcpu_ioctl_vcpu_init(struct kvm_vcpu *vcpu,
+>>  	vcpu_reset_hcr(vcpu);
+>>  
+>>  	/*
+>> -	 * Handle the "start in power-off" case by marking the VCPU as paused.
+>> +	 * Handle the "start in power-off" case.
+>>  	 */
+>>  	if (test_bit(KVM_ARM_VCPU_POWER_OFF, vcpu->arch.features))
+>> -		vcpu->arch.pause = true;
+>> +		vcpu->arch.power_off = true;
+>>  	else
+>> -		vcpu->arch.pause = false;
+>> +		vcpu->arch.power_off = false;
+>>  
+>>  	return 0;
+>>  }
+>> diff --git a/arch/arm/kvm/psci.c b/arch/arm/kvm/psci.c
+>> index 4b94b51..134971a 100644
+>> --- a/arch/arm/kvm/psci.c
+>> +++ b/arch/arm/kvm/psci.c
+>> @@ -63,7 +63,7 @@ static unsigned long kvm_psci_vcpu_suspend(struct kvm_vcpu *vcpu)
+>>  
+>>  static void kvm_psci_vcpu_off(struct kvm_vcpu *vcpu)
+>>  {
+>> -	vcpu->arch.pause = true;
+>> +	vcpu->arch.power_off = true;
+>>  }
+>>  
+>>  static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>> @@ -87,7 +87,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>>  	 */
+>>  	if (!vcpu)
+>>  		return PSCI_RET_INVALID_PARAMS;
+>> -	if (!vcpu->arch.pause) {
+>> +	if (!vcpu->arch.power_off) {
+>>  		if (kvm_psci_version(source_vcpu) != KVM_ARM_PSCI_0_1)
+>>  			return PSCI_RET_ALREADY_ON;
+>>  		else
+>> @@ -115,7 +115,7 @@ static unsigned long kvm_psci_vcpu_on(struct kvm_vcpu *source_vcpu)
+>>  	 * the general puspose registers are undefined upon CPU_ON.
+>>  	 */
+>>  	*vcpu_reg(vcpu, 0) = context_id;
+>> -	vcpu->arch.pause = false;
+>> +	vcpu->arch.power_off = false;
+>>  	smp_mb();		/* Make sure the above is visible */
+>>  
+>>  	wq = kvm_arch_vcpu_wq(vcpu);
+>> @@ -152,7 +152,7 @@ static unsigned long kvm_psci_vcpu_affinity_info(struct kvm_vcpu *vcpu)
+>>  	kvm_for_each_vcpu(i, tmp, kvm) {
+>>  		mpidr = kvm_vcpu_get_mpidr_aff(tmp);
+>>  		if (((mpidr & target_affinity_mask) == target_affinity) &&
+>> -		    !tmp->arch.pause) {
+>> +		    !tmp->arch.power_off) {
+>>  			return PSCI_0_2_AFFINITY_LEVEL_ON;
+>>  		}
+>>  	}
+>> @@ -175,7 +175,7 @@ static void kvm_prepare_system_event(struct kvm_vcpu *vcpu, u32 type)
+>>  	 * re-initialized.
+>>  	 */
+>>  	kvm_for_each_vcpu(i, tmp, vcpu->kvm) {
+>> -		tmp->arch.pause = true;
+>> +		tmp->arch.power_off = true;
+>>  		kvm_vcpu_kick(tmp);
+>>  	}
+>>  
+>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>> index 2709db2..009da6b 100644
+>> --- a/arch/arm64/include/asm/kvm_host.h
+>> +++ b/arch/arm64/include/asm/kvm_host.h
+>> @@ -122,8 +122,8 @@ struct kvm_vcpu_arch {
+>>  	 * here.
+>>  	 */
+>>  
+>> -	/* Don't run the guest */
+>> -	bool pause;
+>> +	/* vcpu power-off state */
+>> +	bool power_off;
+>>  
+>>  	/* IO related fields */
+>>  	struct kvm_decode mmio_decode;
+>> -- 
+>> 1.9.1
+> 
+> Thanks,
+> drew
+> 
