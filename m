@@ -1,91 +1,84 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jul 2015 11:30:18 +0800
-Subject: [PATCH v2 5/9] iommu/arm-smmu: skip the execution of
- CMD_PREFETCH_CONFIG
+Date: Tue, 7 Jul 2015 11:30:22 +0800
+Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
 In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1436239822-14132-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hisilicon SMMUv3 devices treat CMD_PREFETCH_CONFIG as a illegal command,
-execute it will trigger GERROR interrupt. Although the gerror code manage
-to turn the prefetch into a SYNC, and the system can continue to run
-normally, but it's ugly to print error information.
+This patch support a master with multiple stream IDs, but doesn't support a
+master behinds more than one SMMUs.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 32 +++++++++++++++++++++++++++++++-
- 1 file changed, 31 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu-v3.c | 39 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 37 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4e7fd4e..d6e3494 100644
+index 274d059..582cd1e 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -543,6 +543,9 @@ struct arm_smmu_device {
- #define ARM_SMMU_FEAT_HYP		(1 << 12)
- 	u32				features;
+@@ -30,6 +30,7 @@
+ #include <linux/of_address.h>
+ #include <linux/pci.h>
+ #include <linux/platform_device.h>
++#include <linux/amba/bus.h>
+ #include <linux/of_iommu.h>
+ #include <linux/of_platform.h>
 
-+#define ARM_SMMU_OPT_SKIP_PREFETCH	(1 << 0)
-+	u32				options;
-+
- 	struct arm_smmu_cmdq		cmdq;
- 	struct arm_smmu_evtq		evtq;
- 	struct arm_smmu_priq		priq;
-@@ -603,11 +606,35 @@ struct arm_smmu_domain {
- static DEFINE_SPINLOCK(arm_smmu_devices_lock);
- static LIST_HEAD(arm_smmu_devices);
+@@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 		return -EINVAL;
+ 	}
 
-+struct arm_smmu_option_prop {
-+	u32 opt;
-+	const char *prop;
-+};
+-	/* We only support PCI, for now */
+ 	if (!dev_is_pci(dev)) {
+-		return -ENODEV;
++		int i;
++		struct iommu_group *group;
 +
-+static struct arm_smmu_option_prop arm_smmu_options[] = {
-+	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-+	{ 0, NULL},
-+};
++		group = iommu_group_get(dev);
++		if (!group) {
++			group = iommu_group_alloc();
++			if (IS_ERR(group)) {
++				dev_err(dev, "failed to allocate IOMMU group\n");
++				return PTR_ERR(group);
++			}
 +
- static struct arm_smmu_domain *to_smmu_domain(struct iommu_domain *dom)
- {
- 	return container_of(dom, struct arm_smmu_domain, domain);
- }
-
-+static void parse_driver_options(struct arm_smmu_device *smmu)
-+{
-+	int i = 0;
-+
-+	do {
-+		if (of_property_read_bool(smmu->dev->of_node,
-+						arm_smmu_options[i].prop)) {
-+			smmu->options |= arm_smmu_options[i].opt;
-+			dev_notice(smmu->dev, "option %s\n",
-+				arm_smmu_options[i].prop);
++			ret = iommu_group_add_device(group, dev);
++			if (ret) {
++				dev_err(dev, "failed to add device into IOMMU group\n");
++				return PTR_ERR(group);
++			}
 +		}
-+	} while (arm_smmu_options[++i].opt);
-+}
++		iommu_group_put(group);
 +
- /* Low-level queue manipulation functions */
- static bool queue_full(struct arm_smmu_queue *q)
- {
-@@ -1037,7 +1064,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 	arm_smmu_sync_ste_for_sid(smmu, sid);
++		for (i = 0; i < args->args_count; i++) {
++			ret = arm_smmu_add_device(dev, args->args[i]);
++			if (ret) {
++				dev_err(dev,
++					"failed to add sid=%d into SMMU\n",
++					args->args[i]);
++				return ret;
++			}
++		}
+ 	} else {
+ 		u32 sid;
+ 		struct device_node *of_root;
+@@ -2725,6 +2752,14 @@ static int __init arm_smmu_init(void)
+ 	if (ret)
+ 		return ret;
 
- 	/* It's likely that we'll want to use the new STE soon */
--	arm_smmu_cmdq_issue_cmd(smmu, &prefetch_cmd);
-+	if (!(smmu->options & ARM_SMMU_OPT_SKIP_PREFETCH))
-+		arm_smmu_cmdq_issue_cmd(smmu, &prefetch_cmd);
++	if (!iommu_present(&platform_bus_type))
++		bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
++
++#ifdef CONFIG_ARM_AMBA
++	if (!iommu_present(&amba_bustype))
++		bus_set_iommu(&amba_bustype, &arm_smmu_ops);
++#endif
++
+ 	return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
  }
 
- static void arm_smmu_init_bypass_stes(u64 *strtab, unsigned int nent)
-@@ -2576,6 +2604,8 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 	if (irq > 0)
- 		smmu->gerr_irq = irq;
-
-+	parse_driver_options(smmu);
-+
- 	/* Probe the h/w */
- 	ret = arm_smmu_device_probe(smmu);
- 	if (ret)
 --
 1.8.0
