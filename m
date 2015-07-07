@@ -1,41 +1,57 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jul 2015 15:29:21 +0100
-Subject: [RESEND 09/10] regulator: pwm-regulator: Simplify voltage to
- duty-cycle call
-In-Reply-To: <20150707135256.GQ2887@sirena.org.uk>
-References: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
- <1436173112-21397-10-git-send-email-lee.jones@linaro.org>
- <20150707133245.GM2887@sirena.org.uk> <20150707134503.GG3182@x1>
- <20150707135256.GQ2887@sirena.org.uk>
-Message-ID: <20150707142921.GI3182@x1>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 07 Jul 2015 23:30:48 +0900
+Subject: [PATCHv5] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <559B2F0C.5010603@samsung.com>
+References: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
+ <559B2F0C.5010603@samsung.com>
+Message-ID: <08c001d0b8c1$844d4600$8ce7d200$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jul 2015, Mark Brown wrote:
+Krzysztof Kozlowski wrote:
+> 
+> On 06.07.2015 23:12, Chanho Park wrote:
+> > The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+> > booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+> > is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+> > cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
+> > and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+> > cpu4-7 are cortex-a15.
+> >
+> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> > ---
+> > Changes from v4:
+> >  - Remove temporal patch in e-mail body
+> >
+> > Changes from v3:
+> >  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+> >
+> > Changes from v2:
+> >  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+> >  - drop compatibles from exynos5422-cpus.dtsi
+> >
+> > Changes from v1:
+> >  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+> >  - include the dtsi file top of the exynos5422-odroidxu3.dts
+> >
+> > Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+> > to work booting 8 cores correctly.
+> >
+> > [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+> >
+> >  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+> >  2 files changed, 82 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+> 
+> Thanks, applied to my tree. I'll sent it to Kukjin later for 4.3 unless
+> he picks it up from LKML.
+> 
+Hi Krzysztof,
 
-> On Tue, Jul 07, 2015 at 02:45:03PM +0100, Lee Jones wrote:
-> > On Tue, 07 Jul 2015, Mark Brown wrote:
-> 
-> > > You just added this function in the previous patch?
-> 
-> > You're right, it does look a little weird contained in a single
-> > patch-set.  The submission in the previous patch is the tried and
-> > tested (i.e. in real releases) method written by ST.  This patch
-> > contains a simplification provided by me.  IMO it looks and performs
-> > better, but doesn't have the same time-under-test that the original
-> > method does.  I'm merely ensuring we keep some history in order so
-> > provide and easy way back i.e. revert.
-> 
-> > If I have any say at all, I'd really like to keep this piece of
-> > history.
-> 
-> OK, that makes sense - can you put the above in the commit message
-> please?
+If you're OK, I'd like to pick this up into Samsung tree with your ack based on
+4.2-rc1.
 
-Sure.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Kukjin
