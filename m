@@ -1,68 +1,24 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Tue,  7 Jul 2015 15:34:25 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Fix the resource map to handle
- overlapping
-Message-ID: <1436263465-7677-1-git-send-email-rsahu@apm.com>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Tue, 7 Jul 2015 12:05:39 +0200
+Subject: [PATCH 4.2-rc1 v21 3/6] irqchip: gic: Introduce plumbing for IPI
+ FIQ
+In-Reply-To: <1436188438-9478-4-git-send-email-daniel.thompson@linaro.org>
+References: <1436188438-9478-1-git-send-email-daniel.thompson@linaro.org>
+ <1436188438-9478-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <CAOpc7mHS8QmpGu7jtzTj6GFU8p+JU9XB9E_vpQfL3e7vEZwT6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an overlap in dma ring cmd csr region due to sharing of ethernet
-ring cmd csr region. This patch fix the resource overlapping by mapping
-the entire dma ring cmd csr region.
+> Currently it is not possible to exploit FIQ for systems with a GIC, even
+> on systems are otherwise capable of it. This patch makes it possible
+> for IPIs to be delivered using FIQ.
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- Documentation/devicetree/bindings/dma/apm-xgene-dma.txt | 2 +-
- arch/arm64/boot/dts/apm/apm-storm.dtsi                  | 2 +-
- drivers/dma/xgene-dma.c                                 | 3 +++
- 3 files changed, 5 insertions(+), 2 deletions(-)
+I wonder if gic_set_group_irq() can easily be married with mxc_set_irq_fiq().
 
-diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-index d305876..c53e0b0 100644
---- a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-@@ -35,7 +35,7 @@ Example:
- 			device_type = "dma";
- 			reg = <0x0 0x1f270000 0x0 0x10000>,
- 			      <0x0 0x1f200000 0x0 0x10000>,
--			      <0x0 0x1b008000 0x0 0x2000>,
-+			      <0x0 0x1b000000 0x0 0x400000>,
- 			      <0x0 0x1054a000 0x0 0x100>;
- 			interrupts = <0x0 0x82 0x4>,
- 				     <0x0 0xb8 0x4>,
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 0689c3f..58093ed 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -823,7 +823,7 @@
- 			device_type = "dma";
- 			reg = <0x0 0x1f270000 0x0 0x10000>,
- 			      <0x0 0x1f200000 0x0 0x10000>,
--			      <0x0 0x1b008000 0x0 0x2000>,
-+			      <0x0 0x1b000000 0x0 0x400000>,
- 			      <0x0 0x1054a000 0x0 0x100>;
- 			interrupts = <0x0 0x82 0x4>,
- 				     <0x0 0xb8 0x4>,
-diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-index 620fd55ec..dff22ab 100644
---- a/drivers/dma/xgene-dma.c
-+++ b/drivers/dma/xgene-dma.c
-@@ -111,6 +111,7 @@
- #define XGENE_DMA_MEM_RAM_SHUTDOWN		0xD070
- #define XGENE_DMA_BLK_MEM_RDY			0xD074
- #define XGENE_DMA_BLK_MEM_RDY_VAL		0xFFFFFFFF
-+#define XGENE_DMA_RING_CMD_SM_OFFSET		0x8000
+The driver sound/soc/fsl/imx-pcm-fiq.c uses mxc_set_irq_fiq() to
+connect an (assembly) FIQ handler with a hardware IRQ. However, the
+underlying implementation of mxc_set_irq_fiq() is only supported for
+TZIC and AVIC (see arch/arm/mach-imx/irq-common.c).
 
- /* X-Gene SoC EFUSE csr register and bit defination */
- #define XGENE_SOC_JTAG1_SHADOW			0x18
-@@ -1887,6 +1888,8 @@ static int xgene_dma_get_resources(struct platform_device *pdev,
- 		return -ENOMEM;
- 	}
-
-+	pdma->csr_ring_cmd += XGENE_DMA_RING_CMD_SM_OFFSET;
-+
- 	/* Get efuse csr region */
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
- 	if (!res) {
---
-1.8.2.1
+On my i.MX6, which doesn't have an AVIC/TZIC but a GIC I could use a
+method to turn a normal IRQ into a FIQ :-)
