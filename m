@@ -1,94 +1,76 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Jul 2015 19:16:43 +0200
-Subject: [PATCH v3] mfd: atmel-hlcdc: implement config synchronization
-Message-ID: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 07 Jul 2015 11:17:48 -0600
+Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
+In-Reply-To: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436289468.1391.89.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some HLCDC registers cannot be written until the hardware has finished
-applying the previous configuration request. If they are written while
-an action is still in progress, the new configuration might be silently
-ignored, resulting in unpredictable behavior.
+On Mon, 2015-07-06 at 14:11 +0200, Eric Auger wrote:
+> This series introduces and extends the IRQ bypass manager written
+> by Alex and transforms irqfd into an IRQ bypass manager consumer.
+> The producer part, in my case the VFIO platform driver will be introduced
+> separately. That code should be usable by both ARM IRQ forwarding
+> and Intel Posted Interrupts.
+> 
+> The IRQ bypass manager enables to setup a negotiated link between an
+> IRQ producer and an IRQ consumer (typically the VFIO driver and KVM irqfd).
+> 
+> The series currently includes Alex's code which was sent my email.
+> Its structure obvioulsy will adapt to Alex's will.
+> 
+> Also the irq bypass manager gets compiled/linked on arm/arm64 along
+> with KVM and VFIO platform driver.
+> 
+> can be found at:
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-bypass-fwd-v2
 
-Hide the config synchronization stuff in a regmap implementation and use
-this implementation instead of the generic mmio one.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Thanks for taking this from a skeleton to a functional implementation,
+Eric!  I'm happy with the way this is progressing.  Once we're confident
+Feng can use your extensions, I'd be happy to merge those back into the
+irq bypass manager and propose it upstream.
 
----
-Changes since v2:
- - reword the commit message
+Hosting the bypass manager in kernel/irq seemed appropriate, but really
+it could be anywhere.  Does anyone have a different preference or
+specifically want it under their scope?  We had originally thought of
+this as an IOMMU service, but I think we've generalized it beyond that.
+I expect we should also add the necessary hooks to turn it into a
+loadable module to keep the tinification folks happy, I'll incorporate
+the current working changes and post a version with that.  Thanks,
 
-Changes since v1:
- - add a 100 usec timeout
----
- drivers/mfd/atmel-hlcdc.c | 35 +++++++++++++++++++++++++++++++++--
- 1 file changed, 33 insertions(+), 2 deletions(-)
+Alex
 
-diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
-index cfd58f4..04e01cc 100644
---- a/drivers/mfd/atmel-hlcdc.c
-+++ b/drivers/mfd/atmel-hlcdc.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/iopoll.h>
- #include <linux/mfd/atmel-hlcdc.h>
- #include <linux/mfd/core.h>
- #include <linux/module.h>
-@@ -37,11 +38,41 @@ static const struct mfd_cell atmel_hlcdc_cells[] = {
- 	},
- };
- 
-+static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
-+					unsigned int val)
-+{
-+	void __iomem *regs = context;
-+
-+	if (reg <= ATMEL_HLCDC_DIS) {
-+		u32 status;
-+
-+		readl_poll_timeout(regs + ATMEL_HLCDC_SR, status,
-+				   !(status & ATMEL_HLCDC_SIP), 1, 100);
-+	}
-+
-+	writel(val, regs + reg);
-+
-+	return 0;
-+}
-+
-+static int regmap_atmel_hlcdc_reg_read(void *context, unsigned int reg,
-+				       unsigned int *val)
-+{
-+	void __iomem *regs = context;
-+
-+	*val = readl(regs + reg);
-+
-+	return 0;
-+}
-+
- static const struct regmap_config atmel_hlcdc_regmap_config = {
- 	.reg_bits = 32,
- 	.val_bits = 32,
- 	.reg_stride = 4,
- 	.max_register = ATMEL_HLCDC_REG_MAX,
-+	.reg_write = regmap_atmel_hlcdc_reg_write,
-+	.reg_read = regmap_atmel_hlcdc_reg_read,
-+	.fast_io = true,
- };
- 
- static int atmel_hlcdc_probe(struct platform_device *pdev)
-@@ -82,8 +113,8 @@ static int atmel_hlcdc_probe(struct platform_device *pdev)
- 		return PTR_ERR(hlcdc->slow_clk);
- 	}
- 
--	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
--					      &atmel_hlcdc_regmap_config);
-+	hlcdc->regmap = devm_regmap_init(dev, NULL, regs,
-+					 &atmel_hlcdc_regmap_config);
- 	if (IS_ERR(hlcdc->regmap))
- 		return PTR_ERR(hlcdc->regmap);
- 
--- 
-1.9.1
+> History:
+> v1 -> v2:
+> - isolate the bypass manager and irqfd consumer in this series
+> - take into account Paolo's comments and use container_of strategy and
+>   remove additional fields introduced in v1.
+> - create kvm_irqfd.h
+> - add unregistration in irqfd_shutdown
+> 
+> v1: originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+>     bypass manager (https://lkml.org/lkml/2015/7/2/268)
+> 
+> 
+> Eric Auger (6):
+>   KVM: arm/arm64: select IRQ_BYPASS_MANAGER
+>   VFIO: platform: select IRQ_BYPASS_MANAGER
+>   irq: bypass: Extend skeleton for ARM forwarding control
+>   KVM: create kvm_irqfd.h
+>   KVM: introduce kvm_arch functions for IRQ bypass
+>   KVM: eventfd: add irq bypass consumer management
+> 
+>  arch/arm/kvm/Kconfig          |   1 +
+>  arch/arm64/kvm/Kconfig        |   1 +
+>  drivers/vfio/platform/Kconfig |   1 +
+>  include/linux/irqbypass.h     |  19 ++++++--
+>  include/linux/kvm_host.h      |  37 ++++++++++++++
+>  include/linux/kvm_irqfd.h     |  70 +++++++++++++++++++++++++++
+>  kernel/irq/bypass.c           |  44 +++++++++++++++--
+>  virt/kvm/Kconfig              |   3 ++
+>  virt/kvm/eventfd.c            | 109 +++++++++++++-----------------------------
+>  9 files changed, 203 insertions(+), 82 deletions(-)
+>  create mode 100644 include/linux/kvm_irqfd.h
+> 
