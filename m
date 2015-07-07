@@ -1,40 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jul 2015 16:01:39 +0200
-Subject: [PATCH v10 4/5] crypto: Add Allwinner Security System crypto
- accelerator
-In-Reply-To: <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
-References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
- <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20150707140139.GF28632@lukather>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Tue, 07 Jul 2015 16:02:51 +0200
+Subject: [PATCH 3/5] usb: isp1760: udc: add missing
+ usb_ep_set_maxpacket_limit()
+In-Reply-To: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
+References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436277773-14274-4-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin,
+Should use usb_ep_set_maxpacket_limit instead of setting
+maxpacket value manually.
 
-On Mon, Jul 06, 2015 at 09:10:47PM +0200, LABBE Corentin wrote:
-> Add support for the Security System included in Allwinner SoC A20.
-> The Security System is a hardware cryptographic accelerator that support:
-> - MD5 and SHA1 hash algorithms
-> - AES block cipher in CBC/ECB mode with 128/196/256bits keys.
-> - DES and 3DES block cipher in CBC/ECB mode
-> 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/isp1760/isp1760-udc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-There's still a number of style issues.
-
-Make sure to run checkpatch with the --strict option, and fix
-everything that's reported.
-
-Maxime
-
+diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
+index 18ebf5b1..3699962 100644
+--- a/drivers/usb/isp1760/isp1760-udc.c
++++ b/drivers/usb/isp1760/isp1760-udc.c
+@@ -1382,11 +1382,11 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
+ 		 * This fits in the 8kB FIFO without double-buffering.
+ 		 */
+ 		if (ep_num == 0) {
+-			ep->ep.maxpacket = 64;
++			usb_ep_set_maxpacket_limit(&ep->ep, 64);
+ 			ep->maxpacket = 64;
+ 			udc->gadget.ep0 = &ep->ep;
+ 		} else {
+-			ep->ep.maxpacket = 512;
++			usb_ep_set_maxpacket_limit(&ep->ep, 512);
+ 			ep->maxpacket = 0;
+ 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 		}
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/d35fa2a2/attachment.sig>
+1.9.1
