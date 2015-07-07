@@ -1,82 +1,89 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 7 Jul 2015 16:36:21 +0200
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
- <20150707130732.GD18561@pengutronix.de>
- <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
-Message-ID: <20150707143621.GW18700@pengutronix.de>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Jul 2015 09:38:53 -0500
+Subject: [PATCH 12/15] SH: kill off set_irq_flags usage
+In-Reply-To: <20150707015503.GA23941@verge.net.au>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-13-git-send-email-robh@kernel.org>
+ <20150707005338.GG13326@verge.net.au>
+ <20150707015503.GA23941@verge.net.au>
+Message-ID: <CAL_JsqJdDU+=88opwQunDEKZpy7DZbGZ0Xt2tm+X_jDtgjaKig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 10:15:29PM +0800, Daniel Kurtz wrote:
-> On Tue, Jul 7, 2015 at 9:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
-> >> Add clk_null, which represents clocks that can not / need not
-> >> controlled by software.
-> >> There are many clocks' parent set to clk_null.
-> >>
-> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> >> ---
-> >> Base on 4.1-rc1
-> >>
-> >> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
-> >> ---
-> >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
-> >>  1 file changed, 6 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> index 924fdb6..4798f44 100644
-> >> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> @@ -81,6 +81,12 @@
-> >>               cpu_on        = <0x84000003>;
-> >>       };
-> >>
-> >> +     clk_null: clk_null {
-> >> +             compatible = "fixed-clock";
-> >> +             clock-frequency = <0>;
-> >> +             #clock-cells = <0>;
-> >> +     };
-> >
-> > The discussion around this patch shows that we don't want to have this
-> > clock in the device tree as it is not a hardware description.
-> >
-> > Ok, fine. Eddie, you told us that the rate of the current clk_null children
-> > is not interesting. What's the motivation to send this patch anyway
-> > then? Why can't you keep its children on the orphan list where they are
-> > already now?
-> >
-> > Another possibility would be to instantiate the clk_null clock from C
-> > code rather than from the device tree. This way we wouldn't put any
-> > wrong descriptions into the device tree and still can implement the
-> > support for the real parent clocks when we actually need them.
-> 
-> Some device nodes, like mmc, use a clk_null phandle as one of their clocks:
-> 
-> mmc1: mmc at 11240000 {
->         compatible = "mediatek,mt8173-mmc",
->                      "mediatek,mt8135-mmc";
->         reg = <0 0x11240000 0 0x1000>;
->         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
->         clocks = <&pericfg CLK_PERI_MSDC30_1>,
->                  <&clk_null>;
->         clock-names = "source", "hclk";
->         status = "disabled";
-> };
+On Mon, Jul 6, 2015 at 8:55 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Tue, Jul 07, 2015 at 09:53:39AM +0900, Simon Horman wrote:
+>> On Tue, Jun 09, 2015 at 01:26:38PM -0500, Rob Herring wrote:
+>> > set_irq_flags is ARM specific with custom flags which have genirq
+>> > equivalents. Convert drivers to use the genirq interfaces directly, so we
+>> > can kill off set_irq_flags. The translation of flags is as follows:
+>> >
+>> > IRQF_VALID -> !IRQ_NOREQUEST
+>> > IRQF_PROBE -> !IRQ_NOPROBE
+>> > IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+>> >
+>> > For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+>> > and setting IRQ_NOREQUEST already, so there is no need to do this in
+>> > .map() functions and we can simply remove the set_irq_flags calls. Some
+>> > users also set IRQ_NOPROBE and this has been maintained although it is not
+>> > clear that is really needed. There appears to be a great deal of blind
+>> > copy and paste of this code.
+>> >
+>> > Signed-off-by: Rob Herring <robh@kernel.org>
+>> > Cc: Simon Horman <horms@verge.net.au>
+>> > Cc: Magnus Damm <magnus.damm@gmail.com>
+>> > Cc: linux-sh at vger.kernel.org
+>>
+>> I am trusting the description above coupled with the comments in
+>> the original code (that this patch removes). Assuming those ducks are
+>> aligned:
+>>
+>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> As I usually take patches for drivers/sh/ (there have not been many of late)
+> please let me know if you would like me to pick up this change.
 
-This is another case than the one we discussed about. In the case above
-I motivated using a dummy clock since the clock exists in the system,
-but is not software controllable. To abstract this from the driver
-(which needs this clock since it exists) we here have the dummy clock.
-However, of course I can't prove the clock is indeed not software
-controllable; that's only the information I have.
+This is a dependency for removing set_irq_flags from ARM, so I plan to
+send the whole series to arm-soc.
 
-Sascha
+> Also, a very minor nit, the prefix for patches to this file is usually
+> 'sh:' rather than 'SH:'.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Okay, will fix-up.
+
+Rob
+
+>
+>>
+>> > ---
+>> >  drivers/sh/intc/internals.h | 10 +---------
+>> >  1 file changed, 1 insertion(+), 9 deletions(-)
+>> >
+>> > diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+>> > index 7dff08e..897ffb1 100644
+>> > --- a/drivers/sh/intc/internals.h
+>> > +++ b/drivers/sh/intc/internals.h
+>> > @@ -99,15 +99,7 @@ static inline struct intc_desc_int *get_intc_desc(unsigned int irq)
+>> >   */
+>> >  static inline void activate_irq(int irq)
+>> >  {
+>> > -#ifdef CONFIG_ARM
+>> > -   /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+>> > -    * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+>> > -    */
+>> > -   set_irq_flags(irq, IRQF_VALID);
+>> > -#else
+>> > -   /* same effect on other architectures */
+>> > -   irq_set_noprobe(irq);
+>> > -#endif
+>> > +   irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+>> >  }
+>> >
+>> >  static inline int intc_handle_int_cmp(const void *a, const void *b)
+>> > --
+>> > 2.1.0
+>> >
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
