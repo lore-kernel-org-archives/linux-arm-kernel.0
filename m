@@ -1,119 +1,56 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Tue,  7 Jul 2015 17:29:55 +0100
-Subject: [PATCH v8 03/11] KVM: arm: guest debug,
- add stub KVM_SET_GUEST_DEBUG ioctl
-In-Reply-To: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
-References: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1436286603-15192-4-git-send-email-alex.bennee@linaro.org>
+From: russell.joyce@york.ac.uk (Russell Joyce)
+Date: Tue,  7 Jul 2015 17:54:19 +0100
+Subject: [PATCH] PCI: xilinx: Add check for MSI interrupt flag before handling
+ as INTx
+Message-ID: <1436288059-22925-1-git-send-email-russell.joyce@york.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds a stub function to support the KVM_SET_GUEST_DEBUG
-ioctl. Any unsupported flag will return -EINVAL. For now, only
-KVM_GUESTDBG_ENABLE is supported, although it won't have any effects.
+Occasionally both MSI and INTx bits in the interrupt decode register are
+set at once by the Xilinx AXI PCIe Bridge, so the MSI flag in the
+interrupt message should be checked to ensure that the correct handler is
+used.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>.
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+If this check is not in place and the interrupt message type is MSI, the
+INTx handler will be used erroneously when both type bits are set.
+This will also be followed by a second read of the message FIFO, which can
+result in the function returning early and the interrupt decode register
+not being cleared if the FIFO is now empty.
 
+Signed-off-by: Russell Joyce <russell.joyce@york.ac.uk>
 ---
-v2
-  - simplified form of the ioctl (stuff will go into setup_debug)
-v3
- - KVM_GUESTDBG_VALID->KVM_GUESTDBG_VALID_MASK
- - move mask check to the top of function
- - add ioctl doc header
- - split capability into separate patch
- - tweaked commit wording w.r.t return of -EINVAL
-v4
- - add r-b-tag
-v7
- - moved ioctl to arm64/kvm/guest.c, stubbed arm/kvm/guest.c
----
- Documentation/virtual/kvm/api.txt |  2 +-
- arch/arm/kvm/arm.c                |  7 -------
- arch/arm/kvm/guest.c              |  6 ++++++
- arch/arm64/kvm/guest.c            | 27 +++++++++++++++++++++++++++
- 4 files changed, 34 insertions(+), 8 deletions(-)
+ drivers/pci/host/pcie-xilinx.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index c34c32d..ba635c7 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -2645,7 +2645,7 @@ handled.
- 4.87 KVM_SET_GUEST_DEBUG
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index f1a06a0..dcb9b57 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -449,14 +449,17 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+ 			return IRQ_HANDLED;
+ 		}
  
- Capability: KVM_CAP_SET_GUEST_DEBUG
--Architectures: x86, s390, ppc
-+Architectures: x86, s390, ppc, arm64
- Type: vcpu ioctl
- Parameters: struct kvm_guest_debug (in)
- Returns: 0 on success; -1 on error
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index d9631ec..92b80bc 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -302,13 +302,6 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
- 	kvm_arm_set_running_vcpu(NULL);
- }
+-		/* Clear interrupt FIFO register 1 */
+-		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+-			   XILINX_PCIE_REG_RPIFR1);
+-
+-		/* Handle INTx Interrupt */
+-		val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+-			XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
+-		generic_handle_irq(irq_find_mapping(port->irq_domain, val));
++		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
++			/* Clear interrupt FIFO register 1 */
++			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
++				   XILINX_PCIE_REG_RPIFR1);
++
++			/* Handle INTx Interrupt */
++			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
++				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
++			generic_handle_irq(irq_find_mapping(port->irq_domain,
++							    val));
++		}
+ 	}
  
--int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
--					struct kvm_guest_debug *dbg)
--{
--	return -EINVAL;
--}
--
--
- int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
- 				    struct kvm_mp_state *mp_state)
- {
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index d503fbb..96e935b 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -290,3 +290,9 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
- {
- 	return -EINVAL;
- }
-+
-+int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
-+					struct kvm_guest_debug *dbg)
-+{
-+	return -EINVAL;
-+}
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index 9535bd5..0ba8677 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -331,3 +331,30 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
- {
- 	return -EINVAL;
- }
-+
-+#define KVM_GUESTDBG_VALID_MASK (KVM_GUESTDBG_ENABLE)
-+
-+/**
-+ * kvm_arch_vcpu_ioctl_set_guest_debug - set up guest debugging
-+ * @kvm:	pointer to the KVM struct
-+ * @kvm_guest_debug: the ioctl data buffer
-+ *
-+ * This sets up and enables the VM for guest debugging. Userspace
-+ * passes in a control flag to enable different debug types and
-+ * potentially other architecture specific information in the rest of
-+ * the structure.
-+ */
-+int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
-+					struct kvm_guest_debug *dbg)
-+{
-+	if (dbg->control & ~KVM_GUESTDBG_VALID_MASK)
-+		return -EINVAL;
-+
-+	if (dbg->control & KVM_GUESTDBG_ENABLE) {
-+		vcpu->guest_debug = dbg->control;
-+	} else {
-+		/* If not enabled clear all flags */
-+		vcpu->guest_debug = 0;
-+	}
-+	return 0;
-+}
+ 	if (status & XILINX_PCIE_INTR_MSI) {
 -- 
-2.4.5
+2.1.4
