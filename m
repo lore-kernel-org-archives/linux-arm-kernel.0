@@ -1,35 +1,41 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 07 Jul 2015 10:23:29 +0300
-Subject: [PATCH 1/7] KVM: api: add kvm_irq_routing_extended_msi
-In-Reply-To: <559AA449.80705@arm.com>
-References: <1435592237-17924-1-git-send-email-eric.auger@linaro.org>
- <1435592237-17924-2-git-send-email-eric.auger@linaro.org>
- <011f01d0b498$6a17aeb0$3e470c10$@samsung.com> <5596503E.6040902@arm.com>
- <00fd01d0b7b6$f6cf3550$e46d9ff0$@samsung.com> <559A3C9C.6050302@arm.com>
- <20150706093026.GA11590@cbox> <559A52E6.5050402@arm.com>
- <20150706103755.GC11590@cbox> <559A6164.1000401@redhat.com>
- <559A6527.1040107@arm.com> <559A6BBC.2040901@redhat.com>
- <024301d0b7f0$2b13b410$813b1c30$@samsung.com> <559A9854.2090607@linaro.org>
- <559AA449.80705@arm.com>
-Message-ID: <014d01d0b885$d3228380$79678a80$@samsung.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 07 Jul 2015 09:28:34 +0200
+Subject: [PATCH 0/2] arm: berlin: add cpu hotplug support
+In-Reply-To: <1436253035-371-1-git-send-email-jszhang@marvell.com>
+References: <1436253035-371-1-git-send-email-jszhang@marvell.com>
+Message-ID: <559B7FA2.4080005@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi!
+On 07/07/2015 09:10 AM, Jisheng Zhang wrote:
+> These patches try to add cpu hotplug support for Marvell BG2, BG2Q SoCs.
+> These SoCs can't power off cpu independently, but we still want cpu hotplug
+> support for them. However, we need to address "CPU still sat on kernel text"
+> as pointed out by Mark Rutland[1]. We achieved this by putting the dying CPU
+> in WFI state after the coherency is disabled, then asserting the dying CPU
+> reset bit to put the CPU in reset state.
 
-> I guess not. But I prefer the new type anyway, as it also has a known
-> error path for older kernels.
+Jisheng,
 
- flags != 0 has known error path too, and it's absolutely the same.
- Sorry, read this after writing my previous reply, so this is a short addendum.
+thanks for the patches! Out of curiosity, did you measure overall SoC 
+power consumption with WFI and with reset respectively? I'd expect a
+slightly _higher_ power consumption while in reset depending on clock
+gating applied to the processor hardware.
 
- I see lots of people agreed on a new type. If my argument about reusing existing definitions is not
-enough, you can ignore it. Three people beat one definitely. :)
- And yes, since we are talking about it, actually KVM_MSI_VALID_DEVID flag is not yet a part of
-mainline, so it's not set in stone. Then, perhaps you could throw it away completely and invent
-KVM_SIGNAL_EXT_MSI ioctl for sending MSIs with device ID. This would also be consistent IMO.
+Sebastian
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+> patch1 use non-self-cleared control register to reset cpu. This is to prepare
+> for the next cpu hotplug commit.
+>
+> patch2 adds the cpu hotplug support finally.
+>
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342642.html
+>
+> Jisheng Zhang (2):
+>    arm: berlin: use non-self-cleared reset register to reset cpu
+>    arm: berlin: add CPU hotplug support
+>
+>   arch/arm/mach-berlin/platsmp.c | 29 ++++++++++++++++++++++++++++-
+>   1 file changed, 28 insertions(+), 1 deletion(-)
+>
