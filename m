@@ -1,67 +1,61 @@
-From: toshi.kani@hp.com (Toshi Kani)
-Date: Tue, 07 Jul 2015 17:10:58 -0600
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150707160703.GR7021@wotan.suse.de>
-References: <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
- <20150622161002.GB8240@lst.de>
- <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
- <20150701065948.GA4355@lst.de>
- <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
- <20150701072828.GA4881@lst.de> <20150707095012.GQ7021@wotan.suse.de>
- <20150707101330.GJ7557@n2100.arm.linux.org.uk>
- <20150707160703.GR7021@wotan.suse.de>
-Message-ID: <1436310658.3214.85.camel@hp.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 08 Jul 2015 08:41:19 +0900
+Subject: [PATCHv5] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <08c001d0b8c1$844d4600$8ce7d200$@kernel.org>
+References: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
+ <559B2F0C.5010603@samsung.com> <08c001d0b8c1$844d4600$8ce7d200$@kernel.org>
+Message-ID: <559C639F.1010607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-07 at 18:07 +0200, Luis R. Rodriguez wrote:
-> On Tue, Jul 07, 2015 at 11:13:30AM +0100, Russell King - ARM Linux 
-> wrote:
-  :
-> > On ARM, we (probably) have a lot of cases where ioremap() is used 
-> > multiple
-> > times for the same physical address space, so we shouldn't rule out 
-> > having
-> > multiple mappings of the same type.
+On 07.07.2015 23:30, Kukjin Kim wrote:
+> Krzysztof Kozlowski wrote:
+>>
+>> On 06.07.2015 23:12, Chanho Park wrote:
+>>> The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+>>> booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+>>> is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+>>> cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
+>>> and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+>>> cpu4-7 are cortex-a15.
+>>>
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>>> ---
+>>> Changes from v4:
+>>>  - Remove temporal patch in e-mail body
+>>>
+>>> Changes from v3:
+>>>  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+>>>
+>>> Changes from v2:
+>>>  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+>>>  - drop compatibles from exynos5422-cpus.dtsi
+>>>
+>>> Changes from v1:
+>>>  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+>>>  - include the dtsi file top of the exynos5422-odroidxu3.dts
+>>>
+>>> Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+>>> to work booting 8 cores correctly.
+>>>
+>>> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+>>>
+>>>  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+>>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+>>>  2 files changed, 82 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+>>
+>> Thanks, applied to my tree. I'll sent it to Kukjin later for 4.3 unless
+>> he picks it up from LKML.
+>>
+> Hi Krzysztof,
 > 
-> Why is that done? Don't worry if you are not sure why but only 
-> speculate of the
-> practice's existence (sloppy drivers or lazy driver developers). FWIW 
-> for x86
-> IIRC I ended up concluding that overlapping ioremap() calls with the 
-> same type
-> would work but not if they differ in type.  Although I haven't 
-> written a
-> grammer rule to hunt down overlapping ioremap() I suspected its use 
-> was likely
-> odd and likely should be reconsidered. Would this be true for ARM too 
-> ? Or are
-> you saying this should be a feature ? I don't expect an answer now 
-> but I'm
-> saying we *should* all together decide on this, and if you're 
-> inclined to
-> believe that this should ideally be avoided I'd like to hear that. If 
-> you feel
-> strongly though this should be a feature I would like to know why.
+> If you're OK, I'd like to pick this up into Samsung tree with your ack based on
+> 4.2-rc1.
 
-There are multiple mapping interfaces, and overlapping can happen among
-them as well.  For instance, remap_pfn_range() (and 
-io_remap_pfn_range(), which is the same as remap_pfn_range() on x86)
-creates a mapping to user space.  The same physical ranges may be
-mapped to kernel and user spaces.  /dev/mem is one example that may
-create a user space mapping to a physical address that is already
-mapped with ioremap() by other module.  pmem and DAX also create
-mappings to the same NVDIMM ranges.  DAX calls vm_insert_mixed(), which
-is particularly a problematic since vm_insert_mixed() does not verify
-aliasing.  ioremap() and remap_pfn_range() call reserve_memtype() to
-verify aliasing on x86.  reserve_memtype() is x86-specific and there is
-no arch-generic wrapper for such check.  I think DAX could get a cache
-type from pmem to keep them in sync, though.
+Yes, please go ahead. It already has my reviewed-by tag. However the sob
+does not match author so it should be resent once again.
 
-Thanks,
--Toshi
-
-
- 
+Best regards,
+Krzysztof
