@@ -1,55 +1,33 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue,  7 Jul 2015 16:10:16 +0200
-Subject: [PATCH/RFC 10/11] ARM: shmobile: rcar-gen2: Use syscon to configure
- the CPG
+Date: Tue,  7 Jul 2015 16:10:14 +0200
+Subject: [PATCH/RFC 08/11] ARM: shmobile: r8a7793: Link CPG to RST using
+ "renesas, modemr"
 In-Reply-To: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
 References: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1436278217-20522-11-git-send-email-geert+renesas@glider.be>
+Message-ID: <1436278217-20522-9-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let the R-Car Gen2 CPG clock driver rely on syscon to read the Mode
-Monitoring Register (MODEMR), instead of passing the register value
-directly.
+Add a link from the Clock Pulse Generator node to the Reset Controller
+node, so the CPG can read the Mode Monitoring Register (MODEMR) to
+obtain the MD pin values.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/mach-shmobile/Kconfig           | 1 +
- arch/arm/mach-shmobile/setup-rcar-gen2.c | 3 ++-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7793.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 26a036c3ab522128..37faf6e18d26344f 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -23,6 +23,7 @@ config ARCH_RCAR_GEN2
- 	select SYS_SUPPORTS_SH_CMT
- 	select PCI_DOMAINS if PCI
- 	select HAVE_ARM_ARCH_TIMER
-+	select MFD_SYSCON
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index fbb1aa3740e2b55e..4bddaf2fbd0b2e1c 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -192,6 +192,7 @@
+ 					     "lb", "qspi", "sdh", "sd0", "z",
+ 					     "rcan", "adsp";
+ 			#power-domain-cells = <0>;
++			renesas,modemr = <&rst 0x60>;
+ 		};
  
- config ARCH_RMOBILE
- 	bool
-diff --git a/arch/arm/mach-shmobile/setup-rcar-gen2.c b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-index 570d6bd3784f7464..7a845f4829081cd9 100644
---- a/arch/arm/mach-shmobile/setup-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/setup-rcar-gen2.c
-@@ -15,6 +15,7 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <linux/clk-provider.h>
- #include <linux/clk/shmobile.h>
- #include <linux/clocksource.h>
- #include <linux/device.h>
-@@ -125,7 +126,7 @@ void __init rcar_gen2_timer_init(void)
- 
- 	iounmap(base);
- 
--	rcar_gen2_clocks_init(mode);
-+	of_clk_init(NULL);
- 	clocksource_of_init();
- }
- 
+ 		/* Variable factor clocks */
 -- 
 1.9.1
