@@ -1,83 +1,45 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Tue, 7 Jul 2015 11:33:32 +0000
-Subject: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
- control
-In-Reply-To: <E959C4978C3B6342920538CF579893F0025F35E1@SHSMSX104.ccr.corp.intel.com>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
- <1436184692-20927-4-git-send-email-eric.auger@linaro.org>
- <E959C4978C3B6342920538CF579893F0025F342B@SHSMSX104.ccr.corp.intel.com>
- <559BB167.1030603@redhat.com>
- <E959C4978C3B6342920538CF579893F0025F34FC@SHSMSX104.ccr.corp.intel.com>
- <559BB463.6090406@redhat.com>
- <E959C4978C3B6342920538CF579893F0025F3568@SHSMSX104.ccr.corp.intel.com>
- <559BB642.5010701@redhat.com>
- <E959C4978C3B6342920538CF579893F0025F35E1@SHSMSX104.ccr.corp.intel.com>
-Message-ID: <E959C4978C3B6342920538CF579893F0025F3645@SHSMSX104.ccr.corp.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Jul 2015 04:46:59 -0700
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20150707074626.GB12087@pali>
+References: <20141019090107.GA19132@amd> <20141028222123.GA17518@amd>
+ <20141028222641.GW2542@atomide.com> <201507061524.44999@pali>
+ <20150706135317.GH10705@atomide.com> <20150707074626.GB12087@pali>
+Message-ID: <20150707114658.GT10705@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Wu, Feng
-> Sent: Tuesday, July 07, 2015 7:24 PM
-> To: Paolo Bonzini; Eric Auger; eric.auger at st.com;
-> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
-> joro at 8bytes.org; b.reynal at virtualopensystems.com
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org; Wu, Feng
-> Subject: RE: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
-> control
+* Pali Roh?r <pali.rohar@gmail.com> [150707 00:48]:
+> On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
+> > * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
+> > > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
+> > > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
+> > > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
+> > > > > > 
+> > > > > > Networking now works against 3.17-based kernel. Thanks!
+> > > > > 
+> > > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify patch to
+> > > > > apply to 3.17, no changes needed for 3.18-rc1.)
+> > > > > 
+> > > > > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > > > 
+> > > > Whatever we decice to do to fix this regression, it should probably
+> > > > be backported to at least v3.16 stable for distro use, maybe earlier
+> > > > too. I'd assume this is broken on multiple platforms currently.
+> > > > 
+> > > it looks like this patch was not included into any kernel version... I'm 
+> > > still using it on top of 4.x kernels. Are you going to send this patch 
+> > > into upstream? Or do you have another fix for this problem?
+> > 
+> > I think Felipe mentioned a better built-in gether fix that's been
+> > reviewed on linux-usb list.
 > 
-> 
-> 
-> > -----Original Message-----
-> > From: Paolo Bonzini [mailto:pbonzini at redhat.com]
-> > Sent: Tuesday, July 07, 2015 7:22 PM
-> > To: Wu, Feng; Eric Auger; eric.auger at st.com;
-> > linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> > kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> > alex.williamson at redhat.com; avi.kivity at gmail.com; mtosatti at redhat.com;
-> > joro at 8bytes.org; b.reynal at virtualopensystems.com
-> > Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> > Subject: Re: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
-> > control
-> >
-> >
-> >
-> > On 07/07/2015 13:18, Wu, Feng wrote:
-> > > Then I still need assign prod and de-assign prod in
-> > > irq_bypass_register_consumer/irq_bypass_unregister_consumer, Right?
-> > > Would you please share why this is better.
-> >
-> > The need to store the consumer->producer link seems to be unique to
-> > posted interrupts.  It is difficult to say without seeing the PI code,
-> > but I prefer to keep the bypass manager as small as possible.
-> 
-> Fine. I will follow your suggestion!
+> Do you have link to that email thread? Or was Felipe's fix already
+> merged into mainline kernel?
 
-If using the following changes, how can we assign 'prod', we need to use
-container_of to get struct kvm_kernel_irqfd and then refer to 'prod', but
-we cannot do this in irq_bypass_register_consumer(), right? It is a
-common API. But we can only get the associated producer info inside
-bypass manager, right?
+Sorry I don't have a link, maybe Felipe can point you to the right
+patch.
 
-Thanks,
-Feng
+Regards,
 
-struct kvm_kernel_irqfd {
-
- 	......
-
- 	struct irq_bypass_consumer cons;
- 	struct irq_bypass_producer *prod;
-};
-
-
-> 
-> Thanks,
-> Feng
-> 
-> >
-> > Paolo
+Tony
