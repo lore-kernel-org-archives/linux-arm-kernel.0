@@ -1,30 +1,40 @@
-From: bintian.wang@huawei.com (Bintian)
-Date: Tue, 7 Jul 2015 16:47:33 +0800
-Subject: [PATCH] amba: Support clk parents and rates assigned in DT
-In-Reply-To: <559B15DE.7040200@codeaurora.org>
-References: <1432846332-17692-1-git-send-email-sboyd@codeaurora.org>
- <559B15DE.7040200@codeaurora.org>
-Message-ID: <559B9225.6090607@huawei.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 7 Jul 2015 10:58:07 +0200
+Subject: [RFC v2 3/6] irq: bypass: Extend skeleton for ARM forwarding
+ control
+In-Reply-To: <559B7B6C.3060900@linaro.org>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-4-git-send-email-eric.auger@linaro.org>
+ <559A7425.4050506@redhat.com> <559AA02A.6060703@linaro.org>
+ <559AA552.3010400@redhat.com> <559AB62C.9000503@linaro.org>
+ <559ABDC5.3060200@redhat.com> <559B7B6C.3060900@linaro.org>
+Message-ID: <559B949F.4070905@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
 
-Could you spend several minutes to review Stephen's patch?
 
-Thanks,
-
-Bintian
-
-On 2015/7/7 7:57, Stephen Boyd wrote:
-> On 05/28/2015 01:52 PM, Stephen Boyd wrote:
->> Add the call to of_clk_set_defaults() into the amba probe path so
->> that devices on the amba bus can use the assigned rates and
->> parents feature of the common clock framework.
+On 07/07/2015 09:10, Eric Auger wrote:
+> On 07/06/2015 07:41 PM, Paolo Bonzini wrote:
 >>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
+>>
+>> On 06/07/2015 19:09, Eric Auger wrote:
+>>>>> The good thing is that this helps a bit forming a lock hierarchy across
+>>>>> the subsystems, for example irq bypass mutex outside vfio_platform_irq
+>>>>> spinlock, because you cannot have a spinlock inside the mutex.  I think
+>>>>> that all of your six callbacks are fine.
+>>> arghh, no that's wrong then. I have plenty of them in the KVM/arm vgic
+>>> part :-(
+>>
+>> I checked and it's right...
+>>
+>> /me rereads
+>>
+>> AAAARGH.  You cannot have a mutex inside a spinlock.  What you're doing
+>> is fine.
 >
-> Shall I put this into the patch tracker? Turns out it wasn't needed for
-> the hisi stuff immediately.
->
+> Sweated up (+ heat wave in France).
+
+Same here, I also can blame the heat wave for the mistakes. :)
+
+Paolo
