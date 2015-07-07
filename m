@@ -1,56 +1,38 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 7 Jul 2015 11:09:50 +0800
-Subject: [PATCH] arm64: dts: mt8173-evb: Add PMIC support
-In-Reply-To: <1727643.5AqCaKisXT@ubix>
-References: <1434979177-7575-1-git-send-email-henryc.chen@mediatek.com>
- <1436168637.6986.6.camel@mtksdaap41> <1727643.5AqCaKisXT@ubix>
-Message-ID: <1436238590.19228.4.camel@mtksdaap41>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 7 Jul 2015 11:30:17 +0800
+Subject: [PATCH v2 4/9] iommu/arm-smmu: enlarge STRTAB_L1_SZ_SHIFT to support
+ larger sidsize
+In-Reply-To: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1436239822-14132-5-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-07-06 at 18:39 +0200, Matthias Brugger wrote:
-> On Monday, July 06, 2015 03:43:57 PM Eddie Huang wrote:
-> > On Mon, 2015-06-22 at 21:19 +0800, Henry Chen wrote:
-> > > From: Eddie Huang <eddie.huang@mediatek.com>
-> > > 
-[...]
-> > > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > > b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts index 43d5401..b967914
-> > > 100644
-> > > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > > @@ -33,6 +33,180 @@
-> > > 
-> > >  	chosen { };
-> > >  
-> > >  };
-> > > 
-> > > +&pwrap {
-> > > +	pmic: mt6397 {
-> > > +		compatible = "mediatek,mt6397";
-> > > +		interrupt-parent = <&pio>;
-> > > +		interrupts = <11 IRQ_TYPE_LEVEL_HIGH>;
-> > > +		interrupt-controller;
-> > > +		#interrupt-cells = <2>;
-> > > +
-> > > +		mt6397regulator: mt6397regulator {
-> > > +			compatible = "mediatek,mt6397-regulator";
-> > > +			mt6397_vpca15_reg: buck_vpca15 {
-> > > +				regulator-compatible = "buck_vpca15";
-> > > +				regulator-name = "vpca15";
-> > > +				regulator-min-microvolt = < 700000>;
-> > > +				regulator-max-microvolt = <1350000>;
-> > > +				regulator-ramp-delay = <12500>;
-> > > +				regulator-always-on;
-> > 
-> > I see you pull da9211 regulator dts patch, but not this one. How about
-> > this patch ?
-> 
-> I inserted some new-lines and added it to v4.2-next/arm64
-> 
-Thanks the pull. Normally we put alias node in alphabetical order, make
-later merge more easily. I think you can do the modification and squeeze
-into the same commit.
+Because we will choose the minimum value between STRTAB_L1_SZ_SHIFT and
+IDR1.SIDSIZE, so enlarge STRTAB_L1_SZ_SHIFT will not impact the platforms
+whose IDR1.SIDSIZE is smaller than old STRTAB_L1_SZ_SHIFT value.
 
-Thanks
-Eddie
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 0723034..4e7fd4e 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -199,9 +199,10 @@
+  * Stream table.
+  *
+  * Linear: Enough to cover 1 << IDR1.SIDSIZE entries
+- * 2lvl: 8k L1 entries, 256 lazy entries per table (each table covers a PCI bus)
++ * 2lvl: 128k L1 entries,
++ *       256 lazy entries per table (each table covers a PCI bus)
+  */
+-#define STRTAB_L1_SZ_SHIFT		16
++#define STRTAB_L1_SZ_SHIFT		20
+ #define STRTAB_SPLIT			8
+
+ #define STRTAB_L1_DESC_DWORDS		1
+--
+1.8.0
