@@ -1,39 +1,72 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 7 Jul 2015 17:53:45 +0300
-Subject: [PATCH 1/5] usb: gadget: ffs: call functionfs_unbind() if
- _ffs_func_bind() fails
-In-Reply-To: <1436277773-14274-2-git-send-email-r.baldyga@samsung.com>
-References: <1436277773-14274-1-git-send-email-r.baldyga@samsung.com>
- <1436277773-14274-2-git-send-email-r.baldyga@samsung.com>
-Message-ID: <20150707145345.GD4341@mwanda>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 7 Jul 2015 17:53:59 +0300
+Subject: [PATCH v2 5/5] i2c: davinci: use ICPFUNC to toggle I2C as gpio
+ for bus recovery
+In-Reply-To: <20150707141312.GC3411@katana>
+References: <1417010393-30598-1-git-send-email-grygorii.strashko@ti.com>
+ <1417010393-30598-6-git-send-email-grygorii.strashko@ti.com>
+ <20141126160407.GN4431@pengutronix.de> <5476085B.40009@ti.com>
+ <1436276269.3344.94.camel@pengutronix.de>
+ <20150707134852.GE9671@pengutronix.de> <20150707141312.GC3411@katana>
+Message-ID: <559BE807.2030802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 04:02:49PM +0200, Robert Baldyga wrote: 
-> diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-> index 6e7be91..966b214 100644
-> --- a/drivers/usb/gadget/function/f_fs.c
-> +++ b/drivers/usb/gadget/function/f_fs.c
-> @@ -2897,11 +2897,19 @@ static int ffs_func_bind(struct usb_configuration *c,
->  			 struct usb_function *f)
->  {
->  	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
-> +	struct ffs_function *func = ffs_func_from_usb(f);
-> +	int ret;
->  
->  	if (IS_ERR(ffs_opts))
->  		return PTR_ERR(ffs_opts);
->  
-> -	return _ffs_func_bind(c, f);
-> +	ret = _ffs_func_bind(c, f);
-> +	if (ret) {
-> +		ffs_opts->refcnt--;
+On 07/07/2015 05:13 PM, Wolfram Sang wrote:
+> On Tue, Jul 07, 2015 at 03:48:52PM +0200, Uwe Kleine-K?nig wrote:
 
-Wait, why are we decrementing here?  ffs_func_unbind() already has a
-decrement so this looks like a bug to me.  Add a comment if it's really
-needed.
+>> On Tue, Jul 07, 2015 at 03:37:49PM +0200, Jan L?bbe wrote:
+>>> On Mi, 2014-11-26 at 19:05 +0200, Grygorii Strashko wrote:
+>>>> On 11/26/2014 06:04 PM, Uwe Kleine-K?nig wrote:
+>>>>> On Wed, Nov 26, 2014 at 03:59:53PM +0200, Grygorii Strashko wrote:
+>>>>>> Having a board where the I2C bus locks up occasionally made it clear
+>>>>>> that the bus recovery in the i2c-davinci driver will only work on
+>>>>>> some boards, because on regular boards, this will only toggle GPIO
+>>>>>> lines that aren't muxed to the actual pins.
+>>>>>>
+>>>>>> The I2C controller on SoCs like da850 (and da830), Keystone 2 has the
+>>>>>> built-in capability to bit-bang its lines by using the ICPFUNC registers
+>>>>>> of the i2c controller.
+>>>>>> Implement the suggested procedure by toggling SCL and checking SDA using
+>>>>>> the ICPFUNC registers of the I2C controller when present. Allow platforms
+>>>>>> to indicate the presence of the ICPFUNC registers with a has_pfunc platform
+>>>>>> data flag and add optional DT property "ti,has-pfunc" to indicate
+>>>>>> the same in DT.
+>>>>> On what does it depend if this pfunc stuff works or not? Only the SoC,
+>>>>> or also on some board specific properties?
+>>>>
+>>>> SoC / set of SoCs. Also, similar feature is supported by OMAP and AM335x/AM437x SoCs
+>>>> using I2C_SYSTEST register.
+>>>>
+>>>>> Given the former using the
+>>>>> compatible string to detect its availability would be better. (In this
+>>>>> case also sorry, didn't consider this case when requesting the property
+>>>>> in the last round.)
+>>>
+>>> I only stumbled across this after it was merged, with the additional
+>> I also wonder how it came to the Reviewed-by tag for me. The last thing
+>> that I said about the patch was "On what does it depend if this pfunc
+>> stuff works or not? Only the SoC, or also on some board specific
+>> properties?" (see above) and "the patch looks ok". IMHO this hardly
+>> justifies to add the Reviewed-by tag for the next round. :-(
+> 
+> That needs to be discussed with Grygorii. I can't verify the correctness
+> of tags for every patch, although I do try to keep an eye on it...
+> 
 
-> +		functionfs_unbind(func->ffs);
+Regarding "the patch looks ok" - sincerely sorry!
+This is not the first time I've treated "looks good.." as Reviewed-by and I got no complaints before :(
+Will take it into account.
 
+
+Regarding technical comments:
+OK. Seems I missed smth. or understood wrongly.
+So, I'll say what's people usually saying here - Sorry for that :(
+But, to be honest I don't feel guilty, because:
+- v4 of these patches was merged finally
+- that v4 missed >2 kernel releases
+- you were added in "TO:" for all versions of these patches.
+
+-- 
 regards,
-dan carpenter
+-grygorii
