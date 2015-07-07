@@ -1,122 +1,126 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue,  7 Jul 2015 17:03:36 +0800
-Subject: [PATCH] drm/rockchip: use drm_gem_mmap helpers
-Message-ID: <1436259816-31090-1-git-send-email-djkurtz@chromium.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue, 07 Jul 2015 11:05:51 +0200
+Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
+In-Reply-To: <E959C4978C3B6342920538CF579893F0025F2A47@SHSMSX104.ccr.corp.intel.com>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+ <1436184692-20927-7-git-send-email-eric.auger@linaro.org>
+ <E959C4978C3B6342920538CF579893F0025F2A47@SHSMSX104.ccr.corp.intel.com>
+Message-ID: <559B966F.4010508@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than (incompletely [0]) re-implementing drm_gem_mmap() and
-drm_gem_mmap_obj() helpers, call them directly from the rockchip mmap
-routines.
+Hi Feng,
+On 07/07/2015 10:47 AM, Wu, Feng wrote:
+> 
+> 
+>> -----Original Message-----
+>> From: Eric Auger [mailto:eric.auger at linaro.org]
+>> Sent: Monday, July 06, 2015 8:12 PM
+>> To: eric.auger at st.com; eric.auger at linaro.org;
+>> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+>> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+>> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+>> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+>> b.reynal at virtualopensystems.com
+>> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+>> Subject: [RFC v2 6/6] KVM: eventfd: add irq bypass consumer management
+>>
+>> This patch adds the registration/unregistration of an
+>> irq_bypass_consumer on irqfd assignment/deassignment.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>>
+>> ---
+>>
+>> v1 -> v2:
+>> - populate of kvm and gsi removed
+>> - unregister the consumer on irqfd_shutdown
+>> ---
+>>  include/linux/kvm_irqfd.h |  1 +
+>>  virt/kvm/eventfd.c        | 14 +++++++++++---
+>>  2 files changed, 12 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/include/linux/kvm_irqfd.h b/include/linux/kvm_irqfd.h
+>> index f926b39..3c0bd07 100644
+>> --- a/include/linux/kvm_irqfd.h
+>> +++ b/include/linux/kvm_irqfd.h
+>> @@ -64,6 +64,7 @@ struct kvm_kernel_irqfd {
+>>  	struct list_head list;
+>>  	poll_table pt;
+>>  	struct work_struct shutdown;
+>> +	struct irq_bypass_consumer consumer;
+>>  };
+>>
+>>  #endif /* __LINUX_KVM_IRQFD_H */
+>> diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
+>> index b79dc61..9452754 100644
+>> --- a/virt/kvm/eventfd.c
+>> +++ b/virt/kvm/eventfd.c
+>> @@ -35,6 +35,7 @@
+>>  #include <linux/srcu.h>
+>>  #include <linux/slab.h>
+>>  #include <linux/seqlock.h>
+>> +#include <linux/irqbypass.h>
+>>  #include <trace/events/kvm.h>
+>>
+>>  #include <kvm/iodev.h>
+>> @@ -140,6 +141,7 @@ irqfd_shutdown(struct work_struct *work)
+>>  	/*
+>>  	 * It is now safe to release the object's resources
+>>  	 */
+>> +	irq_bypass_unregister_consumer(&irqfd->consumer);
+>>  	eventfd_ctx_put(irqfd->eventfd);
+>>  	kfree(irqfd);
+>>  }
+>> @@ -380,7 +382,14 @@ kvm_irqfd_assign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  	 */
+>>  	fdput(f);
+>>
+>> -	/* irq_bypass_register_consumer(); */
+>> +	irqfd->consumer.token = (void *)irqfd->eventfd;
+>> +	irqfd->consumer.add_producer = kvm_arch_irq_bypass_add_producer;
+>> +	irqfd->consumer.del_producer = kvm_arch_irq_bypass_del_producer;
+>> +	irqfd->consumer.stop = kvm_arch_irq_bypass_stop;
+>> +	irqfd->consumer.resume = kvm_arch_irq_bypass_resume;
+>> +	irqfd->consumer.update = kvm_arch_irq_bypass_update;
+>> +	ret = irq_bypass_register_consumer(&irqfd->consumer);
+>> +	WARN_ON(ret);
+>>
+>>  	return 0;
+>>
+>> @@ -481,8 +490,6 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  	struct kvm_kernel_irqfd *irqfd, *tmp;
+>>  	struct eventfd_ctx *eventfd;
+>>
+>> -	/* irq_bypass_unregister_consumer() */
+>> -
+>>  	eventfd = eventfd_ctx_fdget(args->fd);
+>>  	if (IS_ERR(eventfd))
+>>  		return PTR_ERR(eventfd);
+>> @@ -501,6 +508,7 @@ kvm_irqfd_deassign(struct kvm *kvm, struct kvm_irqfd
+>> *args)
+>>  			irqfd->irq_entry.type = 0;
+>>  			write_seqcount_end(&irqfd->irq_entry_sc);
+>>  			irqfd_deactivate(irqfd);
+>> +			irq_bypass_unregister_consumer(&irqfd->consumer);
+> 
+> consumer is unregistered in irqfd_shutdown(), why need we do it here?
+Yes you're right, this is not needed anymore. Did things too hastily :-(
 
-Once the core functions return successfully, the rockchip mmap routines
-can still use dma_mmap_attrs() to simply mmap the entire buffer.
+Otherwise does that isolated series fit your needs for posted interrupts
+and match your expectations with regards to split/reusability?
 
-[0] Previously, we were performing the mmap() without first taking a
-reference on the underlying gem buffer.  This could leak ptes if the gem
-object is destroyed while userspace is still holding the mapping.
+Eric
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Reviewed-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-Cc: stable at vger.kernel.org
-
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 67 +++++++++++++++--------------
- 1 file changed, 34 insertions(+), 33 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index eb2282c..eba5f8a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -54,55 +54,56 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
- 		       &rk_obj->dma_attrs);
- }
- 
--int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
--			  struct vm_area_struct *vma)
-+static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
-+					struct vm_area_struct *vma)
-+
- {
-+	int ret;
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
- 	struct drm_device *drm = obj->dev;
--	unsigned long vm_size;
- 
--	vma->vm_flags |= VM_IO | VM_DONTEXPAND | VM_DONTDUMP;
--	vm_size = vma->vm_end - vma->vm_start;
--
--	if (vm_size > obj->size)
--		return -EINVAL;
-+	/*
-+	 * dma_alloc_attrs() allocated a struct page table for rk_obj, so clear
-+	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
-+	 */
-+	vma->vm_flags &= ~VM_PFNMAP;
- 
--	return dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
-+	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
- 			     obj->size, &rk_obj->dma_attrs);
-+	if (ret)
-+		drm_gem_vm_close(vma);
-+
-+	return ret;
- }
- 
--/* drm driver mmap file operations */
--int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
-+int rockchip_gem_mmap_buf(struct drm_gem_object *obj,
-+			  struct vm_area_struct *vma)
- {
--	struct drm_file *priv = filp->private_data;
--	struct drm_device *dev = priv->minor->dev;
--	struct drm_gem_object *obj;
--	struct drm_vma_offset_node *node;
-+	struct drm_device *drm = obj->dev;
- 	int ret;
- 
--	if (drm_device_is_unplugged(dev))
--		return -ENODEV;
-+	mutex_lock(&drm->struct_mutex);
-+	ret = drm_gem_mmap_obj(obj, obj->size, vma);
-+	mutex_unlock(&drm->struct_mutex);
-+	if (ret)
-+		return ret;
- 
--	mutex_lock(&dev->struct_mutex);
-+	return rockchip_drm_gem_object_mmap(obj, vma);
-+}
- 
--	node = drm_vma_offset_exact_lookup(dev->vma_offset_manager,
--					   vma->vm_pgoff,
--					   vma_pages(vma));
--	if (!node) {
--		mutex_unlock(&dev->struct_mutex);
--		DRM_ERROR("failed to find vma node.\n");
--		return -EINVAL;
--	} else if (!drm_vma_node_is_allowed(node, filp)) {
--		mutex_unlock(&dev->struct_mutex);
--		return -EACCES;
--	}
-+/* drm driver mmap file operations */
-+int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
-+{
-+	struct drm_gem_object *obj;
-+	int ret;
- 
--	obj = container_of(node, struct drm_gem_object, vma_node);
--	ret = rockchip_gem_mmap_buf(obj, vma);
-+	ret = drm_gem_mmap(filp, vma);
-+	if (ret)
-+		return ret;
- 
--	mutex_unlock(&dev->struct_mutex);
-+	obj = vma->vm_private_data;
- 
--	return ret;
-+	return rockchip_drm_gem_object_mmap(obj, vma);
- }
- 
- struct rockchip_gem_object *
--- 
-2.4.3.573.g4eafbef
+> 
+> Thanks,
+> Feng
+> 
+>>  		}
+>>  	}
+>>
+>> --
+>> 1.9.1
+> 
