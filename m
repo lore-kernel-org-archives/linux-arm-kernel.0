@@ -1,58 +1,132 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Jul 2015 19:19:41 +0100
-Subject: [PATCH 2/9] locking/qrwlock: avoid redundant atomic_add_return
- on read_lock_slowpath
-In-Reply-To: <559C11BA.1070309@hp.com>
-References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
- <1436289865-2331-3-git-send-email-will.deacon@arm.com>
- <559C11BA.1070309@hp.com>
-Message-ID: <20150707181941.GL23879@arm.com>
+Date: Tue,  7 Jul 2015 19:21:35 +0100
+Subject: [PATCH] arm64: lib: use pair accessors for copy_*_user routines
+Message-ID: <1436293295-4353-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 06:51:54PM +0100, Waiman Long wrote:
-> On 07/07/2015 01:24 PM, Will Deacon wrote:
-> > When a slow-path reader gets to the front of the wait queue outside of
-> > interrupt context, it waits for any writers to drain, increments the
-> > reader count and again waits for any additional writers that may have
-> > snuck in between the initial check and the increment.
-> >
-> > Given that this second check is performed with acquire semantics, there
-> > is no need to perform the increment using atomic_add_return, which acts
-> > as a full barrier.
-> >
-> > This patch changes the slow-path code to use smp_load_acquire and
-> > atomic_add instead of atomic_add_return. Since the check only involves
-> > the writer count, we can perform the acquire after the add.
-> >
-> > Signed-off-by: Will Deacon<will.deacon@arm.com>
-> > ---
-> >   kernel/locking/qrwlock.c | 3 ++-
-> >   1 file changed, 2 insertions(+), 1 deletion(-)
-> >
-> > diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-> > index 96b77d1e0545..4e29bef688ac 100644
-> > --- a/kernel/locking/qrwlock.c
-> > +++ b/kernel/locking/qrwlock.c
-> > @@ -98,7 +98,8 @@ void queued_read_lock_slowpath(struct qrwlock *lock, u32 cnts)
-> >   	while (atomic_read(&lock->cnts)&  _QW_WMASK)
-> >   		cpu_relax_lowlatency();
-> >
-> > -	cnts = atomic_add_return(_QR_BIAS,&lock->cnts) - _QR_BIAS;
-> > +	atomic_add(_QR_BIAS,&lock->cnts);
-> > +	cnts = smp_load_acquire((u32 *)&lock->cnts);
-> >   	rspin_until_writer_unlock(lock, cnts);
-> >
-> >   	/*
-> 
-> Atomic add in x86 is actually a full barrier too. The performance 
-> difference between "lock add" and "lock xadd" should be minor. The 
-> additional load, however, could potentially cause an additional 
-> cacheline load on a contended lock. So do you see actual performance 
-> benefit of this change in ARM?
+The AArch64 instruction set contains load/store pair memory accessors,
+so use these in our copy_*_user routines to transfer 16 bytes per
+iteration.
 
-I'd need to re-run the numbers, but atomic_add is significantly less
-work on ARM than atomic_add_return, which basically has two full memory
-barriers compared to none for the former.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/lib/copy_from_user.S | 17 +++++++++++------
+ arch/arm64/lib/copy_in_user.S   | 17 +++++++++++------
+ arch/arm64/lib/copy_to_user.S   | 17 +++++++++++------
+ 3 files changed, 33 insertions(+), 18 deletions(-)
 
-Will
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 5e27add9d362..47c3fa5ae4ae 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -28,14 +28,19 @@
+  *	x0 - bytes not copied
+  */
+ ENTRY(__copy_from_user)
+-	add	x4, x1, x2			// upper user buffer boundary
+-	subs	x2, x2, #8
++	add	x5, x1, x2			// upper user buffer boundary
++	subs	x2, x2, #16
++	b.mi	1f
++0:
++USER(9f, ldp	x3, x4, [x1], #16)
++	subs	x2, x2, #16
++	stp	x3, x4, [x0], #16
++	b.pl	0b
++1:	adds	x2, x2, #8
+ 	b.mi	2f
+-1:
+ USER(9f, ldr	x3, [x1], #8	)
+-	subs	x2, x2, #8
++	sub	x2, x2, #8
+ 	str	x3, [x0], #8
+-	b.pl	1b
+ 2:	adds	x2, x2, #4
+ 	b.mi	3f
+ USER(9f, ldr	w3, [x1], #4	)
+@@ -56,7 +61,7 @@ ENDPROC(__copy_from_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
+-9:	sub	x2, x4, x1
++9:	sub	x2, x5, x1
+ 	mov	x3, x2
+ 10:	strb	wzr, [x0], #1			// zero remaining buffer space
+ 	subs	x3, x3, #1
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+index 84b6c9bb9b93..436bcc5d77b5 100644
+--- a/arch/arm64/lib/copy_in_user.S
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -30,14 +30,19 @@
+  *	x0 - bytes not copied
+  */
+ ENTRY(__copy_in_user)
+-	add	x4, x0, x2			// upper user buffer boundary
+-	subs	x2, x2, #8
++	add	x5, x0, x2			// upper user buffer boundary
++	subs	x2, x2, #16
++	b.mi	1f
++0:
++USER(9f, ldp	x3, x4, [x1], #16)
++	subs	x2, x2, #16
++USER(9f, stp	x3, x4, [x0], #16)
++	b.pl	0b
++1:	adds	x2, x2, #8
+ 	b.mi	2f
+-1:
+ USER(9f, ldr	x3, [x1], #8	)
+-	subs	x2, x2, #8
++	sub	x2, x2, #8
+ USER(9f, str	x3, [x0], #8	)
+-	b.pl	1b
+ 2:	adds	x2, x2, #4
+ 	b.mi	3f
+ USER(9f, ldr	w3, [x1], #4	)
+@@ -58,6 +63,6 @@ ENDPROC(__copy_in_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
+-9:	sub	x0, x4, x0			// bytes not copied
++9:	sub	x0, x5, x0			// bytes not copied
+ 	ret
+ 	.previous
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index a0aeeb9b7a28..f5e1f526f408 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -28,14 +28,19 @@
+  *	x0 - bytes not copied
+  */
+ ENTRY(__copy_to_user)
+-	add	x4, x0, x2			// upper user buffer boundary
+-	subs	x2, x2, #8
++	add	x5, x0, x2			// upper user buffer boundary
++	subs	x2, x2, #16
++	b.mi	1f
++0:
++	ldp	x3, x4, [x1], #16
++	subs	x2, x2, #16
++USER(9f, stp	x3, x4, [x0], #16)
++	b.pl	0b
++1:	adds	x2, x2, #8
+ 	b.mi	2f
+-1:
+ 	ldr	x3, [x1], #8
+-	subs	x2, x2, #8
++	sub	x2, x2, #8
+ USER(9f, str	x3, [x0], #8	)
+-	b.pl	1b
+ 2:	adds	x2, x2, #4
+ 	b.mi	3f
+ 	ldr	w3, [x1], #4
+@@ -56,6 +61,6 @@ ENDPROC(__copy_to_user)
+ 
+ 	.section .fixup,"ax"
+ 	.align	2
+-9:	sub	x0, x4, x0			// bytes not copied
++9:	sub	x0, x5, x0			// bytes not copied
+ 	ret
+ 	.previous
+-- 
+2.1.4
