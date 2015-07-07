@@ -1,128 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jul 2015 18:18:03 +0100
-Subject: [PATCH v3 13/15] irqchip: gicv3-its: Make the PCI/MSI code standalone
-In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436289485-28230-14-git-send-email-marc.zyngier@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  7 Jul 2015 18:24:16 +0100
+Subject: [PATCH 0/9] locking/qrwlock: get qrwlocks up and running on arm64
+Message-ID: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can now lookup the base ITS domain, making it possible to
-initialize the PCI/MSI code independently from the main ITS
-subsystem.
+Hi all,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its-pci-msi.c | 36 +++++++++++++++++++++++++++++---
- drivers/irqchip/irq-gic-v3-its.c         | 14 +------------
- include/linux/irqchip/arm-gic-v3.h       |  3 ---
- 3 files changed, 34 insertions(+), 19 deletions(-)
+This patch series gently massages the qrwlock code so as to make it
+usable on arm64 as a replacement for our current implementation. The
+last two patches actually do the arch conversion and are included here
+for reference.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index 7614721..4de130ac 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -98,8 +98,38 @@ static struct msi_domain_info its_pci_msi_domain_info = {
- 	.chip	= &its_msi_irq_chip,
- };
- 
--struct irq_domain *its_pci_msi_alloc_domain(struct device_node *np,
--					    struct irq_domain *parent)
-+static struct of_device_id its_device_id[] = {
-+	{	.compatible	= "arm,gic-v3-its",	},
-+	{},
-+};
-+
-+static int __init its_pci_msi_init(void)
- {
--	return pci_msi_create_irq_domain(np, &its_pci_msi_domain_info, parent);
-+	struct device_node *np;
-+	struct irq_domain *parent;
-+
-+	for (np = of_find_matching_node(NULL, its_device_id); np;
-+	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_property_read_bool(np, "msi-controller"))
-+			continue;
-+
-+		parent = irq_find_matching_host(np, DOMAIN_BUS_PLATFORM_MSI);
-+		if (!parent) {
-+			pr_err("%s: unable to locate ITS domain\n",
-+			       np->full_name);
-+			continue;
-+		}
-+
-+		if (!pci_msi_create_irq_domain(np, &its_pci_msi_domain_info,
-+					       parent)) {
-+			pr_err("%s: unable to create PCI domain\n",
-+			       np->full_name);
-+			continue;
-+		}
-+
-+		pr_info("PCI/MSI: %s domain created\n", np->full_name);
-+	}
-+
-+	return 0;
- }
-+subsys_initcall(its_pci_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index c0b574e..49020da 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -60,7 +60,6 @@ struct its_collection {
- struct its_node {
- 	raw_spinlock_t		lock;
- 	struct list_head	entry;
--	struct irq_domain	*domain;
- 	void __iomem		*base;
- 	unsigned long		phys_base;
- 	struct its_cmd_block	*cmd_base;
-@@ -1316,7 +1315,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 	struct resource res;
- 	struct its_node *its;
- 	void __iomem *its_base;
--	struct irq_domain *inner_domain = NULL;
-+	struct irq_domain *inner_domain;
- 	u32 val;
- 	u64 baser, tmp;
- 	int err;
-@@ -1414,12 +1413,6 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 
- 		inner_domain->parent = parent;
- 		inner_domain->bus_token = DOMAIN_BUS_PLATFORM_MSI;
--
--		its->domain = its_pci_msi_alloc_domain(node, inner_domain);
--		if (!its->domain) {
--			err = -ENOMEM;
--			goto out_free_domains;
--		}
- 	}
- 
- 	spin_lock(&its_lock);
-@@ -1428,11 +1421,6 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
- 
- 	return 0;
- 
--out_free_domains:
--	if (its->domain)
--		irq_domain_remove(its->domain);
--	if (inner_domain)
--		irq_domain_remove(inner_domain);
- out_free_tables:
- 	its_free_tables(its);
- out_free_cmd:
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index d6149ba..01caef8 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -392,9 +392,6 @@ int its_init(struct device_node *node, struct rdists *rdists,
- int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
- 		    int nvec, msi_alloc_info_t *info);
- 
--struct irq_domain *its_pci_msi_alloc_domain(struct device_node *node,
--					    struct irq_domain *parent);
--
- #endif
- 
- #endif
+Most of the work is removing redundant memory barriers from the current
+implementation and adding hooks to the contended paths to allow us to
+avoid busy-waiting.
+
+Implemented on top of -tip (i.e. the patches queued there from Waiman),
+but this is likely to conflict with his latest series.
+
+All feedback welcome,
+
+Will
+
+--->8
+
+Will Deacon (9):
+  locking/qrwlock: include <linux/spinlock.h> for
+    arch_spin_{lock,unlock}
+  locking/qrwlock: avoid redundant atomic_add_return on
+    read_lock_slowpath
+  locking/qrwlock: tidy up rspin_until_writer_unlock
+  locking/qrwlock: implement queue_write_unlock using smp_store_release
+  locking/qrwlock: remove redundant cmpxchg barriers on writer slow-path
+  locking/qrwlock: allow architectures to hook in to contended paths
+  locking/qrwlock: expose internal lock structure in qrwlock definition
+  arm64: cmpxchg: implement cmpxchg_relaxed
+  arm64: locking: replace read/write locks with generic qrwlock code
+
+ arch/arm64/Kconfig                      |   1 +
+ arch/arm64/include/asm/cmpxchg.h        |   6 +-
+ arch/arm64/include/asm/qrwlock.h        |  30 ++++++++
+ arch/arm64/include/asm/spinlock.h       | 122 +-------------------------------
+ arch/arm64/include/asm/spinlock_types.h |  10 +--
+ arch/x86/include/asm/qrwlock.h          |  10 ---
+ include/asm-generic/qrwlock.h           |  11 ++-
+ include/asm-generic/qrwlock_types.h     |  17 ++++-
+ kernel/locking/qrwlock.c                |  60 +++++++---------
+ 9 files changed, 81 insertions(+), 186 deletions(-)
+ create mode 100644 arch/arm64/include/asm/qrwlock.h
+
 -- 
 2.1.4
