@@ -1,81 +1,97 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Tue,  7 Jul 2015 17:08:27 +0200
-Subject: [PATCH v2 4/4] mtd: pxa3xx_nand: clean up the pxa3xx timings
-In-Reply-To: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1436281707-20106-5-git-send-email-antoine.tenart@free-electrons.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 7 Jul 2015 23:10:37 +0800
+Subject: [PATCH] arm64: dts: mt8173: add clock_null
+In-Reply-To: <20150707143621.GW18700@pengutronix.de>
+References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
+ <20150707130732.GD18561@pengutronix.de>
+ <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
+ <20150707143621.GW18700@pengutronix.de>
+Message-ID: <CAGS+omChOC-EYsmA5ytT+ho0UXvcL1-mjK4Z8=EgboKzwWmtyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the previous modifications, lots of pxa3xx specific definitions can
-be removed.
+On Tue, Jul 7, 2015 at 10:36 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> On Tue, Jul 07, 2015 at 10:15:29PM +0800, Daniel Kurtz wrote:
+>> On Tue, Jul 7, 2015 at 9:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+>> > On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
+>> >> Add clk_null, which represents clocks that can not / need not
+>> >> controlled by software.
+>> >> There are many clocks' parent set to clk_null.
+>> >>
+>> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>> >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+>> >> ---
+>> >> Base on 4.1-rc1
+>> >>
+>> >> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
+>> >> ---
+>> >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
+>> >>  1 file changed, 6 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> >> index 924fdb6..4798f44 100644
+>> >> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> >> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> >> @@ -81,6 +81,12 @@
+>> >>               cpu_on        = <0x84000003>;
+>> >>       };
+>> >>
+>> >> +     clk_null: clk_null {
+>> >> +             compatible = "fixed-clock";
+>> >> +             clock-frequency = <0>;
+>> >> +             #clock-cells = <0>;
+>> >> +     };
+>> >
+>> > The discussion around this patch shows that we don't want to have this
+>> > clock in the device tree as it is not a hardware description.
+>> >
+>> > Ok, fine. Eddie, you told us that the rate of the current clk_null children
+>> > is not interesting. What's the motivation to send this patch anyway
+>> > then? Why can't you keep its children on the orphan list where they are
+>> > already now?
+>> >
+>> > Another possibility would be to instantiate the clk_null clock from C
+>> > code rather than from the device tree. This way we wouldn't put any
+>> > wrong descriptions into the device tree and still can implement the
+>> > support for the real parent clocks when we actually need them.
+>>
+>> Some device nodes, like mmc, use a clk_null phandle as one of their clocks:
+>>
+>> mmc1: mmc at 11240000 {
+>>         compatible = "mediatek,mt8173-mmc",
+>>                      "mediatek,mt8135-mmc";
+>>         reg = <0 0x11240000 0 0x1000>;
+>>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
+>>         clocks = <&pericfg CLK_PERI_MSDC30_1>,
+>>                  <&clk_null>;
+>>         clock-names = "source", "hclk";
+>>         status = "disabled";
+>> };
+>
+> This is another case than the one we discussed about. In the case above
+> I motivated using a dummy clock since the clock exists in the system,
+> but is not software controllable. To abstract this from the driver
+> (which needs this clock since it exists) we here have the dummy clock.
+> However, of course I can't prove the clock is indeed not software
+> controllable; that's only the information I have.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- drivers/mtd/nand/pxa3xx_nand.c                | 20 ++++++++------------
- include/linux/platform_data/mtd-nand-pxa3xx.h | 11 +++--------
- 2 files changed, 11 insertions(+), 20 deletions(-)
+I was trying to answer your question "What's the motivation to send
+this patch anyway?".
+The motivation is to send follow on patches that use the clk_null
+phandle.  We need to provide some clock as the mmc1's hclk.  I do not
+understand why this has to be "clk_null", though.  It seems like this
+should be a real clock coming from one of the real clock_controller
+nodes.  After all, the mmc driver is going to be enabling/disabling
+this clock for power savings at runtime.  What does that even mean for
+clk_null ?
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index 513f8f6069f0..0e1db91b386c 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -252,15 +252,14 @@ static struct pxa3xx_nand_timing timing[] = {
- };
- 
- static struct pxa3xx_nand_flash builtin_flash_types[] = {
--{ "DEFAULT FLASH",      0,   0, 2048,  8,  8,    0, &timing[0] },
--{ "64MiB 16-bit",  0x46ec,  32,  512, 16, 16, 4096, &timing[1] },
--{ "256MiB 8-bit",  0xdaec,  64, 2048,  8,  8, 2048, &timing[1] },
--{ "4GiB 8-bit",    0xd7ec, 128, 4096,  8,  8, 8192, &timing[1] },
--{ "128MiB 8-bit",  0xa12c,  64, 2048,  8,  8, 1024, &timing[2] },
--{ "128MiB 16-bit", 0xb12c,  64, 2048, 16, 16, 1024, &timing[2] },
--{ "512MiB 8-bit",  0xdc2c,  64, 2048,  8,  8, 4096, &timing[2] },
--{ "512MiB 16-bit", 0xcc2c,  64, 2048, 16, 16, 4096, &timing[2] },
--{ "256MiB 16-bit", 0xba20,  64, 2048, 16, 16, 2048, &timing[3] },
-+	{ 0x46ec, 16, 16, &timing[1] },
-+	{ 0xdaec,  8,  8, &timing[1] },
-+	{ 0xd7ec,  8,  8, &timing[1] },
-+	{ 0xa12c,  8,  8, &timing[2] },
-+	{ 0xb12c, 16, 16, &timing[2] },
-+	{ 0xdc2c,  8,  8, &timing[2] },
-+	{ 0xcc2c, 16, 16, &timing[2] },
-+	{ 0xba20, 16, 16, &timing[3] },
- };
- 
- static u8 bbt_pattern[] = {'M', 'V', 'B', 'b', 't', '0' };
-@@ -321,9 +320,6 @@ static struct nand_ecclayout ecc_layout_4KB_bch8bit = {
- 	.oobfree = { }
- };
- 
--/* Define a default flash type setting serve as flash detecting only */
--#define DEFAULT_FLASH_TYPE (&builtin_flash_types[0])
--
- #define NDTR0_tCH(c)	(min((c), 7) << 19)
- #define NDTR0_tCS(c)	(min((c), 7) << 16)
- #define NDTR0_tWH(c)	(min((c), 7) << 11)
-diff --git a/include/linux/platform_data/mtd-nand-pxa3xx.h b/include/linux/platform_data/mtd-nand-pxa3xx.h
-index ac4ea2e641c7..25538cfeee26 100644
---- a/include/linux/platform_data/mtd-nand-pxa3xx.h
-+++ b/include/linux/platform_data/mtd-nand-pxa3xx.h
-@@ -17,15 +17,10 @@ struct pxa3xx_nand_timing {
- };
- 
- struct pxa3xx_nand_flash {
--	char		*name;
- 	uint32_t	chip_id;
--	unsigned int	page_per_block; /* Pages per block (PG_PER_BLK) */
--	unsigned int	page_size;	/* Page size in bytes (PAGE_SZ) */
--	unsigned int	flash_width;	/* Width of Flash memory (DWIDTH_M) */
--	unsigned int	dfc_width;	/* Width of flash controller(DWIDTH_C) */
--	unsigned int	num_blocks;	/* Number of physical blocks in Flash */
--
--	struct pxa3xx_nand_timing *timing;	/* NAND Flash timing */
-+	unsigned int	flash_width;    /* Width of Flash memory (DWIDTH_M) */
-+	unsigned int	dfc_width;      /* Width of flash controller(DWIDTH_C) */
-+	struct pxa3xx_nand_timing *timing; /* NAND Flash timing */
- };
- 
- /*
--- 
-2.4.5
+Sorry, I'm not exactly sure what you are saying in your last reply.
+
+>
+> Sascha
+>
+> --
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
