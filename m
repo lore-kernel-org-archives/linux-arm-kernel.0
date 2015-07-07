@@ -1,58 +1,57 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 7 Jul 2015 15:38:14 +0800
-Subject: [PATCH 0/2] arm: berlin: add cpu hotplug support
-In-Reply-To: <559B7FA2.4080005@gmail.com>
-References: <1436253035-371-1-git-send-email-jszhang@marvell.com>
- <559B7FA2.4080005@gmail.com>
-Message-ID: <20150707153814.72a8ec8f@xhacker>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Tue, 7 Jul 2015 09:40:05 +0200
+Subject: RFC: default ioremap_*() variant defintions
+In-Reply-To: <CAPcyv4jqsB+K5EsYqi1jssWqZV-55Q_Xz=beHXZPL0T6VvpawQ@mail.gmail.com>
+References: <20150703181709.GD7021@wotan.suse.de>
+ <CAPcyv4jqsB+K5EsYqi1jssWqZV-55Q_Xz=beHXZPL0T6VvpawQ@mail.gmail.com>
+Message-ID: <20150707074005.GN7021@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
-
-On Tue, 07 Jul 2015 09:28:34 +0200
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-
-> On 07/07/2015 09:10 AM, Jisheng Zhang wrote:
-> > These patches try to add cpu hotplug support for Marvell BG2, BG2Q SoCs.
-> > These SoCs can't power off cpu independently, but we still want cpu hotplug
-> > support for them. However, we need to address "CPU still sat on kernel text"
-> > as pointed out by Mark Rutland[1]. We achieved this by putting the dying CPU
-> > in WFI state after the coherency is disabled, then asserting the dying CPU
-> > reset bit to put the CPU in reset state.
+On Sat, Jul 04, 2015 at 06:54:40AM -0700, Dan Williams wrote:
+> On Fri, Jul 3, 2015 at 11:17 AM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
+> > I have no idea why its not picking up asm-generic ioremap_uc() for x86,
 > 
-> Jisheng,
+> x86 does not use "include/asm-generic/io.h".  That's a helper-include
+> for archs that want to use it, but it's incomplete, see the patch
+> referenced below...
+
+Ah it includes iomap.h not io.h odd...
+
+> > although this is the right thing to do the guard should not work as we never
+> > define ioremap_uc() as a macro but we do as an exported symbol. The way
+> > archs do their ioremap calls is they define externs and then they include
+> > asm-generic to pick up the things they don't define. In the extern calls
+> > for ioremap_uc() we never add a define there. Adding a simple one line
+> > #define right after the extern declaration to itself should suffice to
+> > fix paranoia but curious why this does work as-is right now.
+> >
+> > I'd like review and consensus from other architecture folks if this is
+> > the Right Thing To Do (TM) and if it is decide how we want to fix this.
+> > For instance my preference would be to just add this fix as-is after
+> > we've figured out the guard thing above, and then define these variants
+> > in the documentation on the asm-generic file as safe to not have, and
+> > safe to map to the default ioremap call. If you don't have a safe call
+> > like this we should set out different expectations, for instance having
+> > it depend on Kconfig symbol and then drivers depend on it, archs then
+> > implement the symbols and can HAVE_ARCH_FOO. If everyone agrees with
+> > this then there is quite a bit of cleanup possible as tons of archs do
+> > tons of their own variant mapping definitions.
 > 
-> thanks for the patches! Out of curiosity, did you measure overall SoC 
-> power consumption with WFI and with reset respectively? I'd expect a
-> slightly _higher_ power consumption while in reset depending on clock
-> gating applied to the processor hardware.
-
-Thank you for your review.
-You are right. The cpu in reset state consumes a bit higher power than in WFI.
-But seems we have no choice for BG2\BG2Q.
-
-For newer Berlin SoCs than BG2Q, we support cpu power off and we'll walk through
-the PSCI code path.
-
-Thanks,
-Jisheng
-
+> We're also discussing this issue in the patch here:
 > 
-> Sebastian
+> https://lkml.org/lkml/2015/6/22/98
+> "[PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases":
+
+Great, you've done all the exact work I expected we needed to do ;)
+
+> Russell mentioned wanting to fix up ioremap_wt() for ARM [1], after
+> which I would look to re-spin this patch with the interface proposed
+> by Christoph [2].
 > 
-> > patch1 use non-self-cleared control register to reset cpu. This is to prepare
-> > for the next cpu hotplug commit.
-> >
-> > patch2 adds the cpu hotplug support finally.
-> >
-> >
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/342642.html
-> >
-> > Jisheng Zhang (2):
-> >    arm: berlin: use non-self-cleared reset register to reset cpu
-> >    arm: berlin: add CPU hotplug support
-> >
-> >   arch/arm/mach-berlin/platsmp.c | 29 ++++++++++++++++++++++++++++-
-> >   1 file changed, 28 insertions(+), 1 deletion(-)
-> >
+> [1]: https://lkml.org/lkml/2015/7/1/125
+> [2]: https://lkml.org/lkml/2015/6/22/391
+
+OK thanks I guess I'll jump in there as I have some feedback.
+
+  Luis
