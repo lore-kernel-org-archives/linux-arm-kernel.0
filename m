@@ -1,73 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 7 Jul 2015 03:11:20 -0500
-Subject: [PATCH] base: power: wakeirq: don't leak dev->power.wakeirq
-In-Reply-To: <20150707074053.GO10705@atomide.com>
-References: <1436205678-31640-1-git-send-email-balbi@ti.com>
- <2783932.o7RC7vMDHB@vostro.rjw.lan>
- <20150707074053.GO10705@atomide.com>
-Message-ID: <20150707081120.GA15545@saruman.tx.rr.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 7 Jul 2015 10:13:08 +0200
+Subject: [PATCH 12/13] KVM: arm64: implement MSI injection in ITS emulation
+In-Reply-To: <559AB0ED.1090405@arm.com>
+References: <1432893209-27313-1-git-send-email-andre.przywara@arm.com>
+ <1432893209-27313-13-git-send-email-andre.przywara@arm.com>
+ <5579C8AA.8010903@linaro.org> <559AB0ED.1090405@arm.com>
+Message-ID: <20150707081308.GB13530@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 12:40:53AM -0700, Tony Lindgren wrote:
-> * Rafael J. Wysocki <rjw@rjwysocki.net> [150706 15:49]:
-> > On Monday, July 06, 2015 01:01:18 PM Felipe Balbi wrote:
-> > > on a first call to dev_pm_attach_wake_irq(), if it
-> > > fails, it will leave dev->power.wakeirq set to a
-> > > dangling pointer. Instead, let's clear it to make
-> > > sure a subsequent call to dev_pm_attach_wake_irq()
-> > > has chance to succeed.
-> > > 
-> > > Cc: Tony Lindgren <tmlind@atomide.com>
-> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
-> > > ---
-> > >  drivers/base/power/wakeirq.c | 9 ++++++++-
-> > >  1 file changed, 8 insertions(+), 1 deletion(-)
-> > > 
-> > > diff --git a/drivers/base/power/wakeirq.c b/drivers/base/power/wakeirq.c
-> > > index 7470004ca810..394d250a1ad8 100644
-> > > --- a/drivers/base/power/wakeirq.c
-> > > +++ b/drivers/base/power/wakeirq.c
-> > > @@ -50,9 +50,16 @@ static int dev_pm_attach_wake_irq(struct device *dev, int irq,
-> > >  
-> > >  	err = device_wakeup_attach_irq(dev, wirq);
-> > >  	if (err)
-> > > -		return err;
-> > > +		goto err_cleanup;
-> > >  
-> > >  	return 0;
-> > > +
-> > > +err_cleanup:
-> > > +	spin_lock_irqsave(&dev->power.lock, flags);
-> > > +	dev->power.wakeirq = NULL;
-> > > +	spin_unlock_irqrestore(&dev->power.lock, flags);
-> > > +
-> > > +	return err;
-> > >  }
-> > 
-> > Too many labels for me and the fact that acquiring of the lock again in the error
-> > patch doesn't look good.
-> > 
-> > However, we can do the entire device_wakeup_attach_irq() under the lock (after
-> > removing the locking from it), because we're its only caller.
-> > 
-> > So what about the below instead (build-tested only)?
+On Mon, Jul 06, 2015 at 05:46:37PM +0100, Andre Przywara wrote:
+
+[...]
+
 > 
-> Nice, still works for me and simplifies things:
+> >> +	inject = itte->enabled;
+> >> +
+> >> +out_unlock:
+> >> +	spin_unlock(&its->lock);
+> >> +
+> >> +	if (inject) {
+> >> +		spin_lock(&dist->lock);
+> >> +		set_bit(cpuid, dist->irq_pending_on_cpu);
+> > isn't it atomic op?
 > 
-> Tested-by: Tony Lindgren <tony@atomide.com>
+> It is, but that's not what the lock protects. It's there to avoid
+> stepping on someone else's toes, who might deal with the ITS data
+> structures at the same time and would not expect a value to change in
+> the middle (think about code iterating over dist->irq_pending_on_cpu).
+> 
+then should it be __set_bit ?
 
-Cool, thanks for testing Tony. Rafael, I'm fine with your version too.
-FWIW:
-
-Reported-by: Felipe Balbi <balbi@ti.com>
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/fbd9c922/attachment.sig>
+-Christoffer
