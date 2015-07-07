@@ -1,38 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 07 Jul 2015 08:46:04 +0100
-Subject: [PATCH v5 1/2] arm64: kvm: allows kvm cpu hotplug
-In-Reply-To: <559B8308.4000200@linaro.org>
-References: <1432877920-12527-1-git-send-email-takahiro.akashi@linaro.org>	
- <1432877920-12527-2-git-send-email-takahiro.akashi@linaro.org>	
- <557729A0.1030700@arm.com> <559A964D.30500@arm.com>
- <1436201874.22232.3.camel@infradead.org> <559B8308.4000200@linaro.org>
-Message-ID: <559B83BC.5080309@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 7 Jul 2015 09:46:26 +0200
+Subject: USB Ethernet gadget on Nokia n900
+In-Reply-To: <20150706135317.GH10705@atomide.com>
+References: <20141019090107.GA19132@amd> <20141028222123.GA17518@amd>
+ <20141028222641.GW2542@atomide.com> <201507061524.44999@pali>
+ <20150706135317.GH10705@atomide.com>
+Message-ID: <20150707074626.GB12087@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/15 08:43, AKASHI Takahiro wrote:
-> On 07/07/2015 01:57 AM, Geoff Levand wrote:
->> Hi Marc,
->>
->> On Mon, 2015-07-06 at 15:53 +0100, Marc Zyngier wrote:
->>> So this has now been a whole month since I reviewed this, and I haven't
->>> seen any repost of this series. Any hope to see this within a reasonable
->>> time frame? Or is it considered dead already?
->>
->> I was hoping to do some work on updating the base kexec patches
->> last week, but all my time was taken up but other things.  I'll
->> try to start on it this week.
+On Monday 06 July 2015 06:53:18 Tony Lindgren wrote:
+> * Pali Roh?r <pali.rohar@gmail.com> [150706 06:27]:
+> > On Tuesday 28 October 2014 23:26:41 Tony Lindgren wrote:
+> > > * Pavel Machek <pavel@ucw.cz> [141028 15:22]:
+> > > > On Tue 2014-10-28 23:04:50, Pavel Machek wrote:
+> > > > > 
+> > > > > Networking now works against 3.17-based kernel. Thanks!
+> > > > 
+> > > > It works on 3.18-rc1 kernel, too. (I had to hand-modify patch to
+> > > > apply to 3.17, no changes needed for 3.18-rc1.)
+> > > > 
+> > > > Tested-by: Pavel Machek <pavel@ucw.cz>
+> > > 
+> > > Whatever we decice to do to fix this regression, it should probably
+> > > be backported to at least v3.16 stable for distro use, maybe earlier
+> > > too. I'd assume this is broken on multiple platforms currently.
+> > > 
+> > it looks like this patch was not included into any kernel version... I'm 
+> > still using it on top of 4.x kernels. Are you going to send this patch 
+> > into upstream? Or do you have another fix for this problem?
 > 
-> I also have some update, and so will submit my patchset
-> after Geoff. Pratyush's patch should also be synced.
+> I think Felipe mentioned a better built-in gether fix that's been
+> reviewed on linux-usb list.
+> 
+> Regards,
+> 
+> Tony
 
-Please coordinate between all of you and post a consistent series. It
-was painful enough to review the KVM stuff independently of the rest of
-the series, so I'd really really want to see a single series that
-addresses the issue end to end.
+Do you have link to that email thread? Or was Felipe's fix already
+merged into mainline kernel?
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Pali Roh?r
+pali.rohar at gmail.com
