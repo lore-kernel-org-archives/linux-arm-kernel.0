@@ -1,659 +1,1673 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jul 2015 19:26:15 +0100
-Subject: [RFC PATCH] arm64: force CONFIG_SMP=y and remove redundant #ifdefs
-Message-ID: <1436293575-5101-1-git-send-email-will.deacon@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue,  7 Jul 2015 20:48:08 +0200
+Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
+Message-ID: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nobody seems to be producing !SMP systems anymore, so this is just
-becoming a source of kernel bugs, particularly if people want to use
-coherent DMA with non-shared pages.
+Clock rates are stored in an unsigned long field, but ->determine_rate()
+(which returns a rounded rate from a requested one) returns a long
+value (errors are reported using negative error codes), which can lead
+to long overflow if the clock rate exceed 2Ghz.
 
-This patch forces CONFIG_SMP=y for arm64, removing a modest amount of
-code in the process.
+Change ->determine_rate() prototype to return 0 or an error code, and pass
+a pointer to a clk_rate_request structure containing the expected target
+rate and the rate constraints imposed by clk users.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+The clk_rate_request structure might be extended in the future to contain
+other kind of constraints like the rounding policy, the maximum clock
+inaccuracy or other things that are not yet supported by the CCF
+(power consumption constraints ?).
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+CC: Jonathan Corbet <corbet@lwn.net>
+CC: Tony Lindgren <tony@atomide.com>
+CC: Ralf Baechle <ralf@linux-mips.org>
+CC: "Emilio L?pez" <emilio@elopez.com.ar>
+CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+CC: Tero Kristo <t-kristo@ti.com>
+CC: Peter De Schrijver <pdeschrijver@nvidia.com>
+CC: Prashant Gaikwad <pgaikwad@nvidia.com>
+CC: Stephen Warren <swarren@wwwdotorg.org>
+CC: Thierry Reding <thierry.reding@gmail.com>
+CC: Alexandre Courbot <gnurou@gmail.com>
+CC: linux-doc at vger.kernel.org
+CC: linux-kernel at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-omap at vger.kernel.org
+CC: linux-mips at linux-mips.org
+CC: linux-tegra at vger.kernel.org
+
 ---
 
-I'd appreciate any comments on this. Anybody got a good reason for
-CONFIG_SMP=n on arm64?
+changes since v4:
+- remove useless tests in omap drivers
+- remove useless parent assignment in the hi-3620 driver
+- fix a compilation error in the clk-mix driver
+- fix a compilation error in the alchemy clk driver
+- fix a wrong return code in the qcom pll driver
 
- arch/arm64/Kconfig                 | 26 ++++----------------------
- arch/arm64/include/asm/assembler.h |  2 --
- arch/arm64/include/asm/barrier.h   | 24 ------------------------
- arch/arm64/include/asm/hardirq.h   |  4 ----
- arch/arm64/include/asm/irq_work.h  | 11 -----------
- arch/arm64/include/asm/percpu.h    |  8 --------
- arch/arm64/include/asm/pgtable.h   |  5 -----
- arch/arm64/include/asm/ptrace.h    |  4 ----
- arch/arm64/include/asm/smp.h       |  4 ----
- arch/arm64/include/asm/topology.h  |  9 ---------
- arch/arm64/kernel/Makefile         |  4 ++--
- arch/arm64/kernel/cpu_ops.c        |  2 --
- arch/arm64/kernel/head.S           |  7 -------
- arch/arm64/kernel/irq.c            |  2 --
- arch/arm64/kernel/psci.c           |  5 -----
- arch/arm64/kernel/setup.c          |  6 ------
- arch/arm64/kernel/sleep.S          |  5 -----
- arch/arm64/kernel/time.c           |  2 --
- arch/arm64/kernel/traps.c          |  4 ----
- arch/arm64/mm/context.c            | 16 ----------------
- arch/arm64/mm/flush.c              |  4 ----
- arch/arm64/mm/proc.S               |  4 ----
- 22 files changed, 6 insertions(+), 152 deletions(-)
+changes since v3:
+- modify clk-emc driver to match the new prototype
+- fix __clk_round_rate negative error code return
+- remove unused variable in clk-hi3620.c
+- rebased on 4.2-rc1
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f6edb14b7e4..7b07354bb50c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -28,7 +28,7 @@ config ARM64
- 	select DCACHE_WORD_ACCESS
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
--	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
-+	select GENERIC_CLOCKEVENTS_BROADCAST
- 	select GENERIC_CPU_AUTOPROBE
- 	select GENERIC_EARLY_IOREMAP
- 	select GENERIC_IRQ_PROBE
-@@ -137,6 +137,9 @@ config NEED_DMA_MAP_STATE
- config NEED_SG_DMA_LENGTH
- 	def_bool y
- 
-+config SMP
-+	def_bool y
-+
- config SWIOTLB
- 	def_bool y
- 
-@@ -474,22 +477,8 @@ config CPU_BIG_ENDIAN
-        help
-          Say Y if you plan on running a kernel in big-endian mode.
- 
--config SMP
--	bool "Symmetric Multi-Processing"
--	help
--	  This enables support for systems with more than one CPU.  If
--	  you say N here, the kernel will run on single and
--	  multiprocessor machines, but will use only one CPU of a
--	  multiprocessor machine. If you say Y here, the kernel will run
--	  on many, but not all, single processor machines. On a single
--	  processor machine, the kernel will run faster if you say N
--	  here.
--
--	  If you don't know what to do here, say N.
--
- config SCHED_MC
- 	bool "Multi-core scheduler support"
--	depends on SMP
- 	help
- 	  Multi-core scheduler support improves the CPU scheduler's decision
- 	  making when dealing with multi-core CPU chips at a cost of slightly
-@@ -497,7 +486,6 @@ config SCHED_MC
- 
- config SCHED_SMT
- 	bool "SMT scheduler support"
--	depends on SMP
- 	help
- 	  Improves the CPU scheduler's decision making when dealing with
- 	  MultiThreading at a cost of slightly increased overhead in some
-@@ -506,23 +494,17 @@ config SCHED_SMT
- config NR_CPUS
- 	int "Maximum number of CPUs (2-4096)"
- 	range 2 4096
--	depends on SMP
- 	# These have to remain sorted largest to smallest
- 	default "64"
- 
- config HOTPLUG_CPU
- 	bool "Support for hot-pluggable CPUs"
--	depends on SMP
- 	help
- 	  Say Y here to experiment with turning CPUs off and on.  CPUs
- 	  can be controlled through /sys/devices/system/cpu.
- 
- source kernel/Kconfig.preempt
- 
--config UP_LATE_INIT
--       def_bool y
--       depends on !SMP
--
- config HZ
- 	int
- 	default 100
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 144b64ad96c3..706ceaf2577a 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -103,9 +103,7 @@
-  * SMP data memory barrier
-  */
- 	.macro	smp_dmb, opt
--#ifdef CONFIG_SMP
- 	dmb	\opt
--#endif
- 	.endm
- 
- #define USER(l, x...)				\
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 0fa47c4275cb..624f9679f4b0 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -35,28 +35,6 @@
- #define dma_rmb()	dmb(oshld)
- #define dma_wmb()	dmb(oshst)
- 
--#ifndef CONFIG_SMP
--#define smp_mb()	barrier()
--#define smp_rmb()	barrier()
--#define smp_wmb()	barrier()
--
--#define smp_store_release(p, v)						\
--do {									\
--	compiletime_assert_atomic_type(*p);				\
--	barrier();							\
--	ACCESS_ONCE(*p) = (v);						\
--} while (0)
--
--#define smp_load_acquire(p)						\
--({									\
--	typeof(*p) ___p1 = ACCESS_ONCE(*p);				\
--	compiletime_assert_atomic_type(*p);				\
--	barrier();							\
--	___p1;								\
--})
--
--#else
--
- #define smp_mb()	dmb(ish)
- #define smp_rmb()	dmb(ishld)
- #define smp_wmb()	dmb(ishst)
-@@ -109,8 +87,6 @@ do {									\
- 	___p1;								\
- })
- 
--#endif
--
- #define read_barrier_depends()		do { } while(0)
- #define smp_read_barrier_depends()	do { } while(0)
- 
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index 6aae421f4d73..2bb7009bdac7 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -24,9 +24,7 @@
- 
- typedef struct {
- 	unsigned int __softirq_pending;
--#ifdef CONFIG_SMP
- 	unsigned int ipi_irqs[NR_IPI];
--#endif
- } ____cacheline_aligned irq_cpustat_t;
- 
- #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
-@@ -34,10 +32,8 @@ typedef struct {
- #define __inc_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)++
- #define __get_irq_stat(cpu, member)	__IRQ_STAT(cpu, member)
- 
--#ifdef CONFIG_SMP
- u64 smp_irq_stat_cpu(unsigned int cpu);
- #define arch_irq_stat_cpu	smp_irq_stat_cpu
--#endif
- 
- #define __ARCH_IRQ_EXIT_IRQS_DISABLED	1
- 
-diff --git a/arch/arm64/include/asm/irq_work.h b/arch/arm64/include/asm/irq_work.h
-index b4f6b19a8a68..8e24ef3f7c82 100644
---- a/arch/arm64/include/asm/irq_work.h
-+++ b/arch/arm64/include/asm/irq_work.h
-@@ -1,8 +1,6 @@
- #ifndef __ASM_IRQ_WORK_H
- #define __ASM_IRQ_WORK_H
- 
--#ifdef CONFIG_SMP
--
- #include <asm/smp.h>
- 
- static inline bool arch_irq_work_has_interrupt(void)
-@@ -10,13 +8,4 @@ static inline bool arch_irq_work_has_interrupt(void)
- 	return !!__smp_cross_call;
- }
- 
--#else
--
--static inline bool arch_irq_work_has_interrupt(void)
--{
--	return false;
--}
--
--#endif
--
- #endif /* __ASM_IRQ_WORK_H */
-diff --git a/arch/arm64/include/asm/percpu.h b/arch/arm64/include/asm/percpu.h
-index 4fde8c1df97f..0a456bef8c79 100644
---- a/arch/arm64/include/asm/percpu.h
-+++ b/arch/arm64/include/asm/percpu.h
-@@ -16,8 +16,6 @@
- #ifndef __ASM_PERCPU_H
- #define __ASM_PERCPU_H
- 
--#ifdef CONFIG_SMP
--
- static inline void set_my_cpu_offset(unsigned long off)
- {
- 	asm volatile("msr tpidr_el1, %0" :: "r" (off) : "memory");
-@@ -38,12 +36,6 @@ static inline unsigned long __my_cpu_offset(void)
- }
- #define __my_cpu_offset __my_cpu_offset()
- 
--#else	/* !CONFIG_SMP */
--
--#define set_my_cpu_offset(x)	do { } while (0)
--
--#endif /* CONFIG_SMP */
--
- #define PERCPU_OP(op, asm_op)						\
- static inline unsigned long __percpu_##op(void *ptr,			\
- 			unsigned long val, int size)			\
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 17aa3d625499..1c2cb73de1d2 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -54,13 +54,8 @@ extern void __pmd_error(const char *file, int line, unsigned long val);
- extern void __pud_error(const char *file, int line, unsigned long val);
- extern void __pgd_error(const char *file, int line, unsigned long val);
- 
--#ifdef CONFIG_SMP
- #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
- #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
--#else
--#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF)
--#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
--#endif
- 
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
- #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_NORMAL_NC))
-diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-index d6dd9fdbc3be..536274ed292e 100644
---- a/arch/arm64/include/asm/ptrace.h
-+++ b/arch/arm64/include/asm/ptrace.h
-@@ -183,11 +183,7 @@ static inline int valid_user_regs(struct user_pt_regs *regs)
- 
- #define instruction_pointer(regs)	((unsigned long)(regs)->pc)
- 
--#ifdef CONFIG_SMP
- extern unsigned long profile_pc(struct pt_regs *regs);
--#else
--#define profile_pc(regs) instruction_pointer(regs)
--#endif
- 
- #endif /* __ASSEMBLY__ */
- #endif
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index db02be81b90a..d9c3d6a6100a 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -20,10 +20,6 @@
- #include <linux/cpumask.h>
- #include <linux/thread_info.h>
- 
--#ifndef CONFIG_SMP
--# error "<asm/smp.h> included in non-SMP build"
--#endif
--
- #define raw_smp_processor_id() (current_thread_info()->cpu)
- 
- struct seq_file;
-diff --git a/arch/arm64/include/asm/topology.h b/arch/arm64/include/asm/topology.h
-index 225ec3524fbf..a3e9d6fdbf21 100644
---- a/arch/arm64/include/asm/topology.h
-+++ b/arch/arm64/include/asm/topology.h
-@@ -1,8 +1,6 @@
- #ifndef __ASM_TOPOLOGY_H
- #define __ASM_TOPOLOGY_H
- 
--#ifdef CONFIG_SMP
--
- #include <linux/cpumask.h>
- 
- struct cpu_topology {
-@@ -24,13 +22,6 @@ void init_cpu_topology(void);
- void store_cpu_topology(unsigned int cpuid);
- const struct cpumask *cpu_coregroup_mask(int cpu);
- 
--#else
--
--static inline void init_cpu_topology(void) { }
--static inline void store_cpu_topology(unsigned int cpuid) { }
--
--#endif
--
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 426d0763c81b..c6fef2f36163 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -17,14 +17,14 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
- 			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
--			   cpufeature.o alternative.o cacheinfo.o
-+			   cpufeature.o alternative.o cacheinfo.o		\
-+			   smp.o smp_spin_table.o topology.o
- 
- arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   sys_compat.o entry32.o		\
- 					   ../../arm/kernel/opcodes.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
--arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
- arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index 5ea337dd2f15..b6bd7d447768 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -30,9 +30,7 @@ extern const struct cpu_operations cpu_psci_ops;
- const struct cpu_operations *cpu_ops[NR_CPUS];
- 
- static const struct cpu_operations *supported_cpu_ops[] __initconst = {
--#ifdef CONFIG_SMP
- 	&smp_spin_table_ops,
--#endif
- 	&cpu_psci_ops,
- 	NULL,
- };
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index c0ff3ce4299e..3a0654173997 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -62,13 +62,8 @@
- /*
-  * Initial memory map attributes.
-  */
--#ifndef CONFIG_SMP
--#define PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF
--#define PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF
--#else
- #define PTE_FLAGS	PTE_TYPE_PAGE | PTE_AF | PTE_SHARED
- #define PMD_FLAGS	PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S
--#endif
- 
- #ifdef CONFIG_ARM64_64K_PAGES
- #define MM_MMUFLAGS	PTE_ATTRINDX(MT_NORMAL) | PTE_FLAGS
-@@ -574,7 +569,6 @@ ENTRY(__boot_cpu_mode)
- 	.long	BOOT_CPU_MODE_EL1
- 	.popsection
- 
--#ifdef CONFIG_SMP
- 	/*
- 	 * This provides a "holding pen" for platforms to hold all secondary
- 	 * cores are held until we're ready for them to initialise.
-@@ -622,7 +616,6 @@ ENTRY(__secondary_switched)
- 	mov	x29, #0
- 	b	secondary_start_kernel
- ENDPROC(__secondary_switched)
--#endif	/* CONFIG_SMP */
- 
- /*
-  * Enable the MMU.
-diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-index 240b75c0e94f..de99d4bd31bb 100644
---- a/arch/arm64/kernel/irq.c
-+++ b/arch/arm64/kernel/irq.c
-@@ -33,9 +33,7 @@ unsigned long irq_err_count;
- 
- int arch_show_interrupts(struct seq_file *p, int prec)
- {
--#ifdef CONFIG_SMP
- 	show_ipi_list(p, prec);
--#endif
- 	seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 869f202748e8..ec30152090ae 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -462,8 +462,6 @@ int __init psci_acpi_init(void)
- }
- #endif
- 
--#ifdef CONFIG_SMP
--
- static int __init cpu_psci_cpu_init(unsigned int cpu)
- {
- 	return 0;
-@@ -550,7 +548,6 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
- 	return -ETIMEDOUT;
- }
- #endif
--#endif
- 
- static int psci_suspend_finisher(unsigned long index)
- {
-@@ -585,7 +582,6 @@ const struct cpu_operations cpu_psci_ops = {
- 	.cpu_init_idle	= cpu_psci_cpu_init_idle,
- 	.cpu_suspend	= cpu_psci_cpu_suspend,
- #endif
--#ifdef CONFIG_SMP
- 	.cpu_init	= cpu_psci_cpu_init,
- 	.cpu_prepare	= cpu_psci_cpu_prepare,
- 	.cpu_boot	= cpu_psci_cpu_boot,
-@@ -594,6 +590,5 @@ const struct cpu_operations cpu_psci_ops = {
- 	.cpu_die	= cpu_psci_cpu_die,
- 	.cpu_kill	= cpu_psci_cpu_kill,
- #endif
--#endif
- };
- 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f3067d4d4e35..cf609cf3fcb5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -131,7 +131,6 @@ bool arch_match_cpu_phys_id(int cpu, u64 phys_id)
- }
- 
- struct mpidr_hash mpidr_hash;
--#ifdef CONFIG_SMP
+Changes since v2:
+- drop the ->round_rate() prototype changes
+- introduce a clk_rate_request struct to avoid any changes on the prototype
+  in the future
+
+Changes since v1:
+- fix an 'uninitialized variable' bug reported by Heiko
+- rebased on clk-next
+---
+ Documentation/clk.txt               |   8 +-
+ arch/arm/mach-omap2/dpll3xxx.c      |  29 +++---
+ arch/arm/mach-omap2/dpll44xx.c      |  30 +++---
+ arch/mips/alchemy/common/clock.c    |  61 +++++--------
+ drivers/clk/at91/clk-programmable.c |  25 ++---
+ drivers/clk/at91/clk-usb.c          |  28 +++---
+ drivers/clk/bcm/clk-kona.c          |  34 ++++---
+ drivers/clk/clk-composite.c         |  48 +++++-----
+ drivers/clk/clk.c                   | 176 ++++++++++++++++++++----------------
+ drivers/clk/hisilicon/clk-hi3620.c  |  39 ++++----
+ drivers/clk/mmp/clk-mix.c           |  20 ++--
+ drivers/clk/qcom/clk-pll.c          |  18 ++--
+ drivers/clk/qcom/clk-rcg.c          |  44 ++++-----
+ drivers/clk/qcom/clk-rcg2.c         |  78 ++++++++--------
+ drivers/clk/sunxi/clk-factors.c     |  21 ++---
+ drivers/clk/sunxi/clk-sun6i-ar100.c |  21 ++---
+ drivers/clk/sunxi/clk-sunxi.c       |  20 ++--
+ drivers/clk/tegra/clk-emc.c         |  28 +++---
+ include/linux/clk-provider.h        |  49 ++++++----
+ include/linux/clk/ti.h              |  16 +---
+ 20 files changed, 393 insertions(+), 400 deletions(-)
+
+diff --git a/Documentation/clk.txt b/Documentation/clk.txt
+index f463bdc..5c4bc4d 100644
+--- a/Documentation/clk.txt
++++ b/Documentation/clk.txt
+@@ -71,12 +71,8 @@ the operations defined in clk.h:
+ 		long		(*round_rate)(struct clk_hw *hw,
+ 						unsigned long rate,
+ 						unsigned long *parent_rate);
+-		long		(*determine_rate)(struct clk_hw *hw,
+-						unsigned long rate,
+-						unsigned long min_rate,
+-						unsigned long max_rate,
+-						unsigned long *best_parent_rate,
+-						struct clk_hw **best_parent_clk);
++		int		(*determine_rate)(struct clk_hw *hw,
++						  struct clk_rate_request *req);
+ 		int		(*set_parent)(struct clk_hw *hw, u8 index);
+ 		u8		(*get_parent)(struct clk_hw *hw);
+ 		int		(*set_rate)(struct clk_hw *hw,
+diff --git a/arch/arm/mach-omap2/dpll3xxx.c b/arch/arm/mach-omap2/dpll3xxx.c
+index 44e57ec..8c57ace 100644
+--- a/arch/arm/mach-omap2/dpll3xxx.c
++++ b/arch/arm/mach-omap2/dpll3xxx.c
+@@ -462,43 +462,38 @@ void omap3_noncore_dpll_disable(struct clk_hw *hw)
  /**
-  * smp_build_mpidr_hash - Pre-compute shifts required at each affinity
-  *			  level in order to build a linear index from an
-@@ -197,7 +196,6 @@ static void __init smp_build_mpidr_hash(void)
- 		pr_warn("Large number of MPIDR hash buckets detected\n");
- 	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
- }
--#endif
- 
- static void __init hyp_mode_check(void)
+  * omap3_noncore_dpll_determine_rate - determine rate for a DPLL
+  * @hw: pointer to the clock to determine rate for
+- * @rate: target rate for the DPLL
+- * @best_parent_rate: pointer for returning best parent rate
+- * @best_parent_clk: pointer for returning best parent clock
++ * @req: target rate request
+  *
+  * Determines which DPLL mode to use for reaching a desired target rate.
+  * Checks whether the DPLL shall be in bypass or locked mode, and if
+  * locked, calculates the M,N values for the DPLL via round-rate.
+- * Returns a positive clock rate with success, negative error value
+- * in failure.
++ * Returns a 0 on success, negative error value in failure.
+  */
+-long omap3_noncore_dpll_determine_rate(struct clk_hw *hw, unsigned long rate,
+-				       unsigned long min_rate,
+-				       unsigned long max_rate,
+-				       unsigned long *best_parent_rate,
+-				       struct clk_hw **best_parent_clk)
++int omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
++				      struct clk_rate_request *req)
  {
-@@ -405,10 +403,8 @@ void __init setup_arch(char **cmdline_p)
- 	xen_early_init();
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	struct dpll_data *dd;
  
- 	cpu_read_bootcpu_ops();
--#ifdef CONFIG_SMP
- 	smp_init_cpus();
- 	smp_build_mpidr_hash();
--#endif
+-	if (!hw || !rate)
++	if (!req->rate)
+ 		return -EINVAL;
  
- #ifdef CONFIG_VT
- #if defined(CONFIG_VGA_CONSOLE)
-@@ -508,9 +504,7 @@ static int c_show(struct seq_file *m, void *v)
- 		 * online processors, looking for lines beginning with
- 		 * "processor".  Give glibc what it expects.
- 		 */
--#ifdef CONFIG_SMP
- 		seq_printf(m, "processor\t: %d\n", i);
--#endif
+ 	dd = clk->dpll_data;
+ 	if (!dd)
+ 		return -EINVAL;
+ 
+-	if (__clk_get_rate(dd->clk_bypass) == rate &&
++	if (__clk_get_rate(dd->clk_bypass) == req->rate &&
+ 	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+-		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
++		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
+ 	} else {
+-		rate = omap2_dpll_round_rate(hw, rate, best_parent_rate);
+-		*best_parent_clk = __clk_get_hw(dd->clk_ref);
++		req->rate = omap2_dpll_round_rate(hw, req->rate,
++					  &req->best_parent_rate);
++		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
+ 	}
+ 
+-	*best_parent_rate = rate;
++	req->best_parent_rate = req->rate;
+ 
+-	return rate;
++	return 0;
+ }
+ 
+ /**
+diff --git a/arch/arm/mach-omap2/dpll44xx.c b/arch/arm/mach-omap2/dpll44xx.c
+index f231be0..446a4e0 100644
+--- a/arch/arm/mach-omap2/dpll44xx.c
++++ b/arch/arm/mach-omap2/dpll44xx.c
+@@ -191,42 +191,36 @@ out:
+ /**
+  * omap4_dpll_regm4xen_determine_rate - determine rate for a DPLL
+  * @hw: pointer to the clock to determine rate for
+- * @rate: target rate for the DPLL
+- * @best_parent_rate: pointer for returning best parent rate
+- * @best_parent_clk: pointer for returning best parent clock
++ * @req: target rate request
+  *
+  * Determines which DPLL mode to use for reaching a desired rate.
+  * Checks whether the DPLL shall be in bypass or locked mode, and if
+  * locked, calculates the M,N values for the DPLL via round-rate.
+- * Returns a positive clock rate with success, negative error value
+- * in failure.
++ * Returns 0 on success and a negative error value otherwise.
+  */
+-long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
++int omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
++				       struct clk_rate_request *req)
+ {
+ 	struct clk_hw_omap *clk = to_clk_hw_omap(hw);
+ 	struct dpll_data *dd;
+ 
+-	if (!hw || !rate)
++	if (!req->rate)
+ 		return -EINVAL;
+ 
+ 	dd = clk->dpll_data;
+ 	if (!dd)
+ 		return -EINVAL;
+ 
+-	if (__clk_get_rate(dd->clk_bypass) == rate &&
++	if (__clk_get_rate(dd->clk_bypass) == req->rate &&
+ 	    (dd->modes & (1 << DPLL_LOW_POWER_BYPASS))) {
+-		*best_parent_clk = __clk_get_hw(dd->clk_bypass);
++		req->best_parent_hw = __clk_get_hw(dd->clk_bypass);
+ 	} else {
+-		rate = omap4_dpll_regm4xen_round_rate(hw, rate,
+-						      best_parent_rate);
+-		*best_parent_clk = __clk_get_hw(dd->clk_ref);
++		req->rate = omap4_dpll_regm4xen_round_rate(hw, req->rate,
++						&req->best_parent_rate);
++		req->best_parent_hw = __clk_get_hw(dd->clk_ref);
+ 	}
+ 
+-	*best_parent_rate = rate;
++	req->best_parent_rate = req->rate;
+ 
+-	return rate;
++	return 0;
+ }
+diff --git a/arch/mips/alchemy/common/clock.c b/arch/mips/alchemy/common/clock.c
+index 6e46abe..0b4cf3e 100644
+--- a/arch/mips/alchemy/common/clock.c
++++ b/arch/mips/alchemy/common/clock.c
+@@ -389,10 +389,9 @@ static long alchemy_calc_div(unsigned long rate, unsigned long prate,
+ 	return div1;
+ }
+ 
+-static long alchemy_clk_fgcs_detr(struct clk_hw *hw, unsigned long rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk,
+-					int scale, int maxdiv)
++static int alchemy_clk_fgcs_detr(struct clk_hw *hw,
++				 struct clk_rate_request *req,
++				 int scale, int maxdiv)
+ {
+ 	struct clk *pc, *bpc, *free;
+ 	long tdv, tpr, pr, nr, br, bpr, diff, lastdiff;
+@@ -422,14 +421,14 @@ static long alchemy_clk_fgcs_detr(struct clk_hw *hw, unsigned long rate,
+ 		}
+ 
+ 		pr = clk_get_rate(pc);
+-		if (pr < rate)
++		if (pr < req->rate)
+ 			continue;
+ 
+ 		/* what can hardware actually provide */
+-		tdv = alchemy_calc_div(rate, pr, scale, maxdiv, NULL);
++		tdv = alchemy_calc_div(req->rate, pr, scale, maxdiv, NULL);
+ 		nr = pr / tdv;
+-		diff = rate - nr;
+-		if (nr > rate)
++		diff = req->rate - nr;
++		if (nr > req->rate)
+ 			continue;
+ 
+ 		if (diff < lastdiff) {
+@@ -448,15 +447,16 @@ static long alchemy_clk_fgcs_detr(struct clk_hw *hw, unsigned long rate,
+ 	 */
+ 	if (lastdiff && free) {
+ 		for (j = (maxdiv == 4) ? 1 : scale; j <= maxdiv; j += scale) {
+-			tpr = rate * j;
++			tpr = req->rate * j;
+ 			if (tpr < 0)
+ 				break;
+ 			pr = clk_round_rate(free, tpr);
+ 
+-			tdv = alchemy_calc_div(rate, pr, scale, maxdiv, NULL);
++			tdv = alchemy_calc_div(req->rate, pr, scale, maxdiv,
++					       NULL);
+ 			nr = pr / tdv;
+-			diff = rate - nr;
+-			if (nr > rate)
++			diff = req->rate - nr;
++			if (nr > req->rate)
+ 				continue;
+ 			if (diff < lastdiff) {
+ 				lastdiff = diff;
+@@ -469,9 +469,10 @@ static long alchemy_clk_fgcs_detr(struct clk_hw *hw, unsigned long rate,
+ 		}
+ 	}
+ 
+-	*best_parent_rate = bpr;
+-	*best_parent_clk = __clk_get_hw(bpc);
+-	return br;
++	req->best_parent_rate = bpr;
++	req->best_parent_hw = __clk_get_hw(bpc);
++	req->rate = br;
++	return 0;
+ }
+ 
+ static int alchemy_clk_fgv1_en(struct clk_hw *hw)
+@@ -562,14 +563,10 @@ static unsigned long alchemy_clk_fgv1_recalc(struct clk_hw *hw,
+ 	return parent_rate / v;
+ }
+ 
+-static long alchemy_clk_fgv1_detr(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
++static int alchemy_clk_fgv1_detr(struct clk_hw *hw,
++				 struct clk_rate_request *req)
+ {
+-	return alchemy_clk_fgcs_detr(hw, rate, best_parent_rate,
+-				     best_parent_clk, 2, 512);
++	return alchemy_clk_fgcs_detr(hw, req, 2, 512);
+ }
+ 
+ /* Au1000, Au1100, Au15x0, Au12x0 */
+@@ -696,11 +693,8 @@ static unsigned long alchemy_clk_fgv2_recalc(struct clk_hw *hw,
+ 	return t;
+ }
+ 
+-static long alchemy_clk_fgv2_detr(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
++static int alchemy_clk_fgv2_detr(struct clk_hw *hw,
++				 struct clk_rate_request *req)
+ {
+ 	struct alchemy_fgcs_clk *c = to_fgcs_clk(hw);
+ 	int scale, maxdiv;
+@@ -713,8 +707,7 @@ static long alchemy_clk_fgv2_detr(struct clk_hw *hw, unsigned long rate,
+ 		maxdiv = 512;
+ 	}
+ 
+-	return alchemy_clk_fgcs_detr(hw, rate, best_parent_rate,
+-				     best_parent_clk, scale, maxdiv);
++	return alchemy_clk_fgcs_detr(hw, req, scale, maxdiv);
+ }
+ 
+ /* Au1300 larger input mux, no separate disable bit, flexible divider */
+@@ -917,17 +910,13 @@ static int alchemy_clk_csrc_setr(struct clk_hw *hw, unsigned long rate,
+ 	return 0;
+ }
+ 
+-static long alchemy_clk_csrc_detr(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
++static int alchemy_clk_csrc_detr(struct clk_hw *hw,
++				 struct clk_rate_request *req)
+ {
+ 	struct alchemy_fgcs_clk *c = to_fgcs_clk(hw);
+ 	int scale = c->dt[2] == 3 ? 1 : 2; /* au1300 check */
+ 
+-	return alchemy_clk_fgcs_detr(hw, rate, best_parent_rate,
+-				     best_parent_clk, scale, 4);
++	return alchemy_clk_fgcs_detr(hw, req, scale, 4);
+ }
+ 
+ static struct clk_ops alchemy_clkops_csrc = {
+diff --git a/drivers/clk/at91/clk-programmable.c b/drivers/clk/at91/clk-programmable.c
+index 8c86c0f..43dacad 100644
+--- a/drivers/clk/at91/clk-programmable.c
++++ b/drivers/clk/at91/clk-programmable.c
+@@ -54,12 +54,8 @@ static unsigned long clk_programmable_recalc_rate(struct clk_hw *hw,
+ 	return parent_rate >> pres;
+ }
+ 
+-static long clk_programmable_determine_rate(struct clk_hw *hw,
+-					    unsigned long rate,
+-					    unsigned long min_rate,
+-					    unsigned long max_rate,
+-					    unsigned long *best_parent_rate,
+-					    struct clk_hw **best_parent_hw)
++static int clk_programmable_determine_rate(struct clk_hw *hw,
++					   struct clk_rate_request *req)
+ {
+ 	struct clk *parent = NULL;
+ 	long best_rate = -EINVAL;
+@@ -76,24 +72,29 @@ static long clk_programmable_determine_rate(struct clk_hw *hw,
+ 		parent_rate = __clk_get_rate(parent);
+ 		for (shift = 0; shift < PROG_PRES_MASK; shift++) {
+ 			tmp_rate = parent_rate >> shift;
+-			if (tmp_rate <= rate)
++			if (tmp_rate <= req->rate)
+ 				break;
+ 		}
+ 
+-		if (tmp_rate > rate)
++		if (tmp_rate > req->rate)
+ 			continue;
+ 
+-		if (best_rate < 0 || (rate - tmp_rate) < (rate - best_rate)) {
++		if (best_rate < 0 ||
++		    (req->rate - tmp_rate) < (req->rate - best_rate)) {
+ 			best_rate = tmp_rate;
+-			*best_parent_rate = parent_rate;
+-			*best_parent_hw = __clk_get_hw(parent);
++			req->best_parent_rate = parent_rate;
++			req->best_parent_hw = __clk_get_hw(parent);
+ 		}
+ 
+ 		if (!best_rate)
+ 			break;
+ 	}
+ 
+-	return best_rate;
++	if (best_rate < 0)
++		return best_rate;
++
++	req->rate = best_rate;
++	return 0;
+ }
+ 
+ static int clk_programmable_set_parent(struct clk_hw *hw, u8 index)
+diff --git a/drivers/clk/at91/clk-usb.c b/drivers/clk/at91/clk-usb.c
+index b0cbd2b..24747df 100644
+--- a/drivers/clk/at91/clk-usb.c
++++ b/drivers/clk/at91/clk-usb.c
+@@ -56,12 +56,8 @@ static unsigned long at91sam9x5_clk_usb_recalc_rate(struct clk_hw *hw,
+ 	return DIV_ROUND_CLOSEST(parent_rate, (usbdiv + 1));
+ }
+ 
+-static long at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
+-					      unsigned long rate,
+-					      unsigned long min_rate,
+-					      unsigned long max_rate,
+-					      unsigned long *best_parent_rate,
+-					      struct clk_hw **best_parent_hw)
++static int at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
++					     struct clk_rate_request *req)
+ {
+ 	struct clk *parent = NULL;
+ 	long best_rate = -EINVAL;
+@@ -80,23 +76,23 @@ static long at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
+ 		for (div = 1; div < SAM9X5_USB_MAX_DIV + 2; div++) {
+ 			unsigned long tmp_parent_rate;
+ 
+-			tmp_parent_rate = rate * div;
++			tmp_parent_rate = req->rate * div;
+ 			tmp_parent_rate = __clk_round_rate(parent,
+ 							   tmp_parent_rate);
+ 			tmp_rate = DIV_ROUND_CLOSEST(tmp_parent_rate, div);
+-			if (tmp_rate < rate)
+-				tmp_diff = rate - tmp_rate;
++			if (tmp_rate < req->rate)
++				tmp_diff = req->rate - tmp_rate;
+ 			else
+-				tmp_diff = tmp_rate - rate;
++				tmp_diff = tmp_rate - req->rate;
+ 
+ 			if (best_diff < 0 || best_diff > tmp_diff) {
+ 				best_rate = tmp_rate;
+ 				best_diff = tmp_diff;
+-				*best_parent_rate = tmp_parent_rate;
+-				*best_parent_hw = __clk_get_hw(parent);
++				req->best_parent_rate = tmp_parent_rate;
++				req->best_parent_hw = __clk_get_hw(parent);
+ 			}
+ 
+-			if (!best_diff || tmp_rate < rate)
++			if (!best_diff || tmp_rate < req->rate)
+ 				break;
+ 		}
+ 
+@@ -104,7 +100,11 @@ static long at91sam9x5_clk_usb_determine_rate(struct clk_hw *hw,
+ 			break;
+ 	}
+ 
+-	return best_rate;
++	if (best_rate < 0)
++		return best_rate;
++
++	req->rate = best_rate;
++	return 0;
+ }
+ 
+ static int at91sam9x5_clk_usb_set_parent(struct clk_hw *hw, u8 index)
+diff --git a/drivers/clk/bcm/clk-kona.c b/drivers/clk/bcm/clk-kona.c
+index 79a9850..d9c039c 100644
+--- a/drivers/clk/bcm/clk-kona.c
++++ b/drivers/clk/bcm/clk-kona.c
+@@ -1017,10 +1017,8 @@ static long kona_peri_clk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				rate ? rate : 1, *parent_rate, NULL);
+ }
+ 
+-static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long min_rate,
+-		unsigned long max_rate,
+-		unsigned long *best_parent_rate, struct clk_hw **best_parent)
++static int kona_peri_clk_determine_rate(struct clk_hw *hw,
++					struct clk_rate_request *req)
+ {
+ 	struct kona_clk *bcm_clk = to_kona_clk(hw);
+ 	struct clk *clk = hw->clk;
+@@ -1029,6 +1027,7 @@ static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long best_delta;
+ 	unsigned long best_rate;
+ 	u32 parent_count;
++	long rate;
+ 	u32 which;
+ 
+ 	/*
+@@ -1037,14 +1036,21 @@ static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	 */
+ 	WARN_ON_ONCE(bcm_clk->init_data.flags & CLK_SET_RATE_NO_REPARENT);
+ 	parent_count = (u32)bcm_clk->init_data.num_parents;
+-	if (parent_count < 2)
+-		return kona_peri_clk_round_rate(hw, rate, best_parent_rate);
++	if (parent_count < 2) {
++		rate = kona_peri_clk_round_rate(hw, req->rate,
++						&req->best_parent_rate);
++		if (rate < 0)
++			return rate;
++
++		req->rate = rate;
++		return 0;
++	}
+ 
+ 	/* Unless we can do better, stick with current parent */
+ 	current_parent = clk_get_parent(clk);
+ 	parent_rate = __clk_get_rate(current_parent);
+-	best_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+-	best_delta = abs(best_rate - rate);
++	best_rate = kona_peri_clk_round_rate(hw, req->rate, &parent_rate);
++	best_delta = abs(best_rate - req->rate);
+ 
+ 	/* Check whether any other parent clock can produce a better result */
+ 	for (which = 0; which < parent_count; which++) {
+@@ -1058,17 +1064,19 @@ static long kona_peri_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		/* We don't support CLK_SET_RATE_PARENT */
+ 		parent_rate = __clk_get_rate(parent);
+-		other_rate = kona_peri_clk_round_rate(hw, rate, &parent_rate);
+-		delta = abs(other_rate - rate);
++		other_rate = kona_peri_clk_round_rate(hw, req->rate,
++						      &parent_rate);
++		delta = abs(other_rate - req->rate);
+ 		if (delta < best_delta) {
+ 			best_delta = delta;
+ 			best_rate = other_rate;
+-			*best_parent = __clk_get_hw(parent);
+-			*best_parent_rate = parent_rate;
++			req->best_parent_hw = __clk_get_hw(parent);
++			req->best_parent_rate = parent_rate;
+ 		}
+ 	}
+ 
+-	return best_rate;
++	req->rate = best_rate;
++	return 0;
+ }
+ 
+ static int kona_peri_clk_set_parent(struct clk_hw *hw, u8 index)
+diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+index 616f5ae..9e69f34 100644
+--- a/drivers/clk/clk-composite.c
++++ b/drivers/clk/clk-composite.c
+@@ -55,11 +55,8 @@ static unsigned long clk_composite_recalc_rate(struct clk_hw *hw,
+ 	return rate_ops->recalc_rate(rate_hw, parent_rate);
+ }
+ 
+-static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_p)
++static int clk_composite_determine_rate(struct clk_hw *hw,
++					struct clk_rate_request *req)
+ {
+ 	struct clk_composite *composite = to_clk_composite(hw);
+ 	const struct clk_ops *rate_ops = composite->rate_ops;
+@@ -71,25 +68,28 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	long tmp_rate, best_rate = 0;
+ 	unsigned long rate_diff;
+ 	unsigned long best_rate_diff = ULONG_MAX;
++	long rate;
+ 	int i;
+ 
+ 	if (rate_hw && rate_ops && rate_ops->determine_rate) {
+ 		__clk_hw_set_clk(rate_hw, hw);
+-		return rate_ops->determine_rate(rate_hw, rate, min_rate,
+-						max_rate,
+-						best_parent_rate,
+-						best_parent_p);
++		return rate_ops->determine_rate(rate_hw, req);
+ 	} else if (rate_hw && rate_ops && rate_ops->round_rate &&
+ 		   mux_hw && mux_ops && mux_ops->set_parent) {
+-		*best_parent_p = NULL;
++		req->best_parent_hw = NULL;
+ 
+ 		if (__clk_get_flags(hw->clk) & CLK_SET_RATE_NO_REPARENT) {
+ 			parent = clk_get_parent(mux_hw->clk);
+-			*best_parent_p = __clk_get_hw(parent);
+-			*best_parent_rate = __clk_get_rate(parent);
++			req->best_parent_hw = __clk_get_hw(parent);
++			req->best_parent_rate = __clk_get_rate(parent);
+ 
+-			return rate_ops->round_rate(rate_hw, rate,
+-						    best_parent_rate);
++			rate = rate_ops->round_rate(rate_hw, req->rate,
++						    &req->best_parent_rate);
++			if (rate < 0)
++				return rate;
++
++			req->rate = rate;
++			return 0;
+ 		}
+ 
+ 		for (i = 0; i < __clk_get_num_parents(mux_hw->clk); i++) {
+@@ -99,33 +99,33 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 			parent_rate = __clk_get_rate(parent);
+ 
+-			tmp_rate = rate_ops->round_rate(rate_hw, rate,
++			tmp_rate = rate_ops->round_rate(rate_hw, req->rate,
+ 							&parent_rate);
+ 			if (tmp_rate < 0)
+ 				continue;
+ 
+-			rate_diff = abs(rate - tmp_rate);
++			rate_diff = abs(req->rate - tmp_rate);
+ 
+-			if (!rate_diff || !*best_parent_p
++			if (!rate_diff || !req->best_parent_hw
+ 				       || best_rate_diff > rate_diff) {
+-				*best_parent_p = __clk_get_hw(parent);
+-				*best_parent_rate = parent_rate;
++				req->best_parent_hw = __clk_get_hw(parent);
++				req->best_parent_rate = parent_rate;
+ 				best_rate_diff = rate_diff;
+ 				best_rate = tmp_rate;
+ 			}
+ 
+ 			if (!rate_diff)
+-				return rate;
++				return 0;
+ 		}
+ 
+-		return best_rate;
++		req->rate = best_rate;
++		return 0;
+ 	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+ 		__clk_hw_set_clk(mux_hw, hw);
+-		return mux_ops->determine_rate(mux_hw, rate, min_rate,
+-					       max_rate, best_parent_rate,
+-					       best_parent_p);
++		return mux_ops->determine_rate(mux_hw, req);
+ 	} else {
+ 		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
++		req->rate = 0;
+ 		return 0;
+ 	}
+ }
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index ddb4b54..c182d8a 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -436,28 +436,37 @@ static bool mux_is_better_rate(unsigned long rate, unsigned long now,
+ 	return now <= rate && now > best;
+ }
+ 
+-static long
+-clk_mux_determine_rate_flags(struct clk_hw *hw, unsigned long rate,
+-			     unsigned long min_rate,
+-			     unsigned long max_rate,
+-			     unsigned long *best_parent_rate,
+-			     struct clk_hw **best_parent_p,
++static int
++clk_mux_determine_rate_flags(struct clk_hw *hw, struct clk_rate_request *req,
+ 			     unsigned long flags)
+ {
+ 	struct clk_core *core = hw->core, *parent, *best_parent = NULL;
+-	int i, num_parents;
+-	unsigned long parent_rate, best = 0;
++	int i, num_parents, ret;
++	unsigned long best = 0;
++	struct clk_rate_request parent_req = *req;
+ 
+ 	/* if NO_REPARENT flag set, pass through to current parent */
+ 	if (core->flags & CLK_SET_RATE_NO_REPARENT) {
+ 		parent = core->parent;
+-		if (core->flags & CLK_SET_RATE_PARENT)
+-			best = __clk_determine_rate(parent ? parent->hw : NULL,
+-						    rate, min_rate, max_rate);
+-		else if (parent)
++		if (core->flags & CLK_SET_RATE_PARENT) {
++			ret = __clk_determine_rate(parent ? parent->hw : NULL,
++						   &parent_req);
++			if (ret)
++				return ret;
++
++			best = parent_req.rate;
++			req->best_parent_hw = parent->hw;
++			req->best_parent_rate = best;
++		} else if (parent) {
+ 			best = clk_core_get_rate_nolock(parent);
+-		else
++			req->best_parent_hw = parent->hw;
++			req->best_parent_rate = best;
++		} else {
+ 			best = clk_core_get_rate_nolock(core);
++			req->best_parent_hw = NULL;
++			req->best_parent_rate = 0;
++		}
++
+ 		goto out;
+ 	}
+ 
+@@ -467,24 +476,30 @@ clk_mux_determine_rate_flags(struct clk_hw *hw, unsigned long rate,
+ 		parent = clk_core_get_parent_by_index(core, i);
+ 		if (!parent)
+ 			continue;
+-		if (core->flags & CLK_SET_RATE_PARENT)
+-			parent_rate = __clk_determine_rate(parent->hw, rate,
+-							   min_rate,
+-							   max_rate);
+-		else
+-			parent_rate = clk_core_get_rate_nolock(parent);
+-		if (mux_is_better_rate(rate, parent_rate, best, flags)) {
++
++		if (core->flags & CLK_SET_RATE_PARENT) {
++			parent_req = *req;
++			ret = __clk_determine_rate(parent->hw, &parent_req);
++			if (ret)
++				continue;
++		} else {
++			parent_req.rate = clk_core_get_rate_nolock(parent);
++		}
++
++		if (mux_is_better_rate(req->rate, parent_req.rate,
++				       best, flags)) {
+ 			best_parent = parent;
+-			best = parent_rate;
++			best = parent_req.rate;
+ 		}
+ 	}
+ 
+ out:
+ 	if (best_parent)
+-		*best_parent_p = best_parent->hw;
+-	*best_parent_rate = best;
++		req->best_parent_hw = best_parent->hw;
++	req->best_parent_rate = best;
++	req->rate = best;
+ 
+-	return best;
++	return 0;
+ }
+ 
+ struct clk *__clk_lookup(const char *name)
+@@ -515,28 +530,17 @@ static void clk_core_get_boundaries(struct clk_core *core,
+  * directly as a determine_rate callback (e.g. for a mux), or from a more
+  * complex clock that may combine a mux with other operations.
+  */
+-long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+-			      unsigned long min_rate,
+-			      unsigned long max_rate,
+-			      unsigned long *best_parent_rate,
+-			      struct clk_hw **best_parent_p)
++int __clk_mux_determine_rate(struct clk_hw *hw,
++			     struct clk_rate_request *req)
+ {
+-	return clk_mux_determine_rate_flags(hw, rate, min_rate, max_rate,
+-					    best_parent_rate,
+-					    best_parent_p, 0);
++	return clk_mux_determine_rate_flags(hw, req, 0);
+ }
+ EXPORT_SYMBOL_GPL(__clk_mux_determine_rate);
+ 
+-long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
+-			      unsigned long min_rate,
+-			      unsigned long max_rate,
+-			      unsigned long *best_parent_rate,
+-			      struct clk_hw **best_parent_p)
++int __clk_mux_determine_rate_closest(struct clk_hw *hw,
++				     struct clk_rate_request *req)
+ {
+-	return clk_mux_determine_rate_flags(hw, rate, min_rate, max_rate,
+-					    best_parent_rate,
+-					    best_parent_p,
+-					    CLK_MUX_ROUND_CLOSEST);
++	return clk_mux_determine_rate_flags(hw, req, CLK_MUX_ROUND_CLOSEST);
+ }
+ EXPORT_SYMBOL_GPL(__clk_mux_determine_rate_closest);
+ 
+@@ -759,14 +763,11 @@ int clk_enable(struct clk *clk)
+ }
+ EXPORT_SYMBOL_GPL(clk_enable);
+ 
+-static unsigned long clk_core_round_rate_nolock(struct clk_core *core,
+-						unsigned long rate,
+-						unsigned long min_rate,
+-						unsigned long max_rate)
++static int clk_core_round_rate_nolock(struct clk_core *core,
++				      struct clk_rate_request *req)
+ {
+-	unsigned long parent_rate = 0;
+ 	struct clk_core *parent;
+-	struct clk_hw *parent_hw;
++	long rate;
+ 
+ 	lockdep_assert_held(&prepare_lock);
+ 
+@@ -774,21 +775,28 @@ static unsigned long clk_core_round_rate_nolock(struct clk_core *core,
+ 		return 0;
+ 
+ 	parent = core->parent;
+-	if (parent)
+-		parent_rate = parent->rate;
++	if (parent) {
++		req->best_parent_hw = parent->hw;
++		req->best_parent_rate = parent->rate;
++	} else {
++		req->best_parent_hw = NULL;
++		req->best_parent_rate = 0;
++	}
+ 
+ 	if (core->ops->determine_rate) {
+-		parent_hw = parent ? parent->hw : NULL;
+-		return core->ops->determine_rate(core->hw, rate,
+-						min_rate, max_rate,
+-						&parent_rate, &parent_hw);
+-	} else if (core->ops->round_rate)
+-		return core->ops->round_rate(core->hw, rate, &parent_rate);
+-	else if (core->flags & CLK_SET_RATE_PARENT)
+-		return clk_core_round_rate_nolock(core->parent, rate, min_rate,
+-						  max_rate);
+-	else
+-		return core->rate;
++		return core->ops->determine_rate(core->hw, req);
++	} else if (core->ops->round_rate) {
++		rate = core->ops->round_rate(core->hw, req->rate,
++					     &req->best_parent_rate);
++		if (rate < 0)
++			return rate;
++
++		req->rate = rate;
++	} else if (core->flags & CLK_SET_RATE_PARENT) {
++		return clk_core_round_rate_nolock(parent, req);
++	}
++
++	return 0;
+ }
+ 
+ /**
+@@ -800,15 +808,12 @@ static unsigned long clk_core_round_rate_nolock(struct clk_core *core,
+  *
+  * Useful for clk_ops such as .set_rate and .determine_rate.
+  */
+-unsigned long __clk_determine_rate(struct clk_hw *hw,
+-				   unsigned long rate,
+-				   unsigned long min_rate,
+-				   unsigned long max_rate)
++int __clk_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+ {
+ 	if (!hw)
+ 		return 0;
+ 
+-	return clk_core_round_rate_nolock(hw->core, rate, min_rate, max_rate);
++	return clk_core_round_rate_nolock(hw->core, req);
+ }
+ EXPORT_SYMBOL_GPL(__clk_determine_rate);
+ 
+@@ -821,15 +826,20 @@ EXPORT_SYMBOL_GPL(__clk_determine_rate);
+  */
+ unsigned long __clk_round_rate(struct clk *clk, unsigned long rate)
+ {
+-	unsigned long min_rate;
+-	unsigned long max_rate;
++	struct clk_rate_request req;
++	int ret;
+ 
+ 	if (!clk)
+ 		return 0;
+ 
+-	clk_core_get_boundaries(clk->core, &min_rate, &max_rate);
++	clk_core_get_boundaries(clk->core, &req.min_rate, &req.max_rate);
++	req.rate = rate;
++
++	ret = clk_core_round_rate_nolock(clk->core, &req);
++	if (ret)
++		return 0;
+ 
+-	return clk_core_round_rate_nolock(clk->core, rate, min_rate, max_rate);
++	return req.rate;
+ }
+ EXPORT_SYMBOL_GPL(__clk_round_rate);
+ 
+@@ -1249,7 +1259,6 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
+ {
+ 	struct clk_core *top = core;
+ 	struct clk_core *old_parent, *parent;
+-	struct clk_hw *parent_hw;
+ 	unsigned long best_parent_rate = 0;
+ 	unsigned long new_rate;
+ 	unsigned long min_rate;
+@@ -1270,20 +1279,29 @@ static struct clk_core *clk_calc_new_rates(struct clk_core *core,
+ 
+ 	/* find the closest rate and parent clk/rate */
+ 	if (core->ops->determine_rate) {
+-		parent_hw = parent ? parent->hw : NULL;
+-		ret = core->ops->determine_rate(core->hw, rate,
+-					       min_rate,
+-					       max_rate,
+-					       &best_parent_rate,
+-					       &parent_hw);
++		struct clk_rate_request req;
++
++		req.rate = rate;
++		req.min_rate = min_rate;
++		req.max_rate = max_rate;
++		if (parent) {
++			req.best_parent_hw = parent->hw;
++			req.best_parent_rate = parent->rate;
++		} else {
++			req.best_parent_hw = NULL;
++			req.best_parent_rate = 0;
++		}
++
++		ret = core->ops->determine_rate(core->hw, &req);
+ 		if (ret < 0)
+ 			return NULL;
+ 
+-		new_rate = ret;
+-		parent = parent_hw ? parent_hw->core : NULL;
++		best_parent_rate = req.best_parent_rate;
++		new_rate = req.rate;
++		parent = req.best_parent_hw ? req.best_parent_hw->core : NULL;
+ 	} else if (core->ops->round_rate) {
+ 		ret = core->ops->round_rate(core->hw, rate,
+-					   &best_parent_rate);
++					    &best_parent_rate);
+ 		if (ret < 0)
+ 			return NULL;
+ 
+diff --git a/drivers/clk/hisilicon/clk-hi3620.c b/drivers/clk/hisilicon/clk-hi3620.c
+index 715d34a..a0674ba 100644
+--- a/drivers/clk/hisilicon/clk-hi3620.c
++++ b/drivers/clk/hisilicon/clk-hi3620.c
+@@ -294,34 +294,29 @@ static unsigned long mmc_clk_recalc_rate(struct clk_hw *hw,
+ 	}
+ }
+ 
+-static long mmc_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+-			      unsigned long min_rate,
+-			      unsigned long max_rate,
+-			      unsigned long *best_parent_rate,
+-			      struct clk_hw **best_parent_p)
++static int mmc_clk_determine_rate(struct clk_hw *hw,
++				  struct clk_rate_request *req)
+ {
+ 	struct clk_mmc *mclk = to_mmc(hw);
+-	unsigned long best = 0;
+ 
+-	if ((rate <= 13000000) && (mclk->id == HI3620_MMC_CIUCLK1)) {
+-		rate = 13000000;
+-		best = 26000000;
+-	} else if (rate <= 26000000) {
+-		rate = 25000000;
+-		best = 180000000;
+-	} else if (rate <= 52000000) {
+-		rate = 50000000;
+-		best = 360000000;
+-	} else if (rate <= 100000000) {
+-		rate = 100000000;
+-		best = 720000000;
++	if ((req->rate <= 13000000) && (mclk->id == HI3620_MMC_CIUCLK1)) {
++		req->rate = 13000000;
++		req->best_parent_rate = 26000000;
++	} else if (req->rate <= 26000000) {
++		req->rate = 25000000;
++		req->best_parent_rate = 180000000;
++	} else if (req->rate <= 52000000) {
++		req->rate = 50000000;
++		req->best_parent_rate = 360000000;
++	} else if (req->rate <= 100000000) {
++		req->rate = 100000000;
++		req->best_parent_rate = 720000000;
+ 	} else {
+ 		/* max is 180M */
+-		rate = 180000000;
+-		best = 1440000000;
++		req->rate = 180000000;
++		req->best_parent_rate = 1440000000;
+ 	}
+-	*best_parent_rate = best;
+-	return rate;
++	return 0;
+ }
+ 
+ static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
+diff --git a/drivers/clk/mmp/clk-mix.c b/drivers/clk/mmp/clk-mix.c
+index de6a873..7a37432 100644
+--- a/drivers/clk/mmp/clk-mix.c
++++ b/drivers/clk/mmp/clk-mix.c
+@@ -201,11 +201,8 @@ error:
+ 	return ret;
+ }
+ 
+-static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk)
++static int mmp_clk_mix_determine_rate(struct clk_hw *hw,
++				      struct clk_rate_request *req)
+ {
+ 	struct mmp_clk_mix *mix = to_clk_mix(hw);
+ 	struct mmp_clk_mix_clk_table *item;
+@@ -221,7 +218,7 @@ static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	parent = NULL;
+ 	mix_rate_best = 0;
+ 	parent_rate_best = 0;
+-	gap_best = rate;
++	gap_best = req->rate;
+ 	parent_best = NULL;
+ 
+ 	if (mix->table) {
+@@ -233,7 +230,7 @@ static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 							item->parent_index);
+ 			parent_rate = __clk_get_rate(parent);
+ 			mix_rate = parent_rate / item->divisor;
+-			gap = abs(mix_rate - rate);
++			gap = abs(mix_rate - req->rate);
+ 			if (parent_best == NULL || gap < gap_best) {
+ 				parent_best = parent;
+ 				parent_rate_best = parent_rate;
+@@ -251,7 +248,7 @@ static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 			for (j = 0; j < div_val_max; j++) {
+ 				div = _get_div(mix, j);
+ 				mix_rate = parent_rate / div;
+-				gap = abs(mix_rate - rate);
++				gap = abs(mix_rate - req->rate);
+ 				if (parent_best == NULL || gap < gap_best) {
+ 					parent_best = parent;
+ 					parent_rate_best = parent_rate;
+@@ -265,10 +262,11 @@ static long mmp_clk_mix_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	}
+ 
+ found:
+-	*best_parent_rate = parent_rate_best;
+-	*best_parent_clk = __clk_get_hw(parent_best);
++	req->best_parent_rate = parent_rate_best;
++	req->best_parent_hw = __clk_get_hw(parent_best);
++	req->rate = mix_rate_best;
+ 
+-	return mix_rate_best;
++	return 0;
+ }
+ 
+ static int mmp_clk_mix_set_rate_and_parent(struct clk_hw *hw,
+diff --git a/drivers/clk/qcom/clk-pll.c b/drivers/clk/qcom/clk-pll.c
+index 245d506..6017a76 100644
+--- a/drivers/clk/qcom/clk-pll.c
++++ b/drivers/clk/qcom/clk-pll.c
+@@ -135,19 +135,23 @@ struct pll_freq_tbl *find_freq(const struct pll_freq_tbl *f, unsigned long rate)
+ 	return NULL;
+ }
+ 
+-static long
+-clk_pll_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		       unsigned long min_rate, unsigned long max_rate,
+-		       unsigned long *p_rate, struct clk_hw **p)
++static int
++clk_pll_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+ {
++	struct clk *parent = __clk_get_parent(hw->clk);
+ 	struct clk_pll *pll = to_clk_pll(hw);
+ 	const struct pll_freq_tbl *f;
+ 
+-	f = find_freq(pll->freq_tbl, rate);
++	req->best_parent_hw = __clk_get_hw(parent);
++	req->best_parent_rate = __clk_get_rate(parent);
++
++	f = find_freq(pll->freq_tbl, req->rate);
+ 	if (!f)
+-		return clk_pll_recalc_rate(hw, *p_rate);
++		req->rate = clk_pll_recalc_rate(hw, req->best_parent_rate);
++	else
++		req->rate = f->freq;
+ 
+-	return f->freq;
++	return 0;
+ }
+ 
+ static int
+diff --git a/drivers/clk/qcom/clk-rcg.c b/drivers/clk/qcom/clk-rcg.c
+index 7b3d626..2bc42bb 100644
+--- a/drivers/clk/qcom/clk-rcg.c
++++ b/drivers/clk/qcom/clk-rcg.c
+@@ -404,13 +404,11 @@ clk_dyn_rcg_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+ 	return calc_rate(parent_rate, m, n, mode, pre_div);
+ }
+ 
+-static long _freq_tbl_determine_rate(struct clk_hw *hw,
+-		const struct freq_tbl *f, unsigned long rate,
+-		unsigned long min_rate, unsigned long max_rate,
+-		unsigned long *p_rate, struct clk_hw **p_hw,
++static int _freq_tbl_determine_rate(struct clk_hw *hw, const struct freq_tbl *f,
++		struct clk_rate_request *req,
+ 		const struct parent_map *parent_map)
+ {
+-	unsigned long clk_flags;
++	unsigned long clk_flags, rate = req->rate;
+ 	struct clk *p;
+ 	int index;
+ 
+@@ -435,25 +433,24 @@ static long _freq_tbl_determine_rate(struct clk_hw *hw,
+ 	} else {
+ 		rate =  __clk_get_rate(p);
+ 	}
+-	*p_hw = __clk_get_hw(p);
+-	*p_rate = rate;
++	req->best_parent_hw = __clk_get_hw(p);
++	req->best_parent_rate = rate;
++	req->rate = f->freq;
+ 
+-	return f->freq;
++	return 0;
+ }
+ 
+-static long clk_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long min_rate, unsigned long max_rate,
+-		unsigned long *p_rate, struct clk_hw **p)
++static int clk_rcg_determine_rate(struct clk_hw *hw,
++				  struct clk_rate_request *req)
+ {
+ 	struct clk_rcg *rcg = to_clk_rcg(hw);
+ 
+-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, min_rate,
+-			max_rate, p_rate, p, rcg->s.parent_map);
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req,
++					rcg->s.parent_map);
+ }
+ 
+-static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long min_rate, unsigned long max_rate,
+-		unsigned long *p_rate, struct clk_hw **p)
++static int clk_dyn_rcg_determine_rate(struct clk_hw *hw,
++				      struct clk_rate_request *req)
+ {
+ 	struct clk_dyn_rcg *rcg = to_clk_dyn_rcg(hw);
+ 	u32 reg;
+@@ -464,13 +461,11 @@ static long clk_dyn_rcg_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	bank = reg_to_bank(rcg, reg);
+ 	s = &rcg->s[bank];
+ 
+-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, min_rate,
+-			max_rate, p_rate, p, s->parent_map);
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req, s->parent_map);
+ }
+ 
+-static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long min_rate, unsigned long max_rate,
+-		unsigned long *p_rate, struct clk_hw **p_hw)
++static int clk_rcg_bypass_determine_rate(struct clk_hw *hw,
++					 struct clk_rate_request *req)
+ {
+ 	struct clk_rcg *rcg = to_clk_rcg(hw);
+ 	const struct freq_tbl *f = rcg->freq_tbl;
+@@ -478,10 +473,11 @@ static long clk_rcg_bypass_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	int index = qcom_find_src_index(hw, rcg->s.parent_map, f->src);
+ 
+ 	p = clk_get_parent_by_index(hw->clk, index);
+-	*p_hw = __clk_get_hw(p);
+-	*p_rate = __clk_round_rate(p, rate);
++	req->best_parent_hw = __clk_get_hw(p);
++	req->best_parent_rate = __clk_round_rate(p, req->rate);
++	req->rate = req->best_parent_rate;
+ 
+-	return *p_rate;
++	return 0;
+ }
+ 
+ static int __clk_rcg_set_rate(struct clk_rcg *rcg, const struct freq_tbl *f)
+diff --git a/drivers/clk/qcom/clk-rcg2.c b/drivers/clk/qcom/clk-rcg2.c
+index b95d17f..aa6c3bd 100644
+--- a/drivers/clk/qcom/clk-rcg2.c
++++ b/drivers/clk/qcom/clk-rcg2.c
+@@ -176,11 +176,10 @@ clk_rcg2_recalc_rate(struct clk_hw *hw, unsigned long parent_rate)
+ 	return calc_rate(parent_rate, m, n, mode, hid_div);
+ }
+ 
+-static long _freq_tbl_determine_rate(struct clk_hw *hw,
+-		const struct freq_tbl *f, unsigned long rate,
+-		unsigned long *p_rate, struct clk_hw **p_hw)
++static int _freq_tbl_determine_rate(struct clk_hw *hw,
++		const struct freq_tbl *f, struct clk_rate_request *req)
+ {
+-	unsigned long clk_flags;
++	unsigned long clk_flags, rate = req->rate;
+ 	struct clk *p;
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 	int index;
+@@ -210,19 +209,19 @@ static long _freq_tbl_determine_rate(struct clk_hw *hw,
+ 	} else {
+ 		rate =  __clk_get_rate(p);
+ 	}
+-	*p_hw = __clk_get_hw(p);
+-	*p_rate = rate;
++	req->best_parent_hw = __clk_get_hw(p);
++	req->best_parent_rate = rate;
++	req->rate = f->freq;
+ 
+-	return f->freq;
++	return 0;
+ }
+ 
+-static long clk_rcg2_determine_rate(struct clk_hw *hw, unsigned long rate,
+-		unsigned long min_rate, unsigned long max_rate,
+-		unsigned long *p_rate, struct clk_hw **p)
++static int clk_rcg2_determine_rate(struct clk_hw *hw,
++				   struct clk_rate_request *req)
+ {
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 
+-	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, rate, p_rate, p);
++	return _freq_tbl_determine_rate(hw, rcg->freq_tbl, req);
+ }
+ 
+ static int clk_rcg2_configure(struct clk_rcg2 *rcg, const struct freq_tbl *f)
+@@ -374,35 +373,34 @@ static int clk_edp_pixel_set_rate_and_parent(struct clk_hw *hw,
+ 	return clk_edp_pixel_set_rate(hw, rate, parent_rate);
+ }
+ 
+-static long clk_edp_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+-				 unsigned long min_rate,
+-				 unsigned long max_rate,
+-				 unsigned long *p_rate, struct clk_hw **p)
++static int clk_edp_pixel_determine_rate(struct clk_hw *hw,
++					struct clk_rate_request *req)
+ {
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 	const struct freq_tbl *f = rcg->freq_tbl;
+ 	const struct frac_entry *frac;
+ 	int delta = 100000;
+-	s64 src_rate = *p_rate;
+ 	s64 request;
+ 	u32 mask = BIT(rcg->hid_width) - 1;
+ 	u32 hid_div;
+ 	int index = qcom_find_src_index(hw, rcg->parent_map, f->src);
++	struct clk *p = clk_get_parent_by_index(hw->clk, index);
+ 
+ 	/* Force the correct parent */
+-	*p = __clk_get_hw(clk_get_parent_by_index(hw->clk, index));
++	req->best_parent_hw = __clk_get_hw(p);
++	req->best_parent_rate = __clk_get_rate(p);
+ 
+-	if (src_rate == 810000000)
++	if (req->best_parent_rate == 810000000)
+ 		frac = frac_table_810m;
+ 	else
+ 		frac = frac_table_675m;
+ 
+ 	for (; frac->num; frac++) {
+-		request = rate;
++		request = req->rate;
+ 		request *= frac->den;
+ 		request = div_s64(request, frac->num);
+-		if ((src_rate < (request - delta)) ||
+-		    (src_rate > (request + delta)))
++		if ((req->best_parent_rate < (request - delta)) ||
++		    (req->best_parent_rate > (request + delta)))
+ 			continue;
+ 
+ 		regmap_read(rcg->clkr.regmap, rcg->cmd_rcgr + CFG_REG,
+@@ -410,8 +408,10 @@ static long clk_edp_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 		hid_div >>= CFG_SRC_DIV_SHIFT;
+ 		hid_div &= mask;
+ 
+-		return calc_rate(src_rate, frac->num, frac->den, !!frac->den,
+-				 hid_div);
++		req->rate = calc_rate(req->best_parent_rate,
++				      frac->num, frac->den,
++				      !!frac->den, hid_div);
++		return 0;
+ 	}
+ 
+ 	return -EINVAL;
+@@ -428,9 +428,8 @@ const struct clk_ops clk_edp_pixel_ops = {
+ };
+ EXPORT_SYMBOL_GPL(clk_edp_pixel_ops);
+ 
+-static long clk_byte_determine_rate(struct clk_hw *hw, unsigned long rate,
+-			 unsigned long min_rate, unsigned long max_rate,
+-			 unsigned long *p_rate, struct clk_hw **p_hw)
++static int clk_byte_determine_rate(struct clk_hw *hw,
++				   struct clk_rate_request *req)
+ {
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 	const struct freq_tbl *f = rcg->freq_tbl;
+@@ -439,17 +438,19 @@ static long clk_byte_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	u32 mask = BIT(rcg->hid_width) - 1;
+ 	struct clk *p;
+ 
+-	if (rate == 0)
++	if (req->rate == 0)
+ 		return -EINVAL;
+ 
+ 	p = clk_get_parent_by_index(hw->clk, index);
+-	*p_hw = __clk_get_hw(p);
+-	*p_rate = parent_rate = __clk_round_rate(p, rate);
++	req->best_parent_hw = __clk_get_hw(p);
++	req->best_parent_rate = parent_rate = __clk_round_rate(p, req->rate);
+ 
+-	div = DIV_ROUND_UP((2 * parent_rate), rate) - 1;
++	div = DIV_ROUND_UP((2 * parent_rate), req->rate) - 1;
+ 	div = min_t(u32, div, mask);
+ 
+-	return calc_rate(parent_rate, 0, 0, 0, div);
++	req->rate = calc_rate(parent_rate, 0, 0, 0, div);
++
++	return 0;
+ }
+ 
+ static int clk_byte_set_rate(struct clk_hw *hw, unsigned long rate,
+@@ -494,10 +495,8 @@ static const struct frac_entry frac_table_pixel[] = {
+ 	{ }
+ };
+ 
+-static long clk_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+-				 unsigned long min_rate,
+-				 unsigned long max_rate,
+-				 unsigned long *p_rate, struct clk_hw **p)
++static int clk_pixel_determine_rate(struct clk_hw *hw,
++				    struct clk_rate_request *req)
+ {
+ 	struct clk_rcg2 *rcg = to_clk_rcg2(hw);
+ 	unsigned long request, src_rate;
+@@ -507,18 +506,19 @@ static long clk_pixel_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	int index = qcom_find_src_index(hw, rcg->parent_map, f->src);
+ 	struct clk *parent = clk_get_parent_by_index(hw->clk, index);
+ 
+-	*p = __clk_get_hw(parent);
++	req->best_parent_hw = __clk_get_hw(parent);
+ 
+ 	for (; frac->num; frac++) {
+-		request = (rate * frac->den) / frac->num;
++		request = (req->rate * frac->den) / frac->num;
+ 
+ 		src_rate = __clk_round_rate(parent, request);
+ 		if ((src_rate < (request - delta)) ||
+ 			(src_rate > (request + delta)))
+ 			continue;
+ 
+-		*p_rate = src_rate;
+-		return (src_rate * frac->num) / frac->den;
++		req->best_parent_rate = src_rate;
++		req->rate = (src_rate * frac->num) / frac->den;
++		return 0;
+ 	}
+ 
+ 	return -EINVAL;
+diff --git a/drivers/clk/sunxi/clk-factors.c b/drivers/clk/sunxi/clk-factors.c
+index 8c20190..7a48587 100644
+--- a/drivers/clk/sunxi/clk-factors.c
++++ b/drivers/clk/sunxi/clk-factors.c
+@@ -79,11 +79,8 @@ static long clk_factors_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	return rate;
+ }
+ 
+-static long clk_factors_determine_rate(struct clk_hw *hw, unsigned long rate,
+-				       unsigned long min_rate,
+-				       unsigned long max_rate,
+-				       unsigned long *best_parent_rate,
+-				       struct clk_hw **best_parent_p)
++static int clk_factors_determine_rate(struct clk_hw *hw,
++				      struct clk_rate_request *req)
+ {
+ 	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
+ 	int i, num_parents;
+@@ -96,13 +93,14 @@ static long clk_factors_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 		if (!parent)
+ 			continue;
+ 		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
+-			parent_rate = __clk_round_rate(parent, rate);
++			parent_rate = __clk_round_rate(parent, req->rate);
+ 		else
+ 			parent_rate = __clk_get_rate(parent);
+ 
+-		child_rate = clk_factors_round_rate(hw, rate, &parent_rate);
++		child_rate = clk_factors_round_rate(hw, req->rate,
++						    &parent_rate);
+ 
+-		if (child_rate <= rate && child_rate > best_child_rate) {
++		if (child_rate <= req->rate && child_rate > best_child_rate) {
+ 			best_parent = parent;
+ 			best = parent_rate;
+ 			best_child_rate = child_rate;
+@@ -110,10 +108,11 @@ static long clk_factors_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	}
+ 
+ 	if (best_parent)
+-		*best_parent_p = __clk_get_hw(best_parent);
+-	*best_parent_rate = best;
++		req->best_parent_hw = __clk_get_hw(best_parent);
++	req->best_parent_rate = best;
++	req->rate = best_child_rate;
+ 
+-	return best_child_rate;
++	return 0;
+ }
+ 
+ static int clk_factors_set_rate(struct clk_hw *hw, unsigned long rate,
+diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c b/drivers/clk/sunxi/clk-sun6i-ar100.c
+index 63cf149..d70c1ea 100644
+--- a/drivers/clk/sunxi/clk-sun6i-ar100.c
++++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
+@@ -44,17 +44,14 @@ static unsigned long ar100_recalc_rate(struct clk_hw *hw,
+ 	return (parent_rate >> shift) / (div + 1);
+ }
+ 
+-static long ar100_determine_rate(struct clk_hw *hw, unsigned long rate,
+-				 unsigned long min_rate,
+-				 unsigned long max_rate,
+-				 unsigned long *best_parent_rate,
+-				 struct clk_hw **best_parent_clk)
++static int ar100_determine_rate(struct clk_hw *hw,
++				struct clk_rate_request *req)
+ {
+ 	int nparents = __clk_get_num_parents(hw->clk);
+ 	long best_rate = -EINVAL;
+ 	int i;
+ 
+-	*best_parent_clk = NULL;
++	req->best_parent_hw = NULL;
+ 
+ 	for (i = 0; i < nparents; i++) {
+ 		unsigned long parent_rate;
+@@ -65,7 +62,7 @@ static long ar100_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		parent = clk_get_parent_by_index(hw->clk, i);
+ 		parent_rate = __clk_get_rate(parent);
+-		div = DIV_ROUND_UP(parent_rate, rate);
++		div = DIV_ROUND_UP(parent_rate, req->rate);
  
  		/*
- 		 * Dump out the common processor features in a single line.
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 803cfea41962..5686a3ae3940 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -82,7 +82,6 @@ ENTRY(__cpu_suspend_enter)
- 	str	x2, [x0, #CPU_CTX_SP]
- 	ldr	x1, =sleep_save_sp
- 	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
--#ifdef CONFIG_SMP
- 	mrs	x7, mpidr_el1
- 	ldr	x9, =mpidr_hash
- 	ldr	x10, [x9, #MPIDR_HASH_MASK]
-@@ -94,7 +93,6 @@ ENTRY(__cpu_suspend_enter)
- 	ldp	w5, w6, [x9, #(MPIDR_HASH_SHIFTS + 8)]
- 	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
- 	add	x1, x1, x8, lsl #3
--#endif
- 	bl	__cpu_suspend_save
- 	/*
- 	 * Grab suspend finisher in x20 and its argument in x19
-@@ -151,7 +149,6 @@ ENDPROC(cpu_resume_after_mmu)
+ 		 * The AR100 clk contains 2 divisors:
+@@ -101,14 +98,16 @@ static long ar100_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 			continue;
  
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
--#ifdef CONFIG_SMP
- 	mrs	x1, mpidr_el1
- 	adrp	x8, mpidr_hash
- 	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
-@@ -161,9 +158,7 @@ ENTRY(cpu_resume)
- 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
- 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
-         /* x7 contains hash index, let's use it to grab context pointer */
--#else
- 	mov	x7, xzr
--#endif
- 	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
- 	ldr	x0, [x0, x7, lsl #3]
- 	/* load sp from context */
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 42f9195cf2f8..149151fb42bb 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -42,7 +42,6 @@
- #include <asm/thread_info.h>
- #include <asm/stacktrace.h>
- 
--#ifdef CONFIG_SMP
- unsigned long profile_pc(struct pt_regs *regs)
- {
- 	struct stackframe frame;
-@@ -62,7 +61,6 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	return frame.pc;
- }
- EXPORT_SYMBOL(profile_pc);
--#endif
- 
- void __init time_init(void)
- {
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 566bc4c35040..443e68e6923b 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -179,11 +179,7 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
- #else
- #define S_PREEMPT ""
- #endif
--#ifdef CONFIG_SMP
- #define S_SMP " SMP"
--#else
--#define S_SMP ""
--#endif
- 
- static int __die(const char *str, int err, struct thread_info *thread,
- 		 struct pt_regs *regs)
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 76c1e6cd36fc..d70ff14dbdbd 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -53,8 +53,6 @@ static void flush_context(void)
- 		__flush_icache_all();
- }
- 
--#ifdef CONFIG_SMP
--
- static void set_mm_context(struct mm_struct *mm, unsigned int asid)
- {
- 	unsigned long flags;
-@@ -110,23 +108,12 @@ static void reset_context(void *info)
- 	cpu_switch_mm(mm->pgd, mm);
- }
- 
--#else
--
--static inline void set_mm_context(struct mm_struct *mm, unsigned int asid)
--{
--	mm->context.id = asid;
--	cpumask_copy(mm_cpumask(mm), cpumask_of(smp_processor_id()));
--}
--
--#endif
--
- void __new_context(struct mm_struct *mm)
- {
- 	unsigned int asid;
- 	unsigned int bits = asid_bits();
- 
- 	raw_spin_lock(&cpu_asid_lock);
--#ifdef CONFIG_SMP
- 	/*
- 	 * Check the ASID again, in case the change was broadcast from another
- 	 * CPU before we acquired the lock.
-@@ -136,7 +123,6 @@ void __new_context(struct mm_struct *mm)
- 		raw_spin_unlock(&cpu_asid_lock);
- 		return;
- 	}
--#endif
- 	/*
- 	 * At this point, it is guaranteed that the current mm (with an old
- 	 * ASID) isn't active on any other CPU since the ASIDs are changed
-@@ -155,10 +141,8 @@ void __new_context(struct mm_struct *mm)
- 			cpu_last_asid = ASID_FIRST_VERSION;
- 		asid = cpu_last_asid + smp_processor_id();
- 		flush_context();
--#ifdef CONFIG_SMP
- 		smp_wmb();
- 		smp_call_function(reset_context, NULL, 1);
--#endif
- 		cpu_last_asid += NR_CPUS - 1;
+ 		tmp_rate = (parent_rate >> shift) / div;
+-		if (!*best_parent_clk || tmp_rate > best_rate) {
+-			*best_parent_clk = __clk_get_hw(parent);
+-			*best_parent_rate = parent_rate;
++		if (!req->best_parent_hw || tmp_rate > best_rate) {
++			req->best_parent_hw = __clk_get_hw(parent);
++			req->best_parent_rate = parent_rate;
+ 			best_rate = tmp_rate;
+ 		}
  	}
  
-diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-index 4dfa3975ce5b..c26b804015e8 100644
---- a/arch/arm64/mm/flush.c
-+++ b/arch/arm64/mm/flush.c
-@@ -60,14 +60,10 @@ void copy_to_user_page(struct vm_area_struct *vma, struct page *page,
- 		       unsigned long uaddr, void *dst, const void *src,
- 		       unsigned long len)
- {
--#ifdef CONFIG_SMP
- 	preempt_disable();
--#endif
- 	memcpy(dst, src, len);
- 	flush_ptrace_access(vma, page, uaddr, dst, len);
--#ifdef CONFIG_SMP
- 	preempt_enable();
--#endif
+-	return best_rate;
++	req->rate = best_rate;
++
++	return 0;
  }
  
- void __sync_icache_dcache(pte_t pte, unsigned long addr)
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 39139a3aa16d..eff4f627358a 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -34,11 +34,7 @@
- #define TCR_TG_FLAGS	TCR_TG0_4K | TCR_TG1_4K
- #endif
+ static int ar100_set_parent(struct clk_hw *hw, u8 index)
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 9a82f17..d0f72a1 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -118,11 +118,8 @@ static long sun6i_ahb1_clk_round(unsigned long rate, u8 *divp, u8 *pre_divp,
+ 	return (parent_rate / calcm) >> calcp;
+ }
  
--#ifdef CONFIG_SMP
- #define TCR_SMP_FLAGS	TCR_SHARED
--#else
--#define TCR_SMP_FLAGS	0
--#endif
+-static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+-					  unsigned long min_rate,
+-					  unsigned long max_rate,
+-					  unsigned long *best_parent_rate,
+-					  struct clk_hw **best_parent_clk)
++static int sun6i_ahb1_clk_determine_rate(struct clk_hw *hw,
++					 struct clk_rate_request *req)
+ {
+ 	struct clk *clk = hw->clk, *parent, *best_parent = NULL;
+ 	int i, num_parents;
+@@ -135,14 +132,14 @@ static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 		if (!parent)
+ 			continue;
+ 		if (__clk_get_flags(clk) & CLK_SET_RATE_PARENT)
+-			parent_rate = __clk_round_rate(parent, rate);
++			parent_rate = __clk_round_rate(parent, req->rate);
+ 		else
+ 			parent_rate = __clk_get_rate(parent);
  
- /* PTWs cacheable, inner/outer WBWA */
- #define TCR_CACHE_FLAGS	TCR_IRGN_WBWA | TCR_ORGN_WBWA
+-		child_rate = sun6i_ahb1_clk_round(rate, NULL, NULL, i,
++		child_rate = sun6i_ahb1_clk_round(req->rate, NULL, NULL, i,
+ 						  parent_rate);
+ 
+-		if (child_rate <= rate && child_rate > best_child_rate) {
++		if (child_rate <= req->rate && child_rate > best_child_rate) {
+ 			best_parent = parent;
+ 			best = parent_rate;
+ 			best_child_rate = child_rate;
+@@ -150,10 +147,11 @@ static long sun6i_ahb1_clk_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 	}
+ 
+ 	if (best_parent)
+-		*best_parent_clk = __clk_get_hw(best_parent);
+-	*best_parent_rate = best;
++		req->best_parent_hw = __clk_get_hw(best_parent);
++	req->best_parent_rate = best;
++	req->rate = best_child_rate;
+ 
+-	return best_child_rate;
++	return 0;
+ }
+ 
+ static int sun6i_ahb1_clk_set_rate(struct clk_hw *hw, unsigned long rate,
+diff --git a/drivers/clk/tegra/clk-emc.c b/drivers/clk/tegra/clk-emc.c
+index 7649685..08ae518 100644
+--- a/drivers/clk/tegra/clk-emc.c
++++ b/drivers/clk/tegra/clk-emc.c
+@@ -116,11 +116,7 @@ static unsigned long emc_recalc_rate(struct clk_hw *hw,
+  * safer since things have EMC rate floors. Also don't touch parent_rate
+  * since we don't want the CCF to play with our parent clocks.
+  */
+-static long emc_determine_rate(struct clk_hw *hw, unsigned long rate,
+-			       unsigned long min_rate,
+-			       unsigned long max_rate,
+-			       unsigned long *best_parent_rate,
+-			       struct clk_hw **best_parent_hw)
++static int emc_determine_rate(struct clk_hw *hw, struct clk_rate_request *req)
+ {
+ 	struct tegra_clk_emc *tegra;
+ 	u8 ram_code = tegra_read_ram_code();
+@@ -135,22 +131,28 @@ static long emc_determine_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 		timing = tegra->timings + i;
+ 
+-		if (timing->rate > max_rate) {
++		if (timing->rate > req->max_rate) {
+ 			i = min(i, 1);
+-			return tegra->timings[i - 1].rate;
++			req->rate = tegra->timings[i - 1].rate;
++			return 0;
+ 		}
+ 
+-		if (timing->rate < min_rate)
++		if (timing->rate < req->min_rate)
+ 			continue;
+ 
+-		if (timing->rate >= rate)
+-			return timing->rate;
++		if (timing->rate >= req->rate) {
++			req->rate = timing->rate;
++			return 0;
++		}
+ 	}
+ 
+-	if (timing)
+-		return timing->rate;
++	if (timing) {
++		req->rate = timing->rate;
++		return 0;
++	}
+ 
+-	return __clk_get_rate(hw->clk);
++	req->rate = __clk_get_rate(hw->clk);
++	return 0;
+ }
+ 
+ static u8 emc_get_parent(struct clk_hw *hw)
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 78842f4..14998f0 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -38,6 +38,28 @@ struct clk_core;
+ struct dentry;
+ 
+ /**
++ * struct clk_rate_request - Structure encoding the clk constraints that
++ * a clock user might require.
++ *
++ * @rate:		Requested clock rate. This field will be adjusted by
++ *			clock drivers according to hardware capabilities.
++ * @min_rate:		Minimum rate imposed by clk users.
++ * @max_rate:		Maximum rate a imposed by clk users.
++ * @best_parent_rate:	The best parent rate a parent can provide to fulfill the
++ *			requested constraints.
++ * @best_parent_hw:	The most appropriate parent clock that fulfills the
++ *			requested constraints.
++ *
++ */
++struct clk_rate_request {
++	unsigned long rate;
++	unsigned long min_rate;
++	unsigned long max_rate;
++	unsigned long best_parent_rate;
++	struct clk_hw *best_parent_hw;
++};
++
++/**
+  * struct clk_ops -  Callback operations for hardware clocks; these are to
+  * be provided by the clock implementation, and will be called by drivers
+  * through the clk_* api.
+@@ -176,12 +198,8 @@ struct clk_ops {
+ 					unsigned long parent_rate);
+ 	long		(*round_rate)(struct clk_hw *hw, unsigned long rate,
+ 					unsigned long *parent_rate);
+-	long		(*determine_rate)(struct clk_hw *hw,
+-					  unsigned long rate,
+-					  unsigned long min_rate,
+-					  unsigned long max_rate,
+-					  unsigned long *best_parent_rate,
+-					  struct clk_hw **best_parent_hw);
++	int		(*determine_rate)(struct clk_hw *hw,
++					  struct clk_rate_request *req);
+ 	int		(*set_parent)(struct clk_hw *hw, u8 index);
+ 	u8		(*get_parent)(struct clk_hw *hw);
+ 	int		(*set_rate)(struct clk_hw *hw, unsigned long rate,
+@@ -578,20 +596,11 @@ unsigned long __clk_get_flags(struct clk *clk);
+ bool __clk_is_prepared(struct clk *clk);
+ bool __clk_is_enabled(struct clk *clk);
+ struct clk *__clk_lookup(const char *name);
+-long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
+-			      unsigned long min_rate,
+-			      unsigned long max_rate,
+-			      unsigned long *best_parent_rate,
+-			      struct clk_hw **best_parent_p);
+-unsigned long __clk_determine_rate(struct clk_hw *core,
+-				   unsigned long rate,
+-				   unsigned long min_rate,
+-				   unsigned long max_rate);
+-long __clk_mux_determine_rate_closest(struct clk_hw *hw, unsigned long rate,
+-			      unsigned long min_rate,
+-			      unsigned long max_rate,
+-			      unsigned long *best_parent_rate,
+-			      struct clk_hw **best_parent_p);
++int __clk_mux_determine_rate(struct clk_hw *hw,
++			     struct clk_rate_request *req);
++int __clk_determine_rate(struct clk_hw *core, struct clk_rate_request *req);
++int __clk_mux_determine_rate_closest(struct clk_hw *hw,
++				     struct clk_rate_request *req);
+ void clk_hw_reparent(struct clk_hw *hw, struct clk_hw *new_parent);
+ 
+ static inline void __clk_hw_set_clk(struct clk_hw *dst, struct clk_hw *src)
+diff --git a/include/linux/clk/ti.h b/include/linux/clk/ti.h
+index 79b76e1..448b4f8 100644
+--- a/include/linux/clk/ti.h
++++ b/include/linux/clk/ti.h
+@@ -269,23 +269,15 @@ int omap3_noncore_dpll_set_rate_and_parent(struct clk_hw *hw,
+ 					   unsigned long rate,
+ 					   unsigned long parent_rate,
+ 					   u8 index);
+-long omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
+-				       unsigned long rate,
+-				       unsigned long min_rate,
+-				       unsigned long max_rate,
+-				       unsigned long *best_parent_rate,
+-				       struct clk_hw **best_parent_clk);
++int omap3_noncore_dpll_determine_rate(struct clk_hw *hw,
++				      struct clk_rate_request *req);
+ unsigned long omap4_dpll_regm4xen_recalc(struct clk_hw *hw,
+ 					 unsigned long parent_rate);
+ long omap4_dpll_regm4xen_round_rate(struct clk_hw *hw,
+ 				    unsigned long target_rate,
+ 				    unsigned long *parent_rate);
+-long omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
+-					unsigned long rate,
+-					unsigned long min_rate,
+-					unsigned long max_rate,
+-					unsigned long *best_parent_rate,
+-					struct clk_hw **best_parent_clk);
++int omap4_dpll_regm4xen_determine_rate(struct clk_hw *hw,
++				       struct clk_rate_request *req);
+ u8 omap2_init_dpll_parent(struct clk_hw *hw);
+ unsigned long omap3_dpll_recalc(struct clk_hw *hw, unsigned long parent_rate);
+ long omap2_dpll_round_rate(struct clk_hw *hw, unsigned long target_rate,
 -- 
-2.1.4
+1.9.1
