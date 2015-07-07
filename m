@@ -1,89 +1,131 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 7 Jul 2015 09:38:53 -0500
-Subject: [PATCH 12/15] SH: kill off set_irq_flags usage
-In-Reply-To: <20150707015503.GA23941@verge.net.au>
-References: <1433874401-27161-1-git-send-email-robh@kernel.org>
- <1433874401-27161-13-git-send-email-robh@kernel.org>
- <20150707005338.GG13326@verge.net.au>
- <20150707015503.GA23941@verge.net.au>
-Message-ID: <CAL_JsqJdDU+=88opwQunDEKZpy7DZbGZ0Xt2tm+X_jDtgjaKig@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 07 Jul 2015 23:40:35 +0900
+Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
+ Rinato/Monk board
+In-Reply-To: <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
+References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
+ <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
+ <5594E57C.2010300@samsung.com>
+ <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
+Message-ID: <092101d0b8c2$e2b39310$a81ab930$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 6, 2015 at 8:55 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Jul 07, 2015 at 09:53:39AM +0900, Simon Horman wrote:
->> On Tue, Jun 09, 2015 at 01:26:38PM -0500, Rob Herring wrote:
->> > set_irq_flags is ARM specific with custom flags which have genirq
->> > equivalents. Convert drivers to use the genirq interfaces directly, so we
->> > can kill off set_irq_flags. The translation of flags is as follows:
->> >
->> > IRQF_VALID -> !IRQ_NOREQUEST
->> > IRQF_PROBE -> !IRQ_NOPROBE
->> > IRQF_NOAUTOEN -> IRQ_NOAUTOEN
->> >
->> > For IRQs managed by an irqdomain, the irqdomain core code handles clearing
->> > and setting IRQ_NOREQUEST already, so there is no need to do this in
->> > .map() functions and we can simply remove the set_irq_flags calls. Some
->> > users also set IRQ_NOPROBE and this has been maintained although it is not
->> > clear that is really needed. There appears to be a great deal of blind
->> > copy and paste of this code.
->> >
->> > Signed-off-by: Rob Herring <robh@kernel.org>
->> > Cc: Simon Horman <horms@verge.net.au>
->> > Cc: Magnus Damm <magnus.damm@gmail.com>
->> > Cc: linux-sh at vger.kernel.org
->>
->> I am trusting the description above coupled with the comments in
->> the original code (that this patch removes). Assuming those ducks are
->> aligned:
->>
->> Acked-by: Simon Horman <horms+renesas@verge.net.au>
->
-> As I usually take patches for drivers/sh/ (there have not been many of late)
-> please let me know if you would like me to pick up this change.
+Krzysztof Kozlowski wrote:
+> 
+> 2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> > On 02.07.2015 15:11, Chanwoo Choi wrote:
+> >> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
+> >>> On 02.07.2015 14:37, Chanwoo Choi wrote:
+> >>>> This patch add the cooling device to control the overheating issue on
+> >>>> Exynos3250-based Rinato/Monk board.
+> >>>>
+> >>>> Cc: Kukjin Kim <kgene@kernel.org>
+> >>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+> >>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>>> ---
+> >>>> Depends on:
+> >>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
+> >>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
+> >>>> [1] https://lkml.org/lkml/2015/7/1/696
+> >>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+> >>>>
+> >>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
+> >>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
+> >>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
+> >>>>  3 files changed, 31 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+> >>>> index 7863265d4868..540a0adf2be6 100644
+> >>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+> >>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+> >>>> @@ -116,6 +116,21 @@
+> >>>>             min-microvolt = <1100000>;
+> >>>>             max-microvolt = <2700000>;
+> >>>>     };
+> >>>> +
+> >>>> +   thermal-zones {
+> >>>> +           cpu_thermal: cpu-thermal {
+> >>>> +                   cooling-maps {
+> >>>> +                           map0 {
+> >>>> +                                   /* Correspond to 500MHz at freq_table */
+> >>>> +                                   cooling-device = <&cpu0 5 5>;
+> >>>> +                           };
+> >>>> +                           map1 {
+> >>>> +                                   /* Correspond to 200MHz at freq_table */
+> >>>> +                                   cooling-device = <&cpu0 8 8>;
+> >>>> +                           };
+> >>>> +                   };
+> >>>> +           };
+> >>>> +   };
+> >>>>  };
+> >>>>
+> >>>>  &adc {
+> >>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+> >>>> index ddd7ac283045..0e62a6435e07 100644
+> >>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+> >>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+> >>>> @@ -107,6 +107,21 @@
+> >>>>             min-microvolt = <1100000>;
+> >>>>             max-microvolt = <2700000>;
+> >>>>     };
+> >>>> +
+> >>>> +   thermal-zones {
+> >>>> +           cpu_thermal: cpu-thermal {
+> >>>> +                   cooling-maps {
+> >>>> +                           map0 {
+> >>>> +                                   /* Corresponds to 500MHz */
+> >>>> +                                   cooling-device = <&cpu0 5 5>;
+> >>>> +                           };
+> >>>> +                           map1 {
+> >>>> +                                   /* Corresponds to 200MHz */
+> >>>> +                                   cooling-device = <&cpu0 8 8>;
+> >>>> +                           };
+> >>>> +                   };
+> >>>> +           };
+> >>>> +   };
+> >>>>  };
+> >>>>
+> >>>>  &adc {
+> >>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+> >>>> index e0f3b2ed41a3..a4931b660ddb 100644
+> >>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+> >>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+> >>>> @@ -55,6 +55,7 @@
+> >>>>                     clock-frequency = <1000000000>;
+> >>>>                     clocks = <&cmu CLK_ARM_CLK>;
+> >>>>                     clock-names = "cpu";
+> >>>> +                   #cooling-cells = <2>;
+> >>>>
+> >>>
+> >>> Don't you need also cooling-{min,max}-state properties?
+> >>
+> >> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
+> >>
+> >> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
+> >> in drivers/thermal/*. But, there are no any code to parse it.
+> >>
+> >> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-
+> state.
+> >>
+> >> I think that there are mismatch between document and thermal core driver.
+> >
+> > Thanks for explanation, looks good.
+> > Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >
+> > Best regards,
+> > Krzysztof
+> 
+> Dear Kukjin,
+> 
+> Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
+> cpufreq-dt 3250, this patch) are actually an one continuous chain.
+> Dependencies are already in mainline. Are you gonna to pick up
+> everything?
+> 
+Yes, I want and I will. BTW maybe clk change is required together? If so, as you
+know we need to get ack from clk guy. Is my understanding right?
 
-This is a dependency for removing set_irq_flags from ARM, so I plan to
-send the whole series to arm-soc.
-
-> Also, a very minor nit, the prefix for patches to this file is usually
-> 'sh:' rather than 'SH:'.
-
-Okay, will fix-up.
-
-Rob
-
->
->>
->> > ---
->> >  drivers/sh/intc/internals.h | 10 +---------
->> >  1 file changed, 1 insertion(+), 9 deletions(-)
->> >
->> > diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
->> > index 7dff08e..897ffb1 100644
->> > --- a/drivers/sh/intc/internals.h
->> > +++ b/drivers/sh/intc/internals.h
->> > @@ -99,15 +99,7 @@ static inline struct intc_desc_int *get_intc_desc(unsigned int irq)
->> >   */
->> >  static inline void activate_irq(int irq)
->> >  {
->> > -#ifdef CONFIG_ARM
->> > -   /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
->> > -    * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
->> > -    */
->> > -   set_irq_flags(irq, IRQF_VALID);
->> > -#else
->> > -   /* same effect on other architectures */
->> > -   irq_set_noprobe(irq);
->> > -#endif
->> > +   irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
->> >  }
->> >
->> >  static inline int intc_handle_int_cmp(const void *a, const void *b)
->> > --
->> > 2.1.0
->> >
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+Thanks,
+Kukjin
