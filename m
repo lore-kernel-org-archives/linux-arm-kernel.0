@@ -1,20 +1,76 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 7 Jul 2015 09:52:53 +0530
-Subject: [PATCH 1/1] dmaengine: Use Pointer xt after NULL check.
-In-Reply-To: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
-References: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
-Message-ID: <20150707042253.GI11002@localhost>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 7 Jul 2015 13:26:34 +0900
+Subject: [RESEND][PATCH v2] arm64:Modify the dump mem for 64 bit addresses
+In-Reply-To: <1436241394-33729-1-git-send-email-maninder1.s@samsung.com>
+References: <1436241394-33729-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <CAJKOXPf51eQOuzpLvFrtiTcU=BMTeZev-kUq84w0D4wm1Ug7sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 04:04:48PM +0530, Maninder Singh wrote:
-> Removing static analysis error:-
-> Possible null pointer dereference: xt
-> 
-> Because currently xt is dereferenced before NULL check,
-> Thus Use it after NULL Check.
-> 
-Applied, thanks
+2015-07-07 12:56 GMT+09:00 Maninder Singh <maninder1.s@samsung.com>:
+> From: Rohit Thapliyal <r.thapliyal@samsung.com>
+>
+> V1 = added new function dump_mem64
+> v1->v2
+> Removed the separate function dump_mem64 and accommodated
+> a field width based on which the dump shall be created of
+> width either 4 or 8 as suggested by Catalin.
 
--- 
-~Vinod
+Hi,
+
+Please put the changelog after the commit message under separator
+(---) so it won't be included in commit. If you really, really want to
+include the changelog inside the commit then please put it at the end
+because it is the least important piece of information (from history
+point of view).
+
+>
+> On 64bit kernel, the dump_mem gives 32 bit addresses
+> on the stack dump. This gives unorganized information regarding
+> the 64bit values on the stack. Hence, modified to get a complete
+> 64bit memory dump.
+>
+> With patch:
+> [   93.534801] Process insmod (pid: 1587, stack limit = 0xffffffc976be4058)
+> [   93.541441] Stack: (0xffffffc976be7cf0 to 0xffffffc976be8000)
+> [   93.547136] 7ce0:                                   ffffffc976be7d00 ffffffc00008163c
+> [   93.554898] 7d00: ffffffc976be7d40 ffffffc0000f8a44 ffffffc00098ef38 ffffffbffc000088
+> [   93.562659] 7d20: ffffffc00098ef50 ffffffbffc0000c0 0000000000000001 ffffffbffc000070
+> [   93.570419] 7d40: ffffffc976be7e40 ffffffc0000f935c 0000000000000000 000000002b424090
+> [   93.578179] 7d60: 000000002b424010 0000007facc555f4 0000000080000000 0000000000000015
+> [   93.585937] 7d80: 0000000000000116 0000000000000069 ffffffc00097b000 ffffffc976be4000
+> [   93.593694] 7da0: 0000000000000064 0000000000000072 000000000000006e 000000000000003f
+> [   93.601453] 7dc0: 000000000000feff 000000000000fff1 ffffffbffc002028 0000000000000124
+> [   93.609211] 7de0: ffffffc976be7e10 0000000000000001 ffffff8000000000 ffffffbbffff0000
+> [   93.616969] 7e00: ffffffc976be7e60 0000000000000000 0000000000000000 0000000000000000
+> [   93.624726] 7e20: 0000000000000000 0000000000000000 0000000000000000 0000000000000000
+> [   93.632484] 7e40: 0000007fcc474550 ffffffc0000841ec 000000002b424010 0000007facda0710
+> [   93.640241] 7e60: ffffffffffffffff ffffffc0000be6dc ffffff80007d2000 000000000001c010
+> [   93.647999] 7e80: ffffff80007e0ae0 ffffff80007e09d0 ffffff80007edf70 0000000000000288
+> [   93.655757] 7ea0: 00000000000002e8 0000000000000000 0000000000000000 0000001c0000001b
+> [   93.663514] 7ec0: 0000000000000009 0000000000000007 000000002b424090 000000000001c010
+> [   93.671272] 7ee0: 000000002b424010 0000007faccd3a48 0000000000000000 0000000000000000
+> [   93.679030] 7f00: 0000007fcc4743f8 0000007fcc4743f8 0000000000000069 0000000000000003
+> [   93.686787] 7f20: 0101010101010101 0000000000000004 0000000000000020 00000000000003f3
+> [   93.694544] 7f40: 0000007facb95664 0000007facda7030 0000007facc555d0 0000000000498378
+> [   93.702301] 7f60: 0000000000000000 000000002b424010 0000007facda0710 000000002b424090
+> [   93.710058] 7f80: 0000007fcc474698 0000000000498000 0000007fcc474ebb 0000000000474f58
+> [   93.717815] 7fa0: 0000000000498000 0000000000000000 0000000000000000 0000007fcc474550
+> [   93.725573] 7fc0: 00000000004104bc 0000007fcc474430 0000007facc555f4 0000000080000000
+> [   93.733330] 7fe0: 000000002b424090 0000000000000069 0950020128000244 4104000008000004
+> [   93.741084] Call trace:
+>
+> The above output makes a debugger life a lot more easier.
+>
+> Signed-off-by: Rohit Thapliyal <r.thapliyal@samsung.com>
+> Signed-off-by: Maninder Singh <maninder1.s@samsung.com>
+> Reviewed-by: Akhilesh kumar <akhilesh.k@samsung.com>
+
+The first patch you sent, already contained Akhilesh kumar's
+reviewed-by tag. But there was no email from him with actual review.
+Reviews should be performed publicly and should have a public trace.
+The person is not even cc-ed so he cannot verify whether the tag is
+appropriate.
+
+Best regards,
+Krzysztof
