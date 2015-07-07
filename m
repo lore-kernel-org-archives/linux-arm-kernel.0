@@ -1,124 +1,140 @@
-From: mcgrof@suse.com (Luis R. Rodriguez)
-Date: Tue, 7 Jul 2015 11:50:12 +0200
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150701072828.GA4881@lst.de>
-References: <20150622081028.35954.89885.stgit@dwillia2-desk3.jf.intel.com>
- <20150622082427.35954.73529.stgit@dwillia2-desk3.jf.intel.com>
- <20150622161002.GB8240@lst.de>
- <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
- <20150701065948.GA4355@lst.de>
- <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
- <20150701072828.GA4881@lst.de>
-Message-ID: <20150707095012.GQ7021@wotan.suse.de>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 07 Jul 2015 15:23:50 +0530
+Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
+In-Reply-To: <20150707072958.GN3182@x1>
+References: <1435591877-18214-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150707072958.GN3182@x1>
+Message-ID: <559BA1AE.9050006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 09:28:28AM +0200, Christoph Hellwig wrote:
-> On Wed, Jul 01, 2015 at 09:19:29AM +0200, Geert Uytterhoeven wrote:
-> > >> So it would be the responsibility of the caller to fall back from
-> > >> ioremap(..., CACHED) to ioremap(..., UNCACHED)?
-> > >> I.e. all drivers using it should be changed...
-> > >
-> > > All of the zero users we currently have will need to be changed, yes.
-> > 
-> > Good. Less work to convert all of these ;-)
-> 
-> And I didn't have enough coffee yet.  We of course have a few users of
-> ioremap_cache(), and two implememantions but no users of ioremap_cached().
-> Looks like the implementations can't even agree on the name.
 
-Yies, that naming is icky... we also have quite a bit of ioremap_nocache() users:
 
-mcgrof at ergon ~/linux-next (git::kill-mtrr)$ git grep ioremap_nocache drivers/| wc -l
-359
+On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
+> On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
+>
+>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
+>> (page 0) controls the method of clearing interrupt
+>> status of 88pm800 family of devices;
+>>
+>>    0: clear on read
+>>    1: clear on write
+>>
+>> If pdata is not coming from board file, then set the
+>> default irq clear method to "irq clear on write"
+>>
+>> Also, as suggested by "Lee Jones" renaming variable field
+>> to appropriate name.
+>>
+>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> ---
+>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
+>>   include/linux/mfd/88pm80x.h | 10 ++++++++--
+>>   2 files changed, 18 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index d495737..66347be 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -374,7 +374,7 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+>>   {
+>>   	struct regmap *map = chip->regmap;
+>>   	unsigned long flags = IRQF_ONESHOT;
+>> -	int data, mask, ret = -EINVAL;
+>> +	int irq_clr_mode, mask, ret = -EINVAL;
+>>
+>>   	if (!map || !chip->irq) {
+>>   		dev_err(chip->dev, "incorrect parameters\n");
+>> @@ -382,15 +382,16 @@ static int device_irq_init_800(struct pm80x_chip *chip)
+>>   	}
+>>
+>>   	/*
+>> -	 * irq_mode defines the way of clearing interrupt. it's read-clear by
+>> -	 * default.
+>> +	 * irq_clr_on_wr defines the way of clearing interrupt by
+>> +	 * read/write(0/1).  It's read-clear by default.
+>>   	 */
+>>   	mask =
+>>   	    PM800_WAKEUP2_INV_INT | PM800_WAKEUP2_INT_CLEAR |
+>>   	    PM800_WAKEUP2_INT_MASK;
+>>
+>> -	data = PM800_WAKEUP2_INT_CLEAR;
+>> -	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, data);
+>> +	irq_clr_mode = chip->irq_clr_method == PM800_IRQ_CLR_ON_WRITE ?
+>> +		PM800_WAKEUP2_INT_WRITE_CLEAR : PM800_WAKEUP2_INT_READ_CLEAR;
+>> +	ret = regmap_update_bits(map, PM800_WAKEUP2, mask, irq_clr_mode);
+>
+> What's stopping you just passing PM800_WAKEUP2_INT_WRITE_CLEAR or
+> PM800_WAKEUP2_INT_READ_CLEAR from pdata?  Then you can use the value
+> directly without all of this faffing about.
+>
+>    regmap_update_bits(map, PM800_WAKEUP2, mask, pdata->irq_clr_mode);
+>
 
-On x86 the default ioremap() happens to map to ioremap_nocache() anyway as well.
+Because "irq_clr_method" is of boolean type.
+And macros which you are referring to is,
 
-This is on purpose, there is an ongoing effort to streamline ioremap_nocache()
-for registers on the x86 front with the long term goal then of making PAT
-strong UC the default preference for both ioremap() and ioremap_nocache() for
-PAT enabled systems. This would prevent things like write-combining modifiers
-from having any effect on the area. This comes with a small architectural
-driver cost, it means all write-combining desired areas must be split out in
-drivers properly.  This is part of the work I've been doing lately. The
-eventual goal once we have the write-combing areas properly split with
-ioremap_wc() and using the new proper preferred architecture agnostic modifier
-(arch_phys_wc_add()) is to change the default ioremap behaviour on x86 to use
-strong UC for PAT enabled systems for *both* ioremap() and ioremap_nocache().
+#define PM800_WAKEUP2_INT_READ_CLEAR            (0 << 1)
+#define PM800_WAKEUP2_INT_WRITE_CLEAR           (1 << 1)
 
-This was aleady done once but reverted later due to the regression issues on
-video drivers not haveing the right ioremap_wc() calls. I'm finishing this
-effort and am about a few patches away...
 
-Once done and once things cool down we should go back and may consider flipping
-the switch again to make strong UC default. For details refer to commit
-de33c442ed2a465 ("x86 PAT: fix performance drop for glx, use UC minus
-for ioremap(), ioremap_nocache() and pci_mmap_page_range()").
+And also, I feel it is more cleaner approach with the current code as
+register definition and userflag are maintained separately.
 
-All this is fine in theory -- but Benjamin Herrenschmidt recently also
-noted that on powerpc the write-combining may end up requiring each
-register read/write with its own specific API. That is, we'd lose the
-magic of having things being done behind the scenes, and that would
-also mean tons of reads/writes may need to be converted over to be
-explicit about write-combining preferences...
+>>   	if (ret < 0)
+>>   		goto out;
+>> @@ -512,6 +513,7 @@ static int device_800_init(struct pm80x_chip *chip,
+>>   	}
+>>
+>>   	chip->regmap_irq_chip = &pm800_irq_chip;
+>> +	chip->irq_clr_method = pdata->irq_clr_method;
+>>
+>>   	ret = device_irq_init_800(chip);
+>>   	if (ret < 0) {
+>> @@ -564,6 +566,9 @@ static int pm800_probe(struct i2c_client *client,
+>>   		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+>>   		if (!pdata)
+>>   			return -ENOMEM;
+>> +
+>> +		/* by default, set irq clear method on write */
+>> +		pdata->irq_clr_method = PM800_IRQ_CLR_ON_WRITE;
+>>   	}
+>>
+>>   	ret = pm80x_init(client);
+>> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+>> index 8fcad63..648e01a 100644
+>> --- a/include/linux/mfd/88pm80x.h
+>> +++ b/include/linux/mfd/88pm80x.h
+>> @@ -77,6 +77,8 @@ enum {
+>>   #define PM800_WAKEUP2			(0x0E)
+>>   #define PM800_WAKEUP2_INV_INT		BIT(0)
+>>   #define PM800_WAKEUP2_INT_CLEAR		BIT(1)
+>> +#define PM800_WAKEUP2_INT_READ_CLEAR	(0 << 1)
+>> +#define PM800_WAKEUP2_INT_WRITE_CLEAR	(1 << 1)
+>>   #define PM800_WAKEUP2_INT_MASK		BIT(2)
+>>
+>>   #define PM800_POWER_UP_LOG		(0x10)
+>> @@ -300,7 +302,11 @@ struct pm80x_chip {
+>>   	struct regmap_irq_chip_data *irq_data;
+>>   	int type;
+>>   	int irq;
+>> -	int irq_mode;
+>> +
+>> +#define PM800_IRQ_CLR_ON_READ	0
+>> +#define PM800_IRQ_CLR_ON_WRITE	1
+>
+> Defines in the middle of structs makes for ugly code.
+>
 
-I will note that upon discussions it seems that the above requirement
-may have been a slight mishap on not being explicit about our semantics
-and requirements on ioremap() variants, technically it may be possible
-that effectively PowerPC may not get any write-combining effects on
-infiniband / networking / anything not doing write-combining on
-userspace such as framebuffer... from what I gather that needs to
-be fixed. Because of these grammatical issues and the issues with
-unaligned access with ARM I think its important we put some effort
-to care a bit more about defining clear semantics through grammar
-for new APIs or as we rewrite APIs. We have tools to do this these
-days, best make use of them.
+Sorry, but kernel code is full of such implementations.
+Infact it is right place in terms of readability.
 
-While we're at it and reconsidering all this, a few items I wish for
-us to address as well then, most of them related to grammar, some
-procedural clarification:
+If you still feel insist to fix it, please let me know whether you want
+to submit V6 just for this. Or you will fix it while merging.
+I am OK with anything here...
 
-  * Document it as not supported to have overlapping ioremap() calls.
-    No one seems to have a clue if this should work, but clearly this
-    is just a bad idea. I don't see why we should support the complexity
-    of having this. It seems we can write grammar rules to prevent this.
 
-  * We seem to care about device drivers / kernel code doing unaligned
-    accesses with certain ioremap() variants. At least for ARM you should
-    not do unaligned accesses on ioremap_nocache() areas. I am not sure
-    if we can come up with grammar to vet for / warn for unaligned access
-    type of code in driver code on some memory area when some ioremap()
-    variant is used, but this could be looked into. I believe we may
-    want rules for unaligned access maybe in general, and not attached
-    to certain calls due to performance considerations, so this work
-    may be welcomed regardless (refer to
-    Documentation/unaligned-memory-access.txt)
-    
-  * We seem to want to be pedantic about adding new ioremap() variants, the
-    unaligned issue on ARM is one reason, do we ideally then want *all*
-    architecture maintainers to provide an Acked-by for any new ioremap
-    variants ? Are we going to have to sit and wait for a kumbaya every time
-    a helper comes along to see how it all fits well for all architectures?
-    The asm-generic io.h seemed to have set in place the ability to let
-    architectures define things *when* they get to it, that seems like a much
-    more fair approach *if* and *when possible*.  Can we not have and define
-    a *safe* ioremap() call to fall under ?  The unaligned access concerns seem
-    fair but.. again it seems we generally care about unaligned access anyway,
-    so the concern really should be to fix all driver code to not do unaligned
-    access, if possible no?
-
-  * There are helpers such as set_memory_wc() which should not be used
-    on IO memory, we should define grammar rules for these.
-
-  * There are ioremap() variants which may require helpers for architectures.
-    The only example I am aware of is ioremap_wc() requires arch_phys_wc_add()
-    so that on x86 PAT enabled systems this does nothing, but on x86 non-PAT
-    systems this will use MTRRs. The arch_phys_wc_add() API can be re-purposed
-    for other architectures if needed, maybe benh can look at this for powerpc?
-    But it seems those helpers were added mostly with a bias towards x86
-    requirements, do we again expect all architecture maintainers to provide
-    an Acked-by for ioremap() variants helpers ?
-
-  Luis
+Thanks,
+Vaibhav
