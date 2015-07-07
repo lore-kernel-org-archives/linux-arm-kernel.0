@@ -1,70 +1,20 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Tue, 7 Jul 2015 06:17:07 +0200
-Subject: [PATCH] base: power: wakeirq: don't leak dev->power.wakeirq
-In-Reply-To: <20150706180921.GF20779@saruman.tx.rr.com>
-References: <1436205678-31640-1-git-send-email-balbi@ti.com>
- <CAOf5uwnj=0m99E96k-+AYu68yE_UnX1WVU-=6y7OvJnfXKh8+g@mail.gmail.com>
- <20150706180921.GF20779@saruman.tx.rr.com>
-Message-ID: <CAOf5uwkwe0PudVVKGs_6-DNuYDqS=p5EOA4=5uVQSTK0BhinWw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Jul 2015 09:52:53 +0530
+Subject: [PATCH 1/1] dmaengine: Use Pointer xt after NULL check.
+In-Reply-To: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
+References: <1435314888-20491-1-git-send-email-maninder1.s@samsung.com>
+Message-ID: <20150707042253.GI11002@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Mon, Jul 6, 2015 at 8:09 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Mon, Jul 06, 2015 at 08:06:17PM +0200, Michael Trimarchi wrote:
->> Hi
->>
->> On Jul 6, 2015 8:01 PM, "Felipe Balbi" <balbi@ti.com> wrote:
->> >
->> > on a first call to dev_pm_attach_wake_irq(), if it
->> > fails, it will leave dev->power.wakeirq set to a
->> > dangling pointer. Instead, let's clear it to make
->> > sure a subsequent call to dev_pm_attach_wake_irq()
->> > has chance to succeed.
->> >
->> > Cc: Tony Lindgren <tmlind@atomide.com>
->> > Signed-off-by: Felipe Balbi <balbi@ti.com>
->> > ---
->> >  drivers/base/power/wakeirq.c | 9 ++++++++-
->> >  1 file changed, 8 insertions(+), 1 deletion(-)
->> >
->> > diff --git a/drivers/base/power/wakeirq.c b/drivers/base/power/wakeirq.c
->> > index 7470004ca810..394d250a1ad8 100644
->> > --- a/drivers/base/power/wakeirq.c
->> > +++ b/drivers/base/power/wakeirq.c
->> > @@ -50,9 +50,16 @@ static int dev_pm_attach_wake_irq(struct device *dev,
->> int irq,
->> >
->> >         err = device_wakeup_attach_irq(dev, wirq);
->> >         if (err)
->> > -               return err;
->> > +               goto err_cleanup;
->> >
->> >         return 0;
->> > +
->> > +err_cleanup:
->> > +       spin_lock_irqsave(&dev->power.lock, flags);
->> > +       dev->power.wakeirq = NULL;
->> > +       spin_unlock_irqrestore(&dev->power.lock, flags);
->> > +
->>
->> Why here and not in the fuction that return the error?
->
-> because the field was set here, why would I clear it elsewhere ?
->
-
-Clear now and even more from the other patch proposal.
-
-Michael
-
-> --
-> balbi
-
-
+On Fri, Jun 26, 2015 at 04:04:48PM +0530, Maninder Singh wrote:
+> Removing static analysis error:-
+> Possible null pointer dereference: xt
+> 
+> Because currently xt is dereferenced before NULL check,
+> Thus Use it after NULL Check.
+> 
+Applied, thanks
 
 -- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+~Vinod
