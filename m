@@ -1,59 +1,122 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Tue, 07 Jul 2015 09:07:56 -0600
-Subject: [PATCH v4 0/2] Correct for ACPI 5.1->6.0 spec changes in MADT
- GICC entries
-In-Reply-To: <20150707133115.GB13228@e104818-lin.cambridge.arm.com>
-References: <1436224608-27754-1-git-send-email-al.stone@linaro.org>
- <CAJZ5v0j+iKhOX4hw2XQEdo9CjpP2sfdxGwCz_vN5OVqithEv0Q@mail.gmail.com>
- <20150707133115.GB13228@e104818-lin.cambridge.arm.com>
-Message-ID: <559BEB4C.90906@redhat.com>
+From: antoine.tenart@free-electrons.com (Antoine Tenart)
+Date: Tue,  7 Jul 2015 17:08:25 +0200
+Subject: [PATCH v2 2/4] mtd: pxa3xx_nand: add helpers to setup the timings
+In-Reply-To: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1436281707-20106-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/2015 07:31 AM, Catalin Marinas wrote:
-> On Tue, Jul 07, 2015 at 01:20:51AM +0200, Rafael J. Wysocki wrote:
->> On Tue, Jul 7, 2015 at 1:16 AM, Al Stone <al.stone@linaro.org> wrote:
->>> In the ACPI 5.1 version of the spec, the struct for the GICC subtable
->>> (struct acpi_madt_generic_interrupt) of the MADT is 76 bytes long; in
->>> ACPI 6.0, the struct is 80 bytes long.  But, there is only one definition
->>> in ACPICA for this struct -- and that is the 6.0 version.  Hence, when
->>> BAD_MADT_ENTRY() compares the struct size to the length in the GICC
->>> subtable, it fails if 5.1 structs are in use, and there are systems in
->>> the wild that have them.
->>>
->>> Note that this was found in linux-next and these patches apply against
->>> that tree and the arm64 kernel tree; 4.1 does not appear to have this
->>> problem since it still has the 5.1 struct definition.
->>>
->>> Though there is precedent in ia64 code for ignoring the changes in size,
->>> this patch set instead verifies correctness.  The first patch adds the
->>> BAD_MADT_GICC_ENTRY() macro to check the GICC subtable only, accounting
->>> for the difference in specification versions that are possible.  The
->>> second patch replaces BAD_MADT_ENTRY usage with the BAD_MADT_GICC_ENTRY
->>> macro in arm64 code, which is currently the only architecture affected.
->>> The BAD_MADT_ENTRY() will continue to work as is for all other MADT
->>> subtables.
->>>
->>> I have tested these patches on an APM Mustang with version 1.15 firmware,
->>> where the problem was found, and they fix the problem -- i.e., the system
->>> will boot with either Linux 4.1 or linux-next kernels using the same ACPI
->>> 5.1 compatible firmware.
->>
->> ACK for the series, but I guess it's better to let it go via ARM64, right?
-> 
-> Fine by me. I'll pick them up for 4.2-rc2.
-> 
-> Thanks.
-> 
+Add helpers to setup the timings in the pxa3xx driver. These helpers
+allow to either make use of the nand framework nand_sdr_timings or the
+pxa3xx specific pxa3xx_nand_host, for compatibility reasons.
 
-Thanks, Catalin.  Holler if there's any problems.
+Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+---
+ drivers/mtd/nand/pxa3xx_nand.c | 91 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 5465fa439c9e..9a95c24ab2ce 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -385,6 +385,97 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+ 	nand_writel(info, NDTR1CS0, ndtr1);
+ }
+ 
++static void pxa3xx_nand_set_sdr_timing(struct pxa3xx_nand_host *host,
++				       const struct nand_sdr_timings *t)
++{
++	struct pxa3xx_nand_info *info = host->info_data;
++	struct nand_chip *chip = &host->chip;
++	unsigned long nand_clk = clk_get_rate(info->clk);
++	uint32_t ndtr0, ndtr1;
++
++	u32 tCH_min = DIV_ROUND_UP(t->tCH_min, 1000);
++	u32 tCS_min = DIV_ROUND_UP(t->tCS_min, 1000);
++	u32 tWH_min = DIV_ROUND_UP(t->tWH_min, 1000);
++	u32 tWP_min = DIV_ROUND_UP(t->tWC_min - tWH_min, 1000);
++	u32 tREH_min = DIV_ROUND_UP(t->tREH_min, 1000);
++	u32 tRP_min = DIV_ROUND_UP(t->tRC_min - tREH_min, 1000);
++	u32 tR = chip->chip_delay * 1000;
++	u32 tWHR_min = DIV_ROUND_UP(t->tWHR_min, 1000);
++	u32 tAR_min = DIV_ROUND_UP(t->tAR_min, 1000);
++
++	/* fallback to a default value if tR = 0 */
++	if (!tR)
++		tR = 20000;
++
++	ndtr0 = NDTR0_tCH(ns2cycle(tCH_min, nand_clk)) |
++		NDTR0_tCS(ns2cycle(tCS_min, nand_clk)) |
++		NDTR0_tWH(ns2cycle(tWH_min, nand_clk)) |
++		NDTR0_tWP(ns2cycle(tWP_min, nand_clk)) |
++		NDTR0_tRH(ns2cycle(tREH_min, nand_clk)) |
++		NDTR0_tRP(ns2cycle(tRP_min, nand_clk));
++
++	ndtr1 = NDTR1_tR(ns2cycle(tR, nand_clk)) |
++		NDTR1_tWHR(ns2cycle(tWHR_min, nand_clk)) |
++		NDTR1_tAR(ns2cycle(tAR_min, nand_clk));
++
++	info->ndtr0cs0 = ndtr0;
++	info->ndtr1cs0 = ndtr1;
++	nand_writel(info, NDTR0CS0, ndtr0);
++	nand_writel(info, NDTR1CS0, ndtr1);
++}
++
++static int pxa3xx_nand_init_timings(struct pxa3xx_nand_host *host)
++{
++	const struct nand_sdr_timings *timings;
++	struct nand_chip *chip = &host->chip;
++	struct pxa3xx_nand_info *info = host->info_data;
++	const struct pxa3xx_nand_flash *f = NULL;
++	int mode, id, ntypes, i;
++
++	mode = onfi_get_async_timing_mode(chip);
++	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
++		ntypes = ARRAY_SIZE(builtin_flash_types);
++
++		chip->cmdfunc(host->mtd, NAND_CMD_READID, 0x00, -1);
++
++		id = chip->read_byte(host->mtd);
++		id |= chip->read_byte(host->mtd) << 0x8;
++
++		for (i = 0; i < ntypes; i++) {
++			f = &builtin_flash_types[i];
++
++			if (f->chip_id == id)
++				break;
++		}
++
++		if (i == ntypes) {
++			dev_err(&info->pdev->dev, "Error: timings not found\n");
++			return -EINVAL;
++		}
++
++		pxa3xx_nand_set_timing(host, f->timing);
++
++		if (f->flash_width == 16) {
++			info->reg_ndcr |= NDCR_DWIDTH_M;
++			chip->options |= NAND_BUSWIDTH_16;
++		}
++
++		info->reg_ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
++	} else {
++		mode = fls(mode) - 1;
++		if (mode < 0)
++			mode = 0;
++
++		timings = onfi_async_timing_mode_to_sdr_timings(mode);
++		if (IS_ERR(timings))
++			return PTR_ERR(timings);
++
++		pxa3xx_nand_set_sdr_timing(host, timings);
++	}
++
++	return 0;
++}
++
+ /*
+  * Set the data and OOB size, depending on the selected
+  * spare and ECC configuration.
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+2.4.5
