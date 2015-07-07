@@ -1,33 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jul 2015 14:53:17 +0100
-Subject: [RESEND 08/10] regulator: pwm-regulator: Add support for
- continuous-voltage
-In-Reply-To: <20150707134545.GH3182@x1>
-References: <1436173112-21397-1-git-send-email-lee.jones@linaro.org>
- <1436173112-21397-9-git-send-email-lee.jones@linaro.org>
- <20150707133155.GL2887@sirena.org.uk> <20150707134545.GH3182@x1>
-Message-ID: <20150707135317.GR2887@sirena.org.uk>
+From: gianlucarenzi@eurek.it (gianluca)
+Date: Tue, 07 Jul 2015 15:50:25 +0200
+Subject: Passing arguments to cmdline or changing the devicetree node??
+Message-ID: <559BD921.3080000@eurek.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 02:45:45PM +0100, Lee Jones wrote:
-> On Tue, 07 Jul 2015, Mark Brown wrote:
-> > On Mon, Jul 06, 2015 at 09:58:30AM +0100, Lee Jones wrote:
+Hello list,
+I was thinking which is the best method to ensure a fallback 
+compatibility to old boards when a single board has changed something in 
+hardware.
 
-> > > +	tmp = max_duty_cycle - min_mV * max_duty_cycle / vdiff;
-> > > +	pwm_code = tmp + max_duty_cycle * volt_mV / vdiff;
+I will explain better:
 
-> > These need some brackets to be clear that they're correct.
+I designed a board running linux (on iMX28) which had 128MB and the 
+first stage bootstrap is programming the DDR2 controller to match the 
+memory timings.
+The bootloader had the memory size hardcoded, but it is not a problem 
+because nothing on the bootloader is using it (maybe some atag for old 
+compatibility, I need to check this out)
+The bootloader now loads linux and the devicetree flattened blob and 
+pass it to the kernel.
+In the .dts I have a node called:
 
-> As you rightly pointed out, this stuff gets over-written in the next
-> patch, although I have no problem with providing some bracketing if
-> required.
+> 	memory {
+> 		reg = <0x40000000 0x08000000>;
+> 	};
 
-Yes, please.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150707/1a0c77cd/attachment.sig>
+and it is fixed.
+
+Now we need to update the memory onboard up to 256Mb or 512Mb, and if I 
+can test easily on the fist stage bootstrap (programming the DDR2 
+controller for 256Mb and writing on memory above 128Mb and if it works I 
+have could have 256Mb or more, for example) I need a procedure to change 
+the memory node on the dts.
+
+I was thinking of two ways:
+
+1- The bootloader can check the DDR2 registers and find out how much 
+memory is installed on board, and pass mem=128M, mem=256M or higher to 
+the kernel. But what about the node on the device tree?
+
+2- The bootloader can select the right .dts file from file-system 
+choosing one of the following: dts-128M, dts-256M or dts-512M.
+All those dts are EQUAL apart the memory descriptor values.
+
+Are there any other way to have this beahviour???
+
+Best regards,
+-- 
+Eurek s.r.l.                          |
+Electronic Engineering                | http://www.eurek.it
+via Celletta 8/B, 40026 Imola, Italy  | Phone: +39-(0)542-609120
+p.iva 00690621206 - c.f. 04020030377  | Fax:   +39-(0)542-609212
