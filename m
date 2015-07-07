@@ -1,49 +1,79 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 07 Jul 2015 10:44:44 +0900
-Subject: [PATCHv5] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-In-Reply-To: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
-References: <1436191955-3650-1-git-send-email-chanho61.park@samsung.com>
-Message-ID: <559B2F0C.5010603@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 7 Jul 2015 10:55:03 +0900
+Subject: [PATCH 12/15] SH: kill off set_irq_flags usage
+In-Reply-To: <20150707005338.GG13326@verge.net.au>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-13-git-send-email-robh@kernel.org>
+ <20150707005338.GG13326@verge.net.au>
+Message-ID: <20150707015503.GA23941@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.07.2015 23:12, Chanho Park wrote:
-> The odroid-xu3 board which is based on exynos5422 not exynos5800 is
-> booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
-> is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
-> cortex-a15 cores. To correct this mis-odering, I added exynos5422.dtsi
-> and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
-> cpu4-7 are cortex-a15.
+On Tue, Jul 07, 2015 at 09:53:39AM +0900, Simon Horman wrote:
+> On Tue, Jun 09, 2015 at 01:26:38PM -0500, Rob Herring wrote:
+> > set_irq_flags is ARM specific with custom flags which have genirq
+> > equivalents. Convert drivers to use the genirq interfaces directly, so we
+> > can kill off set_irq_flags. The translation of flags is as follows:
+> > 
+> > IRQF_VALID -> !IRQ_NOREQUEST
+> > IRQF_PROBE -> !IRQ_NOPROBE
+> > IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> > 
+> > For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> > and setting IRQ_NOREQUEST already, so there is no need to do this in
+> > .map() functions and we can simply remove the set_irq_flags calls. Some
+> > users also set IRQ_NOPROBE and this has been maintained although it is not
+> > clear that is really needed. There appears to be a great deal of blind
+> > copy and paste of this code.
+> > 
+> > Signed-off-by: Rob Herring <robh@kernel.org>
+> > Cc: Simon Horman <horms@verge.net.au>
+> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> > Cc: linux-sh at vger.kernel.org
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> ---
-> Changes from v4:
->  - Remove temporal patch in e-mail body
+> I am trusting the description above coupled with the comments in
+> the original code (that this patch removes). Assuming those ducks are
+> aligned:
 > 
-> Changes from v3:
->  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
-> 
-> Changes from v2:
->  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
->  - drop compatibles from exynos5422-cpus.dtsi
-> 
-> Changes from v1:
->  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
->  - include the dtsi file top of the exynos5422-odroidxu3.dts
-> 
-> Secondary cpu booting problem[1] is not resolved yet. Need more investigations
-> to work booting 8 cores correctly.
-> 
-> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
-> 
->  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
->  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
->  2 files changed, 82 insertions(+)
->  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks, applied to my tree. I'll sent it to Kukjin later for 4.3 unless
-he picks it up from LKML.
+As I usually take patches for drivers/sh/ (there have not been many of late)
+please let me know if you would like me to pick up this change.
 
-Best regards,
-Krzysztof
+Also, a very minor nit, the prefix for patches to this file is usually
+'sh:' rather than 'SH:'.
+
+> 
+> > ---
+> >  drivers/sh/intc/internals.h | 10 +---------
+> >  1 file changed, 1 insertion(+), 9 deletions(-)
+> > 
+> > diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+> > index 7dff08e..897ffb1 100644
+> > --- a/drivers/sh/intc/internals.h
+> > +++ b/drivers/sh/intc/internals.h
+> > @@ -99,15 +99,7 @@ static inline struct intc_desc_int *get_intc_desc(unsigned int irq)
+> >   */
+> >  static inline void activate_irq(int irq)
+> >  {
+> > -#ifdef CONFIG_ARM
+> > -	/* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+> > -	 * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+> > -	 */
+> > -	set_irq_flags(irq, IRQF_VALID);
+> > -#else
+> > -	/* same effect on other architectures */
+> > -	irq_set_noprobe(irq);
+> > -#endif
+> > +	irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+> >  }
+> >  
+> >  static inline int intc_handle_int_cmp(const void *a, const void *b)
+> > -- 
+> > 2.1.0
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
