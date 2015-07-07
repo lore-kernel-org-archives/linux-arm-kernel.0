@@ -1,115 +1,69 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jul 2015 18:24:23 +0100
-Subject: [PATCH 7/9] locking/qrwlock: expose internal lock structure in
- qrwlock definition
+Date: Tue,  7 Jul 2015 18:24:20 +0100
+Subject: [PATCH 4/9] locking/qrwlock: implement queue_write_unlock using
+ smp_store_release
 In-Reply-To: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
 References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436289865-2331-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1436289865-2331-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for a writer to unlock correctly on big-endian machines, we
-need to expose the internal layout of the qrwlock structure so that
-we also zero the correct sub-field.
+smp_store_release supports byte accesses, so use that in writer unlock
+and remove the conditional macro override.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/asm-generic/qrwlock.h       |  2 +-
- include/asm-generic/qrwlock_types.h | 17 ++++++++++++++++-
- kernel/locking/qrwlock.c            | 26 ++------------------------
- 3 files changed, 19 insertions(+), 26 deletions(-)
+ arch/x86/include/asm/qrwlock.h | 10 ----------
+ include/asm-generic/qrwlock.h  |  9 +--------
+ 2 files changed, 1 insertion(+), 18 deletions(-)
 
+diff --git a/arch/x86/include/asm/qrwlock.h b/arch/x86/include/asm/qrwlock.h
+index a8810bf135ab..c537cbb038a7 100644
+--- a/arch/x86/include/asm/qrwlock.h
++++ b/arch/x86/include/asm/qrwlock.h
+@@ -2,16 +2,6 @@
+ #define _ASM_X86_QRWLOCK_H
+ 
+ #include <asm-generic/qrwlock_types.h>
+-
+-#ifndef CONFIG_X86_PPRO_FENCE
+-#define queued_write_unlock queued_write_unlock
+-static inline void queued_write_unlock(struct qrwlock *lock)
+-{
+-        barrier();
+-        ACCESS_ONCE(*(u8 *)&lock->cnts) = 0;
+-}
+-#endif
+-
+ #include <asm-generic/qrwlock.h>
+ 
+ #endif /* _ASM_X86_QRWLOCK_H */
 diff --git a/include/asm-generic/qrwlock.h b/include/asm-generic/qrwlock.h
-index dbaac5f2af8f..25e97942726a 100644
+index deb9e8b0eb9e..eb673dde8879 100644
 --- a/include/asm-generic/qrwlock.h
 +++ b/include/asm-generic/qrwlock.h
-@@ -143,7 +143,7 @@ static inline void queued_read_unlock(struct qrwlock *lock)
- #ifndef queued_write_unlock
+@@ -134,21 +134,14 @@ static inline void queued_read_unlock(struct qrwlock *lock)
+ 	atomic_sub(_QR_BIAS, &lock->cnts);
+ }
+ 
+-#ifndef queued_write_unlock
+ /**
+  * queued_write_unlock - release write lock of a queue rwlock
+  * @lock : Pointer to queue rwlock structure
+  */
  static inline void queued_write_unlock(struct qrwlock *lock)
  {
--	smp_store_release((u8 *)&lock->cnts, 0);
-+	smp_store_release(&lock->wmode, 0);
+-	/*
+-	 * If the writer field is atomic, it can be cleared directly.
+-	 * Otherwise, an atomic subtraction will be used to clear it.
+-	 */
+-	smp_mb__before_atomic();
+-	atomic_sub(_QW_LOCKED, &lock->cnts);
++	smp_store_release((u8 *)&lock->cnts, 0);
  }
- #endif
- 
-diff --git a/include/asm-generic/qrwlock_types.h b/include/asm-generic/qrwlock_types.h
-index 4d76f24df518..4c4f87fcf720 100644
---- a/include/asm-generic/qrwlock_types.h
-+++ b/include/asm-generic/qrwlock_types.h
-@@ -2,14 +2,29 @@
- #define __ASM_GENERIC_QRWLOCK_TYPES_H
- 
- #include <linux/types.h>
-+#include <asm/byteorder.h>
- #include <asm/spinlock_types.h>
+-#endif
  
  /*
-  * The queue read/write lock data structure
-+ *
-+ * The 32-bit count is divided into an 8-bit writer mode byte (least
-+ * significant) and a 24-bit reader count.
-  */
- 
- typedef struct qrwlock {
--	atomic_t		cnts;
-+	union {
-+		atomic_t	cnts;
-+		struct {
-+#ifdef __LITTLE_ENDIAN
-+			u8	wmode;		/* Writer mode   */
-+			u8	rcnts[3];	/* Reader counts */
-+#else
-+			u8	rcnts[3];	/* Reader counts */
-+			u8	wmode;		/* Writer mode   */
-+#endif
-+		};
-+	};
- 	arch_spinlock_t		lock;
- } arch_rwlock_t;
- 
-diff --git a/kernel/locking/qrwlock.c b/kernel/locking/qrwlock.c
-index 45fbb48f83f6..6ae1ae321897 100644
---- a/kernel/locking/qrwlock.c
-+++ b/kernel/locking/qrwlock.c
-@@ -27,26 +27,6 @@
- # define arch_qrwlock_relax(lock)	cpu_relax_lowlatency()
- #endif
- 
--/*
-- * This internal data structure is used for optimizing access to some of
-- * the subfields within the atomic_t cnts.
-- */
--struct __qrwlock {
--	union {
--		atomic_t cnts;
--		struct {
--#ifdef __LITTLE_ENDIAN
--			u8 wmode;	/* Writer mode   */
--			u8 rcnts[3];	/* Reader counts */
--#else
--			u8 rcnts[3];	/* Reader counts */
--			u8 wmode;	/* Writer mode   */
--#endif
--		};
--	};
--	arch_spinlock_t	lock;
--};
--
- /**
-  * rspin_until_writer_unlock - spin until writer is gone
-  * @lock  : Pointer to queue rwlock structure
-@@ -138,10 +118,8 @@ void queued_write_lock_slowpath(struct qrwlock *lock)
- 	 * or wait for a previous writer to go away.
- 	 */
- 	for (;;) {
--		struct __qrwlock *l = (struct __qrwlock *)lock;
--
--		if (!READ_ONCE(l->wmode) &&
--		   (cmpxchg_relaxed(&l->wmode, 0, _QW_WAITING) == 0))
-+		if (!READ_ONCE(lock->wmode) &&
-+		   (cmpxchg_relaxed(&lock->wmode, 0, _QW_WAITING) == 0))
- 			break;
- 
- 		arch_qrwlock_relax(lock);
+  * Remapping rwlock architecture specific functions to the corresponding
 -- 
 2.1.4
