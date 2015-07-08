@@ -1,68 +1,55 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Jul 2015 20:51:08 +0800
-Subject: [PATCH v2 2/2] arm: kernel: implement cpuidle_ops with psci backend
-In-Reply-To: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
-References: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1436359868-6176-3-git-send-email-jszhang@marvell.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 8 Jul 2015 15:59:34 +0300
+Subject: [PATCH 03/10] drm: exynos_hdmi: use of_get_i2c_adapter_by_node
+ interface
+In-Reply-To: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1436360374-9275-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements cpuidle_ops using psci. After this patch, we can
-use cpuidle-arm.c with psci backend for both arm and arm64.
+This change is needed to properly lock I2C bus driver, which serves DDC.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+On release of_get_i2c_adapter_by_node() requires i2c_put_adapter() call,
+which replaces put_device(). By the way added of_node_put(ddc_node) to
+eliminate memory leak, if OF_DYNAMIC is enabled.
+
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 ---
- arch/arm/kernel/Makefile       |  1 +
- arch/arm/kernel/psci_cpuidle.c | 29 +++++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm/kernel/psci_cpuidle.c
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index 3b995f5..96383d8 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- ifeq ($(CONFIG_ARM_PSCI),y)
- obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
-+obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
- endif
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 99e2864..399eff9 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -2407,7 +2407,8 @@ static int hdmi_probe(struct platform_device *pdev)
+ 	}
  
- extra-y := $(head-y) vmlinux.lds
-diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
-new file mode 100644
-index 0000000..ae85d97
---- /dev/null
-+++ b/arch/arm/kernel/psci_cpuidle.c
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (C) 2015 Marvell Technology Group Ltd.
-+ * Author: Jisheng Zhang <jszhang@marvell.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/cpuidle.h>
-+#include <linux/psci.h>
-+
-+#include <asm/cpuidle.h>
-+
-+static int psci_cpuidle_suspend(int cpu, unsigned long arg)
-+{
-+	return cpu_psci_cpu_suspend(arg);
-+}
-+
-+static int psci_cpuidle_init(struct device_node *node, int cpu)
-+{
-+	return cpu_psci_cpu_init_idle(cpu);
-+}
-+
-+static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-+	.suspend = psci_cpuidle_suspend,
-+	.init = psci_cpuidle_init,
-+};
-+CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+ out_get_ddc_adpt:
+-	hdata->ddc_adpt = of_find_i2c_adapter_by_node(ddc_node);
++	hdata->ddc_adpt = of_get_i2c_adapter_by_node(ddc_node);
++	of_node_put(ddc_node);
+ 	if (!hdata->ddc_adpt) {
+ 		DRM_ERROR("Failed to get ddc i2c adapter by node\n");
+ 		return -EPROBE_DEFER;
+@@ -2485,7 +2486,7 @@ err_hdmiphy:
+ 	if (hdata->hdmiphy_port)
+ 		put_device(&hdata->hdmiphy_port->dev);
+ err_ddc:
+-	put_device(&hdata->ddc_adpt->dev);
++	i2c_put_adapter(hdata->ddc_adpt);
+ 
+ 	return ret;
+ }
+@@ -2501,7 +2502,7 @@ static int hdmi_remove(struct platform_device *pdev)
+ 
+ 	if (hdata->hdmiphy_port)
+ 		put_device(&hdata->hdmiphy_port->dev);
+-	put_device(&hdata->ddc_adpt->dev);
++	i2c_put_adapter(hdata->ddc_adpt);
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 	component_del(&pdev->dev, &hdmi_component_ops);
 -- 
 2.1.4
