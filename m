@@ -1,31 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Wed, 08 Jul 2015 22:39:56 +0200
-Subject: [PATCH 1/7] pinctrl: UniPhier: add UniPhier pinctrl core support
-In-Reply-To: <CAK7LNASnaN47cPHyyH-DTrF4pE4XqhgUdZLuOspuqHtKoDxmRQ@mail.gmail.com>
-References: <1436185763-4308-1-git-send-email-yamada.masahiro@socionext.com>
- <1436185763-4308-2-git-send-email-yamada.masahiro@socionext.com>
- <1436260472.20057.121.camel@tiscali.nl>
- <CAK7LNASnaN47cPHyyH-DTrF4pE4XqhgUdZLuOspuqHtKoDxmRQ@mail.gmail.com>
-Message-ID: <1436387996.20619.54.camel@tiscali.nl>
+From: cory.tusar@pid1solutions.com (Cory Tusar)
+Date: Wed,  8 Jul 2015 16:21:20 -0400
+Subject: [PATCH v1 6/7] mtd: spi-nor: Add support for Micron MT25QL02GC serial
+ flash.
+In-Reply-To: <1436386881-28088-1-git-send-email-cory.tusar@pid1solutions.com>
+References: <1436386881-28088-1-git-send-email-cory.tusar@pid1solutions.com>
+Message-ID: <1436386881-28088-7-git-send-email-cory.tusar@pid1solutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+Add Micron (mt25ql02gc) 256 MiB flash to the list of supported devices.
 
-On wo, 2015-07-08 at 14:01 +0900, Masahiro Yamada wrote:
-> Actually, most of pinctrl drivers are boolean, but most of them
-> conventionally have MODULE_AUTHOR, THIS_MODULE, etc.
-> 
-> I do not think it looks so weird.  Thought?
+Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
+---
+ drivers/mtd/spi-nor/spi-nor.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-It's a rather common pattern, but I think it's an anti-pattern
-nevertheless. See the discussion that Shobhit Kumar, Paul Gortmaker, and
-I had starting in https://lkml.org/lkml/2015/6/20/63 .
-
-Please let me know if you're unconvinced by the arguments brought
-forward by both Pauls in that discussion.
-
-Thanks,
-
-
-Paul Bolle
+diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
+index d78831b..7a8896d 100644
+--- a/drivers/mtd/spi-nor/spi-nor.c
++++ b/drivers/mtd/spi-nor/spi-nor.c
+@@ -596,6 +596,7 @@ static const struct spi_device_id spi_nor_ids[] = {
+ 	{ "n25q512a",    INFO(0x20bb20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
+ 	{ "n25q512ax3",  INFO(0x20ba20, 0, 64 * 1024, 1024, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
+ 	{ "n25q00",      INFO(0x20ba21, 0, 64 * 1024, 2048, SECT_4K | USE_FSR | SPI_NOR_QUAD_READ) },
++	{ "mt25ql02gc",  INFO(0x20ba22, 0, 64 * 1024, 4096, SPI_NOR_QUAD_READ) },
+ 
+ 	/* PMC */
+ 	{ "pm25lv512",   INFO(0,        0, 32 * 1024,    2, SECT_4K_PMC) },
+-- 
+2.3.6
