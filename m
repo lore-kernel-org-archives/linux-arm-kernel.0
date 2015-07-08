@@ -1,15 +1,22 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 8 Jul 2015 15:59:24 +0300
-Subject: [PATCH 02/10] drm: dw_hdmi: use of_get_i2c_adapter_by_node interface
-In-Reply-To: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1436360364-9229-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Date: Wed, 8 Jul 2015 15:54:55 +0300
+Subject: [PATCH 00/10] i2c/drm: fix i2c adapter device driver user counter
+Message-ID: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change is needed to properly lock I2C bus driver, which serves DDC.
+The 01/10 change adds and exports new of_get_i2c_adapter_by_node()
+interface of i2c core, the rest of patches fix current users of
+of_find_i2c_adapter_by_node() interface.
 
-The change fixes an overflow over zero of I2C bus driver user counter:
+of_find_i2c_adapter_by_node() call requires quite often missing
+put_device(), and i2c_put_adapter() releases a device locked by
+i2c_get_adapter() only. In general module_put(adapter->owner) and
+put_device(dev) are not interchangeable.
+
+This is a common error reproduction scenario as a result of the
+misusage described above (this is run on iMX6 platform with
+HDMI and I2C bus drivers compiled as kernel modules for clearness):
 
     root at mx6q:~# lsmod | grep i2c
     i2c_imx                10213  0
@@ -27,63 +34,42 @@ The change fixes an overflow over zero of I2C bus driver user counter:
     root at mx6q:~# rmmod i2c_imx
     rmmod: ERROR: Module i2c_imx is in use
 
-Note that prior to this change put_device() coupled with
-of_find_i2c_adapter_by_node() was missing on error path of
-dw_hdmi_bind(), added i2c_put_adapter() there along with the change.
+To fix existing users of these interfaces and to avoid any further
+confusion and misusage in future, add one more interface
+of_get_i2c_adapter_by_node(), it is similar to i2c_get_adapter() in
+sense that an I2C bus device driver found and locked by user can be
+correctly unlocked by i2c_put_adapter().
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
----
- drivers/gpu/drm/bridge/dw_hdmi.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+Mainly the change concerns DRM users of I2C bus device.
 
-diff --git a/drivers/gpu/drm/bridge/dw_hdmi.c b/drivers/gpu/drm/bridge/dw_hdmi.c
-index 816d104..e86776c 100644
---- a/drivers/gpu/drm/bridge/dw_hdmi.c
-+++ b/drivers/gpu/drm/bridge/dw_hdmi.c
-@@ -1591,7 +1591,7 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 
- 	ddc_node = of_parse_phandle(np, "ddc-i2c-bus", 0);
- 	if (ddc_node) {
--		hdmi->ddc = of_find_i2c_adapter_by_node(ddc_node);
-+		hdmi->ddc = of_get_i2c_adapter_by_node(ddc_node);
- 		of_node_put(ddc_node);
- 		if (!hdmi->ddc) {
- 			dev_dbg(hdmi->dev, "failed to read ddc node\n");
-@@ -1603,20 +1603,22 @@ int dw_hdmi_bind(struct device *dev, struct device *master,
- 	}
- 
- 	hdmi->regs = devm_ioremap_resource(dev, iores);
--	if (IS_ERR(hdmi->regs))
--		return PTR_ERR(hdmi->regs);
-+	if (IS_ERR(hdmi->regs)) {
-+		ret = PTR_ERR(hdmi->regs);
-+		goto err_res;
-+	}
- 
- 	hdmi->isfr_clk = devm_clk_get(hdmi->dev, "isfr");
- 	if (IS_ERR(hdmi->isfr_clk)) {
- 		ret = PTR_ERR(hdmi->isfr_clk);
- 		dev_err(hdmi->dev, "Unable to get HDMI isfr clk: %d\n", ret);
--		return ret;
-+		goto err_res;
- 	}
- 
- 	ret = clk_prepare_enable(hdmi->isfr_clk);
- 	if (ret) {
- 		dev_err(hdmi->dev, "Cannot enable HDMI isfr clock: %d\n", ret);
--		return ret;
-+		goto err_res;
- 	}
- 
- 	hdmi->iahb_clk = devm_clk_get(hdmi->dev, "iahb");
-@@ -1682,6 +1684,8 @@ err_iahb:
- 	clk_disable_unprepare(hdmi->iahb_clk);
- err_isfr:
- 	clk_disable_unprepare(hdmi->isfr_clk);
-+err_res:
-+	i2c_put_adapter(hdmi->ddc);
- 
- 	return ret;
- }
+The change is based on torvalds/master branch, d6ac4ffc61a
+
+RFC of the 01/10 change is http://www.spinics.net/lists/linux-i2c/msg20257.html
+
+Vladimir Zapolskiy (10):
+  i2c: add and export of_get_i2c_adapter_by_node() interface
+  drm: dw_hdmi: use of_get_i2c_adapter_by_node interface
+  drm: exynos_hdmi: use of_get_i2c_adapter_by_node interface
+  drm: imx-tve: use of_get_i2c_adapter_by_node interface
+  drm: panel-simple: use of_get_i2c_adapter_by_node interface
+  drm: sti_hdmi: use of_get_i2c_adapter_by_node interface
+  drm: tegra: use of_get_i2c_adapter_by_node interface
+  drm: tilcdc: use of_get_i2c_adapter_by_node interface
+  fbdev: omap2: connector-dvi: use of_get_i2c_adapter_by_node interface
+  i2c: i2c-arb-gpio-challenge: use of_get_i2c_adapter_by_node interface
+
+ drivers/gpu/drm/bridge/dw_hdmi.c                   | 14 ++++--
+ drivers/gpu/drm/exynos/exynos_hdmi.c               |  7 +--
+ drivers/gpu/drm/imx/imx-tve.c                      | 56 +++++++++++++++-------
+ drivers/gpu/drm/panel/panel-simple.c               |  9 ++--
+ drivers/gpu/drm/sti/sti_hdmi.c                     | 19 +++-----
+ drivers/gpu/drm/tegra/output.c                     | 19 ++++----
+ drivers/gpu/drm/tilcdc/tilcdc_tfp410.c             |  6 +--
+ drivers/i2c/i2c-core.c                             | 20 ++++++++
+ drivers/i2c/muxes/i2c-arb-gpio-challenge.c         |  3 +-
+ .../video/fbdev/omap2/displays-new/connector-dvi.c |  2 +-
+ include/linux/i2c.h                                |  6 +++
+ 11 files changed, 104 insertions(+), 57 deletions(-)
+
 -- 
 2.1.4
