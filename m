@@ -1,44 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 8 Jul 2015 15:09:24 +0100
-Subject: [RFC PATCH] arm64: force CONFIG_SMP=y and remove redundant #ifdefs
-In-Reply-To: <20150708105847.GB6944@e104818-lin.cambridge.arm.com>
-References: <1436293575-5101-1-git-send-email-will.deacon@arm.com>
- <20150708105847.GB6944@e104818-lin.cambridge.arm.com>
-Message-ID: <20150708140923.GF9283@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  8 Jul 2015 16:14:06 +0200
+Subject: [PATCH] pinctrl: abx500: remove strict mode
+Message-ID: <1436364846-11471-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 11:58:47AM +0100, Catalin Marinas wrote:
-> On Tue, Jul 07, 2015 at 07:26:15PM +0100, Will Deacon wrote:
-> > Nobody seems to be producing !SMP systems anymore, so this is just
-> > becoming a source of kernel bugs, particularly if people want to use
-> > coherent DMA with non-shared pages.
-> > 
-> > This patch forces CONFIG_SMP=y for arm64, removing a modest amount of
-> > code in the process.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> > 
-> > I'd appreciate any comments on this. Anybody got a good reason for
-> > CONFIG_SMP=n on arm64?
-> 
-> A good reason would be testing/validating some hardware configurations
-> or even KVM/Xen (to see how they cope with UP OS'es). Of course, this
-> still requires that someone tests UP builds regularly but at least under
-> KVM this shouldn't be hard.
+Commit a21763a0b1e5a5ab8310f581886d04beadc16616
+"pinctrl: nomadik: activate strict mux mode"
+put all Nomadik pin controllers to strict mode. This was
+not good on the Snowball platform: the muxing of GPIOs to
+different pins is done with hogs in the DTS file, and then
+these GPIOs are used by offset, relying on hogs to mux the
+pins. Since that means the pin controller "owns" the pins
+and at the same time we have a GPIO user, this pin controller
+is by definition not strict.
 
->From a hypervisor perspective, this "validation" is basically just checking
-that memory is overridden to be shareable and TLB/cache maintenance is
-forced to be broadcast, right?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-href-ab8500.dtsi   | 4 ----
+ drivers/pinctrl/nomadik/pinctrl-abx500.c | 1 -
+ 2 files changed, 5 deletions(-)
 
-However, I think a UP kernel should be doing that *anyway* in order to
-support cache-coherent DMA (potentially behind an SMMU using CPU page
-tables), so by the time you fix !SMP kernels to do all that, they're
-basically indistinguishable imo.
-
-> An alternative, which does not remove any code:
-
-Bah, removing the code is what made it fun :)
-
-Will
+diff --git a/arch/arm/boot/dts/ste-href-ab8500.dtsi b/arch/arm/boot/dts/ste-href-ab8500.dtsi
+index 9b69bce9297d..165c1bac61b1 100644
+--- a/arch/arm/boot/dts/ste-href-ab8500.dtsi
++++ b/arch/arm/boot/dts/ste-href-ab8500.dtsi
+@@ -231,10 +231,6 @@
+ 					 */
+ 					gpio26 {
+ 						gpio26_default_mode: gpio26_default {
+-							default_mux {
+-								function = "gpio";
+-								groups = "gpio26_d_1";
+-							};
+ 							default_cfg {
+ 								pins = "GPIO26_M16";
+ 								output-low;
+diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+index 557d0f2a3031..97681fac082e 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
++++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
+@@ -787,7 +787,6 @@ static const struct pinmux_ops abx500_pinmux_ops = {
+ 	.set_mux = abx500_pmx_set,
+ 	.gpio_request_enable = abx500_gpio_request_enable,
+ 	.gpio_disable_free = abx500_gpio_disable_free,
+-	.strict = true,
+ };
+ 
+ static int abx500_get_groups_cnt(struct pinctrl_dev *pctldev)
+-- 
+2.4.3
