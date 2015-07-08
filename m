@@ -1,44 +1,22 @@
-From: cory.tusar@pid1solutions.com (Cory Tusar)
-Date: Wed,  8 Jul 2015 16:51:06 -0400
-Subject: [PATCH 1/1] ARM: dts: vfxxx: Include support for esdhc0 functionality.
-In-Reply-To: <1436388666-29376-1-git-send-email-cory.tusar@pid1solutions.com>
-References: <1436388666-29376-1-git-send-email-cory.tusar@pid1solutions.com>
-Message-ID: <1436388666-29376-2-git-send-email-cory.tusar@pid1solutions.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 08 Jul 2015 14:55:18 -0600
+Subject: [PATCH v1 3/3] ARM: tegra: Add gpio-ranges property
+In-Reply-To: <1435754753-31307-4-git-send-email-tomeu.vizoso@collabora.com>
+References: <1435754753-31307-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1435754753-31307-4-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <559D8E36.50209@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the existing Vybrid eSDHC devicetree implementation to also
-describe the esdhc0 functional block.
+On 07/01/2015 06:45 AM, Tomeu Vizoso wrote:
+> Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
+> explicit.
+>
+> This currently will add a duplicated entry in the map from pins to gpios
+> in the pinmux controller but it should be harmless and will be fixed in a
+> later commit.
 
-Tested on a custom VF610-based board with a Toshiba THGBM1G5D2EBAI7 eMMC
-module attached to esdhc0.
+Isn't it in an earlier commit now (patch 2/3)? :-)
 
-Signed-off-by: Cory Tusar <cory.tusar@pid1solutions.com>
----
- arch/arm/boot/dts/vfxxx.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 4aa3351..7e97017 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -445,6 +445,17 @@
- 				status = "disabled";
- 			};
- 
-+			esdhc0: esdhc at 400b1000 {
-+				compatible = "fsl,imx53-esdhc";
-+				reg = <0x400b1000 0x1000>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_IPG_BUS>,
-+					<&clks VF610_CLK_PLATFORM_BUS>,
-+					<&clks VF610_CLK_ESDHC0>;
-+				clock-names = "ipg", "ahb", "per";
-+				status = "disabled";
-+			};
-+
- 			esdhc1: esdhc at 400b2000 {
- 				compatible = "fsl,imx53-esdhc";
- 				reg = <0x400b2000 0x1000>;
--- 
-2.3.6
+At a quick glance, I think this approach will be fine, so the series,
+Acked-by: Stephen Warren <swarren@nvidia.com>
