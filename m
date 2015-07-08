@@ -1,27 +1,40 @@
-From: Vineet.Gupta1@synopsys.com (Vineet Gupta)
-Date: Wed, 8 Jul 2015 11:07:09 +0530
-Subject: [PATCH 01/41] clocksource: asm9260: Migrate to new 'set-state'
- interface
-In-Reply-To: <57ae9434bbb7218961c3ad45a26fbe1fffe40cbd.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <57ae9434bbb7218961c3ad45a26fbe1fffe40cbd.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <559CB705.5010805@synopsys.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue,  7 Jul 2015 22:36:26 -0700
+Subject: [PATCH 0/4] ARM: dts: Use labels instead of full paths for Exynos5
+ pinctrl nodes
+Message-ID: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 18 June 2015 04:24 PM, Viresh Kumar wrote:
-> Migrate asm9260 driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
-> 
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
+Hello Kukjin and Krzysztof,
 
-Hi Viresh,
+This is a trivial series that changes Exynos5 pinctrl dtsi files to extend
+the pinctrl nodes using labels instead of full paths.
 
-Is this series (and other one touching arch/arm/*) specific to ARM event timers.
-Are you planning to fixup the drivers in arch/* or the respective maintainers need
-to follow suit.
+Using labels is less error prone since a misstyped label leads to a build
+error while full paths can lead to the creation of a new node instead of
+overriding the original which makes the mistake harder to detect.
 
-Thx,
--Vineet
+I tested the changes by decompiling the Exynos5* dtbs and comparing before
+and after. The resulting dts were identical modulo some node ordering due
+the pinctrl include change.
+
+The series is composed of the following trivial patches:
+
+
+Javier Martinez Canillas (4):
+  ARM: dts: Include exynos5250-pinctrl after the nodes were defined
+  ARM: dts: Extend exynos5250-pinctrl nodes using labels instead of
+    paths
+  ARM: dts: Include exynos5420-pinctrl after the nodes were defined
+  ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
+    paths
+
+ arch/arm/boot/dts/exynos5250-pinctrl.dtsi | 1600 ++++++++++++++---------------
+ arch/arm/boot/dts/exynos5250.dtsi         |    3 +-
+ arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 1411 +++++++++++++------------
+ arch/arm/boot/dts/exynos5420.dtsi         |    3 +-
+ 4 files changed, 1508 insertions(+), 1509 deletions(-)
+
+-- 
+2.4.3
