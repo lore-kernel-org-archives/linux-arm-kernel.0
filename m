@@ -1,104 +1,94 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 7 Jul 2015 17:57:48 -0700
-Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
-In-Reply-To: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150708005748.GG30412@codeaurora.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Jul 2015 10:04:35 +0900
+Subject: [PATCH 12/15] SH: kill off set_irq_flags usage
+In-Reply-To: <CAL_JsqJdDU+=88opwQunDEKZpy7DZbGZ0Xt2tm+X_jDtgjaKig@mail.gmail.com>
+References: <1433874401-27161-1-git-send-email-robh@kernel.org>
+ <1433874401-27161-13-git-send-email-robh@kernel.org>
+ <20150707005338.GG13326@verge.net.au>
+ <20150707015503.GA23941@verge.net.au>
+ <CAL_JsqJdDU+=88opwQunDEKZpy7DZbGZ0Xt2tm+X_jDtgjaKig@mail.gmail.com>
+Message-ID: <20150708010435.GB28100@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07, Boris Brezillon wrote:
-> Clock rates are stored in an unsigned long field, but ->determine_rate()
-> (which returns a rounded rate from a requested one) returns a long
-> value (errors are reported using negative error codes), which can lead
-> to long overflow if the clock rate exceed 2Ghz.
+On Tue, Jul 07, 2015 at 09:38:53AM -0500, Rob Herring wrote:
+> On Mon, Jul 6, 2015 at 8:55 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Jul 07, 2015 at 09:53:39AM +0900, Simon Horman wrote:
+> >> On Tue, Jun 09, 2015 at 01:26:38PM -0500, Rob Herring wrote:
+> >> > set_irq_flags is ARM specific with custom flags which have genirq
+> >> > equivalents. Convert drivers to use the genirq interfaces directly, so we
+> >> > can kill off set_irq_flags. The translation of flags is as follows:
+> >> >
+> >> > IRQF_VALID -> !IRQ_NOREQUEST
+> >> > IRQF_PROBE -> !IRQ_NOPROBE
+> >> > IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> >> >
+> >> > For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> >> > and setting IRQ_NOREQUEST already, so there is no need to do this in
+> >> > .map() functions and we can simply remove the set_irq_flags calls. Some
+> >> > users also set IRQ_NOPROBE and this has been maintained although it is not
+> >> > clear that is really needed. There appears to be a great deal of blind
+> >> > copy and paste of this code.
+> >> >
+> >> > Signed-off-by: Rob Herring <robh@kernel.org>
+> >> > Cc: Simon Horman <horms@verge.net.au>
+> >> > Cc: Magnus Damm <magnus.damm@gmail.com>
+> >> > Cc: linux-sh at vger.kernel.org
+> >>
+> >> I am trusting the description above coupled with the comments in
+> >> the original code (that this patch removes). Assuming those ducks are
+> >> aligned:
+> >>
+> >> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > As I usually take patches for drivers/sh/ (there have not been many of late)
+> > please let me know if you would like me to pick up this change.
 > 
-> Change ->determine_rate() prototype to return 0 or an error code, and pass
-> a pointer to a clk_rate_request structure containing the expected target
-> rate and the rate constraints imposed by clk users.
-> 
-> The clk_rate_request structure might be extended in the future to contain
-> other kind of constraints like the rounding policy, the maximum clock
-> inaccuracy or other things that are not yet supported by the CCF
-> (power consumption constraints ?).
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> CC: Jonathan Corbet <corbet@lwn.net>
-> CC: Tony Lindgren <tony@atomide.com>
-> CC: Ralf Baechle <ralf@linux-mips.org>
-> CC: "Emilio L?pez" <emilio@elopez.com.ar>
-> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
-> CC: Tero Kristo <t-kristo@ti.com>
-> CC: Peter De Schrijver <pdeschrijver@nvidia.com>
-> CC: Prashant Gaikwad <pgaikwad@nvidia.com>
-> CC: Stephen Warren <swarren@wwwdotorg.org>
-> CC: Thierry Reding <thierry.reding@gmail.com>
-> CC: Alexandre Courbot <gnurou@gmail.com>
-> CC: linux-doc at vger.kernel.org
-> CC: linux-kernel at vger.kernel.org
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-omap at vger.kernel.org
-> CC: linux-mips at linux-mips.org
-> CC: linux-tegra at vger.kernel.org
-> 
-> ---
+> This is a dependency for removing set_irq_flags from ARM, so I plan to
+> send the whole series to arm-soc.
 
-I'll throw this patch into -next now to see if any other problems
-shake out. I'm hoping we get some more acks though, so it'll be
-on it's own branch and become immutable in a week or so. One
-question below.
+Thanks, that is fine by me.
 
-> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-> index 616f5ae..9e69f34 100644
-> --- a/drivers/clk/clk-composite.c
-> +++ b/drivers/clk/clk-composite.c
-> @@ -99,33 +99,33 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
->  
->  			parent_rate = __clk_get_rate(parent);
->  
-> -			tmp_rate = rate_ops->round_rate(rate_hw, rate,
-> +			tmp_rate = rate_ops->round_rate(rate_hw, req->rate,
->  							&parent_rate);
->  			if (tmp_rate < 0)
->  				continue;
->  
-> -			rate_diff = abs(rate - tmp_rate);
-> +			rate_diff = abs(req->rate - tmp_rate);
->  
-> -			if (!rate_diff || !*best_parent_p
-> +			if (!rate_diff || !req->best_parent_hw
->  				       || best_rate_diff > rate_diff) {
-> -				*best_parent_p = __clk_get_hw(parent);
-> -				*best_parent_rate = parent_rate;
-> +				req->best_parent_hw = __clk_get_hw(parent);
-> +				req->best_parent_rate = parent_rate;
->  				best_rate_diff = rate_diff;
->  				best_rate = tmp_rate;
->  			}
->  
->  			if (!rate_diff)
-> -				return rate;
-> +				return 0;
->  		}
->  
-> -		return best_rate;
-> +		req->rate = best_rate;
-> +		return 0;
->  	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
->  		__clk_hw_set_clk(mux_hw, hw);
-> -		return mux_ops->determine_rate(mux_hw, rate, min_rate,
-> -					       max_rate, best_parent_rate,
-> -					       best_parent_p);
-> +		return mux_ops->determine_rate(mux_hw, req);
->  	} else {
->  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
-> +		req->rate = 0;
->  		return 0;
-
-Shouldn't this return an error now? And then assigning req->rate
-wouldn't be necessary. Sorry I must have missed this last round.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> > Also, a very minor nit, the prefix for patches to this file is usually
+> > 'sh:' rather than 'SH:'.
+> 
+> Okay, will fix-up.
+> 
+> Rob
+> 
+> >
+> >>
+> >> > ---
+> >> >  drivers/sh/intc/internals.h | 10 +---------
+> >> >  1 file changed, 1 insertion(+), 9 deletions(-)
+> >> >
+> >> > diff --git a/drivers/sh/intc/internals.h b/drivers/sh/intc/internals.h
+> >> > index 7dff08e..897ffb1 100644
+> >> > --- a/drivers/sh/intc/internals.h
+> >> > +++ b/drivers/sh/intc/internals.h
+> >> > @@ -99,15 +99,7 @@ static inline struct intc_desc_int *get_intc_desc(unsigned int irq)
+> >> >   */
+> >> >  static inline void activate_irq(int irq)
+> >> >  {
+> >> > -#ifdef CONFIG_ARM
+> >> > -   /* ARM requires an extra step to clear IRQ_NOREQUEST, which it
+> >> > -    * sets on behalf of every irq_chip.  Also sets IRQ_NOPROBE.
+> >> > -    */
+> >> > -   set_irq_flags(irq, IRQF_VALID);
+> >> > -#else
+> >> > -   /* same effect on other architectures */
+> >> > -   irq_set_noprobe(irq);
+> >> > -#endif
+> >> > +   irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
+> >> >  }
+> >> >
+> >> >  static inline int intc_handle_int_cmp(const void *a, const void *b)
+> >> > --
+> >> > 2.1.0
+> >> >
+> >> --
+> >> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> >> the body of a message to majordomo at vger.kernel.org
+> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >>
+> 
