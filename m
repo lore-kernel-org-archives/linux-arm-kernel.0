@@ -1,51 +1,37 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Thu, 09 Jul 2015 01:29:39 +0300
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <2131951.l0j0CIttAZ@wuerfel>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2349062.9v3Zz7HPLu@wuerfel> <0701f75c1c42f74fd58845bc0ed41c38@advem.lv>
- <2131951.l0j0CIttAZ@wuerfel>
-Message-ID: <f22e65faa7d86074cda27973f83d7a52@advem.lv>
+From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
+Date: Thu, 9 Jul 2015 00:31:56 +0200
+Subject: [PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller
+In-Reply-To: <BLU436-SMTP255283C042EDEF59D9BA0CFB8910@phx.gbl>
+References: <1434668319-6651-1-git-send-email-stefan@agner.ch>
+ <1434668319-6651-5-git-send-email-stefan@agner.ch>
+ <20150708093801.GG28488@tiger>
+ <BLU436-SMTP255283C042EDEF59D9BA0CFB8910@phx.gbl>
+Message-ID: <20150708223156.GA3103@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-05-08 19:08, Arnd Bergmann wrote:
-> On Thursday 07 May 2015 12:03:25 Roman Yeryomin wrote:
->> On 2015-05-06 22:22, Arnd Bergmann wrote:
->> > On Wednesday 06 May 2015 19:21:21 Roman Yeryomin wrote:
->> >>
->> >> > Thanks to point that, I'll merge that one which seems clean enough:
->> >> > http://git.openwrt.org/?p=openwrt.git;a=blob;f=target/linux/gemini/files/drivers/rtc/rtc-gemini.c;h=587d8122b2fbb1230437eadcce4789a53aa60ee5;hb=4c637410a2a1ab45988e8ca6202554a502102039
->> >>
->> >> For 3.18 (and up) to work on gemini 160-gemini-timers.patch is vital.
->> >> Without that timers are broken and cpu is super slow.
->> >
->> > Do you know what part of the patch is the actual bug fix? We should
->> > probably
->> > merge that separately and mark it for stable backports, while the bulk
->> > of that
->> > patch seems to just rearrange code.
->> >
->> >       Arnd
->> 
->> Sorry, didn't try to extract the exact lines it but I guess it's that
->> part which touches the scheduler clock code.
->> Because without that patch sched clock runs at 100Hz instead of 25MHz.
->> I can dive into this deeper if you want, I just didn't see the need.
+On Wed, Jul 08, 2015 at 10:32:54AM -0400, Bill Pringlemeir wrote:
+> >> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> >> index 3a3d3e9..9358135 100644
+> >> --- a/arch/arm/mach-imx/Kconfig
+> >> +++ b/arch/arm/mach-imx/Kconfig
+> >>>> -589,6 +589,7 @@ config SOC_VF610
+> >> 	select PINCTRL_VF610
+> >> 	select PL310_ERRATA_769419 if CACHE_L2X0
+> >> 	select SMP_ON_UP if SMP
+> >> +	select HAVE_NAND_VF610_NFC
 > 
-> I think that would be helpful, yes.
+> > I'm not sure about the benefit of having this option, except we have
+> > to have this additional architecture patch.
 > 
+> For other SOC, like the PowerPC or ColdFire CPUs with this controller,
+> it was a way to mark the controller as populated.  Otherwise, the
+> Kconfig entry to select the controller will pop up for everybody.
+> 
+> Is there a better way to do this?
 
-OK, here are the minimal changes required (see attachment). Tested on 
-4.1.1
-Let me know if you want me to submit it in some other way.
+use
+	depends on SOC_VF610
+instead.
 
-Regards,
-Roman
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 160-gemini-timers.patch
-Type: text/x-diff
-Size: 1986 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150709/cdb787d6/attachment.bin>
+Sebastian
