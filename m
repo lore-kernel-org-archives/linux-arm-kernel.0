@@ -1,103 +1,27 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed,  8 Jul 2015 15:17:18 +0530
-Subject: [PATCH 9/9] arm64: dts: msm8916: Add thermal zones,
- tsens and eeprom nodes
-In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1436348838-22671-10-git-send-email-rnayak@codeaurora.org>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 8 Jul 2015 11:59:44 +0200
+Subject: [PATCH 2/9] locking/qrwlock: avoid redundant atomic_add_return
+ on read_lock_slowpath
+In-Reply-To: <559C284D.4090907@hp.com>
+References: <1436289865-2331-1-git-send-email-will.deacon@arm.com>
+ <1436289865-2331-3-git-send-email-will.deacon@arm.com>
+ <559C11BA.1070309@hp.com> <20150707181941.GL23879@arm.com>
+ <559C284D.4090907@hp.com>
+Message-ID: <20150708095944.GA3644@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add thermal zones, tsens and eeprom nodes
+On Tue, Jul 07, 2015 at 03:28:13PM -0400, Waiman Long wrote:
+> #ifndef queued_inc_reader_return
+> static inline u32 queued_inc_reader_return(struct qrwlock *lock)
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 66 +++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+That's actually a misleading name, we don't do an inc_return, we do a
+fetch_inc.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 0f49ebd..9ff9979 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -63,6 +63,49 @@
- 		};
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal0 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens 4>;
-+
-+			trips {
-+				cpu_alert0: trip at 0 {
-+					temperature = <100000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_crit0: trip at 1 {
-+					temperature = <125000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+		cpu-thermal1 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+
-+			thermal-sensors = <&tsens 3>;
-+
-+			trips {
-+				cpu_alert1: trip at 0 {
-+					temperature = <100000>;
-+					hysteresis = <2000>;
-+					type = "passive";
-+				};
-+				cpu_crit1: trip at 1 {
-+					temperature = <125000>;
-+					hysteresis = <2000>;
-+					type = "critical";
-+				};
-+			};
-+		};
-+
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 2 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-@@ -215,5 +258,28 @@
- 			interrupt-controller;
- 			#interrupt-cells = <4>;
- 		};
-+
-+		qfprom: qfprom at 5c000 {
-+			compatible = "qcom,qfprom";
-+			reg = <0x5c000 0x1000>;
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			tsens_caldata: caldata at d0 {
-+				reg = <0xd0 0x8>;
-+			};
-+			tsens_calsel: calsel at ec {
-+				reg = <0xec 0x4>;
-+			};
-+		};
-+
-+		tsens: thermal-sensor at 4a8000 {
-+			compatible = "qcom,msm8916-tsens";
-+			reg = <0x4a8000 0x2000>;
-+			nvmem-cell = <&tsens_caldata>, <&tsens_calsel>;
-+			nvmem-cell-names = "calib", "calib_sel";
-+			qcom,tsens-slopes = <3200 3200 3200 3200 3200>;
-+			qcom,sensor-id = <0 1 2 4 5>;
-+			#thermal-sensor-cells = <1>;
-+		};
- 	};
- };
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+> {
+>     return atomic_add_return(_QR_BIAS, &lock->cnts) - _QR_BIAS;
+> }
+> #endif
+
+With that you (Will) could even reuse the ll/sc load and avoid issuing a
+second load. You basically need atomic_fetch_add_relaxed().
