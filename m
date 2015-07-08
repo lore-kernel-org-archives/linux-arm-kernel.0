@@ -1,51 +1,58 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 8 Jul 2015 09:02:25 +0200
-Subject: [PATCH V3 2/5] mm: mlock: Add new mlock, munlock, and munlockall
- system calls
-In-Reply-To: <20150708064607.GB7079@osiris>
-References: <1436288623-13007-1-git-send-email-emunson@akamai.com>
- <1436288623-13007-3-git-send-email-emunson@akamai.com>
- <20150708064607.GB7079@osiris>
-Message-ID: <CAMuHMdUS72nYDo=chtcZMv-ZNVU0RhxvVLvMYvSFLtRk_wXrgw@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 8 Jul 2015 16:18:48 +0900
+Subject: [PATCH] ARM: tegra: roth: Add MMC pwrseq to power wifi on
+In-Reply-To: <CABxcv=kBcr7g77jj98KQ19R_oaoTrVGjqDgQa6ghZz7CJ+t3uw@mail.gmail.com>
+References: <1433749292-13890-1-git-send-email-acourbot@nvidia.com>
+ <CABxcv=kBcr7g77jj98KQ19R_oaoTrVGjqDgQa6ghZz7CJ+t3uw@mail.gmail.com>
+Message-ID: <CAAVeFuJ8sQN6t3tPQNyHizd4LGz=0=R3xdrdQstq5PtwYYnwSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 8, 2015 at 8:46 AM, Heiko Carstens
-<heiko.carstens@de.ibm.com> wrote:
->> diff --git a/arch/s390/kernel/syscalls.S b/arch/s390/kernel/syscalls.S
->> index 1acad02..f6d81d6 100644
->> --- a/arch/s390/kernel/syscalls.S
->> +++ b/arch/s390/kernel/syscalls.S
->> @@ -363,3 +363,6 @@ SYSCALL(sys_bpf,compat_sys_bpf)
->>  SYSCALL(sys_s390_pci_mmio_write,compat_sys_s390_pci_mmio_write)
->>  SYSCALL(sys_s390_pci_mmio_read,compat_sys_s390_pci_mmio_read)
->>  SYSCALL(sys_execveat,compat_sys_execveat)
->> +SYSCALL(sys_mlock2,compat_sys_mlock2)                        /* 355 */
->> +SYSCALL(sys_munlock2,compat_sys_munlock2)
->> +SYSCALL(sys_munlockall2,compat_sys_munlockall2)
+Ping Thierry, is this patch good to be merged?
+
+On Mon, Jun 8, 2015 at 5:12 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> Hello Alexandre,
 >
-> FWIW, you would also need to add matching lines to the two files
+> On Mon, Jun 8, 2015 at 9:41 AM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>> The wifi chip on roth needs to have its reset deasserted in order to be
+>> probed. Add a mmc-pwrseq-simple to allow this to happen and get wifi
+>> working at boot time.
+>>
+>> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+>> ---
+>>  arch/arm/boot/dts/tegra114-roth.dts | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra114-roth.dts b/arch/arm/boot/dts/tegra114-roth.dts
+>> index ea1772a686c2..04762532a178 100644
+>> --- a/arch/arm/boot/dts/tegra114-roth.dts
+>> +++ b/arch/arm/boot/dts/tegra114-roth.dts
+>> @@ -972,6 +972,11 @@
+>>                 nvidia,invert-interrupt;
+>>         };
+>>
+>> +       sdhci0_pwrseq: sdhci0_pwrseq {
+>> +               compatible = "mmc-pwrseq-simple";
+>> +               reset-gpios = <&gpio TEGRA_GPIO(CC, 5) GPIO_ACTIVE_LOW>;
+>> +       };
+>> +
+>>         /* Wifi */
+>>         sdhci at 78000000 {
+>>                 status = "okay";
+>> @@ -979,6 +984,7 @@
+>>                 broken-cd;
+>>                 keep-power-in-suspend;
+>>                 cap-sdio-irq;
+>> +               mmc-pwrseq = <&sdhci0_pwrseq>;
+>>         };
+>>
+>>         /* SD card */
 >
-> arch/s390/include/uapi/asm/unistd.h
-> arch/s390/kernel/compat_wrapper.c
+> I'm neither familiar with this board nor have a schematic but the
+> patch looks good to me.
 >
-> so that the system call would be wired up on s390.
-
-Similar comment for m68k:
-
-arch/m68k/include/asm/unistd.h
-arch/m68k/include/uapi/asm/unistd.h
-
-I think you best look at the last commits that added system calls, for all
-architectures, to make sure you don't do partial updates.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>
+> Best regards,
+> Javier
