@@ -1,161 +1,44 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 16:09:20 +0200
-Subject: [PATCH 1/2] ARM: mvebu: add support to clear shared L2 bit on Armada
- XP
-In-Reply-To: <1436364561-20958-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1436364561-20958-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436364561-20958-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Jul 2015 15:09:24 +0100
+Subject: [RFC PATCH] arm64: force CONFIG_SMP=y and remove redundant #ifdefs
+In-Reply-To: <20150708105847.GB6944@e104818-lin.cambridge.arm.com>
+References: <1436293575-5101-1-git-send-email-will.deacon@arm.com>
+ <20150708105847.GB6944@e104818-lin.cambridge.arm.com>
+Message-ID: <20150708140923.GF9283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For optimal performance, in a HW I/O coherency context such as the one
-used on Armada XP, the shared L2 bit of the CPU configuration register
-should be cleared.
+On Wed, Jul 08, 2015 at 11:58:47AM +0100, Catalin Marinas wrote:
+> On Tue, Jul 07, 2015 at 07:26:15PM +0100, Will Deacon wrote:
+> > Nobody seems to be producing !SMP systems anymore, so this is just
+> > becoming a source of kernel bugs, particularly if people want to use
+> > coherent DMA with non-shared pages.
+> > 
+> > This patch forces CONFIG_SMP=y for arm64, removing a modest amount of
+> > code in the process.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> > 
+> > I'd appreciate any comments on this. Anybody got a good reason for
+> > CONFIG_SMP=n on arm64?
+> 
+> A good reason would be testing/validating some hardware configurations
+> or even KVM/Xen (to see how they cope with UP OS'es). Of course, this
+> still requires that someone tests UP builds regularly but at least under
+> KVM this shouldn't be hard.
 
-This commit adjusts the coherency fabric code used by Marvell EBU
-processors to clear this bit on Armada XP. Since it's a per-CPU
-register, it's cleared in set_cpu_coherent() for the boot CPU, and
-through a CPU notifier for the non-boot CPUs.
+>From a hypervisor perspective, this "validation" is basically just checking
+that memory is overridden to be shareable and TLB/cache maintenance is
+forced to be broadcast, right?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- .../devicetree/bindings/arm/mvebu-cpu-config.txt   | 20 +++++++
- arch/arm/mach-mvebu/coherency.c                    | 61 ++++++++++++++++++++++
- 2 files changed, 81 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
+However, I think a UP kernel should be doing that *anyway* in order to
+support cache-coherent DMA (potentially behind an SMMU using CPU page
+tables), so by the time you fix !SMP kernels to do all that, they're
+basically indistinguishable imo.
 
-diff --git a/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt b/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
-new file mode 100644
-index 0000000..2cdcd71
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/mvebu-cpu-config.txt
-@@ -0,0 +1,20 @@
-+MVEBU CPU Config registers
-+--------------------------
-+
-+MVEBU (Marvell SOCs: Armada 370/XP)
-+
-+Required properties:
-+
-+- compatible: one of:
-+	- "marvell,armada-370-cpu-config"
-+	- "marvell,armada-xp-cpu-config"
-+
-+- reg: Should contain CPU config registers location and length, in
-+  their per-CPU variant
-+
-+Example:
-+
-+	cpu-config at 21000 {
-+		compatible = "marvell,armada-xp-cpu-config";
-+		reg = <0x21000 0x8>;
-+	};
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index e46e9ea..48655f8 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -40,6 +40,7 @@
- unsigned long coherency_phys_base;
- void __iomem *coherency_base;
- static void __iomem *coherency_cpu_base;
-+static void __iomem *cpu_config_base;
- 
- /* Coherency fabric registers */
- #define IO_SYNC_BARRIER_CTL_OFFSET		   0x0
-@@ -65,6 +66,31 @@ static const struct of_device_id of_coherency_table[] = {
- int ll_enable_coherency(void);
- void ll_add_cpu_to_smp_group(void);
- 
-+#define CPU_CONFIG_SHARED_L2 BIT(16)
-+
-+/*
-+ * Disable the "Shared L2 Present" bit in CPU Configuration register
-+ * on Armada XP.
-+ *
-+ * The "Shared L2 Present" bit affects the "level of coherence" value
-+ * in the clidr CP15 register.  Cache operation functions such as
-+ * "flush all" and "invalidate all" operate on all the cache levels
-+ * that included in the defined level of coherence. When HW I/O
-+ * coherency is used, this bit causes unnecessary flushes of the L2
-+ * cache.
-+ */
-+static void armada_xp_clear_shared_l2(void)
-+{
-+	u32 reg;
-+
-+	if (!cpu_config_base)
-+		return;
-+
-+	reg = readl(cpu_config_base);
-+	reg &= ~CPU_CONFIG_SHARED_L2;
-+	writel(reg, cpu_config_base);
-+}
-+
- int set_cpu_coherent(void)
- {
- 	if (!coherency_base) {
-@@ -73,10 +99,13 @@ int set_cpu_coherent(void)
- 		return 1;
- 	}
- 
-+	armada_xp_clear_shared_l2();
- 	ll_add_cpu_to_smp_group();
- 	return ll_enable_coherency();
- }
- 
-+
-+
- static int mvebu_hwcc_notifier(struct notifier_block *nb,
- 			       unsigned long event, void *__dev)
- {
-@@ -97,9 +126,24 @@ static struct notifier_block mvebu_hwcc_pci_nb = {
- 	.notifier_call = mvebu_hwcc_notifier,
- };
- 
-+static int armada_xp_clear_shared_l2_notifier_func(struct notifier_block *nfb,
-+						   unsigned long action, void *hcpu)
-+{
-+	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-+		armada_xp_clear_shared_l2();
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block armada_xp_clear_shared_l2_notifier = {
-+	.notifier_call = armada_xp_clear_shared_l2_notifier_func,
-+	.priority = 100,
-+};
-+
- static void __init armada_370_coherency_init(struct device_node *np)
- {
- 	struct resource res;
-+	struct device_node *cpu_config_np;
- 
- 	of_address_to_resource(np, 0, &res);
- 	coherency_phys_base = res.start;
-@@ -112,6 +156,23 @@ static void __init armada_370_coherency_init(struct device_node *np)
- 	sync_cache_w(&coherency_phys_base);
- 	coherency_base = of_iomap(np, 0);
- 	coherency_cpu_base = of_iomap(np, 1);
-+
-+	cpu_config_np = of_find_compatible_node(NULL, NULL,
-+						"marvell,armada-xp-cpu-config");
-+	if (!cpu_config_np)
-+		goto exit;
-+
-+	cpu_config_base = of_iomap(cpu_config_np, 0);
-+	if (!cpu_config_base) {
-+		of_node_put(cpu_config_np);
-+		goto exit;
-+	}
-+
-+	of_node_put(cpu_config_np);
-+
-+	register_cpu_notifier(&armada_xp_clear_shared_l2_notifier);
-+
-+exit:
- 	set_cpu_coherent();
- }
- 
--- 
-2.4.5
+> An alternative, which does not remove any code:
+
+Bah, removing the code is what made it fun :)
+
+Will
