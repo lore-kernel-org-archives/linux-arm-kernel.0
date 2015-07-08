@@ -1,113 +1,42 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 8 Jul 2015 10:37:21 +0800
-Subject: [PATCH] arm64: dts: mt8173: add clock_null
-In-Reply-To: <CAGS+omChOC-EYsmA5ytT+ho0UXvcL1-mjK4Z8=EgboKzwWmtyw@mail.gmail.com>
-References: <1434605351-64592-1-git-send-email-eddie.huang@mediatek.com>
- <20150707130732.GD18561@pengutronix.de>
- <CAGS+omCgSjLZ2Ae5DqfmEm-2BrxQqw2ztxUCxBSngNSXxabtbg@mail.gmail.com>
- <20150707143621.GW18700@pengutronix.de>
- <CAGS+omChOC-EYsmA5ytT+ho0UXvcL1-mjK4Z8=EgboKzwWmtyw@mail.gmail.com>
-Message-ID: <1436323041.27396.23.camel@mtksdaap41>
+From: haikun.wang@freescale.com (Haikun Wang)
+Date: Wed, 8 Jul 2015 10:43:40 +0800
+Subject: [PATCH] arm: dts: ls1021a: Update 'dspi' device node compatible string
+Message-ID: <1436323420-12846-1-git-send-email-haikun.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-07 at 23:10 +0800, Daniel Kurtz wrote:
-> On Tue, Jul 7, 2015 at 10:36 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Tue, Jul 07, 2015 at 10:15:29PM +0800, Daniel Kurtz wrote:
-> >> On Tue, Jul 7, 2015 at 9:07 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> > On Thu, Jun 18, 2015 at 01:29:11PM +0800, Eddie Huang wrote:
-> >> >> Add clk_null, which represents clocks that can not / need not
-> >> >> controlled by software.
-> >> >> There are many clocks' parent set to clk_null.
-> >> >>
-> >> >> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> >> >> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> >> >> ---
-> >> >> Base on 4.1-rc1
-> >> >>
-> >> >> Change-Id: I4db9b40d07e28f54f7bae9b676316cbd6a962124
-> >> >> ---
-> >> >>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 6 ++++++
-> >> >>  1 file changed, 6 insertions(+)
-> >> >>
-> >> >> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> >> index 924fdb6..4798f44 100644
-> >> >> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> >> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> >> >> @@ -81,6 +81,12 @@
-> >> >>               cpu_on        = <0x84000003>;
-> >> >>       };
-> >> >>
-> >> >> +     clk_null: clk_null {
-> >> >> +             compatible = "fixed-clock";
-> >> >> +             clock-frequency = <0>;
-> >> >> +             #clock-cells = <0>;
-> >> >> +     };
-> >> >
-> >> > The discussion around this patch shows that we don't want to have this
-> >> > clock in the device tree as it is not a hardware description.
-> >> >
-> >> > Ok, fine. Eddie, you told us that the rate of the current clk_null children
-> >> > is not interesting. What's the motivation to send this patch anyway
-> >> > then? Why can't you keep its children on the orphan list where they are
-> >> > already now?
-> >> >
-> >> > Another possibility would be to instantiate the clk_null clock from C
-> >> > code rather than from the device tree. This way we wouldn't put any
-> >> > wrong descriptions into the device tree and still can implement the
-> >> > support for the real parent clocks when we actually need them.
-> >>
-> >> Some device nodes, like mmc, use a clk_null phandle as one of their clocks:
-> >>
-> >> mmc1: mmc at 11240000 {
-> >>         compatible = "mediatek,mt8173-mmc",
-> >>                      "mediatek,mt8135-mmc";
-> >>         reg = <0 0x11240000 0 0x1000>;
-> >>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
-> >>         clocks = <&pericfg CLK_PERI_MSDC30_1>,
-> >>                  <&clk_null>;
-> >>         clock-names = "source", "hclk";
-> >>         status = "disabled";
-> >> };
-> >
-> > This is another case than the one we discussed about. In the case above
-> > I motivated using a dummy clock since the clock exists in the system,
-> > but is not software controllable. To abstract this from the driver
-> > (which needs this clock since it exists) we here have the dummy clock.
-> > However, of course I can't prove the clock is indeed not software
-> > controllable; that's only the information I have.
-> 
-> I was trying to answer your question "What's the motivation to send
-> this patch anyway?".
-> The motivation is to send follow on patches that use the clk_null
-> phandle.  We need to provide some clock as the mmc1's hclk.  I do not
-> understand why this has to be "clk_null", though.  It seems like this
-> should be a real clock coming from one of the real clock_controller
-> nodes.  After all, the mmc driver is going to be enabling/disabling
-> this clock for power savings at runtime.  What does that even mean for
-> clk_null ?
+Freescale DSPI driver has been updated and supports TCF interrupt type now.
+In the new driver we choose the interrupt type according the compatible
+string of the device node.
+This patch update the compatible string of DSPI device node of LS1021A in
+order to use the correct interrupt type.
 
-The original purpose of this patch is to provide a common dummy clock
-for both software don't care clock and clock that is not software
-controllable.I got comments that device tree should describe hardware
-and should put exact clock in device tree. I think this is true. So we
-will remove this clock_null patch, and:
+Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-1. For Mediatek SoC CCF driver, James will clarify clock usage further.
-Actually, we still think it's not necessary to describe whole tree that
-software don't care, James will deal this in clock driver.
-
-2. For other module that use SW not controllable clock (mmc case
-mentioned by Dan), because this is a real clock, we will put a dummy
-clock in device tree, like
-
-clk_mmchclk: dummyhclk {
-	compatible = "fixed-clock";
-	clock-frequency = <0>;
-	#clock-cells = <0>;
-};
-
-How about this modification ?
-
-Thanks
-Eddie
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index c70bb27..1b306c7 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -184,7 +184,7 @@
+ 		};
+ 
+ 		dspi0: dspi at 2100000 {
+-			compatible = "fsl,vf610-dspi";
++			compatible = "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x0 0x2100000 0x0 0x10000>;
+@@ -197,7 +197,7 @@
+ 		};
+ 
+ 		dspi1: dspi at 2110000 {
+-			compatible = "fsl,vf610-dspi";
++			compatible = "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			reg = <0x0 0x2110000 0x0 0x10000>;
+-- 
+2.1.0.27.g96db324
