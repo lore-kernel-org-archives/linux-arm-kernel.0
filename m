@@ -1,48 +1,19 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 08 Jul 2015 15:47:43 +0200
-Subject: [PATCH v2 5/5] usb: gadget: atmel_usba_udc: add missing ret value
- check
-In-Reply-To: <1436346323-31593-6-git-send-email-r.baldyga@samsung.com>
-References: <1436346323-31593-1-git-send-email-r.baldyga@samsung.com>
- <1436346323-31593-6-git-send-email-r.baldyga@samsung.com>
-Message-ID: <xa1t7fqadam8.fsf@mina86.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 8 Jul 2015 14:51:24 +0100
+Subject: [PATCH] arm64: lib: use pair accessors for copy_*_user routines
+In-Reply-To: <1436293295-4353-1-git-send-email-will.deacon@arm.com>
+References: <1436293295-4353-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20150708135123.GD6944@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08 2015, Robert Baldyga wrote:
-> Add missing return value check. In case of error print debug message
-> and return error code.
->
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, Jul 07, 2015 at 07:21:35PM +0100, Will Deacon wrote:
+> The AArch64 instruction set contains load/store pair memory accessors,
+> so use these in our copy_*_user routines to transfer 16 bytes per
+> iteration.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
+It makes sense.
 
-> ---
->  drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> index 4095cce0..37d414e 100644
-> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-> @@ -1989,6 +1989,10 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->  		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
->  
->  		ret = of_property_read_string(pp, "name", &name);
-> +		if (ret) {
-> +			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
-> +			goto err;
-> +		}
->  		ep->ep.name = name;
->  
->  		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
-> -- 
-> 1.9.1
->
-
--- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Micha? ?mina86? Nazarewicz    (o o)
-ooo +--<mpn@google.com>--<xmpp:mina86@jabber.org>--ooO--(_)--Ooo--
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
