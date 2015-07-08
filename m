@@ -1,33 +1,70 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed,  8 Jul 2015 15:40:46 -0700
-Subject: [PATCH] ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
-Message-ID: <1436395246-17540-1-git-send-email-javier@osg.samsung.com>
+From: asamson@codeaurora.org (Azriel Samson)
+Date: Wed, 8 Jul 2015 23:03:54 -0000
+Subject: ARM64 kexec/kdump timeline
+In-Reply-To: <CAOZdJXXtMn2==b6y8Lf7Kvc4fWS6Zn_ZxwkO_1OhBPhL2PtfMg@mail.gmail.com>
+References: <555E37FC.9020800@codeaurora.org>
+ <1432239334.1922.7.camel@infradead.org>
+ <55653538.8020206@codeaurora.org> <2420285.dn5MbvMKXS@wuerfel>
+ <55664FD9.1090808@codeaurora.org> <556BFAD1.7010907@redhat.com>
+ <CAOZdJXXtMn2==b6y8Lf7Kvc4fWS6Zn_ZxwkO_1OhBPhL2PtfMg@mail.gmail.com>
+Message-ID: <fcf2a95bf9a7a9fce6ee864a747cea9a.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The old drivers/usb/phy/phy-samsung-usb{2,3} are now deleted since
-were replaced by newers drivers that use the Generic PHY framework
-but their Kconfig options were left over in multi_v7_defconfig.
+Hi,
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+When booting the crash kernel with ACPI, how do you ensure that the ACPI
+tables fall within the kernel's memmap region?
+I was able to boot with ACPI when the crash kernel's memory overlapped
+with the ACPI tables(based on the "crashkernel" and "mem" boot arguments).
 
----
+Is there a better way to make the ACPI tables available to the crash kernel?
 
- arch/arm/configs/multi_v7_defconfig | 2 --
- 1 file changed, 2 deletions(-)
+> On Mon, Jun 1, 2015 at 1:25 AM, Pratyush Anand <panand@redhat.com> wrote:
+>
+>> We had seen a failure with check_cpu_nodes(), when booting with ACPI
+>> without
+>> any DTB.
+>>
+>> If you see the similar failure, then can you pl try following:
+>>
+>> diff --git a/kexec/arch/arm64/kexec-arm64.c
+>> b/kexec/arch/arm64/kexec-arm64.c
+>> index 7b219097dfff..8e085212d8a5 100644
+>> --- a/kexec/arch/arm64/kexec-arm64.c
+>> +++ b/kexec/arch/arm64/kexec-arm64.c
+>> @@ -640,7 +640,7 @@ int arm64_load_other_segments(struct kexec_info
+>> *info,
+>>         result =  check_cpu_nodes(&dtb_1, &dtb_2);
+>>
+>>         if (result)
+>> -               return result;
+>> +               fprintf(stderr, "kexec: Warning: No device tree
+>> available.\n");
+>>
+>>         /*
+>>          * Put the DTB after the kernel with an alignment of 128 KiB,
+>> giving
+>
+> I finally got around to testing this.  With this change, the tool just
+> displays the error message and continues working.  So +1 for this
+> patch.
+>
+> It would be better, of course, if the tool could parse the ACPI tables
+> and generate a compatible device tree with CPU nodes.  Do you have any
+> plans to support ACPI with this tool?  We're working on that
+> internally, but it's mostly hacks and work-arounds for now.
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 77f4b76d16e9..e3fdc3dd02f6 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -493,8 +493,6 @@ CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_AB8500_USB=y
- CONFIG_KEYSTONE_USB_PHY=y
- CONFIG_OMAP_USB3=y
--CONFIG_SAMSUNG_USB2PHY=y
--CONFIG_SAMSUNG_USB3PHY=y
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
- CONFIG_USB_MXS_PHY=y
+
 -- 
-2.4.3
+Thanks,
+Azriel Samson
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,?
+a Linux Foundation Collaborative Project
