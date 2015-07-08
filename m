@@ -1,26 +1,15 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jul 2015 16:44:29 +0200
-Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
-In-Reply-To: <1436361307-27686-1-git-send-email-linus.walleij@linaro.org>
-References: <1436361307-27686-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <2803757.Q7GidEKeB2@wuerfel>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 8 Jul 2015 22:51:36 +0800
+Subject: [PATCH] ARM: dts: imx53-qsb: fix TVE entry
+In-Reply-To: <1434724719-8105-1-git-send-email-p.zabel@pengutronix.de>
+References: <1434724719-8105-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20150708145136.GH28488@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 July 2015 15:15:07 Linus Walleij wrote:
-> This enumerates the PL011 serial ports on the Ux500. This is
-> necessary to do if we want to remove one of the serial ports,
-> since userspace depends on console to be present on ttyAMA2
-> and we must not break userspace.
+On Fri, Jun 19, 2015 at 04:38:39PM +0200, Philipp Zabel wrote:
+> Correct HSYNC/VSYNC pins and add ddc-i2c-bus property
 > 
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC guys: if you find this patch OK, please apply this
-> directly for fixes, as a prerequisite for patch 2/2.
-> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-I'd normally recommend putting the aliases into the per-board
-file, to ensure that the labels on the board match the aliases.
-
-	Arnd
+Applied, thanks.
