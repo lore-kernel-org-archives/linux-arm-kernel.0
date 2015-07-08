@@ -1,97 +1,98 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jul 2015 14:40:19 +0100
-Subject: [PATCH v3 3/3] dt-binding:Documents the mbigen bindings
-In-Reply-To: <1436166548-34920-4-git-send-email-majun258@huawei.com>
-References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
- <1436166548-34920-4-git-send-email-majun258@huawei.com>
-Message-ID: <20150708134019.GE7025@leverpostej>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 08 Jul 2015 15:41:34 +0200
+Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
+ bindings
+In-Reply-To: <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
+Message-ID: <2910042.ys2zsBBKt2@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 08:09:08AM +0100, Ma Jun wrote:
-> Add the mbigen msi interrupt controller bindings document
+
+Hi,
+
+On Monday, June 15, 2015 05:27:31 PM Viresh Kumar wrote:
+> This adds support in OPP library to parse and create list of OPPs from
+> operating-points-v2 bindings. It takes care of most of the properties of
+> new bindings (except shared-opp, which will be handled separately).
 > 
-> Change in v3:
-> ---Change the compatible string
-> ---Change the interrupt cells definition.
+> For backward compatibility, we keep supporting earlier bindings. We try
+> to search for the new bindings first, in case they aren't present we
+> look for the old deprecated ones.
 > 
-> Signed-off-by: Ma Jun <majun258@huawei.com>
+> There are few things marked as TODO:
+> - Support for multiple OPP tables
+> - Support for multiple regulators
+> 
+> They should be fixed separately.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 > ---
->  Documentation/devicetree/bindings/arm/mbigen.txt |   65 ++++++++++++++++++++++
->  1 files changed, 65 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+>  drivers/base/power/opp.c | 238 ++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 213 insertions(+), 25 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/mbigen.txt b/Documentation/devicetree/bindings/arm/mbigen.txt
-> new file mode 100644
-> index 0000000..cf92ef8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/mbigen.txt
-> @@ -0,0 +1,65 @@
-> +Hisilicon mbigen device tree bindings.
-> +=======================================
+> diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+> index 2ac48ff9c1ef..3198c3e77224 100644
+> --- a/drivers/base/power/opp.c
+> +++ b/drivers/base/power/opp.c
+
+[...]
+
+> @@ -675,6 +692,100 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+>  }
+>  
+>  /**
+> + * _opp_add_static_v2() - Allocate static OPPs (As per 'v2' DT bindings)
+> + * @dev:	device for which we do this operation
+> + * @np:		device node
+> + *
+> + * This function adds an opp definition to the opp list and returns status. The
+> + * opp can be controlled using dev_pm_opp_enable/disable functions and may be
+> + * removed by dev_pm_opp_remove.
+> + *
+> + * Locking: The internal device_opp and opp structures are RCU protected.
+> + * Hence this function internally uses RCU updater strategy with mutex locks
+> + * to keep the integrity of the internal data structures. Callers should ensure
+> + * that this function is *NOT* called under RCU protection or in contexts where
+> + * mutex cannot be locked.
+> + *
+> + * Return:
+> + * 0		On success OR
+> + *		Duplicate OPPs (both freq and volt are same) and opp->available
+> + * -EEXIST	Freq are same and volt are different OR
+> + *		Duplicate OPPs (both freq and volt are same) and !opp->available
+> + * -ENOMEM	Memory allocation failure
+> + * -EINVAL	Failed parsing the OPP node
+> + */
+> +static int _opp_add_static_v2(struct device *dev, struct device_node *np)
+> +{
+> +	struct device_opp *dev_opp;
+> +	struct dev_pm_opp *new_opp;
+> +	int ret;
 > +
-> +Mbigen means: message based interrupt generator.
+> +	/* Hold our list modification lock here */
+> +	mutex_lock(&dev_opp_list_lock);
 > +
-> +MBI is kind of msi interrupt only used on Non-PCI devices.
+> +	new_opp = _allocate_opp(dev, &dev_opp);
+> +	if (!new_opp) {
+> +		ret = -ENOMEM;
+> +		goto unlock;
+> +	}
 > +
-> +To reduce the wired interrupt number connected to GIC,
-> +Hisilicon designed mbigen to collect and generate interrupt.
-> +
-> +
-> +Non-pci devices can connect to mbigen and gnerate the inteerrupt
-> +by wirtting ITS register.
+> +	ret = of_property_read_u32(np, "opp-hz", (u32 *)&new_opp->rate);
+> +	if (ret < 0) {
+> +		dev_err(dev, "%s: opp-hz not found\n", __func__);
+> +		goto free_opp;
+> +	}
 
-Please run this through a spell checker to get rid of typos.
+Isn't using u32 for storing frequency (in Hz) too small by today's
+standards?
 
-> +
-> +The mbigen and devices connect to mbigen have the following properties:
-> +
-> +
-> +Mbigen required properties:
-> +-------------------------------------------
-> +-compatible: Should be "hisilicon,mbigen-v2"
-> +-msi-parent: should specified the ITS mbigen connected
-> +-interrupt controller: Identifies the node as an interrupt controller
-> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> +  interrupt source. The value is 5 now.
-> +
-> +  The 1st cell is the device id.
+[ Please note that the old v1 binding uses kHz not Hz. ]
 
-Does a given mbigen block generate interrupts with different ITS device
-IDs? Or does a given mbigen block have a single device ID shared by all
-interrupts it generates?
-
-> +  The 2nd cell is the totall interrupt number of this device?
-
-I don't follow. What is a "total interrupt number"?
-
-> +  The 3rd cell is the hardware pin number of the interrupt.
-> +  This value depends on the Soc design.
-
-This property seems sane.
-
-> +  The 4th cell is the mbigen node number. This value should refer to the
-> +  vendor soc specification.
-
-What is this, and why do you think you need it?
-
-Surely the address of the mbigen node is a sufficient unique identifier?
-
-> +  The 5th cell is the interrupt trigger type, encoded as follows:
-> +		1 = edge triggered
-> +		4 = level triggered
-
-Hmm. How are level-triggered interrupts expected to be handled by the
-mbigen?
-
-> +
-> +- reg: Specifies the base physical address and size of the ITS
-> +  registers.
-
-NAK. You should not describe ITS properties here given this is not the
-ITS.
-
-Perhaps you mean "the mbigen registers"?
-
-Thanks,
-Mark.
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
