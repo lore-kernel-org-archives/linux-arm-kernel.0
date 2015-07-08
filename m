@@ -1,77 +1,29 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:30 +0200
-Subject: [PATCHv2 1/8] ARM: mvebu: prepare set_cpu_coherent() for future
- extension
-In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436367757-14202-2-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 8 Jul 2015 20:57:33 +0530
+Subject: [PATCH 0/4] ARM: omap2plus_defconfig updates
+Message-ID: <cover.1436368740.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nadav Haklai <nadavh@marvell.com>
+Hi Tony,
 
-This patch prepares the set_cpu_coherent() function in coherency.c to
-be extended to support other SoCs than Armada XP. It will be needed on
-Armada 38x to re-enable the coherency after exiting from suspend to
-RAM.
+Here are some defconfig updates for commonly
+used drivers on platforms supported by
+omap2plus_defconfig.
 
-This preparation simply moves the function further down in coherency.c
-so that it can use coherency_type(), and uses that function to only do
-the Armada XP specific work if we are on Armada XP.
+Applies to v4.2-rc1
 
-Signed-off-by: Nadav Haklai <nadavh@marvell.com>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/mach-mvebu/coherency.c | 29 +++++++++++++++++------------
- 1 file changed, 17 insertions(+), 12 deletions(-)
+Thanks,
+Sekhar
 
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index e46e9ea..44eedf3 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -65,18 +65,6 @@ static const struct of_device_id of_coherency_table[] = {
- int ll_enable_coherency(void);
- void ll_add_cpu_to_smp_group(void);
- 
--int set_cpu_coherent(void)
--{
--	if (!coherency_base) {
--		pr_warn("Can't make current CPU cache coherent.\n");
--		pr_warn("Coherency fabric is not initialized\n");
--		return 1;
--	}
--
--	ll_add_cpu_to_smp_group();
--	return ll_enable_coherency();
--}
--
- static int mvebu_hwcc_notifier(struct notifier_block *nb,
- 			       unsigned long event, void *__dev)
- {
-@@ -206,6 +194,23 @@ static int coherency_type(void)
- 	return type;
- }
- 
-+int set_cpu_coherent(void)
-+{
-+	int type = coherency_type();
-+
-+	if (type == COHERENCY_FABRIC_TYPE_ARMADA_370_XP) {
-+		if (!coherency_base) {
-+			pr_warn("Can't make current CPU cache coherent.\n");
-+			pr_warn("Coherency fabric is not initialized\n");
-+			return 1;
-+		}
-+		ll_add_cpu_to_smp_group();
-+		return ll_enable_coherency();
-+	}
-+
-+	return 0;
-+}
-+
- int coherency_available(void)
- {
- 	return coherency_type() != COHERENCY_FABRIC_TYPE_NONE;
+Sekhar Nori (4):
+  ARM: omap2plus_defconfig: enable support for TI ADC
+  ARM: omap2plus_defconfig: enable support for TI touchscreen
+  ARM: omap2plus_defconfig: enable support for TI CPTS
+  ARM: omap2plus_defconfig: enable support for M25P80 SPI NOR
+
+ arch/arm/configs/omap2plus_defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
 -- 
-2.4.5
+2.4.4.408.g16da57c
