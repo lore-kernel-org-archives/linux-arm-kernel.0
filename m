@@ -1,56 +1,38 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 08 Jul 2015 14:03:13 +0100
-Subject: [PATCH v2 5/9] iommu/arm-smmu: skip the execution of
- CMD_PREFETCH_CONFIG
-In-Reply-To: <1436239822-14132-6-git-send-email-thunder.leizhen@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-6-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <559D1F91.6000508@arm.com>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 8 Jul 2015 16:00:21 +0300
+Subject: [PATCH 10/10] i2c: i2c-arb-gpio-challenge: use
+ of_get_i2c_adapter_by_node interface
+In-Reply-To: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
+References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1436360421-9600-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This change is needed to properly lock I2C bus driver, which serves DDC.
 
-Thanks for the respin. I still have a few comments on the series, 
-starting here;
+Prior to this change i2c_put_adapter() is misused, which may lead
+to an overflow over zero of I2C bus driver user counter.
+By the way added of_node_put() to eliminate memory leak, if OF_DYNAMIC
+is enabled.
 
-On 07/07/15 04:30, Zhen Lei wrote:
-> Hisilicon SMMUv3 devices treat CMD_PREFETCH_CONFIG as a illegal command,
-> execute it will trigger GERROR interrupt. Although the gerror code manage
-> to turn the prefetch into a SYNC, and the system can continue to run
-> normally, but it's ugly to print error information.
+Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+---
+ drivers/i2c/muxes/i2c-arb-gpio-challenge.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-No mention of the DT binding change, and no corresponding documentation 
-update either.
-
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
-[...]
-> +static struct arm_smmu_option_prop arm_smmu_options[] = {
-> +	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
-> +	{ 0, NULL},
-> +};
-[...]
-> +static void parse_driver_options(struct arm_smmu_device *smmu)
-> +{
-> +	int i = 0;
-> +
-> +	do {
-> +		if (of_property_read_bool(smmu->dev->of_node,
-> +						arm_smmu_options[i].prop)) {
-> +			smmu->options |= arm_smmu_options[i].opt;
-> +			dev_notice(smmu->dev, "option %s\n",
-> +				arm_smmu_options[i].prop);
-> +		}
-> +	} while (arm_smmu_options[++i].opt);
-> +}
-> +
-
-Nitpicking for sure, but I'm still waiting for a good excuse to rewrite 
-this overcomplicated loop logic in the SMMUv2 driver - can't we just 
-treat a static array as a static array and iterate over the thing in the 
-obvious way?
-
-	for (i = 0; i < ARRAY_SIZE(arm_smmu_options); i++)
-
-Robin.
+diff --git a/drivers/i2c/muxes/i2c-arb-gpio-challenge.c b/drivers/i2c/muxes/i2c-arb-gpio-challenge.c
+index 5cf1b60..402e3a6 100644
+--- a/drivers/i2c/muxes/i2c-arb-gpio-challenge.c
++++ b/drivers/i2c/muxes/i2c-arb-gpio-challenge.c
+@@ -196,7 +196,8 @@ static int i2c_arbitrator_probe(struct platform_device *pdev)
+ 		dev_err(dev, "Cannot parse i2c-parent\n");
+ 		return -EINVAL;
+ 	}
+-	arb->parent = of_find_i2c_adapter_by_node(parent_np);
++	arb->parent = of_get_i2c_adapter_by_node(parent_np);
++	of_node_put(parent_np);
+ 	if (!arb->parent) {
+ 		dev_err(dev, "Cannot find parent bus\n");
+ 		return -EPROBE_DEFER;
+-- 
+2.1.4
