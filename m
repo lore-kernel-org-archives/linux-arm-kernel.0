@@ -1,123 +1,53 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  8 Jul 2015 18:16:50 +0100
-Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
- power_state support
+Date: Wed,  8 Jul 2015 18:16:49 +0100
+Subject: [PATCH v2 3/5] drivers: firmware: psci: add PSCI_FEATURES call
 In-Reply-To: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1436375811-10529-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PSCI v1.0 augmented the power_state parameter format specification
-(extended stateid) and introduced a way to probe it through the
-PSCI_FEATURES interface.
+PSCI v1.0 introduces a PSCI_FEATURES call that allows to probe for
+features related to a specific function identifier.
 
-This patch implements code that detects the power_state format at
-run-time through the PSCI_FEATURES interface, so that the power_state
-argument can be properly detected and validated in the kernel according
-to the information provided through firmware.
+This patch adds PSCI_FEATURES support to the PSCI firmware layer.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/firmware/psci.c   | 34 ++++++++++++++++++++++++++++++++--
- include/uapi/linux/psci.h | 12 ++++++++++++
- 2 files changed, 44 insertions(+), 2 deletions(-)
+ drivers/firmware/psci.c   | 6 ++++++
+ include/uapi/linux/psci.h | 2 ++
+ 2 files changed, 8 insertions(+)
 
 diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 24ef3a8..bd2ba5b 100644
+index 6bd013d..24ef3a8 100644
 --- a/drivers/firmware/psci.c
 +++ b/drivers/firmware/psci.c
-@@ -75,14 +75,34 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 				PSCI_0_2_POWER_STATE_TYPE_MASK | \
- 				PSCI_0_2_POWER_STATE_AFFL_MASK)
+@@ -197,6 +197,12 @@ static void psci_sys_poweroff(void)
+ 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
+ }
  
-+#define PSCI_1_0_EXT_POWER_STATE_MASK		\
-+				(PSCI_1_0_EXT_POWER_STATE_ID_MASK | \
-+				PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
-+
-+static u32 psci_cpu_suspend_feature;
-+
-+static inline bool psci_has_ext_power_state(void)
++static int __init psci_features(u32 psci_func_id)
 +{
-+	return psci_cpu_suspend_feature &
-+				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
-+}
-+
- bool psci_power_state_loses_context(u32 state)
- {
--	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
-+	const u32 mask = psci_has_ext_power_state() ?
-+					PSCI_1_0_EXT_POWER_STATE_TYPE_MASK :
-+					PSCI_0_2_POWER_STATE_TYPE_MASK;
-+
-+	return state & mask;
- }
- 
- bool psci_power_state_is_valid(u32 state)
- {
--	return !(state & ~PSCI_0_2_POWER_STATE_MASK);
-+	const u32 valid_mask = psci_has_ext_power_state() ?
-+			       PSCI_1_0_EXT_POWER_STATE_MASK :
-+			       PSCI_0_2_POWER_STATE_MASK;
-+
-+	return !(state & ~valid_mask);
- }
- 
- static int psci_to_linux_errno(int errno)
-@@ -203,6 +223,14 @@ static int __init psci_features(u32 psci_func_id)
- 			      psci_func_id, 0, 0);
- }
- 
-+static void __init psci_init_cpu_suspend(void)
-+{
-+	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-+
-+	if (feature != PSCI_RET_NOT_SUPPORTED)
-+		psci_cpu_suspend_feature = feature;
++	return invoke_psci_fn(PSCI_1_0_FN_PSCI_FEATURES,
++			      psci_func_id, 0, 0);
 +}
 +
  /*
   * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
   * return DENIED (which would be fatal).
-@@ -287,6 +315,8 @@ static int __init psci_probe(void)
- 
- 	psci_init_migrate();
- 
-+	psci_init_cpu_suspend();
-+
- 	return 0;
- }
- 
 diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-index 187b828d..0a9485f 100644
+index 64469e6..187b828d 100644
 --- a/include/uapi/linux/psci.h
 +++ b/include/uapi/linux/psci.h
-@@ -58,6 +58,13 @@
- #define PSCI_0_2_POWER_STATE_AFFL_MASK		\
- 				(0x3 << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
+@@ -46,6 +46,8 @@
+ #define PSCI_0_2_FN64_MIGRATE			PSCI_0_2_FN64(5)
+ #define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
  
-+/* PSCI extended power state encoding for CPU_SUSPEND function */
-+#define PSCI_1_0_EXT_POWER_STATE_ID_MASK	0xfffffff
-+#define PSCI_1_0_EXT_POWER_STATE_ID_SHIFT	0
-+#define PSCI_1_0_EXT_POWER_STATE_TYPE_SHIFT	30
-+#define PSCI_1_0_EXT_POWER_STATE_TYPE_MASK	\
-+				(0x1 << PSCI_1_0_EXT_POWER_STATE_TYPE_SHIFT)
++#define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
 +
- /* PSCI v0.2 affinity level state returned by AFFINITY_INFO */
- #define PSCI_0_2_AFFINITY_LEVEL_ON		0
- #define PSCI_0_2_AFFINITY_LEVEL_OFF		1
-@@ -78,6 +85,11 @@
- #define PSCI_VERSION_MINOR(ver)			\
- 		((ver) & PSCI_VERSION_MINOR_MASK)
- 
-+/* PSCI features decoding (>=1.0) */
-+#define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT	1
-+#define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK	\
-+			(0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
-+
- /* PSCI return values (inclusive of all PSCI versions) */
- #define PSCI_RET_SUCCESS			0
- #define PSCI_RET_NOT_SUPPORTED			-1
+ /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
+ #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
+ #define PSCI_0_2_POWER_STATE_ID_SHIFT		0
 -- 
 2.2.1
