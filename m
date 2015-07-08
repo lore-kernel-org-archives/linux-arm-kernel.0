@@ -1,79 +1,62 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Wed, 8 Jul 2015 08:27:20 -0600
-Subject: [PATCH] coresight: replicator: Use module_platform_driver
-In-Reply-To: <20150707052624.GA8718@vaishali-Ideapad-Z570>
-References: <20150707052624.GA8718@vaishali-Ideapad-Z570>
-Message-ID: <CANLsYkyezD9wimwxZJtWuJgR=mW5eurMfMhOD7ospPNBYar6_Q@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed,  8 Jul 2015 16:28:13 +0200
+Subject: [PATCHv4 0/6] dmaengine: mv_xor fixes and improvements
+Message-ID: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 July 2015 at 23:26, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
-> Use module_platform_driver for drivers whose init and exit functions
-> only register and unregister, respectively.
->
-> A simplified version of the Coccinelle semantic patch that performs
-> this transformation is as follows:
->
-> @a@
-> identifier f, x;
-> @@
-> -static f(...) { return platform_driver_register(&x); }
->
-> @b depends on a@
-> identifier e, a.x;
-> @@
-> -static e(...) { platform_driver_unregister(&x); }
->
-> @c depends on a && b@
-> identifier a.f;
-> declarer name module_init;
-> @@
-> -module_init(f);
->
-> @d depends on a && b && c@
-> identifier b.e, a.x;
-> declarer name module_exit;
-> declarer name module_platform_driver;
-> @@
-> -module_exit(e);
-> +module_platform_driver(x);
->
-> Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
-> ---
->  drivers/hwtracing/coresight/coresight-replicator.c | 13 +------------
->  1 file changed, 1 insertion(+), 12 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
-> index 7974b7c..df45932 100644
-> --- a/drivers/hwtracing/coresight/coresight-replicator.c
-> +++ b/drivers/hwtracing/coresight/coresight-replicator.c
-> @@ -183,18 +183,7 @@ static struct platform_driver replicator_driver = {
->                 .pm     = &replicator_dev_pm_ops,
->         },
->  };
-> -
-> -static int __init replicator_init(void)
-> -{
-> -       return platform_driver_register(&replicator_driver);
-> -}
-> -module_init(replicator_init);
-> -
-> -static void __exit replicator_exit(void)
-> -{
-> -       platform_driver_unregister(&replicator_driver);
-> -}
-> -module_exit(replicator_exit);
-> +module_platform_driver(replicator_driver);
->
->  MODULE_LICENSE("GPL v2");
->  MODULE_DESCRIPTION("CoreSight Replicator driver");
-> --
-> 1.9.1
->
+Hello,
 
-I agree with this patch but please remove the comment about Coccinelle
-in the commit log (along with the code) and add a newline before
-module_platform_driver().
+Here is a v4 of the series making some fixes and improvements to the
+mv_xor driver. I'd like to see them merged for 4.3 if possible.
+
+Changes v3 -> v4:
+
+ * Rebased on 4.2-rc1.
+
+Changes v2 -> v3:
+
+ * Added Reviewed-by from Maxime Ripard on patches 1, 3, 4 and 5.
+
+ * Added an additional patch improving the performance of the XOR
+   engine by only using a subset of the available channels depending
+   on the number of CPUs in the system.
+
+Changes v1 -> v2:
+
+ * Device Tree related changes omitted, since they have been applied
+   by one of the ARM mach-mvebu maintainer.
+
+ * Addition of one commit, "dmaengine: mv_xor: fix big endian
+   operation in register mode", fixing a regression introduced by one
+   the patches currently in the 'next' branch of Vinod's
+   repository. It should be merged as part of 4.2.
+
+ * Addition of two cleanup patches:
+
+    dmaengine: mv_xor: remove mv_xor_chan->current_type field
+    dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+
+   These patches, like the two other non-fixes, can either go in 4.2
+   if it's not too late, or in 4.3.
 
 Thanks,
-Mathieu
+
+Thomas
+
+Thomas Petazzoni (6):
+  dmaengine: mv_xor: fix big endian operation in register mode
+  dmaengine: mv_xor: add suspend/resume support
+  dmaengine: mv_xor: remove support for dmacap,* DT properties
+  dmaengine: mv_xor: remove mv_xor_chan->current_type field
+  dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
+  dmaengine: mv_xor: optimize performance by using a subset of the XOR
+    channels
+
+ Documentation/devicetree/bindings/dma/mv-xor.txt |  10 +-
+ drivers/dma/mv_xor.c                             | 121 ++++++++++++++---------
+ drivers/dma/mv_xor.h                             |   2 +-
+ 3 files changed, 81 insertions(+), 52 deletions(-)
+
+-- 
+2.4.5
