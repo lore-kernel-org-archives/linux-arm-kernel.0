@@ -1,78 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 16:28:14 +0200
-Subject: [PATCHv4 1/6] dmaengine: mv_xor: fix big endian operation in register
- mode
+Date: Wed,  8 Jul 2015 16:28:15 +0200
+Subject: [PATCHv4 2/6] dmaengine: mv_xor: add suspend/resume support
 In-Reply-To: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436365699-6862-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command
-in descriptor mode") introduced the support for a feature that
-appeared in Armada 38x: specifying the operation to be performed in a
-per-descriptor basis rather than globally per channel.
+This commit adds suspend/resume support to the mv_xor driver. The
+config and interrupt mask registers must be saved and restored, and
+upon resume, the MBus windows configuration must also be done again.
 
-However, when doing so, it changed the function mv_chan_set_mode() to
-use:
+Tested on Armada 388 GP, with a RAID 5 array, accessed before and
+after a suspend to RAM cycle.
 
-  if (IS_ENABLED(__BIG_ENDIAN))
-
-instead of:
-
-  #if defined(__BIG_ENDIAN)
-
-While IS_ENABLED() is perfectly fine for CONFIG_* symbols, it is not
-for other symbols such as __BIG_ENDIAN that is provided directly by
-the compiler. Consequently, the commit broke support for big-endian,
-as the XOR_DESCRIPTOR_SWAP flag was not set in the XOR channel
-configuration register.
-
-The primarily visible effect was some nasty warnings and failures
-appearing during the self-test of the XOR unit:
-
-[    1.197368] mv_xor d0060900.xor: error on chan 0. intr cause 0x00000082
-[    1.197393] mv_xor d0060900.xor: config       0x00008440
-[    1.197410] mv_xor d0060900.xor: activation   0x00000000
-[    1.197427] mv_xor d0060900.xor: intr cause   0x00000082
-[    1.197443] mv_xor d0060900.xor: intr mask    0x000003f7
-[    1.197460] mv_xor d0060900.xor: error cause  0x00000000
-[    1.197477] mv_xor d0060900.xor: error addr   0x00000000
-[    1.197491] ------------[ cut here ]------------
-[    1.197513] WARNING: CPU: 0 PID: 1 at ../drivers/dma/mv_xor.c:664 mv_xor_interrupt_handler+0x14c/0x170()
-
-See also:
-
-  http://storage.kernelci.org/next/next-20150617/arm-mvebu_v7_defconfig+CONFIG_CPU_BIG_ENDIAN=y/lab-khilman/boot-armada-xp-openblocks-ax3-4.txt
+Based on work from Ofer Heifetz and Lior Amsalem.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Fixes: 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x command in descriptor mode")
-Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-This fix should go in for 4.2.
----
- drivers/dma/mv_xor.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/dma/mv_xor.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/dma/mv_xor.h |  1 +
+ 2 files changed, 48 insertions(+)
 
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index fbaf1ea..f1325f6 100644
+index f1325f6..0a3ddc2 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -162,10 +162,11 @@ static void mv_chan_set_mode(struct mv_xor_chan *chan,
- 	config &= ~0x7;
- 	config |= op_mode;
+@@ -1121,6 +1121,51 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
+ 	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
+ }
  
--	if (IS_ENABLED(__BIG_ENDIAN))
--		config |= XOR_DESCRIPTOR_SWAP;
--	else
--		config &= ~XOR_DESCRIPTOR_SWAP;
-+#if defined(__BIG_ENDIAN)
-+	config |= XOR_DESCRIPTOR_SWAP;
-+#else
-+	config &= ~XOR_DESCRIPTOR_SWAP;
-+#endif
++static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
++	int i;
++
++	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
++		struct mv_xor_chan *mv_chan = xordev->channels[i];
++
++		if (!mv_chan)
++			continue;
++
++		mv_chan->saved_config_reg =
++			readl_relaxed(XOR_CONFIG(mv_chan));
++		mv_chan->saved_int_mask_reg =
++			readl_relaxed(XOR_INTR_MASK(mv_chan));
++	}
++
++	return 0;
++}
++
++static int mv_xor_resume(struct platform_device *dev)
++{
++	struct mv_xor_device *xordev = platform_get_drvdata(dev);
++	const struct mbus_dram_target_info *dram;
++	int i;
++
++	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
++		struct mv_xor_chan *mv_chan = xordev->channels[i];
++
++		if (!mv_chan)
++			continue;
++
++		writel_relaxed(mv_chan->saved_config_reg,
++			       XOR_CONFIG(mv_chan));
++		writel_relaxed(mv_chan->saved_int_mask_reg,
++			       XOR_INTR_MASK(mv_chan));
++	}
++
++	dram = mv_mbus_dram_info();
++	if (dram)
++		mv_xor_conf_mbus_windows(xordev, dram);
++
++	return 0;
++}
++
+ static const struct of_device_id mv_xor_dt_ids[] = {
+ 	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
+ 	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
+@@ -1284,6 +1329,8 @@ static int mv_xor_remove(struct platform_device *pdev)
+ static struct platform_driver mv_xor_driver = {
+ 	.probe		= mv_xor_probe,
+ 	.remove		= mv_xor_remove,
++	.suspend        = mv_xor_suspend,
++	.resume         = mv_xor_resume,
+ 	.driver		= {
+ 		.name	        = MV_XOR_NAME,
+ 		.of_match_table = of_match_ptr(mv_xor_dt_ids),
+diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+index b7455b4..41a2e8d 100644
+--- a/drivers/dma/mv_xor.h
++++ b/drivers/dma/mv_xor.h
+@@ -126,6 +126,7 @@ struct mv_xor_chan {
+ 	char			dummy_src[MV_XOR_MIN_BYTE_COUNT];
+ 	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
+ 	dma_addr_t		dummy_src_addr, dummy_dst_addr;
++	u32                     saved_config_reg, saved_int_mask_reg;
+ };
  
- 	writel_relaxed(config, XOR_CONFIG(chan));
- 	chan->current_type = type;
+ /**
 -- 
 2.4.5
