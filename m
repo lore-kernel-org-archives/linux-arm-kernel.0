@@ -1,50 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Jul 2015 12:02:26 +0100
-Subject: [PATCH v3 09/15] irqchip: gicv3-its: Split PCI/MSI code from
- the core ITS driver
-In-Reply-To: <alpine.DEB.2.11.1507081245120.5134@nanos>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <1436289485-28230-10-git-send-email-marc.zyngier@arm.com>
- <alpine.DEB.2.11.1507081245120.5134@nanos>
-Message-ID: <559D0342.2040805@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 8 Jul 2015 12:06:51 +0100
+Subject: [PATCH V3 2/5] mm: mlock: Add new mlock, munlock, and munlockall
+ system calls
+In-Reply-To: <1436288623-13007-3-git-send-email-emunson@akamai.com>
+References: <1436288623-13007-1-git-send-email-emunson@akamai.com>
+ <1436288623-13007-3-git-send-email-emunson@akamai.com>
+Message-ID: <20150708110651.GC6944@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/15 11:48, Thomas Gleixner wrote:
-> On Tue, 7 Jul 2015, Marc Zyngier wrote:
->> +static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
->> +			       int nvec, msi_alloc_info_t *info)
->> +{
->> +	struct pci_dev *pdev;
->> +	struct its_pci_alias dev_alias;
->> +
->> +	if (!dev_is_pci(dev))
->> +		return -EINVAL;
->> +
->> +	pdev = to_pci_dev(dev);
->> +	dev_alias.pdev = pdev;
->> +	dev_alias.count = nvec;
->> +
->> +	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
->> +
->> +	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
-> 
-> I don't think you need its_msi_prepare() exposed to child
-> drivers. Something like
-> 
->   domain->parent->ops->msi_prepare()
-> 
-> should do the trick.
+On Tue, Jul 07, 2015 at 01:03:40PM -0400, Eric B Munson wrote:
+> diff --git a/arch/arm/kernel/calls.S b/arch/arm/kernel/calls.S
+> index 05745eb..514e77b 100644
+> --- a/arch/arm/kernel/calls.S
+> +++ b/arch/arm/kernel/calls.S
+> @@ -397,6 +397,9 @@
+>  /* 385 */	CALL(sys_memfd_create)
+>  		CALL(sys_bpf)
+>  		CALL(sys_execveat)
+> +		CALL(sys_mlock2)
+> +		CALL(sys_munlock2)
+> +/* 400 */	CALL(sys_munlockall2)
 
-Good point.
+s/400/390/
 
-I've so far conveniently avoided having an extra set of msi_domain_ops
-at the ITS level itself, but that is starting to look like a mistake.
+> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+> index cef934a..318072aa 100644
+> --- a/arch/arm64/include/asm/unistd32.h
+> +++ b/arch/arm64/include/asm/unistd32.h
+> @@ -797,3 +797,9 @@ __SYSCALL(__NR_memfd_create, sys_memfd_create)
+>  __SYSCALL(__NR_bpf, sys_bpf)
+>  #define __NR_execveat 387
+>  __SYSCALL(__NR_execveat, compat_sys_execveat)
+> +#define __NR_mlock2 388
+> +__SYSCALL(__NR_mlock2, sys_mlock2)
+> +#define __NR_munlock2 389
+> +__SYSCALL(__NR_munlock2, sys_munlock2)
+> +#define __NR_munlockall2 390
+> +__SYSCALL(__NR_munlockall2, sys_munlockall2)
 
-I'll work something out.
+These look fine.
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Catalin
