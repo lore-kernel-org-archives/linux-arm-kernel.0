@@ -1,43 +1,104 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 8 Jul 2015 09:51:49 +0900
-Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
- compatible property
-In-Reply-To: <9389528.5qtaECVqX7@avalon>
-References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
- <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
- <9389528.5qtaECVqX7@avalon>
-Message-ID: <20150708005148.GA28100@verge.net.au>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 7 Jul 2015 17:57:48 -0700
+Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150708005748.GG30412@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
-> Hi Simon,
+On 07/07, Boris Brezillon wrote:
+> Clock rates are stored in an unsigned long field, but ->determine_rate()
+> (which returns a rounded rate from a requested one) returns a long
+> value (errors are reported using negative error codes), which can lead
+> to long overflow if the clock rate exceed 2Ghz.
 > 
-> On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
-> > On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
-> > > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
-> > > > Replace the deprecated generic "adi,adxl34x" compatible value by the
-> > > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
-> > > > i2c: Deprecate adi,adxl34x compatible string").
-> > > > 
-> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > > 
-> > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > 
-> > > > ---
-> > > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
-> > > > support"), which is in v4.2-rc1.
-> > > > 
-> > > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
-> > > > property".
-> > 
-> > It appears to me that this will cause a regression when booting old kernels
-> > with new dts blobs. For that reason think we should consider v1
-> > of this change coupled with a schedule to remove use of the deprecated
-> > compat string.
+> Change ->determine_rate() prototype to return 0 or an error code, and pass
+> a pointer to a clk_rate_request structure containing the expected target
+> rate and the rate constraints imposed by clk users.
 > 
-> That's the forward compatibility that Geert mentioned, is that really an 
-> issue, especially on this board ?
+> The clk_rate_request structure might be extended in the future to contain
+> other kind of constraints like the rounding policy, the maximum clock
+> inaccuracy or other things that are not yet supported by the CCF
+> (power consumption constraints ?).
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> CC: Jonathan Corbet <corbet@lwn.net>
+> CC: Tony Lindgren <tony@atomide.com>
+> CC: Ralf Baechle <ralf@linux-mips.org>
+> CC: "Emilio L?pez" <emilio@elopez.com.ar>
+> CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> CC: Tero Kristo <t-kristo@ti.com>
+> CC: Peter De Schrijver <pdeschrijver@nvidia.com>
+> CC: Prashant Gaikwad <pgaikwad@nvidia.com>
+> CC: Stephen Warren <swarren@wwwdotorg.org>
+> CC: Thierry Reding <thierry.reding@gmail.com>
+> CC: Alexandre Courbot <gnurou@gmail.com>
+> CC: linux-doc at vger.kernel.org
+> CC: linux-kernel at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-omap at vger.kernel.org
+> CC: linux-mips at linux-mips.org
+> CC: linux-tegra at vger.kernel.org
+> 
+> ---
 
-I think it would be best to provide backwards compatibility unless there
-is a compelling reason not to.
+I'll throw this patch into -next now to see if any other problems
+shake out. I'm hoping we get some more acks though, so it'll be
+on it's own branch and become immutable in a week or so. One
+question below.
+
+> diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> index 616f5ae..9e69f34 100644
+> --- a/drivers/clk/clk-composite.c
+> +++ b/drivers/clk/clk-composite.c
+> @@ -99,33 +99,33 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+>  
+>  			parent_rate = __clk_get_rate(parent);
+>  
+> -			tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> +			tmp_rate = rate_ops->round_rate(rate_hw, req->rate,
+>  							&parent_rate);
+>  			if (tmp_rate < 0)
+>  				continue;
+>  
+> -			rate_diff = abs(rate - tmp_rate);
+> +			rate_diff = abs(req->rate - tmp_rate);
+>  
+> -			if (!rate_diff || !*best_parent_p
+> +			if (!rate_diff || !req->best_parent_hw
+>  				       || best_rate_diff > rate_diff) {
+> -				*best_parent_p = __clk_get_hw(parent);
+> -				*best_parent_rate = parent_rate;
+> +				req->best_parent_hw = __clk_get_hw(parent);
+> +				req->best_parent_rate = parent_rate;
+>  				best_rate_diff = rate_diff;
+>  				best_rate = tmp_rate;
+>  			}
+>  
+>  			if (!rate_diff)
+> -				return rate;
+> +				return 0;
+>  		}
+>  
+> -		return best_rate;
+> +		req->rate = best_rate;
+> +		return 0;
+>  	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+>  		__clk_hw_set_clk(mux_hw, hw);
+> -		return mux_ops->determine_rate(mux_hw, rate, min_rate,
+> -					       max_rate, best_parent_rate,
+> -					       best_parent_p);
+> +		return mux_ops->determine_rate(mux_hw, req);
+>  	} else {
+>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
+> +		req->rate = 0;
+>  		return 0;
+
+Shouldn't this return an error now? And then assigning req->rate
+wouldn't be necessary. Sorry I must have missed this last round.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
