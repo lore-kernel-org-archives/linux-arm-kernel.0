@@ -1,36 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jul 2015 17:30:50 +0900
-Subject: [PATCH 4/4] ARM: dts: Extend exynos5420-pinctrl nodes using labels
- instead of paths
-In-Reply-To: <1436334389-18779-1-git-send-email-javier@osg.samsung.com>
-References: <1436334389-18779-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <559CDFBA.40103@samsung.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 08 Jul 2015 10:36:13 +0200
+Subject: [PATCH] arm64: defconfig: Add Ceva ahci to the defconfig
+In-Reply-To: <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
+References: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
+ <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
+Message-ID: <559CE0FD.6020509@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.07.2015 14:46, Javier Martinez Canillas wrote:
-> A previously defined Device Tree node, can be extended either by defining
-> a node using the same full path or by creating a label for the node and
-> referencing to it.
-> 
-> Using full paths is more error prone since if there was a typo error, a
-> new node will be created instead of extending the node as it was desired.
-> This will lead to run-time errors that could be hard to detect.
-> 
-> A misstyped label on the other hand, will cause a dtc compile error which
+Hi Catalin,
 
-s/misstyped/mistyped/
-
-> makes it easier to detect the mistake since happens at build-time instead.
+On 07/06/2015 06:26 PM, Catalin Marinas wrote:
+> On Mon, Jun 29, 2015 at 07:02:08AM +0200, Michal Simek wrote:
+>> From: Suneel Garapati <suneel.garapati@xilinx.com>
+>>
+>> The Ceva ahci controller is available on the Xilinx Zynq UltraScale+
+>> MPSoC.
+>>
+>> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
+>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>> ---
+>>
+>>  arch/arm64/configs/defconfig | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+>> index f38c94f1d898..ef5b5d27a226 100644
+>> --- a/arch/arm64/configs/defconfig
+>> +++ b/arch/arm64/configs/defconfig
+>> @@ -82,7 +82,7 @@ CONFIG_BLK_DEV_SD=y
+>>  # CONFIG_SCSI_LOWLEVEL is not set
+>>  CONFIG_ATA=y
+>>  CONFIG_SATA_AHCI=y
+>> -CONFIG_SATA_AHCI_PLATFORM=y
+>> +CONFIG_AHCI_CEVA=y
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 1411 ++++++++++++++---------------
->  1 file changed, 705 insertions(+), 706 deletions(-)
+> Any reason why CONFIG_SATA_AHCI_PLATFORM is removed by this patch?
 
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+that's bug. :-( I thought that there was dependency but that's not truth.
 
-Best regards,
-Krzysztof
+> 
+> I merged the patch but modified it to only add CONFIG_AHCI_CEVA without
+> changing any other lines.
+
+Thank you so much.
+
+Thanks,
+Michal
