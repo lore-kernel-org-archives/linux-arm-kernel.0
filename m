@@ -1,11 +1,11 @@
 From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 08 Jul 2015 15:46:08 +0200
-Subject: [PATCH v2 3/5] usb: isp1760: udc: add missing
+Date: Wed, 08 Jul 2015 15:47:21 +0200
+Subject: [PATCH v2 4/5] staging: emxx_udc: add missing
  usb_ep_set_maxpacket_limit()
-In-Reply-To: <1436346323-31593-4-git-send-email-r.baldyga@samsung.com>
+In-Reply-To: <1436346323-31593-5-git-send-email-r.baldyga@samsung.com>
 References: <1436346323-31593-1-git-send-email-r.baldyga@samsung.com>
- <1436346323-31593-4-git-send-email-r.baldyga@samsung.com>
-Message-ID: <xa1td202daov.fsf@mina86.com>
+ <1436346323-31593-5-git-send-email-r.baldyga@samsung.com>
+Message-ID: <xa1ta8v6damu.fsf@mina86.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,27 +20,29 @@ On Wed, Jul 08 2015, Robert Baldyga wrote:
 Acked-by: Michal Nazarewicz <mina86@mina86.com>
 
 > ---
->  drivers/usb/isp1760/isp1760-udc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/staging/emxx_udc/emxx_udc.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-> diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
-> index 18ebf5b1..3699962 100644
-> --- a/drivers/usb/isp1760/isp1760-udc.c
-> +++ b/drivers/usb/isp1760/isp1760-udc.c
-> @@ -1382,11 +1382,11 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
->  		 * This fits in the 8kB FIFO without double-buffering.
->  		 */
->  		if (ep_num == 0) {
-> -			ep->ep.maxpacket = 64;
-> +			usb_ep_set_maxpacket_limit(&ep->ep, 64);
->  			ep->maxpacket = 64;
->  			udc->gadget.ep0 = &ep->ep;
->  		} else {
-> -			ep->ep.maxpacket = 512;
-> +			usb_ep_set_maxpacket_limit(&ep->ep, 512);
->  			ep->maxpacket = 0;
->  			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
->  		}
+> diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
+> index 4178d96..3b7aa36 100644
+> --- a/drivers/staging/emxx_udc/emxx_udc.c
+> +++ b/drivers/staging/emxx_udc/emxx_udc.c
+> @@ -3203,7 +3203,8 @@ static void __init nbu2ss_drv_ep_init(struct nbu2ss_udc *udc)
+>  		ep->ep.name = gp_ep_name[i];
+>  		ep->ep.ops = &nbu2ss_ep_ops;
+>  
+> -		ep->ep.maxpacket = (i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
+> +		usb_ep_set_maxpacket_limit(&ep->ep,
+> +				i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
+
+I would break line just after ( like so:
+
++		usb_ep_set_maxpacket_limit(
++				&ep->ep, i ? EP_PACKETSIZE : EP0_PACKETSIZE);
+
+>  
+>  		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+>  		INIT_LIST_HEAD(&ep->queue);
 > -- 
 > 1.9.1
 >
