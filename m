@@ -1,53 +1,62 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 8 Jul 2015 15:03:23 +0300
-Subject: [PATCH v2 1/5] usb: gadget: ffs: call functionfs_unbind() if
- _ffs_func_bind() fails
-In-Reply-To: <1436346323-31593-2-git-send-email-r.baldyga@samsung.com>
-References: <1436346323-31593-1-git-send-email-r.baldyga@samsung.com>
- <1436346323-31593-2-git-send-email-r.baldyga@samsung.com>
-Message-ID: <559D118B.3050607@cogentembedded.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Wed, 8 Jul 2015 20:11:09 +0800
+Subject: [PATCH v4 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <1436189368-1826-2-git-send-email-yh.huang@mediatek.com>
+References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+ <1436189368-1826-2-git-send-email-yh.huang@mediatek.com>
+Message-ID: <CAGS+omAWNwk_PRy-eeC4bgHQ-ZC2Kvh0sqpF47VD1sfJOhHWUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 7/8/2015 12:05 PM, Robert Baldyga wrote:
-
-> Function ffs_do_functionfs_bind() calls functionfs_bind() which allocates
-> usb request and increments refcounts. These things needs to be cleaned
-> up by if further steps of initialization fail by calling functionfs_unbind().
-
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> Document the device-tree binding of MediatTek display PWM.
+> The PWM has one channel to control the backlight brightness for display.
+> It supports MT8173 and MT6595.
+>
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
 > ---
->   drivers/usb/gadget/function/f_fs.c | 9 ++++++++-
->   1 file changed, 8 insertions(+), 1 deletion(-)
-
-> diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-> index 6e7be91..6516187 100644
-> --- a/drivers/usb/gadget/function/f_fs.c
-> +++ b/drivers/usb/gadget/function/f_fs.c
-> @@ -2897,11 +2897,18 @@ static int ffs_func_bind(struct usb_configuration *c,
->   			 struct usb_function *f)
->   {
->   	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
-> +	struct ffs_function *func = ffs_func_from_usb(f);
-> +	int ret;
+>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
 >
->   	if (IS_ERR(ffs_opts))
->   		return PTR_ERR(ffs_opts);
->
-> -	return _ffs_func_bind(c, f);
-> +	ret = _ffs_func_bind(c, f);
-> +	if (ret)
-> +		if(!--ffs_opts->refcnt)
-> +			functionfs_unbind(func->ffs);
-
-    Hum, I think you need {} around the outer *if* clause. Either that, or 
-just fold two *if* statments together.
-
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> new file mode 100644
+> index 0000000..757b974
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> @@ -0,0 +1,24 @@
+> +MediaTek display PWM controller
 > +
-> +	return ret;
->   }
-[...]
+> +Required properties:
+> + - compatible: should be "mediatek,<name>-disp-pwm"
+> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
+> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
+> + - reg: physical base address and length of the controller's registers
+> + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+> +   the cell format
+> + - clocks: phandle and clock specifier of the PWM reference clock
+> + - clock-names: must contain the following
+> +   - "main": clock used to generate PWM signals
+> +   - "mm": sync signals from the modules of mmsys
+> +
+> +Example:
+> +       pwm0: pwm at 1401e000 {
+> +               compatible = "mediatek,mt8173-disp-pwm",
+> +                            "mediatek,mt6595-disp-pwm";
+> +               reg = <0 0x1401e000 0 0x1000>;
+> +               #pwm-cells = <2>;
+> +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
+> +                        <&mmsys CLK_MM_DISP_PWM0MM>;
+> +               clock-names = "main", "mm";
 
-WBR, Sergei
+Should we include the pinctrl settings here to enable the PWM output?
+
+> +       };
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
