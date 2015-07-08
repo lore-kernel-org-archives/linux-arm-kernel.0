@@ -1,38 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Jul 2015 18:54:52 +0100
-Subject: [PATCH 07/13] arm64: KVM: VHE: Patch out use of HVC
-In-Reply-To: <559D5A8A.4030901@redhat.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <1436372356-30410-8-git-send-email-marc.zyngier@arm.com>
- <559D5A8A.4030901@redhat.com>
-Message-ID: <559D63EC.2090602@arm.com>
+From: ankgupta@codeaurora.org (Ankit Gupta)
+Date: Wed, 8 Jul 2015 11:56:33 -0600
+Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+In-Reply-To: <alpine.DEB.2.11.1507052326100.3916@nanos>
+References: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
+ <20150624124227.1cddbbac@gandalf.local.home>
+ <alpine.DEB.2.11.1507052326100.3916@nanos>
+Message-ID: <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/15 18:14, Paolo Bonzini wrote:
-> 
-> 
-> On 08/07/2015 18:19, Marc Zyngier wrote:
->> +/* Hack to allow stringification of macros... */
->> +#define __S__(a,args...)	__stringify(a, ##args)
->> +#define _S_(a,args...)		__S__(a, args)
->> +
->> +.macro ifnvhe nonvhe vhe
->> +	alternative_insn	"\nonvhe", "\vhe", ARM64_HAS_VIRT_HOST_EXTN
->> +.endm
-> 
-> Why not use this in patch 6 too?
+> On Wed, 24 Jun 2015, Steven Rostedt wrote:
+>> > +
+>> > +#define show_chip_name(irq)					\
+>> > +	(irq_get_irq_data(irq)					\
+>> > +			 ? irq_get_irq_data(irq)->chip->name	\
+>> > +			 : "NULL")
+>> > +
+>> > +#define show_hwirq(irq)						\
+>> > +	(irq_get_irq_data(irq)					\
+>> > +			 ? irq_get_irq_data(irq)->hwirq		\
+>> > +			 : -ENODEV)
+>>
+>> Note these magic functions will only be useful for the tracefs reads of
+>> the trace files. Userspace tools that extract the data (like perf and
+>> trace-cmd), will have no idea of how to parse it.
+>>
+>> I'm not against doing this, but I'm just letting you know what the
+>> effect of this change will be.
+>
+> What's worse is, that they are racy against a concurrent teardown of
+> the interrupt. Not a good idea ...
+>
 
-I tried, and ended up in #include hell. vhe-macros.h is local to
-arch/arm64/kvm, and including it from asm/kvm_mmu.h breaks (we include
-it from arch/arm/kvm/ and virt/kvm/arm/).
+Agree, I'll save the chip-name and hwirq in the struct. This technique
+using the same macros to save the chip-name and hwirq in the struct also
+works well with trace-cmd.
 
-Alternatively, I could move it to arch/arm64/include/asm (renamed to
-kvm_vhe_macros.h?), which would solve this issue. I just gave it a go,
-and that seems sensible enough.
+Thanks,
+Ankit and Gilad
 
-Thanks for the suggestion!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Thanks,
+>
+> 	tglx
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
