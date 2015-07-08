@@ -1,26 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 08 Jul 2015 14:44:57 -0700 (PDT)
-Subject: [PATCH net-next] drivers: net: xgene: Fix the compilation
- error "error: implicit declaration of function 'acpi_evaluate_integer'"
- for CONFIG_ACPI=n.
-In-Reply-To: <1436169862-1372-1-git-send-email-stripathi@apm.com>
-References: <1436169862-1372-1-git-send-email-stripathi@apm.com>
-Message-ID: <20150708.144457.1671326667513366241.davem@davemloft.net>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 8 Jul 2015 16:46:31 -0500
+Subject: [PATCH 0/3] arm/arm64: vexpress: DT updates for v4.2
+In-Reply-To: <7hio9ue6ey.fsf@deeprootsystems.com>
+References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
+ <5596BCC3.9070903@arm.com> <7hio9ue6ey.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa88wR+GcbdN1cHbF4Om0M8gEyBFi57mhORsSwDn7ab5OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Tripathi <stripathi@apm.com>
-Date: Mon,  6 Jul 2015 13:34:22 +0530
+On Wed, Jul 8, 2015 at 3:33 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> Sudeep Holla <sudeep.holla@arm.com> writes:
+>
+>> Hi Kevin,
+>>
+>> On 01/07/15 13:36, Sudeep Holla wrote:
+>>> Hi ARM-SoC guys,
+>>>
+>>> Here are couple of fixes for adding missing nodes(CCI and A7 PMUs) in
+>>> TC2 device tree. The third patch is addition of support for FPGA based
+>>> dual core A53 SMM  platform. All the patches are posted on the list
+>>> already, just putting them together. Let me know if you prefer a pull
+>>> request.
+>>>
+>>
+>> I just realized that I copied this series to your Linaro email instead
+>> of kernel.org. Sorry for that, do you want me to repost ?
+>
+> Not necessary.
+>
+> This just came too late for the v4.2 cycle.  I think the first two
+> patches we can take as fixes for v4.2, but the 3rd one will likely need
+> to wait for v4.3.
 
-> This patch guards the acpi_evaluate_interger function as it fails
-> the build for CONFIG_ACPI=n.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Suman Tripathi <stripathi@apm.com>
-> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Having a closer look, I just picked up all 3 for v4.2-rc.
 
-While the net-next tree is closed, all work and bug fixes should occur against
-'net' which trumps the 'net-next' tree during this time.
+Thanks,
 
-If you had investigated, you would have seen that this build failure had
-been fixed in the 'net' tree for some time now.
+Kevin
