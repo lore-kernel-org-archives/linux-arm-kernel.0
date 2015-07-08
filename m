@@ -1,70 +1,59 @@
-From: asamson@codeaurora.org (Azriel Samson)
-Date: Wed, 8 Jul 2015 23:03:54 -0000
-Subject: ARM64 kexec/kdump timeline
-In-Reply-To: <CAOZdJXXtMn2==b6y8Lf7Kvc4fWS6Zn_ZxwkO_1OhBPhL2PtfMg@mail.gmail.com>
-References: <555E37FC.9020800@codeaurora.org>
- <1432239334.1922.7.camel@infradead.org>
- <55653538.8020206@codeaurora.org> <2420285.dn5MbvMKXS@wuerfel>
- <55664FD9.1090808@codeaurora.org> <556BFAD1.7010907@redhat.com>
- <CAOZdJXXtMn2==b6y8Lf7Kvc4fWS6Zn_ZxwkO_1OhBPhL2PtfMg@mail.gmail.com>
-Message-ID: <fcf2a95bf9a7a9fce6ee864a747cea9a.squirrel@www.codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 8 Jul 2015 17:16:12 -0600
+Subject: [PATCH v4 3/5] tee: generic TEE subsystem
+In-Reply-To: <20150708223325.GA5843@kroah.com>
+References: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
+ <1436350592-7732-4-git-send-email-jens.wiklander@linaro.org>
+ <20150708171026.GA11740@obsidianresearch.com>
+ <20150708211129.GA29824@kroah.com>
+ <20150708222649.GA20068@obsidianresearch.com>
+ <20150708223325.GA5843@kroah.com>
+Message-ID: <20150708231612.GB20068@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 08, 2015 at 03:33:25PM -0700, Greg Kroah-Hartman wrote:
+> > The basic issue is that cdev_del doesn't seem to be synchronizing.
+> > 
+> > The use after free race is then something like:
+> > 
+> >    struct tpm_chip {
+> >  	struct device dev;
+> > 	struct cdev cdev;
+> 
+> Oops, right there's your problem.  You can't have two reference counted
+> objects trying to manage the memory of a single structure.  No matter
+> what you do, it's going to be a pain to deal with this, so don't :)
 
-When booting the crash kernel with ACPI, how do you ensure that the ACPI
-tables fall within the kernel's memmap region?
-I was able to boot with ACPI when the crash kernel's memory overlapped
-with the ACPI tables(based on the "crashkernel" and "mem" boot arguments).
+Sure, generally, yes, but that isn't done for no reason, it is to make
+open straightforward:
 
-Is there a better way to make the ACPI tables available to the crash kernel?
+static int tpm_open(struct inode *inode, struct file *file)
+{
+	struct tpm_chip *chip =
+		container_of(inode->i_cdev, struct tpm_chip, cdev);
 
-> On Mon, Jun 1, 2015 at 1:25 AM, Pratyush Anand <panand@redhat.com> wrote:
->
->> We had seen a failure with check_cpu_nodes(), when booting with ACPI
->> without
->> any DTB.
->>
->> If you see the similar failure, then can you pl try following:
->>
->> diff --git a/kexec/arch/arm64/kexec-arm64.c
->> b/kexec/arch/arm64/kexec-arm64.c
->> index 7b219097dfff..8e085212d8a5 100644
->> --- a/kexec/arch/arm64/kexec-arm64.c
->> +++ b/kexec/arch/arm64/kexec-arm64.c
->> @@ -640,7 +640,7 @@ int arm64_load_other_segments(struct kexec_info
->> *info,
->>         result =  check_cpu_nodes(&dtb_1, &dtb_2);
->>
->>         if (result)
->> -               return result;
->> +               fprintf(stderr, "kexec: Warning: No device tree
->> available.\n");
->>
->>         /*
->>          * Put the DTB after the kernel with an alignment of 128 KiB,
->> giving
->
-> I finally got around to testing this.  With this change, the tool just
-> displays the error message and continues working.  So +1 for this
-> patch.
->
-> It would be better, of course, if the tool could parse the ACPI tables
-> and generate a compatible device tree with CPU nodes.  Do you have any
-> plans to support ACPI with this tool?  We're working on that
-> internally, but it's mostly hacks and work-arounds for now.
->
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project.
->
+We need to recover the tpm_chip associated with the char device
+node, in a way that is holding a kref on it, without racing with
+cdev_del/etc
 
+This scheme does mean that if we have a struct file we have a kref on
+the cdev, and if we have cdev then we have a kref on the tpm_chip,
+which is really easy to use properly.
 
--- 
-Thanks,
-Azriel Samson
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,?
-a Linux Foundation Collaborative Project
+> > Ie we need cdev to hold a ref on tpm_chip->dev until cdev_put is
+> > called.
+> 
+> No, separate them, make the cdev a pointer and all should be fine.
+
+Okay, cdev_alloc takes care of the cdev lifetime.
+
+Do you have a simple solution to replace container_of as well?
+
+What would you think about something like:
+
+ cdev_alloc(&chip->dev.kref)
+
+?
+
+Jason
