@@ -1,52 +1,76 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:29 +0200
-Subject: [PATCHv2 0/8] ARM: mvebu: add suspend to RAM support for Armada 38x
-Message-ID: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  8 Jul 2015 17:02:32 +0200
+Subject: [PATCHv2 3/8] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to
+ support multiple SoCs
+In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436367757-14202-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+As we are going to introduce support for Armada 38x in pm.c, split out
+the Armada XP part of mvebu_pm_store_bootinfo() into
+mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
+error when an unsupported SoC is used.
 
-This is the v2 of the patch series adding suspend to RAM support for
-Armada 38x.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-Since v1 (posted June 16th) :
-
- - Rebased on top of v4.2-rc1, so dropped the patch "ARM: mvebu: fix
-   suspend to RAM on big-endian configurations" which was merged.
-
- - Added Acked-by from Gregory Clement on the relevant patches.
-
- - Fixed the Armada 388 GP board name in the "model" property of the
-   DT, as suggested by Gregory Clement.
-
-Thanks,
-
-Thomas
-
-Nadav Haklai (1):
-  ARM: mvebu: prepare set_cpu_coherent() for future extension
-
-Thomas Petazzoni (7):
-  ARM: mvebu: do not check machine in mvebu_pm_init()
-  ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support multiple SoCs
-  ARM: mvebu: prepare pm-board.c for the introduction of Armada 38x
-    support
-  ARM: mvebu: add suspend/resume support for Armada 38x
-  ARM: mvebu: add suspend/resume related definitions in Armada 38x
-    Device Tree
-  ARM: mvebu: add suspend/resume DT information for Armada 388 GP
-  ARM: mvebu: adjust board name and compatible for Armada 388 GP
-
- arch/arm/boot/dts/armada-388-gp.dts | 20 +++++++++--
- arch/arm/boot/dts/armada-38x.dtsi   |  7 +++-
- arch/arm/mach-mvebu/board-v7.c      |  1 +
- arch/arm/mach-mvebu/coherency.c     | 33 +++++++++++-------
- arch/arm/mach-mvebu/pm-board.c      | 25 +++++++-------
- arch/arm/mach-mvebu/pm.c            | 69 +++++++++++++++++++++++++++++++++----
- arch/arm/mach-mvebu/pmsu.h          |  1 +
- arch/arm/mach-mvebu/pmsu_ll.S       | 43 +++++++++++++++++++++++
- 8 files changed, 165 insertions(+), 34 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
+index eca650b..02fdf67 100644
+--- a/arch/arm/mach-mvebu/pm.c
++++ b/arch/arm/mach-mvebu/pm.c
+@@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
+ 	return of_translate_address(np, in_addr);
+ }
+ 
+-static void mvebu_pm_store_bootinfo(void)
++static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
+ {
+-	u32 *store_addr;
+ 	phys_addr_t resume_pc;
+ 
+-	store_addr = phys_to_virt(BOOT_INFO_ADDR);
+ 	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
+ 
+ 	/*
+@@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
+ 	writel(BOOT_MAGIC_LIST_END, store_addr);
+ }
+ 
++static int mvebu_pm_store_bootinfo(void)
++{
++	u32 *store_addr;
++
++	store_addr = phys_to_virt(BOOT_INFO_ADDR);
++
++	if (of_machine_is_compatible("marvell,armadaxp"))
++		mvebu_pm_store_armadaxp_bootinfo(store_addr);
++	else
++		return -ENODEV;
++
++	return 0;
++}
++
+ static int mvebu_pm_enter(suspend_state_t state)
+ {
++	int ret;
++
+ 	if (state != PM_SUSPEND_MEM)
+ 		return -EINVAL;
+ 
++	ret = mvebu_pm_store_bootinfo();
++	if (ret)
++		return ret;
++
+ 	cpu_pm_enter();
+ 
+-	mvebu_pm_store_bootinfo();
+ 	cpu_suspend(0, mvebu_pm_powerdown);
+ 
+ 	outer_resume();
 -- 
 2.4.5
