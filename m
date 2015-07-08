@@ -1,109 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 16:28:19 +0200
-Subject: [PATCHv4 6/6] dmaengine: mv_xor: optimize performance by using a
- subset of the XOR channels
-In-Reply-To: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436365699-6862-7-git-send-email-thomas.petazzoni@free-electrons.com>
+From: bpringle@sympatico.ca (Bill Pringlemeir)
+Date: Wed, 8 Jul 2015 10:32:54 -0400
+Subject: [PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller
+In-Reply-To: <20150708093801.GG28488@tiger> (Shawn Guo's message of "Wed, 8
+ Jul 2015 17:38:01 +0800")
+References: <1434668319-6651-1-git-send-email-stefan@agner.ch>
+ <1434668319-6651-5-git-send-email-stefan@agner.ch>
+ <20150708093801.GG28488@tiger>
+Message-ID: <BLU436-SMTP255283C042EDEF59D9BA0CFB8910@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to how async_tx behaves internally, having more XOR channels than
-CPUs is actually hurting performance more than it improves it, because
-memcpy requests get scheduled on a different channel than the XOR
-requests, but async_tx will still wait for the completion of the
-memcpy requests before scheduling the XOR requests.
 
-It is in fact more efficient to have at most one channel per CPU,
-which this patch implements by limiting the number of channels per
-engine, and the number of engines registered depending on the number
-of availables CPUs.
+On  8 Jul 2015, shawnguo at kernel.org wrote:
+> On Fri, Jun 19, 2015 at 12:58:37AM +0200, Stefan Agner wrote:
+>> Enable the NAND Flash Controller driver which is part of the Vybrid
+>> SoC by default.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>> arch/arm/mach-imx/Kconfig | 1 +
+>> 1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+>> index 3a3d3e9..9358135 100644
+>> --- a/arch/arm/mach-imx/Kconfig
+>> +++ b/arch/arm/mach-imx/Kconfig
+>>>> -589,6 +589,7 @@ config SOC_VF610
+>> 	select PINCTRL_VF610
+>> 	select PL310_ERRATA_769419 if CACHE_L2X0
+>> 	select SMP_ON_UP if SMP
+>> +	select HAVE_NAND_VF610_NFC
 
-Marvell platforms are currently available in one CPU, two CPUs and
-four CPUs configurations:
+> I'm not sure about the benefit of having this option, except we have
+> to have this additional architecture patch.
 
- - in the configurations with one CPU, only one channel from one
-   engine is used.
+For other SOC, like the PowerPC or ColdFire CPUs with this controller,
+it was a way to mark the controller as populated.  Otherwise, the
+Kconfig entry to select the controller will pop up for everybody.
 
- - in the configurations with two CPUs, only one channel from each
-   engine is used (they are two XOR engines)
+Is there a better way to do this?
 
- - in the configurations with four CPUs, both channels of both engines
-   are used.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- drivers/dma/mv_xor.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 6e09d59..2cdfca7 100644
---- a/drivers/dma/mv_xor.c
-+++ b/drivers/dma/mv_xor.c
-@@ -26,6 +26,7 @@
- #include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/irqdomain.h>
-+#include <linux/cpumask.h>
- #include <linux/platform_data/dma-mv_xor.h>
- 
- #include "dmaengine.h"
-@@ -1137,12 +1138,15 @@ static const struct of_device_id mv_xor_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, mv_xor_dt_ids);
- 
-+static unsigned int mv_xor_engine_count;
-+
- static int mv_xor_probe(struct platform_device *pdev)
- {
- 	const struct mbus_dram_target_info *dram;
- 	struct mv_xor_device *xordev;
- 	struct mv_xor_platform_data *pdata = dev_get_platdata(&pdev->dev);
- 	struct resource *res;
-+	unsigned int max_engines, max_channels;
- 	int i, ret;
- 	int op_in_desc;
- 
-@@ -1186,6 +1190,21 @@ static int mv_xor_probe(struct platform_device *pdev)
- 	if (!IS_ERR(xordev->clk))
- 		clk_prepare_enable(xordev->clk);
- 
-+	/*
-+	 * We don't want to have more than one channel per CPU in
-+	 * order for async_tx to perform well. So we limit the number
-+	 * of engines and channels so that we take into account this
-+	 * constraint. Note that we also want to use channels from
-+	 * separate engines when possible.
-+	 */
-+	max_engines = num_present_cpus();
-+	max_channels = min_t(unsigned int,
-+			     MV_XOR_MAX_CHANNELS,
-+			     DIV_ROUND_UP(num_present_cpus(), 2));
-+
-+	if (mv_xor_engine_count >= max_engines)
-+		return 0;
-+
- 	if (pdev->dev.of_node) {
- 		struct device_node *np;
- 		int i = 0;
-@@ -1199,6 +1218,9 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			int irq;
- 			op_in_desc = (int)of_id->data;
- 
-+			if (i >= max_channels)
-+				continue;
-+
- 			dma_cap_zero(cap_mask);
- 			dma_cap_set(DMA_MEMCPY, cap_mask);
- 			dma_cap_set(DMA_XOR, cap_mask);
-@@ -1222,7 +1244,7 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			i++;
- 		}
- 	} else if (pdata && pdata->channels) {
--		for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-+		for (i = 0; i < max_channels; i++) {
- 			struct mv_xor_channel_data *cd;
- 			struct mv_xor_chan *chan;
- 			int irq;
--- 
-2.4.5
+>>
+>> 	help
+>> 	  This enables support for Freescale Vybrid VF610 processor.
