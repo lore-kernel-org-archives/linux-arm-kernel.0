@@ -1,10 +1,10 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed,  8 Jul 2015 15:17:15 +0530
-Subject: [PATCH 6/9] arm: dts: msm8974: Add thermal zones,
+Date: Wed,  8 Jul 2015 15:17:17 +0530
+Subject: [PATCH 8/9] arm: dts: apq8084: Add thermal zones,
  tsens and eeprom nodes
 In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
 References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1436348838-22671-7-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1436348838-22671-9-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,13 +12,13 @@ Add thermal zones, tsens and eeprom nodes
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-msm8974.dtsi | 105 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/qcom-apq8084.dtsi | 105 ++++++++++++++++++++++++++++++++++++
  1 file changed, 105 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 37b47b5..30f3246 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
+index 7084010..05e83ea 100644
+--- a/arch/arm/boot/dts/qcom-apq8084.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
 @@ -75,6 +75,88 @@
  		};
  	};
