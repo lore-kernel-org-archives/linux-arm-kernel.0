@@ -1,284 +1,156 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Jul 2015 18:13:36 +0800
-Subject: [PATCH 3/4] firmware: psci: move cpu_suspend handling to generic code
-In-Reply-To: <1436350417-6712-1-git-send-email-jszhang@marvell.com>
-References: <1436350417-6712-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1436350417-6712-4-git-send-email-jszhang@marvell.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed,  8 Jul 2015 12:16:27 +0200
+Subject: [PATCH v4 0/5] generic TEE subsystem
+Message-ID: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Functions implemented on arm64 to suspend cpu and translates the idle
-state index passed by the cpu_suspend core call to a valid PSCI state
-are not arm64 specific and should be moved to generic code so that they
-can be reused on arm systems too.
+Hi,
 
-This patch moves these functions to generic PSCI firmware layer code.
+This patch set introduces a generic TEE subsystem. The TEE subsystem will be
+able contain drivers for various TEE implementations. A TEE (Trusted
+Execution Environment) is a trusted OS running in some secure environment,
+for example, TrustZone on ARM cpus, or a separate secure co-processor etc.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/kernel/psci.c | 95 ------------------------------------------------
- drivers/firmware/psci.c  | 95 ++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/psci.h     |  2 +
- 3 files changed, 97 insertions(+), 95 deletions(-)
+Regarding use cases, TrustZone has traditionally been used for
+offloading secure tasks to the secure world. Examples include banking
+applications, Digital Rights Management (DRM), or specific secure
+solutions.
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 4be5972..06e5c9a 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -20,7 +20,6 @@
- #include <linux/smp.h>
- #include <linux/delay.h>
- #include <linux/psci.h>
--#include <linux/slab.h>
- 
- #include <uapi/linux/psci.h>
- 
-@@ -28,73 +27,6 @@
- #include <asm/cpu_ops.h>
- #include <asm/errno.h>
- #include <asm/smp_plat.h>
--#include <asm/suspend.h>
--
--static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
--
--static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
--{
--	int i, ret, count = 0;
--	u32 *psci_states;
--	struct device_node *state_node, *cpu_node;
--
--	cpu_node = of_get_cpu_node(cpu, NULL);
--	if (!cpu_node)
--		return -ENODEV;
--
--	/*
--	 * If the PSCI cpu_suspend function hook has not been initialized
--	 * idle states must not be enabled, so bail out
--	 */
--	if (!psci_ops.cpu_suspend)
--		return -EOPNOTSUPP;
--
--	/* Count idle states */
--	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
--					      count))) {
--		count++;
--		of_node_put(state_node);
--	}
--
--	if (!count)
--		return -ENODEV;
--
--	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
--	if (!psci_states)
--		return -ENOMEM;
--
--	for (i = 0; i < count; i++) {
--		u32 state;
--
--		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
--
--		ret = of_property_read_u32(state_node,
--					   "arm,psci-suspend-param",
--					   &state);
--		if (ret) {
--			pr_warn(" * %s missing arm,psci-suspend-param property\n",
--				state_node->full_name);
--			of_node_put(state_node);
--			goto free_mem;
--		}
--
--		of_node_put(state_node);
--		pr_debug("psci-power-state %#x index %d\n", state, i);
--		if (!psci_power_state_is_valid(state)) {
--			pr_warn("Invalid PSCI power state %#x\n", state);
--			ret = -EINVAL;
--			goto free_mem;
--		}
--		psci_states[i] = state;
--	}
--	/* Idle states parsed correctly, initialize per-cpu pointer */
--	per_cpu(psci_power_state, cpu) = psci_states;
--	return 0;
--
--free_mem:
--	kfree(psci_states);
--	return ret;
--}
- 
- #ifdef CONFIG_SMP
- 
-@@ -181,33 +113,6 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
- #endif
- #endif
- 
--static int psci_suspend_finisher(unsigned long index)
--{
--	u32 *state = __this_cpu_read(psci_power_state);
--
--	return psci_ops.cpu_suspend(state[index - 1],
--				    virt_to_phys(cpu_resume));
--}
--
--static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
--{
--	int ret;
--	u32 *state = __this_cpu_read(psci_power_state);
--	/*
--	 * idle state index 0 corresponds to wfi, should never be called
--	 * from the cpu_suspend operations
--	 */
--	if (WARN_ON_ONCE(!index))
--		return -EINVAL;
--
--	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
--	else
--		ret = cpu_suspend(index, psci_suspend_finisher);
--
--	return ret;
--}
--
- const struct cpu_operations cpu_psci_ops = {
- 	.name		= "psci",
- #ifdef CONFIG_CPU_IDLE
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 2f5d611..5da8aa2 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -20,12 +20,14 @@
- #include <linux/printk.h>
- #include <linux/psci.h>
- #include <linux/reboot.h>
-+#include <linux/slab.h>
- 
- #include <uapi/linux/psci.h>
- 
- #include <asm/cputype.h>
- #include <asm/system_misc.h>
- #include <asm/smp_plat.h>
-+#include <asm/suspend.h>
- 
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-@@ -81,6 +83,8 @@ static u32 psci_function_id[PSCI_FN_MAX];
- 
- static u32 psci_cpu_suspend_feature;
- 
-+static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+
- static inline bool psci_has_ext_power_state(void)
- {
- 	return psci_cpu_suspend_feature &
-@@ -217,6 +221,97 @@ static void psci_sys_poweroff(void)
- 	invoke_psci_fn(PSCI_0_2_FN_SYSTEM_OFF, 0, 0, 0);
- }
- 
-+int cpu_psci_cpu_init_idle(unsigned int cpu)
-+{
-+	int i, ret, count = 0;
-+	u32 *psci_states;
-+	struct device_node *state_node, *cpu_node;
-+
-+	cpu_node = of_get_cpu_node(cpu, NULL);
-+	if (!cpu_node)
-+		return -ENODEV;
-+
-+	/*
-+	 * If the PSCI cpu_suspend function hook has not been initialized
-+	 * idle states must not be enabled, so bail out
-+	 */
-+	if (!psci_ops.cpu_suspend)
-+		return -EOPNOTSUPP;
-+
-+	/* Count idle states */
-+	while ((state_node = of_parse_phandle(cpu_node, "cpu-idle-states",
-+					      count))) {
-+		count++;
-+		of_node_put(state_node);
-+	}
-+
-+	if (!count)
-+		return -ENODEV;
-+
-+	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-+	if (!psci_states)
-+		return -ENOMEM;
-+
-+	for (i = 0; i < count; i++) {
-+		u32 state;
-+
-+		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
-+
-+		ret = of_property_read_u32(state_node,
-+					   "arm,psci-suspend-param",
-+					   &state);
-+		if (ret) {
-+			pr_warn(" * %s missing arm,psci-suspend-param property\n",
-+				state_node->full_name);
-+			of_node_put(state_node);
-+			goto free_mem;
-+		}
-+
-+		of_node_put(state_node);
-+		pr_debug("psci-power-state %#x index %d\n", state, i);
-+		if (!psci_power_state_is_valid(state)) {
-+			pr_warn("Invalid PSCI power state %#x\n", state);
-+			ret = -EINVAL;
-+			goto free_mem;
-+		}
-+		psci_states[i] = state;
-+	}
-+	/* Idle states parsed correctly, initialize per-cpu pointer */
-+	per_cpu(psci_power_state, cpu) = psci_states;
-+	return 0;
-+
-+free_mem:
-+	kfree(psci_states);
-+	return ret;
-+}
-+
-+static int psci_suspend_finisher(unsigned long index)
-+{
-+	u32 *state = __this_cpu_read(psci_power_state);
-+
-+	return psci_ops.cpu_suspend(state[index - 1],
-+				    virt_to_phys(cpu_resume));
-+}
-+
-+int cpu_psci_cpu_suspend(unsigned long index)
-+{
-+	int ret;
-+	u32 *state = __this_cpu_read(psci_power_state);
-+	/*
-+	 * idle state index 0 corresponds to wfi, should never be called
-+	 * from the cpu_suspend operations
-+	 */
-+	if (WARN_ON_ONCE(!index))
-+		return -EINVAL;
-+
-+	if (!psci_power_state_loses_context(state[index - 1]))
-+		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+	else
-+		ret = cpu_suspend(index, psci_suspend_finisher);
-+
-+	return ret;
-+}
-+
- static int __init psci_features(u32 psci_func_id)
- {
- 	return invoke_psci_fn(PSCI_1_0_FN_PSCI_FEATURES,
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 12c4865..cbb49a3 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -23,6 +23,8 @@
- bool psci_tos_resident_on(int cpu);
- bool psci_power_state_loses_context(u32 state);
- bool psci_power_state_is_valid(u32 state);
-+int cpu_psci_cpu_init_idle(unsigned int cpu);
-+int cpu_psci_cpu_suspend(unsigned long index);
- 
- struct psci_operations {
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+This TEE subsystem can serve a TEE driver for a Global Platform compliant
+TEE, but it's not limited to only Global Platform TEEs.  One reason why I'm
+doing this to be able to get an OP-TEE (https://github.com/OP-TEE/optee_os)
+driver upstream.
+
+"tee: generic TEE subsystem" brings in the generic TEE subsystem which
+helps when writing a driver for a specific TEE, for example, OP-TEE.
+
+"tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
+its work.
+
+This patch set has been prepared in cooperation with Javier Gonz?lez who
+proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
+https://lwn.net/Articles/623380/ . We've since then changed the scope to
+TEE instead of TrustZone.
+
+We have discussed the design on tee-dev at lists.linaro.org (archive at
+https://lists.linaro.org/pipermail/tee-dev/) with people from other
+companies, including Valentin Manea <valentin.manea@huawei.com>,
+Emmanuel MICHEL <emmanuel.michel@st.com>,
+Jean-michel DELORME <jean-michel.delorme@st.com>,
+and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
+agree on something that is generic enough to support many different
+TEEs while still keeping the interface together.
+
+v4:
+* Rebased on 4.1
+* Redesigned the synchronization around entry exit of normal SMC
+* Replaced rwsem on the driver instance with kref and completion since
+  rwsem wasn't intended to be used in this way
+* Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
+  future additional parameter types
+* Documents TEE subsystem and OP-TEE driver
+* Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
+  TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
+* DT bindings in a separate patch
+* Assembly parts moved to arch/arm and arch/arm64 respectively, in a
+  separate patch
+* Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
+* Removed CMA usage to limit the scope of the patch set
+
+v3:
+* Rebased on 4.1-rc3 (dma_buf_export() API change)
+* A couple of small sparse fixes
+* Documents bindings for OP-TEE driver
+* Updated MAINTAINERS
+
+v2:
+* Replaced the stubbed OP-TEE driver with a real OP-TEE driver
+* Removed most APIs not needed by OP-TEE in current state
+* Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
+* Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
+* Moved tee.h into include/uapi/linux/
+* Redefined tee.h IOCTL macros to be directly based on _IOR and friends
+* Removed version info on the API to user space, a data blob which
+  can contain an UUID is left for user space to be able to tell which
+  protocol to use in TEE_IOC_CMD
+* Changed user space exposed structures to only have types with __ prefix
+* Dropped THIS_MODULE from tee_fops
+* Reworked how the driver is registered and ref counted:
+  - moved from using an embedded struct miscdevice to an embedded struct
+    device.
+  - uses an struct rw_semaphore as synchronization for driver detachment
+  - uses alloc/register pattern from TPM
+
+Thanks,
+Jens
+
+Jens Wiklander (5):
+  arm/arm64: add smccc ARCH32
+  dt/bindings: add bindings for optee
+  tee: generic TEE subsystem
+  tee: add OP-TEE driver
+  Documentation: tee subsystem and op-tee driver
+
+ Documentation/00-INDEX                             |   2 +
+ Documentation/devicetree/bindings/optee/optee.txt  |  17 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ Documentation/ioctl/ioctl-number.txt               |   1 +
+ Documentation/tee.txt                              | 117 +++
+ MAINTAINERS                                        |  14 +
+ arch/arm/Kconfig                                   |   4 +
+ arch/arm/kernel/Makefile                           |   2 +
+ arch/arm/kernel/smccc-call.S                       |  26 +
+ arch/arm/kernel/smccc.c                            |  17 +
+ arch/arm64/Kconfig                                 |   4 +
+ arch/arm64/kernel/Makefile                         |   1 +
+ arch/arm64/kernel/smccc-call.S                     |  34 +
+ arch/arm64/kernel/smccc.c                          |  17 +
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/tee/Kconfig                                |  18 +
+ drivers/tee/Makefile                               |   4 +
+ drivers/tee/optee/Kconfig                          |   8 +
+ drivers/tee/optee/Makefile                         |   5 +
+ drivers/tee/optee/call.c                           | 390 ++++++++++
+ drivers/tee/optee/core.c                           | 451 +++++++++++
+ drivers/tee/optee/optee_msg.h                      | 334 ++++++++
+ drivers/tee/optee/optee_private.h                  | 129 ++++
+ drivers/tee/optee/optee_smc.h                      | 466 ++++++++++++
+ drivers/tee/optee/rpc.c                            | 248 ++++++
+ drivers/tee/optee/supp.c                           | 212 ++++++
+ drivers/tee/tee.c                                  | 839 +++++++++++++++++++++
+ drivers/tee/tee_private.h                          |  80 ++
+ drivers/tee/tee_shm.c                              | 324 ++++++++
+ drivers/tee/tee_shm_pool.c                         | 133 ++++
+ include/linux/arm-smccc.h                          |  80 ++
+ include/linux/tee_drv.h                            | 306 ++++++++
+ include/uapi/linux/tee.h                           | 376 +++++++++
+ 34 files changed, 4663 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/optee/optee.txt
+ create mode 100644 Documentation/tee.txt
+ create mode 100644 arch/arm/kernel/smccc-call.S
+ create mode 100644 arch/arm/kernel/smccc.c
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+ create mode 100644 arch/arm64/kernel/smccc.c
+ create mode 100644 drivers/tee/Kconfig
+ create mode 100644 drivers/tee/Makefile
+ create mode 100644 drivers/tee/optee/Kconfig
+ create mode 100644 drivers/tee/optee/Makefile
+ create mode 100644 drivers/tee/optee/call.c
+ create mode 100644 drivers/tee/optee/core.c
+ create mode 100644 drivers/tee/optee/optee_msg.h
+ create mode 100644 drivers/tee/optee/optee_private.h
+ create mode 100644 drivers/tee/optee/optee_smc.h
+ create mode 100644 drivers/tee/optee/rpc.c
+ create mode 100644 drivers/tee/optee/supp.c
+ create mode 100644 drivers/tee/tee.c
+ create mode 100644 drivers/tee/tee_private.h
+ create mode 100644 drivers/tee/tee_shm.c
+ create mode 100644 drivers/tee/tee_shm_pool.c
+ create mode 100644 include/linux/arm-smccc.h
+ create mode 100644 include/linux/tee_drv.h
+ create mode 100644 include/uapi/linux/tee.h
+
 -- 
-2.1.4
+1.9.1
