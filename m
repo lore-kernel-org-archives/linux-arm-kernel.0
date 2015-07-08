@@ -1,43 +1,56 @@
-From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 8 Jul 2015 16:00:09 +0300
-Subject: [PATCH 08/10] drm: tilcdc: use of_get_i2c_adapter_by_node interface
-In-Reply-To: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1436360409-9508-1-git-send-email-vladimir_zapolskiy@mentor.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 08 Jul 2015 14:03:13 +0100
+Subject: [PATCH v2 5/9] iommu/arm-smmu: skip the execution of
+ CMD_PREFETCH_CONFIG
+In-Reply-To: <1436239822-14132-6-git-send-email-thunder.leizhen@huawei.com>
+References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+ <1436239822-14132-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <559D1F91.6000508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change is needed to properly lock I2C bus driver, which serves DDC.
+Hi,
 
-Prior to this change i2c_put_adapter() is misused, which may lead
-to an overflow over zero of I2C bus driver user counter.
+Thanks for the respin. I still have a few comments on the series, 
+starting here;
 
-Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
----
- drivers/gpu/drm/tilcdc/tilcdc_tfp410.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+On 07/07/15 04:30, Zhen Lei wrote:
+> Hisilicon SMMUv3 devices treat CMD_PREFETCH_CONFIG as a illegal command,
+> execute it will trigger GERROR interrupt. Although the gerror code manage
+> to turn the prefetch into a SYNC, and the system can continue to run
+> normally, but it's ugly to print error information.
 
-diff --git a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-index 354c47c..4dc78c7 100644
---- a/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-+++ b/drivers/gpu/drm/tilcdc/tilcdc_tfp410.c
-@@ -348,15 +348,13 @@ static int tfp410_probe(struct platform_device *pdev)
- 		goto fail;
- 	}
- 
--	tfp410_mod->i2c = of_find_i2c_adapter_by_node(i2c_node);
-+	tfp410_mod->i2c = of_get_i2c_adapter_by_node(i2c_node);
-+	of_node_put(i2c_node);
- 	if (!tfp410_mod->i2c) {
- 		dev_err(&pdev->dev, "could not get i2c\n");
--		of_node_put(i2c_node);
- 		goto fail;
- 	}
- 
--	of_node_put(i2c_node);
--
- 	tfp410_mod->gpio = of_get_named_gpio_flags(node, "powerdn-gpio",
- 			0, NULL);
- 	if (IS_ERR_VALUE(tfp410_mod->gpio)) {
--- 
-2.1.4
+No mention of the DT binding change, and no corresponding documentation 
+update either.
+
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+[...]
+> +static struct arm_smmu_option_prop arm_smmu_options[] = {
+> +	{ ARM_SMMU_OPT_SKIP_PREFETCH, "hisilicon,broken-prefetch-cmd" },
+> +	{ 0, NULL},
+> +};
+[...]
+> +static void parse_driver_options(struct arm_smmu_device *smmu)
+> +{
+> +	int i = 0;
+> +
+> +	do {
+> +		if (of_property_read_bool(smmu->dev->of_node,
+> +						arm_smmu_options[i].prop)) {
+> +			smmu->options |= arm_smmu_options[i].opt;
+> +			dev_notice(smmu->dev, "option %s\n",
+> +				arm_smmu_options[i].prop);
+> +		}
+> +	} while (arm_smmu_options[++i].opt);
+> +}
+> +
+
+Nitpicking for sure, but I'm still waiting for a good excuse to rewrite 
+this overcomplicated loop logic in the SMMUv2 driver - can't we just 
+treat a static array as a static array and iterate over the thing in the 
+obvious way?
+
+	for (i = 0; i < ARRAY_SIZE(arm_smmu_options); i++)
+
+Robin.
