@@ -1,90 +1,104 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jul 2015 14:30:50 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <20150609101515.GA28474@leverpostej>
-References: <20150324155007.GC23005@leverpostej>
- <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
- <20150527173953.GC23176@leverpostej>
- <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
- <20150601102208.GD22406@leverpostej>
- <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
- <20150605090534.GC1198@arm.com>
- <20150609101515.GA28474@leverpostej>
-Message-ID: <20150708133049.GD7025@leverpostej>
+From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
+Date: Wed, 8 Jul 2015 16:31:37 +0300
+Subject: [PATCH 01/10] i2c: add and export of_get_i2c_adapter_by_node()
+ interface
+In-Reply-To: <20150708131140.GA12791@ulmo.nvidia.com>
+References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <1436360352-9181-1-git-send-email-vladimir_zapolskiy@mentor.com>
+ <20150708131140.GA12791@ulmo.nvidia.com>
+Message-ID: <559D2639.1030706@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 11:17:54AM +0100, Mark Rutland wrote:
-> On Fri, Jun 05, 2015 at 10:05:34AM +0100, Will Deacon wrote:
-> > On Thu, Jun 04, 2015 at 11:19:30PM +0100, Chalamarla, Tirumalesh wrote:
-> > > > On Jun 1, 2015, at 3:22 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > > > It's possible to specify that the paths exist. I expect that software
-> > > > would select which to use at runtime.
-> > > > 
-> > > My worry is how to define any priorities/preferences between masters. 
-> > > in general the proposal looks reasonable.
-> > 
-> > I agree that the proposal looks reasonable (in terms of the ability to
-> > describe the sort of topologies that we will face) but I still don't
-> > understand what I need to do in e.g. my IOMMU driver to support this
-> > binding whilst continuing to support the existing iommus binding, which
-> > is relied upon to configure dma-mapping.
-> > 
-> > Mark: how do you see this co-existing/merging with the current bindings?
+Hi Thierry,
+
+On 08.07.2015 16:11, Thierry Reding wrote:
+> On Wed, Jul 08, 2015 at 03:59:12PM +0300, Vladimir Zapolskiy wrote:
+>> of_find_i2c_adapter_by_node() call requires quite often missing
+>> put_device(), and i2c_put_adapter() releases a device locked by
+>> i2c_get_adapter() only. In general module_put(adapter->owner) and
+>> put_device(dev) are not interchangeable.
+>>
+>> This is a common error reproduction scenario as a result of the
+>> misusage described above (for clearness this is run on iMX6 platform
+>> with HDMI and I2C bus drivers compiled as kernel modules):
+>>
+>>     root at mx6q:~# lsmod | grep i2c
+>>     i2c_imx                10213  0
+>>     root at mx6q:~# lsmod | grep dw_hdmi_imx
+>>     dw_hdmi_imx             3631  0
+>>     dw_hdmi                11846  1 dw_hdmi_imx
+>>     imxdrm                  8674  3 dw_hdmi_imx,imx_ipuv3_crtc,imx_ldb
+>>     drm_kms_helper        113765  5 dw_hdmi,imxdrm,imx_ipuv3_crtc,imx_ldb
+>>     root at mx6q:~# rmmod dw_hdmi_imx
+>>     root at mx6q:~# lsmod | grep i2c
+>>     i2c_imx                10213  -1
+>>
+>>                                  ^^^^^
+>>
+>>     root at mx6q:~# rmmod i2c_imx
+>>     rmmod: ERROR: Module i2c_imx is in use
+>>
+>> To fix existing users of these interfaces and to avoid any further
+>> confusion and misusage in future, add one more interface
+>> of_get_i2c_adapter_by_node(), it is similar to i2c_get_adapter() in
+>> sense that an I2C bus device driver found and locked by user can be
+>> correctly unlocked by i2c_put_adapter().
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+>> ---
+>> The change is based on RFC http://www.spinics.net/lists/linux-i2c/msg20257.html
+>>
+>> * added new exported function declaration in include/linux/i2c.h
+>> * added put_device(dev) call right inside of_get_i2c_adapter_by_node()
+>> * corrected authorship of the change
+>>
+>>  drivers/i2c/i2c-core.c | 20 ++++++++++++++++++++
+>>  include/linux/i2c.h    |  6 ++++++
+>>  2 files changed, 26 insertions(+)
+>>
+>> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+>> index 069a41f..0d902ab 100644
+>> --- a/drivers/i2c/i2c-core.c
+>> +++ b/drivers/i2c/i2c-core.c
+>> @@ -1356,6 +1356,26 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
+>>  	return i2c_verify_adapter(dev);
+>>  }
+>>  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
+>> +
+>> +struct i2c_adapter *of_get_i2c_adapter_by_node(struct device_node *node)
+>> +{
+>> +	struct device *dev;
+>> +	struct i2c_adapter *adapter;
+>> +
+>> +	dev = bus_find_device(&i2c_bus_type, NULL, node,
+>> +			      of_dev_node_match);
+>> +	if (!dev)
+>> +		return NULL;
+>> +
+>> +	adapter = i2c_verify_adapter(dev);
+>> +	if (adapter && !try_module_get(adapter->owner))
+>> +		adapter = NULL;
+>> +
+>> +	put_device(dev);
 > 
-> As I mentioned in my initial mail, it's not clear to me how this can be
-> reconciled with the current bindings. Everything I've been able to come
-> up with so far at best ends up describing the same thing repeatedly.
+> I don't think this is correct. Users still need to keep a reference to
+> the device, otherwise it can simply disappear even if the module stays
+> around (think sysfs bind/unbind attributes).
 > 
-> I'll see what I can come up with. Any sugestions are welcome!
+> Looking at i2c_put_adapter() it seems like it would need to do more than
+> just drop the module reference. Then again, that probably means that we
+> need to add a get_device() somewhere in i2c_get_adapter() to balance the
+> put_device() in i2c_put_adapter().
 
-I can't see a way of keeping the ID transformations explicit with the
-existing bindings, but I think we can simply fold these down into
-properties in the master nodes, given we expect each ID to be derived
-from some initial master ID anyway.
+it makes sense for me, thanks for momentary review.
 
-So, to cater for the ITS we would need to pass master IDs along with the
-MSI parent information, which we could do by extending msi-parent or by
-introducing a new msis property which behaves similarly to the iommus
-property, describing the MSI controllers the device can address (via any
-IOMMUs), along with any controller-specific identification data.
+I'm hesitating to add put_device(dev) to i2c_put_adapter() etc. in this
+series though. After development and testing I would like to send
+another preceding independent change updating i2c_get_adapter(),
+i2c_put_adapter() and clients (or if you wish you can do it), then I'll
+rebase 01/10 on top of it, the rest most probably is unchanged.
 
-Which means we'd have DT fragments like the following for an arbitrary
-platform device:
-
-its0: its {
-	...
-	msi-controller;
-	#msi-cells = <1>; // DeviceId
-};
-
-its1: its {
-	...
-	msi-controller;
-	#msi-cells = <1>; // DeviceId
-};
-
-smmu: smmu {
-	...
-	iommu-cells = <1>; // StreamId
-};
-
-device {
-	...
-	iommus = <&its 0>;
-	/* Can use either ITS, but has a different ID at each */
-	msis = <&its0 0x0>, <&its1 0x400>;
-};
-
-That doesn't allow you to describe a device with multiple mater ports
-where each master port might want to generate MSIs, but I'm not sure if
-that's a real case.
-
-For PCIe root complexes, we'd need to describe the BDF -> iommu-cells
-and BDF -> msi-cells translations separately with new properties on the
-node for the root complex itself.
-
-Is there anything obviously broken with the above approach?
-
-Thanks,
-Mark.
+--
+With best wishes,
+Vladimir
