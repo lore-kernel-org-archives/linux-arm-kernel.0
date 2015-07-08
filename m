@@ -1,83 +1,38 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 8 Jul 2015 18:34:58 +0100
-Subject: [PATCH v2 2/2] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <1436359868-6176-3-git-send-email-jszhang@marvell.com>
-References: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
- <1436359868-6176-3-git-send-email-jszhang@marvell.com>
-Message-ID: <20150708173458.GB10589@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 08 Jul 2015 18:54:52 +0100
+Subject: [PATCH 07/13] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <559D5A8A.4030901@redhat.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <1436372356-30410-8-git-send-email-marc.zyngier@arm.com>
+ <559D5A8A.4030901@redhat.com>
+Message-ID: <559D63EC.2090602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 01:51:08PM +0100, Jisheng Zhang wrote:
-> This patch implements cpuidle_ops using psci. After this patch, we can
-> use cpuidle-arm.c with psci backend for both arm and arm64.
+On 08/07/15 18:14, Paolo Bonzini wrote:
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm/kernel/Makefile       |  1 +
->  arch/arm/kernel/psci_cpuidle.c | 29 +++++++++++++++++++++++++++++
->  2 files changed, 30 insertions(+)
->  create mode 100644 arch/arm/kernel/psci_cpuidle.c
 > 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index 3b995f5..96383d8 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
->  ifeq ($(CONFIG_ARM_PSCI),y)
->  obj-y				+= psci-call.o
->  obj-$(CONFIG_SMP)		+= psci_smp.o
-> +obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
->  endif
->  
->  extra-y := $(head-y) vmlinux.lds
-> diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
-> new file mode 100644
-> index 0000000..ae85d97
-> --- /dev/null
-> +++ b/arch/arm/kernel/psci_cpuidle.c
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> + * Author: Jisheng Zhang <jszhang@marvell.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/cpuidle.h>
-> +#include <linux/psci.h>
-> +
-> +#include <asm/cpuidle.h>
-> +
-> +static int psci_cpuidle_suspend(int cpu, unsigned long arg)
-> +{
-> +	return cpu_psci_cpu_suspend(arg);
-> +}
-> +
-> +static int psci_cpuidle_init(struct device_node *node, int cpu)
-> +{
-> +	return cpu_psci_cpu_init_idle(cpu);
-> +}
-
-It probably makes sense to change the prototypes now that there is
-just one cpuidle ops merged for arm, better now than later.
-
-I am not too fussed about leaving these shims, but I think this can
-save us some time in the future.
-
-Daniel what do you think ?
-
-Lorenzo
-
-> +
-> +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> +	.suspend = psci_cpuidle_suspend,
-> +	.init = psci_cpuidle_init,
-> +};
-> +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
-> -- 
-> 2.1.4
+> On 08/07/2015 18:19, Marc Zyngier wrote:
+>> +/* Hack to allow stringification of macros... */
+>> +#define __S__(a,args...)	__stringify(a, ##args)
+>> +#define _S_(a,args...)		__S__(a, args)
+>> +
+>> +.macro ifnvhe nonvhe vhe
+>> +	alternative_insn	"\nonvhe", "\vhe", ARM64_HAS_VIRT_HOST_EXTN
+>> +.endm
 > 
+> Why not use this in patch 6 too?
+
+I tried, and ended up in #include hell. vhe-macros.h is local to
+arch/arm64/kvm, and including it from asm/kvm_mmu.h breaks (we include
+it from arch/arm/kvm/ and virt/kvm/arm/).
+
+Alternatively, I could move it to arch/arm64/include/asm (renamed to
+kvm_vhe_macros.h?), which would solve this issue. I just gave it a go,
+and that seems sensible enough.
+
+Thanks for the suggestion!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
