@@ -1,36 +1,224 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:37 +0200
-Subject: [PATCHv2 8/8] ARM: mvebu: adjust board name and compatible for Armada
- 388 GP
+Date: Wed,  8 Jul 2015 17:02:34 +0200
+Subject: [PATCHv2 5/8] ARM: mvebu: add suspend/resume support for Armada 38x
 In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436367757-14202-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436367757-14202-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the name of the Device Tree file name suggests, the Armada 388 GP
-really contains an Armada 388 SoC, so this commit updates the board
-name and compatible string in the Device Tree file.
+This commit adds support for suspend/resume on Armada 38x, and
+specifically for the Armada 388 GP board (since on Marvell EBU
+systems, suspend/resume requires board-level specific details). In
+details, the needed changes are:
+
+ - Register mvebu_memblock_reserve() as the ->reserve() callback in
+   DT_MACHINE_START. This is needed to make sure that the small
+   portions of RAM used by the bootloader to do the DDR3 training are
+   not used by the kernel, since this training is done again when
+   existing from suspend to RAM.
+
+ - Add support for Armada 38x in set_cpu_coherent() by enabling the
+   SCU. This will make sure the SCU gets re-enabled after existing
+   from suspend to RAM.
+
+ - Add marvell,a388-gp to the list of supported boards in the
+   board-specific code pm-board.c. No other changes are needed since
+   the Armada 388 GP uses a 3 GPIOs protocol with the PIC
+   micro-controller, like the one used on Armada XP GP.
+
+ - Add mvebu_pm_store_armada38x_bootinfo() in pm.c to prepare the
+   entry to suspend to RAM by creating the boot information structure
+   expected by the bootloader.
+
+ - Add the assembly code in pmsu_ll.S used when returning from suspend
+   to RAM.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/board-v7.c  |  1 +
+ arch/arm/mach-mvebu/coherency.c |  4 ++++
+ arch/arm/mach-mvebu/pm-board.c  |  3 ++-
+ arch/arm/mach-mvebu/pm.c        | 41 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-mvebu/pmsu.h      |  1 +
+ arch/arm/mach-mvebu/pmsu_ll.S   | 43 +++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 92 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index 31e5ede..2f6c31f 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -44,8 +44,8 @@
- #include <dt-bindings/gpio/gpio.h>
+diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
+index afee908..e5911de 100644
+--- a/arch/arm/mach-mvebu/board-v7.c
++++ b/arch/arm/mach-mvebu/board-v7.c
+@@ -230,6 +230,7 @@ DT_MACHINE_START(ARMADA_38X_DT, "Marvell Armada 380/385 (Device Tree)")
+ 	.l2c_aux_mask	= ~0,
+ 	.init_irq       = mvebu_init_irq,
+ 	.restart	= mvebu_restart,
++	.reserve        = mvebu_memblock_reserve,
+ 	.dt_compat	= armada_38x_dt_compat,
+ MACHINE_END
  
- / {
--	model = "Marvell Armada 385 GP";
--	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
-+	model = "Marvell Armada 388 DB-88F6820-GP";
-+	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index 44eedf3..caf4769 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -31,9 +31,11 @@
+ #include <linux/mbus.h>
+ #include <linux/pci.h>
+ #include <asm/smp_plat.h>
++#include <asm/smp_scu.h>
+ #include <asm/cacheflush.h>
+ #include <asm/mach/map.h>
+ #include <asm/dma-mapping.h>
++#include "common.h"
+ #include "coherency.h"
+ #include "mvebu-soc-id.h"
  
- 	chosen {
- 		stdout-path = "serial0:115200n8";
+@@ -206,6 +208,8 @@ int set_cpu_coherent(void)
+ 		}
+ 		ll_add_cpu_to_smp_group();
+ 		return ll_enable_coherency();
++	} else if (type == COHERENCY_FABRIC_TYPE_ARMADA_380) {
++		scu_enable(mvebu_get_scu_base());
+ 	}
+ 
+ 	return 0;
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+index b8c26cb..0f471fa 100644
+--- a/arch/arm/mach-mvebu/pm-board.c
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -82,7 +82,8 @@ static int mvebu_armada_pm_init(void)
+ 	struct device_node *gpio_ctrl_np;
+ 	int ret = 0, i;
+ 
+-	if (!of_machine_is_compatible("marvell,axp-gp"))
++	if (!of_machine_is_compatible("marvell,axp-gp") &&
++	    !of_machine_is_compatible("marvell,a388-gp"))
+ 		return -ENODEV;
+ 
+ 	np = of_find_node_by_name(NULL, "pm_pic");
+diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
+index 02fdf67..90d85ef 100644
+--- a/arch/arm/mach-mvebu/pm.c
++++ b/arch/arm/mach-mvebu/pm.c
+@@ -149,6 +149,45 @@ static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
+ 	writel(BOOT_MAGIC_LIST_END, store_addr);
+ }
+ 
++static void mvebu_pm_store_armada38x_bootinfo(u32 *store_addr)
++{
++	phys_addr_t resume_pc;
++	extern unsigned char armada_38x_mem_resume_data;
++	void *armada_38x_mem_resume_datap =
++		&armada_38x_mem_resume_data;
++
++	/*
++	 * Provide the internal register address to the resume code in
++	 * assembly. The value must be given in the native endianness
++	 * of the system, hence the usage of the raw variant.
++	 */
++	__raw_writel(mvebu_internal_reg_base(),
++		     armada_38x_mem_resume_datap);
++
++	resume_pc = virt_to_phys(armada_38x_mem_resume);
++
++	/*
++	 * The bootloader expects the first two words to be a magic
++	 * value (BOOT_MAGIC_WORD), followed by the address of the
++	 * resume code to jump to. Then, it expects a sequence of
++	 * (address, value) pairs, which can be used to restore the
++	 * value of certain registers. This sequence must end with the
++	 * BOOT_MAGIC_LIST_END magic value.
++	 */
++
++	writel(BOOT_MAGIC_WORD, store_addr++);
++	writel(resume_pc, store_addr++);
++
++	/*
++	 * We don't restore much registers here compared to Armada XP,
++	 * because we're getting out of the bootloader with MMU
++	 * enabled, so we have to disable it first in
++	 * armada_38x_mem_resume before being able to restore things.
++	 */
++
++	writel(BOOT_MAGIC_LIST_END, store_addr);
++}
++
+ static int mvebu_pm_store_bootinfo(void)
+ {
+ 	u32 *store_addr;
+@@ -157,6 +196,8 @@ static int mvebu_pm_store_bootinfo(void)
+ 
+ 	if (of_machine_is_compatible("marvell,armadaxp"))
+ 		mvebu_pm_store_armadaxp_bootinfo(store_addr);
++	else if (of_machine_is_compatible("marvell,armada380"))
++		mvebu_pm_store_armada38x_bootinfo(store_addr);
+ 	else
+ 		return -ENODEV;
+ 
+diff --git a/arch/arm/mach-mvebu/pmsu.h b/arch/arm/mach-mvebu/pmsu.h
+index ea79269..9166e94 100644
+--- a/arch/arm/mach-mvebu/pmsu.h
++++ b/arch/arm/mach-mvebu/pmsu.h
+@@ -18,6 +18,7 @@ int mvebu_setup_boot_addr_wa(unsigned int crypto_eng_target,
+ 
+ void mvebu_v7_pmsu_idle_exit(void);
+ void armada_370_xp_cpu_resume(void);
++void armada_38x_mem_resume(void);
+ 
+ int armada_370_xp_pmsu_idle_enter(unsigned long deepidle);
+ int armada_38x_do_cpu_suspend(unsigned long deepidle);
+diff --git a/arch/arm/mach-mvebu/pmsu_ll.S b/arch/arm/mach-mvebu/pmsu_ll.S
+index 8865122..6305d80 100644
+--- a/arch/arm/mach-mvebu/pmsu_ll.S
++++ b/arch/arm/mach-mvebu/pmsu_ll.S
+@@ -51,6 +51,49 @@ ARM_BE8(setend	be )			@ go BE8 if entered LE
+ 	b	cpu_resume
+ ENDPROC(armada_38x_cpu_resume)
+ 
++.global armada_38x_mem_resume_data
++
++#define MBUS_INTERNAL_REG_ADDRESS 0xd0020080
++
++ENTRY(armada_38x_mem_resume)
++ARM_BE8(setend	be )			@ go BE8 if entered LE
++	/* MMU disable, left enabled by the bootloader */
++	mrc	p15, 0, r1, c1, c0, 0
++	bic	r1, #1
++	mcr	p15, 0, r1, c1, c0, 0
++
++	bl      v7_invalidate_l1
++
++	/*
++	 * Load the internal register base address, we keep the value
++	 * unmodified in r1 throughout this function.
++	 */
++	adr	r1, armada_38x_mem_resume_data
++	ldr	r1, [r1]
++
++	/* Restore internal register address */
++	mov	r2, r1
++ARM_BE8(rev	r2, r2)
++	ldr	r3, =MBUS_INTERNAL_REG_ADDRESS
++	str	r2, [r3]
++
++	/* Update SCU offset CP15 register */
++	add	r2, r1, #0xC000
++	mcr  	p15, 4, r2, c15, c0, 0
++
++	/*
++	 * Disable L2 cache, left enabled by the bootloader,
++	 * it will be re-enabled later by the resume logic
++	 */
++	add	r2, r1, #0x8100
++	ldr  	r3, =0x0
++	str  	r3, [r2]
++
++	b 	cpu_resume
++armada_38x_mem_resume_data:
++	.long	.
++ENDPROC(armada_38x_mem_resume)
++
+ .global mvebu_boot_wa_start
+ .global mvebu_boot_wa_end
+ 
 -- 
 2.4.5
