@@ -1,50 +1,53 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 8 Jul 2015 17:06:04 +0100
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <559D483A.40507@arm.com>
-References: <1435157697-28579-1-git-send-email-marc.zyngier@arm.com>
- <20150625080457.GD28244@cbox> <558BC2F5.9010303@huawei.com>
- <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
- <558BC90B.4060806@huawei.com> <558CD9DE.3010609@web.de>
- <55917E5B.3030401@huawei.com>
- <CAFEAcA-vS8B8pJUSseFw0OaKJFPe-0rMT-XHxjNbSvyxaZ+9Tg@mail.gmail.com>
- <559D483A.40507@arm.com>
-Message-ID: <CAFEAcA-U1mEGy87ax4Cb1MLFcEP+sqc9BL_Q0hO6qg1J3FCMew@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed,  8 Jul 2015 17:11:21 +0100
+Subject: [PATCH 0/7] Add support for FDMA DMA controller found on STi chipsets
+Message-ID: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 July 2015 at 16:56, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 29/06/15 18:37, Peter Maydell wrote:
->> On 29 June 2015 at 18:20, Claudio Fontana <claudio.fontana@huawei.com> wrote:
->>> On 26.06.2015 06:49, Jan Kiszka wrote:
->>>> QEMU has the concept of write-back levels: KVM_PUT_RUNTIME_STATE,
->>>> KVM_PUT_RESET_STATE and KVM_PUT_FULL_STATE. I suspect this registers is
->>>> just sorted into the wrong category, thus written as part of the
->>>> RUNTIME_STATE. We had such bug patterns during the x86 maturing phase as
->>>> well.
->>
->>> It seems that QEMU target-arm ignores the level parameter to
->>> kvm_arch_put_registers completely.
->>>
->>> Is it intended?
->>
->> Yes, sort of. We don't in general know anything about the semantics
->> of most of the system registers. It should always be safe to
->> read them all out of the kernel and write them back...
->
-> I'm not sure you can safely assume this for time related things, unless
-> you can guarantee that all vcpus are stopped. Claudio is seeing time
-> jumping in weird ways, and so have I, which would tend to show that QEMU
-> is introducing some jitter.
->
-> Maybe not easily observable on real hardware, but the FastModel is
-> enough to show the issue.
->
-> So unless someone has a better solution, I'm seriously considering
-> getting this patch merged.
+Hi,
 
-I'd prefer it if somebody could investigate to see why QEMU
-is actually doing this -- so far we just have speculation.
+This patchset adds support for the Flexible Direct Memory Access (FDMA) core
+found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
+with a dedicated firmware. It is a general purpose DMA controller supporting
+16 independent channels and data can be moved from memory to memory or between
+memory and paced latency critical real time targets.
 
--- PMM
+To increase the number of peripheral request, support is also added for the
+FDMA crossbar hardware, which can be used to multiplex up to 96 peripheral
+requests, to the 3 fdma engines.
+
+regards,
+
+Peter.
+
+Peter Griffin (7):
+  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
+    documentation
+  dmaengine: st_fdma: Add STMicroelectronics FDMA xbar DT binding
+    documentation
+  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
+  dmaengine: st_fdma: Add xbar support
+  ARM: STi: DT: STiH407: Add FDMA driver and xbar driver dt nodes.
+  MAINTAINERS: Add FDMA driver files to STi section.
+  ARM: multi_v7_defconfig: Enable STi FDMA driver
+
+ Documentation/devicetree/bindings/dma/st_fdma.txt |  100 ++
+ MAINTAINERS                                       |    2 +
+ arch/arm/boot/dts/stih407-family.dtsi             |   59 +
+ arch/arm/configs/multi_v7_defconfig               |    2 +
+ drivers/dma/Kconfig                               |   26 +
+ drivers/dma/Makefile                              |    2 +
+ drivers/dma/st_fdma.c                             | 1203 +++++++++++++++++++++
+ drivers/dma/st_fdma.h                             |  266 +++++
+ drivers/dma/st_fdma_xbar.c                        |  149 +++
+ include/linux/platform_data/dma-st_fdma.h         |   70 ++
+ 10 files changed, 1879 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
+ create mode 100644 drivers/dma/st_fdma.c
+ create mode 100644 drivers/dma/st_fdma.h
+ create mode 100644 drivers/dma/st_fdma_xbar.c
+ create mode 100644 include/linux/platform_data/dma-st_fdma.h
+
+-- 
+1.9.1
