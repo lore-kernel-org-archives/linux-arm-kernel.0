@@ -1,34 +1,72 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jul 2015 16:20:54 +0530
-Subject: [PATCH v2 0/9] cpufreq: Introduce support for ST's cpufreq
- functionality
-In-Reply-To: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
-References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150708105054.GB1805@linux>
+From: zhichao.huang@linaro.org (Zhichao Huang)
+Date: Wed, 08 Jul 2015 18:50:22 +0800
+Subject: [PATCH v3 08/11] KVM: arm: implement dirty bit mechanism for
+ debug registers
+In-Reply-To: <20150707102405.GE23879@arm.com>
+References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
+ <1434969694-7432-9-git-send-email-zhichao.huang@linaro.org>
+ <20150630092020.GP11332@cbox>
+ <B3B5AB0D-020C-483D-A6DE-76E355865010@linaro.org>
+ <20150703115611.GB14220@lvm>
+ <5A7DE9A0-E7A6-40B0-80F9-896F7DED0E47@linaro.org>
+ <20150707102405.GE23879@arm.com>
+Message-ID: <123AABA4-2C79-462D-91FC-56FB52DB972C@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-06-15, 14:58, Lee Jones wrote:
-> This driver reads very platform specific information in from Device Tree
-> and translates it into frequency tables.  The generic drivers then use the
-> tables to conduct frequency and voltage scaling in the normal way.
-> 
-> There are 'ARM' patches in the set which are not necessarily related to CPUFreq,
-> but are required to get it to work.  Anyone who is not interested in general STi
-> DT changes can safely ignore these.
-> 
-> v1 => v2:
->  - CPUFreq is no longer it's own device in DT; instead:
->    - It is probed from the platform area
->    - Key properties have been moved into the CPU's node
->  - Driver is less generic [ST => STI]
->  - Documentation has been updated
->    - Point one (above) has been accounted for
->    - Example of bootloader supplied node has been provided
->  - GPL licensing has been updated to reflected the header
->  - Kconfig disparity has been rectified [bool => tristate]
+Hi, Will,
 
-Sorry for being so late to get back to this.. Was tooo busy :(
+Are you happy with this?:
+
+diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+
++bool hw_breakpoint_enabled(void)
++{
++    struct perf_event **slots;
++    int i;
++
++    slots = this_cpu_ptr(bp_on_reg);
++    for (i = 0; i < core_num_brps; i++) {
++        if (slots[i])
++            return true;
++    }
++
++    slots = this_cpu_ptr(wp_on_reg);
++    for (i = 0; i < core_num_wrps; i++) {
++        if (slots[i])
++            return true;
++    }
++
++    return false;
++}
+
+It doesn't change any existing functions, and even doesn't add a new
+variables, it just provide an indication for KVM, and it's low-overhead.
+
+We will only call it upon guest entry, so there is also no race for it.
+
+
+On July 7, 2015 6:24:06 PM GMT+08:00, Will Deacon <will.deacon@arm.com> wrote:
+>On Tue, Jul 07, 2015 at 11:06:57AM +0100, Zhichao Huang wrote:
+>> Chazy and me are talking about how to reduce the saving/restoring
+>> overhead for debug registers.
+>> We want to add a state in hw_breakpoint.c to indicate whether the
+>host
+>> enable any hwbrpts or not (might export a fuction that kvm can call),
+>> then we can read this state from memory instead of reading from real
+>> hardware registers, and to decide whether we need a world switch or
+>> not.
+>> Does it acceptable?
+>
+>Maybe, hard to tell without the code. There are obvious races to deal
+>with
+>if you use variables to indicate whether resources are in use -- why
+>not
+>just trap debug access from the host as well? Then you could keep track
+>of
+>the "owner" in kvm and trap accesses from everybody else.
+>
+>Will
 
 -- 
-viresh
+Zhichao Huang
