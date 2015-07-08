@@ -1,214 +1,78 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Jul 2015 17:19:15 +0100
-Subject: [PATCH 12/13] arm64: KVM: Split sysreg save/restore
+Date: Wed,  8 Jul 2015 17:19:13 +0100
+Subject: [PATCH 10/13] arm64: Add support for running Linux in EL2 mode
 In-Reply-To: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
 References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436372356-30410-13-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436372356-30410-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we're starting to get different requirements for non-VHE and VHE
-code paths, use a slightly more fine-grained approach:
+With the ARMv8.1 VHE, the architecture is able to (almost) transparently
+run the kernel at EL2, despite being written for EL1.
 
-- __save/restore_sysregs: save/restore non-shared sysregs
-- __save/restore_shared_sysregs: save/restore only shared sysregs
-
-Of course, non-VHE always requires both.
+This patch takes care of the "almost" part, mostly preventing the kernel
+from dropping from EL2 to EL1, and setting up the HYP configuration.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp.S | 91 +++++++++++++++++++++++++---------------------------
- 1 file changed, 44 insertions(+), 47 deletions(-)
+ arch/arm64/kernel/head.S | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index b61591b..3cbd2c4 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -280,11 +280,6 @@ skip_el1_restore:
- 	mrs	x20,	par_el1
- 	mrs	x21,	mdscr_el1
- 
--	mrs	x22,	tpidr_el0
--	mrs	x23,	tpidrro_el0
--	mrs	x24,	tpidr_el1
--	mrs	x25,	actlr_el1
--
- 	stp	x4, x5, [x3]
- 	stp	x6, x7, [x3, #16]
- 	stp	x8, x9, [x3, #32]
-@@ -294,8 +289,6 @@ skip_el1_restore:
- 	stp	x16, x17, [x3, #96]
- 	stp	x18, x19, [x3, #112]
- 	stp	x20, x21, [x3, #128]
--	stp	x22, x23, [x3, #144]
--	stp	x24, x25, [x3, #160]
- .endm
- 
- .macro save_debug
-@@ -508,8 +501,6 @@ skip_el1_restore:
- 	ldp	x16, x17, [x3, #96]
- 	ldp	x18, x19, [x3, #112]
- 	ldp	x20, x21, [x3, #128]
--	ldp	x22, x23, [x3, #144]
--	ldp	x24, x25, [x3, #160]
- 
- 	msr	vmpidr_el2,	x4
- 	msr	csselr_el1,	x5
-@@ -529,11 +520,6 @@ skip_el1_restore:
- 	msr_el1(cntkctl,	x19)
- 	msr	par_el1,	x20
- 	msr	mdscr_el1,	x21
--
--	msr	tpidr_el0,	x22
--	msr	tpidrro_el0,	x23
--	msr	tpidr_el1,	x24
--	msr	actlr_el1,	x25
- .endm
- 
- .macro restore_debug
-@@ -913,10 +899,12 @@ ifnvhe	nop,					"msr	vbar_el1, x2"
- 
- .macro save_timer_state
- 	// x0: vcpu pointer
--	ldr	x2, [x0, #VCPU_KVM]
--	kern_hyp_va x2
--	ldr	w3, [x2, #KVM_TIMER_ENABLED]
--	cbz	w3, 1f
-+	// x1: return code
-+	// x2: vcpu context
-+	ldr	x3, [x0, #VCPU_KVM]
-+	kern_hyp_va x3
-+	ldr	w4, [x3, #KVM_TIMER_ENABLED]
-+	cbz	w4, 1f
- 
- 	mrs_el0(x3, cntv_ctl)
- 	and	x3, x3, #3
-@@ -931,9 +919,9 @@ ifnvhe	nop,					"msr	vbar_el1, x2"
- 
- 1:
- 	// Allow physical timer/counter access for the host
--	mrs	x2, cnthctl_el2
--	orr	x2, x2, #3
--	msr	cnthctl_el2, x2
-+	mrs	x3, cnthctl_el2
-+	orr	x3, x3, #3
-+	msr	cnthctl_el2, x3
- 
- 	// Clear cntvoff for the host
- ifnvhe "msr	cntvoff_el2, xzr",		nop
-@@ -941,34 +929,43 @@ ifnvhe "msr	cntvoff_el2, xzr",		nop
- 
- .macro restore_timer_state
- 	// x0: vcpu pointer
-+	// x2: vcpu context
- 	// Disallow physical timer access for the guest
- 	// Physical counter access is allowed
--	mrs	x2, cnthctl_el2
--	orr	x2, x2, #1
--	bic	x2, x2, #2
--	msr	cnthctl_el2, x2
--
--	ldr	x2, [x0, #VCPU_KVM]
--	kern_hyp_va x2
--	ldr	w3, [x2, #KVM_TIMER_ENABLED]
--	cbz	w3, 1f
--
--	ldr	x3, [x2, #KVM_TIMER_CNTVOFF]
--	msr	cntvoff_el2, x3
--	ldr	x2, [x0, #VCPU_TIMER_CNTV_CVAL]
--	msr_el0(cntv_cval, x2)
-+	mrs	x3, cnthctl_el2
-+	orr	x3, x3, #1
-+	bic	x3, x3, #2
-+	msr	cnthctl_el2, x3
-+
-+	ldr	x3, [x0, #VCPU_KVM]
-+	kern_hyp_va x3
-+	ldr	w4, [x3, #KVM_TIMER_ENABLED]
-+	cbz	w4, 1f
-+
-+	ldr	x4, [x3, #KVM_TIMER_CNTVOFF]
-+	msr	cntvoff_el2, x4
-+	ldr	x4, [x0, #VCPU_TIMER_CNTV_CVAL]
-+	msr_el0(cntv_cval, x4)
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index c0ff3ce..a179747 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -29,6 +29,7 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/cache.h>
+ #include <asm/cputype.h>
++#include <asm/kvm_mmu.h>
+ #include <asm/memory.h>
+ #include <asm/thread_info.h>
+ #include <asm/pgtable-hwdef.h>
+@@ -481,8 +482,16 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
  	isb
- 
--	ldr	w2, [x0, #VCPU_TIMER_CNTV_CTL]
--	and	x2, x2, #3
--	msr_el0(cntv_ctl, x2)
-+	ldr	w4, [x0, #VCPU_TIMER_CNTV_CTL]
-+	and	x4, x4, #3
-+	msr_el0(cntv_ctl, x4)
- 1:
- .endm
- 
-+__save_shared_sysregs:
-+	save_shared_sysregs
-+	ret
-+
- __save_sysregs:
- 	save_sysregs
  	ret
  
-+__restore_shared_sysregs:
-+	restore_shared_sysregs
++	/* Check for VHE being present */
++2:	mrs	x2, id_aa64mmfr1_el1
++	ubfx	x2, x2, #8, #4
++
+ 	/* Hyp configuration. */
+-2:	mov	x0, #(1 << 31)			// 64-bit EL1
++	mov	x0, #HCR_RW			// 64-bit EL1
++	cbz	x2, set_hcr
++	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
++	orr	x0, x0, #HCR_E2H
++set_hcr:
+ 	msr	hcr_el2, x0
+ 
+ 	/* Generic timers. */
+@@ -522,6 +531,9 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 
+ 	/* Coprocessor traps. */
+ 	mov	x0, #0x33ff
++	cbz	x2, set_cptr
++	orr	x0, x0, #(3 << 20)		// Don't trap FP
++set_cptr:
+ 	msr	cptr_el2, x0			// Disable copro. traps to EL2
+ 
+ #ifdef CONFIG_COMPAT
+@@ -531,6 +543,15 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+ 	/* Stage-2 translation */
+ 	msr	vttbr_el2, xzr
+ 
++	cbz	x2, install_el2_stub
++
++	setup_vtcr x4, x5
++
++	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
++	isb
 +	ret
 +
- __restore_sysregs:
- 	restore_sysregs
- 	ret
-@@ -1010,10 +1007,9 @@ ENTRY(__kvm_vcpu_run)
- 
- 	save_host_regs
- 	bl __save_fpsimd
--ifnvhe "bl	__save_sysregs",		nop
--ifnvhe "b	1f",				nop
--	save_shared_sysregs
--1:
-+ifnvhe "bl	__save_sysregs",		"nop"
-+	bl	__save_shared_sysregs
-+
- 	compute_debug_state 1f
- 	bl	__save_debug
- 1:
-@@ -1027,6 +1023,7 @@ ifnvhe "b	1f",				nop
- 	add	x2, x0, #VCPU_CONTEXT
- 
- 	bl __restore_sysregs
-+	bl __restore_shared_sysregs
- 	bl __restore_fpsimd
- 
- 	skip_debug_state x3, 1f
-@@ -1048,6 +1045,7 @@ __kvm_vcpu_return:
- 	save_guest_regs
- 	bl __save_fpsimd
- 	bl __save_sysregs
-+	bl __save_shared_sysregs
- 
- 	skip_debug_state x3, 1f
- 	bl	__save_debug
-@@ -1064,10 +1062,8 @@ __kvm_vcpu_return:
- 	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
- 	kern_hyp_va x2
- 
--ifnvhe "bl	__restore_sysregs",		nop
--ifnvhe "b	1f",				nop
--	restore_shared_sysregs
--1:
-+ifnvhe "bl	__restore_sysregs",		"nop"
-+	bl	__restore_shared_sysregs
- 	bl __restore_fpsimd
- 
- 	skip_debug_state x3, 1f
-@@ -1159,7 +1155,8 @@ __kvm_hyp_panic:
- 	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
- 	kern_hyp_va x2
- 
--	bl __restore_sysregs
-+ifnvhe "bl __restore_sysregs",			"nop"
-+	bl __restore_shared_sysregs
- 
- 1:	adr	x0, __hyp_panic_str
- 	adr	x1, 2f
++install_el2_stub:
+ 	/* Hypervisor stub */
+ 	adrp	x0, __hyp_stub_vectors
+ 	add	x0, x0, #:lo12:__hyp_stub_vectors
 -- 
 2.1.4
