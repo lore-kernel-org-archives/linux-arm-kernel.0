@@ -1,398 +1,274 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 8 Jul 2015 16:48:04 +0100
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 8 Jul 2015 10:49:13 -0500
+Subject: [PATCH v3 1/1] ARM: dts: imx7d: add cortex-a7 coresight component
+In-Reply-To: <1435676291-27720-1-git-send-email-Frank.Li@freescale.com>
+References: <1435676291-27720-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <CAHrpEqTcYex4OZnJGwbuWJmvXROmtgacPOry24zgA1gcAhyySA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 15, 2015 at 04:59:04PM +0300, Andrey Ryabinin wrote:
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7796af4..4cc73cc 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -44,6 +44,7 @@ config ARM64
->  	select HAVE_ARCH_AUDITSYSCALL
->  	select HAVE_ARCH_BITREVERSE
->  	select HAVE_ARCH_JUMP_LABEL
-> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
+On Tue, Jun 30, 2015 at 9:58 AM,  <Frank.Li@freescale.com> wrote:
+> From: Frank Li <Frank.Li@freescale.com>
+>
+> Added etm, etb, funnel and replicator
+>
+> usage example:
+>
+>     echo 1 >/sys/bus/coresight/devices/30086000.etr/enable_sink
+>     echo 1 >/sys/bus/coresight/devices/3007c000.etm/enable_source
+>
+>         coresight-tmc 30086000.etr: TMC enabled
+>         coresight-replicator replicator.1: REPLICATOR enabled
+>         coresight-tmc 30084000.tmc: TMC enabled
+>         coresight-funnel 30083000.funnel: FUNNEL inport 0 enabled
+>         coresight-funnel 30041000.funnel: FUNNEL inport 0 enabled
+>         coresight-etm3x 3007c000.etm: ETM tracing enabled
+>
+>     etm enable here.
+>     trace data save at /dev/30086000.etr
+>
+>     cat /dev/30086000.etr > trace.data
+>
+>         coresight-tmc 30086000.etr: TMC read start
+>         coresight-tmc 30086000.etr: TMC read end
+>
+>     use ptm2human(https://github.com/hwangcc23/ptm2human) to show trace data
+>
+>     ptm2human -i trace.data
+>
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-Just curious, why the dependency?
+Ping.
 
->  	select HAVE_ARCH_KGDB
->  	select HAVE_ARCH_SECCOMP_FILTER
->  	select HAVE_ARCH_TRACEHOOK
-> @@ -119,6 +120,12 @@ config GENERIC_CSUM
->  config GENERIC_CALIBRATE_DELAY
->  	def_bool y
->  
-> +config KASAN_SHADOW_OFFSET
-> +	hex
-> +	default 0xdfff200000000000 if ARM64_VA_BITS_48
-> +	default 0xdffffc8000000000 if ARM64_VA_BITS_42
-> +	default 0xdfffff9000000000 if ARM64_VA_BITS_39
+> ---
+> Change from v2 to v3
+>  - fix multiline comments
+>  - remove some reduntant space line
+>  - remove extra space after =
+>  - Remove @0
+>
+> Change from V1 to V2
+>  - remove "0" after @
+>  - add comments about unused funnel input port
+>  - add comments about add  arm,primecell-periphid
+>
+>  arch/arm/boot/dts/imx7d.dtsi | 203 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 203 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+> index b4cd8fd..9014b80 100644
+> --- a/arch/arm/boot/dts/imx7d.dtsi
+> +++ b/arch/arm/boot/dts/imx7d.dtsi
+> @@ -121,6 +121,209 @@
+>                 clock-output-names = "osc";
+>         };
+>
+> +       etr at 30086000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x30086000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-
-How were these numbers generated? I can probably guess but we need a
-comment in this file and a BUILD_BUG elsewhere (kasan_init.c) if we
-change the memory map and they no longer match.
-
-> diff --git a/arch/arm64/include/asm/kasan.h b/arch/arm64/include/asm/kasan.h
-> new file mode 100644
-> index 0000000..65ac50d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/kasan.h
-> @@ -0,0 +1,24 @@
-> +#ifndef __ASM_KASAN_H
-> +#define __ASM_KASAN_H
+> +               port {
+> +                       etr_in_port: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out_port1>;
+> +                       };
+> +               };
+> +       };
 > +
-> +#ifndef __ASSEMBLY__
+> +       tpiu at 30087000 {
+> +               compatible = "arm,coresight-tpiu", "arm,primecell";
+> +               reg = <0x30087000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +#ifdef CONFIG_KASAN
+> +               port {
+> +                       tpiu_in_port: endpoint {
+> +                               slave-mode;
+> +                               remote-endpoint = <&replicator_out_port1>;
+> +                       };
+> +               };
+> +       };
 > +
-> +#include <asm/memory.h>
+> +       replicator {
+> +               /*
+> +                * non-configurable replicators don't show up on the
+> +                * AMBA bus.  As such no need to add "arm,primecell"
+> +                */
+> +               compatible = "arm,coresight-replicator";
 > +
-> +/*
-> + * KASAN_SHADOW_START: beginning of the kernel virtual addresses.
-> + * KASAN_SHADOW_END: KASAN_SHADOW_START + 1/8 of kernel virtual addresses.
-> + */
-> +#define KASAN_SHADOW_START      (UL(0xffffffffffffffff) << (VA_BITS))
-> +#define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1UL << (VA_BITS - 3)))
-
-Can you define a VA_START in asm/memory.h so that we avoid this long
-list of f's here and in pgtable.h?
-
-Another BUILD_BUG we need is to ensure that KASAN_SHADOW_START/END
-covers an exact number of pgd entries, otherwise the logic in
-kasan_init.c can go wrong (it seems to be the case in all VA_BITS
-configurations but just in case we forget about this requirement in the
-future).
-
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index bd5db28..8700f66 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -40,7 +40,14 @@
->   *	fixed mappings and modules
->   */
->  #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > +
-> +#ifndef CONFIG_KASAN
->  #define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
-
-And here we could just use VA_START.
-
-> +#else
-> +#include <asm/kasan.h>
-> +#define VMALLOC_START		KASAN_SHADOW_END
-> +#endif
-
-We could add a SZ_64K guard page here (just in case, the KASan shadow
-probably never reaches KASAN_SHADOW_END).
-
-> diff --git a/arch/arm64/include/asm/string.h b/arch/arm64/include/asm/string.h
-> index 64d2d48..bff522c 100644
-> --- a/arch/arm64/include/asm/string.h
-> +++ b/arch/arm64/include/asm/string.h
-> @@ -36,17 +36,33 @@ extern __kernel_size_t strnlen(const char *, __kernel_size_t);
->  
->  #define __HAVE_ARCH_MEMCPY
->  extern void *memcpy(void *, const void *, __kernel_size_t);
-> +extern void *__memcpy(void *, const void *, __kernel_size_t);
->  
->  #define __HAVE_ARCH_MEMMOVE
->  extern void *memmove(void *, const void *, __kernel_size_t);
-> +extern void *__memmove(void *, const void *, __kernel_size_t);
->  
->  #define __HAVE_ARCH_MEMCHR
->  extern void *memchr(const void *, int, __kernel_size_t);
->  
->  #define __HAVE_ARCH_MEMSET
->  extern void *memset(void *, int, __kernel_size_t);
-> +extern void *__memset(void *, int, __kernel_size_t);
->  
->  #define __HAVE_ARCH_MEMCMP
->  extern int memcmp(const void *, const void *, size_t);
->  
+> +                       /* replicator output ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               replicator_out_port0: endpoint {
+> +                                       remote-endpoint = <&tpiu_in_port>;
+> +                               };
+> +                       };
 > +
-> +#if defined(CONFIG_KASAN) && !defined(__SANITIZE_ADDRESS__)
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               replicator_out_port1: endpoint {
+> +                                       remote-endpoint = <&etr_in_port>;
+> +                               };
+> +                       };
 > +
-> +/*
-> + * For files that not instrumented (e.g. mm/slub.c) we
-
-Missing an "are".
-
-> diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-> index dcd06d1..cfe5ea5 100644
-> --- a/arch/arm64/include/asm/thread_info.h
-> +++ b/arch/arm64/include/asm/thread_info.h
-> @@ -24,10 +24,18 @@
->  #include <linux/compiler.h>
->  
->  #ifndef CONFIG_ARM64_64K_PAGES
-> +#ifndef CONFIG_KASAN
->  #define THREAD_SIZE_ORDER	2
-> +#else
-> +#define THREAD_SIZE_ORDER	3
-> +#endif
->  #endif
->  
-> +#ifndef CONFIG_KASAN
->  #define THREAD_SIZE		16384
-> +#else
-> +#define THREAD_SIZE		32768
-> +#endif
->  #define THREAD_START_SP		(THREAD_SIZE - 16)
-
-Have you actually seen it failing with the 16KB THREAD_SIZE? You may run
-into other problems with 8 4KB pages per stack.
-
->  #ifndef __ASSEMBLY__
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 19f915e..650b1e8 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -486,6 +486,9 @@ __mmap_switched:
->  	str_l	x21, __fdt_pointer, x5		// Save FDT pointer
->  	str_l	x24, memstart_addr, x6		// Save PHYS_OFFSET
->  	mov	x29, #0
-> +#ifdef CONFIG_KASAN
-> +	b	kasan_early_init
-> +#endif
->  	b	start_kernel
->  ENDPROC(__mmap_switched)
-
-I think we still have swapper_pg_dir in x26 at this point, could you
-instead do:
-
-	mov	x0, x26
-	bl	kasan_map_early_shadow
-
-Actually, I don't think kasan_map_early_shadow() even needs this
-argument, it uses pgd_offset_k() anyway.
-
-> diff --git a/arch/arm64/lib/memcpy.S b/arch/arm64/lib/memcpy.S
-> index 8a9a96d..845e40a 100644
-> --- a/arch/arm64/lib/memcpy.S
-> +++ b/arch/arm64/lib/memcpy.S
-> @@ -56,6 +56,8 @@ C_h	.req	x12
->  D_l	.req	x13
->  D_h	.req	x14
->  
-> +.weak memcpy
-
-Nitpick: as with other such asm declarations, use some indentation:
-
-	.weak	memcpy
-
-(similarly for the others)
-
-> diff --git a/arch/arm64/mm/Makefile b/arch/arm64/mm/Makefile
-> index 773d37a..e17703c 100644
-> --- a/arch/arm64/mm/Makefile
-> +++ b/arch/arm64/mm/Makefile
-> @@ -4,3 +4,6 @@ obj-y				:= dma-mapping.o extable.o fault.o init.o \
->  				   context.o proc.o pageattr.o
->  obj-$(CONFIG_HUGETLB_PAGE)	+= hugetlbpage.o
->  obj-$(CONFIG_ARM64_PTDUMP)	+= dump.o
+> +                       /* replicator input port */
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               replicator_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf_out_port>;
+> +                               };
+> +                       };
+> +               };
+> +       };
 > +
-> +KASAN_SANITIZE_kasan_init.o	:= n
-> +obj-$(CONFIG_KASAN)		+= kasan_init.o
-> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-> new file mode 100644
-> index 0000000..35dbd84
-> --- /dev/null
-> +++ b/arch/arm64/mm/kasan_init.c
-> @@ -0,0 +1,143 @@
-> +#include <linux/kasan.h>
-> +#include <linux/kernel.h>
-> +#include <linux/memblock.h>
-> +#include <linux/start_kernel.h>
+> +       etf at 30084000 {
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0x30084000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +#include <asm/page.h>
-> +#include <asm/pgalloc.h>
-> +#include <asm/pgtable.h>
-> +#include <asm/tlbflush.h>
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > +
-> +unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
-
-So that's needed because the shadow memory is mapped before paging_init
-is called and we don't have the zero page set up yet. Please add a
-comment.
-
-> +static pgd_t tmp_page_table[PTRS_PER_PGD] __initdata __aligned(PAGE_SIZE);
-
-This doesn't need a full PAGE_SIZE alignment, just PGD_SIZE. You could
-also rename to tmp_pg_dir for consistency with swapper and idmap.
-
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               etf_in_port: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&hugo_funnel_out_port0>;
+> +                               };
+> +                       };
 > +
-> +#if CONFIG_PGTABLE_LEVELS > 3
-> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-> +#endif
-> +#if CONFIG_PGTABLE_LEVELS > 2
-> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-> +#endif
-> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               etf_out_port: endpoint {
+> +                                       remote-endpoint = <&replicator_in_port0>;
+> +                               };
+> +                       };
+> +               };
+> +       };
 > +
-> +static void __init kasan_early_pmd_populate(unsigned long start,
-> +					unsigned long end, pud_t *pud)
-> +{
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pmd_t *pmd;
+> +       funnel at 30083000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x30083000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +	pmd = pmd_offset(pud, start);
-> +	for (addr = start; addr < end; addr = next, pmd++) {
-> +		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> +		next = pmd_addr_end(addr, end);
-> +	}
-> +}
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > +
-> +static void __init kasan_early_pud_populate(unsigned long start,
-> +					unsigned long end, pgd_t *pgd)
-> +{
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pud_t *pud;
+> +                       /* funnel input ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               hugo_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&ca_funnel_out_port0>;
+> +                               };
+> +                       };
 > +
-> +	pud = pud_offset(pgd, start);
-> +	for (addr = start; addr < end; addr = next, pud++) {
-> +		pud_populate(&init_mm, pud, kasan_zero_pmd);
-> +		next = pud_addr_end(addr, end);
-> +		kasan_early_pmd_populate(addr, next, pud);
-> +	}
-> +}
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               hugo_funnel_in_port1: endpoint {
+> +                                       slave-mode; /* M4 input */
+> +                               };
+> +                       };
 > +
-> +static void __init kasan_map_early_shadow(pgd_t *pgdp)
-> +{
-> +	int i;
-> +	unsigned long start = KASAN_SHADOW_START;
-> +	unsigned long end = KASAN_SHADOW_END;
-> +	unsigned long addr;
-> +	unsigned long next;
-> +	pgd_t *pgd;
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               hugo_funnel_out_port0: endpoint {
+> +                                       remote-endpoint = <&etf_in_port>;
+> +                               };
+> +                       };
 > +
-> +	for (i = 0; i < PTRS_PER_PTE; i++)
-> +		set_pte(&kasan_zero_pte[i], pfn_pte(
-> +				virt_to_pfn(kasan_zero_page), PAGE_KERNEL));
-
-Does this need to be writable? If yes, is there anything writing
-non-zero values to it?
-
+> +                       /* the other input ports are not connect to anything */
+> +               };
+> +       };
 > +
-> +	pgd = pgd_offset_k(start);
-> +	for (addr = start; addr < end; addr = next, pgd++) {
-> +		pgd_populate(&init_mm, pgd, kasan_zero_pud);
-> +		next = pgd_addr_end(addr, end);
-> +		kasan_early_pud_populate(addr, next, pgd);
-> +	}
-
-I prefer to use "do ... while" constructs similar to __create_mapping()
-(or zero_{pgd,pud,pmd}_populate as you are more familiar with them).
-
-But what I don't get here is that you repopulate the pud page for every
-pgd (and so on for pmd). You don't need this recursive call all the way
-to kasan_early_pmd_populate() but just sequential:
-
-	kasan_early_pte_populate();
-	kasan_early_pmd_populate(..., pte);
-	kasan_early_pud_populate(..., pmd);
-	kasan_early_pgd_populate(..., pud);
-
-(or in reverse order)
-
-That's because you don't have enough pte/pmd/pud pages to cover the
-range (i.e. you need 512 pte pages for a pmd page) but you just reuse
-the same table page to make all of them pointing to kasan_zero_page.
-
-> +void __init kasan_early_init(void)
-> +{
-> +	kasan_map_early_shadow(swapper_pg_dir);
-> +	start_kernel();
-> +}
+> +       funnel at 30041000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0x30041000 0x1000>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +static void __init clear_pgds(unsigned long start,
-> +			unsigned long end)
-> +{
-> +	/*
-> +	 * Remove references to kasan page tables from
-> +	 * swapper_pg_dir. pgd_clear() can't be used
-> +	 * here because it's nop on 2,3-level pagetable setups
-> +	 */
-> +	for (; start && start < end; start += PGDIR_SIZE)
-> +		set_pgd(pgd_offset_k(start), __pgd(0));
-> +}
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
 > +
-> +static void __init cpu_set_ttbr1(unsigned long ttbr1)
-> +{
-> +	asm(
-> +	"	msr	ttbr1_el1, %0\n"
-> +	"	isb"
-> +	:
-> +	: "r" (ttbr1));
-> +}
+> +                       /* funnel input ports */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               ca_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm0_out_port>;
+> +                               };
+> +                       };
 > +
-> +void __init kasan_init(void)
-> +{
-> +	struct memblock_region *reg;
+> +                       port at 1 {
+> +                               reg = <1>;
+> +                               ca_funnel_in_port1: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etm1_out_port>;
+> +                               };
+> +                       };
 > +
-> +	/*
-> +	 * We are going to perform proper setup of shadow memory.
-> +	 * At first we should unmap early shadow (clear_pgds() call bellow).
-> +	 * However, instrumented code couldn't execute without shadow memory.
-> +	 * tmp_page_table used to keep early shadow mapped until full shadow
-> +	 * setup will be finished.
-> +	 */
-> +	memcpy(tmp_page_table, swapper_pg_dir, sizeof(tmp_page_table));
-> +	cpu_set_ttbr1(__pa(tmp_page_table));
-> +	flush_tlb_all();
+> +                       /* funnel output port */
+> +                       port at 2 {
+> +                               reg = <0>;
+> +                               ca_funnel_out_port0: endpoint {
+> +                                       remote-endpoint = <&hugo_funnel_in_port0>;
+> +                               };
+> +                       };
 > +
-> +	clear_pgds(KASAN_SHADOW_START, KASAN_SHADOW_END);
+> +                       /* the other input ports are not connect to anything */
+> +               };
+> +       };
 > +
-> +	kasan_populate_zero_shadow((void *)KASAN_SHADOW_START,
-> +			kasan_mem_to_shadow((void *)MODULES_VADDR));
+> +       etm at 3007c000 {
+> +               compatible = "arm,coresight-etm3x", "arm,primecell";
+> +               reg = <0x3007c000 0x1000>;
+> +               cpu = <&cpu0>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +	for_each_memblock(memory, reg) {
-> +		void *start = (void *)__phys_to_virt(reg->base);
-> +		void *end = (void *)__phys_to_virt(reg->base + reg->size);
+> +               port {
+> +                       etm0_out_port: endpoint {
+> +                               remote-endpoint = <&ca_funnel_in_port0>;
+> +                       };
+> +               };
+> +       };
 > +
-> +		if (start >= end)
-> +			break;
+> +       etm at 3007d000 {
+> +               compatible = "arm,coresight-etm3x", "arm,primecell";
+> +               reg = <0x3007d000 0x1000>;
 > +
-> +		/*
-> +		 * end + 1 here is intentional. We check several shadow bytes in
-> +		 * advance to slightly speed up fastpath. In some rare cases
-> +		 * we could cross boundary of mapped shadow, so we just map
-> +		 * some more here.
-> +		 */
-> +		vmemmap_populate((unsigned long)kasan_mem_to_shadow(start),
-> +				(unsigned long)kasan_mem_to_shadow(end) + 1,
-> +				pfn_to_nid(virt_to_pfn(start)));
-
-Is the only reason for sparsemem vmemmap dependency to reuse this
-function? Maybe at some point you could factor this out and not require
-SPARSEMEM_VMEMMAP to be enabled.
-
-About the "end + 1", what you actually get is an additional full section
-(PMD_SIZE) with the 4KB page configuration. Since the shadow is 1/8 of
-the VA space, do we need a check for memblocks within 8 * 2MB of each
-other?
-
-> +	}
+> +               /*
+> +                * System will hang if added nosmp in kernel command line
+> +                * without arm,primecell-periphid because amba bus try to
+> +                * read id and core1 power off at this time.
+> +                */
+> +               arm,primecell-periphid = <0xbb956>;
+> +               cpu = <&cpu1>;
+> +               clocks = <&clks IMX7D_MAIN_AXI_ROOT_CLK>;
+> +               clock-names = "apb_pclk";
 > +
-> +	memset(kasan_zero_page, 0, PAGE_SIZE);
-
-Has anyone written to this page? Actually, what's its use after we
-enabled the proper KASan shadow mappings?
-
-> +	cpu_set_ttbr1(__pa(swapper_pg_dir));
-> +	flush_tlb_all();
+> +               port {
+> +                       etm1_out_port: endpoint {
+> +                               remote-endpoint = <&ca_funnel_in_port1>;
+> +                       };
+> +               };
+> +       };
 > +
-> +	/* At this point kasan is fully initialized. Enable error messages */
-> +	init_task.kasan_depth = 0;
-> +}
-
--- 
-Catalin
+>         soc {
+>                 #address-cells = <1>;
+>                 #size-cells = <1>;
+> --
+> 1.9.1
+>
