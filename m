@@ -1,97 +1,252 @@
-From: treding@nvidia.com (Thierry Reding)
-Date: Wed, 8 Jul 2015 15:11:42 +0200
-Subject: [PATCH 01/10] i2c: add and export of_get_i2c_adapter_by_node()
- interface
-In-Reply-To: <1436360352-9181-1-git-send-email-vladimir_zapolskiy@mentor.com>
-References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
- <1436360352-9181-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <20150708131140.GA12791@ulmo.nvidia.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 08 Jul 2015 14:13:20 +0100
+Subject: [PATCH v2 6/9] iommu/arm-smmu: to support probe deferral
+In-Reply-To: <1436239822-14132-7-git-send-email-thunder.leizhen@huawei.com>
+References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+ <1436239822-14132-7-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <559D21F0.3080202@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 03:59:12PM +0300, Vladimir Zapolskiy wrote:
-> of_find_i2c_adapter_by_node() call requires quite often missing
-> put_device(), and i2c_put_adapter() releases a device locked by
-> i2c_get_adapter() only. In general module_put(adapter->owner) and
-> put_device(dev) are not interchangeable.
-> 
-> This is a common error reproduction scenario as a result of the
-> misusage described above (for clearness this is run on iMX6 platform
-> with HDMI and I2C bus drivers compiled as kernel modules):
-> 
->     root at mx6q:~# lsmod | grep i2c
->     i2c_imx                10213  0
->     root at mx6q:~# lsmod | grep dw_hdmi_imx
->     dw_hdmi_imx             3631  0
->     dw_hdmi                11846  1 dw_hdmi_imx
->     imxdrm                  8674  3 dw_hdmi_imx,imx_ipuv3_crtc,imx_ldb
->     drm_kms_helper        113765  5 dw_hdmi,imxdrm,imx_ipuv3_crtc,imx_ldb
->     root at mx6q:~# rmmod dw_hdmi_imx
->     root at mx6q:~# lsmod | grep i2c
->     i2c_imx                10213  -1
-> 
->                                  ^^^^^
-> 
->     root at mx6q:~# rmmod i2c_imx
->     rmmod: ERROR: Module i2c_imx is in use
-> 
-> To fix existing users of these interfaces and to avoid any further
-> confusion and misusage in future, add one more interface
-> of_get_i2c_adapter_by_node(), it is similar to i2c_get_adapter() in
-> sense that an I2C bus device driver found and locked by user can be
-> correctly unlocked by i2c_put_adapter().
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+On 07/07/15 04:30, Zhen Lei wrote:
+> For pci devices, only the root nodes have "iommus" property. So we
+> should traverse all of its sub nodes in of_xlate.
+
+I don't really follow this description; only the host controller is 
+described in DT - the devices behind it are probed dynamically and don't 
+have nodes to traverse.
+
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 > ---
-> The change is based on RFC http://www.spinics.net/lists/linux-i2c/msg20257.html
-> 
-> * added new exported function declaration in include/linux/i2c.h
-> * added put_device(dev) call right inside of_get_i2c_adapter_by_node()
-> * corrected authorship of the change
-> 
->  drivers/i2c/i2c-core.c | 20 ++++++++++++++++++++
->  include/linux/i2c.h    |  6 ++++++
->  2 files changed, 26 insertions(+)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 069a41f..0d902ab 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -1356,6 +1356,26 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
->  	return i2c_verify_adapter(dev);
->  }
->  EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-> +
-> +struct i2c_adapter *of_get_i2c_adapter_by_node(struct device_node *node)
+>   drivers/iommu/arm-smmu-v3.c | 119 +++++++++++++++++++++++++++++++++-----------
+>   1 file changed, 89 insertions(+), 30 deletions(-)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index d6e3494..c569539 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -30,6 +30,8 @@
+>   #include <linux/of_address.h>
+>   #include <linux/pci.h>
+>   #include <linux/platform_device.h>
+> +#include <linux/of_iommu.h>
+> +#include <linux/of_platform.h>
+>
+>   #include "io-pgtable.h"
+>
+> @@ -1741,10 +1743,23 @@ static void __arm_smmu_release_pci_iommudata(void *data)
+>   	kfree(data);
+>   }
+>
+> -static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
+> +static struct arm_smmu_device *find_smmu_by_node(struct device_node *np)
 > +{
-> +	struct device *dev;
-> +	struct i2c_adapter *adapter;
+> +	struct platform_device *pdev;
 > +
-> +	dev = bus_find_device(&i2c_bus_type, NULL, node,
-> +			      of_dev_node_match);
-> +	if (!dev)
+> +	/* to ensure np is a smmu device node */
+> +	if (!of_iommu_get_ops(np))
 > +		return NULL;
 > +
-> +	adapter = i2c_verify_adapter(dev);
-> +	if (adapter && !try_module_get(adapter->owner))
-> +		adapter = NULL;
+> +	pdev = of_find_device_by_node(np);
+> +	if (!pdev)
+> +		return NULL;
 > +
-> +	put_device(dev);
+> +	return platform_get_drvdata(pdev);
+> +}
+> +
+> +static struct device_node *arm_smmu_get_pci_dev_root(struct pci_dev *pdev)
+>   {
+> -	struct device_node *of_node;
+> -	struct arm_smmu_device *curr, *smmu = NULL;
+>   	struct pci_bus *bus = pdev->bus;
+>
+>   	/* Walk up to the root bus */
+> @@ -1752,21 +1767,7 @@ static struct arm_smmu_device *arm_smmu_get_for_pci_dev(struct pci_dev *pdev)
+>   		bus = bus->parent;
+>
+>   	/* Follow the "iommus" phandle from the host controller */
 
-I don't think this is correct. Users still need to keep a reference to
-the device, otherwise it can simply disappear even if the module stays
-around (think sysfs bind/unbind attributes).
+Either update comments to reflect what the new code does, or remove them 
+along with the code they describe.
 
-Looking at i2c_put_adapter() it seems like it would need to do more than
-just drop the module reference. Then again, that probably means that we
-need to add a get_device() somewhere in i2c_get_adapter() to balance the
-put_device() in i2c_put_adapter().
+> -	of_node = of_parse_phandle(bus->bridge->parent->of_node, "iommus", 0);
+> -	if (!of_node)
+> -		return NULL;
+> -
+> -	/* See if we can find an SMMU corresponding to the phandle */
+> -	spin_lock(&arm_smmu_devices_lock);
+> -	list_for_each_entry(curr, &arm_smmu_devices, list) {
+> -		if (curr->dev->of_node == of_node) {
+> -			smmu = curr;
+> -			break;
+> -		}
+> -	}
+> -	spin_unlock(&arm_smmu_devices_lock);
+> -	of_node_put(of_node);
+> -	return smmu;
+> +	return bus->bridge->parent->of_node;
+>   }
+>
+>   static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+> @@ -1779,27 +1780,21 @@ static bool arm_smmu_sid_in_range(struct arm_smmu_device *smmu, u32 sid)
+>   	return sid < limit;
+>   }
+>
+> -static int arm_smmu_add_device(struct device *dev)
+> +static int arm_smmu_add_device(struct device *dev, u32 sid)
+>   {
+>   	int i, ret;
+> -	u32 sid, *sids;
+> -	struct pci_dev *pdev;
+> +	u32 *sids;
+>   	struct iommu_group *group;
+>   	struct arm_smmu_group *smmu_group;
+>   	struct arm_smmu_device *smmu;
+>
+> -	/* We only support PCI, for now */
+> -	if (!dev_is_pci(dev))
+> -		return -ENODEV;
+> -
+> -	pdev = to_pci_dev(dev);
+>   	group = iommu_group_get_for_dev(dev);
+>   	if (IS_ERR(group))
+>   		return PTR_ERR(group);
+>
+>   	smmu_group = iommu_group_get_iommudata(group);
+>   	if (!smmu_group) {
+> -		smmu = arm_smmu_get_for_pci_dev(pdev);
+> +		smmu = dev->archdata.iommu;
+>   		if (!smmu) {
+>   			ret = -ENOENT;
+>   			goto out_put_group;
+> @@ -1819,8 +1814,6 @@ static int arm_smmu_add_device(struct device *dev)
+>   		smmu = smmu_group->smmu;
+>   	}
+>
+> -	/* Assume SID == RID until firmware tells us otherwise */
+> -	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+>   	for (i = 0; i < smmu_group->num_sids; ++i) {
+>   		/* If we already know about this SID, then we're done */
+>   		if (smmu_group->sids[i] == sid)
+> @@ -1862,6 +1855,7 @@ out_put_group:
+>
+>   static void arm_smmu_remove_device(struct device *dev)
+>   {
+> +	dev->archdata.iommu = NULL;
+>   	iommu_group_remove_device(dev);
+>   }
+>
+> @@ -1909,7 +1903,68 @@ out_unlock:
+>   	return ret;
+>   }
+>
+> +static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+> +{
+> +	int ret;
+> +	struct arm_smmu_device *smmu;
+> +
+> +	/*
+> +	 * We can sure that args->np is a smmu device node, because this
+> +	 * function was called by of_xlate hook.
+> +	 *
+> +	 * And in arm_smmu_device_dt_probe:
+> +	 *	platform_set_drvdata(pdev, smmu);
+> +	 *	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
+> +	 *
+> +	 * It seems impossible return NULL in normal times.
+> +	 */
+> +	smmu = find_smmu_by_node(args->np);
+> +	if (!smmu) {
+> +		dev_err(dev, "unknown error caused smmu driver crashed\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	if (!dev->archdata.iommu)
+> +		dev->archdata.iommu = smmu;
+> +
+> +	if (dev->archdata.iommu != smmu) {
+> +		dev_err(dev, "behinds more than one smmu\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* We only support PCI, for now */
+> +	if (!dev_is_pci(dev)) {
+> +		return -ENODEV;
+> +	} else {
+> +		u32 sid;
+> +		struct device_node *of_root;
+> +		struct pci_dev *pdev = NULL;
+> +
+> +		for_each_pci_dev(pdev) {
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150708/212be892/attachment-0001.sig>
+Given that we get here before the host controller's driver probe, is 
+this really going to work? Either way, it looks very dodgy.
+
+> +			of_root = arm_smmu_get_pci_dev_root(pdev);
+> +			if (of_root != dev->of_node)
+> +				continue;
+> +
+> +			/*
+> +			 * Assume SID == RID until firmware tells us otherwise
+> +			 */
+> +			pci_for_each_dma_alias(pdev,
+> +					__arm_smmu_get_pci_sid, &sid);
+> +
+> +			pdev->dev.archdata.iommu = smmu;
+> +			ret = arm_smmu_add_device(dev, sid);
+> +			if (ret) {
+> +				dev_err(dev, "failed to add into SMMU\n");
+> +				return ret;
+> +			}
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   static struct iommu_ops arm_smmu_ops = {
+> +	.of_xlate		= arm_smmu_of_xlate,
+>   	.capable		= arm_smmu_capable,
+>   	.domain_alloc		= arm_smmu_domain_alloc,
+>   	.domain_free		= arm_smmu_domain_free,
+> @@ -1918,7 +1973,6 @@ static struct iommu_ops arm_smmu_ops = {
+>   	.map			= arm_smmu_map,
+>   	.unmap			= arm_smmu_unmap,
+>   	.iova_to_phys		= arm_smmu_iova_to_phys,
+> -	.add_device		= arm_smmu_add_device,
+
+It might not be an immediate concern, but I think subverting the normal 
+add_device process this way also completely breaks any kind of device 
+hotplug.
+
+>   	.remove_device		= arm_smmu_remove_device,
+>   	.domain_get_attr	= arm_smmu_domain_get_attr,
+>   	.domain_set_attr	= arm_smmu_domain_set_attr,
+> @@ -2626,6 +2680,9 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>   	spin_lock(&arm_smmu_devices_lock);
+>   	list_add(&smmu->list, &arm_smmu_devices);
+>   	spin_unlock(&arm_smmu_devices_lock);
+> +	platform_set_drvdata(pdev, smmu);
+> +	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
+> +
+>   	return 0;
+>
+>   out_free_structures:
+> @@ -2697,6 +2754,8 @@ static void __exit arm_smmu_exit(void)
+>   subsys_initcall(arm_smmu_init);
+>   module_exit(arm_smmu_exit);
+>
+> +IOMMU_OF_DECLARE(arm_smmu_v3, "arm,smmu-v3", NULL);
+> +
+>   MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+>   MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>   MODULE_LICENSE("GPL v2");
+> --
+> 1.8.0
+>
+>
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>
