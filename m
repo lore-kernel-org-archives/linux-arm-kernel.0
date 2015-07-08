@@ -1,110 +1,76 @@
 From: vladimir_zapolskiy@mentor.com (Vladimir Zapolskiy)
-Date: Wed, 8 Jul 2015 15:59:12 +0300
-Subject: [PATCH 01/10] i2c: add and export of_get_i2c_adapter_by_node()
- interface
+Date: Wed, 8 Jul 2015 15:59:56 +0300
+Subject: [PATCH 06/10] drm: sti_hdmi: use of_get_i2c_adapter_by_node interface
 In-Reply-To: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
 References: <1436360095-9065-1-git-send-email-vladimir_zapolskiy@mentor.com>
-Message-ID: <1436360352-9181-1-git-send-email-vladimir_zapolskiy@mentor.com>
+Message-ID: <1436360396-9417-1-git-send-email-vladimir_zapolskiy@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_find_i2c_adapter_by_node() call requires quite often missing
-put_device(), and i2c_put_adapter() releases a device locked by
-i2c_get_adapter() only. In general module_put(adapter->owner) and
-put_device(dev) are not interchangeable.
+This change is needed to properly lock I2C bus driver, which serves DDC.
 
-This is a common error reproduction scenario as a result of the
-misusage described above (for clearness this is run on iMX6 platform
-with HDMI and I2C bus drivers compiled as kernel modules):
+On release of_get_i2c_adapter_by_node() requires i2c_put_adapter() call.
 
-    root at mx6q:~# lsmod | grep i2c
-    i2c_imx                10213  0
-    root at mx6q:~# lsmod | grep dw_hdmi_imx
-    dw_hdmi_imx             3631  0
-    dw_hdmi                11846  1 dw_hdmi_imx
-    imxdrm                  8674  3 dw_hdmi_imx,imx_ipuv3_crtc,imx_ldb
-    drm_kms_helper        113765  5 dw_hdmi,imxdrm,imx_ipuv3_crtc,imx_ldb
-    root at mx6q:~# rmmod dw_hdmi_imx
-    root at mx6q:~# lsmod | grep i2c
-    i2c_imx                10213  -1
-
-                                 ^^^^^
-
-    root at mx6q:~# rmmod i2c_imx
-    rmmod: ERROR: Module i2c_imx is in use
-
-To fix existing users of these interfaces and to avoid any further
-confusion and misusage in future, add one more interface
-of_get_i2c_adapter_by_node(), it is similar to i2c_get_adapter() in
-sense that an I2C bus device driver found and locked by user can be
-correctly unlocked by i2c_put_adapter().
+Note, that prior to the change put_device() coupled with
+of_find_i2c_adapter_by_node() was incorrectly placed to sti_hdmi_remove()
+instead of sti_hdmi_unbind().
 
 Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
 ---
-The change is based on RFC http://www.spinics.net/lists/linux-i2c/msg20257.html
+ drivers/gpu/drm/sti/sti_hdmi.c | 19 +++++++------------
+ 1 file changed, 7 insertions(+), 12 deletions(-)
 
-* added new exported function declaration in include/linux/i2c.h
-* added put_device(dev) call right inside of_get_i2c_adapter_by_node()
-* corrected authorship of the change
-
- drivers/i2c/i2c-core.c | 20 ++++++++++++++++++++
- include/linux/i2c.h    |  6 ++++++
- 2 files changed, 26 insertions(+)
-
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 069a41f..0d902ab 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -1356,6 +1356,26 @@ struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node)
- 	return i2c_verify_adapter(dev);
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+index f28a4d5..580a413 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.c
++++ b/drivers/gpu/drm/sti/sti_hdmi.c
+@@ -698,14 +698,10 @@ static int sti_hdmi_bind(struct device *dev, struct device *master, void *data)
+ 
+ 	ddc = of_parse_phandle(dev->of_node, "ddc", 0);
+ 	if (ddc) {
+-		hdmi->ddc_adapt = of_find_i2c_adapter_by_node(ddc);
+-		if (!hdmi->ddc_adapt) {
+-			err = -EPROBE_DEFER;
+-			of_node_put(ddc);
+-			return err;
+-		}
+-
++		hdmi->ddc_adapt = of_get_i2c_adapter_by_node(ddc);
+ 		of_node_put(ddc);
++		if (!hdmi->ddc_adapt)
++			return -EPROBE_DEFER;
+ 	}
+ 
+ 	/* Set the drm device handle */
+@@ -762,14 +758,15 @@ err_sysfs:
+ err_connector:
+ 	drm_connector_cleanup(drm_connector);
+ err_adapt:
+-	put_device(&hdmi->ddc_adapt->dev);
++	i2c_put_adapter(hdmi->ddc_adapt);
++
+ 	return -EINVAL;
  }
- EXPORT_SYMBOL(of_find_i2c_adapter_by_node);
-+
-+struct i2c_adapter *of_get_i2c_adapter_by_node(struct device_node *node)
-+{
-+	struct device *dev;
-+	struct i2c_adapter *adapter;
-+
-+	dev = bus_find_device(&i2c_bus_type, NULL, node,
-+			      of_dev_node_match);
-+	if (!dev)
-+		return NULL;
-+
-+	adapter = i2c_verify_adapter(dev);
-+	if (adapter && !try_module_get(adapter->owner))
-+		adapter = NULL;
-+
-+	put_device(dev);
-+
-+	return adapter;
-+}
-+EXPORT_SYMBOL(of_get_i2c_adapter_by_node);
- #else
- static void of_i2c_register_devices(struct i2c_adapter *adap) { }
- #endif /* CONFIG_OF */
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index e83a738..87bb217 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -638,6 +638,7 @@ extern struct i2c_client *of_find_i2c_device_by_node(struct device_node *node);
- /* must call put_device() when done with returned i2c_adapter device */
- extern struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node *node);
  
-+struct i2c_adapter *of_get_i2c_adapter_by_node(struct device_node *node);
- #else
- 
- static inline struct i2c_client *of_find_i2c_device_by_node(struct device_node *node)
-@@ -649,6 +650,11 @@ static inline struct i2c_adapter *of_find_i2c_adapter_by_node(struct device_node
+ static void sti_hdmi_unbind(struct device *dev,
+ 		struct device *master, void *data)
  {
- 	return NULL;
+-	/* do nothing */
++	i2c_put_adapter(hdmi->ddc_adapt);
  }
-+
-+static inline struct i2c_adapter *of_get_i2c_adapter_by_node(struct device_node *node)
-+{
-+	return NULL;
-+}
- #endif /* CONFIG_OF */
  
- #endif /* _LINUX_I2C_H */
+ static const struct component_ops sti_hdmi_ops = {
+@@ -885,10 +882,8 @@ static int sti_hdmi_remove(struct platform_device *pdev)
+ {
+ 	struct sti_hdmi *hdmi = dev_get_drvdata(&pdev->dev);
+ 
+-	if (hdmi->ddc_adapt)
+-		put_device(&hdmi->ddc_adapt->dev);
+-
+ 	component_del(&pdev->dev, &sti_hdmi_ops);
++
+ 	return 0;
+ }
+ 
 -- 
 2.1.4
