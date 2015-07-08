@@ -1,38 +1,78 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 08 Jul 2015 11:07:42 -0700
-Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
-In-Reply-To: <20150708110005.704c49ff@bbrezillon>
-References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>	<20150708005748.GG30412@codeaurora.org>
- <20150708110005.704c49ff@bbrezillon>
-Message-ID: <559D66EE.4060707@codeaurora.org>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Thu, 9 Jul 2015 01:22:59 +0800
+Subject: [PATCH 1/2] ARM: dts: imx7d: enable snvs rtc, onoffkey and power off
+Message-ID: <1436376180-5891-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2015 02:00 AM, Boris Brezillon wrote:
-> Hi Stephen,
->
-> On Tue, 7 Jul 2015 17:57:48 -0700
-> Stephen Boyd <sboyd@codeaurora.org> wrote:
->
->> On 07/07, Boris Brezillon wrote:
->>>
->>>  	} else {
->>>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
->>> +		req->rate = 0;
->>>  		return 0;
->> Shouldn't this return an error now? And then assigning req->rate
->> wouldn't be necessary. Sorry I must have missed this last round.
->>
-> Actually I wanted to keep the existing behavior: return a 0 rate (not
-> an error) when there is no mux or rate ops.
->
-> That's something we can change afterwards, but it might reveals
-> new bugs if some users are checking for a 0 rate to detect errors.
->
+From: Frank Li <Frank.Li@freescale.com>
 
-Ok. Care to send the patch now to do that while we're thinking about it?
-We can test it out for a month or two.
+Change SNVS rtc to syscon interface.
+Enable onoff key and power off function.
 
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts |  4 ++++
+ arch/arm/boot/dts/imx7d.dtsi    | 27 +++++++++++++++++++++------
+ 2 files changed, 25 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 4d1a4b9..214eba9 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -223,6 +223,10 @@
+ 	};
+ };
+ 
++&snvs_poweroff {
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index b4cd8fd..308ad1b 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -322,17 +322,32 @@
+ 			};
+ 
+ 			snvs: snvs at 30370000 {
+-				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				ranges = <0 0x30370000 0x10000>;
++				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
++				reg = <0x30370000 0x10000>;
+ 
+-				snvs-rtc-lp at 34 {
++				snvs_rtc: snvs-rtc-lp {
+ 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+-					reg = <0x34 0x58>;
++					regmap = <&snvs>;
++					offset = <0x34>;
+ 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				snvs_poweroff: snvs-poweroff {
++					compatible = "syscon-poweroff";
++					regmap = <&snvs>;
++					offset = <0x38>;
++					mask = <0x60>;
++					status = "disabled";
++				};
++
++				snvs_pwrkey: snvs-powerkey {
++					compatible = "fsl,sec-v4.0-pwrkey";
++					regmap = <&snvs>;
++					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++					linux,keycode = <KEY_POWER>;
++					wakeup;
++				};
+ 			};
+ 
+ 			clks: ccm at 30380000 {
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
