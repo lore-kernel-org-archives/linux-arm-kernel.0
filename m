@@ -1,76 +1,41 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:32 +0200
-Subject: [PATCHv2 3/8] ARM: mvebu: prepare mvebu_pm_store_bootinfo() to
- support multiple SoCs
+Date: Wed,  8 Jul 2015 17:02:31 +0200
+Subject: [PATCHv2 2/8] ARM: mvebu: do not check machine in mvebu_pm_init()
 In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436367757-14202-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436367757-14202-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are going to introduce support for Armada 38x in pm.c, split out
-the Armada XP part of mvebu_pm_store_bootinfo() into
-mvebu_pm_store_armadaxp_bootinfo(), and make the former retunr an
-error when an unsupported SoC is used.
+The mvebu_pm_init() initializes the support for suspend/resume, and
+before doing that, it checks if we are on a board on which
+suspend/resume is actually supported. However, this check is already
+done by mvebu_armada_xp_gp_pm_init(), and there is no need to
+duplicate the check: callers of mvebu_pm_init() should now what they
+are doing.
+
+This commit is done in preparation to the addition of suspend/resume
+support on Armada 38x.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ arch/arm/mach-mvebu/pm.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index eca650b..02fdf67 100644
+index 6573a8f..eca650b 100644
 --- a/arch/arm/mach-mvebu/pm.c
 +++ b/arch/arm/mach-mvebu/pm.c
-@@ -105,12 +105,10 @@ static phys_addr_t mvebu_internal_reg_base(void)
- 	return of_translate_address(np, in_addr);
- }
+@@ -182,9 +182,6 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
+ 	struct device_node *np;
+ 	struct resource res;
  
--static void mvebu_pm_store_bootinfo(void)
-+static void mvebu_pm_store_armadaxp_bootinfo(u32 *store_addr)
- {
--	u32 *store_addr;
- 	phys_addr_t resume_pc;
- 
--	store_addr = phys_to_virt(BOOT_INFO_ADDR);
- 	resume_pc = virt_to_phys(armada_370_xp_cpu_resume);
- 
- 	/*
-@@ -151,14 +149,33 @@ static void mvebu_pm_store_bootinfo(void)
- 	writel(BOOT_MAGIC_LIST_END, store_addr);
- }
- 
-+static int mvebu_pm_store_bootinfo(void)
-+{
-+	u32 *store_addr;
-+
-+	store_addr = phys_to_virt(BOOT_INFO_ADDR);
-+
-+	if (of_machine_is_compatible("marvell,armadaxp"))
-+		mvebu_pm_store_armadaxp_bootinfo(store_addr);
-+	else
-+		return -ENODEV;
-+
-+	return 0;
-+}
-+
- static int mvebu_pm_enter(suspend_state_t state)
- {
-+	int ret;
-+
- 	if (state != PM_SUSPEND_MEM)
- 		return -EINVAL;
- 
-+	ret = mvebu_pm_store_bootinfo();
-+	if (ret)
-+		return ret;
-+
- 	cpu_pm_enter();
- 
--	mvebu_pm_store_bootinfo();
- 	cpu_suspend(0, mvebu_pm_powerdown);
- 
- 	outer_resume();
+-	if (!of_machine_is_compatible("marvell,armadaxp"))
+-		return -ENODEV;
+-
+ 	np = of_find_compatible_node(NULL, NULL,
+ 				     "marvell,armada-xp-sdram-controller");
+ 	if (!np)
 -- 
 2.4.5
