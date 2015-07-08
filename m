@@ -1,39 +1,87 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 8 Jul 2015 16:46:31 -0500
-Subject: [PATCH 0/3] arm/arm64: vexpress: DT updates for v4.2
-In-Reply-To: <7hio9ue6ey.fsf@deeprootsystems.com>
-References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
- <5596BCC3.9070903@arm.com> <7hio9ue6ey.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa88wR+GcbdN1cHbF4Om0M8gEyBFi57mhORsSwDn7ab5OA@mail.gmail.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 8 Jul 2015 16:55:52 -0500
+Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
+ socfpga_secondary_startup
+In-Reply-To: <20150708210734.GN7557@n2100.arm.linux.org.uk>
+References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150708165115.GM7557@n2100.arm.linux.org.uk>
+ <559D765C.30102@opensource.altera.com>
+ <20150708210734.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <559D9C68.6030907@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 8, 2015 at 3:33 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Sudeep Holla <sudeep.holla@arm.com> writes:
->
->> Hi Kevin,
->>
->> On 01/07/15 13:36, Sudeep Holla wrote:
->>> Hi ARM-SoC guys,
->>>
->>> Here are couple of fixes for adding missing nodes(CCI and A7 PMUs) in
->>> TC2 device tree. The third patch is addition of support for FPGA based
->>> dual core A53 SMM  platform. All the patches are posted on the list
->>> already, just putting them together. Let me know if you prefer a pull
->>> request.
->>>
->>
->> I just realized that I copied this series to your Linaro email instead
->> of kernel.org. Sorry for that, do you want me to repost ?
->
-> Not necessary.
->
-> This just came too late for the v4.2 cycle.  I think the first two
-> patches we can take as fixes for v4.2, but the 3rd one will likely need
-> to wait for v4.3.
+On 07/08/2015 04:07 PM, Russell King - ARM Linux wrote:
+> On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
+>> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
+>> user mode access.
+> 
+> Hmm.
+> 
+> I think what you've found is a(nother) latent bug in the CPU bring up
+> code.
+> 
+> For SMP CPUs, the sequence we're following during early initialisation is:
+> 
+> 1. Enable SMP coherency.
+> 2. Invalidate the caches.
+> 
+> If the cache contains rubbish, enabling SMP coherency before invalidating
+> the cache is plainly an absurd thing to do.
+> 
+> Can you try the patch below - not tested in any way, so you may need to
+> tweak it, but it should allow us to prove that point.
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0716bbe19872..db5137fc297d 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -275,6 +275,10 @@ __v7_b15mp_setup:
+>  __v7_ca17mp_setup:
+>  	mov	r10, #0
+>  1:
+> +	adr	r12, __v7_setup_stack		@ the local stack
+> +	stmia	r12, {r0-r5, r7, r9-r11, lr}
+> +	bl      v7_invalidate_l1
+> +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
+>  #ifdef CONFIG_SMP
+>  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+>  	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
+> @@ -283,7 +287,7 @@ __v7_ca17mp_setup:
+>  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+>  	mcreq	p15, 0, r0, c1, c0, 1
+>  #endif
+> -	b	__v7_setup
+> +	b	__v7_setup_cont
+>  
+>  /*
+>   * Errata:
+> @@ -417,6 +421,7 @@ __v7_setup:
+>  	bl      v7_invalidate_l1
+>  	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+>  
+> +__v7_setup_cont:
+>  	and	r0, r9, #0xff000000		@ ARM?
+>  	teq	r0, #0x41000000
+>  	bne	__errata_finish
+> @@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
+>  
+>  	.align	2
+>  __v7_setup_stack:
+> -	.space	4 * 11				@ 11 registers
+> +	.space	4 * 12				@ 12 registers
+>  
+>  	__INITDATA
+>  
+> 
 
-Having a closer look, I just picked up all 3 for v4.2-rc.
 
-Thanks,
+This patch seems to have fixed the issue. The SoCFPGA platform is now
+booting/rebooting reliably. Also, the patch was applicable as-is.
 
-Kevin
+Also, I went back and studied up on the CPACR register. I misquoted the
+value in my previous response, I was looking at CPACR on CPU0. For CPU1,
+when the error happens, the value of CPACR is 0x0, so CP10 and CP11 were
+set to "Access denied".
+
+Dinh
