@@ -1,72 +1,90 @@
-From: zhichao.huang@linaro.org (Zhichao Huang)
-Date: Wed, 08 Jul 2015 18:50:22 +0800
-Subject: [PATCH v3 08/11] KVM: arm: implement dirty bit mechanism for
- debug registers
-In-Reply-To: <20150707102405.GE23879@arm.com>
-References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
- <1434969694-7432-9-git-send-email-zhichao.huang@linaro.org>
- <20150630092020.GP11332@cbox>
- <B3B5AB0D-020C-483D-A6DE-76E355865010@linaro.org>
- <20150703115611.GB14220@lvm>
- <5A7DE9A0-E7A6-40B0-80F9-896F7DED0E47@linaro.org>
- <20150707102405.GE23879@arm.com>
-Message-ID: <123AABA4-2C79-462D-91FC-56FB52DB972C@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 08 Jul 2015 13:54:45 +0300
+Subject: [PATCH/RFC 06/11] ARM: shmobile: r8a7790: Link CPG to RST using
+ "renesas, modemr"
+In-Reply-To: <CAMuHMdUpMFLqA+jRwq=tA1niRkm=L5cMyZ5mxSj18BQnc8CpJw@mail.gmail.com>
+References: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
+ <15446450.YUqyGq9qOl@avalon>
+ <CAMuHMdUpMFLqA+jRwq=tA1niRkm=L5cMyZ5mxSj18BQnc8CpJw@mail.gmail.com>
+Message-ID: <2505402.iuhaUfZBWq@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Will,
+Hi Geert,
 
-Are you happy with this?:
+On Wednesday 08 July 2015 10:29:56 Geert Uytterhoeven wrote:
+> On Tue, Jul 7, 2015 at 6:20 PM, Laurent Pinchart wrote:
+> >>>> --- a/arch/arm/boot/dts/r8a7790.dtsi
+> >>>> +++ b/arch/arm/boot/dts/r8a7790.dtsi
+> >>>> @@ -1115,6 +1115,7 @@
+> >>>>                                            "lb", "qspi", "sdh", "sd0",
+> >>>>                                            "sd1",
+> >>>>                                            "z", "rcan", "adsp";
+> >>>>                       #power-domain-cells = <0>;
+> >>>> +                     renesas,modemr = <&rst 0x60>;
+> >>> 
+> >>> I have mixed feelings about this as I don't think it really describes
+> >>> the hardware.
+> >> 
+> >> From the R-Car Gen2 manual:
+> >> 
+> >> 8. Reset (RST)
+> >> 8.1 Features
+> >> The following functions are implemented by RST.
+> >> [...]
+> >> Latching of the levels on mode pins when PRESET# is negated
+> >> Mode monitoring register
+> >> 
+> >> 7. Clock Pulse Generator (CPG)
+> >> 7.2 Input/Output Pins
+> >> Table 7.1 lists the CPG pin configuration.
+> >> Table 7.1 Pin Configuration and Functions of CPG
+> >> Pin Name Function I/O Description
+> >> [...]
+> >> MD0 Mode 0 ...
+> >> 
+> >> Hence there definitely is a link between the (latched) values in the RST
+> >> module and CPG configuration. This link is expressed using the
+> >> "renesas,modemr" property, where the phandle provides the link to the RST
+> >> block, and the register offset provides a way for software to read the
+> >> configuration.
+> > 
+> > The mode bits of course influence the CPG (otherwise we wouldn't be having
+> > this discussion :-)), but to me it looks more like a configuration
+> > broadcast through the whole SoC than a real link between two IP cores.
+> > It's obviously subject to interpretation.
+> 
+> Yep.
+> 
+> Broadcast? Like a bus clock? For that we also have properties with
+> phandles...
 
-diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+I knew someone would raise that topic ;-)
 
-+bool hw_breakpoint_enabled(void)
-+{
-+    struct perf_event **slots;
-+    int i;
-+
-+    slots = this_cpu_ptr(bp_on_reg);
-+    for (i = 0; i < core_num_brps; i++) {
-+        if (slots[i])
-+            return true;
-+    }
-+
-+    slots = this_cpu_ptr(wp_on_reg);
-+    for (i = 0; i < core_num_wrps; i++) {
-+        if (slots[i])
-+            return true;
-+    }
-+
-+    return false;
-+}
+> Syscon is the Hot New Abstraction for a module that provides a bunch of
+> registers needed by drivers for other modules. Those other modules need
+> some way to refer to the appropriate syscon register.
+> 
+> The RST module definitely falls in that category: CPG needs the MODEMR
+> register, watchdog (RWDT/SWDT) needs the Watchdog Timer Reset Control
+> Register, and APMU probably needs the CA15/7 reset control registers.
 
-It doesn't change any existing functions, and even doesn't add a new
-variables, it just provide an indication for KVM, and it's low-overhead.
+syscon is a quick hack to be used when no clean solution exists. Sometimes 
+implementing a proper API is just overkill, especially when the "system 
+controller" aggregates registers that really belong to individual IP cores.
 
-We will only call it upon guest entry, so there is also no race for it.
+Proper abstract kernel APIs should of course be used wherever possible. Some 
+system controllers are already supported in such a way, using the MFD 
+subsystem and exposing proper APIs for part of their features, and letting 
+drivers access registers directly for other features.
 
+In the boot mode case I believe adding a new API would be both useful and 
+quite simple, so I'd like to explore that option.
 
-On July 7, 2015 6:24:06 PM GMT+08:00, Will Deacon <will.deacon@arm.com> wrote:
->On Tue, Jul 07, 2015 at 11:06:57AM +0100, Zhichao Huang wrote:
->> Chazy and me are talking about how to reduce the saving/restoring
->> overhead for debug registers.
->> We want to add a state in hw_breakpoint.c to indicate whether the
->host
->> enable any hwbrpts or not (might export a fuction that kvm can call),
->> then we can read this state from memory instead of reading from real
->> hardware registers, and to decide whether we need a world switch or
->> not.
->> Does it acceptable?
->
->Maybe, hard to tell without the code. There are obvious races to deal
->with
->if you use variables to indicate whether resources are in use -- why
->not
->just trap debug access from the host as well? Then you could keep track
->of
->the "owner" in kvm and trap accesses from everybody else.
->
->Will
+By the way, regarding the CA15/7 reset control registers, shouldn't they be 
+exposed through the reset controller API ?
 
 -- 
-Zhichao Huang
+Regards,
+
+Laurent Pinchart
