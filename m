@@ -1,79 +1,36 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 8 Jul 2015 10:29:56 +0200
-Subject: [PATCH/RFC 06/11] ARM: shmobile: r8a7790: Link CPG to RST using
- "renesas, modemr"
-In-Reply-To: <15446450.YUqyGq9qOl@avalon>
-References: <1436278217-20522-1-git-send-email-geert+renesas@glider.be>
- <3792169.nKlDE6xfl4@avalon>
- <CAMuHMdWCXFbBAPS46d7+3o=FiLLzVacdiTiJq09tCHSCQPUfxw@mail.gmail.com>
- <15446450.YUqyGq9qOl@avalon>
-Message-ID: <CAMuHMdUpMFLqA+jRwq=tA1niRkm=L5cMyZ5mxSj18BQnc8CpJw@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 08 Jul 2015 17:30:50 +0900
+Subject: [PATCH 4/4] ARM: dts: Extend exynos5420-pinctrl nodes using labels
+ instead of paths
+In-Reply-To: <1436334389-18779-1-git-send-email-javier@osg.samsung.com>
+References: <1436334389-18779-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <559CDFBA.40103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+On 08.07.2015 14:46, Javier Martinez Canillas wrote:
+> A previously defined Device Tree node, can be extended either by defining
+> a node using the same full path or by creating a label for the node and
+> referencing to it.
+> 
+> Using full paths is more error prone since if there was a typo error, a
+> new node will be created instead of extending the node as it was desired.
+> This will lead to run-time errors that could be hard to detect.
+> 
+> A misstyped label on the other hand, will cause a dtc compile error which
 
-On Tue, Jul 7, 2015 at 6:20 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> >> --- a/arch/arm/boot/dts/r8a7790.dtsi
->> >> +++ b/arch/arm/boot/dts/r8a7790.dtsi
->> >> @@ -1115,6 +1115,7 @@
->> >>                                            "lb", "qspi", "sdh", "sd0",
->> >>                                            "sd1",
->> >>                                            "z", "rcan", "adsp";
->> >>                       #power-domain-cells = <0>;
->> >> +                     renesas,modemr = <&rst 0x60>;
->> >
->> > I have mixed feelings about this as I don't think it really describes the
->> > hardware.
->>
->> From the R-Car Gen2 manual:
->>
->> 8. Reset (RST)
->> 8.1 Features
->> The following functions are implemented by RST.
->> [...]
->> Latching of the levels on mode pins when PRESET# is negated
->> Mode monitoring register
->>
->> 7. Clock Pulse Generator (CPG)
->> 7.2 Input/Output Pins
->> Table 7.1 lists the CPG pin configuration.
->> Table 7.1 Pin Configuration and Functions of CPG
->> Pin Name Function I/O Description
->> [...]
->> MD0 Mode 0 ...
->>
->> Hence there definitely is a link between the (latched) values in the RST
->> module and CPG configuration. This link is expressed using the
->> "renesas,modemr" property, where the phandle provides the link to the RST
->> block, and the register offset provides a way for software to read the
->> configuration.
->
-> The mode bits of course influence the CPG (otherwise we wouldn't be having
-> this discussion :-)), but to me it looks more like a configuration broadcast
-> through the whole SoC than a real link between two IP cores. It's obviously
-> subject to interpretation.
+s/misstyped/mistyped/
 
-Yep.
+> makes it easier to detect the mistake since happens at build-time instead.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 1411 ++++++++++++++---------------
+>  1 file changed, 705 insertions(+), 706 deletions(-)
 
-Broadcast? Like a bus clock? For that we also have properties with phandles...
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Syscon is the Hot New Abstraction for a module that provides a bunch of
-registers needed by drivers for other modules. Those other modules need
-some way to refer to the appropriate syscon register.
-
-The RST module definitely falls in that category: CPG needs the MODEMR
-register, watchdog (RWDT/SWDT) needs the Watchdog Timer Reset Control Register,
-and APMU probably needs the CA15/7 reset control registers.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Krzysztof
