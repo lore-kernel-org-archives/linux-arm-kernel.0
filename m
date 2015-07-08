@@ -1,41 +1,61 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 08 Jul 2015 13:09:19 +0200
-Subject: [PATCH 35/37] usb: renesas: gadget: add ep capabilities support
-In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
-References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436353761-7107-36-git-send-email-r.baldyga@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 8 Jul 2015 16:49:00 +0530
+Subject: [PATCH v5 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
+ binding
+In-Reply-To: <1435717005-20012-2-git-send-email-pi-cheng.chen@linaro.org>
+References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1435717005-20012-2-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150708111900.GD1805@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+On 01-07-15, 10:16, Pi-Cheng Chen wrote:
+> This patch adds device tree binding document for MT8173 cpufreq driver.
+> 
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
+> ---
+>  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 145 +++++++++++++++++++++
+>  1 file changed, 145 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> new file mode 100644
+> index 0000000..65701c5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
+> @@ -0,0 +1,145 @@
+> +
+> +Mediatek MT8173 cpufreq driver
+> +------------------------------
+> +
+> +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
+> +
+> +Required properties:
+> +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
+> +- clock-names: Should contain the following:
+> +	"cpu"		- The multiplexer for clock input of CPU cluster.
+> +	"intermediate"	- A parent of "cpu" clock which is used as "intermediate" clock
+> +			  source (usually MAINPLL) when the original CPU PLL is under
+> +			  transition and not stable yet.
+> +	Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
+> +	generic clock consumer properties.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/renesas_usbhs/mod_gadget.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Don't have any intentions to halt this series anymore, I have
+irritated you enough already :)
 
-diff --git a/drivers/usb/renesas_usbhs/mod_gadget.c b/drivers/usb/renesas_usbhs/mod_gadget.c
-index dc2aa32..ed8d890 100644
---- a/drivers/usb/renesas_usbhs/mod_gadget.c
-+++ b/drivers/usb/renesas_usbhs/mod_gadget.c
-@@ -1041,12 +1041,18 @@ int usbhs_mod_gadget_probe(struct usbhs_priv *priv)
- 		if (usbhsg_is_dcp(uep)) {
- 			gpriv->gadget.ep0 = &uep->ep;
- 			usb_ep_set_maxpacket_limit(&uep->ep, 64);
-+			uep->ep.caps.type_control = true;
- 		}
- 		/* init normal pipe */
- 		else {
- 			usb_ep_set_maxpacket_limit(&uep->ep, 512);
-+			uep->ep.caps.type_iso = true;
-+			uep->ep.caps.type_bulk = true;
-+			uep->ep.caps.type_int = true;
- 			list_add_tail(&uep->ep.ep_list, &gpriv->gadget.ep_list);
- 		}
-+		uep->ep.caps.dir_in = true;
-+		uep->ep.caps.dir_out = true;
- 	}
- 
- 	ret = usb_add_gadget_udc(dev, &gpriv->gadget);
+But, what about moving these bindings in something like a clock
+driver?
+
+@Mike: ?
+
+I am asking because these really belong to the clock driver, as I
+understood it from Mike. And clearly asked me to not take care of such
+things in cpufreq core/drivers.
+
+Another reason is that, later you will kill this driver one day and
+use cpufreq-dt. And then you will be required to move these bindings
+to a clock driver, as these will stay.
+
 -- 
-1.9.1
+viresh
