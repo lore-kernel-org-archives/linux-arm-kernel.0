@@ -1,181 +1,77 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  8 Jul 2015 17:11:25 +0100
-Subject: [PATCH 4/7] dmaengine: st_fdma: Add xbar support
+Date: Wed,  8 Jul 2015 17:11:24 +0100
+Subject: [PATCH 3/7] dmaengine: st_fdma: Add STMicroelectronics FDMA engine
+ driver support
 In-Reply-To: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
 References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1436371888-27863-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1436371888-27863-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To increase the number of peripheral requests, the FDMA crossbar
-can multiplex up to 96 peripheral requests to one of 3 fdma
-controllers.
+This patch adds support for the Flexible Direct Memory Access (FDMA) core
+driver. The FDMA is a slim core CPU with a dedicated firmware.
+It is a general purpose DMA controller capable of supporting 16
+independent DMA channels. Data moves maybe from memory to memory
+or between memory and paced latency critical real time targets and it
+is found on al STi based chipsets.
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/dma/Kconfig        |  11 ++++
- drivers/dma/Makefile       |   1 +
- drivers/dma/st_fdma.c      |  25 +++++++-
- drivers/dma/st_fdma.h      |  32 ++++++++++
- drivers/dma/st_fdma_xbar.c | 149 +++++++++++++++++++++++++++++++++++++++++++++
- 5 files changed, 216 insertions(+), 2 deletions(-)
- create mode 100644 drivers/dma/st_fdma_xbar.c
+ drivers/dma/Kconfig                       |   15 +
+ drivers/dma/Makefile                      |    1 +
+ drivers/dma/st_fdma.c                     | 1182 +++++++++++++++++++++++++++++
+ drivers/dma/st_fdma.h                     |  234 ++++++
+ include/linux/platform_data/dma-st_fdma.h |   70 ++
+ 5 files changed, 1502 insertions(+)
+ create mode 100644 drivers/dma/st_fdma.c
+ create mode 100644 drivers/dma/st_fdma.h
+ create mode 100644 include/linux/platform_data/dma-st_fdma.h
 
 diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 7a016e0..21802b1 100644
+index 88d474b..7a016e0 100644
 --- a/drivers/dma/Kconfig
 +++ b/drivers/dma/Kconfig
-@@ -522,4 +522,15 @@ config ST_FDMA
- 	  Say Y here if you have such a chipset.
- 	  If unsure, say N.
+@@ -507,4 +507,19 @@ config QCOM_BAM_DMA
+ 	  Enable support for the QCOM BAM DMA controller.  This controller
+ 	  provides DMA capabilities for a variety of on-chip devices.
  
-+config ST_FDMA_XBAR
-+	bool "ST FDMA crossbar"
-+	depends on ST_FDMA
-+	default y
++config ST_FDMA
++	bool "ST FDMA dmaengine support"
++	depends on ARCH_STI
++	select DMA_ENGINE
++	select FW_LOADER
++	select FW_LOADER_USER_HELPER_FALLBACK
++	select LIBELF_32
++	select DMA_VIRTUAL_CHANNELS
 +	help
-+	  Enable support for ST FDMA crossbar.
-+	  xbar add flexibility and increase the number of peripheral request
-+	  can be used by fdma xbar can multiplex until 96 peripheral requests
-+	  to one of 3 fdma controller
++	  Enable support for ST FDMA controller.
++	  It supports 16 independent DMA channels, accepts up to 32 DMA requests
 +
++	  Say Y here if you have such a chipset.
++	  If unsure, say N.
 +
  endif
 diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index f68e6d8..19f18b1 100644
+index 6a4d6f2..f68e6d8 100644
 --- a/drivers/dma/Makefile
 +++ b/drivers/dma/Makefile
 @@ -50,6 +50,7 @@ obj-$(CONFIG_MOXART_DMA) += moxart-dma.o
  obj-$(CONFIG_FSL_RAID) += fsl_raid.o
  obj-$(CONFIG_FSL_EDMA) += fsl-edma.o
  obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
-+obj-$(CONFIG_ST_FDMA_XBAR) += st_fdma_xbar.o
- obj-$(CONFIG_ST_FDMA) += st_fdma.o
++obj-$(CONFIG_ST_FDMA) += st_fdma.o
  obj-y += xilinx/
  obj-$(CONFIG_INTEL_MIC_X100_DMA) += mic_x100_dma.o
+ obj-$(CONFIG_NBPFAXI_DMA) += nbpfaxi.o
 diff --git a/drivers/dma/st_fdma.c b/drivers/dma/st_fdma.c
-index 07a6df1..a870902 100644
---- a/drivers/dma/st_fdma.c
-+++ b/drivers/dma/st_fdma.c
-@@ -336,7 +336,9 @@ static int st_fdma_dreq_get(struct st_fdma_chan *fchan)
- 			return -EINVAL;
- 		}
- 
--		if (try || req_line_cfg >= ST_FDMA_NR_DREQS) {
-+		if (fdev->xbar_dev)
-+			dreq_line = ffz(fdev->dreq_mask);
-+		else if (try || req_line_cfg >= ST_FDMA_NR_DREQS) {
- 			dev_err(fdev->dev, "Invalid or used req line\n");
- 			return -EINVAL;
- 		} else {
-@@ -903,6 +905,15 @@ static int st_fdma_slave_config(struct dma_chan *chan,
- 	else
- 		return -EINVAL;
- 
-+	if (fdev->xbar_dev) {
-+		if (st_fdma_xbar_mux(fdev->xbar_dev, fchan->cfg.req_line,
-+				     fchan->dreq_line)) {
-+			dev_err(fdev->dev, "Error routing req line\n");
-+			clear_bit(fchan->dreq_line, &fdev->dreq_mask);
-+			return -EINVAL;
-+		}
-+	}
-+
- 	fchan->cfg.req_ctrl |= REQ_CTRL_NUM_OPS(maxburst-1);
- 	dreq_write(fchan, fchan->cfg.req_ctrl, REQ_CTRL);
- 
-@@ -1044,6 +1055,13 @@ static int st_fdma_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_clk;
- 
-+	fdev->xbar_dev = st_fdma_xbar_request(&pdev->dev);
-+	if (IS_ERR(fdev->xbar_dev)) {
-+		dev_err(&pdev->dev, "Failed to request xbar:%ld\n",
-+			PTR_ERR(fdev->xbar_dev));
-+		goto err_clk;
-+	}
-+
- 	/* Initialise the FDMA dreq (reserve 0 & 31 for FDMA use) */
- 	fdev->dreq_mask = BIT(0) | BIT(31);
- 
-@@ -1081,7 +1099,10 @@ static int st_fdma_probe(struct platform_device *pdev)
- 		goto err_dma_dev;
- 	}
- 
--	dev_info(&pdev->dev, "ST FDMA engine driver, irq:%d\n", irq);
-+	dev_info(&pdev->dev, "ST FDMA engine driver, irq:%d xbar(%s, id:%d)\n",
-+		 irq, fdev->xbar_dev ?
-+		 dev_name(&fdev->xbar_dev->pdev->dev) : "no",
-+		 fdev->xbar_dev ? fdev->xbar_dev->fdma_id : 0);
- 
- 	return 0;
- 
-diff --git a/drivers/dma/st_fdma.h b/drivers/dma/st_fdma.h
-index 533c811..dd46780 100644
---- a/drivers/dma/st_fdma.h
-+++ b/drivers/dma/st_fdma.h
-@@ -17,6 +17,20 @@
- #define ST_FDMA_NR_DREQS 32
- #define EM_SLIM	102	/* No official SLIM ELF ID */
- 
-+struct st_fdma_xbar {
-+	void __iomem *io_base;
-+	struct clk *clk;
-+	u32 nr_requests;
-+	u32 max_nr_requests;
-+};
-+
-+struct st_fdma_xbar_dev {
-+	struct platform_device *pdev;
-+	struct st_fdma_xbar *xbar;
-+	struct device *fdev;
-+	u32 fdma_id;
-+};
-+
- enum {
- 	CLK_SLIM,
- 	CLK_HI,
-@@ -135,6 +149,7 @@ struct st_fdma_dev {
- 
- 	struct st_fdma_chan *chans;
- 
-+	struct st_fdma_xbar_dev *xbar_dev;
- 	spinlock_t dreq_lock;
- 	unsigned long dreq_mask;
- 
-@@ -142,6 +157,23 @@ struct st_fdma_dev {
- 	atomic_t fw_loaded;
- };
- 
-+#if defined(CONFIG_ST_FDMA_XBAR)
-+struct st_fdma_xbar_dev *st_fdma_xbar_request(struct device *device);
-+int st_fdma_xbar_mux(struct st_fdma_xbar_dev *xbar_dev,
-+		     u32 in_dreq, u32 fdma_dreq);
-+#else
-+struct st_fdma_xbar_dev *st_fdma_xbar_request(struct device *device)
-+{
-+	return NULL;
-+}
-+
-+int st_fdma_xbar_mux(struct st_fdma_xbar_dev *xbar_dev,
-+		     u32 in_dreq, u32 fdma_dreq)
-+{
-+	return -ENODEV;
-+}
-+#endif
-+
- /* Registers*/
- /* FDMA interface */
- #define FDMA_ID_OFST		0x00000
-diff --git a/drivers/dma/st_fdma_xbar.c b/drivers/dma/st_fdma_xbar.c
 new file mode 100644
-index 0000000..c3b8e0f
+index 0000000..07a6df1
 --- /dev/null
-+++ b/drivers/dma/st_fdma_xbar.c
-@@ -0,0 +1,149 @@
++++ b/drivers/dma/st_fdma.c
+@@ -0,0 +1,1182 @@
 +/*
-+ * st_fdma_xbar.c
++ * st_fdma.c
 + *
 + * Copyright (C) 2014 STMicroelectronics
 + * Author: Ludovic Barre <Ludovic.barre@st.com>
@@ -186,142 +82,1491 @@ index 0000000..c3b8e0f
 +#include <linux/slab.h>
 +#include <linux/of.h>
 +#include <linux/of_device.h>
++#include <linux/of_dma.h>
 +#include <linux/platform_device.h>
++#include <linux/interrupt.h>
++#include <linux/clk.h>
++#include <linux/dmaengine.h>
++#include <linux/dmapool.h>
++#include <linux/firmware.h>
++#include <linux/elf.h>
++#include <linux/atomic.h>
 +
 +#include "st_fdma.h"
++#include "dmaengine.h"
++#include "virt-dma.h"
 +
-+#define XBAR_1_0_MAX_REQ	96
++static char *fdma_clk_name[CLK_MAX_NUM] = {
++	[CLK_SLIM]	= "fdma_slim",
++	[CLK_HI]	= "fdma_hi",
++	[CLK_LOW]	= "fdma_low",
++	[CLK_IC]	= "fdma_ic",
++};
 +
-+int st_fdma_xbar_mux(struct st_fdma_xbar_dev *xbar_dev,
-+		     u32 per_req, u32 fdma_req)
++static int st_fdma_clk_get(struct st_fdma_dev *fdev)
 +{
-+	u32 out_req;
++	int i;
 +
-+	if (per_req >= xbar_dev->xbar->nr_requests)
++	for (i = 0; i < CLK_MAX_NUM; i++) {
++		fdev->clks[i] = devm_clk_get(fdev->dev, fdma_clk_name[i]);
++		if (IS_ERR(fdev->clks[i])) {
++			dev_err(fdev->dev,
++				"failed to get clock: %s\n", fdma_clk_name[i]);
++			return PTR_ERR(fdev->clks[i]);
++		}
++	}
++
++	if (i != CLK_MAX_NUM) {
++		dev_err(fdev->dev, "all clocks are not defined\n");
 +		return -EINVAL;
-+
-+	out_req = (xbar_dev->fdma_id * ST_FDMA_NR_DREQS) + fdma_req;
-+	writel(per_req, xbar_dev->xbar->io_base + (out_req << 2));
-+
-+	dev_dbg(&xbar_dev->pdev->dev, "in_req:%d out_req:%d\n",
-+		per_req, out_req);
++	}
 +
 +	return 0;
 +}
 +
-+struct st_fdma_xbar_dev *st_fdma_xbar_request(struct device *device)
++static int st_fdma_clk_enable(struct st_fdma_dev *fdev)
 +{
-+	struct device_node *np = device->of_node;
-+	struct st_fdma_xbar_dev *xbar_dev;
-+	struct of_phandle_args args;
-+	int err;
++	int i, ret;
 +
-+	err = of_parse_phandle_with_args(np, "st,fdma-xbar",
-+					 "#st,fdma-xbar-cells", 0, &args);
-+	if (err)
++	for (i = 0; i < CLK_MAX_NUM; i++) {
++		ret = clk_prepare_enable(fdev->clks[i]);
++		if (ret < 0)
++			return ret;
++	}
++
++	return 0;
++}
++
++static void st_fdma_clk_disable(struct st_fdma_dev *fdev)
++{
++	int i;
++
++	for (i = 0; i < CLK_MAX_NUM; i++)
++		clk_disable_unprepare(fdev->clks[i]);
++}
++
++static inline struct st_fdma_chan *to_st_fdma_chan(struct dma_chan *c)
++{
++	return container_of(c, struct st_fdma_chan, vchan.chan);
++}
++
++static struct st_fdma_desc *to_st_fdma_desc(struct virt_dma_desc *vd)
++{
++	return container_of(vd, struct st_fdma_desc, vdesc);
++}
++
++void *st_fdma_seg_to_mem(struct st_fdma_dev *fdev, u64 da, int len)
++{
++	int i;
++	resource_size_t base = fdev->io_res->start;
++	const struct st_fdma_ram *fdma_mem = fdev->drvdata->fdma_mem;
++	void *ptr = NULL;
++
++	for (i = 0; i < fdev->drvdata->num_mem; i++) {
++		int mem_off = da - (base + fdma_mem[i].offset);
++
++		/* next mem if da is too small */
++		if (mem_off < 0)
++			continue;
++
++		/* next mem if da is too large */
++		if (mem_off + len > fdma_mem[i].size)
++			continue;
++
++		ptr = fdev->io_base + fdma_mem[i].offset + mem_off;
++		break;
++	}
++
++	return ptr;
++}
++
++static int
++st_fdma_elf_sanity_check(struct st_fdma_dev *fdev, const struct firmware *fw)
++{
++	const char *fw_name = fdev->pdata->fw_name;
++	struct elf32_hdr *ehdr;
++	char class;
++
++	if (!fw) {
++		dev_err(fdev->dev, "failed to load %s\n", fw_name);
++		return -EINVAL;
++	}
++
++	if (fw->size < sizeof(struct elf32_hdr)) {
++		dev_err(fdev->dev, "Image is too small\n");
++		return -EINVAL;
++	}
++
++	ehdr = (struct elf32_hdr *)fw->data;
++
++	/* We only support ELF32 at this point */
++	class = ehdr->e_ident[EI_CLASS];
++	if (class != ELFCLASS32) {
++		dev_err(fdev->dev, "Unsupported class: %d\n", class);
++		return -EINVAL;
++	}
++
++	if (ehdr->e_ident[EI_DATA] != ELFDATA2LSB) {
++		dev_err(fdev->dev, "Unsupported firmware endianness\n");
++		return -EINVAL;
++	}
++
++	if (fw->size < ehdr->e_shoff + sizeof(struct elf32_shdr)) {
++		dev_err(fdev->dev, "Image is too small\n");
++		return -EINVAL;
++	}
++
++	if (memcmp(ehdr->e_ident, ELFMAG, SELFMAG)) {
++		dev_err(fdev->dev, "Image is corrupted (bad magic)\n");
++		return -EINVAL;
++	}
++
++	if (ehdr->e_phnum != fdev->drvdata->num_mem) {
++		dev_err(fdev->dev, "spurious nb of segments\n");
++		return -EINVAL;
++	}
++
++	if (ehdr->e_type != ET_EXEC) {
++		dev_err(fdev->dev, "Unsupported ELF header type\n");
++		return -EINVAL;
++	}
++
++	if (ehdr->e_machine != EM_SLIM) {
++		dev_err(fdev->dev, "Unsupported ELF header machine\n");
++		return -EINVAL;
++	}
++	if (ehdr->e_phoff > fw->size) {
++		dev_err(fdev->dev, "Firmware size is too small\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
++static int
++st_fdma_elf_load_segments(struct st_fdma_dev *fdev, const struct firmware *fw)
++{
++	struct device *dev = fdev->dev;
++	struct elf32_hdr *ehdr;
++	struct elf32_phdr *phdr;
++	int i, mem_loaded = 0;
++	const u8 *elf_data = fw->data;
++
++	ehdr = (struct elf32_hdr *)elf_data;
++	phdr = (struct elf32_phdr *)(elf_data + ehdr->e_phoff);
++
++	/*
++	 * go through the available ELF segments
++	 * the program header's paddr member to contain device addresses.
++	 * We then go through the physically contiguous memory regions which we
++	 * allocated (and mapped) earlier on the probe,
++	 * and "translate" device address to kernel addresses,
++	 * so we can copy the segments where they are expected.
++	 */
++	for (i = 0; i < ehdr->e_phnum; i++, phdr++) {
++		u32 da = phdr->p_paddr;
++		u32 memsz = phdr->p_memsz;
++		u32 filesz = phdr->p_filesz;
++		u32 offset = phdr->p_offset;
++		void *dst;
++
++		if (phdr->p_type != PT_LOAD)
++			continue;
++
++		dev_dbg(dev, "phdr: type %d da %#x ofst:%#x memsz %#x filesz %#x\n",
++			phdr->p_type, da, offset, memsz, filesz);
++
++		if (filesz > memsz) {
++			dev_err(dev, "bad phdr filesz 0x%x memsz 0x%x\n",
++				filesz, memsz);
++			break;
++		}
++
++		if (offset + filesz > fw->size) {
++			dev_err(dev, "truncated fw: need 0x%x avail 0x%zx\n",
++				offset + filesz, fw->size);
++			break;
++		}
++
++		dst = st_fdma_seg_to_mem(fdev, da, memsz);
++		if (!dst) {
++			dev_err(dev, "bad phdr da 0x%x mem 0x%x\n", da, memsz);
++			break;
++		}
++
++		if (phdr->p_filesz)
++			memcpy(dst, elf_data + phdr->p_offset, filesz);
++
++		if (memsz > filesz)
++			memset(dst + filesz, 0, memsz - filesz);
++
++		mem_loaded++;
++	}
++
++	return (mem_loaded != fdev->drvdata->num_mem) ? -EINVAL : 0;
++}
++
++static void st_fdma_enable(struct st_fdma_dev *fdev)
++{
++	unsigned long hw_id, hw_ver, fw_rev;
++	u32 val;
++
++	/* disable CPU pipeline clock & reset cpu pipeline */
++	val = FDMA_CLK_GATE_DIS | FDMA_CLK_GATE_RESET;
++	fdma_write(fdev, val, CLK_GATE);
++	/* disable SLIM core STBus sync */
++	fdma_write(fdev, FDMA_STBUS_SYNC_DIS, STBUS_SYNC);
++	/* enable cpu pipeline clock */
++	fdma_write(fdev, !FDMA_CLK_GATE_DIS, CLK_GATE);
++
++	/* clear int & cmd mailbox */
++	fdma_write(fdev, ~0UL, INT_CLR);
++	fdma_write(fdev, ~0UL, CMD_CLR);
++	/* enable all channels cmd & int */
++	fdma_write(fdev, ~0UL, INT_MASK);
++	fdma_write(fdev, ~0UL, CMD_MASK);
++
++	/* enable cpu */
++	writel(FDMA_EN_RUN, fdev->io_base + FDMA_EN_OFST);
++
++	hw_id = fdma_read(fdev, ID);
++	hw_ver = fdma_read(fdev, VER);
++	fw_rev = fdma_read(fdev, REV_ID);
++
++	dev_info(fdev->dev, "fw rev:%ld.%ld on SLIM %ld.%ld\n",
++		 FDMA_REV_ID_MAJ(fw_rev), FDMA_REV_ID_MIN(fw_rev),
++		 hw_id, hw_ver);
++}
++
++static int st_fdma_disable(struct st_fdma_dev *fdev)
++{
++	/* mask all (cmd & int) channels */
++	fdma_write(fdev, 0UL, INT_MASK);
++	fdma_write(fdev, 0UL, CMD_MASK);
++
++	/* disable cpu pipeline clock */
++	fdma_write(fdev, FDMA_CLK_GATE_DIS, CLK_GATE);
++	writel(!FDMA_EN_RUN, fdev->io_base + FDMA_EN_OFST);
++
++	return readl(fdev->io_base + FDMA_EN_OFST);
++}
++
++static void st_fdma_fw_cb(const struct firmware *fw, void *context)
++{
++	struct st_fdma_dev *fdev = context;
++	int ret;
++
++	ret = st_fdma_elf_sanity_check(fdev, fw);
++	if (ret)
++		goto out;
++
++	st_fdma_disable(fdev);
++	ret = st_fdma_elf_load_segments(fdev, fw);
++	if (ret)
++		goto out;
++
++	st_fdma_enable(fdev);
++	atomic_set(&fdev->fw_loaded, 1);
++out:
++	release_firmware(fw);
++	complete_all(&fdev->fw_ack);
++}
++
++static int st_fdma_get_fw(struct st_fdma_dev *fdev)
++{
++	int ret;
++
++	init_completion(&fdev->fw_ack);
++	atomic_set(&fdev->fw_loaded, 0);
++
++	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
++				      fdev->pdata->fw_name, fdev->dev,
++				      GFP_KERNEL, fdev, st_fdma_fw_cb);
++	if (ret) {
++		dev_err(fdev->dev, "request_firmware_nowait err: %d\n", ret);
++		complete_all(&fdev->fw_ack);
++	}
++
++	return ret;
++}
++
++static int st_fdma_dreq_get(struct st_fdma_chan *fchan)
++{
++	struct st_fdma_dev *fdev = fchan->fdev;
++	u32 req_line_cfg = fchan->cfg.req_line;
++	u32 dreq_line;
++	int try = 0;
++
++	/*
++	 * dreq_mask is shared for n channels of fdma, so all accesses must be
++	 * atomic. if the dreq_mask it change between ffz ant set_bit,
++	 * we retry
++	 */
++	do {
++		if (fdev->dreq_mask == ~0L) {
++			dev_err(fdev->dev, "No req lines available\n");
++			return -EINVAL;
++		}
++
++		if (try || req_line_cfg >= ST_FDMA_NR_DREQS) {
++			dev_err(fdev->dev, "Invalid or used req line\n");
++			return -EINVAL;
++		} else {
++			dreq_line = req_line_cfg;
++		}
++
++		try++;
++	} while (test_and_set_bit(dreq_line, &fdev->dreq_mask));
++
++	dev_dbg(fdev->dev, "get dreq_line:%d mask:%#lx\n",
++		dreq_line, fdev->dreq_mask);
++
++	return dreq_line;
++}
++
++static void st_fdma_dreq_put(struct st_fdma_chan *fchan)
++{
++	struct st_fdma_dev *fdev = fchan->fdev;
++
++	dev_dbg(fdev->dev, "put dreq_line:%#x\n", fchan->dreq_line);
++	clear_bit(fchan->dreq_line, &fdev->dreq_mask);
++}
++
++static void st_fdma_xfer_desc(struct st_fdma_chan *fchan)
++{
++	struct virt_dma_desc *vdesc;
++	unsigned long nbytes, ch_cmd, cmd;
++
++	vdesc = vchan_next_desc(&fchan->vchan);
++	if (!vdesc)
++		return;
++
++	fchan->fdesc = to_st_fdma_desc(vdesc);
++	nbytes = fchan->fdesc->node[0].desc->nbytes;
++	cmd = FDMA_CMD_START(fchan->vchan.chan.chan_id);
++	ch_cmd = fchan->fdesc->node[0].pdesc | FDMA_CH_CMD_STA_START;
++
++	/* start the channel for the descriptor */
++	fnode_write(fchan, nbytes, CNTN);
++	fchan_write(fchan, ch_cmd, CH_CMD);
++	writel(cmd, fchan->fdev->io_base + FDMA_CMD_SET_OFST);
++
++	dev_dbg(fchan->fdev->dev, "start chan:%d\n", fchan->vchan.chan.chan_id);
++}
++
++static void st_fdma_ch_sta_update(struct st_fdma_chan *fchan,
++				  unsigned long int_sta)
++{
++	unsigned long ch_sta, ch_err;
++	int ch_id = fchan->vchan.chan.chan_id;
++	struct st_fdma_dev *fdev = fchan->fdev;
++
++	ch_sta = fchan_read(fchan, CH_CMD);
++	ch_err = ch_sta & FDMA_CH_CMD_ERR_MASK;
++	ch_sta &= FDMA_CH_CMD_STA_MASK;
++
++	if (int_sta & FDMA_INT_STA_ERR) {
++		dev_warn(fdev->dev, "chan:%d, error:%ld\n", ch_id, ch_err);
++		fchan->status = DMA_ERROR;
++		return;
++	}
++
++	switch (ch_sta) {
++	case FDMA_CH_CMD_STA_PAUSED:
++		fchan->status = DMA_PAUSED;
++		break;
++	case FDMA_CH_CMD_STA_RUNNING:
++		fchan->status = DMA_IN_PROGRESS;
++		break;
++	}
++}
++
++static irqreturn_t st_fdma_irq_handler(int irq, void *dev_id)
++{
++	struct st_fdma_dev *fdev = dev_id;
++	irqreturn_t ret = IRQ_NONE;
++	struct st_fdma_chan *fchan = &fdev->chans[0];
++	unsigned long int_sta, clr;
++
++	int_sta = fdma_read(fdev, INT_STA);
++	clr = int_sta;
++
++	for (; int_sta != 0 ; int_sta >>= 2, fchan++) {
++		if (!(int_sta & (FDMA_INT_STA_CH | FDMA_INT_STA_ERR)))
++			continue;
++
++		spin_lock(&fchan->vchan.lock);
++		st_fdma_ch_sta_update(fchan, int_sta);
++
++		if (fchan->fdesc) {
++			if (!fchan->fdesc->iscyclic) {
++				list_del(&fchan->fdesc->vdesc.node);
++				vchan_cookie_complete(&fchan->fdesc->vdesc);
++				fchan->fdesc = NULL;
++				fchan->status = DMA_COMPLETE;
++			} else {
++				vchan_cyclic_callback(&fchan->fdesc->vdesc);
++			}
++
++			/* Start the next descriptor (if available) */
++			if (!fchan->fdesc)
++				st_fdma_xfer_desc(fchan);
++		}
++
++		spin_unlock(&fchan->vchan.lock);
++		ret = IRQ_HANDLED;
++	}
++
++	fdma_write(fdev, clr, INT_CLR);
++
++	return ret;
++}
++
++static struct dma_chan *st_fdma_of_xlate(struct of_phandle_args *dma_spec,
++					 struct of_dma *ofdma)
++{
++	struct st_fdma_dev *fdev = ofdma->of_dma_data;
++	struct st_fdma_cfg cfg;
++
++	if (dma_spec->args_count < 1)
 +		return NULL;
 +
-+	xbar_dev = kzalloc(sizeof(*xbar_dev), GFP_KERNEL);
-+	if (!xbar_dev) {
-+		of_node_put(args.np);
-+		err = -ENOMEM;
-+		goto out;
-+	}
++	cfg.of_node = dma_spec->np;
++	cfg.req_line = dma_spec->args[0];
++	cfg.req_ctrl = 0;
++	cfg.type = ST_FDMA_TYPE_FREE_RUN;
 +
-+	xbar_dev->pdev = of_find_device_by_node(args.np);
-+	if (!xbar_dev->pdev) {
-+		of_node_put(args.np);
-+		err = -ENODEV;
-+		goto free;
-+	}
++	if (dma_spec->args_count > 1)
++		cfg.req_ctrl = dma_spec->args[1] & REQ_CTRL_CFG_MASK;
 +
-+	of_node_put(args.np);
++	if (dma_spec->args_count > 2)
++		cfg.type = dma_spec->args[2];
 +
-+	xbar_dev->xbar = platform_get_drvdata(xbar_dev->pdev);
-+	if (!xbar_dev->xbar) {
-+		err = -EPROBE_DEFER;
-+		goto pdev_put;
-+	}
++	dev_dbg(fdev->dev, "xlate req_line:%d type:%d req_ctrl:%#x\n",
++		cfg.req_line, cfg.type, cfg.req_ctrl);
 +
-+	xbar_dev->fdma_id = args.args[0];
-+	xbar_dev->fdev = device;
-+
-+	return xbar_dev;
-+
-+pdev_put:
-+	platform_device_put(xbar_dev->pdev);
-+free:
-+	kfree(xbar_dev);
-+out:
-+	return ERR_PTR(err);
++	return dma_request_channel(fdev->dma_device.cap_mask,
++			st_fdma_filter_fn, &cfg);
 +}
 +
-+void st_fdma_xbar_free(struct st_fdma_xbar_dev *device)
++static void st_fdma_free_desc(struct virt_dma_desc *vdesc)
 +{
-+	platform_device_put(device->pdev);
-+	kfree(device);
++	struct st_fdma_desc *fdesc;
++	int i;
++
++	fdesc = to_st_fdma_desc(vdesc);
++	for (i = 0; i < fdesc->n_nodes; i++)
++			dma_pool_free(fdesc->fchan->node_pool,
++				      fdesc->node[i].desc,
++				      fdesc->node[i].pdesc);
++	kfree(fdesc);
 +}
 +
-+static const struct of_device_id st_fdma_xbar_match[] = {
-+	{ .compatible = "st,fdma-xbar-1.0", .data = (void *)XBAR_1_0_MAX_REQ },
++static struct st_fdma_desc *st_fdma_alloc_desc(struct st_fdma_chan *fchan,
++					       int sg_len)
++{
++	struct st_fdma_desc *fdesc;
++	int i;
++
++	fdesc = kzalloc(sizeof(*fdesc) +
++			sizeof(struct st_fdma_sw_node) * sg_len, GFP_NOWAIT);
++	if (!fdesc)
++		return NULL;
++
++	fdesc->fchan = fchan;
++	fdesc->n_nodes = sg_len;
++	for (i = 0; i < sg_len; i++) {
++		fdesc->node[i].desc = dma_pool_alloc(fchan->node_pool,
++				GFP_NOWAIT, &fdesc->node[i].pdesc);
++		if (!fdesc->node[i].desc)
++			goto err;
++	}
++	return fdesc;
++
++err:
++	while (--i >= 0)
++		dma_pool_free(fchan->node_pool, fdesc->node[i].desc,
++			      fdesc->node[i].pdesc);
++	kfree(fdesc);
++	return NULL;
++}
++
++static int st_fdma_alloc_chan_res(struct dma_chan *chan)
++{
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++
++	if (fchan->cfg.type == ST_FDMA_TYPE_FREE_RUN) {
++		fchan->dreq_line = 0;
++	} else {
++		fchan->dreq_line = st_fdma_dreq_get(fchan);
++		if (IS_ERR_VALUE(fchan->dreq_line))
++			return -EINVAL;
++	}
++
++	/* Create the dma pool for descriptor allocation */
++	fchan->node_pool = dmam_pool_create(dev_name(&chan->dev->device),
++					    fchan->fdev->dev,
++					    sizeof(struct st_fdma_hw_node),
++					    __alignof__(struct st_fdma_hw_node),
++					    0);
++
++	if (!fchan->node_pool) {
++		dev_err(fchan->fdev->dev, "unable to allocate desc pool\n");
++		return -ENOMEM;
++	}
++
++	dev_dbg(fchan->fdev->dev, "alloc ch_id:%d type:%d\n",
++		fchan->vchan.chan.chan_id, fchan->cfg.type);
++
++	return 0;
++}
++
++static void st_fdma_free_chan_res(struct dma_chan *chan)
++{
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	unsigned long flags;
++	LIST_HEAD(head);
++
++	dev_dbg(fchan->fdev->dev, "freeing chan:%d\n",
++		fchan->vchan.chan.chan_id);
++
++	if (fchan->cfg.type != ST_FDMA_TYPE_FREE_RUN)
++		st_fdma_dreq_put(fchan);
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++	fchan->fdesc = NULL;
++	vchan_get_all_descriptors(&fchan->vchan, &head);
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++
++	dma_pool_destroy(fchan->node_pool);
++	fchan->node_pool = NULL;
++	memset(&fchan->cfg, 0, sizeof(struct st_fdma_cfg));
++}
++
++static struct dma_async_tx_descriptor *st_fdma_prep_dma_memcpy(
++	struct dma_chan *chan,	dma_addr_t dst, dma_addr_t src,
++	size_t len, unsigned long flags)
++{
++	struct st_fdma_chan *fchan;
++	struct st_fdma_desc *fdesc;
++	struct st_fdma_hw_node *hw_node;
++
++	if (!len)
++		return NULL;
++
++	fchan = to_st_fdma_chan(chan);
++
++	if (!atomic_read(&fchan->fdev->fw_loaded)) {
++		dev_err(fchan->fdev->dev, "%s: fdma fw not loaded\n", __func__);
++		return NULL;
++	}
++
++	/* We only require a single descriptor */
++	fdesc = st_fdma_alloc_desc(fchan, 1);
++	if (!fdesc) {
++		dev_err(fchan->fdev->dev, "no memory for desc\n");
++		return NULL;
++	}
++
++	hw_node = fdesc->node[0].desc;
++	hw_node->next = 0;
++	hw_node->control = NODE_CTRL_REQ_MAP_FREE_RUN;
++	hw_node->control |= NODE_CTRL_SRC_INCR;
++	hw_node->control |= NODE_CTRL_DST_INCR;
++	hw_node->control |= NODE_CTRL_INT_EON;
++	hw_node->nbytes = len;
++	hw_node->saddr = src;
++	hw_node->daddr = dst;
++	hw_node->generic.length = len;
++	hw_node->generic.sstride = 0;
++	hw_node->generic.dstride = 0;
++
++	return vchan_tx_prep(&fchan->vchan, &fdesc->vdesc, flags);
++}
++
++static struct dma_async_tx_descriptor *st_fdma_prep_dma_cyclic(
++		struct dma_chan *chan, dma_addr_t buf_addr, size_t len,
++		size_t period_len, enum dma_transfer_direction direction,
++		unsigned long flags)
++{
++	struct st_fdma_chan *fchan;
++	struct st_fdma_desc *fdesc;
++	int sg_len, i;
++
++	if (!chan || !len || !period_len)
++		return NULL;
++
++	fchan = to_st_fdma_chan(chan);
++
++	if (!atomic_read(&fchan->fdev->fw_loaded)) {
++		dev_err(fchan->fdev->dev, "%s: fdma fw not loaded\n", __func__);
++		return NULL;
++	}
++
++	if (!is_slave_direction(direction)) {
++		dev_err(fchan->fdev->dev, "bad direction?\n");
++		return NULL;
++	}
++
++	/* the buffer length must be a multiple of period_len */
++	if (len % period_len != 0) {
++		dev_err(fchan->fdev->dev, "len is not multiple of period\n");
++		return NULL;
++	}
++
++	sg_len = len / period_len;
++	fdesc = st_fdma_alloc_desc(fchan, sg_len);
++	if (!fdesc) {
++		dev_err(fchan->fdev->dev, "no memory for desc\n");
++		return NULL;
++	}
++
++	fdesc->iscyclic = true;
++
++	for (i = 0; i < sg_len; i++) {
++		struct st_fdma_hw_node *hw_node = fdesc->node[i].desc;
++
++		hw_node->next = fdesc->node[(i + 1) % sg_len].pdesc;
++
++		hw_node->control = NODE_CTRL_REQ_MAP_DREQ(fchan->dreq_line);
++		hw_node->control |= NODE_CTRL_INT_EON;
++
++		if (direction == DMA_MEM_TO_DEV) {
++			hw_node->control |= NODE_CTRL_SRC_INCR;
++			hw_node->control |= NODE_CTRL_DST_STATIC;
++			hw_node->saddr = buf_addr + (i * period_len);
++			hw_node->daddr = fchan->cfg.dev_addr;
++		} else {
++			hw_node->control |= NODE_CTRL_SRC_STATIC;
++			hw_node->control |= NODE_CTRL_DST_INCR;
++			hw_node->saddr = fchan->cfg.dev_addr;
++			hw_node->daddr = buf_addr + (i * period_len);
++		}
++
++		hw_node->nbytes = period_len;
++		hw_node->generic.length = period_len;
++		hw_node->generic.sstride = 0;
++		hw_node->generic.dstride = 0;
++	}
++
++	return vchan_tx_prep(&fchan->vchan, &fdesc->vdesc, flags);
++}
++
++static struct dma_async_tx_descriptor *st_fdma_prep_slave_sg(
++		struct dma_chan *chan, struct scatterlist *sgl,
++		unsigned int sg_len, enum dma_transfer_direction direction,
++		unsigned long flags, void *context)
++{
++	struct st_fdma_chan *fchan;
++	struct st_fdma_desc *fdesc;
++	struct st_fdma_hw_node *hw_node;
++	struct scatterlist *sg;
++	int i;
++
++	if (!chan || !sgl || !sg_len)
++		return NULL;
++
++	fchan = to_st_fdma_chan(chan);
++
++	if (!atomic_read(&fchan->fdev->fw_loaded)) {
++		dev_err(fchan->fdev->dev, "%s: fdma fw not loaded\n", __func__);
++		return NULL;
++	}
++
++	if (!is_slave_direction(direction)) {
++		dev_err(fchan->fdev->dev, "bad direction?\n");
++		return NULL;
++	}
++
++	fdesc = st_fdma_alloc_desc(fchan, sg_len);
++	if (!fdesc) {
++		dev_err(fchan->fdev->dev, "no memory for desc\n");
++		return NULL;
++	}
++
++	fdesc->iscyclic = false;
++
++	for_each_sg(sgl, sg, sg_len, i) {
++		hw_node = fdesc->node[i].desc;
++
++		hw_node->next = fdesc->node[(i + 1) % sg_len].pdesc;
++		hw_node->control = NODE_CTRL_REQ_MAP_DREQ(fchan->dreq_line);
++
++		if (direction == DMA_MEM_TO_DEV) {
++			hw_node->control |= NODE_CTRL_SRC_INCR;
++			hw_node->control |= NODE_CTRL_DST_STATIC;
++			hw_node->saddr = sg_dma_address(sg);
++			hw_node->daddr = fchan->cfg.dev_addr;
++		} else {
++			hw_node->control |= NODE_CTRL_SRC_STATIC;
++			hw_node->control |= NODE_CTRL_DST_INCR;
++			hw_node->saddr = fchan->cfg.dev_addr;
++			hw_node->daddr = sg_dma_address(sg);
++		}
++
++		hw_node->nbytes = sg_dma_len(sg);
++		hw_node->generic.length = sg_dma_len(sg);
++		hw_node->generic.sstride = 0;
++		hw_node->generic.dstride = 0;
++	}
++	/* interrupt at end of last node */
++	hw_node->control |= NODE_CTRL_INT_EON;
++
++	return vchan_tx_prep(&fchan->vchan, &fdesc->vdesc, flags);
++}
++
++static size_t st_fdma_desc_residue(struct st_fdma_chan *fchan,
++				   struct virt_dma_desc *vdesc,
++				   bool in_progress)
++{
++	struct st_fdma_desc *fdesc = fchan->fdesc;
++	size_t residue = 0;
++	dma_addr_t cur_addr = 0;
++	int i;
++
++	if (in_progress) {
++		cur_addr = fchan_read(fchan, CH_CMD);
++		cur_addr &= FDMA_CH_CMD_DATA_MASK;
++	}
++
++	for (i = fchan->fdesc->n_nodes - 1 ; i >= 0; i--) {
++		if (cur_addr == fdesc->node[i].pdesc) {
++			residue += fnode_read(fchan, CNTN);
++			break;
++		}
++		residue += fdesc->node[i].desc->nbytes;
++	}
++
++	return residue;
++}
++
++static enum dma_status st_fdma_tx_status(struct dma_chan *chan,
++					 dma_cookie_t cookie,
++					 struct dma_tx_state *txstate)
++{
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	struct virt_dma_desc *vd;
++	enum dma_status ret;
++	unsigned long flags;
++
++	ret = dma_cookie_status(chan, cookie, txstate);
++	if (ret == DMA_COMPLETE)
++		return ret;
++
++	if (!txstate)
++		return fchan->status;
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++	vd = vchan_find_desc(&fchan->vchan, cookie);
++	if (fchan->fdesc && cookie == fchan->fdesc->vdesc.tx.cookie)
++		txstate->residue = st_fdma_desc_residue(fchan, vd, true);
++	else if (vd)
++		txstate->residue = st_fdma_desc_residue(fchan, vd, false);
++	else
++		txstate->residue = 0;
++
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++
++	return fchan->status;
++}
++
++static void st_fdma_issue_pending(struct dma_chan *chan)
++{
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	unsigned long flags;
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++
++	if (vchan_issue_pending(&fchan->vchan) && !fchan->fdesc)
++		st_fdma_xfer_desc(fchan);
++
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++}
++
++static int st_fdma_pause(struct dma_chan *chan)
++{
++	unsigned long flags;
++	LIST_HEAD(head);
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	int ch_id = fchan->vchan.chan.chan_id;
++	unsigned long cmd = FDMA_CMD_PAUSE(ch_id);
++
++	dev_dbg(fchan->fdev->dev, "pause chan:%d\n", ch_id);
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++	if (fchan->fdesc)
++		fdma_write(fchan->fdev, cmd, CMD_SET);
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++
++	return 0;
++}
++
++static int st_fdma_resume(struct dma_chan *chan)
++{
++	unsigned long flags;
++	unsigned long val;
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	int ch_id = fchan->vchan.chan.chan_id;
++
++	dev_dbg(fchan->fdev->dev, "resume chan:%d\n", ch_id);
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++	if (fchan->fdesc) {
++		val = fchan_read(fchan, CH_CMD);
++		val &= FDMA_CH_CMD_DATA_MASK;
++		fchan_write(fchan, val, CH_CMD);
++	}
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++
++	return 0;
++}
++
++static int st_fdma_terminate_all(struct dma_chan *chan)
++{
++	unsigned long flags;
++	LIST_HEAD(head);
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	int ch_id = fchan->vchan.chan.chan_id;
++	unsigned long cmd = FDMA_CMD_PAUSE(ch_id);
++
++	dev_dbg(fchan->fdev->dev, "terminate chan:%d\n", ch_id);
++
++	spin_lock_irqsave(&fchan->vchan.lock, flags);
++	fdma_write(fchan->fdev, cmd, CMD_SET);
++	fchan->fdesc = NULL;
++	vchan_get_all_descriptors(&fchan->vchan, &head);
++	spin_unlock_irqrestore(&fchan->vchan.lock, flags);
++	vchan_dma_desc_free_list(&fchan->vchan, &head);
++
++	return 0;
++}
++
++static int st_fdma_slave_config(struct dma_chan *chan,
++				struct dma_slave_config *slave_cfg)
++{
++	u32 maxburst = 0, addr = 0;
++	enum dma_slave_buswidth width;
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++	int ch_id = fchan->vchan.chan.chan_id;
++	struct st_fdma_dev *fdev = fchan->fdev;
++
++	if (slave_cfg->direction == DMA_DEV_TO_MEM) {
++		fchan->cfg.req_ctrl &= ~REQ_CTRL_WNR;
++		maxburst = slave_cfg->src_maxburst;
++		width = slave_cfg->src_addr_width;
++		addr = slave_cfg->src_addr;
++	} else if (slave_cfg->direction == DMA_MEM_TO_DEV) {
++		fchan->cfg.req_ctrl |= REQ_CTRL_WNR;
++		maxburst = slave_cfg->dst_maxburst;
++		width = slave_cfg->dst_addr_width;
++		addr = slave_cfg->dst_addr;
++	} else {
++		return -EINVAL;
++	}
++
++	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
++		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST1;
++	else if (width == DMA_SLAVE_BUSWIDTH_2_BYTES)
++		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST2;
++	else if (width == DMA_SLAVE_BUSWIDTH_4_BYTES)
++		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST4;
++	else if (width == DMA_SLAVE_BUSWIDTH_8_BYTES)
++		fchan->cfg.req_ctrl |= REQ_CTRL_OPCODE_LD_ST8;
++	else
++		return -EINVAL;
++
++	fchan->cfg.req_ctrl |= REQ_CTRL_NUM_OPS(maxburst-1);
++	dreq_write(fchan, fchan->cfg.req_ctrl, REQ_CTRL);
++
++	fchan->cfg.dev_addr = addr;
++	fchan->cfg.dir = slave_cfg->direction;
++
++	dev_dbg(fdev->dev, "chan:%d dma_slave_config addr:%#x req_ctrl:%#x\n",
++		ch_id, addr, fchan->cfg.req_ctrl);
++
++	return 0;
++}
++
++static const struct st_fdma_ram fdma_mpe31_mem[] = {
++	{ .name = "dmem", .offset = 0x10000, .size = 0x3000 },
++	{ .name = "imem", .offset = 0x18000, .size = 0x8000 },
++};
++
++static const struct st_fdma_driverdata fdma_mpe31 = {
++	.fdma_mem = fdma_mpe31_mem,
++	.num_mem = ARRAY_SIZE(fdma_mpe31_mem),
++};
++
++static const struct of_device_id st_fdma_match[] = {
++	{ .compatible = "st,fdma_mpe31", .data = &fdma_mpe31 },
 +	{},
 +};
-+MODULE_DEVICE_TABLE(of, st_fdma_xbar_match);
++MODULE_DEVICE_TABLE(of, st_fdma_match);
 +
-+static int st_fdma_xbar_probe(struct platform_device *pdev)
++static struct st_fdma_platform_data *
++st_fdma_parse_dt(struct platform_device *pdev)
 +{
++	struct device_node *np = pdev->dev.of_node;
++	struct st_fdma_platform_data *pdata;
++	int ret;
++
++	if (!np)
++		goto err;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		goto err;
++
++	ret = of_property_read_u32(np, "dma-channels", &pdata->nr_channels);
++	if (ret)
++		goto err;
++
++	ret = of_property_read_string(np, "st,fw-name", &pdata->fw_name);
++	if (ret)
++		goto err;
++
++	return pdata;
++
++err:
++	return NULL;
++}
++#define FDMA_DMA_BUSWIDTHS	(BIT(DMA_SLAVE_BUSWIDTH_1_BYTE) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_3_BYTES) | \
++				 BIT(DMA_SLAVE_BUSWIDTH_4_BYTES))
++
++
++static int st_fdma_probe(struct platform_device *pdev)
++{
++	struct st_fdma_dev *fdev;
 +	const struct of_device_id *match;
 +	struct device_node *np = pdev->dev.of_node;
-+	struct st_fdma_xbar *xbar;
-+	struct resource *res;
++	const struct st_fdma_driverdata *drvdata;
++	const struct st_fdma_platform_data *pdata;
++	int irq, ret, i;
 +
-+	match = of_match_device((st_fdma_xbar_match), &pdev->dev);
-+	if (!match) {
++	match = of_match_device((st_fdma_match), &pdev->dev);
++	if (!match || !match->data) {
 +		dev_err(&pdev->dev, "No device match found\n");
 +		return -ENODEV;
 +	}
 +
-+	xbar = devm_kzalloc(&pdev->dev, sizeof(*xbar), GFP_KERNEL);
-+	if (!xbar)
-+		return -ENOMEM;
++	drvdata = match->data;
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	xbar->io_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(xbar->io_base))
-+		return PTR_ERR(xbar->io_base);
-+
-+	xbar->max_nr_requests = (unsigned long)match->data;
-+
-+	if (of_property_read_u32(np, "dma-requests", &xbar->nr_requests))
-+		xbar->nr_requests = xbar->max_nr_requests;
-+
-+	if (xbar->nr_requests > xbar->max_nr_requests) {
-+		dev_err(&pdev->dev, "Nr requests not supported\n");
++	pdata = st_fdma_parse_dt(pdev);
++	if (!pdata) {
++		dev_err(&pdev->dev, "unable to find platform data\n");
 +		return -EINVAL;
 +	}
 +
-+	platform_set_drvdata(pdev, xbar);
++	fdev = devm_kzalloc(&pdev->dev, sizeof(*fdev), GFP_KERNEL);
++	if (!fdev)
++		return -ENOMEM;
++
++	fdev->chans = devm_kzalloc(&pdev->dev,
++				   pdata->nr_channels
++				   * sizeof(struct st_fdma_chan), GFP_KERNEL);
++	if (!fdev->chans)
++		return -ENOMEM;
++
++	fdev->dev = &pdev->dev;
++	fdev->drvdata = drvdata;
++	fdev->pdata = pdata;
++	platform_set_drvdata(pdev, fdev);
++
++	fdev->io_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	fdev->io_base = devm_ioremap_resource(&pdev->dev, fdev->io_res);
++	if (IS_ERR(fdev->io_base))
++		return PTR_ERR(fdev->io_base);
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "Failed to get irq resource\n");
++		return -EINVAL;
++	}
++
++	ret = devm_request_irq(&pdev->dev, irq, st_fdma_irq_handler, 0,
++			       dev_name(&pdev->dev), fdev);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to request irq\n");
++		goto err;
++	}
++
++	ret = st_fdma_clk_get(fdev);
++	if (ret)
++		goto err;
++
++	ret = st_fdma_clk_enable(fdev);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to enable clocks\n");
++		goto err_clk;
++	}
++
++	/* Initialise list of FDMA channels */
++	INIT_LIST_HEAD(&fdev->dma_device.channels);
++	for (i = 0; i < fdev->pdata->nr_channels; i++) {
++		struct st_fdma_chan *fchan = &fdev->chans[i];
++
++		fchan->fdev = fdev;
++		fchan->vchan.desc_free = st_fdma_free_desc;
++		vchan_init(&fchan->vchan, &fdev->dma_device);
++	}
++
++	ret = st_fdma_get_fw(fdev);
++	if (ret)
++		goto err_clk;
++
++	/* Initialise the FDMA dreq (reserve 0 & 31 for FDMA use) */
++	fdev->dreq_mask = BIT(0) | BIT(31);
++
++	dma_cap_set(DMA_SLAVE, fdev->dma_device.cap_mask);
++	dma_cap_set(DMA_CYCLIC, fdev->dma_device.cap_mask);
++	dma_cap_set(DMA_MEMCPY, fdev->dma_device.cap_mask);
++
++	fdev->dma_device.dev = &pdev->dev;
++	fdev->dma_device.device_alloc_chan_resources = st_fdma_alloc_chan_res;
++	fdev->dma_device.device_free_chan_resources = st_fdma_free_chan_res;
++	fdev->dma_device.device_prep_dma_cyclic	= st_fdma_prep_dma_cyclic;
++	fdev->dma_device.device_prep_slave_sg = st_fdma_prep_slave_sg;
++	fdev->dma_device.device_prep_dma_memcpy = st_fdma_prep_dma_memcpy;
++	fdev->dma_device.device_tx_status = st_fdma_tx_status;
++	fdev->dma_device.device_issue_pending = st_fdma_issue_pending;
++	fdev->dma_device.device_terminate_all = st_fdma_terminate_all;
++	fdev->dma_device.device_config = st_fdma_slave_config;
++	fdev->dma_device.device_pause = st_fdma_pause;
++	fdev->dma_device.device_resume = st_fdma_resume;
++
++	fdev->dma_device.src_addr_widths = FDMA_DMA_BUSWIDTHS;
++	fdev->dma_device.dst_addr_widths = FDMA_DMA_BUSWIDTHS;
++	fdev->dma_device.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
++	fdev->dma_device.residue_granularity = DMA_RESIDUE_GRANULARITY_BURST;
++
++	ret = dma_async_device_register(&fdev->dma_device);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register DMA device\n");
++		goto err_clk;
++	}
++
++	ret = of_dma_controller_register(np, st_fdma_of_xlate, fdev);
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to register controller\n");
++		goto err_dma_dev;
++	}
++
++	dev_info(&pdev->dev, "ST FDMA engine driver, irq:%d\n", irq);
 +
 +	return 0;
++
++err_dma_dev:
++	dma_async_device_unregister(&fdev->dma_device);
++err_clk:
++	st_fdma_clk_disable(fdev);
++err:
++	return ret;
 +}
 +
-+static int st_fdma_xbar_remove(struct platform_device *pdev)
++static int __exit st_fdma_remove(struct platform_device *pdev)
 +{
++	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
++
++	wait_for_completion(&fdev->fw_ack);
++
++	st_fdma_clk_disable(fdev);
++
 +	return 0;
 +}
 +
-+static struct platform_driver st_fdma_xbar_driver = {
-+	.driver	= {
-+		.name = "st-fdma-xbar",
-+		.of_match_table = st_fdma_xbar_match,
-+	},
-+	.probe = st_fdma_xbar_probe,
-+	.remove = st_fdma_xbar_remove,
++#ifdef CONFIG_PM_SLEEP
++static int st_fdma_pm_suspend(struct device *dev)
++{
++	struct st_fdma_dev *fdev = dev_get_drvdata(dev);
++	int ret;
++
++	if (atomic_read(&fdev->fw_loaded)) {
++		ret = st_fdma_disable(fdev);
++		if (ret & FDMA_EN_RUN) {
++			dev_warn(fdev->dev, "Failed to disable channels");
++			return -EBUSY;
++		}
++	}
++
++	st_fdma_clk_disable(fdev);
++
++	return 0;
++}
++
++static int st_fdma_pm_resume(struct device *dev)
++{
++	struct st_fdma_dev *fdev = dev_get_drvdata(dev);
++	int ret;
++
++	ret = st_fdma_clk_enable(fdev);
++	if (ret) {
++		dev_err(fdev->dev, "Failed to enable clocks\n");
++		goto out;
++	}
++
++	ret = st_fdma_get_fw(fdev);
++out:
++	return ret;
++}
++
++const struct dev_pm_ops st_fdma_pm = {
++	.suspend_late = st_fdma_pm_suspend,
++	.resume_early = st_fdma_pm_resume,
 +};
-+module_platform_driver(st_fdma_xbar_driver);
++
++#define ST_FDMA_PM	(&st_fdma_pm)
++#else
++#define ST_FDMA_PM	NULL
++#endif
++
++static struct platform_driver st_fdma_platform_driver = {
++	.driver = {
++		.name = "st-fdma",
++		.of_match_table = st_fdma_match,
++		.pm = ST_FDMA_PM,
++	},
++	.probe = st_fdma_probe,
++	.remove = st_fdma_remove,
++};
++module_platform_driver(st_fdma_platform_driver);
++
++bool st_fdma_filter_fn(struct dma_chan *chan, void *param)
++{
++	struct st_fdma_cfg *config = param;
++	struct st_fdma_chan *fchan = to_st_fdma_chan(chan);
++
++	if (!param)
++		return false;
++
++	if (fchan->fdev->dma_device.dev->of_node != config->of_node)
++		return false;
++
++	fchan->cfg = *config;
++
++	return true;
++}
++EXPORT_SYMBOL(st_fdma_filter_fn);
 +
 +MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("STMicroelectronics FDMA cross bar");
++MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
 +MODULE_AUTHOR("Ludovic.barre <Ludovic.barre@st.com>");
+diff --git a/drivers/dma/st_fdma.h b/drivers/dma/st_fdma.h
+new file mode 100644
+index 0000000..533c811
+--- /dev/null
++++ b/drivers/dma/st_fdma.h
+@@ -0,0 +1,234 @@
++/*
++ * st_fdma.h
++ *
++ * Copyright (C) 2014 STMicroelectronics
++ * Author: Ludovic Barre <Ludovic.barre@st.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++#ifndef __DMA_ST_FDMA_H
++#define __DMA_ST_FDMA_H
++
++#include <linux/dmaengine.h>
++#include <linux/interrupt.h>
++#include <linux/platform_data/dma-st_fdma.h>
++
++#include "virt-dma.h"
++
++#define ST_FDMA_NR_DREQS 32
++#define EM_SLIM	102	/* No official SLIM ELF ID */
++
++enum {
++	CLK_SLIM,
++	CLK_HI,
++	CLK_LOW,
++	CLK_IC,
++	CLK_MAX_NUM,
++};
++
++#define MEM_NAME_SZ 10
++
++struct st_fdma_ram {
++	char name[MEM_NAME_SZ];
++	u32 offset;
++	u32 size;
++};
++
++/**
++ * struct st_fdma_generic_node - Free running/paced generic node
++ *
++ * @length: Length in bytes of a line in a 2D mem to mem
++ * @sstride: Stride, in bytes, between source lines in a 2D data move
++ * @dstride: Stride, in bytes, between destination lines in a 2D data move
++ */
++struct st_fdma_generic_node {
++	u32 length;
++	u32 sstride;
++	u32 dstride;
++};
++
++/**
++ * struct st_fdma_hw_node - Node structure used by fdma hw
++ *
++ * @next: Pointer to next node
++ * @control: Transfer Control Parameters
++ * @nbytes: Number of Bytes to read
++ * @saddr: Source address
++ * @daddr: Destination address
++ *
++ * @generic: generic node for free running/paced transfert type
++ * 2 others transfert type are possible, but not yet implemented
++ *
++ * The NODE structures must be aligned to a 32 byte boundary
++ */
++struct st_fdma_hw_node {
++	u32 next;
++	u32 control;
++	u32 nbytes;
++	u32 saddr;
++	u32 daddr;
++	union {
++		struct st_fdma_generic_node generic;
++	};
++} __aligned(32);
++
++/*
++ * node control parameters
++ */
++#define NODE_CTRL_REQ_MAP_MASK		GENMASK(4, 0)
++#define NODE_CTRL_REQ_MAP_FREE_RUN	0x0
++#define NODE_CTRL_REQ_MAP_DREQ(n)	((n) & NODE_CTRL_REQ_MAP_MASK)
++#define NODE_CTRL_REQ_MAP_EXT		NODE_CTRL_REQ_MAP_MASK
++#define NODE_CTRL_SRC_MASK		GENMASK(6, 5)
++#define NODE_CTRL_SRC_STATIC		BIT(5)
++#define NODE_CTRL_SRC_INCR		BIT(6)
++#define NODE_CTRL_DST_MASK		GENMASK(8, 7)
++#define NODE_CTRL_DST_STATIC		BIT(7)
++#define NODE_CTRL_DST_INCR		BIT(8)
++#define NODE_CTRL_SECURE		BIT(15)
++#define NODE_CTRL_PAUSE_EON		BIT(30)
++#define NODE_CTRL_INT_EON		BIT(31)
++
++/**
++ * struct st_fdma_sw_node - descriptor structure for link list
++ *
++ * @pdesc: Physical address of desc
++ * @node: link used for putting this into a channel queue
++ */
++struct st_fdma_sw_node {
++	dma_addr_t pdesc;
++	struct st_fdma_hw_node *desc;
++};
++
++struct st_fdma_driverdata {
++	const struct st_fdma_ram *fdma_mem;
++	u32 num_mem;
++};
++
++struct st_fdma_desc {
++	struct virt_dma_desc vdesc;
++	struct st_fdma_chan *fchan;
++	bool iscyclic;
++	unsigned int n_nodes;
++	struct st_fdma_sw_node node[];
++};
++
++struct st_fdma_chan {
++	struct st_fdma_dev *fdev;
++	struct dma_pool *node_pool;
++	struct st_fdma_cfg cfg;
++	int dreq_line;
++
++	struct virt_dma_chan vchan;
++	struct st_fdma_desc *fdesc;
++	enum dma_status	status;
++};
++
++struct st_fdma_dev {
++	struct device *dev;
++	const struct st_fdma_driverdata *drvdata;
++	const struct st_fdma_platform_data *pdata;
++	struct dma_device dma_device;
++
++	void __iomem *io_base;
++	struct resource *io_res;
++	struct clk *clks[CLK_MAX_NUM];
++
++	struct st_fdma_chan *chans;
++
++	spinlock_t dreq_lock;
++	unsigned long dreq_mask;
++
++	struct completion fw_ack;
++	atomic_t fw_loaded;
++};
++
++/* Registers*/
++/* FDMA interface */
++#define FDMA_ID_OFST		0x00000
++#define FDMA_VER_OFST		0x00004
++
++#define FDMA_EN_OFST		0x00008
++#define FDMA_EN_RUN			BIT(0)
++
++#define FDMA_CLK_GATE_OFST	0x0000C
++#define FDMA_CLK_GATE_DIS		BIT(0)
++#define FDMA_CLK_GATE_RESET		BIT(2)
++
++#define FDMA_SLIM_PC_OFST	0x00020
++
++#define FDMA_REV_ID_OFST	0x10000
++#define FDMA_REV_ID_MIN_MASK		GENMASK(15, 8)
++#define FDMA_REV_ID_MIN(id)		((id & FDMA_REV_ID_MIN_MASK) >> 8)
++#define FDMA_REV_ID_MAJ_MASK		GENMASK(23, 16)
++#define FDMA_REV_ID_MAJ(id)		((id & FDMA_REV_ID_MAJ_MASK) >> 16)
++
++#define FDMA_STBUS_SYNC_OFST	0x17F88
++#define FDMA_STBUS_SYNC_DIS		BIT(0)
++
++#define FDMA_CMD_STA_OFST	0x17FC0
++#define FDMA_CMD_SET_OFST	0x17FC4
++#define FDMA_CMD_CLR_OFST	0x17FC8
++#define FDMA_CMD_MASK_OFST	0x17FCC
++#define FDMA_CMD_START(ch)		(0x1 << (ch << 1))
++#define FDMA_CMD_PAUSE(ch)		(0x2 << (ch << 1))
++#define FDMA_CMD_FLUSH(ch)		(0x3 << (ch << 1))
++
++#define FDMA_INT_STA_OFST	0x17FD0
++#define FDMA_INT_STA_CH			0x1
++#define FDMA_INT_STA_ERR		0x2
++
++#define FDMA_INT_SET_OFST	0x17FD4
++#define FDMA_INT_CLR_OFST	0x17FD8
++#define FDMA_INT_MASK_OFST	0x17FDC
++
++#define fdma_read(fdev, name) \
++	readl_relaxed((fdev)->io_base + FDMA_##name##_OFST)
++
++#define fdma_write(fdev, val, name) \
++	writel_relaxed((val), (fdev)->io_base + FDMA_##name##_OFST)
++
++/* fchan interface */
++#define FDMA_CH_CMD_OFST	0x10200
++#define FDMA_CH_CMD_STA_MASK		GENMASK(1, 0)
++#define FDMA_CH_CMD_STA_IDLE		(0x0)
++#define FDMA_CH_CMD_STA_START		(0x1)
++#define FDMA_CH_CMD_STA_RUNNING		(0x2)
++#define FDMA_CH_CMD_STA_PAUSED		(0x3)
++#define FDMA_CH_CMD_ERR_MASK		GENMASK(4, 2)
++#define FDMA_CH_CMD_ERR_INT		(0x0 << 2)
++#define FDMA_CH_CMD_ERR_NAND		(0x1 << 2)
++#define FDMA_CH_CMD_ERR_MCHI		(0x2 << 2)
++#define FDMA_CH_CMD_DATA_MASK		GENMASK(31, 5)
++#define fchan_read(fchan, name) \
++	readl_relaxed((fchan)->fdev->io_base \
++			+ (fchan)->vchan.chan.chan_id * 0x4 \
++			+ FDMA_##name##_OFST)
++
++#define fchan_write(fchan, val, name) \
++	writel_relaxed((val), (fchan)->fdev->io_base \
++			+ (fchan)->vchan.chan.chan_id * 0x4 \
++			+ FDMA_##name##_OFST)
++
++/* req interface */
++#define FDMA_REQ_CTRL_OFST	0x10240
++#define dreq_write(fchan, val, name) \
++	writel_relaxed((val), (fchan)->fdev->io_base \
++			+ fchan->dreq_line * 0x04 \
++			+ FDMA_##name##_OFST)
++/* node interface */
++#define FDMA_NODE_SZ 128
++#define FDMA_PTRN_OFST		0x10800
++#define FDMA_CNTN_OFST		0x10808
++#define FDMA_SADDRN_OFST	0x1080c
++#define FDMA_DADDRN_OFST	0x10810
++#define fnode_read(fchan, name) \
++	readl_relaxed((fchan)->fdev->io_base \
++			+ (fchan)->vchan.chan.chan_id * FDMA_NODE_SZ \
++			+ FDMA_##name##_OFST)
++
++#define fnode_write(fchan, val, name) \
++	writel_relaxed((val), (fchan)->fdev->io_base \
++			+ (fchan)->vchan.chan.chan_id * FDMA_NODE_SZ \
++			+ FDMA_##name##_OFST)
++
++#endif	/* __DMA_ST_FDMA_H */
+diff --git a/include/linux/platform_data/dma-st_fdma.h b/include/linux/platform_data/dma-st_fdma.h
+new file mode 100644
+index 0000000..3a1098b
+--- /dev/null
++++ b/include/linux/platform_data/dma-st_fdma.h
+@@ -0,0 +1,70 @@
++/*
++ * dma-st-fdma.h
++ *
++ * Copyright (C) 2014 STMicroelectronics
++ * Author: Ludovic Barre <Ludovic.barre@st.com>
++ * License terms:  GNU General Public License (GPL), version 2
++ */
++#ifndef __PLAT_ST_FDMA_H
++#define __PLAT_ST_FDMA_H
++
++#include <linux/dmaengine.h>
++
++/*
++ * Channel type
++ */
++enum st_fdma_type {
++	ST_FDMA_TYPE_FREE_RUN,
++	ST_FDMA_TYPE_PACED,
++};
++
++struct st_fdma_cfg {
++	struct device_node *of_node;
++	enum st_fdma_type type;
++	dma_addr_t dev_addr;
++	enum dma_transfer_direction dir;
++	int req_line; /* request line */
++	u32 req_ctrl; /* Request control */
++};
++
++/**
++ * struct st_fdma_platform_data - platform specific data for FDMA engine
++ *
++ * @nr_channels:	Number of channels supported by hardware
++ * @fw_name:		The firmware name
++ */
++struct st_fdma_platform_data {
++	u32 nr_channels;
++	const char *fw_name;
++};
++
++/*
++ * request control bits
++ */
++/*replace by genmask >3.13*/
++#define REQ_CTRL_NUM_OPS_MASK		GENMASK(31, 24)
++#define REQ_CTRL_NUM_OPS(n)		(REQ_CTRL_NUM_OPS_MASK & ((n) << 24))
++#define REQ_CTRL_INITIATOR_MASK		BIT(22)
++#define	REQ_CTRL_INIT0			(0x0 << 22)
++#define	REQ_CTRL_INIT1			(0x1 << 22)
++#define REQ_CTRL_INC_ADDR_ON		BIT(21)
++#define REQ_CTRL_DATA_SWAP_ON		BIT(17)
++#define REQ_CTRL_WNR			BIT(14)
++#define REQ_CTRL_OPCODE_MASK		GENMASK(7, 4)
++#define REQ_CTRL_OPCODE_LD_ST1		(0x0 << 4)
++#define REQ_CTRL_OPCODE_LD_ST2		(0x1 << 4)
++#define REQ_CTRL_OPCODE_LD_ST4		(0x2 << 4)
++#define REQ_CTRL_OPCODE_LD_ST8		(0x3 << 4)
++#define REQ_CTRL_OPCODE_LD_ST16		(0x4 << 4)
++#define REQ_CTRL_OPCODE_LD_ST32		(0x5 << 4)
++#define REQ_CTRL_OPCODE_LD_ST64		(0x6 << 4)
++#define REQ_CTRL_HOLDOFF_MASK		GENMASK(2, 0)
++#define REQ_CTRL_HOLDOFF(n)		((n) & REQ_CTRL_HOLDOFF_MASK)
++
++/* bits used by client to configure request control */
++#define REQ_CTRL_CFG_MASK (REQ_CTRL_HOLDOFF_MASK | REQ_CTRL_DATA_SWAP_ON \
++			| REQ_CTRL_INC_ADDR_ON | REQ_CTRL_INITIATOR_MASK)
++
++bool st_fdma_filter_fn(struct dma_chan *chan, void *param);
++
++#endif	/* __PLAT_ST_FDMA_H */
 -- 
 1.9.1
