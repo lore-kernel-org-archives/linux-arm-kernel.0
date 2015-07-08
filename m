@@ -1,33 +1,122 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 08 Jul 2015 14:30:09 -0700
-Subject: [GIT PULL] Allwinner late changes for 4.2
-In-Reply-To: <20150705203429.GA21927@lukather> (Maxime Ripard's message of
- "Sun, 5 Jul 2015 22:34:29 +0200")
-References: <20150705203429.GA21927@lukather>
-Message-ID: <7hk2uacp7i.fsf@deeprootsystems.com>
+From: xander.huff@ni.com (Xander Huff)
+Date: Wed, 8 Jul 2015 16:38:22 -0500
+Subject: [PATCH v2] iio: adc: xilinx-xadc: Push interrupts into threaded
+ context
+In-Reply-To: <5574633F.7090004@kernel.org>
+References: <5574633F.7090004@kernel.org>
+Message-ID: <1436391502-2604-1-git-send-email-xander.huff@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+The driver currently registers a pair of irq handlers using
+request_threaded_irq(), however the synchronization mechanism between the
+hardirq and the threadedirq handler is a regular spinlock.
 
-> Hi Arnd, Kevin, Olof,
->
-> Here is a bunch of late patches (because I forgot about them) for the
-> 4.2 merge window.
->
-> They're not really controversial, are fixing some issues for the A33
-> and H3 not having the reset controller initialised soon enough (by
-> adding their compatible to the already existing DT machine), and the
-> clock protection code not being run, resulting in the CPU (mainly)
-> clock being shut down at the end of the boot.
->
-> They've also been in linux-next for quite some time, so I don't expect
-> any breakage from them.
+Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
+and is thus not able to be acquired from a hardirq handler. This patch gets
+rid of the hardirq handler and pushes all interrupt handling into the
+threaded context.
 
-Hmm, this is just a tad bit late. ;)  Even several days after we sent our own
-"late" branch to Linus.  I'm afraid this is going to miss v4.2.
+To validate that this change has no impact on RT performance, here are
+cyclictest values with no processes running:
 
-If there are real fixes in here, feel free to send as separate patches
-and I'll queue them for v4.2-rc.
+$ sudo cyclictest -S -m -p 98
+# /dev/cpu_dma_latency set to 0us
+policy: fifo: loadavg: 0.05 0.04 0.05 1/237 828
+T: 0 ( 1861) P:98 I:1000 C:56925046 Min: 9 Act: 12 Avg: 12 Max: 71
+T: 1 ( 1862) P:98 I:1500 C:37950030 Min: 9 Act: 12 Avg: 13 Max: 74
 
-Kevin
+Then, all xadc raw handles were accessed in a continuous loop via
+/sys/bus/iio/devices/iio:device0:
+
+$ sudo cyclictest -S -m -p 98
+# /dev/cpu_dma_latency set to 0us
+policy: fifo: loadavg: 7.81 7.64 7.541 2/247 5751
+T: 0 ( 1568) P:98 I:1000 C:23845515 Min: 11 Act: 22 Avg: 21 Max: 71
+T: 1 ( 1569) P:98 I:1500 C:15897239 Min: 11 Act: 21 Avg: 22 Max: 68
+
+Signed-off-by: Xander Huff <xander.huff@ni.com>
+---
+ drivers/iio/adc/xilinx-xadc-core.c | 35 ++++++++++++-----------------------
+ 1 file changed, 12 insertions(+), 23 deletions(-)
+
+diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+index ce93bd8..b309ad3 100644
+--- a/drivers/iio/adc/xilinx-xadc-core.c
++++ b/drivers/iio/adc/xilinx-xadc-core.c
+@@ -279,28 +279,9 @@ static irqreturn_t xadc_zynq_threaded_interrupt_handler(int irq, void *devid)
+ {
+ 	struct iio_dev *indio_dev = devid;
+ 	struct xadc *xadc = iio_priv(indio_dev);
+-	unsigned int alarm;
+-
+-	spin_lock_irq(&xadc->lock);
+-	alarm = xadc->zynq_alarm;
+-	xadc->zynq_alarm = 0;
+-	spin_unlock_irq(&xadc->lock);
+-
+-	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
+-
+-	/* unmask the required interrupts in timer. */
+-	schedule_delayed_work(&xadc->zynq_unmask_work,
+-			msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+-{
+-	struct iio_dev *indio_dev = devid;
+-	struct xadc *xadc = iio_priv(indio_dev);
+ 	irqreturn_t ret = IRQ_HANDLED;
+ 	uint32_t status;
++	unsigned int alarm;
+ 
+ 	xadc_read_reg(xadc, XADC_ZYNQ_REG_INTSTS, &status);
+ 
+@@ -312,7 +293,6 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+ 	spin_lock(&xadc->lock);
+ 
+ 	xadc_write_reg(xadc, XADC_ZYNQ_REG_INTSTS, status);
+-
+ 	if (status & XADC_ZYNQ_INT_DFIFO_GTH) {
+ 		xadc_zynq_update_intmsk(xadc, XADC_ZYNQ_INT_DFIFO_GTH,
+ 			XADC_ZYNQ_INT_DFIFO_GTH);
+@@ -330,8 +310,18 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+ 		xadc_zynq_update_intmsk(xadc, 0, 0);
+ 		ret = IRQ_WAKE_THREAD;
+ 	}
++
++	alarm = xadc->zynq_alarm;
++	xadc->zynq_alarm = 0;
++
+ 	spin_unlock(&xadc->lock);
+ 
++	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
++
++	/* unmask the required interrupts in timer. */
++	schedule_delayed_work(&xadc->zynq_unmask_work,
++			msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
++
+ 	return ret;
+ }
+ 
+@@ -436,7 +426,6 @@ static const struct xadc_ops xadc_zynq_ops = {
+ 	.write = xadc_zynq_write_adc_reg,
+ 	.setup = xadc_zynq_setup,
+ 	.get_dclk_rate = xadc_zynq_get_dclk_rate,
+-	.interrupt_handler = xadc_zynq_interrupt_handler,
+ 	.threaded_interrupt_handler = xadc_zynq_threaded_interrupt_handler,
+ 	.update_alarm = xadc_zynq_update_alarm,
+ };
+@@ -1225,7 +1214,7 @@ static int xadc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_free_samplerate_trigger;
+ 
+-	ret = request_threaded_irq(irq, xadc->ops->interrupt_handler,
++	ret = request_threaded_irq(irq, 0,
+ 				xadc->ops->threaded_interrupt_handler,
+ 				0, dev_name(&pdev->dev), indio_dev);
+ 	if (ret)
+-- 
+1.9.1
