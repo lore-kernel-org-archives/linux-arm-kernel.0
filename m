@@ -1,49 +1,26 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 08 Jul 2015 10:36:13 +0200
-Subject: [PATCH] arm64: defconfig: Add Ceva ahci to the defconfig
-In-Reply-To: <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
-References: <457a921583db64bf74ae13b227bedf79cf86cff8.1435554123.git.michal.simek@xilinx.com>
- <20150706162645.GG27723@e104818-lin.cambridge.arm.com>
-Message-ID: <559CE0FD.6020509@xilinx.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 8 Jul 2015 16:37:44 +0800
+Subject: [PATCH 0/2] Add MT8173 MMPLL change rate support
+Message-ID: <1436344666-25645-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+MT8173 MMPLL frequency settings are different from common PLLs.
+It needs different post divider settings for some ranges of frequency.
+This patch add support for MT8173 MMPLL frequency setting, includes:
 
-On 07/06/2015 06:26 PM, Catalin Marinas wrote:
-> On Mon, Jun 29, 2015 at 07:02:08AM +0200, Michal Simek wrote:
->> From: Suneel Garapati <suneel.garapati@xilinx.com>
->>
->> The Ceva ahci controller is available on the Xilinx Zynq UltraScale+
->> MPSoC.
->>
->> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->>
->>  arch/arm64/configs/defconfig | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index f38c94f1d898..ef5b5d27a226 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -82,7 +82,7 @@ CONFIG_BLK_DEV_SD=y
->>  # CONFIG_SCSI_LOWLEVEL is not set
->>  CONFIG_ATA=y
->>  CONFIG_SATA_AHCI=y
->> -CONFIG_SATA_AHCI_PLATFORM=y
->> +CONFIG_AHCI_CEVA=y
-> 
-> Any reason why CONFIG_SATA_AHCI_PLATFORM is removed by this patch?
+1. Add div-rate table for PLLs.
+2. Increase the max ost divider setting from 3 (/8) to 4 (/16).
+3. Write postdiv and pcw settings at the same time.
 
-that's bug. :-( I thought that there was dependency but that's not truth.
+James Liao (2):
+  clk: mediatek: Fix PLL registers setting flow
+  clk: mediatek: Add MT8173 MMPLL change rate support
 
-> 
-> I merged the patch but modified it to only add CONFIG_AHCI_CEVA without
-> changing any other lines.
+ drivers/clk/mediatek/clk-mt8173.c | 24 +++++++++++++++++++++---
+ drivers/clk/mediatek/clk-mtk.h    |  6 ++++++
+ drivers/clk/mediatek/clk-pll.c    | 39 +++++++++++++++++++++++++++------------
+ 3 files changed, 54 insertions(+), 15 deletions(-)
 
-Thank you so much.
-
-Thanks,
-Michal
+--
+1.8.1.1.dirty
