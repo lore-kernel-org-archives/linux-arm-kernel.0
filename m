@@ -1,10 +1,10 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed,  8 Jul 2015 15:17:16 +0530
-Subject: [PATCH 7/9] arm: dts: apq8064: Add thermal zones,
+Date: Wed,  8 Jul 2015 15:17:15 +0530
+Subject: [PATCH 6/9] arm: dts: msm8974: Add thermal zones,
  tsens and eeprom nodes
 In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
 References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1436348838-22671-8-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1436348838-22671-7-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,14 +12,14 @@ Add thermal zones, tsens and eeprom nodes
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-apq8064.dtsi | 108 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 105 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 105 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index df2061e..c06e59f 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -76,6 +76,88 @@
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 37b47b5..30f3246 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -75,6 +75,88 @@
  		};
  	};
  
@@ -28,7 +28,7 @@ index df2061e..c06e59f 100644
 +			polling-delay-passive = <250>;
 +			polling-delay = <1000>;
 +
-+			thermal-sensors = <&tsens 7>;
++			thermal-sensors = <&tsens 5>;
 +
 +			trips {
 +				cpu_alert0: trip at 0 {
@@ -48,7 +48,7 @@ index df2061e..c06e59f 100644
 +			polling-delay-passive = <250>;
 +			polling-delay = <1000>;
 +
-+			thermal-sensors = <&tsens 8>;
++			thermal-sensors = <&tsens 6>;
 +
 +			trips {
 +				cpu_alert1: trip at 0 {
@@ -68,7 +68,7 @@ index df2061e..c06e59f 100644
 +			polling-delay-passive = <250>;
 +			polling-delay = <1000>;
 +
-+			thermal-sensors = <&tsens 9>;
++			thermal-sensors = <&tsens 7>;
 +
 +			trips {
 +				cpu_alert2: trip at 0 {
@@ -88,7 +88,7 @@ index df2061e..c06e59f 100644
 +			polling-delay-passive = <250>;
 +			polling-delay = <1000>;
 +
-+			thermal-sensors = <&tsens 10>;
++			thermal-sensors = <&tsens 8>;
 +
 +			trips {
 +				cpu_alert3: trip at 0 {
@@ -107,45 +107,37 @@ index df2061e..c06e59f 100644
 +
  	cpu-pmu {
  		compatible = "qcom,krait-pmu";
- 		interrupts = <1 10 0x304>;
-@@ -289,11 +371,37 @@
- 			qcom,controller-type = "pmic-arbiter";
+ 		interrupts = <1 7 0xf04>;
+@@ -103,6 +185,29 @@
+ 			      <0xf9002000 0x1000>;
  		};
  
-+		qfprom: qfprom at 00700000 {
-+			compatible	= "qcom,qfprom";
-+			reg		= <0x00700000 0x1000>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
-+			tsens_calib: calib {
-+				reg = <0x404 0x10>;
++		qfprom: qfprom at fc4bc000 {
++			#address-cells = <1>;
++			#size-cells = <1>;
++			compatible = "qcom,qfprom";
++			reg = <0xfc4bc000 0x1000>;
++			tsens_calib: calib at d0 {
++				reg = <0xd0 0x18>;
 +			};
-+			tsens_backup: backup_calib {
-+				reg = <0x414 0x10>;
++			tsens_backup: backup at 440 {
++				reg = <0x440 0x10>;
 +			};
 +		};
 +
- 		gcc: clock-controller at 900000 {
- 			compatible = "qcom,gcc-apq8064";
- 			reg = <0x00900000 0x4000>;
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#address-cells	= <1>;
-+			#size-cells	= <1>;
-+			ranges;
++		tsens: thermal-sensor at fc4a8000 {
++			compatible = "qcom,msm8974-tsens";
++			reg = <0xfc4a8000 0x2000>;
++			nvmem-cell = <&tsens_calib>, <&tsens_backup>;
++			nvmem-cell-names = "calib", "calib_backup";
++			qcom,tsens-slopes = <3200 3200 3200 3200 3200 3200
++				3200 3200 3200 3200 3200>;
++			#thermal-sensor-cells = <1>;
++		};
 +
-+			tsens: thermal-sensor at 900000 {
-+				compatible = "qcom,msm8960-tsens";
-+				nvmem-cell = <&tsens_calib>, <&tsens_backup>;
-+				nvmem-cell-names = "calib", "calib_backup";
-+				qcom,tsens-slopes = <1176 1176 1154 1176 1111
-+					1132 1132 1199 1132 1199 1132>;
-+				#thermal-sensor-cells = <1>;
-+			};
- 		};
- 
- 		lcc: clock-controller at 28000000 {
+ 		timer at f9020000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
