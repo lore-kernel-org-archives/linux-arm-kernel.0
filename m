@@ -1,83 +1,76 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 8 Jul 2015 22:55:23 +0200 (CEST)
-Subject: [RFC PATCH v6 3/3] drivers: nvmem: Add Vybrid OCOTP support
-In-Reply-To: <20150708053920.GA4089@Sanchayan-Arch.toradex.int>
-References: <cover.1435574288.git.maitysanchayan@gmail.com>
- <9593ca1f925aff20a6671262efd2f45e256ea676.1435574288.git.maitysanchayan@gmail.com>
- <1877493336.206622.1436177794342.JavaMail.open-xchange@oxbsltgw01.schlund.de>
- <20150707051953.GA3712@Sanchayan-Arch.toradex.int>
- <1488361449.258303.1436273347081.JavaMail.open-xchange@oxbsltgw01.schlund.de>
- <20150708053920.GA4089@Sanchayan-Arch.toradex.int>
-Message-ID: <24856127.49152.1436388923583.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jul 2015 22:07:34 +0100
+Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
+ socfpga_secondary_startup
+In-Reply-To: <559D765C.30102@opensource.altera.com>
+References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150708165115.GM7557@n2100.arm.linux.org.uk>
+ <559D765C.30102@opensource.altera.com>
+Message-ID: <20150708210734.GN7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanchayan,
+On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
+> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
+> user mode access.
 
-> maitysanchayan at gmail.com hat am 8. Juli 2015 um 07:39 geschrieben:
->
->
-> [...]
-> > > >
-> > > > Looking at valid_fuse_addr shows me 0x3F as last valid register. So the
-> > > > rest
-> > > > of the buffer ( 0xD00 - sizeof(valid_fuse_addr) ) in case of raw access
-> > > > could be
-> > > > uninitializied.
-> > >
-> > > Sorry I did not exactly get you here. The intention behind using the
-> > > valid_fuse_addr
-> > > is to allow reading only from valid fuse addresses and avoid reading from
-> > > all
-> > > other
-> > > locations as per the Fuse map address table 35-1.
-> >
-> > Yes, i got your intention. But from my unterstand the read function should
-> > fill
-> > up
-> > the complete buffer with defined values. My MXS OCOTP driver have the same
-> > problem
-> > and fill up the invalid registers with zero.
->
-> I must admit I had not thought of that. Thats a valid point. I dont know at
-> the
-> moment however what would be the correct approach here. Perhaps filling
-> locations
-> other than the valid fuse addresses as per the fuse map table with 0xBADABADA
-> is
-> the right thing? Anyways that's what is going to be returned if we were to
-> read
-> a location which is read locked or reserved.
+Hmm.
 
-since we are operating in userspace the behavior shouldn't be specific to the
-device.
-It would be good when all drivers behave the same. But i think it would be much
-better
-as the nvmem framework take care of it and preinit the buffer with a defined
-value.
+I think what you've found is a(nother) latent bug in the CPU bring up
+code.
 
->
-> However since the fuse address and base address mapping is not exactly linear,
-> this would require some additional logic than the simple thing I did. 
+For SMP CPUs, the sequence we're following during early initialisation is:
 
-I defined a regmap_access_table for valid read registers in my case. But i think
-in your case
-an implementation of the readable_reg callback in the regmap_config would be
-more elegant.
+1. Enable SMP coherency.
+2. Invalidate the caches.
 
-You can validate your implementation under /sys/kernel/debug/regmap/
+If the cache contains rubbish, enabling SMP coherency before invalidating
+the cache is plainly an absurd thing to do.
 
-Sorry, i'm a newbie to regmap.
+Can you try the patch below - not tested in any way, so you may need to
+tweak it, but it should allow us to prove that point.
 
-Stefan
-
-> Also OCOTP requires the fuse address to be written. May be using the nvmem
-> consumer DT property
-> gets something?! Not sure atm.
->
-> - Sanchayan.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 0716bbe19872..db5137fc297d 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -275,6 +275,10 @@ __v7_b15mp_setup:
+ __v7_ca17mp_setup:
+ 	mov	r10, #0
+ 1:
++	adr	r12, __v7_setup_stack		@ the local stack
++	stmia	r12, {r0-r5, r7, r9-r11, lr}
++	bl      v7_invalidate_l1
++	ldmia	r12, {r0-r5, r7, r9-r11, lr}
+ #ifdef CONFIG_SMP
+ 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+ 	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
+@@ -283,7 +287,7 @@ __v7_ca17mp_setup:
+ 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+ 	mcreq	p15, 0, r0, c1, c0, 1
+ #endif
+-	b	__v7_setup
++	b	__v7_setup_cont
+ 
+ /*
+  * Errata:
+@@ -417,6 +421,7 @@ __v7_setup:
+ 	bl      v7_invalidate_l1
+ 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+ 
++__v7_setup_cont:
+ 	and	r0, r9, #0xff000000		@ ARM?
+ 	teq	r0, #0x41000000
+ 	bne	__errata_finish
+@@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
+ 
+ 	.align	2
+ __v7_setup_stack:
+-	.space	4 * 11				@ 11 registers
++	.space	4 * 12				@ 12 registers
+ 
+ 	__INITDATA
+ 
+-- 
+FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
+according to speedtest.net.
