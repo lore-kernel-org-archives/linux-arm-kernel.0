@@ -1,88 +1,95 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 16:28:16 +0200
-Subject: [PATCHv4 3/6] dmaengine: mv_xor: remove support for dmacap,
- * DT properties
+Date: Wed,  8 Jul 2015 16:28:18 +0200
+Subject: [PATCHv4 5/6] dmaengine: mv_xor: de-duplicate mv_chan_set_mode*()
 In-Reply-To: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436365699-6862-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436365699-6862-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only reason why we had dmacap,* properties is because back when
-DMA_MEMSET was supported, only one out of the two channels per engine
-could do a memset operation. But this is something that the driver
-already knows anyway, and since then, the DMA_MEMSET support has been
-removed.
+When commit 6f166312c6ea2 ("dmaengine: mv_xor: add support for a38x
+command in descriptor mode") added support for the descriptor mode
+available in Marvell Armada 38x and later SoCs, it added a new
+function mv_chan_set_mode_to_desc() which allows to configure a XOR
+channel to get the specific operation to be done from each individual
+DMA descriptor.
 
-The driver is already well aware of what each channel supports and the
-one to one mapping between Linux specific implementation details (such
-as dmacap,interrupt enabling DMA_INTERRUPT) and DT properties is a
-good indication that these DT properties are wrong.
+However, this function was mainly a duplicate of the existing
+mv_chan_set_mode(), with just the operation being different.
 
-Therefore, this commit simply gets rid of these dmacap,* properties,
-they are now ignored, and the driver is responsible for knowing the
-capabilities of the hardware with regard to the dmaengine subsystem
-expectations.
+This commit re-organizes the code into a single mv_chan_set_mode()
+function, which takes the operation mode as argument, and the
+mv_xor_channel_add() function decides whether to use
+XOR_OPERATION_MODE_IN_DESC or XOR_OPERATION_MODE_XOR.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/dma/mv-xor.txt | 10 ++++------
- drivers/dma/mv_xor.c                             |  9 +++------
- 2 files changed, 7 insertions(+), 12 deletions(-)
+ drivers/dma/mv_xor.c | 41 +++--------------------------------------
+ 1 file changed, 3 insertions(+), 38 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
-index cc29c35..276ef81 100644
---- a/Documentation/devicetree/bindings/dma/mv-xor.txt
-+++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
-@@ -12,10 +12,13 @@ XOR engine has. Those sub-nodes have the following required
- properties:
- - interrupts: interrupt of the XOR channel
- 
--And the following optional properties:
-+The sub-nodes used to contain one or several of the following
-+properties, but they are now deprecated:
- - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
- - dmacap,memset to indicate that the XOR channel is capable of memset operations
- - dmacap,xor to indicate that the XOR channel is capable of xor operations
-+- dmacap,interrupt to indicate that the XOR channel is capable of
-+  generating interrupts
- 
- Example:
- 
-@@ -28,13 +31,8 @@ xor at d0060900 {
- 
- 	xor00 {
- 	      interrupts = <51>;
--	      dmacap,memcpy;
--	      dmacap,xor;
- 	};
- 	xor01 {
- 	      interrupts = <52>;
--	      dmacap,memcpy;
--	      dmacap,xor;
--	      dmacap,memset;
- 	};
- };
 diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-index 0a3ddc2..6aedc36 100644
+index 1fe3e33..6e09d59 100644
 --- a/drivers/dma/mv_xor.c
 +++ b/drivers/dma/mv_xor.c
-@@ -1236,12 +1236,9 @@ static int mv_xor_probe(struct platform_device *pdev)
- 			op_in_desc = (int)of_id->data;
+@@ -139,45 +139,10 @@ static void mv_chan_clear_err_status(struct mv_xor_chan *chan)
+ }
  
- 			dma_cap_zero(cap_mask);
--			if (of_property_read_bool(np, "dmacap,memcpy"))
--				dma_cap_set(DMA_MEMCPY, cap_mask);
--			if (of_property_read_bool(np, "dmacap,xor"))
--				dma_cap_set(DMA_XOR, cap_mask);
--			if (of_property_read_bool(np, "dmacap,interrupt"))
--				dma_cap_set(DMA_INTERRUPT, cap_mask);
-+			dma_cap_set(DMA_MEMCPY, cap_mask);
-+			dma_cap_set(DMA_XOR, cap_mask);
-+			dma_cap_set(DMA_INTERRUPT, cap_mask);
+ static void mv_chan_set_mode(struct mv_xor_chan *chan,
+-			     enum dma_transaction_type type)
++			     u32 op_mode)
+ {
+-	u32 op_mode;
+ 	u32 config = readl_relaxed(XOR_CONFIG(chan));
  
- 			irq = irq_of_parse_and_map(np, 0);
- 			if (!irq) {
+-	switch (type) {
+-	case DMA_XOR:
+-		op_mode = XOR_OPERATION_MODE_XOR;
+-		break;
+-	case DMA_MEMCPY:
+-		op_mode = XOR_OPERATION_MODE_MEMCPY;
+-		break;
+-	default:
+-		dev_err(mv_chan_to_devp(chan),
+-			"error: unsupported operation %d\n",
+-			type);
+-		BUG();
+-		return;
+-	}
+-
+-	config &= ~0x7;
+-	config |= op_mode;
+-
+-#if defined(__BIG_ENDIAN)
+-	config |= XOR_DESCRIPTOR_SWAP;
+-#else
+-	config &= ~XOR_DESCRIPTOR_SWAP;
+-#endif
+-
+-	writel_relaxed(config, XOR_CONFIG(chan));
+-}
+-
+-static void mv_chan_set_mode_to_desc(struct mv_xor_chan *chan)
+-{
+-	u32 op_mode;
+-	u32 config = readl_relaxed(XOR_CONFIG(chan));
+-
+-	op_mode = XOR_OPERATION_MODE_IN_DESC;
+-
+ 	config &= ~0x7;
+ 	config |= op_mode;
+ 
+@@ -1042,9 +1007,9 @@ mv_xor_channel_add(struct mv_xor_device *xordev,
+ 	mv_chan_unmask_interrupts(mv_chan);
+ 
+ 	if (mv_chan->op_in_desc == XOR_MODE_IN_DESC)
+-		mv_chan_set_mode_to_desc(mv_chan);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_IN_DESC);
+ 	else
+-		mv_chan_set_mode(mv_chan, DMA_XOR);
++		mv_chan_set_mode(mv_chan, XOR_OPERATION_MODE_XOR);
+ 
+ 	spin_lock_init(&mv_chan->lock);
+ 	INIT_LIST_HEAD(&mv_chan->chain);
 -- 
 2.4.5
