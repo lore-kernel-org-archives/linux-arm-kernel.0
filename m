@@ -1,48 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 08 Jul 2015 11:44:40 +0100
-Subject: [PATCH 3/4] irqchip, gicv3: Implement Cavium ThunderX erratum
- 23154
-In-Reply-To: <20150708102846.GT10428@rric.localhost>
-References: <1435673643-31676-1-git-send-email-rric@kernel.org>
- <1435673643-31676-4-git-send-email-rric@kernel.org>
- <559A5BB6.2040509@arm.com> <20150708102846.GT10428@rric.localhost>
-Message-ID: <559CFF18.8090803@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 8 Jul 2015 12:48:34 +0200 (CEST)
+Subject: [PATCH v3 09/15] irqchip: gicv3-its: Split PCI/MSI code from
+ the core ITS driver
+In-Reply-To: <1436289485-28230-10-git-send-email-marc.zyngier@arm.com>
+References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
+ <1436289485-28230-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.DEB.2.11.1507081245120.5134@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/15 11:28, Robert Richter wrote:
-> Marc,
-> 
-> On 06.07.15 11:43:02, Marc Zyngier wrote:
->> On 30/06/15 15:14, Robert Richter wrote:
->>>  static const struct gic_capabilities gicv3_errata[] = {
->>>  	{
->>> +		.desc	= "GIC: Cavium erratum 23154",
->>> +		.id	= 0xa100034c,	/* ThunderX pass 1.x */
->>> +		.mask	= 0xffff0fff,
->>> +		.init	= gicv3_enable_cavium_thunderx,
->>> +	},
->>> +	{
->>>  	}
->>>  };
->>>  
->>>
->>
->> How does this work when running a guest? Does the virtualized access
->> suffer from the same erratum? If that's the case, we need a better
->> workaround...
-> 
-> We need to apply the workaround also for guests. So you are right,
-> evaluating GICD_IIDR does not enable the workaround then as the
-> register is emulated with ARM as implementer.
-> 
-> We considering MIDR_EL1 as a version check for this errata now. This
-> should be the host's cpuid when running as a guest, right?
+On Tue, 7 Jul 2015, Marc Zyngier wrote:
+> +static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+> +			       int nvec, msi_alloc_info_t *info)
+> +{
+> +	struct pci_dev *pdev;
+> +	struct its_pci_alias dev_alias;
+> +
+> +	if (!dev_is_pci(dev))
+> +		return -EINVAL;
+> +
+> +	pdev = to_pci_dev(dev);
+> +	dev_alias.pdev = pdev;
+> +	dev_alias.count = nvec;
+> +
+> +	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+> +
+> +	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
 
-Yes, that should work, as we don't repaint MIDR_EL1 *yet*. But it also
-means that we're going to have a hard time emulating another CPU (such
-as A57) on top of ThunderX. Probably not a big deal at the moment...
+I don't think you need its_msi_prepare() exposed to child
+drivers. Something like
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+  domain->parent->ops->msi_prepare()
+
+should do the trick.
+
+Thanks,
+
+	tglx
