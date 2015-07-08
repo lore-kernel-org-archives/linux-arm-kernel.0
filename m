@@ -1,35 +1,166 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jul 2015 16:42:59 +0530
-Subject: [PATCH v2 0/9] cpufreq: Introduce support for ST's cpufreq
- functionality
-In-Reply-To: <20150708105958.GO3182@x1>
-References: <1435154348-28840-1-git-send-email-lee.jones@linaro.org>
- <20150708105054.GB1805@linux> <20150708105958.GO3182@x1>
-Message-ID: <20150708111259.GC1805@linux>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Wed, 08 Jul 2015 13:09:11 +0200
+Subject: [PATCH 27/37] usb: gadget: pxa25x_udc: add ep capabilities support
+In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436353761-7107-28-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-07-15, 11:59, Lee Jones wrote:
-> No problem.  So long as it's still on your radar.
+Convert endpoint configuration to new capabilities model.
 
-So, for the first 7 patches:
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/gadget/udc/pxa25x_udc.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Reviewed-by: Viresh Kumar <viresh.kumar@linaro.org>
-
-but for the last two:
-- I thought we agreed that you will have a look at opp-v2 bindings and
-  create your new bindings as an extension of those ? As we support
-  extending opp-v2 bindings per vendor basis.
-- And I don't really think you need to create a device for your STM
-  driver, why not move your stm-cpufreq file to arch/arm/- and call it
-  from .init_late, from where you call init_cpufreq() today. Your
-  driver doesn't have anything related to cpufreq-core really and
-  isn't required to stay in drivers/cpufreq, unless you want it that
-  way.
-
-I haven't reviewed the driver yet and waiting for an answer to opp-v2
-question I asked above. opp-v2 is created because we didn't wanted
-platforms to create new separate bindings for OPPs :)
-
+diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
+index f6cbe66..1301e29 100644
+--- a/drivers/usb/gadget/udc/pxa25x_udc.c
++++ b/drivers/usb/gadget/udc/pxa25x_udc.c
+@@ -1821,6 +1821,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= ep0name,
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= EP0_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_CONTROL,
++						USB_EP_CAPS_DIR_ALL),
+ 		},
+ 		.dev		= &memory,
+ 		.reg_udccs	= &UDCCS0,
+@@ -1833,6 +1835,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep1in-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1846,6 +1850,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep2out-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1861,6 +1867,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep3in-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -1874,6 +1882,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep4out-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -1888,6 +1898,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep5in-int",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= INT_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_INT,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= INT_FIFO_SIZE,
+@@ -1903,6 +1915,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep6in-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1916,6 +1930,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep7out-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1930,6 +1946,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep8in-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -1943,6 +1961,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep9out-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -1957,6 +1977,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep10in-int",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= INT_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_INT,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= INT_FIFO_SIZE,
+@@ -1972,6 +1994,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep11in-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1985,6 +2009,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep12out-bulk",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= BULK_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_BULK,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= BULK_FIFO_SIZE,
+@@ -1999,6 +2025,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep13in-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -2012,6 +2040,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep14out-iso",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= ISO_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_ISO,
++						USB_EP_CAPS_DIR_OUT),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= ISO_FIFO_SIZE,
+@@ -2026,6 +2056,8 @@ static struct pxa25x_udc memory = {
+ 			.name		= "ep15in-int",
+ 			.ops		= &pxa25x_ep_ops,
+ 			.maxpacket	= INT_FIFO_SIZE,
++			.caps		= USB_EP_CAPS(USB_EP_CAPS_TYPE_INT,
++						USB_EP_CAPS_DIR_IN),
+ 		},
+ 		.dev		= &memory,
+ 		.fifo_size	= INT_FIFO_SIZE,
 -- 
-viresh
+1.9.1
