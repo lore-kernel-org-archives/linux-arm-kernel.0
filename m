@@ -1,86 +1,87 @@
-From: ankgupta@codeaurora.org (Ankit Gupta)
-Date: Wed,  8 Jul 2015 16:26:03 -0600
-Subject: [PATCH V4] trace/events: add chip name and hwirq to irq entry
- tracepoint
-Message-ID: <1436394363-15797-1-git-send-email-ankgupta@codeaurora.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Wed, 8 Jul 2015 16:26:49 -0600
+Subject: [PATCH v4 3/5] tee: generic TEE subsystem
+In-Reply-To: <20150708211129.GA29824@kroah.com>
+References: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
+ <1436350592-7732-4-git-send-email-jens.wiklander@linaro.org>
+ <20150708171026.GA11740@obsidianresearch.com>
+ <20150708211129.GA29824@kroah.com>
+Message-ID: <20150708222649.GA20068@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add chip name and hw-irq number to the trace_irq_handler_entry()
-tracepoint. When tracing interrupt events the chip-name and hw-irq
-numbers are stable and known in advance. This makes them a better
-choice as a filtering criteria for the trace buffer dump. On the
-flipside, the os-irq numbers are dynamically allocated which makes
-them difficult to use for the same purpose.
+On Wed, Jul 08, 2015 at 02:11:29PM -0700, Greg Kroah-Hartman wrote:
+> > > +       cdev_init(&teedev->cdev, &tee_fops);
+> > > +       teedev->cdev.owner = teedesc->owner;
+> > 
+> > This also needs to set teedev->cdev.kobj.parent.
+> > I'm guessing:
+> > 
+> >  teedev->cdev.kobj.parent = &teedev->dev.kobj;
+> > 
+> > TPM had the same mistake..
+> 
+> Really?  As of a few years ago, A cdev's kobject should not be touched
+> by anything other than the cdev core.  It's not a "real" kobject in that
+> it is never registered in sysfs, and no one sees it.  I keep meaning to
 
-Dump messages will look like:
-...irq_handler_entry: irq=22 name=msm_serial0 chip_name=GIC hwirq=140
+Well, when I looked at it, it looked like it was necessary to maintain
+the refcount on the memory that is holding cdev.
 
-Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-Reviewed-by: Andy Gross <agross@codeaurora.org>
-Signed-off-by: Gilad Avidov <gavidov@codeaurora.org>
-Signed-off-by: Ankit Gupta <ankgupta@codeaurora.org>
----
-Changes since V3:
-- use field variable in trace structure to assign value for chip name
-  and hwirq rather than printing directly to the trace buffer.
----
-Changes since V2:
-- fixed dump message in commit text to reflect Chip name
-  instead of domain.
----
-Changes since V1:
-- added reviewed by Andy Gross
----
- include/trace/events/irq.h | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+The basic issue is that cdev_del doesn't seem to be synchronizing.
 
-diff --git a/include/trace/events/irq.h b/include/trace/events/irq.h
-index 3608beb..0898506 100644
---- a/include/trace/events/irq.h
-+++ b/include/trace/events/irq.h
-@@ -23,6 +23,17 @@ struct softirq_action;
- 			 softirq_name(HRTIMER),		\
- 			 softirq_name(RCU))
- 
-+
-+#define show_chip_name(irq)					\
-+	(irq_get_irq_data(irq)					\
-+			 ? irq_get_irq_data(irq)->chip->name	\
-+			 : "NULL")
-+
-+#define show_hwirq(irq)						\
-+	(irq_get_irq_data(irq)					\
-+			 ? irq_get_irq_data(irq)->hwirq		\
-+			 : -ENODEV)
-+
- /**
-  * irq_handler_entry - called immediately before the irq action handler
-  * @irq: irq number
-@@ -41,16 +52,21 @@ TRACE_EVENT(irq_handler_entry,
- 	TP_ARGS(irq, action),
- 
- 	TP_STRUCT__entry(
--		__field(	int,	irq		)
--		__string(	name,	action->name	)
-+		__field(   int,	          irq	               )
-+		__field(   unsigned long, hwirq                )
-+		__string(  name,	  action->name	       )
-+		__string(  chip,	  show_chip_name(irq)  )
- 	),
- 
- 	TP_fast_assign(
- 		__entry->irq = irq;
-+		__entry->hwirq = show_hwirq(irq);
- 		__assign_str(name, action->name);
-+		__assign_str(chip, show_chip_name(irq));
- 	),
- 
--	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
-+	TP_printk("irq=%d name=%s chip=%s hwirq=%ld", __entry->irq,
-+	  __get_str(name), __get_str(chip), __entry->hwirq)
- );
- 
- /**
--- 
-1.8.5.2
+The use after free race is then something like:
+
+   struct tpm_chip {
+ 	struct device dev;
+	struct cdev cdev;
+
+       CPU0                            CPU1
+=================             ======================
+tpm_chip = kalloc
+cdev_add(&tpm_chip->cdev)
+device_add(&tpm_chip->dev)
+                                chrdev_open
+		                 filp->f_op->open
+cdev_del(&tpm_chip->cdev)
+device_unregister
+   (&tpm_chip->dev)
+ kfree(tpm_chip)
+		                  tpm_chip = container_of
+				 fput
+				  cdev_put(.. cdev)
+
+Ie we need cdev to hold a ref on tpm_chip->dev until cdev_put is
+called.
+
+> just use something else one of these days for that structure, as lots of
+> people get it wrong.  Or has things changed there?
+
+Not recently, but this is the commit:
+
+commit 2f0157f13f42800aa3d9017ebb0fb80a65f7b2de
+Author: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+Date:   Sun Oct 21 17:57:19 2012 -0700
+
+    char_dev: pin parent kobject
+    
+    In certain cases (for example when a cdev structure is embedded into
+    another object whose lifetime is controlled by a separate kobject) it is
+    beneficial to tie lifetime of another object to the lifetime of
+    character device so that related object is not freed until after
+    char_dev object is freed.
+    
+    To achieve this let's pin kobject's parent when doing cdev_add() and
+    unpin when last reference to cdev structure is being released.
+    
+    Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+    Acked-by: Al Viro <viro@zeniv.linux.org.uk>
+    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+
+It doesn't seem the be the best situation, this is the 3rd time this
+week I've noticed cdev with a kalloc'd struct being used improperly.
+
+Perhaps cdev_init should accept the module and kref parent as an
+argument?
+
+Jason
