@@ -1,71 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Jul 2015 17:19:03 +0100
-Subject: [PATCH 00/13] arm64: Virtualization Host Extension support
-Message-ID: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed,  8 Jul 2015 17:19:06 +0100
+Subject: [PATCH 03/13] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+In-Reply-To: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436372356-30410-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.1 comes with the "Virtualization Host Extension" (VHE for
-short), which enables simpler support of Type-2 hypervisors.
+Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
+CPU has the ARMv8,1 VHE capability.
 
-This extension allows the kernel to directly run at EL2, and
-significantly reduces the number of system registers shared between
-host and guest, reducing the overhead of virtualization.
+This will be used to trigger kernel patching in KVM.
 
-In order to have the same kernel binary running on all versions of the
-architecture, this series makes heavy use of runtime code patching.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h |  3 ++-
+ arch/arm64/kernel/cpufeature.c      | 11 +++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-The first ten patches massage the KVM code to deal with VHE and enable
-Linux to run at EL2.
-
-The next patch catches an ugly case when VHE capable CPUs are paired
-with some of their less capable siblings. This should never happen,
-but hey...
-
-The last two patches add an optimisation allowing a physical interrupt
-to be serviced on the host without doing a full save/restore, leading
-to potential reduction in interrupt latency.
-
-This has been tested on the FVP_Base_SLV-V8-A model, and based on
-v4.2-rc1. I've put a branch out on:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe
-
-Marc Zyngier (13):
-  arm/arm64: Add new is_kernel_in_hyp_mode predicate
-  arm64: Allow the arch timer to use the HYP timer
-  arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
-  arm64: KVM: skip HYP setup when already running in HYP
-  arm64: KVM: VHE: macroize VTCR_EL2 setup
-  arm64: KVM: VHE: Patch out kern_hyp_va
-  arm64: KVM: VHE: Patch out use of HVC
-  arm64: KVM: VHE: Preserve VHE config in world switch
-  arm64: KVM: VHE: Add alternatives for VHE-enabled world-switch
-  arm64: Add support for running Linux in EL2 mode
-  arm64: Panic when VHE and non VHE CPUs coexist
-  arm64: KVM: Split sysreg save/restore
-  arm64: KVM: VHE: Early interrupt handling
-
- arch/arm/include/asm/virt.h          |   5 +
- arch/arm/kvm/arm.c                   | 134 ++++++++-----
- arch/arm/kvm/mmu.c                   |   6 +
- arch/arm64/include/asm/cpufeature.h  |   3 +-
- arch/arm64/include/asm/kvm_arm.h     |   1 +
- arch/arm64/include/asm/kvm_asm.h     |  40 +++-
- arch/arm64/include/asm/kvm_emulate.h |   2 +
- arch/arm64/include/asm/kvm_mmu.h     |  24 ++-
- arch/arm64/include/asm/virt.h        |  25 +++
- arch/arm64/kernel/cpufeature.c       |  11 ++
- arch/arm64/kernel/head.S             |  38 +++-
- arch/arm64/kernel/smp.c              |   4 +
- arch/arm64/kvm/hyp-init.S            |   9 +-
- arch/arm64/kvm/hyp.S                 | 363 ++++++++++++++++++++++++-----------
- arch/arm64/kvm/vgic-v2-switch.S      |  19 +-
- arch/arm64/kvm/vgic-v3-switch.S      |  33 ++--
- arch/arm64/kvm/vhe-macros.h          |  54 ++++++
- drivers/clocksource/arm_arch_timer.c |  96 +++++----
- 18 files changed, 638 insertions(+), 229 deletions(-)
- create mode 100644 arch/arm64/kvm/vhe-macros.h
-
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index c104421..6c3742d 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -25,8 +25,9 @@
+ #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+ #define ARM64_WORKAROUND_845719			2
+ #define ARM64_HAS_SYSREG_GIC_CPUIF		3
++#define ARM64_HAS_VIRT_HOST_EXTN		4
+ 
+-#define ARM64_NCAPS				4
++#define ARM64_NCAPS				5
+ 
+ #ifndef __ASSEMBLY__
+ 
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 5ad86ce..e1dcd63 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -21,6 +21,7 @@
+ #include <linux/types.h>
+ #include <asm/cpu.h>
+ #include <asm/cpufeature.h>
++#include <asm/virt.h>
+ 
+ static bool
+ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+@@ -31,6 +32,11 @@ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+ 	return (val & entry->register_mask) == entry->register_value;
+ }
+ 
++static bool runs_at_el2(const struct arm64_cpu_capabilities *entry)
++{
++	return is_kernel_in_hyp_mode();
++}
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -39,6 +45,11 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.register_mask = (0xf << 24),
+ 		.register_value = (1 << 24),
+ 	},
++	{
++		.desc = "Virtualization Host Extensions",
++		.capability = ARM64_HAS_VIRT_HOST_EXTN,
++		.matches = runs_at_el2,
++	},
+ 	{},
+ };
+ 
 -- 
 2.1.4
