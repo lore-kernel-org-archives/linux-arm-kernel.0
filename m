@@ -1,42 +1,60 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 08 Jul 2015 14:22:28 -0700
-Subject: [GIT PULL] CSR atlas7 pinctrl descriptions for 4.2
-In-Reply-To: <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
- (Barry Song's message of "Mon, 6 Jul 2015 10:35:12 +0800")
-References: <CAGsJ_4x7rSFCJW6=9=WpGSUBf0yaCpcxXA22W5k+mZ=9qk5SGg@mail.gmail.com>
- <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
-Message-ID: <7hy4iqcpkb.fsf@deeprootsystems.com>
+Date: Wed, 08 Jul 2015 14:26:33 -0700
+Subject: [PATCH] GICv3: Add ITS entry to THUNDER dts
+In-Reply-To: <20150703095755.GH25907@e104818-lin.cambridge.arm.com> (Catalin
+ Marinas's message of "Fri, 3 Jul 2015 10:57:56 +0100")
+References: <1435345943-31833-1-git-send-email-tchalamarla@caviumnetworks.com>
+ <D2BD6D7B-E4B2-46B8-A324-9261DCFA2642@caviumnetworks.com>
+ <20150703095755.GH25907@e104818-lin.cambridge.arm.com>
+Message-ID: <7hpp42cpdi.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Barry Song <21cnbao@gmail.com> writes:
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-> 2015-06-10 15:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
->> Hi Arnd, Kevin, Olof,
->>
->> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
->>
->>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
->> tags/atlas7-pinctrl-dts-for-4.2
->>
->> for you to fetch changes up to 27b0d37e4209f3fc40c65e2b7936ee4154f4070d:
->>
->>   ARM: dts: atlas7: add pinctrl and gpio descriptions (2015-06-10
->> 15:00:50 +0800)
+> On Thu, Jul 02, 2015 at 08:26:02PM +0000, Chalamarla, Tirumalesh wrote:
+>> > On Jun 26, 2015, at 12:12 PM, Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com> wrote:
+>> > 
+>> > From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>> > 
+>> > The PCIe host controller uses MSIs provided by GICv3 ITS. Enable it on
+>> > Thunder SoCs by adding an entry to DT.
+>> > 
+>> > Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>> > ---
+>> > arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 9 +++++++++
+>> > 1 file changed, 9 insertions(+)
+>> > 
+>> > diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>> > index d8c0bdc..9cb7cf9 100644
+>> > --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>> > +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>> > @@ -376,10 +376,19 @@
+>> > 		gic0: interrupt-controller at 8010,00000000 {
+>> > 			compatible = "arm,gic-v3";
+>> > 			#interrupt-cells = <3>;
+>> > +			#address-cells = <2>;
+>> > +			#size-cells = <2>;
+>> > +			ranges;
+>> > 			interrupt-controller;
+>> > 			reg = <0x8010 0x00000000 0x0 0x010000>, /* GICD */
+>> > 			      <0x8010 0x80000000 0x0 0x600000>; /* GICR */
+>> > 			interrupts = <1 9 0xf04>;
+>> > +
+>> > +			its: gic-its at 8010,00020000 {
+>> > +				compatible = "arm,gic-v3-its";
+>> > +				msi-controller;
+>> > +				reg = <0x8010 0x20000 0x0 0x200000>;
+>> > +			};
+>> > 		};
+>> > 
+>> > 		uaa0: serial at 87e0,24000000 {
+>> 
+>> is it possible to pull this for 4.2?
 >
-> Hi Arnd, Kevin, Olof,
->
-> have you missed this one? it is a follow-up patch to "pinctrl: sirf:
-> add sirf atlas7 pinctrl and gpio support"
+> The dts files go in via the arm-soc tree (cc'ing arm at kernel.org).
 
-Sorry, I hadn't see the original, but found it in my spam folder.  
-
-> do we still have any chance to make it in 4.2?
-
-Yes, I've merged both of your pulls into the fixes branch for v4.2-rc.
+Picked this up for v4.2-rc,
 
 Kevin
