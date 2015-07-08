@@ -1,63 +1,116 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Jul 2015 19:38:42 +0800
-Subject: [PATCH 4/4] arm: psci: add cpuidle_ops support
-In-Reply-To: <20150708103429.GL7557@n2100.arm.linux.org.uk>
-References: <1436350417-6712-1-git-send-email-jszhang@marvell.com>
- <1436350417-6712-5-git-send-email-jszhang@marvell.com>
- <20150708103429.GL7557@n2100.arm.linux.org.uk>
-Message-ID: <20150708193842.1ca1c55a@xhacker>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Wed, 08 Jul 2015 13:09:21 +0200
+Subject: [PATCH 37/37] usb: gadget: epautoconf: add endpoint capabilities flags
+ verification
+In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436353761-7107-38-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+Introduce endpoint matching mechanism basing on endpoint capabilities
+flags. We check if endpoint supports transfer type and direction requested
+in ep descriptor. Since we have this new endpoint matching mechanism
+there is no need to have old code guessing endpoint capabilities basing
+on its name, so we are getting rid of it.
 
-On Wed, 8 Jul 2015 11:34:29 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/gadget/epautoconf.c | 72 +++++++++++++----------------------------
+ 1 file changed, 22 insertions(+), 50 deletions(-)
 
-> On Wed, Jul 08, 2015 at 06:13:37PM +0800, Jisheng Zhang wrote:
-> > This patch implements cpuidle_ops using psci. After this patch, we can use
-> > cpuidle-arm.c with psci backend for both arm and arm64.
-> 
-> I really don't see the point of most of the patches in this series.
-> 
-> To summarise, what you're doing is:
-> 
-> 1. Renaming arch/arm/kernel/psci_smp.c to arch/arm/kernel/psci.c
-> 2. Adding a #ifdef CONFIG_SMP around _all_ the code in psci.c
-> 3. Adding cpuidle code with an #ifdef CONFIG_CPU_IDLE around all the
->    CPU idle code.
-> 
-> So, we end up with a file which contains:
-> 
-> /*
->  header
->  */
-> #include statements
-> 
-> /*
->  some commentry relevant to SMP code
->  */
-> #ifdef CONFIG_CPU_IDLE
-> ... cpu idle code ...
-> #endif
-> #ifdef CONFIG_SMP
-> ... smp code ...
-> #endif
-> 
-> which (a) is a mess, and (b) is unnecessary.  The only relevant bits which
-> are shared are the #include statements.
-> 
-> Please try this alternative approach:
-> 
-> 1. Leave psci_smp.c alone.
-> 2. Add arch/arm/kernel/psci_cpuidle.c containing the #include statements
->    you need, and the CPU idle code.
-> 
-> I think such an approach will reduce your patch series to two patches,
-> one moving the ARM64 code, and one adding the cpuidle code.
-> 
-
-Good idea! Will refine the patches as you suggested.
-
-Thanks a lot for your review,
-Jisheng
+diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+index 8e00ca7..38df22a 100644
+--- a/drivers/usb/gadget/epautoconf.c
++++ b/drivers/usb/gadget/epautoconf.c
+@@ -47,7 +47,6 @@ ep_matches (
+ )
+ {
+ 	u8		type;
+-	const char	*tmp;
+ 	u16		max;
+ 
+ 	int		num_req_streams = 0;
+@@ -56,58 +55,31 @@ ep_matches (
+ 	if (ep->claimed)
+ 		return 0;
+ 
+-	/* only support ep0 for portable CONTROL traffic */
+ 	type = usb_endpoint_type(desc);
+-	if (USB_ENDPOINT_XFER_CONTROL == type)
+-		return 0;
+-
+-	/* some other naming convention */
+-	if ('e' != ep->name[0])
++	switch (type) {
++	case USB_ENDPOINT_XFER_CONTROL:
++		/* only support ep0 for portable CONTROL traffic */
+ 		return 0;
++	case USB_ENDPOINT_XFER_ISOC:
++		if (!ep->caps.type_iso)
++			return 0;
++		break;
++	case USB_ENDPOINT_XFER_BULK:
++		if (!ep->caps.type_bulk)
++			return 0;
++		break;
++	case USB_ENDPOINT_XFER_INT:
++		if (!ep->caps.type_int)
++			return 0;
++		break;
++	}
+ 
+-	/* type-restriction:  "-iso", "-bulk", or "-int".
+-	 * direction-restriction:  "in", "out".
+-	 */
+-	if ('-' != ep->name[2]) {
+-		tmp = strrchr (ep->name, '-');
+-		if (tmp) {
+-			switch (type) {
+-			case USB_ENDPOINT_XFER_INT:
+-				/* bulk endpoints handle interrupt transfers,
+-				 * except the toggle-quirky iso-synch kind
+-				 */
+-				if ('s' == tmp[2])	// == "-iso"
+-					return 0;
+-				/* for now, avoid PXA "interrupt-in";
+-				 * it's documented as never using DATA1.
+-				 */
+-				if (gadget_is_pxa (gadget)
+-						&& 'i' == tmp [1])
+-					return 0;
+-				break;
+-			case USB_ENDPOINT_XFER_BULK:
+-				if ('b' != tmp[1])	// != "-bulk"
+-					return 0;
+-				break;
+-			case USB_ENDPOINT_XFER_ISOC:
+-				if ('s' != tmp[2])	// != "-iso"
+-					return 0;
+-			}
+-		} else {
+-			tmp = ep->name + strlen (ep->name);
+-		}
+-
+-		/* direction-restriction:  "..in-..", "out-.." */
+-		tmp--;
+-		if (!isdigit (*tmp)) {
+-			if (desc->bEndpointAddress & USB_DIR_IN) {
+-				if ('n' != *tmp)
+-					return 0;
+-			} else {
+-				if ('t' != *tmp)
+-					return 0;
+-			}
+-		}
++	if (usb_endpoint_dir_in(desc)) {
++		if (!ep->caps.dir_in)
++			return 0;
++	} else {
++		if (!ep->caps.dir_out)
++			return 0;
+ 	}
+ 
+ 	/*
+-- 
+1.9.1
