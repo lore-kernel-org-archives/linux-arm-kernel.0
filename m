@@ -1,156 +1,305 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  8 Jul 2015 12:16:27 +0200
-Subject: [PATCH v4 0/5] generic TEE subsystem
-Message-ID: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
+Date: Wed,  8 Jul 2015 12:16:28 +0200
+Subject: [PATCH v4 1/5] arm/arm64: add smccc ARCH32
+In-Reply-To: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
+References: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1436350592-7732-2-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Adds helpers to do SMC based on ARM SMC Calling Convention.
+CONFIG_HAVE_SMCCC is enabled for architectures that may support
+the SMC instruction. It's the responsibility of the caller to
+know if the SMC instruction is supported by the platform.
 
-This patch set introduces a generic TEE subsystem. The TEE subsystem will be
-able contain drivers for various TEE implementations. A TEE (Trusted
-Execution Environment) is a trusted OS running in some secure environment,
-for example, TrustZone on ARM cpus, or a separate secure co-processor etc.
-
-Regarding use cases, TrustZone has traditionally been used for
-offloading secure tasks to the secure world. Examples include banking
-applications, Digital Rights Management (DRM), or specific secure
-solutions.
-
-This TEE subsystem can serve a TEE driver for a Global Platform compliant
-TEE, but it's not limited to only Global Platform TEEs.  One reason why I'm
-doing this to be able to get an OP-TEE (https://github.com/OP-TEE/optee_os)
-driver upstream.
-
-"tee: generic TEE subsystem" brings in the generic TEE subsystem which
-helps when writing a driver for a specific TEE, for example, OP-TEE.
-
-"tee: add OP-TEE driver" is an OP-TEE driver which uses the subsystem to do
-its work.
-
-This patch set has been prepared in cooperation with Javier Gonz?lez who
-proposed "Generic TrustZone Driver in Linux Kernel" patches 28 Nov 2014,
-https://lwn.net/Articles/623380/ . We've since then changed the scope to
-TEE instead of TrustZone.
-
-We have discussed the design on tee-dev at lists.linaro.org (archive at
-https://lists.linaro.org/pipermail/tee-dev/) with people from other
-companies, including Valentin Manea <valentin.manea@huawei.com>,
-Emmanuel MICHEL <emmanuel.michel@st.com>,
-Jean-michel DELORME <jean-michel.delorme@st.com>,
-and Joakim Bech <joakim.bech@linaro.org>. Our main concern has been to
-agree on something that is generic enough to support many different
-TEEs while still keeping the interface together.
-
-v4:
-* Rebased on 4.1
-* Redesigned the synchronization around entry exit of normal SMC
-* Replaced rwsem on the driver instance with kref and completion since
-  rwsem wasn't intended to be used in this way
-* Expanded the TEE_IOCTL_PARAM_ATTR_TYPE_MASK to make room for
-  future additional parameter types
-* Documents TEE subsystem and OP-TEE driver
-* Replaced TEE_IOC_CMD with TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
-  TEE_IOC_CANCEL and TEE_IOC_CLOSE_SESSION
-* DT bindings in a separate patch
-* Assembly parts moved to arch/arm and arch/arm64 respectively, in a
-  separate patch
-* Redefined/clarified the meaning of OPTEE_SMC_SHM_CACHED
-* Removed CMA usage to limit the scope of the patch set
-
-v3:
-* Rebased on 4.1-rc3 (dma_buf_export() API change)
-* A couple of small sparse fixes
-* Documents bindings for OP-TEE driver
-* Updated MAINTAINERS
-
-v2:
-* Replaced the stubbed OP-TEE driver with a real OP-TEE driver
-* Removed most APIs not needed by OP-TEE in current state
-* Update Documentation/ioctl/ioctl-number.txt with correct path to tee.h
-* Rename tee_shm_pool_alloc_cma() to tee_shm_pool_alloc()
-* Moved tee.h into include/uapi/linux/
-* Redefined tee.h IOCTL macros to be directly based on _IOR and friends
-* Removed version info on the API to user space, a data blob which
-  can contain an UUID is left for user space to be able to tell which
-  protocol to use in TEE_IOC_CMD
-* Changed user space exposed structures to only have types with __ prefix
-* Dropped THIS_MODULE from tee_fops
-* Reworked how the driver is registered and ref counted:
-  - moved from using an embedded struct miscdevice to an embedded struct
-    device.
-  - uses an struct rw_semaphore as synchronization for driver detachment
-  - uses alloc/register pattern from TPM
-
-Thanks,
-Jens
-
-Jens Wiklander (5):
-  arm/arm64: add smccc ARCH32
-  dt/bindings: add bindings for optee
-  tee: generic TEE subsystem
-  tee: add OP-TEE driver
-  Documentation: tee subsystem and op-tee driver
-
- Documentation/00-INDEX                             |   2 +
- Documentation/devicetree/bindings/optee/optee.txt  |  17 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- Documentation/ioctl/ioctl-number.txt               |   1 +
- Documentation/tee.txt                              | 117 +++
- MAINTAINERS                                        |  14 +
- arch/arm/Kconfig                                   |   4 +
- arch/arm/kernel/Makefile                           |   2 +
- arch/arm/kernel/smccc-call.S                       |  26 +
- arch/arm/kernel/smccc.c                            |  17 +
- arch/arm64/Kconfig                                 |   4 +
- arch/arm64/kernel/Makefile                         |   1 +
- arch/arm64/kernel/smccc-call.S                     |  34 +
- arch/arm64/kernel/smccc.c                          |  17 +
- drivers/Kconfig                                    |   2 +
- drivers/Makefile                                   |   1 +
- drivers/tee/Kconfig                                |  18 +
- drivers/tee/Makefile                               |   4 +
- drivers/tee/optee/Kconfig                          |   8 +
- drivers/tee/optee/Makefile                         |   5 +
- drivers/tee/optee/call.c                           | 390 ++++++++++
- drivers/tee/optee/core.c                           | 451 +++++++++++
- drivers/tee/optee/optee_msg.h                      | 334 ++++++++
- drivers/tee/optee/optee_private.h                  | 129 ++++
- drivers/tee/optee/optee_smc.h                      | 466 ++++++++++++
- drivers/tee/optee/rpc.c                            | 248 ++++++
- drivers/tee/optee/supp.c                           | 212 ++++++
- drivers/tee/tee.c                                  | 839 +++++++++++++++++++++
- drivers/tee/tee_private.h                          |  80 ++
- drivers/tee/tee_shm.c                              | 324 ++++++++
- drivers/tee/tee_shm_pool.c                         | 133 ++++
- include/linux/arm-smccc.h                          |  80 ++
- include/linux/tee_drv.h                            | 306 ++++++++
- include/uapi/linux/tee.h                           | 376 +++++++++
- 34 files changed, 4663 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/optee/optee.txt
- create mode 100644 Documentation/tee.txt
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ arch/arm/Kconfig               |  4 +++
+ arch/arm/kernel/Makefile       |  2 ++
+ arch/arm/kernel/smccc-call.S   | 26 ++++++++++++++
+ arch/arm/kernel/smccc.c        | 17 +++++++++
+ arch/arm64/Kconfig             |  4 +++
+ arch/arm64/kernel/Makefile     |  1 +
+ arch/arm64/kernel/smccc-call.S | 34 ++++++++++++++++++
+ arch/arm64/kernel/smccc.c      | 17 +++++++++
+ include/linux/arm-smccc.h      | 80 ++++++++++++++++++++++++++++++++++++++++++
+ 9 files changed, 185 insertions(+)
  create mode 100644 arch/arm/kernel/smccc-call.S
  create mode 100644 arch/arm/kernel/smccc.c
  create mode 100644 arch/arm64/kernel/smccc-call.S
  create mode 100644 arch/arm64/kernel/smccc.c
- create mode 100644 drivers/tee/Kconfig
- create mode 100644 drivers/tee/Makefile
- create mode 100644 drivers/tee/optee/Kconfig
- create mode 100644 drivers/tee/optee/Makefile
- create mode 100644 drivers/tee/optee/call.c
- create mode 100644 drivers/tee/optee/core.c
- create mode 100644 drivers/tee/optee/optee_msg.h
- create mode 100644 drivers/tee/optee/optee_private.h
- create mode 100644 drivers/tee/optee/optee_smc.h
- create mode 100644 drivers/tee/optee/rpc.c
- create mode 100644 drivers/tee/optee/supp.c
- create mode 100644 drivers/tee/tee.c
- create mode 100644 drivers/tee/tee_private.h
- create mode 100644 drivers/tee/tee_shm.c
- create mode 100644 drivers/tee/tee_shm_pool.c
  create mode 100644 include/linux/arm-smccc.h
- create mode 100644 include/linux/tee_drv.h
- create mode 100644 include/uapi/linux/tee.h
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 45df48b..75e4da3 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -221,6 +221,9 @@ config NEED_RET_TO_USER
+ config ARCH_MTD_XIP
+ 	bool
+ 
++config HAVE_SMCCC
++	bool
++
+ config VECTORS_BASE
+ 	hex
+ 	default 0xffff0000 if MMU || CPU_HIGH_VECTOR
+@@ -324,6 +327,7 @@ config ARCH_MULTIPLATFORM
+ 	select CLKSRC_OF
+ 	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
++	select HAVE_SMCCC if CPU_V7
+ 	select MIGHT_HAVE_PCI
+ 	select MULTI_IRQ_HANDLER
+ 	select SPARSE_IRQ
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index 752725d..8cdd25b 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -90,4 +90,6 @@ obj-y				+= psci.o psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
++obj-$(CONFIG_HAVE_SMCCC)	+= smccc-call.o smccc.o
++
+ extra-y := $(head-y) vmlinux.lds
+diff --git a/arch/arm/kernel/smccc-call.S b/arch/arm/kernel/smccc-call.S
+new file mode 100644
+index 0000000..05bc554
+--- /dev/null
++++ b/arch/arm/kernel/smccc-call.S
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/linkage.h>
++
++#include <asm/opcodes-sec.h>
++
++/* void smccc_call32(struct smccc_param32 *param) */
++ENTRY(smccc_call32)
++	push	{r4-r8, lr}
++	mov	r8, r0
++	ldm	r8, {r0-r7}
++	__SMC(0)
++	stm	r8, {r0-r7}
++	pop	{r4-r8, pc}
++ENDPROC(smccc_call32)
+diff --git a/arch/arm/kernel/smccc.c b/arch/arm/kernel/smccc.c
+new file mode 100644
+index 0000000..ba4039e
+--- /dev/null
++++ b/arch/arm/kernel/smccc.c
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/export.h>
++#include <linux/arm-smccc.h>
++
++EXPORT_SYMBOL_GPL(smccc_call32);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7796af4..b3ea778 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -83,6 +83,7 @@ config ARM64
+ 	select SPARSE_IRQ
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select HAVE_CONTEXT_TRACKING
++	select HAVE_SMCCC
+ 	help
+ 	  ARM 64-bit (AArch64) Linux support.
+ 
+@@ -146,6 +147,9 @@ config KERNEL_MODE_NEON
+ config FIX_EARLYCON_MEM
+ 	def_bool y
+ 
++config HAVE_SMCCC
++	bool
++
+ config PGTABLE_LEVELS
+ 	int
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 426d076..f7804f7 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_HAVE_SMCCC)		+= smccc-call.o smccc.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+new file mode 100644
+index 0000000..3ce7fe8
+--- /dev/null
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -0,0 +1,34 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License Version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/linkage.h>
++
++#define SMC_PARAM_W0_OFFS	0
++#define SMC_PARAM_W2_OFFS	8
++#define SMC_PARAM_W4_OFFS	16
++#define SMC_PARAM_W6_OFFS	24
++
++/* void smccc_call32(struct smccc_param32 *param) */
++ENTRY(smccc_call32)
++	stp	x28, x30, [sp, #-16]!
++	mov	x28, x0
++	ldp	w0, w1, [x28, #SMC_PARAM_W0_OFFS]
++	ldp	w2, w3, [x28, #SMC_PARAM_W2_OFFS]
++	ldp	w4, w5, [x28, #SMC_PARAM_W4_OFFS]
++	ldp	w6, w7, [x28, #SMC_PARAM_W6_OFFS]
++	smc	#0
++	stp	w0, w1, [x28, #SMC_PARAM_W0_OFFS]
++	stp	w2, w3, [x28, #SMC_PARAM_W2_OFFS]
++	ldp	x28, x30, [sp], #16
++	ret
++ENDPROC(smccc_call32)
+diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
+new file mode 100644
+index 0000000..ba4039e
+--- /dev/null
++++ b/arch/arm64/kernel/smccc.c
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/export.h>
++#include <linux/arm-smccc.h>
++
++EXPORT_SYMBOL_GPL(smccc_call32);
+diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+new file mode 100644
+index 0000000..98b3c3c
+--- /dev/null
++++ b/include/linux/arm-smccc.h
+@@ -0,0 +1,80 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#ifndef __LINUX_ARM_SMCCC_H
++#define __LINUX_ARM_SMCCC_H
++
++#include <linux/types.h>
++
++/*
++ * This file provideds defines common defines for ARM SMC Calling
++ * Convention as specified in
++ * http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
++ */
++
++#define SMCCC_SMC_32			(0 << 30)
++#define SMCCC_SMC_64			(1 << 30)
++#define SMCCC_FAST_CALL			(1 << 31)
++#define SMCCC_STD_CALL			(0 << 31)
++
++#define SMCCC_OWNER_MASK		0x3F
++#define SMCCC_OWNER_SHIFT		24
++
++#define SMCCC_FUNC_MASK			0xFFFF
++
++#define SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & SMCCC_FAST_CALL)
++#define SMCCC_IS_64(smc_val)		((smc_val) & SMCCC_SMC_64)
++#define SMCCC_FUNC_NUM(smc_val)		((smc_val) & SMCCC_FUNC_MASK)
++#define SMCCC_OWNER_NUM(smc_val) \
++	(((smc_val) >> SMCCC_OWNER_SHIFT) & SMCCC_OWNER_MASK)
++
++#define SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
++			((type) | (calling_convention) | \
++			(((owner) & SMCCC_OWNER_MASK) << SMCCC_OWNER_SHIFT) | \
++			((func_num) & SMCCC_FUNC_MASK))
++
++#define SMCCC_OWNER_ARCH		0
++#define SMCCC_OWNER_CPU			1
++#define SMCCC_OWNER_SIP			2
++#define SMCCC_OWNER_OEM			3
++#define SMCCC_OWNER_STANDARD		4
++#define SMCCC_OWNER_TRUSTED_APP		48
++#define SMCCC_OWNER_TRUSTED_APP_END	49
++#define SMCCC_OWNER_TRUSTED_OS		50
++#define SMCCC_OWNER_TRUSTED_OS_END	63
++
++struct smccc_param32 {
++	u32 a0;
++	u32 a1;
++	u32 a2;
++	u32 a3;
++	u32 a4;
++	u32 a5;
++	u32 a6;
++	u32 a7;
++};
++
++/**
++ * smccc_call32() - make ARCH32 SMC calls
++ * @param: values to pass in registers 0 to 7
++ *
++ * This function is used to make SMC calls following SMC Calling Convention
++ * for ARCH32 calls. The content of the supplied param are copied to
++ * registers 0 to 7 prior to the SMC instruction. Values a0..a3 are updated
++ * with the content from register 0 to 3 on return from the SMC
++ * instruction.
++ */
++void smccc_call32(struct smccc_param32 *param);
++
++#endif /*__LINUX_ARM_SMCCC_H*/
++
 -- 
 1.9.1
