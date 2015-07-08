@@ -1,55 +1,35 @@
-From: jlu@pengutronix.de (Jan Luebbe)
-Date: Wed,  8 Jul 2015 16:35:27 +0200
-Subject: [PATCH] i2c: omap: fix bus recovery setup
-Message-ID: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  8 Jul 2015 16:41:37 +0200
+Subject: [PATCH v6 1/4] phy-sun4i-usb: Add missing EXPORT_SYMBOL for
+ sun4i_usb_phy_set_squelch_detect
+In-Reply-To: <1436366500-12555-1-git-send-email-hdegoede@redhat.com>
+References: <1436366500-12555-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1436366500-12555-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least on the AM335x, enabling OMAP_I2C_SYSTEST_ST_EN is not enough to
-allow direct access to the SCL and SDA pins. In addition to ST_EN, we
-need to set the TMODE to 0b11 (Loop back & SDA/SCL IO mode select).
-Also, as the reset values of SCL_O and SDA_O are 0 (which means "drive
-low level"), we need to set them to 1 (which means "high-impedance") to
-avoid unwanted changes on the pins.
+sun4i_usb_phy_set_squelch_detect is used by other code, which may be built
+as a module, so it should be exported.
 
-As a precaution, reset all these bits to their default values after
-recovery is complete.
-
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/i2c/busses/i2c-omap.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+Changes in v6:
+-New patch in v6 of the sunxi musb support series
+---
+ drivers/phy/phy-sun4i-usb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index d1c22e3fdd14..fc9bf7f30e35 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -1247,7 +1247,14 @@ static void omap_i2c_prepare_recovery(struct i2c_adapter *adap)
- 	u32 reg;
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index e17c539..b82aa26 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -212,6 +212,7 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
  
- 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-+	/* enable test mode */
- 	reg |= OMAP_I2C_SYSTEST_ST_EN;
-+	/* select SDA/SCL IO mode */
-+	reg |= 3 << OMAP_I2C_SYSTEST_TMODE_SHIFT;
-+	/* set SCL to high-impedance state (reset value is 0) */
-+	reg |= OMAP_I2C_SYSTEST_SCL_O;
-+	/* set SDA to high-impedance state (reset value is 0) */
-+	reg |= OMAP_I2C_SYSTEST_SDA_O;
- 	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+ 	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
  }
++EXPORT_SYMBOL(sun4i_usb_phy_set_squelch_detect);
  
-@@ -1257,7 +1264,11 @@ static void omap_i2c_unprepare_recovery(struct i2c_adapter *adap)
- 	u32 reg;
- 
- 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-+	/* restore reset values */
- 	reg &= ~OMAP_I2C_SYSTEST_ST_EN;
-+	reg &= ~OMAP_I2C_SYSTEST_TMODE_MASK;
-+	reg &= ~OMAP_I2C_SYSTEST_SCL_O;
-+	reg &= ~OMAP_I2C_SYSTEST_SDA_O;
- 	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
- }
- 
+ static struct phy_ops sun4i_usb_phy_ops = {
+ 	.init		= sun4i_usb_phy_init,
 -- 
-2.1.4
+2.4.3
