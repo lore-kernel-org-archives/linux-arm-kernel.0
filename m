@@ -1,45 +1,38 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 08 Jul 2015 11:05:19 +0200
-Subject: [PATCH v2 1/5] usb: gadget: ffs: call functionfs_unbind() if
- _ffs_func_bind() fails
+Date: Wed, 08 Jul 2015 11:05:20 +0200
+Subject: [PATCH v2 2/5] usb: gadget: midi: avoid redundant f_midi_set_alt()
+ call
 In-Reply-To: <1436346323-31593-1-git-send-email-r.baldyga@samsung.com>
 References: <1436346323-31593-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436346323-31593-2-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436346323-31593-3-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function ffs_do_functionfs_bind() calls functionfs_bind() which allocates
-usb request and increments refcounts. These things needs to be cleaned
-up by if further steps of initialization fail by calling functionfs_unbind().
+Function midi registers two interfaces with single set_alt() function
+which means that f_midi_set_alt() is called twice when configuration
+is set. That means that endpoint initialization and ep request allocation
+is done two times. To avoid this problem we do such things only once,
+for interface number 1 (MIDI Streaming interface).
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/function/f_fs.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/gadget/function/f_midi.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-index 6e7be91..6516187 100644
---- a/drivers/usb/gadget/function/f_fs.c
-+++ b/drivers/usb/gadget/function/f_fs.c
-@@ -2897,11 +2897,18 @@ static int ffs_func_bind(struct usb_configuration *c,
- 			 struct usb_function *f)
- {
- 	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
-+	struct ffs_function *func = ffs_func_from_usb(f);
-+	int ret;
+diff --git a/drivers/usb/gadget/function/f_midi.c b/drivers/usb/gadget/function/f_midi.c
+index 6316aa5..4cef222 100644
+--- a/drivers/usb/gadget/function/f_midi.c
++++ b/drivers/usb/gadget/function/f_midi.c
+@@ -329,6 +329,10 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
+ 	unsigned i;
+ 	int err;
  
- 	if (IS_ERR(ffs_opts))
- 		return PTR_ERR(ffs_opts);
- 
--	return _ffs_func_bind(c, f);
-+	ret = _ffs_func_bind(c, f);
-+	if (ret)
-+		if(!--ffs_opts->refcnt)
-+			functionfs_unbind(func->ffs);
++	/* For Control Device interface we do nothing */
++	if (intf == 0)
++		return 0;
 +
-+	return ret;
- }
- 
- 
+ 	err = f_midi_start_ep(midi, f, midi->in_ep);
+ 	if (err)
+ 		return err;
 -- 
 1.9.1
