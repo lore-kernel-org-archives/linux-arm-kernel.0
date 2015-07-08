@@ -1,40 +1,58 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue,  7 Jul 2015 22:36:26 -0700
-Subject: [PATCH 0/4] ARM: dts: Use labels instead of full paths for Exynos5
- pinctrl nodes
-Message-ID: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+Date: Tue,  7 Jul 2015 22:36:27 -0700
+Subject: [PATCH 1/4] ARM: dts: Include exynos5250-pinctrl after the nodes were
+ defined
+In-Reply-To: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+References: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1436333790-18219-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin and Krzysztof,
+The dtc compiler combines all the defined nodes that have the same path
+so a device node definition can be in one file and later be extended in
+another one.
 
-This is a trivial series that changes Exynos5 pinctrl dtsi files to extend
-the pinctrl nodes using labels instead of full paths.
+That's the case of the Exynos5250 pinctrl device nodes that are defined
+in the exynos5250.dtsi file and extended in exynos5250-pinctrl.dtsi.
 
-Using labels is less error prone since a misstyped label leads to a build
-error while full paths can lead to the creation of a new node instead of
-overriding the original which makes the mistake harder to detect.
+But since the exynos5250.dtsi file includes the exynos5250-pinctrl.dtsi
+before the pinctrl device nodes are actually defined, the definition of
+the pinctrl device nodes happens in exynos5250-pinctrl.dtsi and are
+extended in exynos5250.dtsi.
 
-I tested the changes by decompiling the Exynos5* dtbs and comparing before
-and after. The resulting dts were identical modulo some node ordering due
-the pinctrl include change.
+That is the opposite of the original intention so even when there is no
+difference in practice, the exynos5250-pinctrl.dtsi include should be
+moved at the end of the exynos5250.dtsi file after the pinctrl device
+nodes have been already defined.
 
-The series is composed of the following trivial patches:
+This will also allow to later change the exynos5250-pinctrl.dtsi file
+to use labels instead of full paths to extend the pinctrl nodes. Since
+keeping the include at the top, would cause a dtc build error due the
+pinctrl labels not being defined yet.
 
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Javier Martinez Canillas (4):
-  ARM: dts: Include exynos5250-pinctrl after the nodes were defined
-  ARM: dts: Extend exynos5250-pinctrl nodes using labels instead of
-    paths
-  ARM: dts: Include exynos5420-pinctrl after the nodes were defined
-  ARM: dts: Extend exynos5420-pinctrl nodes using labels instead of
-    paths
+ arch/arm/boot/dts/exynos5250.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
- arch/arm/boot/dts/exynos5250-pinctrl.dtsi | 1600 ++++++++++++++---------------
- arch/arm/boot/dts/exynos5250.dtsi         |    3 +-
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 1411 +++++++++++++------------
- arch/arm/boot/dts/exynos5420.dtsi         |    3 +-
- 4 files changed, 1508 insertions(+), 1509 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index bf9bee67c416..4a1f88300a28 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -19,7 +19,6 @@
+ 
+ #include <dt-bindings/clock/exynos5250.h>
+ #include "exynos5.dtsi"
+-#include "exynos5250-pinctrl.dtsi"
+ #include "exynos4-cpu-thermal.dtsi"
+ #include <dt-bindings/clock/exynos-audss-clk.h>
+ 
+@@ -1062,3 +1061,5 @@
+ 	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+ 	clock-names = "uart", "clk_uart_baud0";
+ };
++
++#include "exynos5250-pinctrl.dtsi"
 -- 
 2.4.3
