@@ -1,95 +1,62 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  8 Jul 2015 18:16:48 +0100
-Subject: [PATCH v2 2/5] drivers: firmware: psci: move power_state handling to
- generic code
-In-Reply-To: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1436375811-10529-3-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed,  8 Jul 2015 18:16:46 +0100
+Subject: [PATCH v2 0/5] drivers: firmware: psci: add basic v1.0 support
+Message-ID: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Functions implemented on arm64 to check if a power_state parameter
-is valid and if the power_state implies context loss are not
-arm64 specific and should be moved to generic code so that they
-can be reused on arm systems too.
+This series is a v2 of a previous posting:
 
-This patch moves the functions handling the power_state parameter
-to generic PSCI firmware layer code.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347352.html
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/kernel/psci.c | 14 --------------
- drivers/firmware/psci.c  | 15 +++++++++++++++
- include/linux/psci.h     |  2 ++
- 3 files changed, 17 insertions(+), 14 deletions(-)
+v1 -> v2:
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index 51fd15a..4be5972 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -30,20 +30,6 @@
- #include <asm/smp_plat.h>
- #include <asm/suspend.h>
- 
--static bool psci_power_state_loses_context(u32 state)
--{
--	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
--}
--
--static bool psci_power_state_is_valid(u32 state)
--{
--	const u32 valid_mask = PSCI_0_2_POWER_STATE_ID_MASK |
--			       PSCI_0_2_POWER_STATE_TYPE_MASK |
--			       PSCI_0_2_POWER_STATE_AFFL_MASK;
--
--	return !(state & ~valid_mask);
--}
--
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
- 
- static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 62d9bc1..6bd013d 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -70,6 +70,21 @@ enum psci_function {
- 
- static u32 psci_function_id[PSCI_FN_MAX];
- 
-+#define PSCI_0_2_POWER_STATE_MASK		\
-+				(PSCI_0_2_POWER_STATE_ID_MASK | \
-+				PSCI_0_2_POWER_STATE_TYPE_MASK | \
-+				PSCI_0_2_POWER_STATE_AFFL_MASK)
-+
-+bool psci_power_state_loses_context(u32 state)
-+{
-+	return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
-+}
-+
-+bool psci_power_state_is_valid(u32 state)
-+{
-+	return !(state & ~PSCI_0_2_POWER_STATE_MASK);
-+}
-+
- static int psci_to_linux_errno(int errno)
- {
- 	switch (errno) {
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index a682fcc..12c4865 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -21,6 +21,8 @@
- #define PSCI_POWER_STATE_TYPE_POWER_DOWN	1
- 
- bool psci_tos_resident_on(int cpu);
-+bool psci_power_state_loses_context(u32 state);
-+bool psci_power_state_is_valid(u32 state);
- 
- struct psci_operations {
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+- rebased against v4.2-rc1
+- added version to 1.0 specific macros
+
+The PSCI v1.0 specification[1] introduces a brand new set of features
+(ie OS initiated mode and system suspend being the most notable ones)
+and provides updates to the PSCI 0.2 specification, keeping backward
+compatibility.
+
+PSCI v1.0 applies minor changes to function return codes and function
+behaviour (ie AFFINITY_INFO requirements, INVALID_ADDRESS return value)
+and introduces a new power_state parameter format (extended stateid)
+that is probeable with the newly introduced PSCI_FEATURES call.
+
+This series upgrades the current kernel PSCI layer implementation with
+a set of patches that make the kernel PSCI v1.0 compliant.
+
+The series augments the PSCI firmware layer with a hook to retrieve
+the features for a specific PSCI function (ie based on the PSCI_FEATURES
+call) and uses it to detect the power_state parameter format, updating
+the power_state parameter handling functions accordingly.
+
+In order to prevent firmware interfaces mismatch, a new compatible
+string is added to the DT bindings to characterize a 1.0 compliant
+firmware interface.
+
+The series is built on top of M.Rutland's patch series:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353795.html
+
+Tested on a Juno board.
+
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+
+Lorenzo Pieralisi (5):
+  drivers: firmware: psci: add INVALID_ADDRESS return value
+  drivers: firmware: psci: move power_state handling to generic code
+  drivers: firmware: psci: add PSCI_FEATURES call
+  drivers: firmware: psci: add extended stateid power_state support
+  drivers: firmware: psci: add PSCI v1.0 DT bindings
+
+ Documentation/devicetree/bindings/arm/psci.txt |  6 +++
+ arch/arm64/kernel/psci.c                       | 14 -------
+ drivers/firmware/psci.c                        | 53 ++++++++++++++++++++++++++
+ include/linux/psci.h                           |  2 +
+ include/uapi/linux/psci.h                      | 15 ++++++++
+ 5 files changed, 76 insertions(+), 14 deletions(-)
+
 -- 
 2.2.1
