@@ -1,87 +1,86 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 8 Jul 2015 16:55:52 -0500
-Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
- socfpga_secondary_startup
-In-Reply-To: <20150708210734.GN7557@n2100.arm.linux.org.uk>
-References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
- <20150708165115.GM7557@n2100.arm.linux.org.uk>
- <559D765C.30102@opensource.altera.com>
- <20150708210734.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <559D9C68.6030907@opensource.altera.com>
+From: ankgupta@codeaurora.org (Ankit Gupta)
+Date: Wed,  8 Jul 2015 16:26:03 -0600
+Subject: [PATCH V4] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+Message-ID: <1436394363-15797-1-git-send-email-ankgupta@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2015 04:07 PM, Russell King - ARM Linux wrote:
-> On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
->> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
->> user mode access.
-> 
-> Hmm.
-> 
-> I think what you've found is a(nother) latent bug in the CPU bring up
-> code.
-> 
-> For SMP CPUs, the sequence we're following during early initialisation is:
-> 
-> 1. Enable SMP coherency.
-> 2. Invalidate the caches.
-> 
-> If the cache contains rubbish, enabling SMP coherency before invalidating
-> the cache is plainly an absurd thing to do.
-> 
-> Can you try the patch below - not tested in any way, so you may need to
-> tweak it, but it should allow us to prove that point.
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 0716bbe19872..db5137fc297d 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -275,6 +275,10 @@ __v7_b15mp_setup:
->  __v7_ca17mp_setup:
->  	mov	r10, #0
->  1:
-> +	adr	r12, __v7_setup_stack		@ the local stack
-> +	stmia	r12, {r0-r5, r7, r9-r11, lr}
-> +	bl      v7_invalidate_l1
-> +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
->  #ifdef CONFIG_SMP
->  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
->  	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
-> @@ -283,7 +287,7 @@ __v7_ca17mp_setup:
->  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
->  	mcreq	p15, 0, r0, c1, c0, 1
->  #endif
-> -	b	__v7_setup
-> +	b	__v7_setup_cont
->  
->  /*
->   * Errata:
-> @@ -417,6 +421,7 @@ __v7_setup:
->  	bl      v7_invalidate_l1
->  	ldmia	r12, {r0-r5, r7, r9, r11, lr}
->  
-> +__v7_setup_cont:
->  	and	r0, r9, #0xff000000		@ ARM?
->  	teq	r0, #0x41000000
->  	bne	__errata_finish
-> @@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
->  
->  	.align	2
->  __v7_setup_stack:
-> -	.space	4 * 11				@ 11 registers
-> +	.space	4 * 12				@ 12 registers
->  
->  	__INITDATA
->  
-> 
+Add chip name and hw-irq number to the trace_irq_handler_entry()
+tracepoint. When tracing interrupt events the chip-name and hw-irq
+numbers are stable and known in advance. This makes them a better
+choice as a filtering criteria for the trace buffer dump. On the
+flipside, the os-irq numbers are dynamically allocated which makes
+them difficult to use for the same purpose.
 
+Dump messages will look like:
+...irq_handler_entry: irq=22 name=msm_serial0 chip_name=GIC hwirq=140
 
-This patch seems to have fixed the issue. The SoCFPGA platform is now
-booting/rebooting reliably. Also, the patch was applicable as-is.
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Andy Gross <agross@codeaurora.org>
+Signed-off-by: Gilad Avidov <gavidov@codeaurora.org>
+Signed-off-by: Ankit Gupta <ankgupta@codeaurora.org>
+---
+Changes since V3:
+- use field variable in trace structure to assign value for chip name
+  and hwirq rather than printing directly to the trace buffer.
+---
+Changes since V2:
+- fixed dump message in commit text to reflect Chip name
+  instead of domain.
+---
+Changes since V1:
+- added reviewed by Andy Gross
+---
+ include/trace/events/irq.h | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
 
-Also, I went back and studied up on the CPACR register. I misquoted the
-value in my previous response, I was looking at CPACR on CPU0. For CPU1,
-when the error happens, the value of CPACR is 0x0, so CP10 and CP11 were
-set to "Access denied".
-
-Dinh
+diff --git a/include/trace/events/irq.h b/include/trace/events/irq.h
+index 3608beb..0898506 100644
+--- a/include/trace/events/irq.h
++++ b/include/trace/events/irq.h
+@@ -23,6 +23,17 @@ struct softirq_action;
+ 			 softirq_name(HRTIMER),		\
+ 			 softirq_name(RCU))
+ 
++
++#define show_chip_name(irq)					\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->chip->name	\
++			 : "NULL")
++
++#define show_hwirq(irq)						\
++	(irq_get_irq_data(irq)					\
++			 ? irq_get_irq_data(irq)->hwirq		\
++			 : -ENODEV)
++
+ /**
+  * irq_handler_entry - called immediately before the irq action handler
+  * @irq: irq number
+@@ -41,16 +52,21 @@ TRACE_EVENT(irq_handler_entry,
+ 	TP_ARGS(irq, action),
+ 
+ 	TP_STRUCT__entry(
+-		__field(	int,	irq		)
+-		__string(	name,	action->name	)
++		__field(   int,	          irq	               )
++		__field(   unsigned long, hwirq                )
++		__string(  name,	  action->name	       )
++		__string(  chip,	  show_chip_name(irq)  )
+ 	),
+ 
+ 	TP_fast_assign(
+ 		__entry->irq = irq;
++		__entry->hwirq = show_hwirq(irq);
+ 		__assign_str(name, action->name);
++		__assign_str(chip, show_chip_name(irq));
+ 	),
+ 
+-	TP_printk("irq=%d name=%s", __entry->irq, __get_str(name))
++	TP_printk("irq=%d name=%s chip=%s hwirq=%ld", __entry->irq,
++	  __get_str(name), __get_str(chip), __entry->hwirq)
+ );
+ 
+ /**
+-- 
+1.8.5.2
