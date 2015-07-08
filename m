@@ -1,76 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jul 2015 22:07:34 +0100
-Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
- socfpga_secondary_startup
-In-Reply-To: <559D765C.30102@opensource.altera.com>
-References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
- <20150708165115.GM7557@n2100.arm.linux.org.uk>
- <559D765C.30102@opensource.altera.com>
-Message-ID: <20150708210734.GN7557@n2100.arm.linux.org.uk>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 08 Jul 2015 14:10:34 -0700
+Subject: [PATCH v1] arm64: dts: Add poweroff button device node for APM
+ X-Gene platform
+In-Reply-To: <1435305707-22786-2-git-send-email-yvo@apm.com> (Y. Vo's message
+ of "Fri, 26 Jun 2015 15:01:47 +0700")
+References: <1435305707-22786-1-git-send-email-yvo@apm.com>
+ <1435305707-22786-2-git-send-email-yvo@apm.com>
+Message-ID: <7ha8v6e4ol.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
-> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
-> user mode access.
+Y Vo <yvo@apm.com> writes:
 
-Hmm.
+> This patch adds poweroff button device node to support poweroff feature
+> on APM X-Gene Mustang platform.
+>
+> Signed-off-by: Y Vo <yvo@apm.com>
 
-I think what you've found is a(nother) latent bug in the CPU bring up
-code.
+Picking this up for v4.2-rc.
 
-For SMP CPUs, the sequence we're following during early initialisation is:
+Applied to fixes branch,
 
-1. Enable SMP coherency.
-2. Invalidate the caches.
-
-If the cache contains rubbish, enabling SMP coherency before invalidating
-the cache is plainly an absurd thing to do.
-
-Can you try the patch below - not tested in any way, so you may need to
-tweak it, but it should allow us to prove that point.
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 0716bbe19872..db5137fc297d 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -275,6 +275,10 @@ __v7_b15mp_setup:
- __v7_ca17mp_setup:
- 	mov	r10, #0
- 1:
-+	adr	r12, __v7_setup_stack		@ the local stack
-+	stmia	r12, {r0-r5, r7, r9-r11, lr}
-+	bl      v7_invalidate_l1
-+	ldmia	r12, {r0-r5, r7, r9-r11, lr}
- #ifdef CONFIG_SMP
- 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
- 	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
-@@ -283,7 +287,7 @@ __v7_ca17mp_setup:
- 	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
- 	mcreq	p15, 0, r0, c1, c0, 1
- #endif
--	b	__v7_setup
-+	b	__v7_setup_cont
- 
- /*
-  * Errata:
-@@ -417,6 +421,7 @@ __v7_setup:
- 	bl      v7_invalidate_l1
- 	ldmia	r12, {r0-r5, r7, r9, r11, lr}
- 
-+__v7_setup_cont:
- 	and	r0, r9, #0xff000000		@ ARM?
- 	teq	r0, #0x41000000
- 	bne	__errata_finish
-@@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
- 
- 	.align	2
- __v7_setup_stack:
--	.space	4 * 11				@ 11 registers
-+	.space	4 * 12				@ 12 registers
- 
- 	__INITDATA
- 
--- 
-FTTC broadband for 0.8mile line: currently@10.5Mbps down 400kbps up
-according to speedtest.net.
+Kevin
