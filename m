@@ -1,28 +1,40 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jul 2015 17:27:06 +0900
-Subject: [PATCH 0/4] ARM: dts: Use labels instead of full paths for Exynos5
- pinctrl nodes
-In-Reply-To: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+Date: Wed, 08 Jul 2015 17:29:26 +0900
+Subject: [PATCH 2/4] ARM: dts: Extend exynos5250-pinctrl nodes using labels
+ instead of paths
+In-Reply-To: <1436333790-18219-3-git-send-email-javier@osg.samsung.com>
 References: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <559CDEDA.50608@samsung.com>
+ <1436333790-18219-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <559CDF66.6080609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 08.07.2015 14:36, Javier Martinez Canillas wrote:
-> Hello Kukjin and Krzysztof,
+> A previously defined Device Tree node, can be extended either by defining
+> a node using the same full path or by creating a label for the node and
+> referencing to it.
 > 
-> This is a trivial series that changes Exynos5 pinctrl dtsi files to extend
-> the pinctrl nodes using labels instead of full paths.
+> Using full paths is more error prone since if there was a typo error, a
+> new node will be created instead of extending the node as it was desired.
+> This will lead to run-time errors that could be hard to detect.
 > 
-> Using labels is less error prone since a misstyped label leads to a build
-> error while full paths can lead to the creation of a new node instead of
-> overriding the original which makes the mistake harder to detect.
-> 
-> I tested the changes by decompiling the Exynos5* dtbs and comparing before
-> and after. The resulting dts were identical modulo some node ordering due
-> the pinctrl include change.
+> A misstyped label on the other hand, will cause a dtc compile error which
 
-Is the DTB before and after the same? It should not change by re-ordering.
+s/misstyped/mistyped/
+
+> makes it easier to detect the mistake since happens at build-time instead.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi | 1600 ++++++++++++++---------------
+>  1 file changed, 799 insertions(+), 801 deletions(-)
+> 
+
+I didn't look carefully enough to call it a review (I trust the 'diff'
+of yours) but it seems fine to me:
+
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
 Krzysztof
