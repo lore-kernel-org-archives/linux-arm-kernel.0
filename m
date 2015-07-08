@@ -1,62 +1,50 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Jul 2015 18:56:33 +0100
-Subject: [PATCH v2 01/10] arm/arm64: KVM: Fix ordering of timer/GIC on guest
- entry
+Date: Wed,  8 Jul 2015 18:56:35 +0100
+Subject: [PATCH v2 03/10] KVM: arm/arm64: vgic: Convert struct vgic_lr to use
+ bitfields
 In-Reply-To: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
 References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436378202-20224-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436378202-20224-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now inject the timer interrupt when we're about to enter
-the guest, it makes a lot more sense to make sure this happens
-before the vgic code queues the pending interrupts.
+As we're about to cram more information in the vgic_lr structure
+(HW interrupt number and additional state information), we switch
+to a layout similar to the HW's:
 
-Otherwise, we get the interrupt on the following exit, which is
-not great for latency (and leads to all kind of bizarre issues
-when using with active interrupts at the HW level).
+- use bitfields to save space (we don't need more than 10 bits
+  to represent the irq numbers)
+- source CPU and HW interrupt can share the same field, as
+  a SGI doesn't have a physical line.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/arm.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ include/kvm/arm_vgic.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bc738d2..d605180 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -528,8 +528,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (vcpu->arch.pause)
- 			vcpu_pause(vcpu);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 133ea00..4f9fa1d 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -95,11 +95,15 @@ enum vgic_type {
+ #define LR_STATE_ACTIVE		(1 << 1)
+ #define LR_STATE_MASK		(3 << 0)
+ #define LR_EOI_INT		(1 << 2)
++#define LR_HW			(1 << 3)
  
--		kvm_vgic_flush_hwstate(vcpu);
- 		kvm_timer_flush_hwstate(vcpu);
-+		kvm_vgic_flush_hwstate(vcpu);
+ struct vgic_lr {
+-	u16	irq;
+-	u8	source;
+-	u8	state;
++	unsigned irq:10;
++	union {
++		unsigned hwirq:10;
++		unsigned source:8;
++	};
++	unsigned state:4;
+ };
  
- 		preempt_disable();
- 		local_irq_disable();
-@@ -545,8 +545,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
- 			local_irq_enable();
- 			preempt_enable();
--			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
-+			kvm_timer_sync_hwstate(vcpu);
- 			continue;
- 		}
- 
-@@ -588,9 +588,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
- 		preempt_enable();
- 
--
--		kvm_timer_sync_hwstate(vcpu);
- 		kvm_vgic_sync_hwstate(vcpu);
-+		kvm_timer_sync_hwstate(vcpu);
- 
- 		ret = handle_exit(vcpu, run, ret);
- 	}
+ struct vgic_vmcr {
 -- 
 2.1.4
