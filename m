@@ -1,103 +1,127 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  8 Jul 2015 17:56:28 +0530
-Subject: [PATCH-v6 2/6] mfd: 88pm800: Add device tree support
+Date: Wed,  8 Jul 2015 17:56:29 +0530
+Subject: [PATCH-v6 3/6] mfd: 88pm800: Get pdata from 'device' rather than
+ passing as a parameter
 In-Reply-To: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436358392-15449-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436358392-15449-4-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT support to the 88pm800 driver, along with compatible
-field for it's sub-devices (rtc, onkey and regulator)
+Currently the device_xxx_init() fns take pdata as an input parameter to
+the fn, but the cleaner approach would be to use dev_get_platdata() to
+get the pdata.
+So this patch changes the code accordingly.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/88pm800.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/mfd/88pm800.c | 29 ++++++++++++++---------------
+ 1 file changed, 14 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 0c5470e..95c418c 100644
+index 95c418c..af8232f 100644
 --- a/drivers/mfd/88pm800.c
 +++ b/drivers/mfd/88pm800.c
-@@ -27,6 +27,7 @@
- #include <linux/mfd/core.h>
- #include <linux/mfd/88pm80x.h>
- #include <linux/slab.h>
-+#include <linux/of_device.h>
- 
- /* Interrupt Registers */
- #define PM800_INT_STATUS1		(0x05)
-@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
- };
- MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
- 
-+static const struct of_device_id pm80x_of_match_table[] = {
-+	{ .compatible = "marvell,88pm800", },
-+	{},
-+};
-+
- static struct resource rtc_resources[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
- static struct mfd_cell rtc_devs[] = {
- 	{
- 	 .name = "88pm80x-rtc",
-+	 .of_compatible = "marvell,88pm80x-rtc",
- 	 .num_resources = ARRAY_SIZE(rtc_resources),
- 	 .resources = &rtc_resources[0],
- 	 .id = -1,
-@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
- static const struct mfd_cell onkey_devs[] = {
- 	{
- 	 .name = "88pm80x-onkey",
-+	 .of_compatible = "marvell,88pm80x-onkey",
- 	 .num_resources = 1,
- 	 .resources = &onkey_resources[0],
- 	 .id = -1,
-@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
- static const struct mfd_cell regulator_devs[] = {
- 	{
- 	 .name = "88pm80x-regulator",
-+	 .of_compatible = "marvell,88pm80x-regulator",
- 	 .id = -1,
+@@ -254,11 +254,11 @@ static const struct regmap_irq pm800_irqs[] = {
  	},
  };
-@@ -520,8 +529,24 @@ static int pm800_probe(struct i2c_client *client,
- 	int ret = 0;
- 	struct pm80x_chip *chip;
- 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
-+	struct device_node *np = client->dev.of_node;
- 	struct pm80x_subchip *subchip;
  
-+	if (!pdata && !np) {
-+		dev_err(&client->dev,
-+			"pm80x requires platform data or of_node\n");
-+		return -EINVAL;
-+	}
+-static int device_gpadc_init(struct pm80x_chip *chip,
+-				       struct pm80x_platform_data *pdata)
++static int device_gpadc_init(struct pm80x_chip *chip)
+ {
+ 	struct pm80x_subchip *subchip = chip->subchip;
+ 	struct regmap *map = subchip->regmap_gpadc;
++	struct pm80x_platform_data *pdata = dev_get_platdata(chip->dev);
+ 	int data = 0, mask = 0, ret = 0;
+ 
+ 	if (!map) {
+@@ -320,17 +320,17 @@ out:
+ 	return ret;
+ }
+ 
+-static int device_onkey_init(struct pm80x_chip *chip,
+-				struct pm80x_platform_data *pdata)
++static int device_onkey_init(struct pm80x_chip *chip)
+ {
+ 	return mfd_add_devices(chip->dev, 0, &onkey_devs[0],
+ 			      ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
+ 			      NULL);
+ }
+ 
+-static int device_rtc_init(struct pm80x_chip *chip,
+-				struct pm80x_platform_data *pdata)
++static int device_rtc_init(struct pm80x_chip *chip)
+ {
++	struct pm80x_platform_data *pdata = dev_get_platdata(chip->dev);
 +
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata)
-+			return -ENOMEM;
-+
-+		/* Ensure we only alloc platform data once */
-+		client->dev.platform_data = pdata;
-+	}
-+
- 	ret = pm80x_init(client);
+ 	if (pdata) {
+ 		rtc_devs[0].platform_data = pdata->rtc;
+ 		rtc_devs[0].pdata_size =
+@@ -341,8 +341,7 @@ static int device_rtc_init(struct pm80x_chip *chip,
+ 			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
+ }
+ 
+-static int device_regulator_init(struct pm80x_chip *chip,
+-					   struct pm80x_platform_data *pdata)
++static int device_regulator_init(struct pm80x_chip *chip)
+ {
+ 	return mfd_add_devices(chip->dev, 0, &regulator_devs[0],
+ 			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
+@@ -463,11 +462,11 @@ static void pm800_pages_exit(struct pm80x_chip *chip)
+ 		i2c_unregister_device(subchip->gpadc_page);
+ }
+ 
+-static int device_800_init(struct pm80x_chip *chip,
+-				     struct pm80x_platform_data *pdata)
++static int device_800_init(struct pm80x_chip *chip)
+ {
+ 	int ret;
+ 	unsigned int val;
++	struct pm80x_platform_data *pdata = dev_get_platdata(chip->dev);
+ 
+ 	/*
+ 	 * alarm wake up bit will be clear in device_irq_init(),
+@@ -483,7 +482,7 @@ static int device_800_init(struct pm80x_chip *chip,
+ 			pdata->rtc->rtc_wakeup = 1;
+ 	}
+ 
+-	ret = device_gpadc_init(chip, pdata);
++	ret = device_gpadc_init(chip);
+ 	if (ret < 0) {
+ 		dev_err(chip->dev, "[%s]Failed to init gpadc\n", __func__);
+ 		goto out;
+@@ -497,19 +496,19 @@ static int device_800_init(struct pm80x_chip *chip,
+ 		goto out;
+ 	}
+ 
+-	ret = device_onkey_init(chip, pdata);
++	ret = device_onkey_init(chip);
  	if (ret) {
- 		dev_err(&client->dev, "pm800_init fail\n");
-@@ -587,6 +612,7 @@ static struct i2c_driver pm800_driver = {
- 		.name = "88PM800",
- 		.owner = THIS_MODULE,
- 		.pm = &pm80x_pm_ops,
-+		.of_match_table	= pm80x_of_match_table,
- 		},
- 	.probe = pm800_probe,
- 	.remove = pm800_remove,
+ 		dev_err(chip->dev, "Failed to add onkey subdev\n");
+ 		goto out_dev;
+ 	}
+ 
+-	ret = device_rtc_init(chip, pdata);
++	ret = device_rtc_init(chip);
+ 	if (ret) {
+ 		dev_err(chip->dev, "Failed to add rtc subdev\n");
+ 		goto out;
+ 	}
+ 
+-	ret = device_regulator_init(chip, pdata);
++	ret = device_regulator_init(chip);
+ 	if (ret) {
+ 		dev_err(chip->dev, "Failed to add regulators subdev\n");
+ 		goto out;
+@@ -575,7 +574,7 @@ static int pm800_probe(struct i2c_client *client,
+ 		goto err_device_init;
+ 	}
+ 
+-	ret = device_800_init(chip, pdata);
++	ret = device_800_init(chip);
+ 	if (ret) {
+ 		dev_err(chip->dev, "Failed to initialize 88pm800 devices\n");
+ 		goto err_device_init;
 -- 
 1.9.1
