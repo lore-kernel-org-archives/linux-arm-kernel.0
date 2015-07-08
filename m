@@ -1,61 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jul 2015 16:49:00 +0530
-Subject: [PATCH v5 1/2] dt-bindings: mediatek: Add MT8173 cpufreq driver
- binding
-In-Reply-To: <1435717005-20012-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
- <1435717005-20012-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150708111900.GD1805@linux>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Wed, 08 Jul 2015 13:09:17 +0200
+Subject: [PATCH 33/37] usb: isp1760: udc: add ep capabilities support
+In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436353761-7107-34-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-07-15, 10:16, Pi-Cheng Chen wrote:
-> This patch adds device tree binding document for MT8173 cpufreq driver.
-> 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> Reviewed-by: Michael Turquette <mturquette@baylibre.com>
-> ---
->  .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 145 +++++++++++++++++++++
->  1 file changed, 145 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
-> new file mode 100644
-> index 0000000..65701c5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
-> @@ -0,0 +1,145 @@
-> +
-> +Mediatek MT8173 cpufreq driver
-> +------------------------------
-> +
-> +Mediatek MT8173 cpufreq driver for CPU frequency scaling.
-> +
-> +Required properties:
-> +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
-> +- clock-names: Should contain the following:
-> +	"cpu"		- The multiplexer for clock input of CPU cluster.
-> +	"intermediate"	- A parent of "cpu" clock which is used as "intermediate" clock
-> +			  source (usually MAINPLL) when the original CPU PLL is under
-> +			  transition and not stable yet.
-> +	Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
-> +	generic clock consumer properties.
+Convert endpoint configuration to new capabilities model.
 
-Don't have any intentions to halt this series anymore, I have
-irritated you enough already :)
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/isp1760/isp1760-udc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-But, what about moving these bindings in something like a clock
-driver?
-
-@Mike: ?
-
-I am asking because these really belong to the clock driver, as I
-understood it from Mike. And clearly asked me to not take care of such
-things in cpufreq core/drivers.
-
-Another reason is that, later you will kill this driver one day and
-use cpufreq-dt. And then you will be required to move these bindings
-to a clock driver, as these will stay.
-
+diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
+index 3699962..1c3d0fd 100644
+--- a/drivers/usb/isp1760/isp1760-udc.c
++++ b/drivers/usb/isp1760/isp1760-udc.c
+@@ -1383,13 +1383,24 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
+ 		 */
+ 		if (ep_num == 0) {
+ 			usb_ep_set_maxpacket_limit(&ep->ep, 64);
++			ep->ep.caps.type_control = true;
++			ep->ep.caps.dir_in = true;
++			ep->ep.caps.dir_out = true;
+ 			ep->maxpacket = 64;
+ 			udc->gadget.ep0 = &ep->ep;
+ 		} else {
+ 			usb_ep_set_maxpacket_limit(&ep->ep, 512);
++			ep->ep.caps.type_iso = true;
++			ep->ep.caps.type_bulk = true;
++			ep->ep.caps.type_int = true;
+ 			ep->maxpacket = 0;
+ 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 		}
++
++		if (is_in)
++			ep->ep.caps.dir_in = true;
++		else
++			ep->ep.caps.dir_out = true;
+ 	}
+ }
+ 
 -- 
-viresh
+1.9.1
