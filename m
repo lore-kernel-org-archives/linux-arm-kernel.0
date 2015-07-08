@@ -1,53 +1,104 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  8 Jul 2015 17:11:21 +0100
-Subject: [PATCH 0/7] Add support for FDMA DMA controller found on STi chipsets
-Message-ID: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+Date: Wed,  8 Jul 2015 17:11:22 +0100
+Subject: [PATCH 1/7] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
+In-Reply-To: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1436371888-27863-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds the DT binding documentation for the FDMA constroller
+found on STi based chipsets from STMicroelectronics.
 
-This patchset adds support for the Flexible Direct Memory Access (FDMA) core
-found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
-with a dedicated firmware. It is a general purpose DMA controller supporting
-16 independent channels and data can be moved from memory to memory or between
-memory and paced latency critical real time targets.
-
-To increase the number of peripheral request, support is also added for the
-FDMA crossbar hardware, which can be used to multiplex up to 96 peripheral
-requests, to the 3 fdma engines.
-
-regards,
-
-Peter.
-
-Peter Griffin (7):
-  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
-    documentation
-  dmaengine: st_fdma: Add STMicroelectronics FDMA xbar DT binding
-    documentation
-  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
-  dmaengine: st_fdma: Add xbar support
-  ARM: STi: DT: STiH407: Add FDMA driver and xbar driver dt nodes.
-  MAINTAINERS: Add FDMA driver files to STi section.
-  ARM: multi_v7_defconfig: Enable STi FDMA driver
-
- Documentation/devicetree/bindings/dma/st_fdma.txt |  100 ++
- MAINTAINERS                                       |    2 +
- arch/arm/boot/dts/stih407-family.dtsi             |   59 +
- arch/arm/configs/multi_v7_defconfig               |    2 +
- drivers/dma/Kconfig                               |   26 +
- drivers/dma/Makefile                              |    2 +
- drivers/dma/st_fdma.c                             | 1203 +++++++++++++++++++++
- drivers/dma/st_fdma.h                             |  266 +++++
- drivers/dma/st_fdma_xbar.c                        |  149 +++
- include/linux/platform_data/dma-st_fdma.h         |   70 ++
- 10 files changed, 1879 insertions(+)
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ Documentation/devicetree/bindings/dma/st_fdma.txt | 76 +++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
- create mode 100644 drivers/dma/st_fdma.c
- create mode 100644 drivers/dma/st_fdma.h
- create mode 100644 drivers/dma/st_fdma_xbar.c
- create mode 100644 include/linux/platform_data/dma-st_fdma.h
 
+diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
+new file mode 100644
+index 0000000..1ec7470
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+@@ -0,0 +1,76 @@
++* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
++
++The FDMA is a general-purpose direct memory access controller capable of
++supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
++The FDMA is based on a Slim processor which require a firmware.
++
++* FDMA Controller
++
++Required properties:
++- compatible	: Should be "st,fdma_mpe31"
++- reg		: Should contain DMA registers location and length
++- interrupts	: Should contain one interrupt shared by all channel
++- dma-channels	: Number of channels supported by the controller
++- #dma-cells	: Must be <3>.
++- st,fw-name	: Should contain the name of the firmware to be loaded
++- clocks	: Must contain an entry for each name in clock-names
++- clock-names	: Must contain "fdma_slim, fdma_hi, fdma_low, fdma_ic" entries
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++
++Example:
++
++	fdma1: fdma-app at 1 {
++		compatible = "st,fdma_mpe31";
++		reg = <0x8e40000 0x20000>;
++		interrupts = <GIC_SPI 7 IRQ_TYPE_NONE>;
++		dma-channels = <16>;
++		#dma-cells = <3>;
++		st,fw-name = "fdma_STiH407_1.elf";
++		clocks = <&CLK_S_C0_FLEXGEN CLK_FDMA>,
++			 <&CLK_S_C0_FLEXGEN CLK_TX_ICN_DMU>,
++			 <&CLK_S_C0_FLEXGEN CLK_TX_ICN_DMU>,
++			 <&CLK_S_C0_FLEXGEN CLK_EXT2F_A9>;
++		clock-names = "fdma_slim",
++			      "fdma_hi",
++			      "fdma_low",
++			      "fdma_ic";
++
++* DMA client
++
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 4 cells:
++1. A phandle pointing to the FDMA controller
++2. The request line number
++3. A 32bit mask specifying (see include/linux/platform_data/dma-st-fdma.h)
++ -bit 2-0: Holdoff value, dreq will be masked for
++	0x0: 0-0.5us
++	0x1: 0.5-1us
++	0x2: 1-1.5us
++ -bit 17: data swap
++	0x0: disabled
++	0x1: enabled
++ -bit 21: Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 22: 2 STBus Initiator Coprocessor interface
++	0x0: high priority port
++	0x1: low priority port
++4. transfers type
++ 0 free running
++ 1 paced
++
++Example:
++
++	snd_uni_player2: snd-uni-player at 2 {
++		compatible = "st,snd_uni_player";
++		status = "okay";
++		reg = <0x8D82000  0x158>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		version = <5>;
++		dmas = <&fdma0 4 0 1>;
++		dma-names = "tx";
++		description = "Uni Player #2 (DAC)";
 -- 
 1.9.1
