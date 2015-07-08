@@ -1,51 +1,75 @@
-From: ankgupta@codeaurora.org (Ankit Gupta)
-Date: Wed, 8 Jul 2015 11:56:33 -0600
-Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
- tracepoint
-In-Reply-To: <alpine.DEB.2.11.1507052326100.3916@nanos>
-References: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
- <20150624124227.1cddbbac@gandalf.local.home>
- <alpine.DEB.2.11.1507052326100.3916@nanos>
-Message-ID: <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  8 Jul 2015 18:56:34 +0100
+Subject: [PATCH v2 02/10] arm/arm64: KVM: Move vgic handling to a
+ non-preemptible section
+In-Reply-To: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
+References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436378202-20224-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wed, 24 Jun 2015, Steven Rostedt wrote:
->> > +
->> > +#define show_chip_name(irq)					\
->> > +	(irq_get_irq_data(irq)					\
->> > +			 ? irq_get_irq_data(irq)->chip->name	\
->> > +			 : "NULL")
->> > +
->> > +#define show_hwirq(irq)						\
->> > +	(irq_get_irq_data(irq)					\
->> > +			 ? irq_get_irq_data(irq)->hwirq		\
->> > +			 : -ENODEV)
->>
->> Note these magic functions will only be useful for the tracefs reads of
->> the trace files. Userspace tools that extract the data (like perf and
->> trace-cmd), will have no idea of how to parse it.
->>
->> I'm not against doing this, but I'm just letting you know what the
->> effect of this change will be.
->
-> What's worse is, that they are racy against a concurrent teardown of
-> the interrupt. Not a good idea ...
->
+As we're about to introduce some serious GIC-poking to the vgic code,
+it is important to make sure that we're going to poke the part of
+the GIC that belongs to the CPU we're about to run on (otherwise,
+we'd end up with some unexpected interrupts firing)...
 
-Agree, I'll save the chip-name and hwirq in the struct. This technique
-using the same macros to save the chip-name and hwirq in the struct also
-works well with trace-cmd.
+Introducing a non-preemptible section in kvm_arch_vcpu_ioctl_run
+prevents the problem from occuring.
 
-Thanks,
-Ankit and Gilad
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm/kvm/arm.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-> Thanks,
->
-> 	tglx
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm"
-> in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index d605180..1583a34 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -528,10 +528,20 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (vcpu->arch.pause)
+ 			vcpu_pause(vcpu);
+ 
++		/*
++		 * Disarming the background timer must be done in a
++		 * preemptible context, as this call may sleep.
++		 */
+ 		kvm_timer_flush_hwstate(vcpu);
+-		kvm_vgic_flush_hwstate(vcpu);
+ 
++		/*
++		 * Preparing the interrupts to be injected also
++		 * involves poking the GIC, which must be done in a
++		 * non-preemptible context.
++		 */
+ 		preempt_disable();
++		kvm_vgic_flush_hwstate(vcpu);
++
+ 		local_irq_disable();
+ 
+ 		/*
+@@ -544,8 +554,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+ 			local_irq_enable();
+-			preempt_enable();
+ 			kvm_vgic_sync_hwstate(vcpu);
++			preempt_enable();
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			continue;
+ 		}
+@@ -586,9 +596,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		kvm_guest_exit();
+ 		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+-		preempt_enable();
+ 
+ 		kvm_vgic_sync_hwstate(vcpu);
++
++		preempt_enable();
++
+ 		kvm_timer_sync_hwstate(vcpu);
+ 
+ 		ret = handle_exit(vcpu, run, ret);
+-- 
+2.1.4
