@@ -1,28 +1,32 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 8 Jul 2015 15:53:03 +0200
-Subject: [PATCH] ARM: dts: vf610: Nomenclature fixup for PTA6 pin used in
- RMII mode.
-In-Reply-To: <20150708091006.GC28488@tiger>
-References: <1434124033-13820-1-git-send-email-andrew@lunn.ch>
- <20150708091006.GC28488@tiger>
-Message-ID: <20150708135303.GD13230@lunn.ch>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 08 Jul 2015 14:59:22 +0100
+Subject: [PATCH v4 1/8] Documentation: add DT binding for ARM System
+ Control and Power Interface(SCPI) protocol
+In-Reply-To: <1433760002-24120-2-git-send-email-sudeep.holla@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <559D2CBA.10607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:10:06PM +0800, Shawn Guo wrote:
-> On Fri, Jun 12, 2015 at 05:47:13PM +0200, Andrew Lunn wrote:
-> > Add a missing _ENET_ infix to PTA6 when used in RMII mode. This makes
-> > it consistent with all other pinctrl aliases for Ethernet.
-> > 
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> No, the existing naming is just fine, which follows how Vybrid Reference
-> Manual names them.
+Hi Mark,
 
-So are you saying you want to see a patch removing the ENET_ from
-VF610_PAD_PTC9__ENET_RMII1_MDC, VF610_PAD_PTC10__ENET_RMII1_MDIO,
-VF610_PAD_PTC11__ENET_RMII1_CRS, etc.  A quick search for VYBRIDRM Rev
-7, 06/2014 does not get any hits for ENET_RMII
+On 08/06/15 11:39, Sudeep Holla wrote:
+> This patch adds devicetree binding for System Control and Power
+> Interface (SCPI) Message Protocol used between the Application Cores(AP)
+> and the System Control Processor(SCP). The MHU peripheral provides a
+> mechanism for inter-processor communication between SCP's M3 processor
+> and AP.
+>
+> SCP offers control and management of the core/cluster power states,
+> various power domain DVFS including the core/cluster, certain system
+> clocks configuration, thermal sensors and many others.
+>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
 
-Thanks
-	Andrew
+Can you review this version ?
+
+Regards,
+Sudeep
