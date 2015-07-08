@@ -1,43 +1,122 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 8 Jul 2015 17:00:04 +0800
-Subject: [PATCH 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting support
-In-Reply-To: <BY1PR03MB138801E1ECE136F138F7D4A99A930@BY1PR03MB1388.namprd03.prod.outlook.com>
-References: <1433926244-29244-1-git-send-email-haibo.chen@freescale.com>
- <1433926244-29244-3-git-send-email-haibo.chen@freescale.com>
- <20150703111017.GA17553@localhost>
- <BY1PR03MB138801E1ECE136F138F7D4A99A930@BY1PR03MB1388.namprd03.prod.outlook.com>
-Message-ID: <20150708090004.GB28488@tiger>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 8 Jul 2015 11:00:05 +0200
+Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <20150708005748.GG30412@codeaurora.org>
+References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150708005748.GG30412@codeaurora.org>
+Message-ID: <20150708110005.704c49ff@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 03:05:47AM +0000, Chen Bough wrote:
-> 
-> > -----Original Message-----
-> > From: Shawn Guo [mailto:shawnguo at kernel.org]
-> > Sent: Friday, July 03, 2015 7:10 PM
-> > To: Chen Haibo-B51421
-> > Cc: linux-mmc at vger.kernel.org; Dong Aisheng-B29396;
-> > ulf.hansson at linaro.org; chris at printf.net; shawn.guo at linaro.org; linux-
-> > arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH 2/6] mmc: sdhci-esdhc-imx: add tuning-step seting
-> > support
-> > 
-> > On Wed, Jun 10, 2015 at 04:50:40PM +0800, Haibo Chen wrote:
-> > > @@ -969,6 +976,8 @@ sdhci_esdhc_imx_probe_dt(struct platform_device
-> > *pdev,
-> > >
-> > >  	of_property_read_u32(np, "max-frequency", &boarddata->f_max);
-> > >
-> > > +	of_property_read_u32(np, "tuning-step", &boarddata->tuning_step);
-> > > +
-> > 
-> > Where is the binding doc for this device tree property?
-> > 
-> > Shawn
-> 
-> I will add this in next version, Thanks for your review.
+Hi Stephen,
 
-If this is a vendor specific property rather than generic one, do not
-forget to have a vendor prefix for the property, i.e. "fsl,tuning-step".
+On Tue, 7 Jul 2015 17:57:48 -0700
+Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-Shawn
+> On 07/07, Boris Brezillon wrote:
+> > Clock rates are stored in an unsigned long field, but ->determine_rate()
+> > (which returns a rounded rate from a requested one) returns a long
+> > value (errors are reported using negative error codes), which can lead
+> > to long overflow if the clock rate exceed 2Ghz.
+> > 
+> > Change ->determine_rate() prototype to return 0 or an error code, and pass
+> > a pointer to a clk_rate_request structure containing the expected target
+> > rate and the rate constraints imposed by clk users.
+> > 
+> > The clk_rate_request structure might be extended in the future to contain
+> > other kind of constraints like the rounding policy, the maximum clock
+> > inaccuracy or other things that are not yet supported by the CCF
+> > (power consumption constraints ?).
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > 
+> > CC: Jonathan Corbet <corbet@lwn.net>
+> > CC: Tony Lindgren <tony@atomide.com>
+> > CC: Ralf Baechle <ralf@linux-mips.org>
+> > CC: "Emilio L?pez" <emilio@elopez.com.ar>
+> > CC: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > CC: Tero Kristo <t-kristo@ti.com>
+> > CC: Peter De Schrijver <pdeschrijver@nvidia.com>
+> > CC: Prashant Gaikwad <pgaikwad@nvidia.com>
+> > CC: Stephen Warren <swarren@wwwdotorg.org>
+> > CC: Thierry Reding <thierry.reding@gmail.com>
+> > CC: Alexandre Courbot <gnurou@gmail.com>
+> > CC: linux-doc at vger.kernel.org
+> > CC: linux-kernel at vger.kernel.org
+> > CC: linux-arm-kernel at lists.infradead.org
+> > CC: linux-omap at vger.kernel.org
+> > CC: linux-mips at linux-mips.org
+> > CC: linux-tegra at vger.kernel.org
+> > 
+> > ---
+> 
+> I'll throw this patch into -next now to see if any other problems
+> shake out. I'm hoping we get some more acks though, so it'll be
+> on it's own branch and become immutable in a week or so. One
+> question below.
+> 
+> > diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
+> > index 616f5ae..9e69f34 100644
+> > --- a/drivers/clk/clk-composite.c
+> > +++ b/drivers/clk/clk-composite.c
+> > @@ -99,33 +99,33 @@ static long clk_composite_determine_rate(struct clk_hw *hw, unsigned long rate,
+> >  
+> >  			parent_rate = __clk_get_rate(parent);
+> >  
+> > -			tmp_rate = rate_ops->round_rate(rate_hw, rate,
+> > +			tmp_rate = rate_ops->round_rate(rate_hw, req->rate,
+> >  							&parent_rate);
+> >  			if (tmp_rate < 0)
+> >  				continue;
+> >  
+> > -			rate_diff = abs(rate - tmp_rate);
+> > +			rate_diff = abs(req->rate - tmp_rate);
+> >  
+> > -			if (!rate_diff || !*best_parent_p
+> > +			if (!rate_diff || !req->best_parent_hw
+> >  				       || best_rate_diff > rate_diff) {
+> > -				*best_parent_p = __clk_get_hw(parent);
+> > -				*best_parent_rate = parent_rate;
+> > +				req->best_parent_hw = __clk_get_hw(parent);
+> > +				req->best_parent_rate = parent_rate;
+> >  				best_rate_diff = rate_diff;
+> >  				best_rate = tmp_rate;
+> >  			}
+> >  
+> >  			if (!rate_diff)
+> > -				return rate;
+> > +				return 0;
+> >  		}
+> >  
+> > -		return best_rate;
+> > +		req->rate = best_rate;
+> > +		return 0;
+> >  	} else if (mux_hw && mux_ops && mux_ops->determine_rate) {
+> >  		__clk_hw_set_clk(mux_hw, hw);
+> > -		return mux_ops->determine_rate(mux_hw, rate, min_rate,
+> > -					       max_rate, best_parent_rate,
+> > -					       best_parent_p);
+> > +		return mux_ops->determine_rate(mux_hw, req);
+> >  	} else {
+> >  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
+> > +		req->rate = 0;
+> >  		return 0;
+> 
+> Shouldn't this return an error now? And then assigning req->rate
+> wouldn't be necessary. Sorry I must have missed this last round.
+> 
+
+Actually I wanted to keep the existing behavior: return a 0 rate (not
+an error) when there is no mux or rate ops.
+
+That's something we can change afterwards, but it might reveals
+new bugs if some users are checking for a 0 rate to detect errors.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
