@@ -1,57 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:35 +0200
-Subject: [PATCHv2 6/8] ARM: mvebu: add suspend/resume related definitions in
- Armada 38x Device Tree
+Date: Wed,  8 Jul 2015 17:02:37 +0200
+Subject: [PATCHv2 8/8] ARM: mvebu: adjust board name and compatible for Armada
+ 388 GP
 In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436367757-14202-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436367757-14202-9-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support suspend/resume, the SoC-level Armada 38x Device
-Tree file must be improved with the following additions:
-
- - Description of the SDRAM controller registers, which are needed in
-   order to allow the suspend/resume code to put the RAM in
-   self-refresh. This is similar to what was done in commit
-   6e6db2bea3ea ("ARM: mvebu: add SDRAM controller description for
-   Armada XP") for Armada XP.
-
- - Description of additional registers for the MBus controller, which
-   need to be saved/restored accross a suspend/resume cycle. This is
-   similar to what was done in commit 8b7dc9d37a44e ("ARM: mvebu:
-   adjust mbus controller description on Armada 370/XP") for Armada
-   XP.
+As the name of the Device Tree file name suggests, the Armada 388 GP
+really contains an Armada 388 SoC, so this commit updates the board
+name and compatible string in the Device Tree file.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-38x.dtsi | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-388-gp.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-38x.dtsi b/arch/arm/boot/dts/armada-38x.dtsi
-index 04ecfe6..60adb44 100644
---- a/arch/arm/boot/dts/armada-38x.dtsi
-+++ b/arch/arm/boot/dts/armada-38x.dtsi
-@@ -138,6 +138,11 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0xf0, 0x01) 0 0x100000>;
+diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
+index 31e5ede..2f6c31f 100644
+--- a/arch/arm/boot/dts/armada-388-gp.dts
++++ b/arch/arm/boot/dts/armada-388-gp.dts
+@@ -44,8 +44,8 @@
+ #include <dt-bindings/gpio/gpio.h>
  
-+			sdramc at 1400 {
-+				compatible = "marvell,armada-xp-sdram-controller";
-+				reg = <0x1400 0x500>;
-+			};
-+
- 			L2: cache-controller at 8000 {
- 				compatible = "arm,pl310-cache";
- 				reg = <0x8000 0x1000>;
-@@ -371,7 +376,7 @@
+ / {
+-	model = "Marvell Armada 385 GP";
+-	compatible = "marvell,a385-gp", "marvell,armada388", "marvell,armada380";
++	model = "Marvell Armada 388 DB-88F6820-GP";
++	compatible = "marvell,a388-gp", "marvell,armada388", "marvell,armada380";
  
- 			mbusc: mbus-controller at 20000 {
- 				compatible = "marvell,mbus-controller";
--				reg = <0x20000 0x100>, <0x20180 0x20>;
-+				reg = <0x20000 0x100>, <0x20180 0x20>, <0x20250 0x8>;
- 			};
- 
- 			mpic: interrupt-controller at 20a00 {
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
 -- 
 2.4.5
