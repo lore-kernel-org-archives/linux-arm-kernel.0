@@ -1,66 +1,40 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 8 Jul 2015 16:53:21 -0700
-Subject: [PATCH v4 3/5] tee: generic TEE subsystem
-In-Reply-To: <20150708231612.GB20068@obsidianresearch.com>
-References: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
- <1436350592-7732-4-git-send-email-jens.wiklander@linaro.org>
- <20150708171026.GA11740@obsidianresearch.com>
- <20150708211129.GA29824@kroah.com>
- <20150708222649.GA20068@obsidianresearch.com>
- <20150708223325.GA5843@kroah.com>
- <20150708231612.GB20068@obsidianresearch.com>
-Message-ID: <20150708235321.GB12393@kroah.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 09 Jul 2015 08:53:49 +0900
+Subject: [PATCH 2/4] ARM: dts: Extend exynos5250-pinctrl nodes using labels
+ instead of paths
+In-Reply-To: <559D2E39.6060602@osg.samsung.com>
+References: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+ <1436333790-18219-3-git-send-email-javier@osg.samsung.com>
+ <559CDF66.6080609@samsung.com> <559D2E39.6060602@osg.samsung.com>
+Message-ID: <559DB80D.20702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:16:12PM -0600, Jason Gunthorpe wrote:
-> On Wed, Jul 08, 2015 at 03:33:25PM -0700, Greg Kroah-Hartman wrote:
-> > > The basic issue is that cdev_del doesn't seem to be synchronizing.
-> > > 
-> > > The use after free race is then something like:
-> > > 
-> > >    struct tpm_chip {
-> > >  	struct device dev;
-> > > 	struct cdev cdev;
-> > 
-> > Oops, right there's your problem.  You can't have two reference counted
-> > objects trying to manage the memory of a single structure.  No matter
-> > what you do, it's going to be a pain to deal with this, so don't :)
+On 08.07.2015 23:05, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> Sure, generally, yes, but that isn't done for no reason, it is to make
-> open straightforward:
+> On 07/08/2015 01:29 AM, Krzysztof Kozlowski wrote:
+>> On 08.07.2015 14:36, Javier Martinez Canillas wrote:
+>>> A previously defined Device Tree node, can be extended either by defining
+>>> a node using the same full path or by creating a label for the node and
+>>> referencing to it.
+>>>
+>>> Using full paths is more error prone since if there was a typo error, a
+>>> new node will be created instead of extending the node as it was desired.
+>>> This will lead to run-time errors that could be hard to detect.
+>>>
+>>> A misstyped label on the other hand, will cause a dtc compile error which
+>>
+>> s/misstyped/mistyped/
+>>
 > 
-> static int tpm_open(struct inode *inode, struct file *file)
-> {
-> 	struct tpm_chip *chip =
-> 		container_of(inode->i_cdev, struct tpm_chip, cdev);
+> sigh, it's so ironic that I mistyped that.
 > 
-> We need to recover the tpm_chip associated with the char device
-> node, in a way that is holding a kref on it, without racing with
-> cdev_del/etc
-> 
-> This scheme does mean that if we have a struct file we have a kref on
-> the cdev, and if we have cdev then we have a kref on the tpm_chip,
-> which is really easy to use properly.
-> 
-> > > Ie we need cdev to hold a ref on tpm_chip->dev until cdev_put is
-> > > called.
-> > 
-> > No, separate them, make the cdev a pointer and all should be fine.
-> 
-> Okay, cdev_alloc takes care of the cdev lifetime.
-> 
-> Do you have a simple solution to replace container_of as well?
-> 
-> What would you think about something like:
-> 
->  cdev_alloc(&chip->dev.kref)
+> Do you want me to re-post the whole series with the typo fixed or you /
+> Kukjin would fix in both patches when applying?
 
-Just pick either the cdev to handle the lifetime rules, or the struct
-device, you'll still need a container_of().  Just don't do both as odds
-are the lifetime rules is going to get really hard to debug and ensure
-that everything is correct on the shutdown/release path.
+I'll fix it when applying to my tree. As for Kukjin, it depends whether
+he will pick it up from LKML or from me.
 
-thanks,
-
-greg k-h
+Best regards,
+Krzysztof
