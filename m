@@ -1,52 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  8 Jul 2015 16:14:06 +0200
-Subject: [PATCH] pinctrl: abx500: remove strict mode
-Message-ID: <1436364846-11471-1-git-send-email-linus.walleij@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 8 Jul 2015 07:15:42 -0700
+Subject: [PATCH 0/4] ARM: dts: Use labels instead of full paths for
+ Exynos5 pinctrl nodes
+In-Reply-To: <559CDEDA.50608@samsung.com>
+References: <1436333790-18219-1-git-send-email-javier@osg.samsung.com>
+ <559CDEDA.50608@samsung.com>
+Message-ID: <559D308E.3020809@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a21763a0b1e5a5ab8310f581886d04beadc16616
-"pinctrl: nomadik: activate strict mux mode"
-put all Nomadik pin controllers to strict mode. This was
-not good on the Snowball platform: the muxing of GPIOs to
-different pins is done with hogs in the DTS file, and then
-these GPIOs are used by offset, relying on hogs to mux the
-pins. Since that means the pin controller "owns" the pins
-and at the same time we have a GPIO user, this pin controller
-is by definition not strict.
+Krzysztof,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-href-ab8500.dtsi   | 4 ----
- drivers/pinctrl/nomadik/pinctrl-abx500.c | 1 -
- 2 files changed, 5 deletions(-)
+On 07/08/2015 01:27 AM, Krzysztof Kozlowski wrote:
+> On 08.07.2015 14:36, Javier Martinez Canillas wrote:
+>> Hello Kukjin and Krzysztof,
+>>
+>> This is a trivial series that changes Exynos5 pinctrl dtsi files to extend
+>> the pinctrl nodes using labels instead of full paths.
+>>
+>> Using labels is less error prone since a misstyped label leads to a build
+>> error while full paths can lead to the creation of a new node instead of
+>> overriding the original which makes the mistake harder to detect.
+>>
+>> I tested the changes by decompiling the Exynos5* dtbs and comparing before
+>> and after. The resulting dts were identical modulo some node ordering due
+>> the pinctrl include change.
+> 
+> Is the DTB before and after the same? It should not change by re-ordering.
+>
 
-diff --git a/arch/arm/boot/dts/ste-href-ab8500.dtsi b/arch/arm/boot/dts/ste-href-ab8500.dtsi
-index 9b69bce9297d..165c1bac61b1 100644
---- a/arch/arm/boot/dts/ste-href-ab8500.dtsi
-+++ b/arch/arm/boot/dts/ste-href-ab8500.dtsi
-@@ -231,10 +231,6 @@
- 					 */
- 					gpio26 {
- 						gpio26_default_mode: gpio26_default {
--							default_mux {
--								function = "gpio";
--								groups = "gpio26_d_1";
--							};
- 							default_cfg {
- 								pins = "GPIO26_M16";
- 								output-low;
-diff --git a/drivers/pinctrl/nomadik/pinctrl-abx500.c b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-index 557d0f2a3031..97681fac082e 100644
---- a/drivers/pinctrl/nomadik/pinctrl-abx500.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-abx500.c
-@@ -787,7 +787,6 @@ static const struct pinmux_ops abx500_pinmux_ops = {
- 	.set_mux = abx500_pmx_set,
- 	.gpio_request_enable = abx500_gpio_request_enable,
- 	.gpio_disable_free = abx500_gpio_disable_free,
--	.strict = true,
- };
- 
- static int abx500_get_groups_cnt(struct pinctrl_dev *pctldev)
+The DTB differ but I'm not that familiar with how dtc represents the FDT
+to know what is changing in the binary.
+
+But as mentioned, the decompiled DTS only changes in which position the
+pinctrl are defined and both DTS are identical if I do:
+
+$ cat decompiled.dts | sort
+
+> Best regards,
+> Krzysztof
+> 
+
 -- 
-2.4.3
+Javier Martinez Canillas
+Sr. Linux Kernel Developer
+Open Source Group
+Samsung Research America
