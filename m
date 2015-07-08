@@ -1,105 +1,102 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 08 Jul 2015 17:52:11 +0530
-Subject: [PATCH-V5 3/4] mfd: 88pm800: Set default interrupt clear method
-In-Reply-To: <20150707145756.GJ3182@x1>
-References: <1435591877-18214-4-git-send-email-vaibhav.hiremath@linaro.org>
- <20150707072958.GN3182@x1> <559BA1AE.9050006@linaro.org>
- <20150707104028.GR3182@x1> <559BAF23.90002@linaro.org>
- <20150707111248.GU3182@x1> <559BB58E.9010406@linaro.org>
- <559BB727.2070106@linaro.org> <20150707125439.GE3182@x1>
- <559BE68B.3020801@linaro.org> <20150707145756.GJ3182@x1>
-Message-ID: <559D15F3.6090704@linaro.org>
+Date: Wed,  8 Jul 2015 17:56:26 +0530
+Subject: [PATCH-v6 0/6] mfd: 88pm800: Add Device tree support
+Message-ID: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch-series adds support for Device tree to 88PM800 mfd driver.
+It also sets default configuration of irq clear method if board file
+doesn't exist.
+
+Testing::
+ - Boot tested on PXA1928 based platform.
+ - probe of mfd, rtc and regulator function passing successfully.
+ - Basic read operations on registers
+ - irq clear configuration
+
+V5 => V6
+=======
+Link to V5: https://lkml.org/lkml/2015/6/29/283
+
+ - Added new patch to the series PATCH [1/6]
+   Cleanup patch to remove duplicate dev_err messages
+ - Added new patch to the series PACTH [3/6]
+   Cleanup patch to get pdata from 'device' pointer instead of
+   passing as a parameter.
+ - Removed irq_clr_mode/irq_mode field from 'struct pm80x_chip'
+   and use pdata.irq_clr_method to set irq clear method.
+ - Added acked-by and reviewed-by to respective patches.
+
+V4 => V5
+=======
+Link to V4: https://lkml.org/lkml/2015/6/25/67
+
+  - Renamed binding back again to 88pm800, as 'Yi Zhang' already started
+    submitting 88pm88x, so 88pm8xx won't make sense. Better name would be to
+    stick with 88pm80x.
+  - Added new patch to series PATCH 2/4, to remove unwanted protection around
+    padata
+  - As suggested by Lee, added macro based implementation for CLEAR_ON_WRITE
+    and CLEAR_ON_READ.
+  - and fixed other trivial comments.
+
+V3 => V4
+=======
+Link to V3: https://lkml.org/lkml/2015/6/24/143
+
+  -  irq clear method is 88PM800 feature, which is not dependent on board or
+     doesn't require any wiring changes, so DT is not the way.
+     Hardcoded to "irq clear on write" if board file doesn't exist.
+  - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
+  - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
+
+V2 => V3
+=======
+Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
+
+   - Replaced deprecated "regulator-compatible" property with "regulator-name".
+   - Added Rob's Acked-by  to [PATCH 3/3]
+
+V1 => V2
+=======
+Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
+
+  - Split binding changes from original commit
+  - Updated binding info as per Rob's suggestion
+  - Dropped PATCH 4/4, as discussed during review
+  - Dropped PATCH 3/4, as it is independent RTC code change,
+    so will submit it separately to ease merging.
+  - Fixed all other minor comments
+
+Attempt has been made to push some of the patches to the list sometime
+back in 2013.
+
+Link to previous patch submission:
+        https://lkml.org/lkml/2013/8/14/86
 
 
-On Tuesday 07 July 2015 08:27 PM, Lee Jones wrote:
-> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->
->>
->>
->> On Tuesday 07 July 2015 06:24 PM, Lee Jones wrote:
->>> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->>>
->>>>
->>>>
->>>> On Tuesday 07 July 2015 04:48 PM, Vaibhav Hiremath wrote:
->>>>>
->>>>>
->>>>> On Tuesday 07 July 2015 04:42 PM, Lee Jones wrote:
->>>>>> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->>>>>>> On Tuesday 07 July 2015 04:10 PM, Lee Jones wrote:
->>>>>>>> On Tue, 07 Jul 2015, Vaibhav Hiremath wrote:
->>>>>>>>> On Tuesday 07 July 2015 12:59 PM, Lee Jones wrote:
->>>>>>>>>> On Mon, 29 Jun 2015, Vaibhav Hiremath wrote:
->>>>>>>>>>
->>>>>>>>>>> As per the spec, bit 1 (INT_CLEAR_MODE) of reg addr 0xe
->>>>>>>>>>> (page 0) controls the method of clearing interrupt
->>>>>>>>>>> status of 88pm800 family of devices;
->>>>>>>>>>>
->>>>>>>>>>>    0: clear on read
->>>>>>>>>>>    1: clear on write
->>>>>>>>>>>
->>>>>>>>>>> If pdata is not coming from board file, then set the
->>>>>>>>>>> default irq clear method to "irq clear on write"
->>>>>>>>>>>
->>>>>>>>>>> Also, as suggested by "Lee Jones" renaming variable field
->>>>>>>>>>> to appropriate name.
->>>>>>>>>>>
->>>>>>>>>>> Signed-off-by: Zhao Ye <zhaoy@marvell.com>
->>>>>>>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>>>>>>>>>> ---
->>>>>>>>>>>   drivers/mfd/88pm800.c       | 15 ++++++++++-----
->>>>>>>>>>>   include/linux/mfd/88pm80x.h | 10 ++++++++--
->>>>>>>>>>>   2 files changed, 18 insertions(+), 7 deletions(-)
->>>>>>>>>>>
->>
->> <snip>
->>
->>>>>
->>>>> Yes certainly, this is another option (rather preferred one).
->>>>>
->>>>> But to be consistent with other's I proposed this, please refer to the
->>>>> fn device_800_init(), where all xxx_init() are taking 2 arguments, and
->>>>> second argument is pdata.
->>>>>
->>>>>
->>>>> There is room for cleanup, I agree.
->>>>> I can put this too in the next cleanup series.
->>>>>
->>>>
->>>> Note that this is init function, called from probe.
->>>>
->>>> So both approach looks ok to me.
->>>
->>> Please clean up the other.  Function and put it at the front of the
->>> set when you re-submit.
->>>
->>
->> Sorry for dumb question here :)
->> I did not understand what do you mean by "in front of the set"?
->>
->> You want to see all the patches into one single series?
->> Or
->> have separate series,
->> 	1. existing DT addition series
->> 	2. new clean-up series
->
-> [PATCH v6 0/5] mfd: 88pm800: Add Device tree support
-> ?>[PATCH v6 1/5] mfd: 88pm800: Obtain pdata from 'device' rather than passing as parameter
-> ?>[PATCH v6 2/5] mfd: 88pm800: Add device tree support
-> ?>[PATCH v6 3/5] mfd: 88pm800: Remove unnecessary protection around pdata
-> ?>[PATCH v6 4/5] mfd: 88pm800: Set default interrupt clear method
-> ?>[PATCH v6 5/5] mfd: devicetree: bindings: Add new 88pm800 mfd binding
->
+TODO:
+=====
+  - init config for 88PM860 device
+  - Rgulator driver changes to add support for 88PM860 device
 
-Thanks Lee,
 
-Just FYI,
-I have done some reordering here, because of obvious reasons.
 
-Submitting patches shortly...
+Vaibhav Hiremath (6):
+  mfd: 88pm800: remove duplicate dev_err calls during probe
+  mfd: 88pm800: Add device tree support
+  mfd: 88pm800: Get pdata from 'device' rather than passing as a
+    parameter
+  mfd: 88pm800: Remove unnecessary protection around pdata
+  mfd: 88pm800: Set default interrupt clear method
+  mfd: devicetree: bindings: Add new 88pm800 mfd binding
 
-Thanks,
-Vaibhav
+ Documentation/devicetree/bindings/mfd/88pm800.txt |  53 ++++++++++
+ drivers/mfd/88pm800.c                             | 113 +++++++++++-----------
+ include/linux/mfd/88pm80x.h                       |   9 +-
+ 3 files changed, 118 insertions(+), 57 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+
+-- 
+1.9.1
