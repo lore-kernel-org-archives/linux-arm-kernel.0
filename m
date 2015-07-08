@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 08 Jul 2015 13:09:14 +0200
-Subject: [PATCH 30/37] usb: gadget: s3c-hsudc: add ep capabilities support
+Date: Wed, 08 Jul 2015 13:09:18 +0200
+Subject: [PATCH 34/37] usb: musb: gadget: add ep capabilities support
 In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
 References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436353761-7107-31-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436353761-7107-35-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,34 +11,41 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/s3c-hsudc.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/usb/musb/musb_gadget.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/s3c-hsudc.c b/drivers/usb/gadget/udc/s3c-hsudc.c
-index 85a712a..e9def42 100644
---- a/drivers/usb/gadget/udc/s3c-hsudc.c
-+++ b/drivers/usb/gadget/udc/s3c-hsudc.c
-@@ -1005,6 +1005,21 @@ static void s3c_hsudc_initep(struct s3c_hsudc *hsudc,
- 	hsep->stopped = 0;
- 	hsep->wedge = 0;
- 
-+	if (epnum == 0) {
-+		hsep->ep.caps.type_control = true;
-+		hsep->ep.caps.dir_in = true;
-+		hsep->ep.caps.dir_out = true;
-+	} else {
-+		hsep->ep.caps.type_iso = true;
-+		hsep->ep.caps.type_bulk = true;
-+		hsep->ep.caps.type_int = true;
-+	}
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+index 625d482f..043248a 100644
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1729,6 +1729,7 @@ init_peripheral_ep(struct musb *musb, struct musb_ep *ep, u8 epnum, int is_in)
+ 	INIT_LIST_HEAD(&ep->end_point.ep_list);
+ 	if (!epnum) {
+ 		usb_ep_set_maxpacket_limit(&ep->end_point, 64);
++		ep->end_point.caps.type_control = true;
+ 		ep->end_point.ops = &musb_g_ep0_ops;
+ 		musb->g.ep0 = &ep->end_point;
+ 	} else {
+@@ -1736,9 +1737,20 @@ init_peripheral_ep(struct musb *musb, struct musb_ep *ep, u8 epnum, int is_in)
+ 			usb_ep_set_maxpacket_limit(&ep->end_point, hw_ep->max_packet_sz_tx);
+ 		else
+ 			usb_ep_set_maxpacket_limit(&ep->end_point, hw_ep->max_packet_sz_rx);
++		ep->end_point.caps.type_iso = true;
++		ep->end_point.caps.type_bulk = true;
++		ep->end_point.caps.type_int = true;
+ 		ep->end_point.ops = &musb_ep_ops;
+ 		list_add_tail(&ep->end_point.ep_list, &musb->g.ep_list);
+ 	}
 +
-+	if (epnum & 1)
-+		hsep->ep.caps.dir_in = true;
++	if (!epnum || hw_ep->is_shared_fifo) {
++		ep->end_point.caps.dir_in = true;
++		ep->end_point.caps.dir_out = true;
++	} else if (is_in)
++		ep->end_point.caps.dir_in = true;
 +	else
-+		hsep->ep.caps.dir_out = true;
-+
- 	set_index(hsudc, epnum);
- 	writel(hsep->ep.maxpacket, hsudc->regs + S3C_MPR);
++		ep->end_point.caps.dir_out = true;
  }
+ 
+ /*
 -- 
 1.9.1
