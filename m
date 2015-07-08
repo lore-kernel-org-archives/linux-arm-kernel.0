@@ -1,41 +1,109 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  8 Jul 2015 17:02:31 +0200
-Subject: [PATCHv2 2/8] ARM: mvebu: do not check machine in mvebu_pm_init()
+Date: Wed,  8 Jul 2015 17:02:33 +0200
+Subject: [PATCHv2 4/8] ARM: mvebu: prepare pm-board.c for the introduction of
+ Armada 38x support
 In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1436367757-14202-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1436367757-14202-5-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu_pm_init() initializes the support for suspend/resume, and
-before doing that, it checks if we are on a board on which
-suspend/resume is actually supported. However, this check is already
-done by mvebu_armada_xp_gp_pm_init(), and there is no need to
-duplicate the check: callers of mvebu_pm_init() should now what they
-are doing.
+The pm-board.c code contains the board-specific logic to enter suspend
+to RAM. Until now, the code supported only the Armada XP GP board, so
+all functions and symbols were named with armada_xp_gp. However, it
+turns out that the Armada 388 GP also uses the same 3 GPIOs protocol
+to talk to the PIC microcontroller that controls the power supply.
 
-This commit is done in preparation to the addition of suspend/resume
-support on Armada 38x.
+Since we are going to re-use the same code with no change for Armada
+38x, this commit renames the functions and symbols to use just
+"armada" instead of "armada_xp_gp". Better names can be found if one
+day other boards having a different protocol/mechanism are supported
+in the kernel.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mach-mvebu/pm.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-mvebu/pm-board.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index 6573a8f..eca650b 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -182,9 +182,6 @@ int mvebu_pm_init(void (*board_pm_enter)(void __iomem *sdram_reg, u32 srcmd))
- 	struct device_node *np;
- 	struct resource res;
+diff --git a/arch/arm/mach-mvebu/pm-board.c b/arch/arm/mach-mvebu/pm-board.c
+index 301ab38..b8c26cb 100644
+--- a/arch/arm/mach-mvebu/pm-board.c
++++ b/arch/arm/mach-mvebu/pm-board.c
+@@ -1,7 +1,7 @@
+ /*
+  * Board-level suspend/resume support.
+  *
+- * Copyright (C) 2014 Marvell
++ * Copyright (C) 2014-2015 Marvell
+  *
+  * Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+  *
+@@ -20,27 +20,27 @@
+ #include <linux/slab.h>
+ #include "common.h"
  
--	if (!of_machine_is_compatible("marvell,armadaxp"))
--		return -ENODEV;
--
- 	np = of_find_compatible_node(NULL, NULL,
- 				     "marvell,armada-xp-sdram-controller");
+-#define ARMADA_XP_GP_PIC_NR_GPIOS 3
++#define ARMADA_PIC_NR_GPIOS 3
+ 
+ static void __iomem *gpio_ctrl;
+-static int pic_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
+-static int pic_raw_gpios[ARMADA_XP_GP_PIC_NR_GPIOS];
++static int pic_gpios[ARMADA_PIC_NR_GPIOS];
++static int pic_raw_gpios[ARMADA_PIC_NR_GPIOS];
+ 
+-static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
++static void mvebu_armada_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+ {
+ 	u32 reg, ackcmd;
+ 	int i;
+ 
+ 	/* Put 001 as value on the GPIOs */
+ 	reg = readl(gpio_ctrl);
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+ 		reg &= ~BIT(pic_raw_gpios[i]);
+ 	reg |= BIT(pic_raw_gpios[0]);
+ 	writel(reg, gpio_ctrl);
+ 
+ 	/* Prepare writing 111 to the GPIOs */
+ 	ackcmd = readl(gpio_ctrl);
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++)
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++)
+ 		ackcmd |= BIT(pic_raw_gpios[i]);
+ 
+ 	srcmd = cpu_to_le32(srcmd);
+@@ -76,7 +76,7 @@ static void mvebu_armada_xp_gp_pm_enter(void __iomem *sdram_reg, u32 srcmd)
+ 		  [ackcmd] "r" (ackcmd), [gpio_ctrl] "r" (gpio_ctrl) : "r1");
+ }
+ 
+-static int mvebu_armada_xp_gp_pm_init(void)
++static int mvebu_armada_pm_init(void)
+ {
+ 	struct device_node *np;
+ 	struct device_node *gpio_ctrl_np;
+@@ -89,7 +89,7 @@ static int mvebu_armada_xp_gp_pm_init(void)
  	if (!np)
+ 		return -ENODEV;
+ 
+-	for (i = 0; i < ARMADA_XP_GP_PIC_NR_GPIOS; i++) {
++	for (i = 0; i < ARMADA_PIC_NR_GPIOS; i++) {
+ 		char *name;
+ 		struct of_phandle_args args;
+ 
+@@ -134,11 +134,11 @@ static int mvebu_armada_xp_gp_pm_init(void)
+ 	if (!gpio_ctrl)
+ 		return -ENOMEM;
+ 
+-	mvebu_pm_init(mvebu_armada_xp_gp_pm_enter);
++	mvebu_pm_init(mvebu_armada_pm_enter);
+ 
+ out:
+ 	of_node_put(np);
+ 	return ret;
+ }
+ 
+-late_initcall(mvebu_armada_xp_gp_pm_init);
++late_initcall(mvebu_armada_pm_init);
 -- 
 2.4.5
