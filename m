@@ -1,117 +1,94 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Wed, 8 Jul 2015 14:27:46 +0300
-Subject: [PATCH 3/5] host1x: Handle HOST1X class address registers directly
+Date: Wed, 8 Jul 2015 14:27:47 +0300
+Subject: [PATCH 4/5] drm/tegra: Support kernel mappings with IOMMU
 In-Reply-To: <1436354868-24309-1-git-send-email-mperttunen@nvidia.com>
 References: <1436354868-24309-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1436354868-24309-4-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1436354868-24309-5-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves handling of address registers in the HOST1X class directly
-to the firewall code in host1x's job.c, so that individual clients don't
-have to replicate this code. The list of address registers detected also
-change from INDCTRL which is not actually an address register to INDOFF
-and INDOFF2 which are.
+From: Arto Merilainen <amerilainen@nvidia.com>
 
+Host1x command buffer patching requires that the buffer object can be
+mapped into kernel address space, however, the recent addition of
+IOMMU did not account to this requirement. Therefore Host1x engines
+cannot be used if IOMMU is enabled.
+
+This patch implements kmap, kunmap, mmap and munmap functions to
+host1x bo objects.
+
+Signed-off-by: Arto Merilainen <amerilainen@nvidia.com>
 Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
 ---
- drivers/gpu/drm/tegra/gr2d.c | 21 ++++++---------------
- drivers/gpu/drm/tegra/gr3d.c | 20 ++++++--------------
- drivers/gpu/host1x/job.c     | 12 +++++++++++-
- 3 files changed, 23 insertions(+), 30 deletions(-)
+ drivers/gpu/drm/tegra/gem.c | 34 +++++++++++++++++++++++++++++++---
+ 1 file changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/tegra/gr2d.c b/drivers/gpu/drm/tegra/gr2d.c
-index 7e4424f..f048d45 100644
---- a/drivers/gpu/drm/tegra/gr2d.c
-+++ b/drivers/gpu/drm/tegra/gr2d.c
-@@ -88,23 +88,14 @@ static int gr2d_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
+diff --git a/drivers/gpu/drm/tegra/gem.c b/drivers/gpu/drm/tegra/gem.c
+index 01e16e1..6aed866 100644
+--- a/drivers/gpu/drm/tegra/gem.c
++++ b/drivers/gpu/drm/tegra/gem.c
+@@ -2,7 +2,7 @@
+  * NVIDIA Tegra DRM GEM helper functions
+  *
+  * Copyright (C) 2012 Sascha Hauer, Pengutronix
+- * Copyright (C) 2013 NVIDIA CORPORATION, All rights reserved.
++ * Copyright (C) 2013-2015 NVIDIA CORPORATION, All rights reserved.
+  *
+  * Based on the GEM/CMA helpers
+  *
+@@ -50,23 +50,51 @@ static void *tegra_bo_mmap(struct host1x_bo *bo)
  {
- 	struct gr2d *gr2d = dev_get_drvdata(dev);
+ 	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
  
--	switch (class) {
--	case HOST1X_CLASS_HOST1X:
--		if (offset == 0x2b)
--			return 1;
-+	if (class != HOST1X_CLASS_GR2D && class != HOST1X_CLASS_GR2D_SB)
-+		return 0;
- 
--		break;
-+	if (offset >= GR2D_NUM_REGS)
-+		return 0;
- 
--	case HOST1X_CLASS_GR2D:
--	case HOST1X_CLASS_GR2D_SB:
--		if (offset >= GR2D_NUM_REGS)
--			break;
--
--		if (test_bit(offset, gr2d->addr_regs))
--			return 1;
--
--		break;
--	}
-+	if (test_bit(offset, gr2d->addr_regs))
-+		return 1;
- 
- 	return 0;
+-	return obj->vaddr;
++	if (obj->vaddr)
++		return obj->vaddr;
++	else if (obj->gem.import_attach)
++		return dma_buf_vmap(obj->gem.import_attach->dmabuf);
++	else
++		return vmap(obj->pages, obj->num_pages, VM_MAP,
++			    pgprot_writecombine(PAGE_KERNEL));
  }
-diff --git a/drivers/gpu/drm/tegra/gr3d.c b/drivers/gpu/drm/tegra/gr3d.c
-index 9ceaf35..d0dab15 100644
---- a/drivers/gpu/drm/tegra/gr3d.c
-+++ b/drivers/gpu/drm/tegra/gr3d.c
-@@ -98,22 +98,14 @@ static int gr3d_is_addr_reg(struct device *dev, u32 class, u32 offset, u32 val)
+ 
+ static void tegra_bo_munmap(struct host1x_bo *bo, void *addr)
  {
- 	struct gr3d *gr3d = dev_get_drvdata(dev);
- 
--	switch (class) {
--	case HOST1X_CLASS_HOST1X:
--		if (offset == 0x2b)
--			return 1;
-+	if (class != HOST1X_CLASS_GR3D)
-+		return 0;
- 
--		break;
-+	if (offset >= GR3D_NUM_REGS)
-+		return 0;
- 
--	case HOST1X_CLASS_GR3D:
--		if (offset >= GR3D_NUM_REGS)
--			break;
--
--		if (test_bit(offset, gr3d->addr_regs))
--			return 1;
--
--		break;
--	}
-+	if (test_bit(offset, gr3d->addr_regs))
-+		return 1;
- 
- 	return 0;
++	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
++
++	if (obj->vaddr)
++		return;
++	else if (obj->gem.import_attach)
++		dma_buf_vunmap(obj->gem.import_attach->dmabuf, addr);
++	else
++		vunmap(addr);
  }
-diff --git a/drivers/gpu/host1x/job.c b/drivers/gpu/host1x/job.c
-index 77d977b..0701008 100644
---- a/drivers/gpu/host1x/job.c
-+++ b/drivers/gpu/host1x/job.c
-@@ -295,10 +295,20 @@ struct host1x_firewall {
- 	u32 count;
- };
  
-+static int is_addr_reg(struct host1x_firewall *fw, unsigned long offset,
-+		       u32 val)
-+{
-+	if (fw->class == HOST1X_CLASS_HOST1X &&
-+		(offset == 0x2c /* INDOFF2 */ || offset == 0x2d /* INDOFF */))
-+		return true;
-+
-+	return fw->job->is_addr_reg(fw->dev, fw->class, offset, val);
-+}
-+
- static int check_register(struct host1x_firewall *fw,
- 			  unsigned long offset, u32 val)
+ static void *tegra_bo_kmap(struct host1x_bo *bo, unsigned int page)
  {
--	if (fw->job->is_addr_reg(fw->dev, fw->class, offset, val)) {
-+	if (is_addr_reg(fw, offset, val)) {
- 		if (!fw->num_relocs)
- 			return -EINVAL;
+ 	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
  
+-	return obj->vaddr + page * PAGE_SIZE;
++	if (obj->vaddr)
++		return obj->vaddr + page * PAGE_SIZE;
++	else if (obj->gem.import_attach)
++		return dma_buf_kmap(obj->gem.import_attach->dmabuf, page);
++	else
++		return vmap(obj->pages + page, 1, VM_MAP,
++			    pgprot_writecombine(PAGE_KERNEL));
+ }
+ 
+ static void tegra_bo_kunmap(struct host1x_bo *bo, unsigned int page,
+ 			    void *addr)
+ {
++	struct tegra_bo *obj = host1x_to_tegra_bo(bo);
++
++	if (obj->vaddr)
++		return;
++	else if (obj->gem.import_attach)
++		dma_buf_kunmap(obj->gem.import_attach->dmabuf, page, addr);
++	else
++		vunmap(addr);
+ }
+ 
+ static struct host1x_bo *tegra_bo_get(struct host1x_bo *bo)
 -- 
 2.1.4
