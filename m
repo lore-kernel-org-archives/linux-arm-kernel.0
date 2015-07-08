@@ -1,105 +1,200 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 8 Jul 2015 17:04:55 +0530
-Subject: [PATCH v5 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <1435717005-20012-3-git-send-email-pi-cheng.chen@linaro.org>
-References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
- <1435717005-20012-3-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150708113455.GF1805@linux>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 8 Jul 2015 14:35:12 +0300
+Subject: [PATCH 5/5] drm/tegra: Add Tegra DRM allocation API
+In-Reply-To: <1436354868-24309-1-git-send-email-mperttunen@nvidia.com>
+References: <1436354868-24309-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1436355312-13765-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-07-15, 10:16, Pi-Cheng Chen wrote:
-> This patch implements MT8173 cpufreq driver.
+Add a new IO virtual memory allocation API to allow clients to
+allocate non-GEM memory in the Tegra DRM IOMMU domain. This is
+required e.g. for loading client firmware when clients are attached
+to the IOMMU domain.
 
-Now that you are going to resend this patchset, a few more comments.
+The allocator allocates contiguous physical pages that are then
+mapped contiguously to the IOMMU domain using a bitmap allocator
+inside a 64 MiB reserved for non-GEM allocations. Contiguous
+physical pages are used so that the same allocator works also
+when IOMMU support is disabled and therefore devices access
+physical memory directly.
 
-Please describe your SoC a bit here, so that reviewers know what are
-we going to implement.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ drivers/gpu/drm/tegra/drm.c | 99 ++++++++++++++++++++++++++++++++++++++++++---
+ drivers/gpu/drm/tegra/drm.h |  9 +++++
+ 2 files changed, 103 insertions(+), 5 deletions(-)
 
-> +static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
-> +{
-> +	struct device *cpu_dev;
-> +	struct regulator *proc_reg = ERR_PTR(-ENODEV);
-> +	struct regulator *sram_reg = ERR_PTR(-ENODEV);
-> +	struct clk *cpu_clk = ERR_PTR(-ENODEV);
-> +	struct clk *inter_clk = ERR_PTR(-ENODEV);
-> +	struct dev_pm_opp *opp;
-> +	unsigned long rate;
-> +	int ret;
-> +
-> +	cpu_dev = get_cpu_device(cpu);
-> +	if (!cpu_dev) {
-> +		pr_err("failed to get cpu%d device\n", cpu);
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = of_init_opp_table(cpu_dev);
-> +	if (ret) {
-> +		pr_warn("no OPP table for cpu%d\n", cpu);
-> +		return ret;
-> +	}
-
-Initialize opp table only when you know other resources are available.
-i.e. we aren't going to abort due to EPROBE_DEFER.
-
-> +	cpu_clk = clk_get(cpu_dev, "cpu");
-> +	if (IS_ERR(cpu_clk)) {
-> +		if (PTR_ERR(cpu_clk) == -EPROBE_DEFER)
-> +			pr_warn("cpu clk for cpu%d not ready, retry.\n", cpu);
-> +		else
-> +			pr_err("failed to get cpu clk for cpu%d\n", cpu);
-> +
-> +		ret = PTR_ERR(cpu_clk);
-> +		goto out_free_opp_table;
-> +	}
-> +}
-
-
-> +static int mt8173_cpufreq_probe(struct platform_device *pdev)
-> +{
-> +	int ret;
-> +
-> +	ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
-> +	if (ret)
-> +		pr_err("failed to register mtk cpufreq driver\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver mt8173_cpufreq_platdrv = {
-> +	.driver = {
-> +		.name	= "mt8173-cpufreq",
-> +	},
-> +	.probe		= mt8173_cpufreq_probe,
-> +};
-> +
-> +static int mt8173_cpufreq_driver_init(void)
-> +{
-> +	struct platform_device *pdev;
-> +	int err;
-> +
-> +	if (!of_machine_is_compatible("mediatek,mt8173"))
-> +		return -ENODEV;
-
-Why do you need to check this ? Its going to be the right SoC, others
-can't even compile it.
-
-> +	err = platform_driver_register(&mt8173_cpufreq_platdrv);
-> +	if (err)
-> +		return err;
-> +
-> +	pdev = platform_device_register_simple("mt8173-cpufreq", -1, NULL, 0);
-> +	if (IS_ERR(pdev)) {
-> +		pr_err("failed to register mtk-cpufreq platform device\n");
-> +		return PTR_ERR(pdev);
-> +	}
-
-This is simply crap. You register the driver and then its device from
-the same function. If you are so sure that this driver is required,
-then why to get into the shit of device-driver model ?
-
-Just call cpufreq_register_driver() from here :), no device/driver
-required.
-
+diff --git a/drivers/gpu/drm/tegra/drm.c b/drivers/gpu/drm/tegra/drm.c
+index 427f50c..af4ff86 100644
+--- a/drivers/gpu/drm/tegra/drm.c
++++ b/drivers/gpu/drm/tegra/drm.c
+@@ -1,12 +1,13 @@
+ /*
+  * Copyright (C) 2012 Avionic Design GmbH
+- * Copyright (C) 2012-2013 NVIDIA CORPORATION.  All rights reserved.
++ * Copyright (C) 2012-2015 NVIDIA CORPORATION.  All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/bitops.h>
+ #include <linux/host1x.h>
+ #include <linux/iommu.h>
+ 
+@@ -23,6 +24,8 @@
+ #define DRIVER_MINOR 0
+ #define DRIVER_PATCHLEVEL 0
+ 
++#define IOVA_AREA_SZ (1024 * 1024 * 64) /* 64 MiB */
++
+ struct tegra_drm_file {
+ 	struct list_head contexts;
+ };
+@@ -125,7 +128,8 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
+ 
+ 	if (iommu_present(&platform_bus_type)) {
+ 		struct iommu_domain_geometry *geometry;
+-		u64 start, end;
++		u64 start, end, iova_start;
++		size_t bitmap_size;
+ 
+ 		tegra->domain = iommu_domain_alloc(&platform_bus_type);
+ 		if (!tegra->domain) {
+@@ -136,10 +140,23 @@ static int tegra_drm_load(struct drm_device *drm, unsigned long flags)
+ 		geometry = &tegra->domain->geometry;
+ 		start = geometry->aperture_start;
+ 		end = geometry->aperture_end;
++		iova_start = end - IOVA_AREA_SZ + 1;
++
++		DRM_DEBUG("IOMMU context initialized (GEM aperture: %#llx-%#llx, IOVA aperture: %#llx-%#llx)\n",
++			  start, iova_start-1, iova_start, end);
++		bitmap_size = BITS_TO_LONGS(IOVA_AREA_SZ >> PAGE_SHIFT) *
++			sizeof(long);
++		tegra->iova_bitmap = devm_kzalloc(drm->dev, bitmap_size,
++						  GFP_KERNEL);
++		if (!tegra->iova_bitmap) {
++			err = -ENOMEM;
++			goto free;
++		}
++		tegra->iova_bitmap_bits = BITS_PER_BYTE * bitmap_size;
++		tegra->iova_start = iova_start;
++		mutex_init(&tegra->iova_lock);
+ 
+-		DRM_DEBUG("IOMMU context initialized (aperture: %#llx-%#llx)\n",
+-			  start, end);
+-		drm_mm_init(&tegra->mm, start, end - start + 1);
++		drm_mm_init(&tegra->mm, start, iova_start - start);
+ 	}
+ 
+ 	mutex_init(&tegra->clients_lock);
+@@ -979,6 +996,78 @@ int tegra_drm_unregister_client(struct tegra_drm *tegra,
+ 	return 0;
+ }
+ 
++void *tegra_drm_alloc(struct tegra_drm *tegra, size_t size,
++			      dma_addr_t *iova)
++{
++	size_t aligned = PAGE_ALIGN(size);
++	int num_pages = aligned >> PAGE_SHIFT;
++	void *virt;
++	unsigned int start;
++	int err;
++
++	virt = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
++					get_order(aligned));
++	if (!virt)
++		return NULL;
++
++	if (!tegra->domain) {
++		/*
++		 * If IOMMU is disabled, devices address physical memory
++		 * directly.
++		 */
++		*iova = virt_to_phys(virt);
++		return virt;
++	}
++
++	mutex_lock(&tegra->iova_lock);
++
++	start = bitmap_find_next_zero_area(tegra->iova_bitmap,
++					   tegra->iova_bitmap_bits, 0,
++					   num_pages, 0);
++	if (start > tegra->iova_bitmap_bits)
++		goto free_pages;
++
++	bitmap_set(tegra->iova_bitmap, start, num_pages);
++
++	*iova = tegra->iova_start + (start << PAGE_SHIFT);
++	err = iommu_map(tegra->domain, *iova, virt_to_phys(virt),
++			aligned, IOMMU_READ | IOMMU_WRITE);
++	if (err < 0)
++		goto free_iova;
++
++	mutex_unlock(&tegra->iova_lock);
++
++	return virt;
++
++free_iova:
++	bitmap_clear(tegra->iova_bitmap, start, num_pages);
++free_pages:
++	mutex_unlock(&tegra->iova_lock);
++
++	free_pages((unsigned long)virt, get_order(aligned));
++
++	return NULL;
++}
++
++void tegra_drm_free(struct tegra_drm *tegra, size_t size, void *virt,
++		    dma_addr_t iova)
++{
++	size_t aligned = PAGE_ALIGN(size);
++	int num_pages = aligned >> PAGE_SHIFT;
++
++	if (tegra->domain) {
++		unsigned int start = (iova - tegra->iova_start) >> PAGE_SHIFT;
++
++		iommu_unmap(tegra->domain, iova, aligned);
++
++		mutex_lock(&tegra->iova_lock);
++		bitmap_clear(tegra->iova_bitmap, start, num_pages);
++		mutex_unlock(&tegra->iova_lock);
++	}
++
++	free_pages((unsigned long)virt, get_order(aligned));
++}
++
+ static int host1x_drm_probe(struct host1x_device *dev)
+ {
+ 	struct drm_driver *driver = &tegra_drm_driver;
+diff --git a/drivers/gpu/drm/tegra/drm.h b/drivers/gpu/drm/tegra/drm.h
+index 0e7756e..58c83b11 100644
+--- a/drivers/gpu/drm/tegra/drm.h
++++ b/drivers/gpu/drm/tegra/drm.h
+@@ -42,6 +42,11 @@ struct tegra_drm {
+ 	struct iommu_domain *domain;
+ 	struct drm_mm mm;
+ 
++	struct mutex iova_lock;
++	dma_addr_t iova_start;
++	unsigned long *iova_bitmap;
++	unsigned int iova_bitmap_bits;
++
+ 	struct mutex clients_lock;
+ 	struct list_head clients;
+ 
+@@ -101,6 +106,10 @@ int tegra_drm_unregister_client(struct tegra_drm *tegra,
+ int tegra_drm_init(struct tegra_drm *tegra, struct drm_device *drm);
+ int tegra_drm_exit(struct tegra_drm *tegra);
+ 
++void *tegra_drm_alloc(struct tegra_drm *tegra, size_t size, dma_addr_t *iova);
++void tegra_drm_free(struct tegra_drm *tegra, size_t size, void *virt,
++		    dma_addr_t iova);
++
+ struct tegra_dc_soc_info;
+ struct tegra_output;
+ 
 -- 
-viresh
+2.1.4
