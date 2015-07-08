@@ -1,99 +1,38 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Jul 2015 20:42:18 +0800
-Subject: [PATCH 4/4] arm: psci: add cpuidle_ops support
-In-Reply-To: <20150708193842.1ca1c55a@xhacker>
-References: <1436350417-6712-1-git-send-email-jszhang@marvell.com>
- <1436350417-6712-5-git-send-email-jszhang@marvell.com>
- <20150708103429.GL7557@n2100.arm.linux.org.uk>
- <20150708193842.1ca1c55a@xhacker>
-Message-ID: <20150708204218.50c3cfc3@xhacker>
+Date: Wed, 8 Jul 2015 20:51:06 +0800
+Subject: [PATCH v2 0/2] arm: kernel: implement cpuidle_ops with psci backend
+Message-ID: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+We'd like to use cpuidle-arm.c for both arm and arm64 with psci as backend.
+For arm64, it works. But for arm, we miss cpuidle_ops, these patches try to
+address this issue.
 
-On Wed, 8 Jul 2015 19:38:42 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+Has been tested on Marvell Berlin SoCs. These patches are rebased on the Mark
+Rutland's latest psci unification work and Lorenzo Pieralisi's psci related
+work[1].
 
-> Dear Russell,
-> 
-> On Wed, 8 Jul 2015 11:34:29 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Wed, Jul 08, 2015 at 06:13:37PM +0800, Jisheng Zhang wrote:
-> > > This patch implements cpuidle_ops using psci. After this patch, we can use
-> > > cpuidle-arm.c with psci backend for both arm and arm64.
-> > 
-> > I really don't see the point of most of the patches in this series.
-> > 
-> > To summarise, what you're doing is:
-> > 
-> > 1. Renaming arch/arm/kernel/psci_smp.c to arch/arm/kernel/psci.c
-> > 2. Adding a #ifdef CONFIG_SMP around _all_ the code in psci.c
-> > 3. Adding cpuidle code with an #ifdef CONFIG_CPU_IDLE around all the
-> >    CPU idle code.
-> > 
-> > So, we end up with a file which contains:
-> > 
-> > /*
-> >  header
-> >  */
-> > #include statements
-> > 
-> > /*
-> >  some commentry relevant to SMP code
-> >  */
-> > #ifdef CONFIG_CPU_IDLE
-> > ... cpu idle code ...
-> > #endif
-> > #ifdef CONFIG_SMP
-> > ... smp code ...
-> > #endif
-> > 
-> > which (a) is a mess, and (b) is unnecessary.  The only relevant bits which
-> > are shared are the #include statements.
-> > 
-> > Please try this alternative approach:
-> > 
-> > 1. Leave psci_smp.c alone.
-> > 2. Add arch/arm/kernel/psci_cpuidle.c containing the #include statements
-> >    you need, and the CPU idle code.
+[PATCH 1/2] move psci's cpu_suspend handling to generic code as suggested
+	    by Lorenzo.
+[PATCH 2/2] implement cpuidle_ops with psci finally.
 
-After more consideration, I have one concern.
+Since v1:
+ - add a new file psci_cpuidle.c to implment cpuidle_ops
 
-Currently, cpuidle_ops is defined as the following,
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347352.html
 
-> struct cpuidle_ops {
->        int (*suspend)(int cpu, unsigned long arg);
+Jisheng Zhang (2):
+  firmware: psci: move cpu_suspend handling to generic code
+  arm: kernel: implement cpuidle_ops with psci backend
 
-the cpu may not be necessary, because to-be-suspended cpu is always the calling
-cpu itself.
+ arch/arm/kernel/Makefile       |  1 +
+ arch/arm/kernel/psci_cpuidle.c | 29 +++++++++++++
+ arch/arm64/kernel/psci.c       | 95 ------------------------------------------
+ drivers/firmware/psci.c        | 95 ++++++++++++++++++++++++++++++++++++++++++
+ include/linux/psci.h           |  2 +
+ 5 files changed, 127 insertions(+), 95 deletions(-)
+ create mode 100644 arch/arm/kernel/psci_cpuidle.c
 
->	int (*init)(struct device_node *, int cpu);
-
-the device_node here may not be necessary either, because we can get the node
-via. of_get_cpu_node.
-
-So if we refine cpuidle_ops defintion, the code would be as simple as
-
-static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-        .suspend = cpu_psci_cpu_suspend,
-        .init = cpu_psci_cpu_init_idle,
-};
-CPUIDLE_METHOD_OF_DECLARE(psci_idle, "psci", &psci_cpuidle_ops);
-
-I'm not sure a new psci_cpuidle.c only with above 5 lines is acceptable or not.
-
-Thanks,
-Jisheng
-
-
-
-
-> > 
-> > I think such an approach will reduce your patch series to two patches,
-> > one moving the ARM64 code, and one adding the cpuidle code.
-> > 
-> 
-> Good idea! Will refine the patches as you suggested.
-> 
+-- 
+2.1.4
