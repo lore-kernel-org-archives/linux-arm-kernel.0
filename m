@@ -1,72 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 8 Jul 2015 14:11:29 -0700
-Subject: [PATCH v4 3/5] tee: generic TEE subsystem
-In-Reply-To: <20150708171026.GA11740@obsidianresearch.com>
-References: <1436350592-7732-1-git-send-email-jens.wiklander@linaro.org>
- <1436350592-7732-4-git-send-email-jens.wiklander@linaro.org>
- <20150708171026.GA11740@obsidianresearch.com>
-Message-ID: <20150708211129.GA29824@kroah.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 08 Jul 2015 14:22:28 -0700
+Subject: [GIT PULL] CSR atlas7 pinctrl descriptions for 4.2
+In-Reply-To: <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
+ (Barry Song's message of "Mon, 6 Jul 2015 10:35:12 +0800")
+References: <CAGsJ_4x7rSFCJW6=9=WpGSUBf0yaCpcxXA22W5k+mZ=9qk5SGg@mail.gmail.com>
+ <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
+Message-ID: <7hy4iqcpkb.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 11:10:26AM -0600, Jason Gunthorpe wrote:
-> On Wed, Jul 08, 2015 at 12:16:30PM +0200, Jens Wiklander wrote:
-> 
-> > +static void tee_device_complete_unused(struct kref *kref)
-> > +{
-> > +	struct tee_device *teedev;
-> > +
-> > +	teedev = container_of(kref, struct tee_device, users);
-> > +	/* When the mutex is released, no other tee_device_get() will succeed */
-> > +	teedev->desc = NULL;
-> > +	complete(&teedev->c_no_users);
-> > +}
-> > +
-> > +void tee_device_put(struct tee_device *teedev)
-> > +{
-> > +	mutex_lock(&teedev->mutex);
-> > +	/* Shouldn't put in this state */
-> > +	if (!WARN_ON(!teedev->desc))
-> > +		kref_put(&teedev->users, tee_device_complete_unused);
-> > +	mutex_unlock(&teedev->mutex);
-> > +}
-> > +
-> > +bool tee_device_get(struct tee_device *teedev)
-> > +{
-> > +	mutex_lock(&teedev->mutex);
-> > +	if (!teedev->desc) {
-> > +		mutex_unlock(&teedev->mutex);
-> > +		return false;
-> > +	}
-> > +	kref_get(&teedev->users);
-> > +	mutex_unlock(&teedev->mutex);
-> > +	return true;
-> > +}
-> 
-> If you are holding the mutex then you don't really need a kref, just a
-> simple active count counter.
-> 
-> I've been a bit learly lately about seeing krefs used for something
-> other than kfree, I've seen a few subtle mistakes in those schemes -
-> yours looks OK, only because of the lock, and the lock makes the kref
-> redundant..
-> 
-> > +       cdev_init(&teedev->cdev, &tee_fops);
-> > +       teedev->cdev.owner = teedesc->owner;
-> 
-> This also needs to set teedev->cdev.kobj.parent.
-> I'm guessing:
-> 
->  teedev->cdev.kobj.parent = &teedev->dev.kobj;
-> 
-> TPM had the same mistake..
+Barry Song <21cnbao@gmail.com> writes:
 
-Really?  As of a few years ago, A cdev's kobject should not be touched
-by anything other than the cdev core.  It's not a "real" kobject in that
-it is never registered in sysfs, and no one sees it.  I keep meaning to
-just use something else one of these days for that structure, as lots of
-people get it wrong.  Or has things changed there?
+> 2015-06-10 15:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+>> Hi Arnd, Kevin, Olof,
+>>
+>> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
+>>
+>>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>> tags/atlas7-pinctrl-dts-for-4.2
+>>
+>> for you to fetch changes up to 27b0d37e4209f3fc40c65e2b7936ee4154f4070d:
+>>
+>>   ARM: dts: atlas7: add pinctrl and gpio descriptions (2015-06-10
+>> 15:00:50 +0800)
+>
+> Hi Arnd, Kevin, Olof,
+>
+> have you missed this one? it is a follow-up patch to "pinctrl: sirf:
+> add sirf atlas7 pinctrl and gpio support"
 
-thanks,
+Sorry, I hadn't see the original, but found it in my spam folder.  
 
-greg k-h
+> do we still have any chance to make it in 4.2?
+
+Yes, I've merged both of your pulls into the fixes branch for v4.2-rc.
+
+Kevin
