@@ -1,102 +1,91 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  8 Jul 2015 17:56:26 +0530
-Subject: [PATCH-v6 0/6] mfd: 88pm800: Add Device tree support
-Message-ID: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Wed,  8 Jul 2015 17:56:27 +0530
+Subject: [PATCH-v6 1/6] mfd: 88pm800: remove duplicate dev_err calls during
+ probe
+In-Reply-To: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436358392-15449-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch-series adds support for Device tree to 88PM800 mfd driver.
-It also sets default configuration of irq clear method if board file
-doesn't exist.
+During probe, inside fn device_800_init(), submodule init is
+happening and the same error message is getting printed in both
+the places, <subdev>_init() and inside device_800_init().
 
-Testing::
- - Boot tested on PXA1928 based platform.
- - probe of mfd, rtc and regulator function passing successfully.
- - Basic read operations on registers
- - irq clear configuration
+So this patch gets rid of dev_err from <subdev>_init() fns.
 
-V5 => V6
-=======
-Link to V5: https://lkml.org/lkml/2015/6/29/283
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/mfd/88pm800.c | 32 ++++----------------------------
+ 1 file changed, 4 insertions(+), 28 deletions(-)
 
- - Added new patch to the series PATCH [1/6]
-   Cleanup patch to remove duplicate dev_err messages
- - Added new patch to the series PACTH [3/6]
-   Cleanup patch to get pdata from 'device' pointer instead of
-   passing as a parameter.
- - Removed irq_clr_mode/irq_mode field from 'struct pm80x_chip'
-   and use pdata.irq_clr_method to set irq clear method.
- - Added acked-by and reviewed-by to respective patches.
-
-V4 => V5
-=======
-Link to V4: https://lkml.org/lkml/2015/6/25/67
-
-  - Renamed binding back again to 88pm800, as 'Yi Zhang' already started
-    submitting 88pm88x, so 88pm8xx won't make sense. Better name would be to
-    stick with 88pm80x.
-  - Added new patch to series PATCH 2/4, to remove unwanted protection around
-    padata
-  - As suggested by Lee, added macro based implementation for CLEAR_ON_WRITE
-    and CLEAR_ON_READ.
-  - and fixed other trivial comments.
-
-V3 => V4
-=======
-Link to V3: https://lkml.org/lkml/2015/6/24/143
-
-  -  irq clear method is 88PM800 feature, which is not dependent on board or
-     doesn't require any wiring changes, so DT is not the way.
-     Hardcoded to "irq clear on write" if board file doesn't exist.
-  - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
-  - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
-
-V2 => V3
-=======
-Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
-
-   - Replaced deprecated "regulator-compatible" property with "regulator-name".
-   - Added Rob's Acked-by  to [PATCH 3/3]
-
-V1 => V2
-=======
-Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
-
-  - Split binding changes from original commit
-  - Updated binding info as per Rob's suggestion
-  - Dropped PATCH 4/4, as discussed during review
-  - Dropped PATCH 3/4, as it is independent RTC code change,
-    so will submit it separately to ease merging.
-  - Fixed all other minor comments
-
-Attempt has been made to push some of the patches to the list sometime
-back in 2013.
-
-Link to previous patch submission:
-        https://lkml.org/lkml/2013/8/14/86
-
-
-TODO:
-=====
-  - init config for 88PM860 device
-  - Rgulator driver changes to add support for 88PM860 device
-
-
-
-Vaibhav Hiremath (6):
-  mfd: 88pm800: remove duplicate dev_err calls during probe
-  mfd: 88pm800: Add device tree support
-  mfd: 88pm800: Get pdata from 'device' rather than passing as a
-    parameter
-  mfd: 88pm800: Remove unnecessary protection around pdata
-  mfd: 88pm800: Set default interrupt clear method
-  mfd: devicetree: bindings: Add new 88pm800 mfd binding
-
- Documentation/devicetree/bindings/mfd/88pm800.txt |  53 ++++++++++
- drivers/mfd/88pm800.c                             | 113 +++++++++++-----------
- include/linux/mfd/88pm80x.h                       |   9 +-
- 3 files changed, 118 insertions(+), 57 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
-
+diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+index 841717a..0c5470e 100644
+--- a/drivers/mfd/88pm800.c
++++ b/drivers/mfd/88pm800.c
+@@ -308,59 +308,35 @@ static int device_gpadc_init(struct pm80x_chip *chip,
+ 	return 0;
+ 
+ out:
+-	dev_info(chip->dev, "pm800 device_gpadc_init: Failed!\n");
+ 	return ret;
+ }
+ 
+ static int device_onkey_init(struct pm80x_chip *chip,
+ 				struct pm80x_platform_data *pdata)
+ {
+-	int ret;
+-
+-	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
++	return mfd_add_devices(chip->dev, 0, &onkey_devs[0],
+ 			      ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
+ 			      NULL);
+-	if (ret) {
+-		dev_err(chip->dev, "Failed to add onkey subdev\n");
+-		return ret;
+-	}
+-
+-	return 0;
+ }
+ 
+ static int device_rtc_init(struct pm80x_chip *chip,
+ 				struct pm80x_platform_data *pdata)
+ {
+-	int ret;
+-
+ 	if (pdata) {
+ 		rtc_devs[0].platform_data = pdata->rtc;
+ 		rtc_devs[0].pdata_size =
+ 				pdata->rtc ? sizeof(struct pm80x_rtc_pdata) : 0;
+ 	}
+-	ret = mfd_add_devices(chip->dev, 0, &rtc_devs[0],
+-			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
+-	if (ret) {
+-		dev_err(chip->dev, "Failed to add rtc subdev\n");
+-		return ret;
+-	}
+ 
+-	return 0;
++	return mfd_add_devices(chip->dev, 0, &rtc_devs[0],
++			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
+ }
+ 
+ static int device_regulator_init(struct pm80x_chip *chip,
+ 					   struct pm80x_platform_data *pdata)
+ {
+-	int ret;
+-
+-	ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
++	return mfd_add_devices(chip->dev, 0, &regulator_devs[0],
+ 			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
+-	if (ret) {
+-		dev_err(chip->dev, "Failed to add regulator subdev\n");
+-		return ret;
+-	}
+-
+-	return 0;
+ }
+ 
+ static int device_irq_init_800(struct pm80x_chip *chip)
 -- 
 1.9.1
