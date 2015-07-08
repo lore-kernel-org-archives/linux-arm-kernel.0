@@ -1,42 +1,55 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Wed,  8 Jul 2015 16:35:06 +0200
-Subject: [PATCH] i2c: core: only use set_scl for bus recovery after calling
- prepare_recovery
-Message-ID: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
+Date: Wed,  8 Jul 2015 16:35:27 +0200
+Subject: [PATCH] i2c: omap: fix bus recovery setup
+Message-ID: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using set_scl may be ineffective before calling the driver specific
-prepare_recovery callback, which might change into a test mode. So
-instead of setting SCL in i2c_generic_scl_recovery, move it to
-i2c_generic_recovery (after the optional prepare_recovery).
+At least on the AM335x, enabling OMAP_I2C_SYSTEST_ST_EN is not enough to
+allow direct access to the SCL and SDA pins. In addition to ST_EN, we
+need to set the TMODE to 0b11 (Loop back & SDA/SCL IO mode select).
+Also, as the reset values of SCL_O and SDA_O are 0 (which means "drive
+low level"), we need to set them to 1 (which means "high-impedance") to
+avoid unwanted changes on the pins.
+
+As a precaution, reset all these bits to their default values after
+recovery is complete.
 
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
 ---
- drivers/i2c/i2c-core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/i2c/busses/i2c-omap.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-index 069a41f116dd..be992b3e0be8 100644
---- a/drivers/i2c/i2c-core.c
-+++ b/drivers/i2c/i2c-core.c
-@@ -567,6 +567,9 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
- 	if (bri->prepare_recovery)
- 		bri->prepare_recovery(adap);
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index d1c22e3fdd14..fc9bf7f30e35 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1247,7 +1247,14 @@ static void omap_i2c_prepare_recovery(struct i2c_adapter *adap)
+ 	u32 reg;
  
-+	bri->set_scl(adap, val);
-+	ndelay(RECOVERY_NDELAY);
-+
- 	/*
- 	 * By this time SCL is high, as we need to give 9 falling-rising edges
- 	 */
-@@ -597,7 +600,6 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
- 
- int i2c_generic_scl_recovery(struct i2c_adapter *adap)
- {
--	adap->bus_recovery_info->set_scl(adap, 1);
- 	return i2c_generic_recovery(adap);
+ 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
++	/* enable test mode */
+ 	reg |= OMAP_I2C_SYSTEST_ST_EN;
++	/* select SDA/SCL IO mode */
++	reg |= 3 << OMAP_I2C_SYSTEST_TMODE_SHIFT;
++	/* set SCL to high-impedance state (reset value is 0) */
++	reg |= OMAP_I2C_SYSTEST_SCL_O;
++	/* set SDA to high-impedance state (reset value is 0) */
++	reg |= OMAP_I2C_SYSTEST_SDA_O;
+ 	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
  }
- EXPORT_SYMBOL_GPL(i2c_generic_scl_recovery);
+ 
+@@ -1257,7 +1264,11 @@ static void omap_i2c_unprepare_recovery(struct i2c_adapter *adap)
+ 	u32 reg;
+ 
+ 	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
++	/* restore reset values */
+ 	reg &= ~OMAP_I2C_SYSTEST_ST_EN;
++	reg &= ~OMAP_I2C_SYSTEST_TMODE_MASK;
++	reg &= ~OMAP_I2C_SYSTEST_SCL_O;
++	reg &= ~OMAP_I2C_SYSTEST_SDA_O;
+ 	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+ }
+ 
 -- 
 2.1.4
