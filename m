@@ -1,79 +1,68 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 08 Jul 2015 14:13:52 +0100
-Subject: [PATCH v2 7/9] iommu/arm-smmu: remove arm_smmu_devices
-In-Reply-To: <1436239822-14132-8-git-send-email-thunder.leizhen@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-8-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <559D2210.50202@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  8 Jul 2015 15:15:07 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+Message-ID: <1436361307-27686-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/07/15 04:30, Zhen Lei wrote:
-> It can be replaced by of_iommu_list(in of_iommu.c).
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->   drivers/iommu/arm-smmu-v3.c | 22 ++--------------------
->   1 file changed, 2 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index c569539..39c55f6 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -604,10 +604,6 @@ struct arm_smmu_domain {
->   	struct iommu_domain		domain;
->   };
->
-> -/* Our list of SMMU instances */
-> -static DEFINE_SPINLOCK(arm_smmu_devices_lock);
-> -static LIST_HEAD(arm_smmu_devices);
-> -
->   struct arm_smmu_option_prop {
->   	u32 opt;
->   	const char *prop;
-> @@ -2675,11 +2671,6 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->   	if (ret)
->   		goto out_free_structures;
->
-> -	/* Record our private device structure */
-> -	INIT_LIST_HEAD(&smmu->list);
-> -	spin_lock(&arm_smmu_devices_lock);
-> -	list_add(&smmu->list, &arm_smmu_devices);
-> -	spin_unlock(&arm_smmu_devices_lock);
->   	platform_set_drvdata(pdev, smmu);
->   	of_iommu_set_ops(smmu->dev->of_node, &arm_smmu_ops);
->
-> @@ -2692,19 +2683,10 @@ out_free_structures:
->
->   static int arm_smmu_device_remove(struct platform_device *pdev)
->   {
-> -	struct arm_smmu_device *curr, *smmu = NULL;
-> +	struct arm_smmu_device *smmu;
->   	struct device *dev = &pdev->dev;
->
-> -	spin_lock(&arm_smmu_devices_lock);
-> -	list_for_each_entry(curr, &arm_smmu_devices, list) {
-> -		if (curr->dev == dev) {
-> -			smmu = curr;
-> -			list_del(&smmu->list);
-> -			break;
-> -		}
-> -	}
-> -	spin_unlock(&arm_smmu_devices_lock);
-> -
-> +	smmu = find_smmu_by_node(dev->of_node);
+This enumerates the PL011 serial ports on the Ux500. This is
+necessary to do if we want to remove one of the serial ports,
+since userspace depends on console to be present on ttyAMA2
+and we must not break userspace.
 
-Isn't that just a really long round-trip to platform_get_drvdata(pdev)?
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ARM SoC guys: if you find this patch OK, please apply this
+directly for fixes, as a prerequisite for patch 2/2.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi | 13 ++++++++++---
+ 1 file changed, 10 insertions(+), 3 deletions(-)
 
->   	if (!smmu)
->   		return -ENODEV;
->
-> --
-> 1.8.0
->
->
-> _______________________________________________
-> iommu mailing list
-> iommu at lists.linux-foundation.org
-> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 853684ad7773..7db3650e05c4 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -15,6 +15,13 @@
+ #include "skeleton.dtsi"
+ 
+ / {
++	/* This stablilizes the serial port enumeration */
++	aliases {
++		serial0 = &ux500_serial0;
++		serial1 = &ux500_serial1;
++		serial2 = &ux500_serial2;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -971,7 +978,7 @@
+ 			power-domains = <&pm_domains DOMAIN_VAPE>;
+ 		};
+ 
+-		uart at 80120000 {
++		ux500_serial0: uart at 80120000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x80120000 0x1000>;
+ 			interrupts = <0 11 IRQ_TYPE_LEVEL_HIGH>;
+@@ -986,7 +993,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		uart at 80121000 {
++		ux500_serial1: uart at 80121000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x80121000 0x1000>;
+ 			interrupts = <0 19 IRQ_TYPE_LEVEL_HIGH>;
+@@ -1001,7 +1008,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		uart at 80007000 {
++		ux500_serial2: uart at 80007000 {
+ 			compatible = "arm,pl011", "arm,primecell";
+ 			reg = <0x80007000 0x1000>;
+ 			interrupts = <0 26 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+2.4.3
