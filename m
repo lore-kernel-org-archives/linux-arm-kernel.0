@@ -1,44 +1,151 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed,  8 Jul 2015 15:17:14 +0530
-Subject: [PATCH 5/9] clk: qcom: gcc-msm8960: add child devices support.
+Date: Wed,  8 Jul 2015 15:17:16 +0530
+Subject: [PATCH 7/9] arm: dts: apq8064: Add thermal zones,
+ tsens and eeprom nodes
 In-Reply-To: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
 References: <1436348838-22671-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1436348838-22671-6-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1436348838-22671-8-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Add thermal zones, tsens and eeprom nodes
 
-This patch adds support to add child devices to gcc as some of the
-registers mapped by gcc are used by things like thermal sensors.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gcc-msm8960.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 108 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 108 insertions(+)
 
-diff --git a/drivers/clk/qcom/gcc-msm8960.c b/drivers/clk/qcom/gcc-msm8960.c
-index eb6a4f9..2c80d03 100644
---- a/drivers/clk/qcom/gcc-msm8960.c
-+++ b/drivers/clk/qcom/gcc-msm8960.c
-@@ -15,6 +15,7 @@
- #include <linux/bitops.h>
- #include <linux/err.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-@@ -3520,7 +3521,8 @@ static int gcc_msm8960_probe(struct platform_device *pdev)
- 	if (IS_ERR(clk))
- 		return PTR_ERR(clk);
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index df2061e..c06e59f 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -76,6 +76,88 @@
+ 		};
+ 	};
  
--	return qcom_cc_probe(pdev, match->data);
-+	qcom_cc_probe(pdev, match->data);
-+	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
- }
++	thermal-zones {
++		cpu-thermal0 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 7>;
++
++			trips {
++				cpu_alert0: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit0: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal1 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 8>;
++
++			trips {
++				cpu_alert1: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit1: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal2 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 9>;
++
++			trips {
++				cpu_alert2: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit2: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++
++		cpu-thermal3 {
++			polling-delay-passive = <250>;
++			polling-delay = <1000>;
++
++			thermal-sensors = <&tsens 10>;
++
++			trips {
++				cpu_alert3: trip at 0 {
++					temperature = <75000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++				cpu_crit3: trip at 1 {
++					temperature = <95000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	cpu-pmu {
+ 		compatible = "qcom,krait-pmu";
+ 		interrupts = <1 10 0x304>;
+@@ -289,11 +371,37 @@
+ 			qcom,controller-type = "pmic-arbiter";
+ 		};
  
- static int gcc_msm8960_remove(struct platform_device *pdev)
++		qfprom: qfprom at 00700000 {
++			compatible	= "qcom,qfprom";
++			reg		= <0x00700000 0x1000>;
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			ranges;
++			tsens_calib: calib {
++				reg = <0x404 0x10>;
++			};
++			tsens_backup: backup_calib {
++				reg = <0x414 0x10>;
++			};
++		};
++
+ 		gcc: clock-controller at 900000 {
+ 			compatible = "qcom,gcc-apq8064";
+ 			reg = <0x00900000 0x4000>;
+ 			#clock-cells = <1>;
+ 			#reset-cells = <1>;
++			#address-cells	= <1>;
++			#size-cells	= <1>;
++			ranges;
++
++			tsens: thermal-sensor at 900000 {
++				compatible = "qcom,msm8960-tsens";
++				nvmem-cell = <&tsens_calib>, <&tsens_backup>;
++				nvmem-cell-names = "calib", "calib_backup";
++				qcom,tsens-slopes = <1176 1176 1154 1176 1111
++					1132 1132 1199 1132 1199 1132>;
++				#thermal-sensor-cells = <1>;
++			};
+ 		};
+ 
+ 		lcc: clock-controller at 28000000 {
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
