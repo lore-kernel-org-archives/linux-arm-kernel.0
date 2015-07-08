@@ -1,70 +1,215 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  8 Jul 2015 17:19:04 +0100
-Subject: [PATCH 01/13] arm/arm64: Add new is_kernel_in_hyp_mode predicate
+Date: Wed,  8 Jul 2015 17:19:05 +0100
+Subject: [PATCH 02/13] arm64: Allow the arch timer to use the HYP timer
 In-Reply-To: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
 References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436372356-30410-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARMv8.1 VHE extension, it will be possible to run the kernel
-at EL2 (aka HYP mode). In order for the kernel to easily find out
-where it is running, add a new predicate that returns whether or
-not the kernel is in HYP mode.
+With the ARMv8.1 VHE, the kernel can run in HYP mode, and thus
+use the HYP timer instead of the normal guest timer in a mostly
+transparent way, except for the interrupt line.
 
-For completeness, the 32bit code also get such a predicate (always
-returning false) so that code common to both architecture (timers,
-KVM) can use it transparently.
+This patch reworks the arch timer code to allow the selection of
+the HYP PPI, possibly falling back to the guest timer if not
+available.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h   |  5 +++++
- arch/arm64/include/asm/virt.h | 10 ++++++++++
- 2 files changed, 15 insertions(+)
+ drivers/clocksource/arm_arch_timer.c | 96 ++++++++++++++++++++++--------------
+ 1 file changed, 59 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index 4371f45..b6a3cef 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -74,6 +74,11 @@ static inline bool is_hyp_mode_mismatched(void)
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 0aa135d..459d329 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -67,7 +67,7 @@ static int arch_timer_ppi[MAX_TIMER_PPI];
+ 
+ static struct clock_event_device __percpu *arch_timer_evt;
+ 
+-static bool arch_timer_use_virtual = true;
++static enum ppi_nr arch_timer_uses_ppi = VIRT_PPI;
+ static bool arch_timer_c3stop;
+ static bool arch_timer_mem_use_virtual;
+ 
+@@ -271,14 +271,20 @@ static void __arch_timer_setup(unsigned type,
+ 		clk->name = "arch_sys_timer";
+ 		clk->rating = 450;
+ 		clk->cpumask = cpumask_of(smp_processor_id());
+-		if (arch_timer_use_virtual) {
+-			clk->irq = arch_timer_ppi[VIRT_PPI];
++		clk->irq = arch_timer_ppi[arch_timer_uses_ppi];
++		switch (arch_timer_uses_ppi) {
++		case VIRT_PPI:
+ 			clk->set_mode = arch_timer_set_mode_virt;
+ 			clk->set_next_event = arch_timer_set_next_event_virt;
+-		} else {
+-			clk->irq = arch_timer_ppi[PHYS_SECURE_PPI];
++			break;
++		case PHYS_SECURE_PPI:
++		case PHYS_NONSECURE_PPI:
++		case HYP_PPI:
+ 			clk->set_mode = arch_timer_set_mode_phys;
+ 			clk->set_next_event = arch_timer_set_next_event_phys;
++			break;
++		default:
++			BUG();
+ 		}
+ 	} else {
+ 		clk->features |= CLOCK_EVT_FEAT_DYNIRQ;
+@@ -346,17 +352,20 @@ static void arch_counter_set_user_access(void)
+ 	arch_timer_set_cntkctl(cntkctl);
+ }
+ 
++static bool arch_timer_has_nonsecure_ppi(void)
++{
++	return (arch_timer_uses_ppi == PHYS_SECURE_PPI &&
++		arch_timer_ppi[PHYS_NONSECURE_PPI]);
++}
++
+ static int arch_timer_setup(struct clock_event_device *clk)
  {
- 	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
+ 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
+ 
+-	if (arch_timer_use_virtual)
+-		enable_percpu_irq(arch_timer_ppi[VIRT_PPI], 0);
+-	else {
+-		enable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI], 0);
+-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+-			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+-	}
++	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
++
++	if (arch_timer_has_nonsecure_ppi())
++		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+ 
+ 	arch_counter_set_user_access();
+ 	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
+@@ -398,7 +407,7 @@ static void arch_timer_banner(unsigned type)
+ 		     (unsigned long)arch_timer_rate / 1000000,
+ 		     (unsigned long)(arch_timer_rate / 10000) % 100,
+ 		     type & ARCH_CP15_TIMER ?
+-			arch_timer_use_virtual ? "virt" : "phys" :
++		     (arch_timer_uses_ppi == VIRT_PPI) ? "virt" : "phys" :
+ 			"",
+ 		     type == (ARCH_CP15_TIMER | ARCH_MEM_TIMER) ?  "/" : "",
+ 		     type & ARCH_MEM_TIMER ?
+@@ -468,7 +477,7 @@ static void __init arch_counter_register(unsigned type)
+ 
+ 	/* Register the CP15 based counter if we have one */
+ 	if (type & ARCH_CP15_TIMER) {
+-		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_use_virtual)
++		if (IS_ENABLED(CONFIG_ARM64) || arch_timer_uses_ppi == VIRT_PPI)
+ 			arch_timer_read_counter = arch_counter_get_cntvct;
+ 		else
+ 			arch_timer_read_counter = arch_counter_get_cntpct;
+@@ -498,13 +507,9 @@ static void arch_timer_stop(struct clock_event_device *clk)
+ 	pr_debug("arch_timer_teardown disable IRQ%d cpu #%d\n",
+ 		 clk->irq, smp_processor_id());
+ 
+-	if (arch_timer_use_virtual)
+-		disable_percpu_irq(arch_timer_ppi[VIRT_PPI]);
+-	else {
+-		disable_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI]);
+-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+-			disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
+-	}
++	disable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi]);
++	if (arch_timer_has_nonsecure_ppi())
++		disable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI]);
+ 
+ 	clk->set_mode(CLOCK_EVT_MODE_UNUSED, clk);
  }
+@@ -570,12 +575,14 @@ static int __init arch_timer_register(void)
+ 		goto out;
+ 	}
+ 
+-	if (arch_timer_use_virtual) {
+-		ppi = arch_timer_ppi[VIRT_PPI];
++	ppi = arch_timer_ppi[arch_timer_uses_ppi];
++	switch (arch_timer_uses_ppi) {
++	case VIRT_PPI:
+ 		err = request_percpu_irq(ppi, arch_timer_handler_virt,
+ 					 "arch_timer", arch_timer_evt);
+-	} else {
+-		ppi = arch_timer_ppi[PHYS_SECURE_PPI];
++		break;
++	case PHYS_SECURE_PPI:
++	case PHYS_NONSECURE_PPI:
+ 		err = request_percpu_irq(ppi, arch_timer_handler_phys,
+ 					 "arch_timer", arch_timer_evt);
+ 		if (!err && arch_timer_ppi[PHYS_NONSECURE_PPI]) {
+@@ -586,6 +593,13 @@ static int __init arch_timer_register(void)
+ 				free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
+ 						arch_timer_evt);
+ 		}
++		break;
++	case HYP_PPI:
++		err = request_percpu_irq(ppi, arch_timer_handler_phys,
++					 "arch_timer", arch_timer_evt);
++		break;
++	default:
++		BUG();
+ 	}
+ 
+ 	if (err) {
+@@ -610,15 +624,10 @@ static int __init arch_timer_register(void)
+ out_unreg_notify:
+ 	unregister_cpu_notifier(&arch_timer_cpu_nb);
+ out_free_irq:
+-	if (arch_timer_use_virtual)
+-		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
+-	else {
+-		free_percpu_irq(arch_timer_ppi[PHYS_SECURE_PPI],
++	free_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], arch_timer_evt);
++	if (arch_timer_has_nonsecure_ppi())
++		free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
+ 				arch_timer_evt);
+-		if (arch_timer_ppi[PHYS_NONSECURE_PPI])
+-			free_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI],
+-					arch_timer_evt);
+-	}
+ 
+ out_free:
+ 	free_percpu(arch_timer_evt);
+@@ -705,12 +714,25 @@ static void __init arch_timer_init(void)
+ 	 *
+ 	 * If no interrupt provided for virtual timer, we'll have to
+ 	 * stick to the physical timer. It'd better be accessible...
++	 *
++	 * On ARMv8.1 with VH extensions, the kernel runs in HYP. VHE
++	 * accesses to CNTP_*_EL1 registers are silently redirected to
++	 * their CNTHP_*_EL2 counterparts, and use a different PPI
++	 * number.
+ 	 */
+ 	if (is_hyp_mode_available() || !arch_timer_ppi[VIRT_PPI]) {
+-		arch_timer_use_virtual = false;
++		bool has_ppi;
 +
-+static inline bool is_kernel_in_hyp_mode(void)
-+{
-+	return false;
-+}
- #endif
++		if (is_kernel_in_hyp_mode()) {
++			arch_timer_uses_ppi = HYP_PPI;
++			has_ppi = !!arch_timer_ppi[HYP_PPI];
++		} else {
++			arch_timer_uses_ppi = PHYS_SECURE_PPI;
++			has_ppi = (!!arch_timer_ppi[PHYS_SECURE_PPI] ||
++				   !!arch_timer_ppi[PHYS_NONSECURE_PPI]);
++		}
  
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index 7a5df52..9f22dd6 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -23,6 +23,8 @@
+-		if (!arch_timer_ppi[PHYS_SECURE_PPI] ||
+-		    !arch_timer_ppi[PHYS_NONSECURE_PPI]) {
++		if (!has_ppi) {
+ 			pr_warn("arch_timer: No interrupt available, giving up\n");
+ 			return;
+ 		}
+@@ -743,7 +765,7 @@ static void __init arch_timer_of_init(struct device_node *np)
+ 	 */
+ 	if (IS_ENABLED(CONFIG_ARM) &&
+ 	    of_property_read_bool(np, "arm,cpu-registers-not-fw-configured"))
+-			arch_timer_use_virtual = false;
++		arch_timer_uses_ppi = PHYS_SECURE_PPI;
  
- #ifndef __ASSEMBLY__
- 
-+#include <asm/ptrace.h>
-+
- /*
-  * __boot_cpu_mode records what mode CPUs were booted in.
-  * A correctly-implemented bootloader must start all CPUs in the same mode:
-@@ -50,6 +52,14 @@ static inline bool is_hyp_mode_mismatched(void)
- 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+ 	arch_timer_init();
  }
- 
-+static inline bool is_kernel_in_hyp_mode(void)
-+{
-+	u64 el;
-+
-+	asm("mrs %0, CurrentEL" : "=r" (el));
-+	return el == CurrentEL_EL2;
-+}
-+
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
 -- 
 2.1.4
