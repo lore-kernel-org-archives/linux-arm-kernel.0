@@ -1,31 +1,70 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  8 Jul 2015 17:11:28 +0100
-Subject: [PATCH 7/7] ARM: multi_v7_defconfig: Enable STi FDMA driver
-In-Reply-To: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
-References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1436371888-27863-8-git-send-email-peter.griffin@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  8 Jul 2015 17:19:04 +0100
+Subject: [PATCH 01/13] arm/arm64: Add new is_kernel_in_hyp_mode predicate
+In-Reply-To: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This DMA controller is found on all STi chipsets.
+With ARMv8.1 VHE extension, it will be possible to run the kernel
+at EL2 (aka HYP mode). In order for the kernel to easily find out
+where it is running, add a new predicate that returns whether or
+not the kernel is in HYP mode.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+For completeness, the 32bit code also get such a predicate (always
+returning false) so that code common to both architecture (timers,
+KVM) can use it transparently.
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/include/asm/virt.h   |  5 +++++
+ arch/arm64/include/asm/virt.h | 10 ++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 6d83a1b..370dd85 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -588,6 +588,8 @@ CONFIG_IMX_DMA=y
- CONFIG_MXS_DMA=y
- CONFIG_DMA_OMAP=y
- CONFIG_XILINX_VDMA=y
-+CONFIG_ST_FDMA=y
-+CONFIG_ST_FDMA_XBAR=y
- CONFIG_STAGING=y
- CONFIG_SENSORS_ISL29018=y
- CONFIG_SENSORS_ISL29028=y
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index 4371f45..b6a3cef 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -74,6 +74,11 @@ static inline bool is_hyp_mode_mismatched(void)
+ {
+ 	return !!(__boot_cpu_mode & BOOT_CPU_MODE_MISMATCH);
+ }
++
++static inline bool is_kernel_in_hyp_mode(void)
++{
++	return false;
++}
+ #endif
+ 
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index 7a5df52..9f22dd6 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -23,6 +23,8 @@
+ 
+ #ifndef __ASSEMBLY__
+ 
++#include <asm/ptrace.h>
++
+ /*
+  * __boot_cpu_mode records what mode CPUs were booted in.
+  * A correctly-implemented bootloader must start all CPUs in the same mode:
+@@ -50,6 +52,14 @@ static inline bool is_hyp_mode_mismatched(void)
+ 	return __boot_cpu_mode[0] != __boot_cpu_mode[1];
+ }
+ 
++static inline bool is_kernel_in_hyp_mode(void)
++{
++	u64 el;
++
++	asm("mrs %0, CurrentEL" : "=r" (el));
++	return el == CurrentEL_EL2;
++}
++
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
 -- 
-1.9.1
+2.1.4
