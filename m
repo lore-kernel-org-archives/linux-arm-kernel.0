@@ -1,82 +1,99 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  8 Jul 2015 17:56:32 +0530
-Subject: [PATCH-v6 6/6] mfd: devicetree: bindings: Add new 88pm800 mfd binding
-In-Reply-To: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436358392-15449-7-git-send-email-vaibhav.hiremath@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 8 Jul 2015 20:42:18 +0800
+Subject: [PATCH 4/4] arm: psci: add cpuidle_ops support
+In-Reply-To: <20150708193842.1ca1c55a@xhacker>
+References: <1436350417-6712-1-git-send-email-jszhang@marvell.com>
+ <1436350417-6712-5-git-send-email-jszhang@marvell.com>
+ <20150708103429.GL7557@n2100.arm.linux.org.uk>
+ <20150708193842.1ca1c55a@xhacker>
+Message-ID: <20150708204218.50c3cfc3@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With addition of DT support to 88pm800 mfd driver, this patch
-adds new DT binding documentation along with respective properties.
+Dear Russell,
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Lee Jones <lee.jones@linaro.org>
----
- Documentation/devicetree/bindings/mfd/88pm800.txt | 53 +++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
+On Wed, 8 Jul 2015 19:38:42 +0800
+Jisheng Zhang <jszhang@marvell.com> wrote:
 
-diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-new file mode 100644
-index 0000000..dec842f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-@@ -0,0 +1,53 @@
-+* Marvell 88PM80x Power Management IC
-+
-+Required parent device properties:
-+- compatible		: "marvell,88pm800", "marvell,88pm805", "marvell,88pm860"
-+- reg			: the I2C slave address for the 88pm80x family chip
-+- interrupts		: IRQ line for the 88pm80x family chip
-+- interrupt-controller	: describes the 88pm80x family chip as an interrupt
-+			  controller
-+- #interrupt-cells 	: should be 1.
-+			  The cell is the 88pm80x local IRQ number
-+
-+88pm80x family of devices consists of varied group of sub-devices:
-+
-+Device		 	Supply Names	 Description
-+------		 	------------	 -----------
-+88pm80x-onkey		:		: On key
-+88pm80x-rtc		:		: RTC
-+88pm80x-regulator	:		: Regulators
-+
-+Example:
-+
-+	pmic: 88pm800 at 30 {
-+		compatible = "marvell,88pm800";
-+		reg = <0x30>;
-+		interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gic>;
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+
-+		regulators {
-+			compatible = "marvell,88pm80x-regulator";
-+
-+			buck1a: BUCK1A {
-+				regulator-name = "BUCK1A";
-+				regulator-min-microvolt = <600000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			ldo1: LDO1 {
-+				regulator-name = "LDO1";
-+				regulator-min-microvolt = <1700000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+
-+		rtc {
-+			compatible = "marvell,88pm80x-rtc";
-+		};
-+	};
--- 
-1.9.1
+> Dear Russell,
+> 
+> On Wed, 8 Jul 2015 11:34:29 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Wed, Jul 08, 2015 at 06:13:37PM +0800, Jisheng Zhang wrote:
+> > > This patch implements cpuidle_ops using psci. After this patch, we can use
+> > > cpuidle-arm.c with psci backend for both arm and arm64.
+> > 
+> > I really don't see the point of most of the patches in this series.
+> > 
+> > To summarise, what you're doing is:
+> > 
+> > 1. Renaming arch/arm/kernel/psci_smp.c to arch/arm/kernel/psci.c
+> > 2. Adding a #ifdef CONFIG_SMP around _all_ the code in psci.c
+> > 3. Adding cpuidle code with an #ifdef CONFIG_CPU_IDLE around all the
+> >    CPU idle code.
+> > 
+> > So, we end up with a file which contains:
+> > 
+> > /*
+> >  header
+> >  */
+> > #include statements
+> > 
+> > /*
+> >  some commentry relevant to SMP code
+> >  */
+> > #ifdef CONFIG_CPU_IDLE
+> > ... cpu idle code ...
+> > #endif
+> > #ifdef CONFIG_SMP
+> > ... smp code ...
+> > #endif
+> > 
+> > which (a) is a mess, and (b) is unnecessary.  The only relevant bits which
+> > are shared are the #include statements.
+> > 
+> > Please try this alternative approach:
+> > 
+> > 1. Leave psci_smp.c alone.
+> > 2. Add arch/arm/kernel/psci_cpuidle.c containing the #include statements
+> >    you need, and the CPU idle code.
+
+After more consideration, I have one concern.
+
+Currently, cpuidle_ops is defined as the following,
+
+> struct cpuidle_ops {
+>        int (*suspend)(int cpu, unsigned long arg);
+
+the cpu may not be necessary, because to-be-suspended cpu is always the calling
+cpu itself.
+
+>	int (*init)(struct device_node *, int cpu);
+
+the device_node here may not be necessary either, because we can get the node
+via. of_get_cpu_node.
+
+So if we refine cpuidle_ops defintion, the code would be as simple as
+
+static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+        .suspend = cpu_psci_cpu_suspend,
+        .init = cpu_psci_cpu_init_idle,
+};
+CPUIDLE_METHOD_OF_DECLARE(psci_idle, "psci", &psci_cpuidle_ops);
+
+I'm not sure a new psci_cpuidle.c only with above 5 lines is acceptable or not.
+
+Thanks,
+Jisheng
+
+
+
+
+> > 
+> > I think such an approach will reduce your patch series to two patches,
+> > one moving the ARM64 code, and one adding the cpuidle code.
+> > 
+> 
+> Good idea! Will refine the patches as you suggested.
+> 
