@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 08 Jul 2015 13:09:20 +0200
-Subject: [PATCH 36/37] usb: gadget: atmel_usba_udc: add ep capabilities support
+Date: Wed, 08 Jul 2015 13:09:16 +0200
+Subject: [PATCH 32/37] usb: gadget: udc-xilinx: add ep capabilities support
 In-Reply-To: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
 References: <1436353761-7107-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436353761-7107-37-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436353761-7107-33-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,34 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/atmel_usba_udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/gadget/udc/udc-xilinx.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index 37d414e..267d84f 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -2067,6 +2067,17 @@ static struct usba_ep * usba_udc_pdata(struct platform_device *pdev,
- 		ep->can_dma = pdata->ep[i].can_dma;
- 		ep->can_isoc = pdata->ep[i].can_isoc;
+diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
+index 1f24274..1cbb0ac 100644
+--- a/drivers/usb/gadget/udc/udc-xilinx.c
++++ b/drivers/usb/gadget/udc/udc-xilinx.c
+@@ -1317,12 +1317,21 @@ static void xudc_eps_init(struct xusb_udc *udc)
+ 			snprintf(ep->name, EPNAME_SIZE, "ep%d", ep_number);
+ 			ep->ep_usb.name = ep->name;
+ 			ep->ep_usb.ops = &xusb_ep_ops;
++
++			ep->ep_usb.caps.type_iso = true;
++			ep->ep_usb.caps.type_bulk = true;
++			ep->ep_usb.caps.type_int = true;
+ 		} else {
+ 			ep->ep_usb.name = ep0name;
+ 			usb_ep_set_maxpacket_limit(&ep->ep_usb, EP0_MAX_PACKET);
+ 			ep->ep_usb.ops = &xusb_ep0_ops;
++
++			ep->ep_usb.caps.type_control = true;
+ 		}
  
-+		if (i == 0) {
-+			ep->ep.caps.type_control = true;
-+		} else {
-+			ep->ep.caps.type_iso = ep->can_isoc;
-+			ep->ep.caps.type_bulk = true;
-+			ep->ep.caps.type_int = true;
-+		}
++		ep->ep_usb.caps.dir_in = true;
++		ep->ep_usb.caps.dir_out = true;
 +
-+		ep->ep.caps.dir_in = true;
-+		ep->ep.caps.dir_out = true;
-+
- 		if (i)
- 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
- 	}
+ 		ep->udc = udc;
+ 		ep->epnumber = ep_number;
+ 		ep->desc = NULL;
 -- 
 1.9.1
