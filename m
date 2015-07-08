@@ -1,91 +1,103 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed,  8 Jul 2015 17:56:27 +0530
-Subject: [PATCH-v6 1/6] mfd: 88pm800: remove duplicate dev_err calls during
- probe
+Date: Wed,  8 Jul 2015 17:56:28 +0530
+Subject: [PATCH-v6 2/6] mfd: 88pm800: Add device tree support
 In-Reply-To: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436358392-15449-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436358392-15449-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During probe, inside fn device_800_init(), submodule init is
-happening and the same error message is getting printed in both
-the places, <subdev>_init() and inside device_800_init().
+Add DT support to the 88pm800 driver, along with compatible
+field for it's sub-devices (rtc, onkey and regulator)
 
-So this patch gets rid of dev_err from <subdev>_init() fns.
-
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mfd/88pm800.c | 32 ++++----------------------------
- 1 file changed, 4 insertions(+), 28 deletions(-)
+ drivers/mfd/88pm800.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 841717a..0c5470e 100644
+index 0c5470e..95c418c 100644
 --- a/drivers/mfd/88pm800.c
 +++ b/drivers/mfd/88pm800.c
-@@ -308,59 +308,35 @@ static int device_gpadc_init(struct pm80x_chip *chip,
- 	return 0;
+@@ -27,6 +27,7 @@
+ #include <linux/mfd/core.h>
+ #include <linux/mfd/88pm80x.h>
+ #include <linux/slab.h>
++#include <linux/of_device.h>
  
- out:
--	dev_info(chip->dev, "pm800 device_gpadc_init: Failed!\n");
- 	return ret;
- }
+ /* Interrupt Registers */
+ #define PM800_INT_STATUS1		(0x05)
+@@ -121,6 +122,11 @@ static const struct i2c_device_id pm80x_id_table[] = {
+ };
+ MODULE_DEVICE_TABLE(i2c, pm80x_id_table);
  
- static int device_onkey_init(struct pm80x_chip *chip,
- 				struct pm80x_platform_data *pdata)
- {
--	int ret;
--
--	ret = mfd_add_devices(chip->dev, 0, &onkey_devs[0],
-+	return mfd_add_devices(chip->dev, 0, &onkey_devs[0],
- 			      ARRAY_SIZE(onkey_devs), &onkey_resources[0], 0,
- 			      NULL);
--	if (ret) {
--		dev_err(chip->dev, "Failed to add onkey subdev\n");
--		return ret;
--	}
--
--	return 0;
- }
++static const struct of_device_id pm80x_of_match_table[] = {
++	{ .compatible = "marvell,88pm800", },
++	{},
++};
++
+ static struct resource rtc_resources[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
+@@ -133,6 +139,7 @@ static struct resource rtc_resources[] = {
+ static struct mfd_cell rtc_devs[] = {
+ 	{
+ 	 .name = "88pm80x-rtc",
++	 .of_compatible = "marvell,88pm80x-rtc",
+ 	 .num_resources = ARRAY_SIZE(rtc_resources),
+ 	 .resources = &rtc_resources[0],
+ 	 .id = -1,
+@@ -151,6 +158,7 @@ static struct resource onkey_resources[] = {
+ static const struct mfd_cell onkey_devs[] = {
+ 	{
+ 	 .name = "88pm80x-onkey",
++	 .of_compatible = "marvell,88pm80x-onkey",
+ 	 .num_resources = 1,
+ 	 .resources = &onkey_resources[0],
+ 	 .id = -1,
+@@ -160,6 +168,7 @@ static const struct mfd_cell onkey_devs[] = {
+ static const struct mfd_cell regulator_devs[] = {
+ 	{
+ 	 .name = "88pm80x-regulator",
++	 .of_compatible = "marvell,88pm80x-regulator",
+ 	 .id = -1,
+ 	},
+ };
+@@ -520,8 +529,24 @@ static int pm800_probe(struct i2c_client *client,
+ 	int ret = 0;
+ 	struct pm80x_chip *chip;
+ 	struct pm80x_platform_data *pdata = dev_get_platdata(&client->dev);
++	struct device_node *np = client->dev.of_node;
+ 	struct pm80x_subchip *subchip;
  
- static int device_rtc_init(struct pm80x_chip *chip,
- 				struct pm80x_platform_data *pdata)
- {
--	int ret;
--
- 	if (pdata) {
- 		rtc_devs[0].platform_data = pdata->rtc;
- 		rtc_devs[0].pdata_size =
- 				pdata->rtc ? sizeof(struct pm80x_rtc_pdata) : 0;
- 	}
--	ret = mfd_add_devices(chip->dev, 0, &rtc_devs[0],
--			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
--	if (ret) {
--		dev_err(chip->dev, "Failed to add rtc subdev\n");
--		return ret;
--	}
- 
--	return 0;
-+	return mfd_add_devices(chip->dev, 0, &rtc_devs[0],
-+			      ARRAY_SIZE(rtc_devs), NULL, 0, NULL);
- }
- 
- static int device_regulator_init(struct pm80x_chip *chip,
- 					   struct pm80x_platform_data *pdata)
- {
--	int ret;
--
--	ret = mfd_add_devices(chip->dev, 0, &regulator_devs[0],
-+	return mfd_add_devices(chip->dev, 0, &regulator_devs[0],
- 			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
--	if (ret) {
--		dev_err(chip->dev, "Failed to add regulator subdev\n");
--		return ret;
--	}
--
--	return 0;
- }
- 
- static int device_irq_init_800(struct pm80x_chip *chip)
++	if (!pdata && !np) {
++		dev_err(&client->dev,
++			"pm80x requires platform data or of_node\n");
++		return -EINVAL;
++	}
++
++	if (!pdata) {
++		pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
++		if (!pdata)
++			return -ENOMEM;
++
++		/* Ensure we only alloc platform data once */
++		client->dev.platform_data = pdata;
++	}
++
+ 	ret = pm80x_init(client);
+ 	if (ret) {
+ 		dev_err(&client->dev, "pm800_init fail\n");
+@@ -587,6 +612,7 @@ static struct i2c_driver pm800_driver = {
+ 		.name = "88PM800",
+ 		.owner = THIS_MODULE,
+ 		.pm = &pm80x_pm_ops,
++		.of_match_table	= pm80x_of_match_table,
+ 		},
+ 	.probe = pm800_probe,
+ 	.remove = pm800_remove,
 -- 
 1.9.1
