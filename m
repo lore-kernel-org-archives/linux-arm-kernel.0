@@ -1,135 +1,43 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jul 2015 09:19:26 +0900
-Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <092101d0b8c2$e2b39310$a81ab930$@kernel.org>
-References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
- <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
- <5594E57C.2010300@samsung.com>
- <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
- <092101d0b8c2$e2b39310$a81ab930$@kernel.org>
-Message-ID: <559C6C8E.2070309@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 8 Jul 2015 09:51:49 +0900
+Subject: [PATCH v2] ARM: shmobile: kzm9g dts: Use adxl345-specific
+ compatible property
+In-Reply-To: <9389528.5qtaECVqX7@avalon>
+References: <1436180132-26190-1-git-send-email-geert+renesas@glider.be>
+ <15966074.zDS67FO48r@avalon> <20150707002621.GD13326@verge.net.au>
+ <9389528.5qtaECVqX7@avalon>
+Message-ID: <20150708005148.GA28100@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.07.2015 23:40, Kukjin Kim wrote:
-> Krzysztof Kozlowski wrote:
->>
->> 2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>> On 02.07.2015 15:11, Chanwoo Choi wrote:
->>>> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
->>>>> On 02.07.2015 14:37, Chanwoo Choi wrote:
->>>>>> This patch add the cooling device to control the overheating issue on
->>>>>> Exynos3250-based Rinato/Monk board.
->>>>>>
->>>>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>>>> ---
->>>>>> Depends on:
->>>>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
->>>>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
->>>>>> [1] https://lkml.org/lkml/2015/7/1/696
->>>>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
->>>>>>
->>>>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
->>>>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
->>>>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
->>>>>>  3 files changed, 31 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>> index 7863265d4868..540a0adf2be6 100644
->>>>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>> @@ -116,6 +116,21 @@
->>>>>>             min-microvolt = <1100000>;
->>>>>>             max-microvolt = <2700000>;
->>>>>>     };
->>>>>> +
->>>>>> +   thermal-zones {
->>>>>> +           cpu_thermal: cpu-thermal {
->>>>>> +                   cooling-maps {
->>>>>> +                           map0 {
->>>>>> +                                   /* Correspond to 500MHz at freq_table */
->>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>> +                           };
->>>>>> +                           map1 {
->>>>>> +                                   /* Correspond to 200MHz at freq_table */
->>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>> +                           };
->>>>>> +                   };
->>>>>> +           };
->>>>>> +   };
->>>>>>  };
->>>>>>
->>>>>>  &adc {
->>>>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>> index ddd7ac283045..0e62a6435e07 100644
->>>>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>> @@ -107,6 +107,21 @@
->>>>>>             min-microvolt = <1100000>;
->>>>>>             max-microvolt = <2700000>;
->>>>>>     };
->>>>>> +
->>>>>> +   thermal-zones {
->>>>>> +           cpu_thermal: cpu-thermal {
->>>>>> +                   cooling-maps {
->>>>>> +                           map0 {
->>>>>> +                                   /* Corresponds to 500MHz */
->>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>> +                           };
->>>>>> +                           map1 {
->>>>>> +                                   /* Corresponds to 200MHz */
->>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>> +                           };
->>>>>> +                   };
->>>>>> +           };
->>>>>> +   };
->>>>>>  };
->>>>>>
->>>>>>  &adc {
->>>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>> index e0f3b2ed41a3..a4931b660ddb 100644
->>>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>> @@ -55,6 +55,7 @@
->>>>>>                     clock-frequency = <1000000000>;
->>>>>>                     clocks = <&cmu CLK_ARM_CLK>;
->>>>>>                     clock-names = "cpu";
->>>>>> +                   #cooling-cells = <2>;
->>>>>>
->>>>>
->>>>> Don't you need also cooling-{min,max}-state properties?
->>>>
->>>> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
->>>>
->>>> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
->>>> in drivers/thermal/*. But, there are no any code to parse it.
->>>>
->>>> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-
->> state.
->>>>
->>>> I think that there are mismatch between document and thermal core driver.
->>>
->>> Thanks for explanation, looks good.
->>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> Best regards,
->>> Krzysztof
->>
->> Dear Kukjin,
->>
->> Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
->> cpufreq-dt 3250, this patch) are actually an one continuous chain.
->> Dependencies are already in mainline. Are you gonna to pick up
->> everything?
->>
-> Yes, I want and I will. BTW maybe clk change is required together? If so, as you
-> know we need to get ack from clk guy. Is my understanding right?
+On Tue, Jul 07, 2015 at 09:56:29AM +0300, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Tuesday 07 July 2015 09:26:21 Simon Horman wrote:
+> > On Mon, Jul 06, 2015 at 04:29:33PM +0300, Laurent Pinchart wrote:
+> > > On Monday 06 July 2015 12:55:32 Geert Uytterhoeven wrote:
+> > > > Replace the deprecated generic "adi,adxl34x" compatible value by the
+> > > > adxl345-specific "adi,adxl345" value, cfr. commit e465bf6fc55d5ce2 ("DT:
+> > > > i2c: Deprecate adi,adxl34x compatible string").
+> > > > 
+> > > > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> > > 
+> > > Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > > 
+> > > > ---
+> > > > Depends on commit 3a38958d2477b718 ("Input: adxl34x - add OF match
+> > > > support"), which is in v4.2-rc1.
+> > > > 
+> > > > This is v2 of "ARM: shmobile: kzm9g dts: Add adxl345-specific compatible
+> > > > property".
+> > 
+> > It appears to me that this will cause a regression when booting old kernels
+> > with new dts blobs. For that reason think we should consider v1
+> > of this change coupled with a schedule to remove use of the deprecated
+> > compat string.
+> 
+> That's the forward compatibility that Geert mentioned, is that really an 
+> issue, especially on this board ?
 
-Right. I think the samsung clock and cpufreq patches still need acks.
-
-Best regards,
-Krzysztof
+I think it would be best to provide backwards compatibility unless there
+is a compelling reason not to.
