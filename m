@@ -1,108 +1,99 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  9 Jul 2015 16:00:47 +0800
-Subject: [RFC Patch V1 12/12] genirq,
- PCI: Move alloc_msi_entry() from PCI MSI code into generic MSI code
-In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1436428847-8886-13-git-send-email-jiang.liu@linux.intel.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 9 Jul 2015 10:01:26 +0200
+Subject: [PATCH v2 6/9] regulator: pwm-regulator: Re-write bindings
+In-Reply-To: <1436281613-899-7-git-send-email-lee.jones@linaro.org>
+References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
+ <1436281613-899-7-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150709100126.13716904@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move alloc_msi_entry() from PCI MSI code into generic MSI code, so it
-could be reused by other generic MSI drivers.
-Also introduce free_msi_entry() for completeness.
+Hi Lee,
 
-This is suggested by Stuart Yoder <stuart.yoder@freescale.com>.
+On Tue,  7 Jul 2015 16:06:50 +0100
+Lee Jones <lee.jones@linaro.org> wrote:
 
-Signed-off-by: Stuart Yoder <stuart.yoder@freescale.com>
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- drivers/pci/msi.c   |   16 ++--------------
- include/linux/msi.h |    2 ++
- kernel/irq/msi.c    |   17 +++++++++++++++++
- 3 files changed, 21 insertions(+), 14 deletions(-)
+> * Add support for continuous-voltage mode
+> * Put more meat on the bones with regards to voltage-table mode
+> * Sort out formatting for ease of consumption
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  .../bindings/regulator/pwm-regulator.txt           | 68 ++++++++++++++++++----
+>  1 file changed, 56 insertions(+), 12 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+> index ce91f61..892b366 100644
+> --- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+> @@ -1,27 +1,71 @@
+> -pwm regulator bindings
+> +Bindings for the Generic PWM Regulator
+> +======================================
+> +
+> +Currently supports 2 modes of operation:
+> +
+> +voltage-table:		When in this mode, a voltage table (See below) of
+> +			predefined voltage <=> duty-cycle values must be
+> +			provided via DT. Limitations are that the regulator can
+> +			only operate at the voltages supplied in the table.
+> +			Intermediary duty-cycle values which would normally
+> +			allow finer grained voltage selection are ignored and
+> +			rendered useless.  Although more control is given to
+> +			the user if the assumptions made in continuous-voltage
+> +			mode do not reign true.
+> +
+> +continuous-voltage:	This mode uses the regulator's maximum and minimum
+> +			supplied voltages specified in the
+> +			regulator-{min,max}-microvolt properties to calculate
+> +			appropriate duty-cycle values.  This allows for a much
+> +			more fine grained solution when compared with
+> +			voltage-table mode above.  This solution does make an
+> +			assumption that a %50 duty-cycle value will cause the
+> +			regulator voltage to run at half way between the
+> +			supplied max_uV and min_uV values.
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 260c1653701d..373d96e06cbd 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -406,18 +406,6 @@ static void free_msi_irqs(struct pci_dev *dev)
- 	}
- }
- 
--static struct msi_desc *alloc_msi_entry(struct pci_dev *dev)
--{
--	struct msi_desc *desc = kzalloc(sizeof(*desc), GFP_KERNEL);
--	if (!desc)
--		return NULL;
--
--	INIT_LIST_HEAD(&desc->list);
--	desc->dev = &dev->dev;
--
--	return desc;
--}
--
- static void pci_intx_for_msi(struct pci_dev *dev, int enable)
- {
- 	if (!(dev->dev_flags & PCI_DEV_FLAGS_MSI_INTX_DISABLE_BUG))
-@@ -572,7 +560,7 @@ static struct msi_desc *msi_setup_entry(struct pci_dev *dev, int nvec)
- 	struct msi_desc *entry;
- 
- 	/* MSI Entry Initialization */
--	entry = alloc_msi_entry(dev);
-+	entry = alloc_msi_entry(&dev->dev);
- 	if (!entry)
- 		return NULL;
- 
-@@ -700,7 +688,7 @@ static int msix_setup_entries(struct pci_dev *dev, void __iomem *base,
- 	int i;
- 
- 	for (i = 0; i < nvec; i++) {
--		entry = alloc_msi_entry(dev);
-+		entry = alloc_msi_entry(&dev->dev);
- 		if (!entry) {
- 			if (!i)
- 				iounmap(base);
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index f6845bc83774..c10ec5687efa 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -67,6 +67,8 @@ static inline void *msi_desc_to_pci_sysdata(struct msi_desc *desc)
- }
- #endif /* CONFIG_PCI_MSI */
- 
-+struct msi_desc *alloc_msi_entry(struct device *dev);
-+void free_msi_entry(struct msi_desc *entry);
- void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void pci_write_msi_msg(unsigned int irq, struct msi_msg *msg);
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index 7bf1f1bbb7fa..7e6512b9dc1f 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -18,6 +18,23 @@
- /* Temparory solution for building, will be removed later */
- #include <linux/pci.h>
- 
-+struct msi_desc *alloc_msi_entry(struct device *dev)
-+{
-+	struct msi_desc *desc = kzalloc(sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		return NULL;
-+
-+	INIT_LIST_HEAD(&desc->list);
-+	desc->dev = dev;
-+
-+	return desc;
-+}
-+
-+void free_msi_entry(struct msi_desc *entry)
-+{
-+	kfree(entry);
-+}
-+
- void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- {
- 	*msg = entry->msg;
+Do we really have to specify a new property to select the mode ?
+The existing DT will have to be modified anyway, so maybe we can just
+add a new compatible string differentiate those two modes.
+
+Also note that if you're doing linear interpolation between the points
+specified in the voltage-table instead of doing it on the min -> max
+values, you wouldn't have to modify the binding.
+
+>  
+>  Required properties:
+> -- compatible: Should be "pwm-regulator"
+> -- pwms: OF device-tree PWM specification (see PWM binding pwm.txt)
+> -- voltage-table: voltage and duty table, include 2 members in each set of
+> -  brackets, first one is voltage(unit: uv), the next is duty(unit: percent)
+> +--------------------
+> +- compatible:		Should be "pwm-regulator"
+> +
+> +- pwms:			PWM specification (See: ../pwm/pwm.txt)
+> +
+> +One of these must be provided:
+> +- voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
+> +			    First cell is voltage in microvolts (uV)
+> +			    Second cell is duty-cycle in percent (%)
+> +
+> +- max-duty-cycle:	Maximum Duty-Cycle value -- this will normally be
+> +  			255 (0xff) for an 8 bit PWM device
+
+Why are you introducing another random unit. What is max-duty-cycle
+really encoding (I guess it has to do with the precision you're
+expecting, but I'm not sure) ?
+The PWM framework is using nanoseconds, the existing pwm-regulator
+binding is using percents. Shouldn't we reuse one of them (I
+guess you changed that because the percent unit was not precise
+enough) ?
+
+Best Regards,
+
+Boris
+
 -- 
-1.7.10.4
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
