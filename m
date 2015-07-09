@@ -1,44 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 9 Jul 2015 11:12:44 +0100
-Subject: [PATCH 01/13] arm/arm64: Add new is_kernel_in_hyp_mode predicate
-In-Reply-To: <559E476E.2000306@arm.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
- <20150709094230.GA20105@leverpostej> <559E476E.2000306@arm.com>
-Message-ID: <20150709101244.GC20105@leverpostej>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Thu, 9 Jul 2015 12:18:26 +0200
+Subject: [PATCH 3/3] i2c: omap: on ->remove() call pm_runtime_put_sync()
+In-Reply-To: <1435260890-32335-3-git-send-email-balbi@ti.com>
+References: <1435260890-32335-1-git-send-email-balbi@ti.com>
+ <1435260890-32335-3-git-send-email-balbi@ti.com>
+Message-ID: <559E4A72.9070504@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 11:05:34AM +0100, Marc Zyngier wrote:
-> On 09/07/15 10:42, Mark Rutland wrote:
-> > Hi,
-> > 
-> >> +static inline bool is_kernel_in_hyp_mode(void)
-> >> +{
-> >> +	u64 el;
-> >> +
-> >> +	asm("mrs %0, CurrentEL" : "=r" (el));
-> >> +	return el == CurrentEL_EL2;
-> >> +}
-> > 
-> > If you can include cputype.h, I think this can be:
-> > 
-> > static inline bool is_kernel_in_hyp_mode(void)
-> > {
-> > 	return read_cpuid(CurrentEL) == CurrentEL_EL2;
-> > }
+Hi!
+
+On 25/06/15 21:34, ext Felipe Balbi wrote:
+> we're about to remove the module, so we can't
+> really schedule a PM transition in the future,
+> we must wait for it to finish.
 > 
-> This would indeed work, but CurrentEL is hardly an ID register. I feel
-> slightly uncomfortable using read_cpuid (which might return a cached
-> version at some point) for random system registers.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Thoughts?
-
-I have no strong feelings either way, but I agree with the general
-uneasiness w.r.t. what read_cpuid can be expected to do.
-
-Elsewhere we just use inline asm to read non CPUID system registers, so
-let's leave your patch as it was.
-
-Thanks,
-Mark.
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index 828d5caccfcb..b57d84e01562 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1395,7 +1395,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+>  		return ret;
+>  
+>  	omap_i2c_write_reg(omap, OMAP_I2C_CON_REG, 0);
+> -	pm_runtime_put(&pdev->dev);
+> +	pm_runtime_put_sync(&pdev->dev);
+>  	pm_runtime_disable(&pdev->dev);
+>  	return 0;
+>  }
