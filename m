@@ -1,91 +1,43 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 9 Jul 2015 18:45:49 +0800
-Subject: [PATCH v2] arm64: dts: mt8173: Add afe device node
-In-Reply-To: <1436412725-55129-1-git-send-email-koro.chen@mediatek.com>
-References: <1436412725-55129-1-git-send-email-koro.chen@mediatek.com>
-Message-ID: <CAGS+omBqO6Zcw9KuN6p9YDvRD=UfmOnokUPeRo-iv6ruTBChwg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu,  9 Jul 2015 11:57:12 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+Message-ID: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 9, 2015 at 11:32 AM, Koro Chen <koro.chen@mediatek.com> wrote:
-> This adds afe (audio front end) device node to the MT8173 dtsi file.
->
-> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+sufficient to inhibit pl011_int() from being triggered by a local
+IRQ and trying to re-take the same lock.  This can lead to
+deadlocks.
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+This patch uses the _irq() locking variants instead to ensure that
+pl011_int() handling for a given port is deferred until any
+pl011_tx_softirq() work for that port is complete.
 
-I believe this patch depends on the fix in:
-https://patchwork.kernel.org/patch/6752521/
+Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Tested-by: Robin Murphy <robin.murphy@arm.com>
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+Cc: stable <stable@vger.kernel.org> # 4.1
+---
+ drivers/tty/serial/amba-pl011.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-If so, I think it would have been better to upload them together and
-mention the dependency in the cover letter.
-However, now that they are both on the list, we just need to ensure
-they are merged together.
-
--Dan
-
-
-> ---
-> This patch is based on Matthias's tree:
-> https://github.com/mbgg/linux-mediatek
-> branch: v4.2-next/arm64
->
-> Changes since v1:
-> - change node name to afe: audio-controller at 11220000
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 0696f8f..ce9255a 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -14,6 +14,7 @@
->  #include <dt-bindings/clock/mt8173-clk.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/power/mt8173-power.h>
->  #include <dt-bindings/reset-controller/mt8173-resets.h>
->  #include "mt8173-pinfunc.h"
->
-> @@ -393,6 +394,37 @@
->                         #size-cells = <0>;
->                         status = "disabled";
->                 };
-> +
-> +               afe: audio-controller at 11220000  {
-> +                       compatible = "mediatek,mt8173-afe-pcm";
-> +                       reg = <0 0x11220000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_FALLING>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
-> +                       clocks = <&infracfg CLK_INFRA_AUDIO>,
-> +                                <&topckgen CLK_TOP_AUDIO_SEL>,
-> +                                <&topckgen CLK_TOP_AUD_INTBUS_SEL>,
-> +                                <&topckgen CLK_TOP_APLL1_DIV0>,
-> +                                <&topckgen CLK_TOP_APLL2_DIV0>,
-> +                                <&topckgen CLK_TOP_I2S0_M_SEL>,
-> +                                <&topckgen CLK_TOP_I2S1_M_SEL>,
-> +                                <&topckgen CLK_TOP_I2S2_M_SEL>,
-> +                                <&topckgen CLK_TOP_I2S3_M_SEL>,
-> +                                <&topckgen CLK_TOP_I2S3_B_SEL>;
-> +                       clock-names = "infra_sys_audio_clk",
-> +                                     "top_pdn_audio",
-> +                                     "top_pdn_aud_intbus",
-> +                                     "bck0",
-> +                                     "bck1",
-> +                                     "i2s0_m",
-> +                                     "i2s1_m",
-> +                                     "i2s2_m",
-> +                                     "i2s3_m",
-> +                                     "i2s3_b";
-> +                       assigned-clocks = <&topckgen CLK_TOP_AUD_1_SEL>,
-> +                                         <&topckgen CLK_TOP_AUD_2_SEL>;
-> +                       assigned-clock-parents = <&topckgen CLK_TOP_APLL1>,
-> +                                                <&topckgen CLK_TOP_APLL2>;
-> +               };
->         };
->  };
->
-> --
-> 1.8.1.1.dirty
->
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 763eb20..0cc622a 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
+ 	struct uart_amba_port *uap =
+ 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
+ 
+-	spin_lock(&uap->port.lock);
++	spin_lock_irq(&uap->port.lock);
+ 	while (pl011_tx_chars(uap)) ;
+-	spin_unlock(&uap->port.lock);
++	spin_unlock_irq(&uap->port.lock);
+ }
+ 
+ static void pl011_tx_irq_seen(struct uart_amba_port *uap)
+-- 
+1.7.10.4
