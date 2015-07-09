@@ -1,10 +1,10 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  9 Jul 2015 16:00:39 +0800
-Subject: [RFC Patch V1 04/12] s390/pci: Use for_pci_msi_entry() to access MSI
- device list
+Date: Thu,  9 Jul 2015 16:00:40 +0800
+Subject: [RFC Patch V1 05/12] x86,
+ PCI: Use for_pci_msi_entry() to access MSI device list
 In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1436428847-8886-5-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1436428847-8886-6-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,39 +13,48 @@ easily move msi_list from struct pci_dev into struct device later.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/s390/pci/pci.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/x86/pci/xen.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
-index 598f023cf8a6..34f162753403 100644
---- a/arch/s390/pci/pci.c
-+++ b/arch/s390/pci/pci.c
-@@ -414,7 +414,7 @@ int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
+index d22f4b5bbc04..ff31ab464213 100644
+--- a/arch/x86/pci/xen.c
++++ b/arch/x86/pci/xen.c
+@@ -179,7 +179,7 @@ static int xen_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	if (ret)
+ 		goto error;
+ 	i = 0;
+-	list_for_each_entry(msidesc, &dev->msi_list, list) {
++	for_each_pci_msi_entry(msidesc, dev) {
+ 		irq = xen_bind_pirq_msi_to_irq(dev, msidesc, v[i],
+ 					       (type == PCI_CAP_ID_MSI) ? nvec : 1,
+ 					       (type == PCI_CAP_ID_MSIX) ?
+@@ -230,7 +230,7 @@ static int xen_hvm_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	if (type == PCI_CAP_ID_MSI && nvec > 1)
+ 		return 1;
  
- 	/* Request MSI interrupts */
- 	hwirq = 0;
--	list_for_each_entry(msi, &pdev->msi_list, list) {
-+	for_each_pci_msi_entry(msi, pdev) {
- 		rc = -EIO;
- 		irq = irq_alloc_desc(0);	/* Alloc irq on node 0 */
- 		if (irq < 0)
-@@ -440,7 +440,7 @@ int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
- 	return (msi_vecs == nvec) ? 0 : msi_vecs;
+-	list_for_each_entry(msidesc, &dev->msi_list, list) {
++	for_each_pci_msi_entry(msidesc, dev) {
+ 		__pci_read_msi_msg(msidesc, &msg);
+ 		pirq = MSI_ADDR_EXT_DEST_ID(msg.address_hi) |
+ 			((msg.address_lo >> MSI_ADDR_DEST_ID_SHIFT) & 0xff);
+@@ -274,7 +274,7 @@ static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ 	int ret = 0;
+ 	struct msi_desc *msidesc;
  
- out_msi:
--	list_for_each_entry(msi, &pdev->msi_list, list) {
-+	for_each_pci_msi_entry(msi, pdev) {
- 		if (hwirq-- == 0)
- 			break;
- 		irq_set_msi_desc(msi->irq, NULL);
-@@ -470,7 +470,7 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
- 		return;
+-	list_for_each_entry(msidesc, &dev->msi_list, list) {
++	for_each_pci_msi_entry(msidesc, dev) {
+ 		struct physdev_map_pirq map_irq;
+ 		domid_t domid;
  
- 	/* Release MSI interrupts */
--	list_for_each_entry(msi, &pdev->msi_list, list) {
-+	for_each_pci_msi_entry(msi, pdev) {
- 		if (msi->msi_attrib.is_msix)
- 			__pci_msix_desc_mask_irq(msi, 1);
- 		else
+@@ -386,7 +386,7 @@ static void xen_teardown_msi_irqs(struct pci_dev *dev)
+ {
+ 	struct msi_desc *msidesc;
+ 
+-	msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
++	msidesc = first_pci_msi_entry(dev);
+ 	if (msidesc->msi_attrib.is_msix)
+ 		xen_pci_frontend_disable_msix(dev);
+ 	else
 -- 
 1.7.10.4
