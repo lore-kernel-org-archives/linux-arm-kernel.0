@@ -1,62 +1,78 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Jul 2015 13:50:47 +0200
-Subject: [PATCH v3 08/11] KVM: arm: implement dirty bit mechanism for
- debug registers
-In-Reply-To: <20150707102405.GE23879@arm.com>
-References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
- <1434969694-7432-9-git-send-email-zhichao.huang@linaro.org>
- <20150630092020.GP11332@cbox>
- <B3B5AB0D-020C-483D-A6DE-76E355865010@linaro.org>
- <20150703115611.GB14220@lvm>
- <5A7DE9A0-E7A6-40B0-80F9-896F7DED0E47@linaro.org>
- <20150707102405.GE23879@arm.com>
-Message-ID: <20150709115047.GK13530@cbox>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 9 Jul 2015 12:51:58 +0100
+Subject: [PATCH v2 0/9] regulator: pwm-regulator: Introduce continuous-mode
+In-Reply-To: <20150709083041.3b203eb1@bbrezillon>
+References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
+ <20150709083041.3b203eb1@bbrezillon>
+Message-ID: <20150709115158.GA3445@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 11:24:06AM +0100, Will Deacon wrote:
-> On Tue, Jul 07, 2015 at 11:06:57AM +0100, Zhichao Huang wrote:
-> > Chazy and me are talking about how to reduce the saving/restoring
-> > overhead for debug registers.
-> > We want to add a state in hw_breakpoint.c to indicate whether the host
-> > enable any hwbrpts or not (might export a fuction that kvm can call),
-> > then we can read this state from memory instead of reading from real
-> > hardware registers, and to decide whether we need a world switch or
-> > not.
-> > Does it acceptable?
+On Thu, 09 Jul 2015, Boris Brezillon wrote:
+> I'm interested in this feature (so as Doug is), could you add us in Cc
+> of your next submission ?
+
+There won't be a subsequent submission, as this has already been
+accepted.
+
+> On Tue,  7 Jul 2015 16:06:44 +0100
+> Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> Maybe, hard to tell without the code. There are obvious races to deal with
-> if you use variables to indicate whether resources are in use -- why not
-> just trap debug access from the host as well? Then you could keep track of
-> the "owner" in kvm and trap accesses from everybody else.
+> > This patch-set has been rebased on to topic/pwm.
+> >   
+> > Continuous mode uses the PWM regulator's maximum and minimum supplied
+> > voltages specified in the regulator-{min,max}-microvolt properties to
+> > calculate appropriate duty-cycle values.  This allows for a much more
+> > fine grained solution when compared with voltage-table mode, which
+> > this driver already supports.  This solution does make an assumption
+> > that a %50 duty-cycle value will cause the regulator voltage to run
+> > at half way between the supplied max_uV and min_uV values.
 > 
-The only information we're looking for here is whether the host has
-enabled some break/watch point so that we need to disable them before
-running the guest.
+> Well, I'm not sure this assumption works for all pwm driven regulators.
+> What if your regulator does not react linearly to the PWM duty-cycle
+> config ?
+> 
+> How about addressing that by using all the entries of the
+> voltage<->duty table association and doing the linear interpolation
+> between the provided points instead of doing it on the min -> max
+> range ?
 
-Just to re-iterate, when we are about to run a guest, we have the
-following cases:
+If you wish to add a 3rd mode, then I'm sure Mark will accept
+submissions, but I think what you are suggesting would be pretty
+complex and out-of-scope of what this patch-set is trying to achieve.
 
-1) Neither the host nor the guest has configured any [WB]points
-2) Only the host has configured any [WB]points
-3) Only the guest has configured any [WB]points
-4) Both the host and the guest have configured any [WB]points
+As a side note, then if the voltage isn't directly proportional to the
+duty cycle on a large scale i.e. max => min, then it will not likely
+be very accurate between say table entries 1 => 2, or 4 => 5, etc.
 
-In case (1), KVM should enable trapping and swtich the register state on
-guest accesses.
+What I suggest you do in your case is provide a larger table with all
+of the values you find interesting, as it sounds like your PWM
+regulator isn't doing what one would normally expect.
 
-In cases (2), (3), and (4) we must switch the register state on each
-entry/exit.
+> > Lee Jones (9):
+> >   ARM: multi_v7_defconfig: Enable ST's PWM driver
+> >   ARM: multi_v7_defconfig: Enable ST's Power Reset driver
+> >   ARM: multi_v7_defconfig: Enable support for PWM Regulators
+> >   ARM: STi: STiH407: Move PWM nodes STiH407 => STiH407-family
+> >   ARM: STi: STiH407: Add PWM Regulator node
+> >   regulator: pwm-regulator: Re-write bindings
+> >   regulator: pwm-regulator: Add support for continuous-voltage
+> >   regulator: pwm-regulator: Simplify voltage to duty-cycle call
+> >   regulator: pwm-regulator: Don't assign structure attributes right away
+> > 
+> >  .../bindings/regulator/pwm-regulator.txt           |  68 ++++++++++---
+> >  arch/arm/boot/dts/stih407-family.dtsi              |  41 ++++++++
+> >  arch/arm/boot/dts/stih407.dtsi                     |  28 ------
+> >  arch/arm/configs/multi_v7_defconfig                |   3 +
+> >  drivers/regulator/pwm-regulator.c                  | 109 ++++++++++++++++++---
+> >  5 files changed, 198 insertions(+), 51 deletions(-)
+> > 
+> 
+> 
+> 
 
-If we are to trap debug register accesses in KVM to set a flag to keep
-track of the owner (iow. has the host touched the registers) then don't
-we impose an ordering requirement of whether KVM or the breakpoint
-functionality gets initialized first, and we need to take special care
-when tearing down KVM to disable the traps?  It sounds a little complex.
-
-I've previously suggested to simply look at the B/W control registers to
-figure out what to do.  Caching the state in memory is an optimization,
-do we even have any idea how important such an optimization is?
-
-Thanks,
--Christoffer
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
