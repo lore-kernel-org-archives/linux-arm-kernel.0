@@ -1,129 +1,30 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Thu, 9 Jul 2015 09:56:06 +0800
-Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <559D240F.2090002@arm.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
- <559D240F.2090002@arm.com>
-Message-ID: <559DD4B6.9000403@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 9 Jul 2015 10:00:51 +0800
+Subject: [PATCH] ARM: dts: vf610: Nomenclature fixup for PTA6 pin used in
+ RMII mode.
+In-Reply-To: <20150708135303.GD13230@lunn.ch>
+References: <1434124033-13820-1-git-send-email-andrew@lunn.ch>
+ <20150708091006.GC28488@tiger> <20150708135303.GD13230@lunn.ch>
+Message-ID: <20150709020040.GK28488@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/8 21:22, Robin Murphy wrote:
-> On 07/07/15 04:30, Zhen Lei wrote:
->> This patch support a master with multiple stream IDs, but doesn't support a
->> master behinds more than one SMMUs.
+On Wed, Jul 08, 2015 at 03:53:03PM +0200, Andrew Lunn wrote:
+> On Wed, Jul 08, 2015 at 05:10:06PM +0800, Shawn Guo wrote:
+> > On Fri, Jun 12, 2015 at 05:47:13PM +0200, Andrew Lunn wrote:
+> > > Add a missing _ENET_ infix to PTA6 when used in RMII mode. This makes
+> > > it consistent with all other pinctrl aliases for Ethernet.
+> > > 
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > 
+> > No, the existing naming is just fine, which follows how Vybrid Reference
+> > Manual names them.
 > 
-> This should probably include a binding documentation update to make it clear what values of #iommu-cells the driver supports in what circumstances, and that the cells themselves should contain raw
-> stream IDs.
+> So are you saying you want to see a patch removing the ENET_ from
+> VF610_PAD_PTC9__ENET_RMII1_MDC, VF610_PAD_PTC10__ENET_RMII1_MDIO,
+> VF610_PAD_PTC11__ENET_RMII1_CRS, etc.  A quick search for VYBRIDRM Rev
+> 7, 06/2014 does not get any hits for ENET_RMII
 
-OK.
+Yes.  We should keep the naming consistent with Reference Manual.
 
-> 
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>   drivers/iommu/arm-smmu-v3.c | 39 +++++++++++++++++++++++++++++++++++++--
->>   1 file changed, 37 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
->> index 274d059..582cd1e 100644
->> --- a/drivers/iommu/arm-smmu-v3.c
->> +++ b/drivers/iommu/arm-smmu-v3.c
->> @@ -30,6 +30,7 @@
->>   #include <linux/of_address.h>
->>   #include <linux/pci.h>
->>   #include <linux/platform_device.h>
->> +#include <linux/amba/bus.h>
->>   #include <linux/of_iommu.h>
->>   #include <linux/of_platform.h>
->>
->> @@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->>           return -EINVAL;
->>       }
->>
->> -    /* We only support PCI, for now */
->>       if (!dev_is_pci(dev)) {
->> -        return -ENODEV;
->> +        int i;
->> +        struct iommu_group *group;
->> +
->> +        group = iommu_group_get(dev);
->> +        if (!group) {
->> +            group = iommu_group_alloc();
->> +            if (IS_ERR(group)) {
->> +                dev_err(dev, "failed to allocate IOMMU group\n");
->> +                return PTR_ERR(group);
->> +            }
->> +
->> +            ret = iommu_group_add_device(group, dev);
->> +            if (ret) {
->> +                dev_err(dev, "failed to add device into IOMMU group\n");
->> +                return PTR_ERR(group);
-> 
-> This leaks the group.
-
-OK, I got it. Thanks.
-
-> 
->> +            }
->> +        }
->> +        iommu_group_put(group);
->> +
->> +        for (i = 0; i < args->args_count; i++) {
-> 
-> I'm dubious of the value of looping here - having n>1 #iommu-cells per phandle means that every platform device behind one SMMU must have the same number of stream IDs, or you still have to have
-> repeated phandles for every device with some greater multiple of n stream IDs each, but ruling out any device with <n. I'm not sure how realistic that is, and whether there's any real benefit beyond
-> saving a handful of bytes in the DTB.
-
-As you mentioned before, a master with two streamIDs can be written as below(This is also mentioned in Documentation\devicetree\bindings\iommu\iommu.txt):
-#iommu-cells = <1>;
-iommus = <&{/iommu} 23>, <&{/iommu} 24>;
-
-On my hardware platform, a master only have one streamID. But I tested two cases:
-#iommu-cells = <1>;
-1. iommus = <&smmu0 good-sid>, <&smmu0 bad-sid>;
-2. iommus = <&smmu0 bad-sid>, <&smmu0 good-sid>;
-All of these two cases worked well.
-
-Well, if each master contains two streamIDs(or more but equal), this for loop is needed.
-
-> 
->> +            ret = arm_smmu_add_device(dev, args->args[i]);
->> +            if (ret) {
->> +                dev_err(dev,
->> +                    "failed to add sid=%d into SMMU\n",
->> +                    args->args[i]);
->> +                return ret;
->> +            }
->> +        }
->>       } else {
->>           u32 sid;
->>           struct device_node *of_root;
->> @@ -2725,6 +2752,14 @@ static int __init arm_smmu_init(void)
->>       if (ret)
->>           return ret;
->>
->> +    if (!iommu_present(&platform_bus_type))
->> +        bus_set_iommu(&platform_bus_type, &arm_smmu_ops);
->> +
->> +#ifdef CONFIG_ARM_AMBA
->> +    if (!iommu_present(&amba_bustype))
->> +        bus_set_iommu(&amba_bustype, &arm_smmu_ops);
->> +#endif
->> +
->>       return bus_set_iommu(&pci_bus_type, &arm_smmu_ops);
->>   }
->>
->> -- 
->> 1.8.0
->>
->>
->> _______________________________________________
->> iommu mailing list
->> iommu at lists.linux-foundation.org
->> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->>
-> 
-> 
-> .
-> 
+Shawn
