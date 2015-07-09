@@ -1,69 +1,59 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu,  9 Jul 2015 12:25:51 +0530
-Subject: [RESEND PATCH-v2] rtc: 88pm80x: add device tree support
-Message-ID: <1436424952-29680-1-git-send-email-vaibhav.hiremath@linaro.org>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 9 Jul 2015 14:59:56 +0800
+Subject: [linux-sunxi] Re: [PATCH v10 4/5] crypto: Add Allwinner Security
+ System crypto accelerator
+In-Reply-To: <20150709064150.GA4028@Red>
+References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150707134936.GA2958@gondor.apana.org.au>
+ <20150709064150.GA4028@Red>
+Message-ID: <20150709065955.GC32698@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Along with DT support, this patch also cleans up the unnecessary
-code around 'rtc_wakeup' initialization.
+On Thu, Jul 09, 2015 at 08:41:50AM +0200, LABBE Corentin wrote:
+>
+> > > +	/* get the partial hash only if something was written */
+> > > +	if (op->mode == SS_OP_SHA1) {
+> > > +		for (i = 0; i < 5; i++)
+> > > +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> > > +	} else {
+> > > +		for (i = 0; i < 4; i++)
+> > > +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> > > +	}
+> > 
+> > You can avoid the op->mode check by storing the hash size in algt.
+> > 
+> 
+> It seems that I can use crypto_ahash_digestsize() that do the same thing.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+I don't think so because the partial hash size is not the same
+as the final digest size.
 
-diff --git a/drivers/rtc/rtc-88pm80x.c b/drivers/rtc/rtc-88pm80x.c
-index 7df0579..8f66519 100644
---- a/drivers/rtc/rtc-88pm80x.c
-+++ b/drivers/rtc/rtc-88pm80x.c
-@@ -251,17 +251,26 @@ static SIMPLE_DEV_PM_OPS(pm80x_rtc_pm_ops, pm80x_rtc_suspend, pm80x_rtc_resume);
- static int pm80x_rtc_probe(struct platform_device *pdev)
- {
- 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
--	struct pm80x_platform_data *pm80x_pdata =
--				dev_get_platdata(pdev->dev.parent);
--	struct pm80x_rtc_pdata *pdata = NULL;
-+	struct pm80x_rtc_pdata *pdata = dev_get_platdata(&pdev->dev);
- 	struct pm80x_rtc_info *info;
-+	struct device_node *node = pdev->dev.of_node;
- 	struct rtc_time tm;
- 	unsigned long ticks = 0;
- 	int ret;
- 
--	pdata = dev_get_platdata(&pdev->dev);
--	if (pdata == NULL)
--		dev_warn(&pdev->dev, "No platform data!\n");
-+	if (!pdata && !node) {
-+		dev_err(&pdev->dev,
-+			"pm80x-rtc requires platform data or of_node\n");
-+		return -EINVAL;
-+	}
-+
-+	if (!pdata) {
-+		pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
-+		if (!pdata) {
-+			dev_err(&pdev->dev, "failed to allocate memory\n");
-+			return -ENOMEM;
-+		}
-+	}
- 
- 	info =
- 	    devm_kzalloc(&pdev->dev, sizeof(struct pm80x_rtc_info), GFP_KERNEL);
-@@ -327,11 +336,8 @@ static int pm80x_rtc_probe(struct platform_device *pdev)
- 	regmap_update_bits(info->map, PM800_RTC_CONTROL, PM800_RTC1_USE_XO,
- 			   PM800_RTC1_USE_XO);
- 
--	if (pm80x_pdata) {
--		pdata = pm80x_pdata->rtc;
--		if (pdata)
--			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
--	}
-+	/* remeber whether this power up is caused by PMIC RTC or not */
-+	info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
- 
- 	device_init_wakeup(&pdev->dev, 1);
- 
+> > > +int sun4i_hash_finup(struct ahash_request *areq)
+> > > +{
+> > > +	int err;
+> > > +
+> > > +	err = sun4i_hash_update(areq);
+> > > +	if (err != 0)
+> > > +		return err;
+> > > +
+> > > +	return sun4i_hash_final(areq);
+> > 
+> > You can drop finup since the API provides a default finup that's
+> > exactly the same as this.  You only need to provide finup if it
+> > can optimise on this.
+> > 
+> > Ditto for digest.
+> 
+> If I remove digest(), loading the driver crash the kernel with:
+
+You're right.  We don't provide a default digest function for ahash,
+we only do it for shash.  So I guess you'll have to keep digest
+around for now.
+
+Cheers,
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
