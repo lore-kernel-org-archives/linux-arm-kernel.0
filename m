@@ -1,10 +1,10 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  9 Jul 2015 16:00:37 +0800
-Subject: [RFC Patch V1 02/12] MIPS,
- PCI: Use for_pci_msi_entry() to access MSI device list
+Date: Thu,  9 Jul 2015 16:00:39 +0800
+Subject: [RFC Patch V1 04/12] s390/pci: Use for_pci_msi_entry() to access MSI
+ device list
 In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1436428847-8886-3-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1436428847-8886-5-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,21 +13,39 @@ easily move msi_list from struct pci_dev into struct device later.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- arch/mips/pci/msi-octeon.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/s390/pci/pci.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/mips/pci/msi-octeon.c b/arch/mips/pci/msi-octeon.c
-index cffaaf4aae3c..2a5bb849b10e 100644
---- a/arch/mips/pci/msi-octeon.c
-+++ b/arch/mips/pci/msi-octeon.c
-@@ -200,7 +200,7 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
- 	if (type == PCI_CAP_ID_MSI && nvec > 1)
- 		return 1;
+diff --git a/arch/s390/pci/pci.c b/arch/s390/pci/pci.c
+index 598f023cf8a6..34f162753403 100644
+--- a/arch/s390/pci/pci.c
++++ b/arch/s390/pci/pci.c
+@@ -414,7 +414,7 @@ int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
  
--	list_for_each_entry(entry, &dev->msi_list, list) {
-+	for_each_pci_msi_entry(entry, dev) {
- 		ret = arch_setup_msi_irq(dev, entry);
- 		if (ret < 0)
- 			return ret;
+ 	/* Request MSI interrupts */
+ 	hwirq = 0;
+-	list_for_each_entry(msi, &pdev->msi_list, list) {
++	for_each_pci_msi_entry(msi, pdev) {
+ 		rc = -EIO;
+ 		irq = irq_alloc_desc(0);	/* Alloc irq on node 0 */
+ 		if (irq < 0)
+@@ -440,7 +440,7 @@ int arch_setup_msi_irqs(struct pci_dev *pdev, int nvec, int type)
+ 	return (msi_vecs == nvec) ? 0 : msi_vecs;
+ 
+ out_msi:
+-	list_for_each_entry(msi, &pdev->msi_list, list) {
++	for_each_pci_msi_entry(msi, pdev) {
+ 		if (hwirq-- == 0)
+ 			break;
+ 		irq_set_msi_desc(msi->irq, NULL);
+@@ -470,7 +470,7 @@ void arch_teardown_msi_irqs(struct pci_dev *pdev)
+ 		return;
+ 
+ 	/* Release MSI interrupts */
+-	list_for_each_entry(msi, &pdev->msi_list, list) {
++	for_each_pci_msi_entry(msi, pdev) {
+ 		if (msi->msi_attrib.is_msix)
+ 			__pci_msix_desc_mask_irq(msi, 1);
+ 		else
 -- 
 1.7.10.4
