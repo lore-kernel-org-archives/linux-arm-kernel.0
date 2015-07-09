@@ -1,33 +1,27 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:16 +0100
-Subject: [PATCH v2 04/20] xen/grant: Add helper
- gnttab_page_grant_foreign_access_ref
+Date: Thu, 9 Jul 2015 21:42:15 +0100
+Subject: [PATCH v2 03/20] xen/grant: Introduce helpers to split a page into
+ grant
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-4-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many PV drivers contain the idiom:
+Currently, a grant is always based on the Xen page granularity (i.e
+4KB). When Linux is using a different page granularity, a single page
+will be split between multiple grants.
 
-pfn = page_to_mfn(...) /* Or similar */
-gnttab_grant_foreign_access_ref
+The new helpers will be in charge to split the Linux page into grant and
+call a function given by the caller on each grant.
 
-Replace it by a new helper. Note that when Linux is using a different
-page granularity than Xen, the helper only gives access to the first 4KB
-grant.
+In order to help some PV drivers, the callback is allowed to use less
+data and must update the resulting length. This is useful for netback.
 
-This is useful where drivers are allocating a full Linux page for each
-grant.
+Also provide and helper to count the number of grants within a given
+contiguous region.
 
-Also include xen/interface/grant_table.h rather than xen/grant_table.h in
-asm/page.h for x86 to fix a compilation issue [1]. Only the former is
-useful in order to get the structure definition.
-
-[1] Interpendency between asm/page.h and xen/grant_table.h which result
-to page_mfn not being defined when necessary.
-
-Signed-off-by: Julien Grall <julien.grall@linaro.org>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: David Vrabel <david.vrabel@citrix.com>
@@ -35,42 +29,105 @@ Cc: David Vrabel <david.vrabel@citrix.com>
     Changes in v2:
         - Patch added
 ---
- arch/x86/include/asm/xen/page.h | 2 +-
- include/xen/grant_table.h       | 9 +++++++++
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ drivers/xen/grant-table.c | 26 ++++++++++++++++++++++++++
+ include/xen/grant_table.h | 41 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
 
-diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-index c44a5d5..fb2e037 100644
---- a/arch/x86/include/asm/xen/page.h
-+++ b/arch/x86/include/asm/xen/page.h
-@@ -12,7 +12,7 @@
- #include <asm/pgtable.h>
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 62f591f..3679293 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -296,6 +296,32 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
+ }
+ EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
  
- #include <xen/interface/xen.h>
--#include <xen/grant_table.h>
-+#include <xen/interface/grant_table.h>
- #include <xen/features.h>
- 
- /* Xen machine address */
-diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-index 6f77378..6a1ef86 100644
---- a/include/xen/grant_table.h
-+++ b/include/xen/grant_table.h
-@@ -131,6 +131,15 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
- void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
- 				     unsigned long frame, int readonly);
- 
-+/* Give access to the first 4K of the page */
-+static inline void gnttab_page_grant_foreign_access_ref(
-+	grant_ref_t ref, domid_t domid,
-+	struct page *page, int readonly)
++void gnttab_foreach_grant(struct page *page, unsigned int offset,
++			  unsigned int len, xen_grant_fn_t fn,
++			  void *data)
 +{
-+	gnttab_grant_foreign_access_ref(ref, domid, page_to_mfn(page),
-+					readonly);
++	unsigned int goffset;
++	unsigned int glen;
++	unsigned long pfn;
++
++	len = min_t(unsigned int, PAGE_SIZE - offset, len);
++	goffset = offset & ~XEN_PAGE_MASK;
++
++	pfn = xen_page_to_pfn(page) + (offset >> XEN_PAGE_SHIFT);
++
++	while (len) {
++		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
++		fn(pfn_to_mfn(pfn), goffset, &glen, data);
++
++		goffset += glen;
++		if (goffset == XEN_PAGE_SIZE) {
++			goffset = 0;
++			pfn++;
++		}
++		len -= glen;
++	}
 +}
 +
- void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
- 				       unsigned long pfn);
+ struct deferred_entry {
+ 	struct list_head list;
+ 	grant_ref_t ref;
+diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+index 4478f4b..6f77378 100644
+--- a/include/xen/grant_table.h
++++ b/include/xen/grant_table.h
+@@ -45,8 +45,10 @@
+ #include <asm/xen/hypervisor.h>
  
+ #include <xen/features.h>
++#include <xen/page.h>
+ #include <linux/mm_types.h>
+ #include <linux/page-flags.h>
++#include <linux/kernel.h>
+ 
+ #define GNTTAB_RESERVED_XENSTORE 1
+ 
+@@ -224,4 +226,43 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
+ #endif
+ }
+ 
++/* Split Linux page in chunk of the size of the grant and call fn
++ *
++ * Parameters of fn:
++ *	mfn: machine frame number based on grant granularity
++ *	offset: offset in the grant
++ *	len: length of the data in the grant. If fn decides to use less data,
++ *	it must update len.
++ *	data: internal information
++ */
++typedef void (*xen_grant_fn_t)(unsigned long mfn, unsigned int offset,
++			       unsigned int *len, void *data);
++
++void gnttab_foreach_grant(struct page *page, unsigned int offset,
++			  unsigned int len, xen_grant_fn_t fn,
++			  void *data);
++
++/* Helper to get to call fn only on the first "grant chunk" */
++static inline void gnttab_one_grant(struct page *page, unsigned int offset,
++				    unsigned len, xen_grant_fn_t fn,
++				    void *data)
++{
++	/* The first request is limited to the size of one grant */
++	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
++		    len);
++
++	gnttab_foreach_grant(page, offset, len, fn, data);
++}
++
++/* Get the number of grant in a specified region
++ *
++ * offset: Offset in the first page
++ * len: total lenght of data (can cross multiple page)
++ */
++static inline unsigned int gnttab_count_grant(unsigned int offset,
++					      unsigned int len)
++{
++	return (XEN_PFN_UP((offset & ~XEN_PAGE_MASK) + len));
++}
++
+ #endif /* __ASM_GNTTAB_H__ */
 -- 
 2.1.4
