@@ -1,117 +1,98 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 9 Jul 2015 14:36:16 +0800
-Subject: [PATCH v4 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <CAGS+omAZismuEYXsUkHEAec4xF+KRWm62AuCUmrmso6p+DKQ4Q@mail.gmail.com>
-References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
- <1436189368-1826-2-git-send-email-yh.huang@mediatek.com>
- <CAGS+omAWNwk_PRy-eeC4bgHQ-ZC2Kvh0sqpF47VD1sfJOhHWUw@mail.gmail.com>
- <1436409944.4915.6.camel@mtksdaap41>
- <CAGS+omAZismuEYXsUkHEAec4xF+KRWm62AuCUmrmso6p+DKQ4Q@mail.gmail.com>
-Message-ID: <1436423776.32314.9.camel@mtksdaap41>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Thu, 9 Jul 2015 08:41:50 +0200
+Subject: [linux-sunxi] Re: [PATCH v10 4/5] crypto: Add Allwinner Security
+ System crypto accelerator
+In-Reply-To: <20150707134936.GA2958@gondor.apana.org.au>
+References: <1436209848-16530-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1436209848-16530-5-git-send-email-clabbe.montjoie@gmail.com>
+ <20150707134936.GA2958@gondor.apana.org.au>
+Message-ID: <20150709064150.GA4028@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-09 at 12:47 +0800, Daniel Kurtz wrote:
-> On Thu, Jul 9, 2015 at 10:45 AM, YH Huang <yh.huang@mediatek.com> wrote:
+On Tue, Jul 07, 2015 at 09:49:36PM +0800, Herbert Xu wrote:
+> On Mon, Jul 06, 2015 at 09:10:47PM +0200, LABBE Corentin wrote:
 > >
-> > On Wed, 2015-07-08 at 20:11 +0800, Daniel Kurtz wrote:
-> > > On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > > > Document the device-tree binding of MediatTek display PWM.
-> > > > The PWM has one channel to control the backlight brightness for display.
-> > > > It supports MT8173 and MT6595.
-> > > >
-> > > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > > > ---
-> > > >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
-> > > >  1 file changed, 24 insertions(+)
-> > > >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > > >
-> > > > diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > > > new file mode 100644
-> > > > index 0000000..757b974
-> > > > --- /dev/null
-> > > > +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > > > @@ -0,0 +1,24 @@
-> > > > +MediaTek display PWM controller
-> > > > +
-> > > > +Required properties:
-> > > > + - compatible: should be "mediatek,<name>-disp-pwm"
-> > > > +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
-> > > > +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
-> > > > + - reg: physical base address and length of the controller's registers
-> > > > + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-> > > > +   the cell format
-> > > > + - clocks: phandle and clock specifier of the PWM reference clock
-> > > > + - clock-names: must contain the following
-> > > > +   - "main": clock used to generate PWM signals
-> > > > +   - "mm": sync signals from the modules of mmsys
-
-- pinctrl-names: Must contain a "default" entry.
-- pinctrl-0: One property must exist for each entry in pinctrl-names.
-  See pinctrl/pinctrl-bindings.txt for details of the property values.
-
-> > > > +
-> > > > +Example:
-> > > > +       pwm0: pwm at 1401e000 {
-> > > > +               compatible = "mediatek,mt8173-disp-pwm",
-> > > > +                            "mediatek,mt6595-disp-pwm";
-> > > > +               reg = <0 0x1401e000 0 0x1000>;
-> > > > +               #pwm-cells = <2>;
-> > > > +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-> > > > +                        <&mmsys CLK_MM_DISP_PWM0MM>;
-> > > > +               clock-names = "main", "mm";
-
-pio: pinctrl at 10005000 {
-...
-
-   disp_pwm0_pins: disp_pwm0_pins {
-	pins1 {
-		pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
-        	bias-pull-up;
-        };
-   };
-
-...
-}
-
-pwm0: pwm at 1401e000 {
-	compatible = "mediatek,mt8173-disp-pwm";
-	reg = <0 0x1401e000 0 0x1000>;
-	#pwm-cells = <2>;
-	clocks = <&mmsys CLK_MM_DISP_PWM0MM>,
-		 <&mmsys CLK_MM_DISP_PWM026M>;
-	clock-names = "mm", "main";
-	pinctrl-names = "default";
-	pinctrl-0 = <&disp_pwm0_pins>;
-	status = "disabled";
-};
-
-So should I change dtsi like this?
-
-Regards,
-YH Huang
-
-> > >
-> > > Should we include the pinctrl settings here to enable the PWM output?
-> > >
-> >
-> > Since we use pwm-backlight driver to control backlight, we should enable
-> > PWM output in the backlight node.
-> >
-> > Ref:
-> > https://www.kernel.org/doc/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-> >
+> > +int sun4i_hash_init(struct ahash_request *areq)
+> > +{
+> > +	const char *hash_type;
+> > +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> > +	struct crypto_ahash *tfm = crypto_ahash_reqtfm(areq);
+> > +	struct ahash_alg *alg = __crypto_ahash_alg(tfm->base.__crt_alg);
+> > +	struct sun4i_ss_alg_template *algt;
+> > +	struct sun4i_ss_ctx *ss;
+> > +
+> > +	memset(op, 0, sizeof(struct sun4i_req_ctx));
+> > +
+> > +	algt = container_of(alg, struct sun4i_ss_alg_template, alg.hash);
+> > +	ss = algt->ss;
+> > +	op->ss = algt->ss;
+> > +
+> > +	hash_type = crypto_tfm_alg_name(areq->base.tfm);
+> > +
+> > +	if (strcmp(hash_type, "sha1") == 0)
+> > +		op->mode = SS_OP_SHA1;
+> > +	else if (strcmp(hash_type, "md5") == 0)
+> > +		op->mode = SS_OP_MD5;
 > 
-> The pwm-backlight binding specifies which pwm the backlight driver
-> should use, and how to use it.
+> Please store these modes in algt and then you wouldn't need to do
+> the strcmp.
 > 
-> I believe actually configuring the output pin for the pwm via pinctl
-> belongs to the pwm binding.
+
+thanks, that's better
+
+> > +int sun4i_hash_import_md5(struct ahash_request *areq, const void *in)
+> > +{
+> > +	struct sun4i_req_ctx *op = ahash_request_ctx(areq);
+> > +	const struct md5_state *ictx = in;
+> > +	int i;
 > 
-> Regards,
-> 0Dan
+> You need to initialise op->ss here.  Ditto for SHA.
 > 
-> >
-> > Regards,
-> > YH Huang
-> >
+
+Ok
+
+> > +	/* get the partial hash only if something was written */
+> > +	if (op->mode == SS_OP_SHA1) {
+> > +		for (i = 0; i < 5; i++)
+> > +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> > +	} else {
+> > +		for (i = 0; i < 4; i++)
+> > +			op->hash[i] = readl(ss->base + SS_MD0 + i * 4);
+> > +	}
+> 
+> You can avoid the op->mode check by storing the hash size in algt.
+> 
+
+It seems that I can use crypto_ahash_digestsize() that do the same thing.
+
+> > +int sun4i_hash_finup(struct ahash_request *areq)
+> > +{
+> > +	int err;
+> > +
+> > +	err = sun4i_hash_update(areq);
+> > +	if (err != 0)
+> > +		return err;
+> > +
+> > +	return sun4i_hash_final(areq);
+> 
+> You can drop finup since the API provides a default finup that's
+> exactly the same as this.  You only need to provide finup if it
+> can optimise on this.
+> 
+> Ditto for digest.
+
+If I remove digest(), loading the driver crash the kernel with:
+
+Unable to handle kernel NULL pointer dereference at virtual address 00000000
+pgd = c0004000
+[00000000] *pgd=00000000
+Internal error: Oops: 80000007 [#1] PREEMPT SMP ARM
+CPU: 0 PID: 10120 Comm: cryptomgr_test Tainted: G            E   4.2.0-rc1+ #78
+LR is at crypto_ahash_op+0x30/0x68
+
+For using the default one does I need to do something particular ?
+
+Thanks
+
+LABBE Corentin
