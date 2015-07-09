@@ -1,96 +1,86 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 9 Jul 2015 16:17:40 +0800
-Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
- socfpga_secondary_startup
-In-Reply-To: <20150709075717.GO7557@n2100.arm.linux.org.uk>
-References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
- <20150708165115.GM7557@n2100.arm.linux.org.uk>
- <559D765C.30102@opensource.altera.com>
- <20150708210734.GN7557@n2100.arm.linux.org.uk>
- <20150709115249.18fefe8d@xhacker>
- <20150709075717.GO7557@n2100.arm.linux.org.uk>
-Message-ID: <20150709161740.3512fc5b@xhacker>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu,  9 Jul 2015 10:22:10 +0200
+Subject: [PATCH v2 0/7] KVM: arm/arm64: gsi routing support
+Message-ID: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Russell,
+With the advent of GICv3 ITS in-kernel emulation, KVM GSI routing
+appears to be requested. More specifically MSI routing is needed.
+irqchip routing does not sound to be really useful on arm but usage of
+MSI routing also mandates to integrate irqchip routing. The initial
+implementation of irqfd on arm must be upgraded with the integration
+of kvm irqchip.c code and the implementation of its standard hooks
+in the architecture specific part.
 
-On Thu, 9 Jul 2015 08:57:17 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+In case KVM_SET_GSI_ROUTING ioctl is not called, a default routing
+table with flat irqchip routing entries is built enabling to inject gsi
+corresponding to the SPI indexes seen by the guest.
 
-> On Thu, Jul 09, 2015 at 11:52:49AM +0800, Jisheng Zhang wrote:
-> > Dear Russell,
-> > 
-> > On Wed, 8 Jul 2015 22:07:34 +0100
-> > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > 
-> > > On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
-> > > > The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
-> > > > user mode access.
-> > > 
-> > > Hmm.
-> > > 
-> > > I think what you've found is a(nother) latent bug in the CPU bring up
-> > > code.
-> > > 
-> > > For SMP CPUs, the sequence we're following during early initialisation is:
-> > > 
-> > > 1. Enable SMP coherency.
-> > > 2. Invalidate the caches.
-> > > 
-> > > If the cache contains rubbish, enabling SMP coherency before invalidating
-> > > the cache is plainly an absurd thing to do.
-> > > 
-> > > Can you try the patch below - not tested in any way, so you may need to
-> > > tweak it, but it should allow us to prove that point.
-> > > 
-> > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > > index 0716bbe19872..db5137fc297d 100644
-> > > --- a/arch/arm/mm/proc-v7.S
-> > > +++ b/arch/arm/mm/proc-v7.S
-> > > @@ -275,6 +275,10 @@ __v7_b15mp_setup:
-> > >  __v7_ca17mp_setup:
-> > >  	mov	r10, #0
-> > >  1:
-> > > +	adr	r12, __v7_setup_stack		@ the local stack
-> > > +	stmia	r12, {r0-r5, r7, r9-r11, lr}
-> > > +	bl      v7_invalidate_l1
-> > > +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
-> > 
-> > Some CPUs such as CA7 need enable SMP before any cache maintenance.
-> > 
-> > CA7 TRM says something about SMP bit:
-> > "You must ensure this bit is set to 1 before the caches and MMU are enabled,
-> > or any cache and TLB maintenance operations are performed."
-> 
-> Frankly, that's wrong for two reasons.  Think about it for a moment...
-> 
-> If the cache contains crap - in other words, it contains random
-> uninitialised data in the cache lines at random locations, some of
-> which are marked valid and some of which are marked dirty - then
-> enabling the SMP bit puts the caches into coherent mode, and they
-> join the coherent cluster.
-> 
-> That means those cache lines containing crap become visible to other
-> CPUs in the cluster, and can be migrated to other CPUs, and the crap
-> data in them becomes visible to other CPUs.  This leads to state
-> corruption on other CPUs in the cluster.
-> 
-> Moreover, the cache invalidation of the local L1 cache is broadcast
-> to other CPUs in the cluster, and _their_ caches are also invalidated,
-> again, leading to state corruption on already running CPUs.  We don't
-> want the invalidation of the incoming CPU to be broadcast to the other
-> CPUs.
-> 
-> This is all round a very bad thing.
-> 
-> > Also CA7 would invalidate L1 automatically once reset, can we remove the
-> > invalidate op in CA7 case?
-> 
-> No, because we enter this path from multiple different situations, eg,
-> after the decompressor has run, after the boot loader has run which
-> may have enabled caches and not properly invalidated them prior to
-> calling the kernel.
-> 
+As soon as KVM_SET_GSI_ROUTING is called, user-space overwrites this
+default routing table and is responsible for building the whole routing
+table.
 
-Got it. Thanks very much for your detailed explanation!
+for arm/arm64 KVM_SET_GSI_ROUTING has a limited support:
+- only applies to KVM_IRQFD and not to KVM_IRQ_LINE
+
+- irqchip routing was tested on Calxeda midway (VFIO with irqfd)
+  with and without explicit routing
+- MSI routing without GICv3 ITS was tested using APM Xgene-I
+  (qemu VIRTIO-PCI vhost net without gsi_direct_mapping).
+- MSI routing with GICv3 ITS is *NOT* tested.
+
+Code can be found at https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-gsi-routing-v2
+
+It applies on Andre's [PATCH 00/13] arm64: KVM: GICv3 ITS emulation
+(http://www.spinics.net/lists/kvm/msg117402.html)
+
+History:
+
+v1 -> v2:
+- user API changed:
+  x devid id passed in kvm_irq_routing_msi
+  x kept the new routing entry type: KVM_IRQ_ROUTING_EXTENDED_MSI
+- kvm_host.h: adopt Andre's proposal to replace the msi_msg by a struct
+  composed of the msi_msg and devid in kvm_kernel_irq_routing_entry
+- Fix bug reported by Pavel: Added KVM_IRQ_ROUTING_EXTENDED_MSI handling
+  in eventfd.c
+- added vgic_v2m_inject_msi in vgic-v2-emul.c as suggested by Andre
+- fix bug reported by Andre: bad setting of msi.flags and msi.devid
+  in kvm_send_userspace_msi
+- avoid injecting reserved IRQ numbers in vgic_irqfd_set_irq
+
+RFC -> PATCH:
+- clearly state limited support on arm/arm64:
+  KVM_IRQ_LINE not impacted by GSI routing
+- add default routing table feature (new patch file)
+- changed uapi to use padding field area
+- reword api.txt
+
+Eric Auger (7):
+  KVM: api: introduce KVM_IRQ_ROUTING_EXTENDED_MSI
+  KVM: kvm_host: add devid in kvm_kernel_irq_routing_entry
+  KVM: irqchip: convey devid to kvm_set_msi
+  KVM: arm/arm64: enable irqchip routing
+  KVM: arm/arm64: build a default routing table
+  KVM: arm/arm64: enable MSI routing
+  KVM: arm: implement kvm_set_msi by gsi direct mapping
+
+ Documentation/virtual/kvm/api.txt |  32 ++++++++++--
+ arch/arm/include/asm/kvm_host.h   |   2 +
+ arch/arm/kvm/Kconfig              |   3 ++
+ arch/arm/kvm/Makefile             |   2 +-
+ arch/arm64/include/asm/kvm_host.h |   1 +
+ arch/arm64/kvm/Kconfig            |   2 +
+ arch/arm64/kvm/Makefile           |   2 +-
+ include/kvm/arm_vgic.h            |   9 ----
+ include/linux/kvm_host.h          |   7 ++-
+ include/uapi/linux/kvm.h          |   6 ++-
+ virt/kvm/arm/vgic-v2-emul.c       |  12 +++++
+ virt/kvm/arm/vgic.c               | 101 +++++++++++++++++++++++++++++---------
+ virt/kvm/eventfd.c                |   6 ++-
+ virt/kvm/irqchip.c                |  12 ++++-
+ 14 files changed, 153 insertions(+), 44 deletions(-)
+
+-- 
+1.9.1
