@@ -1,58 +1,84 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  9 Jul 2015 16:35:28 +0100
-Subject: [PATCH 3/3] regulator: pwm-regulator: Small clean-ups
+Date: Thu,  9 Jul 2015 16:35:27 +0100
+Subject: [PATCH 2/3] regulator: pwm-regulator: Remove obsoleted property
 In-Reply-To: <1436456128-18278-1-git-send-email-lee.jones@linaro.org>
 References: <1436456128-18278-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1436456128-18278-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <1436456128-18278-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove over-bracketing, use framework API to fetch PWM period and
-be more forthcoming that pwm_voltage_to_duty_cycle() actually returns
-duty cycle as a percentage, rather than a register value.
+In "[3d7ef30] regulator: pwm-regulator: Simplify voltage to duty-cycle
+call" we stopped using max_duty_cycle, so we can retire it from device
+data and DT.
+
+There is no need to deprecate this property, as it hasn't hit Mainline
+yet.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/pwm-regulator.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/regulator/pwm-regulator.txt | 11 ++++-------
+ drivers/regulator/pwm-regulator.c                             |  9 ---------
+ 2 files changed, 4 insertions(+), 16 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+index 23b4772..ed936f0 100644
+--- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+@@ -29,15 +29,14 @@ Required properties:
+ 
+ - pwms:			PWM specification (See: ../pwm/pwm.txt)
+ 
+-One of these must be provided:
++Only required for Voltage Table Mode:
+ - voltage-table: 	Voltage and Duty-Cycle table consisting of 2 cells
+ 			    First cell is voltage in microvolts (uV)
+ 			    Second cell is duty-cycle in percent (%)
+ 
+-- max-duty-cycle:	Maximum Duty-Cycle value -- this will normally be
+-  			255 (0xff) for an 8 bit PWM device
+-
+-If both are provided, the current default is voltage-table mode.
++NB: To be clear, if voltage-table is provided, then the device will be used
++in Voltage Table Mode.  If no voltage-table is provided, then the device will
++be used in Continuous Voltage Mode.
+ 
+ Any property defined as part of the core regulator binding can also be used.
+ (See: ../regulator/regulator.txt)
+@@ -49,8 +48,6 @@ Continuous Voltage Example:
+ 		regulator-min-microvolt = <1016000>;
+ 		regulator-max-microvolt = <1114000>;
+ 		regulator-name = "vdd_logic";
+-
+-		max-duty-cycle = <255>; /* 8bit PWM */
+ 	};
+ 
+ Voltage Table Example:
 diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index d92e667..936e387 100644
+index cb48208..d92e667 100644
 --- a/drivers/regulator/pwm-regulator.c
 +++ b/drivers/regulator/pwm-regulator.c
-@@ -92,13 +92,13 @@ static int pwm_regulator_list_voltage(struct regulator_dev *rdev,
- /**
-  * Continuous voltage call-backs
-  */
--static int pwm_voltage_to_duty_cycle(struct regulator_dev *rdev, int req_uV)
-+static int pwm_voltage_to_duty_cycle_percentage(struct regulator_dev *rdev, int req_uV)
+@@ -30,7 +30,6 @@ struct pwm_regulator_data {
+ 	int state;
+ 
+ 	/* Continuous voltage */
+-	u32 max_duty_cycle;
+ 	int volt_uV;
+ };
+ 
+@@ -201,14 +200,6 @@ static int pwm_regulator_init_continuous(struct platform_device *pdev,
+ 					 struct pwm_regulator_data *drvdata)
  {
- 	int min_uV = rdev->constraints->min_uV;
- 	int max_uV = rdev->constraints->max_uV;
- 	int diff = max_uV - min_uV;
+ 	struct device_node *np = pdev->dev.of_node;
+-	int ret;
+-
+-	ret = of_property_read_u32(np, "max-duty-cycle",
+-				   &drvdata->max_duty_cycle);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Failed to read \"pwm-max-value\"\n");
+-		return ret;
+-	}
  
--	return 100 - ((((req_uV * 100) - (min_uV * 100)) / diff));
-+	return 100 - (((req_uV * 100) - (min_uV * 100)) / diff);
- }
- 
- static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
-@@ -114,14 +114,13 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
- 	unsigned int ramp_delay = rdev->constraints->ramp_delay;
-+	unsigned int period = pwm_get_period(drvdata->pwm);
- 	int duty_cycle;
- 	int ret;
- 
--	duty_cycle = pwm_voltage_to_duty_cycle(rdev, min_uV);
-+	duty_cycle = pwm_voltage_to_duty_cycle_percentage(rdev, min_uV);
- 
--	ret = pwm_config(drvdata->pwm,
--			 (drvdata->pwm->period / 100) * duty_cycle,
--			 drvdata->pwm->period);
-+	ret = pwm_config(drvdata->pwm, (period / 100) * duty_cycle, period);
- 	if (ret) {
- 		dev_err(&rdev->dev, "Failed to configure PWM\n");
- 		return ret;
+ 	pwm_regulator_desc.ops = &pwm_regulator_voltage_continuous_ops;
+ 	pwm_regulator_desc.continuous_voltage_range = true;
 -- 
 1.9.1
