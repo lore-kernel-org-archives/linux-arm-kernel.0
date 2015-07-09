@@ -1,45 +1,54 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 9 Jul 2015 13:58:02 +0200 (CEST)
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <1781580.JRD7b0UrJA@wuerfel>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2131951.l0j0CIttAZ@wuerfel> <f22e65faa7d86074cda27973f83d7a52@advem.lv>
- <1781580.JRD7b0UrJA@wuerfel>
-Message-ID: <alpine.LNX.2.00.1507091343150.24357@localhost>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 09 Jul 2015 13:01:13 +0100
+Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <559DD4B6.9000403@huawei.com>
+References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
+ <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
+ <559D240F.2090002@arm.com> <559DD4B6.9000403@huawei.com>
+Message-ID: <559E6289.6060802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On 09/07/15 02:56, leizhen wrote:
+[...]
+>>> @@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+[...]
+>>> +        for (i = 0; i < args->args_count; i++) {
+>>
+>> I'm dubious of the value of looping here - having n>1 #iommu-cells per phandle means that every platform device behind one SMMU must have the same number of stream IDs, or you still have to have
+>> repeated phandles for every device with some greater multiple of n stream IDs each, but ruling out any device with <n. I'm not sure how realistic that is, and whether there's any real benefit beyond
+>> saving a handful of bytes in the DTB.
+>
+> As you mentioned before, a master with two streamIDs can be written as below(This is also mentioned in Documentation\devicetree\bindings\iommu\iommu.txt):
+> #iommu-cells = <1>;
+> iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+>
+> On my hardware platform, a master only have one streamID. But I tested two cases:
+> #iommu-cells = <1>;
+> 1. iommus = <&smmu0 good-sid>, <&smmu0 bad-sid>;
+> 2. iommus = <&smmu0 bad-sid>, <&smmu0 good-sid>;
+> All of these two cases worked well.
+>
+> Well, if each master contains two streamIDs(or more but equal), this for loop is needed.
 
-On Thu, 9 Jul 2015, Arnd Bergmann wrote:
+My point is that args_count == #iommu-cells here. If you mandate 
+#iommu-cells == 1 as per your example (which in my opinion *is* the 
+right thing to do), then looping over something which is guaranteed to 
+be a single item is pointless.
 
-> On Thursday 09 July 2015 01:29:39 Roman Yeryomin wrote:
-> > 
-> > OK, here are the minimal changes required (see attachment). Tested on 
-> > 4.1.1
-> > Let me know if you want me to submit it in some other way.
-> > 
-> 
-> The changes look ok to me. Please submit them as two separate
-> patches (1. set up and use timer3, 2. register sched_clock) according
-> to the Documentation/SubmittingPatches description.
-> 
-> Thanks,
-> 
-> 	Arnd
-> 
+You'd only need the loop if args_count > 1, for example:
 
-have you seen this thread ...
-[PATCH 00/18] ARM: Migrate clockevent drivers to 'set-state
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/423992
+	#iommu-cells = <2>;
+	1: iommus = <&smmu0 sid1 sid2>;
+	2: iommus = <&smmu0 sid1 sid2>, <&smmu0 sid3 sid4>;
 
-arch/arm/mach-gemini/time.c              | 69 ++++++++++++------------ 
+but then you'd be also stuck describing any device with an odd number of 
+stream IDs on that SMMU:
 
-Two or more weeks ago I send a patchset fixing this problem.
-At this time Arnd was in holiday and until today I was very busy at work.
+	3: iommus = <&smmu0 sid1 what-do-I-put-here?>;
 
-I can rework my patches on top of Viresh's patchset
+which is why I don't think it's worth trying to accommodate anything 
+other than #iommu-cells == 1, and for that case you know you will only 
+ever have to deal with args[0] in each of_xlate() call.
 
-and Roman please fix the subject.
-
-Ulli
+Robin.
