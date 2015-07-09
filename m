@@ -1,56 +1,93 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 9 Jul 2015 22:32:57 +0800
-Subject: [PATCH v4 6/7] imx27: dt: add support of internal rtc
-In-Reply-To: <1435965320-1478-7-git-send-email-tremyfr@gmail.com>
-References: <1435965320-1478-1-git-send-email-tremyfr@gmail.com>
- <1435965320-1478-7-git-send-email-tremyfr@gmail.com>
-Message-ID: <20150709143257.GJ23464@tiger>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Jul 2015 15:35:05 +0100
+Subject: [PATCH v3 00/15] Introducing per-device MSI domain
+In-Reply-To: <20150709135809.GA5223@red-moon>
+References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
+ <20150709135809.GA5223@red-moon>
+Message-ID: <559E8699.4010007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 04, 2015 at 01:15:19AM +0200, Philippe Reynes wrote:
-> Add support of internal rtc on imx27.
-> 
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
-> ---
->  arch/arm/boot/dts/imx27.dtsi |   10 ++++++++++
->  1 files changed, 10 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-> index b69be5c..38e6e84 100644
-> --- a/arch/arm/boot/dts/imx27.dtsi
-> +++ b/arch/arm/boot/dts/imx27.dtsi
-> @@ -144,6 +144,16 @@
->  				clock-names = "ipg", "per";
->  			};
->  
-> +			rtc: rtc at 10007000 {
-> +				compatible = "fsl,imx21-rtc";
-> +				reg = <0x10007000 0x1000>;
-> +				interrupts = <22>;
-> +				clocks = <&clks IMX27_CLK_CKIL>,
-> +					 <&clks IMX27_CLK_RTC_IPG_GATE>;
-> +				clock-names = "rtc", "ipg";
-> +				status = "disabled";
+Hi Lorenzo,
 
-It has neither pin-out nor board level configuration.  For such device,
-it makes more sense to drop status = "disabled" and enable the device by
-default.  The bonus point would be that patch #7 in the series can be
-saved.
+On 09/07/15 14:58, Lorenzo Pieralisi wrote:
+> On Tue, Jul 07, 2015 at 06:17:50PM +0100, Marc Zyngier wrote:
+>> [Picking up this series again after sleeping on it for too long,
+>>  hopefully still relevant]
+>>
+>> MSI-like interrupts are starting to creep out of the PCI world, and
+>> can now be seen into a number of "platform"-type busses. The
+>> introduction of the MSI domains feature in v3.19 recognised that fact,
+>> and started providing a way to implement this.
+>>
+>> Another problem we have to solve is to identify which MSI domain a
+>> device is "connected" to. Currently, PCI gets away with a mixture of
+>> arch-specific callbacks, and a msi_controller structure that can
+>> optionally carry a pointer to an MSI domain. As we add new bus types
+>> and start dealing with topologies that do not map to what PCI does,
+>> this doesn't scale anymore.
+>>
+>> This patch series tries to address some of it by providing a basic
+>> link between 'struct device' and an MSI domain. It also adds :
+>>
+>> - a way to "tag" domains according to the "type" of interrupt it
+>>   provides (PCI/MSI, platform MSI...), allowing a driver for a piece
+>>   of HW identified by its device_node to provide several IRQ domains
+>>
+>> - (yet another) way for PCI to propagate the domain pointer through
+>>   the PCI device hierarchy, providing a method for OF to kick-start
+>>   the propagation process, and finally allowing the PCI/MSI layer to
+>>   use that information
+>>
+>> - a similar way to hook an MSI domain to a platform device.
+>>
+>> Hopefully this can serve as a model to implement support for different
+>> but types.
+>>
+>> Additionally, the last few patches use all the above to remove any
+>> trace of the msi_controller structure from the three MSI controllers
+>> we use on arm64, so that they solely rely on the above infrastructure,
+>> leading to some interesting improvements. We take this opportunity to
+>> also kill the domain pointer from the msi_controller structure.
+>>
+>> My hope is to eventually kill msi_controller entirely, and only rely
+>> on the msi_domain contained in the device structure (any help
+>> welcomed).
+> 
+> And kill pcibios_msi_controller from arch/arm, which means we have
+> to convert all arm platforms relying on pci_sys_data for the MSI look-up,
+> I only have an iMX6 Sabrelite, so yes, help is welcome here.
 
-Shawn
+Ah, yet another way to squirrel information away. Lovely. Yes, that
+needs consolidating too, which means converting all ARM MSI controllers
+to PCI/MSI IRQ domains. I did it for Tegra a long while ago, but don't
+have the HW - anyone with a Tegra4 that could test this?
 
-> +			};
-> +
->  			kpp: kpp at 10008000 {
->  				compatible = "fsl,imx27-kpp", "fsl,imx21-kpp";
->  				reg = <0x10008000 0x1000>;
-> -- 
-> 1.7.4.4
+> BTW, is there a reason why _all_ arm host bridges rely on
+> pcibios_msi_controller (so pci_sys_data) instead of initializing
+> the struct pci_bus.msi pointer to carry out the MSI controller look-up ?
+
+Probably an ordering issue - the bus may not be there yet. But ensuring
+that the MSI domain is created early (before the bus is scanned) should
+solve that problem nicely enough.
+
+> I do not see any (and I want to get rid of pcibios_msi_controller on
+> arm asap, if we can use the struct pci_bus.msi pointer patch that's
+> trivial).
 > 
+> I know that the way forward is by doing it through domains and this
+> patchset, just asking (to understand why pcibios_msi_controller is
+> even needed on arm at present).
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
+>> (FVP model).
 > 
+> I tested it on arm64 AMD Seattle too, so FWIW:
+> 
+> Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+Excellent, thanks a lot!
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
