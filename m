@@ -1,48 +1,123 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Thu, 9 Jul 2015 16:38:41 +0200
-Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-In-Reply-To: <1436451223.1391.219.camel@redhat.com>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
- <1436289468.1391.89.camel@redhat.com> <20150709122805.GW18569@8bytes.org>
- <1436451223.1391.219.camel@redhat.com>
-Message-ID: <559E8771.9010401@redhat.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 09 Jul 2015 07:55:51 -0700
+Subject: [PATCH v6 1/4] dt-bindings: mediatek: Add MT8173 CPU DVFS clock
+ bindings
+In-Reply-To: <1436437661-17606-2-git-send-email-pi-cheng.chen@linaro.org>
+References: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1436437661-17606-2-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <20150709145551.9112.35610@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 09/07/2015 16:13, Alex Williamson wrote:
-> On Thu, 2015-07-09 at 14:28 +0200, Joerg Roedel wrote:
->> On Tue, Jul 07, 2015 at 11:17:48AM -0600, Alex Williamson wrote:
->>> Hosting the bypass manager in kernel/irq seemed appropriate, but really
->>> it could be anywhere.  Does anyone have a different preference or
->>> specifically want it under their scope?  We had originally thought of
->>> this as an IOMMU service, but I think we've generalized it beyond that.
->>> I expect we should also add the necessary hooks to turn it into a
->>> loadable module to keep the tinification folks happy, I'll incorporate
->>> the current working changes and post a version with that.
->>
->> Yeah, this is only an IOMMU service on x86, afaik. So drivers/iommu is
->> probably the wrong place to host it.
->>
->> Will there be any other producers than VFIO or any other consumers than
->> KVM? If not, it should live in one of these spaces. KVM is probably the
->> best choice, as any hardware feature that uses this targets
->> virtualization, so there will hardly ever be another consumer than KVM.
+Quoting Pi-Cheng Chen (2015-07-09 03:27:38)
+> This patch adds the clock and regulator consumer properties part of
+> document for CPU DVFS clocks on Mediatek MT8173 SoC.
 > 
-> If we think that it's *only* a kvm-vfio interaction then we could add it
-> to virt/kvm/vfio.c.  vfio could use symbol_get to avoid a module
-> dependency and effectively disable the code path when not used with kvm.
-> The reverse model of hosting it in vfio and using symbol_get from
-> kvm-vfio would also work.  Do we really want to declare it to be
-> kvm-vfio specific though?  Another option would be to simply host it
-> under virt/lib with module dependencies for both vfio and kvm.
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
 
-I wonder if in the future we may have some kind of driver-mediated
-passthrough, e.g. for network drivers.  They might use the bypass
-mechanism too.  So I think drivers/vfio is too restrictive.
+Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-virt/ right now only hosts KVM, but it could for example host lguest
-too.  virt/lib/ is okay with me.
+Regards,
+Mike
 
-Paolo
+> ---
+>  .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  | 83 ++++++++++++++++++++++
+>  1 file changed, 83 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> new file mode 100644
+> index 0000000..27b3521
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> @@ -0,0 +1,83 @@
+> +Device Tree Clock bindings for CPU DVFS clock of Mediatek MT8173 SoC
+> +
+> +Required properties:
+> +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
+> +- clock-names: Should contain the following:
+> +       "cpu"           - The multiplexer for clock input of CPU cluster.
+> +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
+> +                         source (usually MAINPLL) when the original CPU PLL is under
+> +                         transition and not stable yet.
+> +       Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
+> +       generic clock consumer properties.
+> +- proc-supply: Regulator for Vproc of CPU cluster.
+> +
+> +Optional properties:
+> +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
+> +              needs to do "voltage tracking" to step by step scale up/down Vproc and
+> +              Vsram to fit SoC specific needs. When absent, the voltage scaling
+> +              flow is handled by hardware, hence no software "voltage tracking" is
+> +              needed.
+> +
+> +Example:
+> +--------
+> +       cpu0: cpu at 0 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a53";
+> +               reg = <0x000>;
+> +               enable-method = "psci";
+> +               cpu-idle-states = <&CPU_SLEEP_0>;
+> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> +               clock-names = "cpu", "intermediate";
+> +       };
+> +
+> +       cpu1: cpu at 1 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a53";
+> +               reg = <0x001>;
+> +               enable-method = "psci";
+> +               cpu-idle-states = <&CPU_SLEEP_0>;
+> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
+> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> +               clock-names = "cpu", "intermediate";
+> +       };
+> +
+> +       cpu2: cpu at 100 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x100>;
+> +               enable-method = "psci";
+> +               cpu-idle-states = <&CPU_SLEEP_0>;
+> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> +               clock-names = "cpu", "intermediate";
+> +       };
+> +
+> +       cpu3: cpu at 101 {
+> +               device_type = "cpu";
+> +               compatible = "arm,cortex-a57";
+> +               reg = <0x101>;
+> +               enable-method = "psci";
+> +               cpu-idle-states = <&CPU_SLEEP_0>;
+> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
+> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
+> +               clock-names = "cpu", "intermediate";
+> +       };
+> +
+> +       &cpu0 {
+> +               proc-supply = <&mt6397_vpca15_reg>;
+> +       };
+> +
+> +       &cpu1 {
+> +               proc-supply = <&mt6397_vpca15_reg>;
+> +       };
+> +
+> +       &cpu2 {
+> +               proc-supply = <&da9211_vcpu_reg>;
+> +               sram-supply = <&mt6397_vsramca7_reg>;
+> +       };
+> +
+> +       &cpu3 {
+> +               proc-supply = <&da9211_vcpu_reg>;
+> +               sram-supply = <&mt6397_vsramca7_reg>;
+> +       };
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
