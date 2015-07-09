@@ -1,37 +1,87 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 9 Jul 2015 16:04:20 +0530
-Subject: [PATCH v6 0/4] Add Mediatek MT8173 cpufreq driver
-In-Reply-To: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150709103420.GC5627@linux>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 9 Jul 2015 11:38:40 +0100
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <20150709102201.GH13530@cbox>
+References: <558BC2F5.9010303@huawei.com>
+ <CAFEAcA_RzWSppaYA9vuAaL-MO6sQV1SgpXf3w-LScUdaarpOEQ@mail.gmail.com>
+ <558BC90B.4060806@huawei.com> <558CD9DE.3010609@web.de>
+ <55917E5B.3030401@huawei.com>
+ <CAFEAcA-vS8B8pJUSseFw0OaKJFPe-0rMT-XHxjNbSvyxaZ+9Tg@mail.gmail.com>
+ <559D483A.40507@arm.com>
+ <CAFEAcA-U1mEGy87ax4Cb1MLFcEP+sqc9BL_Q0hO6qg1J3FCMew@mail.gmail.com>
+ <559D51C5.3070600@arm.com>
+ <CAFEAcA-rWf5UkiP+5UbtjYihfhDOVaY4hVpXNRGMnYEhNWqwSQ@mail.gmail.com>
+ <20150709102201.GH13530@cbox>
+Message-ID: <CAFEAcA-4rMB6i2=UBXjxTAHQWn5xMiCSiaYbknuXOuHmf4XY_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-07-15, 18:27, Pi-Cheng Chen wrote:
-> MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
-> share the same power and clock domain. This series tries to add cpufreq support
-> for MT8173 SoC.
-> 
-> changes in v6:
-> - Move clock and regulator consumer properties document to the device tree
->   bindings documents of MT8173 CPU DVFS clock driver
-> - Add change log to describe what is implemented in the MT8173 cpufreq driver
-> - Add missed rcu_read_unlock() in the error path
-> - Move of_init_opp_table() call to make sure all required hardware resources
->   are already there before it is called
-> - Add comments to describe why both platform driver and deivce registration
->   codes are put in the initcall function
-> - Use the term "voltage tracking" instead of "voltage trace" according to an
->   internal SoC document
+On 9 July 2015 at 11:22, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> On Wed, Jul 08, 2015 at 08:13:59PM +0100, Peter Maydell wrote:
+>> I suspect Jan is right and we really need to distinguish
+>> the KVM_PUT_*_STATE levels in ARM QEMU. This probably
+>> implies some kind of whitelist/override mechanism, since
+>> by and large we neither know nor want to know the
+>> semantics for system registers, we leave that up to the
+>> kernel.
+>>
+>> Q: if you have a running VM, and you pause it for
+>> an hour, what should the CNTVCT register do? Presumably
+>> it should not advance, but how do we arrange for that
+>> to happen?
 
-I think Mike would again need to comment or Ack 1/4 as we have moved
-the stuff to another file.
+> I think the CNTVCT should not advance when the VM is not scheduled, so
+> if we pause the VM or starve all the VCPUs for enough time, the guest
+> should not see time progressing, since otherwise the guest scheduler
+> cannot maintain fairness and you're bound to see spurious RCU stalls
+> etc.
+>
+> That's exactly why a guest can read both a virtual and physical counter
+> and it is an area where you simply want some level of
+> paravirtualization.  I haven't studied how/if Linux deals with this at
+> all.
+>
+> So I think adjusting CNTVOFF should be managed by the kernel for the
+> pause/starvation scenario (which I think Avi once told me x86 does too -
+> does anyone know the current state of the art?).
 
-But for [1,3-4]:
+Agreed that we should be aiming for same behaviour as x86
+rather than reinventing the wheel...
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+> So the only situation where I think userspace should adjust the CNTVOFF
+> value is for migration where we are talking about a brand new VM with
+> has_run_once clear.
 
-Thanks for your hardwork :)
+For incoming migration/loadvm the VM will be freshly *reset*,
+but it will not be completely created from scratch. It's
+possible for the user to run a VM for a bit, and then use
+"loadvm" from the monitor to load an old snapshot. This
+will do a qemu_system_reset() and then restore the state.
+So in that case has_run_once won't be clear. (Would it be
+OK to clear it when userspace does VCPU_INIT? What else
+does it control?)
 
--- 
-viresh
+> Thus, if we were designing this from scratch now, the API should
+> be to return an error when trying to set KVM_REG_ARM_TIMER_CNT after the
+> VM has run once, but it's too late for that as we would break userspace.
+> The best alternative IMHO would be to merge Marc's patch and fix CNTVOFF
+> in the kernel side as well, and finally also fix QEMU so that it doesn't
+> try to do the thing that future kernels will ignore.
+
+Isn't Marc's patch causing us to return an error to userspace?
+(It does a 'return -1', at least -- does that get ignored at
+a higher level?)
+
+In principle, if userspace does:
+ * stop all vCPUs
+ * read the counter values from each vCPU
+ * write the counter values back to each vCPU
+ * resume vCPUs
+
+this shouldn't cause time to do funny things, should it?
+(ie the problem only occurs if we try to write the vCPU
+counter value while only one vCPU is stopped).
+
+thanks
+-- PMM
