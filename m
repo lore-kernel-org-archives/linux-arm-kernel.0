@@ -1,112 +1,98 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 9 Jul 2015 10:17:30 +0800
-Subject: [PATCH 1/8] ARM: imx: add i.mx6ul msl support
-In-Reply-To: <1434555569-8237-2-git-send-email-Frank.Li@freescale.com>
+Date: Thu, 9 Jul 2015 10:36:34 +0800
+Subject: [PATCH 3/8] Document: dt: binding: imx: update document for
+ imx6ul support
+In-Reply-To: <1434555569-8237-4-git-send-email-Frank.Li@freescale.com>
 References: <1434555569-8237-1-git-send-email-Frank.Li@freescale.com>
- <1434555569-8237-2-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150709021730.GL28488@tiger>
+ <1434555569-8237-4-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150709023634.GM28488@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 11:39:22PM +0800, Frank.Li at freescale.com wrote:
+On Wed, Jun 17, 2015 at 11:39:24PM +0800, Frank.Li at freescale.com wrote:
 > From: Frank Li <Frank.Li@freescale.com>
 > 
-> i.MX6UL is a new SOC, add MSL support
+> This part just add necessary change to boot imx6ul.
+> Update clock and pinctrl for imx6ul
 > 
 > Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> ---
->  arch/arm/mach-imx/Kconfig       |  8 ++++++++
->  arch/arm/mach-imx/Makefile      |  1 +
->  arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 52 insertions(+)
->  create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 573536f..8ceda28 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -548,6 +548,14 @@ config SOC_IMX6SX
->  	help
->  	  This enables support for Freescale i.MX6 SoloX processor.
->  
-> +config SOC_IMX6UL
-> +	bool "i.MX6 UltraLite support"
-> +	select PINCTRL_IMX6UL
-> +	select SOC_IMX6
-> +
-> +	help
-> +	  This enables support for Freescale i.MX6 UltraLite processor.
-> +
->  config SOC_IMX7D
->  	bool "i.MX7 Dual support"
->  	select PINCTRL_IMX7D
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 37c502a..fb689d8 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -83,6 +83,7 @@ endif
->  obj-$(CONFIG_SOC_IMX6Q) += mach-imx6q.o
->  obj-$(CONFIG_SOC_IMX6SL) += mach-imx6sl.o
->  obj-$(CONFIG_SOC_IMX6SX) += mach-imx6sx.o
-> +obj-$(CONFIG_SOC_IMX6UL) += mach-imx6ul.o
->  obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
->  
->  ifeq ($(CONFIG_SUSPEND),y)
-> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-> new file mode 100644
-> index 0000000..706d5f6
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-imx6ul.c
-> @@ -0,0 +1,43 @@
-> +/*
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/irqchip.h>
-> +#include <linux/of_platform.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/map.h>
-> +
-> +#include "common.h"
-> +
-> +static void __init imx6ul_init_machine(void)
-> +{
-> +	struct device *parent;
-> +
-> +	parent = imx_soc_device_init();
+> Signed-off-by: Frank Li <Frank.Li@freescale.com>
 
-How does the soc_id of soc_device work?  I do not see any patch adding
-imx6ul soc_id.
+Double SoB.  Drop one.
+
+> ---
+>  .../devicetree/bindings/clock/imx6ul-clock.txt     | 13 ++++++++
+>  .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        | 36 ++++++++++++++++++++++
+>  2 files changed, 49 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/imx6ul-clock.txt b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+> new file mode 100644
+> index 0000000..3ff362e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+> @@ -0,0 +1,13 @@
+> +* Clock bindings for Freescale i.MX6 UltraLite
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx6ul-ccm"
+> +- reg: Address and length of the register set
+> +- #clock-cells: Should be <1>
+> +- clocks: list of clock specifiers, must contain an entry for each required
+> +  entry in clock-names
+> +- clock-names: should include entries "ckil", "osc", "ipp_di0" and "ipp_di1"
+> +
+> +The clock consumer should specify the desired clock by having the clock
+> +ID in its "clocks" phandle cell.  See include/dt-bindings/clock/imx6ul-clock.h
+> +for the full list of i.MX6 UltraLite  clock IDs.
+                                       ^^
+Double spaces.  Drop one.
 
 Shawn
 
-> +	if (parent == NULL)
-> +		pr_warn("failed to initialize soc device\n");
+> diff --git a/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+> new file mode 100644
+> index 0000000..a81bbf3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+> @@ -0,0 +1,36 @@
+> +* Freescale i.MX6 UltraLite IOMUX Controller
 > +
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	imx_anatop_init();
-> +}
+> +Please refer to fsl,imx-pinctrl.txt in this directory for common binding part
+> +and usage.
 > +
-> +static void __init imx6ul_init_irq(void)
-> +{
-> +	imx_init_revision_from_anatop();
-> +	imx_src_init();
-> +	irqchip_init();
-> +}
+> +Required properties:
+> +- compatible: "fsl,imx6ul-iomuxc"
+> +- fsl,pins: each entry consists of 6 integers and represents the mux and config
+> +  setting for one pin.  The first 5 integers <mux_reg conf_reg input_reg mux_val
+> +  input_val> are specified using a PIN_FUNC_ID macro, which can be found in
+> +  imx6ul-pinfunc.h under device tree source folder.  The last integer CONFIG is
+> +  the pad setting value like pull-up on this pin.  Please refer to i.MX6 UltraLite
+> +  Reference Manual for detailed CONFIG settings.
 > +
-> +static const char *imx6ul_dt_compat[] __initconst = {
-> +	"fsl,imx6ul",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(IMX7D, "Freescale i.MX6 Ultralite (Device Tree)")
-> +	.init_irq	= imx6ul_init_irq,
-> +	.init_machine	= imx6ul_init_machine,
-> +	.dt_compat	= imx6ul_dt_compat,
-> +MACHINE_END
+> +CONFIG bits definition:
+> +PAD_CTL_HYS                     (1 << 16)
+> +PAD_CTL_PUS_100K_DOWN           (0 << 14)
+> +PAD_CTL_PUS_47K_UP              (1 << 14)
+> +PAD_CTL_PUS_100K_UP             (2 << 14)
+> +PAD_CTL_PUS_22K_UP              (3 << 14)
+> +PAD_CTL_PUE                     (1 << 13)
+> +PAD_CTL_PKE                     (1 << 12)
+> +PAD_CTL_ODE                     (1 << 11)
+> +PAD_CTL_SPEED_LOW               (0 << 6)
+> +PAD_CTL_SPEED_MED               (1 << 6)
+> +PAD_CTL_SPEED_HIGH              (3 << 6)
+> +PAD_CTL_DSE_DISABLE             (0 << 3)
+> +PAD_CTL_DSE_260ohm              (1 << 3)
+> +PAD_CTL_DSE_130ohm              (2 << 3)
+> +PAD_CTL_DSE_87ohm               (3 << 3)
+> +PAD_CTL_DSE_65ohm               (4 << 3)
+> +PAD_CTL_DSE_52ohm               (5 << 3)
+> +PAD_CTL_DSE_43ohm               (6 << 3)
+> +PAD_CTL_DSE_37ohm               (7 << 3)
+> +PAD_CTL_SRE_FAST                (1 << 0)
+> +PAD_CTL_SRE_SLOW                (0 << 0)
 > -- 
 > 1.9.1
 > 
