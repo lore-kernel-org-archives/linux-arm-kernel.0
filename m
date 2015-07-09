@@ -1,236 +1,169 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 9 Jul 2015 22:39:38 +0200
-Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
-In-Reply-To: <559D66EE.4060707@codeaurora.org>
-References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150708005748.GG30412@codeaurora.org>
- <20150708110005.704c49ff@bbrezillon>
- <559D66EE.4060707@codeaurora.org>
-Message-ID: <20150709223938.19450e75@bbrezillon>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 9 Jul 2015 21:42:18 +0100
+Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn in the
+ grant structure
+In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+All the usage of the field pfn are done using the same idiom:
 
-On Wed, 08 Jul 2015 11:07:42 -0700
-Stephen Boyd <sboyd@codeaurora.org> wrote:
+pfn_to_page(grant->pfn)
 
-> On 07/08/2015 02:00 AM, Boris Brezillon wrote:
-> > Hi Stephen,
-> >
-> > On Tue, 7 Jul 2015 17:57:48 -0700
-> > Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >
-> >> On 07/07, Boris Brezillon wrote:
-> >>>
-> >>>  	} else {
-> >>>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
-> >>> +		req->rate = 0;
-> >>>  		return 0;
-> >> Shouldn't this return an error now? And then assigning req->rate
-> >> wouldn't be necessary. Sorry I must have missed this last round.
-> >>
-> > Actually I wanted to keep the existing behavior: return a 0 rate (not
-> > an error) when there is no mux or rate ops.
-> >
-> > That's something we can change afterwards, but it might reveals
-> > new bugs if some users are checking for a 0 rate to detect errors.
-> >
-> 
-> Ok. Care to send the patch now to do that while we're thinking about it?
-> We can test it out for a month or two.
-> 
+This will  return always the same page. Store directly the page in the
+grant to clean up the code.
 
-Here is a patch modifying a few drivers to return errors instead of a 0
-rate. Feel free to squash it in the previous one if you think this is
-better.
-
-Best Regards,
-
-Boris
-
---- >8 ---
-
->From dca9c28301042cf19dad4b1e4555cdb7c1063745 Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Thu, 9 Jul 2015 12:20:21 +0200
-Subject: [PATCH] clk: fix some determine_rate implementations
-
-Some determine_rate implementations are not returning an error when then
-failed to adapt the rate according to the rate request.
-Fix them so that they return an error instead of silently returning 0.
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Roger Pau Monn? <roger.pau@citrix.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
 ---
- arch/mips/alchemy/common/clock.c    |  4 ++++
- drivers/clk/clk-composite.c         |  3 +--
- drivers/clk/clk.c                   | 15 ++++++---------
- drivers/clk/hisilicon/clk-hi3620.c  |  2 +-
- drivers/clk/mmp/clk-mix.c           |  5 ++++-
- drivers/clk/sunxi/clk-factors.c     |  6 ++++--
- drivers/clk/sunxi/clk-sun6i-ar100.c |  3 +++
- drivers/clk/sunxi/clk-sunxi.c       |  6 ++++--
- 8 files changed, 27 insertions(+), 17 deletions(-)
+    Changes in v2:
+        - Patch added
+---
+ drivers/block/xen-blkfront.c | 37 ++++++++++++++++++-------------------
+ 1 file changed, 18 insertions(+), 19 deletions(-)
 
-diff --git a/arch/mips/alchemy/common/clock.c
-b/arch/mips/alchemy/common/clock.c index 0b4cf3e..7cc3eed 100644
---- a/arch/mips/alchemy/common/clock.c
-+++ b/arch/mips/alchemy/common/clock.c
-@@ -469,9 +469,13 @@ static int alchemy_clk_fgcs_detr(struct clk_hw *hw,
- 		}
- 	}
+diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+index 7107d58..7b81d23 100644
+--- a/drivers/block/xen-blkfront.c
++++ b/drivers/block/xen-blkfront.c
+@@ -67,7 +67,7 @@ enum blkif_state {
  
-+	if (br < 0)
-+		return br;
-+
- 	req->best_parent_rate = bpr;
- 	req->best_parent_hw = __clk_get_hw(bpc);
- 	req->rate = br;
-+
- 	return 0;
- }
+ struct grant {
+ 	grant_ref_t gref;
+-	unsigned long pfn;
++	struct page *page;
+ 	struct list_head node;
+ };
  
-diff --git a/drivers/clk/clk-composite.c b/drivers/clk/clk-composite.c
-index 9e69f34..35ac062 100644
---- a/drivers/clk/clk-composite.c
-+++ b/drivers/clk/clk-composite.c
-@@ -125,8 +125,7 @@ static int clk_composite_determine_rate(struct
-clk_hw *hw, return mux_ops->determine_rate(mux_hw, req);
- 	} else {
- 		pr_err("clk: clk_composite_determine_rate function
-called, but no mux or rate callback set!\n");
--		req->rate = 0;
--		return 0;
-+		return -EINVAL;
- 	}
- }
- 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c182d8a..d67d9b4 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -447,24 +447,18 @@ clk_mux_determine_rate_flags(struct clk_hw *hw,
-struct clk_rate_request *req, 
- 	/* if NO_REPARENT flag set, pass through to current parent */
- 	if (core->flags & CLK_SET_RATE_NO_REPARENT) {
--		parent = core->parent;
-+		best_parent = core->parent;
- 		if (core->flags & CLK_SET_RATE_PARENT) {
--			ret = __clk_determine_rate(parent ?
-parent->hw : NULL,
-+			ret = __clk_determine_rate(best_parent ?
-best_parent->hw : NULL, &parent_req);
- 			if (ret)
- 				return ret;
- 
- 			best = parent_req.rate;
--			req->best_parent_hw = parent->hw;
--			req->best_parent_rate = best;
--		} else if (parent) {
-+		} else if (best_parent) {
- 			best = clk_core_get_rate_nolock(parent);
--			req->best_parent_hw = parent->hw;
--			req->best_parent_rate = best;
- 		} else {
- 			best = clk_core_get_rate_nolock(core);
--			req->best_parent_hw = NULL;
--			req->best_parent_rate = 0;
+@@ -219,7 +219,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
+ 				kfree(gnt_list_entry);
+ 				goto out_of_memory;
+ 			}
+-			gnt_list_entry->pfn = page_to_pfn(granted_page);
++			gnt_list_entry->page = granted_page;
  		}
  
- 		goto out;
-@@ -493,6 +487,9 @@ clk_mux_determine_rate_flags(struct clk_hw *hw,
-struct clk_rate_request *req, }
+ 		gnt_list_entry->gref = GRANT_INVALID_REF;
+@@ -234,7 +234,7 @@ out_of_memory:
+ 	                         &info->grants, node) {
+ 		list_del(&gnt_list_entry->node);
+ 		if (info->feature_persistent)
+-			__free_page(pfn_to_page(gnt_list_entry->pfn));
++			__free_page(gnt_list_entry->page);
+ 		kfree(gnt_list_entry);
+ 		i--;
  	}
- 
-+	if (!best_parent)
-+		return -EINVAL;
-+
- out:
- 	if (best_parent)
- 		req->best_parent_hw = best_parent->hw;
-diff --git a/drivers/clk/hisilicon/clk-hi3620.c
-b/drivers/clk/hisilicon/clk-hi3620.c index a0674ba..c84ec86 100644
---- a/drivers/clk/hisilicon/clk-hi3620.c
-+++ b/drivers/clk/hisilicon/clk-hi3620.c
-@@ -316,7 +316,7 @@ static int mmc_clk_determine_rate(struct clk_hw *hw,
- 		req->rate = 180000000;
- 		req->best_parent_rate = 1440000000;
- 	}
--	return 0;
-+	return -EINVAL;
+@@ -243,7 +243,7 @@ out_of_memory:
  }
  
- static u32 mmc_clk_delay(u32 val, u32 para, u32 off, u32 len)
-diff --git a/drivers/clk/mmp/clk-mix.c b/drivers/clk/mmp/clk-mix.c
-index 7a37432..665cb67 100644
---- a/drivers/clk/mmp/clk-mix.c
-+++ b/drivers/clk/mmp/clk-mix.c
-@@ -218,7 +218,7 @@ static int mmp_clk_mix_determine_rate(struct clk_hw
-*hw, parent = NULL;
- 	mix_rate_best = 0;
- 	parent_rate_best = 0;
--	gap_best = req->rate;
-+	gap_best = ULONG_MAX;
- 	parent_best = NULL;
- 
- 	if (mix->table) {
-@@ -262,6 +262,9 @@ static int mmp_clk_mix_determine_rate(struct clk_hw
-*hw, }
- 
- found:
-+	if (!parent_best)
-+		return -EINVAL;
-+
- 	req->best_parent_rate = parent_rate_best;
- 	req->best_parent_hw = __clk_get_hw(parent_best);
- 	req->rate = mix_rate_best;
-diff --git a/drivers/clk/sunxi/clk-factors.c
-b/drivers/clk/sunxi/clk-factors.c index 7a48587..94e2570 100644
---- a/drivers/clk/sunxi/clk-factors.c
-+++ b/drivers/clk/sunxi/clk-factors.c
-@@ -107,8 +107,10 @@ static int clk_factors_determine_rate(struct
-clk_hw *hw, }
+ static struct grant *get_grant(grant_ref_t *gref_head,
+-                               unsigned long pfn,
++			       struct page *page,
+                                struct blkfront_info *info)
+ {
+ 	struct grant *gnt_list_entry;
+@@ -263,10 +263,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
+ 	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
+ 	BUG_ON(gnt_list_entry->gref == -ENOSPC);
+ 	if (!info->feature_persistent) {
+-		BUG_ON(!pfn);
+-		gnt_list_entry->pfn = pfn;
++		BUG_ON(!page);
++		gnt_list_entry->page = page;
  	}
+-	buffer_mfn = pfn_to_mfn(gnt_list_entry->pfn);
++	buffer_mfn = page_to_mfn(gnt_list_entry->page);
+ 	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
+ 	                                info->xbdev->otherend_id,
+ 	                                buffer_mfn, 0);
+@@ -522,7 +522,7 @@ static int blkif_queue_rw_req(struct request *req)
  
--	if (best_parent)
--		req->best_parent_hw = __clk_get_hw(best_parent);
-+	if (!best_parent)
-+		return -EINVAL;
-+
-+	req->best_parent_hw = __clk_get_hw(best_parent);
- 	req->best_parent_rate = best;
- 	req->rate = best_child_rate;
+ 		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
+ 		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
+-			unsigned long uninitialized_var(pfn);
++			struct page *uninitialized_var(page);
  
-diff --git a/drivers/clk/sunxi/clk-sun6i-ar100.c
-b/drivers/clk/sunxi/clk-sun6i-ar100.c index d70c1ea..21b076e 100644
---- a/drivers/clk/sunxi/clk-sun6i-ar100.c
-+++ b/drivers/clk/sunxi/clk-sun6i-ar100.c
-@@ -105,6 +105,9 @@ static int ar100_determine_rate(struct clk_hw *hw,
+ 			if (segments)
+ 				kunmap_atomic(segments);
+@@ -536,15 +536,15 @@ static int blkif_queue_rw_req(struct request *req)
+ 				indirect_page = list_first_entry(&info->indirect_pages,
+ 				                                 struct page, lru);
+ 				list_del(&indirect_page->lru);
+-				pfn = page_to_pfn(indirect_page);
++				page = indirect_page;
+ 			}
+-			gnt_list_entry = get_grant(&gref_head, pfn, info);
++			gnt_list_entry = get_grant(&gref_head, page, info);
+ 			info->shadow[id].indirect_grants[n] = gnt_list_entry;
+-			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
++			segments = kmap_atomic(gnt_list_entry->page);
+ 			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
+ 		}
+ 
+-		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
++		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
+ 		ref = gnt_list_entry->gref;
+ 
+ 		info->shadow[id].grants_used[i] = gnt_list_entry;
+@@ -555,7 +555,7 @@ static int blkif_queue_rw_req(struct request *req)
+ 
+ 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+ 
+-			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
++			shared_data = kmap_atomic(gnt_list_entry->page);
+ 			bvec_data = kmap_atomic(sg_page(sg));
+ 
+ 			/*
+@@ -1002,7 +1002,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+ 				info->persistent_gnts_c--;
+ 			}
+ 			if (info->feature_persistent)
+-				__free_page(pfn_to_page(persistent_gnt->pfn));
++				__free_page(persistent_gnt->page);
+ 			kfree(persistent_gnt);
  		}
  	}
+@@ -1037,7 +1037,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+ 			persistent_gnt = info->shadow[i].grants_used[j];
+ 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
+ 			if (info->feature_persistent)
+-				__free_page(pfn_to_page(persistent_gnt->pfn));
++				__free_page(persistent_gnt->page);
+ 			kfree(persistent_gnt);
+ 		}
  
-+	if (best_rate < 0)
-+		return best_rate;
-+
- 	req->rate = best_rate;
+@@ -1051,7 +1051,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+ 		for (j = 0; j < INDIRECT_GREFS(segs); j++) {
+ 			persistent_gnt = info->shadow[i].indirect_grants[j];
+ 			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
+-			__free_page(pfn_to_page(persistent_gnt->pfn));
++			__free_page(persistent_gnt->page);
+ 			kfree(persistent_gnt);
+ 		}
  
- 	return 0;
-diff --git a/drivers/clk/sunxi/clk-sunxi.c
-b/drivers/clk/sunxi/clk-sunxi.c index d0f72a1..0e15165 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -146,8 +146,10 @@ static int sun6i_ahb1_clk_determine_rate(struct
-clk_hw *hw, }
- 	}
- 
--	if (best_parent)
--		req->best_parent_hw = __clk_get_hw(best_parent);
-+	if (!best_parent)
-+		return -EINVAL;
-+
-+	req->best_parent_hw = __clk_get_hw(best_parent);
- 	req->best_parent_rate = best;
- 	req->rate = best_child_rate;
- 
+@@ -1102,8 +1102,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+ 	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
+ 		for_each_sg(s->sg, sg, nseg, i) {
+ 			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+-			shared_data = kmap_atomic(
+-				pfn_to_page(s->grants_used[i]->pfn));
++			shared_data = kmap_atomic(s->grants_used[i]->page);
+ 			bvec_data = kmap_atomic(sg_page(sg));
+ 			memcpy(bvec_data   + sg->offset,
+ 			       shared_data + sg->offset,
+@@ -1154,7 +1153,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+ 				 * Add the used indirect page back to the list of
+ 				 * available pages for indirect grefs.
+ 				 */
+-				indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
++				indirect_page = s->indirect_grants[i]->page;
+ 				list_add(&indirect_page->lru, &info->indirect_pages);
+ 				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
+ 				list_add_tail(&s->indirect_grants[i]->node, &info->grants);
 -- 
-1.9.1
+2.1.4
