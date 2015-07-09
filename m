@@ -1,25 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 9 Jul 2015 21:27:36 +0800
-Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
-In-Reply-To: <20150709092949.GB3917@shlinux1.ap.freescale.net>
-References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
- <20150709075032.GD23464@tiger>
- <20150709092949.GB3917@shlinux1.ap.freescale.net>
-Message-ID: <20150709132736.GG23464@tiger>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 9 Jul 2015 22:28:58 +0900
+Subject: [PATCH 0/6] mfd: 88pm800: Add 88pm860 device support
+In-Reply-To: <559E6EBA.3020401@linaro.org>
+References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <CAJKOXPetR4KkfRVNz_QtVfFnjQ7p455QknErr1gnK9iBYgRY+A@mail.gmail.com>
+ <559E6C9A.8090004@linaro.org> <559E6EBA.3020401@linaro.org>
+Message-ID: <CAJKOXPeF6N_=FhBYOYTTxnGgU8GcTrbqthPNU=bXBfo7Db0Lkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 05:29:50PM +0800, Dong Aisheng wrote:
-> I agree with you.
-> One difference is that i'd like to fix it ASAP without reverting 8d86e4f
-> due to more patches depends on it is already there as i mentioned above..
-> Revert it may need to revert a lot others.
-> 
-> The pain is that v4.1 is left broken.
+2015-07-09 21:53 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+>
+>
+> On Thursday 09 July 2015 06:14 PM, Vaibhav Hiremath wrote:
+>>
+>>
+>>
+>> On Thursday 09 July 2015 05:34 PM, Krzysztof Kozlowski wrote:
+>>>
+>>> 2015-07-09 20:47 GMT+09:00 Vaibhav Hiremath
+>>> <vaibhav.hiremath@linaro.org>:
+>>>>
+>>>> 88PM860 falls under 88pm800 family of devices, with some feature
+>>>> additions, for example, support for dual phase on BUCK1.
+>>>
+>>>
+>>> Hi,
+>>>
+>>> There are already drivers for 88PM860: mfd, charger and battery. Isn't
+>>> you duplicating existing code?
+>>>
+>>
+>> Can you please point me to MFD driver for 88PM860 (Not the charger and
+>> battery, as I treat them subdevice) ???
+>>
+>> I do not think 88PM860 MFD driver is supported already. Correct me if I
+>> am wrong.
+>>
+>
+> If you are referring to 88pm860x driver, then the answer is NO,
+> as they both are totally different.
 
-Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
-know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
-the best option.  I suggest you rebase the dts series on top of
-v4.2-rc1, and send it via mmc tree.
+I am confused... so the driver drivers/mfd/88pm860x-core.c and its
+child drivers do not support 88pm860 device? They support 88pm860x
+device which is totally different than 88pm860 device?
 
-Shawn
+Best regards,
+Krzysztof
