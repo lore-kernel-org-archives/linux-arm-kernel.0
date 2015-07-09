@@ -1,74 +1,20 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  9 Jul 2015 16:00:46 +0800
-Subject: [RFC Patch V1 11/12] genirq,
- PCI: Reorginize struct msi_desc to prepare for support of generic MSI
-In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 09 Jul 2015 01:00:45 -0700 (PDT)
+Subject: [RFC Patch V1 07/12] sparc, PCI: Use helper functions to
+ access fields in struct msi_desc
+In-Reply-To: <1436428847-8886-8-git-send-email-jiang.liu@linux.intel.com>
 References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1436428847-8886-12-git-send-email-jiang.liu@linux.intel.com>
+ <1436428847-8886-8-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150709.010045.1327001449508270216.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reorganize struct msi_desc so it could be reused by other MSI drivers.
+From: Jiang Liu <jiang.liu@linux.intel.com>
+Date: Thu,  9 Jul 2015 16:00:42 +0800
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
----
- include/linux/msi.h |   41 +++++++++++++++++++++--------------------
- 1 file changed, 21 insertions(+), 20 deletions(-)
+> Use helper functions to access fields in struct msi_desc, so we could
+> easily refine struct msi_desc later.
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 5f77e231f515..f6845bc83774 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -19,29 +19,30 @@ void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
- void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
- 
- struct msi_desc {
--	struct {
--		__u8	is_msix	: 1;
--		__u8	multiple: 3;	/* log2 num of messages allocated */
--		__u8	multi_cap : 3;	/* log2 num of messages supported */
--		__u8	maskbit	: 1;	/* mask-pending bit supported ? */
--		__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit */
--		__u16	entry_nr;	/* specific enabled entry */
--		unsigned default_irq;	/* default pre-assigned irq */
--	} msi_attrib;
--
--	u32 masked;			/* mask bits */
--	unsigned int irq;
--	unsigned int nvec_used;		/* number of messages */
--	struct list_head list;
-+	struct list_head		list;
-+	unsigned int			irq;
-+	unsigned int			nvec_used;	/* number of messages */
-+	struct device *			dev;
-+	struct msi_msg			msg;		/* Last set MSI message */
- 
- 	union {
--		void __iomem *mask_base;
--		u8 mask_pos;
-+		struct {				/* For PCI MSI/MSI-X */
-+			u32 masked;			/* mask bits */
-+			struct {
-+				__u8	is_msix	: 1;
-+				__u8	multiple: 3;	/* log2 num of messages allocated */
-+				__u8	multi_cap : 3;	/* log2 num of messages supported */
-+				__u8	maskbit	: 1;	/* mask-pending bit supported ? */
-+				__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit */
-+				__u16	entry_nr;	/* specific enabled entry */
-+				unsigned default_irq;	/* default pre-assigned irq */
-+			} msi_attrib;
-+			union {
-+				u8	mask_pos;
-+				void __iomem *mask_base;
-+			};
-+		};
- 	};
--	struct device *dev;
--
--	/* Last set MSI message */
--	struct msi_msg msg;
- };
- 
- /* Helpers to hide struct msi_desc implementation details */
--- 
-1.7.10.4
+Acked-by: David S. Miller <davem@davemloft.net>
