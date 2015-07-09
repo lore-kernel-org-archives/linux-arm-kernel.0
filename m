@@ -1,47 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Jul 2015 12:27:20 +0100
-Subject: [PATCH v2 6/9] iommu/arm-smmu: to support probe deferral
-In-Reply-To: <559E5693.9060709@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-7-git-send-email-thunder.leizhen@huawei.com>
- <559D21F0.3080202@arm.com> <559E5693.9060709@huawei.com>
-Message-ID: <20150709112243.GA20778@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Jul 2015 13:47:39 +0200
+Subject: [PATCH v2 0/2] pci: xgene: Add multiple memory ranges support
+In-Reply-To: <CADaLNDmpkdHT7B1fSEu9qtoVcj4ookvxh=BA4EUCvG=pp80s=A@mail.gmail.com>
+References: <46305464.n5SOjGAhJb@wuerfel> <cover.1435688121.git.dhdang@apm.com>
+ <CADaLNDmpkdHT7B1fSEu9qtoVcj4ookvxh=BA4EUCvG=pp80s=A@mail.gmail.com>
+Message-ID: <1481643.dA4ocqzitg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 12:10:11PM +0100, leizhen wrote:
-> On 2015/7/8 21:13, Robin Murphy wrote:
-> > On 07/07/15 04:30, Zhen Lei wrote:
-> >> For pci devices, only the root nodes have "iommus" property. So we
-> >> should traverse all of its sub nodes in of_xlate.
-> > 
-> > I don't really follow this description; only the host controller is
-> > described in DT - the devices behind it are probed dynamically and don't
-> > have nodes to traverse.
+On Monday 06 July 2015 16:28:43 Duc Dang wrote:
+> On Tue, Jun 30, 2015 at 11:22 AM, Duc Dang <dhdang@apm.com> wrote:
+> > This patch set adds 1 large (up to 64GB) memory window for each PCIe
+> > controller nodes in X-Gene device tree and fix PCIe controller driver
+> > to handle multiple memory ranges correctly. These changes are required
+> > to support PCIe devices that has huge BAR.
+> >
+> > v2 changes:
+> >         1. Separate device-tree changes and driver changes into different
+> >         patches
+> >         2. Explicitly define new large window as 64-bit prefetchable in dts
+> >         3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
+> >         register to be used to configure the memory ranges.
+> >
+> >  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
+> >  drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
+> >  2 files changed, 24 insertions(+), 11 deletions(-)
 > 
-> The devices behind host controller may have nodes, but have no "iommus" property.
-
-No, the PCI masters won't have nodes in the DT on arm/arm64 systems (it
-makes hotplug difficult).
-
-> I got this conclusion base on the original code as below:
+> Hi Arnd, Bjorn,
 > 
-> 	struct pci_bus *bus = pdev->bus;
+> Do you have additional comment on this v2 patch set?
 > 
-> 	/* Walk up to the root bus */
-> 	while (!pci_is_root_bus(bus))
-> 		bus = bus->parent;
+> 
 
-So this walks up the PCI topology, created by probing the bus, until we
-get to the top-level bus...
+The changes look ok to me now, but I'd mention in the changelog about
+the fact that one of the windows is prefetchable and the other one
+is not, and that only prefetchable BARs are now using the 64-bit
+window.
 
-> 	/* Follow the "iommus" phandle from the host controller */
-> 	of_node = of_parse_phandle(bus->bridge->parent->of_node, "iommus", 0);
-> 	if (!of_node)
-> 		return NULL;
-
-... then we find the host controller device, which *does* have a
-device-tree node and use *that* to find out the IOMMU corresponding to
-the PCI device.
-
-Will
+	Arnd
