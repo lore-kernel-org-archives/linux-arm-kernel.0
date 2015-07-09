@@ -1,50 +1,22 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 9 Jul 2015 14:32:01 +0900
-Subject: [PATCH 1/7] pinctrl: UniPhier: add UniPhier pinctrl core support
-In-Reply-To: <1436387996.20619.54.camel@tiscali.nl>
-References: <1436185763-4308-1-git-send-email-yamada.masahiro@socionext.com>
- <1436185763-4308-2-git-send-email-yamada.masahiro@socionext.com>
- <1436260472.20057.121.camel@tiscali.nl>
- <CAK7LNASnaN47cPHyyH-DTrF4pE4XqhgUdZLuOspuqHtKoDxmRQ@mail.gmail.com>
- <1436387996.20619.54.camel@tiscali.nl>
-Message-ID: <CAK7LNARqsxrFhSEOiZw7TYSyFR8vhaZYcK6KbuG84mP2eM5NJw@mail.gmail.com>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 9 Jul 2015 11:18:44 +0530
+Subject: [PATCH 3/4] ARM: omap2plus_defconfig: enable support for TI CPTS
+In-Reply-To: <0947246c3e1cda5c8ef56b9f0d60fec4ce6a0026.1436368740.git.nsekhar@ti.com>
+References: <cover.1436368740.git.nsekhar@ti.com>
+ <0947246c3e1cda5c8ef56b9f0d60fec4ce6a0026.1436368740.git.nsekhar@ti.com>
+Message-ID: <559E0B3C.9070009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wednesday 08 July 2015 08:57 PM, Sekhar Nori wrote:
+> CPTS module of CPSW IP enables timestamp synchronization
+> using PTP. Enable CPTS feature of CPSW driver.
+> 
+> Available on AM335x, AM437x and DRA7x SoCs.
+> 
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-2015-07-09 5:39 GMT+09:00 Paul Bolle <pebolle@tiscali.nl>:
-> Hi Masahiro,
->
-> On wo, 2015-07-08 at 14:01 +0900, Masahiro Yamada wrote:
->> Actually, most of pinctrl drivers are boolean, but most of them
->> conventionally have MODULE_AUTHOR, THIS_MODULE, etc.
->>
->> I do not think it looks so weird.  Thought?
->
-> It's a rather common pattern, but I think it's an anti-pattern
-> nevertheless. See the discussion that Shobhit Kumar, Paul Gortmaker, and
-> I had starting in https://lkml.org/lkml/2015/6/20/63 .
->
-> Please let me know if you're unconvinced by the arguments brought
-> forward by both Pauls in that discussion.
->
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
 
-
-After I read your references and thought a bit more,
-I am now considering to change the bool into tristate.
-
-Pinctrl drivers usually contain quite big pin tables, so
-it sounds somewhat reasonable to make it loadable,
-given that minimal pin-settings could be done in the boot-loader.
-Actually, some of pinctrl drivers in the mainline are already tristate.
-
-I will send v2 later with some other fixes I have noticed.
-
-
-Is this OK with you?
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards
+Mugunthan V N
