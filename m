@@ -1,84 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 09 Jul 2015 15:20:19 +0200
-Subject: [PATCH 2/3] ARM: mvebu: update EEPROM description of Armada 388 GP
-In-Reply-To: <55913F0E.6080604@free-electrons.com>
-References: <1434631121-32014-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1434631121-32014-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <55913F0E.6080604@free-electrons.com>
-Message-ID: <559E7513.7080307@free-electrons.com>
+From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
+Date: Thu,  9 Jul 2015 22:21:20 +0900
+Subject: [RFT PATCH] net: axienet: Fix devm_ioremap_resource return value check
+Message-ID: <1436448080-24775-1-git-send-email-k.kozlowski.k@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Value returned by devm_ioremap_resource() was checked for non-NULL but
+devm_ioremap_resource() returns IOMEM_ERR_PTR, not NULL. In case of
+error this could lead to dereference of ERR_PTR.
 
-On 29/06/2015 14:50, Gregory CLEMENT wrote:
-> Hi Thomas,
-> 
-> On 18/06/2015 14:38, Thomas Petazzoni wrote:
->> Contrary to what the Device Tree indicates, the EEPROM at 0x54 is not
->> populated, so we get rid of this comment.
->>
->> However, there is an EEPROM at 0x57, so we add support for this
->> AT24C64 EEPROM:
->>
->> $ hexdump -C /sys/bus/i2c/devices/0-0057/eeprom
->> 00000000  0c ff f3 ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
->> 00000010  ff ff ff ff ff ff ff ff  ff ff ff ff ff ff ff ff  |................|
->> *
->> 00002000
->>
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> 
-> Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+Cc: <stable@vger.kernel.org>
+Fixes: 46aa27df8853 ("net: axienet: Use devm_* calls")
 
-applied on mvebu/dt
+---
 
-Thanks,
+Patch only compile tested.
+---
+ drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Gregory
-> 
-> Thanks,
-> 
-> Gregory
-> 
->> ---
->>  arch/arm/boot/dts/armada-388-gp.dts | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
->> index 5164b9a..fc1ee3e 100644
->> --- a/arch/arm/boot/dts/armada-388-gp.dts
->> +++ b/arch/arm/boot/dts/armada-388-gp.dts
->> @@ -81,10 +81,6 @@
->>  				pinctrl-0 = <&i2c0_pins>;
->>  				status = "okay";
->>  				clock-frequency = <100000>;
->> -				/*
->> -				 * The EEPROM located at adresse 54 is needed
->> -				 * for the boot - DO NOT ERASE IT -
->> -				 */
->>  
->>  				expander0: pca9555 at 20 {
->>  					compatible = "nxp,pca9555";
->> @@ -111,6 +107,10 @@
->>  					reg = <0x21>;
->>  				};
->>  
->> +				eeprom at 57 {
->> +					compatible = "atmel,24c64";
->> +					reg = <0x57>;
->> +				};
->>  			};
->>  
->>  			serial at 12000 {
->>
-> 
-> 
-
-
+diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+index 4208dd7ef101..d95f9aae95e7 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
++++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
+@@ -1530,9 +1530,9 @@ static int axienet_probe(struct platform_device *pdev)
+ 	/* Map device registers */
+ 	ethres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	lp->regs = devm_ioremap_resource(&pdev->dev, ethres);
+-	if (!lp->regs) {
++	if (IS_ERR(lp->regs)) {
+ 		dev_err(&pdev->dev, "could not map Axi Ethernet regs.\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(lp->regs);
+ 		goto free_netdev;
+ 	}
+ 
+@@ -1599,9 +1599,9 @@ static int axienet_probe(struct platform_device *pdev)
+ 		goto free_netdev;
+ 	}
+ 	lp->dma_regs = devm_ioremap_resource(&pdev->dev, &dmares);
+-	if (!lp->dma_regs) {
++	if (IS_ERR(lp->dma_regs)) {
+ 		dev_err(&pdev->dev, "could not map DMA regs\n");
+-		ret = -ENOMEM;
++		ret = PTR_ERR(lp->dma_regs);
+ 		goto free_netdev;
+ 	}
+ 	lp->rx_irq = irq_of_parse_and_map(np, 1);
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.1.4
