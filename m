@@ -1,40 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Jul 2015 13:47:39 +0200
-Subject: [PATCH v2 0/2] pci: xgene: Add multiple memory ranges support
-In-Reply-To: <CADaLNDmpkdHT7B1fSEu9qtoVcj4ookvxh=BA4EUCvG=pp80s=A@mail.gmail.com>
-References: <46305464.n5SOjGAhJb@wuerfel> <cover.1435688121.git.dhdang@apm.com>
- <CADaLNDmpkdHT7B1fSEu9qtoVcj4ookvxh=BA4EUCvG=pp80s=A@mail.gmail.com>
-Message-ID: <1481643.dA4ocqzitg@wuerfel>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu,  9 Jul 2015 17:17:05 +0530
+Subject: [PATCH 0/6] mfd: 88pm800: Add 88pm860 device support
+Message-ID: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 06 July 2015 16:28:43 Duc Dang wrote:
-> On Tue, Jun 30, 2015 at 11:22 AM, Duc Dang <dhdang@apm.com> wrote:
-> > This patch set adds 1 large (up to 64GB) memory window for each PCIe
-> > controller nodes in X-Gene device tree and fix PCIe controller driver
-> > to handle multiple memory ranges correctly. These changes are required
-> > to support PCIe devices that has huge BAR.
-> >
-> > v2 changes:
-> >         1. Separate device-tree changes and driver changes into different
-> >         patches
-> >         2. Explicitly define new large window as 64-bit prefetchable in dts
-> >         3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
-> >         register to be used to configure the memory ranges.
-> >
-> >  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
-> >  drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
-> >  2 files changed, 24 insertions(+), 11 deletions(-)
-> 
-> Hi Arnd, Bjorn,
-> 
-> Do you have additional comment on this v2 patch set?
-> 
-> 
+88PM860 falls under 88pm800 family of devices, with some feature
+additions, for example, support for dual phase on BUCK1.
 
-The changes look ok to me now, but I'd mention in the changelog about
-the fact that one of the windows is prefetchable and the other one
-is not, and that only prefetchable BARs are now using the 64-bit
-window.
+This patch series, enabled chip ID support for 88pm860 in the driver
+and adds,
+  - Init time configuration support based on chip ID
+  - DT property for 32KHz low jitter clock enable
+  - DT property for dual phase enable
 
-	Arnd
+TODO:
+ - Some of init time configurations are common to both 88pm800 and 88pm860
+   devices, but since I can not validate it, decided to move it to
+   88pm860 block only.
+   But if someone is willing to help me in validation, we can move it to
+   common code later. No issues there.
+ - Sleep/low-power-mode related configuration is also part of init time,
+   but since we are too far from sleep mode support and without testing
+   I do not want add anything, decided to take it later when we actually
+   start looking at sleep support.
+ - Init time configuration also includes pinmux setting for the device.
+   I am working on using pinctrl-single driver to have standard and generic
+   interface, hopefully it will get handled through pinctrl subsystem.
+   Link to RFC - https://patches.linaro.org/50604/
+
+Vaibhav Hiremath (6):
+  mfd: 88pm80x: Add 88pm860 chip type support
+  mfd: 88pm800: Add init time initial configuration support
+  mfd: devicetree: bindings: 88pm800: Add DT property for 32KHz output
+    enable
+  mfd: 88pm800: Enable 32KHZ XO low jitter clock out
+  mfd: devicetree: bindings: 88pm800: Add DT property for dual phase
+    enable
+  mfd: 88pm800: Add support for configuration of dual phase on BUCK1
+
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 12 ++++
+ drivers/mfd/88pm800.c                             | 88 +++++++++++++++++++++++
+ drivers/mfd/88pm80x.c                             |  2 +
+ include/linux/mfd/88pm80x.h                       | 18 +++++
+ 4 files changed, 120 insertions(+)
+
+-- 
+1.9.1
