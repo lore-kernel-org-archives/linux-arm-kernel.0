@@ -1,127 +1,70 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  9 Jul 2015 10:22:16 +0200
-Subject: [PATCH v2 6/7] KVM: arm/arm64: enable MSI routing
+Date: Thu,  9 Jul 2015 10:22:17 +0200
+Subject: [PATCH v2 7/7] KVM: arm: implement kvm_set_msi by gsi direct mapping
 In-Reply-To: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
 References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436430137-24205-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Up to now, only irqchip routing entries could be set. This patch
-adds the capability to insert MSI routing entries, with or without
-device id. Although standard MSI entries can be set, their
-injection still is not supported. For ARM64, let's also increase
-KVM_MAX_IRQ_ROUTES to 4096: include SPI irqchip flat routes plus
-MSI routes. In the future this might be extended.
+If the ITS modality is not available, let's simply support MSI
+injection by transforming the MSI.data into an SPI ID.
 
-The new MSI routing entry type also must be managed similarly to
-legacy KVM_IRQ_ROUTING_MSI in eventfd irqfd_wakeup and irqfd_update.
+This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
 v1 -> v2:
-- adapt to new routing entry types
-
-RFC -> PATCH:
-- move api MSI routing updates into that patch file
-- use new devid field of user api struct
+- introduce vgic_v2m_inject_msi in vgic-v2-emul.c following Andre's
+  advice
 ---
- Documentation/virtual/kvm/api.txt | 10 ++++++++++
- include/linux/kvm_host.h          |  2 ++
- virt/kvm/arm/vgic.c               | 13 +++++++++++++
- virt/kvm/eventfd.c                |  6 ++++--
- 4 files changed, 29 insertions(+), 2 deletions(-)
+ arch/arm/kvm/Kconfig        |  1 +
+ virt/kvm/arm/vgic-v2-emul.c | 12 ++++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-index 9276dac..686b121 100644
---- a/Documentation/virtual/kvm/api.txt
-+++ b/Documentation/virtual/kvm/api.txt
-@@ -1431,6 +1431,11 @@ Sets the GSI routing table entries, overwriting any previously set entries.
- On arm/arm64, GSI routing has the following limitation:
- - GSI routing does not apply to KVM_IRQ_LINE but only to KVM_IRQFD.
+diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
+index 151e710..0f58baf 100644
+--- a/arch/arm/kvm/Kconfig
++++ b/arch/arm/kvm/Kconfig
+@@ -31,6 +31,7 @@ config KVM
+ 	select KVM_VFIO
+ 	select HAVE_KVM_EVENTFD
+ 	select HAVE_KVM_IRQFD
++	select HAVE_KVM_MSI
+ 	select HAVE_KVM_IRQCHIP
+ 	select HAVE_KVM_IRQ_ROUTING
+ 	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
+diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
+index 1390797..43013cc 100644
+--- a/virt/kvm/arm/vgic-v2-emul.c
++++ b/virt/kvm/arm/vgic-v2-emul.c
+@@ -478,6 +478,17 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
+ }
  
-+On arm/arm64, MSI routing through in-kernel GICv3 ITS must use
-+KVM_IRQ_ROUTING_EXTENDED_MSI routing type and device ID must be set
-+in msi struct. Otherwise, KVM_IRQ_ROUTING_MSI must be used without
-+populating the msi devid field.
+ /**
++ * Emulates GICv2M MSI injection by injecting the SPI ID matching
++ * the msi data
++ * @kvm: pointer to the kvm struct
++ * @msi: the msi struct handle
++ */
++static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
++{
++	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
++}
 +
- struct kvm_irq_routing {
- 	__u32 nr;
- 	__u32 flags;
-@@ -2342,6 +2347,11 @@ On arm/arm64, gsi routing being supported, the following can happen:
- - in case no routing entry is associated to this gsi, injection fails
- - in case the gsi is associated to an irqchip routing entry,
-   irqchip.pin + 32 corresponds to the injected SPI ID.
-+- in case the gsi is associated to an MSI routing entry,
-+  * without GICv3 ITS in-kernel emulation, MSI data matches the SPI ID
-+    of the injected SPI
-+  * with GICv3 ITS in-kernel emulation, the MSI message and device ID
-+    are translated into an LPI.
++/**
+  * kvm_vgic_map_resources - Configure global VGIC state before running any VCPUs
+  * @kvm: pointer to the kvm struct
+  *
+@@ -566,6 +577,7 @@ void vgic_v2_init_emulation(struct kvm *kvm)
+ 	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
+ 	dist->vm_ops.init_model = vgic_v2_init_model;
+ 	dist->vm_ops.map_resources = vgic_v2_map_resources;
++	dist->vm_ops.inject_msi = vgic_v2m_inject_msi;
  
- 4.76 KVM_PPC_ALLOCATE_HTAB
- 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index cac0fe4..ea1a810 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -976,6 +976,8 @@ static inline int mmu_notifier_retry(struct kvm *kvm, unsigned long mmu_seq)
- 
- #ifdef CONFIG_S390
- #define KVM_MAX_IRQ_ROUTES 4096 //FIXME: we can have more than that...
-+#elif defined(CONFIG_ARM64)
-+#define KVM_MAX_IRQ_ROUTES 4096
- #else
- #define KVM_MAX_IRQ_ROUTES 1024
- #endif
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 63be67e..c5546d8 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -2252,6 +2252,19 @@ int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
- 		    (e->irqchip.irqchip >= KVM_NR_IRQCHIPS))
- 			goto out;
- 		break;
-+	case KVM_IRQ_ROUTING_MSI:
-+		e->set = kvm_set_msi;
-+		e->msi.address_lo = ue->u.msi.address_lo;
-+		e->msi.address_hi = ue->u.msi.address_hi;
-+		e->msi.data = ue->u.msi.data;
-+		break;
-+	case KVM_IRQ_ROUTING_EXTENDED_MSI:
-+		e->set = kvm_set_msi;
-+		e->msi.address_lo = ue->u.msi.address_lo;
-+		e->msi.address_hi = ue->u.msi.address_hi;
-+		e->msi.data = ue->u.msi.data;
-+		e->devid = ue->u.msi.devid;
-+		break;
- 	default:
- 		goto out;
- 	}
-diff --git a/virt/kvm/eventfd.c b/virt/kvm/eventfd.c
-index 9ff4193..d76d05d 100644
---- a/virt/kvm/eventfd.c
-+++ b/virt/kvm/eventfd.c
-@@ -238,7 +238,8 @@ irqfd_wakeup(wait_queue_t *wait, unsigned mode, int sync, void *key)
- 			irq = irqfd->irq_entry;
- 		} while (read_seqcount_retry(&irqfd->irq_entry_sc, seq));
- 		/* An event has been signaled, inject an interrupt */
--		if (irq.type == KVM_IRQ_ROUTING_MSI)
-+		if (irq.type == KVM_IRQ_ROUTING_MSI ||
-+		    irq.type == KVM_IRQ_ROUTING_EXTENDED_MSI)
- 			kvm_set_msi(&irq, kvm, KVM_USERSPACE_IRQ_SOURCE_ID, 1,
- 					false);
- 		else
-@@ -294,7 +295,8 @@ static void irqfd_update(struct kvm *kvm, struct _irqfd *irqfd)
- 	e = entries;
- 	for (i = 0; i < n_entries; ++i, ++e) {
- 		/* Only fast-path MSI. */
--		if (e->type == KVM_IRQ_ROUTING_MSI)
-+		if (e->type == KVM_IRQ_ROUTING_MSI ||
-+		    e->type == KVM_IRQ_ROUTING_EXTENDED_MSI)
- 			irqfd->irq_entry = *e;
- 	}
- 
+ 	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
+ }
 -- 
 1.9.1
