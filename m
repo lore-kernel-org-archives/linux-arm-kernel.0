@@ -1,133 +1,74 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:15 +0100
-Subject: [PATCH v2 03/20] xen/grant: Introduce helpers to split a page into
- grant
+Date: Thu, 9 Jul 2015 21:42:13 +0100
+Subject: [PATCH v2 01/20] xen: Add Xen specific page definition
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-4-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, a grant is always based on the Xen page granularity (i.e
-4KB). When Linux is using a different page granularity, a single page
-will be split between multiple grants.
+The Xen hypercall interface is always using 4K page granularity on ARM
+and x86 architecture.
 
-The new helpers will be in charge to split the Linux page into grant and
-call a function given by the caller on each grant.
+With the incoming support of 64K page granularity for ARM64 guest, it
+won't be possible to re-use the Linux page definition in Xen drivers.
 
-In order to help some PV drivers, the callback is allowed to use less
-data and must update the resulting length. This is useful for netback.
+Introduce Xen page definition helpers based on the Linux page
+definition. They have exactly the same name but prefixed with
+XEN_/xen_ prefix.
 
-Also provide and helper to count the number of grants within a given
-contiguous region.
+Also modify page_to_pfn to use new Xen page definition.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: David Vrabel <david.vrabel@citrix.com>
 ---
-    Changes in v2:
-        - Patch added
----
- drivers/xen/grant-table.c | 26 ++++++++++++++++++++++++++
- include/xen/grant_table.h | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 67 insertions(+)
+    I'm wondering if we should drop page_to_pfn has the macro will likely
+    misuse when Linux is using 64KB page granularity.
 
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 62f591f..3679293 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -296,6 +296,32 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
- }
- EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
+    Changes in v2:
+        - Add XEN_PFN_UP
+        - Add a comment describing the behavior of page_to_pfn
+---
+ include/xen/page.h | 21 ++++++++++++++++++++-
+ 1 file changed, 20 insertions(+), 1 deletion(-)
+
+diff --git a/include/xen/page.h b/include/xen/page.h
+index c5ed20b..8ebd37b 100644
+--- a/include/xen/page.h
++++ b/include/xen/page.h
+@@ -1,11 +1,30 @@
+ #ifndef _XEN_PAGE_H
+ #define _XEN_PAGE_H
  
-+void gnttab_foreach_grant(struct page *page, unsigned int offset,
-+			  unsigned int len, xen_grant_fn_t fn,
-+			  void *data)
-+{
-+	unsigned int goffset;
-+	unsigned int glen;
-+	unsigned long pfn;
++#include <asm/page.h>
 +
-+	len = min_t(unsigned int, PAGE_SIZE - offset, len);
-+	goffset = offset & ~XEN_PAGE_MASK;
++/* The hypercall interface supports only 4KB page */
++#define XEN_PAGE_SHIFT	12
++#define XEN_PAGE_SIZE	(_AC(1,UL) << XEN_PAGE_SHIFT)
++#define XEN_PAGE_MASK	(~(XEN_PAGE_SIZE-1))
++#define xen_offset_in_page(p)	((unsigned long)(p) & ~XEN_PAGE_MASK)
++#define xen_pfn_to_page(pfn)	\
++	((pfn_to_page(((unsigned long)(pfn) << XEN_PAGE_SHIFT) >> PAGE_SHIFT)))
++#define xen_page_to_pfn(page)	\
++	(((page_to_pfn(page)) << PAGE_SHIFT) >> XEN_PAGE_SHIFT)
 +
-+	pfn = xen_page_to_pfn(page) + (offset >> XEN_PAGE_SHIFT);
++#define XEN_PFN_PER_PAGE	(PAGE_SIZE / XEN_PAGE_SIZE)
 +
-+	while (len) {
-+		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
-+		fn(pfn_to_mfn(pfn), goffset, &glen, data);
++#define XEN_PFN_DOWN(x)	((x) >> XEN_PAGE_SHIFT)
++#define XEN_PFN_UP(x)	(((x) + XEN_PAGE_SIZE-1) >> XEN_PAGE_SHIFT)
++#define XEN_PFN_PHYS(x)	((phys_addr_t)(x) << XEN_PAGE_SHIFT)
 +
-+		goffset += glen;
-+		if (goffset == XEN_PAGE_SIZE) {
-+			goffset = 0;
-+			pfn++;
-+		}
-+		len -= glen;
-+	}
-+}
-+
- struct deferred_entry {
- 	struct list_head list;
- 	grant_ref_t ref;
-diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-index 4478f4b..6f77378 100644
---- a/include/xen/grant_table.h
-+++ b/include/xen/grant_table.h
-@@ -45,8 +45,10 @@
- #include <asm/xen/hypervisor.h>
+ #include <asm/xen/page.h>
  
- #include <xen/features.h>
-+#include <xen/page.h>
- #include <linux/mm_types.h>
- #include <linux/page-flags.h>
-+#include <linux/kernel.h>
- 
- #define GNTTAB_RESERVED_XENSTORE 1
- 
-@@ -224,4 +226,43 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
- #endif
++/* Return the MFN associated to the first 4KB of the page */
+ static inline unsigned long page_to_mfn(struct page *page)
+ {
+-	return pfn_to_mfn(page_to_pfn(page));
++	return pfn_to_mfn(xen_page_to_pfn(page));
  }
  
-+/* Split Linux page in chunk of the size of the grant and call fn
-+ *
-+ * Parameters of fn:
-+ *	mfn: machine frame number based on grant granularity
-+ *	offset: offset in the grant
-+ *	len: length of the data in the grant. If fn decides to use less data,
-+ *	it must update len.
-+ *	data: internal information
-+ */
-+typedef void (*xen_grant_fn_t)(unsigned long mfn, unsigned int offset,
-+			       unsigned int *len, void *data);
-+
-+void gnttab_foreach_grant(struct page *page, unsigned int offset,
-+			  unsigned int len, xen_grant_fn_t fn,
-+			  void *data);
-+
-+/* Helper to get to call fn only on the first "grant chunk" */
-+static inline void gnttab_one_grant(struct page *page, unsigned int offset,
-+				    unsigned len, xen_grant_fn_t fn,
-+				    void *data)
-+{
-+	/* The first request is limited to the size of one grant */
-+	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
-+		    len);
-+
-+	gnttab_foreach_grant(page, offset, len, fn, data);
-+}
-+
-+/* Get the number of grant in a specified region
-+ *
-+ * offset: Offset in the first page
-+ * len: total lenght of data (can cross multiple page)
-+ */
-+static inline unsigned int gnttab_count_grant(unsigned int offset,
-+					      unsigned int len)
-+{
-+	return (XEN_PFN_UP((offset & ~XEN_PAGE_MASK) + len));
-+}
-+
- #endif /* __ASM_GNTTAB_H__ */
+ struct xen_memory_region {
 -- 
 2.1.4
