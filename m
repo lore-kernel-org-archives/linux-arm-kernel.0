@@ -1,51 +1,26 @@
-From: thuth@redhat.com (Thomas Huth)
-Date: Thu, 9 Jul 2015 20:59:26 +0200
-Subject: [PATCH] KVM: Add Kconfig option to signal cross-endian guests
-In-Reply-To: <20150709160626-mutt-send-email-mst@redhat.com>
-References: <20150707195012-mutt-send-email-mst@redhat.com>
- <1436428145-29823-1-git-send-email-thuth@redhat.com>
- <559E435E.9050608@redhat.com> <559E6FBD.5050502@redhat.com>
- <20150709160626-mutt-send-email-mst@redhat.com>
-Message-ID: <20150709205926.1f00b6b2@thh440s>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Jul 2015 20:04:59 +0100
+Subject: [PATCH 2/3] regulator: 88pm800: fix LDO vsel_mask value
+In-Reply-To: <1436445692-10656-3-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436445692-10656-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436445692-10656-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150709190459.GP11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jul 2015 16:07:47 +0300
-"Michael S. Tsirkin" <mst@redhat.com> wrote:
-
-> On Thu, Jul 09, 2015 at 02:57:33PM +0200, Paolo Bonzini wrote:
-> > 
-> > 
-> > On 09/07/2015 11:48, Laurent Vivier wrote:
-> > > 
-> > > 
-> > > On 09/07/2015 09:49, Thomas Huth wrote:
-> > >> The option for supporting cross-endianness legacy guests in
-> > >> the vhost and tun code should only be available on systems
-> > >> that support cross-endian guests.
-> > > 
-> > > I'm sure I misunderstand something, but what happens if we use QEMU with
-> > > TCG instead of KVM, i.e. a big endian powerpc kernel guest on x86_64
-> > > little endian host ?
-> > 
-> > TCG does not yet support irqfd/ioeventfd, so it cannot be used with vhost.
-> > 
-> > Paolo
+On Thu, Jul 09, 2015 at 06:11:31PM +0530, Vaibhav Hiremath wrote:
+> From: Yi Zhang <yizhang@marvell.com>
 > 
-> vhost does not require irqfd anymore.  I think ioeventfd actually works
-> fine though I didn't try, it would be easy to support.
+> As per datasheet,
+> Except LDO2, all other LDO's use bit [3:0] for VOUT select.
 
-That's an interesting issue, thanks for pointing this out, Laurent! So
-do we now rather want to leave everything as it currently is, in case
-somebody wants to use vhost-net with a cross-endian TCG guest one day?
-
-Or do we assume that either
-a) TCG is so slow anyway that nobody wants to accelerate it with vhost
-or
-b) TCG vhost likely won't happen that soon so we hope that everybody
-will already be using virtio 1.0 at that point in time (with a fixed
-endianness) 
-?
-... then I think we should go on and include this patch.
-
- Thomas
+Bug fixes like this should come at the start of the series before new
+functionality so they can be merged as bug fixes into Linus' tree and
+-stable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150709/9051c207/attachment.sig>
