@@ -1,48 +1,88 @@
-From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
-Date: Thu, 9 Jul 2015 19:02:20 +0200
-Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
-In-Reply-To: <20150709132736.GG23464@tiger>
-References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
- <20150709075032.GD23464@tiger>
- <20150709092949.GB3917@shlinux1.ap.freescale.net>
- <20150709132736.GG23464@tiger>
-Message-ID: <559EA91C.6010408@melag.de>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 09 Jul 2015 19:11:25 +0200
+Subject: [PATCH v2 0/7] KVM: arm/arm64: gsi routing support
+In-Reply-To: <026801d0ba5f$43a79520$caf6bf60$@samsung.com>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+ <023601d0ba54$c4d6e020$4e84a060$@samsung.com> <559E927E.8040403@arm.com>
+ <026801d0ba5f$43a79520$caf6bf60$@samsung.com>
+Message-ID: <559EAB3D.2080205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 09.07.2015 um 15:27 schrieb Shawn Guo:
+Hi Pavel, Andre,
+On 07/09/2015 05:52 PM, Pavel Fedin wrote:
+>  Hi!
+> 
+>>> 3. KVM_SET_GSI_ROUTING - we use KVM_IRQ_ROUTING_EXTENDED_MSI plus devid
+>>
+>> Here we already have a type field with some users, so lets piggy-back on
+>> this.
+> 
+>  We already have 'flags' there too.
+> 
+>> Both ioctl extensions are coupled with a per-VM capability to let
+>> userland know that it needs to provide a device ID.
+> 
+>> Using flags on its own (without an explicit capability) is what I
+>> opposed against, not flags in general.
+> 
+>  Ok, and in your next respin you'll add the capability, correct? So that we will finally have all
+> pieces in place.
+> 
+>> In case of KVM_SET_GSI_ROUTING it just seems awkward
+>> to me to use a flag when a different type would do as well.
+> 
+>  Well, MSI vs "Extended MSI" are even not different types really. It's just MSI which has devid. And
+> we *ALREADY* have VALID_DEVID flag.
+> 
+>> But after all, I don't have a strong opinion on that matter, so if
+>> others prefer using a flag I am also fine with that.
+> 
+>  So, ok, to be short... My vote is for flag, because it's already there and it keeps up with the
+> style we already have. Eric, this is my final statement about it. It's up to you to accept or
+> ignore. In qemu code flag is a little bit nicer because it's just stored in a variable and helps to
+> avoid several if-else's (however small ones). Compare:
+Well personally I prefer the type thing and I don't see much difference
+at userspace level anyway. But I am not this kind of hyperspace
+architect guy. So, since there is no consensus here, I would say let's
+wait for formal reviews of our maintainers and I will align.
 
- > Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
-> know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
-> the best option.  I suggest you rebase the dts series on top of
-> v4.2-rc1, and send it via mmc tree.
+The v2 update is not the outcome of a consensus so I made arbitrary
+decisions to progress & fix bugs and I hope this eventually works with
+ITS ;-)
 
-Yeah, I already stumbled across that. Fortunately, I dont need it at
-all, so I just removed it from dts:
+Best Regards
 
-
-diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi
-b/arch/arm/boot/dts/imx53-tqma53.dtsi
-index 2dea6dc..3c545e3 100644
---- a/arch/arm/boot/dts/imx53-tqma53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
-@@ -41,7 +41,6 @@
-         pinctrl-0 = <&pinctrl_esdhc2>,
-                     <&pinctrl_esdhc2_cdwp>;
-         vmmc-supply = <&reg_3p3v>;
--       wp-gpios = <&gpio1 2 0>;
-         cd-gpios = <&gpio1 4 0>;
-         status = "disabled";
-  };
-
-
---mtx
-
-https://www.facebook.com/MELAG.Medizintechnik
-
-[http://www.melag.de/fbbanner.png]<https://www.facebook.com/MELAG.Medizintechnik>
-
-MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
-
-Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
-Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
+Eric
+> --- cut ---
+>     kroute.gsi = virq;
+>     kroute.type = KVM_IRQ_ROUTING_MSI;
+>     kroute.u.msi.address_lo = (uint32_t)msg.address;
+>     kroute.u.msi.address_hi = msg.address >> 32;
+>     kroute.u.msi.data = le32_to_cpu(msg.data);
+>     kroute.flags = kvm_msi_flags;
+>     if (kroute.flags & KVM_MSI_VALID_DEVID) {
+>         kroute.u.msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
+>     }
+> --- cut ---
+> and:
+> --- cut ---
+>     kroute.gsi = virq;
+>     if (use_extended_msi) {
+>         kroute.u.msi.devid = (pci_bus_num(dev->bus) << 8) | dev->devfn;
+>         kroute.type = KVM_IRQ_ROUTING_EXTENDED_MSI;
+>     } else {
+>         kroute.type = KVM_IRQ_ROUTING_MSI;
+>     }
+>     kroute.u.msi.address_lo = (uint32_t)msg.address;
+>     kroute.u.msi.address_hi = msg.address >> 32;
+>     kroute.u.msi.data = le32_to_cpu(msg.data);
+>     kroute.flags = kvm_msi_flags;
+> --- cut ---
+> 
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
+> 
+> 
