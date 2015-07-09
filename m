@@ -1,53 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 9 Jul 2015 21:42:00 +0800
-Subject: [PATCH v2 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board
- support
-In-Reply-To: <CAHrpEqQMtaL_ReeFP4VR2bfg_HDaQAHc0BUMB3X4KM3b23ra0A@mail.gmail.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
- <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
- <CAHrpEqQMtaL_ReeFP4VR2bfg_HDaQAHc0BUMB3X4KM3b23ra0A@mail.gmail.com>
-Message-ID: <20150709134200.GH23464@tiger>
+From: panand@redhat.com (Pratyush Anand)
+Date: Thu, 9 Jul 2015 19:23:35 +0530
+Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
+In-Reply-To: <20150706114920.GB17305@dhcppc13.redhat.com>
+References: <cover.1436158027.git.panand@redhat.com>
+ <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
+ <559A6257.60608@hitachi.com>
+ <20150706114920.GB17305@dhcppc13.redhat.com>
+Message-ID: <20150709135335.GC16331@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 01:55:46PM -0500, Zhi Li wrote:
-> On Fri, Jun 19, 2015 at 12:05 PM, Nicolae Rosia <nicolae.rosia@gmail.com> wrote:
-> > Hi,
-> >
-> > On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
-> >> From: Frank Li <Frank.Li@freescale.com>
-> > [...]
-> >> +       cpus {
-> >> +               #address-cells = <1>;
-> >> +               #size-cells = <0>;
-> >> +
-> >> +               cpu0: cpu at 0 {
-> >> +                       compatible = "arm,cortex-a7";
-> >> +                       device_type = "cpu";
-> >> +                       reg = <0>;
-> >> +                       clock-latency = <61036>; /* two CLK32 periods */
-> >> +                       operating-points = <
-> >> +                               /* kHz  uV */
-> >> +                               528000  1250000
-> >> +                               396000  1150000
-> >> +                               198000  1150000
-> >> +                       >;
-> >> +                       fsl,soc-operating-points = <
-> >> +                               /* KHz  uV */
-> >> +                               528000  1250000
-> >> +                               396000  1150000
-> >> +                               198000  1150000
-> >> +                       >;
-> > Why is this necessary? Can't you adapt the driver to use operating-points?
-> > I have looked through other imx dts and saw that some had different
-> > values in these two tables.
+On 06/07/2015:05:19:20 PM, Pratyush Anand wrote:
+> On 06/07/2015:08:11:19 PM, Masami Hiramatsu wrote:
+> > On 2015/07/06 14:03, Pratyush Anand wrote:
+> > > Add all function symbols which are called from do_debug_exception under
+> > > NOKPROBE_SYMBOL, as they can not kprobed.
+> > 
+> > Could you tell me how you checked that? from the code?
 > 
-> It is used by internal busfreq driver. I will remove it at next version.
+> Well.. I found out that some of the symbol like single_step_handler
+> does not allow kprobing, and then it seemed logical to me that we
+> should not allow kprobing of any symbols which are called in the path
+> of do_debug_exception. So, manually :( I reviewed the code and put
+> NOKPROBE_SYMBOL across all those.
+> 
+> However, now I am doing some more tests  and as I said in previous
+> reply, there are still few symbols like (_mcount) which is creating
+> problem with following simple test and I need to look into that. In
+> case of _mcount, I do not see any print and its complete freeze.
+> 
 
-It's used by mainline imx6q-cpufreq driver, but it's a piece of
-undocumented binding.  Basically, on i.MX6 series, when CPU frequency
-scales, there are two voltages, 'core' and 'soc', need to scale
-accordingly.  The OPP binding v1 only supports one voltage.
+Once these two patches are applied, I do not see any issue (at least)
+in enabling kprobes for all the symbols of /proc/kallsyms, except
+_mcount. Blacklisting _mcount seems reasonable to me, as this is
+called from every function and so from do_debug_exception as well.
 
-Shawn
+There might still be some path which can create issue if a kprobe is
+inserted there, but I do not see any way to find them. So,
+I will send V2 with following updates.Please let me know if there is
+any other concern.
+
+--- a/arch/arm64/kernel/arm64ksyms.c
++++ b/arch/arm64/kernel/arm64ksyms.c
+@@ -26,6 +26,7 @@
+#include <linux/syscalls.h>
+#include <linux/uaccess.h>
+#include <linux/io.h>
++#include <linux/kprobes.h>
+    
+#include <asm/checksum.h>
+      
+@@ -64,4 +65,5 @@ EXPORT_SYMBOL(test_and_change_bit);
+       
+#ifdef CONFIG_FUNCTION_TRACER
+EXPORT_SYMBOL(_mcount);
++NOKPROBE_SYMBOL(_mcount);
+#endif
+
+~Pratyush
+
+PS:
+Some related details are here:
+http://marc.info/?l=linux-kernel&m=143644472722751
