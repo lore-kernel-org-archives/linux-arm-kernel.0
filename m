@@ -1,156 +1,89 @@
 From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Thu,  9 Jul 2015 16:00:43 +0800
-Subject: [RFC Patch V1 08/12] PCI: Use helper functions to access fields in
- struct msi_desc
+Date: Thu,  9 Jul 2015 16:00:45 +0800
+Subject: [RFC Patch V1 10/12] genirq,
+ PCI: Store 'struct device *' instead 'struct pci_dev *' in struct
+ msi_desc
 In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
 References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <1436428847-8886-9-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <1436428847-8886-11-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper functions to access fields in struct msi_desc, so we could
-easily refine msi_desc later.
+Store 'struct device *' instead 'struct pci_dev *' in struct msi_desc,
+so struct msi_desc may be reused by generic MSI drivers.
 
 Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 ---
- drivers/pci/host/pci-keystone-dw.c |    6 +++---
- drivers/pci/host/pcie-designware.c |    4 ++--
- drivers/pci/host/pcie-xilinx.c     |   12 +++++-------
- drivers/pci/msi.c                  |   13 ++++++++-----
- 4 files changed, 18 insertions(+), 17 deletions(-)
+ drivers/pci/msi.c   |    7 ++++++-
+ include/linux/msi.h |   11 ++++-------
+ 2 files changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e0edb4..e792086c1639 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -109,7 +109,7 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
- 	struct pcie_port *pp;
- 
- 	msi = irq_get_msi_desc(irq);
--	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
- 	ks_pcie = to_keystone_pcie(pp);
- 	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
- 	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-@@ -148,7 +148,7 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
- 	u32 offset;
- 
- 	msi = irq_get_msi_desc(irq);
--	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
- 	ks_pcie = to_keystone_pcie(pp);
- 	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
- 
-@@ -170,7 +170,7 @@ static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
- 	u32 offset;
- 
- 	msi = irq_get_msi_desc(irq);
--	pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
- 	ks_pcie = to_keystone_pcie(pp);
- 	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
- 
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 69486be7181e..65596f96763c 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -255,7 +255,7 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
- static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
- {
- 	int irq, pos0, i;
--	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
-+	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(desc));
- 
- 	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
- 				       order_base_2(no_irqs));
-@@ -327,7 +327,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
- {
- 	struct irq_data *data = irq_get_irq_data(irq);
- 	struct msi_desc *msi = irq_data_get_msi(data);
--	struct pcie_port *pp = sys_to_pcie(msi->dev->bus->sysdata);
-+	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
- 
- 	clear_irq_range(pp, irq, 1, data->hwirq);
- }
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index f1a06a091ccb..64454f416639 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -227,18 +227,16 @@ static struct pci_ops xilinx_pcie_ops = {
-  */
- static void xilinx_pcie_destroy_msi(unsigned int irq)
- {
--	struct irq_desc *desc;
- 	struct msi_desc *msi;
- 	struct xilinx_pcie_port *port;
- 
--	desc = irq_to_desc(irq);
--	msi = irq_desc_get_msi_desc(desc);
--	port = sys_to_pcie(msi->dev->bus->sysdata);
--
--	if (!test_bit(irq, msi_irq_in_use))
-+	if (!test_bit(irq, msi_irq_in_use)) {
-+		msi = irq_get_msi_desc(irq);
-+		port = sys_to_pcie(msi_desc_to_pci_sys_data(msi));
- 		dev_err(port->dev, "Trying to free unused MSI#%d\n", irq);
--	else
-+	} else {
- 		clear_bit(irq, msi_irq_in_use);
-+	}
- }
- 
- /**
 diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index d09afa78d7a1..6497608545e2 100644
+index 0050ad436718..260c1653701d 100644
 --- a/drivers/pci/msi.c
 +++ b/drivers/pci/msi.c
-@@ -208,7 +208,8 @@ u32 __pci_msi_desc_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
+@@ -413,7 +413,7 @@ static struct msi_desc *alloc_msi_entry(struct pci_dev *dev)
+ 		return NULL;
  
- 	mask_bits &= ~mask;
- 	mask_bits |= flag;
--	pci_write_config_dword(desc->dev, desc->mask_pos, mask_bits);
-+	pci_write_config_dword(msi_desc_to_pci_dev(desc), desc->mask_pos,
-+			       mask_bits);
+ 	INIT_LIST_HEAD(&desc->list);
+-	desc->dev = dev;
++	desc->dev = &dev->dev;
  
- 	return mask_bits;
+ 	return desc;
  }
-@@ -288,7 +289,9 @@ void default_restore_msi_irqs(struct pci_dev *dev)
+@@ -1140,6 +1140,11 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
+ }
+ EXPORT_SYMBOL(pci_enable_msix_range);
  
- void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- {
--	BUG_ON(entry->dev->current_state != PCI_D0);
-+	struct pci_dev *dev = msi_desc_to_pci_dev(entry);
++struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc)
++{
++	return to_pci_dev(desc->dev);
++}
 +
-+	BUG_ON(dev->current_state != PCI_D0);
- 
- 	if (entry->msi_attrib.is_msix) {
- 		void __iomem *base = entry->mask_base +
-@@ -298,7 +301,6 @@ void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- 		msg->address_hi = readl(base + PCI_MSIX_ENTRY_UPPER_ADDR);
- 		msg->data = readl(base + PCI_MSIX_ENTRY_DATA);
- 	} else {
--		struct pci_dev *dev = entry->dev;
- 		int pos = dev->msi_cap;
- 		u16 data;
- 
-@@ -318,7 +320,9 @@ void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- 
- void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
+ void *msi_desc_to_pci_sysdata(struct msi_desc *desc)
  {
--	if (entry->dev->current_state != PCI_D0) {
-+	struct pci_dev *dev = msi_desc_to_pci_dev(entry);
-+
-+	if (dev->current_state != PCI_D0) {
- 		/* Don't touch the hardware now */
- 	} else if (entry->msi_attrib.is_msix) {
- 		void __iomem *base;
-@@ -329,7 +333,6 @@ void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
- 		writel(msg->address_hi, base + PCI_MSIX_ENTRY_UPPER_ADDR);
- 		writel(msg->data, base + PCI_MSIX_ENTRY_DATA);
- 	} else {
--		struct pci_dev *dev = entry->dev;
- 		int pos = dev->msi_cap;
- 		u16 msgctl;
+ 	struct pci_dev *dev = msi_desc_to_pci_dev(desc);
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 57fe766a14bf..5f77e231f515 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -14,6 +14,7 @@ extern int pci_msi_ignore_mask;
+ /* Helper functions */
+ struct irq_data;
+ struct msi_desc;
++struct pci_dev;
+ void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+ void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
  
+@@ -37,14 +38,14 @@ struct msi_desc {
+ 		void __iomem *mask_base;
+ 		u8 mask_pos;
+ 	};
+-	struct pci_dev *dev;
++	struct device *dev;
+ 
+ 	/* Last set MSI message */
+ 	struct msi_msg msg;
+ };
+ 
+ /* Helpers to hide struct msi_desc implementation details */
+-#define msi_desc_to_dev(desc)		(&(desc)->dev.dev)
++#define msi_desc_to_dev(desc)		((desc)->dev)
+ #define dev_to_msi_list(dev)		(&(dev)->msi_list)
+ #define first_msi_entry(dev)		\
+ 	list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+@@ -56,11 +57,7 @@ struct msi_desc {
+ #define for_each_pci_msi_entry(desc, pdev)	\
+ 	for_each_msi_entry((desc), &(pdev)->dev)
+ 
+-static inline struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc)
+-{
+-	return desc->dev;
+-}
+-
++struct pci_dev *msi_desc_to_pci_dev(struct msi_desc *desc);
+ void *msi_desc_to_pci_sysdata(struct msi_desc *desc);
+ #else /* CONFIG_PCI_MSI */
+ static inline void *msi_desc_to_pci_sysdata(struct msi_desc *desc)
 -- 
 1.7.10.4
