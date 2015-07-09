@@ -1,108 +1,91 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 9 Jul 2015 15:50:32 +0800
-Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
-In-Reply-To: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
-References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <20150709075032.GD23464@tiger>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jul 2015 08:57:17 +0100
+Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
+ socfpga_secondary_startup
+In-Reply-To: <20150709115249.18fefe8d@xhacker>
+References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150708165115.GM7557@n2100.arm.linux.org.uk>
+ <559D765C.30102@opensource.altera.com>
+ <20150708210734.GN7557@n2100.arm.linux.org.uk>
+ <20150709115249.18fefe8d@xhacker>
+Message-ID: <20150709075717.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 02:05:31AM +0800, Dong Aisheng wrote:
-> Commit 8d86e4f mmc: sdhci-esdhc-imx: Call mmc_of_parse()
-> seriously break the sd card detect/write protect function
-> of most IMX platforms since a lot of GPIO flags of cd-gpios/wp-gpios
-> are wrongly set in devicetree.
+On Thu, Jul 09, 2015 at 11:52:49AM +0800, Jisheng Zhang wrote:
+> Dear Russell,
 > 
-> It breaks the following things:
+> On Wed, 8 Jul 2015 22:07:34 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
+> > > The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
+> > > user mode access.
+> > 
+> > Hmm.
+> > 
+> > I think what you've found is a(nother) latent bug in the CPU bring up
+> > code.
+> > 
+> > For SMP CPUs, the sequence we're following during early initialisation is:
+> > 
+> > 1. Enable SMP coherency.
+> > 2. Invalidate the caches.
+> > 
+> > If the cache contains rubbish, enabling SMP coherency before invalidating
+> > the cache is plainly an absurd thing to do.
+> > 
+> > Can you try the patch below - not tested in any way, so you may need to
+> > tweak it, but it should allow us to prove that point.
+> > 
+> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > index 0716bbe19872..db5137fc297d 100644
+> > --- a/arch/arm/mm/proc-v7.S
+> > +++ b/arch/arm/mm/proc-v7.S
+> > @@ -275,6 +275,10 @@ __v7_b15mp_setup:
+> >  __v7_ca17mp_setup:
+> >  	mov	r10, #0
+> >  1:
+> > +	adr	r12, __v7_setup_stack		@ the local stack
+> > +	stmia	r12, {r0-r5, r7, r9-r11, lr}
+> > +	bl      v7_invalidate_l1
+> > +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
+> 
+> Some CPUs such as CA7 need enable SMP before any cache maintenance.
+> 
+> CA7 TRM says something about SMP bit:
+> "You must ensure this bit is set to 1 before the caches and MMU are enabled,
+> or any cache and TLB maintenance operations are performed."
 
-My opinion would be that we revert the commit 8d86e4f for v4.2, as it's
-so broken.
+Frankly, that's wrong for two reasons.  Think about it for a moment...
 
-> 1) cd-gpio function enable
-> Most IMX boards GPIO card detect function becomes unwork and using card
-> polling mode instead by mistake.
-> Openning CONFIG_MMC_DEBUG will easily see that.
-> It is caused by the default quirk SDHCI_QUIRK_BROKEN_CARD_DETECTION
-> is not cleared for dt platform by commit 8d86e4f, then
-> MMC_CAP_NEEDS_POLL is wrongly set.
-> Patch 1~2 is to fix it.
-> 
-> 2) cd-gpio/wp-gpio polarity
-> Before commit 8d86e4f, we do not use GPIO flags passed from
-> devicetree. But after it, GPIO flags specfied in dt becomes valid
-> and will affect the normal cd/wp function.
-> 
-> This is fixed by another dts fix patch series:
-> [PATCH 0/5] dts: imx: fix sd card gpio polarity specified in device tree
-> http://www.spinics.net/lists/arm-kernel/msg426156.html
-> 
-> Since it needs to change a lot board dts files, so i cook the patch
-> based on Shawn/for-next branch to make sure all board dts file are
-> changed in the same time.
-> 
-> The dts fix patches series should be picked before this series since
-> the driver fixes depend on the correct dts(correct GPIO polarity)
-> to work properly.
+If the cache contains crap - in other words, it contains random
+uninitialised data in the cache lines at random locations, some of
+which are marked valid and some of which are marked dirty - then
+enabling the SMP bit puts the caches into coherent mode, and they
+join the coherent cluster.
 
-So this is a device tree ABI breakage.  All the existing DTBs already
-installed on devices will be broken with the new kernel.  You can argue
-that the device trees are buggy and we're fixing bugs.  But if a bugfix
-breaks things, we should be conservative.  Here is my suggestion:
+That means those cache lines containing crap become visible to other
+CPUs in the cluster, and can be migrated to other CPUs, and the crap
+data in them becomes visible to other CPUs.  This leads to state
+corruption on other CPUs in the cluster.
 
-1. Revert commit 8d86e4f for v4.2
-2. I queue up your dts fixing series for v4.2
-3. Keep things as they are for a few releases and then consider to move
-   to mmc_of_parse() with the hope that those buggy DTBs have been
-   upgraded during that period.
+Moreover, the cache invalidation of the local L1 cache is broadcast
+to other CPUs in the cluster, and _their_ caches are also invalidated,
+again, leading to state corruption on already running CPUs.  We don't
+want the invalidation of the incoming CPU to be broadcast to the other
+CPUs.
 
-Shawn
+This is all round a very bad thing.
 
-> 
-> 3) max-frequency not work in sdhci
-> mmc_of_parse will parse the max-frequency from devicetree,
-> however, its value will be overwritten by common sdhci driver
-> finnally,so it does not actually work.
-> Patch 3 is to fix it.
-> 
-> 4) patch 4~6 clear unneeded parsing code after switch to mmc_of_parse().
-> 
-> The series is based on ulf/next tree.
-> 
-> I also CCed this patch series to all board maintainer related in this
-> change, hope they can help test it.
-> I only tested some freescale IMX boards.
-> 
-> BTW, There's indeed a problem here that dts fix patch series needs to
-> be picked before this series, but it can't go through Ulf tree
-> since some board dts changed does not in Ulf's tree.
-> And this patch series also can not go through Shawn's tree,
-> since mmc part change depends on some patches in Ulf tree.
-> Two series are cross dependant.
-> Hope you guy can find a solution for it.
-> 
-> Those two patch series is an important fix, hopefully can catch up the
-> final 4.1 merge window.
-> 
-> Dong Aisheng (6):
->   mmc: sdhci-esdhc-imx: fix cd regression for dt platform
->   mmc: sdhci-esdhc-imx: move all non dt probe code into one function
->   mmc: sdhci: make max-frequency property in device tree work
->   mmc: sdhci-esdhc-imx: remove duplicated dts parsing
->   mmc: sdhci-esdhc-imx: clear f_max in boarddata
->   dts: mmc: fsl-imx-esdhc: remove fsl,cd-controller support
-> 
->  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 -
->  drivers/mmc/host/sdhci-esdhc-imx.c                 | 210 ++++++++++-----------
->  drivers/mmc/host/sdhci.c                           |   9 +-
->  include/linux/platform_data/mmc-esdhc-imx.h        |   1 -
->  4 files changed, 111 insertions(+), 111 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> Also CA7 would invalidate L1 automatically once reset, can we remove the
+> invalidate op in CA7 case?
+
+No, because we enter this path from multiple different situations, eg,
+after the decompressor has run, after the boot loader has run which
+may have enabled caches and not properly invalidated them prior to
+calling the kernel.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
