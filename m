@@ -1,66 +1,95 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 9 Jul 2015 08:30:41 +0200
-Subject: [PATCH v2 0/9] regulator: pwm-regulator: Introduce continuous-mode
-In-Reply-To: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
-References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150709083041.3b203eb1@bbrezillon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 9 Jul 2015 14:35:52 +0800
+Subject: [PATCH v2 2/2] arm: kernel: implement cpuidle_ops with psci
+ backend
+In-Reply-To: <20150708173458.GB10589@red-moon>
+References: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
+ <1436359868-6176-3-git-send-email-jszhang@marvell.com>
+ <20150708173458.GB10589@red-moon>
+Message-ID: <20150709143552.7f1f83ce@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Dear Lorenzo,
 
-I'm interested in this feature (so as Doug is), could you add us in Cc
-of your next submission ?
+On Wed, 8 Jul 2015 18:34:58 +0100
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 
-On Tue,  7 Jul 2015 16:06:44 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, Jul 08, 2015 at 01:51:08PM +0100, Jisheng Zhang wrote:
+> > This patch implements cpuidle_ops using psci. After this patch, we can
+> > use cpuidle-arm.c with psci backend for both arm and arm64.
+> > 
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >  arch/arm/kernel/Makefile       |  1 +
+> >  arch/arm/kernel/psci_cpuidle.c | 29 +++++++++++++++++++++++++++++
+> >  2 files changed, 30 insertions(+)
+> >  create mode 100644 arch/arm/kernel/psci_cpuidle.c
+> > 
+> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> > index 3b995f5..96383d8 100644
+> > --- a/arch/arm/kernel/Makefile
+> > +++ b/arch/arm/kernel/Makefile
+> > @@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+> >  ifeq ($(CONFIG_ARM_PSCI),y)
+> >  obj-y				+= psci-call.o
+> >  obj-$(CONFIG_SMP)		+= psci_smp.o
+> > +obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
+> >  endif
+> >  
+> >  extra-y := $(head-y) vmlinux.lds
+> > diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
+> > new file mode 100644
+> > index 0000000..ae85d97
+> > --- /dev/null
+> > +++ b/arch/arm/kernel/psci_cpuidle.c
+> > @@ -0,0 +1,29 @@
+> > +/*
+> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> > + * Author: Jisheng Zhang <jszhang@marvell.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/cpuidle.h>
+> > +#include <linux/psci.h>
+> > +
+> > +#include <asm/cpuidle.h>
+> > +
+> > +static int psci_cpuidle_suspend(int cpu, unsigned long arg)
+> > +{
+> > +	return cpu_psci_cpu_suspend(arg);
+> > +}
+> > +
+> > +static int psci_cpuidle_init(struct device_node *node, int cpu)
+> > +{
+> > +	return cpu_psci_cpu_init_idle(cpu);
+> > +}
+> 
+> It probably makes sense to change the prototypes now that there is
+> just one cpuidle ops merged for arm, better now than later.
 
-> This patch-set has been rebased on to topic/pwm.
->   
-> Continuous mode uses the PWM regulator's maximum and minimum supplied
-> voltages specified in the regulator-{min,max}-microvolt properties to
-> calculate appropriate duty-cycle values.  This allows for a much more
-> fine grained solution when compared with voltage-table mode, which
-> this driver already supports.  This solution does make an assumption
-> that a %50 duty-cycle value will cause the regulator voltage to run
-> at half way between the supplied max_uV and min_uV values.
+Good idea. I will do as you suggested.
 
-Well, I'm not sure this assumption works for all pwm driven regulators.
-What if your regulator does not react linearly to the PWM duty-cycle
-config ?
-
-How about addressing that by using all the entries of the
-voltage<->duty table association and doing the linear interpolation
-between the provided points instead of doing it on the min -> max
-range ?
-
-Best Regards,
-
-Boris
+Thanks a lot,
+Jisheng
 
 > 
-> Lee Jones (9):
->   ARM: multi_v7_defconfig: Enable ST's PWM driver
->   ARM: multi_v7_defconfig: Enable ST's Power Reset driver
->   ARM: multi_v7_defconfig: Enable support for PWM Regulators
->   ARM: STi: STiH407: Move PWM nodes STiH407 => STiH407-family
->   ARM: STi: STiH407: Add PWM Regulator node
->   regulator: pwm-regulator: Re-write bindings
->   regulator: pwm-regulator: Add support for continuous-voltage
->   regulator: pwm-regulator: Simplify voltage to duty-cycle call
->   regulator: pwm-regulator: Don't assign structure attributes right away
+> I am not too fussed about leaving these shims, but I think this can
+> save us some time in the future.
 > 
->  .../bindings/regulator/pwm-regulator.txt           |  68 ++++++++++---
->  arch/arm/boot/dts/stih407-family.dtsi              |  41 ++++++++
->  arch/arm/boot/dts/stih407.dtsi                     |  28 ------
->  arch/arm/configs/multi_v7_defconfig                |   3 +
->  drivers/regulator/pwm-regulator.c                  | 109 ++++++++++++++++++---
->  5 files changed, 198 insertions(+), 51 deletions(-)
+> Daniel what do you think ?
 > 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> Lorenzo
+> 
+> > +
+> > +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+> > +	.suspend = psci_cpuidle_suspend,
+> > +	.init = psci_cpuidle_init,
+> > +};
+> > +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+> > -- 
+> > 2.1.4
+> > 
