@@ -1,30 +1,24 @@
-From: roman@advem.lv (Roman Yeryomin)
-Date: Thu, 09 Jul 2015 19:51:20 +0300
-Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
-In-Reply-To: <1781580.JRD7b0UrJA@wuerfel>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2131951.l0j0CIttAZ@wuerfel> <f22e65faa7d86074cda27973f83d7a52@advem.lv>
- <1781580.JRD7b0UrJA@wuerfel>
-Message-ID: <89dc8e097d12d9400217a237b7a6ca6e@advem.lv>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 9 Jul 2015 18:59:44 +0200
+Subject: Build failure on ARM64 for Linux 4.2-rc1 was: Linux 4.2-rc1
+In-Reply-To: <559EA54C.4060807@redhat.com>
+References: <CA+55aFxmm7THBsCK62esr=JCcHpn6nmReGKqPp0inUrhbkveuA@mail.gmail.com>
+ <559BCC8A.1030708@redhat.com> <559EA54C.4060807@redhat.com>
+Message-ID: <20150709165944.GA19282@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-09 11:04, Arnd Bergmann wrote:
-> On Thursday 09 July 2015 01:29:39 Roman Yeryomin wrote:
->> 
->> OK, here are the minimal changes required (see attachment). Tested on
->> 4.1.1
->> Let me know if you want me to submit it in some other way.
->> 
+On Thu, Jul 09, 2015 at 11:46:04AM -0500, Mark Langsdorf wrote:
+> I did a git bisect and it looks like the faulty patch is
+> d72da4a4d973d8a0a0d3c97e7cdebf287fbe3a99, "rbtree: Make lockless
+> searches non-fatal". I can't see why it causes my builds to fail,
+> but if I revert that patch and the related series, then I can
+> build the kernel and build tools/perf successfully.
 > 
-> The changes look ok to me. Please submit them as two separate
-> patches (1. set up and use timer3, 2. register sched_clock) according
-> to the Documentation/SubmittingPatches description.
-> 
+> Any insight into a less intensive way of fixing my build would
+> be appreciated.
 
-So what do we do?
-Do you still want me to split this as you said and submit or you want 
-Hans's patches rebased/resubmitted?
+This is tools/perf failing to build right? Add tip/perf/urgent, it
+appears to contain the required bits to make it go again.
 
-Regards,
-Roman
+The /urgent branches will get to Linus 'soon' I imagine.
