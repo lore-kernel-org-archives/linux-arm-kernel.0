@@ -1,58 +1,90 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 09 Jul 2015 15:26:40 -0700
-Subject: [GIT PULL] Allwinner late changes for 4.2
-In-Reply-To: <20150709120458.GX28632@lukather> (Maxime Ripard's message of
- "Thu, 9 Jul 2015 14:04:58 +0200")
-References: <20150705203429.GA21927@lukather>
- <7hk2uacp7i.fsf@deeprootsystems.com> <20150709120458.GX28632@lukather>
-Message-ID: <7hmvz5arxb.fsf@deeprootsystems.com>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Thu,  9 Jul 2015 15:37:57 -0700
+Subject: [PATCH v2] ARM: dts: configure regulators for Gumstix Pepper
+Message-ID: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+Boot process is halting in midway because some of the necessary voltage
+regulators are deemed unused and subsequently powered off, leading to
+a completely unresponsive system.
 
-> Hi Kevin,
->
-> On Wed, Jul 08, 2015 at 02:30:09PM -0700, Kevin Hilman wrote:
->> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
->> 
->> > Hi Arnd, Kevin, Olof,
->> >
->> > Here is a bunch of late patches (because I forgot about them) for the
->> > 4.2 merge window.
->> >
->> > They're not really controversial, are fixing some issues for the A33
->> > and H3 not having the reset controller initialised soon enough (by
->> > adding their compatible to the already existing DT machine), and the
->> > clock protection code not being run, resulting in the CPU (mainly)
->> > clock being shut down at the end of the boot.
->> >
->> > They've also been in linux-next for quite some time, so I don't expect
->> > any breakage from them.
->> 
->> Hmm, this is just a tad bit late. ;) Even several days after we sent
->> our own "late" branch to Linus.  I'm afraid this is going to miss
->> v4.2.
->
-> Hmmm, I thought you said you wanted them before -rc1 was out?
->
->> If there are real fixes in here, feel free to send as separate
->> patches and I'll queue them for v4.2-rc.
->
-> Yes, the two patches in mach-sunxi are needed, otherwise the boards
-> using this platform won't even boot. I'll submit them in a separate PR
-> then.
+Most of the device nodes had correct voltage regulator attachments.
+Yet these nodes had to set stricter enforcement on them through
+'regulator-boot-on' and 'regulator-always-on' to function correctly.
 
-Nevermind, you're right.  I had forgotten we has already discussed
-this.  Thanks for the reminder.
+The consumers of the regulators this commit affect are the followings:
 
-I guess I'm purging my my brain a little early in preparation to
-take some time off (the next 2 weeks.)
+	DCDC1: vdd_1v8 system supply, USB-PHY, and ADC
+	DCDC2: Core domain
+	DCDC3: MPU core domain
+	 LDO1: RTC
+	 LDO2: 3v3 IO domain
+	 LDO3: USB-PHY; not a boot-time requirement
+	 LDO4: LCD [16:23]
 
-I've pulled this into fixes, and added to for-next.  Should get a PR of
-our fixes branch out to Linus tomorrow, after a spin through
-kernelci.org.
+All but LDO3 need to be always-on for the system to be functional.
 
-Thanks,
+Additionally regulator-name properties have been added for the kernel to
+display the name from the schematic. This will improve diagnostics.
 
-Kevin
+Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
+---
+ arch/arm/boot/dts/am335x-pepper.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+index 0d35ab6..661f835 100644
+--- a/arch/arm/boot/dts/am335x-pepper.dts
++++ b/arch/arm/boot/dts/am335x-pepper.dts
+@@ -438,6 +438,7 @@
+ 	regulators {
+ 		dcdc1_reg: regulator at 0 {
+ 			/* VDD_1V8 system supply */
++			regulator-always-on;
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
+@@ -446,6 +447,7 @@
+ 			regulator-min-microvolt = <925000>;
+ 			regulator-max-microvolt = <1325000>;
+ 			regulator-boot-on;
++			regulator-always-on;
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
+@@ -454,25 +456,32 @@
+ 			regulator-min-microvolt = <925000>;
+ 			regulator-max-microvolt = <1150000>;
+ 			regulator-boot-on;
++			regulator-always-on;
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
+ 			/* VRTC 1.8V always-on supply */
++			regulator-name = "vrtc,vdds";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
+ 			/* 3.3V rail */
++			regulator-name = "vdd_3v3aux";
++			regulator-always-on;
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
+ 			/* VDD_3V3A 3.3V rail */
++			regulator-name = "vdd_3v3a";
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
+ 			/* VDD_3V3B 3.3V rail */
++			regulator-name = "vdd_3v3b";
++			regulator-always-on;
+ 		};
+ 	};
+ };
+-- 
+2.1.4
