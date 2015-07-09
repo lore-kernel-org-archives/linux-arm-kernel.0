@@ -1,44 +1,44 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Thu,  9 Jul 2015 10:22:12 +0200
-Subject: [PATCH v2 2/7] KVM: kvm_host: add devid in
- kvm_kernel_irq_routing_entry
+Date: Thu,  9 Jul 2015 10:22:13 +0200
+Subject: [PATCH v2 3/7] KVM: irqchip: convey devid to kvm_set_msi
 In-Reply-To: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
 References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1436430137-24205-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <1436430137-24205-4-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend kvm_kernel_irq_routing_entry to transport devid. This is
-needed for ARM. Its validity depends on the routing type entry.
+on ARM, a devid field is populated in kvm_msi struct in case the
+flag is set to KVM_MSI_VALID_DEVID. Let's populate the corresponding
+kvm_kernel_irq_routing_entry devid field and set the msi type to
+KVM_IRQ_ROUTING_EXTENDED_MSI.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ virt/kvm/irqchip.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-v1 -> v2:
-replace msi_msg field by a struct composed of msi_msg and devid
-
-RFC -> PATCH:
-- reword the commit message after change in first patch (uapi)
----
- include/linux/kvm_host.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 9564fd7..cac0fe4 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -321,7 +321,10 @@ struct kvm_kernel_irq_routing_entry {
- 			unsigned irqchip;
- 			unsigned pin;
- 		} irqchip;
--		struct msi_msg msi;
-+		struct {
-+			struct msi_msg msi;
-+			u32 devid;
-+		};
- 		struct kvm_s390_adapter_int adapter;
- 	};
- 	struct hlist_node link;
+diff --git a/virt/kvm/irqchip.c b/virt/kvm/irqchip.c
+index 21c1424..e678f8a 100644
+--- a/virt/kvm/irqchip.c
++++ b/virt/kvm/irqchip.c
+@@ -72,9 +72,17 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
+ {
+ 	struct kvm_kernel_irq_routing_entry route;
+ 
+-	if (!irqchip_in_kernel(kvm) || msi->flags != 0)
++	if (!irqchip_in_kernel(kvm))
+ 		return -EINVAL;
+ 
++	if (msi->flags & KVM_MSI_VALID_DEVID) {
++		route.devid = msi->devid;
++		route.type = KVM_IRQ_ROUTING_EXTENDED_MSI;
++	} else if (!msi->flags)
++		return -EINVAL;
++
++	/* historically the route.type was not set */
++
+ 	route.msi.address_lo = msi->address_lo;
+ 	route.msi.address_hi = msi->address_hi;
+ 	route.msi.data = msi->data;
 -- 
 1.9.1
