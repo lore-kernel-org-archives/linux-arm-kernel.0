@@ -1,95 +1,137 @@
-From: mcgrof@suse.com (Luis R. Rodriguez)
-Date: Thu, 9 Jul 2015 03:40:20 +0200
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <1436310658.3214.85.camel@hp.com>
-References: <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
- <20150701065948.GA4355@lst.de>
- <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
- <20150701072828.GA4881@lst.de>
- <20150707095012.GQ7021@wotan.suse.de>
- <20150707101330.GJ7557@n2100.arm.linux.org.uk>
- <20150707160703.GR7021@wotan.suse.de>
- <1436310658.3214.85.camel@hp.com>
-Message-ID: <20150709014020.GA7021@wotan.suse.de>
+From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
+Date: Thu, 9 Jul 2015 09:55:17 +0800
+Subject: [PATCH v5 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
+In-Reply-To: <20150708113455.GF1805@linux>
+References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
+ <1435717005-20012-3-git-send-email-pi-cheng.chen@linaro.org>
+ <20150708113455.GF1805@linux>
+Message-ID: <CALx668Xp051A-BBGwwNxpiQCt318Bh5fnA5jcAXBg-9vPcqpvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 05:10:58PM -0600, Toshi Kani wrote:
-> On Tue, 2015-07-07 at 18:07 +0200, Luis R. Rodriguez wrote:
-> > On Tue, Jul 07, 2015 at 11:13:30AM +0100, Russell King - ARM Linux 
-> > wrote:
->   :
-> > > On ARM, we (probably) have a lot of cases where ioremap() is used 
-> > > multiple
-> > > times for the same physical address space, so we shouldn't rule out 
-> > > having
-> > > multiple mappings of the same type.
-> > 
-> > Why is that done? Don't worry if you are not sure why but only 
-> > speculate of the
-> > practice's existence (sloppy drivers or lazy driver developers). FWIW 
-> > for x86
-> > IIRC I ended up concluding that overlapping ioremap() calls with the 
-> > same type
-> > would work but not if they differ in type.  Although I haven't 
-> > written a
-> > grammer rule to hunt down overlapping ioremap() I suspected its use 
-> > was likely
-> > odd and likely should be reconsidered. Would this be true for ARM too 
-> > ? Or are
-> > you saying this should be a feature ? I don't expect an answer now 
-> > but I'm
-> > saying we *should* all together decide on this, and if you're 
-> > inclined to
-> > believe that this should ideally be avoided I'd like to hear that. If 
-> > you feel
-> > strongly though this should be a feature I would like to know why.
-> 
-> There are multiple mapping interfaces, and overlapping can happen among
-> them as well.  For instance, remap_pfn_range() (and 
-> io_remap_pfn_range(), which is the same as remap_pfn_range() on x86)
-> creates a mapping to user space. The same physical ranges may be
-> mapped to kernel and user spaces.  /dev/mem is one example that may
-> create a user space mapping to a physical address that is already
-> mapped with ioremap() by other module.
+Hi Viresh,
 
-Thanks for the feedback. The restriction seems to be differing cache types
-requirements, other than this, are there any other concerns ? For instance are
-we completley happy with aliasing so long as cache types match everywhere?  I'd
-expect no architecture would want cache types to differ when aliasing, what
-should differ then I think would just be how to verify this and it doesn't seem
-we may be doing this for all architectures.
+On Wed, Jul 8, 2015 at 7:34 PM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> On 01-07-15, 10:16, Pi-Cheng Chen wrote:
+>> This patch implements MT8173 cpufreq driver.
+>
+> Now that you are going to resend this patchset, a few more comments.
+>
+> Please describe your SoC a bit here, so that reviewers know what are
+> we going to implement.
 
-Even for userspace we seem to be covered -- we enable userspace mmap() calls to
-get their mapped space with a cache type, on the kernel we'd say use
-pgprot_writecombine() on the vma->vm_page_prot prior to the
-io_remap_pfn_range() -- that maps to remap_pfn_range() on x86 and as you note
-that checks cache type via reserve_memtype() -- but only on x86...
+Yes. I will add it.
 
-Other than this differing cache type concern are we OK with aliasing in
-userspace all the time ?
+>
+>> +static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
+>> +{
+>> +     struct device *cpu_dev;
+>> +     struct regulator *proc_reg = ERR_PTR(-ENODEV);
+>> +     struct regulator *sram_reg = ERR_PTR(-ENODEV);
+>> +     struct clk *cpu_clk = ERR_PTR(-ENODEV);
+>> +     struct clk *inter_clk = ERR_PTR(-ENODEV);
+>> +     struct dev_pm_opp *opp;
+>> +     unsigned long rate;
+>> +     int ret;
+>> +
+>> +     cpu_dev = get_cpu_device(cpu);
+>> +     if (!cpu_dev) {
+>> +             pr_err("failed to get cpu%d device\n", cpu);
+>> +             return -ENODEV;
+>> +     }
+>> +
+>> +     ret = of_init_opp_table(cpu_dev);
+>> +     if (ret) {
+>> +             pr_warn("no OPP table for cpu%d\n", cpu);
+>> +             return ret;
+>> +     }
+>
+> Initialize opp table only when you know other resources are available.
+> i.e. we aren't going to abort due to EPROBE_DEFER.
 
-If we want to restrict aliasing either for the kernel or userspace mapping
-we might be able to do it, I just want to know if we want to or not care
-at all.
+Will do it.
 
-> pmem and DAX also create mappings to the same NVDIMM ranges.  DAX calls
-> vm_insert_mixed(), which is particularly a problematic since
-> vm_insert_mixed() does not verify aliasing.  ioremap() and remap_pfn_range()
-> call reserve_memtype() to verify aliasing on x86.  reserve_memtype() is
-> x86-specific and there is no arch-generic wrapper for such check.
+>
+>> +     cpu_clk = clk_get(cpu_dev, "cpu");
+>> +     if (IS_ERR(cpu_clk)) {
+>> +             if (PTR_ERR(cpu_clk) == -EPROBE_DEFER)
+>> +                     pr_warn("cpu clk for cpu%d not ready, retry.\n", cpu);
+>> +             else
+>> +                     pr_err("failed to get cpu clk for cpu%d\n", cpu);
+>> +
+>> +             ret = PTR_ERR(cpu_clk);
+>> +             goto out_free_opp_table;
+>> +     }
+>> +}
+>
+>
+>> +static int mt8173_cpufreq_probe(struct platform_device *pdev)
+>> +{
+>> +     int ret;
+>> +
+>> +     ret = cpufreq_register_driver(&mt8173_cpufreq_driver);
+>> +     if (ret)
+>> +             pr_err("failed to register mtk cpufreq driver\n");
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static struct platform_driver mt8173_cpufreq_platdrv = {
+>> +     .driver = {
+>> +             .name   = "mt8173-cpufreq",
+>> +     },
+>> +     .probe          = mt8173_cpufreq_probe,
+>> +};
+>> +
+>> +static int mt8173_cpufreq_driver_init(void)
+>> +{
+>> +     struct platform_device *pdev;
+>> +     int err;
+>> +
+>> +     if (!of_machine_is_compatible("mediatek,mt8173"))
+>> +             return -ENODEV;
+>
+> Why do you need to check this ? Its going to be the right SoC, others
+> can't even compile it.
 
-As clarified by Matthew Wilcox via commit d92576f1167cacf7844 ("dax: does not
-work correctly with virtual aliasing caches") caches are virtually mapped for
-some architectures, it seems it should be possible to fix this for DAX somehow
-though.
+Originally I was thinking this driver should be generic to other Mediatek
+SoCs, so I add this check to filter out those SoCs that are not yet
+confirmed with this driver supported. Since it's targeted to MT8173 only
+now, I will remove this check.
 
-> I think DAX could get a cache type from pmem to keep them in sync, though.
+>
+>> +     err = platform_driver_register(&mt8173_cpufreq_platdrv);
+>> +     if (err)
+>> +             return err;
+>> +
+>> +     pdev = platform_device_register_simple("mt8173-cpufreq", -1, NULL, 0);
+>> +     if (IS_ERR(pdev)) {
+>> +             pr_err("failed to register mtk-cpufreq platform device\n");
+>> +             return PTR_ERR(pdev);
+>> +     }
+>
+> This is simply crap. You register the driver and then its device from
+> the same function. If you are so sure that this driver is required,
+> then why to get into the shit of device-driver model ?
+>
+> Just call cpufreq_register_driver() from here :), no device/driver
+> required.
 
-pmem is x86 specific right now, are other folks going to expose something
-similar ? Otherwise we seem to only be addressing these deep concerns for
-x86 so far.
+That's what I did in previous version. But the reason I use the device-
+driver model is to handle the defer probing issue. Since there's no
+arch/arm64/mach-mediatek/ directory to hold the device registration
+code anymore, no device tree way to match cpufreq driver
+(please correct me if there's any), and initcall seems not handle
+defer probing either, therefore I put both device and driver
+registration in this function. I know it's crappy. :(
+Do you have any suggestion to do it right and handle defer probing
+properly?
 
- Luis
+Thanks.
+
+Best Regards,
+Pi-Cheng
+
+>
+> --
+> viresh
