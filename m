@@ -1,43 +1,41 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu,  9 Jul 2015 11:57:12 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-Message-ID: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 9 Jul 2015 14:03:10 +0300
+Subject: [RFC Patch V1 02/12] MIPS, PCI: Use for_pci_msi_entry() to access
+ MSI device list
+In-Reply-To: <1436428847-8886-3-git-send-email-jiang.liu@linux.intel.com>
+References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+ <1436428847-8886-3-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <559E54EE.7090504@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-sufficient to inhibit pl011_int() from being triggered by a local
-IRQ and trying to re-take the same lock.  This can lead to
-deadlocks.
+Hello.
 
-This patch uses the _irq() locking variants instead to ensure that
-pl011_int() handling for a given port is deferred until any
-pl011_tx_softirq() work for that port is complete.
+On 7/9/2015 11:00 AM, Jiang Liu wrote:
 
-Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Tested-by: Robin Murphy <robin.murphy@arm.com>
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-Cc: stable <stable@vger.kernel.org> # 4.1
----
- drivers/tty/serial/amba-pl011.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> Use accessor for_pci_msi_entry() to access MSI device list, so we could
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 763eb20..0cc622a 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -1360,9 +1360,9 @@ static void pl011_tx_softirq(struct work_struct *work)
- 	struct uart_amba_port *uap =
- 		container_of(dwork, struct uart_amba_port, tx_softirq_work);
- 
--	spin_lock(&uap->port.lock);
-+	spin_lock_irq(&uap->port.lock);
- 	while (pl011_tx_chars(uap)) ;
--	spin_unlock(&uap->port.lock);
-+	spin_unlock_irq(&uap->port.lock);
- }
- 
- static void pl011_tx_irq_seen(struct uart_amba_port *uap)
--- 
-1.7.10.4
+     Maybe for_each_pci_msi_entry()?
+
+> easily move msi_list from struct pci_dev into struct device later.
+
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>   arch/mips/pci/msi-octeon.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+
+> diff --git a/arch/mips/pci/msi-octeon.c b/arch/mips/pci/msi-octeon.c
+> index cffaaf4aae3c..2a5bb849b10e 100644
+> --- a/arch/mips/pci/msi-octeon.c
+> +++ b/arch/mips/pci/msi-octeon.c
+> @@ -200,7 +200,7 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>   	if (type == PCI_CAP_ID_MSI && nvec > 1)
+>   		return 1;
+>
+> -	list_for_each_entry(entry, &dev->msi_list, list) {
+> +	for_each_pci_msi_entry(entry, dev) {
+>   		ret = arch_setup_msi_irq(dev, entry);
+>   		if (ret < 0)
+>   			return ret;
+
+WBR, Sergei
