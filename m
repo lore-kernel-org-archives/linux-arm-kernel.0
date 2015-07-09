@@ -1,38 +1,49 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 09 Jul 2015 22:19:08 +0200
-Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
-In-Reply-To: <20150709195944.GA4470@vaishali-Ideapad-Z570>
-References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
-Message-ID: <1436473148.20619.116.camel@tiscali.nl>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu,  9 Jul 2015 22:19:05 +0200
+Subject: [PATCH v4 0/2] NXP SPIFI driver for LPC18xx/43xx familiy
+Message-ID: <1436473147-31063-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On vr, 2015-07-10 at 01:29 +0530, Vaishali Thakkar wrote:
-> --- a/drivers/hwtracing/coresight/coresight-replicator.c
-> +++ b/drivers/hwtracing/coresight/coresight-replicator.c
+This patch set adds a SPI-NOR driver for the NXP SPI Flash (SPIFI)
+controller that can be found on newer NXP MCUs. For example on the
+LPC18xx and LPC43xx familiy.
 
-> -static int __init replicator_init(void)
-> -{
-> -	return platform_driver_register(&replicator_driver);
-> -}
-> -module_init(replicator_init);
-> -
-> -static void __exit replicator_exit(void)
-> -{
-> -	platform_driver_unregister(&replicator_driver);
-> -}
-> -module_exit(replicator_exit);
-> +module_platform_driver(replicator_driver);
+NXP SPIFI is a specialized SPI interface for serial Flash devices.
+It supports one Flash device with 1-, 2- and 4-bits width in SPI
+mode 0 or 3. The controller operates in either command or memory
+mode. In memory mode the Flash is made accessible for the CPU as
+normal memory.
 
-coresight-replicator.o is built if CONFIG_CORESIGHT_LINKS_AND_SINKS is
-defined. CORESIGHT_LINKS_AND_SINKS is a bool symbol. It depends on
-CORESIGHT, which is also a bool symbol. CORESIGHT is a top level symbol,
-available on arm and arm64.
+This version fix a bug in the write function discovered during
+testing with JFFS2.
 
-I think coresight-replicator.o can only be built-in. So I suggest to use
-builtin_platform_driver() instead.
+Changes since v3:
+ - fix bug in write function
+ - rebase on 4.2-rc1
 
-Thanks,
+Changes since v2:
+ - default to auto detection unless chip is specified
+ - update doc with reference to jedec,spi-nor.txt
 
+Changes since v1:
+ - use readb_poll_timeout instead of open coding
+ - cache current mode (memory/command)
+ - depend on HAS_IOMEM
+ - removed stray white space
+ - removed leftover debug print
 
-Paul Bolle
+Joachim Eastwood (2):
+  mtd: spi-nor: add driver for NXP SPI Flash Interface (SPIFI)
+  doc: dt: add documentation for nxp,lpc1773-spifi
+
+ .../devicetree/bindings/mtd/nxp-spifi.txt          |  58 +++
+ drivers/mtd/spi-nor/Kconfig                        |  11 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/nxp-spifi.c                    | 494 +++++++++++++++++++++
+ 4 files changed, 564 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/nxp-spifi.txt
+ create mode 100644 drivers/mtd/spi-nor/nxp-spifi.c
+
+-- 
+1.8.0
