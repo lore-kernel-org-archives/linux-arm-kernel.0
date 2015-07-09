@@ -1,54 +1,283 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Jul 2015 16:44:30 +0100
-Subject: [PATCH v2 0/9] regulator: pwm-regulator: Introduce continuous-mode
-In-Reply-To: <20150709151429.6daf8fcb@bbrezillon>
-References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
- <20150709083041.3b203eb1@bbrezillon> <20150709115158.GA3445@x1>
- <20150709151429.6daf8fcb@bbrezillon>
-Message-ID: <20150709154430.GC3445@x1>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 09 Jul 2015 17:43:39 +0200
+Subject: [PATCH v2 5/7] ARM: dts: Exynos4x12: add CPU OPP and regulator supply
+ property
+In-Reply-To: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <1436456621-29839-6-git-send-email-b.zolnierkie@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > Lee Jones <lee.jones@linaro.org> wrote:
-> > > 
-> > > > This patch-set has been rebased on to topic/pwm.
-> > > >   
-> > > > Continuous mode uses the PWM regulator's maximum and minimum supplied
-> > > > voltages specified in the regulator-{min,max}-microvolt properties to
-> > > > calculate appropriate duty-cycle values.  This allows for a much more
-> > > > fine grained solution when compared with voltage-table mode, which
-> > > > this driver already supports.  This solution does make an assumption
-> > > > that a %50 duty-cycle value will cause the regulator voltage to run
-> > > > at half way between the supplied max_uV and min_uV values.
-> > > 
-> > > Well, I'm not sure this assumption works for all pwm driven regulators.
-> > > What if your regulator does not react linearly to the PWM duty-cycle
-> > > config ?
-> > > 
-> > > How about addressing that by using all the entries of the
-> > > voltage<->duty table association and doing the linear interpolation
-> > > between the provided points instead of doing it on the min -> max
-> > > range ?
-> > 
-> > If you wish to add a 3rd mode, then I'm sure Mark will accept
-> > submissions, but I think what you are suggesting would be pretty
-> > complex and out-of-scope of what this patch-set is trying to achieve.
-> 
-> Okay, still don't get the need to add a new mode which is almost doing
-> the same thing when we could have implemented it in a generic way in the
-> first place. But if your version has already been accepted then I think
-> I'll have to propose a new mode :-/.
+For Exynos4x12 platforms, add CPU operating points (using
+opp-v2 bindings) and CPU regulator supply properties for
+migrating from Exynos specific cpufreq driver to using
+generic cpufreq driver.
 
-This solution is very generic.  What you're suggesting is pretty
-non-standard I think.  This solution specifically doesn't account for
-wonky/non-linear PWM regulators -- that's why I made the effort to
-write it as an explicit assumption.
+Based on the earlier work by Thomas Abraham.
 
-FYI, I just sent a patch amending the binding documentation.  It
-should prevent any further confusion.
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Doug Anderson <dianders@chromium.org>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Andreas Faerber <afaerber@suse.de>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+---
+ arch/arm/boot/dts/exynos4212.dtsi               | 81 ++++++++++++++++++++++++
+ arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 ++
+ arch/arm/boot/dts/exynos4412-origen.dts         |  5 ++
+ arch/arm/boot/dts/exynos4412-trats2.dts         |  5 ++
+ arch/arm/boot/dts/exynos4412.dtsi               | 83 +++++++++++++++++++++++++
+ 5 files changed, 178 insertions(+)
 
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index d9c8efee..9dc40d5 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -30,6 +30,9 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA00>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			operating-points-v2 = <&cpu0_opp_table>;
+ 			cooling-min-level = <13>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -39,6 +42,84 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA01>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp00 {
++			opp-hz = <200000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp01 {
++			opp-hz = <300000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp02 {
++			opp-hz = <400000000>;
++			opp-microvolt = <925000>;
++			clock-latency-ns = <200000>;
++		};
++		opp03 {
++			opp-hz = <500000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <200000>;
++		};
++		opp04 {
++			opp-hz = <600000000>;
++			opp-microvolt = <975000>;
++			clock-latency-ns = <200000>;
++		};
++		opp05 {
++			opp-hz = <700000000>;
++			opp-microvolt = <987500>;
++			clock-latency-ns = <200000>;
++		};
++		opp06 {
++			opp-hz = <800000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <200000>;
++		};
++		opp07 {
++			opp-hz = <900000000>;
++			opp-microvolt = <1037500>;
++			clock-latency-ns = <200000>;
++		};
++		opp08 {
++			opp-hz = <1000000000>;
++			opp-microvolt = <1087500>;
++			clock-latency-ns = <200000>;
++		};
++		opp09 {
++			opp-hz = <1100000000>;
++			opp-microvolt = <1137500>;
++			clock-latency-ns = <200000>;
++		};
++		opp10 {
++			opp-hz = <1200000000>;
++			opp-microvolt = <1187500>;
++			clock-latency-ns = <200000>;
++		};
++		opp11 {
++			opp-hz = <1300000000>;
++			opp-microvolt = <1250000>;
++			clock-latency-ns = <200000>;
++		};
++		opp12 {
++			opp-hz = <1400000000>;
++			opp-microvolt = <1287500>;
++			clock-latency-ns = <200000>;
++		};
++		opp13 {
++			opp-hz = <1500000000>;
++			opp-microvolt = <1350000>;
++			clock-latency-ns = <200000>;
++			turbo-mode;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+index ca7d168..1c7811a 100644
+--- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
++++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+@@ -507,3 +507,7 @@
+ &watchdog {
+ 	status = "okay";
+ };
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+index 84c7631..21150b4 100644
+--- a/arch/arm/boot/dts/exynos4412-origen.dts
++++ b/arch/arm/boot/dts/exynos4412-origen.dts
+@@ -532,3 +532,8 @@
+ &watchdog {
+ 	status = "okay";
+ };
++
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index afc199d..1ee43456 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -1313,3 +1313,8 @@
+ 	vtmu-supply = <&ldo10_reg>;
+ 	status = "okay";
+ };
++
++
++&cpu0 {
++	cpu0-supply = <&buck2_reg>;
++};
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index b78ada7..cead3a7 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -30,6 +30,9 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA00>;
++			clocks = <&clock CLK_ARM_CLK>;
++			clock-names = "cpu";
++			operating-points-v2 = <&cpu0_opp_table>;
+ 			cooling-min-level = <13>;
+ 			cooling-max-level = <7>;
+ 			#cooling-cells = <2>; /* min followed by max */
+@@ -39,18 +42,98 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA01>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at A02 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA02>;
++			operating-points-v2 = <&cpu0_opp_table>;
+ 		};
+ 
+ 		cpu at A03 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a9";
+ 			reg = <0xA03>;
++			operating-points-v2 = <&cpu0_opp_table>;
++		};
++	};
++
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++		opp-shared;
++
++		opp00 {
++			opp-hz = <200000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp01 {
++			opp-hz = <300000000>;
++			opp-microvolt = <900000>;
++			clock-latency-ns = <200000>;
++		};
++		opp02 {
++			opp-hz = <400000000>;
++			opp-microvolt = <925000>;
++			clock-latency-ns = <200000>;
++		};
++		opp03 {
++			opp-hz = <500000000>;
++			opp-microvolt = <950000>;
++			clock-latency-ns = <200000>;
++		};
++		opp04 {
++			opp-hz = <600000000>;
++			opp-microvolt = <975000>;
++			clock-latency-ns = <200000>;
++		};
++		opp05 {
++			opp-hz = <700000000>;
++			opp-microvolt = <987500>;
++			clock-latency-ns = <200000>;
++		};
++		opp06 {
++			opp-hz = <800000000>;
++			opp-microvolt = <1000000>;
++			clock-latency-ns = <200000>;
++		};
++		opp07 {
++			opp-hz = <900000000>;
++			opp-microvolt = <1037500>;
++			clock-latency-ns = <200000>;
++		};
++		opp08 {
++			opp-hz = <1000000000>;
++			opp-microvolt = <1087500>;
++			clock-latency-ns = <200000>;
++		};
++		opp09 {
++			opp-hz = <1100000000>;
++			opp-microvolt = <1137500>;
++			clock-latency-ns = <200000>;
++		};
++		opp10 {
++			opp-hz = <1200000000>;
++			opp-microvolt = <1187500>;
++			clock-latency-ns = <200000>;
++		};
++		opp11 {
++			opp-hz = <1300000000>;
++			opp-microvolt = <1250000>;
++			clock-latency-ns = <200000>;
++		};
++		opp12 {
++			opp-hz = <1400000000>;
++			opp-microvolt = <1287500>;
++			clock-latency-ns = <200000>;
++		};
++		opp13 {
++			opp-hz = <1500000000>;
++			opp-microvolt = <1350000>;
++			clock-latency-ns = <200000>;
++			turbo-mode;
+ 		};
+ 	};
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
