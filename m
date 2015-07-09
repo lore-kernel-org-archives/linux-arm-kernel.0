@@ -1,92 +1,112 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Jul 2015 14:03:35 +0200
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150709120335.GW28632@lukather>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 9 Jul 2015 14:05:31 +0200
+Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
+ once guest is running
+In-Reply-To: <CAFEAcA-4rMB6i2=UBXjxTAHQWn5xMiCSiaYbknuXOuHmf4XY_A@mail.gmail.com>
+References: <558BC90B.4060806@huawei.com> <558CD9DE.3010609@web.de>
+ <55917E5B.3030401@huawei.com>
+ <CAFEAcA-vS8B8pJUSseFw0OaKJFPe-0rMT-XHxjNbSvyxaZ+9Tg@mail.gmail.com>
+ <559D483A.40507@arm.com>
+ <CAFEAcA-U1mEGy87ax4Cb1MLFcEP+sqc9BL_Q0hO6qg1J3FCMew@mail.gmail.com>
+ <559D51C5.3070600@arm.com>
+ <CAFEAcA-rWf5UkiP+5UbtjYihfhDOVaY4hVpXNRGMnYEhNWqwSQ@mail.gmail.com>
+ <20150709102201.GH13530@cbox>
+ <CAFEAcA-4rMB6i2=UBXjxTAHQWn5xMiCSiaYbknuXOuHmf4XY_A@mail.gmail.com>
+Message-ID: <20150709120531.GL13530@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 09, 2015 at 06:15:46PM +0800, Josh Wu wrote:
-> As since sama5d3, to reset the chip, we don't need to shutdown the ddr
-> controller.
+On Thu, Jul 09, 2015 at 11:38:40AM +0100, Peter Maydell wrote:
+> On 9 July 2015 at 11:22, Christoffer Dall <christoffer.dall@linaro.org> wrote:
+> > On Wed, Jul 08, 2015 at 08:13:59PM +0100, Peter Maydell wrote:
+> >> I suspect Jan is right and we really need to distinguish
+> >> the KVM_PUT_*_STATE levels in ARM QEMU. This probably
+> >> implies some kind of whitelist/override mechanism, since
+> >> by and large we neither know nor want to know the
+> >> semantics for system registers, we leave that up to the
+> >> kernel.
+> >>
+> >> Q: if you have a running VM, and you pause it for
+> >> an hour, what should the CNTVCT register do? Presumably
+> >> it should not advance, but how do we arrange for that
+> >> to happen?
 > 
-> So add a new compatible string and new restart function for sama5d3 and
-> later chips. As we don't use sama5d3 ddr controller, so remove it as
-> well.
+> > I think the CNTVCT should not advance when the VM is not scheduled, so
+> > if we pause the VM or starve all the VCPUs for enough time, the guest
+> > should not see time progressing, since otherwise the guest scheduler
+> > cannot maintain fairness and you're bound to see spurious RCU stalls
+> > etc.
+> >
+> > That's exactly why a guest can read both a virtual and physical counter
+> > and it is an area where you simply want some level of
+> > paravirtualization.  I haven't studied how/if Linux deals with this at
+> > all.
+> >
+> > So I think adjusting CNTVOFF should be managed by the kernel for the
+> > pause/starvation scenario (which I think Avi once told me x86 does too -
+> > does anyone know the current state of the art?).
 > 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
+> Agreed that we should be aiming for same behaviour as x86
+> rather than reinventing the wheel...
 > 
->  drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
->  1 file changed, 21 insertions(+), 9 deletions(-)
+> > So the only situation where I think userspace should adjust the CNTVOFF
+> > value is for migration where we are talking about a brand new VM with
+> > has_run_once clear.
 > 
-> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> index 36dc52f..8944b63 100644
-> --- a/drivers/power/reset/at91-reset.c
-> +++ b/drivers/power/reset/at91-reset.c
-> @@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
->  	return NOTIFY_DONE;
->  }
->  
-> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
-> +			void *cmd)
-> +{
-> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
-> +				at91_rstc_base);
-> +	return NOTIFY_DONE;
-> +}
-> +
->  static void __init at91_reset_status(struct platform_device *pdev)
->  {
->  	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
-> @@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
->  static const struct of_device_id at91_ramc_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-sdramc", },
->  	{ .compatible = "atmel,at91sam9g45-ddramc", },
-> -	{ .compatible = "atmel,sama5d3-ddramc", },
->  	{ /* sentinel */ }
->  };
->  
->  static const struct of_device_id at91_reset_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
->  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
-> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
->  	{ /* sentinel */ }
->  };
->  
-> @@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	for_each_matching_node(np, at91_ramc_of_match) {
-> -		at91_ramc_base[idx] = of_iomap(np, 0);
-> -		if (!at91_ramc_base[idx]) {
-> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
-> -			return -ENODEV;
-> +	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
-> +	at91_restart_nb.notifier_call = match->data;
-> +
-> +	if (match->data != sama5d3_restart) {
+> For incoming migration/loadvm the VM will be freshly *reset*,
+> but it will not be completely created from scratch. It's
+> possible for the user to run a VM for a bit, and then use
+> "loadvm" from the monitor to load an old snapshot. This
+> will do a qemu_system_reset() and then restore the state.
+> So in that case has_run_once won't be clear. (Would it be
+> OK to clear it when userspace does VCPU_INIT? What else
+> does it control?)
 
-Using of_device_is_compatible seems more appropriate.
+We would have to introduce another flag.  It is currently used to only
+map the VGIC resources once (we have to do this before running the VCPU
+the first time because only then do we have the required info of where
+to map the resources etc.), and we use it to enforce that the user
+doesn't initialize a VCPU with one setting, and then initialize it with
+a different setting afterwards (for example with power-on state or the
+emulated CPU target).
 
-Also, why are you changing the order of this loop and the notifier
-registration?
+> 
+> > Thus, if we were designing this from scratch now, the API should
+> > be to return an error when trying to set KVM_REG_ARM_TIMER_CNT after the
+> > VM has run once, but it's too late for that as we would break userspace.
+> > The best alternative IMHO would be to merge Marc's patch and fix CNTVOFF
+> > in the kernel side as well, and finally also fix QEMU so that it doesn't
+> > try to do the thing that future kernels will ignore.
+> 
+> Isn't Marc's patch causing us to return an error to userspace?
+> (It does a 'return -1', at least -- does that get ignored at
+> a higher level?)
 
-Maxime
+I remembered it as it simply ignored it, but you're right, it returns -1
+to userspace (which is a strange thing we do in arch_timer.c, I'm not
+sure why we return -EPERM here - probably a bug).
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150709/56e3802f/attachment.sig>
+So that can't work obviously, because it will regress userspace.
+
+> 
+> In principle, if userspace does:
+>  * stop all vCPUs
+>  * read the counter values from each vCPU
+>  * write the counter values back to each vCPU
+>  * resume vCPUs
+> 
+> this shouldn't cause time to do funny things, should it?
+
+No, it shouldn't.
+
+> (ie the problem only occurs if we try to write the vCPU
+> counter value while only one vCPU is stopped).
+> 
+
+As I understand it, the problem is that if we ever run a VCPU after
+reading the value, and write back the value afterwards, you potentially
+make time go backwards and get inconsistent views of time from different
+VCPUs because they may have read the time before/after updating the
+CNTVOFF.
+
+-Christoffer
