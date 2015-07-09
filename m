@@ -1,53 +1,80 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Thu, 9 Jul 2015 09:58:10 +0200
-Subject: [PATCH] i2c: core: only use set_scl for bus recovery after
- calling prepare_recovery
-In-Reply-To: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
-References: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
-Message-ID: <559E2992.7050203@nokia.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Thu,  9 Jul 2015 16:00:35 +0800
+Subject: [RFC Patch V1 00/12] Reorganize struct msi_desc to prepare for
+ support of generic MSI
+Message-ID: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Recently Marc Zyngier <marc.zyngier@arm.com> has posted a patch set at
+https://lkml.org/lkml/2015/7/7/712
+to enhance PCI MSI code to support generic MSI.
 
-On 08/07/15 16:35, ext Jan Luebbe wrote:
-> Using set_scl may be ineffective before calling the driver specific
-> prepare_recovery callback, which might change into a test mode. So
-> instead of setting SCL in i2c_generic_scl_recovery, move it to
-> i2c_generic_recovery (after the optional prepare_recovery).
-> 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+This is a companion patch set to refine struct msi_desc and related data
+structures to support generic MSI, and it would be better to combined with
+Marc's patch set.  It's also requested by
+Stuart Yoder <stuart.yoder@freescale.com>
 
-Makes sense,
-Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+It first introduces a helper function msi_desc_to_pci_sysdata(), and
+convert current PCI drivers to use helper functions to access fields
+in struct msi_desc.
+Then it moves msi_list from struct pci_dev into struct device and
+refines struct msi_desc.
+At last it moves alloc_msi_entry() into kernel/irq/msi.c for reuse.
 
-> ---
->  drivers/i2c/i2c-core.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
-> index 069a41f116dd..be992b3e0be8 100644
-> --- a/drivers/i2c/i2c-core.c
-> +++ b/drivers/i2c/i2c-core.c
-> @@ -567,6 +567,9 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
->  	if (bri->prepare_recovery)
->  		bri->prepare_recovery(adap);
->  
-> +	bri->set_scl(adap, val);
-> +	ndelay(RECOVERY_NDELAY);
-> +
->  	/*
->  	 * By this time SCL is high, as we need to give 9 falling-rising edges
->  	 */
-> @@ -597,7 +600,6 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
->  
->  int i2c_generic_scl_recovery(struct i2c_adapter *adap)
->  {
-> -	adap->bus_recovery_info->set_scl(adap, 1);
->  	return i2c_generic_recovery(adap);
->  }
->  EXPORT_SYMBOL_GPL(i2c_generic_scl_recovery);
+Currently msi_desc_to_pci_sysdata() and msi_desc_to_pci_dev() are
+implemented as normal functions instead of inlines to avoid header file
+inclusion issue. If inlined version is preferred for performance, we could
+move all of first_pci_msi_entry, for_each_pci_msi_entry, msi_desc_to_pci_dev
+and msi_desc_to_pci_sysdata from linxu/kernel/msi.h into linux/kernel/pci.h.
+
+This patch set is based on v4.2-rc1 and passes 0day test suite. You
+may access the code at:
+https://github.com/jiangliu/linux.git msi_desc_v1
+
+Thanks!
+Gerry
+
+Jiang Liu (12):
+  PCI: Add helper function msi_desc_to_pci_sysdata()
+  MIPS, PCI: Use for_pci_msi_entry() to access MSI device list
+  PowerPC, PCI: Use for_pci_msi_entry() to access MSI device list
+  s390/pci: Use for_pci_msi_entry() to access MSI device list
+  x86, PCI: Use for_pci_msi_entry() to access MSI device list
+  PCI: Use for_pci_msi_entry() to access MSI device list
+  sparc, PCI: Use helper functions to access fields in struct msi_desc
+  PCI: Use helper functions to access fields in struct msi_desc
+  genirq: Move msi_list from struct pci_dev to struct device
+  genirq, PCI: Store 'struct device *' instead 'struct pci_dev *' in
+    struct msi_desc
+  genirq, PCI: Reorginize struct msi_desc to prepare for support of
+    generic MSI
+  genirq, PCI: Move alloc_msi_entry() from PCI MSI code into generic
+    MSI code
+
+ arch/mips/pci/msi-octeon.c             |    2 +-
+ arch/powerpc/platforms/cell/axon_msi.c |    6 +--
+ arch/powerpc/platforms/pasemi/msi.c    |    4 +-
+ arch/powerpc/platforms/powernv/pci.c   |    4 +-
+ arch/powerpc/platforms/pseries/msi.c   |    6 +--
+ arch/powerpc/sysdev/fsl_msi.c          |    4 +-
+ arch/powerpc/sysdev/mpic_u3msi.c       |    4 +-
+ arch/powerpc/sysdev/ppc4xx_hsta_msi.c  |    4 +-
+ arch/powerpc/sysdev/ppc4xx_msi.c       |    4 +-
+ arch/s390/pci/pci.c                    |    6 +--
+ arch/sparc/kernel/pci.c                |    2 +-
+ arch/x86/pci/xen.c                     |    8 ++--
+ drivers/base/core.c                    |    3 ++
+ drivers/pci/host/pci-keystone-dw.c     |    6 +--
+ drivers/pci/host/pcie-designware.c     |    4 +-
+ drivers/pci/host/pcie-xilinx.c         |   12 ++---
+ drivers/pci/msi.c                      |   82 +++++++++++++++++---------------
+ drivers/pci/xen-pcifront.c             |    2 +-
+ include/linux/device.h                 |    4 ++
+ include/linux/msi.h                    |   55 +++++++++++----------
+ include/linux/pci.h                    |    1 -
+ kernel/irq/msi.c                       |   17 +++++++
+ 22 files changed, 136 insertions(+), 104 deletions(-)
 
 -- 
-Best regards,
-Alexander Sverdlin.
+1.7.10.4
