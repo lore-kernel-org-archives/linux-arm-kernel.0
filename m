@@ -1,34 +1,67 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 09 Jul 2015 21:08:36 +0300
-Subject: [PATCH v2 0/7] KVM: arm/arm64: gsi routing support
-In-Reply-To: <559EAB3D.2080205@linaro.org>
-References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
- <023601d0ba54$c4d6e020$4e84a060$@samsung.com> <559E927E.8040403@arm.com>
- <026801d0ba5f$43a79520$caf6bf60$@samsung.com> <559EAB3D.2080205@linaro.org>
-Message-ID: <028401d0ba72$4736dbc0$d5a49340$@samsung.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 10 Jul 2015 01:16:37 +0800
+Subject: [PATCH v3 0/7] add basic support for i.mx6 ul chip 
+Message-ID: <1436462204-32654-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Well personally I prefer the type thing and I don't see much difference
-> at userspace level anyway. But I am not this kind of hyperspace
-> architect guy. So, since there is no consensus here, I would say let's
-> wait for formal reviews of our maintainers and I will align.
+From: Frank Li <Frank.Li@freescale.com>
 
- Hah, okay... Don't take it for too much. Anyway your word weighs much more than my one...
+Add basic function support i.mx6ul.
+add simple dts.
+add full pin function define
+add clock support.
+add low level debug
 
-> hope this eventually works with
-> ITS ;-)
+Change from v2 to v3:
+ - Remove pinctrl patch in list because shawn already acked.
+ - UPdate dts file according to shawn's feedback.
+ - Update Document according to shawn's feedback.
+ - update pinfun.h, change to low case. use space after define
+ - add soc_id
 
- You know... There are actually problems with irqfd. However i'm not sure whether they are result of
-some bug or of poorly made vGIC CPU interface software emulation. I don't have hardware with working
-vGICv3 here. With GICv2m everything is fine, but code path is quite different, and LPI != SPI.
- This is further overcomplicated by the fact that as soon as i start up the profiler, the problem
-goes away. Looks like increased number of context switches have impact.
- Actually, the problem is very poor vhost-net throughput, which jumps up when i start the profiler
-and goes back down when i stop it. Just to note...
- I'm off since now for a small vacation, will be back on monday or tuesday. See you guys!
+Change from v1 to v2:
+ - Remove unnecessary clk_register_clkdev for gpt
+ - use fat iomux in dts
+ - use macro GPIO_ACTIVE_LOW
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Anson Huang (1):
+  ARM: imx: add low-level debug support for i.mx6ul
+
+Frank Li (6):
+  ARM: imx: add i.mx6ul msl support
+  ARM: imx: add imx6ul clk tree support
+  Document: dt: binding: imx: update document for imx6ul support
+  ARM: dts: add i.mx6ul pin function include file
+  ARM: dts: imx: add imx6ul and imx6ul evk board support
+  ARM: imx: imx_v6_v7_defconfig enable imx6ul support
+
+ .../devicetree/bindings/clock/imx6ul-clock.txt     |  13 +
+ .../bindings/pinctrl/fsl,imx6ul-pinctrl.txt        |  36 +
+ arch/arm/Kconfig.debug                             |   9 +
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts             | 278 ++++++
+ arch/arm/boot/dts/imx6ul-pinfunc.h                 | 938 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi                      | 607 +++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+ arch/arm/include/debug/imx-uart.h                  |  13 +
+ arch/arm/mach-imx/Kconfig                          |   8 +
+ arch/arm/mach-imx/Makefile                         |   1 +
+ arch/arm/mach-imx/cpu.c                            |   3 +
+ arch/arm/mach-imx/mach-imx6ul.c                    |  43 +
+ arch/arm/mach-imx/mxc.h                            |   6 +
+ drivers/clk/imx/Makefile                           |   1 +
+ drivers/clk/imx/clk-imx6ul.c                       | 432 ++++++++++
+ include/dt-bindings/clock/imx6ul-clock.h           | 240 ++++++
+ 17 files changed, 2631 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/imx6ul-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/fsl,imx6ul-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/imx6ul-14x14-evk.dts
+ create mode 100644 arch/arm/boot/dts/imx6ul-pinfunc.h
+ create mode 100644 arch/arm/boot/dts/imx6ul.dtsi
+ create mode 100644 arch/arm/mach-imx/mach-imx6ul.c
+ create mode 100644 drivers/clk/imx/clk-imx6ul.c
+ create mode 100644 include/dt-bindings/clock/imx6ul-clock.h
+
+-- 
+1.9.1
