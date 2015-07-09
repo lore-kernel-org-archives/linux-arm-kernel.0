@@ -1,27 +1,22 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 9 Jul 2015 10:47:04 +0530
-Subject: [PATCH v5 2/2] cpufreq: mediatek: Add MT8173 cpufreq driver
-In-Reply-To: <CALx668Xp051A-BBGwwNxpiQCt318Bh5fnA5jcAXBg-9vPcqpvg@mail.gmail.com>
-References: <1435717005-20012-1-git-send-email-pi-cheng.chen@linaro.org>
- <1435717005-20012-3-git-send-email-pi-cheng.chen@linaro.org>
- <20150708113455.GF1805@linux>
- <CALx668Xp051A-BBGwwNxpiQCt318Bh5fnA5jcAXBg-9vPcqpvg@mail.gmail.com>
-Message-ID: <20150709051704.GL1805@linux>
+Date: Thu, 9 Jul 2015 10:48:46 +0530
+Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
+ bindings
+In-Reply-To: <2910042.ys2zsBBKt2@amdc1976>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
+ <2910042.ys2zsBBKt2@amdc1976>
+Message-ID: <20150709051845.GM1805@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-07-15, 09:55, Pi-Cheng Chen wrote:
-> That's what I did in previous version. But the reason I use the device-
-> driver model is to handle the defer probing issue. Since there's no
-> arch/arm64/mach-mediatek/ directory to hold the device registration
-> code anymore, no device tree way to match cpufreq driver
-> (please correct me if there's any), and initcall seems not handle
-> defer probing either, therefore I put both device and driver
-> registration in this function. I know it's crappy. :(
-> Do you have any suggestion to do it right and handle defer probing
-> properly?
+On 08-07-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
+> Isn't using u32 for storing frequency (in Hz) too small by today's
+> standards?
+> 
+> [ Please note that the old v1 binding uses kHz not Hz. ]
 
-Sounds reasonable. Just add proper comment in code to explain that.
+Hmm, probably yes we need it to be u64. Thanks for pointing out.
 
 -- 
 viresh
