@@ -1,146 +1,58 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 9 Jul 2015 15:12:44 -0700
-Subject: [PATCH v3 14/15] PCI/MSI: pci-xgene-msi: Get rid of struct
- msi_controller
-In-Reply-To: <1436289485-28230-15-git-send-email-marc.zyngier@arm.com>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <1436289485-28230-15-git-send-email-marc.zyngier@arm.com>
-Message-ID: <CADaLNDm9o8XH749ocy4eJO=1T_w0AAFa1UZJLiFGrgR=5Aqjcg@mail.gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 09 Jul 2015 15:26:40 -0700
+Subject: [GIT PULL] Allwinner late changes for 4.2
+In-Reply-To: <20150709120458.GX28632@lukather> (Maxime Ripard's message of
+ "Thu, 9 Jul 2015 14:04:58 +0200")
+References: <20150705203429.GA21927@lukather>
+ <7hk2uacp7i.fsf@deeprootsystems.com> <20150709120458.GX28632@lukather>
+Message-ID: <7hmvz5arxb.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 10:18 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> The XGene MSI driver only uses the msi_controller structure as
-> a way to match the host bridge  with its MSI HW, and thus the
-> msi_domain.
->
-> But now that we can directly associate an msi_domain with a device,
-> there is no use keeping this msi_controller around.
->
-> Just remove all traces of msi_controller from the driver.
->
-Thanks, Marc.
+Maxime Ripard <maxime.ripard@free-electrons.com> writes:
 
-I tested this patch set and it works on my APM X-Gene evaluation platform.
+> Hi Kevin,
+>
+> On Wed, Jul 08, 2015 at 02:30:09PM -0700, Kevin Hilman wrote:
+>> Maxime Ripard <maxime.ripard@free-electrons.com> writes:
+>> 
+>> > Hi Arnd, Kevin, Olof,
+>> >
+>> > Here is a bunch of late patches (because I forgot about them) for the
+>> > 4.2 merge window.
+>> >
+>> > They're not really controversial, are fixing some issues for the A33
+>> > and H3 not having the reset controller initialised soon enough (by
+>> > adding their compatible to the already existing DT machine), and the
+>> > clock protection code not being run, resulting in the CPU (mainly)
+>> > clock being shut down at the end of the boot.
+>> >
+>> > They've also been in linux-next for quite some time, so I don't expect
+>> > any breakage from them.
+>> 
+>> Hmm, this is just a tad bit late. ;) Even several days after we sent
+>> our own "late" branch to Linus.  I'm afraid this is going to miss
+>> v4.2.
+>
+> Hmmm, I thought you said you wanted them before -rc1 was out?
+>
+>> If there are real fixes in here, feel free to send as separate
+>> patches and I'll queue them for v4.2-rc.
+>
+> Yes, the two patches in mach-sunxi are needed, otherwise the boards
+> using this platform won't even boot. I'll submit them in a separate PR
+> then.
 
-The xgene_pcie_msi_enable (in driver/pci/host/pci-xgene.c), which is
-used to get msi_controller for X-Gene PCIe port,
-also becomes unnecessary with this patch set. I will post a clean-up
-patch when your changes are accepted.
+Nevermind, you're right.  I had forgotten we has already discussed
+this.  Thanks for the reminder.
 
-You can add my tested-by if you want:
+I guess I'm purging my my brain a little early in preparation to
+take some time off (the next 2 weeks.)
 
-Tested-by: Duc Dang <dhdang@apm.com>
+I've pulled this into fixes, and added to for-next.  Should get a PR of
+our fixes branch out to Linus tomorrow, after a spin through
+kernelci.org.
 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/pci/host/pci-xgene-msi.c | 41 ++++++++++++++++------------------------
->  1 file changed, 16 insertions(+), 25 deletions(-)
->
-> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-> index 2d31d4d..ec5a14b 100644
-> --- a/drivers/pci/host/pci-xgene-msi.c
-> +++ b/drivers/pci/host/pci-xgene-msi.c
-> @@ -40,8 +40,8 @@ struct xgene_msi_group {
->
->  struct xgene_msi {
->         struct device_node      *node;
-> -       struct msi_controller   mchip;
-> -       struct irq_domain       *domain;
-> +       struct irq_domain       *inner_domain;
-> +       struct irq_domain       *msi_domain;
->         u64                     msi_addr;
->         void __iomem            *msi_regs;
->         unsigned long           *bitmap;
-> @@ -252,17 +252,17 @@ static const struct irq_domain_ops msi_domain_ops = {
->
->  static int xgene_allocate_domains(struct xgene_msi *msi)
->  {
-> -       msi->domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-> -                                           &msi_domain_ops, msi);
-> -       if (!msi->domain)
-> +       msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-> +                                                 &msi_domain_ops, msi);
-> +       if (!msi->inner_domain)
->                 return -ENOMEM;
->
-> -       msi->mchip.domain = pci_msi_create_irq_domain(msi->mchip.of_node,
-> -                                                     &xgene_msi_domain_info,
-> -                                                     msi->domain);
-> +       msi->msi_domain = pci_msi_create_irq_domain(msi->node,
-> +                                                   &xgene_msi_domain_info,
-> +                                                   msi->inner_domain);
->
-> -       if (!msi->mchip.domain) {
-> -               irq_domain_remove(msi->domain);
-> +       if (!msi->msi_domain) {
-> +               irq_domain_remove(msi->inner_domain);
->                 return -ENOMEM;
->         }
->
-> @@ -271,10 +271,10 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->
->  static void xgene_free_domains(struct xgene_msi *msi)
->  {
-> -       if (msi->mchip.domain)
-> -               irq_domain_remove(msi->mchip.domain);
-> -       if (msi->domain)
-> -               irq_domain_remove(msi->domain);
-> +       if (msi->msi_domain)
-> +               irq_domain_remove(msi->msi_domain);
-> +       if (msi->inner_domain)
-> +               irq_domain_remove(msi->inner_domain);
->  }
->
->  static int xgene_msi_init_allocator(struct xgene_msi *xgene_msi)
-> @@ -340,7 +340,7 @@ static void xgene_msi_isr(unsigned int irq, struct irq_desc *desc)
->                          * CPU0
->                          */
->                         hw_irq = hwirq_to_canonical_hwirq(hw_irq);
-> -                       virq = irq_find_mapping(xgene_msi->domain, hw_irq);
-> +                       virq = irq_find_mapping(xgene_msi->inner_domain, hw_irq);
->                         WARN_ON(!virq);
->                         if (virq != 0)
->                                 generic_handle_irq(virq);
-> @@ -497,7 +497,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
->                 goto error;
->         }
->         xgene_msi->msi_addr = res->start;
-> -
-> +       xgene_msi->node = pdev->dev.of_node;
->         xgene_msi->num_cpus = num_possible_cpus();
->
->         rc = xgene_msi_init_allocator(xgene_msi);
-> @@ -561,19 +561,10 @@ static int xgene_msi_probe(struct platform_device *pdev)
->
->         cpu_notifier_register_done();
->
-> -       xgene_msi->mchip.of_node = pdev->dev.of_node;
-> -       rc = of_pci_msi_chip_add(&xgene_msi->mchip);
-> -       if (rc) {
-> -               dev_err(&pdev->dev, "failed to add MSI controller chip\n");
-> -               goto error_notifier;
-> -       }
-> -
->         dev_info(&pdev->dev, "APM X-Gene PCIe MSI driver loaded\n");
->
->         return 0;
->
-> -error_notifier:
-> -       unregister_hotcpu_notifier(&xgene_msi_cpu_notifier);
->  error:
->         xgene_msi_remove(pdev);
->         return rc;
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
 
-
-
--- 
-Regards,
-Duc Dang.
+Kevin
