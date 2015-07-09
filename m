@@ -1,44 +1,73 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu,  9 Jul 2015 08:55:49 +0530
-Subject: [PATCH V4 6/7] dts: msm8974: Add blsp2_bam dma node
-In-Reply-To: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>
-References: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1436412350-19519-7-git-send-email-sricharan@codeaurora.org>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 9 Jul 2015 11:32:05 +0800
+Subject: [PATCH v2] arm64: dts: mt8173: Add afe device node
+Message-ID: <1436412725-55129-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8974.dtsi | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+This adds afe (audio front end) device node to the MT8173 dtsi file.
 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 37b47b5..f138202 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -1,6 +1,6 @@
- /dts-v1/;
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+This patch is based on Matthias's tree:
+https://github.com/mbgg/linux-mediatek
+branch: v4.2-next/arm64
+
+Changes since v1:
+- change node name to afe: audio-controller at 11220000
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 0696f8f..ce9255a 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/clock/mt8173-clk.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/power/mt8173-power.h>
+ #include <dt-bindings/reset-controller/mt8173-resets.h>
+ #include "mt8173-pinfunc.h"
  
--#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/qcom,gcc-msm8974.h>
- #include "skeleton.dtsi"
- 
-@@ -301,5 +301,15 @@
- 			interrupt-controller;
- 			#interrupt-cells = <4>;
+@@ -393,6 +394,37 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
  		};
 +
-+		blsp2_dma: dma-controller at f9944000 {
-+			compatible = "qcom,bam-v1.4.0";
-+			reg = <0xf9944000 0x19000>;
-+			interrupts = <GIC_SPI 239 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_BLSP2_AHB_CLK>;
-+			clock-names = "bam_clk";
-+			#dma-cells = <1>;
-+			qcom,ee = <0>;
++		afe: audio-controller at 11220000  {
++			compatible = "mediatek,mt8173-afe-pcm";
++			reg = <0 0x11220000 0 0x1000>;
++			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_FALLING>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
++			clocks = <&infracfg CLK_INFRA_AUDIO>,
++				 <&topckgen CLK_TOP_AUDIO_SEL>,
++				 <&topckgen CLK_TOP_AUD_INTBUS_SEL>,
++				 <&topckgen CLK_TOP_APLL1_DIV0>,
++				 <&topckgen CLK_TOP_APLL2_DIV0>,
++				 <&topckgen CLK_TOP_I2S0_M_SEL>,
++				 <&topckgen CLK_TOP_I2S1_M_SEL>,
++				 <&topckgen CLK_TOP_I2S2_M_SEL>,
++				 <&topckgen CLK_TOP_I2S3_M_SEL>,
++				 <&topckgen CLK_TOP_I2S3_B_SEL>;
++			clock-names = "infra_sys_audio_clk",
++				      "top_pdn_audio",
++				      "top_pdn_aud_intbus",
++				      "bck0",
++				      "bck1",
++				      "i2s0_m",
++				      "i2s1_m",
++				      "i2s2_m",
++				      "i2s3_m",
++				      "i2s3_b";
++			assigned-clocks = <&topckgen CLK_TOP_AUD_1_SEL>,
++					  <&topckgen CLK_TOP_AUD_2_SEL>;
++			assigned-clock-parents = <&topckgen CLK_TOP_APLL1>,
++						 <&topckgen CLK_TOP_APLL2>;
 +		};
  	};
  };
+ 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+1.8.1.1.dirty
