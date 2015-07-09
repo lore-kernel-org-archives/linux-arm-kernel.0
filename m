@@ -1,35 +1,45 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Thu, 9 Jul 2015 19:57:04 +0000
-Subject: [PATCH 3/3] ARM: ep93xx: add framebuffer to the defconfig
-In-Reply-To: <1436456606-4963-1-git-send-email-linus.walleij@linaro.org>
-References: <1436456606-4963-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <DC148C5AA1CEBA4E87973D432B1C2D883D4D95BD@P3PWEX4MB008.ex4.secureserver.net>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Fri, 10 Jul 2015 01:29:44 +0530
+Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
+Message-ID: <20150709195944.GA4470@vaishali-Ideapad-Z570>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 09, 2015 8:43 AM, Linus Walleij wrote:
-> The EP93xx SoC has a framebuffer driver, let's add this to the
-> defconfig so we can have graphics working out of the box.
->
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  arch/arm/configs/ep93xx_defconfig | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/configs/ep93xx_defconfig b/arch/arm/configs/ep93xx_defconfig
-> index e684386e97ba..a7846d64b396 100644
-> --- a/arch/arm/configs/ep93xx_defconfig
-> +++ b/arch/arm/configs/ep93xx_defconfig
-> @@ -90,6 +90,10 @@ CONFIG_SPI=y
->  CONFIG_SPI_EP93XX=y
->  CONFIG_WATCHDOG=y
->  CONFIG_EP93XX_WATCHDOG=y
-> +CONFIG_FB=y
-> +CONFIG_FB_MODE_HELPERS=y
-> +CONFIG_FB_EP93XX=y
-> +CONFIG_LOGO=y
->  CONFIG_USB=y
->  CONFIG_USB_DYNAMIC_MINORS=y
->  CONFIG_USB_OHCI_HCD=y
+Use module_platform_driver for drivers whose init and exit functions
+only register and unregister, respectively.
 
-Reviewed-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+---
+Changes since v1:
+	- As per Mathieu's suggestion, remove the comment and
+          code of Coccinelle
+	- Also, add blank line before module_platform_driver
+---
+ drivers/hwtracing/coresight/coresight-replicator.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index 7974b7c..9c18bb5 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -184,17 +184,7 @@ static struct platform_driver replicator_driver = {
+ 	},
+ };
+ 
+-static int __init replicator_init(void)
+-{
+-	return platform_driver_register(&replicator_driver);
+-}
+-module_init(replicator_init);
+-
+-static void __exit replicator_exit(void)
+-{
+-	platform_driver_unregister(&replicator_driver);
+-}
+-module_exit(replicator_exit);
++module_platform_driver(replicator_driver);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("CoreSight Replicator driver");
+-- 
+1.9.1
