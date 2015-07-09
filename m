@@ -1,18 +1,38 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 9 Jul 2015 12:02:56 +0200
-Subject: [PATCH] KVM: Add Kconfig option to signal cross-endian guests
-In-Reply-To: <1436428145-29823-1-git-send-email-thuth@redhat.com>
-References: <20150707195012-mutt-send-email-mst@redhat.com>
- <1436428145-29823-1-git-send-email-thuth@redhat.com>
-Message-ID: <20150709100256.GG13530@cbox>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 09 Jul 2015 11:05:34 +0100
+Subject: [PATCH 01/13] arm/arm64: Add new is_kernel_in_hyp_mode predicate
+In-Reply-To: <20150709094230.GA20105@leverpostej>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
+ <20150709094230.GA20105@leverpostej>
+Message-ID: <559E476E.2000306@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 09:49:05AM +0200, Thomas Huth wrote:
-> The option for supporting cross-endianness legacy guests in
-> the vhost and tun code should only be available on systems
-> that support cross-endian guests.
+On 09/07/15 10:42, Mark Rutland wrote:
+> Hi,
 > 
-> Signed-off-by: Thomas Huth <thuth@redhat.com>
+>> +static inline bool is_kernel_in_hyp_mode(void)
+>> +{
+>> +	u64 el;
+>> +
+>> +	asm("mrs %0, CurrentEL" : "=r" (el));
+>> +	return el == CurrentEL_EL2;
+>> +}
+> 
+> If you can include cputype.h, I think this can be:
+> 
+> static inline bool is_kernel_in_hyp_mode(void)
+> {
+> 	return read_cpuid(CurrentEL) == CurrentEL_EL2;
+> }
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+This would indeed work, but CurrentEL is hardly an ID register. I feel
+slightly uncomfortable using read_cpuid (which might return a cached
+version at some point) for random system registers.
+
+Thoughts?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
