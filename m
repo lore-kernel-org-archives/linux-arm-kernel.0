@@ -1,66 +1,110 @@
 From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Thu,  9 Jul 2015 18:27:37 +0800
-Subject: [PATCH v6 0/4] Add Mediatek MT8173 cpufreq driver
-Message-ID: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
+Date: Thu,  9 Jul 2015 18:27:38 +0800
+Subject: [PATCH v6 1/4] dt-bindings: mediatek: Add MT8173 CPU DVFS clock
+ bindings
+In-Reply-To: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <1436437661-17606-2-git-send-email-pi-cheng.chen@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MT8173 is a ARMv8 based SoC with 2 clusters. All CPUs in a single cluster
-share the same power and clock domain. This series tries to add cpufreq support
-for MT8173 SoC.
+This patch adds the clock and regulator consumer properties part of
+document for CPU DVFS clocks on Mediatek MT8173 SoC.
 
-changes in v6:
-- Move clock and regulator consumer properties document to the device tree
-  bindings documents of MT8173 CPU DVFS clock driver
-- Add change log to describe what is implemented in the MT8173 cpufreq driver
-- Add missed rcu_read_unlock() in the error path
-- Move of_init_opp_table() call to make sure all required hardware resources
-  are already there before it is called
-- Add comments to describe why both platform driver and deivce registration
-  codes are put in the initcall function
-- Use the term "voltage tracking" instead of "voltage trace" according to an
-  internal SoC document
-
-changes in v5:
-- Move resource allocation code from init() into probe() and remove some unused
-  functions due to this change
-- Fix descriptions for device tree binding document
-- Address review comments for last version
-- Register CPU cooling device
-
-Changes in v4:
-- Add bindings for MT8173 cpufreq driver
-- Move OPP table back into device tree
-- Address comments for last version
-
-Changes in v3:
-- Implement MT8173 specific standalone cpufreq driver instead of using
-  cpufreq-dt driver
-- Define OPP table in the driver source code until new OPP binding is ready
-
-Changes in v2:
-- Add intermediate frequency support in cpufreq-dt driver
-- Use voltage scaling code of cpufreq-dt for little cluster instead of
-  implementaion in notifier of mtk-cpufreq driver
-- Code refinement for mtk-cpufreq driver
-
-Pi-Cheng Chen (4):
-  dt-bindings: mediatek: Add MT8173 CPU DVFS clock bindings
-  dt-bindings: mediatek: Add MT8173 cpufreq driver bindings
-  cpufreq: mediatek: Add MT8173 cpufreq driver
-  arm64: dts: mt8173: Add mt8173 cpufreq driver support
-
- .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  |  83 ++++
- .../devicetree/bindings/cpufreq/cpufreq-mt8173.txt | 134 ++++++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  18 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  64 +++
- drivers/cpufreq/Kconfig.arm                        |   7 +
- drivers/cpufreq/Makefile                           |   1 +
- drivers/cpufreq/mt8173-cpufreq.c                   | 524 +++++++++++++++++++++
- 7 files changed, 831 insertions(+)
+Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+---
+ .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  | 83 ++++++++++++++++++++++
+ 1 file changed, 83 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-mt8173.txt
- create mode 100644 drivers/cpufreq/mt8173-cpufreq.c
 
+diff --git a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+new file mode 100644
+index 0000000..27b3521
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+@@ -0,0 +1,83 @@
++Device Tree Clock bindings for CPU DVFS clock of Mediatek MT8173 SoC
++
++Required properties:
++- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
++- clock-names: Should contain the following:
++	"cpu"		- The multiplexer for clock input of CPU cluster.
++	"intermediate"	- A parent of "cpu" clock which is used as "intermediate" clock
++			  source (usually MAINPLL) when the original CPU PLL is under
++			  transition and not stable yet.
++	Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
++	generic clock consumer properties.
++- proc-supply: Regulator for Vproc of CPU cluster.
++
++Optional properties:
++- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
++	       needs to do "voltage tracking" to step by step scale up/down Vproc and
++	       Vsram to fit SoC specific needs. When absent, the voltage scaling
++	       flow is handled by hardware, hence no software "voltage tracking" is
++	       needed.
++
++Example:
++--------
++	cpu0: cpu at 0 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a53";
++		reg = <0x000>;
++		enable-method = "psci";
++		cpu-idle-states = <&CPU_SLEEP_0>;
++		clocks = <&infracfg CLK_INFRA_CA53SEL>,
++			 <&apmixedsys CLK_APMIXED_MAINPLL>;
++		clock-names = "cpu", "intermediate";
++	};
++
++	cpu1: cpu at 1 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a53";
++		reg = <0x001>;
++		enable-method = "psci";
++		cpu-idle-states = <&CPU_SLEEP_0>;
++		clocks = <&infracfg CLK_INFRA_CA53SEL>,
++			 <&apmixedsys CLK_APMIXED_MAINPLL>;
++		clock-names = "cpu", "intermediate";
++	};
++
++	cpu2: cpu at 100 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a57";
++		reg = <0x100>;
++		enable-method = "psci";
++		cpu-idle-states = <&CPU_SLEEP_0>;
++		clocks = <&infracfg CLK_INFRA_CA57SEL>,
++			 <&apmixedsys CLK_APMIXED_MAINPLL>;
++		clock-names = "cpu", "intermediate";
++	};
++
++	cpu3: cpu at 101 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a57";
++		reg = <0x101>;
++		enable-method = "psci";
++		cpu-idle-states = <&CPU_SLEEP_0>;
++		clocks = <&infracfg CLK_INFRA_CA57SEL>,
++			 <&apmixedsys CLK_APMIXED_MAINPLL>;
++		clock-names = "cpu", "intermediate";
++	};
++
++	&cpu0 {
++		proc-supply = <&mt6397_vpca15_reg>;
++	};
++
++	&cpu1 {
++		proc-supply = <&mt6397_vpca15_reg>;
++	};
++
++	&cpu2 {
++		proc-supply = <&da9211_vcpu_reg>;
++		sram-supply = <&mt6397_vsramca7_reg>;
++	};
++
++	&cpu3 {
++		proc-supply = <&da9211_vcpu_reg>;
++		sram-supply = <&mt6397_vsramca7_reg>;
++	};
 -- 
 1.9.1
