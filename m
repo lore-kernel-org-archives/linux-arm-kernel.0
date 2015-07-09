@@ -1,123 +1,23 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 09 Jul 2015 07:55:51 -0700
-Subject: [PATCH v6 1/4] dt-bindings: mediatek: Add MT8173 CPU DVFS clock
- bindings
-In-Reply-To: <1436437661-17606-2-git-send-email-pi-cheng.chen@linaro.org>
-References: <1436437661-17606-1-git-send-email-pi-cheng.chen@linaro.org>
- <1436437661-17606-2-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <20150709145551.9112.35610@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 9 Jul 2015 16:58:24 +0200
+Subject: [PATCH 1/2] ARM: ep93xx: vision_ep9307: enable DMA for SPI
+In-Reply-To: <1434473567-5258-2-git-send-email-hsweeten@visionengravers.com>
+References: <1434473567-5258-1-git-send-email-hsweeten@visionengravers.com>
+ <1434473567-5258-2-git-send-email-hsweeten@visionengravers.com>
+Message-ID: <CACRpkdbS0hpiKxeqaQV_VegT8V2MPyddRtJdXPM5RYKgYF8jCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Pi-Cheng Chen (2015-07-09 03:27:38)
-> This patch adds the clock and regulator consumer properties part of
-> document for CPU DVFS clocks on Mediatek MT8173 SoC.
-> 
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+On Tue, Jun 16, 2015 at 6:52 PM, H Hartley Sweeten
+<hsweeten@visionengravers.com> wrote:
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
+> Enable the 'use_dma' flag in the SPI platform data to improve the speed
+> of the mmc_spi driver.
+>
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-Regards,
-Mike
+I've signed this off and queued for my pull request to ARM SoC.
+Also cooking a similar patch for my simone card.
 
-> ---
->  .../devicetree/bindings/clock/mt8173-cpu-dvfs.txt  | 83 ++++++++++++++++++++++
->  1 file changed, 83 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-> new file mode 100644
-> index 0000000..27b3521
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-> @@ -0,0 +1,83 @@
-> +Device Tree Clock bindings for CPU DVFS clock of Mediatek MT8173 SoC
-> +
-> +Required properties:
-> +- clocks: A list of phandle + clock-specifier pairs for the clocks listed in clock names.
-> +- clock-names: Should contain the following:
-> +       "cpu"           - The multiplexer for clock input of CPU cluster.
-> +       "intermediate"  - A parent of "cpu" clock which is used as "intermediate" clock
-> +                         source (usually MAINPLL) when the original CPU PLL is under
-> +                         transition and not stable yet.
-> +       Please refer to Documentation/devicetree/bindings/clk/clock-bindings.txt for
-> +       generic clock consumer properties.
-> +- proc-supply: Regulator for Vproc of CPU cluster.
-> +
-> +Optional properties:
-> +- sram-supply: Regulator for Vsram of CPU cluster. When present, the cpufreq driver
-> +              needs to do "voltage tracking" to step by step scale up/down Vproc and
-> +              Vsram to fit SoC specific needs. When absent, the voltage scaling
-> +              flow is handled by hardware, hence no software "voltage tracking" is
-> +              needed.
-> +
-> +Example:
-> +--------
-> +       cpu0: cpu at 0 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a53";
-> +               reg = <0x000>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +       };
-> +
-> +       cpu1: cpu at 1 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a53";
-> +               reg = <0x001>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA53SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +       };
-> +
-> +       cpu2: cpu at 100 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x100>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +       };
-> +
-> +       cpu3: cpu at 101 {
-> +               device_type = "cpu";
-> +               compatible = "arm,cortex-a57";
-> +               reg = <0x101>;
-> +               enable-method = "psci";
-> +               cpu-idle-states = <&CPU_SLEEP_0>;
-> +               clocks = <&infracfg CLK_INFRA_CA57SEL>,
-> +                        <&apmixedsys CLK_APMIXED_MAINPLL>;
-> +               clock-names = "cpu", "intermediate";
-> +       };
-> +
-> +       &cpu0 {
-> +               proc-supply = <&mt6397_vpca15_reg>;
-> +       };
-> +
-> +       &cpu1 {
-> +               proc-supply = <&mt6397_vpca15_reg>;
-> +       };
-> +
-> +       &cpu2 {
-> +               proc-supply = <&da9211_vcpu_reg>;
-> +               sram-supply = <&mt6397_vsramca7_reg>;
-> +       };
-> +
-> +       &cpu3 {
-> +               proc-supply = <&da9211_vcpu_reg>;
-> +               sram-supply = <&mt6397_vsramca7_reg>;
-> +       };
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Yours,
+Linus Walleij
