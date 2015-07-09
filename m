@@ -1,137 +1,66 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Thu, 9 Jul 2015 17:29:50 +0800
-Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
-In-Reply-To: <20150709075032.GD23464@tiger>
-References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
- <20150709075032.GD23464@tiger>
-Message-ID: <20150709092949.GB3917@shlinux1.ap.freescale.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Jul 2015 02:41:30 -0700
+Subject: [GIT PULL] omap fixes against v4.2-rc1
+Message-ID: <20150709094130.GK10644@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 03:50:32PM +0800, Shawn Guo wrote:
-> On Thu, Jun 18, 2015 at 02:05:31AM +0800, Dong Aisheng wrote:
-> > Commit 8d86e4f mmc: sdhci-esdhc-imx: Call mmc_of_parse()
-> > seriously break the sd card detect/write protect function
-> > of most IMX platforms since a lot of GPIO flags of cd-gpios/wp-gpios
-> > are wrongly set in devicetree.
-> > 
-> > It breaks the following things:
-> 
-> My opinion would be that we revert the commit 8d86e4f for v4.2, as it's
-> so broken.
-> 
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-It may be a bit difficult since there're a few successive patches already
-in Ulf's tree based on 8d86e4f.
-Most are also fixes for 8d86e4f by Fabio.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-> > 1) cd-gpio function enable
-> > Most IMX boards GPIO card detect function becomes unwork and using card
-> > polling mode instead by mistake.
-> > Openning CONFIG_MMC_DEBUG will easily see that.
-> > It is caused by the default quirk SDHCI_QUIRK_BROKEN_CARD_DETECTION
-> > is not cleared for dt platform by commit 8d86e4f, then
-> > MMC_CAP_NEEDS_POLL is wrongly set.
-> > Patch 1~2 is to fix it.
-> > 
-> > 2) cd-gpio/wp-gpio polarity
-> > Before commit 8d86e4f, we do not use GPIO flags passed from
-> > devicetree. But after it, GPIO flags specfied in dt becomes valid
-> > and will affect the normal cd/wp function.
-> > 
-> > This is fixed by another dts fix patch series:
-> > [PATCH 0/5] dts: imx: fix sd card gpio polarity specified in device tree
-> > http://www.spinics.net/lists/arm-kernel/msg426156.html
-> > 
-> > Since it needs to change a lot board dts files, so i cook the patch
-> > based on Shawn/for-next branch to make sure all board dts file are
-> > changed in the same time.
-> > 
-> > The dts fix patches series should be picked before this series since
-> > the driver fixes depend on the correct dts(correct GPIO polarity)
-> > to work properly.
-> 
-> So this is a device tree ABI breakage.  All the existing DTBs already
-> installed on devices will be broken with the new kernel.  You can argue
-> that the device trees are buggy and we're fixing bugs.  But if a bugfix
-> breaks things, we should be conservative.  Here is my suggestion:
-> 
+are available in the git repository at:
 
-I agree that it's a pain, but we may have to suffer.
-Your below suggestion can't eventually avoid this pain.
-The old dts will finally not work again if upgrade to new kernel.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/fixes-rc1
 
-As currently dts and kernel tree are still not separated, it may be not
-a serious issue and usually user uses new kernel and dts together.
+for you to fetch changes up to ae745302c0a3e2b5b768690f631fc14db44467e7:
 
-> 1. Revert commit 8d86e4f for v4.2
-> 2. I queue up your dts fixing series for v4.2
-> 3. Keep things as they are for a few releases and then consider to move
->    to mmc_of_parse() with the hope that those buggy DTBs have been
->    upgraded during that period.
-> 
+  Merge branch 'fixes-rc1' into omap-for-v4.2/fixes (2015-07-06 05:33:17 -0700)
 
-I agree with you.
-One difference is that i'd like to fix it ASAP without reverting 8d86e4f
-due to more patches depends on it is already there as i mentioned above..
-Revert it may need to revert a lot others.
+----------------------------------------------------------------
+Minor fixes for omaps against v4.2-rc1. Mostly just minor dts changes
+except for a GPMC fix to not use names for probing devices. Also a
+one liner clean-up to remove unecessary return from a void function.
 
-The pain is that v4.1 is left broken.
+The summary for the changes being:
 
-How about you queue dts fixing first for v4.2 rc1,
-then we can fix the driver in v4.2 rc2?
+- Fix probe for GPMC devices by reoving limitations based on device
+  name
 
-Regards
-Dong Aisheng
+- Remove unnecessary return from a void function
 
-> Shawn
-> 
-> > 
-> > 3) max-frequency not work in sdhci
-> > mmc_of_parse will parse the max-frequency from devicetree,
-> > however, its value will be overwritten by common sdhci driver
-> > finnally,so it does not actually work.
-> > Patch 3 is to fix it.
-> > 
-> > 4) patch 4~6 clear unneeded parsing code after switch to mmc_of_parse().
-> > 
-> > The series is based on ulf/next tree.
-> > 
-> > I also CCed this patch series to all board maintainer related in this
-> > change, hope they can help test it.
-> > I only tested some freescale IMX boards.
-> > 
-> > BTW, There's indeed a problem here that dts fix patch series needs to
-> > be picked before this series, but it can't go through Ulf tree
-> > since some board dts changed does not in Ulf's tree.
-> > And this patch series also can not go through Shawn's tree,
-> > since mmc part change depends on some patches in Ulf tree.
-> > Two series are cross dependant.
-> > Hope you guy can find a solution for it.
-> > 
-> > Those two patch series is an important fix, hopefully can catch up the
-> > final 4.1 merge window.
-> > 
-> > Dong Aisheng (6):
-> >   mmc: sdhci-esdhc-imx: fix cd regression for dt platform
-> >   mmc: sdhci-esdhc-imx: move all non dt probe code into one function
-> >   mmc: sdhci: make max-frequency property in device tree work
-> >   mmc: sdhci-esdhc-imx: remove duplicated dts parsing
-> >   mmc: sdhci-esdhc-imx: clear f_max in boarddata
-> >   dts: mmc: fsl-imx-esdhc: remove fsl,cd-controller support
-> > 
-> >  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 -
-> >  drivers/mmc/host/sdhci-esdhc-imx.c                 | 210 ++++++++++-----------
-> >  drivers/mmc/host/sdhci.c                           |   9 +-
-> >  include/linux/platform_data/mmc-esdhc-imx.h        |   1 -
-> >  4 files changed, 111 insertions(+), 111 deletions(-)
-> > 
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+- Revert beaglebone RTC sleep fix, we now have a better fix merged
+
+- Add am4372 EMIF node to fix a warning
+
+- Add am57xx-beagle-x15 power supply to fix USB2 if USB1 is disabled
+
+- Disable rfbi for am4372 as it does not have a driver
+
+----------------------------------------------------------------
+Dave Gerlach (1):
+      ARM: dts: am4372: Add emif node
+
+Johan Hovold (1):
+      Revert "ARM: dts: am335x-boneblack: disable RTC-only sleep"
+
+Nicholas Krause (1):
+      ARM: OMAP2+: Remove unnessary return statement from the void function, omap2_show_dma_caps
+
+Roger Quadros (1):
+      ARM: dts: am57xx-beagle-x15: Provide supply for usb2_phy2
+
+Tomi Valkeinen (1):
+      ARM: dts: am4372.dtsi: disable rfbi
+
+Tony Lindgren (2):
+      memory: omap-gpmc: Fix parsing of devices
+      Merge branch 'fixes-rc1' into omap-for-v4.2/fixes
+
+ Documentation/devicetree/bindings/memory-controllers/ti/emif.txt | 1 +
+ arch/arm/boot/dts/am335x-boneblack.dts                           | 4 ++++
+ arch/arm/boot/dts/am4372.dtsi                                    | 7 +++++++
+ arch/arm/boot/dts/am57xx-beagle-x15.dts                          | 4 ++++
+ arch/arm/mach-omap2/dma.c                                        | 1 -
+ drivers/memory/omap-gpmc.c                                       | 8 +-------
+ 6 files changed, 17 insertions(+), 8 deletions(-)
