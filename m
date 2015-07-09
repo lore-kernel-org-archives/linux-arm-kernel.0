@@ -1,53 +1,87 @@
-From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
-Date: Thu, 9 Jul 2015 12:09:01 +0200
-Subject: [PATCH 1/3] i2c: omap: switch to dev_get_drvdata()
-In-Reply-To: <1435260890-32335-1-git-send-email-balbi@ti.com>
-References: <1435260890-32335-1-git-send-email-balbi@ti.com>
-Message-ID: <559E483D.1020206@nokia.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 9 Jul 2015 18:15:46 +0800
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+Message-ID: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+As since sama5d3, to reset the chip, we don't need to shutdown the ddr
+controller.
 
-On 25/06/15 21:34, ext Felipe Balbi wrote:
-> there's no need to fetch the platform_device
-> in order to dereference it back to the dev
-> pointer to access drvdata, we can use
-> dev_get_drvdata() instead.
-> 
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+So add a new compatible string and new restart function for sama5d3 and
+later chips. As we don't use sama5d3 ddr controller, so remove it as
+well.
 
-Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
 
-> ---
->  drivers/i2c/busses/i2c-omap.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index 0e894193accf..00712c1cf3c0 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1403,8 +1403,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
->  #ifdef CONFIG_PM
->  static int omap_i2c_runtime_suspend(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-> +	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
->  
->  	_dev->iestate = omap_i2c_read_reg(_dev, OMAP_I2C_IE_REG);
->  
-> @@ -1428,8 +1427,7 @@ static int omap_i2c_runtime_suspend(struct device *dev)
->  
->  static int omap_i2c_runtime_resume(struct device *dev)
->  {
-> -	struct platform_device *pdev = to_platform_device(dev);
-> -	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-> +	struct omap_i2c_dev *_dev = dev_get_drvdata(dev);
->  
->  	if (!_dev->regs)
->  		return 0;
+ drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
+ 1 file changed, 21 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 36dc52f..8944b63 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
+ 	return NOTIFY_DONE;
+ }
+ 
++static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
++			void *cmd)
++{
++	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
++				at91_rstc_base);
++	return NOTIFY_DONE;
++}
++
+ static void __init at91_reset_status(struct platform_device *pdev)
+ {
+ 	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+@@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ static const struct of_device_id at91_ramc_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-sdramc", },
+ 	{ .compatible = "atmel,at91sam9g45-ddramc", },
+-	{ .compatible = "atmel,sama5d3-ddramc", },
+ 	{ /* sentinel */ }
+ };
+ 
+ static const struct of_device_id at91_reset_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+ 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
++	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	for_each_matching_node(np, at91_ramc_of_match) {
+-		at91_ramc_base[idx] = of_iomap(np, 0);
+-		if (!at91_ramc_base[idx]) {
+-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+-			return -ENODEV;
++	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
++	at91_restart_nb.notifier_call = match->data;
++
++	if (match->data != sama5d3_restart) {
++		/* we need to shutdown the ddr controller, so get ramc base */
++		for_each_matching_node(np, at91_ramc_of_match) {
++			at91_ramc_base[idx] = of_iomap(np, 0);
++			if (!at91_ramc_base[idx]) {
++				dev_err(&pdev->dev, "Could not map ram controller address\n");
++				return -ENODEV;
++			}
++			idx++;
+ 		}
+-		idx++;
+ 	}
+ 
+-	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+-	at91_restart_nb.notifier_call = match->data;
+ 	return register_restart_handler(&at91_restart_nb);
+ }
+ 
 -- 
-Best regards,
-Alexander Sverdlin.
+1.9.1
