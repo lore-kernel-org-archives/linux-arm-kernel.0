@@ -1,316 +1,264 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:30 +0100
-Subject: [PATCH v2 18/20] net/xen-netback: Make it running on 64KB page
+Date: Thu, 9 Jul 2015 21:42:31 +0100
+Subject: [PATCH v2 19/20] xen/privcmd: Add support for Linux 64KB page
  granularity
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-19-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PV network protocol is using 4KB page granularity. The goal of this
-patch is to allow a Linux using 64KB page granularity working as a
-network backend on a non-modified Xen.
+The hypercall interface (as well as the toolstack) is always using 4KB
+page granularity. When the toolstack is asking for mapping a series of
+guest PFN in a batch, it expects to have the page map contiguously in
+its virtual memory.
 
-It's only necessary to adapt the ring size and break skb data in small
-chunk of 4KB. The rest of the code is relying on the grant table code.
+When Linux is using 64KB page granularity, the privcmd driver will have
+to map multiple Xen PFN in a single Linux page.
+
+Note that this solution works on page granularity which is a multiple of
+4KB.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Ian Campbell <ian.campbell@citrix.com>
-Cc: Wei Liu <wei.liu2@citrix.com>
-Cc: netdev at vger.kernel.org
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
 ---
-
-Improvement such as support of 64KB grant is not taken into
-consideration in this patch because we have the requirement to run a
-Linux using 64KB pages on a non-modified Xen.
-
-    Changes in v2:
-        - Correctly set MAX_GRANT_COPY_OPS and XEN_NETBK_RX_SLOTS_MAX
-        - Don't use XEN_PAGE_SIZE in handle_frag_list as we coalesce
-        fragment into a new skb
-        - Use gnntab_foreach_grant to split a Linux page into grant
+Changes in v2:
+    - Use xen_apply_to_page
 ---
- drivers/net/xen-netback/common.h  |  15 +++--
- drivers/net/xen-netback/netback.c | 138 +++++++++++++++++++++++---------------
- 2 files changed, 93 insertions(+), 60 deletions(-)
+ drivers/xen/privcmd.c   |   8 +--
+ drivers/xen/xlate_mmu.c | 127 +++++++++++++++++++++++++++++++++---------------
+ 2 files changed, 92 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/net/xen-netback/common.h b/drivers/net/xen-netback/common.h
-index 8a495b3..bb68211 100644
---- a/drivers/net/xen-netback/common.h
-+++ b/drivers/net/xen-netback/common.h
-@@ -44,6 +44,7 @@
- #include <xen/interface/grant_table.h>
- #include <xen/grant_table.h>
- #include <xen/xenbus.h>
-+#include <xen/page.h>
- #include <linux/debugfs.h>
+diff --git a/drivers/xen/privcmd.c b/drivers/xen/privcmd.c
+index 5a29616..e8714b4 100644
+--- a/drivers/xen/privcmd.c
++++ b/drivers/xen/privcmd.c
+@@ -446,7 +446,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+ 		return -EINVAL;
+ 	}
  
- typedef unsigned int pending_ring_idx_t;
-@@ -64,8 +65,8 @@ struct pending_tx_info {
- 	struct ubuf_info callback_struct;
+-	nr_pages = m.num;
++	nr_pages = DIV_ROUND_UP_ULL(m.num, PAGE_SIZE / XEN_PAGE_SIZE);
+ 	if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
+ 		return -EINVAL;
+ 
+@@ -494,7 +494,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+ 			goto out_unlock;
+ 		}
+ 		if (xen_feature(XENFEAT_auto_translated_physmap)) {
+-			ret = alloc_empty_pages(vma, m.num);
++			ret = alloc_empty_pages(vma, nr_pages);
+ 			if (ret < 0)
+ 				goto out_unlock;
+ 		} else
+@@ -518,6 +518,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+ 	state.global_error  = 0;
+ 	state.version       = version;
+ 
++	BUILD_BUG_ON(((PAGE_SIZE / sizeof(xen_pfn_t)) % XEN_PFN_PER_PAGE) != 0);
+ 	/* mmap_batch_fn guarantees ret == 0 */
+ 	BUG_ON(traverse_pages_block(m.num, sizeof(xen_pfn_t),
+ 				    &pagelist, mmap_batch_fn, &state));
+@@ -582,12 +583,13 @@ static void privcmd_close(struct vm_area_struct *vma)
+ {
+ 	struct page **pages = vma->vm_private_data;
+ 	int numpgs = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
++	int nr_pfn = (vma->vm_end - vma->vm_start) >> XEN_PAGE_SHIFT;
+ 	int rc;
+ 
+ 	if (!xen_feature(XENFEAT_auto_translated_physmap) || !numpgs || !pages)
+ 		return;
+ 
+-	rc = xen_unmap_domain_mfn_range(vma, numpgs, pages);
++	rc = xen_unmap_domain_mfn_range(vma, nr_pfn, pages);
+ 	if (rc == 0)
+ 		free_xenballooned_pages(numpgs, pages);
+ 	else
+diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+index 58a5389..1fac17c 100644
+--- a/drivers/xen/xlate_mmu.c
++++ b/drivers/xen/xlate_mmu.c
+@@ -38,31 +38,9 @@
+ #include <xen/interface/xen.h>
+ #include <xen/interface/memory.h>
+ 
+-/* map fgmfn of domid to lpfn in the current domain */
+-static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
+-			    unsigned int domid)
+-{
+-	int rc;
+-	struct xen_add_to_physmap_range xatp = {
+-		.domid = DOMID_SELF,
+-		.foreign_domid = domid,
+-		.size = 1,
+-		.space = XENMAPSPACE_gmfn_foreign,
+-	};
+-	xen_ulong_t idx = fgmfn;
+-	xen_pfn_t gpfn = lpfn;
+-	int err = 0;
+-
+-	set_xen_guest_handle(xatp.idxs, &idx);
+-	set_xen_guest_handle(xatp.gpfns, &gpfn);
+-	set_xen_guest_handle(xatp.errs, &err);
+-
+-	rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+-	return rc < 0 ? rc : err;
+-}
+-
+ struct remap_data {
+ 	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
++	xen_pfn_t *efgmfn; /* pointer to the end of the fgmfn array */
+ 	pgprot_t prot;
+ 	domid_t  domid;
+ 	struct vm_area_struct *vma;
+@@ -71,24 +49,75 @@ struct remap_data {
+ 	struct xen_remap_mfn_info *info;
+ 	int *err_ptr;
+ 	int mapped;
++
++	/* Hypercall parameters */
++	int h_errs[XEN_PFN_PER_PAGE];
++	xen_ulong_t h_idxs[XEN_PFN_PER_PAGE];
++	xen_pfn_t h_gpfns[XEN_PFN_PER_PAGE];
++
++	int h_iter;	/* Iterator */
  };
  
--#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, PAGE_SIZE)
--#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, PAGE_SIZE)
-+#define XEN_NETIF_TX_RING_SIZE __CONST_RING_SIZE(xen_netif_tx, XEN_PAGE_SIZE)
-+#define XEN_NETIF_RX_RING_SIZE __CONST_RING_SIZE(xen_netif_rx, XEN_PAGE_SIZE)
- 
- struct xenvif_rx_meta {
- 	int id;
-@@ -80,16 +81,18 @@ struct xenvif_rx_meta {
- /* Discriminate from any valid pending_idx value. */
- #define INVALID_PENDING_IDX 0xFFFF
- 
--#define MAX_BUFFER_OFFSET PAGE_SIZE
-+#define MAX_BUFFER_OFFSET XEN_PAGE_SIZE
- 
- #define MAX_PENDING_REQS XEN_NETIF_TX_RING_SIZE
- 
-+#define MAX_XEN_SKB_FRAGS (65536 / XEN_PAGE_SIZE + 1)
-+
- /* It's possible for an skb to have a maximal number of frags
-  * but still be less than MAX_BUFFER_OFFSET in size. Thus the
-- * worst-case number of copy operations is MAX_SKB_FRAGS per
-+ * worst-case number of copy operations is MAX_XEN_SKB_FRAGS per
-  * ring slot.
-  */
--#define MAX_GRANT_COPY_OPS (MAX_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
-+#define MAX_GRANT_COPY_OPS (MAX_XEN_SKB_FRAGS * XEN_NETIF_RX_RING_SIZE)
- 
- #define NETBACK_INVALID_HANDLE -1
- 
-@@ -203,7 +206,7 @@ struct xenvif_queue { /* Per-queue data for xenvif */
- /* Maximum number of Rx slots a to-guest packet may use, including the
-  * slot needed for GSO meta-data.
-  */
--#define XEN_NETBK_RX_SLOTS_MAX (MAX_SKB_FRAGS + 1)
-+#define XEN_NETBK_RX_SLOTS_MAX ((MAX_XEN_SKB_FRAGS + 1))
- 
- enum state_bit_shift {
- 	/* This bit marks that the vif is connected */
-diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-index 3f77030..828085b 100644
---- a/drivers/net/xen-netback/netback.c
-+++ b/drivers/net/xen-netback/netback.c
-@@ -263,6 +263,65 @@ static struct xenvif_rx_meta *get_next_rx_buffer(struct xenvif_queue *queue,
- 	return meta;
- }
- 
-+struct gop_frag_copy
++static int setup_hparams(struct page *page, unsigned long pfn, void *data)
 +{
-+	struct xenvif_queue *queue;
-+	struct netrx_pending_operations *npo;
-+	struct xenvif_rx_meta *meta;
-+	int head;
-+	int gso_type;
++	struct remap_data *info = data;
 +
-+	struct page *page;
-+};
++	/* We may not have enough domain's gmfn to fill a Linux Page */
++	if (info->fgmfn == info->efgmfn)
++		return 0;
 +
-+static void xenvif_gop_frag_copy_grant(unsigned long mfn, unsigned int offset,
-+				       unsigned int *len, void *data)
-+{
-+	struct gop_frag_copy *info = data;
-+	struct gnttab_copy *copy_gop;
-+	struct xen_page_foreign *foreign;
-+	/* Convenient aliases */
-+	struct xenvif_queue *queue = info->queue;
-+	struct netrx_pending_operations *npo = info->npo;
-+	struct page *page = info->page;
++	info->h_idxs[info->h_iter] = *info->fgmfn;
++	info->h_gpfns[info->h_iter] = pfn;
++	info->h_errs[info->h_iter] = 0;
++	info->h_iter++;
 +
-+	BUG_ON(npo->copy_off > MAX_BUFFER_OFFSET);
++	info->fgmfn++;
 +
-+	if (npo->copy_off == MAX_BUFFER_OFFSET)
-+		info->meta = get_next_rx_buffer(queue, npo);
-+
-+	if (npo->copy_off + *len > MAX_BUFFER_OFFSET)
-+		*len = MAX_BUFFER_OFFSET - npo->copy_off;
-+
-+	copy_gop = npo->copy + npo->copy_prod++;
-+	copy_gop->flags = GNTCOPY_dest_gref;
-+	copy_gop->len = *len;
-+
-+	foreign = xen_page_foreign(page);
-+	if (foreign) {
-+		copy_gop->source.domid = foreign->domid;
-+		copy_gop->source.u.ref = foreign->gref;
-+		copy_gop->flags |= GNTCOPY_source_gref;
-+	} else {
-+		copy_gop->source.domid = DOMID_SELF;
-+		copy_gop->source.u.gmfn = mfn;
-+	}
-+	copy_gop->source.offset = offset;
-+
-+	copy_gop->dest.domid = queue->vif->domid;
-+	copy_gop->dest.offset = npo->copy_off;
-+	copy_gop->dest.u.ref = npo->copy_gref;
-+
-+	npo->copy_off += *len;
-+	info->meta->size += *len;
-+
-+	/* Leave a gap for the GSO descriptor. */
-+	if (info->head && ((1 << info->gso_type) & queue->vif->gso_mask))
-+		queue->rx.req_cons++;
-+
-+	info->head = 0; /* There must be something in this buffer now */
++	return 0;
 +}
 +
- /*
-  * Set up the grant operations for this fragment. If it's a flipping
-  * interface, we also set up the unmap request from here.
-@@ -272,83 +331,54 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
- 				 struct page *page, unsigned long size,
- 				 unsigned long offset, int *head)
+ static int remap_pte_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
+ 			void *data)
  {
--	struct gnttab_copy *copy_gop;
--	struct xenvif_rx_meta *meta;
-+	struct gop_frag_copy info =
-+	{
-+		.queue = queue,
-+		.npo = npo,
-+		.head = *head,
-+		.gso_type = XEN_NETIF_GSO_TYPE_NONE,
+ 	struct remap_data *info = data;
+ 	struct page *page = info->pages[info->index++];
+-	unsigned long pfn = page_to_pfn(page);
+-	pte_t pte = pte_mkspecial(pfn_pte(pfn, info->prot));
++	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), info->prot));
+ 	int rc;
++	uint32_t i;
++	struct xen_add_to_physmap_range xatp = {
++		.domid = DOMID_SELF,
++		.foreign_domid = info->domid,
++		.space = XENMAPSPACE_gmfn_foreign,
 +	};
- 	unsigned long bytes;
--	int gso_type = XEN_NETIF_GSO_TYPE_NONE;
  
- 	if (skb_is_gso(skb)) {
- 		if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV4)
--			gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
-+			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV4;
- 		else if (skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6)
--			gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
-+			info.gso_type = XEN_NETIF_GSO_TYPE_TCPV6;
- 	}
- 
- 	/* Data must not cross a page boundary. */
- 	BUG_ON(size + offset > PAGE_SIZE<<compound_order(page));
- 
--	meta = npo->meta + npo->meta_prod - 1;
-+	info.meta = npo->meta + npo->meta_prod - 1;
- 
- 	/* Skip unused frames from start of page */
- 	page += offset >> PAGE_SHIFT;
- 	offset &= ~PAGE_MASK;
- 
- 	while (size > 0) {
--		struct xen_page_foreign *foreign;
--
- 		BUG_ON(offset >= PAGE_SIZE);
--		BUG_ON(npo->copy_off > MAX_BUFFER_OFFSET);
--
--		if (npo->copy_off == MAX_BUFFER_OFFSET)
--			meta = get_next_rx_buffer(queue, npo);
- 
- 		bytes = PAGE_SIZE - offset;
- 		if (bytes > size)
- 			bytes = size;
- 
--		if (npo->copy_off + bytes > MAX_BUFFER_OFFSET)
--			bytes = MAX_BUFFER_OFFSET - npo->copy_off;
- 
--		copy_gop = npo->copy + npo->copy_prod++;
--		copy_gop->flags = GNTCOPY_dest_gref;
--		copy_gop->len = bytes;
--
--		foreign = xen_page_foreign(page);
--		if (foreign) {
--			copy_gop->source.domid = foreign->domid;
--			copy_gop->source.u.ref = foreign->gref;
--			copy_gop->flags |= GNTCOPY_source_gref;
--		} else {
--			copy_gop->source.domid = DOMID_SELF;
--			copy_gop->source.u.gmfn =
--				virt_to_mfn(page_address(page));
--		}
--		copy_gop->source.offset = offset;
--
--		copy_gop->dest.domid = queue->vif->domid;
--		copy_gop->dest.offset = npo->copy_off;
--		copy_gop->dest.u.ref = npo->copy_gref;
--
--		npo->copy_off += bytes;
--		meta->size += bytes;
--
--		offset += bytes;
-+		info.page = page;
-+		gnttab_foreach_grant(page, offset, bytes,
-+				     xenvif_gop_frag_copy_grant,
-+				     &info);
- 		size -= bytes;
-+		offset = 0;
- 
--		/* Next frame */
--		if (offset == PAGE_SIZE && size) {
-+		/* Next page */
-+		if (size) {
- 			BUG_ON(!PageCompound(page));
- 			page++;
--			offset = 0;
- 		}
--
--		/* Leave a gap for the GSO descriptor. */
--		if (*head && ((1 << gso_type) & queue->vif->gso_mask))
--			queue->rx.req_cons++;
--
--		*head = 0; /* There must be something in this buffer now. */
--
- 	}
+-	rc = map_foreign_page(pfn, *info->fgmfn, info->domid);
+-	*info->err_ptr++ = rc;
+-	if (!rc) {
+-		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
+-		info->mapped++;
++	info->h_iter = 0;
 +
-+	*head = info.head;
- }
- 
- /*
-@@ -747,7 +777,7 @@ static int xenvif_count_requests(struct xenvif_queue *queue,
- 		first->size -= txp->size;
- 		slots++;
- 
--		if (unlikely((txp->offset + txp->size) > PAGE_SIZE)) {
-+		if (unlikely((txp->offset + txp->size) > XEN_PAGE_SIZE)) {
- 			netdev_err(queue->vif->dev, "Cross page boundary, txp->offset: %u, size: %u\n",
- 				 txp->offset, txp->size);
- 			xenvif_fatal_tx_err(queue->vif);
-@@ -1241,11 +1271,11 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
- 		}
- 
- 		/* No crossing a page as the payload mustn't fragment. */
--		if (unlikely((txreq.offset + txreq.size) > PAGE_SIZE)) {
-+		if (unlikely((txreq.offset + txreq.size) > XEN_PAGE_SIZE)) {
- 			netdev_err(queue->vif->dev,
- 				   "txreq.offset: %u, size: %u, end: %lu\n",
- 				   txreq.offset, txreq.size,
--				   (unsigned long)(txreq.offset&~PAGE_MASK) + txreq.size);
-+				   (unsigned long)(txreq.offset&~XEN_PAGE_MASK) + txreq.size);
- 			xenvif_fatal_tx_err(queue->vif);
- 			break;
- 		}
-@@ -1287,7 +1317,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
- 			virt_to_mfn(skb->data);
- 		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
- 		queue->tx_copy_ops[*copy_ops].dest.offset =
--			offset_in_page(skb->data);
-+			offset_in_page(skb->data) & ~XEN_PAGE_MASK;
- 
- 		queue->tx_copy_ops[*copy_ops].len = data_len;
- 		queue->tx_copy_ops[*copy_ops].flags = GNTCOPY_source_gref;
-@@ -1780,7 +1810,7 @@ int xenvif_map_frontend_rings(struct xenvif_queue *queue,
- 		goto err;
- 
- 	txs = (struct xen_netif_tx_sring *)addr;
--	BACK_RING_INIT(&queue->tx, txs, PAGE_SIZE);
-+	BACK_RING_INIT(&queue->tx, txs, XEN_PAGE_SIZE);
- 
- 	err = xenbus_map_ring_valloc(xenvif_to_xenbus_device(queue->vif),
- 				     &rx_ring_ref, 1, &addr);
-@@ -1788,7 +1818,7 @@ int xenvif_map_frontend_rings(struct xenvif_queue *queue,
- 		goto err;
- 
- 	rxs = (struct xen_netif_rx_sring *)addr;
--	BACK_RING_INIT(&queue->rx, rxs, PAGE_SIZE);
-+	BACK_RING_INIT(&queue->rx, rxs, XEN_PAGE_SIZE);
++	/* setup_hparams guarantees ret == 0 */
++	BUG_ON(xen_apply_to_page(page, setup_hparams, info));
++
++	set_xen_guest_handle(xatp.idxs, info->h_idxs);
++	set_xen_guest_handle(xatp.gpfns, info->h_gpfns);
++	set_xen_guest_handle(xatp.errs, info->h_errs);
++	xatp.size = info->h_iter;
++
++	rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
++
++	/* info->err_ptr expect to have one error status per Xen PFN */
++	for (i = 0; i < info->h_iter; i++) {
++		int err = (rc < 0) ? rc : info->h_errs[i];
++
++		*(info->err_ptr++) = err;
++		if (!err)
++			info->mapped++;
+ 	}
+-	info->fgmfn++;
++
++	/*
++	 * Note: The hypercall will return 0 in most of the case if even if
++	 * all the fgmfn are not mapped. We still have to update the pte
++	 * as the userspace may decide to continue.
++	 */
++	if (!rc)
++		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
  
  	return 0;
+ }
+@@ -102,13 +131,14 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+ {
+ 	int err;
+ 	struct remap_data data;
+-	unsigned long range = nr << PAGE_SHIFT;
++	unsigned long range = round_up(nr, XEN_PFN_PER_PAGE) << XEN_PAGE_SHIFT;
  
+ 	/* Kept here for the purpose of making sure code doesn't break
+ 	   x86 PVOPS */
+ 	BUG_ON(!((vma->vm_flags & (VM_PFNMAP | VM_IO)) == (VM_PFNMAP | VM_IO)));
+ 
+ 	data.fgmfn = mfn;
++	data.efgmfn = mfn + nr;
+ 	data.prot  = prot;
+ 	data.domid = domid;
+ 	data.vma   = vma;
+@@ -123,21 +153,38 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+ }
+ EXPORT_SYMBOL_GPL(xen_xlate_remap_gfn_array);
+ 
++static int unmap_gfn(struct page *page, unsigned long pfn, void *data)
++{
++	int *nr = data;
++	struct xen_remove_from_physmap xrp;
++
++	/* The Linux Page may not have been fully mapped to Xen */
++	if (!*nr)
++		return 0;
++
++	xrp.domid = DOMID_SELF;
++	xrp.gpfn = pfn;
++	(void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
++
++	(*nr)--;
++
++	return 0;
++}
++
+ int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+ 			      int nr, struct page **pages)
+ {
+ 	int i;
++	int nr_page = round_up(nr, XEN_PFN_PER_PAGE);
+ 
+-	for (i = 0; i < nr; i++) {
+-		struct xen_remove_from_physmap xrp;
+-		unsigned long pfn;
++	for (i = 0; i < nr_page; i++) {
++		/* unmap_gfn guarantees ret == 0 */
++		BUG_ON(xen_apply_to_page(pages[i], unmap_gfn, &nr));
++	}
+ 
+-		pfn = page_to_pfn(pages[i]);
++	/* We should have consume every xen page */
++	BUG_ON(nr != 0);
+ 
+-		xrp.domid = DOMID_SELF;
+-		xrp.gpfn = pfn;
+-		(void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
+-	}
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
 -- 
 2.1.4
