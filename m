@@ -1,32 +1,47 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 09 Jul 2015 10:32:46 +0200
-Subject: [PATCH 1/7] pinctrl: UniPhier: add UniPhier pinctrl core support
-In-Reply-To: <CAK7LNARqsxrFhSEOiZw7TYSyFR8vhaZYcK6KbuG84mP2eM5NJw@mail.gmail.com>
-References: <1436185763-4308-1-git-send-email-yamada.masahiro@socionext.com>
- <1436185763-4308-2-git-send-email-yamada.masahiro@socionext.com>
- <1436260472.20057.121.camel@tiscali.nl>
- <CAK7LNASnaN47cPHyyH-DTrF4pE4XqhgUdZLuOspuqHtKoDxmRQ@mail.gmail.com>
- <1436387996.20619.54.camel@tiscali.nl>
- <CAK7LNARqsxrFhSEOiZw7TYSyFR8vhaZYcK6KbuG84mP2eM5NJw@mail.gmail.com>
-Message-ID: <1436430766.20619.91.camel@tiscali.nl>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 09 Jul 2015 09:42:42 +0100
+Subject: [PATCH 0/3] arm/arm64: vexpress: DT updates for v4.2
+In-Reply-To: <CAMAWPa88wR+GcbdN1cHbF4Om0M8gEyBFi57mhORsSwDn7ab5OA@mail.gmail.com>
+References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>	<5596BCC3.9070903@arm.com>	<7hio9ue6ey.fsf@deeprootsystems.com>
+ <CAMAWPa88wR+GcbdN1cHbF4Om0M8gEyBFi57mhORsSwDn7ab5OA@mail.gmail.com>
+Message-ID: <559E3402.3020909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
-
-On do, 2015-07-09 at 14:32 +0900, Masahiro Yamada wrote:
-> After I read your references and thought a bit more,
-> I am now considering to change the bool into tristate.
-> 
-> [...]
-> 
-> Is this OK with you?
-
-Whether this should be bool or tristate is up to you and the maintainer
-(Linus?). I just prefer if you'd be consistent with that choice (ie, you
-should not use module specific code in a built-in only driver).
-
-Thanks,
 
 
-Paul Bolle
+On 08/07/15 22:46, Kevin Hilman wrote:
+> On Wed, Jul 8, 2015 at 3:33 PM, Kevin Hilman <khilman@kernel.org> wrote:
+>> Sudeep Holla <sudeep.holla@arm.com> writes:
+>>
+>>> Hi Kevin,
+>>>
+>>> On 01/07/15 13:36, Sudeep Holla wrote:
+>>>> Hi ARM-SoC guys,
+>>>>
+>>>> Here are couple of fixes for adding missing nodes(CCI and A7 PMUs) in
+>>>> TC2 device tree. The third patch is addition of support for FPGA based
+>>>> dual core A53 SMM  platform. All the patches are posted on the list
+>>>> already, just putting them together. Let me know if you prefer a pull
+>>>> request.
+>>>>
+>>>
+>>> I just realized that I copied this series to your Linaro email instead
+>>> of kernel.org. Sorry for that, do you want me to repost ?
+>>
+>> Not necessary.
+>>
+>> This just came too late for the v4.2 cycle.  I think the first two
+>> patches we can take as fixes for v4.2, but the 3rd one will likely need
+>> to wait for v4.3.
+
+Agreed, will try my best not to repeat that again.
+
+>
+> Having a closer look, I just picked up all 3 for v4.2-rc.
+>
+
+Thanks.
+
+Regards,
+Sudeep
