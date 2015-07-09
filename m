@@ -1,91 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jul 2015 08:57:17 +0100
-Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
- socfpga_secondary_startup
-In-Reply-To: <20150709115249.18fefe8d@xhacker>
-References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
- <20150708165115.GM7557@n2100.arm.linux.org.uk>
- <559D765C.30102@opensource.altera.com>
- <20150708210734.GN7557@n2100.arm.linux.org.uk>
- <20150709115249.18fefe8d@xhacker>
-Message-ID: <20150709075717.GO7557@n2100.arm.linux.org.uk>
+From: alexander.sverdlin@nokia.com (Alexander Sverdlin)
+Date: Thu, 9 Jul 2015 09:58:10 +0200
+Subject: [PATCH] i2c: core: only use set_scl for bus recovery after
+ calling prepare_recovery
+In-Reply-To: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
+References: <1436366106-11779-1-git-send-email-jlu@pengutronix.de>
+Message-ID: <559E2992.7050203@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 11:52:49AM +0800, Jisheng Zhang wrote:
-> Dear Russell,
+Hi!
+
+On 08/07/15 16:35, ext Jan Luebbe wrote:
+> Using set_scl may be ineffective before calling the driver specific
+> prepare_recovery callback, which might change into a test mode. So
+> instead of setting SCL in i2c_generic_scl_recovery, move it to
+> i2c_generic_recovery (after the optional prepare_recovery).
 > 
-> On Wed, 8 Jul 2015 22:07:34 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+
+Makes sense,
+Acked-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+
+> ---
+>  drivers/i2c/i2c-core.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 > 
-> > On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
-> > > The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
-> > > user mode access.
-> > 
-> > Hmm.
-> > 
-> > I think what you've found is a(nother) latent bug in the CPU bring up
-> > code.
-> > 
-> > For SMP CPUs, the sequence we're following during early initialisation is:
-> > 
-> > 1. Enable SMP coherency.
-> > 2. Invalidate the caches.
-> > 
-> > If the cache contains rubbish, enabling SMP coherency before invalidating
-> > the cache is plainly an absurd thing to do.
-> > 
-> > Can you try the patch below - not tested in any way, so you may need to
-> > tweak it, but it should allow us to prove that point.
-> > 
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index 0716bbe19872..db5137fc297d 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -275,6 +275,10 @@ __v7_b15mp_setup:
-> >  __v7_ca17mp_setup:
-> >  	mov	r10, #0
-> >  1:
-> > +	adr	r12, __v7_setup_stack		@ the local stack
-> > +	stmia	r12, {r0-r5, r7, r9-r11, lr}
-> > +	bl      v7_invalidate_l1
-> > +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
-> 
-> Some CPUs such as CA7 need enable SMP before any cache maintenance.
-> 
-> CA7 TRM says something about SMP bit:
-> "You must ensure this bit is set to 1 before the caches and MMU are enabled,
-> or any cache and TLB maintenance operations are performed."
-
-Frankly, that's wrong for two reasons.  Think about it for a moment...
-
-If the cache contains crap - in other words, it contains random
-uninitialised data in the cache lines at random locations, some of
-which are marked valid and some of which are marked dirty - then
-enabling the SMP bit puts the caches into coherent mode, and they
-join the coherent cluster.
-
-That means those cache lines containing crap become visible to other
-CPUs in the cluster, and can be migrated to other CPUs, and the crap
-data in them becomes visible to other CPUs.  This leads to state
-corruption on other CPUs in the cluster.
-
-Moreover, the cache invalidation of the local L1 cache is broadcast
-to other CPUs in the cluster, and _their_ caches are also invalidated,
-again, leading to state corruption on already running CPUs.  We don't
-want the invalidation of the incoming CPU to be broadcast to the other
-CPUs.
-
-This is all round a very bad thing.
-
-> Also CA7 would invalidate L1 automatically once reset, can we remove the
-> invalidate op in CA7 case?
-
-No, because we enter this path from multiple different situations, eg,
-after the decompressor has run, after the boot loader has run which
-may have enabled caches and not properly invalidated them prior to
-calling the kernel.
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 069a41f116dd..be992b3e0be8 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -567,6 +567,9 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+>  	if (bri->prepare_recovery)
+>  		bri->prepare_recovery(adap);
+>  
+> +	bri->set_scl(adap, val);
+> +	ndelay(RECOVERY_NDELAY);
+> +
+>  	/*
+>  	 * By this time SCL is high, as we need to give 9 falling-rising edges
+>  	 */
+> @@ -597,7 +600,6 @@ static int i2c_generic_recovery(struct i2c_adapter *adap)
+>  
+>  int i2c_generic_scl_recovery(struct i2c_adapter *adap)
+>  {
+> -	adap->bus_recovery_info->set_scl(adap, 1);
+>  	return i2c_generic_recovery(adap);
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_generic_scl_recovery);
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Alexander Sverdlin.
