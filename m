@@ -1,48 +1,59 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 9 Jul 2015 23:33:50 +0200 (CEST)
-Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
- for cascaded interrupts
-In-Reply-To: <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
-References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
- <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <alpine.DEB.2.11.1507092331130.5134@nanos>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 9 Jul 2015 23:46:10 +0200
+Subject: musb-hdrc: "Vbus off, timeout 1100 msec" message does not belong
+ in sysfs
+In-Reply-To: <20150709213922.GA32698@amd>
+References: <20150709213922.GA32698@amd>
+Message-ID: <20150709214610.GA20890@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jul 2015, Marc Zyngier wrote:
-
-> When used as a primary interrupt controller, the GIC driver uses
-> irq_data->chip_data to extract controller-specific information.
+On Thu 2015-07-09 23:39:22, Pavel Machek wrote:
+> Hi!
 > 
-> When used as a secondary interrupt controller, it uses handler_data
-> instead. As this difference is relatively pointless and only creates
-> confusion, change the secondary path to match what the rest of the
-> driver does.
+> sysfs should contain one value per file. This one has at least two,
+> with nice english sentence as a bonus.
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+> cat vbus
+> Vbus off, timeout 1100 msec
 > 
-> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> index e264675..3c7f3a4 100644
-> --- a/drivers/irqchip/irq-gic.c
-> +++ b/drivers/irqchip/irq-gic.c
-> @@ -298,7 +298,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
->  
->  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
->  {
-> -	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
-> +	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
->  	struct irq_chip *chip = irq_get_chip(irq);
+> :-(.
 
-You should make that
+Plus, documentation for this is nowhere to be seen:
 
-    chip_data = irq_desc_get_chip_data(desc);
-    chip = irq_desc_get_chip(desc);
+pavel at amd:/data/l/linux-n900$ grep -ri musb Documentation/ABI/
+pavel at amd:/data/l/linux-n900$
 
-That avoids two pointless lookups of irqdesc ....
+..which is a shame, because it is not really clear how to use this
+one:
 
-Thanks,
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+cat mode
+b_idle
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo a_suspend > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo a > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo a_host > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo b_host > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo a_idle > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+echo b_wait_acon > mode
+-bash: echo: write error: Invalid argument
+root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
 
-	tglx
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
