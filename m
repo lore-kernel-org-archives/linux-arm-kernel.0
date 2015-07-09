@@ -1,233 +1,188 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Thu,  9 Jul 2015 13:57:39 +0200
-Subject: [PATCH 2/3] drivers: clk: st: PLL rate change implementation for DVFS
+Date: Thu,  9 Jul 2015 13:57:40 +0200
+Subject: [PATCH 3/3] drivers: clk: st: Correct the pll-type for A9 for stih418
 In-Reply-To: <1436443060-12866-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1436443060-12866-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1436443060-12866-3-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1436443060-12866-4-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change A9 PLL rate, as per requirement from the cpufreq framework,
-for DVFS. For rate change, the A9 clock needs to be temporarily sourced
-from PLL external to A9 and then sourced back to A9-PLL
+Add support for new PLL-type for stih418 A9-PLL.
+Currently the 407_A9_PLL type being used, it is corrected with this patch
+4600c28 PLL allows to reach higher frequencies
+so its programming algorithm is extended.
 
 Signed-off-by: Pankaj Dev <pankaj.dev@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- drivers/clk/st/clkgen-mux.c |   3 +
- drivers/clk/st/clkgen-pll.c | 182 ++++++++++++++++++++++++++++++++++++++++++--
- drivers/clk/st/clkgen.h     |   2 +
- 3 files changed, 180 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   1 +
+ drivers/clk/st/clkgen-pll.c                        | 195 +++++++++++++++++++++
+ 2 files changed, 196 insertions(+)
 
-diff --git a/drivers/clk/st/clkgen-mux.c b/drivers/clk/st/clkgen-mux.c
-index 717c4a9..a75633b 100644
---- a/drivers/clk/st/clkgen-mux.c
-+++ b/drivers/clk/st/clkgen-mux.c
-@@ -16,6 +16,7 @@
- #include <linux/slab.h>
- #include <linux/of_address.h>
- #include <linux/clk-provider.h>
-+#include "clkgen.h"
+diff --git a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+index efb51cf..19dc0ca 100644
+--- a/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
++++ b/Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt
+@@ -23,6 +23,7 @@ Required properties:
+ 	"st,stih407-plls-c32-a9",	"st,clkgen-plls-c32"
+ 	"st,stih407-plls-c32-c0_0",	"st,clkgen-plls-c32"
+ 	"st,stih407-plls-c32-c0_1",	"st,clkgen-plls-c32"
++	"st,stih418-plls-c28-a9",	"st,clkgen-plls-c32"
  
- static DEFINE_SPINLOCK(clkgena_divmux_lock);
- static DEFINE_SPINLOCK(clkgenf_lock);
-@@ -575,6 +576,7 @@ static struct clkgen_mux_data stih415_a9_mux_data = {
- 	.offset = 0,
- 	.shift = 1,
- 	.width = 2,
-+	.lock = &clkgen_a9_lock,
- };
- static struct clkgen_mux_data stih416_a9_mux_data = {
- 	.offset = 0,
-@@ -585,6 +587,7 @@ static struct clkgen_mux_data stih407_a9_mux_data = {
- 	.offset = 0x1a4,
- 	.shift = 0,
- 	.width = 2,
-+	.lock = &clkgen_a9_lock,
- };
- 
- static const struct of_device_id mux_of_match[] = {
+ 	"st,stih415-gpu-pll-c32",	"st,clkgengpu-pll-c32"
+ 	"st,stih416-gpu-pll-c32",	"st,clkgengpu-pll-c32"
 diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
-index bd2fcd3..04d66ee1d 100644
+index 04d66ee1d..7062943 100644
 --- a/drivers/clk/st/clkgen-pll.c
 +++ b/drivers/clk/st/clkgen-pll.c
-@@ -21,6 +21,7 @@
- #include "clkgen.h"
- 
- static DEFINE_SPINLOCK(clkgena_c32_odf_lock);
-+DEFINE_SPINLOCK(clkgen_a9_lock);
- 
- /*
-  * Common PLL configuration register bits for PLL800 and PLL1600 C65
-@@ -37,6 +38,7 @@ static DEFINE_SPINLOCK(clkgena_c32_odf_lock);
- #define C32_IDF_MASK (0x7)
- #define C32_ODF_MASK (0x3f)
- #define C32_LDF_MASK (0x7f)
-+#define C32_CP_MASK (0x1f)
+@@ -42,6 +42,13 @@ DEFINE_SPINLOCK(clkgen_a9_lock);
  
  #define C32_MAX_ODFS (4)
  
-@@ -49,15 +51,20 @@ struct clkgen_pll_data {
- 	struct clkgen_field pdiv;
- 	struct clkgen_field idf;
- 	struct clkgen_field ldf;
-+	struct clkgen_field cp;
- 	unsigned int num_odfs;
- 	struct clkgen_field odf[C32_MAX_ODFS];
- 	struct clkgen_field odf_gate[C32_MAX_ODFS];
-+	bool switch2pll_en;
-+	struct clkgen_field switch2pll;
-+	spinlock_t *lock;
- 	const struct clk_ops *ops;
- };
- 
- static const struct clk_ops st_pll1600c65_ops;
- static const struct clk_ops st_pll800c65_ops;
++/*
++ * PLL configuration register bits for PLL4600 C28
++ */
++#define C28_NDIV_MASK (0xff)
++#define C28_IDF_MASK (0x7)
++#define C28_ODF_MASK (0x3f)
++
+ struct clkgen_pll_data {
+ 	struct clkgen_field pdn_status;
+ 	struct clkgen_field pdn_ctrl;
+@@ -66,6 +73,7 @@ static const struct clk_ops st_pll800c65_ops;
  static const struct clk_ops stm_pll3200c32_ops;
-+static const struct clk_ops stm_pll3200c32_a9_ops;
+ static const struct clk_ops stm_pll3200c32_a9_ops;
  static const struct clk_ops st_pll1200c32_ops;
++static const struct clk_ops stm_pll4600c28_ops;
  
  static const struct clkgen_pll_data st_pll1600c65_ax = {
-@@ -240,7 +247,11 @@ static const struct clkgen_pll_data st_pll3200c32_407_a9 = {
- 	.num_odfs = 1,
- 	.odf		= { CLKGEN_FIELD(0x1b0, C32_ODF_MASK,		8) },
- 	.odf_gate	= { CLKGEN_FIELD(0x1ac, 0x1,			28) },
--	.ops		= &stm_pll3200c32_ops,
+ 	.pdn_status	= CLKGEN_FIELD(0x0, 0x1,			19),
+@@ -254,6 +262,22 @@ static const struct clkgen_pll_data st_pll3200c32_407_a9 = {
+ 	.ops		= &stm_pll3200c32_a9_ops,
+ };
+ 
++static struct clkgen_pll_data st_pll4600c28_418_a9 = {
++	/* 418 A9 */
++	.pdn_status	= CLKGEN_FIELD(0x1a8,	0x1,			0),
++	.pdn_ctrl	= CLKGEN_FIELD(0x1a8,	0x1,			0),
++	.locked_status	= CLKGEN_FIELD(0x87c,	0x1,			0),
++	.ndiv		= CLKGEN_FIELD(0x1b0,	C28_NDIV_MASK,		0),
++	.idf		= CLKGEN_FIELD(0x1a8,	C28_IDF_MASK,		25),
++	.num_odfs = 1,
++	.odf		= { CLKGEN_FIELD(0x1b0, C28_ODF_MASK,		8) },
++	.odf_gate	= { CLKGEN_FIELD(0x1ac, 0x1,			28) },
 +	.switch2pll_en	= true,
-+	.cp		= CLKGEN_FIELD(0x1a8,	C32_CP_MASK,		1),
 +	.switch2pll	= CLKGEN_FIELD(0x1a4,	0x1,			1),
-+	.lock = &clkgen_a9_lock,
-+	.ops		= &stm_pll3200c32_a9_ops,
- };
- 
- /**
-@@ -266,10 +277,26 @@ struct clkgen_pll {
- 	struct clk_hw		hw;
- 	struct clkgen_pll_data	*data;
- 	void __iomem		*regs_base;
-+	spinlock_t	*lock;
-+
-+	u32 ndiv;
-+	u32 idf;
-+	u32 odf;
-+	u32 cp;
- };
- 
- #define to_clkgen_pll(_hw) container_of(_hw, struct clkgen_pll, hw)
- 
-+struct stm_pll {
-+	unsigned long mdiv;
-+	unsigned long ndiv;
-+	unsigned long pdiv;
-+	unsigned long odf;
-+	unsigned long idf;
-+	unsigned long ldf;
-+	unsigned long cp;
++	.lock		= &clkgen_a9_lock,
++	.ops		= &stm_pll4600c28_ops,
 +};
 +
- static int clkgen_pll_is_locked(struct clk_hw *hw)
- {
- 	struct clkgen_pll *pll = to_clkgen_pll(hw);
-@@ -304,6 +331,9 @@ static int __clkgen_pll_enable(struct clk_hw *hw)
- 		cpu_relax();
- 	}
- 
-+	if (pll->data->switch2pll_en)
-+		CLKGEN_WRITE(pll, switch2pll, 0);
-+
- 	pr_debug("%s:%s enabled\n", __clk_get_name(hw->clk), __func__);
- 
- 	return ret;
-@@ -333,6 +363,9 @@ static void __clkgen_pll_disable(struct clk_hw *hw)
- 	if (!clkgen_pll_is_enabled(hw))
- 		return;
- 
-+	if (pll->data->switch2pll_en)
-+		CLKGEN_WRITE(pll, switch2pll, 1);
-+
- 	CLKGEN_WRITE(pll, pdn_ctrl, 1);
- 
- 	pr_debug("%s:%s disabled\n", __clk_get_name(hw->clk), __func__);
-@@ -403,6 +436,67 @@ static unsigned long recalc_stm_pll1600c65(struct clk_hw *hw,
+ /**
+  * DOC: Clock Generated by PLL, rate set and enabled by bootloader
+  *
+@@ -610,6 +634,164 @@ static unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
  	return rate;
  }
  
-+static int clk_pll3200c32_get_params(unsigned long input, unsigned long output,
++/* PLL output structure
++ * FVCO >> /2 >> FVCOBY2 (no output)
++ *                 |> Divider (ODF) >> PHI
++ *
++ * FVCOby2 output = (input * 2 * NDIV) / IDF (assuming FRAC_CONTROL==L)
++ *
++ * Rules:
++ *   4Mhz <= INFF input <= 350Mhz
++ *   4Mhz <= INFIN (INFF / IDF) <= 50Mhz
++ *   19.05Mhz <= FVCOby2 output (PHI w ODF=1) <= 3000Mhz
++ *   1 <= i (register/dec value for IDF) <= 7
++ *   8 <= n (register/dec value for NDIV) <= 246
++ */
++
++static int clk_pll4600c28_get_params(unsigned long input, unsigned long output,
 +			  struct stm_pll *pll)
 +{
-+	unsigned long i, n;
-+	unsigned long deviation = ~0;
-+	unsigned long new_freq;
-+	long new_deviation;
-+	/* Charge pump table: highest ndiv value for cp=6 to 25 */
-+	static const unsigned char cp_table[] = {
-+		48, 56, 64, 72, 80, 88, 96, 104, 112, 120,
-+		128, 136, 144, 152, 160, 168, 176, 184, 192
-+	};
 +
-+	/* Output clock range: 800Mhz to 1600Mhz */
-+	if (output < 800000000 || output > 1600000000)
++	unsigned long i, infin, n;
++	unsigned long deviation = ~0;
++	unsigned long new_freq, new_deviation;
++
++	/* Output clock range: 19Mhz to 3000Mhz */
++	if (output < 19000000 || output > 3000000000u)
 +		return -EINVAL;
 +
-+	input /= 1000;
-+	output /= 1000;
-+
++	/* For better jitter, IDF should be smallest
++	   and NDIV must be maximum */
 +	for (i = 1; i <= 7 && deviation; i++) {
-+		n = i * output / (2 * input);
++		/* INFIN checks */
++		infin = input / i;
++		if (infin < 4000000 || infin > 50000000)
++			continue;	/* Invalid case */
 +
-+		/* Checks */
-+		if (n < 8)
-+			continue;
-+		if (n > 200)
-+			break;
++		n = output / (infin * 2);
++		if (n < 8 || n > 246)
++			continue;	/* Invalid case */
++		if (n < 246)
++			n++;	/* To work around 'y' when n=x.y */
 +
-+		new_freq = (input * 2 * n) / i;
++		for (; n >= 8 && deviation; n--) {
++			new_freq = infin * 2 * n;
++			if (new_freq < output)
++				break;	/* Optimization: shorting loop */
 +
-+		new_deviation = abs(new_freq - output);
-+
-+		if (!new_deviation || new_deviation < deviation) {
-+			pll->idf  = i;
-+			pll->ndiv = n;
-+			deviation = new_deviation;
++			new_deviation = new_freq - output;
++			if (!new_deviation || new_deviation < deviation) {
++				pll->idf  = i;
++				pll->ndiv = n;
++				deviation = new_deviation;
++			}
 +		}
 +	}
 +
 +	if (deviation == ~0) /* No solution found */
 +		return -EINVAL;
 +
-+	/* Computing recommended charge pump value */
-+	for (pll->cp = 6; pll->ndiv > cp_table[pll->cp-6]; (pll->cp)++)
-+		;
-+
 +	return 0;
 +}
 +
-+static int clk_pll3200c32_get_rate(unsigned long input, struct stm_pll *pll,
++static int clk_pll4600c28_get_rate(unsigned long input, struct stm_pll *pll,
 +			unsigned long *rate)
 +{
 +	if (!pll->idf)
 +		pll->idf = 1;
 +
-+	*rate = ((2 * (input / 1000) * pll->ndiv) / pll->idf) * 1000;
++	*rate = (input / pll->idf) * 2 * pll->ndiv;
 +
 +	return 0;
 +}
 +
- static unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
- 		unsigned long parent_rate)
- {
-@@ -425,6 +519,70 @@ static unsigned long recalc_stm_pll3200c32(struct clk_hw *hw,
- 	return rate;
- }
- 
-+static long round_rate_stm_pll3200c32(struct clk_hw *hw, unsigned long rate,
-+		unsigned long *prate)
++static unsigned long recalc_stm_pll4600c28(struct clk_hw *hw,
++				    unsigned long parent_rate)
++{
++	struct clkgen_pll *pll = to_clkgen_pll(hw);
++	struct stm_pll params;
++	unsigned long rate;
++
++	if (!clkgen_pll_is_enabled(hw) || !clkgen_pll_is_locked(hw))
++		return 0;
++
++	params.ndiv = CLKGEN_READ(pll, ndiv);
++	params.idf = CLKGEN_READ(pll, idf);
++
++	clk_pll4600c28_get_rate(parent_rate, &params, &rate);
++
++	pr_debug("%s:%s rate %lu\n", __clk_get_name(hw->clk), __func__, rate);
++
++	return rate;
++}
++
++static long round_rate_stm_pll4600c28(struct clk_hw *hw, unsigned long rate,
++				      unsigned long *prate)
 +{
 +	struct stm_pll params;
 +
-+	if (!clk_pll3200c32_get_params(*prate, rate, &params))
-+		clk_pll3200c32_get_rate(*prate, &params, &rate);
-+	else {
++	if (!clk_pll4600c28_get_params(*prate, rate, &params)) {
++		clk_pll4600c28_get_rate(*prate, &params, &rate);
++	} else {
 +		pr_debug("%s: %s rate %ld Invalid\n", __func__,
 +			 __clk_get_name(hw->clk), rate);
 +		return 0;
@@ -241,19 +196,24 @@ index bd2fcd3..04d66ee1d 100644
 +	return rate;
 +}
 +
-+static int set_rate_stm_pll3200c32(struct clk_hw *hw, unsigned long rate,
-+				unsigned long parent_rate)
++static int set_rate_stm_pll4600c28(struct clk_hw *hw, unsigned long rate,
++				   unsigned long parent_rate)
 +{
 +	struct clkgen_pll *pll = to_clkgen_pll(hw);
 +	struct stm_pll params;
-+	long hwrate = 0;
++	long hwrate;
 +	unsigned long flags = 0;
 +
 +	if (!rate || !parent_rate)
 +		return -EINVAL;
 +
-+	if (!clk_pll3200c32_get_params(parent_rate, rate, &params))
-+		clk_pll3200c32_get_rate(parent_rate, &params, &hwrate);
++	if (!clk_pll4600c28_get_params(parent_rate, rate, &params)) {
++		clk_pll4600c28_get_rate(parent_rate, &params, &hwrate);
++	} else {
++		pr_debug("%s: %s rate %ld Invalid\n", __func__,
++			 __clk_get_name(hw->clk), rate);
++		return -EINVAL;
++	}
 +
 +	pr_debug("%s: %s new rate %ld [ndiv=0x%x] [idf=0x%x]\n",
 +		 __func__, __clk_get_name(hw->clk),
@@ -265,7 +225,6 @@ index bd2fcd3..04d66ee1d 100644
 +
 +	pll->ndiv = params.ndiv;
 +	pll->idf = params.idf;
-+	pll->cp = params.cp;
 +
 +	clkgen_pll_disable(hw);
 +
@@ -274,7 +233,6 @@ index bd2fcd3..04d66ee1d 100644
 +
 +	CLKGEN_WRITE(pll, ndiv, pll->ndiv);
 +	CLKGEN_WRITE(pll, idf, pll->idf);
-+	CLKGEN_WRITE(pll, cp, pll->cp);
 +
 +	if (pll->lock)
 +		spin_unlock_irqrestore(pll->lock, flags);
@@ -284,92 +242,35 @@ index bd2fcd3..04d66ee1d 100644
 +	return 0;
 +}
 +
- static unsigned long recalc_stm_pll1200c32(struct clk_hw *hw,
- 		unsigned long parent_rate)
- {
-@@ -473,6 +631,15 @@ static const struct clk_ops stm_pll3200c32_ops = {
- 	.recalc_rate	= recalc_stm_pll3200c32,
+ static const struct clk_ops st_pll1600c65_ops = {
+ 	.enable		= clkgen_pll_enable,
+ 	.disable	= clkgen_pll_disable,
+@@ -647,6 +829,15 @@ static const struct clk_ops st_pll1200c32_ops = {
+ 	.recalc_rate	= recalc_stm_pll1200c32,
  };
  
-+static const struct clk_ops stm_pll3200c32_a9_ops = {
++static const struct clk_ops stm_pll4600c28_ops = {
 +	.enable		= clkgen_pll_enable,
 +	.disable	= clkgen_pll_disable,
 +	.is_enabled	= clkgen_pll_is_enabled,
-+	.recalc_rate	= recalc_stm_pll3200c32,
-+	.round_rate	= round_rate_stm_pll3200c32,
-+	.set_rate	= set_rate_stm_pll3200c32,
++	.recalc_rate	= recalc_stm_pll4600c28,
++	.round_rate	= round_rate_stm_pll4600c28,
++	.set_rate	= set_rate_stm_pll4600c28,
 +};
 +
- static const struct clk_ops st_pll1200c32_ops = {
- 	.enable		= clkgen_pll_enable,
- 	.disable	= clkgen_pll_disable,
-@@ -483,7 +650,7 @@ static const struct clk_ops st_pll1200c32_ops = {
  static struct clk * __init clkgen_pll_register(const char *parent_name,
  				struct clkgen_pll_data	*pll_data,
  				void __iomem *reg,
--				const char *clk_name)
-+				const char *clk_name, spinlock_t *lock)
- {
- 	struct clkgen_pll *pll;
- 	struct clk *clk;
-@@ -590,7 +757,7 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
- 	 */
- 	clk_data->clks[0] = clkgen_pll_register(parent_name,
- 			(struct clkgen_pll_data *) &st_pll1600c65_ax,
--			reg + CLKGENAx_PLL0_OFFSET, clk_name);
-+			reg + CLKGENAx_PLL0_OFFSET, clk_name, NULL);
+@@ -892,6 +1083,10 @@ static const struct of_device_id c32_pll_of_match[] = {
+ 		.compatible = "st,stih407-plls-c32-a9",
+ 		.data = &st_pll3200c32_407_a9,
+ 	},
++	{
++		.compatible = "st,stih418-plls-c28-a9",
++		.data = &st_pll4600c28_418_a9,
++	},
+ 	{}
+ };
  
- 	if (IS_ERR(clk_data->clks[0]))
- 		goto err;
-@@ -619,7 +786,7 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
- 	 */
- 	clk_data->clks[2] = clkgen_pll_register(parent_name,
- 			(struct clkgen_pll_data *) &st_pll800c65_ax,
--			reg + CLKGENAx_PLL1_OFFSET, clk_name);
-+			reg + CLKGENAx_PLL1_OFFSET, clk_name, NULL);
- 
- 	if (IS_ERR(clk_data->clks[2]))
- 		goto err;
-@@ -646,7 +813,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
- 	struct clk_gate *gate;
- 	struct clk_divider *div;
- 
--	flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_GATE;
-+	flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT;
- 
- 	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
- 	if (!gate)
-@@ -754,7 +921,8 @@ static void __init clkgen_c32_pll_setup(struct device_node *np)
- 	if (!pll_base)
- 		return;
- 
--	clk = clkgen_pll_register(parent_name, data, pll_base, np->name);
-+	clk = clkgen_pll_register(parent_name, data, pll_base, np->name,
-+				  data->lock);
- 	if (IS_ERR(clk))
- 		return;
- 
-@@ -843,7 +1011,7 @@ static void __init clkgengpu_c32_pll_setup(struct device_node *np)
- 	/*
- 	 * PLL 1200MHz output
- 	 */
--	clk = clkgen_pll_register(parent_name, data, reg, clk_name);
-+	clk = clkgen_pll_register(parent_name, data, reg, clk_name, data->lock);
- 
- 	if (!IS_ERR(clk))
- 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
-diff --git a/drivers/clk/st/clkgen.h b/drivers/clk/st/clkgen.h
-index 35c8632..f7ec2d9 100644
---- a/drivers/clk/st/clkgen.h
-+++ b/drivers/clk/st/clkgen.h
-@@ -9,6 +9,8 @@ Copyright (C) 2014 STMicroelectronics
- #ifndef __CLKGEN_INFO_H
- #define __CLKGEN_INFO_H
- 
-+extern spinlock_t clkgen_a9_lock;
-+
- struct clkgen_field {
- 	unsigned int offset;
- 	unsigned int mask;
 -- 
 1.9.1
