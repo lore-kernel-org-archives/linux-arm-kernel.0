@@ -1,46 +1,26 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 09 Jul 2015 17:27:05 +0530
-Subject: [RESEND PATCH-v2] rtc: 88pm80x: add device tree support
-In-Reply-To: <20150709115533.GY3127@piout.net>
-References: <1436424952-29680-1-git-send-email-vaibhav.hiremath@linaro.org>
- <20150709115533.GY3127@piout.net>
-Message-ID: <559E6191.3050202@linaro.org>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Thu,  9 Jul 2015 13:57:37 +0200
+Subject: [PATCH 0/3] ST PLL improvement
+Message-ID: <1436443060-12866-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patchset adds:
+ * Enable/Disable support for Clockgen PLLs.
+ * A new a9 pll for stih418 platform.
+ * PLL rate change implementation for DVFS
 
 
-On Thursday 09 July 2015 05:25 PM, Alexandre Belloni wrote:
-> Hi,
->
-> On 09/07/2015 at 12:25:51 +0530, Vaibhav Hiremath wrote :
->> Along with DT support, this patch also cleans up the unnecessary
->> code around 'rtc_wakeup' initialization.
->>
->> Signed-off-by: Chao Xie <chao.xie@marvell.com>
->> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->
-> No need to resend, I'll take it. I'm current busy with other things and
-> it is still early in the development cycle.
->
+Gabriel Fernandez (3):
+  drivers: clk: st: Support for enable/disable in Clockgen PLLs
+  drivers: clk: st: PLL rate change implementation for DVFS
+  drivers: clk: st: Correct the pll-type for A9 for stih418
 
-Thanks,
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   1 +
+ drivers/clk/st/clkgen-mux.c                        |   3 +
+ drivers/clk/st/clkgen-pll.c                        | 470 ++++++++++++++++++++-
+ drivers/clk/st/clkgen.h                            |   2 +
+ 4 files changed, 468 insertions(+), 8 deletions(-)
 
-And sorry for noise,
-I was not so sure about the status, so resent it.
-
-
->> -	if (pm80x_pdata) {
->> -		pdata = pm80x_pdata->rtc;
->> -		if (pdata)
->> -			info->rtc_dev->dev.platform_data = &pdata->rtc_wakeup;
->> -	}
->> +	/* remeber whether this power up is caused by PMIC RTC or not */
->
-> I'll fix that typo...
->
-
-Oops. Thankks for noting and correcting it.
-
-Thanks,
-Vaibhav
+-- 
+1.9.1
