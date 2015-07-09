@@ -1,32 +1,86 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Thu,  9 Jul 2015 14:20:10 -0700
-Subject: [PATCH v3 0/2] pci: xgene: Add multiple memory ranges support
-In-Reply-To: <1481643.dA4ocqzitg@wuerfel>
-References: <1481643.dA4ocqzitg@wuerfel>
-Message-ID: <cover.1436476099.git.dhdang@apm.com>
+Date: Thu,  9 Jul 2015 14:20:11 -0700
+Subject: [PATCH v3 1/2] arm64: dts: Add 1 more window with large size for
+ X-Gene PCIe nodes
+In-Reply-To: <cover.1436476099.git.dhdang@apm.com>
+References: <cover.1436476099.git.dhdang@apm.com>
+Message-ID: <d4b73718e3d9f265be3cde883ed23c51a3bb1444.1436476099.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds 1 large (up to 64GB) memory window for each PCIe
-controller nodes in X-Gene device tree and fix PCIe controller driver
-to handle multiple memory ranges correctly. These changes are required
-to support PCIe devices that have huge BAR.
+This patch adds 1 additional window with large size (up to 64GB) for
+X-Gene PCIe nodes to support devices that require huge BAR.
 
-v3 changes:
-	1. Explicitly mention in change log that: Each PCIe node in dts 
-	will have 1 32-bit non-prefetchable memory window and 1 64-bit 
-	prefetchable memory window.
+Each X-Gene PCIe node now will have 2 memory windows:1 non-prefetchable
+32-bit window and 1 prefetchable 64-bit window.
 
-v2 changes:
-        1. Separate device-tree changes and driver changes into different
-        patches
-        2. Explicitly define new large window as 64-bit prefetchable in dts.
-        3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
-        register to be used to configure the memory ranges.
- 
+Signed-off-by: Duc Dang <dhdang@apm.com>
+Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+---
  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
- drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
- 2 files changed, 24 insertions(+), 11 deletions(-)
+ 1 file changed, 14 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index d8f3a1c..80a8050 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -407,7 +407,8 @@
+ 				0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+ 			ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
+-				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
++				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000   /* mem */
++				  0x43000000 0xf0 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -430,8 +431,9 @@
+ 			reg = < 0x00 0x1f2c0000 0x0 0x00010000   /* Controller registers */
+ 				0xd0 0xd0000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0xd1 0x80000000 0x00 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xd1 0x80000000 0x00 0x80000000   /* mem */
++				  0x43000000 0xd8 0x00000000 0xd8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -454,8 +456,9 @@
+ 			reg =  < 0x00 0x1f2d0000 0x0 0x00010000   /* Controller registers */
+ 				 0x90 0xd0000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0x90 0x10000000 0x0 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0x91 0x80000000 0x0 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0x90 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0x91 0x80000000 0x00 0x80000000   /* mem */
++				  0x43000000 0x94 0x00000000 0x94 0x00000000 0x04 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -478,8 +481,9 @@
+ 			reg = < 0x00 0x1f500000 0x0 0x00010000   /* Controller registers */
+ 				0xa0 0xd0000000 0x0 0x00040000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xa0 0x10000000 0x0 0x00010000   /* io   */
+-				  0x02000000 0x0 0x80000000 0xa1 0x80000000 0x0 0x80000000>; /* mem  */
++			ranges = <0x01000000 0x00 0x00000000 0xa0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xa1 0x80000000 0x00 0x80000000   /* mem */
++				  0x43000000 0xb0 0x00000000 0xb0 0x00000000 0x10 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+@@ -502,8 +506,9 @@
+ 			reg = < 0x00 0x1f510000 0x0 0x00010000   /* Controller registers */
+ 				0xc0 0xd0000000 0x0 0x00200000>; /* PCI config space */
+ 			reg-names = "csr", "cfg";
+-			ranges = <0x01000000 0x0 0x00000000 0xc0 0x10000000 0x0 0x00010000   /* io  */
+-				  0x02000000 0x0 0x80000000 0xc1 0x80000000 0x0 0x80000000>; /* mem */
++			ranges = <0x01000000 0x00 0x00000000 0xc0 0x10000000 0x00 0x00010000   /* io  */
++				  0x02000000 0x00 0x80000000 0xc1 0x80000000 0x00 0x80000000   /* mem */
++				  0x43000000 0xc8 0x00000000 0xc8 0x00000000 0x08 0x00000000>; /* mem */
+ 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
+ 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
+ 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
 -- 
 1.9.1
