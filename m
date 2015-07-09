@@ -1,64 +1,133 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Thu, 9 Jul 2015 19:23:35 +0530
-Subject: [PATCH 1/2] arm64: Blacklist non-kprobe-able symbols
-In-Reply-To: <20150706114920.GB17305@dhcppc13.redhat.com>
-References: <cover.1436158027.git.panand@redhat.com>
- <9994841a0b0a8194a6dcc1b6af148ba358488c62.1436158027.git.panand@redhat.com>
- <559A6257.60608@hitachi.com>
- <20150706114920.GB17305@dhcppc13.redhat.com>
-Message-ID: <20150709135335.GC16331@dhcppc13.redhat.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 9 Jul 2015 14:58:09 +0100
+Subject: [PATCH v3 00/15] Introducing per-device MSI domain
+In-Reply-To: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
+References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150709135809.GA5223@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2015:05:19:20 PM, Pratyush Anand wrote:
-> On 06/07/2015:08:11:19 PM, Masami Hiramatsu wrote:
-> > On 2015/07/06 14:03, Pratyush Anand wrote:
-> > > Add all function symbols which are called from do_debug_exception under
-> > > NOKPROBE_SYMBOL, as they can not kprobed.
-> > 
-> > Could you tell me how you checked that? from the code?
+On Tue, Jul 07, 2015 at 06:17:50PM +0100, Marc Zyngier wrote:
+> [Picking up this series again after sleeping on it for too long,
+>  hopefully still relevant]
 > 
-> Well.. I found out that some of the symbol like single_step_handler
-> does not allow kprobing, and then it seemed logical to me that we
-> should not allow kprobing of any symbols which are called in the path
-> of do_debug_exception. So, manually :( I reviewed the code and put
-> NOKPROBE_SYMBOL across all those.
+> MSI-like interrupts are starting to creep out of the PCI world, and
+> can now be seen into a number of "platform"-type busses. The
+> introduction of the MSI domains feature in v3.19 recognised that fact,
+> and started providing a way to implement this.
 > 
-> However, now I am doing some more tests  and as I said in previous
-> reply, there are still few symbols like (_mcount) which is creating
-> problem with following simple test and I need to look into that. In
-> case of _mcount, I do not see any print and its complete freeze.
+> Another problem we have to solve is to identify which MSI domain a
+> device is "connected" to. Currently, PCI gets away with a mixture of
+> arch-specific callbacks, and a msi_controller structure that can
+> optionally carry a pointer to an MSI domain. As we add new bus types
+> and start dealing with topologies that do not map to what PCI does,
+> this doesn't scale anymore.
 > 
+> This patch series tries to address some of it by providing a basic
+> link between 'struct device' and an MSI domain. It also adds :
+> 
+> - a way to "tag" domains according to the "type" of interrupt it
+>   provides (PCI/MSI, platform MSI...), allowing a driver for a piece
+>   of HW identified by its device_node to provide several IRQ domains
+> 
+> - (yet another) way for PCI to propagate the domain pointer through
+>   the PCI device hierarchy, providing a method for OF to kick-start
+>   the propagation process, and finally allowing the PCI/MSI layer to
+>   use that information
+> 
+> - a similar way to hook an MSI domain to a platform device.
+> 
+> Hopefully this can serve as a model to implement support for different
+> but types.
+> 
+> Additionally, the last few patches use all the above to remove any
+> trace of the msi_controller structure from the three MSI controllers
+> we use on arm64, so that they solely rely on the above infrastructure,
+> leading to some interesting improvements. We take this opportunity to
+> also kill the domain pointer from the msi_controller structure.
+> 
+> My hope is to eventually kill msi_controller entirely, and only rely
+> on the msi_domain contained in the device structure (any help
+> welcomed).
 
-Once these two patches are applied, I do not see any issue (at least)
-in enabling kprobes for all the symbols of /proc/kallsyms, except
-_mcount. Blacklisting _mcount seems reasonable to me, as this is
-called from every function and so from do_debug_exception as well.
+And kill pcibios_msi_controller from arch/arm, which means we have
+to convert all arm platforms relying on pci_sys_data for the MSI look-up,
+I only have an iMX6 Sabrelite, so yes, help is welcome here.
 
-There might still be some path which can create issue if a kprobe is
-inserted there, but I do not see any way to find them. So,
-I will send V2 with following updates.Please let me know if there is
-any other concern.
+BTW, is there a reason why _all_ arm host bridges rely on
+pcibios_msi_controller (so pci_sys_data) instead of initializing
+the struct pci_bus.msi pointer to carry out the MSI controller look-up ?
 
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -26,6 +26,7 @@
-#include <linux/syscalls.h>
-#include <linux/uaccess.h>
-#include <linux/io.h>
-+#include <linux/kprobes.h>
-    
-#include <asm/checksum.h>
-      
-@@ -64,4 +65,5 @@ EXPORT_SYMBOL(test_and_change_bit);
-       
-#ifdef CONFIG_FUNCTION_TRACER
-EXPORT_SYMBOL(_mcount);
-+NOKPROBE_SYMBOL(_mcount);
-#endif
+I do not see any (and I want to get rid of pcibios_msi_controller on
+arm asap, if we can use the struct pci_bus.msi pointer patch that's
+trivial).
 
-~Pratyush
+I know that the way forward is by doing it through domains and this
+patchset, just asking (to understand why pcibios_msi_controller is
+even needed on arm at present).
 
-PS:
-Some related details are here:
-http://marc.info/?l=linux-kernel&m=143644472722751
+> This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
+> (FVP model).
+
+I tested it on arm64 AMD Seattle too, so FWIW:
+
+Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> Patches are on top of 4.2-rc1 and available at:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/msi_domain
+> 
+> As always, comments most welcome.
+> 
+> Marc Zyngier (15):
+>   genirq: irqdomain: Allow irq domain aliasing
+>   PCI: MSI: Register irq domain with specific token
+>   device core: Introduce per-device MSI domain pointer
+>   PCI/MSI: Add hooks to populate the msi_domain field
+>   PCI/MSI: of: Add support for OF-provided msi_domain
+>   PCI/MSI: of: Allow msi_domain lookup using the host bridge node
+>   PCI/MSI: Let pci_msi_get_domain use struct device's msi_domain
+>   platform: of: Assign MSI domain to platform device
+>   irqchip: gicv3-its: Split PCI/MSI code from the core ITS driver
+>   irqchip: gicv3-its: Register irq domain with platform MSI token
+>   irqchip: GICv2m: Get rid of struct msi_controller
+>   irqchip: gicv3-its: Get rid of struct msi_controller
+>   irqchip: gicv3-its: Make the PCI/MSI code standalone
+>   PCI/MSI: pci-xgene-msi: Get rid of struct msi_controller
+>   PCI/MSI: Drop domain field from msi_controller
+> 
+>  arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |   3 +-
+>  arch/powerpc/platforms/cell/interrupt.c          |   3 +-
+>  arch/powerpc/platforms/embedded6xx/flipper-pic.c |   3 +-
+>  arch/powerpc/platforms/powermac/pic.c            |   3 +-
+>  arch/powerpc/platforms/powernv/opal-irqchip.c    |   3 +-
+>  arch/powerpc/platforms/ps3/interrupt.c           |   3 +-
+>  arch/powerpc/sysdev/ehv_pic.c                    |   3 +-
+>  arch/powerpc/sysdev/i8259.c                      |   3 +-
+>  arch/powerpc/sysdev/ipic.c                       |   3 +-
+>  arch/powerpc/sysdev/mpic.c                       |   3 +-
+>  arch/powerpc/sysdev/qe_lib/qe_ic.c               |   3 +-
+>  arch/powerpc/sysdev/xics/xics-common.c           |   3 +-
+>  drivers/irqchip/Makefile                         |   2 +-
+>  drivers/irqchip/irq-gic-v2m.c                    |  27 ++---
+>  drivers/irqchip/irq-gic-v3-its-pci-msi.c         | 135 +++++++++++++++++++++++
+>  drivers/irqchip/irq-gic-v3-its.c                 | 130 ++++------------------
+>  drivers/of/irq.c                                 |  16 +++
+>  drivers/of/platform.c                            |   1 +
+>  drivers/pci/host/pci-xgene-msi.c                 |  41 +++----
+>  drivers/pci/msi.c                                |  11 +-
+>  drivers/pci/of.c                                 |  24 ++++
+>  drivers/pci/probe.c                              |  31 ++++++
+>  include/linux/device.h                           |  20 ++++
+>  include/linux/irqchip/arm-gic-v3.h               |   3 +
+>  include/linux/irqdomain.h                        |  25 ++++-
+>  include/linux/msi.h                              |   3 -
+>  include/linux/of_irq.h                           |   1 +
+>  include/linux/pci.h                              |   3 +
+>  kernel/irq/irqdomain.c                           |  18 ++-
+>  29 files changed, 350 insertions(+), 177 deletions(-)
+>  create mode 100644 drivers/irqchip/irq-gic-v3-its-pci-msi.c
+> 
+> -- 
+> 2.1.4
+> 
