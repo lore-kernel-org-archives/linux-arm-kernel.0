@@ -1,73 +1,96 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Thu, 9 Jul 2015 11:32:05 +0800
-Subject: [PATCH v2] arm64: dts: mt8173: Add afe device node
-Message-ID: <1436412725-55129-1-git-send-email-koro.chen@mediatek.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Thu, 9 Jul 2015 11:52:49 +0800
+Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
+ socfpga_secondary_startup
+In-Reply-To: <20150708210734.GN7557@n2100.arm.linux.org.uk>
+References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150708165115.GM7557@n2100.arm.linux.org.uk>
+ <559D765C.30102@opensource.altera.com>
+ <20150708210734.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <20150709115249.18fefe8d@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds afe (audio front end) device node to the MT8173 dtsi file.
+Dear Russell,
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
----
-This patch is based on Matthias's tree:
-https://github.com/mbgg/linux-mediatek
-branch: v4.2-next/arm64
+On Wed, 8 Jul 2015 22:07:34 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-Changes since v1:
-- change node name to afe: audio-controller at 11220000
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+> On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
+> > The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
+> > user mode access.
+> 
+> Hmm.
+> 
+> I think what you've found is a(nother) latent bug in the CPU bring up
+> code.
+> 
+> For SMP CPUs, the sequence we're following during early initialisation is:
+> 
+> 1. Enable SMP coherency.
+> 2. Invalidate the caches.
+> 
+> If the cache contains rubbish, enabling SMP coherency before invalidating
+> the cache is plainly an absurd thing to do.
+> 
+> Can you try the patch below - not tested in any way, so you may need to
+> tweak it, but it should allow us to prove that point.
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0716bbe19872..db5137fc297d 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -275,6 +275,10 @@ __v7_b15mp_setup:
+>  __v7_ca17mp_setup:
+>  	mov	r10, #0
+>  1:
+> +	adr	r12, __v7_setup_stack		@ the local stack
+> +	stmia	r12, {r0-r5, r7, r9-r11, lr}
+> +	bl      v7_invalidate_l1
+> +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 0696f8f..ce9255a 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
- 
-@@ -393,6 +394,37 @@
- 			#size-cells = <0>;
- 			status = "disabled";
- 		};
-+
-+		afe: audio-controller at 11220000  {
-+			compatible = "mediatek,mt8173-afe-pcm";
-+			reg = <0 0x11220000 0 0x1000>;
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_EDGE_FALLING>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
-+			clocks = <&infracfg CLK_INFRA_AUDIO>,
-+				 <&topckgen CLK_TOP_AUDIO_SEL>,
-+				 <&topckgen CLK_TOP_AUD_INTBUS_SEL>,
-+				 <&topckgen CLK_TOP_APLL1_DIV0>,
-+				 <&topckgen CLK_TOP_APLL2_DIV0>,
-+				 <&topckgen CLK_TOP_I2S0_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S1_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S2_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S3_M_SEL>,
-+				 <&topckgen CLK_TOP_I2S3_B_SEL>;
-+			clock-names = "infra_sys_audio_clk",
-+				      "top_pdn_audio",
-+				      "top_pdn_aud_intbus",
-+				      "bck0",
-+				      "bck1",
-+				      "i2s0_m",
-+				      "i2s1_m",
-+				      "i2s2_m",
-+				      "i2s3_m",
-+				      "i2s3_b";
-+			assigned-clocks = <&topckgen CLK_TOP_AUD_1_SEL>,
-+					  <&topckgen CLK_TOP_AUD_2_SEL>;
-+			assigned-clock-parents = <&topckgen CLK_TOP_APLL1>,
-+						 <&topckgen CLK_TOP_APLL2>;
-+		};
- 	};
- };
- 
--- 
-1.8.1.1.dirty
+Some CPUs such as CA7 need enable SMP before any cache maintenance.
+
+CA7 TRM says something about SMP bit:
+"You must ensure this bit is set to 1 before the caches and MMU are enabled,
+or any cache and TLB maintenance operations are performed."
+
+So it seems we need to use different path for different CPUs.
+
+Also CA7 would invalidate L1 automatically once reset, can we remove the
+invalidate op in CA7 case?
+
+I'm not sure I understand the code correctly, criticism is welcome.
+
+Thanks,
+Jisheng
+
+>  #ifdef CONFIG_SMP
+>  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+>  	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
+> @@ -283,7 +287,7 @@ __v7_ca17mp_setup:
+>  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+>  	mcreq	p15, 0, r0, c1, c0, 1
+>  #endif
+> -	b	__v7_setup
+> +	b	__v7_setup_cont
+>  
+>  /*
+>   * Errata:
+> @@ -417,6 +421,7 @@ __v7_setup:
+>  	bl      v7_invalidate_l1
+>  	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+>  
+> +__v7_setup_cont:
+>  	and	r0, r9, #0xff000000		@ ARM?
+>  	teq	r0, #0x41000000
+>  	bne	__errata_finish
+> @@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
+>  
+>  	.align	2
+>  __v7_setup_stack:
+> -	.space	4 * 11				@ 11 registers
+> +	.space	4 * 12				@ 12 registers
+>  
+>  	__INITDATA
+>  
