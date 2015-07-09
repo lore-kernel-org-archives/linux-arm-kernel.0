@@ -1,93 +1,291 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:26 +0100
-Subject: [PATCH v2 14/20] xen/grant-table: Make it running on 64KB granularity
+Date: Thu, 9 Jul 2015 21:42:24 +0100
+Subject: [PATCH v2 12/20] xen/balloon: Don't rely on the page granularity is
+ the same for Xen and Linux
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-15-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-13-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen interface is using 4KB page granularity. This means that each
-grant is 4KB.
+For ARM64 guests, Linux is able to support either 64K or 4K page
+granularity. Although, the hypercall interface is always based on 4K
+page granularity.
 
-The current implementation allocates a Linux page per grant. On Linux
-using 64KB page granularity, only the first 4KB of the page will be
-used.
+With 64K page granuliarty, a single page will be spread over multiple
+Xen frame.
 
-We could decrease the memory wasted by sharing the page with multiple
-grant. It will require some care with the {Set,Clear}ForeignPage macro.
+When a driver request/free a balloon page, the balloon driver will have
+to split the Linux page in 4K chunk before asking Xen to add/remove the
+frame from the guest.
 
-Note that no changes has been made in the x86 code because both Linux
-and Xen will only use 4KB page granularity.
+Note that this can work on any page granularity assuming it's a multiple
+of 4K.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Reviewed-by: David Vrabel <david.vrabel@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: David Vrabel <david.vrabel@citrix.com>
+Cc: Wei Liu <wei.liu2@citrix.com>
 ---
-    Changes in v2
-        - Add David's reviewed-by
+    Changes in v2:
+        - Use xen_apply_to_page to split a page in 4K chunk
+        - It's not necessary to have a smaller frame list. Re-use
+        PAGE_SIZE
+        - Convert reserve_additional_memory to use XEN_... macro
 ---
- arch/arm/xen/p2m.c        | 6 +++---
- drivers/xen/grant-table.c | 6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+ drivers/xen/balloon.c | 147 +++++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 105 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/xen/p2m.c b/arch/arm/xen/p2m.c
-index 887596c..0ed01f2 100644
---- a/arch/arm/xen/p2m.c
-+++ b/arch/arm/xen/p2m.c
-@@ -93,8 +93,8 @@ int set_foreign_p2m_mapping(struct gnttab_map_grant_ref *map_ops,
- 	for (i = 0; i < count; i++) {
- 		if (map_ops[i].status)
- 			continue;
--		set_phys_to_machine(map_ops[i].host_addr >> PAGE_SHIFT,
--				    map_ops[i].dev_bus_addr >> PAGE_SHIFT);
-+		set_phys_to_machine(map_ops[i].host_addr >> XEN_PAGE_SHIFT,
-+				    map_ops[i].dev_bus_addr >> XEN_PAGE_SHIFT);
- 	}
+diff --git a/drivers/xen/balloon.c b/drivers/xen/balloon.c
+index fd93369..19a72b1 100644
+--- a/drivers/xen/balloon.c
++++ b/drivers/xen/balloon.c
+@@ -230,6 +230,7 @@ static enum bp_state reserve_additional_memory(long credit)
+ 	nid = memory_add_physaddr_to_nid(hotplug_start_paddr);
  
- 	return 0;
-@@ -108,7 +108,7 @@ int clear_foreign_p2m_mapping(struct gnttab_unmap_grant_ref *unmap_ops,
- 	int i;
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++	/* TODO */
+         /*
+          * add_memory() will build page tables for the new memory so
+          * the p2m must contain invalid entries so the correct
+@@ -242,8 +243,8 @@ static enum bp_state reserve_additional_memory(long credit)
+ 	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+ 		unsigned long pfn, i;
  
- 	for (i = 0; i < count; i++) {
--		set_phys_to_machine(unmap_ops[i].host_addr >> PAGE_SHIFT,
-+		set_phys_to_machine(unmap_ops[i].host_addr >> XEN_PAGE_SHIFT,
- 				    INVALID_P2M_ENTRY);
- 	}
+-		pfn = PFN_DOWN(hotplug_start_paddr);
+-		for (i = 0; i < balloon_hotplug; i++) {
++		pfn = XEN_PFN_DOWN(hotplug_start_paddr);
++		for (i = 0; i < (balloon_hotplug * XEN_PFN_PER_PAGE); i++) {
+ 			if (!set_phys_to_machine(pfn + i, INVALID_P2M_ENTRY)) {
+ 				pr_warn("set_phys_to_machine() failed, no memory added\n");
+ 				return BP_ECANCELED;
+@@ -323,10 +324,72 @@ static enum bp_state reserve_additional_memory(long credit)
+ }
+ #endif /* CONFIG_XEN_BALLOON_MEMORY_HOTPLUG */
  
-diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-index 3679293..0a1f903 100644
---- a/drivers/xen/grant-table.c
-+++ b/drivers/xen/grant-table.c
-@@ -668,7 +668,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
- 	if (xen_auto_xlat_grant_frames.count)
- 		return -EINVAL;
- 
--	vaddr = xen_remap(addr, PAGE_SIZE * max_nr_gframes);
-+	vaddr = xen_remap(addr, XEN_PAGE_SIZE * max_nr_gframes);
- 	if (vaddr == NULL) {
- 		pr_warn("Failed to ioremap gnttab share frames (addr=%pa)!\n",
- 			&addr);
-@@ -680,7 +680,7 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
- 		return -ENOMEM;
- 	}
- 	for (i = 0; i < max_nr_gframes; i++)
--		pfn[i] = PFN_DOWN(addr) + i;
-+		pfn[i] = XEN_PFN_DOWN(addr) + i;
- 
- 	xen_auto_xlat_grant_frames.vaddr = vaddr;
- 	xen_auto_xlat_grant_frames.pfn = pfn;
-@@ -1004,7 +1004,7 @@ static void gnttab_request_version(void)
++static int set_frame(struct page *page, unsigned long pfn, void *data)
++{
++	unsigned long *index = data;
++
++	frame_list[(*index)++] = pfn;
++
++	return 0;
++}
++
++#ifdef CONFIG_XEN_HAVE_PVMMU
++static int pvmmu_update_mapping(struct page *page, unsigned long pfn,
++				void *data)
++{
++	unsigned long *index = data;
++	xen_pfn_t frame = frame_list[*index];
++
++	set_phys_to_machine(pfn, frame);
++	/* Link back into the page tables if not highmem. */
++	if (!PageHighMem(page)) {
++		int ret;
++		ret = HYPERVISOR_update_va_mapping(
++				(unsigned long)__va(pfn << XEN_PAGE_SHIFT),
++				mfn_pte(frame, PAGE_KERNEL),
++				0);
++		BUG_ON(ret);
++	}
++
++	(*index)++;
++
++	return 0;
++}
++#endif
++
++static int balloon_remove_mapping(struct page *page, unsigned long pfn,
++				  void *data)
++{
++	unsigned long *index = data;
++
++	/* We expect the frame_list to contain the same pfn */
++	BUG_ON(pfn != frame_list[*index]);
++
++	frame_list[*index] = pfn_to_mfn(pfn);
++
++#ifdef CONFIG_XEN_HAVE_PVMMU
++	if (!xen_feature(XENFEAT_auto_translated_physmap)) {
++		if (!PageHighMem(page)) {
++			int ret;
++
++			ret = HYPERVISOR_update_va_mapping(
++					(unsigned long)__va(pfn << XEN_PAGE_SHIFT),
++					__pte_ma(0), 0);
++			BUG_ON(ret);
++		}
++		__set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
++	}
++#endif
++
++	(*index)++;
++
++	return 0;
++}
++
+ static enum bp_state increase_reservation(unsigned long nr_pages)
  {
- 	/* Only version 1 is used, which will always be available. */
- 	grant_table_version = 1;
--	grefs_per_grant_frame = PAGE_SIZE / sizeof(struct grant_entry_v1);
-+	grefs_per_grant_frame = XEN_PAGE_SIZE / sizeof(struct grant_entry_v1);
- 	gnttab_interface = &gnttab_v1_ops;
+ 	int rc;
+-	unsigned long  pfn, i;
++	unsigned long i, frame_idx;
+ 	struct page   *page;
+ 	struct xen_memory_reservation reservation = {
+ 		.address_bits = 0,
+@@ -343,44 +406,43 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ 	}
+ #endif
  
- 	pr_info("Grant tables using version %d layout\n", grant_table_version);
+-	if (nr_pages > ARRAY_SIZE(frame_list))
+-		nr_pages = ARRAY_SIZE(frame_list);
++	if (nr_pages > (ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE))
++		nr_pages = ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE;
+ 
++	frame_idx = 0;
+ 	page = list_first_entry_or_null(&ballooned_pages, struct page, lru);
+ 	for (i = 0; i < nr_pages; i++) {
+ 		if (!page) {
+ 			nr_pages = i;
+ 			break;
+ 		}
+-		frame_list[i] = page_to_pfn(page);
++
++		rc = xen_apply_to_page(page, set_frame, &frame_idx);
++
+ 		page = balloon_next_page(page);
+ 	}
+ 
+ 	set_xen_guest_handle(reservation.extent_start, frame_list);
+-	reservation.nr_extents = nr_pages;
++	reservation.nr_extents = nr_pages * XEN_PFN_PER_PAGE;
+ 	rc = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
+ 	if (rc <= 0)
+ 		return BP_EAGAIN;
+ 
+-	for (i = 0; i < rc; i++) {
++	/* rc is equal to the number of Xen page populated */
++	nr_pages = rc / XEN_PFN_PER_PAGE;
++
++	for (i = 0; i < nr_pages; i++) {
+ 		page = balloon_retrieve(false);
+ 		BUG_ON(page == NULL);
+ 
+-		pfn = page_to_pfn(page);
+-
+ #ifdef CONFIG_XEN_HAVE_PVMMU
++		frame_idx = 0;
+ 		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+-			set_phys_to_machine(pfn, frame_list[i]);
+-
+-			/* Link back into the page tables if not highmem. */
+-			if (!PageHighMem(page)) {
+-				int ret;
+-				ret = HYPERVISOR_update_va_mapping(
+-						(unsigned long)__va(pfn << PAGE_SHIFT),
+-						mfn_pte(frame_list[i], PAGE_KERNEL),
+-						0);
+-				BUG_ON(ret);
+-			}
++			int ret;
++
++			ret = xen_apply_to_page(page, pvmmu_update_mapping,
++						&frame_idx);
++			BUG_ON(ret);
+ 		}
+ #endif
+ 
+@@ -388,7 +450,7 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ 		__free_reserved_page(page);
+ 	}
+ 
+-	balloon_stats.current_pages += rc;
++	balloon_stats.current_pages += nr_pages;
+ 
+ 	return BP_DONE;
+ }
+@@ -396,7 +458,7 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
+ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ {
+ 	enum bp_state state = BP_DONE;
+-	unsigned long  pfn, i;
++	unsigned long  pfn, i, frame_idx, nr_frames;
+ 	struct page   *page;
+ 	int ret;
+ 	struct xen_memory_reservation reservation = {
+@@ -414,9 +476,10 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 	}
+ #endif
+ 
+-	if (nr_pages > ARRAY_SIZE(frame_list))
+-		nr_pages = ARRAY_SIZE(frame_list);
++	if (nr_pages > (ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE))
++		nr_pages = ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE;
+ 
++	frame_idx = 0;
+ 	for (i = 0; i < nr_pages; i++) {
+ 		page = alloc_page(gfp);
+ 		if (page == NULL) {
+@@ -426,9 +489,12 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 		}
+ 		scrub_page(page);
+ 
+-		frame_list[i] = page_to_pfn(page);
++		ret = xen_apply_to_page(page, set_frame, &frame_idx);
++		BUG_ON(ret);
+ 	}
+ 
++	nr_frames = nr_pages * XEN_PFN_PER_PAGE;
++
+ 	/*
+ 	 * Ensure that ballooned highmem pages don't have kmaps.
+ 	 *
+@@ -439,22 +505,19 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 	kmap_flush_unused();
+ 
+ 	/* Update direct mapping, invalidate P2M, and add to balloon. */
++	frame_idx = 0;
+ 	for (i = 0; i < nr_pages; i++) {
+-		pfn = frame_list[i];
+-		frame_list[i] = pfn_to_mfn(pfn);
+-		page = pfn_to_page(pfn);
++		/*
++		 * The Xen PFN for a given Linux Page are contiguous in
++		 * frame_list
++		 */
++		pfn = frame_list[frame_idx];
++		page = xen_pfn_to_page(pfn);
+ 
+-#ifdef CONFIG_XEN_HAVE_PVMMU
+-		if (!xen_feature(XENFEAT_auto_translated_physmap)) {
+-			if (!PageHighMem(page)) {
+-				ret = HYPERVISOR_update_va_mapping(
+-						(unsigned long)__va(pfn << PAGE_SHIFT),
+-						__pte_ma(0), 0);
+-				BUG_ON(ret);
+-			}
+-			__set_phys_to_machine(pfn, INVALID_P2M_ENTRY);
+-		}
+-#endif
++
++		ret = xen_apply_to_page(page, balloon_remove_mapping,
++					&frame_idx);
++		BUG_ON(ret);
+ 
+ 		balloon_append(page);
+ 	}
+@@ -462,9 +525,9 @@ static enum bp_state decrease_reservation(unsigned long nr_pages, gfp_t gfp)
+ 	flush_tlb_all();
+ 
+ 	set_xen_guest_handle(reservation.extent_start, frame_list);
+-	reservation.nr_extents   = nr_pages;
++	reservation.nr_extents   = nr_frames;
+ 	ret = HYPERVISOR_memory_op(XENMEM_decrease_reservation, &reservation);
+-	BUG_ON(ret != nr_pages);
++	BUG_ON(ret != nr_frames);
+ 
+ 	balloon_stats.current_pages -= nr_pages;
+ 
 -- 
 2.1.4
