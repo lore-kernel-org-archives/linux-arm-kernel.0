@@ -1,74 +1,118 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Jul 2015 10:10:39 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/3] ARM: dts: axp152: Add a dtsi file
- for the axp152 pmic
-In-Reply-To: <559A70B6.3010101@redhat.com>
-References: <1435088503-20776-1-git-send-email-hdegoede@redhat.com>
- <1435088503-20776-3-git-send-email-hdegoede@redhat.com>
- <20150625174027.GF2266@lukather> <558D0BC2.10004@redhat.com>
- <20150706085713.GE3269@lukather> <559A70B6.3010101@redhat.com>
-Message-ID: <20150709081039.GQ28632@lukather>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 09 Jul 2015 10:17:52 +0200
+Subject: [PATCH 3/7] dmaengine: st_fdma: Add STMicroelectronics FDMA
+ engine driver support
+In-Reply-To: <1436371888-27863-4-git-send-email-peter.griffin@linaro.org>
+References: <1436371888-27863-1-git-send-email-peter.griffin@linaro.org>
+ <1436371888-27863-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1436429872.20619.77.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 02:12:38PM +0200, Hans de Goede wrote:
-> Hi,
+On wo, 2015-07-08 at 17:11 +0100, Peter Griffin wrote:
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+ 
+> +config ST_FDMA
+> +	bool "ST FDMA dmaengine support"
+> +	depends on ARCH_STI
+> +	select DMA_ENGINE
+> +	select FW_LOADER
+> +	select FW_LOADER_USER_HELPER_FALLBACK
+> +	select LIBELF_32
+> +	select DMA_VIRTUAL_CHANNELS
+> +	help
+> +	  Enable support for ST FDMA controller.
+> +	  It supports 16 independent DMA channels, accepts up to 32 DMA requests
+> +
+> +	  Say Y here if you have such a chipset.
+> +	  If unsure, say N.
+
+> --- a/drivers/dma/Makefile
+> +++ b/drivers/dma/Makefile
 > 
-> On 06-07-15 10:57, Maxime Ripard wrote:
-> >Hi,
-> >
-> >On Fri, Jun 26, 2015 at 10:22:26AM +0200, Hans de Goede wrote:
-> >>Hi,
-> >>
-> >>On 25-06-15 19:40, Maxime Ripard wrote:
-> >>>Hi,
-> >>>
-> >>>On Tue, Jun 23, 2015 at 09:41:42PM +0200, Hans de Goede wrote:
-> >>>>From: Michal Suchanek <hramrach@gmail.com>
-> >>>>
-> >>>>Add a dtsi file for the axp152 pmic, this mirrors the way things are
-> >>>>handled for the axp202 pmic.
-> >>>>
-> >>>>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> >>>>---
-> >>>>  arch/arm/boot/dts/axp152.dtsi | 49 +++++++++++++++++++++++++++++++++++++++++++
-> >>>>  1 file changed, 49 insertions(+)
-> >>>>  create mode 100644 arch/arm/boot/dts/axp152.dtsi
-> >>>
-> >>>Unfortunately, Mark expressed clearly that he didn't want such files.
-> >>
-> >>That is not how I remember the discussion, he said that he did not consider
-> >>them useful, we explained why we do consider them useful for the sunxi
-> >>case and then things went quiet.
-> >>
-> >>And we do already have an axp209.dtsi, and I find having that useful
-> >>for enabling the regulators on axp209 using boards.
-> >
-> >Hmmm, reading this discussion again, it indeed looks like I
-> >misremembered what he was saying.
-> >
-> >>Ultimately it is your call, but I really think we should be consistent
-> >>and add an axp152.dtsi to mirror how we do things with the axp209.
-> >
-> >Was there any other comments on this serie (and are you going to send
-> >a v2?) or should I apply this patch?
-> 
-> There were some comments on the actual mfd bits of this series, and
-> I will send a v2 for that sometime this week. The dts patches however
-> are good to go, so please apply this one.
+> +obj-$(CONFIG_ST_FDMA) += st_fdma.o
 
-Applied 2 and 3 then. Thanks!
+ST_FDMA is a bool symbol, so st_fdma.o can only be built-in.
 
-Maxime
+> --- /dev/null
+> +++ b/drivers/dma/st_fdma.c
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150709/8933a5a6/attachment-0001.sig>
+> +#include <linux/module.h>
+
+Needed?
+
+> +void *st_fdma_seg_to_mem(struct st_fdma_dev *fdev, u64 da, int len)
+
+static?
+
+> +{
+> +	[...]
+> +}
+
+> +static int
+> +st_fdma_elf_load_segments(struct st_fdma_dev *fdev, const struct 
+> firmware *fw)
+> +{
+> +	[...]
+> +		dst = st_fdma_seg_to_mem(fdev, da, memsz);
+> +		[...]
+> +}
+
+> +static const struct of_device_id st_fdma_match[] = {
+> +	{ .compatible = "st,fdma_mpe31", .data = &fdma_mpe31 },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, st_fdma_match);
+
+MODULE_DEVICE_TABLE() is preprocessed away for built-in only code.
+
+> +static int __exit st_fdma_remove(struct platform_device *pdev)
+> +{
+> +	struct st_fdma_dev *fdev = platform_get_drvdata(pdev);
+> +
+> +	wait_for_completion(&fdev->fw_ack);
+> +
+> +	st_fdma_clk_disable(fdev);
+> +
+> +	return 0;
+> +}
+
+Since this driver is built-in only this means st_fdma_remove() can never
+be used, right?
+
+> +static struct platform_driver st_fdma_platform_driver = {
+> +	.driver = {
+> +		.name = "st-fdma",
+> +		.of_match_table = st_fdma_match,
+> +		.pm = ST_FDMA_PM,
+> +	},
+> +	.probe = st_fdma_probe,
+> +	.remove = st_fdma_remove,
+> +};
+> +module_platform_driver(st_fdma_platform_driver);
+
+So can .remove be dropped?
+
+Since v4.2-rc1 there's builtin_platform_driver() for built-in only code.
+
+> +bool st_fdma_filter_fn(struct dma_chan *chan, void *param)
+> +{
+> +	[...]
+> +}
+> +EXPORT_SYMBOL(st_fdma_filter_fn);
+
+This series adds no users of this export. I suppose they will be added
+in another series. Is that correct?
+
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_DESCRIPTION("STMicroelectronics FDMA engine driver");
+> +MODULE_AUTHOR("Ludovic.barre <Ludovic.barre@st.com>");
+
+These macros will, basically, be preprocessed away for built-in only
+code.
+
+Thanks,
+
+
+Paul Bolle
