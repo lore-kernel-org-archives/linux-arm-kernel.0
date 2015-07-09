@@ -1,93 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 09 Jul 2015 15:35:05 +0100
-Subject: [PATCH v3 00/15] Introducing per-device MSI domain
-In-Reply-To: <20150709135809.GA5223@red-moon>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <20150709135809.GA5223@red-moon>
-Message-ID: <559E8699.4010007@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 09 Jul 2015 17:37:22 +0300
+Subject: [PATCH v2 0/7] KVM: arm/arm64: gsi routing support
+In-Reply-To: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <023601d0ba54$c4d6e020$4e84a060$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+ Hello!
 
-On 09/07/15 14:58, Lorenzo Pieralisi wrote:
-> On Tue, Jul 07, 2015 at 06:17:50PM +0100, Marc Zyngier wrote:
->> [Picking up this series again after sleeping on it for too long,
->>  hopefully still relevant]
->>
->> MSI-like interrupts are starting to creep out of the PCI world, and
->> can now be seen into a number of "platform"-type busses. The
->> introduction of the MSI domains feature in v3.19 recognised that fact,
->> and started providing a way to implement this.
->>
->> Another problem we have to solve is to identify which MSI domain a
->> device is "connected" to. Currently, PCI gets away with a mixture of
->> arch-specific callbacks, and a msi_controller structure that can
->> optionally carry a pointer to an MSI domain. As we add new bus types
->> and start dealing with topologies that do not map to what PCI does,
->> this doesn't scale anymore.
->>
->> This patch series tries to address some of it by providing a basic
->> link between 'struct device' and an MSI domain. It also adds :
->>
->> - a way to "tag" domains according to the "type" of interrupt it
->>   provides (PCI/MSI, platform MSI...), allowing a driver for a piece
->>   of HW identified by its device_node to provide several IRQ domains
->>
->> - (yet another) way for PCI to propagate the domain pointer through
->>   the PCI device hierarchy, providing a method for OF to kick-start
->>   the propagation process, and finally allowing the PCI/MSI layer to
->>   use that information
->>
->> - a similar way to hook an MSI domain to a platform device.
->>
->> Hopefully this can serve as a model to implement support for different
->> but types.
->>
->> Additionally, the last few patches use all the above to remove any
->> trace of the msi_controller structure from the three MSI controllers
->> we use on arm64, so that they solely rely on the above infrastructure,
->> leading to some interesting improvements. We take this opportunity to
->> also kill the domain pointer from the msi_controller structure.
->>
->> My hope is to eventually kill msi_controller entirely, and only rely
->> on the msi_domain contained in the device structure (any help
->> welcomed).
-> 
-> And kill pcibios_msi_controller from arch/arm, which means we have
-> to convert all arm platforms relying on pci_sys_data for the MSI look-up,
-> I only have an iMX6 Sabrelite, so yes, help is welcome here.
+> v1 -> v2:
+> - user API changed:
+>   x devid id passed in kvm_irq_routing_msi
+>   x kept the new routing entry type: KVM_IRQ_ROUTING_EXTENDED_MSI
 
-Ah, yet another way to squirrel information away. Lovely. Yes, that
-needs consolidating too, which means converting all ARM MSI controllers
-to PCI/MSI IRQ domains. I did it for Tegra a long while ago, but don't
-have the HW - anyone with a Tegra4 that could test this?
+ Andre, you never replied to my last comment to the previous series. Are you going to do the same
+change in your MSI API? Otherwise:
+1. KVM_IRQ_LINE - we have completely own convention. Well, this was already done before us, we
+cannot fix it.
+2. KVM_SIGNAL_MSI - we use VALID_DEVID flag plus devid
+3. KVM_SET_GSI_ROUTING - we use KVM_IRQ_ROUTING_EXTENDED_MSI plus devid
 
-> BTW, is there a reason why _all_ arm host bridges rely on
-> pcibios_msi_controller (so pci_sys_data) instead of initializing
-> the struct pci_bus.msi pointer to carry out the MSI controller look-up ?
+ Don't (2) and (3) together still look bad? Since we agreed on not using flags, i would suggest to
+have KVM_SIGNAL_EXTENDED_MSI counterpart, which also doesn't use flags.
+ I know, we were already talking about it, so, if this gets ignored for the second time, i assume
+the Architects decided that fancy APIs are cool, and i promise to stop this.
 
-Probably an ordering issue - the bus may not be there yet. But ensuring
-that the MSI domain is created early (before the bus is scanned) should
-solve that problem nicely enough.
-
-> I do not see any (and I want to get rid of pcibios_msi_controller on
-> arm asap, if we can use the struct pci_bus.msi pointer patch that's
-> trivial).
-> 
-> I know that the way forward is by doing it through domains and this
-> patchset, just asking (to understand why pcibios_msi_controller is
-> even needed on arm at present).
-> 
->> This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
->> (FVP model).
-> 
-> I tested it on arm64 AMD Seattle too, so FWIW:
-> 
-> Tested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-Excellent, thanks a lot!
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
