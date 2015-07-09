@@ -1,90 +1,51 @@
-From: adam.yh.lee@gmail.com (Adam YH Lee)
-Date: Thu,  9 Jul 2015 15:37:57 -0700
-Subject: [PATCH v2] ARM: dts: configure regulators for Gumstix Pepper
-Message-ID: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 09 Jul 2015 15:39:27 -0700
+Subject: [GIT PULL] omap fixes against v4.2-rc1
+In-Reply-To: <20150709094130.GK10644@atomide.com> (Tony Lindgren's message of
+ "Thu, 9 Jul 2015 02:41:30 -0700")
+References: <20150709094130.GK10644@atomide.com>
+Message-ID: <7hio9tarc0.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Boot process is halting in midway because some of the necessary voltage
-regulators are deemed unused and subsequently powered off, leading to
-a completely unresponsive system.
+Tony Lindgren <tony@atomide.com> writes:
 
-Most of the device nodes had correct voltage regulator attachments.
-Yet these nodes had to set stricter enforcement on them through
-'regulator-boot-on' and 'regulator-always-on' to function correctly.
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+>
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/fixes-rc1
+>
+> for you to fetch changes up to ae745302c0a3e2b5b768690f631fc14db44467e7:
+>
+>   Merge branch 'fixes-rc1' into omap-for-v4.2/fixes (2015-07-06 05:33:17 -0700)
+>
+> ----------------------------------------------------------------
+> Minor fixes for omaps against v4.2-rc1. Mostly just minor dts changes
+> except for a GPMC fix to not use names for probing devices. Also a
+> one liner clean-up to remove unecessary return from a void function.
+>
+> The summary for the changes being:
+>
+> - Fix probe for GPMC devices by reoving limitations based on device
+>   name
+>
+> - Remove unnecessary return from a void function
+>
+> - Revert beaglebone RTC sleep fix, we now have a better fix merged
+>
+> - Add am4372 EMIF node to fix a warning
+>
+> - Add am57xx-beagle-x15 power supply to fix USB2 if USB1 is disabled
+>
+> - Disable rfbi for am4372 as it does not have a driver
+>
+> ----------------------------------------------------------------
 
-The consumers of the regulators this commit affect are the followings:
+Pulled into fixes,
 
-	DCDC1: vdd_1v8 system supply, USB-PHY, and ADC
-	DCDC2: Core domain
-	DCDC3: MPU core domain
-	 LDO1: RTC
-	 LDO2: 3v3 IO domain
-	 LDO3: USB-PHY; not a boot-time requirement
-	 LDO4: LCD [16:23]
+Thanks,
 
-All but LDO3 need to be always-on for the system to be functional.
-
-Additionally regulator-name properties have been added for the kernel to
-display the name from the schematic. This will improve diagnostics.
-
-Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
----
- arch/arm/boot/dts/am335x-pepper.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
-index 0d35ab6..661f835 100644
---- a/arch/arm/boot/dts/am335x-pepper.dts
-+++ b/arch/arm/boot/dts/am335x-pepper.dts
-@@ -438,6 +438,7 @@
- 	regulators {
- 		dcdc1_reg: regulator at 0 {
- 			/* VDD_1V8 system supply */
-+			regulator-always-on;
- 		};
- 
- 		dcdc2_reg: regulator at 1 {
-@@ -446,6 +447,7 @@
- 			regulator-min-microvolt = <925000>;
- 			regulator-max-microvolt = <1325000>;
- 			regulator-boot-on;
-+			regulator-always-on;
- 		};
- 
- 		dcdc3_reg: regulator at 2 {
-@@ -454,25 +456,32 @@
- 			regulator-min-microvolt = <925000>;
- 			regulator-max-microvolt = <1150000>;
- 			regulator-boot-on;
-+			regulator-always-on;
- 		};
- 
- 		ldo1_reg: regulator at 3 {
- 			/* VRTC 1.8V always-on supply */
-+			regulator-name = "vrtc,vdds";
- 			regulator-always-on;
- 		};
- 
- 		ldo2_reg: regulator at 4 {
- 			/* 3.3V rail */
-+			regulator-name = "vdd_3v3aux";
-+			regulator-always-on;
- 		};
- 
- 		ldo3_reg: regulator at 5 {
- 			/* VDD_3V3A 3.3V rail */
-+			regulator-name = "vdd_3v3a";
- 			regulator-min-microvolt = <3300000>;
- 			regulator-max-microvolt = <3300000>;
- 		};
- 
- 		ldo4_reg: regulator at 6 {
- 			/* VDD_3V3B 3.3V rail */
-+			regulator-name = "vdd_3v3b";
-+			regulator-always-on;
- 		};
- 	};
- };
--- 
-2.1.4
+Kevin
