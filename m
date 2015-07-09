@@ -1,30 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Jul 2015 20:05:47 +0100
-Subject: [PATCH 3/3] regulator: 88pm800: Add dev_info to show probe
- success status
-In-Reply-To: <1436445692-10656-4-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1436445692-10656-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436445692-10656-4-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150709190547.GQ11162@sirena.org.uk>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 9 Jul 2015 15:07:33 -0400
+Subject: [RFC Patch V1 05/12] x86, PCI: Use for_pci_msi_entry() to access
+ MSI device list
+In-Reply-To: <1436428847-8886-6-git-send-email-jiang.liu@linux.intel.com>
+References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+ <1436428847-8886-6-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150709190733.GE21016@l.oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 06:11:32PM +0530, Vaibhav Hiremath wrote:
-> This patch adds dev_info line at the end of probe function, to
-> clearly put status of regulator probe on console. Useful during
-> development, specially to check bootlog.
+On Thu, Jul 09, 2015 at 04:00:40PM +0800, Jiang Liu wrote:
+> Use accessor for_pci_msi_entry() to access MSI device list, so we could
+> easily move msi_list from struct pci_dev into struct device later.
+> 
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
 
-> +	dev_info(&pdev->dev, "Regulator registered ...\n");
->  	return 0;
-
-No, this is pure noise - all you're doing is slowing down boot for users
-with no content.  Think about what would happen if every driver did
-this.  The core already displays the constraints when things are
-registered.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150709/4bdb1d8f/attachment.sig>
+Looks pretty simple. Acked- by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> ---
+>  arch/x86/pci/xen.c |    8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/x86/pci/xen.c b/arch/x86/pci/xen.c
+> index d22f4b5bbc04..ff31ab464213 100644
+> --- a/arch/x86/pci/xen.c
+> +++ b/arch/x86/pci/xen.c
+> @@ -179,7 +179,7 @@ static int xen_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>  	if (ret)
+>  		goto error;
+>  	i = 0;
+> -	list_for_each_entry(msidesc, &dev->msi_list, list) {
+> +	for_each_pci_msi_entry(msidesc, dev) {
+>  		irq = xen_bind_pirq_msi_to_irq(dev, msidesc, v[i],
+>  					       (type == PCI_CAP_ID_MSI) ? nvec : 1,
+>  					       (type == PCI_CAP_ID_MSIX) ?
+> @@ -230,7 +230,7 @@ static int xen_hvm_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>  	if (type == PCI_CAP_ID_MSI && nvec > 1)
+>  		return 1;
+>  
+> -	list_for_each_entry(msidesc, &dev->msi_list, list) {
+> +	for_each_pci_msi_entry(msidesc, dev) {
+>  		__pci_read_msi_msg(msidesc, &msg);
+>  		pirq = MSI_ADDR_EXT_DEST_ID(msg.address_hi) |
+>  			((msg.address_lo >> MSI_ADDR_DEST_ID_SHIFT) & 0xff);
+> @@ -274,7 +274,7 @@ static int xen_initdom_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>  	int ret = 0;
+>  	struct msi_desc *msidesc;
+>  
+> -	list_for_each_entry(msidesc, &dev->msi_list, list) {
+> +	for_each_pci_msi_entry(msidesc, dev) {
+>  		struct physdev_map_pirq map_irq;
+>  		domid_t domid;
+>  
+> @@ -386,7 +386,7 @@ static void xen_teardown_msi_irqs(struct pci_dev *dev)
+>  {
+>  	struct msi_desc *msidesc;
+>  
+> -	msidesc = list_entry(dev->msi_list.next, struct msi_desc, list);
+> +	msidesc = first_pci_msi_entry(dev);
+>  	if (msidesc->msi_attrib.is_msix)
+>  		xen_pci_frontend_disable_msix(dev);
+>  	else
+> -- 
+> 1.7.10.4
+> 
