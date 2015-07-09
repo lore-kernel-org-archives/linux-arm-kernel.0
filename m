@@ -1,64 +1,157 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 9 Jul 2015 10:45:44 +0800
-Subject: [PATCH v4 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <CAGS+omAWNwk_PRy-eeC4bgHQ-ZC2Kvh0sqpF47VD1sfJOhHWUw@mail.gmail.com>
-References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
- <1436189368-1826-2-git-send-email-yh.huang@mediatek.com>
- <CAGS+omAWNwk_PRy-eeC4bgHQ-ZC2Kvh0sqpF47VD1sfJOhHWUw@mail.gmail.com>
-Message-ID: <1436409944.4915.6.camel@mtksdaap41>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Thu, 9 Jul 2015 10:51:27 +0800
+Subject: [PATCH] ASoC: mediatek: Use platform_of_node for machine drivers
+Message-ID: <1436410287-61097-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-07-08 at 20:11 +0800, Daniel Kurtz wrote:
-> On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > Document the device-tree binding of MediatTek display PWM.
-> > The PWM has one channel to control the backlight brightness for display.
-> > It supports MT8173 and MT6595.
-> >
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
-> >  1 file changed, 24 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > new file mode 100644
-> > index 0000000..757b974
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > @@ -0,0 +1,24 @@
-> > +MediaTek display PWM controller
-> > +
-> > +Required properties:
-> > + - compatible: should be "mediatek,<name>-disp-pwm"
-> > +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
-> > +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
-> > + - reg: physical base address and length of the controller's registers
-> > + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-> > +   the cell format
-> > + - clocks: phandle and clock specifier of the PWM reference clock
-> > + - clock-names: must contain the following
-> > +   - "main": clock used to generate PWM signals
-> > +   - "mm": sync signals from the modules of mmsys
-> > +
-> > +Example:
-> > +       pwm0: pwm at 1401e000 {
-> > +               compatible = "mediatek,mt8173-disp-pwm",
-> > +                            "mediatek,mt6595-disp-pwm";
-> > +               reg = <0 0x1401e000 0 0x1000>;
-> > +               #pwm-cells = <2>;
-> > +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-> > +                        <&mmsys CLK_MM_DISP_PWM0MM>;
-> > +               clock-names = "main", "mm";
-> 
-> Should we include the pinctrl settings here to enable the PWM output?
-> 
+This replaces the platform_name in snd_soc_dai_link by device tree node.
 
-Since we use pwm-backlight driver to control backlight, we should enable
-PWM output in the backlight node.
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+ .../devicetree/bindings/sound/mt8173-max98090.txt     |  2 ++
+ .../bindings/sound/mt8173-rt5650-rt5676.txt           |  2 ++
+ sound/soc/mediatek/mt8173-max98090.c                  | 17 +++++++++++++----
+ sound/soc/mediatek/mt8173-rt5650-rt5676.c             | 19 +++++++++++++++----
+ 4 files changed, 32 insertions(+), 8 deletions(-)
 
-Ref:
-https://www.kernel.org/doc/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
-
-Regards,
-YH Huang
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-max98090.txt b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
+index 829bd26..519e97c 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-max98090.txt
+@@ -3,11 +3,13 @@ MT8173 with MAX98090 CODEC
+ Required properties:
+ - compatible : "mediatek,mt8173-max98090"
+ - mediatek,audio-codec: the phandle of the MAX98090 audio codec
++- mediatek,platform: the phandle of MT8173 ASoC platform
+ 
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-max98090";
+ 		mediatek,audio-codec = <&max98090>;
++		mediatek,platform = <&afe>;
+ 	};
+ 
+diff --git a/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
+index 61e98c9..f205ce9 100644
+--- a/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
++++ b/Documentation/devicetree/bindings/sound/mt8173-rt5650-rt5676.txt
+@@ -3,11 +3,13 @@ MT8173 with RT5650 RT5676 CODECS
+ Required properties:
+ - compatible : "mediatek,mt8173-rt5650-rt5676"
+ - mediatek,audio-codec: the phandles of rt5650 and rt5676 codecs
++- mediatek,platform: the phandle of MT8173 ASoC platform
+ 
+ Example:
+ 
+ 	sound {
+ 		compatible = "mediatek,mt8173-rt5650-rt5676";
+ 		mediatek,audio-codec = <&rt5650 &rt5676>;
++		mediatek,platform = <&afe>;
+ 	};
+ 
+diff --git a/sound/soc/mediatek/mt8173-max98090.c b/sound/soc/mediatek/mt8173-max98090.c
+index 4d44b58..2d2536a 100644
+--- a/sound/soc/mediatek/mt8173-max98090.c
++++ b/sound/soc/mediatek/mt8173-max98090.c
+@@ -103,7 +103,6 @@ static struct snd_soc_dai_link mt8173_max98090_dais[] = {
+ 		.name = "MAX98090 Playback",
+ 		.stream_name = "MAX98090 Playback",
+ 		.cpu_dai_name = "DL1",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.codec_name = "snd-soc-dummy",
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+ 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+@@ -114,7 +113,6 @@ static struct snd_soc_dai_link mt8173_max98090_dais[] = {
+ 		.name = "MAX98090 Capture",
+ 		.stream_name = "MAX98090 Capture",
+ 		.cpu_dai_name = "VUL",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.codec_name = "snd-soc-dummy",
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+ 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+@@ -125,7 +123,6 @@ static struct snd_soc_dai_link mt8173_max98090_dais[] = {
+ 	{
+ 		.name = "Codec",
+ 		.cpu_dai_name = "I2S",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.no_pcm = 1,
+ 		.codec_dai_name = "HiFi",
+ 		.init = mt8173_max98090_init,
+@@ -152,9 +149,21 @@ static struct snd_soc_card mt8173_max98090_card = {
+ static int mt8173_max98090_dev_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &mt8173_max98090_card;
+-	struct device_node *codec_node;
++	struct device_node *codec_node, *platform_node;
+ 	int ret, i;
+ 
++	platform_node = of_parse_phandle(pdev->dev.of_node,
++					 "mediatek,platform", 0);
++	if (!platform_node) {
++		dev_err(&pdev->dev, "Property 'platform' missing or invalid\n");
++		return -EINVAL;
++	}
++	for (i = 0; i < card->num_links; i++) {
++		if (mt8173_max98090_dais[i].platform_name)
++			continue;
++		mt8173_max98090_dais[i].platform_of_node = platform_node;
++	}
++
+ 	codec_node = of_parse_phandle(pdev->dev.of_node,
+ 				      "mediatek,audio-codec", 0);
+ 	if (!codec_node) {
+diff --git a/sound/soc/mediatek/mt8173-rt5650-rt5676.c b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
+index 0940553..6f52eca 100644
+--- a/sound/soc/mediatek/mt8173-rt5650-rt5676.c
++++ b/sound/soc/mediatek/mt8173-rt5650-rt5676.c
+@@ -138,7 +138,6 @@ static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
+ 		.name = "rt5650_rt5676 Playback",
+ 		.stream_name = "rt5650_rt5676 Playback",
+ 		.cpu_dai_name = "DL1",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.codec_name = "snd-soc-dummy",
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+ 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+@@ -149,7 +148,6 @@ static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
+ 		.name = "rt5650_rt5676 Capture",
+ 		.stream_name = "rt5650_rt5676 Capture",
+ 		.cpu_dai_name = "VUL",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.codec_name = "snd-soc-dummy",
+ 		.codec_dai_name = "snd-soc-dummy-dai",
+ 		.trigger = {SND_SOC_DPCM_TRIGGER_POST, SND_SOC_DPCM_TRIGGER_POST},
+@@ -161,7 +159,6 @@ static struct snd_soc_dai_link mt8173_rt5650_rt5676_dais[] = {
+ 	{
+ 		.name = "Codec",
+ 		.cpu_dai_name = "I2S",
+-		.platform_name = "11220000.mt8173-afe-pcm",
+ 		.no_pcm = 1,
+ 		.codecs = mt8173_rt5650_rt5676_codecs,
+ 		.num_codecs = 2,
+@@ -209,7 +206,21 @@ static struct snd_soc_card mt8173_rt5650_rt5676_card = {
+ static int mt8173_rt5650_rt5676_dev_probe(struct platform_device *pdev)
+ {
+ 	struct snd_soc_card *card = &mt8173_rt5650_rt5676_card;
+-	int ret;
++	struct device_node *platform_node;
++	int i, ret;
++
++	platform_node = of_parse_phandle(pdev->dev.of_node,
++					 "mediatek,platform", 0);
++	if (!platform_node) {
++		dev_err(&pdev->dev, "Property 'platform' missing or invalid\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < card->num_links; i++) {
++		if (mt8173_rt5650_rt5676_dais[i].platform_name)
++			continue;
++		mt8173_rt5650_rt5676_dais[i].platform_of_node = platform_node;
++	}
+ 
+ 	mt8173_rt5650_rt5676_codecs[0].of_node =
+ 		of_parse_phandle(pdev->dev.of_node, "mediatek,audio-codec", 0);
+-- 
+1.8.1.1.dirty
