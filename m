@@ -1,36 +1,58 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Jul 2015 18:13:54 +0200
-Subject: [PATCH 10/10] cpufreq-dt: Add support for operating-points-v2
- bindings
-In-Reply-To: <a486d730c2c2dacd387feee13a4c800fdc641077.1434369079.git.viresh.kumar@linaro.org>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <a486d730c2c2dacd387feee13a4c800fdc641077.1434369079.git.viresh.kumar@linaro.org>
-Message-ID: <3095426.xc9msIINgb@amdc1976>
+From: dianders@google.com (Doug Anderson)
+Date: Thu, 9 Jul 2015 09:25:53 -0700
+Subject: [PATCH v2 0/9] regulator: pwm-regulator: Introduce continuous-mode
+In-Reply-To: <20150709151429.6daf8fcb@bbrezillon>
+References: <1436281613-899-1-git-send-email-lee.jones@linaro.org>
+ <20150709083041.3b203eb1@bbrezillon> <20150709115158.GA3445@x1>
+ <20150709151429.6daf8fcb@bbrezillon>
+Message-ID: <CAD=FV=UkSgx0zRyJ6M2AqvWd3=jMr01ZXLC__8zr3awsYh5kyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
 Hi,
 
-On Monday, June 15, 2015 05:27:36 PM Viresh Kumar wrote:
-> Support for parsing operating-points-v2 bindings is in place now, lets
-> modify cpufreq-dt driver to use them.
+On Thu, Jul 9, 2015 at 6:14 AM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+>> If you wish to add a 3rd mode, then I'm sure Mark will accept
+>> submissions, but I think what you are suggesting would be pretty
+>> complex and out-of-scope of what this patch-set is trying to achieve.
+>
+> Okay, still don't get the need to add a new mode which is almost doing
+> the same thing when we could have implemented it in a generic way in the
+> first place. But if your version has already been accepted then I think
+> I'll have to propose a new mode :-/.
+>
+>>
+>> As a side note, then if the voltage isn't directly proportional to the
+>> duty cycle on a large scale i.e. max => min, then it will not likely
+>> be very accurate between say table entries 1 => 2, or 4 => 5, etc.
+>>
+>> What I suggest you do in your case is provide a larger table with all
+>> of the values you find interesting, as it sounds like your PWM
+>> regulator isn't doing what one would normally expect.
+>
+> Well, I do not exactly agree here. Yes if you want to have a precise
+> mapping you'll have to add more entries in your voltage table, but
+> using linear interpolation between two points can be precise enough on
+> some ranges and prevent one to define a complete voltage table in the
+> DT.
+>
+> Doug, could give more details about the regulator used on the veyron
+> board ?
 
-I believe that following patches:
+There's no need for a new mode as far as veyron is concerned.  The pwm
+regulator on veyron (as far as I understand it) acts the way that Lee
+describes.  Try doing the math on the values in the table and you
+should see that it's as linear as it can be while still using integral
+duty cycles.
 
-* [PATCH v2 1/7] opp: add dev_pm_opp_get_turbo_mode_setting() helper
-  (http://lkml.org/lkml/2015/7/9/420)
+Originally I only suggested using "linear interpolation" because:
 
-* [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
-  (http://lkml.org/lkml/2015/7/9/421)
+* It meant no bindings change, which is always nice to avoid.
 
-should be integrated into this patch series before patch #10 (the current
-one) can be applied.
+* It meant that old devices got this new mode, which is probably the
+right thing anyway (I think).  Maybe nobody has published DTS files
+with pwm-regulator, so the point is moot.
 
-[ Please see http://lkml.org/lkml/2015/7/9/419 for more details. ]
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-Doug
