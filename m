@@ -1,35 +1,36 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Thu, 09 Jul 2015 10:06:35 -0600
-Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-In-Reply-To: <20150709153458.GX18569@8bytes.org>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
- <1436289468.1391.89.camel@redhat.com> <20150709122805.GW18569@8bytes.org>
- <1436451223.1391.219.camel@redhat.com> <559E8771.9010401@redhat.com>
- <20150709153458.GX18569@8bytes.org>
-Message-ID: <1436457995.1391.231.camel@redhat.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Thu, 09 Jul 2015 18:13:54 +0200
+Subject: [PATCH 10/10] cpufreq-dt: Add support for operating-points-v2
+ bindings
+In-Reply-To: <a486d730c2c2dacd387feee13a4c800fdc641077.1434369079.git.viresh.kumar@linaro.org>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <a486d730c2c2dacd387feee13a4c800fdc641077.1434369079.git.viresh.kumar@linaro.org>
+Message-ID: <3095426.xc9msIINgb@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-09 at 17:34 +0200, Joerg Roedel wrote:
-> On Thu, Jul 09, 2015 at 04:38:41PM +0200, Paolo Bonzini wrote:
-> > >> On Tue, Jul 07, 2015 at 11:17:48AM -0600, Alex Williamson wrote:
-> > > If we think that it's *only* a kvm-vfio interaction then we could add it
-> > > to virt/kvm/vfio.c.  vfio could use symbol_get to avoid a module
-> > > dependency and effectively disable the code path when not used with kvm.
-> > > The reverse model of hosting it in vfio and using symbol_get from
-> > > kvm-vfio would also work.  Do we really want to declare it to be
-> > > kvm-vfio specific though?  Another option would be to simply host it
-> > > under virt/lib with module dependencies for both vfio and kvm.
-> > 
-> > I wonder if in the future we may have some kind of driver-mediated
-> > passthrough, e.g. for network drivers.  They might use the bypass
-> > mechanism too.  So I think drivers/vfio is too restrictive.
-> > 
-> > virt/ right now only hosts KVM, but it could for example host lguest
-> > too.  virt/lib/ is okay with me.
-> 
-> Yeah, virt/lib is probably the best choice.
 
-I will make it so.  Thanks,
+Hi,
 
-Alex
+On Monday, June 15, 2015 05:27:36 PM Viresh Kumar wrote:
+> Support for parsing operating-points-v2 bindings is in place now, lets
+> modify cpufreq-dt driver to use them.
+
+I believe that following patches:
+
+* [PATCH v2 1/7] opp: add dev_pm_opp_get_turbo_mode_setting() helper
+  (http://lkml.org/lkml/2015/7/9/420)
+
+* [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
+  (http://lkml.org/lkml/2015/7/9/421)
+
+should be integrated into this patch series before patch #10 (the current
+one) can be applied.
+
+[ Please see http://lkml.org/lkml/2015/7/9/419 for more details. ]
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
