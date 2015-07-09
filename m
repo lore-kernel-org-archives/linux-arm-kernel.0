@@ -1,95 +1,117 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 9 Jul 2015 14:35:52 +0800
-Subject: [PATCH v2 2/2] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <20150708173458.GB10589@red-moon>
-References: <1436359868-6176-1-git-send-email-jszhang@marvell.com>
- <1436359868-6176-3-git-send-email-jszhang@marvell.com>
- <20150708173458.GB10589@red-moon>
-Message-ID: <20150709143552.7f1f83ce@xhacker>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Thu, 9 Jul 2015 14:36:16 +0800
+Subject: [PATCH v4 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <CAGS+omAZismuEYXsUkHEAec4xF+KRWm62AuCUmrmso6p+DKQ4Q@mail.gmail.com>
+References: <1436189368-1826-1-git-send-email-yh.huang@mediatek.com>
+ <1436189368-1826-2-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omAWNwk_PRy-eeC4bgHQ-ZC2Kvh0sqpF47VD1sfJOhHWUw@mail.gmail.com>
+ <1436409944.4915.6.camel@mtksdaap41>
+ <CAGS+omAZismuEYXsUkHEAec4xF+KRWm62AuCUmrmso6p+DKQ4Q@mail.gmail.com>
+Message-ID: <1436423776.32314.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Lorenzo,
+On Thu, 2015-07-09 at 12:47 +0800, Daniel Kurtz wrote:
+> On Thu, Jul 9, 2015 at 10:45 AM, YH Huang <yh.huang@mediatek.com> wrote:
+> >
+> > On Wed, 2015-07-08 at 20:11 +0800, Daniel Kurtz wrote:
+> > > On Mon, Jul 6, 2015 at 9:29 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > > > Document the device-tree binding of MediatTek display PWM.
+> > > > The PWM has one channel to control the backlight brightness for display.
+> > > > It supports MT8173 and MT6595.
+> > > >
+> > > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > > > ---
+> > > >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 24 ++++++++++++++++++++++
+> > > >  1 file changed, 24 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> > > > new file mode 100644
+> > > > index 0000000..757b974
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> > > > @@ -0,0 +1,24 @@
+> > > > +MediaTek display PWM controller
+> > > > +
+> > > > +Required properties:
+> > > > + - compatible: should be "mediatek,<name>-disp-pwm"
+> > > > +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC
+> > > > +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC
+> > > > + - reg: physical base address and length of the controller's registers
+> > > > + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+> > > > +   the cell format
+> > > > + - clocks: phandle and clock specifier of the PWM reference clock
+> > > > + - clock-names: must contain the following
+> > > > +   - "main": clock used to generate PWM signals
+> > > > +   - "mm": sync signals from the modules of mmsys
 
-On Wed, 8 Jul 2015 18:34:58 +0100
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+- pinctrl-names: Must contain a "default" entry.
+- pinctrl-0: One property must exist for each entry in pinctrl-names.
+  See pinctrl/pinctrl-bindings.txt for details of the property values.
 
-> On Wed, Jul 08, 2015 at 01:51:08PM +0100, Jisheng Zhang wrote:
-> > This patch implements cpuidle_ops using psci. After this patch, we can
-> > use cpuidle-arm.c with psci backend for both arm and arm64.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm/kernel/Makefile       |  1 +
-> >  arch/arm/kernel/psci_cpuidle.c | 29 +++++++++++++++++++++++++++++
-> >  2 files changed, 30 insertions(+)
-> >  create mode 100644 arch/arm/kernel/psci_cpuidle.c
-> > 
-> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> > index 3b995f5..96383d8 100644
-> > --- a/arch/arm/kernel/Makefile
-> > +++ b/arch/arm/kernel/Makefile
-> > @@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-> >  ifeq ($(CONFIG_ARM_PSCI),y)
-> >  obj-y				+= psci-call.o
-> >  obj-$(CONFIG_SMP)		+= psci_smp.o
-> > +obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
-> >  endif
-> >  
-> >  extra-y := $(head-y) vmlinux.lds
-> > diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
-> > new file mode 100644
-> > index 0000000..ae85d97
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/psci_cpuidle.c
-> > @@ -0,0 +1,29 @@
-> > +/*
-> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> > + * Author: Jisheng Zhang <jszhang@marvell.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/cpuidle.h>
-> > +#include <linux/psci.h>
-> > +
-> > +#include <asm/cpuidle.h>
-> > +
-> > +static int psci_cpuidle_suspend(int cpu, unsigned long arg)
-> > +{
-> > +	return cpu_psci_cpu_suspend(arg);
-> > +}
-> > +
-> > +static int psci_cpuidle_init(struct device_node *node, int cpu)
-> > +{
-> > +	return cpu_psci_cpu_init_idle(cpu);
-> > +}
-> 
-> It probably makes sense to change the prototypes now that there is
-> just one cpuidle ops merged for arm, better now than later.
+> > > > +
+> > > > +Example:
+> > > > +       pwm0: pwm at 1401e000 {
+> > > > +               compatible = "mediatek,mt8173-disp-pwm",
+> > > > +                            "mediatek,mt6595-disp-pwm";
+> > > > +               reg = <0 0x1401e000 0 0x1000>;
+> > > > +               #pwm-cells = <2>;
+> > > > +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
+> > > > +                        <&mmsys CLK_MM_DISP_PWM0MM>;
+> > > > +               clock-names = "main", "mm";
 
-Good idea. I will do as you suggested.
+pio: pinctrl at 10005000 {
+...
 
-Thanks a lot,
-Jisheng
+   disp_pwm0_pins: disp_pwm0_pins {
+	pins1 {
+		pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
+        	bias-pull-up;
+        };
+   };
 
+...
+}
+
+pwm0: pwm at 1401e000 {
+	compatible = "mediatek,mt8173-disp-pwm";
+	reg = <0 0x1401e000 0 0x1000>;
+	#pwm-cells = <2>;
+	clocks = <&mmsys CLK_MM_DISP_PWM0MM>,
+		 <&mmsys CLK_MM_DISP_PWM026M>;
+	clock-names = "mm", "main";
+	pinctrl-names = "default";
+	pinctrl-0 = <&disp_pwm0_pins>;
+	status = "disabled";
+};
+
+So should I change dtsi like this?
+
+Regards,
+YH Huang
+
+> > >
+> > > Should we include the pinctrl settings here to enable the PWM output?
+> > >
+> >
+> > Since we use pwm-backlight driver to control backlight, we should enable
+> > PWM output in the backlight node.
+> >
+> > Ref:
+> > https://www.kernel.org/doc/Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+> >
 > 
-> I am not too fussed about leaving these shims, but I think this can
-> save us some time in the future.
+> The pwm-backlight binding specifies which pwm the backlight driver
+> should use, and how to use it.
 > 
-> Daniel what do you think ?
+> I believe actually configuring the output pin for the pwm via pinctl
+> belongs to the pwm binding.
 > 
-> Lorenzo
+> Regards,
+> 0Dan
 > 
-> > +
-> > +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> > +	.suspend = psci_cpuidle_suspend,
-> > +	.init = psci_cpuidle_init,
-> > +};
-> > +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
-> > -- 
-> > 2.1.4
-> > 
+> >
+> > Regards,
+> > YH Huang
+> >
