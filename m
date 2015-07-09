@@ -1,74 +1,59 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:13 +0100
-Subject: [PATCH v2 01/20] xen: Add Xen specific page definition
+Date: Thu, 9 Jul 2015 21:42:14 +0100
+Subject: [PATCH v2 02/20] xen: Introduce a function to split a Linux page into
+ Xen page
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Xen hypercall interface is always using 4K page granularity on ARM
-and x86 architecture.
+The Xen interface is always using 4KB page. This means that a Linux page
+may be split across multiple Xen page when the page granularity is not
+the same.
 
-With the incoming support of 64K page granularity for ARM64 guest, it
-won't be possible to re-use the Linux page definition in Xen drivers.
-
-Introduce Xen page definition helpers based on the Linux page
-definition. They have exactly the same name but prefixed with
-XEN_/xen_ prefix.
-
-Also modify page_to_pfn to use new Xen page definition.
+This helper will break down a Linux page into 4KB chunk and call the
+helper on each of them.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 Cc: David Vrabel <david.vrabel@citrix.com>
 ---
-    I'm wondering if we should drop page_to_pfn has the macro will likely
-    misuse when Linux is using 64KB page granularity.
-
     Changes in v2:
-        - Add XEN_PFN_UP
-        - Add a comment describing the behavior of page_to_pfn
+        - Patch added
 ---
- include/xen/page.h | 21 ++++++++++++++++++++-
- 1 file changed, 20 insertions(+), 1 deletion(-)
+ include/xen/page.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/include/xen/page.h b/include/xen/page.h
-index c5ed20b..8ebd37b 100644
+index 8ebd37b..b1f7722 100644
 --- a/include/xen/page.h
 +++ b/include/xen/page.h
-@@ -1,11 +1,30 @@
- #ifndef _XEN_PAGE_H
- #define _XEN_PAGE_H
+@@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
  
-+#include <asm/page.h>
-+
-+/* The hypercall interface supports only 4KB page */
-+#define XEN_PAGE_SHIFT	12
-+#define XEN_PAGE_SIZE	(_AC(1,UL) << XEN_PAGE_SHIFT)
-+#define XEN_PAGE_MASK	(~(XEN_PAGE_SIZE-1))
-+#define xen_offset_in_page(p)	((unsigned long)(p) & ~XEN_PAGE_MASK)
-+#define xen_pfn_to_page(pfn)	\
-+	((pfn_to_page(((unsigned long)(pfn) << XEN_PAGE_SHIFT) >> PAGE_SHIFT)))
-+#define xen_page_to_pfn(page)	\
-+	(((page_to_pfn(page)) << PAGE_SHIFT) >> XEN_PAGE_SHIFT)
-+
-+#define XEN_PFN_PER_PAGE	(PAGE_SIZE / XEN_PAGE_SIZE)
-+
-+#define XEN_PFN_DOWN(x)	((x) >> XEN_PAGE_SHIFT)
-+#define XEN_PFN_UP(x)	(((x) + XEN_PAGE_SIZE-1) >> XEN_PAGE_SHIFT)
-+#define XEN_PFN_PHYS(x)	((phys_addr_t)(x) << XEN_PAGE_SHIFT)
-+
- #include <asm/xen/page.h>
+ extern unsigned long xen_released_pages;
  
-+/* Return the MFN associated to the first 4KB of the page */
- static inline unsigned long page_to_mfn(struct page *page)
- {
--	return pfn_to_mfn(page_to_pfn(page));
-+	return pfn_to_mfn(xen_page_to_pfn(page));
- }
- 
- struct xen_memory_region {
++typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
++
++/* Break down the page in 4KB granularity and call fn foreach xen pfn */
++static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
++				    void *data)
++{
++	unsigned long pfn = xen_page_to_pfn(page);
++	int i;
++	int ret;
++
++	for (i = 0; i < XEN_PFN_PER_PAGE; i++, pfn++) {
++		ret = fn(page, pfn, data);
++		if (ret)
++			return ret;
++	}
++
++	return ret;
++}
++
++
+ #endif	/* _XEN_PAGE_H */
 -- 
 2.1.4
