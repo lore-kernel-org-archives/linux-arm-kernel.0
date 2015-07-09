@@ -1,24 +1,48 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Jul 2015 18:59:44 +0200
-Subject: Build failure on ARM64 for Linux 4.2-rc1 was: Linux 4.2-rc1
-In-Reply-To: <559EA54C.4060807@redhat.com>
-References: <CA+55aFxmm7THBsCK62esr=JCcHpn6nmReGKqPp0inUrhbkveuA@mail.gmail.com>
- <559BCC8A.1030708@redhat.com> <559EA54C.4060807@redhat.com>
-Message-ID: <20150709165944.GA19282@twins.programming.kicks-ass.net>
+From: weigelt@melag.de (Enrico Weigelt, metux IT consult)
+Date: Thu, 9 Jul 2015 19:02:20 +0200
+Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
+In-Reply-To: <20150709132736.GG23464@tiger>
+References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
+ <20150709075032.GD23464@tiger>
+ <20150709092949.GB3917@shlinux1.ap.freescale.net>
+ <20150709132736.GG23464@tiger>
+Message-ID: <559EA91C.6010408@melag.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 11:46:04AM -0500, Mark Langsdorf wrote:
-> I did a git bisect and it looks like the faulty patch is
-> d72da4a4d973d8a0a0d3c97e7cdebf287fbe3a99, "rbtree: Make lockless
-> searches non-fatal". I can't see why it causes my builds to fail,
-> but if I revert that patch and the related series, then I can
-> build the kernel and build tools/perf successfully.
-> 
-> Any insight into a less intensive way of fixing my build would
-> be appreciated.
+Am 09.07.2015 um 15:27 schrieb Shawn Guo:
 
-This is tools/perf failing to build right? Add tip/perf/urgent, it
-appears to contain the required bits to make it go again.
+ > Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
+> know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
+> the best option.  I suggest you rebase the dts series on top of
+> v4.2-rc1, and send it via mmc tree.
 
-The /urgent branches will get to Linus 'soon' I imagine.
+Yeah, I already stumbled across that. Fortunately, I dont need it at
+all, so I just removed it from dts:
+
+
+diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi
+b/arch/arm/boot/dts/imx53-tqma53.dtsi
+index 2dea6dc..3c545e3 100644
+--- a/arch/arm/boot/dts/imx53-tqma53.dtsi
++++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
+@@ -41,7 +41,6 @@
+         pinctrl-0 = <&pinctrl_esdhc2>,
+                     <&pinctrl_esdhc2_cdwp>;
+         vmmc-supply = <&reg_3p3v>;
+-       wp-gpios = <&gpio1 2 0>;
+         cd-gpios = <&gpio1 4 0>;
+         status = "disabled";
+  };
+
+
+--mtx
+
+https://www.facebook.com/MELAG.Medizintechnik
+
+[http://www.melag.de/fbbanner.png]<https://www.facebook.com/MELAG.Medizintechnik>
+
+MELAG Medizintechnik oHG Sitz Berlin Registergericht AG Charlottenburg HRA 21333 B
+
+Wichtiger Hinweis: Diese Nachricht kann vertrauliche oder nur f?r einen begrenzten Personenkreis bestimmte Informationen enthalten. Sie ist ausschlie?lich f?r denjenigen bestimmt, an den sie gerichtet worden ist. Wenn Sie nicht der Adressat dieser E-Mail sind, d?rfen Sie diese nicht kopieren, weiterleiten, weitergeben oder sie ganz oder teilweise in irgendeiner Weise nutzen. Sollten Sie diese E-Mail irrt?mlich erhalten haben, so benachrichtigen Sie bitte den Absender, indem Sie auf diese Nachricht antworten. Bitte l?schen Sie in diesem Fall diese Nachricht und alle Anh?nge, ohne eine Kopie zu behalten.
+Important Notice: This message may contain confidential or privileged information. It is intended only for the person it was addressed to. If you are not the intended recipient of this email you may not copy, forward, disclose or otherwise use it or any part of it in any form whatsoever. If you received this email in error please notify the sender by replying and delete this message and any attachments without retaining a copy.
