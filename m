@@ -1,54 +1,67 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 09 Jul 2015 13:01:13 +0100
-Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <559DD4B6.9000403@huawei.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
- <559D240F.2090002@arm.com> <559DD4B6.9000403@huawei.com>
-Message-ID: <559E6289.6060802@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 9 Jul 2015 21:04:27 +0900
+Subject: [PATCH 0/6] mfd: 88pm800: Add 88pm860 device support
+In-Reply-To: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CAJKOXPetR4KkfRVNz_QtVfFnjQ7p455QknErr1gnK9iBYgRY+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/15 02:56, leizhen wrote:
-[...]
->>> @@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-[...]
->>> +        for (i = 0; i < args->args_count; i++) {
->>
->> I'm dubious of the value of looping here - having n>1 #iommu-cells per phandle means that every platform device behind one SMMU must have the same number of stream IDs, or you still have to have
->> repeated phandles for every device with some greater multiple of n stream IDs each, but ruling out any device with <n. I'm not sure how realistic that is, and whether there's any real benefit beyond
->> saving a handful of bytes in the DTB.
+2015-07-09 20:47 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
+> 88PM860 falls under 88pm800 family of devices, with some feature
+> additions, for example, support for dual phase on BUCK1.
+
+Hi,
+
+There are already drivers for 88PM860: mfd, charger and battery. Isn't
+you duplicating existing code?
+
+Best regards,
+Krzysztof
+
 >
-> As you mentioned before, a master with two streamIDs can be written as below(This is also mentioned in Documentation\devicetree\bindings\iommu\iommu.txt):
-> #iommu-cells = <1>;
-> iommus = <&{/iommu} 23>, <&{/iommu} 24>;
+> This patch series, enabled chip ID support for 88pm860 in the driver
+> and adds,
+>   - Init time configuration support based on chip ID
+>   - DT property for 32KHz low jitter clock enable
+>   - DT property for dual phase enable
 >
-> On my hardware platform, a master only have one streamID. But I tested two cases:
-> #iommu-cells = <1>;
-> 1. iommus = <&smmu0 good-sid>, <&smmu0 bad-sid>;
-> 2. iommus = <&smmu0 bad-sid>, <&smmu0 good-sid>;
-> All of these two cases worked well.
+> TODO:
+>  - Some of init time configurations are common to both 88pm800 and 88pm860
+>    devices, but since I can not validate it, decided to move it to
+>    88pm860 block only.
+>    But if someone is willing to help me in validation, we can move it to
+>    common code later. No issues there.
+>  - Sleep/low-power-mode related configuration is also part of init time,
+>    but since we are too far from sleep mode support and without testing
+>    I do not want add anything, decided to take it later when we actually
+>    start looking at sleep support.
+>  - Init time configuration also includes pinmux setting for the device.
+>    I am working on using pinctrl-single driver to have standard and generic
+>    interface, hopefully it will get handled through pinctrl subsystem.
+>    Link to RFC - https://patches.linaro.org/50604/
 >
-> Well, if each master contains two streamIDs(or more but equal), this for loop is needed.
-
-My point is that args_count == #iommu-cells here. If you mandate 
-#iommu-cells == 1 as per your example (which in my opinion *is* the 
-right thing to do), then looping over something which is guaranteed to 
-be a single item is pointless.
-
-You'd only need the loop if args_count > 1, for example:
-
-	#iommu-cells = <2>;
-	1: iommus = <&smmu0 sid1 sid2>;
-	2: iommus = <&smmu0 sid1 sid2>, <&smmu0 sid3 sid4>;
-
-but then you'd be also stuck describing any device with an odd number of 
-stream IDs on that SMMU:
-
-	3: iommus = <&smmu0 sid1 what-do-I-put-here?>;
-
-which is why I don't think it's worth trying to accommodate anything 
-other than #iommu-cells == 1, and for that case you know you will only 
-ever have to deal with args[0] in each of_xlate() call.
-
-Robin.
+> Vaibhav Hiremath (6):
+>   mfd: 88pm80x: Add 88pm860 chip type support
+>   mfd: 88pm800: Add init time initial configuration support
+>   mfd: devicetree: bindings: 88pm800: Add DT property for 32KHz output
+>     enable
+>   mfd: 88pm800: Enable 32KHZ XO low jitter clock out
+>   mfd: devicetree: bindings: 88pm800: Add DT property for dual phase
+>     enable
+>   mfd: 88pm800: Add support for configuration of dual phase on BUCK1
+>
+>  Documentation/devicetree/bindings/mfd/88pm800.txt | 12 ++++
+>  drivers/mfd/88pm800.c                             | 88 +++++++++++++++++++++++
+>  drivers/mfd/88pm80x.c                             |  2 +
+>  include/linux/mfd/88pm80x.h                       | 18 +++++
+>  4 files changed, 120 insertions(+)
+>
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
