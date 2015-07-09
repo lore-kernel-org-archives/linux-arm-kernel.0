@@ -1,43 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 9 Jul 2015 20:06:52 +0200
-Subject: [PATCH] pinctrl: imx1-core: Fix debug output pin array index
-In-Reply-To: <20150709133036.GK7573@pengutronix.de>
-References: <1436364966-19778-1-git-send-email-mpa@pengutronix.de>
- <20150709071252.GF1426@pengutronix.de>
- <559E3098.9070609@gtsys.com.hk>
- <20150709133036.GK7573@pengutronix.de>
-Message-ID: <20150709180652.GJ1426@pengutronix.de>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 09 Jul 2015 21:08:36 +0300
+Subject: [PATCH v2 0/7] KVM: arm/arm64: gsi routing support
+In-Reply-To: <559EAB3D.2080205@linaro.org>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+ <023601d0ba54$c4d6e020$4e84a060$@samsung.com> <559E927E.8040403@arm.com>
+ <026801d0ba5f$43a79520$caf6bf60$@samsung.com> <559EAB3D.2080205@linaro.org>
+Message-ID: <028401d0ba72$4736dbc0$d5a49340$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+> Well personally I prefer the type thing and I don't see much difference
+> at userspace level anyway. But I am not this kind of hyperspace
+> architect guy. So, since there is no consensus here, I would say let's
+> wait for formal reviews of our maintainers and I will align.
 
-On Thu, Jul 09, 2015 at 03:30:36PM +0200, Markus Pargmann wrote:
-> > b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > index 5ac59fb..8408bd8 100644
-> > --- a/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > +++ b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > @@ -403,14 +403,16 @@ static int imx1_pinconf_set(struct pinctrl_dev *pctldev,
-> >  			     unsigned num_configs)
-> >  {
-> >  	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> > -	const struct imx1_pinctrl_soc_info *info = ipctl->info;
-> > +	struct pin_desc *desc;
-> >  	int i;
-> > 
-> > +	desc = pin_desc_get(pctldev, pin_id);
-> 
-> For the rest of this function pin_desc_get() is not necessary. This is
-> not a simple function call but a radix tree lookup as far as I can see.
-> I am not sure how important this debugging information is and how
-> expensive this function call is?!
-If it's moved into the call to pr_debug it should be optimized away when
-debugging is off. That together with a merge of Chris' and mine commit
-log and I'm happy.
+ Hah, okay... Don't take it for too much. Anyway your word weighs much more than my one...
 
-Best regards
-Uwe
+> hope this eventually works with
+> ITS ;-)
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+ You know... There are actually problems with irqfd. However i'm not sure whether they are result of
+some bug or of poorly made vGIC CPU interface software emulation. I don't have hardware with working
+vGICv3 here. With GICv2m everything is fine, but code path is quite different, and LPI != SPI.
+ This is further overcomplicated by the fact that as soon as i start up the profiler, the problem
+goes away. Looks like increased number of context switches have impact.
+ Actually, the problem is very poor vhost-net throughput, which jumps up when i start the profiler
+and goes back down when i stop it. Just to note...
+ I'm off since now for a small vacation, will be back on monday or tuesday. See you guys!
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
