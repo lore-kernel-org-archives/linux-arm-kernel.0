@@ -1,55 +1,88 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 9 Jul 2015 21:42:23 +0100
-Subject: [PATCH v2 11/20] tty/hvc: xen: Use xen page definition
+Date: Thu, 9 Jul 2015 21:42:32 +0100
+Subject: [PATCH v2 20/20] arm/xen: Add support for 64KB page granularity
 In-Reply-To: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1436474552-31789-12-git-send-email-julien.grall@citrix.com>
+Message-ID: <1436474552-31789-21-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The console ring is always based on the page granularity of Xen.
+The hypercall interface is always using 4KB page granularity. This is
+requiring to use xen page definition macro when we deal with hypercall.
+
+Note that pfn_to_mfn is working with a Xen pfn (i.e 4KB). We may want to
+rename pfn_mfn to make this explicit.
+
+We also allocate a 64KB page for the shared page even though only the
+first 4KB is used. I don't think this is really important for now as it
+helps to have the pointer 4KB aligned (XENMEM_add_to_physmap is taking a
+Xen PFN).
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.cz>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: linuxppc-dev at lists.ozlabs.org
----
- drivers/tty/hvc/hvc_xen.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 
-diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
-index a9d837f..2135944 100644
---- a/drivers/tty/hvc/hvc_xen.c
-+++ b/drivers/tty/hvc/hvc_xen.c
-@@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
- 	if (r < 0 || v == 0)
- 		goto err;
- 	mfn = v;
--	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
-+	info->intf = xen_remap(mfn << XEN_PAGE_SHIFT, XEN_PAGE_SIZE);
- 	if (info->intf == NULL)
- 		goto err;
- 	info->vtermno = HVC_COOKIE;
-@@ -392,7 +392,7 @@ static int xencons_connect_backend(struct xenbus_device *dev,
- 	if (xen_pv_domain())
- 		mfn = virt_to_mfn(info->intf);
- 	else
--		mfn = __pa(info->intf) >> PAGE_SHIFT;
-+		mfn = __pa(info->intf) >> XEN_PAGE_SHIFT;
- 	ret = gnttab_alloc_grant_references(1, &gref_head);
- 	if (ret < 0)
- 		return ret;
-@@ -476,7 +476,7 @@ static int xencons_resume(struct xenbus_device *dev)
- 	struct xencons_info *info = dev_get_drvdata(&dev->dev);
+---
+    Changes in v2
+        - Add Stefano's reviewed-by
+---
+ arch/arm/include/asm/xen/page.h | 12 ++++++------
+ arch/arm/xen/enlighten.c        |  6 +++---
+ 2 files changed, 9 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 1bee8ca..ab6eb9a 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -56,19 +56,19 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
  
- 	xencons_disconnect_backend(info);
--	memset(info->intf, 0, PAGE_SIZE);
-+	memset(info->intf, 0, XEN_PAGE_SIZE);
- 	return xencons_connect_backend(dev, info);
+ static inline xmaddr_t phys_to_machine(xpaddr_t phys)
+ {
+-	unsigned offset = phys.paddr & ~PAGE_MASK;
+-	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
++	unsigned offset = phys.paddr & ~XEN_PAGE_MASK;
++	return XMADDR(XEN_PFN_PHYS(pfn_to_mfn(XEN_PFN_DOWN(phys.paddr))) | offset);
  }
+ 
+ static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+ {
+-	unsigned offset = machine.maddr & ~PAGE_MASK;
+-	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
++	unsigned offset = machine.maddr & ~XEN_PAGE_MASK;
++	return XPADDR(XEN_PFN_PHYS(mfn_to_pfn(XEN_PFN_DOWN(machine.maddr))) | offset);
+ }
+ /* VIRT <-> MACHINE conversion */
+ #define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
+-#define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
+-#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
++#define virt_to_mfn(v)		(pfn_to_mfn(virt_to_phys(v) >> XEN_PAGE_SHIFT))
++#define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << XEN_PAGE_SHIFT))
+ 
+ static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
+ {
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 6c09cc4..c7d32af 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -96,8 +96,8 @@ static void xen_percpu_init(void)
+ 	pr_info("Xen: initializing cpu%d\n", cpu);
+ 	vcpup = per_cpu_ptr(xen_vcpu_info, cpu);
+ 
+-	info.mfn = __pa(vcpup) >> PAGE_SHIFT;
+-	info.offset = offset_in_page(vcpup);
++	info.mfn = __pa(vcpup) >> XEN_PAGE_SHIFT;
++	info.offset = xen_offset_in_page(vcpup);
+ 
+ 	err = HYPERVISOR_vcpu_op(VCPUOP_register_vcpu_info, cpu, &info);
+ 	BUG_ON(err);
+@@ -220,7 +220,7 @@ static int __init xen_guest_init(void)
+ 	xatp.domid = DOMID_SELF;
+ 	xatp.idx = 0;
+ 	xatp.space = XENMAPSPACE_shared_info;
+-	xatp.gpfn = __pa(shared_info_page) >> PAGE_SHIFT;
++	xatp.gpfn = __pa(shared_info_page) >> XEN_PAGE_SHIFT;
+ 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp))
+ 		BUG();
  
 -- 
 2.1.4
