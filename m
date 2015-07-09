@@ -1,52 +1,25 @@
-From: k.kozlowski.k@gmail.com (Krzysztof Kozlowski)
-Date: Thu,  9 Jul 2015 22:21:20 +0900
-Subject: [RFT PATCH] net: axienet: Fix devm_ioremap_resource return value check
-Message-ID: <1436448080-24775-1-git-send-email-k.kozlowski.k@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 9 Jul 2015 21:27:36 +0800
+Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
+In-Reply-To: <20150709092949.GB3917@shlinux1.ap.freescale.net>
+References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
+ <20150709075032.GD23464@tiger>
+ <20150709092949.GB3917@shlinux1.ap.freescale.net>
+Message-ID: <20150709132736.GG23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Value returned by devm_ioremap_resource() was checked for non-NULL but
-devm_ioremap_resource() returns IOMEM_ERR_PTR, not NULL. In case of
-error this could lead to dereference of ERR_PTR.
+On Thu, Jul 09, 2015 at 05:29:50PM +0800, Dong Aisheng wrote:
+> I agree with you.
+> One difference is that i'd like to fix it ASAP without reverting 8d86e4f
+> due to more patches depends on it is already there as i mentioned above..
+> Revert it may need to revert a lot others.
+> 
+> The pain is that v4.1 is left broken.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
-Cc: <stable@vger.kernel.org>
-Fixes: 46aa27df8853 ("net: axienet: Use devm_* calls")
+Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
+know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
+the best option.  I suggest you rebase the dts series on top of
+v4.2-rc1, and send it via mmc tree.
 
----
-
-Patch only compile tested.
----
- drivers/net/ethernet/xilinx/xilinx_axienet_main.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-index 4208dd7ef101..d95f9aae95e7 100644
---- a/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_axienet_main.c
-@@ -1530,9 +1530,9 @@ static int axienet_probe(struct platform_device *pdev)
- 	/* Map device registers */
- 	ethres = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	lp->regs = devm_ioremap_resource(&pdev->dev, ethres);
--	if (!lp->regs) {
-+	if (IS_ERR(lp->regs)) {
- 		dev_err(&pdev->dev, "could not map Axi Ethernet regs.\n");
--		ret = -ENOMEM;
-+		ret = PTR_ERR(lp->regs);
- 		goto free_netdev;
- 	}
- 
-@@ -1599,9 +1599,9 @@ static int axienet_probe(struct platform_device *pdev)
- 		goto free_netdev;
- 	}
- 	lp->dma_regs = devm_ioremap_resource(&pdev->dev, &dmares);
--	if (!lp->dma_regs) {
-+	if (IS_ERR(lp->dma_regs)) {
- 		dev_err(&pdev->dev, "could not map DMA regs\n");
--		ret = -ENOMEM;
-+		ret = PTR_ERR(lp->dma_regs);
- 		goto free_netdev;
- 	}
- 	lp->rx_irq = irq_of_parse_and_map(np, 1);
--- 
-2.1.4
+Shawn
