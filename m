@@ -1,59 +1,48 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 9 Jul 2015 14:24:04 -0700
-Subject: [PATCH v2 0/2] pci: xgene: Add multiple memory ranges support
-In-Reply-To: <1481643.dA4ocqzitg@wuerfel>
-References: <46305464.n5SOjGAhJb@wuerfel> <cover.1435688121.git.dhdang@apm.com>
- <CADaLNDmpkdHT7B1fSEu9qtoVcj4ookvxh=BA4EUCvG=pp80s=A@mail.gmail.com>
- <1481643.dA4ocqzitg@wuerfel>
-Message-ID: <CADaLNDmARPFtBUuz0sOKMZDtAzgn3Q03P=ZkHsKDUAPZp6NPVA@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 9 Jul 2015 23:33:50 +0200 (CEST)
+Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
+ for cascaded interrupts
+In-Reply-To: <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <alpine.DEB.2.11.1507092331130.5134@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 9, 2015 at 4:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->
-> On Monday 06 July 2015 16:28:43 Duc Dang wrote:
-> > On Tue, Jun 30, 2015 at 11:22 AM, Duc Dang <dhdang@apm.com> wrote:
-> > > This patch set adds 1 large (up to 64GB) memory window for each PCIe
-> > > controller nodes in X-Gene device tree and fix PCIe controller driver
-> > > to handle multiple memory ranges correctly. These changes are required
-> > > to support PCIe devices that has huge BAR.
-> > >
-> > > v2 changes:
-> > >         1. Separate device-tree changes and driver changes into different
-> > >         patches
-> > >         2. Explicitly define new large window as 64-bit prefetchable in dts
-> > >         3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
-> > >         register to be used to configure the memory ranges.
-> > >
-> > >  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
-> > >  drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
-> > >  2 files changed, 24 insertions(+), 11 deletions(-)
-> >
-> > Hi Arnd, Bjorn,
-> >
-> > Do you have additional comment on this v2 patch set?
-> >
-> >
->
-> The changes look ok to me now, but I'd mention in the changelog about
-> the fact that one of the windows is prefetchable and the other one
-> is not, and that only prefetchable BARs are now using the 64-bit
-> window.
+On Thu, 9 Jul 2015, Marc Zyngier wrote:
 
-Thanks, Arnd.
+> When used as a primary interrupt controller, the GIC driver uses
+> irq_data->chip_data to extract controller-specific information.
+> 
+> When used as a secondary interrupt controller, it uses handler_data
+> instead. As this difference is relatively pointless and only creates
+> confusion, change the secondary path to match what the rest of the
+> driver does.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index e264675..3c7f3a4 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -298,7 +298,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>  
+>  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>  {
+> -	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
+> +	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
+>  	struct irq_chip *chip = irq_get_chip(irq);
 
-I posted v3 patch to clarify each PCIe node will have 2 memory windows:
-1 non-prefetchable 32-bit memory window and
-1 prefetchable 64-bit window
+You should make that
 
->
->         Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+    chip_data = irq_desc_get_chip_data(desc);
+    chip = irq_desc_get_chip(desc);
 
+That avoids two pointless lookups of irqdesc ....
 
--- 
-Regards,
-Duc Dang.
+Thanks,
+
+	tglx
