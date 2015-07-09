@@ -1,34 +1,39 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 9 Jul 2015 17:34:58 +0200
-Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-In-Reply-To: <559E8771.9010401@redhat.com>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
- <1436289468.1391.89.camel@redhat.com>
- <20150709122805.GW18569@8bytes.org>
- <1436451223.1391.219.camel@redhat.com>
- <559E8771.9010401@redhat.com>
-Message-ID: <20150709153458.GX18569@8bytes.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu,  9 Jul 2015 16:35:26 +0100
+Subject: [PATCH 1/3] regulator: pwm-regulator: Ensure headings aren't confused
+ with properties
+Message-ID: <1436456128-18278-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 04:38:41PM +0200, Paolo Bonzini wrote:
-> >> On Tue, Jul 07, 2015 at 11:17:48AM -0600, Alex Williamson wrote:
-> > If we think that it's *only* a kvm-vfio interaction then we could add it
-> > to virt/kvm/vfio.c.  vfio could use symbol_get to avoid a module
-> > dependency and effectively disable the code path when not used with kvm.
-> > The reverse model of hosting it in vfio and using symbol_get from
-> > kvm-vfio would also work.  Do we really want to declare it to be
-> > kvm-vfio specific though?  Another option would be to simply host it
-> > under virt/lib with module dependencies for both vfio and kvm.
-> 
-> I wonder if in the future we may have some kind of driver-mediated
-> passthrough, e.g. for network drivers.  They might use the bypass
-> mechanism too.  So I think drivers/vfio is too restrictive.
-> 
-> virt/ right now only hosts KVM, but it could for example host lguest
-> too.  virt/lib/ is okay with me.
+We're using capitalisation and removing the '-' to mitigate confusion.
 
-Yeah, virt/lib is probably the best choice.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ Documentation/devicetree/bindings/regulator/pwm-regulator.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-	Joerg
+diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+index 892b366..23b4772 100644
+--- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+@@ -3,7 +3,7 @@ Bindings for the Generic PWM Regulator
+ 
+ Currently supports 2 modes of operation:
+ 
+-voltage-table:		When in this mode, a voltage table (See below) of
++Voltage Table:		When in this mode, a voltage table (See below) of
+ 			predefined voltage <=> duty-cycle values must be
+ 			provided via DT. Limitations are that the regulator can
+ 			only operate at the voltages supplied in the table.
+@@ -13,7 +13,7 @@ voltage-table:		When in this mode, a voltage table (See below) of
+ 			the user if the assumptions made in continuous-voltage
+ 			mode do not reign true.
+ 
+-continuous-voltage:	This mode uses the regulator's maximum and minimum
++Continuous Voltage:	This mode uses the regulator's maximum and minimum
+ 			supplied voltages specified in the
+ 			regulator-{min,max}-microvolt properties to calculate
+ 			appropriate duty-cycle values.  This allows for a much
+-- 
+1.9.1
