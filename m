@@ -1,56 +1,73 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 9 Jul 2015 15:26:20 +0100
-Subject: [RFC PATCH] KVM: arm/arm64: Don't let userspace update CNTVOFF
- once guest is running
-In-Reply-To: <20150709141723.GP13530@cbox>
-References: <CAFEAcA-vS8B8pJUSseFw0OaKJFPe-0rMT-XHxjNbSvyxaZ+9Tg@mail.gmail.com>
- <559D483A.40507@arm.com>
- <CAFEAcA-U1mEGy87ax4Cb1MLFcEP+sqc9BL_Q0hO6qg1J3FCMew@mail.gmail.com>
- <559D51C5.3070600@arm.com>
- <CAFEAcA-rWf5UkiP+5UbtjYihfhDOVaY4hVpXNRGMnYEhNWqwSQ@mail.gmail.com>
- <20150709102201.GH13530@cbox>
- <CAFEAcA-4rMB6i2=UBXjxTAHQWn5xMiCSiaYbknuXOuHmf4XY_A@mail.gmail.com>
- <20150709120531.GL13530@cbox>
- <CAFEAcA94qRKs7TV4MmrhD4O0+cE4SYPb4iKydQQbSzdrzKMC+w@mail.gmail.com>
- <20150709122406.GN13530@cbox> <20150709141723.GP13530@cbox>
-Message-ID: <CAFEAcA81LRcRu1r+H-6T_yT-AQ4XLAzX1osAWZYNPEDHSTiAQg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 9 Jul 2015 22:26:48 +0800
+Subject: [PATCH v4 5/7] dt-binding: document the binding for mxc rtc
+In-Reply-To: <1435965320-1478-6-git-send-email-tremyfr@gmail.com>
+References: <1435965320-1478-1-git-send-email-tremyfr@gmail.com>
+ <1435965320-1478-6-git-send-email-tremyfr@gmail.com>
+Message-ID: <20150709142648.GI23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 July 2015 at 15:17, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Thu, Jul 09, 2015 at 02:24:06PM +0200, Christoffer Dall wrote:
-> So I ran this through GDB, and this happens when the guest probes the
-> virtio devices, specifically the backtrace tells me that
->
-> virtio_current_cpu_endian () at /root/src/qemu/hw/virtio/virtio.c:594
-> => cc->virtio_is_big_endian
->   -> arm_cpu_is_big_endian
->     -> cpu_synchronize_state
->       -> kvm_cpu_synchronize_state
->
-> which causes cpu->kvm_vcpu_dirty = true, which causes the run-loop to
-> write the CNTVOFF on a per-vcpu basis without stopping anything, as far
-> as I can tell.
+On Sat, Jul 04, 2015 at 01:15:18AM +0200, Philippe Reynes wrote:
+> This adds documentation of device tree bindings for the
+> mxc rtc.
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   27 +++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> new file mode 100644
+> index 0000000..5505493
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+> @@ -0,0 +1,27 @@
+> +* Real Time Clock of the i.MX SoCs
+> +
+> +RTC controller for the i.MX SoCs
+> +
+> +Required properties:
+> +- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- interrupts: IRQ line for the RTC.
+> +- clocks: should contain two entries:
+> +  * one for the input reference
+> +  * one for the the SoC RTC
+> +- clock-names: should contain:
+> +  * "rtc" for the input reference clock
 
-Ah, I was wondering if it was going to turn out to be this,
-but I hadn't figured out why it was going to cause us to do
-a write-back of state rather than just a read.
+Would it be better to use "ref" here?
 
-> So yeah, I guess the only required fix here is to fix QEMU in some way
-> as to not fiddle with the timer registers in this way, and then I
-> honestly don't know if we should try to fix legacy userspace in the
-> kernel, but based on the feedback from Jan, I suppose not.
+Shawn
 
-arm_cpu_is_big_endian() doesn't actually want to write
-back any state -- all it's interested in is reading.
-So we really ought not to need to write anything back there.
-kvm-all.c's sync functions don't seem to provide a "sync
-kernel state to userspace but I promise I'm not going to
-dirty it" function though. I guess we could add one.
-
-(Overall it's kind of fragile even if we can avoid this
-specific case where we're writing back the counter state,
-though -- we should probably think about the sync level
-stuff as well.)
-
--- PMM
+> +  * "ipg" for the SoC RTC clock
+> +
+> +Example:
+> +
+> +rtc at 10007000 {
+> +	compatible = "fsl,imx21-rtc";
+> +	reg = <0x10007000 0x1000>;
+> +	interrupts = <22>;
+> +	clocks = <&clks IMX27_CLK_CKIL>,
+> +	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
+> +	clock-names = "rtc, "ipg";
+> +	status = "disabled";
+> +};
+> -- 
+> 1.7.4.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
