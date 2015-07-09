@@ -1,30 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 9 Jul 2015 02:50:33 -0700
-Subject: [PATCH 14/18] ARM/omap2/timer: Migrate to new 'set-state'
- interface
-In-Reply-To: <559A9CAE.7020806@oracle.com>
-References: <cover.1436178990.git.viresh.kumar@linaro.org>
- <9231fc8eb977888f780a2bdc35681cf76b09ea42.1436178990.git.viresh.kumar@linaro.org>
- <559A9CAE.7020806@oracle.com>
-Message-ID: <20150709095033.GY10705@atomide.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 9 Jul 2015 11:53:23 +0200
+Subject: [PATCH v8 00/11] KVM Guest Debug support for arm64
+In-Reply-To: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
+References: <1436286603-15192-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <20150709095323.GF13530@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* santosh shilimkar <santosh.shilimkar@oracle.com> [150706 08:22]:
+On Tue, Jul 07, 2015 at 05:29:52PM +0100, Alex Benn?e wrote:
+> Here is V8 of the KVM Guest Debug support for arm64.
+> 
+> The diffstat between v7 and v8 is getting pretty small and as I
+> haven't re-based you can run:
+> 
+>         git diff -u guest-debug/4.1-v7..guest-debug/4.1-v8
+> 
+> And the kernelci report is at:
+> 
+>         http://kernelci.org/build/alex/kernel/v4.1-11-g182a5fa64600/
 > 
 > 
-> On 7/6/2015 3:54 AM, Viresh Kumar wrote:
-> >Migrate omap2 driver to the new 'set-state' interface provided by
-> >clockevents core, the earlier 'set-mode' interface is marked obsolete
-> >now.
-> >
-> >This also enables us to implement callbacks for new states of clockevent
-> >devices, for example: ONESHOT_STOPPED.
-> >
-> >Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> >Cc: Tony Lindgren <tony@atomide.com>
-> >Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> >---
-> Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> The only real changes apart from comments and white space are to
+> sys_regs which sees another minor re-factoring. The 32 bit handling
+> explicitly preserves the top 32 bits of the AArch64 registers although
+> I'm not convinced it matter too much as for a booting AArch32 guest
+> kernel they should start as 0 and never change.
+> 
+> For full details see the changelog on each of the patches.
+> 
+> GIT Repos:
+> 
+> The patches for this series are based off v4.1 and can be found
+> at:
+> 
+> Kernel:
+> https://git.linaro.org/people/alex.bennee/linux.git
+> branch: guest-debug/4.1-v8
+> describe: v4.1-11-g182a5faB
+> 
+> QEMU:
+> https://github.com/stsquad/qemu
+> branch: kvm/guest-debug-v6*** BLURB HERE ***
+> 
+> 
+I'm happy with this series as it stands now and think it can be put into
+-next.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+I have boot-tested the series with a VM on both Juno and TC2.
+
+Thanks,
+-Christoffer
