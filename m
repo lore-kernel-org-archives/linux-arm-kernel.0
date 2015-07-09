@@ -1,27 +1,53 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 9 Jul 2015 14:39:39 +0100
-Subject: [PATCH v2 2/5] drivers: firmware: psci: move power_state
- handling to generic code
-In-Reply-To: <1436375811-10529-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1436375811-10529-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150709133938.GE20855@e104818-lin.cambridge.arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 9 Jul 2015 21:42:00 +0800
+Subject: [PATCH v2 6/8] ARM: dts: imx: add imx6ul and imx6ul evk board
+ support
+In-Reply-To: <CAHrpEqQMtaL_ReeFP4VR2bfg_HDaQAHc0BUMB3X4KM3b23ra0A@mail.gmail.com>
+References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
+ <1434727951-4852-7-git-send-email-Frank.Li@freescale.com>
+ <CAH=tA9G_x=6wNTOWbOc2FGGARTxioikUSwqyENKk74wL=7uzaw@mail.gmail.com>
+ <CAHrpEqQMtaL_ReeFP4VR2bfg_HDaQAHc0BUMB3X4KM3b23ra0A@mail.gmail.com>
+Message-ID: <20150709134200.GH23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 06:16:48PM +0100, Lorenzo Pieralisi wrote:
-> Functions implemented on arm64 to check if a power_state parameter
-> is valid and if the power_state implies context loss are not
-> arm64 specific and should be moved to generic code so that they
-> can be reused on arm systems too.
+On Fri, Jun 19, 2015 at 01:55:46PM -0500, Zhi Li wrote:
+> On Fri, Jun 19, 2015 at 12:05 PM, Nicolae Rosia <nicolae.rosia@gmail.com> wrote:
+> > Hi,
+> >
+> > On Fri, Jun 19, 2015 at 6:32 PM,  <Frank.Li@freescale.com> wrote:
+> >> From: Frank Li <Frank.Li@freescale.com>
+> > [...]
+> >> +       cpus {
+> >> +               #address-cells = <1>;
+> >> +               #size-cells = <0>;
+> >> +
+> >> +               cpu0: cpu at 0 {
+> >> +                       compatible = "arm,cortex-a7";
+> >> +                       device_type = "cpu";
+> >> +                       reg = <0>;
+> >> +                       clock-latency = <61036>; /* two CLK32 periods */
+> >> +                       operating-points = <
+> >> +                               /* kHz  uV */
+> >> +                               528000  1250000
+> >> +                               396000  1150000
+> >> +                               198000  1150000
+> >> +                       >;
+> >> +                       fsl,soc-operating-points = <
+> >> +                               /* KHz  uV */
+> >> +                               528000  1250000
+> >> +                               396000  1150000
+> >> +                               198000  1150000
+> >> +                       >;
+> > Why is this necessary? Can't you adapt the driver to use operating-points?
+> > I have looked through other imx dts and saw that some had different
+> > values in these two tables.
 > 
-> This patch moves the functions handling the power_state parameter
-> to generic PSCI firmware layer code.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Acked-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
+> It is used by internal busfreq driver. I will remove it at next version.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+It's used by mainline imx6q-cpufreq driver, but it's a piece of
+undocumented binding.  Basically, on i.MX6 series, when CPU frequency
+scales, there are two voltages, 'core' and 'soc', need to scale
+accordingly.  The OPP binding v1 only supports one voltage.
+
+Shawn
