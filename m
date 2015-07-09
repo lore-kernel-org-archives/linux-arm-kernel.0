@@ -1,60 +1,45 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Thu, 09 Jul 2015 18:44:28 +0200
-Subject: [PATCH 10/10] cpufreq-dt: Add support for operating-points-v2
- bindings
-In-Reply-To: <3095426.xc9msIINgb@amdc1976>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <a486d730c2c2dacd387feee13a4c800fdc641077.1434369079.git.viresh.kumar@linaro.org>
- <3095426.xc9msIINgb@amdc1976>
-Message-ID: <4945455.PmBrA0DySW@amdc1976>
+From: mlangsdo@redhat.com (Mark Langsdorf)
+Date: Thu, 09 Jul 2015 11:46:04 -0500
+Subject: Build failure on ARM64 for Linux 4.2-rc1 was: Linux 4.2-rc1
+In-Reply-To: <559BCC8A.1030708@redhat.com>
+References: <CA+55aFxmm7THBsCK62esr=JCcHpn6nmReGKqPp0inUrhbkveuA@mail.gmail.com>
+ <559BCC8A.1030708@redhat.com>
+Message-ID: <559EA54C.4060807@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 09, 2015 06:13:54 PM Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Monday, June 15, 2015 05:27:36 PM Viresh Kumar wrote:
-> > Support for parsing operating-points-v2 bindings is in place now, lets
-> > modify cpufreq-dt driver to use them.
-> 
-> I believe that following patches:
-> 
-> * [PATCH v2 1/7] opp: add dev_pm_opp_get_turbo_mode_setting() helper
->   (http://lkml.org/lkml/2015/7/9/420)
-> 
-> * [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
->   (http://lkml.org/lkml/2015/7/9/421)
-> 
-> should be integrated into this patch series before patch #10 (the current
-> one) can be applied.
-> 
-> [ Please see http://lkml.org/lkml/2015/7/9/419 for more details. ]
+On 07/07/2015 07:56 AM, Mark Langsdorf wrote:
+> On 07/05/2015 03:22 PM, Linus Torvalds wrote:
+>> It's Sunday, two weeks have passed, and the merge window is closed. I
+>> just pushed out the tag to the git trees, and tar-balls and patches
+>> should be mirroring out too.
+>
+> I'm seeing a build regression on arm64 for tools/perf.
+>
+> On linux-4.1, it builds fine.
+>
+> On linux-4.2-rc1, it dies with this relevant message (skipping the
+> missing defines, etc):
+>
+> /home/mlangsdorf/tmp/linux-4.2/include/linux/preempt.h: At top level:
+> /home/mlangsdorf/tmp/linux-4.2/include/linux/preempt.h:64:25: fatal
+> error: asm/preempt.h: No such file or directory
+>   #include <asm/preempt.h>
+>
+> On both versions, arch/arm64/include/generated/asm/preempt.h
+> exists. I'm guessing something changed in the build system so
+> that's its not being picked up for 4.2-rc1 but I'm not sure where
+> to look.
 
-On the 2nd thought here is the issue description, so people don't
-have to search for it:
+Hi Peter,
 
-With the current code the turbo-mode opp-s are not distinguished in
-any way in the cpufreq subsystem and once somebody defines them in
-their DTS file they are treated as normal modes. I.e. if you define
-opp-s using opp-v2 bindings in your DTS file (for use by cpufreq-dt
-driver) and some are marked as turbo modes then the freq_table (build
-by cpufreq core) will contain turbo mode frequencies and cpufreq-dt
-driver will use them as normal frequencies.  This is certainly not
-a desired behavior.
+I did a git bisect and it looks like the faulty patch is
+d72da4a4d973d8a0a0d3c97e7cdebf287fbe3a99, "rbtree: Make lockless
+searches non-fatal". I can't see why it causes my builds to fail,
+but if I revert that patch and the related series, then I can
+build the kernel and build tools/perf successfully.
 
-To fix it I added opp core helper to check whether opp is a turbo
-mode and during build of freq_table turbo mode frequencies are
-marked with special flag (CPUFREQ_BOOST_FREQ).  Such frequencies
-are ignored by cpufreq core unless 'boost' mode is enabled.
-'boost' mode support needs to be explicitly supported & enabled in
-a specific cpufreq driver.  For the moment it is only available for
-Exynos4x12 cpufreq driver but my patchset (converting Exynos4x12
-platforms to use cpufreq-dt driver) makes it available for use in
-cpufreq-dt (to be enabled from your platform support when needed).
+Any insight into a less intensive way of fixing my build would
+be appreciated.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+--Mark Langsdorf
