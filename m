@@ -1,150 +1,39 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu,  9 Jul 2015 17:17:07 +0530
-Subject: [PATCH 2/6] mfd: 88pm800: Add init time initial configuration support
+Date: Thu,  9 Jul 2015 17:17:08 +0530
+Subject: [PATCH 3/6] mfd: devicetree: bindings: 88pm800: Add DT property for
+ 32KHz output enable
 In-Reply-To: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1436442431-3471-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1436442431-3471-4-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds init time configuration of 88PM800/805 and
-88PM860. It includes,
+88PM800 family of device supports output of 32KHz clock (low jitter)
+on CLK32K2/3 pin which can be supplied to other peripherals on the board.
 
-  - Enable BUCK clock gating in low power mode
-  - Full mode support for BUCK2 and 4
-  - Enable voltage change (LPF, DVC) in PMIC
-
-Note that both 88PM800 and 88PM860 do share common configurations,
-but since I can not validate the configuration on 88PM800,
-restricting myself only to 88PM860.
-If anyone can validate on 88PM800, we can move common code accordingly.
+This patch adds the devicetree binding to enable this feature.
 
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- drivers/mfd/88pm800.c       | 64 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/88pm80x.h | 13 +++++++++
- 2 files changed, 77 insertions(+)
+ Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-index 95c8ad4..80a1bc1 100644
---- a/drivers/mfd/88pm800.c
-+++ b/drivers/mfd/88pm800.c
-@@ -521,6 +521,63 @@ out:
- 	return ret;
- }
+diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
+index dec842f..ae1311c 100644
+--- a/Documentation/devicetree/bindings/mfd/88pm800.txt
++++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+@@ -9,6 +9,12 @@ Required parent device properties:
+ - #interrupt-cells 	: should be 1.
+ 			  The cell is the 88pm80x local IRQ number
  
-+static int pm800_init_config(struct pm80x_chip *chip, struct device_node *np)
-+{
-+	int ret;
-+	unsigned int val;
++Optional properties :
++ - marvell,88pm800-32khz-xolj-out-en	: If set, driver will enable low jitter
++   version of 32Khz clock output on
++      CLK32K3 - for 88pm800
++      CLK32K2 - for 88pm860
 +
-+	switch (chip->type) {
-+	case CHIP_PM800:
-+	case CHIP_PM805:
-+		break;
-+	case CHIP_PM860:
-+		/* Enable LDO and BUCK clock gating in low power mode */
-+		ret = regmap_update_bits(chip->regmap, PM800_LOW_POWER_CONFIG3,
-+					PM800_LDOBK_FREEZE, PM800_LDOBK_FREEZE);
-+		if (ret)
-+			goto error;
-+
-+		/* Enable voltage change in pmic, POWER_HOLD = 1 */
-+		ret = regmap_update_bits(chip->regmap, PM800_WAKEUP1,
-+					PM800_PWR_HOLD_EN, PM800_PWR_HOLD_EN);
-+		if (ret)
-+			goto error;
-+
-+		/*
-+		 * Set buck2 and buck4 driver selection to be full.
-+		 * The default value is 0, for full drive support
-+		 * it should be set to 1.
-+		 * In A1 version it will be set to 1 by default.
-+		 * To be on safer side, set it explicitly
-+		 */
-+		ret = regmap_update_bits(chip->subchip->regmap_power,
-+					PM860_BUCK2_MISC2,
-+					PM860_BUCK2_FULL_DRV,
-+					PM860_BUCK2_FULL_DRV);
-+		if (ret)
-+			goto error;
-+
-+		ret = regmap_update_bits(chip->subchip->regmap_power,
-+					PM860_BUCK4_MISC2,
-+					PM860_BUCK4_FULL_DRV,
-+					PM860_BUCK4_FULL_DRV);
-+		if (ret)
-+			goto error;
-+
-+
-+		break;
-+	default:
-+		dev_err(chip->dev, "Unknown device type: %d\n", chip->type);
-+		break;
-+	}
-+
-+	return 0;
-+
-+error:
-+	dev_err(chip->dev, "failed to access registers\n");
-+	return ret;
-+}
-+
- static int pm800_probe(struct i2c_client *client,
- 				 const struct i2c_device_id *id)
- {
-@@ -585,6 +642,13 @@ static int pm800_probe(struct i2c_client *client,
- 	if (pdata->plat_config)
- 		pdata->plat_config(chip, pdata);
+ 88pm80x family of devices consists of varied group of sub-devices:
  
-+	/* common register configurations , init time only */
-+	ret = pm800_init_config(chip, np);
-+	if (ret) {
-+		dev_err(chip->dev, "Failed to configure 88pm800 devices\n");
-+		goto err_device_init;
-+	}
-+
- 	return 0;
- 
- err_device_init:
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index 2e25fb1..2ef62af 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -74,6 +74,7 @@ enum {
- 
- /* Wakeup Registers */
- #define PM800_WAKEUP1			(0x0D)
-+#define PM800_PWR_HOLD_EN		BIT(7)
- 
- #define PM800_WAKEUP2			(0x0E)
- #define PM800_WAKEUP2_INV_INT		BIT(0)
-@@ -87,7 +88,10 @@ enum {
- /* Referance and low power registers */
- #define PM800_LOW_POWER1		(0x20)
- #define PM800_LOW_POWER2		(0x21)
-+
- #define PM800_LOW_POWER_CONFIG3		(0x22)
-+#define PM800_LDOBK_FREEZE		BIT(7)
-+
- #define PM800_LOW_POWER_CONFIG4		(0x23)
- 
- /* GPIO register */
-@@ -279,6 +283,15 @@ enum {
- #define PM805_EARPHONE_SETTING		(0x29)
- #define PM805_AUTO_SEQ_SETTING		(0x2A)
- 
-+
-+/* 88PM860 Registers */
-+
-+#define PM860_BUCK2_MISC2		(0x7C)
-+#define PM860_BUCK2_FULL_DRV		BIT(2)
-+
-+#define PM860_BUCK4_MISC2		(0x82)
-+#define PM860_BUCK4_FULL_DRV		BIT(2)
-+
- struct pm80x_rtc_pdata {
- 	int		vrtc;
- 	int		rtc_wakeup;
+ Device		 	Supply Names	 Description
 -- 
 1.9.1
