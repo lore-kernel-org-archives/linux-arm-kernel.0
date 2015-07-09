@@ -1,86 +1,44 @@
 From: dhdang@apm.com (Duc Dang)
-Date: Thu,  9 Jul 2015 14:20:11 -0700
-Subject: [PATCH v3 1/2] arm64: dts: Add 1 more window with large size for
- X-Gene PCIe nodes
+Date: Thu,  9 Jul 2015 14:20:12 -0700
+Subject: [PATCH v3 2/2] pci: xgene: Fix driver to handle multiple memory ranges
 In-Reply-To: <cover.1436476099.git.dhdang@apm.com>
 References: <cover.1436476099.git.dhdang@apm.com>
-Message-ID: <d4b73718e3d9f265be3cde883ed23c51a3bb1444.1436476099.git.dhdang@apm.com>
+Message-ID: <844cb76fe55ce4ce45411281500bdb93e0d6932a.1436476100.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds 1 additional window with large size (up to 64GB) for
-X-Gene PCIe nodes to support devices that require huge BAR.
-
-Each X-Gene PCIe node now will have 2 memory windows:1 non-prefetchable
-32-bit window and 1 prefetchable 64-bit window.
+X-Gene PCIe controller has registers to support multiple memory ranges.
+This patch implement addtional register configuration required for the
+driver to support 1 additional huge 64-bit prefetch memory window.
 
 Signed-off-by: Duc Dang <dhdang@apm.com>
 Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
 ---
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
- 1 file changed, 14 insertions(+), 9 deletions(-)
+ drivers/pci/host/pci-xgene.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index d8f3a1c..80a8050 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -407,7 +407,8 @@
- 				0xe0 0xd0000000 0x0 0x00040000>; /* PCI config space */
- 			reg-names = "csr", "cfg";
- 			ranges = <0x01000000 0x00 0x00000000 0xe0 0x10000000 0x00 0x00010000   /* io */
--				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000>; /* mem */
-+				  0x02000000 0x00 0x80000000 0xe1 0x80000000 0x00 0x80000000   /* mem */
-+				  0x43000000 0xf0 0x00000000 0xf0 0x00000000 0x10 0x00000000>; /* mem */
- 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
- 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-@@ -430,8 +431,9 @@
- 			reg = < 0x00 0x1f2c0000 0x0 0x00010000   /* Controller registers */
- 				0xd0 0xd0000000 0x0 0x00040000>; /* PCI config space */
- 			reg-names = "csr", "cfg";
--			ranges = <0x01000000 0x0 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
--				  0x02000000 0x0 0x80000000 0xd1 0x80000000 0x00 0x80000000>; /* mem */
-+			ranges = <0x01000000 0x00 0x00000000 0xd0 0x10000000 0x00 0x00010000   /* io  */
-+				  0x02000000 0x00 0x80000000 0xd1 0x80000000 0x00 0x80000000   /* mem */
-+				  0x43000000 0xd8 0x00000000 0xd8 0x00000000 0x08 0x00000000>; /* mem */
- 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
- 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-@@ -454,8 +456,9 @@
- 			reg =  < 0x00 0x1f2d0000 0x0 0x00010000   /* Controller registers */
- 				 0x90 0xd0000000 0x0 0x00040000>; /* PCI config space */
- 			reg-names = "csr", "cfg";
--			ranges = <0x01000000 0x0 0x00000000 0x90 0x10000000 0x0 0x00010000   /* io  */
--				  0x02000000 0x0 0x80000000 0x91 0x80000000 0x0 0x80000000>; /* mem */
-+			ranges = <0x01000000 0x00 0x00000000 0x90 0x10000000 0x00 0x00010000   /* io  */
-+				  0x02000000 0x00 0x80000000 0x91 0x80000000 0x00 0x80000000   /* mem */
-+				  0x43000000 0x94 0x00000000 0x94 0x00000000 0x04 0x00000000>; /* mem */
- 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
- 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-@@ -478,8 +481,9 @@
- 			reg = < 0x00 0x1f500000 0x0 0x00010000   /* Controller registers */
- 				0xa0 0xd0000000 0x0 0x00040000>; /* PCI config space */
- 			reg-names = "csr", "cfg";
--			ranges = <0x01000000 0x0 0x00000000 0xa0 0x10000000 0x0 0x00010000   /* io   */
--				  0x02000000 0x0 0x80000000 0xa1 0x80000000 0x0 0x80000000>; /* mem  */
-+			ranges = <0x01000000 0x00 0x00000000 0xa0 0x10000000 0x00 0x00010000   /* io  */
-+				  0x02000000 0x00 0x80000000 0xa1 0x80000000 0x00 0x80000000   /* mem */
-+				  0x43000000 0xb0 0x00000000 0xb0 0x00000000 0x10 0x00000000>; /* mem */
- 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
- 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-@@ -502,8 +506,9 @@
- 			reg = < 0x00 0x1f510000 0x0 0x00010000   /* Controller registers */
- 				0xc0 0xd0000000 0x0 0x00200000>; /* PCI config space */
- 			reg-names = "csr", "cfg";
--			ranges = <0x01000000 0x0 0x00000000 0xc0 0x10000000 0x0 0x00010000   /* io  */
--				  0x02000000 0x0 0x80000000 0xc1 0x80000000 0x0 0x80000000>; /* mem */
-+			ranges = <0x01000000 0x00 0x00000000 0xc0 0x10000000 0x00 0x00010000   /* io  */
-+				  0x02000000 0x00 0x80000000 0xc1 0x80000000 0x00 0x80000000   /* mem */
-+				  0x43000000 0xc8 0x00000000 0xc8 0x00000000 0x08 0x00000000>; /* mem */
- 			dma-ranges = <0x42000000 0x80 0x00000000 0x80 0x00000000 0x00 0x80000000
- 				      0x42000000 0x00 0x00000000 0x00 0x00000000 0x80 0x00000000>;
- 			interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
+index a9dfb70..55fe865 100644
+--- a/drivers/pci/host/pci-xgene.c
++++ b/drivers/pci/host/pci-xgene.c
+@@ -321,8 +321,16 @@ static int xgene_pcie_map_ranges(struct xgene_pcie_port *port,
+ 				return ret;
+ 			break;
+ 		case IORESOURCE_MEM:
+-			xgene_pcie_setup_ob_reg(port, res, OMR1BARL, res->start,
+-						res->start - window->offset);
++			if (res->flags & IORESOURCE_PREFETCH)
++				xgene_pcie_setup_ob_reg(port, res, OMR2BARL,
++							res->start,
++							res->start -
++							window->offset);
++			else
++				xgene_pcie_setup_ob_reg(port, res, OMR1BARL,
++							res->start,
++							res->start -
++							window->offset);
+ 			break;
+ 		case IORESOURCE_BUS:
+ 			break;
 -- 
 1.9.1
