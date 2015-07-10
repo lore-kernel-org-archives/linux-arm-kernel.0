@@ -1,19 +1,40 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 10 Jul 2015 13:30:02 +0530
-Subject: [PATCH] dmaengine: at_xdmac: fix bug about channel configuration
-In-Reply-To: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20150710080002.GC836@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Jul 2015 08:58:36 +0100
+Subject: ACPI: regression: Failed to initialize GIC IRQ controller
+In-Reply-To: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
+References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
+Message-ID: <559F7B2C.6090402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 04:22:26PM +0200, Ludovic Desroches wrote:
-> When using descriptor view 2 or higher, we don't write the configuration
-> into AT_XDMAC_CC register because this configuration will be fetch from
-> the descriptor. Unfortunately, the PROT bit is not updated with this
-> method, we have to do it manually before enabling the channel.
+On 10/07/15 08:45, Ming Lei wrote:
+> Hi,
 > 
-Applied, thanks
+> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
+> causes the following failure on APM mustang board(arm64) when
+> booting via UEFI and ACPI:
+> 
+> No valid GICC entries exist
+> ACPI: Failed to initialize GIC IRQ controller
+> Kernel panic - not syncing: No interrupt controller found.
+> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
+> Hardware name: APM X-Gene Mustang board (DT)
+> Call trace:
+> [<ffffffc000089b94>] dump_backtrace+0x0/0x12c
+> [<ffffffc000089cd0>] show_stack+0x10/0x1c
+> [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
+> [<ffffffc0005f7218>] panic+0xe4/0x220
+> [<ffffffc00082631c>] init_IRQ+0x24/0x30
+> [<ffffffc00082486c>] start_kernel+0x274/0x3d8
+> ---[ end Kernel panic - not syncing: No interrupt controller found.
+
+Isn't that addressed by [1] which Catalin has queued for -rc2?
+
+Thanks,
+
+	M.
+
+[1] https://lkml.org/lkml/2015/7/6/876
 
 -- 
-~Vinod
+Jazz is not dead. It just smells funny...
