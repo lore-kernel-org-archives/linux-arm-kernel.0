@@ -1,86 +1,66 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 10 Jul 2015 17:07:55 +0200
-Subject: [PATCH] mmc: sunxi: Don't start commands while the card is busy
-Message-ID: <1436540875-11570-1-git-send-email-hdegoede@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Jul 2015 16:00:09 +0100
+Subject: [PATCH] arm: ls1021a: utilize hrtimer based broadcast mode
+In-Reply-To: <1436521145-21055-1-git-send-email-b18965@freescale.com>
+References: <1436521145-21055-1-git-send-email-b18965@freescale.com>
+Message-ID: <20150710150009.GD6564@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some sdio wifi modules have not been working reliable with the sunxi-mmc
-host code. This turns out to be caused by it starting new commands while
-the card signals that it is still busy processing a previous command.
+On Fri, Jul 10, 2015 at 10:39:05AM +0100, Alison Wang wrote:
+> Hrtimer based broadcast mode is used instead of
+> periodic tick broadcast to provide high resolution
+> clock in SMP.
+> 
+> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-ls1021a.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-ls1021a.c b/arch/arm/mach-imx/mach-ls1021a.c
+> index b89c858..1a1a115 100644
+> --- a/arch/arm/mach-imx/mach-ls1021a.c
+> +++ b/arch/arm/mach-imx/mach-ls1021a.c
+> @@ -8,9 +8,19 @@
+>   */
+>  
+>  #include <asm/mach/arch.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clocksource.h>
+>  
+>  #include "common.h"
+>  
+> +static void __init ls1021a_init_time(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +	tick_setup_hrtimer_broadcast();
+> +}
 
-This commit fixes this, thereby fixing the wifi reliability issues on
-the Cubietruck and other sunxi boards using sdio wifi.
+It would be nicer to place this in the arch time_init() function, as
+already happens for arm64 and powerpc. That way everyone can benefit.
 
-Cc: Arend van Spriel <arend@broadcom.com>
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/mmc/host/sunxi-mmc.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+Thanks,
+Mark.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 4d3e1ff..daa90b7 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -289,6 +289,24 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
- 	return 0;
- }
- 
-+/* Wait for card to report ready before starting a new cmd */
-+static int sunxi_mmc_wait_card_ready(struct sunxi_mmc_host *host)
-+{
-+	unsigned long expire = jiffies + msecs_to_jiffies(500);
-+	u32 rval;
-+
-+	do {
-+		rval = mmc_readl(host, REG_STAS);
-+	} while (time_before(jiffies, expire) && (rval & SDXC_CARD_DATA_BUSY));
-+
-+	if (rval & SDXC_CARD_DATA_BUSY) {
-+		dev_err(mmc_dev(host->mmc), "Error R1 ready timeout\n");
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
- static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
- 				    struct mmc_data *data)
- {
-@@ -383,6 +401,8 @@ static void sunxi_mmc_send_manual_stop(struct sunxi_mmc_host *host,
- 	u32 arg, cmd_val, ri;
- 	unsigned long expire = jiffies + msecs_to_jiffies(1000);
- 
-+	sunxi_mmc_wait_card_ready(host);
-+
- 	cmd_val = SDXC_START | SDXC_RESP_EXPIRE |
- 		  SDXC_STOP_ABORT_CMD | SDXC_CHECK_RESPONSE_CRC;
- 
-@@ -597,6 +617,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- {
- 	unsigned long expire = jiffies + msecs_to_jiffies(250);
- 	u32 rval;
-+	int ret;
-+
-+	ret = sunxi_mmc_wait_card_ready(host);
-+	if (ret)
-+		return ret;
- 
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
-@@ -785,6 +810,13 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
- 		return;
- 	}
- 
-+	ret = sunxi_mmc_wait_card_ready(host);
-+	if (ret) {
-+		mrq->cmd->error = ret;
-+		mmc_request_done(mmc, mrq);
-+		return;
-+	}
-+
- 	if (data) {
- 		ret = sunxi_mmc_map_dma(host, data);
- 		if (ret < 0) {
--- 
-2.4.3
+> +
+>  static const char * const ls1021a_dt_compat[] __initconst = {
+>  	"fsl,ls1021a",
+>  	NULL,
+> @@ -18,5 +28,6 @@ static const char * const ls1021a_dt_compat[] __initconst = {
+>  
+>  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
+>  	.smp		= smp_ops(ls1021a_smp_ops),
+> +	.init_time	= ls1021a_init_time,
+>  	.dt_compat	= ls1021a_dt_compat,
+>  MACHINE_END
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
