@@ -1,60 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Jul 2015 15:25:00 +0100
-Subject: [PATCH v3 00/15] Introducing per-device MSI domain
-In-Reply-To: <20150710133458.GC11270@red-moon>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <20150709135809.GA5223@red-moon> <559E8699.4010007@arm.com>
- <20150710133458.GC11270@red-moon>
-Message-ID: <559FD5BC.9070206@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 10 Jul 2015 19:55:31 +0530
+Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
+ master mode reset
+In-Reply-To: <20150710141440.GA6594@katana>
+References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
+ <20150710141440.GA6594@katana>
+Message-ID: <559FD5DB.9030308@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/15 14:34, Lorenzo Pieralisi wrote:
-> On Thu, Jul 09, 2015 at 03:35:05PM +0100, Marc Zyngier wrote:
-> 
-> [...]
-> 
->>> BTW, is there a reason why _all_ arm host bridges rely on
->>> pcibios_msi_controller (so pci_sys_data) instead of initializing
->>> the struct pci_bus.msi pointer to carry out the MSI controller look-up ?
->>
->> Probably an ordering issue - the bus may not be there yet. But ensuring
->> that the MSI domain is created early (before the bus is scanned) should
->> solve that problem nicely enough.
-> 
-> Yes, I think the only reason is that, as sysdata, the msi controller
-> pointer is propagated (in pci_alloc_child_bus()), with a tiny difference:
-> sysdata can be passed to pci_scan_root_bus(), msi controller pointer
-> can't (explicitly) at present.
-> 
-> Since most of the ARM PCI host controllers have been converted to:
-> 
-> - pci_create_root_bus()
-> 
-> -> here we can init bus msi controller pointer
-> 
-> - pci_scan_child_bus()
-> 
-> we could get rid of pcibios_msi_controller on arm _now_ by just initializing
-> the msi controller pointer in the struct pci_bus before
-> pci_scan_child_bus() is called, unless I am missing something.
-> 
-> I converted pcie-designware.c to stacked domains (and pci-keystone that
-> relies on it, with its own quirks of course), I might take the step
-> above as an intermediate step to have a common arm/arm64 generic host
-> controller asap (ie for that getting rid of pcibios_msi_controller is
-> mandatory, which requires converting all ARM host controllers to stacked
-> domains, or taking the intermediate step above).
 
-It doesn't look like the two approaches are incompatible. Killing
-pcibios_msi_controller is an interesting short term goal which could
-happen quite quickly. Converting these host controllers to stacked
-domains is obviously more effort, which can happen at its own pace. We
-just need to make sure people do not add more cruft to the mix in the
-meantime.
+
+On Friday 10 July 2015 07:44 PM, Wolfram Sang wrote:
+> On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
+>>
+>>
+>> On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
+>>> On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
+>>>> Normally i2c controller works as master, so slave addr is not needed, or it
+>>>> will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+>>>> the same i2c address with controller.
+>>>
+>>> Just to make sure: Does it? As I read the code, slave interrupts are
+>>> enabled later only when slave mode is selected? Is that a HW bug? And if
+>>> so, can't the code just be moved into this #ifdef block later?
+>>>
+>>
+>> Yes we could, infact I thought about it;
+>> but I would break recommended sequence here.
+>
+> And did you set the "own slave address" to a value which one of your
+> existing i2c slaves also has (without enabling slave mode)? Did it
+> disturb communication?
+>
+
+Since slave and master mode are mutual exclusive,
+I did not try this.
+
+But I can try.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Vaibhav
