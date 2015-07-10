@@ -1,44 +1,71 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 10 Jul 2015 17:58:02 +0200
-Subject: [PATCH v3 5/5] arm64: dts: mt8173: Add subsystem clock controller
- device nodes
-In-Reply-To: <CAGS+omC7274iPDdfXpKuM0HvCcEscUE5e5jrDH4DhW4j_Ykt2A@mail.gmail.com>
-References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
- <1436522405-13923-6-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omC7274iPDdfXpKuM0HvCcEscUE5e5jrDH4DhW4j_Ykt2A@mail.gmail.com>
-Message-ID: <CABuKBe+oLmRRHZKnBsfU8icf2r2f3+XrPNMVw_QaGPE9vVxGFw@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 10 Jul 2015 10:00:11 -0600
+Subject: [PATCH v3] coresight: replicator: Use builtin_platform_driver()
+In-Reply-To: <20150710123831.GA7877@vaishali-Ideapad-Z570>
+References: <20150710123831.GA7877@vaishali-Ideapad-Z570>
+Message-ID: <CANLsYkxqQe5VuRYmJ+tPbq95uuCsxFuFs0A3d85uoKf1wcY5Sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-10 17:02 GMT+02:00 Daniel Kurtz <djkurtz@chromium.org>:
+On 10 July 2015 at 06:38, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+> Macro builtin_platform_driver can be used for builtin drivers
+> that don't do anything in driver init. This file depends on
+> Kconfig CONFIG_CORESIGHT_LINKS_AND_SINKS which eventually
+> depends on CORESIGHT. Both CONFIG_CORESIGHT_LINKS_AND_SINKS and
+> CORESIGHT are bool. So, use builtin_platform_driver and remove
+> some boilerplate code.
 >
-> On Jul 10, 2015 18:00, "James Liao" <jamesjj.liao@mediatek.com> wrote:
->>
->> This patch adds device nodes providing subsystem clocks on MT8173,
->> includes mmsys, imgsys, vdecsys, vencsys and vencltsys.
->>
->> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 30
->> ++++++++++++++++++++++++++++++
->>  1 file changed, 30 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index a2f63e4..9d74ce5 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -227,6 +227,36 @@
->>                         clocks = <&uart_clk>;
->>                         status = "disabled";
->>                 };
->> +
->> +               mmsys: mmsys at 14000000 {
+> Also, remove header file init.h as functionality like module_init
+> and module_exit is now relocated to module.h.
 >
-> I think we agreed previously that these should all be clock-controller at .
+> Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+> Suggested-by: Paul Bolle <pebolle@tiscali.nl>
+> ---
+> Changes since v1:
+>         - As per Mathieu's suggestion, remove the comment and
+>           code of Coccinelle
+>         - Also, add blank line before module_platform_driver
+> Changes since v2:
+>         - Use builtin_platform_driver instead of
+>           module_platform_driver and change commit log and subject
+>           accordingly.
+> ---
+>  drivers/hwtracing/coresight/coresight-replicator.c | 13 +------------
+>  1 file changed, 1 insertion(+), 12 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+> index 7974b7c..963ac19 100644
+> --- a/drivers/hwtracing/coresight/coresight-replicator.c
+> +++ b/drivers/hwtracing/coresight/coresight-replicator.c
+> @@ -12,7 +12,6 @@
+>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> -#include <linux/init.h>
+>  #include <linux/device.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+> @@ -184,17 +183,7 @@ static struct platform_driver replicator_driver = {
+>         },
+>  };
+>
+> -static int __init replicator_init(void)
+> -{
+> -       return platform_driver_register(&replicator_driver);
+> -}
+> -module_init(replicator_init);
+> -
+> -static void __exit replicator_exit(void)
+> -{
+> -       platform_driver_unregister(&replicator_driver);
+> -}
+> -module_exit(replicator_exit);
+> +builtin_platform_driver(replicator_driver);
+>
+>  MODULE_LICENSE("GPL v2");
+>  MODULE_DESCRIPTION("CoreSight Replicator driver");
+> --
+> 1.9.1
 >
 
-I did understand the same.
-Please change that.
-
-Thanks.
+Applied, thanks.
