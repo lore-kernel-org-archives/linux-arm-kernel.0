@@ -1,58 +1,131 @@
-From: thunder.leizhen@huawei.com (leizhen)
-Date: Fri, 10 Jul 2015 08:34:31 +0800
-Subject: [PATCH v2 9/9] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <559E6289.6060802@arm.com>
-References: <1436239822-14132-1-git-send-email-thunder.leizhen@huawei.com>
- <1436239822-14132-10-git-send-email-thunder.leizhen@huawei.com>
- <559D240F.2090002@arm.com> <559DD4B6.9000403@huawei.com>
- <559E6289.6060802@arm.com>
-Message-ID: <559F1317.70200@huawei.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 10 Jul 2015 03:26:57 +0200
+Subject: [PATCH V4] PM / Domains: Remove intermediate states from the
+ power off sequence
+In-Reply-To: <20150709140532.GA2049@linaro.org>
+References: <1434633473-12908-1-git-send-email-ulf.hansson@linaro.org>
+ <7htwtee84d.fsf@deeprootsystems.com> <20150709140532.GA2049@linaro.org>
+Message-ID: <1894506.4i1rX8XdVk@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/9 20:01, Robin Murphy wrote:
-> On 09/07/15 02:56, leizhen wrote:
-> [...]
->>>> @@ -1928,9 +1929,35 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
-> [...]
->>>> +        for (i = 0; i < args->args_count; i++) {
->>>
->>> I'm dubious of the value of looping here - having n>1 #iommu-cells per phandle means that every platform device behind one SMMU must have the same number of stream IDs, or you still have to have
->>> repeated phandles for every device with some greater multiple of n stream IDs each, but ruling out any device with <n. I'm not sure how realistic that is, and whether there's any real benefit beyond
->>> saving a handful of bytes in the DTB.
->>
->> As you mentioned before, a master with two streamIDs can be written as below(This is also mentioned in Documentation\devicetree\bindings\iommu\iommu.txt):
->> #iommu-cells = <1>;
->> iommus = <&{/iommu} 23>, <&{/iommu} 24>;
->>
->> On my hardware platform, a master only have one streamID. But I tested two cases:
->> #iommu-cells = <1>;
->> 1. iommus = <&smmu0 good-sid>, <&smmu0 bad-sid>;
->> 2. iommus = <&smmu0 bad-sid>, <&smmu0 good-sid>;
->> All of these two cases worked well.
->>
->> Well, if each master contains two streamIDs(or more but equal), this for loop is needed.
+On Thursday, July 09, 2015 08:05:32 AM Lina Iyer wrote:
+> On Wed, Jul 08 2015 at 13:56 -0600, Kevin Hilman wrote:
+> >Ulf Hansson <ulf.hansson@linaro.org> writes:
+> >
+> >> Genpd's ->runtime_suspend() (assigned to pm_genpd_runtime_suspend())
+> >> doesn't immediately walk the hierarchy of ->runtime_suspend() callbacks.
+> >> Instead, pm_genpd_runtime_suspend() calls pm_genpd_poweroff() which
+> >> postpones that until *all* the devices in the genpd are runtime suspended.
+> >>
+> >> When pm_genpd_poweroff() discovers that the last device in the genpd is
+> >> about to be runtime suspended, it calls __pm_genpd_save_device() for *all*
+> >> the devices in the genpd sequentially. Furthermore,
+> >> __pm_genpd_save_device() invokes the ->start() callback, walks the
+> >> hierarchy of the ->runtime_suspend() callbacks and invokes the ->stop()
+> >> callback. This causes a "thundering herd" problem.
+> >>
+> >> Let's address this issue by having pm_genpd_runtime_suspend() immediately
+> >> walk the hierarchy of the ->runtime_suspend() callbacks, instead of
+> >> postponing that to the power off sequence via pm_genpd_poweroff(). If the
+> >> selected ->runtime_suspend() callback doesn't return an error code, call
+> >> pm_genpd_poweroff() to see if it's feasible to also power off the PM
+> >> domain.
+> >>
+> >> Adopting this change enables us to simplify parts of the code in genpd,
+> >> for example the locking mechanism. Additionally, it gives some positive
+> >> side effects, as described below.
+> >>
+> >> i)
+> >> One device's ->runtime_resume() latency is no longer affected by other
+> >> devices' latencies in a genpd.
+> >>
+> >> The complexity genpd has to support the option to abort the power off
+> >> sequence suffers from latency issues. More precisely, a device that is
+> >> requested to be runtime resumed, may end up waiting for
+> >> __pm_genpd_save_device() to complete its operations for *another* device.
+> >> That's because pm_genpd_poweroff() can't confirm an abort request while it
+> >> waits for __pm_genpd_save_device() to return.
+> >>
+> >> As this patch removes the intermediate states in pm_genpd_poweroff() while
+> >> powering off the PM domain, we no longer need the ability to abort that
+> >> sequence.
+> >>
+> >> ii)
+> >> Make pm_runtime[_status]_suspended() reliable when used with genpd.
+> >>
+> >> Until the last device in a genpd becomes idle, pm_genpd_runtime_suspend()
+> >> will return 0 without actually walking the hierarchy of the
+> >> ->runtime_suspend() callbacks. However, by returning 0 the runtime PM core
+> >> considers the device as runtime_suspended, so
+> >> pm_runtime[_status]_suspended() will return true, even though the device
+> >> isn't (yet) runtime suspended.
+> >>
+> >> After this patch, since pm_genpd_runtime_suspend() immediately walks the
+> >> hierarchy of the ->runtime_suspend() callbacks,
+> >> pm_runtime[_status]_suspended() will accurately reflect the status of the
+> >> device.
+> >>
+> >> iii)
+> >> Enable fine-grained PM through runtime PM callbacks in drivers/subsystems.
+> >>
+> >> There are currently cases were drivers/subsystems implements runtime PM
+> >> callbacks to deploy fine-grained PM (e.g. gate clocks, move pinctrl to
+> >> power-save state, etc.). While using the genpd, pm_genpd_runtime_suspend()
+> >> postpones invoking these callbacks until *all* the devices in the genpd
+> >> are runtime suspended. In essence, one runtime resumed device prevents
+> >> fine-grained PM for other devices within the same genpd.
+> >>
+> >> After this patch, since pm_genpd_runtime_suspend() immediately walks the
+> >> hierarchy of the ->runtime_suspend() callbacks, fine-grained PM is enabled
+> >> throughout all the levels of runtime PM callbacks.
+> >>
+> >> iiii)
+> >> Enable fine-grained PM for IRQ safe devices
+> >>
+> >> Per the definition for an IRQ safe device, its runtime PM callbacks must
+> >> be able to execute in atomic context. In the path while genpd walks the
+> >> hierarchy of the ->runtime_suspend() callbacks for the device, it uses a
+> >> mutex. Therefore, genpd prevents that path to be executed for IRQ safe
+> >> devices.
+> >>
+> >> As this patch changes pm_genpd_runtime_suspend() to immediately walk the
+> >> hierarchy of the ->runtime_suspend() callbacks and without needing to use
+> >> a mutex, fine-grained PM is enabled throughout all the levels of runtime
+> >> PM callbacks for IRQ safe devices.
+> >>
+> >> Unfortunately this patch also comes with a drawback, as described in the
+> >> summary below.
+> >>
+> >> Driver's/subsystem's runtime PM callbacks may be invoked even when the
+> >> genpd hasn't actually powered off the PM domain, potentially introducing
+> >> unnecessary latency.
+> >>
+> >> However, in most cases, saving/restoring register contexts for devices are
+> >> typically fast operations or can be optimized in device specific ways
+> >> (e.g. shadow copies of register contents in memory, device-specific checks
+> >> to see if context has been lost before restoring context, etc.).
+> >>
+> >> Still, in some cases the driver/subsystem may suffer from latency if
+> >> runtime PM is used in a very fine-grained manner (e.g. for each IO request
+> >> or xfer). To prevent that extra overhead, the driver/subsystem may deploy
+> >> the runtime PM autosuspend feature.
+> >>
+> >> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >
+> >Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> >
+> >I believe Geert and Lina have both tested earlier versions, but would be
+> >nice to see their Tested-by for this one.
+> >
 > 
-> My point is that args_count == #iommu-cells here. If you mandate #iommu-cells == 1 as per your example (which in my opinion *is* the right thing to do), then looping over something which is guaranteed
-> to be a single item is pointless.
+> I tested verssion 4. Did not see any issues with genpd suspend/resume.
 > 
-> You'd only need the loop if args_count > 1, for example:
-> 
->     #iommu-cells = <2>;
->     1: iommus = <&smmu0 sid1 sid2>;
->     2: iommus = <&smmu0 sid1 sid2>, <&smmu0 sid3 sid4>;
-> 
-> but then you'd be also stuck describing any device with an odd number of stream IDs on that SMMU:
-> 
->     3: iommus = <&smmu0 sid1 what-do-I-put-here?>;
-> 
-> which is why I don't think it's worth trying to accommodate anything other than #iommu-cells == 1, and for that case you know you will only ever have to deal with args[0] in each of_xlate() call.
+> Tested-by: Lina Iyer <lina.iyer@linaro.org>
 
-OK, I will consider it in v3.
+OK, I'm queing this patch up for 4.3, thanks everybody!
 
-> 
-> Robin.
-> 
-> 
-> .
-> 
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
