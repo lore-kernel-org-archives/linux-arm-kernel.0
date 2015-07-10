@@ -1,46 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jul 2015 11:22:23 +0100
-Subject: [PATCH] ARM: add boot image dependencies not to generate invalid
- images
-In-Reply-To: <1436186224-6673-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1436186224-6673-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20150710102222.GP7557@n2100.arm.linux.org.uk>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 10 Jul 2015 03:29:05 -0700
+Subject: [PATCH v7 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <1436521486-10682-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1436521486-10682-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1436524145.24866.21.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 09:37:04PM +0900, Masahiro Yamada wrote:
-> [3] Then, re-build "all" and "uImage" simultaneously.
->     You will get an invalid uImage at random.
->   $ make -s -j8 ARCH=arm UIMAGE_LOADADDR=0x80208000 all uImage
->   Image Name:   Linux-4.2.0-rc1-00008-g1c4c715-d
->   Created:      Mon Jul  6 17:52:22 2015
->   Image Type:   ARM Linux Kernel Image (uncompressed)
->   Data Size:    26768 Bytes = 26.14 kB = 0.03 MB
->   Load Address: 80208000
->   Entry Point:  80208000
+On Fri, 2015-07-10 at 10:44 +0100, Srinivas Kandagatla wrote:
+> This patch adds just providers part of the framework just to enable easy
+> review.
 
-At no point in the above do I see an attempt to rebuild init/main.o,
-which there should be as you touched the corresponding .c file -
-because you're hiding that output with -s.  Please show what's going
-on without using -s.
+Trivial notes:
 
-> "make uImage" could descend into arch/arm/boot/Makefile before
-> "make zImage" is completed because arch/arm/Makefile describes no
-> dependency among boot targets.
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
 
-The uImage target should depend on vmlinux, which should force the
-rebuild of init/main.o, and relink of the top-level vmlinux file
-before decending into arch/arm/boot/Makefile for the
-arch/arm/boot/uImage target.
+> +struct nvmem_device {
+> +	const char		*name;
+> +	struct regmap		*regmap;
+[]
+> +struct nvmem_cell {
+> +	const char *name;
+> +	int			offset;
+> +	int			bytes;
 
-That makefile contains the dependencies required to order things
-correctly - the arch/arm/boot/uImage target depends on
-arch/arm/boot/zImage, which in turn depends on
-arch/arm/boot/compressed/vmlinux, and then arch/arm/boot/Image.
+It'd be nicer to use consistent indentation for *name
+in nvmem_cell
 
-In other words, arch/arm/boot/Makefile deals with the dependencies
-between the targets it's responsible for building itself.
+> +static ssize_t bin_attr_nvmem_read(struct file *filp, struct kobject *kobj,
+> +				    struct bin_attribute *attr,
+> +				    char *buf, loff_t pos, size_t count)
+> +{
+[]
+> +	count = count/nvmem->word_size * nvmem->word_size;
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+maybe rounddown() ?
+
+> +static ssize_t bin_attr_nvmem_write(struct file *filp, struct kobject *kobj,
+> +				     struct bin_attribute *attr,
+> +				     char *buf, loff_t pos, size_t count)
+> +{
+
+> +	count = count/nvmem->word_size * nvmem->word_size;
+
+and rounddown() here too ?
+
+> +static struct nvmem_device *of_nvmem_find(struct device_node *nvmem_np)
+> +{
+> +	struct device *d;
+> +
+> +	if (!nvmem_np)
+> +		return NULL;
+> +
+> +	d = bus_find_device(&nvmem_bus_type, NULL, nvmem_np, of_nvmem_match);
+> +
+> +	return d ? to_nvmem_device(d) : NULL;
+> +}
+
+Perhaps more common as
+
+	d = bus_find_device(&nvmem_bus_type, NULL, nvmem_np, of_nvmem_match);
+	if (!d)
+		return NULL;
+
+	return to_nvmem_device(d);
+}
+
+> +struct nvmem_device *nvmem_register(struct nvmem_config *config)
+> +{
+[]
+> +	nvmem->read_only = nvmem->dev.of_node ?
+> +				of_property_read_bool(nvmem->dev.of_node,
+> +				"read-only") :
+> +				config->read_only;
+
+odd indentation.
+Normally, "read-only" would be aligned with nvmem->dev.of_node,
+
+> +	dev_dbg(&nvmem->dev, "Registering nvmem device %s\n",
+> +		dev_name(&nvmem->dev));
+
+Isn't this going to have duplicated dev_name prefix and postfix?
+
+> +	if (device_create_bin_file(&nvmem->dev,
+> +				nvmem->read_only ? &bin_attr_ro_nvmem :
+> +				&bin_attr_rw_nvmem))
+> +		dev_info(&nvmem->dev, "Failed to create sysfs binary file\n");
+
+Is the KERN_LEVEL correct?
+Maybe dev_err/notice/warn/dbg?
