@@ -1,45 +1,70 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 10 Jul 2015 18:49:08 +0800
-Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-In-Reply-To: <559F7B2C.6090402@arm.com>
-References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
- <559F7B2C.6090402@arm.com>
-Message-ID: <559FA324.8030801@linaro.org>
+From: joe@perches.com (Joe Perches)
+Date: Fri, 10 Jul 2015 03:49:25 -0700
+Subject: [PATCH v7 3/9] nvmem: Add nvmem_device based consumer apis.
+In-Reply-To: <1436521505-10779-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1436521505-10779-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1436525365.24866.36.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 03:58 PM, Marc Zyngier wrote:
-> On 10/07/15 08:45, Ming Lei wrote:
->> Hi,
->>
->> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
->> causes the following failure on APM mustang board(arm64) when
->> booting via UEFI and ACPI:
->>
->> No valid GICC entries exist
->> ACPI: Failed to initialize GIC IRQ controller
->> Kernel panic - not syncing: No interrupt controller found.
->> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
->> Hardware name: APM X-Gene Mustang board (DT)
->> Call trace:
->> [<ffffffc000089b94>] dump_backtrace+0x0/0x12c
->> [<ffffffc000089cd0>] show_stack+0x10/0x1c
->> [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
->> [<ffffffc0005f7218>] panic+0xe4/0x220
->> [<ffffffc00082631c>] init_IRQ+0x24/0x30
->> [<ffffffc00082486c>] start_kernel+0x274/0x3d8
->> ---[ end Kernel panic - not syncing: No interrupt controller found.
->
-> Isn't that addressed by [1] which Catalin has queued for -rc2?
->
-> Thanks,
->
-> 	M.
->
-> [1] https://lkml.org/lkml/2015/7/6/876
+On Fri, 2015-07-10 at 10:45 +0100, Srinivas Kandagatla wrote:
+> This patch adds read/write apis which are based on nvmem_device.
 
-Yes, already fixed by Al and Catalin already queued for
-4.2-rc2.
+More trivia:
 
-Thanks
-Hanjun
+> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+
+> +static struct nvmem_device *nvmem_find(const char *name)
+> +{
+> +	struct device *d;
+> +
+> +	d = bus_find_device(&nvmem_bus_type, NULL, (void *)name, nvmem_match);
+> +
+> +	return d ? to_nvmem_device(d) : NULL;
+
+Maybe:
+	d = bus_find_device(...);
+	if (!d)
+		return NULL;
+
+	return to_nvmem_device(d);
+
+> +struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
+> +{
+[]
+> +	return __nvmem_device_get(nvmem_np, NULL, NULL);
+> +
+
+odd blank line
+> +}
+> +EXPORT_SYMBOL_GPL(of_nvmem_device_get);
+
+> +struct nvmem_device *nvmem_device_get(struct device *dev, const char *dev_name)
+> +{
+[]
+> +	return nvmem_find(dev_name);
+> +
+
+here too
+
+> +}
+> +EXPORT_SYMBOL_GPL(nvmem_device_get);
+
+[]
+
+> +void devm_nvmem_device_put(struct device *dev, struct nvmem_device *nvmem)
+> +{
+> +	int ret;
+> +
+> +	ret = devres_release(dev, devm_nvmem_device_release,
+> +			     devm_nvmem_device_match, nvmem);
+> +
+> +	WARN_ON(ret);
+> +
+
+Last unnecessary blank line I'll mention
+(it seems to be the last one anyway)
+
+> +}
+> +EXPORT_SYMBOL_GPL(devm_nvmem_device_put);
