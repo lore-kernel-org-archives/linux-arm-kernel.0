@@ -1,87 +1,39 @@
-From: robert.moore@intel.com (Moore, Robert)
-Date: Fri, 10 Jul 2015 15:47:34 +0000
-Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-In-Reply-To: <20150710151740.GB12489@red-moon>
-References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37D30B295@ORSMSX112.amr.corp.intel.com>
- <CACVXFVPjRiE55ndUY8PrGt6Qjnj1M_cJ5De=PDuRF-mz9NpAvg@mail.gmail.com>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37D30B2E9@ORSMSX112.amr.corp.intel.com>
- <20150710151740.GB12489@red-moon>
-Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37D30B373@ORSMSX112.amr.corp.intel.com>
+From: dinh.linux@gmail.com (dinh.linux at gmail.com)
+Date: Fri, 10 Jul 2015 10:48:17 -0500
+Subject: [GIT PULL] SoCFPGA fixes for v4.2-rc1
+Message-ID: <1436543297-3254-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Arnd, Kevin, Olof:
 
+Please pull in these fixes for v4.2-rc1.
 
-> -----Original Message-----
-> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> Sent: Friday, July 10, 2015 8:18 AM
-> To: Moore, Robert
-> Cc: Ming Lei; Zheng, Lv; Wysocki, Rafael J; Linux Kernel Mailing List;
-> linux-arm-kernel; Thomas Gleixner; Jason Cooper; hanjun.guo at linaro.org
-> Subject: Re: ACPI: regression: Failed to initialize GIC IRQ controller
-> 
-> On Fri, Jul 10, 2015 at 03:45:32PM +0100, Moore, Robert wrote:
-> > It's nice that someone took a sizeof() on the struct -- so, one would
-> hope that no code actually depended on a particular value, no?
-> 
-> Unfortunately that sizeof has been there forever (x86/ia64),
-> ia64 code ran into a similar issue, so the check was removed to cope with
-> lsapic MADT updates, see:
-> 
-> arch/ia64/kernel/acpi.c line 204
-> 
-> /*Skip BAD_MADT_ENTRY check, as lsapic size could vary */
-> 
-> Is checking the subtable length field against a static value really
-> worthwhile/suitable ?
-> 
+Thanks,
 
-I would at least traverse the subtables via the subtable length given in the table, and not use a sizeof() for each subtable. Then, multiple table/subtable versions are handled automatically; you don't have to use any new fields until necessary.
+Dinh
 
-> Thanks,
-> Lorenzo
-> 
-> > > -----Original Message-----
-> > > From: Ming Lei [mailto:ming.lei at canonical.com]
-> > > Sent: Friday, July 10, 2015 7:43 AM
-> > > To: Moore, Robert
-> > > Cc: Zheng, Lv; Wysocki, Rafael J; Linux Kernel Mailing List;
-> > > linux-arm- kernel; Thomas Gleixner; Jason Cooper; Hanjun Guo
-> > > Subject: Re: ACPI: regression: Failed to initialize GIC IRQ
-> > > controller
-> > >
-> > > On Fri, Jul 10, 2015 at 10:28 PM, Moore, Robert
-> > > <robert.moore@intel.com>
-> > > wrote:
-> > > >
-> > > >
-> > > >> -----Original Message-----
-> > > >> From: Ming Lei [mailto:ming.lei at canonical.com]
-> > > >> Sent: Friday, July 10, 2015 12:46 AM
-> > > >> To: Moore, Robert; Zheng, Lv; Wysocki, Rafael J
-> > > >> Cc: Linux Kernel Mailing List; linux-arm-kernel; Thomas Gleixner;
-> > > >> Jason Cooper; Hanjun Guo
-> > > >> Subject: ACPI: regression: Failed to initialize GIC IRQ
-> > > >> controller
-> > > >>
-> > > >> Hi,
-> > > >>
-> > > >> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT
-> > > >> table.) causes the following failure on APM mustang board(arm64)
-> > > >> when booting via UEFI and ACPI:
-> > > >
-> > > >
-> > > > I would be interested to know just what exactly about this change
-> > > > broke
-> > > things.
-> > >
-> > > sizeof(struct acpi_madt_generic_interrupt)
-> >
-> N???????????????r??????y?????????b???X????????v???^???)??{.n???+??????????
-> ??{????????????zX??????????????}???????????z???&j:+v?????????
-> ????????????zZ+??????+zf?????????h?????????~????????????i?????????z???
-???
-> w??????????????????????&???)??f??????^j??y???m??????@A???a?????????
-> 
-> 0??????h??????i
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_fixes_for_v4.2-rc1
+
+for you to fetch changes up to 93abc72bc7901cfc61a2871da7a565c9fdb26108:
+
+  ARM: socfpga: dts: Fix entries order (2015-07-07 08:58:02 -0500)
+
+----------------------------------------------------------------
+SoCFPGA fixes against v4.2-rc1
+- Update compatible "adxl345x" compatible string
+- Alphabetize the DTS nodes for the C5 sockit board file
+
+----------------------------------------------------------------
+Walter Lozano (2):
+      ARM: socfpga: dts: Fix adxl34x formating and compatible string
+      ARM: socfpga: dts: Fix entries order
+
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
