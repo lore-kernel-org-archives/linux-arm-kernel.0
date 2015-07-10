@@ -1,64 +1,43 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 10 Jul 2015 19:02:07 +0200
-Subject: [PATCH v7 1/4] drm/layerscape: Add Freescale DCU DRM driver
-In-Reply-To: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
-References: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
-Message-ID: <20150710170207.GF3736@phenom.ffwll.local>
+From: linux@roeck-us.net (Guenter)
+Date: Fri, 10 Jul 2015 10:01:19 -0700
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150710055658.GZ3127@piout.net>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150709173747.GA32448@roeck-us.net> <559F2719.3060708@atmel.com>
+ <20150710031438.GA27089@roeck-us.net>
+ <20150710055658.GZ3127@piout.net>
+Message-ID: <20150710170119.GA6585@groeck-UX31A>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 07:17:40PM +0800, Jianwei Wang wrote:
-> This patch add support for Two Dimensional Animation and Compositing
-> Engine (2D-ACE) on the Freescale SoCs.
+On Fri, Jul 10, 2015 at 07:56:58AM +0200, Alexandre Belloni wrote:
+> Hi Guenter,
 > 
-> 2D-ACE is a Freescale display controller. 2D-ACE describes
-> the functionality of the module extremely well its name is a value
-> that cannot be used as a token in programming languages.
-> Instead the valid token "DCU" is used to tag the register names and
-> function names.
+> On 09/07/2015 at 20:14:38 -0700, Guenter Roeck wrote :
+> > > This patch introduces a new compatible string: "atmel,sama5d3-rstc" for the
+> > > reset driver of sama5d3 and later chips.
+> > > As in sama5d3 or later chips, we don't have to shutdown the DDR controller
+> > > before reset. Shutdown the DDR controller before reset is a workaround to
+> > > avoid DDR signal driving the bus, but since sama5d3 and later chips there is
+> > > no such a conflict.
+> > > That means:
+> > >   1. the sama5d3 reset function only need to write the rstc register and
+> > > return.
+> > >   2. for sama5d3, we can remove the code related with DDR controller as we
+> > > don't use it at all.
+> > > 
+> > Sorry, I don't get it. Doesn't that mean there are two distinct logical
+> > changes, which would ask for two separate patches ?
 > 
-> The Display Controller Unit (DCU) module is a system master that
-> fetches graphics stored in internal or external memory and displays
-> them on a TFT LCD panel. A wide range of panel sizes is supported
-> and the timing of the interface signals is highly configurable.
-> Graphics are read directly from memory and then blended in real-time,
-> which allows for dynamic content creation with minimal CPU
-> intervention.
+> I would agree with Josh and I think that only one patch is needed. There
+> is only one change, the removal of the workaround for sama5d3 and later.
 > 
-> The features:
-> (1) Full RGB888 output to TFT LCD panel.
-> (2) For the current LCD panel, WQVGA "480x272" is supported.
-> (3) Blending of each pixel using up to 4 source layers
-> dependent on size of panel.
-> (4) Each graphic layer can be placed with one pixel resolution
-> in either axis.
-> (5) Each graphic layer support RGB565 and RGB888 direct colors
-> without alpha
-> channel and BGRA8888 BGRA4444 ARGB1555 direct colors with an
-> alpha channel and
-> YUV422 format.
-> (6) Each graphic layer support alpha blending with 8-bit
-> resolution.
+> As the workaround is using a table of compatibles to remap the ram
+> controller and the one for sama5d3 is not used because it is not needed,
+> I think it makes sense to remove it in that same patch. The logical
+> change here is the removal of the workaround.
 > 
-> This is a simplified version, only one primary plane, one
-> framebuffer created for
-> fbdev, one crtc, one connector for TFT LCD panel, an encoder.
-> 
-> Signed-off-by: Alison Wang <b18965@freescale.com>
-> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-> Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+Ok, makes sense.
 
-Can't find any other use of deprecated functions or legacy code patterns
-or anything else that we've recently started cleaning up, looks good. No
-detailed review though (for one I lack hw docs).
-
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-
-Might be good to get some cross-review from some other arm soc drm driver
-team, then send a pull request to Dave for 4.3.
-
-Cheers, Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Thanks,
+Guenter
