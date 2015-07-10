@@ -1,48 +1,51 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 10 Jul 2015 13:35:42 +0530
-Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
- computation
-In-Reply-To: <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
- <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150710080542.GD836@localhost>
+Date: Fri, 10 Jul 2015 13:38:05 +0530
+Subject: [PATCH v2 1/1] dmaengine: at_xdmac: fix transfer data width in
+ at_xdmac_prep_slave_sg()
+In-Reply-To: <32f90f9820ddf6412a637cdf3fda4e284a7854d1.1435667600.git.cyrille.pitchen@atmel.com>
+References: <32f90f9820ddf6412a637cdf3fda4e284a7854d1.1435667600.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150710080805.GE836@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 01:25:41PM +0200, Cyrille Pitchen wrote:
-> As claimed by the programmer datasheet and confirmed by the IP designer,
-> the Block Transfer Size (BTSIZE) bitfield of the Channel x Control A
-> Register (CTRLAx) always refers to a number of Source Width (SRC_WIDTH)
-> transfers.
+On Tue, Jun 30, 2015 at 02:36:57PM +0200, Cyrille Pitchen wrote:
+> This patch adds the missing update of the transfer data width in
+> at_xdmac_prep_slave_sg().
 > 
-> Both the SRC_WIDTH and BTSIZE bitfields can be extacted from the CTRLAx
-> register to compute the DMA residue. So the 'tx_width' field is useless
-> and can be removed from the struct at_desc.
+> Indeed, for each item in the scatter-gather list, we check whether the
+> transfer length is aligned with the data width provided by
+> dmaengine_slave_config(). If so, we directly use this data width for the
+> current part of the transfer we are preparing. Otherwise, the data width
+> is reduced to 8 bits (1 byte). Of course, the actual number of register
+> accesses must also be updated to match the new data width.
 > 
-> Before this patch, atc_prep_slave_sg() was not consistent: BTSIZE was
-> correctly initialized according to the SRC_WIDTH but 'tx_width' was always
-> set to reg_width, which was incorrect for MEM_TO_DEV transfers. It led to
-> bad DMA residue when 'tx_width' != SRC_WIDTH.
+> So one chunk was missing in the original patch (see Fixes tag below): the
+> number of register accesses was correctly set to (len >> fixed_dwidth) in
+> mbr_ubc but the real data width was not updated in mbr_cfg. Since mbr_cfg
+> may change for each part of the scatter-gather transfer this also explains
+> why the original patch used the Descriptor View 2 instead of the
+> Descriptor View 1.
 > 
-> Also the 'tx_width' field was mostly set only in the first and last
-> descriptors. Depending on the kind of DMA transfer, this field remained
-> uninitialized for intermediate descriptors. The accurate DMA residue was
-> computed only when the currently processed descriptor was the first or the
-> last of the chain. This algorithm was a little bit odd. An accurate DMA
-> residue can always be computed using the SRC_WIDTH and BTSIZE bitfields
-> in the CTRLAx register.
+> Let's take the example of a DMA transfer to write 8bit data into an Atmel
+> USART with FIFOs. When FIFOs are enabled in the USART, its Transmit
+> Holding Register (THR) works in multidata mode, that is to say that up to
+> 4 8bit data can be written into the THR in a single 32bit access and it is
+> still possible to write only one data with a 8bit access. To take
+> advantage of this new feature, the DMA driver was modified to allow
+> multiple dwidths when doing slave transfers.
+> For instance, when the total length is 22 bytes, the USART driver splits
+> the transfer into 2 parts:
 > 
-> Finally, the test to check whether the currently processed descriptor is
-> the last of the chain was wrong: for cyclic transfer, last_desc->lli.dscr
-> is NOT equal to zero, since set_desc_eol() is never called, but logically
-> equal to first_desc->txd.phys. This bug has a side effect on the
-> drivers/tty/serial/atmel_serial.c driver, which uses cyclic DMA transfer
-> to receive data. Since the DMA residue was wrong each time the DMA
-> transfer reaches the second (and last) period of the transfer, no more
-> data were received by the USART driver till the cyclic DMA transfer loops
-> back to the first period.
+> First part: 20 bytes transferred through 5 32bit writes into THR
+> Second part: 2 bytes transferred though 2 8bit writes into THR
 > 
-Applied, thanks
+> For the second part, the data width was first set to 4_BYTES by the USART
+> driver thanks to dmaengine_slave_config() then at_xdmac_prep_slave_sg()
+> reduces this data width to 1_BYTE because the 2 byte length is not aligned
+> with the original 4_BYTES data width. Since the data width is modified,
+> the actual number of writes into THR must be set accordingly.
+ 
+Applied thanks
 
 -- 
 ~Vinod
