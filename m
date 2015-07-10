@@ -1,113 +1,110 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:36:59 +0900
-Subject: [PATCH 12/16] ARM: shmobile: Remove unused dma-register.h
+Date: Fri, 10 Jul 2015 15:37:00 +0900
+Subject: [PATCH 13/16] ARM: shmobile: R-Mobile: Remove legacy PM Domain code
 In-Reply-To: <cover.1436509680.git.horms+renesas@verge.net.au>
 References: <cover.1436509680.git.horms+renesas@verge.net.au>
-Message-ID: <68a31785697c6292e4de3f54914a6ff5ebd0a82d.1436509680.git.horms+renesas@verge.net.au>
+Message-ID: <b587288001f05c0e6b4bdb5a5f0e7a28594cbf0d.1436509680.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The last users of "dma-register.h" were the sh73a0 and r8a7740 legacy
-SoC code, which have been removed.
+The last user of the legacy R-Mobile PM Domain code was the r8a7740
+legacy SoC code, which has been removed.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/dma-register.h | 84 -----------------------------------
- 1 file changed, 84 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/dma-register.h
+ arch/arm/mach-shmobile/pm-rmobile.c | 39 -------------------------------------
+ arch/arm/mach-shmobile/pm-rmobile.h | 24 -----------------------
+ 2 files changed, 63 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/dma-register.h b/arch/arm/mach-shmobile/dma-register.h
-deleted file mode 100644
-index 52a2f66e600f..000000000000
---- a/arch/arm/mach-shmobile/dma-register.h
-+++ /dev/null
-@@ -1,84 +0,0 @@
--/*
-- * SH-ARM CPU-specific DMA definitions, used by both DMA drivers
-- *
-- * Copyright (C) 2012 Renesas Solutions Corp
-- *
-- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- *
-- * Based on arch/sh/include/cpu-sh4/cpu/dma-register.h
-- * Copyright (C) 2010 Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index b9b494f5ca99..a5b96b990aea 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -169,43 +169,6 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	__rmobile_pd_power_up(rmobile_pd, false);
+ }
+ 
+-#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
 -
--#ifndef DMA_REGISTER_H
--#define DMA_REGISTER_H
+-void rmobile_init_domains(struct rmobile_pm_domain domains[], int num)
+-{
+-	int j;
 -
--/*
-- *		Direct Memory Access Controller
-- */
+-	for (j = 0; j < num; j++)
+-		rmobile_init_pm_domain(&domains[j]);
+-}
 -
--/* Transmit sizes and respective CHCR register values */
--enum {
--	XMIT_SZ_8BIT		= 0,
--	XMIT_SZ_16BIT		= 1,
--	XMIT_SZ_32BIT		= 2,
--	XMIT_SZ_64BIT		= 7,
--	XMIT_SZ_128BIT		= 3,
--	XMIT_SZ_256BIT		= 4,
--	XMIT_SZ_512BIT		= 5,
--};
+-void rmobile_add_device_to_domain_td(const char *domain_name,
+-				     struct platform_device *pdev,
+-				     struct gpd_timing_data *td)
+-{
+-	struct device *dev = &pdev->dev;
 -
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_ts_shift[] = {
--	[XMIT_SZ_8BIT]		= 0,
--	[XMIT_SZ_16BIT]		= 1,
--	[XMIT_SZ_32BIT]		= 2,
--	[XMIT_SZ_64BIT]		= 3,
--	[XMIT_SZ_128BIT]	= 4,
--	[XMIT_SZ_256BIT]	= 5,
--	[XMIT_SZ_512BIT]	= 6,
--};
+-	__pm_genpd_name_add_device(domain_name, dev, td);
+-}
 -
--#define TS_LOW_BIT	0x3 /* --xx */
--#define TS_HI_BIT	0xc /* xx-- */
+-void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+-				    int size)
+-{
+-	struct gpd_timing_data latencies = {
+-		.stop_latency_ns = DEFAULT_DEV_LATENCY_NS,
+-		.start_latency_ns = DEFAULT_DEV_LATENCY_NS,
+-		.save_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
+-		.restore_state_latency_ns = DEFAULT_DEV_LATENCY_NS,
+-	};
+-	int j;
 -
--#define TS_LOW_SHIFT	(3)
--#define TS_HI_SHIFT	(20 - 2)	/* 2 bits for shifted low TS */
+-	for (j = 0; j < size; j++)
+-		rmobile_add_device_to_domain_td(data[j].domain_name,
+-						data[j].pdev, &latencies);
+-}
 -
--#define TS_INDEX2VAL(i) \
--	((((i) & TS_LOW_BIT) << TS_LOW_SHIFT) |\
--	 (((i) & TS_HI_BIT)  << TS_HI_SHIFT))
+-#else /* !CONFIG_ARCH_SHMOBILE_LEGACY */
 -
--#define CHCR_TX(xmit_sz) (DM_FIX | SM_INC | RS_ERS | TS_INDEX2VAL((xmit_sz)))
--#define CHCR_RX(xmit_sz) (DM_INC | SM_FIX | RS_ERS | TS_INDEX2VAL((xmit_sz)))
+ static int rmobile_pd_suspend_busy(void)
+ {
+ 	/*
+@@ -436,5 +399,3 @@ static int __init rmobile_init_pm_domains(void)
+ }
+ 
+ core_initcall(rmobile_init_pm_domains);
 -
+-#endif /* !CONFIG_ARCH_SHMOBILE_LEGACY */
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.h b/arch/arm/mach-shmobile/pm-rmobile.h
+index 3992b619c127..30a4a421ee31 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.h
++++ b/arch/arm/mach-shmobile/pm-rmobile.h
+@@ -31,28 +31,4 @@ struct pm_domain_device {
+ 	struct platform_device *pdev;
+ };
+ 
+-#if defined(CONFIG_PM_RMOBILE) && defined(CONFIG_ARCH_SHMOBILE_LEGACY)
+-extern void rmobile_init_domains(struct rmobile_pm_domain domains[], int num);
+-extern void rmobile_add_device_to_domain_td(const char *domain_name,
+-					    struct platform_device *pdev,
+-					    struct gpd_timing_data *td);
 -
--/*
-- *		USB High-Speed DMAC
-- */
--/* Transmit sizes and respective CHCR register values */
--enum {
--	USBTS_XMIT_SZ_8BYTE		= 0,
--	USBTS_XMIT_SZ_16BYTE		= 1,
--	USBTS_XMIT_SZ_32BYTE		= 2,
--};
+-static inline void rmobile_add_device_to_domain(const char *domain_name,
+-						struct platform_device *pdev)
+-{
+-	rmobile_add_device_to_domain_td(domain_name, pdev, NULL);
+-}
 -
--/* log2(size / 8) - used to calculate number of transfers */
--static const unsigned int dma_usbts_shift[] = {
--	[USBTS_XMIT_SZ_8BYTE]	= 3,
--	[USBTS_XMIT_SZ_16BYTE]	= 4,
--	[USBTS_XMIT_SZ_32BYTE]	= 5,
--};
+-extern void rmobile_add_devices_to_domains(struct pm_domain_device data[],
+-					   int size);
+-#else
 -
--#define USBTS_LOW_BIT	0x3 /* --xx */
--#define USBTS_HI_BIT	0x0 /* ---- */
+-#define rmobile_init_domains(domains, num) do { } while (0)
+-#define rmobile_add_device_to_domain_td(name, pdev, td) do { } while (0)
+-#define rmobile_add_device_to_domain(name, pdev) do { } while (0)
 -
--#define USBTS_LOW_SHIFT	6
--#define USBTS_HI_SHIFT	0
+-static inline void rmobile_add_devices_to_domains(struct pm_domain_device d[],
+-						  int size) {}
+-#endif /* CONFIG_PM_RMOBILE */
 -
--#define USBTS_INDEX2VAL(i) (((i) & 3) << 6)
--
--#endif /* DMA_REGISTER_H */
+ #endif /* PM_RMOBILE_H */
 -- 
 2.1.4
