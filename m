@@ -1,64 +1,173 @@
-From: stripathi@apm.com (Suman Tripathi)
-Date: Fri, 10 Jul 2015 15:07:28 +0530
-Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-In-Reply-To: <559F8115.1060801@arm.com>
-References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
- <559F7B2C.6090402@arm.com>
- <CAOHikRBYS-oaWa8qKd+6-2LZ4drVrWnfvqN34cGEu8QxbrMX1Q@mail.gmail.com>
- <559F8115.1060801@arm.com>
-Message-ID: <CAOHikRAKDEoRh7v11Nt-5nNsnJMueWtK+1WZs=u8AaAAf+b4GA@mail.gmail.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Fri, 10 Jul 2015 17:36:49 +0800
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com> <559B4B0E.4060004@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
+Message-ID: <559F9231.4080008@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 1:53 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 10/07/15 09:17, Suman Tripathi wrote:
->> On Fri, Jul 10, 2015 at 1:28 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>
->>> On 10/07/15 08:45, Ming Lei wrote:
->>>> Hi,
->>>>
->>>> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
->>>> causes the following failure on APM mustang board(arm64) when
->>>> booting via UEFI and ACPI:
->>>>
->>>> No valid GICC entries exist
->>>> ACPI: Failed to initialize GIC IRQ controller
->>>> Kernel panic - not syncing: No interrupt controller found.
->>>> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
->>>> Hardware name: APM X-Gene Mustang board (DT)
->>>> Call trace:
->>>> [<ffffffc000089b94>] dump_backtrace+0x0/0x12c
->>>> [<ffffffc000089cd0>] show_stack+0x10/0x1c
->>>> [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
->>>> [<ffffffc0005f7218>] panic+0xe4/0x220
->>>> [<ffffffc00082631c>] init_IRQ+0x24/0x30
->>>> [<ffffffc00082486c>] start_kernel+0x274/0x3d8
->>>> ---[ end Kernel panic - not syncing: No interrupt controller found.
->>>
->>> Isn't that addressed by [1] which Catalin has queued for -rc2?
+On 2015/7/10 16:53, Gabriele Paoloni wrote:
+> I have just sent this patch "[PATCH] Store PCIe controllers address in struct of_pci_range".
+> 
+> It would be needed by "pcie_designware.c" to retrieve the PCI controller addresses from "win->__res.start".
+> 
+> So we do not need to retrieve info from the DT parser anymore and we can use the new PCI DT parsing API
+> 
+> This problem was already discussed in this thread:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
+> 
+> 
+
+Hi Gab,
+
+Thanks for your patch.
+
+That means I can use something like: pp->io_mod_base = win->__res.start
+to get io_mod_base, mem_mod_base and cfg0_mod_base.
+
+will send my v4 series based on your patch.
+
+Best regards,
+Zhou
+
+>> -----Original Message-----
+>> From: Wangzhou (B)
+>> Sent: Tuesday, July 07, 2015 4:44 AM
+>> To: James Morse
+>> Cc: Gabriele Paoloni; Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd
+>> Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
+>> karicheri2 at ti.com; Minghuan.Lian at freescale.com; linux-
+>> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+>> qiuzhenfa; Liguozhu (Kenneth)
+>> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
 >>
+>> On 2015/7/1 22:26, James Morse wrote:
+>>> Zhou Wang wrote:
+>>>> I tested this patch on D02 board of Hisilicon. It works well.
+>>>> I have compiled the driver with multi_v7_defconfig. However, I don't
+>>>> have
+>>>> ARM32 PCIe related board to do test. It will be appreciated if
+>> someone
+>>>> could
+>>>> help to test it.
+>>>>
+>>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>>> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>>> Tested-by: James Morse <james.morse@arm.com>
+>>>
+>>> Tests on this new series, using the same i.MX 6Quad board, are not
+>> working.
+>>>
+>>> The network card is no longer detected, and I get a lockup when
+>> removing
+>>> the root bridge and rescanning.
+>>>
+>>> Partial dmesg output below. Significantly, the lines:
+>>>> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+>>>> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
+>> [bus
+>>> 00-ff]
+>>> are new.
+>>>
+>>> Both series are applied to v4.1, use the same .config file, and the
+>> same dtb.
+>>> I will investigate further.
+>>>
+>>> (Re-testing v2 works, so this isn't an interim hardware failure)
+>>>
+>>> Thanks,
+>>>
+>>> James
+>>>
 >>
->> I am also seeing the same . But it fixes after I apply the parking
->> protocol  patch but that is not upstreamed.
->
-> I'm more interested to find out if the patch I mentioned in my original
-> email fixes it or not. An additional dependency on something that is not
-> aimed for mainline yet doesn't really help.
-
-Yes the patch mentioned by you fixes the issue.
-
-[1] https://lkml.org/lkml/2015/7/6/876
-
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
-
-
-
--- 
-Thanks,
-with regards,
-Suman Tripathi
+>> Hi James,
+>>
+>> There are something wrong with v3 patch.
+>>
+>> pp->io_mod_base = of_read_number(parser_range_end -
+>> 		of_n_addr_cells(np) - 5 + na, ns);
+>> pp->mem_mod_base = of_read_number(parser_range_end -
+>> 		of_n_addr_cells(np) - 5 + na, ns);
+>> pp->cfg0_mod_base = of_read_number(parser_range_end -
+>> 		of_n_addr_cells(np) - 5 + na, ns);
+>> are wrong.
+>>
+>> The ranges item in your dts is:
+>> ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000
+>> 	  0x81000000 0x0 0x0  0x1f80000 0x0 0x10000
+>> 	  0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
+>> parser_range_end points to the end of ranges(0xf00000) directly. In v2
+>> patch,
+>> of_read_number is of_read_number(parser.range - parser.np + na, ns);
+>> parser.range
+>> points to the end of each line in ranges item.
+>>
+>> When I did test on D02 board with intel82599 card, I set ranges item as:
+>> ranges = <0x03000000 0 0xb0000000 0x220 0x00000000 0 0xf000000>;
+>> It is just one line. In this case, parser_range_end is same with
+>> parser.range.
+>> That is why it happened to work well on D02 board.
+>>
+>> very sorry to bother you about this problem.
+>>
+>> Thanks,
+>> Zhou
+>>
+>>>
+>>>
+>>> root at localhost:~# dmesg | grep -i pci
+>>> [    0.126184] PCI: CLS 0 bytes, default 64
+>>> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+>>> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
+>> [bus 00-ff]
+>>> [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus
+>> 0000:00
+>>> [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
+>>> [    0.154215] pci_bus 0000:00: root bus resource [???
+>>> 0x01f00000-0x01f7ffff flags 0x0]
+>>> [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+>>> [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-
+>> 0x01efffff]
+>>> [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+>>> [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+>>> [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff
+>> pref]
+>>> [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for
+>> PCI
+>>> [    0.154429] pci 0000:00:00.0: supports D1
+>>> [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
+>> D3cold
+>>> [    0.154683] PCI: bus0: Fast back to back transfers disabled
+>>> [    0.154806] PCI: bus1: Fast back to back transfers enabled
+>>> [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-
+>> 0x010fffff]
+>>> [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-
+>> 0x0110ffff
+>>> pref]
+>>> [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
+>>> [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME
+>> interrupt
+>>> [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme
+>> loaded
+>>> [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
+>>> [    1.188840] ehci-pci: EHCI PCI platform driver
+>>> [    1.232518] ohci-pci: OHCI PCI platform driver
+>>>
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-pci"
+>> in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>>
+>>> .
+>>>
+>>
+> 
