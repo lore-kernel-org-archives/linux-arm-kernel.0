@@ -1,118 +1,19 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 10 Jul 2015 15:56:52 +0800
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <20150710060350.GA3127@piout.net>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
- <20150710060350.GA3127@piout.net>
-Message-ID: <559F7AC4.6050008@atmel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 10 Jul 2015 13:30:02 +0530
+Subject: [PATCH] dmaengine: at_xdmac: fix bug about channel configuration
+In-Reply-To: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1434550946-27750-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20150710080002.GC836@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Alexandre
+On Wed, Jun 17, 2015 at 04:22:26PM +0200, Ludovic Desroches wrote:
+> When using descriptor view 2 or higher, we don't write the configuration
+> into AT_XDMAC_CC register because this configuration will be fetch from
+> the descriptor. Unfortunately, the PROT bit is not updated with this
+> method, we have to do it manually before enabling the channel.
+> 
+Applied, thanks
 
-On 7/10/2015 2:03 PM, Alexandre Belloni wrote:
-> Hi,
->
-> On 09/07/2015 at 18:15:46 +0800, Josh Wu wrote :
->> As since sama5d3, to reset the chip, we don't need to shutdown the ddr
->> controller.
->>
->> So add a new compatible string and new restart function for sama5d3 and
->> later chips. As we don't use sama5d3 ddr controller, so remove it as
->> well.
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>
->>   drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
->>   1 file changed, 21 insertions(+), 9 deletions(-)
->>
->> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
->> index 36dc52f..8944b63 100644
->> --- a/drivers/power/reset/at91-reset.c
->> +++ b/drivers/power/reset/at91-reset.c
->> @@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
->>   	return NOTIFY_DONE;
->>   }
->>   
->> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
->> +			void *cmd)
-> Please align that line properly.
-
-Ok.
-
->
->> +{
->> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
->> +				at91_rstc_base);
-> That one too.
-
-I'll align them in v2.
-
->
->> +	return NOTIFY_DONE;
->> +}
->> +
->>   static void __init at91_reset_status(struct platform_device *pdev)
->>   {
->>   	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
->> @@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
->>   static const struct of_device_id at91_ramc_of_match[] = {
->>   	{ .compatible = "atmel,at91sam9260-sdramc", },
->>   	{ .compatible = "atmel,at91sam9g45-ddramc", },
->> -	{ .compatible = "atmel,sama5d3-ddramc", },
->>   	{ /* sentinel */ }
->>   };
->>   
->>   static const struct of_device_id at91_reset_of_match[] = {
->>   	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
->>   	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
->> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
->>   	{ /* sentinel */ }
->>   };
->>   
->> @@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
->>   		return -ENODEV;
->>   	}
->>   
->> -	for_each_matching_node(np, at91_ramc_of_match) {
->> -		at91_ramc_base[idx] = of_iomap(np, 0);
->> -		if (!at91_ramc_base[idx]) {
->> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
->> -			return -ENODEV;
->> +	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
->> +	at91_restart_nb.notifier_call = match->data;
->> +
->> +	if (match->data != sama5d3_restart) {
-> This doesn't scale well. I would create a structure with a pointer to
-> the restart function and a boolean or a bitfield to store whether the
-> workaround is needed. Use that structure in your match data. Then, you
-> won't need to reorder anything.
-
-I would agree with Maxime. Currently all latest chip reset function is 
-compatible with the atmel,sama5d3-rstc.
-So check compatible string is enough for now.
-But of cause if we have other incompatible reset in future with new 
-chip, the structure like you said is needed.
-
-Thanks.
-Best Regards,
-Josh Wu
->
->> +		/* we need to shutdown the ddr controller, so get ramc base */
->> +		for_each_matching_node(np, at91_ramc_of_match) {
->> +			at91_ramc_base[idx] = of_iomap(np, 0);
->> +			if (!at91_ramc_base[idx]) {
->> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
->> +				return -ENODEV;
->> +			}
->> +			idx++;
->>   		}
->> -		idx++;
->>   	}
->>   
->> -	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
->> -	at91_restart_nb.notifier_call = match->data;
->>   	return register_restart_handler(&at91_restart_nb);
->>   }
+-- 
+~Vinod
