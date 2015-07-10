@@ -1,57 +1,157 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 10 Jul 2015 16:53:24 +0800
-Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample
- time
-In-Reply-To: <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
-References: <cover.1435134626.git.maitysanchayan@gmail.com>
- <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
-Message-ID: <20150710085324.GL23464@tiger>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 10 Jul 2015 08:53:45 +0000
+Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <559B4B0E.4060004@hisilicon.com>
+References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
+ <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
+ <5593F899.6050306@arm.com> <559B4B0E.4060004@hisilicon.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 02:03:41PM +0530, Sanchayan Maity wrote:
-> Add a device tree property which allows to specify the minimum sample
-> time which can be used to calculate the actual ADC cycles required
-> depending on the hardware.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> index 90a03d5..71d9c08 100644
-> --- a/arch/arm/boot/dts/vfxxx.dtsi
-> +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> @@ -229,6 +229,7 @@
->  				status = "disabled";
->  				fsl,adck-max-frequency = <30000000>, <40000000>,
->  							<20000000>;
-> +				min-sample-time = <1000>;
->  			};
->  
->  			wdoga5: wdog at 4003e000 {
-> @@ -447,6 +448,7 @@
->  				status = "disabled";
->  				fsl,adck-max-frequency = <30000000>, <40000000>,
->  							<20000000>;
-> +				min-sample-time = <1000>;
+I have just sent this patch "[PATCH] Store PCIe controllers address in struct of_pci_range".
 
-Can we code 1000 as the default in kernel driver, so that only boards
-requiring different value need to have this property?  Doing so makes
-the property optional rather than required.
+It would be needed by "pcie_designware.c" to retrieve the PCI controller addresses from "win->__res.start".
 
-Shawn
+So we do not need to retrieve info from the DT parser anymore and we can use the new PCI DT parsing API
 
->  			};
->  
->  			esdhc1: esdhc at 400b2000 {
-> -- 
-> 2.4.4
+This problem was already discussed in this thread:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
+
+
+> -----Original Message-----
+> From: Wangzhou (B)
+> Sent: Tuesday, July 07, 2015 4:44 AM
+> To: James Morse
+> Cc: Gabriele Paoloni; Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd
+> Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
+> karicheri2 at ti.com; Minghuan.Lian at freescale.com; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
+> qiuzhenfa; Liguozhu (Kenneth)
+> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> On 2015/7/1 22:26, James Morse wrote:
+> > Zhou Wang wrote:
+> >> I tested this patch on D02 board of Hisilicon. It works well.
+> >> I have compiled the driver with multi_v7_defconfig. However, I don't
+> >> have
+> >> ARM32 PCIe related board to do test. It will be appreciated if
+> someone
+> >> could
+> >> help to test it.
+> >>
+> >> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> >> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> >> Tested-by: James Morse <james.morse@arm.com>
+> >
+> > Tests on this new series, using the same i.MX 6Quad board, are not
+> working.
+> >
+> > The network card is no longer detected, and I get a lockup when
+> removing
+> > the root bridge and rescanning.
+> >
+> > Partial dmesg output below. Significantly, the lines:
+> >> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+> >> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
+> [bus
+> > 00-ff]
+> > are new.
+> >
+> > Both series are applied to v4.1, use the same .config file, and the
+> same dtb.
+> > I will investigate further.
+> >
+> > (Re-testing v2 works, so this isn't an interim hardware failure)
+> >
+> > Thanks,
+> >
+> > James
+> >
+> 
+> Hi James,
+> 
+> There are something wrong with v3 patch.
+> 
+> pp->io_mod_base = of_read_number(parser_range_end -
+> 		of_n_addr_cells(np) - 5 + na, ns);
+> pp->mem_mod_base = of_read_number(parser_range_end -
+> 		of_n_addr_cells(np) - 5 + na, ns);
+> pp->cfg0_mod_base = of_read_number(parser_range_end -
+> 		of_n_addr_cells(np) - 5 + na, ns);
+> are wrong.
+> 
+> The ranges item in your dts is:
+> ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000
+> 	  0x81000000 0x0 0x0  0x1f80000 0x0 0x10000
+> 	  0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
+> parser_range_end points to the end of ranges(0xf00000) directly. In v2
+> patch,
+> of_read_number is of_read_number(parser.range - parser.np + na, ns);
+> parser.range
+> points to the end of each line in ranges item.
+> 
+> When I did test on D02 board with intel82599 card, I set ranges item as:
+> ranges = <0x03000000 0 0xb0000000 0x220 0x00000000 0 0xf000000>;
+> It is just one line. In this case, parser_range_end is same with
+> parser.range.
+> That is why it happened to work well on D02 board.
+> 
+> very sorry to bother you about this problem.
+> 
+> Thanks,
+> Zhou
+> 
+> >
+> >
+> > root at localhost:~# dmesg | grep -i pci
+> > [    0.126184] PCI: CLS 0 bytes, default 64
+> > [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
+> > [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
+> [bus 00-ff]
+> > [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus
+> 0000:00
+> > [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
+> > [    0.154215] pci_bus 0000:00: root bus resource [???
+> > 0x01f00000-0x01f7ffff flags 0x0]
+> > [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
+> > [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-
+> 0x01efffff]
+> > [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
+> > [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
+> > [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff
+> pref]
+> > [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for
+> PCI
+> > [    0.154429] pci 0000:00:00.0: supports D1
+> > [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
+> D3cold
+> > [    0.154683] PCI: bus0: Fast back to back transfers disabled
+> > [    0.154806] PCI: bus1: Fast back to back transfers enabled
+> > [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-
+> 0x010fffff]
+> > [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-
+> 0x0110ffff
+> > pref]
+> > [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
+> > [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME
+> interrupt
+> > [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme
+> loaded
+> > [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
+> > [    1.188840] ehci-pci: EHCI PCI platform driver
+> > [    1.232518] ohci-pci: OHCI PCI platform driver
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
+> in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> >
+> > .
+> >
 > 
