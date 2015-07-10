@@ -1,331 +1,166 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 10 Jul 2015 16:31:54 +0200
-Subject: [PATCH v2 2/6] soc: Mediatek: Add SCPSYS CPU power domain driver
-In-Reply-To: <1436508249-49338-3-git-send-email-scott.shu@mediatek.com>
-References: <1436508249-49338-3-git-send-email-scott.shu@mediatek.com>
-Message-ID: <1480643.lE6oTr5Rlh@ubix>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Fri, 10 Jul 2015 09:07:39 -0600
+Subject: [PATCH v3 2/3] ARM: cpuidle: refine cpuidle_ops member's
+ parameters.
+In-Reply-To: <20150709092848.GA26079@red-moon>
+References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
+ <1436430685-2202-3-git-send-email-jszhang@marvell.com>
+ <20150709164304.26b6c2be@xhacker> <20150709092848.GA26079@red-moon>
+Message-ID: <20150710150739.GB2049@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 10, 2015 02:04:05 PM Scott Shu wrote:
-> This adds a CPU power domain driver for the Mediatek SCPSYS unit on
-> MT6580.
-> 
-> Signed-off-by: Scott Shu <scott.shu@mediatek.com>
-> ---
->  arch/arm/mach-mediatek/Makefile  |   2 +-
->  arch/arm/mach-mediatek/generic.h |  23 ++++
->  arch/arm/mach-mediatek/hotplug.c | 267
-> +++++++++++++++++++++++++++++++++++++++ 3 files changed, 291 insertions(+),
-> 1 deletion(-)
->  create mode 100644 arch/arm/mach-mediatek/generic.h
->  create mode 100644 arch/arm/mach-mediatek/hotplug.c
-> 
-> diff --git a/arch/arm/mach-mediatek/Makefile
-> b/arch/arm/mach-mediatek/Makefile index 2116460..b2e4ef5 100644
-> --- a/arch/arm/mach-mediatek/Makefile
-> +++ b/arch/arm/mach-mediatek/Makefile
-> @@ -1,4 +1,4 @@
->  ifeq ($(CONFIG_SMP),y)
-> -obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o
-> +obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o hotplug.o
->  endif
->  obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
-> diff --git a/arch/arm/mach-mediatek/generic.h
-> b/arch/arm/mach-mediatek/generic.h new file mode 100644
-> index 0000000..376f183
-> --- /dev/null
-> +++ b/arch/arm/mach-mediatek/generic.h
-> @@ -0,0 +1,23 @@
-> +/*
-> + * Copyright (c) 2015 Mediatek Inc.
-> + * Author: Scott Shu <scott.shu@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#ifndef __MACH_GENERIC_H
-> +#define __MACH_GENERIC_H
-> +
-> +#include <linux/kernel.h>
-> +
-> +int spm_cpu_mtcmos_init(void);
-> +int spm_cpu_mtcmos_on(int cpu);
-> +int spm_cpu_mtcmos_off(int cpu, bool wfi);
-> +
-> +#endif
-> diff --git a/arch/arm/mach-mediatek/hotplug.c
-> b/arch/arm/mach-mediatek/hotplug.c new file mode 100644
-> index 0000000..bd97f2e
-> --- /dev/null
-> +++ b/arch/arm/mach-mediatek/hotplug.c
-> @@ -0,0 +1,267 @@
-> +/*
-> + * Copyright (c) 2015 Mediatek Inc.
-> + * Author: Scott Shu <scott.shu@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +#include <linux/init.h>
-> +#include <linux/module.h>
-> +#include <linux/kernel.h>
-> +#include <linux/spinlock.h>
-> +#include <linux/delay.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_address.h>
-> +
-> +/* SCPSYS registers */
-> +#define SPM_POWERON_CONFIG_SET		0x0000
-> +
-> +#define SPM_CA7_CPU0_PWR_CON		0x0200
-> +#define SPM_CA7_CPU1_PWR_CON		0x0218
-> +#define SPM_CA7_CPU2_PWR_CON		0x021c
-> +#define SPM_CA7_CPU3_PWR_CON		0x0220
-> +
-> +#define SPM_CA7_CPU0_L1_PDN		0x025c
-> +#define SPM_CA7_CPU1_L1_PDN		0x0264
-> +#define SPM_CA7_CPU2_L1_PDN		0x026c
-> +#define SPM_CA7_CPU3_L1_PDN		0x0274
-> +
-> +#define SPM_PWR_STATUS			0x060c
-> +#define SPM_PWR_STATUS_2ND		0x0610
-> +#define SPM_SLEEP_TIMER_STA		0x0720
-> +
-> +/* bit definition in SPM_CA7_CPUx_PWR_CON */
-> +#define SRAM_ISOINT_B		BIT(6)
-> +#define SRAM_CKISO		BIT(5)
-> +#define PWR_CLK_DIS		BIT(4)
-> +#define PWR_ON_2ND		BIT(3)
-> +#define PWR_ON			BIT(2)
-> +#define PWR_ISO			BIT(1)
-> +#define PWR_RST_B		BIT(0)
-> +
-> +/* bit definition in SPM_CA7_CPUx_L1_PDN */
-> +#define L1_PDN_ACK		BIT(8)
-> +#define L1_PDN			BIT(0)
-> +
-> +#define MT6580_MAX_CPUS		4
-> +
-> +static DEFINE_SPINLOCK(spm_cpu_lock);
-> +
-> +void __iomem *spm_cpu_base;
-> +
-> +u32 spm_cpu_pwr_con[MT6580_MAX_CPUS] = {
-> +	SPM_CA7_CPU0_PWR_CON,
-> +	SPM_CA7_CPU1_PWR_CON,
-> +	SPM_CA7_CPU2_PWR_CON,
-> +	SPM_CA7_CPU3_PWR_CON,
-> +};
-> +
-> +u32 spm_cpu_l1_pdn[MT6580_MAX_CPUS] = {
-> +	SPM_CA7_CPU0_L1_PDN,
-> +	SPM_CA7_CPU1_L1_PDN,
-> +	SPM_CA7_CPU2_L1_PDN,
-> +	SPM_CA7_CPU3_L1_PDN,
-> +};
-> +
-> +#define SPM_REGWR_EN		BIT(0)
-> +#define SPM_PROJECT_CODE	0x0B16
-> +
-> +int spm_cpu_mtcmos_on(int cpu)
-> +{
-> +	unsigned long flags;
-> +	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
-> +	unsigned int temp;
-> +	int timeout = 10;
-> +	int ret = -ENOSYS;
-> +
-> +	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
-> +	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
-> +
-> +	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
-> +	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
-> +
-> +	spin_lock_irqsave(&spm_cpu_lock, flags);
-> +
-> +	/* Set PWR_ON */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= PWR_ON;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Wait for charging core power */
-> +	udelay(1);
-> +
-> +	/* Set PWR_ON_2ND */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= PWR_ON_2ND;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Wait for the power-ack */
-> +	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
-> +		(1U << (13 - cpu))) != (1U << (13 - cpu))) ||
-> +		((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
-> +		(1U << (13 - cpu))) != (1U << (13 - cpu)))) {
-> +		if (--timeout == 0)
-> +			goto fail;
-> +		udelay(1);
-> +	}
-> +
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~PWR_ISO;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* L1 power on */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
-> +	temp &= ~L1_PDN;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
-> +	timeout = 10;
-> +	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
-> +		L1_PDN_ACK) != 0) {
-> +		if (--timeout == 0)
-> +			goto fail;
-> +		udelay(1);
-> +	}
-> +
-> +	/* Wait for memory power ready */
-> +	udelay(1);
-> +
-> +	/* Set SRAM_ISOINT_B */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= SRAM_ISOINT_B;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Clear SRAM_CKISO */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~SRAM_CKISO;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Clear PWR_CLK_DIS */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~PWR_CLK_DIS;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Set PWR_RST_B to finish power on and reset sequences */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= PWR_RST_B;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	ret = 0;
-> +fail:
-> +	spin_unlock_irqrestore(&spm_cpu_lock, flags);
-> +
-> +	return ret;
-> +}
-> +
-> +int spm_cpu_mtcmos_off(int cpu, bool wfi)
-> +{
-> +	unsigned long flags;
-> +	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
-> +	unsigned int temp;
-> +	int timeout = 10;
-> +	int ret = -ENOSYS;
-> +
-> +	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
-> +	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
-> +
-> +	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
-> +	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
-> +
-> +	if (wfi) {
-> +		while ((readl_relaxed(spm_cpu_base + SPM_SLEEP_TIMER_STA) &
-> +			(1U << (16 + cpu))) == 0) {
-> +			if (--timeout == 0)
-> +				return ret;
-> +			udelay(1);
-> +		}
-> +	}
-> +
-> +	spin_lock_irqsave(&spm_cpu_lock, flags);
-> +
-> +	/* Set PWR_ISO */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= PWR_ISO;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Set SRAM_CKISO */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= SRAM_CKISO;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Clear SRAM_ISOINT_B */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~SRAM_ISOINT_B;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* L1 power off */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
-> +	temp |= L1_PDN;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
-> +	timeout = 10;
-> +	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
-> +		L1_PDN_ACK) != L1_PDN_ACK) {
-> +		if (--timeout == 0)
-> +			goto fail;
-> +		udelay(1);
-> +	}
-> +
-> +	/* Clear PWR_RST_B */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~PWR_RST_B;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Set PWR_CLK_DIS */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp |= PWR_CLK_DIS;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Clear PWR_ON */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~PWR_ON;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	/* Clear PWR_ON_2ND */
-> +	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
-> +	temp &= ~PWR_ON_2ND;
-> +	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
-> +
-> +	timeout = 10;
-> +	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
-> +		(1U << (13 - cpu))) != 0) ||
-> +	       ((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
-> +		(1U << (13 - cpu))) != 0)) {
-> +		if (--timeout == 0)
-> +			goto fail;
-> +		udelay(1);
-> +	}
-> +
-> +	ret = 0;
-> +fail:
-> +	spin_unlock_irqrestore(&spm_cpu_lock, flags);
-> +
-> +	return ret;
-> +}
-> +
-> +int spm_cpu_mtcmos_init(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6580-scpsys");
+On Thu, Jul 09 2015 at 03:28 -0600, Lorenzo Pieralisi wrote:
+>On Thu, Jul 09, 2015 at 09:43:04AM +0100, Jisheng Zhang wrote:
+>> On Thu, 9 Jul 2015 16:31:24 +0800
+>> Jisheng Zhang <jszhang@marvell.com> wrote:
+>>
+>> > As for the suspend member function, the to-be-suspended cpu is always
+>> > the calling cpu itself, so the 'cpu' parameter may not be necessary, let
+>> > driver get 'cpu' itself if need.
+>> >
+>> > As for the init member function, the device_node here may not be
+>> > necessary either, because we can get the node via. of_get_cpu_node().
+>>
+>> This patch also changes drivers/soc/qcom/spm.c accordingly, but I have no
+>> qcom platform, so I can't test it, just make sure it can pass kernel building.
+>> Could anyone kindly help me to test?
+>
+>CC'ing Lina who should be able to help you test it.
+>
+Sure, will test and let you know.
 
-This looks pretty much as if it should go in 
-drivers/soc/mediatek/mtk-scpsys.c
+-- Lina
 
-AFAIR Sascha already mentioned that in v1.
-Why do you want/need to implement this mach-mediatek?
-
-Thanks,
-Matthias
+>Thanks,
+>Lorenzo
+>
+>> Thanks a lot,
+>> Jisheng
+>>
+>> >
+>> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>> > ---
+>> >  arch/arm/include/asm/cpuidle.h |  6 +++---
+>> >  arch/arm/kernel/cpuidle.c      |  8 ++++----
+>> >  drivers/soc/qcom/spm.c         | 17 ++++++++++++-----
+>> >  3 files changed, 19 insertions(+), 12 deletions(-)
+>> >
+>> > diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
+>> > index 0f84249..ca5dfe6 100644
+>> > --- a/arch/arm/include/asm/cpuidle.h
+>> > +++ b/arch/arm/include/asm/cpuidle.h
+>> > @@ -30,8 +30,8 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>> >  struct device_node;
+>> >
+>> >  struct cpuidle_ops {
+>> > -	int (*suspend)(int cpu, unsigned long arg);
+>> > -	int (*init)(struct device_node *, int cpu);
+>> > +	int (*suspend)(unsigned long arg);
+>> > +	int (*init)(unsigned int cpu);
+>> >  };
+>> >
+>> >  struct of_cpuidle_method {
+>> > @@ -46,6 +46,6 @@ struct of_cpuidle_method {
+>> >
+>> >  extern int arm_cpuidle_suspend(int index);
+>> >
+>> > -extern int arm_cpuidle_init(int cpu);
+>> > +extern int arm_cpuidle_init(unsigned int cpu);
+>> >
+>> >  #endif
+>> > diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
+>> > index 318da33..7bc7bc6 100644
+>> > --- a/arch/arm/kernel/cpuidle.c
+>> > +++ b/arch/arm/kernel/cpuidle.c
+>> > @@ -53,10 +53,10 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
+>> >  int arm_cpuidle_suspend(int index)
+>> >  {
+>> >  	int ret = -EOPNOTSUPP;
+>> > -	int cpu = smp_processor_id();
+>> > +	unsigned int cpu = smp_processor_id();
+>> >
+>> >  	if (cpuidle_ops[cpu].suspend)
+>> > -		ret = cpuidle_ops[cpu].suspend(cpu, index);
+>> > +		ret = cpuidle_ops[cpu].suspend(index);
+>> >
+>> >  	return ret;
+>> >  }
+>> > @@ -134,7 +134,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
+>> >   *  -ENXIO if the HW reports a failure or a misconfiguration,
+>> >   *  -ENOMEM if the HW report an memory allocation failure
+>> >   */
+>> > -int __init arm_cpuidle_init(int cpu)
+>> > +int __init arm_cpuidle_init(unsigned int cpu)
+>> >  {
+>> >  	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
+>> >  	int ret;
+>> > @@ -144,7 +144,7 @@ int __init arm_cpuidle_init(int cpu)
+>> >
+>> >  	ret = arm_cpuidle_read_ops(cpu_node, cpu);
+>> >  	if (!ret && cpuidle_ops[cpu].init)
+>> > -		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
+>> > +		ret = cpuidle_ops[cpu].init(cpu);
+>> >
+>> >  	of_node_put(cpu_node);
+>> >
+>> > diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
+>> > index b04b05a..1649ec3 100644
+>> > --- a/drivers/soc/qcom/spm.c
+>> > +++ b/drivers/soc/qcom/spm.c
+>> > @@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
+>> >
+>> >  static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
+>> >
+>> > -typedef int (*idle_fn)(int);
+>> > +typedef int (*idle_fn)(void);
+>> >  static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
+>> >
+>> >  static inline void spm_register_write(struct spm_driver_data *drv,
+>> > @@ -179,9 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
+>> >  	return -1;
+>> >  }
+>> >
+>> > -static int qcom_cpu_spc(int cpu)
+>> > +static int qcom_cpu_spc(void)
+>> >  {
+>> >  	int ret;
+>> > +	int cpu = smp_processor_id();
+>> >  	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
+>> >
+>> >  	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
+>> > @@ -197,9 +198,11 @@ static int qcom_cpu_spc(int cpu)
+>> >  	return ret;
+>> >  }
+>> >
+>> > -static int qcom_idle_enter(int cpu, unsigned long index)
+>> > +static int qcom_idle_enter(unsigned long index)
+>> >  {
+>> > -	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
+>> > +	unsigned int cpu = smp_processor_id();
+>> > +
+>> > +	return per_cpu(qcom_idle_ops, cpu)[index]();
+>> >  }
+>> >
+>> >  static const struct of_device_id qcom_idle_state_match[] __initconst = {
+>> > @@ -207,7 +210,7 @@ static const struct of_device_id qcom_idle_state_match[] __initconst = {
+>> >  	{ },
+>> >  };
+>> >
+>> > -static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
+>> > +static int __init qcom_cpuidle_init(unsigned int cpu)
+>> >  {
+>> >  	const struct of_device_id *match_id;
+>> >  	struct device_node *state_node;
+>> > @@ -217,6 +220,10 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
+>> >  	idle_fn *fns;
+>> >  	cpumask_t mask;
+>> >  	bool use_scm_power_down = false;
+>> > +	struct device_node *cpu_node = of_get_cpu_node(cpu, NULL);
+>> > +
+>> > +	if (!cpu_node)
+>> > +		return -ENODEV;
+>> >
+>> >  	for (i = 0; ; i++) {
+>> >  		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
+>>
