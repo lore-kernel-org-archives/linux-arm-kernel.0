@@ -1,110 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 17:30:38 +0900
-Subject: [PATCH v2 4/7] clk: samsung: exynos4x12: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <1436456621-29839-5-git-send-email-b.zolnierkie@samsung.com>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-5-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <559F82AE.8070108@samsung.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 10 Jul 2015 11:31:03 +0300
+Subject: [PATCH v2 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
+References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <559F82C7.5010202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.07.2015 00:43, Bartlomiej Zolnierkiewicz wrote:
-> With the addition of the new Samsung specific cpu-clock type, the
-> arm clock can be represented as a cpu-clock type. Add the CPU clock
-> configuration data and instantiate the CPU clock type for Exynos4x12.
+Hi,
+
+On 08/07/15 12:41, Chunfeng Yun wrote:
+> add a DT binding documentation of xHCI host controller for the
+> MT8173 SoC from Mediatek.
 > 
-> Based on the earlier work by Thomas Abraham.
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 > ---
->  drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+>  .../devicetree/bindings/usb/mt8173-xhci.txt        | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
-> index cae2c048..3071260 100644
-> --- a/drivers/clk/samsung/clk-exynos4.c
-> +++ b/drivers/clk/samsung/clk-exynos4.c
-> @@ -1396,6 +1396,45 @@ static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
->  	{  0 },
->  };
->  
-> +static const struct exynos_cpuclk_cfg_data e4212_armclk_d[] __initconst = {
-> +	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
-> +	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
-> +	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
-> +	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
-> +	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4210_CPU_DIV1(2, 4), },
-> +	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4210_CPU_DIV1(2, 4), },
-> +	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
-> +	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4210_CPU_DIV1(2, 3), },
-> +	{  0 },
+> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> new file mode 100644
+> index 0000000..94cec94
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> @@ -0,0 +1,27 @@
+> +MT65XX xhci
+> +
+> +The device node for Mediatek SOC usb3.0 host controller
+> +
+> +Required properties:
+> + - compatible : supports "mediatek,mt8173-xhci"
+> + - reg        : Offset and length of registers
+> + - interrupts : Interrupt mode, number and trigger mode
+> + - reg-vusb33-supply:  regulator of usb avdd3.3v
+> + - reg-vbus-supply : regulator of vbus;
+
+General trend is to use <supply-name>-supply.
+We already know it is a regulator so no need to add "reg-"
+
+So those two can be
+
+vusb33-supply:
+vbus-supply:
+
+
+> + - usb-phy : the phy that xhci will bind
+> + - usb3-lpm-capable: supports USB3 LPM
+> + - clocks     : must support all clocks that xhci needs
+> + - clock-names: should be "sys_mac" for sys and mac clocks
+> +
+> +Example:
+> +usb: usb30 at 11270000 {
+> +	compatible = "mediatek,mt8173-xhci";
+> +	reg = <0 0x11270000 0 0x1000>;
+> +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> +	reg-vusb33-supply = <&mt6397_vusb_reg>;
+> +	reg-vbus-supply = <&usb_p1_vbus>;
+> +	usb-phy = <&u3phy>;
+> +	usb3-lpm-capable;
+> +	clocks = <&topckgen CLK_TOP_USB30_SEL>;
+> +	clock-names = "sys_mac";
 > +};
-> +
-> +#define E4412_CPU_DIV1(cores, hpm, copy)				\
-> +		(((cores) << 8) | ((hpm) << 4) | ((copy) << 0))
-> +
-> +static const struct exynos_cpuclk_cfg_data e4412_armclk_d[] __initconst = {
-> +	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(7, 0, 6), },
-> +	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(6, 0, 6), },
-> +	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(6, 0, 5), },
-> +	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(5, 0, 5), },
-> +	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4412_CPU_DIV1(5, 0, 4), },
-> +	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4412_CPU_DIV1(4, 0, 4), },
-> +	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(4, 0, 3), },
-> +	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(3, 0, 3), },
-> +	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(3, 0, 3), },
-> +	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
-> +	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
-> +	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
-> +	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
-> +	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4412_CPU_DIV1(0, 0, 3), },
-> +	{  0 },
-> +};
-
-Numbers look fine!
-
-> +
->  /* register exynos4 clocks */
->  static void __init exynos4_clk_init(struct device_node *np,
->  				    enum exynos4_soc soc)
-> @@ -1489,6 +1528,17 @@ static void __init exynos4_clk_init(struct device_node *np,
->  		samsung_clk_register_fixed_factor(ctx,
->  			exynos4x12_fixed_factor_clks,
->  			ARRAY_SIZE(exynos4x12_fixed_factor_clks));
-> +		if (of_machine_is_compatible("samsung,exynos4412")) {
-
-The driver uses here enum exynos4_soc to differentiate between SoC
-(unless I missed some changes). This of_machine_is_compatible() makes
-sense but introduces inconsistency. I would prefer sticking to one
-convention: always enum or switch everything (before this patch) to
-of_compatible.
-
-Best regards,
-Krzysztof
-
-
-> +			exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +				mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
-> +				e4412_armclk_d, ARRAY_SIZE(e4412_armclk_d),
-> +				CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
-> +		} else {
-> +			exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +				mout_core_p4x12[0], mout_core_p4x12[1], 0x14200,
-> +				e4212_armclk_d, ARRAY_SIZE(e4212_armclk_d),
-> +				CLK_CPU_NEEDS_DEBUG_ALT_DIV | CLK_CPU_HAS_DIV1);
-> +		}
->  	}
->  
->  	samsung_clk_register_alias(ctx, exynos4_aliases,
 > 
+
+cheers,
+-roger
