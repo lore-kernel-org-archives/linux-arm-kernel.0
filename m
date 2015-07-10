@@ -1,78 +1,168 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 10 Jul 2015 15:21:40 +0100
-Subject: [PATCH v2 04/15] KVM: arm/arm64: extend arch CAP checks to allow
- per-VM capabilities
+Date: Fri, 10 Jul 2015 15:21:43 +0100
+Subject: [PATCH v2 07/15] KVM: arm64: handle ITS related GICv3 redistributor
+ registers
 In-Reply-To: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
 References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1436538111-4294-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <1436538111-4294-8-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM capabilities can be a per-VM property, though ARM/ARM64 currently
-does not pass on the VM pointer to the architecture specific
-capability handlers.
-Add a "struct kvm*" parameter to those function to later allow proper
-per-VM capability reporting.
+In the GICv3 redistributor there are the PENDBASER and PROPBASER
+registers which we did not emulate so far, as they only make sense
+when having an ITS. In preparation for that emulate those MMIO
+accesses by storing the 64-bit data written into it into a variable
+which we later read in the ITS emulation.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   | 2 +-
- arch/arm/kvm/arm.c                | 2 +-
- arch/arm64/include/asm/kvm_host.h | 2 +-
- arch/arm64/kvm/reset.c            | 2 +-
- 4 files changed, 4 insertions(+), 4 deletions(-)
+ include/kvm/arm_vgic.h      |  8 ++++++++
+ virt/kvm/arm/vgic-v3-emul.c | 44 ++++++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic.c         | 35 +++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic.h         |  4 ++++
+ 4 files changed, 91 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index e896d2c..56cac05 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -213,7 +213,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 	kvm_call_hyp((void*)hyp_stack_ptr, vector_ptr, pgd_ptr);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 3ee063b..8c6cb0e 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -256,6 +256,14 @@ struct vgic_dist {
+ 	struct vgic_vm_ops	vm_ops;
+ 	struct vgic_io_device	dist_iodev;
+ 	struct vgic_io_device	*redist_iodevs;
++
++	/* Address of LPI configuration table shared by all redistributors */
++	u64			propbaser;
++
++	/* Addresses of LPI pending tables per redistributor */
++	u64			*pendbaser;
++
++	bool			lpis_enabled;
+ };
+ 
+ struct vgic_v2_cpu_if {
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index a8cf669..5269ad1 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -651,6 +651,38 @@ static bool handle_mmio_cfg_reg_redist(struct kvm_vcpu *vcpu,
+ 	return vgic_handle_cfg_reg(reg, mmio, offset);
  }
  
--static inline int kvm_arch_dev_ioctl_check_extension(long ext)
-+static inline int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- {
- 	return 0;
- }
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index bc738d2..7c65353 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -196,7 +196,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
- 		r = KVM_MAX_VCPUS;
- 		break;
- 	default:
--		r = kvm_arch_dev_ioctl_check_extension(ext);
-+		r = kvm_arch_dev_ioctl_check_extension(kvm, ext);
- 		break;
++/* We don't trigger any actions here, just store the register value */
++static bool handle_mmio_propbaser_redist(struct kvm_vcpu *vcpu,
++					 struct kvm_exit_mmio *mmio,
++					 phys_addr_t offset)
++{
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE;
++
++	/* Storing a value with LPIs already enabled is undefined */
++	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
++	vgic_handle_base_register(vcpu, mmio, offset, &dist->propbaser, mode);
++
++	return false;
++}
++
++/* We don't trigger any actions here, just store the register value */
++static bool handle_mmio_pendbaser_redist(struct kvm_vcpu *vcpu,
++					 struct kvm_exit_mmio *mmio,
++					 phys_addr_t offset)
++{
++	struct kvm_vcpu *rdvcpu = mmio->private;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	int mode = ACCESS_READ_VALUE;
++
++	/* Storing a value with LPIs already enabled is undefined */
++	mode |= dist->lpis_enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
++	vgic_handle_base_register(vcpu, mmio, offset,
++				  &dist->pendbaser[rdvcpu->vcpu_id], mode);
++
++	return false;
++}
++
+ #define SGI_base(x) ((x) + SZ_64K)
+ 
+ static const struct vgic_io_range vgic_redist_ranges[] = {
+@@ -679,6 +711,18 @@ static const struct vgic_io_range vgic_redist_ranges[] = {
+ 		.handle_mmio    = handle_mmio_raz_wi,
+ 	},
+ 	{
++		.base		= GICR_PENDBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_pendbaser_redist,
++	},
++	{
++		.base		= GICR_PROPBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_propbaser_redist,
++	},
++	{
+ 		.base           = GICR_IDREGS,
+ 		.len            = 0x30,
+ 		.bits_per_irq   = 0,
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 15e447f..49ee92b 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -446,6 +446,41 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
  	}
- 	return r;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 2709db2..8d78a72 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -47,7 +47,7 @@
- 
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
--int kvm_arch_dev_ioctl_check_extension(long ext);
-+int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext);
- 
- struct kvm_arch {
- 	/* The VMID generation used for the virt. memory system */
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index 0b43265..866502b 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -56,7 +56,7 @@ static bool cpu_has_32bit_el1(void)
- 	return !!(pfr0 & 0x20);
  }
  
--int kvm_arch_dev_ioctl_check_extension(long ext)
-+int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
++/* handle a 64-bit register access */
++void vgic_handle_base_register(struct kvm_vcpu *vcpu,
++			       struct kvm_exit_mmio *mmio,
++			       phys_addr_t offset, u64 *basereg,
++			       int mode)
++{
++	u32 reg;
++	u64 breg;
++
++	switch (offset & ~3) {
++	case 0x00:
++		breg = *basereg;
++		reg = lower_32_bits(breg);
++		vgic_reg_access(mmio, &reg, offset & 3, mode);
++		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
++			breg &= GENMASK_ULL(63, 32);
++			breg |= reg;
++			*basereg = breg;
++		}
++		break;
++	case 0x04:
++		breg = *basereg;
++		reg = upper_32_bits(breg);
++		vgic_reg_access(mmio, &reg, offset & 3, mode);
++		if (mmio->is_write && (mode & ACCESS_WRITE_VALUE)) {
++			breg  = lower_32_bits(breg);
++			breg |= (u64)reg << 32;
++			*basereg = breg;
++		}
++		break;
++	}
++}
++
++
++
+ bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			phys_addr_t offset)
  {
- 	int r;
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index a093f5c..b2d791c 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -71,6 +71,10 @@ void vgic_reg_access(struct kvm_exit_mmio *mmio, u32 *reg,
+ 		     phys_addr_t offset, int mode);
+ bool handle_mmio_raz_wi(struct kvm_vcpu *vcpu, struct kvm_exit_mmio *mmio,
+ 			phys_addr_t offset);
++void vgic_handle_base_register(struct kvm_vcpu *vcpu,
++			       struct kvm_exit_mmio *mmio,
++			       phys_addr_t offset, u64 *basereg,
++			       int mode);
  
+ static inline
+ u32 mmio_data_read(struct kvm_exit_mmio *mmio, u32 mask)
 -- 
 2.3.5
