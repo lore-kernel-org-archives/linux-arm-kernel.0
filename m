@@ -1,49 +1,127 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Jul 2015 09:43:52 +0100
-Subject: [PATCH v3 14/15] PCI/MSI: pci-xgene-msi: Get rid of struct
- msi_controller
-In-Reply-To: <CADaLNDm9o8XH749ocy4eJO=1T_w0AAFa1UZJLiFGrgR=5Aqjcg@mail.gmail.com>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <1436289485-28230-15-git-send-email-marc.zyngier@arm.com>
- <CADaLNDm9o8XH749ocy4eJO=1T_w0AAFa1UZJLiFGrgR=5Aqjcg@mail.gmail.com>
-Message-ID: <559F85C8.7000403@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Fri, 10 Jul 2015 16:48:19 +0800
+Subject: [PATCH] Store PCIe controllers address in struct of_pci_range
+Message-ID: <1436518099-98633-1-git-send-email-gabriele.paoloni@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-On 09/07/15 23:12, Duc Dang wrote:
-> On Tue, Jul 7, 2015 at 10:18 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> The XGene MSI driver only uses the msi_controller structure as
->> a way to match the host bridge  with its MSI HW, and thus the
->> msi_domain.
->>
->> But now that we can directly associate an msi_domain with a device,
->> there is no use keeping this msi_controller around.
->>
->> Just remove all traces of msi_controller from the driver.
->>
-> Thanks, Marc.
-> 
-> I tested this patch set and it works on my APM X-Gene evaluation platform.
+This patch is needed port PCIe designware to new DT parsing API
+As discussed in
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
+in designware we have a problem as the PCI addresses in the PCIe controller
+address space are required in order to perform correct HW operation.
 
-Ah, thanks! I did that as a side effort, but didn't have a chance to
-test it (who the *&%^!! decided to mount this board in a 1U chassis
-without an angle bracket for the PCIe bus? Seriously???).
+In order to solve this problem commit
+f4c55c5a3f7f68c06cc559ed7af8b2d017cbb0a7 "PCI: designware:
+Program ATU with untranslated address" added code to read the PCIe
+controller start address directly from the DT ranges.
 
-> The xgene_pcie_msi_enable (in driver/pci/host/pci-xgene.c), which is
-> used to get msi_controller for X-Gene PCIe port,
-> also becomes unnecessary with this patch set. I will post a clean-up
-> patch when your changes are accepted.
+In the new DT parsing API of_pci_get_host_bridge_resources() hides the
+DT parser from the host controller drivers, so it is not possible
+for drivers to parse values directly from the DT.
 
-Yeah, I didn't want to touch too much of it without any testing.
+In http://www.spinics.net/lists/linux-pci/msg42540.html we already tried
+to use the new DT parsing API but there is a bug (obviously) in setting
+the <*>_mod_base addresses
+Applying this patch we can easily set "<*>_mod_base = win->__res.start"
 
-> You can add my tested-by if you want:
-> 
-> Tested-by: Duc Dang <dhdang@apm.com>
+This patch adds a new field in "struct of_pci_range" to store the
+pci controller start address; it fills the field in of_pci_range_parser_one();
+in of_pci_get_host_bridge_resources() it retrieve the resource entry
+after it is created and added to the resource list and uses
+entry->__res.start to store the pci controller address
 
-Thanks a lot for that,
+the patch is based on 4.2-rc1
 
-	M.
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+---
+ drivers/of/address.c               | 1 +
+ drivers/of/of_pci.c                | 4 ++++
+ drivers/pci/host/pcie-designware.c | 9 +++------
+ include/linux/of_address.h         | 1 +
+ 4 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 8bfda6a..52f9321 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -265,6 +265,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
+ 	range->pci_addr = of_read_number(parser->range + 1, ns);
+ 	range->cpu_addr = of_translate_address(parser->node,
+ 				parser->range + na);
++	range->pci_ctrl_addr = of_read_number(parser->range + na, ns);
+ 	range->size = of_read_number(parser->range + parser->pna + na, ns);
+ 
+ 	parser->range += parser->np;
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 5751dc5..2ccc749 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 
+ 	pr_debug("Parsing ranges property...\n");
+ 	for_each_of_pci_range(&parser, &range) {
++		struct resource_entry *entry;
+ 		/* Read next ranges element */
+ 		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+ 			snprintf(range_type, 4, " IO");
+@@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 		}
+ 
+ 		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
++		entry = list_last_entry(resources, struct resource_entry, node);
++		/*we are using __res for storing the PCI controller address*/
++		entry->__res.start = range.pci_ctrl_addr;
+ 	}
+ 
+ 	return 0;
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 69486be..106dae6 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -416,8 +416,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io_base = range.cpu_addr;
+ 
+ 			/* Find the untranslated IO space address */
+-			pp->io_mod_base = of_read_number(parser.range -
+-							 parser.np + na, ns);
++			pp->io_mod_base = range.pci_ctrl_addr;
+ 		}
+ 		if (restype == IORESOURCE_MEM) {
+ 			of_pci_range_to_resource(&range, np, &pp->mem);
+@@ -426,8 +425,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->mem_bus_addr = range.pci_addr;
+ 
+ 			/* Find the untranslated MEM space address */
+-			pp->mem_mod_base = of_read_number(parser.range -
+-							  parser.np + na, ns);
++			pp->mem_mod_base = range.pci_ctrl_addr;
+ 		}
+ 		if (restype == 0) {
+ 			of_pci_range_to_resource(&range, np, &pp->cfg);
+@@ -437,8 +435,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+ 
+ 			/* Find the untranslated configuration space address */
+-			pp->cfg0_mod_base = of_read_number(parser.range -
+-							   parser.np + na, ns);
++			pp->cfg0_mod_base = range.pci_ctrl_addr;
+ 			pp->cfg1_mod_base = pp->cfg0_mod_base +
+ 					    pp->cfg0_size;
+ 		}
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index d88e81b..55bb1ae 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -16,6 +16,7 @@ struct of_pci_range {
+ 	u32 pci_space;
+ 	u64 pci_addr;
+ 	u64 cpu_addr;
++	u64 pci_ctrl_addr;
+ 	u64 size;
+ 	u32 flags;
+ };
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
