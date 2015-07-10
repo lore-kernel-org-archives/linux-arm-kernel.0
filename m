@@ -1,49 +1,43 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 10 Jul 2015 09:15:24 +0200
-Subject: [PATCH] soc: mediatek: Drop owner assignment from platform_driver
-In-Reply-To: <1436509789-27361-1-git-send-email-k.kozlowski@samsung.com>
-References: <1436509789-27361-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150710071524.GW18700@pengutronix.de>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 10 Jul 2015 09:17:39 +0200
+Subject: musb-hdrc: "Vbus off, timeout 1100 msec" message does not belong
+ in sysfs
+In-Reply-To: <20150709214610.GA20890@amd>
+References: <20150709213922.GA32698@amd> <20150709214610.GA20890@amd>
+Message-ID: <559F7193.7090508@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 03:29:45PM +0900, Krzysztof Kozlowski wrote:
-> platform_driver does not need to set an owner because
-> platform_driver_register() will set it.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On 07/09/2015 11:46 PM, Pavel Machek wrote:
+> On Thu 2015-07-09 23:39:22, Pavel Machek wrote:
+>> Hi!
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi,
 
+>>
+>> sysfs should contain one value per file. This one has at least two,
+>> with nice english sentence as a bonus.
+>>
+>> root at n900:/sys/devices/platform/68000000.ocp/480ab000.usb_otg_hs/musb-hdrc.0.auto#
+>> cat vbus
+>> Vbus off, timeout 1100 msec
+>>
+>> :-(.
+> 
+> Plus, documentation for this is nowhere to be seen:
+> 
+> pavel at amd:/data/l/linux-n900$ grep -ri musb Documentation/ABI/
+> pavel at amd:/data/l/linux-n900$
 
-> 
-> ---
-> 
-> The coccinelle script which generated the patch was sent here:
-> http://www.spinics.net/lists/kernel/msg2029903.html
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index f432291feee9..8bc7b41b09fd 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -926,7 +926,6 @@ err_out1:
->  static struct platform_driver pwrap_drv = {
->  	.driver = {
->  		.name = "mt-pmic-pwrap",
-> -		.owner = THIS_MODULE,
->  		.of_match_table = of_match_ptr(of_pwrap_match_tbl),
->  	},
->  	.probe = pwrap_probe,
-> -- 
-> 1.9.1
-> 
-> 
+that is a shame indeed. It is part of the driver since TUSB support was
+merged via commit 550a7375f ("USB: Add MUSB and TUSB support") about 7
+years ago.
+The parameter expects the timeout values which is used to poll the port
+for mode changes (host/device mode) since it can not be detected on its
+own.
+Felipe knows best if it is better to document it or remove it. I can't
+remember that I needed it on am335x.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> 									Pavel
+> 
+Sebastian
