@@ -1,39 +1,63 @@
-From: dinh.linux@gmail.com (dinh.linux at gmail.com)
-Date: Fri, 10 Jul 2015 10:48:17 -0500
-Subject: [GIT PULL] SoCFPGA fixes for v4.2-rc1
-Message-ID: <1436543297-3254-1-git-send-email-dinh.linux@gmail.com>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Fri, 10 Jul 2015 21:21:24 +0530
+Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
+In-Reply-To: <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
+References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
+ <1436473148.20619.116.camel@tiscali.nl>
+ <CAK-LDb+HSbM2zV8WxipLb8v7g+eL=5vMHcKGttEOdnCjSXSwPA@mail.gmail.com>
+ <1436518813.20619.134.camel@tiscali.nl>
+ <CAK-LDb+Yg+wQJ_bM3Usc=hoK-jDOxHy5AsUOAbmg+-dVnOM4KA@mail.gmail.com>
+ <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
+Message-ID: <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof:
+On Fri, Jul 10, 2015 at 8:00 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> On 10 July 2015 at 05:47, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+>> On Fri, Jul 10, 2015 at 2:30 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>>> On vr, 2015-07-10 at 08:53 +0530, Vaishali Thakkar wrote:
+>>>> I thought about this solution before sending this patch. But I was not
+>>>> sure about it. Thanks for the explanation. I will send v3 with this
+>>>> change.
+>>>>
+>>>> Can I add Suggested By: Paul Bolle <pebolle@tiscali.nl>
+>>>
+>>> That should be "Suggested-by:". The net effect would be that, if my
+>>> suggestion turns out to be unwise, fan mail will also hit my INBOX,
+>>> right? Anyhow, fine with me.
+>>
+>> Ok. Thanks.
+>>
+>>> By the way, there's more module specific stuff in
+>>> drivers/hwtracing/coresight/. And there's no tristate symbol to be found
+>>> in its Kconfig file. So I'd guess there are a few other cleanups
+>>> possible too, if someone cared enough to have a closer look at that.
+>>>
+>>
+>> Yes. It seems that introducing something like builtin_amba_driver()
+>> can be useful for files which are using module_amba_driver now . But I'm
+>> not sure if Mathieu is ok with it or not? If it seems useful to him, then I
+>> can go for it.
+>
+> The ETB drivers could use a "module_amba_driver()"...
 
-Please pull in these fixes for v4.2-rc1.
+Why? Is there any specific reason behind this?
+How about other drivers?? Will it be beneficial to introduce
+builtin_amba_driver() for the others?
 
-Thanks,
+Thank You.
 
-Dinh
+>>
+>>>
+>>> Paul Bolle
+>>
+>>
+>>
+>> --
+>> Vaishali
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_fixes_for_v4.2-rc1
-
-for you to fetch changes up to 93abc72bc7901cfc61a2871da7a565c9fdb26108:
-
-  ARM: socfpga: dts: Fix entries order (2015-07-07 08:58:02 -0500)
-
-----------------------------------------------------------------
-SoCFPGA fixes against v4.2-rc1
-- Update compatible "adxl345x" compatible string
-- Alphabetize the DTS nodes for the C5 sockit board file
-
-----------------------------------------------------------------
-Walter Lozano (2):
-      ARM: socfpga: dts: Fix adxl34x formating and compatible string
-      ARM: socfpga: dts: Fix entries order
-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+-- 
+Vaishali
