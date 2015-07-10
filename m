@@ -1,192 +1,336 @@
 From: scott.shu@mediatek.com (Scott Shu)
-Date: Fri, 10 Jul 2015 14:04:06 +0800
-Subject: [PATCH v2 3/6] ARM: mediatek: add smp bringup code for MT6580
+Date: Fri, 10 Jul 2015 14:04:05 +0800
+Subject: [PATCH v2 2/6] soc: Mediatek: Add SCPSYS CPU power domain driver
 In-Reply-To: <1436508249-49338-1-git-send-email-scott.shu@mediatek.com>
 References: <Scott Shu <scott.shu@gmail.com>
  <1436508249-49338-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <1436508249-49338-4-git-send-email-scott.shu@mediatek.com>
+Message-ID: <1436508249-49338-3-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for cpu enable-method "mediatek,mt6580-smp" for booting
-secondary CPUs on MT6580.
+This adds a CPU power domain driver for the Mediatek SCPSYS unit on
+MT6580.
 
 Signed-off-by: Scott Shu <scott.shu@mediatek.com>
 ---
- arch/arm/mach-mediatek/platsmp.c | 139 ++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 138 insertions(+), 1 deletion(-)
+ arch/arm/mach-mediatek/Makefile  |   2 +-
+ arch/arm/mach-mediatek/generic.h |  23 ++++
+ arch/arm/mach-mediatek/hotplug.c | 267 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 291 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-mediatek/generic.h
+ create mode 100644 arch/arm/mach-mediatek/hotplug.c
 
-diff --git a/arch/arm/mach-mediatek/platsmp.c b/arch/arm/mach-mediatek/platsmp.c
-index 12fefb3..7f5a5cfb 100644
---- a/arch/arm/mach-mediatek/platsmp.c
-+++ b/arch/arm/mach-mediatek/platsmp.c
-@@ -13,7 +13,6 @@
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-- *
-  */
- #include <linux/io.h>
- #include <linux/memblock.h>
-@@ -21,10 +20,15 @@
- #include <linux/of_address.h>
- #include <linux/string.h>
- #include <linux/threads.h>
-+#include <linux/delay.h>
-+#include <asm/cacheflush.h>
-+#include "generic.h"
- 
- #define MTK_MAX_CPU		8
- #define MTK_SMP_REG_SIZE	0x1000
- 
-+static DEFINE_SPINLOCK(boot_lock);
-+
- struct mtk_smp_boot_info {
- 	unsigned long smp_base;
- 	unsigned int jump_reg;
-@@ -57,6 +61,128 @@ static const struct of_device_id mtk_smp_boot_infos[] __initconst = {
- static void __iomem *mtk_smp_base;
- static const struct mtk_smp_boot_info *mtk_smp_info;
- 
-+#ifdef CONFIG_HOTPLUG_CPU
-+static int mt6580_cpu_kill(unsigned cpu)
-+{
-+	int ret;
-+
-+	ret = spm_cpu_mtcmos_off(cpu, 1);
-+	if (ret < 0)
-+		return 0;
-+
-+	return 1;
-+}
-+
-+static void mt6580_cpu_die(unsigned int cpu)
-+{
-+	for (;;)
-+		cpu_do_idle();
-+}
-+#endif
-+
-+static void write_pen_release(int val)
-+{
-+	pen_release = val;
-+	/* Make sure this is visible to other CPUs */
-+	smp_wmb();
-+	sync_cache_w(&pen_release);
-+}
-+
+diff --git a/arch/arm/mach-mediatek/Makefile b/arch/arm/mach-mediatek/Makefile
+index 2116460..b2e4ef5 100644
+--- a/arch/arm/mach-mediatek/Makefile
++++ b/arch/arm/mach-mediatek/Makefile
+@@ -1,4 +1,4 @@
+ ifeq ($(CONFIG_SMP),y)
+-obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o
++obj-$(CONFIG_ARCH_MEDIATEK) += platsmp.o hotplug.o
+ endif
+ obj-$(CONFIG_ARCH_MEDIATEK) += mediatek.o
+diff --git a/arch/arm/mach-mediatek/generic.h b/arch/arm/mach-mediatek/generic.h
+new file mode 100644
+index 0000000..376f183
+--- /dev/null
++++ b/arch/arm/mach-mediatek/generic.h
+@@ -0,0 +1,23 @@
 +/*
-+ * Refer common "pen" secondary release method
++ * Copyright (c) 2015 Mediatek Inc.
++ * Author: Scott Shu <scott.shu@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+static int mt6580_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	unsigned long timeout;
-+	int ret;
++#ifndef __MACH_GENERIC_H
++#define __MACH_GENERIC_H
 +
-+	/*
-+	 * Set synchronisation state between this boot processor
-+	 * and the secondary one
-+	 */
-+	spin_lock(&boot_lock);
++#include <linux/kernel.h>
 +
-+	/*
-+	 * The secondary processor is waiting to be released from
-+	 * the holding pen - release it, then wait for it to flag
-+	 * that it has been released by resetting pen_release.
-+	 *
-+	 * Note that "pen_release" is the hardware CPU ID, whereas
-+	 * "cpu" is Linux's internal ID.
-+	 */
-+	write_pen_release(cpu);
++int spm_cpu_mtcmos_init(void);
++int spm_cpu_mtcmos_on(int cpu);
++int spm_cpu_mtcmos_off(int cpu, bool wfi);
 +
-+	/*
-+	 * CPU power on control by SPM
-+	 */
-+	ret = spm_cpu_mtcmos_on(cpu);
-+	if (ret < 0) {
-+		spin_unlock(&boot_lock);
-+		return -ENOSYS;
-+	}
-+
-+	timeout = jiffies + (1 * HZ);
-+	while (time_before(jiffies, timeout)) {
-+		/* Read barrier */
-+		smp_rmb();
-+
-+		if (pen_release == -1)
-+			break;
-+
-+		udelay(10);
-+	}
-+
-+	/*
-+	 * Now the secondary core is starting up let it run its
-+	 * calibrations, then wait for it to finish
-+	 */
-+	spin_unlock(&boot_lock);
-+
-+	return (pen_release != -1 ? -ENOSYS : 0);
-+}
-+
-+static void mt6580_secondary_init(unsigned int cpu)
-+{
-+	/*
-+	 * Let the primary processor know we're out of the
-+	 * pen, then head off into the C entry point
-+	 */
-+	write_pen_release(-1);
-+
-+	/*
-+	 * Synchronise with the boot thread.
-+	 */
-+	spin_lock(&boot_lock);
-+	spin_unlock(&boot_lock);
-+}
-+
-+#define MT6580_INFRACFG_AO	0x10001000
-+#define SW_ROM_PD		BIT(31)
-+
-+static void __init mt6580_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	static void __iomem *infracfg_ao_base;
-+
-+	infracfg_ao_base = ioremap(MT6580_INFRACFG_AO, 0x1000);
-+
-+	if (!infracfg_ao_base)
-+		pr_err("%s: Unable to map I/O memory\n", __func__);
-+
-+	/* Enable bootrom power down mode */
-+	writel_relaxed(readl(infracfg_ao_base + 0x804) | SW_ROM_PD,
-+		       infracfg_ao_base + 0x804);
-+
-+	/* Write the address of slave startup into boot address
-+	   register for bootrom power down mode */
-+	writel_relaxed(virt_to_phys(secondary_startup_arm),
-+		       infracfg_ao_base + 0x800);
-+
-+	iounmap(infracfg_ao_base);
-+
-+	/* Initial spm cpu mtcmos memory map */
-+	spm_cpu_mtcmos_init();
-+}
-+
- static int mtk_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
- 	if (!mtk_smp_base)
-@@ -143,3 +269,14 @@ static struct smp_operations mt65xx_smp_ops __initdata = {
- 	.smp_boot_secondary = mtk_boot_secondary,
- };
- CPU_METHOD_OF_DECLARE(mt65xx_smp, "mediatek,mt65xx-smp", &mt65xx_smp_ops);
-+
-+static struct smp_operations mt6580_smp_ops __initdata = {
-+	.smp_prepare_cpus = mt6580_smp_prepare_cpus,
-+	.smp_secondary_init = mt6580_secondary_init,
-+	.smp_boot_secondary = mt6580_boot_secondary,
-+#ifdef CONFIG_HOTPLUG_CPU
-+	.cpu_kill = mt6580_cpu_kill,
-+	.cpu_die = mt6580_cpu_die,
 +#endif
+diff --git a/arch/arm/mach-mediatek/hotplug.c b/arch/arm/mach-mediatek/hotplug.c
+new file mode 100644
+index 0000000..bd97f2e
+--- /dev/null
++++ b/arch/arm/mach-mediatek/hotplug.c
+@@ -0,0 +1,267 @@
++/*
++ * Copyright (c) 2015 Mediatek Inc.
++ * Author: Scott Shu <scott.shu@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#include <linux/init.h>
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/spinlock.h>
++#include <linux/delay.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++
++/* SCPSYS registers */
++#define SPM_POWERON_CONFIG_SET		0x0000
++
++#define SPM_CA7_CPU0_PWR_CON		0x0200
++#define SPM_CA7_CPU1_PWR_CON		0x0218
++#define SPM_CA7_CPU2_PWR_CON		0x021c
++#define SPM_CA7_CPU3_PWR_CON		0x0220
++
++#define SPM_CA7_CPU0_L1_PDN		0x025c
++#define SPM_CA7_CPU1_L1_PDN		0x0264
++#define SPM_CA7_CPU2_L1_PDN		0x026c
++#define SPM_CA7_CPU3_L1_PDN		0x0274
++
++#define SPM_PWR_STATUS			0x060c
++#define SPM_PWR_STATUS_2ND		0x0610
++#define SPM_SLEEP_TIMER_STA		0x0720
++
++/* bit definition in SPM_CA7_CPUx_PWR_CON */
++#define SRAM_ISOINT_B		BIT(6)
++#define SRAM_CKISO		BIT(5)
++#define PWR_CLK_DIS		BIT(4)
++#define PWR_ON_2ND		BIT(3)
++#define PWR_ON			BIT(2)
++#define PWR_ISO			BIT(1)
++#define PWR_RST_B		BIT(0)
++
++/* bit definition in SPM_CA7_CPUx_L1_PDN */
++#define L1_PDN_ACK		BIT(8)
++#define L1_PDN			BIT(0)
++
++#define MT6580_MAX_CPUS		4
++
++static DEFINE_SPINLOCK(spm_cpu_lock);
++
++void __iomem *spm_cpu_base;
++
++u32 spm_cpu_pwr_con[MT6580_MAX_CPUS] = {
++	SPM_CA7_CPU0_PWR_CON,
++	SPM_CA7_CPU1_PWR_CON,
++	SPM_CA7_CPU2_PWR_CON,
++	SPM_CA7_CPU3_PWR_CON,
 +};
-+CPU_METHOD_OF_DECLARE(mt6580_smp, "mediatek,mt6580-smp", &mt6580_smp_ops);
++
++u32 spm_cpu_l1_pdn[MT6580_MAX_CPUS] = {
++	SPM_CA7_CPU0_L1_PDN,
++	SPM_CA7_CPU1_L1_PDN,
++	SPM_CA7_CPU2_L1_PDN,
++	SPM_CA7_CPU3_L1_PDN,
++};
++
++#define SPM_REGWR_EN		BIT(0)
++#define SPM_PROJECT_CODE	0x0B16
++
++int spm_cpu_mtcmos_on(int cpu)
++{
++	unsigned long flags;
++	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
++	unsigned int temp;
++	int timeout = 10;
++	int ret = -ENOSYS;
++
++	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
++	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
++
++	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
++	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
++
++	spin_lock_irqsave(&spm_cpu_lock, flags);
++
++	/* Set PWR_ON */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ON;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Wait for charging core power */
++	udelay(1);
++
++	/* Set PWR_ON_2ND */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ON_2ND;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Wait for the power-ack */
++	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
++		(1U << (13 - cpu))) != (1U << (13 - cpu))) ||
++		((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
++		(1U << (13 - cpu))) != (1U << (13 - cpu)))) {
++		if (--timeout == 0)
++			goto fail;
++		udelay(1);
++	}
++
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ISO;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* L1 power on */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
++	temp &= ~L1_PDN;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
++	timeout = 10;
++	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
++		L1_PDN_ACK) != 0) {
++		if (--timeout == 0)
++			goto fail;
++		udelay(1);
++	}
++
++	/* Wait for memory power ready */
++	udelay(1);
++
++	/* Set SRAM_ISOINT_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= SRAM_ISOINT_B;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear SRAM_CKISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~SRAM_CKISO;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_CLK_DIS */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_CLK_DIS;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set PWR_RST_B to finish power on and reset sequences */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_RST_B;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	ret = 0;
++fail:
++	spin_unlock_irqrestore(&spm_cpu_lock, flags);
++
++	return ret;
++}
++
++int spm_cpu_mtcmos_off(int cpu, bool wfi)
++{
++	unsigned long flags;
++	static u32 spmcpu_pwr_con, spmcpu_l1_pdn;
++	unsigned int temp;
++	int timeout = 10;
++	int ret = -ENOSYS;
++
++	temp = (SPM_PROJECT_CODE << 16) | SPM_REGWR_EN;
++	writel_relaxed(temp, spm_cpu_base + SPM_POWERON_CONFIG_SET);
++
++	spmcpu_pwr_con = spm_cpu_pwr_con[cpu];
++	spmcpu_l1_pdn = spm_cpu_l1_pdn[cpu];
++
++	if (wfi) {
++		while ((readl_relaxed(spm_cpu_base + SPM_SLEEP_TIMER_STA) &
++			(1U << (16 + cpu))) == 0) {
++			if (--timeout == 0)
++				return ret;
++			udelay(1);
++		}
++	}
++
++	spin_lock_irqsave(&spm_cpu_lock, flags);
++
++	/* Set PWR_ISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_ISO;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set SRAM_CKISO */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= SRAM_CKISO;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear SRAM_ISOINT_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~SRAM_ISOINT_B;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* L1 power off */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_l1_pdn);
++	temp |= L1_PDN;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_l1_pdn);
++	timeout = 10;
++	while ((readl_relaxed(spm_cpu_base + spmcpu_l1_pdn) &
++		L1_PDN_ACK) != L1_PDN_ACK) {
++		if (--timeout == 0)
++			goto fail;
++		udelay(1);
++	}
++
++	/* Clear PWR_RST_B */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_RST_B;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Set PWR_CLK_DIS */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp |= PWR_CLK_DIS;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_ON */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ON;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	/* Clear PWR_ON_2ND */
++	temp = readl_relaxed(spm_cpu_base + spmcpu_pwr_con);
++	temp &= ~PWR_ON_2ND;
++	writel_relaxed(temp, spm_cpu_base + spmcpu_pwr_con);
++
++	timeout = 10;
++	while (((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS) &
++		(1U << (13 - cpu))) != 0) ||
++	       ((readl_relaxed(spm_cpu_base + SPM_PWR_STATUS_2ND) &
++		(1U << (13 - cpu))) != 0)) {
++		if (--timeout == 0)
++			goto fail;
++		udelay(1);
++	}
++
++	ret = 0;
++fail:
++	spin_unlock_irqrestore(&spm_cpu_lock, flags);
++
++	return ret;
++}
++
++int spm_cpu_mtcmos_init(void)
++{
++	struct device_node *node;
++
++	node = of_find_compatible_node(NULL, NULL, "mediatek,mt6580-scpsys");
++	if (!node) {
++		pr_err("Missing mt6580-scpsys node in the device tree\n");
++		return -ENODEV;
++	}
++
++	spm_cpu_base = of_iomap(node, 0);
++	if (!spm_cpu_base) {
++		pr_err("%s: Unable to map I/O memory\n", __func__);
++		return -ENODEV;
++	}
++
++	return 0;
++}
 -- 
 1.8.1.1.dirty
