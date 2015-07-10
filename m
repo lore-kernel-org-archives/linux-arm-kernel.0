@@ -1,41 +1,40 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Fri, 10 Jul 2015 14:58:00 +0100
-Subject: [PATCH] arm64: Remove unused macros from assembler.h
-Message-ID: <1436536680-23661-1-git-send-email-daniel.thompson@linaro.org>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 10 Jul 2015 16:14:40 +0200
+Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
+ master mode reset
+In-Reply-To: <559FBCD3.4050402@linaro.org>
+References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
+Message-ID: <20150710141440.GA6594@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed the
-only users of these macros.
+On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
+> 
+> 
+> On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
+> >On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
+> >>Normally i2c controller works as master, so slave addr is not needed, or it
+> >>will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+> >>the same i2c address with controller.
+> >
+> >Just to make sure: Does it? As I read the code, slave interrupts are
+> >enabled later only when slave mode is selected? Is that a HW bug? And if
+> >so, can't the code just be moved into this #ifdef block later?
+> >
+> 
+> Yes we could, infact I thought about it;
+> but I would break recommended sequence here.
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
- arch/arm64/include/asm/assembler.h | 12 ------------
- 1 file changed, 12 deletions(-)
+And did you set the "own slave address" to a value which one of your
+existing i2c slaves also has (without enabling slave mode)? Did it
+disturb communication?
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 144b64ad96c3..e10516bbe833 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -50,18 +50,6 @@
- 	.endm
-
- /*
-- * Save/disable and restore interrupts.
-- */
--	.macro	save_and_disable_irqs, olddaif
--	mrs	\olddaif, daif
--	disable_irq
--	.endm
--
--	.macro	restore_irqs, olddaif
--	msr	daif, \olddaif
--	.endm
--
--/*
-  * Enable and disable debug exceptions.
-  */
- 	.macro	disable_dbg
---
-2.4.3
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/9bbb00c2/attachment.sig>
