@@ -1,49 +1,58 @@
-From: ganguly.s@samsung.com (Sarbojit Ganguly)
-Date: Fri, 10 Jul 2015 07:50:09 +0000 (GMT)
-Subject: [PATCH] arm: Adding support for atomic half word exchange
-Message-ID: <710840938.569501436514608029.JavaMail.weblogic@ep2mlwas06b>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Jul 2015 08:52:38 +0100
+Subject: [PATCH 4/6] irqchip: GIC: Use chip_data instead of handler_data
+ for cascaded interrupts
+In-Reply-To: <alpine.DEB.2.11.1507092331130.5134@nanos>
+References: <1436447951-22357-1-git-send-email-marc.zyngier@arm.com>
+ <1436447951-22357-5-git-send-email-marc.zyngier@arm.com>
+ <alpine.DEB.2.11.1507092331130.5134@nanos>
+Message-ID: <559F79C6.8020107@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 09/07/15 22:33, Thomas Gleixner wrote:
+> On Thu, 9 Jul 2015, Marc Zyngier wrote:
+> 
+>> When used as a primary interrupt controller, the GIC driver uses
+>> irq_data->chip_data to extract controller-specific information.
+>>
+>> When used as a secondary interrupt controller, it uses handler_data
+>> instead. As this difference is relatively pointless and only creates
+>> confusion, change the secondary path to match what the rest of the
+>> driver does.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/irqchip/irq-gic.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index e264675..3c7f3a4 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -298,7 +298,7 @@ static void __exception_irq_entry gic_handle_irq(struct pt_regs *regs)
+>>  
+>>  static void gic_handle_cascade_irq(unsigned int irq, struct irq_desc *desc)
+>>  {
+>> -	struct gic_chip_data *chip_data = irq_get_handler_data(irq);
+>> +	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
+>>  	struct irq_chip *chip = irq_get_chip(irq);
+> 
+> You should make that
+> 
+>     chip_data = irq_desc_get_chip_data(desc);
+>     chip = irq_desc_get_chip(desc);
+> 
+> That avoids two pointless lookups of irqdesc ....
 
-Since 16 bit half word exchange was not there and MCS based qspinlock by Waiman's xchg_tail() requires an atomic exchange on a half word,
-here is a small modification to __xchg() code to support the exchange.
-ARMv6 and lower does not have support for LDREXH, so we need to make sure things do not break when we're compiling on ARMv6.
+Ah, very good point.
 
-Signed-off-by: Sarbojit Ganguly <ganguly.s@samsung.com>
----
- arch/arm/include/asm/cmpxchg.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+And it turns out that these constructs (use of irq_get_* when the
+irq_desc is readily available) is actually fairly common in a number of
+irqchip implementations used as secondary interrupt controllers.
 
-diff --git a/arch/arm/include/asm/cmpxchg.h b/arch/arm/include/asm/cmpxchg.h
-index 1692a05..547101d 100644
---- a/arch/arm/include/asm/cmpxchg.h
-+++ b/arch/arm/include/asm/cmpxchg.h
-@@ -50,6 +50,24 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 			: "r" (x), "r" (ptr)
- 			: "memory", "cc");
- 		break;
-+#if !defined (CONFIG_CPU_V6)
-+		/*
-+		 * Halfword exclusive exchange
-+		 * This is new implementation as qspinlock
-+		 * wants 16 bit atomic CAS.
-+		 * This is not supported on ARMv6.
-+		 */
-+	case 2:
-+		asm volatile("@ __xchg2\n"
-+		"1:     ldrexh  %0, [%3]\n"
-+		"       strexh  %1, %2, [%3]\n"
-+		"       teq     %1, #0\n"
-+		"       bne     1b"
-+		: "=&r" (ret), "=&r" (tmp)
-+		: "r" (x), "r" (ptr)
-+		: "memory", "cc");
-+		break;
-+#endif
- 	case 4:
- 		asm volatile("@	__xchg4\n"
- 		"1:	ldrex	%0, [%3]\n"
+Time for another cleanup series, I believe... ;-)
+
+	M.
 -- 
-
-Sarbojit
+Jazz is not dead. It just smells funny...
