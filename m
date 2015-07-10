@@ -1,51 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Jul 2015 13:54:48 +0100
-Subject: [RFC Patch V1 00/12] Reorganize struct msi_desc to prepare for
- support of generic MSI
-In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <559FC098.6080606@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 10 Jul 2015 18:31:48 +0530
+Subject: [PATCH-v3 04/11] i2c: pxa: Remove compile warnning in 64bit mode
+In-Reply-To: <20150710081327.GC1528@katana>
+References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436210695-19159-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150710081327.GC1528@katana>
+Message-ID: <559FC23C.1040400@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerry,
 
-On 09/07/15 09:00, Jiang Liu wrote:
-> Recently Marc Zyngier <marc.zyngier@arm.com> has posted a patch set at
-> https://lkml.org/lkml/2015/7/7/712
-> to enhance PCI MSI code to support generic MSI.
-> 
-> This is a companion patch set to refine struct msi_desc and related data
-> structures to support generic MSI, and it would be better to combined with
-> Marc's patch set.  It's also requested by
-> Stuart Yoder <stuart.yoder@freescale.com>
-> 
-> It first introduces a helper function msi_desc_to_pci_sysdata(), and
-> convert current PCI drivers to use helper functions to access fields
-> in struct msi_desc.
-> Then it moves msi_list from struct pci_dev into struct device and
-> refines struct msi_desc.
-> At last it moves alloc_msi_entry() into kernel/irq/msi.c for reuse.
-> 
-> Currently msi_desc_to_pci_sysdata() and msi_desc_to_pci_dev() are
-> implemented as normal functions instead of inlines to avoid header file
-> inclusion issue. If inlined version is preferred for performance, we could
-> move all of first_pci_msi_entry, for_each_pci_msi_entry, msi_desc_to_pci_dev
-> and msi_desc_to_pci_sysdata from linxu/kernel/msi.h into linux/kernel/pci.h.
-> 
-> This patch set is based on v4.2-rc1 and passes 0day test suite. You
-> may access the code at:
-> https://github.com/jiangliu/linux.git msi_desc_v1
 
-Thanks a lot for doing this, it looks much helpful. I have a good look
-at it, and apart from a small nit I commented on, I'm very happy with
-this move.
+On Friday 10 July 2015 01:43 PM, Wolfram Sang wrote:
+> On Tue, Jul 07, 2015 at 12:54:48AM +0530, Vaibhav Hiremath wrote:
+>> From: Yipeng Yao <ypyao@marvell.com>
+>>
+>> Fix below warning message, coming from 64 bit toolchain.
+>>
+>> drivers/i2c/busses/i2c-pxa.c:1237:15: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+>>
+>> Signed-off-by: Yipeng Yao <ypyao@marvell.com>
+>> [vaibhav.hiremath at linaro.org: Updated Changelog]
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Huh? Why long? Shouldn't that be casted to enum pxa_i2c_types?
+>
 
-For the whole set:
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+My bad.
+Indeed it can be (and should be) enum pxa_i2c_types.
+
+Will wait to close on the discussion on slave mode patch PATCH [02/11]
+before pushing V4.
+
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Vaibhav
