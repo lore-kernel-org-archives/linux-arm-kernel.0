@@ -1,359 +1,143 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 10 Jul 2015 15:21:45 +0100
-Subject: [PATCH v2 09/15] KVM: arm64: implement basic ITS register handlers
+Date: Fri, 10 Jul 2015 15:21:42 +0100
+Subject: [PATCH v2 06/15] KVM: arm64: Introduce new MMIO region for the ITS
+ base address
 In-Reply-To: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
 References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1436538111-4294-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <1436538111-4294-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add emulation for some basic MMIO registers used in the ITS emulation.
-This includes:
-- GITS_{CTLR,TYPER,IIDR}
-- ID registers
-- GITS_{CBASER,CREADR,CWRITER}
-  those implement the ITS command buffer handling
-
-Most of the handlers are pretty straight forward, but CWRITER goes
-some extra miles to allow fine grained locking. The idea here
-is to let only the first instance iterate through the command ring
-buffer, CWRITER accesses on other VCPUs meanwhile will be picked up
-by that first instance and handled as well. The ITS lock is thus only
-hold for very small periods of time and is dropped before the actual
-command handler is called.
+The ARM GICv3 ITS controller requires a separate register frame to
+cover ITS specific registers. Add a new VGIC address type and store
+the address in a field in the vgic_dist structure.
+Provide a function to check whether userland has provided the address,
+so ITS functionality can be guarded by that check.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h             |   3 +
- include/linux/irqchip/arm-gic-v3.h |   8 ++
- virt/kvm/arm/its-emul.c            | 205 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h            |   1 +
- virt/kvm/arm/vgic-v3-emul.c        |   2 +
- 5 files changed, 219 insertions(+)
+ Documentation/virtual/kvm/devices/arm-vgic.txt |  9 +++++++++
+ arch/arm64/include/uapi/asm/kvm.h              |  2 ++
+ include/kvm/arm_vgic.h                         |  3 +++
+ virt/kvm/arm/vgic-v3-emul.c                    |  2 ++
+ virt/kvm/arm/vgic.c                            | 16 ++++++++++++++++
+ virt/kvm/arm/vgic.h                            |  1 +
+ 6 files changed, 33 insertions(+)
 
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+index 3fb9054..ec715f9e 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+@@ -39,6 +39,15 @@ Groups:
+       Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
+       This address needs to be 64K aligned.
+ 
++    KVM_VGIC_V3_ADDR_TYPE_ITS (rw, 64-bit)
++      Base address in the guest physical address space of the GICv3 ITS
++      control register frame. The ITS allows MSI(-X) interrupts to be
++      injected into guests. This extension is optional, if the kernel
++      does not support the ITS, the call returns -ENODEV.
++      This memory is solely for the guest to access the ITS control
++      registers and does not cover the ITS translation register.
++      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
++      This address needs to be 64K aligned and the region covers 64 KByte.
+ 
+   KVM_DEV_ARM_VGIC_GRP_DIST_REGS
+   Attributes:
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index d268320..a89b407c 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -81,9 +81,11 @@ struct kvm_regs {
+ /* Supported VGICv3 address types  */
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
+ 
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 9e9d4aa..b432055 100644
+index b18e2c5..3ee063b 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -159,6 +159,9 @@ struct vgic_io_device {
- struct vgic_its {
- 	bool			enabled;
- 	spinlock_t		lock;
-+	u64			cbaser;
-+	int			creadr;
-+	int			cwriter;
- };
+@@ -178,6 +178,9 @@ struct vgic_dist {
+ 		phys_addr_t		vgic_redist_base;
+ 	};
  
- struct vgic_dist {
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index df4e527..0b450c7 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -179,15 +179,23 @@
- #define GITS_BASER			0x0100
- #define GITS_IDREGS_BASE		0xffd0
- #define GITS_PIDR2			GICR_PIDR2
-+#define GITS_PIDR4			0xffd0
-+#define GITS_CIDR0			0xfff0
-+#define GITS_CIDR1			0xfff4
-+#define GITS_CIDR2			0xfff8
-+#define GITS_CIDR3			0xfffc
++	/* The base address of the ITS control register frame */
++	phys_addr_t		vgic_its_base;
++
+ 	/* Distributor enabled */
+ 	u32			enabled;
  
- #define GITS_TRANSLATER			0x10040
- 
- #define GITS_CTLR_ENABLE		(1U << 0)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
- 
-+#define GITS_TYPER_PLPIS		(1UL << 0)
-+#define GITS_TYPER_IDBITS_SHIFT		8
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_PTA			(1UL << 19)
-+#define GITS_TYPER_HWCOLLCNT_SHIFT	24
- 
- #define GITS_CBASER_VALID		(1UL << 63)
- #define GITS_CBASER_nCnB		(0UL << 59)
-diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-index 659dd39..b498f06 100644
---- a/virt/kvm/arm/its-emul.c
-+++ b/virt/kvm/arm/its-emul.c
-@@ -32,10 +32,62 @@
- #include "vgic.h"
- #include "its-emul.h"
- 
-+#define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
-+
-+/* The distributor lock is held by the VGIC MMIO handler. */
- static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
- 				  phys_addr_t offset)
- {
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	u32 reg;
-+	bool was_enabled;
-+
-+	switch (offset & ~3) {
-+	case 0x00:		/* GITS_CTLR */
-+		/* We never defer any command execution. */
-+		reg = GITS_CTLR_QUIESCENT;
-+		if (its->enabled)
-+			reg |= GITS_CTLR_ENABLE;
-+		was_enabled = its->enabled;
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-+		its->enabled = !!(reg & GITS_CTLR_ENABLE);
-+		return !was_enabled && its->enabled;
-+	case 0x04:		/* GITS_IIDR */
-+		reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-+		break;
-+	case 0x08:		/* GITS_TYPER */
-+		/*
-+		 * We use linear CPU numbers for redistributor addressing,
-+		 * so GITS_TYPER.PTA is 0.
-+		 * To avoid memory waste on the guest side, we keep the
-+		 * number of IDBits and DevBits low for the time being.
-+		 * This could later be made configurable by userland.
-+		 * Since we have all collections in linked list, we claim
-+		 * that we can hold all of the collection tables in our
-+		 * own memory and that the ITT entry size is 1 byte (the
-+		 * smallest possible one).
-+		 */
-+		reg = GITS_TYPER_PLPIS;
-+		reg |= 0xff << GITS_TYPER_HWCOLLCNT_SHIFT;
-+		reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
-+		reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-+		break;
-+	case 0x0c:
-+		/* The upper 32bits of TYPER are all 0 for the time being.
-+		 * Should we need more than 256 collections, we can enable
-+		 * some bits in here.
-+		 */
-+		vgic_reg_access(mmio, NULL, offset & 3,
-+				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-+		break;
-+	}
-+
- 	return false;
- }
- 
-@@ -43,20 +95,142 @@ static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
- 				    struct kvm_exit_mmio *mmio,
- 				    phys_addr_t offset)
- {
-+	u32 reg = 0;
-+	int idreg = (offset & ~3) + GITS_IDREGS_BASE;
-+
-+	switch (idreg) {
-+	case GITS_PIDR2:
-+		reg = GIC_PIDR2_ARCH_GICv3;
-+		break;
-+	case GITS_PIDR4:
-+		/* This is a 64K software visible page */
-+		reg = 0x40;
-+		break;
-+	/* Those are the ID registers for (any) GIC. */
-+	case GITS_CIDR0:
-+		reg = 0x0d;
-+		break;
-+	case GITS_CIDR1:
-+		reg = 0xf0;
-+		break;
-+	case GITS_CIDR2:
-+		reg = 0x05;
-+		break;
-+	case GITS_CIDR3:
-+		reg = 0xb1;
-+		break;
-+	}
-+	vgic_reg_access(mmio, &reg, offset & 3,
-+			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
- 	return false;
- }
- 
-+static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
-+{
-+	return -ENODEV;
-+}
-+
- static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
- 				    struct kvm_exit_mmio *mmio,
- 				    phys_addr_t offset)
- {
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	int mode = ACCESS_READ_VALUE;
-+
-+	mode |= its->enabled ? ACCESS_WRITE_IGNORED : ACCESS_WRITE_VALUE;
-+
-+	vgic_handle_base_register(vcpu, mmio, offset, &its->cbaser, mode);
-+
-+	/* Writing CBASER resets the read pointer. */
-+	if (mmio->is_write)
-+		its->creadr = 0;
-+
- 	return false;
- }
- 
-+static int its_cmd_buffer_size(struct kvm *kvm)
-+{
-+	struct vgic_its *its = &kvm->arch.vgic.its;
-+
-+	return ((its->cbaser & 0xff) + 1) << 12;
-+}
-+
-+static gpa_t its_cmd_buffer_base(struct kvm *kvm)
-+{
-+	struct vgic_its *its = &kvm->arch.vgic.its;
-+
-+	return BASER_BASE_ADDRESS(its->cbaser);
-+}
-+
-+/*
-+ * By writing to CWRITER the guest announces new commands to be processed.
-+ * Since we cannot read from guest memory inside the ITS spinlock, we
-+ * iterate over the command buffer (with the lock dropped) until the read
-+ * pointer matches the write pointer. Other VCPUs writing this register in the
-+ * meantime will just update the write pointer, leaving the command
-+ * processing to the first instance of the function.
-+ */
- static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
- 				     struct kvm_exit_mmio *mmio,
- 				     phys_addr_t offset)
- {
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
-+	u64 cmd_buf[4];
-+	u32 reg;
-+	bool finished;
-+
-+	/* The upper 32 bits are RES0 */
-+	if ((offset & ~3) == 0x04) {
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-+		return false;
-+	}
-+
-+	reg = its->cwriter & 0xfffe0;
-+	vgic_reg_access(mmio, &reg, offset & 3,
-+			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
-+	if (!mmio->is_write)
-+		return false;
-+
-+	reg &= 0xfffe0;
-+	if (reg > its_cmd_buffer_size(vcpu->kvm))
-+		return false;
-+
-+	spin_lock(&its->lock);
-+
-+	/*
-+	 * If there is still another VCPU handling commands, let this
-+	 * one pick up the new CWRITER and process our new commands as well.
-+	 */
-+	finished = (its->cwriter != its->creadr);
-+	its->cwriter = reg;
-+
-+	spin_unlock(&its->lock);
-+
-+	while (!finished) {
-+		int ret = kvm_read_guest(vcpu->kvm, cbaser + its->creadr,
-+					 cmd_buf, 32);
-+		if (ret) {
-+			/*
-+			 * Gah, we are screwed. Reset CWRITER to that command
-+			 * that we have finished processing and return.
-+			 */
-+			spin_lock(&its->lock);
-+			its->cwriter = its->creadr;
-+			spin_unlock(&its->lock);
-+			break;
-+		}
-+		vits_handle_command(vcpu, cmd_buf);
-+
-+		spin_lock(&its->lock);
-+		its->creadr += 32;
-+		if (its->creadr == its_cmd_buffer_size(vcpu->kvm))
-+			its->creadr = 0;
-+		finished = (its->creadr == its->cwriter);
-+		spin_unlock(&its->lock);
-+	}
-+
- 	return false;
- }
- 
-@@ -64,6 +238,20 @@ static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
- 				    struct kvm_exit_mmio *mmio,
- 				    phys_addr_t offset)
- {
-+	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
-+	u32 reg;
-+
-+	switch (offset & ~3) {
-+	case 0x00:
-+		reg = its->creadr & 0xfffe0;
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-+		break;
-+	case 0x04:
-+		vgic_reg_access(mmio, &reg, offset & 3,
-+				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
-+		break;
-+	}
- 	return false;
- }
- 
-@@ -117,9 +305,26 @@ int vits_init(struct kvm *kvm)
- 	struct vgic_dist *dist = &kvm->arch.vgic;
- 	struct vgic_its *its = &dist->its;
- 
-+	dist->pendbaser = kmalloc(sizeof(u64) * dist->nr_cpus, GFP_KERNEL);
-+	if (!dist->pendbaser)
-+		return -ENOMEM;
-+
- 	spin_lock_init(&its->lock);
- 
- 	its->enabled = false;
- 
- 	return -ENXIO;
- }
-+
-+void vits_destroy(struct kvm *kvm)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	struct vgic_its *its = &dist->its;
-+
-+	if (!vgic_has_its(kvm))
-+		return;
-+
-+	kfree(dist->pendbaser);
-+
-+	its->enabled = false;
-+}
-diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-index 5dc8e2f..472a6d0 100644
---- a/virt/kvm/arm/its-emul.h
-+++ b/virt/kvm/arm/its-emul.h
-@@ -31,5 +31,6 @@
- 
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
- int vits_init(struct kvm *kvm);
-+void vits_destroy(struct kvm *kvm);
- 
- #endif
 diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-index f5865e7..49be3c3 100644
+index 1f42348..a8cf669 100644
 --- a/virt/kvm/arm/vgic-v3-emul.c
 +++ b/virt/kvm/arm/vgic-v3-emul.c
-@@ -928,6 +928,8 @@ static void vgic_v3_destroy_model(struct kvm *kvm)
- {
- 	struct vgic_dist *dist = &kvm->arch.vgic;
+@@ -887,6 +887,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
  
-+	vits_destroy(kvm);
-+
- 	kfree(dist->irq_spi_mpidr);
- 	dist->irq_spi_mpidr = NULL;
+ 	dist->vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	dist->vgic_redist_base = VGIC_ADDR_UNDEF;
++	dist->vgic_its_base = VGIC_ADDR_UNDEF;
+ 
+ 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
  }
+@@ -1059,6 +1060,7 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 			return -ENXIO;
+ 		case KVM_VGIC_V3_ADDR_TYPE_DIST:
+ 		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		case KVM_VGIC_V3_ADDR_TYPE_ITS:
+ 			return 0;
+ 		}
+ 		break;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 59f1801..15e447f 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -930,6 +930,16 @@ int vgic_register_kvm_io_dev(struct kvm *kvm, gpa_t base, int len,
+ 	return ret;
+ }
+ 
++bool vgic_has_its(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
++		return false;
++
++	return !IS_VGIC_ADDR_UNDEF(dist->vgic_its_base);
++}
++
+ static int vgic_nr_shared_irqs(struct vgic_dist *dist)
+ {
+ 	return dist->nr_irqs - VGIC_NR_PRIVATE_IRQS;
+@@ -1927,6 +1937,12 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
+ 		block_size = KVM_VGIC_V3_REDIST_SIZE;
+ 		alignment = SZ_64K;
+ 		break;
++	case KVM_VGIC_V3_ADDR_TYPE_ITS:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_its_base;
++		block_size = KVM_VGIC_V3_ITS_SIZE;
++		alignment = SZ_64K;
++		break;
+ #endif
+ 	default:
+ 		r = -ENODEV;
+diff --git a/virt/kvm/arm/vgic.h b/virt/kvm/arm/vgic.h
+index 0df74cb..a093f5c 100644
+--- a/virt/kvm/arm/vgic.h
++++ b/virt/kvm/arm/vgic.h
+@@ -136,5 +136,6 @@ int vgic_get_common_attr(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_init(struct kvm *kvm);
+ void vgic_v2_init_emulation(struct kvm *kvm);
+ void vgic_v3_init_emulation(struct kvm *kvm);
++bool vgic_has_its(struct kvm *kvm);
+ 
+ #endif
 -- 
 2.3.5
