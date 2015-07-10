@@ -1,44 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:12 +0900
-Subject: [PATCH 04/11] ARM: shmobile: r8a7790: add EtherAVB DT support
+Date: Fri, 10 Jul 2015 15:37:14 +0900
+Subject: [PATCH 06/11] ARM: shmobile: r8a73a4 dtsi: Use "arm,gic-400" for GIC
 In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
 References: <cover.1436509954.git.horms+renesas@verge.net.au>
-Message-ID: <f25d6b977240117eb4b6e3111f4eb41f968d28fb.1436509954.git.horms+renesas@verge.net.au>
+Message-ID: <eaec1d675c194965081297014503938a9f58e2f7.1436509954.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Define the generic R8A7790 part of the EtherAVB device node.
+Replace the "arm,cortex-a15-gic" compatible value for the GIC by
+"arm,gic-400", as the documentation states it's a GIC-400.
+This has been confirmed by reading the GICD_IIDR register, which reports
+0x0200043b (GIC-400 = 0x02, ARM = 0x43b).
 
-Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
+This has no effect on runtime behavior, as currently the GIC driver
+treats both compatible values the same.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index feb4652ed4b2..c9aae06319c0 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -671,6 +671,16 @@
- 		status = "disabled";
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 7ee22a41c6c9..5090d1a8f652 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -434,7 +434,7 @@
  	};
  
-+	avb: ethernet at e6800000 {
-+		compatible = "renesas,etheravb-r8a7790";
-+		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
-+		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sata0: sata at ee300000 {
- 		compatible = "renesas,sata-r8a7790";
- 		reg = <0 0xee300000 0 0x2000>;
+ 	gic: interrupt-controller at f1001000 {
+-		compatible = "arm,cortex-a15-gic";
++		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+ 		#address-cells = <0>;
+ 		interrupt-controller;
 -- 
 2.1.4
