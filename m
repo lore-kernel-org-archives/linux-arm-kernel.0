@@ -1,30 +1,46 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 10 Jul 2015 14:18:00 -0600
-Subject: [PATCH] drivers: qcom: Select QCOM_SCM unconditionally for QCOM_PM
-In-Reply-To: <55A01D84.8070701@ti.com>
-References: <55A01D84.8070701@ti.com>
-Message-ID: <1436559480-9239-1-git-send-email-lina.iyer@linaro.org>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 10 Jul 2015 15:29:11 -0500
+Subject: Build error with !CONFIG_SMP in v4.2-rc1 on arm multi_v7_defconfig
+In-Reply-To: <55A01EBB.2040106@codeaurora.org>
+References: <55A01D84.8070701@ti.com> <55A01EBB.2040106@codeaurora.org>
+Message-ID: <55A02B17.40705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable QCOM_SCM for QCOM power management driver
+On 07/10/2015 02:36 PM, Stephen Boyd wrote:
+> On 07/10/2015 12:31 PM, Dave Gerlach wrote:
+>> Hello,
+>> I am seeing the following error when building v4.2-rc1 for arm with
+>> multi_v7_defconfig with CONFIG_SMP=n:
+>>
+>>  LINK    vmlinux
+>>   LD      vmlinux.o
+>>   MODPOST vmlinux.o
+>>   GEN     .version
+>>   CHK     include/generated/compile.h
+>>   UPD     include/generated/compile.h
+>>   CC      init/version.o
+>>   LD      init/built-in.o
+>> drivers/built-in.o: In function `qcom_pm_collapse':
+>> :(.text+0xaf44c): undefined reference to `qcom_scm_cpu_power_down'
+>> drivers/built-in.o: In function `qcom_cpuidle_init':
+>> :(.init.text+0x9508): undefined reference to `qcom_scm_set_warm_boot_addr'
+>> make: *** [vmlinux] Error 1
+>>
+>>
+>> It appears the calling functions in drivers/soc/qcom/spm.c get included by
+>> CONFIG_QCOM_PM which is part of multi_v7_defconfig but the missing functions
+>> from drivers/firmware/qcom_scm.c only get included by CONFIG_QCOM_SCM if SMP is
+>> selected. I am not sure if the correct approach is to remove CONFIG_QCOM_PM from
+>> multi_v7_defconfig or to remove 'if SMP' from CONFIG_QCOM_SCM, or something else
+>> entirely. Thoughts?
+>>
+>>
+> 
+> CONFIG_QCOM_PM should select CONFIG_QCOM_SCM unconditionally.
+> 
 
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
----
- drivers/soc/qcom/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Ok thanks, I can send a quick patch.
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index 5eea374..e9a2c19 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -13,6 +13,7 @@ config QCOM_GSBI
- config QCOM_PM
- 	bool "Qualcomm Power Management"
- 	depends on ARCH_QCOM && !ARM64
-+	select QCOM_SCM
- 	help
- 	  QCOM Platform specific power driver to manage cores and L2 low power
- 	  modes. It interface with various system drivers to put the cores in
--- 
-2.1.4
+Regards,
+Dave
