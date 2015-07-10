@@ -1,70 +1,29 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 10 Jul 2015 03:49:25 -0700
-Subject: [PATCH v7 3/9] nvmem: Add nvmem_device based consumer apis.
-In-Reply-To: <1436521505-10779-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1436521505-10779-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1436525365.24866.36.camel@perches.com>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Fri, 10 Jul 2015 13:02:56 +0200
+Subject: [PATCH 07/13] arm64: KVM: VHE: Patch out use of HVC
+In-Reply-To: <559D63EC.2090602@arm.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <1436372356-30410-8-git-send-email-marc.zyngier@arm.com>
+ <559D5A8A.4030901@redhat.com> <559D63EC.2090602@arm.com>
+Message-ID: <559FA660.2050102@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-10 at 10:45 +0100, Srinivas Kandagatla wrote:
-> This patch adds read/write apis which are based on nvmem_device.
 
-More trivia:
 
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+On 08/07/2015 19:54, Marc Zyngier wrote:
+> Alternatively, I could move it to arch/arm64/include/asm (renamed to
+> kvm_vhe_macros.h?), which would solve this issue. I just gave it a go,
+> and that seems sensible enough.
 
-> +static struct nvmem_device *nvmem_find(const char *name)
-> +{
-> +	struct device *d;
-> +
-> +	d = bus_find_device(&nvmem_bus_type, NULL, (void *)name, nvmem_match);
-> +
-> +	return d ? to_nvmem_device(d) : NULL;
+Yes, that would do.  Alternatively:
 
-Maybe:
-	d = bus_find_device(...);
-	if (!d)
-		return NULL;
+* create kvm_hyp_macros.h and put more stuff in there from kvm_mmu.h
 
-	return to_nvmem_device(d);
+* just put it in kvm_host.h
 
-> +struct nvmem_device *of_nvmem_device_get(struct device_node *np, const char *id)
-> +{
-[]
-> +	return __nvmem_device_get(nvmem_np, NULL, NULL);
-> +
+Whatever looks better to you.
 
-odd blank line
-> +}
-> +EXPORT_SYMBOL_GPL(of_nvmem_device_get);
+Paolo
 
-> +struct nvmem_device *nvmem_device_get(struct device *dev, const char *dev_name)
-> +{
-[]
-> +	return nvmem_find(dev_name);
-> +
-
-here too
-
-> +}
-> +EXPORT_SYMBOL_GPL(nvmem_device_get);
-
-[]
-
-> +void devm_nvmem_device_put(struct device *dev, struct nvmem_device *nvmem)
-> +{
-> +	int ret;
-> +
-> +	ret = devres_release(dev, devm_nvmem_device_release,
-> +			     devm_nvmem_device_match, nvmem);
-> +
-> +	WARN_ON(ret);
-> +
-
-Last unnecessary blank line I'll mention
-(it seems to be the last one anyway)
-
-> +}
-> +EXPORT_SYMBOL_GPL(devm_nvmem_device_put);
+> Thanks for the suggestion!
