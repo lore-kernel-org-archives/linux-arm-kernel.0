@@ -1,55 +1,67 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 10 Jul 2015 15:42:02 -0500
-Subject: Build error with !CONFIG_SMP in v4.2-rc1 on arm multi_v7_defconfig
-In-Reply-To: <20150710203933.GH2049@linaro.org>
-References: <55A01D84.8070701@ti.com> <55A01EBB.2040106@codeaurora.org>
- <55A02B17.40705@ti.com> <20150710203933.GH2049@linaro.org>
-Message-ID: <55A02E1A.5070307@ti.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 10 Jul 2015 15:43:05 -0500
+Subject: [PATCH] ARM: OMAP2+: Remove module references from IOMMU machine layer
+Message-ID: <1436560985-5947-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 03:39 PM, Lina Iyer wrote:
-> On Fri, Jul 10 2015 at 14:29 -0600, Dave Gerlach wrote:
->> On 07/10/2015 02:36 PM, Stephen Boyd wrote:
->>> On 07/10/2015 12:31 PM, Dave Gerlach wrote:
->>>> Hello,
->>>> I am seeing the following error when building v4.2-rc1 for arm with
->>>> multi_v7_defconfig with CONFIG_SMP=n:
->>>>
->>>>  LINK    vmlinux
->>>>   LD      vmlinux.o
->>>>   MODPOST vmlinux.o
->>>>   GEN     .version
->>>>   CHK     include/generated/compile.h
->>>>   UPD     include/generated/compile.h
->>>>   CC      init/version.o
->>>>   LD      init/built-in.o
->>>> drivers/built-in.o: In function `qcom_pm_collapse':
->>>> :(.text+0xaf44c): undefined reference to `qcom_scm_cpu_power_down'
->>>> drivers/built-in.o: In function `qcom_cpuidle_init':
->>>> :(.init.text+0x9508): undefined reference to `qcom_scm_set_warm_boot_addr'
->>>> make: *** [vmlinux] Error 1
->>>>
->>>>
->>>> It appears the calling functions in drivers/soc/qcom/spm.c get included by
->>>> CONFIG_QCOM_PM which is part of multi_v7_defconfig but the missing functions
->>>> from drivers/firmware/qcom_scm.c only get included by CONFIG_QCOM_SCM if SMP is
->>>> selected. I am not sure if the correct approach is to remove CONFIG_QCOM_PM
->>>> from
->>>> multi_v7_defconfig or to remove 'if SMP' from CONFIG_QCOM_SCM, or something
->>>> else
->>>> entirely. Thoughts?
->>>>
->>>>
->>>
->>> CONFIG_QCOM_PM should select CONFIG_QCOM_SCM unconditionally.
->>>
->>
->> Ok thanks, I can send a quick patch.
->>
-> I sent one a few minutes ago, in reply to your mail :)
+The OMAP IOMMU driver has been adapted to the IOMMU framework
+for a while now, and it no longer supports being built as a
+module. Cleanup all the module related references both from
+the code and in the build.
 
-Thank you! Does indeed solve the problem.
+While at it, also relocate a comment around the initcall to
+avoid a checkpatch strict warning about using a blank line
+after function/struct/union/enum declarations.
 
-Regards,
-Dave
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/mach-omap2/Makefile     |  3 +--
+ arch/arm/mach-omap2/omap-iommu.c | 13 +------------
+ 2 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index 903c85be2897..d4579f856b25 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -234,8 +234,7 @@ obj-$(CONFIG_SOC_DRA7XX)		+= omap_hwmod_7xx_data.o
+ # EMU peripherals
+ obj-$(CONFIG_HW_PERF_EVENTS)		+= pmu.o
+ 
+-iommu-$(CONFIG_OMAP_IOMMU)		:= omap-iommu.o
+-obj-y					+= $(iommu-m) $(iommu-y)
++obj-$(CONFIG_OMAP_IOMMU)		+= omap-iommu.o
+ 
+ # OMAP2420 MSDI controller integration support ("MMC")
+ obj-$(CONFIG_SOC_OMAP2420)		+= msdi.o
+diff --git a/arch/arm/mach-omap2/omap-iommu.c b/arch/arm/mach-omap2/omap-iommu.c
+index 4068350f9059..8867eb4025bf 100644
+--- a/arch/arm/mach-omap2/omap-iommu.c
++++ b/arch/arm/mach-omap2/omap-iommu.c
+@@ -11,7 +11,6 @@
+  */
+ 
+ #include <linux/of.h>
+-#include <linux/module.h>
+ #include <linux/platform_device.h>
+ #include <linux/err.h>
+ #include <linux/slab.h>
+@@ -63,15 +62,5 @@ static int __init omap_iommu_init(void)
+ 
+ 	return omap_hwmod_for_each_by_class("mmu", omap_iommu_dev_init, NULL);
+ }
+-/* must be ready before omap3isp is probed */
+ omap_subsys_initcall(omap_iommu_init);
+-
+-static void __exit omap_iommu_exit(void)
+-{
+-	/* Do nothing */
+-}
+-module_exit(omap_iommu_exit);
+-
+-MODULE_AUTHOR("Hiroshi DOYU");
+-MODULE_DESCRIPTION("omap iommu: omap device registration");
+-MODULE_LICENSE("GPL v2");
++/* must be ready before omap3isp is probed */
+-- 
+2.4.4
