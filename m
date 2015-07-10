@@ -1,76 +1,29 @@
-From: rsahu@apm.com (Rameshwar Sahu)
-Date: Fri, 10 Jul 2015 14:06:48 +0530
-Subject: [PATCH] dmaengine: xgene-dma: Fix the resource map to handle
- overlapping
-In-Reply-To: <1436263465-7677-1-git-send-email-rsahu@apm.com>
-References: <1436263465-7677-1-git-send-email-rsahu@apm.com>
-Message-ID: <CAFd313y1YKrrrMrCLTJGNd7PWqoopLQ5aXEcxygVq1WTPJR=-g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 10 Jul 2015 10:39:17 +0200
+Subject: [PATCH] ARM: ep93xx: simone: enable DMA on the SPI host
+Message-ID: <1436517557-11725-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+The SPI host on the SIM.ONE is used for the MMC/SD card and
+will badly need this turbo boost.
 
-On Tue, Jul 7, 2015 at 3:34 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
-> There is an overlap in dma ring cmd csr region due to sharing of ethernet
-> ring cmd csr region. This patch fix the resource overlapping by mapping
-> the entire dma ring cmd csr region.
->
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
-> ---
->  Documentation/devicetree/bindings/dma/apm-xgene-dma.txt | 2 +-
->  arch/arm64/boot/dts/apm/apm-storm.dtsi                  | 2 +-
->  drivers/dma/xgene-dma.c                                 | 3 +++
->  3 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-> index d305876..c53e0b0 100644
-> --- a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
-> @@ -35,7 +35,7 @@ Example:
->                         device_type = "dma";
->                         reg = <0x0 0x1f270000 0x0 0x10000>,
->                               <0x0 0x1f200000 0x0 0x10000>,
-> -                             <0x0 0x1b008000 0x0 0x2000>,
-> +                             <0x0 0x1b000000 0x0 0x400000>,
->                               <0x0 0x1054a000 0x0 0x100>;
->                         interrupts = <0x0 0x82 0x4>,
->                                      <0x0 0xb8 0x4>,
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index 0689c3f..58093ed 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -823,7 +823,7 @@
->                         device_type = "dma";
->                         reg = <0x0 0x1f270000 0x0 0x10000>,
->                               <0x0 0x1f200000 0x0 0x10000>,
-> -                             <0x0 0x1b008000 0x0 0x2000>,
-> +                             <0x0 0x1b000000 0x0 0x400000>,
->                               <0x0 0x1054a000 0x0 0x100>;
->                         interrupts = <0x0 0x82 0x4>,
->                                      <0x0 0xb8 0x4>,
-> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
-> index 620fd55ec..dff22ab 100644
-> --- a/drivers/dma/xgene-dma.c
-> +++ b/drivers/dma/xgene-dma.c
-> @@ -111,6 +111,7 @@
->  #define XGENE_DMA_MEM_RAM_SHUTDOWN             0xD070
->  #define XGENE_DMA_BLK_MEM_RDY                  0xD074
->  #define XGENE_DMA_BLK_MEM_RDY_VAL              0xFFFFFFFF
-> +#define XGENE_DMA_RING_CMD_SM_OFFSET           0x8000
->
->  /* X-Gene SoC EFUSE csr register and bit defination */
->  #define XGENE_SOC_JTAG1_SHADOW                 0x18
-> @@ -1887,6 +1888,8 @@ static int xgene_dma_get_resources(struct platform_device *pdev,
->                 return -ENOMEM;
->         }
->
-> +       pdma->csr_ring_cmd += XGENE_DMA_RING_CMD_SM_OFFSET;
-> +
->         /* Get efuse csr region */
->         res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
->         if (!res) {
-> --
-> 1.8.2.1
->
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-ep93xx/simone.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Any comments on above patch ?
+diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
+index 3c950f5864f3..d0938a219443 100644
+--- a/arch/arm/mach-ep93xx/simone.c
++++ b/arch/arm/mach-ep93xx/simone.c
+@@ -169,6 +169,7 @@ static struct spi_board_info simone_spi_devices[] __initdata = {
+ 
+ static struct ep93xx_spi_info simone_spi_info __initdata = {
+ 	.num_chipselect	= ARRAY_SIZE(simone_spi_devices),
++	.use_dma = 1,
+ };
+ 
+ static struct i2c_gpio_platform_data __initdata simone_i2c_gpio_data = {
+-- 
+2.4.3
