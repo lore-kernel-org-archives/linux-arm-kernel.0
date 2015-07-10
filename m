@@ -1,29 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Jul 2015 10:39:17 +0200
-Subject: [PATCH] ARM: ep93xx: simone: enable DMA on the SPI host
-Message-ID: <1436517557-11725-1-git-send-email-linus.walleij@linaro.org>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Fri, 10 Jul 2015 16:39:31 +0800
+Subject: [PATCH v3 0/3] Fixes for MT8173 PLLs
+Message-ID: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SPI host on the SIM.ONE is used for the MMC/SD card and
-will badly need this turbo boost.
+Title changed. Previous title is "Add MT8173 MMPLL change rate support"
+and can be found in [1].
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ep93xx/simone.c | 1 +
- 1 file changed, 1 insertion(+)
+This patchset contains some fixes for changing rate of PLLs, especially
+for MMPLL.
 
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index 3c950f5864f3..d0938a219443 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -169,6 +169,7 @@ static struct spi_board_info simone_spi_devices[] __initdata = {
- 
- static struct ep93xx_spi_info simone_spi_info __initdata = {
- 	.num_chipselect	= ARRAY_SIZE(simone_spi_devices),
-+	.use_dma = 1,
- };
- 
- static struct i2c_gpio_platform_data __initdata simone_i2c_gpio_data = {
--- 
-2.4.3
+The first 2 patches are common fixes for PLLs, and the last patch is a
+fix to support MT8173 MMPLL changing rate because its frequency setting
+is different from other PLLs.
+
+changes since v2:
+- Rebase to 4.2-rc1.
+- Split fixes of PLL setting calculation to a separeted patch.
+
+changes since v1:
+- Add a separated patch for mtk_pll_set_rate_regs().
+- Use a structure array to describe a div_table.
+- Limit max frequency to div_table[0].
+- Minor changes such as static and comments.
+
+[1] https://lkml.org/lkml/2015/7/8/265
+
+James Liao (3):
+  clk: mediatek: Fix PLL registers setting flow
+  clk: mediatek: Fix calculation of PLL rate settings
+  clk: mediatek: Add MT8173 MMPLL change rate support
+
+ drivers/clk/mediatek/clk-mt8173.c | 24 +++++++++++++++++++++---
+ drivers/clk/mediatek/clk-mtk.h    |  6 ++++++
+ drivers/clk/mediatek/clk-pll.c    | 39 +++++++++++++++++++++++++++------------
+ 3 files changed, 54 insertions(+), 15 deletions(-)
+
+--
+1.8.1.1.dirty
