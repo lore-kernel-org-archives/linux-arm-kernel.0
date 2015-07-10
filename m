@@ -1,173 +1,163 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 10 Jul 2015 17:36:49 +0800
-Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
-References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
- <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
- <5593F899.6050306@arm.com> <559B4B0E.4060004@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
-Message-ID: <559F9231.4080008@hisilicon.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Jul 2015 10:41:58 +0100
+Subject: [PATCH v2 6/9] irqchip / gic: Add stacked irqdomain support for
+ ACPI based GICv2 init
+In-Reply-To: <559C9BB4.90103@linaro.org>
+References: <1434703572-26221-1-git-send-email-hanjun.guo@linaro.org>
+ <1434703572-26221-7-git-send-email-hanjun.guo@linaro.org>
+ <20150622172014.GB26129@red-moon> <5589772A.8070708@linaro.org>
+ <20150623173845.GC31466@red-moon> <558E1DEE.3090900@linaro.org>
+ <55910440.8070702@arm.com> <559282A0.8090601@linaro.org>
+ <559288CA.40605@arm.com> <559C9BB4.90103@linaro.org>
+Message-ID: <559F9366.2070900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/10 16:53, Gabriele Paoloni wrote:
-> I have just sent this patch "[PATCH] Store PCIe controllers address in struct of_pci_range".
+On 08/07/15 04:40, Hanjun Guo wrote:
+> Hi Marc,
 > 
-> It would be needed by "pcie_designware.c" to retrieve the PCI controller addresses from "win->__res.start".
-> 
-> So we do not need to retrieve info from the DT parser anymore and we can use the new PCI DT parsing API
-> 
-> This problem was already discussed in this thread:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
-> 
-> 
-
-Hi Gab,
-
-Thanks for your patch.
-
-That means I can use something like: pp->io_mod_base = win->__res.start
-to get io_mod_base, mem_mod_base and cfg0_mod_base.
-
-will send my v4 series based on your patch.
-
-Best regards,
-Zhou
-
->> -----Original Message-----
->> From: Wangzhou (B)
->> Sent: Tuesday, July 07, 2015 4:44 AM
->> To: James Morse
->> Cc: Gabriele Paoloni; Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd
->> Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
->> karicheri2 at ti.com; Minghuan.Lian at freescale.com; linux-
->> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
->> qiuzhenfa; Liguozhu (Kenneth)
->> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
->>
->> On 2015/7/1 22:26, James Morse wrote:
->>> Zhou Wang wrote:
->>>> I tested this patch on D02 board of Hisilicon. It works well.
->>>> I have compiled the driver with multi_v7_defconfig. However, I don't
->>>> have
->>>> ARM32 PCIe related board to do test. It will be appreciated if
->> someone
->>>> could
->>>> help to test it.
+> On 06/30/2015 08:17 PM, Marc Zyngier wrote:
+>> On 30/06/15 12:50, Hanjun Guo wrote:
+>>> Hi Marc,
+>>>
+>>> On 06/29/2015 04:39 PM, Marc Zyngier wrote:
+>>>> On 27/06/15 04:52, Hanjun Guo wrote:
+>>>>> On 06/24/2015 01:38 AM, Lorenzo Pieralisi wrote:
+>>>>>> On Tue, Jun 23, 2015 at 04:11:38PM +0100, Hanjun Guo wrote:
+>>> [...]
+>>>>>>
+>>>>>>>>>        for (i = 0; i < nr_irqs; i++)
+>>>>>>>>>                gic_irq_domain_map(domain, virq + i, hwirq + i);
+>>>>>>>>> @@ -945,11 +952,11 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>>>>>                gic_irqs = 1020;
+>>>>>>>>>        gic->gic_irqs = gic_irqs;
+>>>>>>>>>
+>>>>>>>>> -      if (node) {             /* DT case */
+>>>>>>>>> +      if (node || !acpi_disabled) {           /* DT or ACPI case */
+>>>>>>>>>                gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>>>>>>>>                                                    &gic_irq_domain_hierarchy_ops,
+>>>>>>>>>                                                    gic);
+>>>>>>
+>>>>>> I think this is a bit more worrying, I mean passing a NULL node pointer to
+>>>>>> the irqdomain layer which basically means you are booting out of ACPI
+>>>>>
+>>>>> I'm little confused here, would you mind explaining more for your
+>>>>> worrying? To me, node pointer is optional and it's ok for ACPI
+>>>>> case.
+>>>>>
+>>>>>> (for you, if that's true for the irq_domain_add_linear implementation
+>>>>>> that's another story), the node pointer should be optional but you
+>>>>>> need feedback from IRQ layer maintainers here.
+>>>>>
+>>>>> Sure.
 >>>>
->>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->>>> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->>>> Tested-by: James Morse <james.morse@arm.com>
->>>
->>> Tests on this new series, using the same i.MX 6Quad board, are not
->> working.
->>>
->>> The network card is no longer detected, and I get a lockup when
->> removing
->>> the root bridge and rescanning.
->>>
->>> Partial dmesg output below. Significantly, the lines:
->>>> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
->>>> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
->> [bus
->>> 00-ff]
->>> are new.
->>>
->>> Both series are applied to v4.1, use the same .config file, and the
->> same dtb.
->>> I will investigate further.
->>>
->>> (Re-testing v2 works, so this isn't an interim hardware failure)
->>>
->>> Thanks,
->>>
->>> James
->>>
->>
->> Hi James,
->>
->> There are something wrong with v3 patch.
->>
->> pp->io_mod_base = of_read_number(parser_range_end -
->> 		of_n_addr_cells(np) - 5 + na, ns);
->> pp->mem_mod_base = of_read_number(parser_range_end -
->> 		of_n_addr_cells(np) - 5 + na, ns);
->> pp->cfg0_mod_base = of_read_number(parser_range_end -
->> 		of_n_addr_cells(np) - 5 + na, ns);
->> are wrong.
->>
->> The ranges item in your dts is:
->> ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000
->> 	  0x81000000 0x0 0x0  0x1f80000 0x0 0x10000
->> 	  0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
->> parser_range_end points to the end of ranges(0xf00000) directly. In v2
->> patch,
->> of_read_number is of_read_number(parser.range - parser.np + na, ns);
->> parser.range
->> points to the end of each line in ranges item.
->>
->> When I did test on D02 board with intel82599 card, I set ranges item as:
->> ranges = <0x03000000 0 0xb0000000 0x220 0x00000000 0 0xf000000>;
->> It is just one line. In this case, parser_range_end is same with
->> parser.range.
->> That is why it happened to work well on D02 board.
->>
->> very sorry to bother you about this problem.
->>
->> Thanks,
->> Zhou
->>
->>>
->>>
->>> root at localhost:~# dmesg | grep -i pci
->>> [    0.126184] PCI: CLS 0 bytes, default 64
->>> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
->>> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
->> [bus 00-ff]
->>> [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus
->> 0000:00
->>> [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
->>> [    0.154215] pci_bus 0000:00: root bus resource [???
->>> 0x01f00000-0x01f7ffff flags 0x0]
->>> [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
->>> [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-
->> 0x01efffff]
->>> [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
->>> [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
->>> [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff
->> pref]
->>> [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for
->> PCI
->>> [    0.154429] pci 0000:00:00.0: supports D1
->>> [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
->> D3cold
->>> [    0.154683] PCI: bus0: Fast back to back transfers disabled
->>> [    0.154806] PCI: bus1: Fast back to back transfers enabled
->>> [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-
->> 0x010fffff]
->>> [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-
->> 0x0110ffff
->>> pref]
->>> [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
->>> [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME
->> interrupt
->>> [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme
->> loaded
->>> [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
->>> [    1.188840] ehci-pci: EHCI PCI platform driver
->>> [    1.232518] ohci-pci: OHCI PCI platform driver
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe linux-pci"
->> in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
->>> .
->>>
->>
+>>>> Frankly, I'd really like to see ACPI using the "node" parameter for
+>>>> something useful. This would save having to cache pointers all over the
+>>>> place, will make find_irq_host() work as expected... etc.
+>>>>
+>>>> See the comment at the top of linux/irqdomain.h :
+>>>>
+>>>> "... This code could thus be used on other architectures by replacing
+>>>> those two by some sort of arch-specific void * "token" used to identify
+>>>> interrupt controllers."
 > 
+> I'm stuck here, I think the token for now is tied to device tree as
+> the device node pointer for now in the code if the pointer is not NULL,
+> just see the of_node_get(of_node) in __irq_domain_add(), if dynamic
+> dt is enabled:
+> 
+> struct device_node *of_node_get(struct device_node *node)
+> {
+>          if (node)
+>                  kobject_get(&node->kobj);
+>          return node;
+> }
+> EXPORT_SYMBOL(of_node_get);
+> 
+> so if the node is not NULL, it will be used to get the node's
+> kobject, that will be a problem for acpi case if we pass a token
+> as a parameter.
+
+Well, I'm sure this could be worked around, and we could have different
+handling for different type of objects.
+
+> 
+> I rethink for quite a while and have a discussion with Graeme,
+> I come out another idea and we don't need the token at all
+> for ACPI case.
+
+>>>
+>>> To init GIC in ACPI, we can only use the table entry pointer as
+>>> the token, but the ACPI static tables are early mem/io remapped
+>>> memory at boot stage, and it will be not available after boot,
+>>> also we need muti types of MADT enties to init GIC (GICC and GICD
+>>> for GICv2, GICC or GICR and GICD for GICv3), not as DT, just
+>>> one single node to include all the information needed to init
+>>> the GIC.
+>>
+>> A single pointer would be enough, you don't need all of them.
+>>
+>>> We use ACPI handle for devices as node for DT when the namespace
+>>> is available, but that's pretty late in the boot stage which GIC,
+>>> SMP and timers were already initialized, so ACPI handle can not
+>>> use as the token too.
+>>>
+>>> I see multi places just pass NULL as the pointer directly for
+>>> irq_domain_add_linear() which works fine, and for ACPI, we tested
+>>> this patch and also it works.
+>>
+>> Yes it works. But you're reinventing the wheel by keeping references
+>> outside of the normal framework, which is simply going to make the code
+> 
+> That's the framework for DT not suitable for ACPI, just see the comments
+> below.
+> 
+>> more difficult to maintain in the long run.
+>>
+>> Putting NULL as the device_node parameter really means "this is a domain
+>> I don't need to look up later". In your case, you will have to lookup
+> 
+> I agree that we need to look up the domain not just using the
+> global acpi_irq_domain pointer everywhere, which make the code not
+> scalable, but I don't think it's not OK to put NULL as the device_node
+> parameter in ACPI case.
+> 
+> The reason is that we use different model of mapping interrupt with
+> device in ACPI, for ACPI device in DSDT, it's using another mapping of
+> device and hwirq number than DT, in DT, we using the interrupt parent
+> property to get the device node of irqchip, that's why we need the
+> matching function that match the device node with the one associated
+> with the irqdomain. But for ACPI, we only can get the gsi which the
+> device is using, no interrupt parent will be used, that because gsi is
+> a flat hwirq number which is unique in the system, then we can get its
+> associated irq domain by matching the gsi supported by this irqchip
+> (see drawings below),  then we can be without the token pointer
+> matching the interrupt controller.
+
+But that's for only GSI. GSI are not the *real* problem. The real issue
+is when you have a system that composes domains. We're moving away from
+a model where you can store the various domains yourself. For example,
+have a look at this:
+
+https://lwn.net/Articles/650418/
+
+and specially patch 13. See how the PCI/MSI domain looks up the core ITS
+domain? This is where we're going. Various *independent* entities
+building a hierarchy based on a common repository.
+
+So please stop saying that ACPI is different, because it really isn't.
+You create domains based on some global identifier, you look them up
+using this identifier. There is nothing more to it. The core code has
+some issues with that? Let's fix it.
+
+Look at Suravee's patches introducing ACPI support for GICv2m. He seems
+to be doing a rather good job reusing the existing framework, and
+adapting it to fit the ACPI model. It doesn't mean I agree with
+everything in his series (I need to review it in more details), but this
+is the direction I'd like to see things taken.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
