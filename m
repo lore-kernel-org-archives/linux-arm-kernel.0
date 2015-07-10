@@ -1,7 +1,7 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 15:27:30 +0900
-Subject: [PATCH] pinctrl: Drop owner assignment from platform_driver
-Message-ID: <1436509650-5218-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 10 Jul 2015 15:29:45 +0900
+Subject: [PATCH] soc: mediatek: Drop owner assignment from platform_driver
+Message-ID: <1436509789-27361-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,20 +15,20 @@ Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 The coccinelle script which generated the patch was sent here:
 http://www.spinics.net/lists/kernel/msg2029903.html
 ---
- drivers/pinctrl/sirf/pinctrl-atlas7.c | 1 -
+ drivers/soc/mediatek/mtk-pmic-wrap.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/pinctrl/sirf/pinctrl-atlas7.c b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-index 9384e0aa3996..d6e80fe1c7f7 100644
---- a/drivers/pinctrl/sirf/pinctrl-atlas7.c
-+++ b/drivers/pinctrl/sirf/pinctrl-atlas7.c
-@@ -4621,7 +4621,6 @@ failed:
- static struct platform_driver atlas7_gpio_driver = {
+diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
+index f432291feee9..8bc7b41b09fd 100644
+--- a/drivers/soc/mediatek/mtk-pmic-wrap.c
++++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
+@@ -926,7 +926,6 @@ err_out1:
+ static struct platform_driver pwrap_drv = {
  	.driver = {
- 		.name = "atlas7-gpio",
+ 		.name = "mt-pmic-pwrap",
 -		.owner = THIS_MODULE,
- 		.of_match_table = atlas7_gpio_ids,
+ 		.of_match_table = of_match_ptr(of_pwrap_match_tbl),
  	},
- 	.probe = atlas7_gpio_probe,
+ 	.probe = pwrap_probe,
 -- 
 1.9.1
