@@ -1,15 +1,14 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 15:19:43 +0900
-Subject: [PATCH 2/7] [media] dvb-frontends: Drop owner assignment from
- platform_driver
+Date: Fri, 10 Jul 2015 15:19:45 +0900
+Subject: [PATCH 4/7] [media] platform: Drop owner assignment from i2c_driver
 In-Reply-To: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
 References: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1436509188-23320-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1436509188-23320-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_driver does not need to set an owner because
-platform_driver_register() will set it.
+i2c_driver does not need to set an owner because i2c_register_driver()
+will set it.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
@@ -18,20 +17,33 @@ Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 The coccinelle script which generated the patch was sent here:
 http://www.spinics.net/lists/kernel/msg2029903.html
 ---
- drivers/media/dvb-frontends/rtl2832_sdr.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/media/platform/s5p-tv/hdmiphy_drv.c | 1 -
+ drivers/media/platform/s5p-tv/sii9234_drv.c | 1 -
+ 2 files changed, 2 deletions(-)
 
-diff --git a/drivers/media/dvb-frontends/rtl2832_sdr.c b/drivers/media/dvb-frontends/rtl2832_sdr.c
-index 7edb885ae9c8..d5b994f17612 100644
---- a/drivers/media/dvb-frontends/rtl2832_sdr.c
-+++ b/drivers/media/dvb-frontends/rtl2832_sdr.c
-@@ -1538,7 +1538,6 @@ static int rtl2832_sdr_remove(struct platform_device *pdev)
- static struct platform_driver rtl2832_sdr_driver = {
+diff --git a/drivers/media/platform/s5p-tv/hdmiphy_drv.c b/drivers/media/platform/s5p-tv/hdmiphy_drv.c
+index c2f2e35642f2..aae652351aa8 100644
+--- a/drivers/media/platform/s5p-tv/hdmiphy_drv.c
++++ b/drivers/media/platform/s5p-tv/hdmiphy_drv.c
+@@ -315,7 +315,6 @@ MODULE_DEVICE_TABLE(i2c, hdmiphy_id);
+ static struct i2c_driver hdmiphy_driver = {
  	.driver = {
- 		.name   = "rtl2832_sdr",
--		.owner  = THIS_MODULE,
+ 		.name	= "s5p-hdmiphy",
+-		.owner	= THIS_MODULE,
  	},
- 	.probe          = rtl2832_sdr_probe,
- 	.remove         = rtl2832_sdr_remove,
+ 	.probe		= hdmiphy_probe,
+ 	.remove		= hdmiphy_remove,
+diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
+index db8c17bb4aaa..8d171310af8f 100644
+--- a/drivers/media/platform/s5p-tv/sii9234_drv.c
++++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
+@@ -397,7 +397,6 @@ MODULE_DEVICE_TABLE(i2c, sii9234_id);
+ static struct i2c_driver sii9234_driver = {
+ 	.driver = {
+ 		.name	= "sii9234",
+-		.owner	= THIS_MODULE,
+ 		.pm = &sii9234_pm_ops,
+ 	},
+ 	.probe		= sii9234_probe,
 -- 
 1.9.1
