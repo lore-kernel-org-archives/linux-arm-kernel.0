@@ -1,62 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Jul 2015 18:12:30 +0100
-Subject: [GIT PULL] arm64 fixes for 4.2-rc2
-Message-ID: <20150710171228.GA2621@e104818-lin.cambridge.arm.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 10 Jul 2015 12:27:01 -0500
+Subject: [PATCH 2/3] i2c: omap: abolish variable name confusion
+In-Reply-To: <20150709194941.GH4744@katana>
+References: <1435260890-32335-1-git-send-email-balbi@ti.com>
+ <1435260890-32335-2-git-send-email-balbi@ti.com>
+ <20150709194941.GH4744@katana>
+Message-ID: <20150710172701.GB20408@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-Please pull the arm64 fixes below. Thanks.
+On Thu, Jul 09, 2015 at 09:49:41PM +0200, Wolfram Sang wrote:
+> On Thu, Jun 25, 2015 at 02:34:49PM -0500, Felipe Balbi wrote:
+> > struct device pointers are usually called
+> > dev. Calling our struct omap_i2c_dev pointers
+> > also dev has caused enough confusion.
+> > 
+> > This is the result of a few simple sed rules
+> > to convert all struct omap_i2c_dev pointers
+> > to be called omap instead.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> I couldn't apply this one. On what was it based?
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to ad2daa85bd50b7ff5c851b80a0b813bdc8d14f8e:
-
-  arm64: entry32: remove pointless register assignment (2015-07-10 16:47:13 +0100)
-
-----------------------------------------------------------------
-arm64 fixes/clean-up:
-
-- ACPI fix when checking the validity of the GICC MADT subtable
-- handle debug exceptions in the el*_inv exception entries
-- remove pointless register assignment in two compat syscall wrappers
-- unnecessary include path
-- defconfig update
-
-----------------------------------------------------------------
-Al Stone (2):
-      ACPI / ARM64: add BAD_MADT_GICC_ENTRY() macro
-      ACPI / ARM64 : use the new BAD_MADT_GICC_ENTRY macro
-
-Ard Biesheuvel (1):
-      arm64: remove another unnecessary libfdt include path
-
-Catalin Marinas (1):
-      arm64: Keep the ARM64 Kconfig selects sorted
-
-Mark Rutland (2):
-      arm64: entry: handle debug exceptions in el*_inv
-      arm64: entry32: remove pointless register assignment
-
-Suneel Garapati (1):
-      arm64: defconfig: Add Ceva ahci to the defconfig
-
- arch/arm64/Kconfig            | 2 +-
- arch/arm64/configs/defconfig  | 1 +
- arch/arm64/include/asm/acpi.h | 8 ++++++++
- arch/arm64/kernel/entry.S     | 4 ++--
- arch/arm64/kernel/entry32.S   | 2 --
- arch/arm64/kernel/smp.c       | 2 +-
- arch/arm64/mm/Makefile        | 2 --
- drivers/irqchip/irq-gic.c     | 2 +-
- 8 files changed, 14 insertions(+), 9 deletions(-)
+it was v4.1 at the time, IIRC. I'll rebase again once I'm back in the
+office.
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/e7a09c43/attachment.sig>
