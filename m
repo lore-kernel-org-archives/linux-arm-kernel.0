@@ -1,46 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Jul 2015 14:31:48 +0200
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <20150710120907.GC3127@piout.net>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
- <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
- <20150710120907.GC3127@piout.net>
-Message-ID: <20150710123148.GA28632@lukather>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Fri, 10 Jul 2015 18:08:31 +0530
+Subject: [PATCH v3] coresight: replicator: Use builtin_platform_driver()
+Message-ID: <20150710123831.GA7877@vaishali-Ideapad-Z570>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
-> > I would agree with Maxime. Currently all latest chip reset function is
-> > compatible with the atmel,sama5d3-rstc.
-> > So check compatible string is enough for now.
-> > But of cause if we have other incompatible reset in future with new chip,
-> > the structure like you said is needed.
-> 
-> We managed to avoid using of_machine_is_compatible() in all the at91
-> drivers. I'd like to keep it that way. It was painful enough to remove
-> all those cpu_is_at91xxx calls.
+Macro builtin_platform_driver can be used for builtin drivers
+that don't do anything in driver init. This file depends on
+Kconfig CONFIG_CORESIGHT_LINKS_AND_SINKS which eventually
+depends on CORESIGHT. Both CONFIG_CORESIGHT_LINKS_AND_SINKS and
+CORESIGHT are bool. So, use builtin_platform_driver and remove
+some boilerplate code.
 
-That's your call...
+Also, remove header file init.h as functionality like module_init
+and module_exit is now relocated to module.h.
 
-> Also, using it is trying to match strings and will result in longer boot
-> times.
+Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+Suggested-by: Paul Bolle <pebolle@tiscali.nl>
+---
+Changes since v1:
+        - As per Mathieu's suggestion, remove the comment and
+          code of Coccinelle
+        - Also, add blank line before module_platform_driver
+Changes since v2:
+	- Use builtin_platform_driver instead of
+	  module_platform_driver and change commit log and subject
+	  accordingly.
+---
+ drivers/hwtracing/coresight/coresight-replicator.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-Have you looked at the implementation of of_match_device? If that's
-really a concern to you, you should actually avoid it.
-
-Maxime
-
+diff --git a/drivers/hwtracing/coresight/coresight-replicator.c b/drivers/hwtracing/coresight/coresight-replicator.c
+index 7974b7c..963ac19 100644
+--- a/drivers/hwtracing/coresight/coresight-replicator.c
++++ b/drivers/hwtracing/coresight/coresight-replicator.c
+@@ -12,7 +12,6 @@
+ 
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+-#include <linux/init.h>
+ #include <linux/device.h>
+ #include <linux/platform_device.h>
+ #include <linux/io.h>
+@@ -184,17 +183,7 @@ static struct platform_driver replicator_driver = {
+ 	},
+ };
+ 
+-static int __init replicator_init(void)
+-{
+-	return platform_driver_register(&replicator_driver);
+-}
+-module_init(replicator_init);
+-
+-static void __exit replicator_exit(void)
+-{
+-	platform_driver_unregister(&replicator_driver);
+-}
+-module_exit(replicator_exit);
++builtin_platform_driver(replicator_driver);
+ 
+ MODULE_LICENSE("GPL v2");
+ MODULE_DESCRIPTION("CoreSight Replicator driver");
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/7998893a/attachment.sig>
+1.9.1
