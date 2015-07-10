@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:12 +0900
-Subject: [PATCH 7/8] ARM: shmobile: r8a7779: Make struct rcar_sysc_ch const
+Date: Fri, 10 Jul 2015 15:37:13 +0900
+Subject: [PATCH 8/8] ARM: shmobile: r8a7790: Make struct rcar_sysc_ch const
 In-Reply-To: <cover.1436510166.git.horms+renesas@verge.net.au>
 References: <cover.1436510166.git.horms+renesas@verge.net.au>
-Message-ID: <5afcd90f65ac990ca08b101a0e0fd9eac4e0dcde.1436510166.git.horms+renesas@verge.net.au>
+Message-ID: <bd82aff9192dad2bfd3cb3fc19fdf741c2f6028e.1436510166.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,75 +12,27 @@ From: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-r8a7779.c  |  3 ++-
- arch/arm/mach-shmobile/smp-r8a7779.c | 12 ++++++------
- 2 files changed, 8 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/smp-r8a7790.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
-index 44a74c4c5a01..44e29e54b3bf 100644
---- a/arch/arm/mach-shmobile/pm-r8a7779.c
-+++ b/arch/arm/mach-shmobile/pm-r8a7779.c
-@@ -35,7 +35,8 @@ struct r8a7779_pm_domain {
- 	struct rcar_sysc_ch ch;
+diff --git a/arch/arm/mach-shmobile/smp-r8a7790.c b/arch/arm/mach-shmobile/smp-r8a7790.c
+index 930f45cbc08a..2ef0054ce934 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7790.c
++++ b/arch/arm/mach-shmobile/smp-r8a7790.c
+@@ -26,12 +26,12 @@
+ #include "rcar-gen2.h"
+ #include "r8a7790.h"
+ 
+-static struct rcar_sysc_ch r8a7790_ca15_scu = {
++static const struct rcar_sysc_ch r8a7790_ca15_scu = {
+ 	.chan_offs = 0x180, /* PWRSR5 .. PWRER5 */
+ 	.isr_bit = 12, /* CA15-SCU */
  };
  
--static inline struct rcar_sysc_ch *to_r8a7779_ch(struct generic_pm_domain *d)
-+static inline
-+const struct rcar_sysc_ch *to_r8a7779_ch(struct generic_pm_domain *d)
- {
- 	return &container_of(d, struct r8a7779_pm_domain, genpd)->ch;
- }
-diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
-index 01f792fcb220..9122216df060 100644
---- a/arch/arm/mach-shmobile/smp-r8a7779.c
-+++ b/arch/arm/mach-shmobile/smp-r8a7779.c
-@@ -32,25 +32,25 @@
- #define AVECR IOMEM(0xfe700040)
- #define R8A7779_SCU_BASE 0xf0000000
- 
--static struct rcar_sysc_ch r8a7779_ch_cpu1 = {
-+static const struct rcar_sysc_ch r8a7779_ch_cpu1 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
- 	.chan_bit = 1, /* ARM1 */
- 	.isr_bit = 1, /* ARM1 */
+-static struct rcar_sysc_ch r8a7790_ca7_scu = {
++static const struct rcar_sysc_ch r8a7790_ca7_scu = {
+ 	.chan_offs = 0x100, /* PWRSR3 .. PWRER3 */
+ 	.isr_bit = 21, /* CA7-SCU */
  };
- 
--static struct rcar_sysc_ch r8a7779_ch_cpu2 = {
-+static const struct rcar_sysc_ch r8a7779_ch_cpu2 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
- 	.chan_bit = 2, /* ARM2 */
- 	.isr_bit = 2, /* ARM2 */
- };
- 
--static struct rcar_sysc_ch r8a7779_ch_cpu3 = {
-+static const struct rcar_sysc_ch r8a7779_ch_cpu3 = {
- 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
- 	.chan_bit = 3, /* ARM3 */
- 	.isr_bit = 3, /* ARM3 */
- };
- 
--static struct rcar_sysc_ch *r8a7779_ch_cpu[4] = {
-+static const struct rcar_sysc_ch * const r8a7779_ch_cpu[4] = {
- 	[1] = &r8a7779_ch_cpu1,
- 	[2] = &r8a7779_ch_cpu2,
- 	[3] = &r8a7779_ch_cpu3,
-@@ -66,7 +66,7 @@ void __init r8a7779_register_twd(void)
- 
- static int r8a7779_platform_cpu_kill(unsigned int cpu)
- {
--	struct rcar_sysc_ch *ch = NULL;
-+	const struct rcar_sysc_ch *ch = NULL;
- 	int ret = -EIO;
- 
- 	cpu = cpu_logical_map(cpu);
-@@ -82,7 +82,7 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
- 
- static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
- {
--	struct rcar_sysc_ch *ch = NULL;
-+	const struct rcar_sysc_ch *ch = NULL;
- 	unsigned int lcpu = cpu_logical_map(cpu);
- 	int ret;
- 
 -- 
 2.1.4
