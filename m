@@ -1,106 +1,52 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 10 Jul 2015 08:03:50 +0200
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150710060350.GA3127@piout.net>
+From: scott.shu@mediatek.com (Scott Shu)
+Date: Fri, 10 Jul 2015 14:04:03 +0800
+Subject: [PATCH v2 0/6] This series adds SMP support for the MediaTek MT6580.
+In-Reply-To: <Scott Shu <scott.shu@gmail.com>
+References: <Scott Shu <scott.shu@gmail.com>
+Message-ID: <1436508249-49338-1-git-send-email-scott.shu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patchset adds support SMP on MediaTek MT6580 Cortex-A7 quad-core SoC.
 
-On 09/07/2015 at 18:15:46 +0800, Josh Wu wrote :
-> As since sama5d3, to reset the chip, we don't need to shutdown the ddr
-> controller.
-> 
-> So add a new compatible string and new restart function for sama5d3 and
-> later chips. As we don't use sama5d3 ddr controller, so remove it as
-> well.
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> 
->  drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
->  1 file changed, 21 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> index 36dc52f..8944b63 100644
-> --- a/drivers/power/reset/at91-reset.c
-> +++ b/drivers/power/reset/at91-reset.c
-> @@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
->  	return NOTIFY_DONE;
->  }
->  
-> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
-> +			void *cmd)
+This is based on v4.1-rc1 and following patch series:
+(1) Yingjoe Chen's "Add SMP bringup support for mt65xx socs" [1]
+(2) Mars Cheng's "Add mt6580 basic chip support" [2]
+(3) Sascha Hauer's "Mediatek SCPSYS power domain support" [3]
 
-Please align that line properly.
+The secondary cores are power off as default on MT6580, this change adds
+a new enable-method to turn on power to the cores during booting process.
 
-> +{
-> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
-> +				at91_rstc_base);
+The System Power Manager (SPM) inside the SCPSYS is for the CPU MTCMOS
+power domain control. Please check [3] for more information about SCPSYS.
 
-That one too.
+[1] https://lkml.org/lkml/2015/5/16/33
+[2] https://lkml.org/lkml/2015/7/7/122
+[3] https://lkml.org/lkml/2015/6/9/172
 
-> +	return NOTIFY_DONE;
-> +}
-> +
->  static void __init at91_reset_status(struct platform_device *pdev)
->  {
->  	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
-> @@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
->  static const struct of_device_id at91_ramc_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-sdramc", },
->  	{ .compatible = "atmel,at91sam9g45-ddramc", },
-> -	{ .compatible = "atmel,sama5d3-ddramc", },
->  	{ /* sentinel */ }
->  };
->  
->  static const struct of_device_id at91_reset_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
->  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
-> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
->  	{ /* sentinel */ }
->  };
->  
-> @@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	for_each_matching_node(np, at91_ramc_of_match) {
-> -		at91_ramc_base[idx] = of_iomap(np, 0);
-> -		if (!at91_ramc_base[idx]) {
-> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
-> -			return -ENODEV;
-> +	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
-> +	at91_restart_nb.notifier_call = match->data;
-> +
-> +	if (match->data != sama5d3_restart) {
+Change in v2:
+1. Rebase to 4.2-rc1
+2. Fix using usleep() in atomic context
+3. Put a timeout in cpu power on/off sequence
+4. Fix some coding style
 
-This doesn't scale well. I would create a structure with a pointer to
-the restart function and a boolean or a bitfield to store whether the
-workaround is needed. Use that structure in your match data. Then, you
-won't need to reorder anything.
+Scott Shu (6):
+  Document: bindings: DT: Add SMP enable method for MT6580     SoC
+    platform
+  soc: Mediatek: Add SCPSYS CPU power domain driver
+  ARM: mediatek: add smp bringup code for MT6580
+  ARM: Mediatek: enable GPT6 on boot up to make arch timer     working
+    for MT6580
+  ARM: dts: mt6580: Add device nodes to the MT6580 dtsi file
+  ARM: dts: mt6580: enable basic SMP bringup for MT6580
 
-> +		/* we need to shutdown the ddr controller, so get ramc base */
-> +		for_each_matching_node(np, at91_ramc_of_match) {
-> +			at91_ramc_base[idx] = of_iomap(np, 0);
-> +			if (!at91_ramc_base[idx]) {
-> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
-> +				return -ENODEV;
-> +			}
-> +			idx++;
->  		}
-> -		idx++;
->  	}
->  
-> -	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
-> -	at91_restart_nb.notifier_call = match->data;
->  	return register_restart_handler(&at91_restart_nb);
->  }
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+ Documentation/devicetree/bindings/arm/cpus.txt |   1 +
+ arch/arm/boot/dts/mt6580.dtsi                  |  25 +++
+ arch/arm/mach-mediatek/Makefile                |   2 +-
+ arch/arm/mach-mediatek/generic.h               |  23 +++
+ arch/arm/mach-mediatek/hotplug.c               | 267 +++++++++++++++++++++++++
+ arch/arm/mach-mediatek/mediatek.c              |   4 +-
+ arch/arm/mach-mediatek/platsmp.c               | 139 ++++++++++++-
+ 7 files changed, 458 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/mach-mediatek/generic.h
+ create mode 100644 arch/arm/mach-mediatek/hotplug.c
