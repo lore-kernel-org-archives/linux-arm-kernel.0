@@ -1,43 +1,33 @@
-From: jianwei.wang@freescale.com (Jianwei Wang)
-Date: Fri, 10 Jul 2015 19:17:43 +0800
-Subject: [PATCH v7 4/4] arm/dts/ls1021a: Add a TFT LCD panel dts node
-In-Reply-To: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
-References: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
-Message-ID: <1436527063-44762-4-git-send-email-jianwei.wang@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Jul 2015 12:25:22 +0100
+Subject: [PATCH v3] ARM: early fixmap support for earlycon
+In-Reply-To: <20150606124800.GR7557@n2100.arm.linux.org.uk>
+References: <1433593888-7142-1-git-send-email-stefan@agner.ch>
+ <20150606124800.GR7557@n2100.arm.linux.org.uk>
+Message-ID: <20150710112522.GR7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a TFT LCD panel. the TFT LCD panel is WQVGA "480x272",
-and the bpp is 24.
+On Sat, Jun 06, 2015 at 01:48:00PM +0100, Russell King - ARM Linux wrote:
+> On Sat, Jun 06, 2015 at 02:31:28PM +0200, Stefan Agner wrote:
+> > @@ -1231,7 +1272,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+> >  
+> >  	early_trap_init(vectors);
+> >  
+> > -	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
+> > +	for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
+> >  		pmd_clear(pmd_off_k(addr));
+> 
+> You introduce a bug here - we no logner clear the very top entry of the
+> page tables, which means it could contain anything - and means that the
+> subsequent creation of the L2 table in early_pte_alloc() can fail.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+You trimmed my reply hard, and seemingly ignored this; the v4 patch
+contains exactly the same code here, and therefore continues to leave
+the top of the page table uninitialised.
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..f6ad7ba 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -56,6 +56,17 @@
- 		enet0_sgmii_phy = &sgmii_phy2;
- 		enet1_sgmii_phy = &sgmii_phy0;
- 	};
-+
-+	panel: panel {
-+		compatible = "nec,nl4827hc19_05b";
-+	};
-+
-+};
-+
-+&dcu {
-+	panel = <&panel>;
-+	status = "okay";
-+
- };
- 
- &dspi1 {
+Not applying the v4 patch, sorry.
+
 -- 
-2.1.0.27.g96db324
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
