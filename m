@@ -1,52 +1,105 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 10 Jul 2015 19:10:46 +0800
-Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-In-Reply-To: <CACVXFVMcKuj+uan43dqT0+=5=nm+Drt1WzBSng9OCEF3ThSufg@mail.gmail.com>
-References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>	<559F7B2C.6090402@arm.com>	<CAOHikRBYS-oaWa8qKd+6-2LZ4drVrWnfvqN34cGEu8QxbrMX1Q@mail.gmail.com>	<559F8115.1060801@arm.com>
- <CACVXFVMcKuj+uan43dqT0+=5=nm+Drt1WzBSng9OCEF3ThSufg@mail.gmail.com>
-Message-ID: <559FA836.8020001@linaro.org>
+From: jianwei.wang@freescale.com (Jianwei Wang)
+Date: Fri, 10 Jul 2015 19:17:41 +0800
+Subject: [PATCH v7 2/4] drm/panel: simple: Add support for NEC NL4827HC19-05B
+ 480x272 panel
+In-Reply-To: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
+References: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
+Message-ID: <1436527063-44762-2-git-send-email-jianwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 06:11 PM, Ming Lei wrote:
-> On Fri, Jul 10, 2015 at 4:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> On 10/07/15 09:17, Suman Tripathi wrote:
->>> On Fri, Jul 10, 2015 at 1:28 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>>
->>>> On 10/07/15 08:45, Ming Lei wrote:
->>>>> Hi,
->>>>>
->>>>> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
->>>>> causes the following failure on APM mustang board(arm64) when
->>>>> booting via UEFI and ACPI:
->>>>>
->>>>> No valid GICC entries exist
->>>>> ACPI: Failed to initialize GIC IRQ controller
->>>>> Kernel panic - not syncing: No interrupt controller found.
->>>>> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
->>>>> Hardware name: APM X-Gene Mustang board (DT)
->>>>> Call trace:
->>>>> [<ffffffc000089b94>] dump_backtrace+0x0/0x12c
->>>>> [<ffffffc000089cd0>] show_stack+0x10/0x1c
->>>>> [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
->>>>> [<ffffffc0005f7218>] panic+0xe4/0x220
->>>>> [<ffffffc00082631c>] init_IRQ+0x24/0x30
->>>>> [<ffffffc00082486c>] start_kernel+0x274/0x3d8
->>>>> ---[ end Kernel panic - not syncing: No interrupt controller found.
->>>>
->>>> Isn't that addressed by [1] which Catalin has queued for -rc2?
->>>
->>>
->>> I am also seeing the same . But it fixes after I apply the parking
->>> protocol  patch but that is not upstreamed.
->>
->> I'm more interested to find out if the patch I mentioned in my original
->> email fixes it or not. An additional dependency on something that is not
->> aimed for mainline yet doesn't really help.
->
-> Yes, Al's patches do fix the issue.
+This adds support for the  NEC NL4827HC19-05B 480x272 panel to the DRM
+simple panel driver.
 
-I should have read ahead :)
+Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+---
+ .../bindings/panel/nec,nl4827hc19_05b.txt          |  7 ++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ MAINTAINERS                                        |  1 +
+ drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
+ 4 files changed, 35 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
 
-Thanks
-Hanjun
+diff --git a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+new file mode 100644
+index 0000000..20e9473
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+@@ -0,0 +1,7 @@
++NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
++
++Required properties:
++- compatible: should be "nec,nl4827hc19_05b"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 8033919..9f22b3e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -131,6 +131,7 @@ mundoreader	Mundo Reader S.L.
+ murata	Murata Manufacturing Co., Ltd.
+ mxicy	Macronix International Co., Ltd.
+ national	National Semiconductor
++nec	NEC LCD Technologies, Ltd.
+ neonode		Neonode Inc.
+ netgear	NETGEAR
+ netlogic	Broadcom Corporation (formerly NetLogic Microsystems)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b25b948..e191ded 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3410,6 +3410,7 @@ M:	Alison Wang <alison.wang@freescale.com>
+ L:	dri-devel at lists.freedesktop.org
+ S:	Supported
+ F:	drivers/gpu/drm/fsl-dcu/
++F:      Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+ 
+ DRM DRIVERS FOR NVIDIA TEGRA
+ M:	Thierry Reding <thierry.reding@gmail.com>
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index f94201b..eee95f4 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -1036,6 +1036,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
+ 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+ };
+ 
++static const struct drm_display_mode nec_nl4827hc19_05b_mode = {
++	.clock = 10870,
++	.hdisplay = 480,
++	.hsync_start = 480 + 2,
++	.hsync_end = 480 + 2 + 41,
++	.htotal = 480 + 2 + 41 + 2,
++	.vdisplay = 272,
++	.vsync_start = 272 + 2,
++	.vsync_end = 272 + 2 + 4,
++	.vtotal = 272 + 2 + 4 + 2,
++	.vrefresh = 74,
++};
++
++static const struct panel_desc nec_nl4827hc19_05b = {
++	.modes = &nec_nl4827hc19_05b_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 480,
++		.height = 272,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24
++};
++
+ static const struct of_device_id platform_of_match[] = {
+ 	{
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+@@ -1125,6 +1148,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "shelly,sca07010-bfn-lnn",
+ 		.data = &shelly_sca07010_bfn_lnn,
+ 	}, {
++		.compatible = "nec,nl4827hc19_05b",
++		.data = &nec_nl4827hc19_05b,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+-- 
+2.1.0.27.g96db324
