@@ -1,89 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Jul 2015 13:41:53 +0100
-Subject: [RFC Patch V1 11/12] genirq, PCI: Reorginize struct msi_desc
- to prepare for support of generic MSI
-In-Reply-To: <1436428847-8886-12-git-send-email-jiang.liu@linux.intel.com>
-References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
- <1436428847-8886-12-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <559FBD91.9070803@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 10 Jul 2015 14:46:20 +0200
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150710123148.GA28632@lukather>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+ <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
+Message-ID: <20150710124620.GD3127@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gerry,
-
-On 09/07/15 09:00, Jiang Liu wrote:
-> Reorganize struct msi_desc so it could be reused by other MSI drivers.
+On 10/07/2015 at 14:31:48 +0200, Maxime Ripard wrote :
+> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
+> > Hi,
+> > 
+> > On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+> > > I would agree with Maxime. Currently all latest chip reset function is
+> > > compatible with the atmel,sama5d3-rstc.
+> > > So check compatible string is enough for now.
+> > > But of cause if we have other incompatible reset in future with new chip,
+> > > the structure like you said is needed.
+> > 
+> > We managed to avoid using of_machine_is_compatible() in all the at91
+> > drivers. I'd like to keep it that way. It was painful enough to remove
+> > all those cpu_is_at91xxx calls.
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> ---
->  include/linux/msi.h |   41 +++++++++++++++++++++--------------------
->  1 file changed, 21 insertions(+), 20 deletions(-)
+> That's your call...
 > 
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 5f77e231f515..f6845bc83774 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -19,29 +19,30 @@ void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
->  void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
->  
->  struct msi_desc {
-> -	struct {
-> -		__u8	is_msix	: 1;
-> -		__u8	multiple: 3;	/* log2 num of messages allocated */
-> -		__u8	multi_cap : 3;	/* log2 num of messages supported */
-> -		__u8	maskbit	: 1;	/* mask-pending bit supported ? */
-> -		__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit */
-> -		__u16	entry_nr;	/* specific enabled entry */
-> -		unsigned default_irq;	/* default pre-assigned irq */
-> -	} msi_attrib;
-> -
-> -	u32 masked;			/* mask bits */
-> -	unsigned int irq;
-> -	unsigned int nvec_used;		/* number of messages */
-> -	struct list_head list;
-> +	struct list_head		list;
-> +	unsigned int			irq;
-> +	unsigned int			nvec_used;	/* number of messages */
-> +	struct device *			dev;
-> +	struct msi_msg			msg;		/* Last set MSI message */
->  
->  	union {
-> -		void __iomem *mask_base;
-> -		u8 mask_pos;
-> +		struct {				/* For PCI MSI/MSI-X */
-> +			u32 masked;			/* mask bits */
-> +			struct {
-> +				__u8	is_msix	: 1;
-> +				__u8	multiple: 3;	/* log2 num of messages allocated */
-> +				__u8	multi_cap : 3;	/* log2 num of messages supported */
-> +				__u8	maskbit	: 1;	/* mask-pending bit supported ? */
-> +				__u8	is_64	: 1;	/* Address size: 0=32bit 1=64bit */
-> +				__u16	entry_nr;	/* specific enabled entry */
-> +				unsigned default_irq;	/* default pre-assigned irq */
-> +			} msi_attrib;
-> +			union {
-> +				u8	mask_pos;
-> +				void __iomem *mask_base;
-> +			};
-> +		};
-
-Is this union the location where you would expect some non-PCI MSI
-infrastructure to store their own data? If that's the case, maybe a
-small comment to that effect would be good, as it is not completely
-obvious from looking at the data structure.
-
->  	};
-> -	struct device *dev;
-> -
-> -	/* Last set MSI message */
-> -	struct msi_msg msg;
->  };
->  
->  /* Helpers to hide struct msi_desc implementation details */
+> > Also, using it is trying to match strings and will result in longer boot
+> > times.
+> 
+> Have you looked at the implementation of of_match_device? If that's
+> really a concern to you, you should actually avoid it.
 > 
 
-Thanks,
+Indeed, I misread. of_device_is_compatible is acceptable,
+of_machine_is_compatible is not :)
 
-	M.
+
 -- 
-Jazz is not dead. It just smells funny...
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
