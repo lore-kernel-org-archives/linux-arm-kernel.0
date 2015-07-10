@@ -1,220 +1,299 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 10 Jul 2015 15:21:48 +0100
-Subject: [PATCH v2 12/15] KVM: arm64: sync LPI configuration and pending tables
+Date: Fri, 10 Jul 2015 15:21:44 +0100
+Subject: [PATCH v2 08/15] KVM: arm64: introduce ITS emulation file with stub
+ functions
 In-Reply-To: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
 References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1436538111-4294-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1436538111-4294-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPI configuration and pending tables of the GICv3 LPIs are held
-in tables in (guest) memory. To achieve reasonable performance, we
-cache this data in our own data structures, so we need to sync those
-two views from time to time. This behaviour is well described in the
-GICv3 spec and is also exercised by hardware, so the sync points are
-well known.
-
-Provide functions that read the guest memory and store the
-information from the configuration and pending tables in the kernel.
+The ARM GICv3 ITS emulation code goes into a separate file, but
+needs to be connected to the GICv3 emulation, of which it is an
+option.
+Introduce the skeleton with function stubs to be filled later.
+Introduce the basic ITS data structure and initialize it, but don't
+return any success yet, as we are not yet ready for the show.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/arm_vgic.h  |   2 +
- virt/kvm/arm/its-emul.c | 124 ++++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/its-emul.h |   3 ++
- 3 files changed, 129 insertions(+)
+ arch/arm64/kvm/Makefile            |   1 +
+ include/kvm/arm_vgic.h             |   6 ++
+ include/linux/irqchip/arm-gic-v3.h |   1 +
+ virt/kvm/arm/its-emul.c            | 125 +++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/its-emul.h            |  35 +++++++++++
+ virt/kvm/arm/vgic-v3-emul.c        |  24 ++++++-
+ 6 files changed, 189 insertions(+), 3 deletions(-)
+ create mode 100644 virt/kvm/arm/its-emul.c
+ create mode 100644 virt/kvm/arm/its-emul.h
 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index f90f4aa..9803307 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -25,5 +25,6 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v2-switch.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/its-emul.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 2a67a10..323c33a 100644
+index 8c6cb0e..9e9d4aa 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -167,6 +167,8 @@ struct vgic_its {
- 	int			cwriter;
- 	struct list_head	device_list;
- 	struct list_head	collection_list;
-+	/* memory used for buffering guest's memory */
-+	void			*buffer_page;
+@@ -156,6 +156,11 @@ struct vgic_io_device {
+ 	struct kvm_io_device dev;
  };
  
++struct vgic_its {
++	bool			enabled;
++	spinlock_t		lock;
++};
++
  struct vgic_dist {
-diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-index b9c40d7..05245cb 100644
---- a/virt/kvm/arm/its-emul.c
-+++ b/virt/kvm/arm/its-emul.c
-@@ -50,6 +50,7 @@ struct its_itte {
- 	struct its_collection *collection;
- 	u32 lpi;
- 	u32 event_id;
-+	u8 priority;
- 	bool enabled;
- 	unsigned long *pending;
+ 	spinlock_t		lock;
+ 	bool			in_kernel;
+@@ -264,6 +269,7 @@ struct vgic_dist {
+ 	u64			*pendbaser;
+ 
+ 	bool			lpis_enabled;
++	struct vgic_its		its;
  };
-@@ -70,8 +71,124 @@ static struct its_itte *find_itte_by_lpi(struct kvm *kvm, int lpi)
- 	return NULL;
- }
  
-+#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-+#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-+
-+/* stores the priority and enable bit for a given LPI */
-+static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
-+{
-+	itte->priority = LPI_PROP_PRIORITY(prop);
-+	itte->enabled  = LPI_PROP_ENABLE_BIT(prop);
-+}
-+
-+#define GIC_LPI_OFFSET 8192
-+
-+/* We scan the table in chunks the size of the smallest page size */
-+#define CHUNK_SIZE 4096U
-+
- #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+ struct vgic_v2_cpu_if {
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..df4e527 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -177,6 +177,7 @@
+ #define GITS_CWRITER			0x0088
+ #define GITS_CREADR			0x0090
+ #define GITS_BASER			0x0100
++#define GITS_IDREGS_BASE		0xffd0
+ #define GITS_PIDR2			GICR_PIDR2
  
-+static int nr_idbits_propbase(u64 propbaser)
-+{
-+	int nr_idbits = (1U << (propbaser & 0x1f)) + 1;
-+
-+	return max(nr_idbits, INTERRUPT_ID_BITS_ITS);
-+}
-+
+ #define GITS_TRANSLATER			0x10040
+diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
+new file mode 100644
+index 0000000..659dd39
+--- /dev/null
++++ b/virt/kvm/arm/its-emul.c
+@@ -0,0 +1,125 @@
 +/*
-+ * Scan the whole LPI configuration table and put the LPI configuration
-+ * data in our own data structures. This relies on the LPI being
-+ * mapped before.
++ * GICv3 ITS emulation
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ * Author: Andre Przywara <andre.przywara@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+static bool its_update_lpis_configuration(struct kvm *kvm)
++
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/interrupt.h>
++
++#include <linux/irqchip/arm-gic-v3.h>
++#include <kvm/arm_vgic.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#include "vgic.h"
++#include "its-emul.h"
++
++static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
++				  struct kvm_exit_mmio *mmio,
++				  phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_idregs(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_cbaser(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_cwriter(struct kvm_vcpu *vcpu,
++				     struct kvm_exit_mmio *mmio,
++				     phys_addr_t offset)
++{
++	return false;
++}
++
++static bool handle_mmio_gits_creadr(struct kvm_vcpu *vcpu,
++				    struct kvm_exit_mmio *mmio,
++				    phys_addr_t offset)
++{
++	return false;
++}
++
++static const struct vgic_io_range vgicv3_its_ranges[] = {
++	{
++		.base		= GITS_CTLR,
++		.len		= 0x10,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_misc_gits,
++	},
++	{
++		.base		= GITS_CBASER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_cbaser,
++	},
++	{
++		.base		= GITS_CWRITER,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_cwriter,
++	},
++	{
++		.base		= GITS_CREADR,
++		.len		= 0x08,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_creadr,
++	},
++	{
++		/* We don't need any memory from the guest. */
++		.base		= GITS_BASER,
++		.len		= 0x40,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_raz_wi,
++	},
++	{
++		.base		= GITS_IDREGS_BASE,
++		.len		= 0x30,
++		.bits_per_irq	= 0,
++		.handle_mmio	= handle_mmio_gits_idregs,
++	},
++};
++
++/* This is called on setting the LPI enable bit in the redistributor. */
++void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++{
++}
++
++int vits_init(struct kvm *kvm)
 +{
 +	struct vgic_dist *dist = &kvm->arch.vgic;
-+	u8 *prop = dist->its.buffer_page;
-+	u32 tsize;
-+	gpa_t propbase;
-+	int lpi = GIC_LPI_OFFSET;
-+	struct its_itte *itte;
-+	struct its_device *device;
-+	int ret;
++	struct vgic_its *its = &dist->its;
 +
-+	propbase = BASER_BASE_ADDRESS(dist->propbaser);
-+	tsize = nr_idbits_propbase(dist->propbaser);
++	spin_lock_init(&its->lock);
 +
-+	while (tsize > 0) {
-+		int chunksize = min(tsize, CHUNK_SIZE);
++	its->enabled = false;
 +
-+		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
-+		if (ret)
-+			return false;
-+
-+		spin_lock(&dist->its.lock);
-+		/*
-+		 * Updating the status for all allocated LPIs. We catch
-+		 * those LPIs that get disabled. We really don't care
-+		 * about unmapped LPIs, as they need to be updated
-+		 * later manually anyway once they get mapped.
-+		 */
-+		for_each_lpi(device, itte, kvm) {
-+			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
-+				continue;
-+
-+			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
-+		}
-+		spin_unlock(&dist->its.lock);
-+		tsize -= chunksize;
-+		lpi += chunksize;
-+		propbase += chunksize;
-+	}
-+
-+	return true;
++	return -ENXIO;
 +}
-+
-+/*
-+ * Scan the whole LPI pending table and sync the pending bit in there
-+ * with our own data structures. This relies on the LPI being
-+ * mapped before.
-+ */
-+static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	unsigned long *pendmask = dist->its.buffer_page;
-+	u32 nr_lpis = VITS_NR_LPIS;
-+	gpa_t pendbase;
-+	int lpi = 0;
-+	struct its_itte *itte;
-+	struct its_device *device;
-+	int ret;
-+	int lpi_bit, nr_bits;
-+
-+	pendbase = BASER_BASE_ADDRESS(dist->pendbaser[vcpu->vcpu_id]);
-+
-+	while (nr_lpis > 0) {
-+		nr_bits = min(nr_lpis, CHUNK_SIZE * 8);
-+
-+		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
-+				     nr_bits / 8);
-+		if (ret)
-+			return false;
-+
-+		spin_lock(&dist->its.lock);
-+		for_each_lpi(device, itte, vcpu->kvm) {
-+			lpi_bit = itte->lpi - lpi;
-+			if (lpi_bit < 0 || lpi_bit >= nr_bits)
-+				continue;
-+			if (test_bit(lpi_bit, pendmask))
-+				__set_bit(vcpu->vcpu_id, itte->pending);
-+			else
-+				__clear_bit(vcpu->vcpu_id, itte->pending);
-+		}
-+		spin_unlock(&dist->its.lock);
-+		nr_lpis -= nr_bits;
-+		lpi += nr_bits;
-+		pendbase += nr_bits / 8;
-+	}
-+
-+	return true;
-+}
-+
- /* The distributor lock is held by the VGIC MMIO handler. */
- static bool handle_mmio_misc_gits(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
-@@ -389,6 +506,8 @@ static const struct vgic_io_range vgicv3_its_ranges[] = {
- /* This is called on setting the LPI enable bit in the redistributor. */
- void vgic_enable_lpis(struct kvm_vcpu *vcpu)
- {
-+	its_update_lpis_configuration(vcpu->kvm);
-+	its_sync_lpi_pending_table(vcpu);
- }
- 
- int vits_init(struct kvm *kvm)
-@@ -400,6 +519,10 @@ int vits_init(struct kvm *kvm)
- 	if (!dist->pendbaser)
- 		return -ENOMEM;
- 
-+	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-+	if (!its->buffer_page)
-+		return -ENOMEM;
-+
- 	spin_lock_init(&its->lock);
- 
- 	INIT_LIST_HEAD(&its->device_list);
-@@ -442,6 +565,7 @@ void vits_destroy(struct kvm *kvm)
- 		kfree(container_of(cur, struct its_collection, coll_list));
- 	}
- 
-+	kfree(its->buffer_page);
- 	kfree(dist->pendbaser);
- 
- 	its->enabled = false;
 diff --git a/virt/kvm/arm/its-emul.h b/virt/kvm/arm/its-emul.h
-index cc5d5ff..cbc3877 100644
---- a/virt/kvm/arm/its-emul.h
+new file mode 100644
+index 0000000..5dc8e2f
+--- /dev/null
 +++ b/virt/kvm/arm/its-emul.h
-@@ -29,6 +29,9 @@
+@@ -0,0 +1,35 @@
++/*
++ * GICv3 ITS emulation definitions
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ * Author: Andre Przywara <andre.przywara@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef __KVM_ITS_EMUL_H__
++#define __KVM_ITS_EMUL_H__
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#include "vgic.h"
++
++void vgic_enable_lpis(struct kvm_vcpu *vcpu);
++int vits_init(struct kvm *kvm);
++
++#endif
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index 5269ad1..f5865e7 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -48,6 +48,7 @@
+ #include <asm/kvm_mmu.h>
  
  #include "vgic.h"
++#include "its-emul.h"
  
-+#define INTERRUPT_ID_BITS_ITS 16
-+#define VITS_NR_LPIS (1U << INTERRUPT_ID_BITS_ITS)
+ static bool handle_mmio_rao_wi(struct kvm_vcpu *vcpu,
+ 			       struct kvm_exit_mmio *mmio, phys_addr_t offset)
+@@ -530,9 +531,20 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
+ 				    struct kvm_exit_mmio *mmio,
+ 				    phys_addr_t offset)
+ {
+-	/* since we don't support LPIs, this register is zero for now */
+-	vgic_reg_access(mmio, NULL, offset,
+-			ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	u32 reg;
 +
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
- int vits_init(struct kvm *kvm);
- void vits_destroy(struct kvm *kvm);
++	if (!vgic_has_its(vcpu->kvm)) {
++		vgic_reg_access(mmio, NULL, offset,
++				ACCESS_READ_RAZ | ACCESS_WRITE_IGNORED);
++		return false;
++	}
++	reg = dist->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
++	vgic_reg_access(mmio, &reg, offset,
++			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
++	if (!dist->lpis_enabled && (reg & GICR_CTLR_ENABLE_LPIS)) {
++		/* Eventually do something */
++	}
+ 	return false;
+ }
+ 
+@@ -861,6 +873,12 @@ static int vgic_v3_map_resources(struct kvm *kvm,
+ 		rdbase += GIC_V3_REDIST_SIZE;
+ 	}
+ 
++	if (vgic_has_its(kvm)) {
++		ret = vits_init(kvm);
++		if (ret)
++			goto out_unregister;
++	}
++
+ 	dist->redist_iodevs = iodevs;
+ 	dist->ready = true;
+ 	goto out;
 -- 
 2.3.5
