@@ -1,157 +1,114 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 10 Jul 2015 08:53:45 +0000
-Subject: [PATCH v3 2/5] PCI: designware: Add ARM64 support
-In-Reply-To: <559B4B0E.4060004@hisilicon.com>
-References: <1435743817-19083-1-git-send-email-wangzhou1@hisilicon.com>
- <1435743817-19083-3-git-send-email-wangzhou1@hisilicon.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D4E4BB@lhreml503-mbs>
- <5593F899.6050306@arm.com> <559B4B0E.4060004@hisilicon.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D568F4@lhreml503-mbs>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 10 Jul 2015 17:55:01 +0900
+Subject: [PATCH v2 6/7] ARM: Exynos: switch to using generic cpufreq driver
+ for Exynos4x12
+In-Reply-To: <1436456621-29839-7-git-send-email-b.zolnierkie@samsung.com>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <1436456621-29839-7-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <559F8865.1040608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I have just sent this patch "[PATCH] Store PCIe controllers address in struct of_pci_range".
+On 10.07.2015 00:43, Bartlomiej Zolnierkiewicz wrote:
+> The new CPU clock type allows the use of generic CPUfreq driver.
+> Switch Exynos4x12 to using generic cpufreq driver.
+> 
+> This patch also takes care of making ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> config option depend on cpufreq-dt driver instead of exynos-cpufreq
+> one and fixes the minor issue present with the old code (support
+> for 'boost' mode in the exynos-cpufreq driver was enabled for all
+> supported SoCs even though 'boost' frequency was provided only for
+> Exynos4x12 ones).
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c    | 14 ++++++++++++++
+>  drivers/cpufreq/Kconfig.arm      |  2 +-
+>  drivers/cpufreq/exynos-cpufreq.c |  3 ---
+>  3 files changed, 15 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index 4015ec3..0c74e90 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/pm_domain.h>
+>  #include <linux/irqchip.h>
+> +#include <linux/cpufreq-dt.h>
+>  
+>  #include <asm/cacheflush.h>
+>  #include <asm/hardware/cache-l2x0.h>
+> @@ -224,6 +225,12 @@ static void __init exynos_init_irq(void)
+>  	exynos_map_pmu();
+>  }
+>  
+> +struct cpufreq_dt_platform_data cpufreq_dt_pd = {
 
-It would be needed by "pcie_designware.c" to retrieve the PCI controller addresses from "win->__res.start".
+Shouldn't this be static?
 
-So we do not need to retrieve info from the DT parser anymore and we can use the new PCI DT parsing API
+> +#ifdef CONFIG_ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> +	.boost_supported = true,
+> +#endif
+> +};
+> +
+>  static const struct of_device_id exynos_cpufreq_matches[] = {
+>  	{ .compatible = "samsung,exynos4210", .data = "cpufreq-dt" },
+>  	{ .compatible = "samsung,exynos5250", .data = "cpufreq-dt" },
+> @@ -235,6 +242,13 @@ static void __init exynos_cpufreq_init(void)
+>  	struct device_node *root = of_find_node_by_path("/");
+>  	const struct of_device_id *match;
+>  
+> +	if (of_machine_is_compatible("samsung,exynos4212") ||
+> +	    of_machine_is_compatible("samsung,exynos4412")) {
+> +		platform_device_register_data(NULL, "cpufreq-dt", -1,
+> +					&cpufreq_dt_pd, sizeof(cpufreq_dt_pd));
+> +		return;
+> +	}
+> +
+>  	match = of_match_node(exynos_cpufreq_matches, root);
+>  	if (!match) {
+>  		platform_device_register_simple("exynos-cpufreq", -1, NULL, 0);
 
-This problem was already discussed in this thread:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
+Now we have two places with compatibles for matching cpufreq-dt driver.
+It is confusing especially when grepping for compatibles.
+
+Instead why not use 'data' from exynos_cpufreq_matches? Currently it
+stores the "cpufreq-dt" string which looks useless.
+
+Best regards,
+Krzysztof
 
 
-> -----Original Message-----
-> From: Wangzhou (B)
-> Sent: Tuesday, July 07, 2015 4:44 AM
-> To: James Morse
-> Cc: Gabriele Paoloni; Bjorn Helgaas; Jingoo Han; Pratyush Anand; Arnd
-> Bergmann; Liviu Dudau; kishon at ti.com; xobs at kosagi.com; m-
-> karicheri2 at ti.com; Minghuan.Lian at freescale.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth)
-> Subject: Re: [PATCH v3 2/5] PCI: designware: Add ARM64 support
-> 
-> On 2015/7/1 22:26, James Morse wrote:
-> > Zhou Wang wrote:
-> >> I tested this patch on D02 board of Hisilicon. It works well.
-> >> I have compiled the driver with multi_v7_defconfig. However, I don't
-> >> have
-> >> ARM32 PCIe related board to do test. It will be appreciated if
-> someone
-> >> could
-> >> help to test it.
-> >>
-> >> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> >> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> >> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> >> Tested-by: James Morse <james.morse@arm.com>
-> >
-> > Tests on this new series, using the same i.MX 6Quad board, are not
-> working.
-> >
-> > The network card is no longer detected, and I get a lockup when
-> removing
-> > the root bridge and rescanning.
-> >
-> > Partial dmesg output below. Significantly, the lines:
-> >> [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
-> >> [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
-> [bus
-> > 00-ff]
-> > are new.
-> >
-> > Both series are applied to v4.1, use the same .config file, and the
-> same dtb.
-> > I will investigate further.
-> >
-> > (Re-testing v2 works, so this isn't an interim hardware failure)
-> >
-> > Thanks,
-> >
-> > James
-> >
-> 
-> Hi James,
-> 
-> There are something wrong with v3 patch.
-> 
-> pp->io_mod_base = of_read_number(parser_range_end -
-> 		of_n_addr_cells(np) - 5 + na, ns);
-> pp->mem_mod_base = of_read_number(parser_range_end -
-> 		of_n_addr_cells(np) - 5 + na, ns);
-> pp->cfg0_mod_base = of_read_number(parser_range_end -
-> 		of_n_addr_cells(np) - 5 + na, ns);
-> are wrong.
-> 
-> The ranges item in your dts is:
-> ranges = <0x800 0x0 0x1f00000 0x1f00000 0x0 0x80000
-> 	  0x81000000 0x0 0x0  0x1f80000 0x0 0x10000
-> 	  0x82000000 0x0 0x1000000 0x1000000 0x0 0xf00000>;
-> parser_range_end points to the end of ranges(0xf00000) directly. In v2
-> patch,
-> of_read_number is of_read_number(parser.range - parser.np + na, ns);
-> parser.range
-> points to the end of each line in ranges item.
-> 
-> When I did test on D02 board with intel82599 card, I set ranges item as:
-> ranges = <0x03000000 0 0xb0000000 0x220 0x00000000 0 0xf000000>;
-> It is just one line. In this case, parser_range_end is same with
-> parser.range.
-> That is why it happened to work well on D02 board.
-> 
-> very sorry to bother you about this problem.
-> 
-> Thanks,
-> Zhou
-> 
-> >
-> >
-> > root at localhost:~# dmesg | grep -i pci
-> > [    0.126184] PCI: CLS 0 bytes, default 64
-> > [    0.152128] PCI host bridge /soc/pcie at 0x01000000 ranges:
-> > [    0.152142]   No bus range found for /soc/pcie at 0x01000000, using
-> [bus 00-ff]
-> > [    0.154183] imx6q-pcie 1ffc000.pcie: PCI host bridge to bus
-> 0000:00
-> > [    0.154201] pci_bus 0000:00: root bus resource [bus 00-ff]
-> > [    0.154215] pci_bus 0000:00: root bus resource [???
-> > 0x01f00000-0x01f7ffff flags 0x0]
-> > [    0.154228] pci_bus 0000:00: root bus resource [io  0x0000-0xffff]
-> > [    0.154270] pci_bus 0000:00: root bus resource [mem 0x01000000-
-> 0x01efffff]
-> > [    0.154306] pci 0000:00:00.0: [16c3:abcd] type 01 class 0x060400
-> > [    0.154333] pci 0000:00:00.0: reg 0x10: [mem 0x00000000-0x000fffff]
-> > [    0.154352] pci 0000:00:00.0: reg 0x38: [mem 0x00000000-0x0000ffff
-> pref]
-> > [    0.154377] pci 0000:00:00.0: IOMMU is currently not supported for
-> PCI
-> > [    0.154429] pci 0000:00:00.0: supports D1
-> > [    0.154440] pci 0000:00:00.0: PME# supported from D0 D1 D3hot
-> D3cold
-> > [    0.154683] PCI: bus0: Fast back to back transfers disabled
-> > [    0.154806] PCI: bus1: Fast back to back transfers enabled
-> > [    0.154884] pci 0000:00:00.0: BAR 0: assigned [mem 0x01000000-
-> 0x010fffff]
-> > [    0.154903] pci 0000:00:00.0: BAR 6: assigned [mem 0x01100000-
-> 0x0110ffff
-> > pref]
-> > [    0.154917] pci 0000:00:00.0: PCI bridge to [bus 01]
-> > [    0.155145] pcieport 0000:00:00.0: Signaling PME through PCIe PME
-> interrupt
-> > [    0.155161] pcie_pme 0000:00:00.0:pcie01: service driver pcie_pme
-> loaded
-> > [    0.155279] aer 0000:00:00.0:pcie02: service driver aer loaded
-> > [    1.188840] ehci-pci: EHCI PCI platform driver
-> > [    1.232518] ohci-pci: OHCI PCI platform driver
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> > .
-> >
+> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+> index 9ab6388c1..5f5a15a 100644
+> --- a/drivers/cpufreq/Kconfig.arm
+> +++ b/drivers/cpufreq/Kconfig.arm
+> @@ -49,7 +49,7 @@ config ARM_EXYNOS4X12_CPUFREQ
+>  
+>  config ARM_EXYNOS_CPU_FREQ_BOOST_SW
+>  	bool "EXYNOS Frequency Overclocking - Software"
+> -	depends on ARM_EXYNOS_CPUFREQ && THERMAL
+> +	depends on CPUFREQ_DT && THERMAL
+>  	select CPU_FREQ_BOOST_SW
+>  	select EXYNOS_THERMAL
+>  	help
+> diff --git a/drivers/cpufreq/exynos-cpufreq.c b/drivers/cpufreq/exynos-cpufreq.c
+> index 71d8891..89d252e 100644
+> --- a/drivers/cpufreq/exynos-cpufreq.c
+> +++ b/drivers/cpufreq/exynos-cpufreq.c
+> @@ -150,9 +150,6 @@ static struct cpufreq_driver exynos_driver = {
+>  	.init		= exynos_cpufreq_cpu_init,
+>  	.name		= "exynos_cpufreq",
+>  	.attr		= cpufreq_generic_attr,
+> -#ifdef CONFIG_ARM_EXYNOS_CPU_FREQ_BOOST_SW
+> -	.boost_supported = true,
+> -#endif
+>  #ifdef CONFIG_PM
+>  	.suspend	= cpufreq_generic_suspend,
+>  #endif
 > 
