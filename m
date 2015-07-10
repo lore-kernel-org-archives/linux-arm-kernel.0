@@ -1,98 +1,48 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Fri, 10 Jul 2015 15:59:11 +0800
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <20150710065440.GY28632@lukather>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
- <20150709120335.GW28632@lukather> <559F36CC.7020203@atmel.com>
- <20150710065440.GY28632@lukather>
-Message-ID: <559F7B4F.9010307@atmel.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Fri, 10 Jul 2015 13:35:42 +0530
+Subject: [PATCH linux-next v2 1/1] dmaengine: at_hdmac: fix residue
+ computation
+In-Reply-To: <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+References: <cover.1434626239.git.cyrille.pitchen@atmel.com>
+ <b9630cef4224b93939138b3a8c1950ea44cbcf59.1434626239.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150710080542.GD836@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/10/2015 2:54 PM, Maxime Ripard wrote:
-> On Fri, Jul 10, 2015 at 11:06:52AM +0800, Josh Wu wrote:
->> Hi, Maxime
->>
->> On 7/9/2015 8:03 PM, Maxime Ripard wrote:
->>> Hi,
->>>
->>> On Thu, Jul 09, 2015 at 06:15:46PM +0800, Josh Wu wrote:
->>>> As since sama5d3, to reset the chip, we don't need to shutdown the ddr
->>>> controller.
->>>>
->>>> So add a new compatible string and new restart function for sama5d3 and
->>>> later chips. As we don't use sama5d3 ddr controller, so remove it as
->>>> well.
->>>>
->>>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>> ---
->>>>
->>>>   drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
->>>>   1 file changed, 21 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
->>>> index 36dc52f..8944b63 100644
->>>> --- a/drivers/power/reset/at91-reset.c
->>>> +++ b/drivers/power/reset/at91-reset.c
->>>> @@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
->>>>   	return NOTIFY_DONE;
->>>>   }
->>>> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
->>>> +			void *cmd)
->>>> +{
->>>> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
->>>> +				at91_rstc_base);
->>>> +	return NOTIFY_DONE;
->>>> +}
->>>> +
->>>>   static void __init at91_reset_status(struct platform_device *pdev)
->>>>   {
->>>>   	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
->>>> @@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
->>>>   static const struct of_device_id at91_ramc_of_match[] = {
->>>>   	{ .compatible = "atmel,at91sam9260-sdramc", },
->>>>   	{ .compatible = "atmel,at91sam9g45-ddramc", },
->>>> -	{ .compatible = "atmel,sama5d3-ddramc", },
->>>>   	{ /* sentinel */ }
->>>>   };
->>>>   static const struct of_device_id at91_reset_of_match[] = {
->>>>   	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
->>>>   	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
->>>> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
->>>>   	{ /* sentinel */ }
->>>>   };
->>>> @@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
->>>>   		return -ENODEV;
->>>>   	}
->>>> -	for_each_matching_node(np, at91_ramc_of_match) {
->>>> -		at91_ramc_base[idx] = of_iomap(np, 0);
->>>> -		if (!at91_ramc_base[idx]) {
->>>> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
->>>> -			return -ENODEV;
->>>> +	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
->>>> +	at91_restart_nb.notifier_call = match->data;
->>>> +
->>>> +	if (match->data != sama5d3_restart) {
->>> Using of_device_is_compatible seems more appropriate.
->>>
->>> Also, why are you changing the order of this loop and the notifier
->>> registration?
->> I moved this order because I use the match->data to compare whether is
->> sama5d3_restart. So I need to move this function (of_match_node) up.
-> Ah right, my bad.
->
-> Still, testing against the kernel pointer is not that great.
->
-> It would be great to use something explicit instead, like
-> of_device_is_compatible.
+On Thu, Jun 18, 2015 at 01:25:41PM +0200, Cyrille Pitchen wrote:
+> As claimed by the programmer datasheet and confirmed by the IP designer,
+> the Block Transfer Size (BTSIZE) bitfield of the Channel x Control A
+> Register (CTRLAx) always refers to a number of Source Width (SRC_WIDTH)
+> transfers.
+> 
+> Both the SRC_WIDTH and BTSIZE bitfields can be extacted from the CTRLAx
+> register to compute the DMA residue. So the 'tx_width' field is useless
+> and can be removed from the struct at_desc.
+> 
+> Before this patch, atc_prep_slave_sg() was not consistent: BTSIZE was
+> correctly initialized according to the SRC_WIDTH but 'tx_width' was always
+> set to reg_width, which was incorrect for MEM_TO_DEV transfers. It led to
+> bad DMA residue when 'tx_width' != SRC_WIDTH.
+> 
+> Also the 'tx_width' field was mostly set only in the first and last
+> descriptors. Depending on the kind of DMA transfer, this field remained
+> uninitialized for intermediate descriptors. The accurate DMA residue was
+> computed only when the currently processed descriptor was the first or the
+> last of the chain. This algorithm was a little bit odd. An accurate DMA
+> residue can always be computed using the SRC_WIDTH and BTSIZE bitfields
+> in the CTRLAx register.
+> 
+> Finally, the test to check whether the currently processed descriptor is
+> the last of the chain was wrong: for cyclic transfer, last_desc->lli.dscr
+> is NOT equal to zero, since set_desc_eol() is never called, but logically
+> equal to first_desc->txd.phys. This bug has a side effect on the
+> drivers/tty/serial/atmel_serial.c driver, which uses cyclic DMA transfer
+> to receive data. Since the DMA residue was wrong each time the DMA
+> transfer reaches the second (and last) period of the transfer, no more
+> data were received by the USART driver till the cyclic DMA transfer loops
+> back to the first period.
+> 
+Applied, thanks
 
-I agree. I will use of_device_is_compatible() in v2. And that can avoid 
-the order change in the loop as well. Thanks.
-
-Best Regards,
-Josh Wu
-
->
-> Maxime
->
+-- 
+~Vinod
