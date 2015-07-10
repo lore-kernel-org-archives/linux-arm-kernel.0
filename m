@@ -1,57 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 10 Jul 2015 10:48:26 +0200
-Subject: Gemini Soc timers
-In-Reply-To: <975d474dd947bcef8d3dd70ef18a5c29@advem.lv>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <2131951.l0j0CIttAZ@wuerfel>
- <f22e65faa7d86074cda27973f83d7a52@advem.lv>
- <1781580.JRD7b0UrJA@wuerfel>
- <alpine.LNX.2.00.1507091343150.24357@localhost>
- <5e6214ee669fbd797ad2ef257ce52068@advem.lv>
- <CACRpkdYm-W8FqBgvustJUweizocmX9LtVS6Q=7j8EjF8D+H77Q@mail.gmail.com>
- <975d474dd947bcef8d3dd70ef18a5c29@advem.lv>
-Message-ID: <CACRpkdbf2CfT7fJ6wAC3WB9=-Cp0A5xZAO1-Rh78o-U26Fr0Ag@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 10 Jul 2015 16:53:24 +0800
+Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample
+ time
+In-Reply-To: <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
+References: <cover.1435134626.git.maitysanchayan@gmail.com>
+ <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
+Message-ID: <20150710085324.GL23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 9, 2015 at 6:48 PM, Roman Yeryomin <roman@advem.lv> wrote:
-> [Me]
->> As usual they are just keeping it out of mainline, and this
->> is adding sched_clock() and other goodies so should
->> probably be upstreamed ASAP.
->
->
-> This is what I initially submitted here.
+On Wed, Jun 24, 2015 at 02:03:41PM +0530, Sanchayan Maity wrote:
+> Add a device tree property which allows to specify the minimum sample
+> time which can be used to calculate the actual ADC cycles required
+> depending on the hardware.
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 90a03d5..71d9c08 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -229,6 +229,7 @@
+>  				status = "disabled";
+>  				fsl,adck-max-frequency = <30000000>, <40000000>,
+>  							<20000000>;
+> +				min-sample-time = <1000>;
+>  			};
+>  
+>  			wdoga5: wdog at 4003e000 {
+> @@ -447,6 +448,7 @@
+>  				status = "disabled";
+>  				fsl,adck-max-frequency = <30000000>, <40000000>,
+>  							<20000000>;
+> +				min-sample-time = <1000>;
 
-Ah. I missed part of the start of the discussion it seems.
+Can we code 1000 as the default in kernel driver, so that only boards
+requiring different value need to have this property?  Doing so makes
+the property optional rather than required.
 
-> But Arnd wanted to see a smaller patch which only fixes gemini timer issue
-> (t.i. shed clock being 100Hz instead of 25MHz).
-> Also I've submitted 4.1 support yesterday, but patches didn't change much
-> comparing to 3.18
+Shawn
 
-On the other hand I think the bigger patch is OK actually.
-
-I rewrote the timer support some time back and did not get
-anyone to test it properly at the time, so the patch went in
-untested. So this is a fix.
-
-I think this should be applied as-is since you can actually
-test the whole thing on real hardware, and also add:
-
-Fixes: f3372c01816e "ARM: gemini: convert to GENERIC_CLOCKEVENTS"
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-
-> I would love to see all those patches/drivers in mainline - tell me where do
-> I submit all that :)
-
-I recently looked at some of the patch stacks in OpenWRT and
-get a bit sad that the stuff did not go upstream, so I am ready
-to help in any way I can.
-
-Anything GPIO related I am ready to help in reviewing/applying
-and I will also help out with ARM32 if I can. Sadly I do not have
-a Gemini system.
-
-Yours,
-Linus Walleij
+>  			};
+>  
+>  			esdhc1: esdhc at 400b2000 {
+> -- 
+> 2.4.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
