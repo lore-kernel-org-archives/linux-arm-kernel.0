@@ -1,301 +1,76 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 17:35:34 +0900
-Subject: [PATCH v2 5/7] ARM: dts: Exynos4x12: add CPU OPP and regulator
- supply property
-In-Reply-To: <1436456621-29839-6-git-send-email-b.zolnierkie@samsung.com>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-6-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <559F83D6.8040409@samsung.com>
+From: rsahu@apm.com (Rameshwar Sahu)
+Date: Fri, 10 Jul 2015 14:06:48 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix the resource map to handle
+ overlapping
+In-Reply-To: <1436263465-7677-1-git-send-email-rsahu@apm.com>
+References: <1436263465-7677-1-git-send-email-rsahu@apm.com>
+Message-ID: <CAFd313y1YKrrrMrCLTJGNd7PWqoopLQ5aXEcxygVq1WTPJR=-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.07.2015 00:43, Bartlomiej Zolnierkiewicz wrote:
-> For Exynos4x12 platforms, add CPU operating points (using
-> opp-v2 bindings) and CPU regulator supply properties for
-> migrating from Exynos specific cpufreq driver to using
-> generic cpufreq driver.
-> 
-> Based on the earlier work by Thomas Abraham.
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+Hi Vinod,
+
+On Tue, Jul 7, 2015 at 3:34 PM, Rameshwar Prasad Sahu <rsahu@apm.com> wrote:
+> There is an overlap in dma ring cmd csr region due to sharing of ethernet
+> ring cmd csr region. This patch fix the resource overlapping by mapping
+> the entire dma ring cmd csr region.
+>
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 > ---
->  arch/arm/boot/dts/exynos4212.dtsi               | 81 ++++++++++++++++++++++++
->  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 ++
->  arch/arm/boot/dts/exynos4412-origen.dts         |  5 ++
->  arch/arm/boot/dts/exynos4412-trats2.dts         |  5 ++
->  arch/arm/boot/dts/exynos4412.dtsi               | 83 +++++++++++++++++++++++++
->  5 files changed, 178 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-> index d9c8efee..9dc40d5 100644
-> --- a/arch/arm/boot/dts/exynos4212.dtsi
-> +++ b/arch/arm/boot/dts/exynos4212.dtsi
-> @@ -30,6 +30,9 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA00>;
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +			operating-points-v2 = <&cpu0_opp_table>;
->  			cooling-min-level = <13>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> @@ -39,6 +42,84 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA01>;
-> +			operating-points-v2 = <&cpu0_opp_table>;
-> +		};
-> +	};
+>  Documentation/devicetree/bindings/dma/apm-xgene-dma.txt | 2 +-
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi                  | 2 +-
+>  drivers/dma/xgene-dma.c                                 | 3 +++
+>  3 files changed, 5 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+> index d305876..c53e0b0 100644
+> --- a/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/apm-xgene-dma.txt
+> @@ -35,7 +35,7 @@ Example:
+>                         device_type = "dma";
+>                         reg = <0x0 0x1f270000 0x0 0x10000>,
+>                               <0x0 0x1f200000 0x0 0x10000>,
+> -                             <0x0 0x1b008000 0x0 0x2000>,
+> +                             <0x0 0x1b000000 0x0 0x400000>,
+>                               <0x0 0x1054a000 0x0 0x100>;
+>                         interrupts = <0x0 0x82 0x4>,
+>                                      <0x0 0xb8 0x4>,
+> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> index 0689c3f..58093ed 100644
+> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+> @@ -823,7 +823,7 @@
+>                         device_type = "dma";
+>                         reg = <0x0 0x1f270000 0x0 0x10000>,
+>                               <0x0 0x1f200000 0x0 0x10000>,
+> -                             <0x0 0x1b008000 0x0 0x2000>,
+> +                             <0x0 0x1b000000 0x0 0x400000>,
+>                               <0x0 0x1054a000 0x0 0x100>;
+>                         interrupts = <0x0 0x82 0x4>,
+>                                      <0x0 0xb8 0x4>,
+> diff --git a/drivers/dma/xgene-dma.c b/drivers/dma/xgene-dma.c
+> index 620fd55ec..dff22ab 100644
+> --- a/drivers/dma/xgene-dma.c
+> +++ b/drivers/dma/xgene-dma.c
+> @@ -111,6 +111,7 @@
+>  #define XGENE_DMA_MEM_RAM_SHUTDOWN             0xD070
+>  #define XGENE_DMA_BLK_MEM_RDY                  0xD074
+>  #define XGENE_DMA_BLK_MEM_RDY_VAL              0xFFFFFFFF
+> +#define XGENE_DMA_RING_CMD_SM_OFFSET           0x8000
+>
+>  /* X-Gene SoC EFUSE csr register and bit defination */
+>  #define XGENE_SOC_JTAG1_SHADOW                 0x18
+> @@ -1887,6 +1888,8 @@ static int xgene_dma_get_resources(struct platform_device *pdev,
+>                 return -ENOMEM;
+>         }
+>
+> +       pdma->csr_ring_cmd += XGENE_DMA_RING_CMD_SM_OFFSET;
 > +
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp00 {
-> +			opp-hz = <200000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp01 {
-> +			opp-hz = <300000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp02 {
-> +			opp-hz = <400000000>;
-> +			opp-microvolt = <925000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp03 {
-> +			opp-hz = <500000000>;
-> +			opp-microvolt = <950000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp04 {
-> +			opp-hz = <600000000>;
-> +			opp-microvolt = <975000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp05 {
-> +			opp-hz = <700000000>;
-> +			opp-microvolt = <987500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp06 {
-> +			opp-hz = <800000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp07 {
-> +			opp-hz = <900000000>;
-> +			opp-microvolt = <1037500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp08 {
-> +			opp-hz = <1000000000>;
-> +			opp-microvolt = <1087500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp09 {
-> +			opp-hz = <1100000000>;
-> +			opp-microvolt = <1137500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp10 {
-> +			opp-hz = <1200000000>;
-> +			opp-microvolt = <1187500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp11 {
-> +			opp-hz = <1300000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp12 {
-> +			opp-hz = <1400000000>;
-> +			opp-microvolt = <1287500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp13 {
-> +			opp-hz = <1500000000>;
-> +			opp-microvolt = <1350000>;
-> +			clock-latency-ns = <200000>;
-> +			turbo-mode;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> index ca7d168..1c7811a 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
-> @@ -507,3 +507,7 @@
->  &watchdog {
->  	status = "okay";
->  };
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
+>         /* Get efuse csr region */
+>         res = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+>         if (!res) {
+> --
+> 1.8.2.1
+>
 
-Can you put this in alphabetical order (before ehci node)?
-
-> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
-> index 84c7631..21150b4 100644
-> --- a/arch/arm/boot/dts/exynos4412-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
-> @@ -532,3 +532,8 @@
->  &watchdog {
->  	status = "okay";
->  };
-> +
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-
-Ditto
-
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index afc199d..1ee43456 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -1313,3 +1313,8 @@
->  	vtmu-supply = <&ldo10_reg>;
->  	status = "okay";
->  };
-> +
-> +
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-
-The same.
-
-Rest looks fine, so with the re-ordering:
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
-
-
-> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-> index b78ada7..cead3a7 100644
-> --- a/arch/arm/boot/dts/exynos4412.dtsi
-> +++ b/arch/arm/boot/dts/exynos4412.dtsi
-> @@ -30,6 +30,9 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA00>;
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +			operating-points-v2 = <&cpu0_opp_table>;
->  			cooling-min-level = <13>;
->  			cooling-max-level = <7>;
->  			#cooling-cells = <2>; /* min followed by max */
-> @@ -39,18 +42,98 @@
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA01>;
-> +			operating-points-v2 = <&cpu0_opp_table>;
->  		};
->  
->  		cpu at A02 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA02>;
-> +			operating-points-v2 = <&cpu0_opp_table>;
->  		};
->  
->  		cpu at A03 {
->  			device_type = "cpu";
->  			compatible = "arm,cortex-a9";
->  			reg = <0xA03>;
-> +			operating-points-v2 = <&cpu0_opp_table>;
-> +		};
-> +	};
-> +
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +		opp-shared;
-> +
-> +		opp00 {
-> +			opp-hz = <200000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp01 {
-> +			opp-hz = <300000000>;
-> +			opp-microvolt = <900000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp02 {
-> +			opp-hz = <400000000>;
-> +			opp-microvolt = <925000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp03 {
-> +			opp-hz = <500000000>;
-> +			opp-microvolt = <950000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp04 {
-> +			opp-hz = <600000000>;
-> +			opp-microvolt = <975000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp05 {
-> +			opp-hz = <700000000>;
-> +			opp-microvolt = <987500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp06 {
-> +			opp-hz = <800000000>;
-> +			opp-microvolt = <1000000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp07 {
-> +			opp-hz = <900000000>;
-> +			opp-microvolt = <1037500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp08 {
-> +			opp-hz = <1000000000>;
-> +			opp-microvolt = <1087500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp09 {
-> +			opp-hz = <1100000000>;
-> +			opp-microvolt = <1137500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp10 {
-> +			opp-hz = <1200000000>;
-> +			opp-microvolt = <1187500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp11 {
-> +			opp-hz = <1300000000>;
-> +			opp-microvolt = <1250000>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp12 {
-> +			opp-hz = <1400000000>;
-> +			opp-microvolt = <1287500>;
-> +			clock-latency-ns = <200000>;
-> +		};
-> +		opp13 {
-> +			opp-hz = <1500000000>;
-> +			opp-microvolt = <1350000>;
-> +			clock-latency-ns = <200000>;
-> +			turbo-mode;
->  		};
->  	};
->  
-> 
+Any comments on above patch ?
