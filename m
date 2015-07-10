@@ -1,100 +1,86 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 10 Jul 2015 20:19:35 +0100
-Subject: [PATCH v3 4/4] arm64: Hook up IOMMU dma_ops
+Date: Fri, 10 Jul 2015 20:19:32 +0100
+Subject: [PATCH v3 1/4] iommu/iova: Avoid over-allocating when size-aligned
 In-Reply-To: <cover.1436552949.git.robin.murphy@arm.com>
 References: <cover.1436552949.git.robin.murphy@arm.com>
-Message-ID: <4ff852dce576fe3ad536165bfa8fe70aef346460.1436552949.git.robin.murphy@arm.com>
+Message-ID: <35cb877828b570db84e89684ef76308cd1857f0c.1436552949.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With iommu_dma_ops in place, hook them up to the configuration code, so
-IOMMU-fronted devices will get them automatically.
+Currently, allocating a size-aligned IOVA region quietly adjusts the
+actual allocation size in the process, returning a rounded-up
+power-of-two-sized allocation. This results in mismatched behaviour in
+the IOMMU driver if the original size was not a power of two, where the
+original size is mapped, but the rounded-up IOVA size is unmapped.
 
+Whilst some IOMMUs will happily unmap already-unmapped pages, others
+consider this an error, so fix it by computing the necessary alignment
+padding without altering the actual allocation size. Also clean up by
+making pad_size unsigned, since its callers always pass unsigned values
+and negative padding makes little sense here anyway.
+
+CC: David Woodhouse <dwmw2@infradead.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/Kconfig                   |  1 +
- arch/arm64/include/asm/dma-mapping.h | 15 +++++++--------
- arch/arm64/mm/dma-mapping.c          | 24 ++++++++++++++++++++++++
- 3 files changed, 32 insertions(+), 8 deletions(-)
+ drivers/iommu/intel-iommu.c |  2 ++
+ drivers/iommu/iova.c        | 23 ++++++-----------------
+ 2 files changed, 8 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f6edb1..3509621 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -72,6 +72,7 @@ config ARM64
- 	select HAVE_PERF_USER_STACK_DUMP
- 	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
-+	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select IRQ_FORCED_THREADING
- 	select MODULES_USE_ELF_RELA
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index f0d6d0b..7f9edcb 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -56,16 +56,15 @@ static inline struct dma_map_ops *get_dma_ops(struct device *dev)
- 		return __generic_dma_ops(dev);
+diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
+index a98a7b2..9210159 100644
+--- a/drivers/iommu/intel-iommu.c
++++ b/drivers/iommu/intel-iommu.c
+@@ -3233,6 +3233,8 @@ static struct iova *intel_alloc_iova(struct device *dev,
+ 
+ 	/* Restrict dma_mask to the width that the iommu can handle */
+ 	dma_mask = min_t(uint64_t, DOMAIN_MAX_ADDR(domain->gaw), dma_mask);
++	/* Ensure we reserve the whole size-aligned region */
++	nrpages = __roundup_pow_of_two(nrpages);
+ 
+ 	if (!dmar_forcedac && dma_mask > DMA_BIT_MASK(32)) {
+ 		/*
+diff --git a/drivers/iommu/iova.c b/drivers/iommu/iova.c
+index b7c3d92..29f2efc 100644
+--- a/drivers/iommu/iova.c
++++ b/drivers/iommu/iova.c
+@@ -120,19 +120,14 @@ __cached_rbnode_delete_update(struct iova_domain *iovad, struct iova *free)
+ 	}
  }
  
--static inline void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
--				      struct iommu_ops *iommu, bool coherent)
--{
--	if (!acpi_disabled && !dev->archdata.dma_ops)
--		dev->archdata.dma_ops = dma_ops;
--
--	dev->archdata.dma_coherent = coherent;
--}
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			struct iommu_ops *iommu, bool coherent);
- #define arch_setup_dma_ops	arch_setup_dma_ops
- 
-+#ifdef CONFIG_IOMMU_DMA
-+void arch_teardown_dma_ops(struct device *dev);
-+#define arch_teardown_dma_ops	arch_teardown_dma_ops
-+#endif
-+
- /* do not use this function in a driver */
- static inline bool is_device_dma_coherent(struct device *dev)
+-/* Computes the padding size required, to make the
+- * the start address naturally aligned on its size
++/*
++ * Computes the padding size required, to make the start address
++ * naturally aligned on the power-of-two order of its size
+  */
+-static int
+-iova_get_pad_size(int size, unsigned int limit_pfn)
++static unsigned int
++iova_get_pad_size(unsigned int size, unsigned int limit_pfn)
  {
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index ccadfd4..1e6085a 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -942,6 +942,20 @@ out_no_domain:
- 	pr_warn("Failed to set up IOMMU domain for device %s\n", dev_name(dev));
+-	unsigned int pad_size = 0;
+-	unsigned int order = ilog2(size);
+-
+-	if (order)
+-		pad_size = (limit_pfn + 1) % (1 << order);
+-
+-	return pad_size;
++	return (limit_pfn + 1 - size) & (__roundup_pow_of_two(size) - 1);
  }
  
-+void arch_teardown_dma_ops(struct device *dev)
-+{
-+	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-+
-+	if (domain) {
-+		iommu_detach_device(domain, dev);
-+		if (domain->type & __IOMMU_DOMAIN_ARM64_IOVA)
-+			iommu_put_dma_cookie(domain);
-+		if (domain->type & __IOMMU_DOMAIN_ARM64)
-+			iommu_domain_free(domain);
-+		dev->archdata.dma_ops = NULL;
-+	}
-+}
-+
- #else
+ static int __alloc_and_insert_iova_range(struct iova_domain *iovad,
+@@ -265,12 +260,6 @@ alloc_iova(struct iova_domain *iovad, unsigned long size,
+ 	if (!new_iova)
+ 		return NULL;
  
- static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-@@ -949,3 +963,13 @@ static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- { }
+-	/* If size aligned is set then round the size to
+-	 * to next power of two.
+-	 */
+-	if (size_aligned)
+-		size = __roundup_pow_of_two(size);
+-
+ 	ret = __alloc_and_insert_iova_range(iovad, size, limit_pfn,
+ 			new_iova, size_aligned);
  
- #endif  /* CONFIG_IOMMU_DMA */
-+
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			struct iommu_ops *iommu, bool coherent)
-+{
-+	if (!acpi_disabled && !dev->archdata.dma_ops)
-+		dev->archdata.dma_ops = dma_ops;
-+
-+	dev->archdata.dma_coherent = coherent;
-+	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
-+}
 -- 
 1.9.1
