@@ -1,43 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 10 Jul 2015 14:46:20 +0200
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <20150710123148.GA28632@lukather>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
- <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
- <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
-Message-ID: <20150710124620.GD3127@piout.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Jul 2015 13:54:48 +0100
+Subject: [RFC Patch V1 00/12] Reorganize struct msi_desc to prepare for
+ support of generic MSI
+In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <559FC098.6080606@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2015 at 14:31:48 +0200, Maxime Ripard wrote :
-> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
-> > Hi,
-> > 
-> > On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
-> > > I would agree with Maxime. Currently all latest chip reset function is
-> > > compatible with the atmel,sama5d3-rstc.
-> > > So check compatible string is enough for now.
-> > > But of cause if we have other incompatible reset in future with new chip,
-> > > the structure like you said is needed.
-> > 
-> > We managed to avoid using of_machine_is_compatible() in all the at91
-> > drivers. I'd like to keep it that way. It was painful enough to remove
-> > all those cpu_is_at91xxx calls.
-> 
-> That's your call...
-> 
-> > Also, using it is trying to match strings and will result in longer boot
-> > times.
-> 
-> Have you looked at the implementation of of_match_device? If that's
-> really a concern to you, you should actually avoid it.
-> 
+Hi Gerry,
 
-Indeed, I misread. of_device_is_compatible is acceptable,
-of_machine_is_compatible is not :)
+On 09/07/15 09:00, Jiang Liu wrote:
+> Recently Marc Zyngier <marc.zyngier@arm.com> has posted a patch set at
+> https://lkml.org/lkml/2015/7/7/712
+> to enhance PCI MSI code to support generic MSI.
+> 
+> This is a companion patch set to refine struct msi_desc and related data
+> structures to support generic MSI, and it would be better to combined with
+> Marc's patch set.  It's also requested by
+> Stuart Yoder <stuart.yoder@freescale.com>
+> 
+> It first introduces a helper function msi_desc_to_pci_sysdata(), and
+> convert current PCI drivers to use helper functions to access fields
+> in struct msi_desc.
+> Then it moves msi_list from struct pci_dev into struct device and
+> refines struct msi_desc.
+> At last it moves alloc_msi_entry() into kernel/irq/msi.c for reuse.
+> 
+> Currently msi_desc_to_pci_sysdata() and msi_desc_to_pci_dev() are
+> implemented as normal functions instead of inlines to avoid header file
+> inclusion issue. If inlined version is preferred for performance, we could
+> move all of first_pci_msi_entry, for_each_pci_msi_entry, msi_desc_to_pci_dev
+> and msi_desc_to_pci_sysdata from linxu/kernel/msi.h into linux/kernel/pci.h.
+> 
+> This patch set is based on v4.2-rc1 and passes 0day test suite. You
+> may access the code at:
+> https://github.com/jiangliu/linux.git msi_desc_v1
 
+Thanks a lot for doing this, it looks much helpful. I have a good look
+at it, and apart from a small nit I commented on, I'm very happy with
+this move.
 
+For the whole set:
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Thanks,
+
+	M.
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Jazz is not dead. It just smells funny...
