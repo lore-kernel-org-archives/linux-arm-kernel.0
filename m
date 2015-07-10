@@ -1,54 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:13 +0900
-Subject: [PATCH 05/11] ARM: shmobile: armadillo800eva dts: Add pinctrl and
- gpio-hog for lcdc0
+Date: Fri, 10 Jul 2015 15:37:16 +0900
+Subject: [PATCH 08/11] ARM: shmobile: r8a7791 dtsi: Use "arm,gic-400" for GIC
 In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
 References: <cover.1436509954.git.horms+renesas@verge.net.au>
-Message-ID: <ffd2f9a5afb730b9f6c1d1938934213c3cfcf249.1436509954.git.horms+renesas@verge.net.au>
+Message-ID: <d238b5e628c98c39fe669610e6ab8e06a6f00b5b.1436509954.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Configure pinctrl and a GPIO-controller board mux for LCD use.
-This allows the armadillo800eva board staging code to enable lcdc0.
+Replace the "arm,cortex-a15-gic" compatible value for the GIC by
+"arm,gic-400", as the R-Car Gen2 GIC is assumed to be a GIC-400.
+This has been confirmed by reading the GICD_IIDR register, which reports
+0x0200043b (GIC-400 = 0x02, ARM = 0x43b).
+
+This has no effect on runtime behavior, as currently the GIC driver
+treats both compatible values the same.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 2e31d8c01cbf..105d9c95de4a 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -224,6 +224,9 @@
- };
- 
- &pfc {
-+	pinctrl-0 = <&lcd0_pins>;
-+	pinctrl-names = "default";
-+
- 	ether_pins: ether {
- 		renesas,groups = "gether_mii", "gether_int";
- 		renesas,function = "gether";
-@@ -259,6 +262,16 @@
- 				 "fsia_data_in_1", "fsia_data_out_0";
- 		renesas,function = "fsia";
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index dc1cd3f16606..07ea2bebe496 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -70,7 +70,7 @@
  	};
-+
-+	lcd0_pins: lcd0 {
-+		renesas,groups = "lcd0_data24_0", "lcd0_lclk_1", "lcd0_sync";
-+		renesas,function = "lcd0";
-+
-+		/* DBGMD/LCDC0/FSIA MUX */
-+		gpio-hog;
-+		gpios = <176 0>;
-+		output-high;
-+	};
- };
  
- &tpu {
+ 	gic: interrupt-controller at f1001000 {
+-		compatible = "arm,cortex-a15-gic";
++		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+ 		#address-cells = <0>;
+ 		interrupt-controller;
 -- 
 2.1.4
