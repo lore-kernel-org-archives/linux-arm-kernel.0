@@ -1,63 +1,44 @@
-From: vthakkar1994@gmail.com (Vaishali Thakkar)
-Date: Fri, 10 Jul 2015 21:21:24 +0530
-Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
-In-Reply-To: <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
-References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
- <1436473148.20619.116.camel@tiscali.nl>
- <CAK-LDb+HSbM2zV8WxipLb8v7g+eL=5vMHcKGttEOdnCjSXSwPA@mail.gmail.com>
- <1436518813.20619.134.camel@tiscali.nl>
- <CAK-LDb+Yg+wQJ_bM3Usc=hoK-jDOxHy5AsUOAbmg+-dVnOM4KA@mail.gmail.com>
- <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
-Message-ID: <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 10 Jul 2015 17:58:02 +0200
+Subject: [PATCH v3 5/5] arm64: dts: mt8173: Add subsystem clock controller
+ device nodes
+In-Reply-To: <CAGS+omC7274iPDdfXpKuM0HvCcEscUE5e5jrDH4DhW4j_Ykt2A@mail.gmail.com>
+References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1436522405-13923-6-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omC7274iPDdfXpKuM0HvCcEscUE5e5jrDH4DhW4j_Ykt2A@mail.gmail.com>
+Message-ID: <CABuKBe+oLmRRHZKnBsfU8icf2r2f3+XrPNMVw_QaGPE9vVxGFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 8:00 PM, Mathieu Poirier
-<mathieu.poirier@linaro.org> wrote:
-> On 10 July 2015 at 05:47, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
->> On Fri, Jul 10, 2015 at 2:30 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
->>> On vr, 2015-07-10 at 08:53 +0530, Vaishali Thakkar wrote:
->>>> I thought about this solution before sending this patch. But I was not
->>>> sure about it. Thanks for the explanation. I will send v3 with this
->>>> change.
->>>>
->>>> Can I add Suggested By: Paul Bolle <pebolle@tiscali.nl>
->>>
->>> That should be "Suggested-by:". The net effect would be that, if my
->>> suggestion turns out to be unwise, fan mail will also hit my INBOX,
->>> right? Anyhow, fine with me.
->>
->> Ok. Thanks.
->>
->>> By the way, there's more module specific stuff in
->>> drivers/hwtracing/coresight/. And there's no tristate symbol to be found
->>> in its Kconfig file. So I'd guess there are a few other cleanups
->>> possible too, if someone cared enough to have a closer look at that.
->>>
->>
->> Yes. It seems that introducing something like builtin_amba_driver()
->> can be useful for files which are using module_amba_driver now . But I'm
->> not sure if Mathieu is ok with it or not? If it seems useful to him, then I
->> can go for it.
+2015-07-10 17:02 GMT+02:00 Daniel Kurtz <djkurtz@chromium.org>:
 >
-> The ETB drivers could use a "module_amba_driver()"...
-
-Why? Is there any specific reason behind this?
-How about other drivers?? Will it be beneficial to introduce
-builtin_amba_driver() for the others?
-
-Thank You.
-
+> On Jul 10, 2015 18:00, "James Liao" <jamesjj.liao@mediatek.com> wrote:
 >>
->>>
->>> Paul Bolle
+>> This patch adds device nodes providing subsystem clocks on MT8173,
+>> includes mmsys, imgsys, vdecsys, vencsys and vencltsys.
 >>
+>> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 30
+>> ++++++++++++++++++++++++++++++
+>>  1 file changed, 30 insertions(+)
 >>
->>
->> --
->> Vaishali
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index a2f63e4..9d74ce5 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -227,6 +227,36 @@
+>>                         clocks = <&uart_clk>;
+>>                         status = "disabled";
+>>                 };
+>> +
+>> +               mmsys: mmsys at 14000000 {
+>
+> I think we agreed previously that these should all be clock-controller at .
+>
 
+I did understand the same.
+Please change that.
 
-
--- 
-Vaishali
+Thanks.
