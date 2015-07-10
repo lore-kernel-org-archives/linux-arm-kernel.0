@@ -1,137 +1,119 @@
-From: toshi.kani@hp.com (Toshi Kani)
-Date: Thu, 09 Jul 2015 17:43:25 -0600
-Subject: [PATCH v5 2/6] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150709014020.GA7021@wotan.suse.de>
-References: <CAPcyv4h5OXyRvZvLGD5ZknO-YUPn675YGv0XdtW1QOO9qmZsug@mail.gmail.com>
- <20150701062352.GA3739@lst.de>
- <CAMuHMdUO4uSWH1Qc0SfDTLuXbiG2N9fq8Tf6j+3RoqVKdPugbA@mail.gmail.com>
- <20150701065948.GA4355@lst.de>
- <CAMuHMdXqjmo2T3V=msZySVSu2j4YjyE7FnVXWTjySEyfYLSg1A@mail.gmail.com>
- <20150701072828.GA4881@lst.de> <20150707095012.GQ7021@wotan.suse.de>
- <20150707101330.GJ7557@n2100.arm.linux.org.uk>
- <20150707160703.GR7021@wotan.suse.de> <1436310658.3214.85.camel@hp.com>
- <20150709014020.GA7021@wotan.suse.de>
-Message-ID: <1436485405.3214.99.camel@hp.com>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Thu, 9 Jul 2015 20:19:37 -0400
+Subject: [RFC Patch V1 09/12] genirq: Move msi_list from struct pci_dev
+ to struct device
+In-Reply-To: <1436428847-8886-10-git-send-email-jiang.liu@linux.intel.com>
+References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+ <1436428847-8886-10-git-send-email-jiang.liu@linux.intel.com>
+Message-ID: <20150710001936.GD6957@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-09 at 03:40 +0200, Luis R. Rodriguez wrote:
-> On Tue, Jul 07, 2015 at 05:10:58PM -0600, Toshi Kani wrote:
-> > On Tue, 2015-07-07 at 18:07 +0200, Luis R. Rodriguez wrote:
-> > > On Tue, Jul 07, 2015 at 11:13:30AM +0100, Russell King - ARM 
-> > > Linux 
-> > > wrote:
-> >   :
-> > > > On ARM, we (probably) have a lot of cases where ioremap() is 
-> > > > used 
-> > > > multiple
-> > > > times for the same physical address space, so we shouldn't rule 
-> > > > out 
-> > > > having
-> > > > multiple mappings of the same type.
-> > > 
-> > > Why is that done? Don't worry if you are not sure why but only 
-> > > speculate of the
-> > > practice's existence (sloppy drivers or lazy driver developers). 
-> > > FWIW 
-> > > for x86
-> > > IIRC I ended up concluding that overlapping ioremap() calls with 
-> > > the 
-> > > same type
-> > > would work but not if they differ in type.  Although I haven't 
-> > > written a
-> > > grammer rule to hunt down overlapping ioremap() I suspected its 
-> > > use 
-> > > was likely
-> > > odd and likely should be reconsidered. Would this be true for ARM 
-> > > too 
-> > > ? Or are
-> > > you saying this should be a feature ? I don't expect an answer 
-> > > now 
-> > > but I'm
-> > > saying we *should* all together decide on this, and if you're 
-> > > inclined to
-> > > believe that this should ideally be avoided I'd like to hear 
-> > > that. If 
-> > > you feel
-> > > strongly though this should be a feature I would like to know 
-> > > why.
-> > 
-> > There are multiple mapping interfaces, and overlapping can happen 
-> > among
-> > them as well.  For instance, remap_pfn_range() (and 
-> > io_remap_pfn_range(), which is the same as remap_pfn_range() on 
-> > x86)
-> > creates a mapping to user space. The same physical ranges may be
-> > mapped to kernel and user spaces.  /dev/mem is one example that may
-> > create a user space mapping to a physical address that is already
-> > mapped with ioremap() by other module.
-> 
-> Thanks for the feedback. The restriction seems to be differing cache 
-> types
-> requirements, other than this, are there any other concerns ? For 
-> instance are
-> we completley happy with aliasing so long as cache types match 
-> everywhere?  I'd
-> expect no architecture would want cache types to differ when 
-> aliasing, what
-> should differ then I think would just be how to verify this and it 
-> doesn't seem
-> we may be doing this for all architectures.
-> 
-> Even for userspace we seem to be covered -- we enable userspace 
-> mmap() calls to
-> get their mapped space with a cache type, on the kernel we'd say use
-> pgprot_writecombine() on the vma->vm_page_prot prior to the
-> io_remap_pfn_range() -- that maps to remap_pfn_range() on x86 and as 
-> you note
-> that checks cache type via reserve_memtype() -- but only on x86...
-> 
-> Other than this differing cache type concern are we OK with aliasing 
-> in
-> userspace all the time ?
-> 
-> If we want to restrict aliasing either for the kernel or userspace 
-> mapping
-> we might be able to do it, I just want to know if we want to or not 
-> care
-> at all.
+[[RFC Patch V1 09/12] genirq: Move msi_list from struct pci_dev to struct device] On 09/07/2015 (Thu 16:00) Jiang Liu wrote:
 
-Yes, we allow to create multiple mappings to a same physical page as
-long as their cache type is the same.  There are multiple use-cases
-that depend on this ability.
+> Move msi_list from struct pci_dev into struct device, so we could support
+> non-PCI-device based generic MSI interrupts.
 
-> > pmem and DAX also create mappings to the same NVDIMM ranges.  DAX 
-> > calls
-> > vm_insert_mixed(), which is particularly a problematic since
-> > vm_insert_mixed() does not verify aliasing.  ioremap() and 
-> > remap_pfn_range()
-> > call reserve_memtype() to verify aliasing on x86. 
-> >  reserve_memtype() is
-> > x86-specific and there is no arch-generic wrapper for such check.
+This is not just a simple move, as the new instances are within a
+Kconfig option.  I did not get the 0/12 so I don't know if this is
+expected, but the commit log here does not seem stand-alone enough
+to get through on its own merits; it needs more details.
+
+Paul.
+--
+
 > 
-> As clarified by Matthew Wilcox via commit d92576f1167cacf7844 ("dax: 
-> does not
-> work correctly with virtual aliasing caches") caches are virtually 
-> mapped for
-> some architectures, it seems it should be possible to fix this for 
-> DAX somehow
-> though.
-
-I simply described this DAX case as an example of how two modules might
-request different cache types.  Yes, we should be able to fix this
-case.
-
-> > I think DAX could get a cache type from pmem to keep them in sync, 
-> > though.
+> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+> ---
+>  drivers/base/core.c    |    3 +++
+>  drivers/pci/msi.c      |    3 +--
+>  include/linux/device.h |    4 ++++
+>  include/linux/msi.h    |    2 +-
+>  include/linux/pci.h    |    1 -
+>  5 files changed, 9 insertions(+), 4 deletions(-)
 > 
-> pmem is x86 specific right now, are other folks going to expose 
-> something
-> similar ? Otherwise we seem to only be addressing these deep concerns 
-> for
-> x86 so far.
-
-pmem is a generic driver and is not x86-specific. 
-
-Thanks,
--Toshi
+> diff --git a/drivers/base/core.c b/drivers/base/core.c
+> index dafae6d2f7ac..18e2a89aa138 100644
+> --- a/drivers/base/core.c
+> +++ b/drivers/base/core.c
+> @@ -662,6 +662,9 @@ void device_initialize(struct device *dev)
+>  	INIT_LIST_HEAD(&dev->devres_head);
+>  	device_pm_init(dev);
+>  	set_dev_node(dev, -1);
+> +#ifdef CONFIG_GENERIC_MSI_IRQ
+> +	INIT_LIST_HEAD(&dev->msi_list);
+> +#endif
+>  }
+>  EXPORT_SYMBOL_GPL(device_initialize);
+>  
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 6497608545e2..0050ad436718 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -900,7 +900,7 @@ void pci_msi_shutdown(struct pci_dev *dev)
+>  		return;
+>  
+>  	BUG_ON(list_empty(dev_to_msi_list(&dev->dev)));
+> -	desc = first_msi_entry(dev);
+> +	desc = first_pci_msi_entry(dev);
+>  
+>  	pci_msi_set_enable(dev, 0);
+>  	pci_intx_for_msi(dev, 1);
+> @@ -1044,7 +1044,6 @@ EXPORT_SYMBOL(pci_msi_enabled);
+>  
+>  void pci_msi_init_pci_dev(struct pci_dev *dev)
+>  {
+> -	INIT_LIST_HEAD(&dev->msi_list);
+>  }
+>  
+>  /**
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index 5a31bf3a4024..22227e7fe463 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -713,6 +713,7 @@ struct device_dma_parameters {
+>   * 		along with subsystem-level and driver-level callbacks.
+>   * @pins:	For device pin management.
+>   *		See Documentation/pinctrl.txt for details.
+> + * @msi_list:	Hosts MSI descriptors
+>   * @numa_node:	NUMA node this device is close to.
+>   * @dma_mask:	Dma mask (if dma'ble device).
+>   * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+> @@ -776,6 +777,9 @@ struct device {
+>  #ifdef CONFIG_PINCTRL
+>  	struct dev_pin_info	*pins;
+>  #endif
+> +#ifdef CONFIG_GENERIC_MSI_IRQ
+> +	struct list_head	msi_list;
+> +#endif
+>  
+>  #ifdef CONFIG_NUMA
+>  	int		numa_node;	/* NUMA node this device is close to */
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index cfbd2afeaf64..57fe766a14bf 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -45,7 +45,7 @@ struct msi_desc {
+>  
+>  /* Helpers to hide struct msi_desc implementation details */
+>  #define msi_desc_to_dev(desc)		(&(desc)->dev.dev)
+> -#define dev_to_msi_list(dev)		(&to_pci_dev((dev))->msi_list)
+> +#define dev_to_msi_list(dev)		(&(dev)->msi_list)
+>  #define first_msi_entry(dev)		\
+>  	list_first_entry(dev_to_msi_list((dev)), struct msi_desc, list)
+>  #define for_each_msi_entry(desc, dev)	\
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 8a0321a8fb59..fbf245f5eba7 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -366,7 +366,6 @@ struct pci_dev {
+>  	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
+>  	struct bin_attribute *res_attr_wc[DEVICE_COUNT_RESOURCE]; /* sysfs file for WC mapping of resources */
+>  #ifdef CONFIG_PCI_MSI
+> -	struct list_head msi_list;
+>  	const struct attribute_group **msi_irq_groups;
+>  #endif
+>  	struct pci_vpd *vpd;
+> -- 
+> 1.7.10.4
+> 
