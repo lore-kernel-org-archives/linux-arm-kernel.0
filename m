@@ -1,35 +1,30 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 10 Jul 2015 08:45:36 +0100
-Subject: [PATCH 3/3] regulator: pwm-regulator: Fix ' comparison between signed
- and unsigned integer' warning
-In-Reply-To: <1436514336-2075-1-git-send-email-lee.jones@linaro.org>
-References: <1436514336-2075-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1436514336-2075-3-git-send-email-lee.jones@linaro.org>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 10 Jul 2015 15:45:52 +0800
+Subject: ACPI: regression: Failed to initialize GIC IRQ controller
+Message-ID: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-drivers/regulator/pwm-regulator.c:
-  In function ?pwm_regulator_init_table?:
-drivers/regulator/pwm-regulator.c:171:14:
-  warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+Hi,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/regulator/pwm-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
+causes the following failure on APM mustang board(arm64) when
+booting via UEFI and ACPI:
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 331b851..fc3166d 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -163,7 +163,7 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct pwm_voltages *duty_cycle_table;
--	int length = 0;
-+	unsigned int length = 0;
- 	int ret;
- 
- 	of_find_property(np, "voltage-table", &length);
--- 
-1.9.1
+No valid GICC entries exist
+ACPI: Failed to initialize GIC IRQ controller
+Kernel panic - not syncing: No interrupt controller found.
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
+Hardware name: APM X-Gene Mustang board (DT)
+Call trace:
+[<ffffffc000089b94>] dump_backtrace+0x0/0x12c
+[<ffffffc000089cd0>] show_stack+0x10/0x1c
+[<ffffffc0005fac18>] dump_stack+0x8c/0xdc
+[<ffffffc0005f7218>] panic+0xe4/0x220
+[<ffffffc00082631c>] init_IRQ+0x24/0x30
+[<ffffffc00082486c>] start_kernel+0x274/0x3d8
+---[ end Kernel panic - not syncing: No interrupt controller found.
+
+
+Thanks,
+Ming
