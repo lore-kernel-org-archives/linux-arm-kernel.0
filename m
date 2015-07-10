@@ -1,65 +1,53 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jul 2015 15:48:14 +0100
-Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-In-Reply-To: <94F2FBAB4432B54E8AACC7DFDE6C92E37D30B295@ORSMSX112.amr.corp.intel.com>
-References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
- <94F2FBAB4432B54E8AACC7DFDE6C92E37D30B295@ORSMSX112.amr.corp.intel.com>
-Message-ID: <20150710144814.GA12489@red-moon>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 10 Jul 2015 16:56:29 +0200
+Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
+ master mode reset
+In-Reply-To: <559FD5DB.9030308@linaro.org>
+References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
+ <20150710141440.GA6594@katana> <559FD5DB.9030308@linaro.org>
+Message-ID: <20150710145628.GB6594@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 03:28:36PM +0100, Moore, Robert wrote:
+On Fri, Jul 10, 2015 at 07:55:31PM +0530, Vaibhav Hiremath wrote:
 > 
 > 
-> > -----Original Message-----
-> > From: Ming Lei [mailto:ming.lei at canonical.com]
-> > Sent: Friday, July 10, 2015 12:46 AM
-> > To: Moore, Robert; Zheng, Lv; Wysocki, Rafael J
-> > Cc: Linux Kernel Mailing List; linux-arm-kernel; Thomas Gleixner; Jason
-> > Cooper; Hanjun Guo
-> > Subject: ACPI: regression: Failed to initialize GIC IRQ controller
-> > 
-> > Hi,
-> > 
-> > Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
-> > causes the following failure on APM mustang board(arm64) when booting via
-> > UEFI and ACPI:
+> On Friday 10 July 2015 07:44 PM, Wolfram Sang wrote:
+> >On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
+> >>
+> >>
+> >>On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
+> >>>On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
+> >>>>Normally i2c controller works as master, so slave addr is not needed, or it
+> >>>>will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+> >>>>the same i2c address with controller.
+> >>>
+> >>>Just to make sure: Does it? As I read the code, slave interrupts are
+> >>>enabled later only when slave mode is selected? Is that a HW bug? And if
+> >>>so, can't the code just be moved into this #ifdef block later?
+> >>>
+> >>
+> >>Yes we could, infact I thought about it;
+> >>but I would break recommended sequence here.
+> >
+> >And did you set the "own slave address" to a value which one of your
+> >existing i2c slaves also has (without enabling slave mode)? Did it
+> >disturb communication?
+> >
 > 
-> 
-> I would be interested to know just what exactly about this change broke things.
+> Since slave and master mode are mutual exclusive,
+> I did not try this.
 
-struct acpi_madt_generic_interrupt gained 4 bytes, 4 too many for ACPI
-on ARM64 to boot with 5.1 tables.
+Ehrm, what I meant was. Did you see the issue mentioned in the above
+commit message? Can you reproduce it? You don't need to enable slave
+mode for that, no?
 
->From now onwards we have to test acpica changes against the arm64 kernel
-tree, this must not happen again.
-
-See below:
-
-https://lkml.org/lkml/2015/7/6/876
-
-Thanks,
-Lorenzo
-
-> Bob
-> 
-> 
-> 
-> > 
-> > No valid GICC entries exist
-> > ACPI: Failed to initialize GIC IRQ controller Kernel panic - not syncing:
-> > No interrupt controller found.
-> > CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45 Hardware name:
-> > APM X-Gene Mustang board (DT) Call trace:
-> > [<ffffffc000089b94>] dump_backtrace+0x0/0x12c [<ffffffc000089cd0>]
-> > show_stack+0x10/0x1c [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
-> > [<ffffffc0005f7218>] panic+0xe4/0x220 [<ffffffc00082631c>]
-> > init_IRQ+0x24/0x30 [<ffffffc00082486c>] start_kernel+0x274/0x3d8 ---[ end
-> > Kernel panic - not syncing: No interrupt controller found.
-> > 
-> > 
-> > Thanks,
-> > Ming
-> N???????????????r??????y?????????b???X????????v???^???)??{.n???+????????????{????????????zX??????????????}???????????z???&j:+v?????????????????????zZ+??????+zf?????????h?????????~????????????i?????????z???
-???w??????????????????????&???)??f??????^j??y???m??????@A???a?????????
-0??????h??????i
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/173e2b51/attachment.sig>
