@@ -1,66 +1,102 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Fri, 10 Jul 2015 14:50:36 +0800
-Subject: [PATCH] drm: Drop owner assignment from i2c_driver
-In-Reply-To: <1436506597-1096-2-git-send-email-k.kozlowski@samsung.com>
-References: <1436506597-1096-1-git-send-email-k.kozlowski@samsung.com>
- <1436506597-1096-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <559F6B3C.8080908@rock-chips.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 10 Jul 2015 08:54:40 +0200
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <559F36CC.7020203@atmel.com>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150709120335.GW28632@lukather> <559F36CC.7020203@atmel.com>
+Message-ID: <20150710065440.GY28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?07?10? 13:36, Krzysztof Kozlowski wrote:
-> i2c_driver does not need to set an owner because i2c_register_driver()
-> will set it.
->
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> ---
->
-> The coccinelle script which generated the patch was sent here:
-> http://www.spinics.net/lists/kernel/msg2029903.html
-> ---
->   drivers/gpu/drm/bridge/ps8622.c             | 1 -
->   drivers/gpu/drm/bridge/ptn3460.c            | 1 -
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 1 -
->   3 files changed, 3 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/ps8622.c b/drivers/gpu/drm/bridge/ps8622.c
-> index 1a6607beb29f..be881e9fef8f 100644
-> --- a/drivers/gpu/drm/bridge/ps8622.c
-> +++ b/drivers/gpu/drm/bridge/ps8622.c
-> @@ -668,7 +668,6 @@ static struct i2c_driver ps8622_driver = {
->   	.remove		= ps8622_remove,
->   	.driver		= {
->   		.name	= "ps8622",
-> -		.owner	= THIS_MODULE,
->   		.of_match_table = ps8622_devices,
->   	},
->   };
-> diff --git a/drivers/gpu/drm/bridge/ptn3460.c b/drivers/gpu/drm/bridge/ptn3460.c
-> index 1b1bf2384815..0ffa3a6a206a 100644
-> --- a/drivers/gpu/drm/bridge/ptn3460.c
-> +++ b/drivers/gpu/drm/bridge/ptn3460.c
-> @@ -400,7 +400,6 @@ static struct i2c_driver ptn3460_driver = {
->   	.remove		= ptn3460_remove,
->   	.driver		= {
->   		.name	= "nxp,ptn3460",
-> -		.owner	= THIS_MODULE,
->   		.of_match_table = ptn3460_match,
->   	},
->   };
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index 01b558fe3695..9a0c2911272a 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -555,7 +555,6 @@ static struct platform_driver rockchip_drm_platform_driver = {
->   	.probe = rockchip_drm_platform_probe,
->   	.remove = rockchip_drm_platform_remove,
->   	.driver = {
-> -		.owner = THIS_MODULE,
+On Fri, Jul 10, 2015 at 11:06:52AM +0800, Josh Wu wrote:
+> Hi, Maxime
+> 
+> On 7/9/2015 8:03 PM, Maxime Ripard wrote:
+> >Hi,
+> >
+> >On Thu, Jul 09, 2015 at 06:15:46PM +0800, Josh Wu wrote:
+> >>As since sama5d3, to reset the chip, we don't need to shutdown the ddr
+> >>controller.
+> >>
+> >>So add a new compatible string and new restart function for sama5d3 and
+> >>later chips. As we don't use sama5d3 ddr controller, so remove it as
+> >>well.
+> >>
+> >>Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> >>Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >>---
+> >>
+> >>  drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
+> >>  1 file changed, 21 insertions(+), 9 deletions(-)
+> >>
+> >>diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+> >>index 36dc52f..8944b63 100644
+> >>--- a/drivers/power/reset/at91-reset.c
+> >>+++ b/drivers/power/reset/at91-reset.c
+> >>@@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
+> >>  	return NOTIFY_DONE;
+> >>  }
+> >>+static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
+> >>+			void *cmd)
+> >>+{
+> >>+	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
+> >>+				at91_rstc_base);
+> >>+	return NOTIFY_DONE;
+> >>+}
+> >>+
+> >>  static void __init at91_reset_status(struct platform_device *pdev)
+> >>  {
+> >>  	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+> >>@@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
+> >>  static const struct of_device_id at91_ramc_of_match[] = {
+> >>  	{ .compatible = "atmel,at91sam9260-sdramc", },
+> >>  	{ .compatible = "atmel,at91sam9g45-ddramc", },
+> >>-	{ .compatible = "atmel,sama5d3-ddramc", },
+> >>  	{ /* sentinel */ }
+> >>  };
+> >>  static const struct of_device_id at91_reset_of_match[] = {
+> >>  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+> >>  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+> >>+	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
+> >>  	{ /* sentinel */ }
+> >>  };
+> >>@@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
+> >>  		return -ENODEV;
+> >>  	}
+> >>-	for_each_matching_node(np, at91_ramc_of_match) {
+> >>-		at91_ramc_base[idx] = of_iomap(np, 0);
+> >>-		if (!at91_ramc_base[idx]) {
+> >>-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+> >>-			return -ENODEV;
+> >>+	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+> >>+	at91_restart_nb.notifier_call = match->data;
+> >>+
+> >>+	if (match->data != sama5d3_restart) {
+> >Using of_device_is_compatible seems more appropriate.
+> >
+> >Also, why are you changing the order of this loop and the notifier
+> >registration?
+> 
+> I moved this order because I use the match->data to compare whether is
+> sama5d3_restart. So I need to move this function (of_match_node) up.
 
-But rockchip drm is platform driver not i2c_driver, why remove its .owner ?
+Ah right, my bad.
 
--Mark
->   		.name = "rockchip-drm",
->   		.of_match_table = rockchip_drm_dt_ids,
->   		.pm = &rockchip_drm_pm_ops,
+Still, testing against the kernel pointer is not that great.
+
+It would be great to use something explicit instead, like
+of_device_is_compatible.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/2456d567/attachment.sig>
