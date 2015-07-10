@@ -1,60 +1,40 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Jul 2015 12:27:15 -0500
-Subject: [PATCH v3] i2c: omap: improve duty cycle on SCL
-In-Reply-To: <20150709194241.GF4744@katana>
-References: <1434569475-17378-1-git-send-email-balbi@ti.com>
- <55827CD7.7030207@nokia.com>
- <20150618172558.GC27790@saruman.tx.rr.com>
- <20150709194241.GF4744@katana>
-Message-ID: <20150710172714.GC20408@saruman.tx.rr.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Fri, 10 Jul 2015 12:28:55 -0500
+Subject: [PATCH 1/2] ARM: dts: OMAP4: Add #iommu-cells property to IOMMUs
+In-Reply-To: <1436549336-33456-1-git-send-email-s-anna@ti.com>
+References: <1436549336-33456-1-git-send-email-s-anna@ti.com>
+Message-ID: <1436549336-33456-2-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 09:42:41PM +0200, Wolfram Sang wrote:
-> On Thu, Jun 18, 2015 at 12:25:58PM -0500, Felipe Balbi wrote:
-> > On Thu, Jun 18, 2015 at 10:09:59AM +0200, Alexander Sverdlin wrote:
-> > > Hello Felipe,
-> > > 
-> > > On 17/06/15 21:31, ext Felipe Balbi wrote:
-> > > > With this patch we try to be as close to 50%
-> > > > duty cycle as possible. The reason for this
-> > > > is that some devices present an erratic behavior
-> > > > with certain duty cycles.
-> > > > 
-> > > > One such example is TPS65218 PMIC which fails
-> > > > to change voltages when running @ 400kHz and
-> > > > duty cycle is lower than 34%.
-> > > > 
-> > > > The idea of the patch is simple:
-> > > > 
-> > > > calculate desired scl_period from requested scl
-> > > > and use 50% for tLow and 50% for tHigh.
-> > > > 
-> > > > tLow is calculated with a DIV_ROUND_UP() to make
-> > > > sure it's slightly higher than tHigh and to make
-> > > > sure that we end up within I2C specifications.
-> > > 
-> > > if you refuse to change the calculations to achieve maximum possible
-> > > bus rate (as I've shown you with SCLL=9 and SCLH=9), maybe you want to
-> > > change the description? Because you are doing something else than is
-> > > written here. You are only in spec because you are not doing 50% duty
-> > > cycle. And you didn't mention here that you lower the bus speed below
-> > > 400kHz to achieve this.
-> > 
-> > and there's a comment where the calculation goes which states "as close
-> > to 50% as possible but we make sure tLow is higher than tHigh so we're
-> > still within spec".
-> 
-> So, is that ready to go in for-next?
+Add missing #iommu-cells property to the DSP and IPU IOMMU nodes
+for OMAP4 platforms. This property is required as per the generic
+iommu binding.
 
-should be.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/omap4.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index f884d6adb71e..7d31c6ff246f 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -551,6 +551,7 @@
+ 			reg = <0x4a066000 0x100>;
+ 			interrupts = <GIC_SPI 28 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmu_dsp";
++			#iommu-cells = <0>;
+ 		};
+ 
+ 		mmu_ipu: mmu at 55082000 {
+@@ -558,6 +559,7 @@
+ 			reg = <0x55082000 0x100>;
+ 			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			ti,hwmods = "mmu_ipu";
++			#iommu-cells = <0>;
+ 			ti,iommu-bus-err-back;
+ 		};
+ 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/5969e077/attachment.sig>
+2.4.4
