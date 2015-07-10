@@ -1,43 +1,34 @@
-From: jianwei.wang@freescale.com (Jianwei Wang)
-Date: Fri, 10 Jul 2015 15:26:55 +0800
-Subject: [PATCH v6 4/4] arm/dts/ls1021a: Add a TFT LCD panel dts node
-In-Reply-To: <1436513215-43423-1-git-send-email-jianwei.wang@freescale.com>
-References: <1436513215-43423-1-git-send-email-jianwei.wang@freescale.com>
-Message-ID: <1436513215-43423-4-git-send-email-jianwei.wang@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 10 Jul 2015 08:45:34 +0100
+Subject: [PATCH 1/3] regulator: pwm-regulator: Fix 'unused-variable' warning
+Message-ID: <1436514336-2075-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a TFT LCD panel node. the TFT LCD panel is
-WQVGA "480x272", and the bpp is 24.
-
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+drivers/regulator/pwm-regulator.c:
+  In function 'pwm_regulator_init_continuous':
+drivers/regulator/pwm-regulator.c:202:22:
+  warning: unused variable 'np' [-Wunused-variable]
+     struct device_node *np = pdev->dev.of_node;
+              ^
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/regulator/pwm-regulator.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..f6ad7ba 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -56,6 +56,17 @@
- 		enet0_sgmii_phy = &sgmii_phy2;
- 		enet1_sgmii_phy = &sgmii_phy0;
- 	};
-+
-+	panel: panel {
-+		compatible = "nec,nl4827hc19_05b";
-+	};
-+
-+};
-+
-+&dcu {
-+	panel = <&panel>;
-+	status = "okay";
-+
- };
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 936e387..a4c2ce9 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -198,8 +198,6 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
+ static int pwm_regulator_init_continuous(struct platform_device *pdev,
+ 					 struct pwm_regulator_data *drvdata)
+ {
+-	struct device_node *np = pdev->dev.of_node;
+-
+ 	pwm_regulator_desc.ops = &pwm_regulator_voltage_continuous_ops;
+ 	pwm_regulator_desc.continuous_voltage_range = true;
  
- &dspi1 {
 -- 
-2.1.0.27.g96db324
+1.9.1
