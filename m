@@ -1,10 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:10 +0900
-Subject: [PATCH 5/8] ARM: shmobile: R-Car: Use BIT() macro instead of open
- coding
+Date: Fri, 10 Jul 2015 15:37:12 +0900
+Subject: [PATCH 7/8] ARM: shmobile: r8a7779: Make struct rcar_sysc_ch const
 In-Reply-To: <cover.1436510166.git.horms+renesas@verge.net.au>
 References: <cover.1436510166.git.horms+renesas@verge.net.au>
-Message-ID: <21437c53f3dc2e1e52ccb8aed0a65dd3879ca671.1436510166.git.horms+renesas@verge.net.au>
+Message-ID: <5afcd90f65ac990ca08b101a0e0fd9eac4e0dcde.1436510166.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,50 +12,75 @@ From: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-rcar.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/pm-r8a7779.c  |  3 ++-
+ arch/arm/mach-shmobile/smp-r8a7779.c | 12 ++++++------
+ 2 files changed, 8 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
-index b1a7f2a7f757..7adf9ce5fc1d 100644
---- a/arch/arm/mach-shmobile/pm-rcar.c
-+++ b/arch/arm/mach-shmobile/pm-rcar.c
-@@ -58,7 +58,7 @@ static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
+diff --git a/arch/arm/mach-shmobile/pm-r8a7779.c b/arch/arm/mach-shmobile/pm-r8a7779.c
+index 44a74c4c5a01..44e29e54b3bf 100644
+--- a/arch/arm/mach-shmobile/pm-r8a7779.c
++++ b/arch/arm/mach-shmobile/pm-r8a7779.c
+@@ -35,7 +35,8 @@ struct r8a7779_pm_domain {
+ 	struct rcar_sysc_ch ch;
+ };
  
- 	/* Wait until SYSC is ready to accept a power request */
- 	for (k = 0; k < SYSCSR_RETRIES; k++) {
--		if (ioread32(rcar_sysc_base + SYSCSR) & (1 << sr_bit))
-+		if (ioread32(rcar_sysc_base + SYSCSR) & BIT(sr_bit))
- 			break;
- 		udelay(SYSCSR_DELAY_US);
- 	}
-@@ -67,7 +67,7 @@ static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
- 		return -EAGAIN;
- 
- 	/* Submit power shutoff or power resume request */
--	iowrite32(1 << sysc_ch->chan_bit,
-+	iowrite32(BIT(sysc_ch->chan_bit),
- 		  rcar_sysc_base + sysc_ch->chan_offs + reg_offs);
- 
- 	return 0;
-@@ -86,8 +86,8 @@ static int rcar_sysc_pwr_on(const struct rcar_sysc_ch *sysc_ch)
- static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
- 			    int (*on_off_fn)(const struct rcar_sysc_ch *))
+-static inline struct rcar_sysc_ch *to_r8a7779_ch(struct generic_pm_domain *d)
++static inline
++const struct rcar_sysc_ch *to_r8a7779_ch(struct generic_pm_domain *d)
  {
--	unsigned int isr_mask = 1 << sysc_ch->isr_bit;
--	unsigned int chan_mask = 1 << sysc_ch->chan_bit;
-+	unsigned int isr_mask = BIT(sysc_ch->isr_bit);
-+	unsigned int chan_mask = BIT(sysc_ch->chan_bit);
- 	unsigned int status;
- 	unsigned long flags;
- 	int ret = 0;
-@@ -151,7 +151,7 @@ bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
- 	unsigned int st;
+ 	return &container_of(d, struct r8a7779_pm_domain, genpd)->ch;
+ }
+diff --git a/arch/arm/mach-shmobile/smp-r8a7779.c b/arch/arm/mach-shmobile/smp-r8a7779.c
+index 01f792fcb220..9122216df060 100644
+--- a/arch/arm/mach-shmobile/smp-r8a7779.c
++++ b/arch/arm/mach-shmobile/smp-r8a7779.c
+@@ -32,25 +32,25 @@
+ #define AVECR IOMEM(0xfe700040)
+ #define R8A7779_SCU_BASE 0xf0000000
  
- 	st = ioread32(rcar_sysc_base + sysc_ch->chan_offs + PWRSR_OFFS);
--	if (st & (1 << sysc_ch->chan_bit))
-+	if (st & BIT(sysc_ch->chan_bit))
- 		return true;
+-static struct rcar_sysc_ch r8a7779_ch_cpu1 = {
++static const struct rcar_sysc_ch r8a7779_ch_cpu1 = {
+ 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+ 	.chan_bit = 1, /* ARM1 */
+ 	.isr_bit = 1, /* ARM1 */
+ };
  
- 	return false;
+-static struct rcar_sysc_ch r8a7779_ch_cpu2 = {
++static const struct rcar_sysc_ch r8a7779_ch_cpu2 = {
+ 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+ 	.chan_bit = 2, /* ARM2 */
+ 	.isr_bit = 2, /* ARM2 */
+ };
+ 
+-static struct rcar_sysc_ch r8a7779_ch_cpu3 = {
++static const struct rcar_sysc_ch r8a7779_ch_cpu3 = {
+ 	.chan_offs = 0x40, /* PWRSR0 .. PWRER0 */
+ 	.chan_bit = 3, /* ARM3 */
+ 	.isr_bit = 3, /* ARM3 */
+ };
+ 
+-static struct rcar_sysc_ch *r8a7779_ch_cpu[4] = {
++static const struct rcar_sysc_ch * const r8a7779_ch_cpu[4] = {
+ 	[1] = &r8a7779_ch_cpu1,
+ 	[2] = &r8a7779_ch_cpu2,
+ 	[3] = &r8a7779_ch_cpu3,
+@@ -66,7 +66,7 @@ void __init r8a7779_register_twd(void)
+ 
+ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ {
+-	struct rcar_sysc_ch *ch = NULL;
++	const struct rcar_sysc_ch *ch = NULL;
+ 	int ret = -EIO;
+ 
+ 	cpu = cpu_logical_map(cpu);
+@@ -82,7 +82,7 @@ static int r8a7779_platform_cpu_kill(unsigned int cpu)
+ 
+ static int r8a7779_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ {
+-	struct rcar_sysc_ch *ch = NULL;
++	const struct rcar_sysc_ch *ch = NULL;
+ 	unsigned int lcpu = cpu_logical_map(cpu);
+ 	int ret;
+ 
 -- 
 2.1.4
