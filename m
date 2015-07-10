@@ -1,38 +1,22 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Fri, 10 Jul 2015 12:11:38 +0800
-Subject: question about i2c-designware
-In-Reply-To: <559E37D7.6040103@huawei.com>
-References: <559E37D7.6040103@huawei.com>
-Message-ID: <559F45FA.8060801@huawei.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 09 Jul 2015 21:44:05 -0700 (PDT)
+Subject: [RFT PATCH] net: axienet: Fix devm_ioremap_resource return
+ value check
+In-Reply-To: <1436448080-24775-1-git-send-email-k.kozlowski.k@gmail.com>
+References: <1436448080-24775-1-git-send-email-k.kozlowski.k@gmail.com>
+Message-ID: <20150709.214405.325044957551402588.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ linux-arm-kernel at lists.infradead.org
+From: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+Date: Thu,  9 Jul 2015 22:21:20 +0900
 
-On 2015-07-09 16:59, Kefeng Wang wrote:
-> Hi all,
+> Value returned by devm_ioremap_resource() was checked for non-NULL but
+> devm_ioremap_resource() returns IOMEM_ERR_PTR, not NULL. In case of
+> error this could lead to dereference of ERR_PTR.
 > 
->   We met a issue when use Synopsys DesignWare I2C. The SDA will keep low level and never go back to the high level
-> if both i2c controllers simultaneously access the same i2c device(rtc), then both two i2c controllers can't send any data.
-> we try to reset the rtc, but not working. After reset the i2c controller, the SDA goes back to the high state and we
-> can get time from rtc again.
-> 
-> The scenario is as follows, any advice will be appreciated.
-> 
->                    OS 1         |     OS 2
->                                 |
-> 	+--------------+----------|--------------+
-> 	|	       |	  |              |
-> 	|    +---------|----+-----|---------+    |
-> 	|    |	       |    |     |         |    |
->    ----------------    ------	  |    -----------------
->    |i2c controller1|   | rtc|	  |    |i2c controller2|
->    ----------------    ------   |    -----------------
->                                 |
-> note:
-> 1) i2c controller1 and controller2 use same IP.
-> 2) OS1 use v3.19 and OS2 use 2.6
-> 
-> Thanks
-> Kefeng
-> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski.k@gmail.com>
+> Cc: <stable@vger.kernel.org>
+> Fixes: 46aa27df8853 ("net: axienet: Use devm_* calls")
+
+Applied, thanks.
