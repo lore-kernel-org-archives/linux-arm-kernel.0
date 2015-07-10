@@ -1,67 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:08 +0900
-Subject: [PATCH 3/8] ARM: shmobile: R-Car: Break infinite loop
+Date: Fri, 10 Jul 2015 15:37:09 +0900
+Subject: [PATCH 4/8] ARM: shmobile: R-Car: Make struct rcar_sysc_ch *
+ parameters const
 In-Reply-To: <cover.1436510166.git.horms+renesas@verge.net.au>
 References: <cover.1436510166.git.horms+renesas@verge.net.au>
-Message-ID: <2f575fcff1fad24e97b8e7d793ad9af9ae5b8a17.1436510166.git.horms+renesas@verge.net.au>
+Message-ID: <624deb39a1c684b42569a3ec6a0fdcc74b950ed3.1436510166.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-rcar_sysc_update() loops (with interrupts disabled and while holding a
-spinlock) until submitting a power shutoff or resume request fails, or
-until the submitted request was accepted.
-If none of these conditions becomes true, this forms an infinite loop.
-
-Put a limit on the maximum number of loop iterations, and add a small
-delay to each iteration, to fix this.
+The passed struct rcar_sysc_ch is never modified, so it can be const.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-rcar.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/pm-rcar.c | 16 ++++++++--------
+ arch/arm/mach-shmobile/pm-rcar.h |  6 +++---
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
-index 56ea82a851cb..a5e4c3a88ec4 100644
+index a5e4c3a88ec4..b1a7f2a7f757 100644
 --- a/arch/arm/mach-shmobile/pm-rcar.c
 +++ b/arch/arm/mach-shmobile/pm-rcar.c
-@@ -42,6 +42,9 @@
- #define SYSCSR_RETRIES		100
- #define SYSCSR_DELAY_US		1
+@@ -51,7 +51,7 @@
+ static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
  
-+#define PWRER_RETRIES		100
-+#define PWRER_DELAY_US		1
-+
- #define SYSCISR_RETRIES		1000
- #define SYSCISR_DELAY_US	1
+-static int rcar_sysc_pwr_on_off(struct rcar_sysc_ch *sysc_ch,
++static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
+ 				int sr_bit, int reg_offs)
+ {
+ 	int k;
+@@ -73,18 +73,18 @@ static int rcar_sysc_pwr_on_off(struct rcar_sysc_ch *sysc_ch,
+ 	return 0;
+ }
  
-@@ -95,14 +98,23 @@ static int rcar_sysc_update(struct rcar_sysc_ch *sysc_ch,
- 	iowrite32(isr_mask, rcar_sysc_base + SYSCISCR);
+-static int rcar_sysc_pwr_off(struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_pwr_off(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_POFFENB, PWROFFCR_OFFS);
+ }
  
- 	/* Submit power shutoff or resume request until it was accepted */
--	do {
-+	for (k = 0; k < PWRER_RETRIES; k++) {
- 		ret = on_off_fn(sysc_ch);
- 		if (ret)
- 			goto out;
+-static int rcar_sysc_pwr_on(struct rcar_sysc_ch *sysc_ch)
++static int rcar_sysc_pwr_on(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_PONENB, PWRONCR_OFFS);
+ }
  
- 		status = ioread32(rcar_sysc_base +
- 				  sysc_ch->chan_offs + PWRER_OFFS);
--	} while (status & chan_mask);
-+		if (!(status & chan_mask))
-+			break;
-+
-+		udelay(PWRER_DELAY_US);
-+	}
-+
-+	if (k == PWRER_RETRIES) {
-+		ret = -EIO;
-+		goto out;
-+	}
+-static int rcar_sysc_update(struct rcar_sysc_ch *sysc_ch,
+-			    int (*on_off_fn)(struct rcar_sysc_ch *))
++static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
++			    int (*on_off_fn)(const struct rcar_sysc_ch *))
+ {
+ 	unsigned int isr_mask = 1 << sysc_ch->isr_bit;
+ 	unsigned int chan_mask = 1 << sysc_ch->chan_bit;
+@@ -136,17 +136,17 @@ static int rcar_sysc_update(struct rcar_sysc_ch *sysc_ch,
+ 	return ret;
+ }
  
- 	/* Wait until the power shutoff or resume request has completed * */
- 	for (k = 0; k < SYSCISR_RETRIES; k++) {
+-int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch)
++int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_off);
+ }
+ 
+-int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch)
++int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_on);
+ }
+ 
+-bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch)
++bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+ {
+ 	unsigned int st;
+ 
+diff --git a/arch/arm/mach-shmobile/pm-rcar.h b/arch/arm/mach-shmobile/pm-rcar.h
+index 06ebf00a6a5a..1b901db4a24c 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.h
++++ b/arch/arm/mach-shmobile/pm-rcar.h
+@@ -7,9 +7,9 @@ struct rcar_sysc_ch {
+ 	u8 isr_bit;
+ };
+ 
+-int rcar_sysc_power_down(struct rcar_sysc_ch *sysc_ch);
+-int rcar_sysc_power_up(struct rcar_sysc_ch *sysc_ch);
+-bool rcar_sysc_power_is_off(struct rcar_sysc_ch *sysc_ch);
++int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch);
++int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch);
++bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch);
+ void __iomem *rcar_sysc_init(phys_addr_t base);
+ 
+ #endif /* PM_RCAR_H */
 -- 
 2.1.4
