@@ -1,70 +1,301 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 10 Jul 2015 11:31:03 +0300
-Subject: [PATCH v2 2/5] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
-References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
- <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <559F82C7.5010202@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 10 Jul 2015 17:35:34 +0900
+Subject: [PATCH v2 5/7] ARM: dts: Exynos4x12: add CPU OPP and regulator
+ supply property
+In-Reply-To: <1436456621-29839-6-git-send-email-b.zolnierkie@samsung.com>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <1436456621-29839-6-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <559F83D6.8040409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 08/07/15 12:41, Chunfeng Yun wrote:
-> add a DT binding documentation of xHCI host controller for the
-> MT8173 SoC from Mediatek.
+On 10.07.2015 00:43, Bartlomiej Zolnierkiewicz wrote:
+> For Exynos4x12 platforms, add CPU operating points (using
+> opp-v2 bindings) and CPU regulator supply properties for
+> migrating from Exynos specific cpufreq driver to using
+> generic cpufreq driver.
 > 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Based on the earlier work by Thomas Abraham.
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Doug Anderson <dianders@chromium.org>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Andreas Faerber <afaerber@suse.de>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > ---
->  .../devicetree/bindings/usb/mt8173-xhci.txt        | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+>  arch/arm/boot/dts/exynos4212.dtsi               | 81 ++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos4412-odroid-common.dtsi |  4 ++
+>  arch/arm/boot/dts/exynos4412-origen.dts         |  5 ++
+>  arch/arm/boot/dts/exynos4412-trats2.dts         |  5 ++
+>  arch/arm/boot/dts/exynos4412.dtsi               | 83 +++++++++++++++++++++++++
+>  5 files changed, 178 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> new file mode 100644
-> index 0000000..94cec94
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> @@ -0,0 +1,27 @@
-> +MT65XX xhci
+> diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+> index d9c8efee..9dc40d5 100644
+> --- a/arch/arm/boot/dts/exynos4212.dtsi
+> +++ b/arch/arm/boot/dts/exynos4212.dtsi
+> @@ -30,6 +30,9 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA00>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  			cooling-min-level = <13>;
+>  			cooling-max-level = <7>;
+>  			#cooling-cells = <2>; /* min followed by max */
+> @@ -39,6 +42,84 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA01>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+> +		};
+> +	};
 > +
-> +The device node for Mediatek SOC usb3.0 host controller
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
 > +
-> +Required properties:
-> + - compatible : supports "mediatek,mt8173-xhci"
-> + - reg        : Offset and length of registers
-> + - interrupts : Interrupt mode, number and trigger mode
-> + - reg-vusb33-supply:  regulator of usb avdd3.3v
-> + - reg-vbus-supply : regulator of vbus;
-
-General trend is to use <supply-name>-supply.
-We already know it is a regulator so no need to add "reg-"
-
-So those two can be
-
-vusb33-supply:
-vbus-supply:
-
-
-> + - usb-phy : the phy that xhci will bind
-> + - usb3-lpm-capable: supports USB3 LPM
-> + - clocks     : must support all clocks that xhci needs
-> + - clock-names: should be "sys_mac" for sys and mac clocks
+> +		opp00 {
+> +			opp-hz = <200000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = <300000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = <400000000>;
+> +			opp-microvolt = <925000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = <500000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = <600000000>;
+> +			opp-microvolt = <975000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp05 {
+> +			opp-hz = <700000000>;
+> +			opp-microvolt = <987500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp06 {
+> +			opp-hz = <800000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp07 {
+> +			opp-hz = <900000000>;
+> +			opp-microvolt = <1037500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp08 {
+> +			opp-hz = <1000000000>;
+> +			opp-microvolt = <1087500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp09 {
+> +			opp-hz = <1100000000>;
+> +			opp-microvolt = <1137500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp10 {
+> +			opp-hz = <1200000000>;
+> +			opp-microvolt = <1187500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp11 {
+> +			opp-hz = <1300000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp12 {
+> +			opp-hz = <1400000000>;
+> +			opp-microvolt = <1287500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp13 {
+> +			opp-hz = <1500000000>;
+> +			opp-microvolt = <1350000>;
+> +			clock-latency-ns = <200000>;
+> +			turbo-mode;
+>  		};
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> index ca7d168..1c7811a 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412-odroid-common.dtsi
+> @@ -507,3 +507,7 @@
+>  &watchdog {
+>  	status = "okay";
+>  };
 > +
-> +Example:
-> +usb: usb30 at 11270000 {
-> +	compatible = "mediatek,mt8173-xhci";
-> +	reg = <0 0x11270000 0 0x1000>;
-> +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-> +	reg-vusb33-supply = <&mt6397_vusb_reg>;
-> +	reg-vbus-supply = <&usb_p1_vbus>;
-> +	usb-phy = <&u3phy>;
-> +	usb3-lpm-capable;
-> +	clocks = <&topckgen CLK_TOP_USB30_SEL>;
-> +	clock-names = "sys_mac";
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
 > +};
-> 
 
-cheers,
--roger
+Can you put this in alphabetical order (before ehci node)?
+
+> diff --git a/arch/arm/boot/dts/exynos4412-origen.dts b/arch/arm/boot/dts/exynos4412-origen.dts
+> index 84c7631..21150b4 100644
+> --- a/arch/arm/boot/dts/exynos4412-origen.dts
+> +++ b/arch/arm/boot/dts/exynos4412-origen.dts
+> @@ -532,3 +532,8 @@
+>  &watchdog {
+>  	status = "okay";
+>  };
+> +
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+
+Ditto
+
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index afc199d..1ee43456 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -1313,3 +1313,8 @@
+>  	vtmu-supply = <&ldo10_reg>;
+>  	status = "okay";
+>  };
+> +
+> +
+> +&cpu0 {
+> +	cpu0-supply = <&buck2_reg>;
+> +};
+
+The same.
+
+Rest looks fine, so with the re-ordering:
+
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
+
+
+> diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+> index b78ada7..cead3a7 100644
+> --- a/arch/arm/boot/dts/exynos4412.dtsi
+> +++ b/arch/arm/boot/dts/exynos4412.dtsi
+> @@ -30,6 +30,9 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA00>;
+> +			clocks = <&clock CLK_ARM_CLK>;
+> +			clock-names = "cpu";
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  			cooling-min-level = <13>;
+>  			cooling-max-level = <7>;
+>  			#cooling-cells = <2>; /* min followed by max */
+> @@ -39,18 +42,98 @@
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA01>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu at A02 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA02>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+>  		};
+>  
+>  		cpu at A03 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a9";
+>  			reg = <0xA03>;
+> +			operating-points-v2 = <&cpu0_opp_table>;
+> +		};
+> +	};
+> +
+> +	cpu0_opp_table: opp_table0 {
+> +		compatible = "operating-points-v2";
+> +		opp-shared;
+> +
+> +		opp00 {
+> +			opp-hz = <200000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp01 {
+> +			opp-hz = <300000000>;
+> +			opp-microvolt = <900000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp02 {
+> +			opp-hz = <400000000>;
+> +			opp-microvolt = <925000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp03 {
+> +			opp-hz = <500000000>;
+> +			opp-microvolt = <950000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp04 {
+> +			opp-hz = <600000000>;
+> +			opp-microvolt = <975000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp05 {
+> +			opp-hz = <700000000>;
+> +			opp-microvolt = <987500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp06 {
+> +			opp-hz = <800000000>;
+> +			opp-microvolt = <1000000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp07 {
+> +			opp-hz = <900000000>;
+> +			opp-microvolt = <1037500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp08 {
+> +			opp-hz = <1000000000>;
+> +			opp-microvolt = <1087500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp09 {
+> +			opp-hz = <1100000000>;
+> +			opp-microvolt = <1137500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp10 {
+> +			opp-hz = <1200000000>;
+> +			opp-microvolt = <1187500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp11 {
+> +			opp-hz = <1300000000>;
+> +			opp-microvolt = <1250000>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp12 {
+> +			opp-hz = <1400000000>;
+> +			opp-microvolt = <1287500>;
+> +			clock-latency-ns = <200000>;
+> +		};
+> +		opp13 {
+> +			opp-hz = <1500000000>;
+> +			opp-microvolt = <1350000>;
+> +			clock-latency-ns = <200000>;
+> +			turbo-mode;
+>  		};
+>  	};
+>  
+> 
