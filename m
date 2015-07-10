@@ -1,36 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 10 Jul 2015 15:50:57 -0700
-Subject: [PATCH] arm64: Remove clk-provider.h include
-Message-ID: <1436568657-26243-1-git-send-email-sboyd@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Sat, 11 Jul 2015 00:15:40 +0100
+Subject: [PATCH v2 3/7] KVM: irqchip: convey devid to kvm_set_msi
+In-Reply-To: <1436430137-24205-4-git-send-email-eric.auger@linaro.org>
+References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
+ <1436430137-24205-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <55A0521C.1040605@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file doesn't use the clk provider APIs. Remove the include.
+On 09/07/15 09:22, Eric Auger wrote:
+> on ARM, a devid field is populated in kvm_msi struct in case the
+> flag is set to KVM_MSI_VALID_DEVID. Let's populate the corresponding
+> kvm_kernel_irq_routing_entry devid field and set the msi type to
+> KVM_IRQ_ROUTING_EXTENDED_MSI.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> ---
+>  virt/kvm/irqchip.c | 10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/irqchip.c b/virt/kvm/irqchip.c
+> index 21c1424..e678f8a 100644
+> --- a/virt/kvm/irqchip.c
+> +++ b/virt/kvm/irqchip.c
+> @@ -72,9 +72,17 @@ int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
+>  {
+>  	struct kvm_kernel_irq_routing_entry route;
+>  
+> -	if (!irqchip_in_kernel(kvm) || msi->flags != 0)
+> +	if (!irqchip_in_kernel(kvm))
+>  		return -EINVAL;
+>  
+> +	if (msi->flags & KVM_MSI_VALID_DEVID) {
+> +		route.devid = msi->devid;
+> +		route.type = KVM_IRQ_ROUTING_EXTENDED_MSI;
+> +	} else if (!msi->flags)
+> +		return -EINVAL;
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+I think we get away without using the extended type on the kernel side.
+Within the kernel we don't have an ABI that we have to stick to forever,
+so we can simplify things by re-using the existing type (no need to
+check for both MSI types later).
+So we always set the device ID, the only code that looks at it later is
+the ITS emulation anyway, any other code path simply ignores that.
 
-Please ack if you want this to go through the clk-tree (along
-with quite a few other patches that do the same thing). Otherwise,
-it's fine if it's applied to the arm64 tree.
+To be honest I am not 100% sure that is actually better, but I had
+hacked it in a way where I didn't need it.
+Also have a look at the other comments in the following patches for
+clarification.
 
- arch/arm64/kernel/setup.c | 1 -
- 1 file changed, 1 deletion(-)
+Cheers,
+Andre.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f3067d4d4e35..926ae8d9abc5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -34,7 +34,6 @@
- #include <linux/kexec.h>
- #include <linux/crash_dump.h>
- #include <linux/root_dev.h>
--#include <linux/clk-provider.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
- #include <linux/smp.h>
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+
+> +
+> +	/* historically the route.type was not set */
+> +
+>  	route.msi.address_lo = msi->address_lo;
+>  	route.msi.address_hi = msi->address_hi;
+>  	route.msi.data = msi->data;
+> 
