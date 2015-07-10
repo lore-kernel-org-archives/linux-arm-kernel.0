@@ -1,41 +1,58 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 10 Jul 2015 16:39:31 +0800
-Subject: [PATCH v3 0/3] Fixes for MT8173 PLLs
-Message-ID: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
+Date: Fri, 10 Jul 2015 16:39:32 +0800
+Subject: [PATCH v3 1/3] clk: mediatek: Fix PLL registers setting flow
+In-Reply-To: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1436517574-17895-2-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Title changed. Previous title is "Add MT8173 MMPLL change rate support"
-and can be found in [1].
+Write postdiv and pcw settings at the same time for PLLs if postdiv
+and pcw settings are on the same register.
 
-This patchset contains some fixes for changing rate of PLLs, especially
-for MMPLL.
+This is need by PLLs such as MT8173 MMPLL and ARM*PLL.
 
-The first 2 patches are common fixes for PLLs, and the last patch is a
-fix to support MT8173 MMPLL changing rate because its frequency setting
-is different from other PLLs.
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+ drivers/clk/mediatek/clk-pll.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-changes since v2:
-- Rebase to 4.2-rc1.
-- Split fixes of PLL setting calculation to a separeted patch.
-
-changes since v1:
-- Add a separated patch for mtk_pll_set_rate_regs().
-- Use a structure array to describe a div_table.
-- Limit max frequency to div_table[0].
-- Minor changes such as static and comments.
-
-[1] https://lkml.org/lkml/2015/7/8/265
-
-James Liao (3):
-  clk: mediatek: Fix PLL registers setting flow
-  clk: mediatek: Fix calculation of PLL rate settings
-  clk: mediatek: Add MT8173 MMPLL change rate support
-
- drivers/clk/mediatek/clk-mt8173.c | 24 +++++++++++++++++++++---
- drivers/clk/mediatek/clk-mtk.h    |  6 ++++++
- drivers/clk/mediatek/clk-pll.c    | 39 +++++++++++++++++++++++++++------------
- 3 files changed, 54 insertions(+), 15 deletions(-)
-
---
+diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
+index 44409e9..68af518 100644
+--- a/drivers/clk/mediatek/clk-pll.c
++++ b/drivers/clk/mediatek/clk-pll.c
+@@ -90,20 +90,23 @@ static unsigned long __mtk_pll_recalc_rate(struct mtk_clk_pll *pll, u32 fin,
+ static void mtk_pll_set_rate_regs(struct mtk_clk_pll *pll, u32 pcw,
+ 		int postdiv)
+ {
+-	u32 con1, pd, val;
++	u32 con1, val;
+ 	int pll_en;
+ 
+-	/* set postdiv */
+-	pd = readl(pll->pd_addr);
+-	pd &= ~(POSTDIV_MASK << pll->data->pd_shift);
+-	pd |= (ffs(postdiv) - 1) << pll->data->pd_shift;
+-	writel(pd, pll->pd_addr);
+-
+ 	pll_en = readl(pll->base_addr + REG_CON0) & CON0_BASE_EN;
+ 
+-	/* set pcw */
+-	val = readl(pll->pcw_addr);
++	/* set postdiv */
++	val = readl(pll->pd_addr);
++	val &= ~(POSTDIV_MASK << pll->data->pd_shift);
++	val |= (ffs(postdiv) - 1) << pll->data->pd_shift;
++
++	/* postdiv and pcw need to set at the same time if on same register */
++	if (pll->pd_addr != pll->pcw_addr) {
++		writel(val, pll->pd_addr);
++		val = readl(pll->pcw_addr);
++	}
+ 
++	/* set pcw */
+ 	val &= ~GENMASK(pll->data->pcw_shift + pll->data->pcwbits - 1,
+ 			pll->data->pcw_shift);
+ 	val |= pcw << pll->data->pcw_shift;
+-- 
 1.8.1.1.dirty
