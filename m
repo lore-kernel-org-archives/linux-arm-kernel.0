@@ -1,30 +1,29 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Fri, 10 Jul 2015 17:37:13 +0530
-Subject: [PATCH 2/3] regulator: 88pm800: fix LDO vsel_mask value
-In-Reply-To: <20150709190459.GP11162@sirena.org.uk>
-References: <1436445692-10656-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436445692-10656-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150709190459.GP11162@sirena.org.uk>
-Message-ID: <559FB571.9030302@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 10 Jul 2015 14:09:07 +0200
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <559F7AC4.6050008@atmel.com>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+Message-ID: <20150710120907.GC3127@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+> I would agree with Maxime. Currently all latest chip reset function is
+> compatible with the atmel,sama5d3-rstc.
+> So check compatible string is enough for now.
+> But of cause if we have other incompatible reset in future with new chip,
+> the structure like you said is needed.
 
-On Friday 10 July 2015 12:34 AM, Mark Brown wrote:
-> On Thu, Jul 09, 2015 at 06:11:31PM +0530, Vaibhav Hiremath wrote:
->> From: Yi Zhang <yizhang@marvell.com>
->>
->> As per datasheet,
->> Except LDO2, all other LDO's use bit [3:0] for VOUT select.
->
-> Bug fixes like this should come at the start of the series before new
-> functionality so they can be merged as bug fixes into Linus' tree and
-> -stable.
->
+We managed to avoid using of_machine_is_compatible() in all the at91
+drivers. I'd like to keep it that way. It was painful enough to remove
+all those cpu_is_at91xxx calls.
+Also, using it is trying to match strings and will result in longer boot
+times.
 
-You are right.
-Will take care from next time onwards.
-
-Thanks,
-Vaibhav
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
