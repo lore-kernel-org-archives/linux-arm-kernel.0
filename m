@@ -1,48 +1,54 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jul 2015 14:34:58 +0100
-Subject: [PATCH v3 00/15] Introducing per-device MSI domain
-In-Reply-To: <559E8699.4010007@arm.com>
-References: <1436289485-28230-1-git-send-email-marc.zyngier@arm.com>
- <20150709135809.GA5223@red-moon> <559E8699.4010007@arm.com>
-Message-ID: <20150710133458.GC11270@red-moon>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Fri, 10 Jul 2015 08:41:28 -0500
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump is
+ not available
+In-Reply-To: <20150710113331.4368.63745.stgit@softrs> (Hidehiro Kawai's
+ message of "Fri, 10 Jul 2015 20:33:31 +0900")
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+Message-ID: <87wpy82kqf.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 03:35:05PM +0100, Marc Zyngier wrote:
+Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
 
-[...]
+> You can call panic notifiers and kmsg dumpers before kdump by
+> specifying "crash_kexec_post_notifiers" as a boot parameter.
+> However, it doesn't make sense if kdump is not available.  In that
+> case, disable "crash_kexec_post_notifiers" boot parameter so that
+> you can't change the value of the parameter.
 
-> > BTW, is there a reason why _all_ arm host bridges rely on
-> > pcibios_msi_controller (so pci_sys_data) instead of initializing
-> > the struct pci_bus.msi pointer to carry out the MSI controller look-up ?
-> 
-> Probably an ordering issue - the bus may not be there yet. But ensuring
-> that the MSI domain is created early (before the bus is scanned) should
-> solve that problem nicely enough.
+Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
 
-Yes, I think the only reason is that, as sysdata, the msi controller
-pointer is propagated (in pci_alloc_child_bus()), with a tiny difference:
-sysdata can be passed to pci_scan_root_bus(), msi controller pointer
-can't (explicitly) at present.
+You are confusing kexec on panic and CONFIG_CRASH_DUMP
+which is about the tools for reading the state of the previous kernel.
 
-Since most of the ARM PCI host controllers have been converted to:
+Eric
 
-- pci_create_root_bus()
-
--> here we can init bus msi controller pointer
-
-- pci_scan_child_bus()
-
-we could get rid of pcibios_msi_controller on arm _now_ by just initializing
-the msi controller pointer in the struct pci_bus before
-pci_scan_child_bus() is called, unless I am missing something.
-
-I converted pcie-designware.c to stacked domains (and pci-keystone that
-relies on it, with its own quirks of course), I might take the step
-above as an intermediate step to have a common arm/arm64 generic host
-controller asap (ie for that getting rid of pcibios_msi_controller is
-mandatory, which requires converting all ARM host controllers to stacked
-domains, or taking the intermediate step above).
-
-Thanks,
-Lorenzo
+> Signed-off-by: Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: Eric Biederman <ebiederm@xmission.com>
+> Cc: Vivek Goyal <vgoyal@redhat.com>
+> ---
+>  kernel/panic.c |    2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/kernel/panic.c b/kernel/panic.c
+> index 04e91ff..5252331 100644
+> --- a/kernel/panic.c
+> +++ b/kernel/panic.c
+> @@ -502,12 +502,14 @@ __visible void __stack_chk_fail(void)
+>  core_param(pause_on_oops, pause_on_oops, int, 0644);
+>  core_param(panic_on_warn, panic_on_warn, int, 0644);
+>  
+> +#ifdef CONFIG_CRASH_DUMP
+>  static int __init setup_crash_kexec_post_notifiers(char *s)
+>  {
+>  	crash_kexec_post_notifiers = true;
+>  	return 0;
+>  }
+>  early_param("crash_kexec_post_notifiers", setup_crash_kexec_post_notifiers);
+> +#endif
+>  
+>  static int __init oops_setup(char *s)
+>  {
