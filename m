@@ -1,50 +1,105 @@
-From: anurag.kumar.vulisha@xilinx.com (Anurag Kumar Vulisha)
-Date: Fri, 10 Jul 2015 07:29:39 +0000
-Subject: [PATCH] i2c: removed work arounds in i2c driver for Zynq
- Ultrascale+ MPSoC
-In-Reply-To: <20150709200913.GL4744@katana>
-References: <1434644382-11905-1-git-send-email-anuragku@xilinx.com>
- <20150709200913.GL4744@katana>
-Message-ID: <3802E9A6666DF54886E2B9CBF743BA98011EFAFC@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: jianwei.wang@freescale.com (Jianwei Wang)
+Date: Fri, 10 Jul 2015 15:26:53 +0800
+Subject: [PATCH v6 2/4] drm/panel: simple: Add support for NEC NL4827HC19-05B
+ 480x272 panel
+In-Reply-To: <1436513215-43423-1-git-send-email-jianwei.wang@freescale.com>
+References: <1436513215-43423-1-git-send-email-jianwei.wang@freescale.com>
+Message-ID: <1436513215-43423-2-git-send-email-jianwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds support for the  NEC NL4827HC19-05B 480x272 panel to
+the DRM simple panel driver.
 
-Hi,
-        Thanks for reviewing the code. I will make the changes as said and send the patch as v2.
-Thanks,
-Anurag Kumar V
+Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+---
+ .../bindings/panel/nec,nl4827hc19_05b.txt          |  8 +++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ MAINTAINERS                                        |  1 +
+ drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
+ 4 files changed, 36 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
 
-> -----Original Message-----
-> From: Wolfram Sang [mailto:wsa at the-dreams.de]
-> Sent: Friday, July 10, 2015 1:39 AM
-> To: Anurag Kumar Vulisha
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek; Soren
-> Brinkmann; linux-i2c at vger.kernel.org; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Punnaiah
-> Choudary Kalluri; Harini Katakam; Anirudha Sarangi; Srikanth Vemula; Anurag
-> Kumar Vulisha
-> Subject: Re: [PATCH] i2c: removed work arounds in i2c driver for Zynq
-> Ultrascale+ MPSoC
->
-> Hi,
->
-> thanks for the submission!
->
-> > +#define CDNS_I2C_BROKEN_HOLD_BIT   0x00000001
->
-> BIT(0) maybe?
->
-> > +static const struct cdns_platform_data r1p10_i2c_def = {
-> > +                           .quirks = CDNS_I2C_BROKEN_HOLD_BIT, };
->
-> Closing '}' should be on seperate line.
->
-> And what Mark said.
->
-> Other than that, looks okay I'd say.
-
-
-
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+diff --git a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+new file mode 100644
+index 0000000..6f6dbdd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+@@ -0,0 +1,7 @@
++NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
++
++Required properties:
++- compatible: should be "nec,nl4827hc19_05b"
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 8033919..9f22b3e 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -131,6 +131,7 @@ mundoreader	Mundo Reader S.L.
+ murata	Murata Manufacturing Co., Ltd.
+ mxicy	Macronix International Co., Ltd.
+ national	National Semiconductor
++nec	NEC LCD Technologies, Ltd.
+ neonode		Neonode Inc.
+ netgear	NETGEAR
+ netlogic	Broadcom Corporation (formerly NetLogic Microsystems)
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b25b948..9047c2b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -3410,6 +3410,7 @@ M:	Alison Wang <alison.wang@freescale.com>
+ L:	dri-devel at lists.freedesktop.org
+ S:	Supported
+ F:	drivers/gpu/drm/fsl-dcu/
++F:	Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+ 
+ DRM DRIVERS FOR NVIDIA TEGRA
+ M:	Thierry Reding <thierry.reding@gmail.com>
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index f94201b..eee95f4 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -1036,6 +1036,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
+ 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+ };
+ 
++static const struct drm_display_mode nec_nl4827hc19_05b_mode = {
++	.clock = 10870,
++	.hdisplay = 480,
++	.hsync_start = 480 + 2,
++	.hsync_end = 480 + 2 + 41,
++	.htotal = 480 + 2 + 41 + 2,
++	.vdisplay = 272,
++	.vsync_start = 272 + 2,
++	.vsync_end = 272 + 2 + 4,
++	.vtotal = 272 + 2 + 4 + 2,
++	.vrefresh = 74,
++};
++
++static const struct panel_desc nec_nl4827hc19_05b = {
++	.modes = &nec_nl4827hc19_05b_mode,
++	.num_modes = 1,
++	.size = {
++		.width = 480,
++		.height = 272,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24
++};
++
+ static const struct of_device_id platform_of_match[] = {
+ 	{
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+@@ -1125,6 +1148,9 @@ static const struct of_device_id platform_of_match[] = {
+ 		.compatible = "shelly,sca07010-bfn-lnn",
+ 		.data = &shelly_sca07010_bfn_lnn,
+ 	}, {
++		.compatible = "nec,nl4827hc19_05b",
++		.data = &nec_nl4827hc19_05b,
++	}, {
+ 		/* sentinel */
+ 	}
+ };
+--
+2.1.0.27.g96db324
