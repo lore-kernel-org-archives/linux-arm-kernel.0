@@ -1,89 +1,117 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Fri, 10 Jul 2015 09:41:43 +0800
-Subject: [RFC Patch V1 00/12] Reorganize struct msi_desc to prepare for
- support of generic MSI
-In-Reply-To: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <559F22D7.8090402@huawei.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Fri, 10 Jul 2015 09:59:53 +0800
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150709173747.GA32448@roeck-us.net>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150709173747.GA32448@roeck-us.net>
+Message-ID: <559F2719.3060708@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/9 16:00, Jiang Liu wrote:
-> Recently Marc Zyngier <marc.zyngier@arm.com> has posted a patch set at
-> https://lkml.org/lkml/2015/7/7/712
-> to enhance PCI MSI code to support generic MSI.
-> 
-> This is a companion patch set to refine struct msi_desc and related data
-> structures to support generic MSI, and it would be better to combined with
-> Marc's patch set.  It's also requested by
-> Stuart Yoder <stuart.yoder@freescale.com>
-> 
-> It first introduces a helper function msi_desc_to_pci_sysdata(), and
-> convert current PCI drivers to use helper functions to access fields
-> in struct msi_desc.
-> Then it moves msi_list from struct pci_dev into struct device and
-> refines struct msi_desc.
-> At last it moves alloc_msi_entry() into kernel/irq/msi.c for reuse.
-> 
-> Currently msi_desc_to_pci_sysdata() and msi_desc_to_pci_dev() are
-> implemented as normal functions instead of inlines to avoid header file
-> inclusion issue. If inlined version is preferred for performance, we could
-> move all of first_pci_msi_entry, for_each_pci_msi_entry, msi_desc_to_pci_dev
-> and msi_desc_to_pci_sysdata from linxu/kernel/msi.h into linux/kernel/pci.h.
-> 
-> This patch set is based on v4.2-rc1 and passes 0day test suite. You
-> may access the code at:
-> https://github.com/jiangliu/linux.git msi_desc_v1
-> 
-> Thanks!
-> Gerry
-> 
-> Jiang Liu (12):
->   PCI: Add helper function msi_desc_to_pci_sysdata()
->   MIPS, PCI: Use for_pci_msi_entry() to access MSI device list
->   PowerPC, PCI: Use for_pci_msi_entry() to access MSI device list
->   s390/pci: Use for_pci_msi_entry() to access MSI device list
->   x86, PCI: Use for_pci_msi_entry() to access MSI device list
->   PCI: Use for_pci_msi_entry() to access MSI device list
->   sparc, PCI: Use helper functions to access fields in struct msi_desc
->   PCI: Use helper functions to access fields in struct msi_desc
->   genirq: Move msi_list from struct pci_dev to struct device
->   genirq, PCI: Store 'struct device *' instead 'struct pci_dev *' in
->     struct msi_desc
->   genirq, PCI: Reorginize struct msi_desc to prepare for support of
->     generic MSI
->   genirq, PCI: Move alloc_msi_entry() from PCI MSI code into generic
->     MSI code
+Hi, Guenter
 
-Great, it loos good to me, for patch 1,6,8,9,10,11,12, Reviewed-by: Yijing Wang <wangyijing@huawei.com>
+On 7/10/2015 1:37 AM, Guenter Roeck wrote:
+> On Thu, Jul 09, 2015 at 06:15:46PM +0800, Josh Wu wrote:
+>> As since sama5d3, to reset the chip, we don't need to shutdown the ddr
+>> controller.
+>>
+>> So add a new compatible string and new restart function for sama5d3 and
+>> later chips. As we don't use sama5d3 ddr controller, so remove it as
+>> well.
+>>
+> That sounds like it should be two separate patches, or am I missing something ?
 
-> 
->  arch/mips/pci/msi-octeon.c             |    2 +-
->  arch/powerpc/platforms/cell/axon_msi.c |    6 +--
->  arch/powerpc/platforms/pasemi/msi.c    |    4 +-
->  arch/powerpc/platforms/powernv/pci.c   |    4 +-
->  arch/powerpc/platforms/pseries/msi.c   |    6 +--
->  arch/powerpc/sysdev/fsl_msi.c          |    4 +-
->  arch/powerpc/sysdev/mpic_u3msi.c       |    4 +-
->  arch/powerpc/sysdev/ppc4xx_hsta_msi.c  |    4 +-
->  arch/powerpc/sysdev/ppc4xx_msi.c       |    4 +-
->  arch/s390/pci/pci.c                    |    6 +--
->  arch/sparc/kernel/pci.c                |    2 +-
->  arch/x86/pci/xen.c                     |    8 ++--
->  drivers/base/core.c                    |    3 ++
->  drivers/pci/host/pci-keystone-dw.c     |    6 +--
->  drivers/pci/host/pcie-designware.c     |    4 +-
->  drivers/pci/host/pcie-xilinx.c         |   12 ++---
->  drivers/pci/msi.c                      |   82 +++++++++++++++++---------------
->  drivers/pci/xen-pcifront.c             |    2 +-
->  include/linux/device.h                 |    4 ++
->  include/linux/msi.h                    |   55 +++++++++++----------
->  include/linux/pci.h                    |    1 -
->  kernel/irq/msi.c                       |   17 +++++++
->  22 files changed, 136 insertions(+), 104 deletions(-)
-> 
+I think using one patch makes more sense. Maybe the commit log is not 
+clear enough. How about put it this way:
 
+This patch introduces a new compatible string: "atmel,sama5d3-rstc" for 
+the reset driver of sama5d3 and later chips.
+As in sama5d3 or later chips, we don't have to shutdown the DDR 
+controller before reset. Shutdown the DDR controller before reset is a 
+workaround to avoid DDR signal driving the bus, but since sama5d3 and 
+later chips there is no such a conflict.
+That means:
+   1. the sama5d3 reset function only need to write the rstc register 
+and return.
+   2. for sama5d3, we can remove the code related with DDR controller as 
+we don't use it at all.
 
--- 
-Thanks!
-Yijing
+Best Regards,
+Josh Wu
+>
+> Guenter
+>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>> ---
+>>
+>>   drivers/power/reset/at91-reset.c | 30 +++++++++++++++++++++---------
+>>   1 file changed, 21 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+>> index 36dc52f..8944b63 100644
+>> --- a/drivers/power/reset/at91-reset.c
+>> +++ b/drivers/power/reset/at91-reset.c
+>> @@ -123,6 +123,14 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
+>>   	return NOTIFY_DONE;
+>>   }
+>>   
+>> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
+>> +			void *cmd)
+>> +{
+>> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
+>> +				at91_rstc_base);
+>> +	return NOTIFY_DONE;
+>> +}
+>> +
+>>   static void __init at91_reset_status(struct platform_device *pdev)
+>>   {
+>>   	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+>> @@ -155,13 +163,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
+>>   static const struct of_device_id at91_ramc_of_match[] = {
+>>   	{ .compatible = "atmel,at91sam9260-sdramc", },
+>>   	{ .compatible = "atmel,at91sam9g45-ddramc", },
+>> -	{ .compatible = "atmel,sama5d3-ddramc", },
+>>   	{ /* sentinel */ }
+>>   };
+>>   
+>>   static const struct of_device_id at91_reset_of_match[] = {
+>>   	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+>>   	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
+>> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
+>>   	{ /* sentinel */ }
+>>   };
+>>   
+>> @@ -181,17 +189,21 @@ static int at91_reset_of_probe(struct platform_device *pdev)
+>>   		return -ENODEV;
+>>   	}
+>>   
+>> -	for_each_matching_node(np, at91_ramc_of_match) {
+>> -		at91_ramc_base[idx] = of_iomap(np, 0);
+>> -		if (!at91_ramc_base[idx]) {
+>> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
+>> -			return -ENODEV;
+>> +	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+>> +	at91_restart_nb.notifier_call = match->data;
+>> +
+>> +	if (match->data != sama5d3_restart) {
+>> +		/* we need to shutdown the ddr controller, so get ramc base */
+>> +		for_each_matching_node(np, at91_ramc_of_match) {
+>> +			at91_ramc_base[idx] = of_iomap(np, 0);
+>> +			if (!at91_ramc_base[idx]) {
+>> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
+>> +				return -ENODEV;
+>> +			}
+>> +			idx++;
+>>   		}
+>> -		idx++;
+>>   	}
+>>   
+>> -	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+>> -	at91_restart_nb.notifier_call = match->data;
+>>   	return register_restart_handler(&at91_restart_nb);
+>>   }
+>>   
+>> -- 
+>> 1.9.1
+>>
