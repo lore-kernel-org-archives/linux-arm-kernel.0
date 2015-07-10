@@ -1,14 +1,12 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 15:19:48 +0900
-Subject: [PATCH 7/7] [media] Drop owner assignment from i2c_driver
-In-Reply-To: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
-References: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1436509188-23320-8-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 10 Jul 2015 15:26:27 +0900
+Subject: [PATCH] phy: Drop owner assignment from platform_driver
+Message-ID: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c_driver does not need to set an owner because i2c_register_driver()
-will set it.
+platform_driver does not need to set an owner because
+platform_driver_register() will set it.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
@@ -17,33 +15,72 @@ Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 The coccinelle script which generated the patch was sent here:
 http://www.spinics.net/lists/kernel/msg2029903.html
 ---
- drivers/media/usb/go7007/s2250-board.c | 1 -
- drivers/media/v4l2-core/tuner-core.c   | 1 -
- 2 files changed, 2 deletions(-)
+ drivers/phy/phy-berlin-usb.c        | 1 -
+ drivers/phy/phy-miphy28lp.c         | 1 -
+ drivers/phy/phy-qcom-ufs-qmp-14nm.c | 1 -
+ drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
+ drivers/phy/phy-rockchip-usb.c      | 1 -
+ 5 files changed, 5 deletions(-)
 
-diff --git a/drivers/media/usb/go7007/s2250-board.c b/drivers/media/usb/go7007/s2250-board.c
-index 5c2a49534d2b..1466db150d82 100644
---- a/drivers/media/usb/go7007/s2250-board.c
-+++ b/drivers/media/usb/go7007/s2250-board.c
-@@ -629,7 +629,6 @@ MODULE_DEVICE_TABLE(i2c, s2250_id);
- 
- static struct i2c_driver s2250_driver = {
+diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+index c6fc95b53083..d7431f6ab975 100644
+--- a/drivers/phy/phy-berlin-usb.c
++++ b/drivers/phy/phy-berlin-usb.c
+@@ -207,7 +207,6 @@ static struct platform_driver phy_berlin_usb_driver = {
+ 	.probe	= phy_berlin_usb_probe,
+ 	.driver	= {
+ 		.name		= "phy-berlin-usb",
+-		.owner		= THIS_MODULE,
+ 		.of_match_table	= phy_berlin_sata_of_match,
+ 	 },
+ };
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index 5e257ef7ac05..677c290f4b14 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -1268,7 +1268,6 @@ static struct platform_driver miphy28lp_driver = {
+ 	.probe = miphy28lp_probe,
  	.driver = {
--		.owner	= THIS_MODULE,
- 		.name	= "s2250",
- 	},
- 	.probe		= s2250_probe,
-diff --git a/drivers/media/v4l2-core/tuner-core.c b/drivers/media/v4l2-core/tuner-core.c
-index abdcffabcb59..581e21ad6801 100644
---- a/drivers/media/v4l2-core/tuner-core.c
-+++ b/drivers/media/v4l2-core/tuner-core.c
-@@ -1366,7 +1366,6 @@ MODULE_DEVICE_TABLE(i2c, tuner_id);
- 
- static struct i2c_driver tuner_driver = {
+ 		.name = "miphy28lp-phy",
+-		.owner = THIS_MODULE,
+ 		.of_match_table = miphy28lp_of_match,
+ 	}
+ };
+diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+index f5fc50a9fce7..e1eea1b379fc 100644
+--- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
++++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+@@ -191,7 +191,6 @@ static struct platform_driver ufs_qcom_phy_qmp_14nm_driver = {
  	.driver = {
--		.owner	= THIS_MODULE,
- 		.name	= "tuner",
- 		.pm	= &tuner_pm_ops,
+ 		.of_match_table = ufs_qcom_phy_qmp_14nm_of_match,
+ 		.name = "ufs_qcom_phy_qmp_14nm",
+-		.owner = THIS_MODULE,
  	},
+ };
+ 
+diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+index 8332f96b2c4a..fde8c876823b 100644
+--- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
++++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+@@ -247,7 +247,6 @@ static struct platform_driver ufs_qcom_phy_qmp_20nm_driver = {
+ 	.driver = {
+ 		.of_match_table = ufs_qcom_phy_qmp_20nm_of_match,
+ 		.name = "ufs_qcom_phy_qmp_20nm",
+-		.owner = THIS_MODULE,
+ 	},
+ };
+ 
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+index 7d4c33643768..bf78721b58f4 100644
+--- a/drivers/phy/phy-rockchip-usb.c
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -146,7 +146,6 @@ static struct platform_driver rockchip_usb_driver = {
+ 	.probe		= rockchip_usb_phy_probe,
+ 	.driver		= {
+ 		.name	= "rockchip-usb-phy",
+-		.owner	= THIS_MODULE,
+ 		.of_match_table = rockchip_usb_phy_dt_ids,
+ 	},
+ };
 -- 
 1.9.1
