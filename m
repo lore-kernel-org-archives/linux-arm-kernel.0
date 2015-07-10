@@ -1,58 +1,41 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 10 Jul 2015 13:46:37 +0800
-Subject: [PATCH v2 2/2] clk: mediatek: Add MT8173 MMPLL change rate support
-In-Reply-To: <559DC44A.1030900@codeaurora.org>
-References: <1436344666-25645-1-git-send-email-jamesjj.liao@mediatek.com>
- <1436344666-25645-3-git-send-email-jamesjj.liao@mediatek.com>
- <559DC44A.1030900@codeaurora.org>
-Message-ID: <1436507197.3526.119.camel@mtksdaap41>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 10 Jul 2015 07:56:58 +0200
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150710031438.GA27089@roeck-us.net>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150709173747.GA32448@roeck-us.net> <559F2719.3060708@atmel.com>
+ <20150710031438.GA27089@roeck-us.net>
+Message-ID: <20150710055658.GZ3127@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hi Guenter,
 
-On Wed, 2015-07-08 at 17:46 -0700, Stephen Boyd wrote:
-> On 07/08/2015 01:37 AM, James Liao wrote:
-> > diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> > index 68af518..622e7b6 100644
-> > --- a/drivers/clk/mediatek/clk-pll.c
-> > +++ b/drivers/clk/mediatek/clk-pll.c
-> > @@ -138,16 +138,28 @@ static void mtk_pll_calc_values(struct mtk_clk_pll *pll, u32 *pcw, u32 *postdiv,
-> >  		u32 freq, u32 fin)
-> >  {
-> >  	unsigned long fmin = 1000 * MHZ;
-> > +	const struct mtk_pll_div_table *div_table = pll->data->div_table;
-> >  	u64 _pcw;
-> >  	u32 val;
-> >  
-> >  	if (freq > pll->data->fmax)
-> >  		freq = pll->data->fmax;
-> >  
-> > -	for (val = 0; val < 4; val++) {
-> > +	if (div_table) {
-> > +		if (freq > div_table[0].freq)
-> > +			freq = div_table[0].freq;
-> > +
-> > +		for (val = 0; div_table[val + 1].freq != 0; val++) {
-> > +			if (freq > div_table[val + 1].freq)
-> > +				break;
-> > +		}
-> >  		*postdiv = 1 << val;
-> > -		if (freq * *postdiv >= fmin)
-> > -			break;
-> > +	} else {
-> > +		for (val = 0; val < 5; val++) {
-> > +			*postdiv = 1 << val;
-> > +			if ((u64)freq * *postdiv >= fmin)
-> >
-> 
-> No mention of this cast in the commit text. Is this fixing a bug? If so,
-> please mention it and/or split this bug fix off of this patch.
-> 
+On 09/07/2015 at 20:14:38 -0700, Guenter Roeck wrote :
+> > This patch introduces a new compatible string: "atmel,sama5d3-rstc" for the
+> > reset driver of sama5d3 and later chips.
+> > As in sama5d3 or later chips, we don't have to shutdown the DDR controller
+> > before reset. Shutdown the DDR controller before reset is a workaround to
+> > avoid DDR signal driving the bus, but since sama5d3 and later chips there is
+> > no such a conflict.
+> > That means:
+> >   1. the sama5d3 reset function only need to write the rstc register and
+> > return.
+> >   2. for sama5d3, we can remove the code related with DDR controller as we
+> > don't use it at all.
+> > 
+> Sorry, I don't get it. Doesn't that mean there are two distinct logical
+> changes, which would ask for two separate patches ?
 
-Yes, this is a fix to avoid u32 overflow. I'll split it in next patch.
+I would agree with Josh and I think that only one patch is needed. There
+is only one change, the removal of the workaround for sama5d3 and later.
 
+As the workaround is using a table of compatibles to remap the ram
+controller and the one for sama5d3 is not used because it is not needed,
+I think it makes sense to remove it in that same patch. The logical
+change here is the removal of the workaround.
 
-Best regards,
-
-James
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
