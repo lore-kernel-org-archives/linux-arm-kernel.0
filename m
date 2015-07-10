@@ -1,65 +1,63 @@
 From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 10 Jul 2015 18:59:49 +0200
-Subject: [PATCH v6 1/4] drm/layerscape: Add Freescale DCU DRM driver
-In-Reply-To: <DM2PR0301MB1229FD0A506ABD3AE7A0C7DF9F9F0@DM2PR0301MB1229.namprd03.prod.outlook.com>
-References: <1436513215-43423-1-git-send-email-jianwei.wang@freescale.com>
- <20150710075941.GB3736@phenom.ffwll.local>
- <DM2PR0301MB1229FD0A506ABD3AE7A0C7DF9F9F0@DM2PR0301MB1229.namprd03.prod.outlook.com>
-Message-ID: <20150710165949.GE3736@phenom.ffwll.local>
+Date: Fri, 10 Jul 2015 19:02:07 +0200
+Subject: [PATCH v7 1/4] drm/layerscape: Add Freescale DCU DRM driver
+In-Reply-To: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
+References: <1436527063-44762-1-git-send-email-jianwei.wang@freescale.com>
+Message-ID: <20150710170207.GF3736@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 10:43:11AM +0000, Wang J.W. wrote:
-> Hi Daniel,
+On Fri, Jul 10, 2015 at 07:17:40PM +0800, Jianwei Wang wrote:
+> This patch add support for Two Dimensional Animation and Compositing
+> Engine (2D-ACE) on the Freescale SoCs.
 > 
-> Thank you very much for your review!
-> See below...
+> 2D-ACE is a Freescale display controller. 2D-ACE describes
+> the functionality of the module extremely well its name is a value
+> that cannot be used as a token in programming languages.
+> Instead the valid token "DCU" is used to tag the register names and
+> function names.
 > 
-> > -----Original Message-----
-> > From: Daniel Vetter [mailto:daniel.vetter at ffwll.ch] On Behalf Of Daniel
-> > Vetter
-> > Sent: Friday, July 10, 2015 4:00 PM
-> > To: Wang Jianwei-B52261
-> > Cc: dri-devel at lists.freedesktop.org; linux-kernel at vger.kernel.org; linux-
-> > arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
-> > airlied at linux.ie; daniel.vetter at ffwll.ch; mark.yao at rock-chips.com; Wood
-> > Scott-B07421; Wang Huan-B18965; Xiubo Li
-> > Subject: Re: [PATCH v6 1/4] drm/layerscape: Add Freescale DCU DRM driver
-> > 
-> > On Fri, Jul 10, 2015 at 03:26:52PM +0800, Jianwei Wang wrote:
-> > > +	.atomic_check = fsl_dcu_drm_encoder_atomic_check,
-> > 
-> > .atomic_check is optional
-> > 
+> The Display Controller Unit (DCU) module is a system master that
+> fetches graphics stored in internal or external memory and displays
+> them on a TFT LCD panel. A wide range of panel sizes is supported
+> and the timing of the interface signals is highly configurable.
+> Graphics are read directly from memory and then blended in real-time,
+> which allows for dynamic content creation with minimal CPU
+> intervention.
 > 
-> I try to remove .atomic_check, but it will cause CPU hang when starting up
-> And I find this in drivers/gpu/drm/drm_atomic_helper.c
+> The features:
+> (1) Full RGB888 output to TFT LCD panel.
+> (2) For the current LCD panel, WQVGA "480x272" is supported.
+> (3) Blending of each pixel using up to 4 source layers
+> dependent on size of panel.
+> (4) Each graphic layer can be placed with one pixel resolution
+> in either axis.
+> (5) Each graphic layer support RGB565 and RGB888 direct colors
+> without alpha
+> channel and BGRA8888 BGRA4444 ARGB1555 direct colors with an
+> alpha channel and
+> YUV422 format.
+> (6) Each graphic layer support alpha blending with 8-bit
+> resolution.
 > 
->  293                 if (funcs->atomic_check) {
->  294                         ret = funcs->atomic_check(encoder, crtc_state,
->  295                                                   conn_state);
->  296                         if (ret) {
->  297                                 DRM_DEBUG_ATOMIC("[ENCODER:%d:%s] check failed\n",
->  298                                                  encoder->base.id, encoder->name);
->  299                                 return ret;
->  300                         }
->  301                 } else {
->  302                         ret = funcs->mode_fixup(encoder, &crtc_state->mode,
->  303                                                 &crtc_state->adjusted_mode);
->  304                         if (!ret) {
->  305                                 DRM_DEBUG_ATOMIC("[ENCODER:%d:%s] fixup failed\n",
->  306                                                  encoder->base.id, encoder->name);
->  307                                 return -EINVAL;
->  308                         }
->  309                 }
-> It means that I have to implement at least one of atomic_check and mode_fixup.
-> So I reserve atomic_check.
-> Is there problem? Please give me some more comments if necessary. Thanks!
+> This is a simplified version, only one primary plane, one
+> framebuffer created for
+> fbdev, one crtc, one connector for TFT LCD panel, an encoder.
+> 
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
 
-Ah sorry you are right, atomic check is not optional. Unfortunately the
-optional-or-not thing has grown a bit organically so there's no clear
-rules.
--Daniel
+Can't find any other use of deprecated functions or legacy code patterns
+or anything else that we've recently started cleaning up, looks good. No
+detailed review though (for one I lack hw docs).
+
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+
+Might be good to get some cross-review from some other arm soc drm driver
+team, then send a pull request to Dave for 4.3.
+
+Cheers, Daniel
 -- 
 Daniel Vetter
 Software Engineer, Intel Corporation
