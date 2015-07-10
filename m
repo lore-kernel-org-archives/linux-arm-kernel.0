@@ -1,32 +1,53 @@
 From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Jul 2015 12:27:01 -0500
-Subject: [PATCH 2/3] i2c: omap: abolish variable name confusion
-In-Reply-To: <20150709194941.GH4744@katana>
-References: <1435260890-32335-1-git-send-email-balbi@ti.com>
- <1435260890-32335-2-git-send-email-balbi@ti.com>
- <20150709194941.GH4744@katana>
-Message-ID: <20150710172701.GB20408@saruman.tx.rr.com>
+Date: Fri, 10 Jul 2015 12:27:15 -0500
+Subject: [PATCH v3] i2c: omap: improve duty cycle on SCL
+In-Reply-To: <20150709194241.GF4744@katana>
+References: <1434569475-17378-1-git-send-email-balbi@ti.com>
+ <55827CD7.7030207@nokia.com>
+ <20150618172558.GC27790@saruman.tx.rr.com>
+ <20150709194241.GF4744@katana>
+Message-ID: <20150710172714.GC20408@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jul 09, 2015 at 09:49:41PM +0200, Wolfram Sang wrote:
-> On Thu, Jun 25, 2015 at 02:34:49PM -0500, Felipe Balbi wrote:
-> > struct device pointers are usually called
-> > dev. Calling our struct omap_i2c_dev pointers
-> > also dev has caused enough confusion.
+On Thu, Jul 09, 2015 at 09:42:41PM +0200, Wolfram Sang wrote:
+> On Thu, Jun 18, 2015 at 12:25:58PM -0500, Felipe Balbi wrote:
+> > On Thu, Jun 18, 2015 at 10:09:59AM +0200, Alexander Sverdlin wrote:
+> > > Hello Felipe,
+> > > 
+> > > On 17/06/15 21:31, ext Felipe Balbi wrote:
+> > > > With this patch we try to be as close to 50%
+> > > > duty cycle as possible. The reason for this
+> > > > is that some devices present an erratic behavior
+> > > > with certain duty cycles.
+> > > > 
+> > > > One such example is TPS65218 PMIC which fails
+> > > > to change voltages when running @ 400kHz and
+> > > > duty cycle is lower than 34%.
+> > > > 
+> > > > The idea of the patch is simple:
+> > > > 
+> > > > calculate desired scl_period from requested scl
+> > > > and use 50% for tLow and 50% for tHigh.
+> > > > 
+> > > > tLow is calculated with a DIV_ROUND_UP() to make
+> > > > sure it's slightly higher than tHigh and to make
+> > > > sure that we end up within I2C specifications.
+> > > 
+> > > if you refuse to change the calculations to achieve maximum possible
+> > > bus rate (as I've shown you with SCLL=9 and SCLH=9), maybe you want to
+> > > change the description? Because you are doing something else than is
+> > > written here. You are only in spec because you are not doing 50% duty
+> > > cycle. And you didn't mention here that you lower the bus speed below
+> > > 400kHz to achieve this.
 > > 
-> > This is the result of a few simple sed rules
-> > to convert all struct omap_i2c_dev pointers
-> > to be called omap instead.
-> > 
-> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > and there's a comment where the calculation goes which states "as close
+> > to 50% as possible but we make sure tLow is higher than tHigh so we're
+> > still within spec".
 > 
-> I couldn't apply this one. On what was it based?
+> So, is that ready to go in for-next?
 
-it was v4.1 at the time, IIRC. I'll rebase again once I'm back in the
-office.
+should be.
 
 -- 
 balbi
@@ -36,4 +57,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/e7a09c43/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/5969e077/attachment.sig>
