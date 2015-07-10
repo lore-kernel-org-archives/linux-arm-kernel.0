@@ -1,59 +1,51 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 10 Jul 2015 12:02:19 +0200
-Subject: [PATCH] pinctrl: imx1-core: Fix debug output pin array index
-In-Reply-To: <20150709180652.GJ1426@pengutronix.de>
-References: <1436364966-19778-1-git-send-email-mpa@pengutronix.de>
- <20150709071252.GF1426@pengutronix.de>
- <559E3098.9070609@gtsys.com.hk>
- <20150709133036.GK7573@pengutronix.de>
- <20150709180652.GJ1426@pengutronix.de>
-Message-ID: <20150710100219.GO7573@pengutronix.de>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 10 Jul 2015 18:11:23 +0800
+Subject: ACPI: regression: Failed to initialize GIC IRQ controller
+In-Reply-To: <559F8115.1060801@arm.com>
+References: <CACVXFVPkZYm2i+S3m8B0tixKmTx02psGndo79ehdJxLiz9T92A@mail.gmail.com>
+ <559F7B2C.6090402@arm.com>
+ <CAOHikRBYS-oaWa8qKd+6-2LZ4drVrWnfvqN34cGEu8QxbrMX1Q@mail.gmail.com>
+ <559F8115.1060801@arm.com>
+Message-ID: <CACVXFVMcKuj+uan43dqT0+=5=nm+Drt1WzBSng9OCEF3ThSufg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 10, 2015 at 4:23 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 10/07/15 09:17, Suman Tripathi wrote:
+>> On Fri, Jul 10, 2015 at 1:28 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>
+>>> On 10/07/15 08:45, Ming Lei wrote:
+>>>> Hi,
+>>>>
+>>>> Commit 0cff8dc0099f6d4f(ACPICA: ACPI 6.0: Add changes for MADT table.)
+>>>> causes the following failure on APM mustang board(arm64) when
+>>>> booting via UEFI and ACPI:
+>>>>
+>>>> No valid GICC entries exist
+>>>> ACPI: Failed to initialize GIC IRQ controller
+>>>> Kernel panic - not syncing: No interrupt controller found.
+>>>> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.2.0-rc1+ #45
+>>>> Hardware name: APM X-Gene Mustang board (DT)
+>>>> Call trace:
+>>>> [<ffffffc000089b94>] dump_backtrace+0x0/0x12c
+>>>> [<ffffffc000089cd0>] show_stack+0x10/0x1c
+>>>> [<ffffffc0005fac18>] dump_stack+0x8c/0xdc
+>>>> [<ffffffc0005f7218>] panic+0xe4/0x220
+>>>> [<ffffffc00082631c>] init_IRQ+0x24/0x30
+>>>> [<ffffffc00082486c>] start_kernel+0x274/0x3d8
+>>>> ---[ end Kernel panic - not syncing: No interrupt controller found.
+>>>
+>>> Isn't that addressed by [1] which Catalin has queued for -rc2?
+>>
+>>
+>> I am also seeing the same . But it fixes after I apply the parking
+>> protocol  patch but that is not upstreamed.
+>
+> I'm more interested to find out if the patch I mentioned in my original
+> email fixes it or not. An additional dependency on something that is not
+> aimed for mainline yet doesn't really help.
 
-On Thu, Jul 09, 2015 at 08:06:52PM +0200, Uwe Kleine-K?nig wrote:
-> Hi,
-> 
-> On Thu, Jul 09, 2015 at 03:30:36PM +0200, Markus Pargmann wrote:
-> > > b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > > index 5ac59fb..8408bd8 100644
-> > > --- a/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > > +++ b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> > > @@ -403,14 +403,16 @@ static int imx1_pinconf_set(struct pinctrl_dev *pctldev,
-> > >  			     unsigned num_configs)
-> > >  {
-> > >  	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> > > -	const struct imx1_pinctrl_soc_info *info = ipctl->info;
-> > > +	struct pin_desc *desc;
-> > >  	int i;
-> > > 
-> > > +	desc = pin_desc_get(pctldev, pin_id);
-> > 
-> > For the rest of this function pin_desc_get() is not necessary. This is
-> > not a simple function call but a radix tree lookup as far as I can see.
-> > I am not sure how important this debugging information is and how
-> > expensive this function call is?!
-> If it's moved into the call to pr_debug it should be optimized away when
-> debugging is off. That together with a merge of Chris' and mine commit
-> log and I'm happy.
+Yes, Al's patches do fix the issue.
 
-Ok. If you change that I am happy as well.
-
-Best Regards,
-
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/9ef8930b/attachment.sig>
+Thanks,
+Ming
