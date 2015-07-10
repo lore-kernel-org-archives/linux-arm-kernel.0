@@ -1,40 +1,101 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 10 Jul 2015 16:14:40 +0200
-Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
- master mode reset
-In-Reply-To: <559FBCD3.4050402@linaro.org>
-References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
-Message-ID: <20150710141440.GA6594@katana>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 10 Jul 2015 15:21:39 +0100
+Subject: [PATCH v2 03/15] KVM: arm/arm64: add emulation model specific destroy
+ function
+In-Reply-To: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1436538111-4294-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
-> 
-> 
-> On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
-> >On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
-> >>Normally i2c controller works as master, so slave addr is not needed, or it
-> >>will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
-> >>the same i2c address with controller.
-> >
-> >Just to make sure: Does it? As I read the code, slave interrupts are
-> >enabled later only when slave mode is selected? Is that a HW bug? And if
-> >so, can't the code just be moved into this #ifdef block later?
-> >
-> 
-> Yes we could, infact I thought about it;
-> but I would break recommended sequence here.
+Currently we destroy the VGIC emulation in one function that cares for
+all emulated models. To be on par with init_model (which is model
+specific), lets introduce a per-emulation-model destroy method, too.
+Use it for a tiny GICv3 specific code already, later it will be handy
+for the ITS emulation.
 
-And did you set the "own slave address" to a value which one of your
-existing i2c slaves also has (without enabling slave mode)? Did it
-disturb communication?
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+---
+ include/kvm/arm_vgic.h      |  1 +
+ virt/kvm/arm/vgic-v3-emul.c |  9 +++++++++
+ virt/kvm/arm/vgic.c         | 11 ++++++++++-
+ 3 files changed, 20 insertions(+), 1 deletion(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150710/9bbb00c2/attachment.sig>
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 2ccfa9a..b18e2c5 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -144,6 +144,7 @@ struct vgic_vm_ops {
+ 	bool	(*queue_sgi)(struct kvm_vcpu *, int irq);
+ 	void	(*add_sgi_source)(struct kvm_vcpu *, int irq, int source);
+ 	int	(*init_model)(struct kvm *);
++	void	(*destroy_model)(struct kvm *);
+ 	int	(*map_resources)(struct kvm *, const struct vgic_params *);
+ };
+ 
+diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
+index e661e7f..d2eeb20 100644
+--- a/virt/kvm/arm/vgic-v3-emul.c
++++ b/virt/kvm/arm/vgic-v3-emul.c
+@@ -862,6 +862,14 @@ static int vgic_v3_init_model(struct kvm *kvm)
+ 	return 0;
+ }
+ 
++static void vgic_v3_destroy_model(struct kvm *kvm)
++{
++	struct vgic_dist *dist = &kvm->arch.vgic;
++
++	kfree(dist->irq_spi_mpidr);
++	dist->irq_spi_mpidr = NULL;
++}
++
+ /* GICv3 does not keep track of SGI sources anymore. */
+ static void vgic_v3_add_sgi_source(struct kvm_vcpu *vcpu, int irq, int source)
+ {
+@@ -874,6 +882,7 @@ void vgic_v3_init_emulation(struct kvm *kvm)
+ 	dist->vm_ops.queue_sgi = vgic_v3_queue_sgi;
+ 	dist->vm_ops.add_sgi_source = vgic_v3_add_sgi_source;
+ 	dist->vm_ops.init_model = vgic_v3_init_model;
++	dist->vm_ops.destroy_model = vgic_v3_destroy_model;
+ 	dist->vm_ops.map_resources = vgic_v3_map_resources;
+ 
+ 	kvm->arch.max_vcpus = KVM_MAX_VCPUS;
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 394622c..cc8f5ed 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -100,6 +100,14 @@ int kvm_vgic_map_resources(struct kvm *kvm)
+ 	return kvm->arch.vgic.vm_ops.map_resources(kvm, vgic);
+ }
+ 
++static void vgic_destroy_model(struct kvm *kvm)
++{
++	struct vgic_vm_ops *vm_ops = &kvm->arch.vgic.vm_ops;
++
++	if (vm_ops->destroy_model)
++		vm_ops->destroy_model(kvm);
++}
++
+ /*
+  * struct vgic_bitmap contains a bitmap made of unsigned longs, but
+  * extracts u32s out of them.
+@@ -1629,6 +1637,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 	struct kvm_vcpu *vcpu;
+ 	int i;
+ 
++	vgic_destroy_model(kvm);
++
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		kvm_vgic_vcpu_destroy(vcpu);
+ 
+@@ -1645,7 +1655,6 @@ void kvm_vgic_destroy(struct kvm *kvm)
+ 	}
+ 	kfree(dist->irq_sgi_sources);
+ 	kfree(dist->irq_spi_cpu);
+-	kfree(dist->irq_spi_mpidr);
+ 	kfree(dist->irq_spi_target);
+ 	kfree(dist->irq_pending_on_cpu);
+ 	kfree(dist->irq_active_on_cpu);
+-- 
+2.3.5
