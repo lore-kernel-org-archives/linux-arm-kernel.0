@@ -1,40 +1,46 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:17 +0900
-Subject: [PATCH 09/11] ARM: shmobile: r8a7793 dtsi: Use "arm,gic-400" for GIC
+Date: Fri, 10 Jul 2015 15:37:19 +0900
+Subject: [PATCH 11/11] ARM: shmobile: r8a7779: Configure IRLM mode via DT
 In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
 References: <cover.1436509954.git.horms+renesas@verge.net.au>
-Message-ID: <5b3b3268518fb67c7accf83d786909b2a8cbee63.1436509954.git.horms+renesas@verge.net.au>
+Message-ID: <7bf46d0be278a3586c78322c65ceff5fd03bb95d.1436509954.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Replace the "arm,cortex-a15-gic" compatible value for the GIC by
-"arm,gic-400", as the R-Car Gen2 GIC is assumed to be a GIC-400.
-This has been confirmed by reading the GICD_IIDR register (on r8a7791),
-which reports 0x0200043b (GIC-400 = 0x02, ARM = 0x43b).
+Adjust the r8a7779 SoC DTS and the Marzen Reference
+C board code to use DTS only for INTC-IRQPIN IRLM setup.
 
-This has no effect on runtime behavior, as currently the GIC driver
-treats both compatible values the same.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7779.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index c50c5f65388a..3355c487d108 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -42,7 +42,7 @@
+diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
+index 5c8071e87ae9..a2b5430d3257 100644
+--- a/arch/arm/boot/dts/r8a7779.dtsi
++++ b/arch/arm/boot/dts/r8a7779.dtsi
+@@ -148,7 +148,7 @@
+ 		interrupt-controller;
  	};
  
- 	gic: interrupt-controller at f1001000 {
--		compatible = "arm,cortex-a15-gic";
-+		compatible = "arm,gic-400";
- 		#interrupt-cells = <3>;
- 		#address-cells = <0>;
- 		interrupt-controller;
+-	irqpin0: interrupt-controller at fe780010 {
++	irqpin0: interrupt-controller at fe78001c {
+ 		compatible = "renesas,intc-irqpin-r8a7779", "renesas,intc-irqpin";
+ 		#interrupt-cells = <2>;
+ 		status = "disabled";
+@@ -157,7 +157,8 @@
+ 			<0xfe780010 4>,
+ 			<0xfe780024 4>,
+ 			<0xfe780044 4>,
+-			<0xfe780064 4>;
++			<0xfe780064 4>,
++			<0xfe780000 4>;
+ 		interrupts = <0 27 IRQ_TYPE_LEVEL_HIGH
+ 			      0 28 IRQ_TYPE_LEVEL_HIGH
+ 			      0 29 IRQ_TYPE_LEVEL_HIGH
 -- 
 2.1.4
