@@ -1,129 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 10 Jul 2015 09:12:18 -0700
-Subject: [PATCH v2 4/7] clk: samsung: exynos4x12: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <559F82AE.8070108@samsung.com>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-5-git-send-email-b.zolnierkie@samsung.com>
- <559F82AE.8070108@samsung.com>
-Message-ID: <559FEEE2.6060608@osg.samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 10 Jul 2015 18:12:03 +0200
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150710123148.GA28632@lukather>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+ <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
+Message-ID: <559FEED3.5080505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 07/10/2015 01:30 AM, Krzysztof Kozlowski wrote:
-> On 10.07.2015 00:43, Bartlomiej Zolnierkiewicz wrote:
->> With the addition of the new Samsung specific cpu-clock type, the
->> arm clock can be represented as a cpu-clock type. Add the CPU clock
->> configuration data and instantiate the CPU clock type for Exynos4x12.
+Le 10/07/2015 14:31, Maxime Ripard a ?crit :
+> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
+>> Hi,
 >>
->> Based on the earlier work by Thomas Abraham.
+>> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+>>> I would agree with Maxime. Currently all latest chip reset function is
+>>> compatible with the atmel,sama5d3-rstc.
+>>> So check compatible string is enough for now.
+>>> But of cause if we have other incompatible reset in future with new chip,
+>>> the structure like you said is needed.
 >>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Michael Turquette <mturquette@baylibre.com>
->> Cc: Javier Martinez Canillas <javier@dowhile0.org>
->> Cc: Thomas Abraham <thomas.ab@samsung.com>
->> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> ---
->>  drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 50 insertions(+)
->>
->> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
->> index cae2c048..3071260 100644
->> --- a/drivers/clk/samsung/clk-exynos4.c
->> +++ b/drivers/clk/samsung/clk-exynos4.c
->> @@ -1396,6 +1396,45 @@ static const struct exynos_cpuclk_cfg_data e4210_armclk_d[] __initconst = {
->>  	{  0 },
->>  };
->>  
->> +static const struct exynos_cpuclk_cfg_data e4212_armclk_d[] __initconst = {
->> +	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
->> +	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4210_CPU_DIV1(2, 6), },
->> +	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
->> +	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4210_CPU_DIV1(2, 5), },
->> +	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4210_CPU_DIV1(2, 4), },
->> +	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4210_CPU_DIV1(2, 4), },
->> +	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4210_CPU_DIV1(2, 3), },
->> +	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4210_CPU_DIV1(2, 3), },
->> +	{  0 },
->> +};
->> +
->> +#define E4412_CPU_DIV1(cores, hpm, copy)				\
->> +		(((cores) << 8) | ((hpm) << 4) | ((copy) << 0))
->> +
->> +static const struct exynos_cpuclk_cfg_data e4412_armclk_d[] __initconst = {
->> +	{ 1500000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(7, 0, 6), },
->> +	{ 1400000, E4210_CPU_DIV0(2, 1, 6, 0, 7, 3), E4412_CPU_DIV1(6, 0, 6), },
->> +	{ 1300000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(6, 0, 5), },
->> +	{ 1200000, E4210_CPU_DIV0(2, 1, 5, 0, 7, 3), E4412_CPU_DIV1(5, 0, 5), },
->> +	{ 1100000, E4210_CPU_DIV0(2, 1, 4, 0, 6, 3), E4412_CPU_DIV1(5, 0, 4), },
->> +	{ 1000000, E4210_CPU_DIV0(1, 1, 4, 0, 5, 2), E4412_CPU_DIV1(4, 0, 4), },
->> +	{  900000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(4, 0, 3), },
->> +	{  800000, E4210_CPU_DIV0(1, 1, 3, 0, 5, 2), E4412_CPU_DIV1(3, 0, 3), },
->> +	{  700000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(3, 0, 3), },
->> +	{  600000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
->> +	{  500000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(2, 0, 3), },
->> +	{  400000, E4210_CPU_DIV0(1, 1, 3, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
->> +	{  300000, E4210_CPU_DIV0(1, 1, 2, 0, 4, 2), E4412_CPU_DIV1(1, 0, 3), },
->> +	{  200000, E4210_CPU_DIV0(1, 1, 1, 0, 3, 1), E4412_CPU_DIV1(0, 0, 3), },
->> +	{  0 },
->> +};
+>> We managed to avoid using of_machine_is_compatible() in all the at91
+>> drivers. I'd like to keep it that way. It was painful enough to remove
+>> all those cpu_is_at91xxx calls.
 > 
-> Numbers look fine!
+> That's your call...
 > 
->> +
->>  /* register exynos4 clocks */
->>  static void __init exynos4_clk_init(struct device_node *np,
->>  				    enum exynos4_soc soc)
->> @@ -1489,6 +1528,17 @@ static void __init exynos4_clk_init(struct device_node *np,
->>  		samsung_clk_register_fixed_factor(ctx,
->>  			exynos4x12_fixed_factor_clks,
->>  			ARRAY_SIZE(exynos4x12_fixed_factor_clks));
->> +		if (of_machine_is_compatible("samsung,exynos4412")) {
+>> Also, using it is trying to match strings and will result in longer boot
+>> times.
 > 
-> The driver uses here enum exynos4_soc to differentiate between SoC
-> (unless I missed some changes). This of_machine_is_compatible() makes
-> sense but introduces inconsistency. I would prefer sticking to one
-> convention: always enum or switch everything (before this patch) to
-> of_compatible.
->
+> Have you looked at the implementation of of_match_device? If that's
+> really a concern to you, you should actually avoid it.
 
-When reviewing this patch I also ran into the same thing because as you
-said, it's not consistent. But digging a little bit I found that is not
-that easy since the two are not checking exactly the same.
+I agree: let's keep it simple and use of_match_device().
 
-The enum is to differentiate between "samsung,exynos4412-clock" and
-"samsung,exynos4210-clock" while the of_machine_is_compatible() is for
-"samsung,exynos4412" and "samsung,exynos4212".
-
-The problem is that both exynos4412 and exynos4212 use the same
-"samsung,exynos4412-clock" compatible for their clock controller nodes.
-But there are differences so it would had been better to also have a
-"samsung,exynos4212-clock" to avoid the of_machine_is_compatible() but
-that is not possible anymore without breaking DT backward compatibility.
-
-On the other hand, if of_machine_is_compatible() is used for everything,
-then there is no point anymore to have both "samsung,exynos4412-clock"
-and "samsung,exynos4210-clock". A single "samsung,exynos4-clock" plus
-checking the SoC would had been enough.
-
-That's why I thought that Bart's approach was sensible although is true
-that the of_compatible() check can be moved to exynos4412_clk_init()
-and the enum be extended so at least exynos4_clk_init() is consistent.
-
-> Best regards,
-> Krzysztof
-
-Best regards,
-
+Bye,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Nicolas Ferre
