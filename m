@@ -1,67 +1,55 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Fri, 10 Jul 2015 15:12:45 -0400
-Subject: [PATCH v2 09/20] xen/biomerge: Don't allow biovec to be merge
- when Linux is not using 4KB page
-In-Reply-To: <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
-Message-ID: <20150710191245.GA31063@l.oracle.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 10 Jul 2015 20:19:31 +0100
+Subject: [PATCH v3 0/4] arm64: IOMMU-backed DMA mapping
+Message-ID: <cover.1436552949.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 09:42:21PM +0100, Julien Grall wrote:
-> When Linux is using 64K page granularity, every page will be slipt in
-> multiple non-contiguous 4K MFN (page granularity of Xen).
+Hi all,
 
-But you don't care about that on the Linux layer I think?
+Here we are again, and I really hope this is good to merge this time.
 
-As in, is there an SWIOTLB that does PFN to MFN and vice-versa
-translation?
+Changes since v2[1]:
+- Rework to use default domains. Of course, we don't have the requisite
+  default domain support in arm/arm64 IOMMU drivers yet, but the grotty
+  workarounds now end up corralled into one place outside the base code.
+- Fixed the logic around atomic allocation where coherent devices would
+  have ended up with non-cacheable buffers.
+- Fixed a missing size-alignment which made only whole-page allocations
+  succeed.
+- Added more documentation, especially around the really confusing bit.
 
-I thought that ARM guests are not exposed to the MFN<->PFN logic
-and trying to figure that out to not screw up the DMA engine
-on a PCIe device slurping up contingous MFNs which don't map
-to contingous PFNs?
+Once again, branch available at [2].
 
-> 
-> I'm not sure how to handle efficiently the check to know whether we can
-> merge 2 biovec with a such case. So for now, always says that biovec are
-> not mergeable.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
-> ---
->     Changes in v2:
->         - Remove the workaround and check if the Linux page granularity
->         is the same as Xen or not
-> ---
->  drivers/xen/biomerge.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-> index 0edb91c..571567c 100644
-> --- a/drivers/xen/biomerge.c
-> +++ b/drivers/xen/biomerge.c
-> @@ -6,10 +6,17 @@
->  bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
->  			       const struct bio_vec *vec2)
->  {
-> +#if XEN_PAGE_SIZE == PAGE_SIZE
->  	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
->  	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
->  
->  	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
->  		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
-> +#else
-> +	/* XXX: bio_vec are not mergeable when using different page size in
-> +	 * Xen and Linux
-> +	 */
-> +	return 0;
-> +#endif
->  }
->  EXPORT_SYMBOL(xen_biovec_phys_mergeable);
-> -- 
-> 2.1.4
-> 
+Looking ahead, I have some half-worked-out prototypes for DT-based
+IOMMU group allocation - with that and Laurent's probe deferral series,
+we should hopefully be able to implement the rest of default domain
+support in the IOMMU drivers, and get rid of the hacks. 
+
+Robin.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/9946
+[2]:git://linux-arm.org/linux-rm iommu/dma
+
+Robin Murphy (4):
+  iommu/iova: Avoid over-allocating when size-aligned
+  iommu: Implement common IOMMU ops for DMA mapping
+  arm64: Add IOMMU dma_ops
+  arm64: Hook up IOMMU dma_ops
+
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/dma-mapping.h |  15 +-
+ arch/arm64/mm/dma-mapping.c          | 447 +++++++++++++++++++++++++++++
+ drivers/iommu/Kconfig                |   7 +
+ drivers/iommu/Makefile               |   1 +
+ drivers/iommu/dma-iommu.c            | 536 +++++++++++++++++++++++++++++++++++
+ drivers/iommu/intel-iommu.c          |   2 +
+ drivers/iommu/iova.c                 |  23 +-
+ include/linux/dma-iommu.h            |  84 ++++++
+ include/linux/iommu.h                |   1 +
+ 10 files changed, 1092 insertions(+), 25 deletions(-)
+ create mode 100644 drivers/iommu/dma-iommu.c
+ create mode 100644 include/linux/dma-iommu.h
+
+-- 
+1.9.1
