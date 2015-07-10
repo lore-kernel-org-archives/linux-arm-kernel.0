@@ -1,105 +1,154 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 15:19:41 +0900
-Subject: [PATCH] Drop owner assignment from i2c_driver (and platform
- left-overs)
-Message-ID: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 10 Jul 2015 15:19:42 +0900
+Subject: [PATCH 1/7] [media] dvb-frontends: Drop owner assignment from
+ i2c_driver
+In-Reply-To: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
+References: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1436509188-23320-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+i2c_driver does not need to set an owner because i2c_register_driver()
+will set it.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-The i2c drivers also do not have to set 'owner' field because
-i2c_register_driver() will do it instead.
-
-'owner' is removed from i2c drivers, which I was able to compile
-with allyesconfig (arm, arm64, i386, x86_64, ppc64).
-Only compile-tested.
+---
 
 The coccinelle script which generated the patch was sent here:
 http://www.spinics.net/lists/kernel/msg2029903.html
-
-
-Best regards,
-Krzysztof
-
-Krzysztof Kozlowski (7):
-  [media] dvb-frontends: Drop owner assignment from i2c_driver
-  [media] dvb-frontends: Drop owner assignment from platform_driver
-  [media] i2c: Drop owner assignment from i2c_driver
-  [media] platform: Drop owner assignment from i2c_driver
-  [media] radio: Drop owner assignment from i2c_driver
-  [media] tuners: Drop owner assignment from i2c_driver
-  [media] Drop owner assignment from i2c_driver
-
+---
  drivers/media/dvb-frontends/a8293.c          | 1 -
  drivers/media/dvb-frontends/af9033.c         | 1 -
  drivers/media/dvb-frontends/au8522_decoder.c | 1 -
  drivers/media/dvb-frontends/m88ds3103.c      | 1 -
  drivers/media/dvb-frontends/rtl2830.c        | 1 -
  drivers/media/dvb-frontends/rtl2832.c        | 1 -
- drivers/media/dvb-frontends/rtl2832_sdr.c    | 1 -
  drivers/media/dvb-frontends/si2168.c         | 1 -
  drivers/media/dvb-frontends/sp2.c            | 1 -
  drivers/media/dvb-frontends/tda10071.c       | 1 -
  drivers/media/dvb-frontends/ts2020.c         | 1 -
- drivers/media/i2c/adv7170.c                  | 1 -
- drivers/media/i2c/adv7175.c                  | 1 -
- drivers/media/i2c/adv7180.c                  | 1 -
- drivers/media/i2c/adv7343.c                  | 1 -
- drivers/media/i2c/adv7511.c                  | 1 -
- drivers/media/i2c/adv7604.c                  | 1 -
- drivers/media/i2c/adv7842.c                  | 1 -
- drivers/media/i2c/bt819.c                    | 1 -
- drivers/media/i2c/bt856.c                    | 1 -
- drivers/media/i2c/bt866.c                    | 1 -
- drivers/media/i2c/cs5345.c                   | 1 -
- drivers/media/i2c/cs53l32a.c                 | 1 -
- drivers/media/i2c/cx25840/cx25840-core.c     | 1 -
- drivers/media/i2c/ks0127.c                   | 1 -
- drivers/media/i2c/m52790.c                   | 1 -
- drivers/media/i2c/msp3400-driver.c           | 1 -
- drivers/media/i2c/mt9v011.c                  | 1 -
- drivers/media/i2c/ov7640.c                   | 1 -
- drivers/media/i2c/ov7670.c                   | 1 -
- drivers/media/i2c/saa6588.c                  | 1 -
- drivers/media/i2c/saa6752hs.c                | 1 -
- drivers/media/i2c/saa7110.c                  | 1 -
- drivers/media/i2c/saa7115.c                  | 1 -
- drivers/media/i2c/saa7127.c                  | 1 -
- drivers/media/i2c/saa717x.c                  | 1 -
- drivers/media/i2c/saa7185.c                  | 1 -
- drivers/media/i2c/sony-btf-mpx.c             | 1 -
- drivers/media/i2c/tda7432.c                  | 1 -
- drivers/media/i2c/tda9840.c                  | 1 -
- drivers/media/i2c/tea6415c.c                 | 1 -
- drivers/media/i2c/tea6420.c                  | 1 -
- drivers/media/i2c/ths7303.c                  | 1 -
- drivers/media/i2c/tvaudio.c                  | 1 -
- drivers/media/i2c/tvp5150.c                  | 1 -
- drivers/media/i2c/tw9903.c                   | 1 -
- drivers/media/i2c/tw9906.c                   | 1 -
- drivers/media/i2c/upd64031a.c                | 1 -
- drivers/media/i2c/upd64083.c                 | 1 -
- drivers/media/i2c/vp27smpx.c                 | 1 -
- drivers/media/i2c/vpx3220.c                  | 1 -
- drivers/media/i2c/wm8739.c                   | 1 -
- drivers/media/i2c/wm8775.c                   | 1 -
- drivers/media/platform/s5p-tv/hdmiphy_drv.c  | 1 -
- drivers/media/platform/s5p-tv/sii9234_drv.c  | 1 -
- drivers/media/radio/radio-tea5764.c          | 1 -
- drivers/media/radio/saa7706h.c               | 1 -
- drivers/media/radio/tef6862.c                | 1 -
- drivers/media/tuners/e4000.c                 | 1 -
- drivers/media/tuners/fc2580.c                | 1 -
- drivers/media/tuners/it913x.c                | 1 -
- drivers/media/tuners/m88rs6000t.c            | 1 -
- drivers/media/tuners/si2157.c                | 1 -
- drivers/media/tuners/tda18212.c              | 1 -
- drivers/media/tuners/tua9001.c               | 1 -
- drivers/media/usb/go7007/s2250-board.c       | 1 -
- drivers/media/v4l2-core/tuner-core.c         | 1 -
- 67 files changed, 67 deletions(-)
+ 10 files changed, 10 deletions(-)
 
+diff --git a/drivers/media/dvb-frontends/a8293.c b/drivers/media/dvb-frontends/a8293.c
+index 97ecbe01034c..df3c9758a903 100644
+--- a/drivers/media/dvb-frontends/a8293.c
++++ b/drivers/media/dvb-frontends/a8293.c
+@@ -234,7 +234,6 @@ MODULE_DEVICE_TABLE(i2c, a8293_id_table);
+ 
+ static struct i2c_driver a8293_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "a8293",
+ 		.suppress_bind_attrs = true,
+ 	},
+diff --git a/drivers/media/dvb-frontends/af9033.c b/drivers/media/dvb-frontends/af9033.c
+index 59018afaa95f..bc35206a0821 100644
+--- a/drivers/media/dvb-frontends/af9033.c
++++ b/drivers/media/dvb-frontends/af9033.c
+@@ -1387,7 +1387,6 @@ MODULE_DEVICE_TABLE(i2c, af9033_id_table);
+ 
+ static struct i2c_driver af9033_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "af9033",
+ 	},
+ 	.probe		= af9033_probe,
+diff --git a/drivers/media/dvb-frontends/au8522_decoder.c b/drivers/media/dvb-frontends/au8522_decoder.c
+index 33aa9410b624..28d7dc2fee34 100644
+--- a/drivers/media/dvb-frontends/au8522_decoder.c
++++ b/drivers/media/dvb-frontends/au8522_decoder.c
+@@ -820,7 +820,6 @@ MODULE_DEVICE_TABLE(i2c, au8522_id);
+ 
+ static struct i2c_driver au8522_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "au8522",
+ 	},
+ 	.probe		= au8522_probe,
+diff --git a/drivers/media/dvb-frontends/m88ds3103.c b/drivers/media/dvb-frontends/m88ds3103.c
+index e9b2d2b69b1d..ff31e7a01ca9 100644
+--- a/drivers/media/dvb-frontends/m88ds3103.c
++++ b/drivers/media/dvb-frontends/m88ds3103.c
+@@ -1495,7 +1495,6 @@ MODULE_DEVICE_TABLE(i2c, m88ds3103_id_table);
+ 
+ static struct i2c_driver m88ds3103_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "m88ds3103",
+ 		.suppress_bind_attrs = true,
+ 	},
+diff --git a/drivers/media/dvb-frontends/rtl2830.c b/drivers/media/dvb-frontends/rtl2830.c
+index 3d01f4f22aca..b792f305cf15 100644
+--- a/drivers/media/dvb-frontends/rtl2830.c
++++ b/drivers/media/dvb-frontends/rtl2830.c
+@@ -915,7 +915,6 @@ MODULE_DEVICE_TABLE(i2c, rtl2830_id_table);
+ 
+ static struct i2c_driver rtl2830_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "rtl2830",
+ 	},
+ 	.probe		= rtl2830_probe,
+diff --git a/drivers/media/dvb-frontends/rtl2832.c b/drivers/media/dvb-frontends/rtl2832.c
+index 822ea4b7a7ff..78b87b260d74 100644
+--- a/drivers/media/dvb-frontends/rtl2832.c
++++ b/drivers/media/dvb-frontends/rtl2832.c
+@@ -1319,7 +1319,6 @@ MODULE_DEVICE_TABLE(i2c, rtl2832_id_table);
+ 
+ static struct i2c_driver rtl2832_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "rtl2832",
+ 	},
+ 	.probe		= rtl2832_probe,
+diff --git a/drivers/media/dvb-frontends/si2168.c b/drivers/media/dvb-frontends/si2168.c
+index 25e238c370e5..81788c5a44d8 100644
+--- a/drivers/media/dvb-frontends/si2168.c
++++ b/drivers/media/dvb-frontends/si2168.c
+@@ -757,7 +757,6 @@ MODULE_DEVICE_TABLE(i2c, si2168_id_table);
+ 
+ static struct i2c_driver si2168_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "si2168",
+ 	},
+ 	.probe		= si2168_probe,
+diff --git a/drivers/media/dvb-frontends/sp2.c b/drivers/media/dvb-frontends/sp2.c
+index 8fd42767e263..43d47dfcc7b8 100644
+--- a/drivers/media/dvb-frontends/sp2.c
++++ b/drivers/media/dvb-frontends/sp2.c
+@@ -426,7 +426,6 @@ MODULE_DEVICE_TABLE(i2c, sp2_id);
+ 
+ static struct i2c_driver sp2_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "sp2",
+ 	},
+ 	.probe		= sp2_probe,
+diff --git a/drivers/media/dvb-frontends/tda10071.c b/drivers/media/dvb-frontends/tda10071.c
+index f6dc6307d35a..2b7d6ca69945 100644
+--- a/drivers/media/dvb-frontends/tda10071.c
++++ b/drivers/media/dvb-frontends/tda10071.c
+@@ -1409,7 +1409,6 @@ MODULE_DEVICE_TABLE(i2c, tda10071_id_table);
+ 
+ static struct i2c_driver tda10071_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "tda10071",
+ 		.suppress_bind_attrs = true,
+ 	},
+diff --git a/drivers/media/dvb-frontends/ts2020.c b/drivers/media/dvb-frontends/ts2020.c
+index f61b143a0052..7979e5d6498b 100644
+--- a/drivers/media/dvb-frontends/ts2020.c
++++ b/drivers/media/dvb-frontends/ts2020.c
+@@ -726,7 +726,6 @@ MODULE_DEVICE_TABLE(i2c, ts2020_id_table);
+ 
+ static struct i2c_driver ts2020_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= "ts2020",
+ 	},
+ 	.probe		= ts2020_probe,
 -- 
 1.9.1
