@@ -1,98 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:11 +0900
-Subject: [PATCH 6/8] ARM: shmobile: R-Car: Get rid of on_off_fn() function
- pointer
-In-Reply-To: <cover.1436510166.git.horms+renesas@verge.net.au>
-References: <cover.1436510166.git.horms+renesas@verge.net.au>
-Message-ID: <bcb8243792eaa855a51c96bfeaa5dbca19f48d07.1436510166.git.horms+renesas@verge.net.au>
+Date: Fri, 10 Jul 2015 15:37:12 +0900
+Subject: [PATCH 04/11] ARM: shmobile: r8a7790: add EtherAVB DT support
+In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
+References: <cover.1436509954.git.horms+renesas@verge.net.au>
+Message-ID: <f25d6b977240117eb4b6e3111f4eb41f968d28fb.1436509954.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Simplify the power request code by passing an "on" flag, and picking the
-right status bit and register offset in the innermost function, based on
-this flag.
-This allows to remove the rcar_sysc_pwr_{off,on}() helper functions, and
-the function pointer through which they were called.
+Define the generic R8A7790 part of the EtherAVB device node.
 
-Make sr_bit and reg_offs unsigned while we're at it.
+Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-rcar.c | 31 ++++++++++++++-----------------
- 1 file changed, 14 insertions(+), 17 deletions(-)
+ arch/arm/boot/dts/r8a7790.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
-index 7adf9ce5fc1d..4092ad16e0a4 100644
---- a/arch/arm/mach-shmobile/pm-rcar.c
-+++ b/arch/arm/mach-shmobile/pm-rcar.c
-@@ -51,11 +51,19 @@
- static void __iomem *rcar_sysc_base;
- static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index feb4652ed4b2..c9aae06319c0 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -671,6 +671,16 @@
+ 		status = "disabled";
+ 	};
  
--static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
--				int sr_bit, int reg_offs)
-+static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch, bool on)
- {
-+	unsigned int sr_bit, reg_offs;
- 	int k;
- 
-+	if (on) {
-+		sr_bit = SYSCSR_PONENB;
-+		reg_offs = PWRONCR_OFFS;
-+	} else {
-+		sr_bit = SYSCSR_POFFENB;
-+		reg_offs = PWROFFCR_OFFS;
-+	}
++	avb: ethernet at e6800000 {
++		compatible = "renesas,etheravb-r8a7790";
++		reg = <0 0xe6800000 0 0x800>, <0 0xee0e8000 0 0x4000>;
++		interrupts = <0 163 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp8_clks R8A7790_CLK_ETHERAVB>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
 +
- 	/* Wait until SYSC is ready to accept a power request */
- 	for (k = 0; k < SYSCSR_RETRIES; k++) {
- 		if (ioread32(rcar_sysc_base + SYSCSR) & BIT(sr_bit))
-@@ -73,18 +81,7 @@ static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
- 	return 0;
- }
- 
--static int rcar_sysc_pwr_off(const struct rcar_sysc_ch *sysc_ch)
--{
--	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_POFFENB, PWROFFCR_OFFS);
--}
--
--static int rcar_sysc_pwr_on(const struct rcar_sysc_ch *sysc_ch)
--{
--	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_PONENB, PWRONCR_OFFS);
--}
--
--static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
--			    int (*on_off_fn)(const struct rcar_sysc_ch *))
-+static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
- {
- 	unsigned int isr_mask = BIT(sysc_ch->isr_bit);
- 	unsigned int chan_mask = BIT(sysc_ch->chan_bit);
-@@ -99,7 +96,7 @@ static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
- 
- 	/* Submit power shutoff or resume request until it was accepted */
- 	for (k = 0; k < PWRER_RETRIES; k++) {
--		ret = on_off_fn(sysc_ch);
-+		ret = rcar_sysc_pwr_on_off(sysc_ch, on);
- 		if (ret)
- 			goto out;
- 
-@@ -138,12 +135,12 @@ static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
- 
- int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
- {
--	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_off);
-+	return rcar_sysc_power(sysc_ch, false);
- }
- 
- int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
- {
--	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_on);
-+	return rcar_sysc_power(sysc_ch, true);
- }
- 
- bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
+ 	sata0: sata at ee300000 {
+ 		compatible = "renesas,sata-r8a7790";
+ 		reg = <0 0xee300000 0 0x2000>;
 -- 
 2.1.4
