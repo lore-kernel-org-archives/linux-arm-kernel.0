@@ -1,68 +1,107 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:19 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC DT Updates for v4.3
-Message-ID: <cover.1436509954.git.horms+renesas@verge.net.au>
+Date: Fri, 10 Jul 2015 15:37:10 +0900
+Subject: [PATCH 02/11] ARM: shmobile: r8a7793: add minimal Gose board device
+ tree
+In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
+References: <cover.1436509954.git.horms+renesas@verge.net.au>
+Message-ID: <b8af4591db5bb0529b7f56d25b2e7db3eb71fdf6.1436509954.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Please consider these Renesas ARM based SoC DT updates for v4.3.
+Minimal DT description and Makefile entry for the Gose eval board.
+Support for console, timer, and Ethernet.
 
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v4.3
-
-for you to fetch changes up to 7bf46d0be278a3586c78322c65ceff5fd03bb95d:
-
-  ARM: shmobile: r8a7779: Configure IRLM mode via DT (2015-07-06 09:33:41 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC DT Updates for v4.3
-
-* Configure IRLM mode via DT on r8a7779 SoC
-* Use "arm,gic-400" for GIC on r8a777[01349] and r8a73a4 SoCs
-* Add pinctrl and gpio-hog for lcdc0 to armadillo800eva board
-* EtherAVB DT support for r8a7790 SoC
-* Minimal device tree for r8a7793 SoC and its Gose board
-
-----------------------------------------------------------------
-Geert Uytterhoeven (6):
-      ARM: shmobile: armadillo800eva dts: Add pinctrl and gpio-hog for lcdc0
-      ARM: shmobile: r8a73a4 dtsi: Use "arm,gic-400" for GIC
-      ARM: shmobile: r8a7790 dtsi: Use "arm,gic-400" for GIC
-      ARM: shmobile: r8a7791 dtsi: Use "arm,gic-400" for GIC
-      ARM: shmobile: r8a7793 dtsi: Use "arm,gic-400" for GIC
-      ARM: shmobile: r8a7794 dtsi: Use "arm,gic-400" for GIC
-
-Magnus Damm (1):
-      ARM: shmobile: r8a7779: Configure IRLM mode via DT
-
-Sergei Shtylyov (2):
-      ARM: shmobile: r8a7790: add EtherAVB clocks
-      ARM: shmobile: r8a7790: add EtherAVB DT support
-
-Ulrich Hecht (2):
-      ARM: shmobile: add r8a7793 minimal SoC device tree
-      ARM: shmobile: r8a7793: add minimal Gose board device tree
-
- arch/arm/boot/dts/Makefile                    |   1 +
- arch/arm/boot/dts/r8a73a4.dtsi                |   2 +-
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts |  13 +
- arch/arm/boot/dts/r8a7779.dtsi                |   5 +-
- arch/arm/boot/dts/r8a7790.dtsi                |  22 +-
- arch/arm/boot/dts/r8a7791.dtsi                |   2 +-
- arch/arm/boot/dts/r8a7793-gose.dts            |  63 +++++
- arch/arm/boot/dts/r8a7793.dtsi                | 367 ++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7794.dtsi                |   2 +-
- include/dt-bindings/clock/r8a7790-clock.h     |   1 +
- include/dt-bindings/clock/r8a7793-clock.h     | 164 ++++++++++++
- 11 files changed, 632 insertions(+), 10 deletions(-)
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/Makefile         |  1 +
+ arch/arm/boot/dts/r8a7793-gose.dts | 63 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
  create mode 100644 arch/arm/boot/dts/r8a7793-gose.dts
- create mode 100644 arch/arm/boot/dts/r8a7793.dtsi
- create mode 100644 include/dt-bindings/clock/r8a7793-clock.h
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 246473a244f6..679d7cc2f57c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -516,6 +516,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7790-lager.dtb \
+ 	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
++	r8a7793-gose.dtb \
+ 	r8a7794-alt.dtb \
+ 	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
+new file mode 100644
+index 000000000000..96443ec5f6ab
+--- /dev/null
++++ b/arch/arm/boot/dts/r8a7793-gose.dts
+@@ -0,0 +1,63 @@
++/*
++ * Device Tree Source for the Gose board
++ *
++ * Copyright (C) 2014-2015 Renesas Electronics Corporation
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7793.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Gose";
++	compatible = "renesas,gose", "renesas,r8a7793";
++
++	aliases {
++		serial0 = &scif0;
++		serial1 = &scif1;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
++		stdout-path = &scif0;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&ether {
++	phy-handle = <&phy1>;
++	renesas,ether-link-active-low;
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++		interrupt-parent = <&irqc0>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		micrel,led-mode = <1>;
++	};
++};
++
++&cmt0 {
++	status = "okay";
++};
++
++&scif0 {
++	status = "okay";
++};
++
++&scif1 {
++	status = "okay";
++};
+-- 
+2.1.4
