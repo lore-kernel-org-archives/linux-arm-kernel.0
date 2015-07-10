@@ -1,254 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Jul 2015 15:37:01 +0900
-Subject: [PATCH 14/16] ARM: shmobile: Remove obsolete zboot support
+Date: Fri, 10 Jul 2015 15:37:03 +0900
+Subject: [PATCH 16/16] ARM: shmobile: timer: r8a73a4 and r8a7790 are
+ multi-platform only
 In-Reply-To: <cover.1436509680.git.horms+renesas@verge.net.au>
 References: <cover.1436509680.git.horms+renesas@verge.net.au>
-Message-ID: <11e386719b08606502477cddf10c832b6658bb55.1436509680.git.horms+renesas@verge.net.au>
+Message-ID: <20834a406ee20b57c796f9911f06600b71c75788.1436509680.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The last user of the zboot code was the KZM-A9-GT legacy board code,
-which has been removed.
+Since commits e042681894b62d60 ("ARM: shmobile: r8a7790: Remove legacy
+code") and 9d07d414d4c33d86 ("ARM: shmobile: r8a73a4: ape6evm: Remove
+legacy platform"), the R-Mobile APE6 and R-Car H2 SoCs are supported by
+multiplatform kernels only.
+Hence we can drop checks for these SoCs in legacy kernel builds.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/compressed/Makefile                  |   4 -
- arch/arm/boot/compressed/head-shmobile.S           |  71 --------------
- arch/arm/mach-shmobile/include/mach/zboot.h        |  14 ---
- arch/arm/mach-shmobile/include/mach/zboot_macros.h | 108 ---------------------
- 4 files changed, 197 deletions(-)
- delete mode 100644 arch/arm/boot/compressed/head-shmobile.S
- delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/zboot_macros.h
+ arch/arm/mach-shmobile/timer.c | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 7a13aebacf81..3f9a9ebc77c3 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -51,10 +51,6 @@ else
- endif
- endif
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 0edf2a6d2bbe..f1d027aa7a81 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -70,18 +70,6 @@ void __init shmobile_init_delay(void)
+ 	if (!max_freq)
+ 		return;
  
--ifeq ($(CONFIG_ARCH_SHMOBILE_LEGACY),y)
--OBJS		+= head-shmobile.o
--endif
+-#ifdef CONFIG_ARCH_SHMOBILE_LEGACY
+-	/* Non-multiplatform r8a73a4 SoC cannot use arch timer due
+-	 * to GIC being initialized from C and arch timer via DT */
+-	if (of_machine_is_compatible("renesas,r8a73a4"))
+-		has_arch_timer = false;
 -
- #
- # We now have a PIC decompressor implementation.  Decompressors running
- # from RAM should not define ZTEXTADDR.  Decompressors running directly
-diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
-deleted file mode 100644
-index 22a75259faa3..000000000000
---- a/arch/arm/boot/compressed/head-shmobile.S
-+++ /dev/null
-@@ -1,71 +0,0 @@
--/*
-- * The head-file for SH-Mobile ARM platforms
-- *
-- * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-- * Simon Horman <horms@verge.net.au>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- */
--
--#ifdef CONFIG_ZBOOT_ROM
--
--	.section	".start", "ax"
--
--	/* load board-specific initialization code */
--#include <mach/zboot.h>
--
--	adr	r0, dtb_info
--	ldmia	r0, {r1, r3, r4, r5, r7}
--
--	sub	r0, r0, r1		@ calculate the delta offset
--	add	r5, r5, r0		@ _edata
--
--	ldr	lr, [r5, #0]		@ check if valid DTB is present
--	cmp	lr, r3
--	bne	0f
--
--	add	r9, r7, #31		@ rounded up to a multiple
--	bic	r9, r9, #31		@ ... of 32 bytes
--
--	add	r6, r9, r5		@ copy from _edata
--	add	r9, r9, r4		@ to MEMORY_START
--
--1:	ldmdb	r6!, {r0 - r3, r10 - r12, lr}
--	cmp	r6, r5
--	stmdb	r9!, {r0 - r3, r10 - r12, lr}
--	bhi	1b
--
--	/* Success: Zero board ID, pointer to start of memory for atag/dtb */
--	mov	r7, #0
--	mov	r8, r4
--	b	2f
--
--	.align	2
--dtb_info:
--	.word	dtb_info
--#ifndef __ARMEB__
--	.word	0xedfe0dd0		@ sig is 0xd00dfeed big endian
--#else
--	.word	0xd00dfeed
+-	/* Non-multiplatform r8a7790 SoC cannot use arch timer due
+-	 * to GIC being initialized from C and arch timer via DT */
+-	if (of_machine_is_compatible("renesas,r8a7790"))
+-		has_arch_timer = false;
 -#endif
--	.word	MEMORY_START
--	.word	_edata
--	.word	0x4000			@ maximum DTB size
--0:
--	/* Failure: Zero board ID, NULL atag/dtb */
--	mov 	r7, #0
--	mov	r8, #0			@ pass null pointer as atag
--2 :
 -
--#endif /* CONFIG_ZBOOT_ROM */
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
-deleted file mode 100644
-index 80f599f4b5ab..000000000000
---- a/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ /dev/null
-@@ -1,14 +0,0 @@
--#ifndef ZBOOT_H
--#define ZBOOT_H
--
--#include <mach/zboot_macros.h>
--
--/**************************************************
-- *
-- *		board specific settings
-- *
-- **************************************************/
--
--#error "unsupported board."
--
--#endif /* ZBOOT_H */
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot_macros.h b/arch/arm/mach-shmobile/include/mach/zboot_macros.h
-deleted file mode 100644
-index 14fd3d538e9a..000000000000
---- a/arch/arm/mach-shmobile/include/mach/zboot_macros.h
-+++ /dev/null
-@@ -1,108 +0,0 @@
--#ifndef __ZBOOT_MACRO_H
--#define __ZBOOT_MACRO_H
--
--/* The LIST command is used to include comments in the script */
--.macro	LIST comment
--.endm
--
--/* The ED command is used to write a 32-bit word */
--.macro ED, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STR	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The EW command is used to write a 16-bit word */
--.macro EW, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STRH	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The EB command is used to write an 8-bit word */
--.macro EB, addr, data
--	LDR	r0, 1f
--	LDR	r1, 2f
--	STRB	r1, [r0]
--	B	3f
--1 :	.long	\addr
--2 :	.long	\data
--3 :
--.endm
--
--/* The WAIT command is used to delay the execution */
--.macro  WAIT, time, reg
--	LDR	r1, 1f
--	LDR	r0, 2f
--	STR	r0, [r1]
--10 :
--	LDR	r0, [r1]
--	CMP	r0, #0x00000000
--	BNE	10b
--	NOP
--	B	3f
--1 :	.long	\reg
--2 :	.long	\time * 100
--3 :
--.endm
--
--/* The DD command is used to read a 32-bit word */
--.macro  DD, start, end
--	LDR	r1, 1f
--	B	2f
--1 :	.long	\start
--2 :
--.endm
--
--/* loop until a given value has been read (with mask) */
--.macro WAIT_MASK, addr, data, cmp
--	LDR	r0, 2f
--	LDR	r1, 3f
--	LDR	r2, 4f
--1:
--	LDR	r3, [r0, #0]
--	AND	r3, r1, r3
--	CMP	r2, r3
--	BNE	1b
--	B	5f
--2:	.long	\addr
--3:	.long	\data
--4:	.long	\cmp
--5:
--.endm
--
--/* read 32-bit value from addr, "or" an immediate and write back */
--.macro ED_OR, addr, data
--	LDR r4, 1f
--	LDR r5, 2f
--	LDR r6, [r4]
--	ORR r5, r6, r5
--	STR r5, [r4]
--	B	3f
--1:	.long	\addr
--2:	.long	\data
--3:
--.endm
--
--/* read 32-bit value from addr, "and" an immediate and write back */
--.macro ED_AND, addr, data
--	LDR r4, 1f
--	LDR r5, 2f
--	LDR r6, [r4]
--	AND r5, r6, r5
--	STR r5, [r4]
--	B	3f
--1:	.long \addr
--2:	.long \data
--3:
--.endm
--
--#endif /* __ZBOOT_MACRO_H */
+ 	if (!has_arch_timer || !IS_ENABLED(CONFIG_ARM_ARCH_TIMER)) {
+ 		if (is_a7_a8_a9)
+ 			shmobile_setup_delay_hz(max_freq, 1, 3);
 -- 
 2.1.4
