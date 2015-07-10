@@ -1,57 +1,85 @@
 From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Fri, 10 Jul 2015 23:36:40 +0530
-Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample
- time
-In-Reply-To: <20150710085324.GL23464@tiger>
-References: <cover.1435134626.git.maitysanchayan@gmail.com>
- <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
- <20150710085324.GL23464@tiger>
-Message-ID: <20150710180640.GB8723@Sanchayan-Arch>
+Date: Fri, 10 Jul 2015 23:39:46 +0530
+Subject: [RFC PATCH v6 3/3] drivers: nvmem: Add Vybrid OCOTP support
+In-Reply-To: <24856127.49152.1436388923583.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+References: <cover.1435574288.git.maitysanchayan@gmail.com>
+ <9593ca1f925aff20a6671262efd2f45e256ea676.1435574288.git.maitysanchayan@gmail.com>
+ <1877493336.206622.1436177794342.JavaMail.open-xchange@oxbsltgw01.schlund.de>
+ <20150707051953.GA3712@Sanchayan-Arch.toradex.int>
+ <1488361449.258303.1436273347081.JavaMail.open-xchange@oxbsltgw01.schlund.de>
+ <20150708053920.GA4089@Sanchayan-Arch.toradex.int>
+ <24856127.49152.1436388923583.JavaMail.open-xchange@oxbsltgw04.schlund.de>
+Message-ID: <20150710180946.GC8723@Sanchayan-Arch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+Hello Stefan,
 
-On 15-07-10 16:53:24, Shawn Guo wrote:
-> On Wed, Jun 24, 2015 at 02:03:41PM +0530, Sanchayan Maity wrote:
-> > Add a device tree property which allows to specify the minimum sample
-> > time which can be used to calculate the actual ADC cycles required
-> > depending on the hardware.
-> > 
-> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-> > index 90a03d5..71d9c08 100644
-> > --- a/arch/arm/boot/dts/vfxxx.dtsi
-> > +++ b/arch/arm/boot/dts/vfxxx.dtsi
-> > @@ -229,6 +229,7 @@
-> >  				status = "disabled";
-> >  				fsl,adck-max-frequency = <30000000>, <40000000>,
-> >  							<20000000>;
-> > +				min-sample-time = <1000>;
-> >  			};
-> >  
-> >  			wdoga5: wdog at 4003e000 {
-> > @@ -447,6 +448,7 @@
-> >  				status = "disabled";
-> >  				fsl,adck-max-frequency = <30000000>, <40000000>,
-> >  							<20000000>;
-> > +				min-sample-time = <1000>;
+On 15-07-08 22:55:23, Stefan Wahren wrote:
+> Hi Sanchayan,
 > 
-> Can we code 1000 as the default in kernel driver, so that only boards
-> requiring different value need to have this property?  Doing so makes
-> the property optional rather than required.
+> > maitysanchayan at gmail.com hat am 8. Juli 2015 um 07:39 geschrieben:
+> >
+> >
+> > [...]
+> > > > >
+> > > > > Looking at valid_fuse_addr shows me 0x3F as last valid register. So the
+> > > > > rest
+> > > > > of the buffer ( 0xD00 - sizeof(valid_fuse_addr) ) in case of raw access
+> > > > > could be
+> > > > > uninitializied.
+> > > >
+> > > > Sorry I did not exactly get you here. The intention behind using the
+> > > > valid_fuse_addr
+> > > > is to allow reading only from valid fuse addresses and avoid reading from
+> > > > all
+> > > > other
+> > > > locations as per the Fuse map address table 35-1.
+> > >
+> > > Yes, i got your intention. But from my unterstand the read function should
+> > > fill
+> > > up
+> > > the complete buffer with defined values. My MXS OCOTP driver have the same
+> > > problem
+> > > and fill up the invalid registers with zero.
+> >
+> > I must admit I had not thought of that. Thats a valid point. I dont know at
+> > the
+> > moment however what would be the correct approach here. Perhaps filling
+> > locations
+> > other than the valid fuse addresses as per the fuse map table with 0xBADABADA
+> > is
+> > the right thing? Anyways that's what is going to be returned if we were to
+> > read
+> > a location which is read locked or reserved.
 > 
+> since we are operating in userspace the behavior shouldn't be specific to the
+> device.
+> It would be good when all drivers behave the same. But i think it would be much
+> better
+> as the nvmem framework take care of it and preinit the buffer with a defined
+> value.
 
-Not sure if hardcoding it in the driver is the right approach.
+There is a v7 now. Yet to give that a try or look at it.
 
-However if the maintainers and others agree on doing this, I will do
-the necessary change.
+> 
+> >
+> > However since the fuse address and base address mapping is not exactly linear,
+> > this would require some additional logic than the simple thing I did. 
+> 
+> I defined a regmap_access_table for valid read registers in my case. But i think
+> in your case
+> an implementation of the readable_reg callback in the regmap_config would be
+> more elegant.
+> 
+> You can validate your implementation under /sys/kernel/debug/regmap/
 
-Thanks.
+Thank you for the input. I will have a look at it and give it a try.
+
+> 
+> Sorry, i'm a newbie to regmap.
+
+Same here as well :)
 
 Regards,
 Sanchayan.
