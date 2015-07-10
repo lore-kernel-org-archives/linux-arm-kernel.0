@@ -1,63 +1,98 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Fri, 10 Jul 2015 15:37:11 +0900
-Subject: [PATCH 03/11] ARM: shmobile: r8a7790: add EtherAVB clocks
-In-Reply-To: <cover.1436509954.git.horms+renesas@verge.net.au>
-References: <cover.1436509954.git.horms+renesas@verge.net.au>
-Message-ID: <63d2d750c902dec77439f12b2eac9709468298ce.1436509954.git.horms+renesas@verge.net.au>
+Subject: [PATCH 6/8] ARM: shmobile: R-Car: Get rid of on_off_fn() function
+ pointer
+In-Reply-To: <cover.1436510166.git.horms+renesas@verge.net.au>
+References: <cover.1436510166.git.horms+renesas@verge.net.au>
+Message-ID: <bcb8243792eaa855a51c96bfeaa5dbca19f48d07.1436510166.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add the EtherAVB clock to the R8A7790 device tree.
+Simplify the power request code by passing an "on" flag, and picking the
+right status bit and register offset in the innermost function, based on
+this flag.
+This allows to remove the rcar_sysc_pwr_{off,on}() helper functions, and
+the function pointer through which they were called.
 
-Based on original patch by Mitsuhiro Kimura <mitsuhiro.kimura.kc@renesas.com>.
+Make sr_bit and reg_offs unsigned while we're at it.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi            | 10 ++++++----
- include/dt-bindings/clock/r8a7790-clock.h |  1 +
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/pm-rcar.c | 31 ++++++++++++++-----------------
+ 1 file changed, 14 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 51ab8865ea37..feb4652ed4b2 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1249,16 +1249,18 @@
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
- 			reg = <0 0xe6150990 0 4>, <0 0xe61509a0 0 4>;
- 			clocks = <&hp_clk>, <&zg_clk>, <&zg_clk>, <&zg_clk>,
--			         <&zg_clk>, <&p_clk>, <&zs_clk>, <&zs_clk>;
-+			         <&zg_clk>, <&hp_clk>, <&p_clk>, <&zs_clk>,
-+				 <&zs_clk>;
- 			#clock-cells = <1>;
- 			clock-indices = <
- 				R8A7790_CLK_MLB R8A7790_CLK_VIN3 R8A7790_CLK_VIN2
--				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0 R8A7790_CLK_ETHER
-+				R8A7790_CLK_VIN1 R8A7790_CLK_VIN0
-+				R8A7790_CLK_ETHERAVB R8A7790_CLK_ETHER
- 				R8A7790_CLK_SATA1 R8A7790_CLK_SATA0
- 			>;
- 			clock-output-names =
--				"mlb", "vin3", "vin2", "vin1", "vin0", "ether",
--				"sata1", "sata0";
-+				"mlb", "vin3", "vin2", "vin1", "vin0",
-+				"etheravb", "ether", "sata1", "sata0";
- 		};
- 		mstp9_clks: mstp9_clks at e6150994 {
- 			compatible = "renesas,r8a7790-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
-index ff7ca3584e16..e119ef372ba3 100644
---- a/include/dt-bindings/clock/r8a7790-clock.h
-+++ b/include/dt-bindings/clock/r8a7790-clock.h
-@@ -108,6 +108,7 @@
- #define R8A7790_CLK_VIN2		9
- #define R8A7790_CLK_VIN1		10
- #define R8A7790_CLK_VIN0		11
-+#define R8A7790_CLK_ETHERAVB		12
- #define R8A7790_CLK_ETHER		13
- #define R8A7790_CLK_SATA1		14
- #define R8A7790_CLK_SATA0		15
+diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
+index 7adf9ce5fc1d..4092ad16e0a4 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.c
++++ b/arch/arm/mach-shmobile/pm-rcar.c
+@@ -51,11 +51,19 @@
+ static void __iomem *rcar_sysc_base;
+ static DEFINE_SPINLOCK(rcar_sysc_lock); /* SMP CPUs + I/O devices */
+ 
+-static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
+-				int sr_bit, int reg_offs)
++static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch, bool on)
+ {
++	unsigned int sr_bit, reg_offs;
+ 	int k;
+ 
++	if (on) {
++		sr_bit = SYSCSR_PONENB;
++		reg_offs = PWRONCR_OFFS;
++	} else {
++		sr_bit = SYSCSR_POFFENB;
++		reg_offs = PWROFFCR_OFFS;
++	}
++
+ 	/* Wait until SYSC is ready to accept a power request */
+ 	for (k = 0; k < SYSCSR_RETRIES; k++) {
+ 		if (ioread32(rcar_sysc_base + SYSCSR) & BIT(sr_bit))
+@@ -73,18 +81,7 @@ static int rcar_sysc_pwr_on_off(const struct rcar_sysc_ch *sysc_ch,
+ 	return 0;
+ }
+ 
+-static int rcar_sysc_pwr_off(const struct rcar_sysc_ch *sysc_ch)
+-{
+-	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_POFFENB, PWROFFCR_OFFS);
+-}
+-
+-static int rcar_sysc_pwr_on(const struct rcar_sysc_ch *sysc_ch)
+-{
+-	return rcar_sysc_pwr_on_off(sysc_ch, SYSCSR_PONENB, PWRONCR_OFFS);
+-}
+-
+-static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
+-			    int (*on_off_fn)(const struct rcar_sysc_ch *))
++static int rcar_sysc_power(const struct rcar_sysc_ch *sysc_ch, bool on)
+ {
+ 	unsigned int isr_mask = BIT(sysc_ch->isr_bit);
+ 	unsigned int chan_mask = BIT(sysc_ch->chan_bit);
+@@ -99,7 +96,7 @@ static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
+ 
+ 	/* Submit power shutoff or resume request until it was accepted */
+ 	for (k = 0; k < PWRER_RETRIES; k++) {
+-		ret = on_off_fn(sysc_ch);
++		ret = rcar_sysc_pwr_on_off(sysc_ch, on);
+ 		if (ret)
+ 			goto out;
+ 
+@@ -138,12 +135,12 @@ static int rcar_sysc_update(const struct rcar_sysc_ch *sysc_ch,
+ 
+ int rcar_sysc_power_down(const struct rcar_sysc_ch *sysc_ch)
+ {
+-	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_off);
++	return rcar_sysc_power(sysc_ch, false);
+ }
+ 
+ int rcar_sysc_power_up(const struct rcar_sysc_ch *sysc_ch)
+ {
+-	return rcar_sysc_update(sysc_ch, rcar_sysc_pwr_on);
++	return rcar_sysc_power(sysc_ch, true);
+ }
+ 
+ bool rcar_sysc_power_is_off(const struct rcar_sysc_ch *sysc_ch)
 -- 
 2.1.4
