@@ -1,9 +1,9 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jul 2015 15:19:45 +0900
-Subject: [PATCH 4/7] [media] platform: Drop owner assignment from i2c_driver
+Date: Fri, 10 Jul 2015 15:19:46 +0900
+Subject: [PATCH 5/7] [media] radio: Drop owner assignment from i2c_driver
 In-Reply-To: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
 References: <1436509188-23320-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1436509188-23320-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1436509188-23320-6-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,33 +17,46 @@ Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 The coccinelle script which generated the patch was sent here:
 http://www.spinics.net/lists/kernel/msg2029903.html
 ---
- drivers/media/platform/s5p-tv/hdmiphy_drv.c | 1 -
- drivers/media/platform/s5p-tv/sii9234_drv.c | 1 -
- 2 files changed, 2 deletions(-)
+ drivers/media/radio/radio-tea5764.c | 1 -
+ drivers/media/radio/saa7706h.c      | 1 -
+ drivers/media/radio/tef6862.c       | 1 -
+ 3 files changed, 3 deletions(-)
 
-diff --git a/drivers/media/platform/s5p-tv/hdmiphy_drv.c b/drivers/media/platform/s5p-tv/hdmiphy_drv.c
-index c2f2e35642f2..aae652351aa8 100644
---- a/drivers/media/platform/s5p-tv/hdmiphy_drv.c
-+++ b/drivers/media/platform/s5p-tv/hdmiphy_drv.c
-@@ -315,7 +315,6 @@ MODULE_DEVICE_TABLE(i2c, hdmiphy_id);
- static struct i2c_driver hdmiphy_driver = {
+diff --git a/drivers/media/radio/radio-tea5764.c b/drivers/media/radio/radio-tea5764.c
+index cc3990111411..a1930b300c06 100644
+--- a/drivers/media/radio/radio-tea5764.c
++++ b/drivers/media/radio/radio-tea5764.c
+@@ -526,7 +526,6 @@ MODULE_DEVICE_TABLE(i2c, tea5764_id);
+ static struct i2c_driver tea5764_i2c_driver = {
  	.driver = {
- 		.name	= "s5p-hdmiphy",
--		.owner	= THIS_MODULE,
+ 		.name = "radio-tea5764",
+-		.owner = THIS_MODULE,
  	},
- 	.probe		= hdmiphy_probe,
- 	.remove		= hdmiphy_remove,
-diff --git a/drivers/media/platform/s5p-tv/sii9234_drv.c b/drivers/media/platform/s5p-tv/sii9234_drv.c
-index db8c17bb4aaa..8d171310af8f 100644
---- a/drivers/media/platform/s5p-tv/sii9234_drv.c
-+++ b/drivers/media/platform/s5p-tv/sii9234_drv.c
-@@ -397,7 +397,6 @@ MODULE_DEVICE_TABLE(i2c, sii9234_id);
- static struct i2c_driver sii9234_driver = {
+ 	.probe = tea5764_i2c_probe,
+ 	.remove = tea5764_i2c_remove,
+diff --git a/drivers/media/radio/saa7706h.c b/drivers/media/radio/saa7706h.c
+index ec805b09c608..53a5de1af9b4 100644
+--- a/drivers/media/radio/saa7706h.c
++++ b/drivers/media/radio/saa7706h.c
+@@ -429,7 +429,6 @@ MODULE_DEVICE_TABLE(i2c, saa7706h_id);
+ 
+ static struct i2c_driver saa7706h_driver = {
  	.driver = {
- 		.name	= "sii9234",
 -		.owner	= THIS_MODULE,
- 		.pm = &sii9234_pm_ops,
+ 		.name	= DRIVER_NAME,
  	},
- 	.probe		= sii9234_probe,
+ 	.probe		= saa7706h_probe,
+diff --git a/drivers/media/radio/tef6862.c b/drivers/media/radio/tef6862.c
+index a9319a24c7ef..9f879f0ec0ef 100644
+--- a/drivers/media/radio/tef6862.c
++++ b/drivers/media/radio/tef6862.c
+@@ -195,7 +195,6 @@ MODULE_DEVICE_TABLE(i2c, tef6862_id);
+ 
+ static struct i2c_driver tef6862_driver = {
+ 	.driver = {
+-		.owner	= THIS_MODULE,
+ 		.name	= DRIVER_NAME,
+ 	},
+ 	.probe		= tef6862_probe,
 -- 
 1.9.1
