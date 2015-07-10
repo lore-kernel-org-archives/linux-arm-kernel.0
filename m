@@ -1,154 +1,74 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Fri, 10 Jul 2015 11:37:10 -0600
-Subject: [PATCH v3 2/3] ARM: cpuidle: refine cpuidle_ops member's
- parameters.
-In-Reply-To: <1436430685-2202-3-git-send-email-jszhang@marvell.com>
-References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
- <1436430685-2202-3-git-send-email-jszhang@marvell.com>
-Message-ID: <20150710173710.GF2049@linaro.org>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Fri, 10 Jul 2015 23:31:28 +0530
+Subject: [PATCH v2 0/2] Implement sample time consideration for Vybrid's
+ ADC
+In-Reply-To: <20150710084704.GK23464@tiger>
+References: <cover.1435134626.git.maitysanchayan@gmail.com>
+ <20150710084704.GK23464@tiger>
+Message-ID: <20150710180128.GA8723@Sanchayan-Arch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09 2015 at 02:33 -0600, Jisheng Zhang wrote:
->As for the suspend member function, the to-be-suspended cpu is always
->the calling cpu itself, so the 'cpu' parameter may not be necessary, let
->driver get 'cpu' itself if need.
->
->As for the init member function, the device_node here may not be
->necessary either, because we can get the node via. of_get_cpu_node().
->
->Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Hello Shawn,
 
-Tested-by: Lina Iyer <lina.iyer@linaro.org>
+On 15-07-10 16:47:04, Shawn Guo wrote:
+> On Wed, Jun 24, 2015 at 02:03:39PM +0530, Sanchayan Maity wrote:
+> > Hello,
+> > 
+> > This patchset adds a dt binding for specifying sample time
+> > for the vybrid adc driver and takes this into account for
+> > sampling frequency calculation and related configuration in
+> > the driver.
+> > 
+> > The patchset is based on top of Stefan's patches here
+> > http://lkml.iu.edu/hypermail/linux/kernel/1505.3/02043.html
+> > 
+> > which got recently applied. Tested with shawn's for-next
+> > branch.
+> > 
+> > Changes since v1:
+> > 
+> > Change from a vendor specific fsl,min-sample-time to non vendor
+> > specific min-sample-time.
+> 
+> What's the reason for that?  Property without vendor prefix would be
+> the generic one, which should be defined by generic ADC bindings, not
+> vf610-adc.txt.
 
->---
-> arch/arm/include/asm/cpuidle.h |  6 +++---
-> arch/arm/kernel/cpuidle.c      |  8 ++++----
-> drivers/soc/qcom/spm.c         | 17 ++++++++++++-----
-> 3 files changed, 19 insertions(+), 12 deletions(-)
->
->diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
->index 0f84249..ca5dfe6 100644
->--- a/arch/arm/include/asm/cpuidle.h
->+++ b/arch/arm/include/asm/cpuidle.h
->@@ -30,8 +30,8 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
-> struct device_node;
->
-> struct cpuidle_ops {
->-	int (*suspend)(int cpu, unsigned long arg);
->-	int (*init)(struct device_node *, int cpu);
->+	int (*suspend)(unsigned long arg);
->+	int (*init)(unsigned int cpu);
-> };
->
-> struct of_cpuidle_method {
->@@ -46,6 +46,6 @@ struct of_cpuidle_method {
->
-> extern int arm_cpuidle_suspend(int index);
->
->-extern int arm_cpuidle_init(int cpu);
->+extern int arm_cpuidle_init(unsigned int cpu);
->
-> #endif
->diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
->index 318da33..7bc7bc6 100644
->--- a/arch/arm/kernel/cpuidle.c
->+++ b/arch/arm/kernel/cpuidle.c
->@@ -53,10 +53,10 @@ int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
-> int arm_cpuidle_suspend(int index)
-> {
-> 	int ret = -EOPNOTSUPP;
->-	int cpu = smp_processor_id();
->+	unsigned int cpu = smp_processor_id();
->
-> 	if (cpuidle_ops[cpu].suspend)
->-		ret = cpuidle_ops[cpu].suspend(cpu, index);
->+		ret = cpuidle_ops[cpu].suspend(index);
->
-> 	return ret;
-> }
->@@ -134,7 +134,7 @@ static int __init arm_cpuidle_read_ops(struct device_node *dn, int cpu)
->  *  -ENXIO if the HW reports a failure or a misconfiguration,
->  *  -ENOMEM if the HW report an memory allocation failure
->  */
->-int __init arm_cpuidle_init(int cpu)
->+int __init arm_cpuidle_init(unsigned int cpu)
-> {
-> 	struct device_node *cpu_node = of_cpu_device_node_get(cpu);
-> 	int ret;
->@@ -144,7 +144,7 @@ int __init arm_cpuidle_init(int cpu)
->
-> 	ret = arm_cpuidle_read_ops(cpu_node, cpu);
-> 	if (!ret && cpuidle_ops[cpu].init)
->-		ret = cpuidle_ops[cpu].init(cpu_node, cpu);
->+		ret = cpuidle_ops[cpu].init(cpu);
->
-> 	of_node_put(cpu_node);
->
->diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
->index b04b05a..1649ec3 100644
->--- a/drivers/soc/qcom/spm.c
->+++ b/drivers/soc/qcom/spm.c
->@@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
->
-> static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
->
->-typedef int (*idle_fn)(int);
->+typedef int (*idle_fn)(void);
-> static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
->
-> static inline void spm_register_write(struct spm_driver_data *drv,
->@@ -179,9 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
-> 	return -1;
-> }
->
->-static int qcom_cpu_spc(int cpu)
->+static int qcom_cpu_spc(void)
-> {
-> 	int ret;
->+	int cpu = smp_processor_id();
-> 	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
->
-> 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
->@@ -197,9 +198,11 @@ static int qcom_cpu_spc(int cpu)
-> 	return ret;
-> }
->
->-static int qcom_idle_enter(int cpu, unsigned long index)
->+static int qcom_idle_enter(unsigned long index)
-> {
->-	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
->+	unsigned int cpu = smp_processor_id();
->+
->+	return per_cpu(qcom_idle_ops, cpu)[index]();
-> }
->
-> static const struct of_device_id qcom_idle_state_match[] __initconst = {
->@@ -207,7 +210,7 @@ static const struct of_device_id qcom_idle_state_match[] __initconst = {
-> 	{ },
-> };
->
->-static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
->+static int __init qcom_cpuidle_init(unsigned int cpu)
-> {
-> 	const struct of_device_id *match_id;
-> 	struct device_node *state_node;
->@@ -217,6 +220,10 @@ static int __init qcom_cpuidle_init(struct device_node *cpu_node, int cpu)
-> 	idle_fn *fns;
-> 	cpumask_t mask;
-> 	bool use_scm_power_down = false;
->+	struct device_node *cpu_node = of_get_cpu_node(cpu, NULL);
->+
->+	if (!cpu_node)
->+		return -ENODEV;
->
-> 	for (i = 0; ; i++) {
-> 		state_node = of_parse_phandle(cpu_node, "cpu-idle-states", i);
->-- 
->2.1.4
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The reason for going with a generic one was discussed in the first series,
+as though there might not be any devices at the moment using this property,
+some might appear or use it in the future.
+
+I did consider putting this in the generic ADC bindings, however for lack
+of one like one present for touchscreen, I kept it in the vf610 specific
+driver binding. Thought there should not be any harm with this.
+
+- Sanchayan.
+
+> 
+> Shawn
+> 
+> > 
+> > Version 1 of the patchset can be found here
+> > http://lkml.iu.edu/hypermail/linux/kernel/1506.1/00026.html
+> > 
+> > - Sanchayan.
+> > 
+> > Sanchayan Maity (2):
+> >   iio: adc: Determine sampling frequencies by using minimum sample time
+> >   ARM: dts: vfxxx: Add property for minimum sample time
+> > 
+> >  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  6 ++
+> >  arch/arm/boot/dts/vfxxx.dtsi                       |  2 +
+> >  drivers/iio/adc/vf610_adc.c                        | 74 ++++++++++++++++++++--
+> >  3 files changed, 78 insertions(+), 4 deletions(-)
+> > 
+> > -- 
+> > 2.4.4
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> > 
