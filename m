@@ -1,58 +1,55 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 11 Jul 2015 10:02:51 +0200 (CEST)
-Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
- tracepoint
-In-Reply-To: <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
-References: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
- <20150624124227.1cddbbac@gandalf.local.home>
- <alpine.DEB.2.11.1507052326100.3916@nanos>
- <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
-Message-ID: <alpine.DEB.2.11.1507110953140.17353@nanos>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Sat, 11 Jul 2015 18:32:37 +0800
+Subject: [PATCH v2 4/9] clocksource: mediatek: Use GPT as sched clock
+ source
+In-Reply-To: <1551938.VHQvCCENeg@ubix>
+References: <1431763110-443-1-git-send-email-yingjoe.chen@mediatek.com>
+ <CABuKBeJhdRBBw1v1kj8J0YFVWZ27vzx5W=XU8jiwePVgL_7g_g@mail.gmail.com>
+ <CAGS+omDa4X7daAYD6SDuEM6bMQwojNUCnGMGiUwnJ6M_yBTRLg@mail.gmail.com>
+ <1551938.VHQvCCENeg@ubix>
+Message-ID: <1436610757.17661.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Jul 2015, Ankit Gupta wrote:
-> > On Wed, 24 Jun 2015, Steven Rostedt wrote:
-> >> > +
-> >> > +#define show_chip_name(irq)					\
-> >> > +	(irq_get_irq_data(irq)					\
-> >> > +			 ? irq_get_irq_data(irq)->chip->name	\
-> >> > +			 : "NULL")
-> >> > +
-> >> > +#define show_hwirq(irq)						\
-> >> > +	(irq_get_irq_data(irq)					\
-> >> > +			 ? irq_get_irq_data(irq)->hwirq		\
-> >> > +			 : -ENODEV)
-> >>
-> >> Note these magic functions will only be useful for the tracefs reads of
-> >> the trace files. Userspace tools that extract the data (like perf and
-> >> trace-cmd), will have no idea of how to parse it.
-> >>
-> >> I'm not against doing this, but I'm just letting you know what the
-> >> effect of this change will be.
-> >
-> > What's worse is, that they are racy against a concurrent teardown of
-> > the interrupt. Not a good idea ...
-> >
+On Fri, 2015-07-03 at 17:51 +0200, Matthias Brugger wrote:
+> On Friday, July 03, 2015 09:48:42 PM Daniel Kurtz wrote:
+
+<...>
+
+> > >> @@ -243,6 +251,8 @@ static void __init mtk_timer_init(struct device_node
+> > >> *node)>> 
+> > >>         mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, 1);
+> > >>         clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
+> > >>         
+> > >>                         node->name, rate, 300, 32,
+> > >>                         clocksource_mmio_readl_up);
+> > >> 
+> > >> +       gpt_base = evt->gpt_base;
+> > > 
+> > > This is really hacky. We should clean up the code and provide
+> > > mtk_clock_event_device globally.
+> > > Please add the patch below, which does exactly this.
+> > 
+> > I don't think this is so hacky.
+> > In light of Stephen's comment about the benefit of using
+> > container_of() to extract gpt_base from the passed in struct
+> > clock_event_device in the other routines, what is the benefit of
+> > making more of mtk_clock_event_device global?
+> > I think what Yingjoe has implemented is short and sweet.
+> > 
 > 
-> Agree, I'll save the chip-name and hwirq in the struct. This technique
-> using the same macros to save the chip-name and hwirq in the struct also
-> works well with trace-cmd.
+> Huh, this patch got somehow forgotten.
+> Ok, just one comment. I would prefer to rename the global gpt_base to 
+> gpt_sched_base or something similar and set the pointer + offset directly 
+> mtk_timer_init.
 
-Though I really doubt that this is the proper way to go. Why do you want
-to store redundant information on every tracepoint?
 
-That does not make any sense.
+In next version, I will it change to:
 
-What we really want is an interface to query the interrupt association
-(linux interrupt number, chip, domain, hwirq, ...) in one go when the
-tracer starts and have tracepoints which keep track of irq setup and
-teardown.
+static void __iomem *gpt_sched_reg __read_mostly;
 
-That way we keep the hotpath tracepoints tiny and the analysis tools
-can create rich tracepoints for postprocessing. That's how perf is
-working as well.
+and in mtk_timer_init:
 
-Thanks,
++       gpt_sched_reg = evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC);
 
-	tglx
+Joe.C
