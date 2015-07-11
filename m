@@ -1,82 +1,47 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Sat, 11 Jul 2015 00:17:22 +0100
-Subject: [PATCH v2 7/7] KVM: arm: implement kvm_set_msi by gsi direct
- mapping
-In-Reply-To: <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
-References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
- <1436430137-24205-8-git-send-email-eric.auger@linaro.org>
-Message-ID: <55A05282.6020105@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sat, 11 Jul 2015 02:29:19 +0200
+Subject: [PATCH 1/4] ARM: dts: Add sbs-battery dts fragment used by chromebooks
+In-Reply-To: <1436574562-16308-1-git-send-email-heiko@sntech.de>
+References: <1436574562-16308-1-git-send-email-heiko@sntech.de>
+Message-ID: <1436574562-16308-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/07/15 09:22, Eric Auger wrote:
-> If the ITS modality is not available, let's simply support MSI
-> injection by transforming the MSI.data into an SPI ID.
-> 
-> This becomes possible to use KVM_SIGNAL_MSI ioctl for arm too.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
-> ---
-> 
-> v1 -> v2:
-> - introduce vgic_v2m_inject_msi in vgic-v2-emul.c following Andre's
->   advice
-> ---
->  arch/arm/kvm/Kconfig        |  1 +
->  virt/kvm/arm/vgic-v2-emul.c | 12 ++++++++++++
->  2 files changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-> index 151e710..0f58baf 100644
-> --- a/arch/arm/kvm/Kconfig
-> +++ b/arch/arm/kvm/Kconfig
-> @@ -31,6 +31,7 @@ config KVM
->  	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
-> +	select HAVE_KVM_MSI
+From: Chris Zhong <zyw@rock-chips.com>
 
-I wonder if this requires some more code to only advertise
-KVM_CAP_SIGNAL_MSI if userland actually sets up a GICv2M?
-Otherwise userland could get the idea of being able to inectj MSIs
-without the guest actually being prepared for that (because the GICv2M
-driver did not initialize).
+This patch creates a sbs-battery fragment for batteries connected
+to the i2c tunnel of the cros-ec embedded controller.
 
-Cheers,
-Andre.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/cros-ec-sbs.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 arch/arm/boot/dts/cros-ec-sbs.dtsi
 
->  	select HAVE_KVM_IRQCHIP
->  	select HAVE_KVM_IRQ_ROUTING
->  	depends on ARM_VIRT_EXT && ARM_LPAE && ARM_ARCH_TIMER
-> diff --git a/virt/kvm/arm/vgic-v2-emul.c b/virt/kvm/arm/vgic-v2-emul.c
-> index 1390797..43013cc 100644
-> --- a/virt/kvm/arm/vgic-v2-emul.c
-> +++ b/virt/kvm/arm/vgic-v2-emul.c
-> @@ -478,6 +478,17 @@ static bool vgic_v2_queue_sgi(struct kvm_vcpu *vcpu, int irq)
->  }
->  
->  /**
-> + * Emulates GICv2M MSI injection by injecting the SPI ID matching
-> + * the msi data
-> + * @kvm: pointer to the kvm struct
-> + * @msi: the msi struct handle
-> + */
-> +static int vgic_v2m_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	return kvm_vgic_inject_irq(kvm, 0, msi->data, 1);
-> +}
-> +
-> +/**
->   * kvm_vgic_map_resources - Configure global VGIC state before running any VCPUs
->   * @kvm: pointer to the kvm struct
->   *
-> @@ -566,6 +577,7 @@ void vgic_v2_init_emulation(struct kvm *kvm)
->  	dist->vm_ops.add_sgi_source = vgic_v2_add_sgi_source;
->  	dist->vm_ops.init_model = vgic_v2_init_model;
->  	dist->vm_ops.map_resources = vgic_v2_map_resources;
-> +	dist->vm_ops.inject_msi = vgic_v2m_inject_msi;
->  
->  	kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
->  }
-> 
+diff --git a/arch/arm/boot/dts/cros-ec-sbs.dtsi b/arch/arm/boot/dts/cros-ec-sbs.dtsi
+new file mode 100644
+index 0000000..b76afe2
+--- /dev/null
++++ b/arch/arm/boot/dts/cros-ec-sbs.dtsi
+@@ -0,0 +1,18 @@
++/*
++ * Smart battery dts fragment for devices that use cros-ec-sbs
++ *
++ * Copyright (c) 2015 Google, Inc
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++&i2c_tunnel {
++	battery: sbs-battery at b {
++		compatible = "sbs,sbs-battery";
++		reg = <0xb>;
++		sbs,i2c-retry-count = <2>;
++		sbs,poll-retry-count = <1>;
++	};
++};
+-- 
+2.1.4
