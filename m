@@ -1,56 +1,50 @@
-From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
-Date: Sat, 11 Jul 2015 17:26:44 +0200
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <55A09710.3030509@wwwdotorg.org>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
- <55A09710.3030509@wwwdotorg.org>
-Message-ID: <55A135B4.1060309@tronnes.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 11 Jul 2015 19:28:48 +0200
+Subject: [PATCH v3 0/2] RTC support for NXP LPC18xx family
+Message-ID: <1436635730-15617-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch set adds support for the RTC found on many NXP devices
+including LPC178x/18xx/408x/43xx. The RTC provides calendar and
+clock functionality together with alarm interrupt support.
 
-Den 11.07.2015 06:09, skrev Stephen Warren:
-> (Sorry for the slow reply; I was on vacation)
->
-> On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
->> Den 18.06.2015 04:26, skrev Stephen Warren:
->>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
->>>> Add a duplicate irq range with an offset on the hwirq's so the
->>>> driver can detect that enable_fiq() is used.
->>>> Tested with downstream dwc_otg USB controller driver.
->>> This basically looks OK, but a few comments/thoughts:
->>> b) Doesn't the driver need to refuse some operation (handler
->>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
->>> FIQ range, since the FIQ control register only allows routing 1 IRQ to
->>> FIQ.
->> claim_fiq() protects the FIQ. See d) answer below.
-> That assumes the IRQ is "accessed" via the fiq-specific APIs. Since this
-> patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
-> doesn't do anything special to prevent clients from using IRQs n..2n-1
-> via the existing IRQ APIs, it's quite possible the a buggy client would.
+The driver is a rework of an old driver by Kevin Wells. It has been
+modified to support modern resource allocation, device tree and
+generally cleaned up. Driver was originally written to support the
+LPC24xx platform but since this platform isn't upstream support has
+been removed. The LPC24xx name is still kept to preserve the origin
+of this hardware block.
 
-Yes, but doesn't this apply to all irq use, using the wrong one doesn't 
-work.
-If FIQ's where in more common use, we might have seen a FIQ IRQ flag instead
-of special FIQ irqs.
+Been a while since the last version, but this version should address
+all comments from Josh and Alexandre on v2. There has also been some
+rework from my side. Please have a look.
 
-> (From another email):
->>>> c) The DT binding needs updating to describe the extra IRQs:
->>>>
->>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
->>> Ok.
->> I have seconds thoughts on this:
->> This patch does not change the DT bindings so I don't see what update
->> I should make. This patch only adds support for the Linux way of
->> handling FIQ's through enable_fiq(). It doesn't change how interrupts
->> are described in the DT.
-> The intention of the patch may not be to expand the set of IRQs
-> available via DT, but it does in practice. I think you need to add a
-> custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
-> be translated from DT, and not IRQs n..2n-1. If you do that, then I
-> agree that no DT binding update should be required.
+changes since v2:
+ - rework hw init
+ - update Kconfig text
+ - remove unused registers defines
+ - misc clean ups
+ - rebase on 4.2-rc1
 
-armctrl_xlate() maps to the same hwirqs as before. This patch adds a
-new range of hwirqs at the end of the "real" hwirq range.
-It's not possible to get to these FIQ shadow hwirqs through DT.
+changes since v1:
+ - s/lpc2k/lpc24xx for better consistency
+ - fix Kconfig entry
+ - drop support for old versions for the ip block
+
+Patch set is based on Linux v4.2-rc1.
+
+Joachim Eastwood (2):
+  rtc: add rtc-lpc24xx driver
+  doc: dt: add documentation for nxp,lpc1788-rtc
+
+ .../devicetree/bindings/rtc/nxp,lpc1788-rtc.txt    |  21 ++
+ drivers/rtc/Kconfig                                |  12 +
+ drivers/rtc/Makefile                               |   1 +
+ drivers/rtc/rtc-lpc24xx.c                          | 310 +++++++++++++++++++++
+ 4 files changed, 344 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt
+ create mode 100644 drivers/rtc/rtc-lpc24xx.c
+
+-- 
+1.8.0
