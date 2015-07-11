@@ -1,62 +1,58 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 11 Jul 2015 09:51:08 +0200 (CEST)
-Subject: [PATCH 4/4] irqchip: Add bcm2836 interrupt controller for
- Raspberry Pi 2.
-In-Reply-To: <55A0A5EB.4090007@wwwdotorg.org>
-References: <1436303617-17185-1-git-send-email-eric@anholt.net>
- <1436303617-17185-5-git-send-email-eric@anholt.net>
- <55A0A5EB.4090007@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.11.1507110940420.17353@nanos>
+Date: Sat, 11 Jul 2015 10:02:51 +0200 (CEST)
+Subject: [PATCH V3] trace/events: add chip name and hwirq to irq entry
+ tracepoint
+In-Reply-To: <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
+References: <1435162650-32266-1-git-send-email-ankgupta@codeaurora.org>
+ <20150624124227.1cddbbac@gandalf.local.home>
+ <alpine.DEB.2.11.1507052326100.3916@nanos>
+ <2686ba70b03b3e16c94f93052aa56703.squirrel@www.codeaurora.org>
+Message-ID: <alpine.DEB.2.11.1507110953140.17353@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jul 2015, Stephen Warren wrote:
-> On 07/07/2015 03:13 PM, Eric Anholt wrote:
-> > +static struct arm_local_intc intc  __read_mostly;
+On Wed, 8 Jul 2015, Ankit Gupta wrote:
+> > On Wed, 24 Jun 2015, Steven Rostedt wrote:
+> >> > +
+> >> > +#define show_chip_name(irq)					\
+> >> > +	(irq_get_irq_data(irq)					\
+> >> > +			 ? irq_get_irq_data(irq)->chip->name	\
+> >> > +			 : "NULL")
+> >> > +
+> >> > +#define show_hwirq(irq)						\
+> >> > +	(irq_get_irq_data(irq)					\
+> >> > +			 ? irq_get_irq_data(irq)->hwirq		\
+> >> > +			 : -ENODEV)
+> >>
+> >> Note these magic functions will only be useful for the tracefs reads of
+> >> the trace files. Userspace tools that extract the data (like perf and
+> >> trace-cmd), will have no idea of how to parse it.
+> >>
+> >> I'm not against doing this, but I'm just letting you know what the
+> >> effect of this change will be.
+> >
+> > What's worse is, that they are racy against a concurrent teardown of
+> > the interrupt. Not a good idea ...
+> >
 > 
-> It'd be nice to give everything (types, functions, variables) a
-> consistent symbol prefix; bcm2836_arm_irqchip_ sounds like a good
-> bikeshed to me, but perhaps just propagating the above arm_local_ to the
-> functions too would be good, although that seems to risk symbol name
-> collisions with other ARM SoCs.
+> Agree, I'll save the chip-name and hwirq in the struct. This technique
+> using the same macros to save the chip-name and hwirq in the struct also
+> works well with trace-cmd.
 
-Which is irrelevant because its static.
+Though I really doubt that this is the proper way to go. Why do you want
+to store redundant information on every tracepoint?
 
-> > +static void bcm2836_mask_per_cpu_irq(unsigned int reg, unsigned int bit)
-> > +{
-> > +	void __iomem *reg_base = intc.base + reg;
-> > +	unsigned int i;
-> > +
-> > +	for (i = 0; i < 4; i++)
-> 
-> Is "4" there the CPU count? Perhaps this should use one of the Linux
-> APIs to query the CPU count rather than hard-coding it?
-> 
-> Should per-CPU IRQs automatically be masked on all CPUs at once, or only
-> on the current CPU? A very quick look at the ARM GIC driver implies it
-> doesn't iterate over all CPUs when masking per-CPU IRQs.
+That does not make any sense.
 
-Usually per cpu interrupts are only masked on the cpu which is calling
-the function. The whole reason why per cpu interrupts exist is that
-you can share the same interrupt number for all cores.
+What we really want is an interface to query the interrupt association
+(linux interrupt number, chip, domain, hwirq, ...) in one go when the
+tracer starts and have tracepoints which keep track of irq setup and
+teardown.
 
-So masking all interrupts is not a good idea. In this case if a cpu is
-hot unplugged, then all other cpus would not longer get timer
-interrupts. Not what you really want, right?
- 
-> > +static void bcm2836_mask_gpu_irq(struct irq_data *d)
-> > +{
-> > +}
-> > +
-> > +static void bcm2836_unmask_gpu_irq(struct irq_data *d)
-> > +{
-> > +}
-> 
-> If the IRQs can't be masked, should these functions actually be implemented?
+That way we keep the hotpath tracepoints tiny and the analysis tools
+can create rich tracepoints for postprocessing. That's how perf is
+working as well.
 
-We have a few places in the core which expect at least mask/unmask to
-be implemented.
- 
 Thanks,
 
 	tglx
