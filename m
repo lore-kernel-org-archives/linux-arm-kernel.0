@@ -1,30 +1,44 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 11 Jul 2015 14:53:08 +0200
-Subject: [linux-sunxi] Re: [PATCH v2 2/2] mfd: ax20x: Add axp152 support
-In-Reply-To: <CAJKOXPc=RGUrv74E9bh2g2SLi8+1w46c05xr5Lj=sutssvxwDA@mail.gmail.com>
-References: <1436527717-28062-1-git-send-email-hdegoede@redhat.com>
- <1436527717-28062-2-git-send-email-hdegoede@redhat.com>
- <CAOMqctRTgfvn9E9=dk5GR6Koy23wfRY4y5vqtSaZ+8vovTQ35w@mail.gmail.com>
- <CAJKOXPc=RGUrv74E9bh2g2SLi8+1w46c05xr5Lj=sutssvxwDA@mail.gmail.com>
-Message-ID: <55A111B4.8080808@redhat.com>
+Date: Sat, 11 Jul 2015 14:59:55 +0200
+Subject: [PATCH v3 1/2] ARM: dts: Add binding documentation for AXP152 PMIC
+Message-ID: <1436619596-11823-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add devicetree binding documentation for the AXP152 PMIC, this is a
+stripped down version of the AXP202 PMIC with the battery charging
+function removed.
 
-On 11-07-15 08:45, Krzysztof Kozlowski wrote:
-> 2015-07-10 20:50 GMT+09:00 Michal Suchanek <hramrach@gmail.com>:
->> Hello,
->>
->> I see missing 'p' in axp20x in the subject u.u
->>
->> Please fix before merging this anywhere.
->
-> Shouldn't it contain also your signed-off-by?
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-New patch in v2 of this series
+Changes in v3:
+-Added Michal Suchanek's S-o-b (with his permission)
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Ah right, Michal already gave me permission to add that, but
-I forgot to add it. I will do a v3 fixing both right away.
-
-Regards,
-
-Hans
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 753f14f..4181122 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -1,12 +1,14 @@
+ AXP family PMIC device tree bindings
+ 
+ The axp20x family current members :
++axp152 (X-Powers)
+ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
+ 
+ Required properties:
+-- compatible: "x-powers,axp202", "x-powers,axp209", "x-powers,axp221"
++- compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
++	      "x-powers,axp221"
+ - reg: The I2C slave address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+-- 
+2.4.3
