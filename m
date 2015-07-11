@@ -1,66 +1,69 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Fri, 10 Jul 2015 18:19:07 -0700
-Subject: [PATCH v4 2/2] keep arm vfp/simd exit handling consistent with arm64
-In-Reply-To: <1436577547-5646-1-git-send-email-m.smarduch@samsung.com>
-References: <1436577547-5646-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <1436577547-5646-3-git-send-email-m.smarduch@samsung.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 10 Jul 2015 22:09:52 -0600
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <5582C87C.20008@tronnes.org>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
+Message-ID: <55A09710.3030509@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After enhancing arm64 FP/SIMD exit handling, ARMv7 VFP exit branch is moved
-to guest trap handling. This allows us to keep exit handling flow between both
-architectures consistent.
+(Sorry for the slow reply; I was on vacation)
 
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/kvm/interrupts.S | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
+> Den 18.06.2015 04:26, skrev Stephen Warren:
+>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
+>>> Add a duplicate irq range with an offset on the hwirq's so the
+>>> driver can detect that enable_fiq() is used.
+>>> Tested with downstream dwc_otg USB controller driver.
+>> This basically looks OK, but a few comments/thoughts:
 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index 568494d..900ef6d 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -361,10 +361,6 @@ hyp_hvc:
- 	@ Check syndrome register
- 	mrc	p15, 4, r1, c5, c2, 0	@ HSR
- 	lsr	r0, r1, #HSR_EC_SHIFT
--#ifdef CONFIG_VFPv3
--	cmp	r0, #HSR_EC_CP_0_13
--	beq	switch_to_guest_vfp
--#endif
- 	cmp	r0, #HSR_EC_HVC
- 	bne	guest_trap		@ Not HVC instr.
- 
-@@ -378,7 +374,10 @@ hyp_hvc:
- 	cmp     r2, #0
- 	bne	guest_trap		@ Guest called HVC
- 
--host_switch_to_hyp:
-+	/*
-+	 * Getting here means host called HVC, we shift parameters and branch
-+	 * to Hyp function.
-+	 */
- 	pop	{r0, r1, r2}
- 
- 	/* Check for __hyp_get_vectors */
-@@ -409,6 +408,10 @@ guest_trap:
- 
- 	@ Check if we need the fault information
- 	lsr	r1, r1, #HSR_EC_SHIFT
-+#ifdef CONFIG_VFPv3
-+	cmp	r1, #HSR_EC_CP_0_13
-+	beq	switch_to_guest_vfp
-+#endif
- 	cmp	r1, #HSR_EC_IABT
- 	mrceq	p15, 4, r2, c6, c0, 2	@ HIFAR
- 	beq	2f
-@@ -477,7 +480,6 @@ guest_trap:
-  */
- #ifdef CONFIG_VFPv3
- switch_to_guest_vfp:
--	load_vcpu			@ Load VCPU pointer to r0
- 	push	{r3-r7}
- 
- 	@ NEON/VFP used.  Turn on VFP access.
--- 
-1.9.1
+>> b) Doesn't the driver need to refuse some operation (handler
+>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
+>> FIQ range, since the FIQ control register only allows routing 1 IRQ to
+>> FIQ.
+> 
+> claim_fiq() protects the FIQ. See d) answer below.
+
+That assumes the IRQ is "accessed" via the fiq-specific APIs. Since this
+patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
+doesn't do anything special to prevent clients from using IRQs n..2n-1
+via the existing IRQ APIs, it's quite possible the a buggy client would.
+
+(From another email):
+>>> c) The DT binding needs updating to describe the extra IRQs:
+>>>
+>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
+>>
+>> Ok.
+> 
+> I have seconds thoughts on this:
+> This patch does not change the DT bindings so I don't see what update
+> I should make. This patch only adds support for the Linux way of
+> handling FIQ's through enable_fiq(). It doesn't change how interrupts
+> are described in the DT.
+
+The intention of the patch may not be to expand the set of IRQs
+available via DT, but it does in practice. I think you need to add a
+custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
+be translated from DT, and not IRQs n..2n-1. If you do that, then I
+agree that no DT binding update should be required.
+
+Even with a custom of_xlate function, some code could hard-code an IRQ
+number and hence end up registering a FIQ handler that way. However, I
+guess that's a bug that the driver doesn't need to solve. We can just
+fix that bug in the kernel code in that case. The same argument doesn't
+apply to bad DTs; we need to more aggressively protect against that case.
+
+>> d) I wonder how the FIQ handler actually gets routed to this controller
+>> and hooked to its handler etc. I assume there's a separate patch for
+>> that coming?
+> 
+> set_fiq_handler() sets the handler and enable_fiq() enables it:
+> 
+>     if (claim_fiq(&fh))
+>         ERROR;
+>     set_fiq_handler(...)
+>     set_fiq_regs(&regs);
+>     enable_fiq(irq);
+>     local_fiq_enable();
