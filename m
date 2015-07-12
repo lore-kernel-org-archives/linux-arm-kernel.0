@@ -1,167 +1,167 @@
-From: jingoohan1@gmail.com (Jingoo Han)
-Date: Sun, 12 Jul 2015 20:18:29 +0900
-Subject: [RFC Patch V1 08/12] PCI: Use helper functions to access fields
- in struct msi_desc
-In-Reply-To: <1436428847-8886-9-git-send-email-jiang.liu@linux.intel.com>
-References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
- <1436428847-8886-9-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <000001d0bc94$81cc5ca0$856515e0$@com>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 12 Jul 2015 09:26:38 -0500
+Subject: [PATCH v2 00/13] Kill off set_irq_flags
+Message-ID: <1436711211-18223-1-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 09, 2015 5:01 PM, Jiang Liu wrote:
-> 
-> Use helper functions to access fields in struct msi_desc, so we could
-> easily refine msi_desc later.
-> 
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+This series converts all users of ARM specific set_irq_flags to use
+common genirq functions. set_irq_flags is just a wrapper around
+irq_modify_status, so this simply removes the wrapper to directly call
+irq_modify_status (or other helpers) and the translation from ARM
+specific flags to genirq flags. The final irq flag states are unchanged.
+In many cases where irqdomains are used, the set_irq_flags calls were
+redundant, so I've removed them.
 
-For pcie-designware.c,
+The last version has been run thru kernelci.org testing (thanks Kevin H!).
+I plan to send this series through arm-soc. I still need acks from the To
+list here.
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
+This series is available here:
 
-Best regards,
-Jingoo Han
+git://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git irqflags
 
-> ---
->  drivers/pci/host/pci-keystone-dw.c |    6 +++---
->  drivers/pci/host/pcie-designware.c |    4 ++--
->  drivers/pci/host/pcie-xilinx.c     |   12 +++++-------
->  drivers/pci/msi.c                  |   13 ++++++++-----
->  4 files changed, 18 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-> index f34892e0edb4..e792086c1639 100644
-> --- a/drivers/pci/host/pci-keystone-dw.c
-> +++ b/drivers/pci/host/pci-keystone-dw.c
-> @@ -109,7 +109,7 @@ static void ks_dw_pcie_msi_irq_ack(struct irq_data *d)
->  	struct pcie_port *pp;
-> 
->  	msi = irq_get_msi_desc(irq);
-> -	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
->  	update_reg_offset_bit_pos(offset, &reg_offset, &bit_pos);
-> @@ -148,7 +148,7 @@ static void ks_dw_pcie_msi_irq_mask(struct irq_data *d)
->  	u32 offset;
-> 
->  	msi = irq_get_msi_desc(irq);
-> -	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-> 
-> @@ -170,7 +170,7 @@ static void ks_dw_pcie_msi_irq_unmask(struct irq_data *d)
->  	u32 offset;
-> 
->  	msi = irq_get_msi_desc(irq);
-> -	pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
->  	ks_pcie = to_keystone_pcie(pp);
->  	offset = irq - irq_linear_revmap(pp->irq_domain, 0);
-> 
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 69486be7181e..65596f96763c 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -255,7 +255,7 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
->  static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
->  {
->  	int irq, pos0, i;
-> -	struct pcie_port *pp = sys_to_pcie(desc->dev->bus->sysdata);
-> +	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(desc));
-> 
->  	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
->  				       order_base_2(no_irqs));
-> @@ -327,7 +327,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
->  {
->  	struct irq_data *data = irq_get_irq_data(irq);
->  	struct msi_desc *msi = irq_data_get_msi(data);
-> -	struct pcie_port *pp = sys_to_pcie(msi->dev->bus->sysdata);
-> +	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
-> 
->  	clear_irq_range(pp, irq, 1, data->hwirq);
->  }
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index f1a06a091ccb..64454f416639 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -227,18 +227,16 @@ static struct pci_ops xilinx_pcie_ops = {
->   */
->  static void xilinx_pcie_destroy_msi(unsigned int irq)
->  {
-> -	struct irq_desc *desc;
->  	struct msi_desc *msi;
->  	struct xilinx_pcie_port *port;
-> 
-> -	desc = irq_to_desc(irq);
-> -	msi = irq_desc_get_msi_desc(desc);
-> -	port = sys_to_pcie(msi->dev->bus->sysdata);
-> -
-> -	if (!test_bit(irq, msi_irq_in_use))
-> +	if (!test_bit(irq, msi_irq_in_use)) {
-> +		msi = irq_get_msi_desc(irq);
-> +		port = sys_to_pcie(msi_desc_to_pci_sys_data(msi));
->  		dev_err(port->dev, "Trying to free unused MSI#%d\n", irq);
-> -	else
-> +	} else {
->  		clear_bit(irq, msi_irq_in_use);
-> +	}
->  }
-> 
->  /**
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index d09afa78d7a1..6497608545e2 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -208,7 +208,8 @@ u32 __pci_msi_desc_mask_irq(struct msi_desc *desc, u32 mask, u32 flag)
-> 
->  	mask_bits &= ~mask;
->  	mask_bits |= flag;
-> -	pci_write_config_dword(desc->dev, desc->mask_pos, mask_bits);
-> +	pci_write_config_dword(msi_desc_to_pci_dev(desc), desc->mask_pos,
-> +			       mask_bits);
-> 
->  	return mask_bits;
->  }
-> @@ -288,7 +289,9 @@ void default_restore_msi_irqs(struct pci_dev *dev)
-> 
->  void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
->  {
-> -	BUG_ON(entry->dev->current_state != PCI_D0);
-> +	struct pci_dev *dev = msi_desc_to_pci_dev(entry);
-> +
-> +	BUG_ON(dev->current_state != PCI_D0);
-> 
->  	if (entry->msi_attrib.is_msix) {
->  		void __iomem *base = entry->mask_base +
-> @@ -298,7 +301,6 @@ void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
->  		msg->address_hi = readl(base + PCI_MSIX_ENTRY_UPPER_ADDR);
->  		msg->data = readl(base + PCI_MSIX_ENTRY_DATA);
->  	} else {
-> -		struct pci_dev *dev = entry->dev;
->  		int pos = dev->msi_cap;
->  		u16 data;
-> 
-> @@ -318,7 +320,9 @@ void __pci_read_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
-> 
->  void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
->  {
-> -	if (entry->dev->current_state != PCI_D0) {
-> +	struct pci_dev *dev = msi_desc_to_pci_dev(entry);
-> +
-> +	if (dev->current_state != PCI_D0) {
->  		/* Don't touch the hardware now */
->  	} else if (entry->msi_attrib.is_msix) {
->  		void __iomem *base;
-> @@ -329,7 +333,6 @@ void __pci_write_msi_msg(struct msi_desc *entry, struct msi_msg *msg)
->  		writel(msg->address_hi, base + PCI_MSIX_ENTRY_UPPER_ADDR);
->  		writel(msg->data, base + PCI_MSIX_ENTRY_DATA);
->  	} else {
-> -		struct pci_dev *dev = entry->dev;
->  		int pos = dev->msi_cap;
->  		u16 msgctl;
-> 
-> --
-> 1.7.10.4
+v2 changes:
+- Rebase to 4.2-rc1 and add acks
+- Add xgene PCI conversion (added in 4.2)
+- Fix build on clps711x
+
+Rob
+
+
+Rob Herring (13):
+  ARM: kill off set_irq_flags usage
+  clk: kill off set_irq_flags usage
+  dma: kill off set_irq_flags usage
+  gpio: kill off set_irq_flags usage
+  gpu/drm: kill off set_irq_flags usage
+  irqchip: kill off set_irq_flags usage
+  memory: kill off set_irq_flags usage
+  mfd: kill off set_irq_flags usage
+  PCI: kill off set_irq_flags usage
+  pinctrl: kill off set_irq_flags usage
+  sh: kill off set_irq_flags usage
+  ARM: remove ununsed set_irq_flags
+  arm64: remove ununsed set_irq_flags
+
+ arch/arm/common/it8152.c                      |  2 +-
+ arch/arm/common/locomo.c                      |  2 +-
+ arch/arm/common/sa1111.c                      |  4 ++--
+ arch/arm/include/asm/hw_irq.h                 |  6 ------
+ arch/arm/kernel/irq.c                         | 20 --------------------
+ arch/arm/mach-davinci/cp_intc.c               |  2 +-
+ arch/arm/mach-dove/irq.c                      |  2 +-
+ arch/arm/mach-ebsa110/core.c                  |  2 +-
+ arch/arm/mach-footbridge/common.c             |  2 +-
+ arch/arm/mach-footbridge/isa-irq.c            |  8 ++++----
+ arch/arm/mach-gemini/gpio.c                   |  2 +-
+ arch/arm/mach-gemini/irq.c                    |  2 +-
+ arch/arm/mach-imx/3ds_debugboard.c            |  2 +-
+ arch/arm/mach-imx/mach-mx31ads.c              |  2 +-
+ arch/arm/mach-iop13xx/irq.c                   |  2 +-
+ arch/arm/mach-iop32x/irq.c                    |  2 +-
+ arch/arm/mach-iop33x/irq.c                    |  2 +-
+ arch/arm/mach-ixp4xx/common.c                 |  2 +-
+ arch/arm/mach-ks8695/irq.c                    |  2 +-
+ arch/arm/mach-lpc32xx/irq.c                   |  2 +-
+ arch/arm/mach-netx/generic.c                  |  2 +-
+ arch/arm/mach-omap1/fpga.c                    |  2 +-
+ arch/arm/mach-omap1/irq.c                     |  2 +-
+ arch/arm/mach-pxa/balloon3.c                  |  2 +-
+ arch/arm/mach-pxa/irq.c                       |  1 -
+ arch/arm/mach-pxa/lpd270.c                    |  2 +-
+ arch/arm/mach-pxa/pcm990-baseboard.c          |  2 +-
+ arch/arm/mach-pxa/pxa3xx.c                    |  2 +-
+ arch/arm/mach-pxa/viper.c                     |  2 +-
+ arch/arm/mach-pxa/zeus.c                      |  2 +-
+ arch/arm/mach-rpc/ecard.c                     |  2 +-
+ arch/arm/mach-rpc/irq.c                       | 16 ++++++++--------
+ arch/arm/mach-s3c24xx/bast-irq.c              |  2 +-
+ arch/arm/mach-s3c64xx/common.c                |  2 +-
+ arch/arm/mach-sa1100/neponset.c               |  4 ++--
+ arch/arm/mach-w90x900/irq.c                   |  2 +-
+ arch/arm64/include/asm/hardirq.h              |  5 -----
+ drivers/clk/at91/pmc.c                        |  1 -
+ drivers/dma/ipu/ipu_irq.c                     |  8 ++------
+ drivers/gpio/gpio-adp5588.c                   | 10 +---------
+ drivers/gpio/gpio-bcm-kona.c                  | 15 ---------------
+ drivers/gpio/gpio-davinci.c                   |  1 -
+ drivers/gpio/gpio-em.c                        |  1 -
+ drivers/gpio/gpio-ep93xx.c                    |  2 +-
+ drivers/gpio/gpio-grgpio.c                    |  8 --------
+ drivers/gpio/gpio-mcp23s08.c                  |  4 ----
+ drivers/gpio/gpio-msm-v2.c                    |  1 -
+ drivers/gpio/gpio-pxa.c                       |  8 ++++----
+ drivers/gpio/gpio-sa1100.c                    |  2 +-
+ drivers/gpio/gpio-sta2x11.c                   |  2 +-
+ drivers/gpio/gpio-tegra.c                     |  1 -
+ drivers/gpio/gpio-timberdale.c                |  4 +---
+ drivers/gpio/gpiolib.c                        |  8 +-------
+ drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c       |  1 -
+ drivers/gpu/ipu-v3/ipu-common.c               |  3 +--
+ drivers/irqchip/exynos-combiner.c             |  2 +-
+ drivers/irqchip/irq-armada-370-xp.c           |  3 +--
+ drivers/irqchip/irq-bcm2835.c                 |  2 +-
+ drivers/irqchip/irq-clps711x.c                |  6 +++---
+ drivers/irqchip/irq-gic-v3.c                  |  5 ++---
+ drivers/irqchip/irq-gic.c                     |  4 ++--
+ drivers/irqchip/irq-hip04.c                   |  4 ++--
+ drivers/irqchip/irq-keystone.c                |  2 +-
+ drivers/irqchip/irq-mmp.c                     |  3 ---
+ drivers/irqchip/irq-mxs.c                     |  1 -
+ drivers/irqchip/irq-renesas-intc-irqpin.c     |  1 -
+ drivers/irqchip/irq-renesas-irqc.c            |  1 -
+ drivers/irqchip/irq-s3c24xx.c                 | 14 ++------------
+ drivers/irqchip/irq-sa11x0.c                  |  1 -
+ drivers/irqchip/irq-sun4i.c                   |  2 +-
+ drivers/irqchip/irq-versatile-fpga.c          |  2 +-
+ drivers/irqchip/irq-vic.c                     |  2 +-
+ drivers/irqchip/irq-vt8500.c                  |  1 -
+ drivers/irqchip/spear-shirq.c                 |  1 -
+ drivers/memory/omap-gpmc.c                    |  5 ++---
+ drivers/mfd/88pm860x-core.c                   |  4 ----
+ drivers/mfd/ab8500-core.c                     |  4 ----
+ drivers/mfd/arizona-irq.c                     |  7 -------
+ drivers/mfd/asic3.c                           |  4 ++--
+ drivers/mfd/db8500-prcmu.c                    |  1 -
+ drivers/mfd/ezx-pcap.c                        |  6 +-----
+ drivers/mfd/htc-egpio.c                       |  4 ++--
+ drivers/mfd/htc-i2cpld.c                      |  6 +-----
+ drivers/mfd/lp8788-irq.c                      |  5 -----
+ drivers/mfd/max8925-core.c                    |  5 +----
+ drivers/mfd/max8997-irq.c                     |  5 +----
+ drivers/mfd/max8998-irq.c                     |  5 +----
+ drivers/mfd/mt6397-core.c                     |  4 ----
+ drivers/mfd/pm8921-core.c                     |  5 +----
+ drivers/mfd/rc5t583-irq.c                     |  4 +---
+ drivers/mfd/stmpe.c                           |  7 -------
+ drivers/mfd/t7l66xb.c                         |  6 ------
+ drivers/mfd/tc3589x.c                         |  7 -------
+ drivers/mfd/tc6393xb.c                        |  4 ++--
+ drivers/mfd/tps6586x.c                        |  7 -------
+ drivers/mfd/tps65912-irq.c                    |  8 +-------
+ drivers/mfd/twl4030-irq.c                     | 11 +----------
+ drivers/mfd/twl6030-irq.c                     | 13 -------------
+ drivers/mfd/ucb1x00-core.c                    |  2 +-
+ drivers/mfd/wm831x-irq.c                      |  7 -------
+ drivers/mfd/wm8350-irq.c                      |  8 +-------
+ drivers/mfd/wm8994-irq.c                      |  7 -------
+ drivers/pci/host/pci-dra7xx.c                 |  1 -
+ drivers/pci/host/pci-keystone-dw.c            |  2 --
+ drivers/pci/host/pci-tegra.c                  |  1 -
+ drivers/pci/host/pci-xgene-msi.c              |  1 -
+ drivers/pci/host/pcie-designware.c            |  1 -
+ drivers/pci/host/pcie-rcar.c                  |  1 -
+ drivers/pci/host/pcie-xilinx.c                |  2 --
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c         |  1 -
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |  2 --
+ drivers/pinctrl/pinctrl-single.c              |  5 -----
+ drivers/pinctrl/samsung/pinctrl-exynos.c      |  1 -
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c  |  1 -
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c     |  2 --
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c     |  2 --
+ drivers/sh/intc/internals.h                   | 10 +---------
+ 117 files changed, 96 insertions(+), 357 deletions(-)
+
+--
+2.1.0
