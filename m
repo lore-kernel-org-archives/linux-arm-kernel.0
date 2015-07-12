@@ -1,43 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 12 Jul 2015 23:06:03 +0200
-Subject: Gemini Soc timers
-In-Reply-To: <CACRpkdbf2CfT7fJ6wAC3WB9=-Cp0A5xZAO1-Rh78o-U26Fr0Ag@mail.gmail.com>
-References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
- <975d474dd947bcef8d3dd70ef18a5c29@advem.lv>
- <CACRpkdbf2CfT7fJ6wAC3WB9=-Cp0A5xZAO1-Rh78o-U26Fr0Ag@mail.gmail.com>
-Message-ID: <9777530.lnQDW33Iqo@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 12 Jul 2015 22:58:55 +0100
+Subject: [PATCH 3/3] arm64, mm: Use IPIs for TLB invalidation.
+In-Reply-To: <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1436646323-10527-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150712215851.GA12807@MBP>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 July 2015 10:48:26 Linus Walleij wrote:
-> On Thu, Jul 9, 2015 at 6:48 PM, Roman Yeryomin <roman@advem.lv> wrote:
-> > [Me]
-> >> As usual they are just keeping it out of mainline, and this
-> >> is adding sched_clock() and other goodies so should
-> >> probably be upstreamed ASAP.
-> >
-> >
-> > This is what I initially submitted here.
+On Sat, Jul 11, 2015 at 01:25:23PM -0700, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> Ah. I missed part of the start of the discussion it seems.
+> Most broadcast TLB invalidations are unnecessary.  So when
+> invalidating for a given mm/vma target the only the needed CPUs via
+> and IPI.
 > 
-> > But Arnd wanted to see a smaller patch which only fixes gemini timer issue
-> > (t.i. shed clock being 100Hz instead of 25MHz).
-> > Also I've submitted 4.1 support yesterday, but patches didn't change much
-> > comparing to 3.18
+> For global TLB invalidations, also use IPI.
 > 
-> On the other hand I think the bigger patch is OK actually.
+> Tested on Cavium ThunderX.
 > 
-> I rewrote the timer support some time back and did not get
-> anyone to test it properly at the time, so the patch went in
-> untested. So this is a fix.
+> This change reduces 'time make -j48' on kernel from 139s to 116s (83%
+> as long).
 
-The bigger patch seemed a little too verbose to have it backported
-to stable kernels, so I asked for a minimal fix that could be marked
-as stable, with the other changes applied on top for the current
-arm-soc tree.
+Have you tried something like kernbench? It tends to be more consistent
+than a simple "time make".
 
-I'm still on parental leave and not dealing with patches directly,
-so whichever patch we want should get routed through Ulli to arm at kernel.org
+However, the main question is how's the performance on systems with a
+lot less CPUs (like 4 to 8)? The results are highly dependent on the
+type of application, CPU and SoC implementation (I've done similar
+benchmarks in the past). So, I don't think it's a simple answer here.
 
-	Arnd
+> The patch is needed because of a ThunderX Pass1 erratum: Exclusive
+> store operations unreliable in the presence of broadcast TLB
+> invalidations. The performance improvements shown make it compelling
+> even without the erratum workaround need.
+
+This performance argument is debatable, I need more data and not just
+for the Cavium boards and kernel building. In the meantime, it's an
+erratum workaround and it needs to follow the other workarounds we have
+in the kernel with a proper Kconfig option and alternatives that can be
+patched in our out at run-time (I wonder whether jump labels would be
+better suited here).
+
+-- 
+Catalin
