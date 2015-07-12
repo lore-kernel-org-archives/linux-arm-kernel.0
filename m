@@ -1,110 +1,124 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 12 Jul 2015 14:51:01 +0800
-Subject: [PATCH] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and eTSEC2
-In-Reply-To: <1435213498-21025-1-git-send-email-b18965@freescale.com>
-References: <1435213498-21025-1-git-send-email-b18965@freescale.com>
-Message-ID: <20150712065101.GA14354@localhost>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Sun, 12 Jul 2015 11:39:17 +0200
+Subject: [PATCH] ARM: dts: Add STM32429i-EVAL board support
+Message-ID: <1436693957-30855-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 25, 2015 at 02:24:58PM +0800, Alison Wang wrote:
-> @@ -391,6 +394,85 @@
->  			reg = <0x0 0x2d24000 0x0 0x4000>;
->  		};
->  
-> +		enet0: ethernet at 2d10000 {
+Main features of STM32429i-EVAL evaluation kit are:
+ - STM32F429 Cortex-M4 MCU @180MHz
+   * 2MB internal Flash
+   * 256KB internal RAM
+ - 32MB SDRAM
+ - 16MB NOR Flash
+ - 2MB SRAM
+ - 4.3" TFT LCD with resistive touchscreen
+ - SDCard connector (SDIO compatible)
+ - 1x USB 2.0 OTG + 1x USB 1.1 OTG
+ - Ethernet
 
-Most of the vendor specific properties below are undocumented bindings.
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ arch/arm/boot/dts/Makefile           |  4 +-
+ arch/arm/boot/dts/stm32429i-eval.dts | 75 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/stm32429i-eval.dts
 
-Shawn
-
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			fsl,dma-endian-le;
-> +			fsl,magic-packet;
-> +			fsl,wake-on-filer;
-> +			fsl,num_rx_queues = <0x1>;
-> +			fsl,num_tx_queues = <0x1>;
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-> +			ranges;
-> +
-> +			queue-group at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				reg = <0x0 0x2d10000 0x0 0x8000>;
-> +				fsl,rx-bit-map = <0xff>;
-> +				fsl,tx-bit-map = <0xff>;
-> +				interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +		};
-> +
-> +		enet1: ethernet at 2d50000 {
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			fsl,dma-endian-le;
-> +			fsl,num_rx_queues = <0x1>;
-> +			fsl,num_tx_queues = <0x1>;
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-> +			ranges;
-> +
-> +			queue-group at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				reg = <0x0 0x2d50000 0x0 0x8000>;
-> +				fsl,rx-bit-map = <0xff>;
-> +				fsl,tx-bit-map = <0xff>;
-> +				interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +		};
-> +
-> +		enet2: ethernet at 2d90000 {
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			fsl,dma-endian-le;
-> +			fsl,num_rx_queues = <0x1>;
-> +			fsl,num_tx_queues = <0x1>;
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-> +			ranges;
-> +
-> +			queue-group at 0 {
-> +				#address-cells = <1>;
-> +				#size-cells = <1>;
-> +				reg = <0x0 0x2d90000 0x0 0x8000>;
-> +				fsl,rx-bit-map = <0xff>;
-> +				fsl,tx-bit-map = <0xff>;
-> +				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +
->  		usb at 8600000 {
->  			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
->  			reg = <0x0 0x8600000 0x0 0x1000>;
-> -- 
-> 2.1.0.27.g96db324
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 246473a..6ff9508 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -544,7 +544,9 @@ dtb-$(CONFIG_ARCH_STI) += \
+ 	stih416-b2020.dtb \
+ 	stih416-b2020e.dtb \
+ 	stih418-b2199.dtb
+-dtb-$(CONFIG_ARCH_STM32)+= stm32f429-disco.dtb
++dtb-$(CONFIG_ARCH_STM32)+= \
++	stm32f429-disco.dtb \
++	stm32429i-eval.dtb
+ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-a1000.dtb \
+ 	sun4i-a10-ba10-tvbox.dtb \
+diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+new file mode 100644
+index 0000000..3436c60
+--- /dev/null
++++ b/arch/arm/boot/dts/stm32429i-eval.dts
+@@ -0,0 +1,75 @@
++/*
++ * Copyright 2015 - Maxime Coquelin <mcoquelin.stm32@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *     You should have received a copy of the GNU General Public
++ *     License along with this file; if not, write to the Free
++ *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
++ *     MA 02110-1301 USA
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "stm32f429.dtsi"
++
++/ {
++	model = "STMicroelectronics STM32429i-EVAL board";
++	compatible = "st,stm32429i-eval", "st,stm32f429";
++
++	chosen {
++		bootargs = "console=ttyS0,115200 root=/dev/ram rdinit=/linuxrc";
++		linux,stdout-path = &usart1;
++	};
++
++	memory {
++		reg = <0xc0000000 0x2000000>;
++	};
++
++	aliases {
++		serial0 = &usart1;
++	};
++};
++
++&clk_hse {
++	clock-frequency = <25000000>;
++};
++
++&usart1 {
++	status = "okay";
++};
+-- 
+1.9.1
