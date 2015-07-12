@@ -1,42 +1,27 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Sun, 12 Jul 2015 12:04:16 -0700
-Subject: [PATCH 3/7] ARM: keystone: Remove clk-provider.h include
-In-Reply-To: <1436568347-24554-4-git-send-email-sboyd@codeaurora.org>
-References: <1436568347-24554-1-git-send-email-sboyd@codeaurora.org>
- <1436568347-24554-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <55A2BA30.1000903@oracle.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 12 Jul 2015 23:02:52 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+In-Reply-To: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <4229513.CS60qBeWmX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 7/10/15 3:45 PM, Stephen Boyd wrote:
-> This file doesn't use the clk provider APIs. Remove the include.
->
-> Cc: Nishanth Menon <nm@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Santosh Shilimkar <ssantosh@kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Friday 10 July 2015 11:32:15 Linus Walleij wrote:
+> This enumerates the PL011 serial ports on the Ux500. This is
+> necessary to do if we want to remove one of the serial ports,
+> since userspace depends on console to be present on ttyAMA2
+> and we must not break userspace.
+> 
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->
-> Please ack if you want this to go through clk-tree.
->
-Sure.
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+> ChangeLog v1->v2:
+> - Moved the alias definitions from the core SoC file
+>   to the toplevel DTS file, as requested by Arnd.
+> 
+> 
 
->   arch/arm/mach-keystone/pm_domain.c | 1 -
->   1 file changed, 1 deletion(-)
->
-> diff --git a/arch/arm/mach-keystone/pm_domain.c b/arch/arm/mach-keystone/pm_domain.c
-> index edea697e8253..e283939a216f 100644
-> --- a/arch/arm/mach-keystone/pm_domain.c
-> +++ b/arch/arm/mach-keystone/pm_domain.c
-> @@ -16,7 +16,6 @@
->   #include <linux/pm_runtime.h>
->   #include <linux/pm_clock.h>
->   #include <linux/platform_device.h>
-> -#include <linux/clk-provider.h>
->   #include <linux/of.h>
->
->   static struct dev_pm_domain keystone_pm_domain = {
->
+Do all of the boards expose all three uarts in the same order?
+
+	Arnd
