@@ -1,9 +1,9 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 12 Jul 2015 09:26:42 -0500
-Subject: [PATCH v2 04/13] gpio: kill off set_irq_flags usage
+Date: Sun, 12 Jul 2015 09:26:44 -0500
+Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
 In-Reply-To: <1436711211-18223-1-git-send-email-robh@kernel.org>
 References: <1436711211-18223-1-git-send-email-robh@kernel.org>
-Message-ID: <1436711211-18223-5-git-send-email-robh@kernel.org>
+Message-ID: <1436711211-18223-7-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,295 +23,369 @@ clear that is really needed. There appears to be a great deal of blind
 copy and paste of this code.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Michael Hennerich <michael.hennerich@analog.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Ray Jui <rjui@broadcom.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: linux-gpio at vger.kernel.org
-Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: linux-tegra at vger.kernel.org
+Cc: Lee Jones <lee@kernel.org>
+Cc: Alexander Shiyan <shc_work@mail.ru>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
 ---
- drivers/gpio/gpio-adp5588.c    | 10 +---------
- drivers/gpio/gpio-bcm-kona.c   | 15 ---------------
- drivers/gpio/gpio-davinci.c    |  1 -
- drivers/gpio/gpio-em.c         |  1 -
- drivers/gpio/gpio-ep93xx.c     |  2 +-
- drivers/gpio/gpio-grgpio.c     |  8 --------
- drivers/gpio/gpio-mcp23s08.c   |  4 ----
- drivers/gpio/gpio-msm-v2.c     |  1 -
- drivers/gpio/gpio-pxa.c        |  8 ++++----
- drivers/gpio/gpio-sa1100.c     |  2 +-
- drivers/gpio/gpio-sta2x11.c    |  2 +-
- drivers/gpio/gpio-tegra.c      |  1 -
- drivers/gpio/gpio-timberdale.c |  4 +---
- drivers/gpio/gpiolib.c         |  8 +-------
- 14 files changed, 10 insertions(+), 57 deletions(-)
+v2:
+- Fix build error on clps711x
 
-diff --git a/drivers/gpio/gpio-adp5588.c b/drivers/gpio/gpio-adp5588.c
-index d3fe6a6..df7bb75 100644
---- a/drivers/gpio/gpio-adp5588.c
-+++ b/drivers/gpio/gpio-adp5588.c
-@@ -305,15 +305,7 @@ static int adp5588_irq_setup(struct adp5588_gpio *dev)
- 		irq_set_chip_and_handler(irq, &adp5588_irq_chip,
- 					 handle_level_irq);
- 		irq_set_nested_thread(irq, 1);
--#ifdef CONFIG_ARM
--		/*
--		 * ARM needs us to explicitly flag the IRQ as VALID,
--		 * once we do so, it will also set the noprobe.
--		 */
--		set_irq_flags(irq, IRQF_VALID);
--#else
--		irq_set_noprobe(irq);
--#endif
-+		irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
- 	}
- 
- 	ret = request_threaded_irq(client->irq,
-diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-index 40343fa..af20bda 100644
---- a/drivers/gpio/gpio-bcm-kona.c
-+++ b/drivers/gpio/gpio-bcm-kona.c
-@@ -525,11 +525,7 @@ static int bcm_kona_gpio_irq_map(struct irq_domain *d, unsigned int irq,
- 		return ret;
- 	irq_set_lockdep_class(irq, &gpio_lock_class);
- 	irq_set_chip_and_handler(irq, &bcm_gpio_irq_chip, handle_simple_irq);
--#ifdef CONFIG_ARM
--	set_irq_flags(irq, IRQF_VALID);
--#else
- 	irq_set_noprobe(irq);
--#endif
- 
+ drivers/irqchip/exynos-combiner.c         |  2 +-
+ drivers/irqchip/irq-armada-370-xp.c       |  3 +--
+ drivers/irqchip/irq-bcm2835.c             |  2 +-
+ drivers/irqchip/irq-clps711x.c            |  6 +++---
+ drivers/irqchip/irq-gic-v3.c              |  5 ++---
+ drivers/irqchip/irq-gic.c                 |  4 ++--
+ drivers/irqchip/irq-hip04.c               |  4 ++--
+ drivers/irqchip/irq-keystone.c            |  2 +-
+ drivers/irqchip/irq-mmp.c                 |  3 ---
+ drivers/irqchip/irq-mxs.c                 |  1 -
+ drivers/irqchip/irq-renesas-intc-irqpin.c |  1 -
+ drivers/irqchip/irq-renesas-irqc.c        |  1 -
+ drivers/irqchip/irq-s3c24xx.c             | 14 ++------------
+ drivers/irqchip/irq-sun4i.c               |  2 +-
+ drivers/irqchip/irq-versatile-fpga.c      |  2 +-
+ drivers/irqchip/irq-vic.c                 |  2 +-
+ drivers/irqchip/irq-vt8500.c              |  1 -
+ drivers/irqchip/spear-shirq.c             |  1 -
+ 18 files changed, 18 insertions(+), 38 deletions(-)
+
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 5c82e3b..81aacb8 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -165,7 +165,7 @@ static int combiner_irq_domain_map(struct irq_domain *d, unsigned int irq,
+
+ 	irq_set_chip_and_handler(irq, &combiner_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, &combiner_data[hw >> 3]);
+-	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(irq);
+
  	return 0;
  }
-@@ -644,17 +640,6 @@ static int bcm_kona_gpio_probe(struct platform_device *pdev)
- 		dev_err(dev, "Couldn't add GPIO chip -- %d\n", ret);
- 		goto err_irq_domain;
- 	}
--	for (i = 0; i < chip->ngpio; i++) {
--		int irq = bcm_kona_gpio_to_irq(chip, i);
--		irq_set_lockdep_class(irq, &gpio_lock_class);
--		irq_set_chip_and_handler(irq, &bcm_gpio_irq_chip,
--					 handle_simple_irq);
--#ifdef CONFIG_ARM
--		set_irq_flags(irq, IRQF_VALID);
--#else
--		irq_set_noprobe(irq);
--#endif
--	}
- 	for (i = 0; i < kona_gpio->num_bank; i++) {
- 		bank = &kona_gpio->banks[i];
- 		irq_set_chained_handler_and_data(bank->irq,
-diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
-index c5e05c8..59020a6 100644
---- a/drivers/gpio/gpio-davinci.c
-+++ b/drivers/gpio/gpio-davinci.c
-@@ -422,7 +422,6 @@ davinci_gpio_irq_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_irq_type(irq, IRQ_TYPE_NONE);
- 	irq_set_chip_data(irq, (__force void *)g);
- 	irq_set_handler_data(irq, (void *)__gpio_mask(hw));
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-diff --git a/drivers/gpio/gpio-em.c b/drivers/gpio/gpio-em.c
-index fbf2873..d42b166 100644
---- a/drivers/gpio/gpio-em.c
-+++ b/drivers/gpio/gpio-em.c
-@@ -262,7 +262,6 @@ static int em_gio_irq_domain_map(struct irq_domain *h, unsigned int irq,
- 
- 	irq_set_chip_data(irq, h->host_data);
- 	irq_set_chip_and_handler(irq, &p->irq_chip, handle_level_irq);
--	set_irq_flags(irq, IRQF_VALID); /* kill me now */
- 	return 0;
- }
- 
-diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
-index 45684f3..4d35fdc 100644
---- a/drivers/gpio/gpio-ep93xx.c
-+++ b/drivers/gpio/gpio-ep93xx.c
-@@ -234,7 +234,7 @@ static void ep93xx_gpio_init_irq(void)
- 	     gpio_irq <= gpio_to_irq(EP93XX_GPIO_LINE_MAX_IRQ); ++gpio_irq) {
- 		irq_set_chip_and_handler(gpio_irq, &ep93xx_gpio_irq_chip,
- 					 handle_level_irq);
--		set_irq_flags(gpio_irq, IRQF_VALID);
-+		irq_clear_status_flags(gpio_irq, IRQ_NOREQUEST);
- 	}
- 
- 	irq_set_chained_handler(IRQ_EP93XX_GPIO_AB,
-diff --git a/drivers/gpio/gpio-grgpio.c b/drivers/gpio/gpio-grgpio.c
-index 0a8f761..77053d6 100644
---- a/drivers/gpio/gpio-grgpio.c
-+++ b/drivers/gpio/gpio-grgpio.c
-@@ -281,12 +281,7 @@ static int grgpio_irq_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_chip_data(irq, priv);
- 	irq_set_chip_and_handler(irq, &grgpio_irq_chip,
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index 0d3b0fe..b8bf8b0 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -201,7 +201,6 @@ static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
+ {
+ 	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
  				 handle_simple_irq);
--	irq_clear_status_flags(irq, IRQ_NOREQUEST);
--#ifdef CONFIG_ARM
--	set_irq_flags(irq, IRQF_VALID);
--#else
- 	irq_set_noprobe(irq);
--#endif
- 
- 	return ret;
+-	set_irq_flags(virq, IRQF_VALID);
+
+ 	return 0;
  }
-@@ -301,9 +296,6 @@ static void grgpio_irq_unmap(struct irq_domain *d, unsigned int irq)
- 	int ngpio = priv->bgc.gc.ngpio;
- 	int i;
- 
--#ifdef CONFIG_ARM
--	set_irq_flags(irq, 0);
--#endif
- 	irq_set_chip_and_handler(irq, NULL, NULL);
- 	irq_set_chip_data(irq, NULL);
- 
-diff --git a/drivers/gpio/gpio-mcp23s08.c b/drivers/gpio/gpio-mcp23s08.c
-index 2fc7ff8..73db7ec 100644
---- a/drivers/gpio/gpio-mcp23s08.c
-+++ b/drivers/gpio/gpio-mcp23s08.c
-@@ -507,11 +507,7 @@ static int mcp23s08_irq_setup(struct mcp23s08 *mcp)
- 		irq_set_chip_data(irq, mcp);
- 		irq_set_chip(irq, &mcp23s08_irq_chip);
- 		irq_set_nested_thread(irq, true);
--#ifdef CONFIG_ARM
+@@ -318,7 +317,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+ 		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+ 					handle_level_irq);
+ 	}
+-	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(virq);
+
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index e68c3b6..5ae2fd4 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -165,7 +165,7 @@ static int __init armctrl_of_init(struct device_node *node,
+ 			BUG_ON(irq <= 0);
+ 			irq_set_chip_and_handler(irq, &armctrl_chip,
+ 				handle_level_irq);
+-			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++			irq_set_noprobe(irq);
+ 		}
+ 	}
+
+diff --git a/drivers/irqchip/irq-clps711x.c b/drivers/irqchip/irq-clps711x.c
+index 33127f1..2e74e81 100644
+--- a/drivers/irqchip/irq-clps711x.c
++++ b/drivers/irqchip/irq-clps711x.c
+@@ -133,14 +133,14 @@ static int __init clps711x_intc_irq_map(struct irq_domain *h, unsigned int virq,
+ 					irq_hw_number_t hw)
+ {
+ 	irq_flow_handler_t handler = handle_level_irq;
+-	unsigned int flags = IRQF_VALID | IRQF_PROBE;
++	unsigned int flags = 0;
+
+ 	if (!clps711x_irqs[hw].flags)
+ 		return 0;
+
+ 	if (clps711x_irqs[hw].flags & CLPS711X_FLAG_FIQ) {
+ 		handler = handle_bad_irq;
+-		flags |= IRQF_NOAUTOEN;
++		flags |= IRQ_NOAUTOEN;
+ 	} else if (clps711x_irqs[hw].eoi) {
+ 		handler = handle_fasteoi_irq;
+ 	}
+@@ -150,7 +150,7 @@ static int __init clps711x_intc_irq_map(struct irq_domain *h, unsigned int virq,
+ 		writel_relaxed(0, clps711x_intc->base + clps711x_irqs[hw].eoi);
+
+ 	irq_set_chip_and_handler(virq, &clps711x_intc_chip, handler);
+-	set_irq_flags(virq, flags);
++	irq_modify_status(virq, IRQ_NOPROBE, flags);
+
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index c52f7ba..16f9028 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -681,13 +681,13 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_set_percpu_devid(irq);
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_percpu_devid_irq, NULL, NULL);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
++		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+ 	}
+ 	/* SPIs */
+ 	if (hw >= 32 && hw < gic_data.irq_nr) {
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		irq_set_probe(irq);
+ 	}
+ 	/* LPIs */
+ 	if (hw >= 8192 && hw < GIC_ID_NR) {
+@@ -695,7 +695,6 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 			return -EPERM;
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
 -		set_irq_flags(irq, IRQF_VALID);
--#else
- 		irq_set_noprobe(irq);
--#endif
+ 	}
+
+ 	return 0;
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 8d7e1c8..ba16399 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -793,11 +793,11 @@ static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_set_percpu_devid(irq);
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_percpu_devid_irq, NULL, NULL);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
++		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+ 	} else {
+ 		irq_domain_set_info(d, irq, hw, &gic_chip, d->host_data,
+ 				    handle_fasteoi_irq, NULL, NULL);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		irq_set_noprobe(irq);
  	}
  	return 0;
  }
-diff --git a/drivers/gpio/gpio-msm-v2.c b/drivers/gpio/gpio-msm-v2.c
-index 52ff182..4bbaeb36 100644
---- a/drivers/gpio/gpio-msm-v2.c
-+++ b/drivers/gpio/gpio-msm-v2.c
-@@ -363,7 +363,6 @@ static int msm_gpio_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 	irq_set_lockdep_class(irq, &msm_gpio_lock_class);
- 	irq_set_chip_and_handler(irq, &msm_gpio_irq_chip,
- 			handle_level_irq);
--	set_irq_flags(irq, IRQF_VALID);
- 
+diff --git a/drivers/irqchip/irq-hip04.c b/drivers/irqchip/irq-hip04.c
+index 0cae45d..af07a91 100644
+--- a/drivers/irqchip/irq-hip04.c
++++ b/drivers/irqchip/irq-hip04.c
+@@ -305,11 +305,11 @@ static int hip04_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 		irq_set_percpu_devid(irq);
+ 		irq_set_chip_and_handler(irq, &hip04_irq_chip,
+ 					 handle_percpu_devid_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_NOAUTOEN);
++		irq_set_status_flags(irq, IRQ_NOAUTOEN);
+ 	} else {
+ 		irq_set_chip_and_handler(irq, &hip04_irq_chip,
+ 					 handle_fasteoi_irq);
+-		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
++		irq_set_noprobe(irq);
+ 	}
+ 	irq_set_chip_data(irq, d->host_data);
+ 	return 0;
+diff --git a/drivers/irqchip/irq-keystone.c b/drivers/irqchip/irq-keystone.c
+index 81e3cf5..bbbe78a 100644
+--- a/drivers/irqchip/irq-keystone.c
++++ b/drivers/irqchip/irq-keystone.c
+@@ -127,7 +127,7 @@ static int keystone_irq_map(struct irq_domain *h, unsigned int virq,
+
+ 	irq_set_chip_data(virq, kirq);
+ 	irq_set_chip_and_handler(virq, &kirq->chip, handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(virq);
  	return 0;
  }
-diff --git a/drivers/gpio/gpio-pxa.c b/drivers/gpio/gpio-pxa.c
-index cdbbcf0..55a11de 100644
---- a/drivers/gpio/gpio-pxa.c
-+++ b/drivers/gpio/gpio-pxa.c
-@@ -524,7 +524,7 @@ static int pxa_irq_domain_map(struct irq_domain *d, unsigned int irq,
+
+diff --git a/drivers/irqchip/irq-mmp.c b/drivers/irqchip/irq-mmp.c
+index c0da57b..3dfef63 100644
+--- a/drivers/irqchip/irq-mmp.c
++++ b/drivers/irqchip/irq-mmp.c
+@@ -164,7 +164,6 @@ static int mmp_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 			      irq_hw_number_t hw)
  {
- 	irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
- 				 handle_edge_irq);
+ 	irq_set_chip_and_handler(irq, &icu_irq_chip, handle_level_irq);
+-	set_irq_flags(irq, IRQF_VALID);
+ 	return 0;
+ }
+
+@@ -234,7 +233,6 @@ void __init icu_init_irq(void)
+ 	for (irq = 0; irq < 64; irq++) {
+ 		icu_mask_irq(irq_get_irq_data(irq));
+ 		irq_set_chip_and_handler(irq, &icu_irq_chip, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 	irq_set_default_host(icu_data[0].domain);
+ 	set_handle_irq(mmp_handle_irq);
+@@ -337,7 +335,6 @@ void __init mmp2_init_icu(void)
+ 			irq_set_chip_and_handler(irq, &icu_irq_chip,
+ 						 handle_level_irq);
+ 		}
+-		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 	irq_set_default_host(icu_data[0].domain);
+ 	set_handle_irq(mmp2_handle_irq);
+diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+index 04bf97b..ffe85d6 100644
+--- a/drivers/irqchip/irq-mxs.c
++++ b/drivers/irqchip/irq-mxs.c
+@@ -85,7 +85,6 @@ static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
+ 				irq_hw_number_t hw)
+ {
+ 	irq_set_chip_and_handler(virq, &mxs_icoll_chip, handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID);
+
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+index 0670ab4..20a86de 100644
+--- a/drivers/irqchip/irq-renesas-intc-irqpin.c
++++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+@@ -343,7 +343,6 @@ static int intc_irqpin_irq_domain_map(struct irq_domain *h, unsigned int virq,
+ 	intc_irqpin_dbg(&p->irq[hw], "map");
+ 	irq_set_chip_data(virq, h->host_data);
+ 	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID); /* kill me now */
+ 	return 0;
+ }
+
+diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
+index 778bd07..74e980f 100644
+--- a/drivers/irqchip/irq-renesas-irqc.c
++++ b/drivers/irqchip/irq-renesas-irqc.c
+@@ -162,7 +162,6 @@ static int irqc_irq_domain_map(struct irq_domain *h, unsigned int virq,
+ 	irqc_dbg(&p->irq[hw], "map");
+ 	irq_set_chip_data(virq, h->host_data);
+ 	irq_set_chip_and_handler(virq, &p->irq_chip, handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID); /* kill me now */
+ 	return 0;
+ }
+
+diff --git a/drivers/irqchip/irq-s3c24xx.c b/drivers/irqchip/irq-s3c24xx.c
+index e96717f..19d1fc4 100644
+--- a/drivers/irqchip/irq-s3c24xx.c
++++ b/drivers/irqchip/irq-s3c24xx.c
+@@ -469,13 +469,11 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned int virq,
+
+ 	irq_set_chip_data(virq, irq_data);
+
+-	set_irq_flags(virq, IRQF_VALID);
+-
+ 	if (parent_intc && irq_data->type != S3C_IRQTYPE_NONE) {
+ 		if (irq_data->parent_irq > 31) {
+ 			pr_err("irq-s3c24xx: parent irq %lu is out of range\n",
+ 			       irq_data->parent_irq);
+-			goto err;
++			return -EINVAL;
+ 		}
+
+ 		parent_irq_data = &parent_intc->irqs[irq_data->parent_irq];
+@@ -488,18 +486,12 @@ static int s3c24xx_irq_map(struct irq_domain *h, unsigned int virq,
+ 		if (!irqno) {
+ 			pr_err("irq-s3c24xx: could not find mapping for parent irq %lu\n",
+ 			       irq_data->parent_irq);
+-			goto err;
++			return -EINVAL;
+ 		}
+ 		irq_set_chained_handler(irqno, s3c_irq_demux);
+ 	}
+
+ 	return 0;
+-
+-err:
+-	set_irq_flags(virq, 0);
+-
+-	/* the only error can result from bad mapping data*/
+-	return -EINVAL;
+ }
+
+ static const struct irq_domain_ops s3c24xx_irq_ops = {
+@@ -1177,8 +1169,6 @@ static int s3c24xx_irq_map_of(struct irq_domain *h, unsigned int virq,
+
+ 	irq_set_chip_data(virq, irq_data);
+
+-	set_irq_flags(virq, IRQF_VALID);
+-
+ 	return 0;
+ }
+
+diff --git a/drivers/irqchip/irq-sun4i.c b/drivers/irqchip/irq-sun4i.c
+index 83d6aa6..fdc1a80 100644
+--- a/drivers/irqchip/irq-sun4i.c
++++ b/drivers/irqchip/irq-sun4i.c
+@@ -84,7 +84,7 @@ static int sun4i_irq_map(struct irq_domain *d, unsigned int virq,
+ 			 irq_hw_number_t hw)
+ {
+ 	irq_set_chip_and_handler(virq, &sun4i_irq_chip, handle_fasteoi_irq);
+-	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
++	irq_set_noprobe(virq);
+
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
+index 888111b..e53aa98 100644
+--- a/drivers/irqchip/irq-versatile-fpga.c
++++ b/drivers/irqchip/irq-versatile-fpga.c
+@@ -128,7 +128,7 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_chip_data(irq, f);
+ 	irq_set_chip_and_handler(irq, &f->chip,
+ 				handle_level_irq);
 -	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 +	irq_set_noprobe(irq);
  	return 0;
  }
- 
-@@ -643,20 +643,20 @@ static int pxa_gpio_probe(struct platform_device *pdev)
- 			irq = gpio_to_irq(0);
- 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
- 						 handle_edge_irq);
--			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
- 		}
- 		if (irq1 > 0) {
- 			irq = gpio_to_irq(1);
- 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
- 						 handle_edge_irq);
--			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
- 		}
- 
- 		for (irq  = gpio_to_irq(gpio_offset);
- 			irq <= gpio_to_irq(pxa_last_gpio); irq++) {
- 			irq_set_chip_and_handler(irq, &pxa_muxed_gpio_chip,
- 						 handle_edge_irq);
--			set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-+			irq_clear_status_flags(irq, IRQ_NOREQUEST | IRQ_NOPROBE);
- 		}
- 	}
- 
-diff --git a/drivers/gpio/gpio-sa1100.c b/drivers/gpio/gpio-sa1100.c
-index 3fa22da..1aaa340 100644
---- a/drivers/gpio/gpio-sa1100.c
-+++ b/drivers/gpio/gpio-sa1100.c
-@@ -155,7 +155,7 @@ static int sa1100_gpio_irqdomain_map(struct irq_domain *d,
- {
- 	irq_set_chip_and_handler(irq, &sa1100_gpio_irq_chip,
- 				 handle_edge_irq);
+
+diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+index d4ce331..33d64b1 100644
+--- a/drivers/irqchip/irq-vic.c
++++ b/drivers/irqchip/irq-vic.c
+@@ -202,7 +202,7 @@ static int vic_irqdomain_map(struct irq_domain *d, unsigned int irq,
+ 		return -EPERM;
+ 	irq_set_chip_and_handler(irq, &vic_chip, handle_level_irq);
+ 	irq_set_chip_data(irq, v->base);
 -	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 +	irq_set_noprobe(irq);
- 
  	return 0;
  }
-diff --git a/drivers/gpio/gpio-sta2x11.c b/drivers/gpio/gpio-sta2x11.c
-index 18579ac..55e47828 100644
---- a/drivers/gpio/gpio-sta2x11.c
-+++ b/drivers/gpio/gpio-sta2x11.c
-@@ -346,7 +346,7 @@ static void gsta_alloc_irq_chip(struct gsta_gpio *chip)
- 			i = chip->irq_base + j;
- 			irq_set_chip_and_handler(i, &ct->chip, ct->handler);
- 			irq_set_chip_data(i, gc);
--			irq_modify_status(i, IRQ_NOREQUEST | IRQ_NOPROBE, 0);
-+			irq_clear_status_flags(i, IRQ_NOREQUEST | IRQ_NOPROBE);
- 		}
- 		gc->irq_cnt = i - gc->irq_base;
- 	}
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 9b25c90..5b9163c 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -509,7 +509,6 @@ static int tegra_gpio_probe(struct platform_device *pdev)
- 		irq_set_chip_data(irq, bank);
- 		irq_set_chip_and_handler(irq, &tegra_gpio_irq_chip,
- 					 handle_simple_irq);
--		set_irq_flags(irq, IRQF_VALID);
- 	}
- 
- 	for (i = 0; i < tegra_gpio_bank_count; i++) {
-diff --git a/drivers/gpio/gpio-timberdale.c b/drivers/gpio/gpio-timberdale.c
-index e8f97e0..166fe1c 100644
---- a/drivers/gpio/gpio-timberdale.c
-+++ b/drivers/gpio/gpio-timberdale.c
-@@ -294,9 +294,7 @@ static int timbgpio_probe(struct platform_device *pdev)
- 		irq_set_chip_and_handler(tgpio->irq_base + i,
- 			&timbgpio_irqchip, handle_simple_irq);
- 		irq_set_chip_data(tgpio->irq_base + i, tgpio);
--#ifdef CONFIG_ARM
--		set_irq_flags(tgpio->irq_base + i, IRQF_VALID | IRQF_PROBE);
--#endif
-+		irq_clear_status_flags(tgpio->irq_base + i, IRQ_NOREQUEST | IRQ_NOPROBE);
- 	}
- 
- 	irq_set_handler_data(irq, tgpio);
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index bf4bd1d..5af50d3 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -483,11 +483,8 @@ static int gpiochip_irq_map(struct irq_domain *d, unsigned int irq,
- 	/* Chips that can sleep need nested thread handlers */
- 	if (chip->can_sleep && !chip->irq_not_threaded)
- 		irq_set_nested_thread(irq, 1);
--#ifdef CONFIG_ARM
--	set_irq_flags(irq, IRQF_VALID);
--#else
- 	irq_set_noprobe(irq);
--#endif
-+
- 	/*
- 	 * No set-up of the hardware will happen if IRQ_TYPE_NONE
- 	 * is passed as default type.
-@@ -502,9 +499,6 @@ static void gpiochip_irq_unmap(struct irq_domain *d, unsigned int irq)
+
+diff --git a/drivers/irqchip/irq-vt8500.c b/drivers/irqchip/irq-vt8500.c
+index 0b29700..8b235c9 100644
+--- a/drivers/irqchip/irq-vt8500.c
++++ b/drivers/irqchip/irq-vt8500.c
+@@ -168,7 +168,6 @@ static int vt8500_irq_map(struct irq_domain *h, unsigned int virq,
+ 							irq_hw_number_t hw)
  {
- 	struct gpio_chip *chip = d->host_data;
- 
--#ifdef CONFIG_ARM
--	set_irq_flags(irq, 0);
--#endif
- 	if (chip->can_sleep)
- 		irq_set_nested_thread(irq, 0);
- 	irq_set_chip_and_handler(irq, NULL, NULL);
--- 
+ 	irq_set_chip_and_handler(virq, &vt8500_irq_chip, handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID);
+
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/spear-shirq.c b/drivers/irqchip/spear-shirq.c
+index a4512154..187c0f6 100644
+--- a/drivers/irqchip/spear-shirq.c
++++ b/drivers/irqchip/spear-shirq.c
+@@ -212,7 +212,6 @@ static void __init spear_shirq_register(struct spear_shirq *shirq,
+ 	for (i = 0; i < shirq->nr_irqs; i++) {
+ 		irq_set_chip_and_handler(shirq->virq_base + i,
+ 					 shirq->irq_chip, handle_simple_irq);
+-		set_irq_flags(shirq->virq_base + i, IRQF_VALID);
+ 		irq_set_chip_data(shirq->virq_base + i, shirq);
+ 	}
+ }
+--
 2.1.0
