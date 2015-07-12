@@ -1,24 +1,26 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 11 Jul 2015 18:34:13 -0700
-Subject: [PATCH] ARM: BCM63xx: Remove custom secondary_startup function
-In-Reply-To: <1436318221-30225-1-git-send-email-f.fainelli@gmail.com>
-References: <E1Yuk8W-0001tC-IK@rmk-PC.arm.linux.org.uk>
- <1436318221-30225-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <55A1C415.1090109@gmail.com>
+Date: Sat, 11 Jul 2015 18:35:06 -0700
+Subject: [PATCH] ARM: BCM63xx: fix parameter to of_get_cpu_node in
+ bcm63138_smp_boot_secondary
+In-Reply-To: <1436549771-6097-1-git-send-email-sudeep.holla@arm.com>
+References: <1436549771-6097-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <55A1C44A.9070905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/07/15 18:17, Florian Fainelli a ?crit :
-> With commit 02b4e2756e01c623cc4dbceae4b07be75252db5b ("ARM: v7 setup
-> function should invalidate L1 cache"), the default secondary_startup
-> function for ARMv7 CPUs does invalidate the L1 cache, which was the sole
-> reason why BCM63xx had to have its own secondary_startup implementation.
+Le 07/10/15 10:36, Sudeep Holla a ?crit :
+> of_get_cpu_node provides the device node associated with the given
+> logical CPU and cpu_logical_map contains the physical id for each CPU
+> in the logical ordering. Passing cpu_logical_map(cpu) to of_get_cpu_node
+> is incorrect.
 > 
-> Now that the secondary_startup takes care of this, we can completely
-> remove that code.
+> This patch fixes the issue by passing the logical CPU number to
+> of_get_cpu_node
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Applied to soc/next.
+Applied to soc/next, with the proper Fixes tag for this, thanks!
 -- 
 Florian
