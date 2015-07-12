@@ -1,9 +1,9 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 12 Jul 2015 09:26:43 -0500
-Subject: [PATCH v2 05/13] gpu/drm: kill off set_irq_flags usage
+Date: Sun, 12 Jul 2015 09:26:45 -0500
+Subject: [PATCH v2 07/13] memory: kill off set_irq_flags usage
 In-Reply-To: <1436711211-18223-1-git-send-email-robh@kernel.org>
 References: <1436711211-18223-1-git-send-email-robh@kernel.org>
-Message-ID: <1436711211-18223-6-git-send-email-robh@kernel.org>
+Message-ID: <1436711211-18223-8-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,38 +23,35 @@ clear that is really needed. There appears to be a great deal of blind
 copy and paste of this code.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: David Airlie <airlied@linux.ie>
-Cc: dri-devel at lists.freedesktop.org
+Acked-by: Roger Quadros <rogerq@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 ---
- drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c | 1 -
- drivers/gpu/ipu-v3/ipu-common.c         | 3 +--
- 2 files changed, 1 insertion(+), 3 deletions(-)
+ drivers/memory/omap-gpmc.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
-index 33bd4c6..9a6a747 100644
---- a/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
-+++ b/drivers/gpu/drm/msm/mdp/mdp5/mdp5_irq.c
-@@ -165,7 +165,6 @@ static int mdp5_hw_irqdomain_map(struct irq_domain *d,
- 
- 	irq_set_chip_and_handler(irq, &mdp5_hw_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, mdp5_kms);
--	set_irq_flags(irq, IRQF_VALID);
- 
- 	return 0;
- }
-diff --git a/drivers/gpu/ipu-v3/ipu-common.c b/drivers/gpu/ipu-v3/ipu-common.c
-index 6d2f39d..cf0cf46 100644
---- a/drivers/gpu/ipu-v3/ipu-common.c
-+++ b/drivers/gpu/ipu-v3/ipu-common.c
-@@ -1099,8 +1099,7 @@ static int ipu_irq_init(struct ipu_soc *ipu)
+diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
+index 8911e51..dde6f4dd 100644
+--- a/drivers/memory/omap-gpmc.c
++++ b/drivers/memory/omap-gpmc.c
+@@ -1176,8 +1176,8 @@ static int gpmc_setup_irq(void)
+ 		gpmc_client_irq[i].irq = gpmc_irq_start + i;
+ 		irq_set_chip_and_handler(gpmc_client_irq[i].irq,
+ 					&gpmc_irq_chip, handle_simple_irq);
+-		set_irq_flags(gpmc_client_irq[i].irq,
+-				IRQF_VALID | IRQF_NOAUTOEN);
++		irq_modify_status(gpmc_client_irq[i].irq, IRQ_NOREQUEST,
++				  IRQ_NOAUTOEN);
  	}
  
- 	ret = irq_alloc_domain_generic_chips(ipu->domain, 32, 1, "IPU",
--					     handle_level_irq, 0,
--					     IRQF_VALID, 0);
-+					     handle_level_irq, 0, 0, 0);
- 	if (ret < 0) {
- 		dev_err(ipu->dev, "failed to alloc generic irq chips\n");
- 		irq_domain_remove(ipu->domain);
+ 	/* Disable interrupts */
+@@ -1200,7 +1200,6 @@ static int gpmc_free_irq(void)
+ 	for (i = 0; i < GPMC_NR_IRQ; i++) {
+ 		irq_set_handler(gpmc_client_irq[i].irq, NULL);
+ 		irq_set_chip(gpmc_client_irq[i].irq, &no_irq_chip);
+-		irq_modify_status(gpmc_client_irq[i].irq, 0, 0);
+ 	}
+ 
+ 	irq_free_descs(gpmc_irq_start, GPMC_NR_IRQ);
 -- 
 2.1.0
