@@ -1,32 +1,60 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 13 Jul 2015 00:47:20 +0200
-Subject: [PATCH 0/2] I2C support for NXP LPC18xx family
-Message-ID: <1436741242-13489-1-git-send-email-manabian@gmail.com>
+Date: Mon, 13 Jul 2015 00:47:22 +0200
+Subject: [PATCH 2/2] doc: dt: add documentation for i2c-lpc2k
+In-Reply-To: <1436741242-13489-1-git-send-email-manabian@gmail.com>
+References: <1436741242-13489-1-git-send-email-manabian@gmail.com>
+Message-ID: <1436741242-13489-3-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set adds a I2C driver and documentation for the I2C
-peripheral found on many NXP LPC MCUs.
+Add binding documentation for the nxp,lpc1788-i2c controller
+which also can be found on LPC2xxx, LPC178x/7x and LPC18xx/43xx
+devices.
 
-The driver is a rework of an old driver by Kevin Wells. It has been
-modified to support modern resource allocation, device tree and
-generally cleaned up. Driver was originally written to support the
-LPC2xxx platforms.
-
-Patches based on v4.2-rc1 and tested on Embedded Artists' LPC4357
-Developer's Kit with several I2C devices.
-
-Joachim Eastwood (2):
-  i2c: add i2c-lpc2k driver
-  doc: dt: add documentation for i2c-lpc2k
-
- .../devicetree/bindings/i2c/i2c-lpc2k.txt          |  33 ++
- drivers/i2c/busses/Kconfig                         |  10 +
- drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-lpc2k.c                     | 551 +++++++++++++++++++++
- 4 files changed, 595 insertions(+)
+Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+---
+ .../devicetree/bindings/i2c/i2c-lpc2k.txt          | 33 ++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
- create mode 100644 drivers/i2c/busses/i2c-lpc2k.c
 
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt b/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
+new file mode 100644
+index 000000000000..4101aa621ad4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/i2c/i2c-lpc2k.txt
+@@ -0,0 +1,33 @@
++NXP I2C controller for LPC2xxx/178x/18xx/43xx
++
++Required properties:
++ - compatible: must be "nxp,lpc1788-i2c"
++ - reg: physical address and length of the device registers
++ - interrupts: a single interrupt specifier
++ - clocks: clock for the device
++ - #address-cells: should be <1>
++ - #size-cells: should be <0>
++
++Optional properties:
++- clock-frequency: the desired I2C bus clock frequency in Hz; in
++  absence of this property the default value is used (100 kHz).
++
++Example:
++i2c0: i2c at 400a1000 {
++	compatible = "nxp,lpc1788-i2c";
++	reg = <0x400a1000 0x1000>;
++	interrupts = <18>;
++	clocks = <&ccu1 CLK_APB1_I2C0>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++};
++
++&i2c0 {
++	clock-frequency = <400000>;
++
++	lm75 at 48 {
++		compatible = "nxp,lm75";
++		reg = <0x48>;
++	};
++};
++
 -- 
 1.8.0
