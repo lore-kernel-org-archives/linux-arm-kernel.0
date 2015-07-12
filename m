@@ -1,62 +1,57 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Sun, 12 Jul 2015 17:32:17 +0200
-Subject: [PATCH] i2c: omap: fix bus recovery setup
-In-Reply-To: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
-References: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
-Message-ID: <55A28881.60703@gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 13 Jul 2015 00:45:58 +0900
+Subject: [PATCH v2 10/13] pinctrl: kill off set_irq_flags usage
+In-Reply-To: <1436711211-18223-11-git-send-email-robh@kernel.org>
+References: <1436711211-18223-1-git-send-email-robh@kernel.org>
+ <1436711211-18223-11-git-send-email-robh@kernel.org>
+Message-ID: <CA+Ln22He4_LAsZeGbQ+BuZYfhPAQa-JbzgX85-4m0Gay3ikEqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/07/15 16:35, Jan Luebbe wrote:
-> At least on the AM335x, enabling OMAP_I2C_SYSTEST_ST_EN is not enough to
-> allow direct access to the SCL and SDA pins. In addition to ST_EN, we
-> need to set the TMODE to 0b11 (Loop back & SDA/SCL IO mode select).
-> Also, as the reset values of SCL_O and SDA_O are 0 (which means "drive
-> low level"), we need to set them to 1 (which means "high-impedance") to
-> avoid unwanted changes on the pins.
-> 
-> As a precaution, reset all these bits to their default values after
-> recovery is complete.
-> 
-> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Hi,
 
-Tested with oscilloscope on Beagle Bone Black, without the patch nothing
-meningful appears on SCL during recovery, with the patch I'm able to see
-the recovery pulses.
-
-Tested-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-
+2015-07-12 23:26 GMT+09:00 Rob Herring <robh@kernel.org>:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+>
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+>
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+>
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-rpi-kernel at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
 > ---
->  drivers/i2c/busses/i2c-omap.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
-> 
-> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-> index d1c22e3fdd14..fc9bf7f30e35 100644
-> --- a/drivers/i2c/busses/i2c-omap.c
-> +++ b/drivers/i2c/busses/i2c-omap.c
-> @@ -1247,7 +1247,14 @@ static void omap_i2c_prepare_recovery(struct i2c_adapter *adap)
->  	u32 reg;
->  
->  	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-> +	/* enable test mode */
->  	reg |= OMAP_I2C_SYSTEST_ST_EN;
-> +	/* select SDA/SCL IO mode */
-> +	reg |= 3 << OMAP_I2C_SYSTEST_TMODE_SHIFT;
-> +	/* set SCL to high-impedance state (reset value is 0) */
-> +	reg |= OMAP_I2C_SYSTEST_SCL_O;
-> +	/* set SDA to high-impedance state (reset value is 0) */
-> +	reg |= OMAP_I2C_SYSTEST_SDA_O;
->  	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
->  }
->  
-> @@ -1257,7 +1264,11 @@ static void omap_i2c_unprepare_recovery(struct i2c_adapter *adap)
->  	u32 reg;
->  
->  	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
-> +	/* restore reset values */
->  	reg &= ~OMAP_I2C_SYSTEST_ST_EN;
-> +	reg &= ~OMAP_I2C_SYSTEST_TMODE_MASK;
-> +	reg &= ~OMAP_I2C_SYSTEST_SCL_O;
-> +	reg &= ~OMAP_I2C_SYSTEST_SDA_O;
->  	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
->  }
+>  drivers/pinctrl/bcm/pinctrl-bcm2835.c         | 1 -
+>  drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 --
+>  drivers/pinctrl/pinctrl-single.c              | 5 -----
+>  drivers/pinctrl/samsung/pinctrl-exynos.c      | 1 -
+>  drivers/pinctrl/samsung/pinctrl-exynos5440.c  | 1 -
+>  drivers/pinctrl/samsung/pinctrl-s3c24xx.c     | 2 --
+>  drivers/pinctrl/samsung/pinctrl-s3c64xx.c     | 2 --
+
+For drivers/pinctrl/samsung:
+
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
+Tomasz
