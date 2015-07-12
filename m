@@ -1,9 +1,9 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 12 Jul 2015 09:26:47 -0500
-Subject: [PATCH v2 09/13] PCI: kill off set_irq_flags usage
+Date: Sun, 12 Jul 2015 09:26:48 -0500
+Subject: [PATCH v2 10/13] pinctrl: kill off set_irq_flags usage
 In-Reply-To: <1436711211-18223-1-git-send-email-robh@kernel.org>
 References: <1436711211-18223-1-git-send-email-robh@kernel.org>
-Message-ID: <1436711211-18223-10-git-send-email-robh@kernel.org>
+Message-ID: <1436711211-18223-11-git-send-email-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,134 +23,137 @@ clear that is really needed. There appears to be a great deal of blind
 copy and paste of this code.
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Murali Karicheri <m-karicheri2@ti.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Pratyush Anand <pratyush.anand@gmail.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-pci at vger.kernel.org
+Cc: Lee Jones <lee@kernel.org>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Thomas Abraham <thomas.abraham@linaro.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: linux-gpio at vger.kernel.org
+Cc: linux-rpi-kernel at lists.infradead.org
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-tegra at vger.kernel.org
-Cc: linux-sh at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
 ---
-v2:
-- Add xgene which was added in v4.2
+ drivers/pinctrl/bcm/pinctrl-bcm2835.c         | 1 -
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 2 --
+ drivers/pinctrl/pinctrl-single.c              | 5 -----
+ drivers/pinctrl/samsung/pinctrl-exynos.c      | 1 -
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c  | 1 -
+ drivers/pinctrl/samsung/pinctrl-s3c24xx.c     | 2 --
+ drivers/pinctrl/samsung/pinctrl-s3c64xx.c     | 2 --
+ 7 files changed, 14 deletions(-)
 
- drivers/pci/host/pci-dra7xx.c      | 1 -
- drivers/pci/host/pci-keystone-dw.c | 2 --
- drivers/pci/host/pci-tegra.c       | 1 -
- drivers/pci/host/pci-xgene-msi.c   | 1 -
- drivers/pci/host/pcie-designware.c | 1 -
- drivers/pci/host/pcie-rcar.c       | 1 -
- drivers/pci/host/pcie-xilinx.c     | 2 --
- 7 files changed, 9 deletions(-)
-
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 80db09e..1a0d124 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -155,7 +155,6 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
+diff --git a/drivers/pinctrl/bcm/pinctrl-bcm2835.c b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+index efcf2a2..0cfdbb5 100644
+--- a/drivers/pinctrl/bcm/pinctrl-bcm2835.c
++++ b/drivers/pinctrl/bcm/pinctrl-bcm2835.c
+@@ -987,7 +987,6 @@ static int bcm2835_pinctrl_probe(struct platform_device *pdev)
+ 		irq_set_chip_and_handler(irq, &bcm2835_gpio_irq_chip,
+ 				handle_level_irq);
+ 		irq_set_chip_data(irq, pc);
+-		set_irq_flags(irq, IRQF_VALID);
+ 	}
+ 
+ 	for (i = 0; i < BCM2835_NUM_BANKS; i++) {
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index ad1ea16..661677c 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1348,11 +1348,9 @@ int mtk_pctrl_init(struct platform_device *pdev,
+ 		irq_set_chip_and_handler(virq, &mtk_pinctrl_irq_chip,
+ 			handle_level_irq);
+ 		irq_set_chip_data(virq, pctl);
+-		set_irq_flags(virq, IRQF_VALID);
+ 	};
+ 
+ 	irq_set_chained_handler_and_data(irq, mtk_eint_irq_handler, pctl);
 -	set_irq_flags(irq, IRQF_VALID);
-
  	return 0;
- }
-diff --git a/drivers/pci/host/pci-keystone-dw.c b/drivers/pci/host/pci-keystone-dw.c
-index f34892e..f1d0749 100644
---- a/drivers/pci/host/pci-keystone-dw.c
-+++ b/drivers/pci/host/pci-keystone-dw.c
-@@ -196,7 +196,6 @@ static int ks_dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- 	irq_set_chip_and_handler(irq, &ks_dw_pcie_msi_irq_chip,
+ 
+ chip_error:
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index b2de09d..d00a990 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1716,12 +1716,7 @@ static int pcs_irqdomain_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_chip_data(irq, pcs_soc);
+ 	irq_set_chip_and_handler(irq, &pcs->chip,
  				 handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
+-
+-#ifdef CONFIG_ARM
 -	set_irq_flags(irq, IRQF_VALID);
-
+-#else
+ 	irq_set_noprobe(irq);
+-#endif
+ 
  	return 0;
  }
-@@ -277,7 +276,6 @@ static int ks_dw_pcie_init_legacy_irq_map(struct irq_domain *d,
- 	irq_set_chip_and_handler(irq, &ks_dw_pcie_legacy_irq_chip,
- 				 handle_level_irq);
- 	irq_set_chip_data(irq, d->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
- 	return 0;
- }
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 10c0571..81df0c1 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -1248,7 +1248,6 @@ static int tegra_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &tegra_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
- 	tegra_cpuidle_pcie_irqs_in_use();
-
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index 2d31d4d..8e559d1 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -223,7 +223,6 @@ static int xgene_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 	irq_domain_set_info(domain, virq, msi_irq,
- 			    &xgene_msi_bottom_irq_chip, domain->host_data,
- 			    handle_simple_irq, NULL, NULL);
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index b18dabb..0e8add9 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -256,7 +256,6 @@ static int exynos_eint_irq_map(struct irq_domain *h, unsigned int virq,
+ 	irq_set_chip_data(virq, b);
+ 	irq_set_chip_and_handler(virq, &b->irq_chip->chip,
+ 					handle_level_irq);
 -	set_irq_flags(virq, IRQF_VALID);
-
  	return 0;
  }
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 69486be..5c6b562 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -350,7 +350,6 @@ static int dw_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dw_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
+ 
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+index f5619fb..e7d1c9e 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+@@ -929,7 +929,6 @@ static int exynos5440_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+ 	irq_set_chip_data(virq, d);
+ 	irq_set_chip_and_handler(virq, &exynos5440_gpio_irq_chip,
+ 					handle_level_irq);
+-	set_irq_flags(virq, IRQF_VALID);
  	return 0;
  }
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index c086210..7678fe0 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -664,7 +664,6 @@ static int rcar_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &rcar_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
+ 
+diff --git a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+index 01b43db..f218be7 100644
+--- a/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
++++ b/drivers/pinctrl/samsung/pinctrl-s3c24xx.c
+@@ -437,7 +437,6 @@ static int s3c24xx_gpf_irq_map(struct irq_domain *h, unsigned int virq,
+ 					 handle_edge_irq);
+ 	}
+ 	irq_set_chip_data(virq, bank);
+-	set_irq_flags(virq, IRQF_VALID);
  	return 0;
  }
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index f1a06a0..72015119 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -338,7 +338,6 @@ static int xilinx_pcie_msi_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &xilinx_msi_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
+ 
+@@ -457,7 +456,6 @@ static int s3c24xx_gpg_irq_map(struct irq_domain *h, unsigned int virq,
+ 
+ 	irq_set_chip_and_handler(virq, &s3c24xx_eint_chip, handle_edge_irq);
+ 	irq_set_chip_data(virq, bank);
+-	set_irq_flags(virq, IRQF_VALID);
  	return 0;
  }
-@@ -377,7 +376,6 @@ static int xilinx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- {
- 	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
- 	irq_set_chip_data(irq, domain->host_data);
--	set_irq_flags(irq, IRQF_VALID);
-
+ 
+diff --git a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
+index ec8cc3b..1a4dd01 100644
+--- a/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
++++ b/drivers/pinctrl/samsung/pinctrl-s3c64xx.c
+@@ -395,7 +395,6 @@ static int s3c64xx_gpio_irq_map(struct irq_domain *h, unsigned int virq,
+ 	irq_set_chip_and_handler(virq,
+ 				&s3c64xx_gpio_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(virq, bank);
+-	set_irq_flags(virq, IRQF_VALID);
+ 
  	return 0;
  }
---
+@@ -673,7 +672,6 @@ static int s3c64xx_eint0_irq_map(struct irq_domain *h, unsigned int virq,
+ 	irq_set_chip_and_handler(virq,
+ 				&s3c64xx_eint0_irq_chip, handle_level_irq);
+ 	irq_set_chip_data(virq, ddata);
+-	set_irq_flags(virq, IRQF_VALID);
+ 
+ 	return 0;
+ }
+-- 
 2.1.0
