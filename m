@@ -1,35 +1,122 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 13:18:51 +0200
-Subject: [PATCH] serial: samsung: Remove redundant DEBUG_LL check
-Message-ID: <1436786331-5188-1-git-send-email-javier@osg.samsung.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 13 Jul 2015 13:20:41 +0200
+Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
+ property
+In-Reply-To: <CAJKOXPcX83C+=D-Fpstgu8N1y7-TFM3tXki_YfUyKkU1q3EfSA@mail.gmail.com>
+References: <'@samsung.com> <4721448.dpAUKITTdt@amdc1976>
+ <CAJKOXPcX83C+=D-Fpstgu8N1y7-TFM3tXki_YfUyKkU1q3EfSA@mail.gmail.com>
+Message-ID: <1549704.AH5CyPJE5q@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 84f57d9e3685 ("tty: serial/samsung: fix modular build") fixed
-build issues when the driver was built as a module. One of those was
-that printascii is only accessible when the driver is built-in.
+On Monday, July 13, 2015 08:10:21 PM Krzysztof Kozlowski wrote:
+> 2015-07-13 20:02 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> >
+> > Hi,
+> >
+> > On Tuesday, June 23, 2015 09:24:40 AM Krzysztof Kozlowski wrote:
+> >> On 23.06.2015 08:46, Krzysztof Kozlowski wrote:
+> >> > On 23.06.2015 00:04, Michael Turquette wrote:
+> >> >> Quoting Kukjin Kim (2015-06-21 18:46:26)
+> >> >>> Krzysztof Kozlowski wrote:
+> >> >>>>
+> >> >>>> On 22.06.2015 10:38, Kukjin Kim wrote:
+> >> >>>>> Krzysztof Kozlowski wrote:
+> >> >>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+> >> >>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+> >> >>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
+> >> >>>>>>>>
+> >> >>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
+> >> >>>>>>>> regulator supply properties for migrating from Exynos specific
+> >> >>>>>>>> cpufreq driver to using generic cpufreq driver.
+> >> >>>>>>>>
+> >> >>>>>>>> Changes by Bartlomiej:
+> >> >>>>>>>> - removed Exynos5250 and Exynos5420 support for now
+> >> >>>>>>>>
+> >> >>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> >> >>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
+> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >> >>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
+> >> >>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
+> >> >>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
+> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> >> >>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> >> >>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >> >>>>>>>
+> >> >>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> >>>>>>
+> >> >>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
+> >> >>>>>> picks it by himself from LKML.
+> >> >>>>>>
+> >> >>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
+> >> >>>>> v4.2-rc1 after v4.2-rc1 release.
+> >> >>>>
+> >> >>>> You mean it is for v4.3, not v4.2?
+> >> >>>>
+> >> >>> Oops, yes v4.3.
+> >> >>>
+> >> >>> Thanks for the correction.
+> >> >>
+> >> >> Kukjin & Krzysztof,
+> >> >>
+> >> >> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
+> >> >> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
+> >> >> week).
+> >> >>
+> >> >> Is patch 4 going out for 4.2 or 4.3?
+> >> >
+> >> > It is quite late for sending pull request to arm-soc for 4.2.
+> >> > For example SoCFPGA pull request from last week was rejected:
+> >> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
+> >>
+> >> Oh, that was wrong link. Here it is:
+> >> http://www.spinics.net/lists/arm-kernel/msg425911.html
+> >>
+> >> > If you want to take it for 4.2 then I am fine with it but this will
+> >> > cause some easy but annoying conflicts. There aren't difficult - just
+> >> > most of nodes in board DTS changed their place.
+> >> >
+> >> > Example of resolution (target file after merge, with cpu nodes reordered
+> >> > alphabetically):
+> >> > https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+> >
+> > This patch is needed for v4.2 as other changes has been already
+> > merged.
+> >
+> > Krzysztof/Kukjin, could you please take care of it?
+> 
+> Of course! It is already in my queue. I'll send it later to Kukjin for
+> 4.3 (unless he picks it also).
 
-But there is no need to check for defined(CONFIG_DEBUG_LL) since the
-SERIAL_SAMSUNG_DEBUG Kconfig symbol already depends on DEBUG_LL.
+It is in your queue for v4.3 but the patch is needed for v4.2,
+without it cpufreq support will not work for Exynos4210 platforms.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> BTW for other patchsets you still need acks from Samsung clock
+> maintainers. Did you poke Sylwester or Tomasz about it?
 
----
+Sylwester, please review/ack Samsung specific clock changes in
+Exynos5250 cpufreq and Exynos4x12 cpufreq patch series.
 
- drivers/tty/serial/samsung.c | 1 -
- 1 file changed, 1 deletion(-)
+Patch series:
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 67d0c213b1c7..8c963d6d9074 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -53,7 +53,6 @@
- #include "samsung.h"
- 
- #if	defined(CONFIG_SERIAL_SAMSUNG_DEBUG) &&	\
--	defined(CONFIG_DEBUG_LL) &&		\
- 	!defined(MODULE)
- 
- extern void printascii(const char *);
--- 
-2.4.3
+* [PATCH v3 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
+  (http://lkml.org/lkml/2015/7/1/311)
+
+* [PATCH v2 0/7] cpufreq: use generic cpufreq drivers for Exynos4x12 platform
+  (http://lkml.org/lkml/2015/7/9/419)
+
+Samsung clock specific changes:
+
+* [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock configuration data
+  and instantiate cpu clock
+  (http://lkml.org/lkml/2015/7/1/313)
+
+* [PATCH v2 4/7] clk: samsung: exynos4x12: add cpu clock configuration data
+  and instantiate cpu clock
+  (http://lkml.org/lkml/2015/7/9/424)
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
