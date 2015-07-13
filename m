@@ -1,31 +1,74 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 13 Jul 2015 15:59:57 -0700
-Subject: [PATCH] pinctrl: qcom: Hook pm_power_down for shutdown support
-In-Reply-To: <1436231370-18301-1-git-send-email-sboyd@codeaurora.org>
-References: <1436231370-18301-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150713225957.GF15178@usrtlx11787.corpusers.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 13 Jul 2015 16:02:18 -0700
+Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <20150709223938.19450e75@bbrezillon>
+References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150708005748.GG30412@codeaurora.org>
+ <20150708110005.704c49ff@bbrezillon>
+ <559D66EE.4060707@codeaurora.org>
+ <20150709223938.19450e75@bbrezillon>
+Message-ID: <20150713230217.GI30412@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 06 Jul 18:09 PDT 2015, Stephen Boyd wrote:
-
-> Assign pm_power_off() if we have the PS_HOLD functionality so
-> that we can properly shutdown the SoC. Otherwise, shutdown won't
-> do anything besides put the CPU into a tight loop. Unfortunately,
-> we have to use a singleton here because pm_power_off() doesn't
-> take any arguments. Fortunately there's only one instance of the
-> pinctrl device on a running system so this isn't a problem.
+On 07/09, Boris Brezillon wrote:
+> Hi Stephen,
 > 
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Cc: Pramod Gurav <pramod.gurav@smartplayin.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> On Wed, 08 Jul 2015 11:07:42 -0700
+> Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > On 07/08/2015 02:00 AM, Boris Brezillon wrote:
+> > > Hi Stephen,
+> > >
+> > > On Tue, 7 Jul 2015 17:57:48 -0700
+> > > Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > >
+> > >> On 07/07, Boris Brezillon wrote:
+> > >>>
+> > >>>  	} else {
+> > >>>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
+> > >>> +		req->rate = 0;
+> > >>>  		return 0;
+> > >> Shouldn't this return an error now? And then assigning req->rate
+> > >> wouldn't be necessary. Sorry I must have missed this last round.
+> > >>
+> > > Actually I wanted to keep the existing behavior: return a 0 rate (not
+> > > an error) when there is no mux or rate ops.
+> > >
+> > > That's something we can change afterwards, but it might reveals
+> > > new bugs if some users are checking for a 0 rate to detect errors.
+> > >
+> > 
+> > Ok. Care to send the patch now to do that while we're thinking about it?
+> > We can test it out for a month or two.
+> > 
+> 
+> Here is a patch modifying a few drivers to return errors instead of a 0
+> rate. Feel free to squash it in the previous one if you think this is
+> better.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> --- >8 ---
+> 
+> From dca9c28301042cf19dad4b1e4555cdb7c1063745 Mon Sep 17 00:00:00 2001
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Date: Thu, 9 Jul 2015 12:20:21 +0200
+> Subject: [PATCH] clk: fix some determine_rate implementations
+> 
+> Some determine_rate implementations are not returning an error when then
+> failed to adapt the rate according to the rate request.
+> Fix them so that they return an error instead of silently returning 0.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
+The linewrap is seriously messed up here. Please fix your mailer
+next time. I had to hand edit the patch to get it to apply. I've
+applied this in top of the original patch as a different commit,
+in case we need to revert it later.
 
-I do find it odd that there's generic handling for restart but only the
-crude way pm_power_off to shut the system down... But this seems to be
-the way it should be done...
-
-Acked-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-
-Regards,
-Bjorn
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
