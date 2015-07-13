@@ -1,73 +1,171 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 13 Jul 2015 09:28:49 +0000
-Subject: [PATCH 2/3] hwspinlock: sirf: fix the memory base and move to
- devm_ioremap
-In-Reply-To: <1436779729-3052-1-git-send-email-21cnbao@gmail.com>
-References: <1436779729-3052-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1436779729-3052-2-git-send-email-21cnbao@gmail.com>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Mon, 13 Jul 2015 10:23:43 +0100
+Subject: [3.16.y-ckt stable] Patch "clocksource: exynos_mct: Avoid blocking
+ calls in the cpu hotplug notifier" has been added to staging queue
+Message-ID: <1436779423-22107-1-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Chen <Wei.Chen@csr.com>
+This is a note to let you know that I have just added a patch titled
 
-this patch moves to the right base since we fix the dts, then
-we can use devm_ioremap now.
+    clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier
 
-Cc: Suman Anna <s-anna@ti.com>
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+to the linux-3.16.y-queue branch of the 3.16.y-ckt extended stable tree 
+which can be found at:
+
+    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-3.16.y-queue
+
+This patch is scheduled to be released in version 3.16.7-ckt15.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.16.y-ckt tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Luis
+
+------
+
+>From 468b12a3a0f1abf01ed865d4195e84d84e7c9fbc Mon Sep 17 00:00:00 2001
+From: Damian Eppel <d.eppel@samsung.com>
+Date: Fri, 26 Jun 2015 15:23:04 +0200
+Subject: clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug
+ notifier
+
+commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
+
+Whilst testing cpu hotplug events on kernel configured with
+DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+caused by calling request_irq() and free_irq() in the context of
+hotplug notification (which is in this case atomic context).
+
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+notifications which run on the hotplugged cpu with interrupts and
+preemption disabled.
+
+To avoid the issue, request the interrupts for all possible cpus in
+the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+request_irq/disable_irq() sequence. The flag prevents the
+request_irq() code from enabling the interrupt immediately.
+
+The interrupt is then enabled in the CPU_STARTING notifier of the
+hotplugged cpu and again disabled with disable_irq_nosync() in the
+CPU_DYING notifier.
+
+[ tglx: Massaged changelog to match the patch ]
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: m.szyprowski at samsung.com
+Cc: kyungmin.park at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: kgene at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
 ---
- drivers/hwspinlock/sirf_hwspinlock.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/hwspinlock/sirf_hwspinlock.c b/drivers/hwspinlock/sirf_hwspinlock.c
-index 1601854..692ac41 100644
---- a/drivers/hwspinlock/sirf_hwspinlock.c
-+++ b/drivers/hwspinlock/sirf_hwspinlock.c
-@@ -29,7 +29,7 @@ struct sirf_hwspinlock {
- #define	HW_SPINLOCK_NUMBER	30
- 
- /* Hardware spinlock register offsets */
--#define HW_SPINLOCK_BASE	0x404
-+#define HW_SPINLOCK_BASE	0x04
- #define HW_SPINLOCK_OFFSET(x)	(HW_SPINLOCK_BASE + 0x4 * (x))
- 
- static int sirf_hwspinlock_trylock(struct hwspinlock *lock)
-@@ -57,6 +57,7 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 336a60fbabf9..5d1b7f64947c 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -441,15 +441,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -462,10 +459,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
  {
- 	struct sirf_hwspinlock *hwspin;
- 	struct hwspinlock *hwlock;
-+	struct resource *res;
- 	int idx, ret;
- 
- 	if (!pdev->dev.of_node)
-@@ -68,7 +69,8 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	/* retrieve io base */
--	hwspin->io_base = of_iomap(pdev->dev.of_node, 0);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	hwspin->io_base = devm_ioremap_resource(&pdev->dev, res);
- 	if (!hwspin->io_base)
- 		return -ENOMEM;
- 
-@@ -91,7 +93,6 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
- 
- reg_failed:
- 	pm_runtime_disable(&pdev->dev);
--	iounmap(hwspin->io_base);
- 
- 	return ret;
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
  }
-@@ -109,8 +110,6 @@ static int sirf_hwspinlock_remove(struct platform_device *pdev)
- 
- 	pm_runtime_disable(&pdev->dev);
- 
--	iounmap(hwspin->io_base);
--
- 	return 0;
- }
- 
--- 
-2.3.5
+
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -497,7 +496,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+
+@@ -524,7 +523,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
