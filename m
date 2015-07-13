@@ -1,78 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jul 2015 14:07:45 +0200
-Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
- muxing controllers
-In-Reply-To: <55925EB1.1030500@atmel.com>
-References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
- <557EF60D.8020007@wwwdotorg.org>
- <20150617123816.GB12295@odux.rfo.atmel.com>
- <5581988C.50000@wwwdotorg.org> <55925EB1.1030500@atmel.com>
-Message-ID: <CACRpkdb3+9=seJo7w5nrJS-iURH3SnH-PYVvJCQ-S619KOcKbg@mail.gmail.com>
+From: zhichao.huang@linaro.org (zichao)
+Date: Mon, 13 Jul 2015 20:12:33 +0800
+Subject: [PATCH v3 08/11] KVM: arm: implement dirty bit mechanism for
+ debug registers
+In-Reply-To: <20150709115047.GK13530@cbox>
+References: <1434969694-7432-1-git-send-email-zhichao.huang@linaro.org>
+ <1434969694-7432-9-git-send-email-zhichao.huang@linaro.org>
+ <20150630092020.GP11332@cbox>
+ <B3B5AB0D-020C-483D-A6DE-76E355865010@linaro.org>
+ <20150703115611.GB14220@lvm>
+ <5A7DE9A0-E7A6-40B0-80F9-896F7DED0E47@linaro.org>
+ <20150707102405.GE23879@arm.com> <20150709115047.GK13530@cbox>
+Message-ID: <55A3AB31.2020001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 11:17 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> - no agreement on 3 points:
-> 1/ ways to use groups in generic pinctrl
-> 2/ ways to describe a comprehensive configuration in device tree
-> 3/ readability of a sysfs information
->
-> - no way out on the generic pinctrl little changes that Ludovic proposed
-> as Linus W. never gave his point of view (RFC posts on April the 2nd).
+On 2015/7/9 19:50, Christoffer Dall wrote:
+> On Tue, Jul 07, 2015 at 11:24:06AM +0100, Will Deacon wrote:
+>> On Tue, Jul 07, 2015 at 11:06:57AM +0100, Zhichao Huang wrote:
+>>> Chazy and me are talking about how to reduce the saving/restoring
+>>> overhead for debug registers.
+>>> We want to add a state in hw_breakpoint.c to indicate whether the host
+>>> enable any hwbrpts or not (might export a fuction that kvm can call),
+>>> then we can read this state from memory instead of reading from real
+>>> hardware registers, and to decide whether we need a world switch or
+>>> not.
+>>> Does it acceptable?
+>>
+>> Maybe, hard to tell without the code. There are obvious races to deal with
+>> if you use variables to indicate whether resources are in use -- why not
+>> just trap debug access from the host as well? Then you could keep track of
+>> the "owner" in kvm and trap accesses from everybody else.
+>>
+> The only information we're looking for here is whether the host has
+> enabled some break/watch point so that we need to disable them before
+> running the guest.
+> 
+> Just to re-iterate, when we are about to run a guest, we have the
+> following cases:
+> 
+> 1) Neither the host nor the guest has configured any [WB]points
+> 2) Only the host has configured any [WB]points
+> 3) Only the guest has configured any [WB]points
+> 4) Both the host and the guest have configured any [WB]points
+> 
+> In case (1), KVM should enable trapping and swtich the register state on
+> guest accesses.
+> 
+> In cases (2), (3), and (4) we must switch the register state on each
+> entry/exit.
+> 
+> If we are to trap debug register accesses in KVM to set a flag to keep
+> track of the owner (iow. has the host touched the registers) then don't
+> we impose an ordering requirement of whether KVM or the breakpoint
+> functionality gets initialized first, and we need to take special care
+> when tearing down KVM to disable the traps?  It sounds a little complex.
+> 
+> I've previously suggested to simply look at the B/W control registers to
+> figure out what to do.  Caching the state in memory is an optimization,
+> do we even have any idea how important such an optimization is?
+> 
 
-Yeah I know. I am battling with this, it is one of those topics
-where you feel "eeeehhhh" and try to avoid looking at it. Sadly
-I have to...
+I have a test for the overhead both in el1 and el2 on D01 board(ARMv7).
 
-I refer to Documentation/ManagementStyle, chapter 1,
-"Decisions".
+Each "MRC p14 ..." instruction cost 8 cycles, and Each "MCR p14 ..." cost 5 cycles.
 
-What makes me feel uneasy about these things is that the decisions
-are irreversible due to the nature of the device tree bindings.
+A15 has 6 breakpoints and 4 watchpoints, which gives us a total of 20 registers.
+and the overhead in each world switch is at least (20*8 + 20*5 = 260)cycles.
 
-I am not a manager, but a maintainer...
 
-> Ludovic explained at length our point of view and gave detailed
-> technical arguments. We don't intend to convince you, we just would like
-> the harmless modifications to be integrated.
-
-So is it universally agreed that the changes are harmless?
-
-If they are harmless, I would be able to revert the patch and
-nothing breaks in the world, I don't think that is the case. The
-case is a piece of code and functionality that is not AT91-specific
-but has to be maintained in the core pinctrl code forever.
-
-That is basically the big problem with anything device tree.
-It etches stuff in stone so it can't be changed, like ever.
-Further, the decision on whether to etch this or that is
-pushed to Linux subsystem maintainers, who are clearly
-unsuited for the task. :(
-
-> As we preferred to give a chance to the generic pinconf/pinctrl for our
-> use by adding a little bit of flexibility, we are now in a situation
-> where we are nearly obliged to give up this approach and write a new
-> driver without the use of the generic facilities: what a pity!
-> We lost several months of useless work to match what we thought the
-> maintainer would prefer.
->
-> So Linus, do you confirm that we won't go further with this approach?
->
-> We are pretty disappointed by the way this interaction with the pinctrl
-> sub-system went.
-
-I'm sorry, I am just trying to wait for consensus but it seems to
-be hard for that to happen.
-
-Things I need:
-
-- More DT bindings people to look at this patch.
-
-- More other driver maintainers to look at this patch.
-  Sacha is one of those I'd like to get an opinion from
-  for example. ACKs, Reviewed-by's are always good.
-
-Yours,
-Linus Walleij
+> Thanks,
+> -Christoffer
+> 
