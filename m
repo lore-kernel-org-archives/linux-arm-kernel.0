@@ -1,39 +1,37 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 13 Jul 2015 11:03:51 +0200
-Subject: [PATCH v3 2/5] usb: gadget: midi: avoid redundant f_midi_set_alt()
- call
+Date: Mon, 13 Jul 2015 11:03:53 +0200
+Subject: [PATCH v3 4/5] staging: emxx_udc: add missing
+ usb_ep_set_maxpacket_limit()
 In-Reply-To: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
 References: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436778234-12787-3-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436778234-12787-5-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function midi registers two interfaces with single set_alt() function
-which means that f_midi_set_alt() is called twice when configuration
-is set. That means that endpoint initialization and ep request allocation
-is done two times. To avoid this problem we do such things only once,
-for interface number 1 (MIDI Streaming interface).
+Since maxpacket_limit was introduced all UDC drivers should use
+usb_ep_set_maxpacket_limit() function instead of setting maxpacket value
+manually. ep.maxpacket_limit contains actual maximum maxpacket value
+supported by hardware which is needed by epautoconf.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 Acked-by: Michal Nazarewicz <mina86@mina86.com>
 ---
- drivers/usb/gadget/function/f_midi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/staging/emxx_udc/emxx_udc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/usb/gadget/function/f_midi.c b/drivers/usb/gadget/function/f_midi.c
-index 6316aa5..4cef222 100644
---- a/drivers/usb/gadget/function/f_midi.c
-+++ b/drivers/usb/gadget/function/f_midi.c
-@@ -329,6 +329,10 @@ static int f_midi_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
- 	unsigned i;
- 	int err;
+diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
+index 4178d96..3b7aa36 100644
+--- a/drivers/staging/emxx_udc/emxx_udc.c
++++ b/drivers/staging/emxx_udc/emxx_udc.c
+@@ -3203,7 +3203,8 @@ static void __init nbu2ss_drv_ep_init(struct nbu2ss_udc *udc)
+ 		ep->ep.name = gp_ep_name[i];
+ 		ep->ep.ops = &nbu2ss_ep_ops;
  
-+	/* For Control Device interface we do nothing */
-+	if (intf == 0)
-+		return 0;
-+
- 	err = f_midi_start_ep(midi, f, midi->in_ep);
- 	if (err)
- 		return err;
+-		ep->ep.maxpacket = (i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
++		usb_ep_set_maxpacket_limit(&ep->ep,
++				i == 0 ? EP0_PACKETSIZE : EP_PACKETSIZE);
+ 
+ 		list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+ 		INIT_LIST_HEAD(&ep->queue);
 -- 
 1.9.1
