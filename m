@@ -1,88 +1,62 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 13 Jul 2015 14:29:32 +0900
-Subject: [RFC 0/3] arm64: ftrace: fix incorrect output from stack tracer
-Message-ID: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Mon, 13 Jul 2015 14:29:33 +0900
+Subject: [RFC 1/3] ftrace: adjust a function's pc to search for in
+ check_stack() for arm64
+In-Reply-To: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1436765375-7119-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported in the thread below[1], the output from stack tracer using
-ftrace on arm64 seems to be incorrect due to different reasons. Each
-problem is described and fixed repsectively in the following patches.
-Please see the commit messages for the details.
+Ftace's stack tracer on arm64 returns wrong information about call stacks:
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
+        Depth    Size   Location    (50 entries)
+        -----    ----   --------
+  0)     5256       0   notifier_call_chain+0x30/0x94
+  1)     5256       0   ftrace_call+0x0/0x4
+  2)     5256       0   notifier_call_chain+0x2c/0x94
+  3)     5256       0   raw_notifier_call_chain+0x34/0x44
+  4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
+  5)     5256       0   update_wall_time+0x408/0x6dc
 
-If the patch[1/3], which adds "#ifdef CONFIG_ARM64" to generic ftrace code,
-is not acceptable, we will have to introduce an arch-dependent function,
-ie. arch_check_stack().
+Most of 'Size' fields are unexpectedly zero.
 
-Even with those patches, we see another issue that the values in 'Size'
-field are *inaccurate*. This is simply because we have no way to estimate
-the value of stack pointer at each function from the content of stack.
-Thus the function's reported stack size does not include its own local
-variables, but includes *its child's* ones.
-See more details below.
+This is because stack tracer fails to recognize each function's stack frame
+in check_stack(). Stack tracer searches for a function's pc in the stack
+based on the list returned by save_stack_trace(), but save_stack_trace() on
+arm64 does not return the exact return address saved in a stack frame, but
+a value decrmented by 4 (which means a branch instruction's address).
+This behavior was introduced by
+    commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
 
-In my opinion, we cannot fix this issue unless analyzing the function's
-first instruction, ie. "stp x29, x30, [sp, #xx]!".
+So the matching doesn't succeed in most cases.
 
-* How does stack tracer identify each function's stack size?
+This problem can be fixed either by
+a) reverting the commit above
+b) adding an arm64-specific hack to check_patch()
 
-Take an example, func-0 calls func-1 and func-1 calls func-2.
-The stack layout looks like the below:
-("p" is a temp variable in check_stack().)
+This patch does b).
 
-sp2     +-------+ <--------- func-2's stackframe
-        |       |
-        |       |
-fp2     +-------+
-        |  fp1  |
-        +-------+ <-- p1 (*p1 == stack_dump_trace[i] == lr1)
-        |  lr1  |
-        +-------+
-        |       |
-        |  func-2's local variables
-        |       |
-sp1     +-------+ <--------- func-1(lr1)'s stackframe
-        |       |             (stack_dump_index[i] = top - p1)
-        |  func-1's dynamic local variables
-        |       |
-fp1     +-------+
-        |  fp0  |
-        +-------+ <-- p0 (*p0 == stack_dump_trace[i+1] == lr0)
-        |  lr0  |
-        +-------+
-        |       |
-        |  func-1's local variables
-        |       |
-sp0     +-------+ <--------- func-0(lr0)'s stackframe
-        |       |             (stack_dump_index[i+1] = top - p0)
-        |       |
-        *-------+ top
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ kernel/trace/trace_stack.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-Stack tracer records the stack height of func-1 (== stack_dump_trace[i]):
-	stack_dump_index[i] = <stack top> - <estimated stack pointer>
-in check_stack() by searching for func-1's return address (lr1)
-and eventually calculates func-1's stack size by:
-	stack_dump_index[i] - stack_dump_index[i+1]
-		=> (top - p1) - (top - p0)
-		=> p1 - p0
-
-On x86, this calculation is correct because x86's call instruction pushes
-the return address to the stack and jump into the child(func-2) function,
-thus the func-1's stack pointer is "p1" where *p1 is equal to
-stack_dump_trace[i]. But this is not true on arm64.
-
-AKASHI Takahiro (3):
-  ftrace: adjust a function's pc to search for in check_stack() for
-    arm64
-  arm64: refactor save_stack_trace()
-  arm64: ftrace: mcount() should not create a stack frame
-
- arch/arm64/kernel/entry-ftrace.S |   15 ++++++++-------
- arch/arm64/kernel/stacktrace.c   |   31 +++++++++++++++++++++++--------
- kernel/trace/trace_stack.c       |    4 ++++
- 3 files changed, 35 insertions(+), 15 deletions(-)
-
+diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+index 3f34496..7086fc3 100644
+--- a/kernel/trace/trace_stack.c
++++ b/kernel/trace/trace_stack.c
+@@ -143,7 +143,11 @@ check_stack(unsigned long ip, unsigned long *stack)
+ 		p = start;
+ 
+ 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
++#ifdef CONFIG_ARM64
++			if (*p == (stack_dump_trace[i] + 4)) {
++#else
+ 			if (*p == stack_dump_trace[i]) {
++#endif
+ 				this_size = stack_dump_index[i++] =
+ 					(top - p) * sizeof(unsigned long);
+ 				found = 1;
 -- 
 1.7.9.5
