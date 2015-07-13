@@ -1,62 +1,69 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 13 Jul 2015 12:34:54 -0500
-Subject: [PATCH v4 2/3] ARM: dts: AM33xx: Update and move wkup_m3 node to l4
- node
-In-Reply-To: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
-References: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1436808895-21206-3-git-send-email-d-gerlach@ti.com>
+From: me@kylehuey.com (Kyle Huey)
+Date: Mon, 13 Jul 2015 10:35:45 -0700
+Subject: [RESEND PATCH v3] ARM: tegra124: pmu support
+Message-ID: <1436808945-14524-1-git-send-email-khuey@kylehuey.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Suman Anna <s-anna@ti.com>
+This patch modifies the device tree for tegra124 based devices to enable
+the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM
+DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
 
-The WakeupM3 remote processor device node has been moved to
-be a child node of the newly created l4_wkup node, to reflect
-its presence properly within the SoC. The node was added
-previously before any driver support, it is now updated as
-per the wkup_m3_rproc bindings added alongside the driver
-support.
+Updated for proper ordering and to add interrupt-affinity values.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+Signed-off-by: Kyle Huey <khuey@kylehuey.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ arch/arm/boot/dts/tegra124.dtsi | 17 +++++++++++++----
+ 1 file changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 21fcc44..4c1b4a8 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -103,6 +103,15 @@
- 			#size-cells = <1>;
- 			ranges = <0 0x44c00000 0x280000>;
+diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+index 13cc7ca..de07d7e 100644
+--- a/arch/arm/boot/dts/tegra124.dtsi
++++ b/arch/arm/boot/dts/tegra124.dtsi
+@@ -918,31 +918,40 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
-+			wkup_m3: wkup_m3 at 100000 {
-+				compatible = "ti,am3352-wkup-m3";
-+				reg = <0x100000 0x4000>,
-+				      <0x180000	0x2000>;
-+				reg-names = "umem", "dmem";
-+				ti,hwmods = "wkup_m3";
-+				ti,pm-firmware = "am335x-pm-firmware.elf";
-+			};
-+
- 			prcm: prcm at 200000 {
- 				compatible = "ti,am3-prcm";
- 				reg = <0x200000 0x4000>;
-@@ -762,14 +771,6 @@
- 			reg = <0x40300000 0x10000>; /* 64k */
+-		cpu at 0 {
++		A15_0: cpu at 0 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <0>;
  		};
  
--		wkup_m3: wkup_m3 at 44d00000 {
--			compatible = "ti,am3353-wkup-m3";
--			reg = <0x44d00000 0x4000	/* M3 UMEM */
--			       0x44d80000 0x2000>;	/* M3 DMEM */
--			ti,hwmods = "wkup_m3";
--			ti,no-reset-on-init;
--		};
--
- 		elm: elm at 48080000 {
- 			compatible = "ti,am3352-elm";
- 			reg = <0x48080000 0x2000>;
+-		cpu at 1 {
++		A15_1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <1>;
+ 		};
+ 
+-		cpu at 2 {
++		A15_2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <2>;
+ 		};
+ 
+-		cpu at 3 {
++		A15_3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
+ 			reg = <3>;
+ 		};
+ 	};
+ 
++	pmu {
++		compatible = "arm,cortex-a15-pmu";
++		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&A15_0>, <&A15_1>, <&A15_2>, <&A15_3>;
++	};
++
+ 	thermal-zones {
+ 		cpu {
+ 			polling-delay-passive = <1000>;
 -- 
-2.4.5
+1.9.1
