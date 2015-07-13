@@ -1,51 +1,98 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 13 Jul 2015 14:35:28 +0200
-Subject: Extensions for KVM MSI related ioctls
-In-Reply-To: <55A39231.4050904@arm.com>
-References: <55A39231.4050904@arm.com>
-Message-ID: <55A3B090.6090002@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 13 Jul 2015 13:39:38 +0100
+Subject: [PATCH V3 00/19] Add generic PM domain support for Tegra SoCs
+Message-ID: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series is based upon the V2 series from Vince Hsu [1]. The code
+for the MC flush operations and PMC code for the generic PM domains
+has been re-written to simplify and consolidate legacy/existing support
+for power-domains on the Tegra SoC.
+
+This series has been boot tested on various 32-bit Tegra platforms
+as well as compile tested for 64-bit ARM. A summary of the results is
+available here [2]. Would be great to get some more testing for PCI,
+SATA, GR3D and DRM.
+
+Summary:
+
+Patch 1:     Adds the new function of_reset_control_get_by_index().
+Patch 2-5:   Add the MC flush operations for Tegra30/Tegra114/Tegra124.
+Patch 6:     Is a PLLD fix for Tegra114.
+Patch 7-9:   PMC preparation for generic PM domains.
+Patch 10-13: Update drivers to support generic PM domains
+Patch 14:    Add DT documentation for tegra generic PM domains
+Patch 15:    Add PMC generic DM domains support
+Patch 16:    Remove legacy functions
+Patch 17-18: Add DT bindings for tegra124
+Patch 19:    Enable generic PM domains for tegra
 
 
-On 13/07/2015 12:25, Andre Przywara wrote:
-> 
-> For using MSIs in a guest when running on an ARM(64) system using a
-> GICv3 interrupt controller we need to have a device ID available. On
-> real hardware this information is sampled from the bus by the ITS part
-> of the interrupt controller.
-> To make this work for guests, we need to extend two ioctls which deal
-> with MSIs: KVM_SIGNAL_MSI and KVM_SET_GSI_ROUTING.
-> 
-> The idea that we sketched so far in [1] and [2] is to use a new
-> capability (KVM_CAP_MSI_DEVID) to advertise both a flag bit for
-> KVM_SIGNAL_MSI and a new type for KVM_SET_GSI_ROUTING.
-> 
-> Since current kernels bail out on any flag value != 0 in KVM_SIGNAL_MSI,
-> we need the new capability to tell userland about it in a reliable and
-> portable way (to avoid hacks like #ifdef ARM && USES_IRQ_ROUTING in
-> userland).
-> 
-> For KVM_SET_GSI_ROUTING there was the idea of using the very same flag
-> value in it's own flag field, but I find it saner to use a new routing
-> type instead (KVM_IRQ_ROUTING_EXTENDED_MSI). Both approaches would
-> piggy-back on the existing struct kvm_irq_routing_msi and re-purpose the
-> pad field in there.
+Changes:
+   v3:
+   * Re-wrote and simplified MC flush code
+   * Re-wrote PMC code for generic PM domains to permit devices to use
+     legacy DT blobs without generic PM domain info.
+   * Re-worked DRM, PCI, AHCI and GR3D drivers to allow then to work
+     with and without generic PM domains.
+   * Added DT documentation for tegra generic PM domain bindings.
+   * Dropped DT bindings for T30 and T114 (plan to add later)
 
-I think I prefer the flag.  Offhand it sounds easier to add support for
-it to non-ARM architectures, compared to KVM_IRQ_ROUTING_EXTENDED_MSI.
+   v2 (Vince Hsu):
+   * Add support for Tegra30/Tegra114
+   * Address Alex's comments
 
-> Summarized:
-> 1) Add a new KVM_CAP_MSI_DEVID to advertise the device ID extension.
-> 2) Use a KVM_MSI_VALID_DEVID flag in KVM_SIGNAL_MSI to re-purpose part
->    of struct kvm_msi.
+[1] https://lkml.org/lkml/2015/3/12/284
+[2] https://nvtb.github.io//epmt/jonathanh-tester/test_20150713051933_58fc293c9467f52c51f1e52e5d5a8da174b8550a/20150713051933/
 
-These two sounds good.
 
-Paolo
+Jon Hunter (12):
+  memory: tegra: Add MC flush support
+  soc: tegra: pmc: Wait for powergate state to change
+  soc: tegra: pmc: Clean-up PMC helper functions
+  soc: tegra: pmc: Prepare for migrating to generic PM domains
+  drm/tegra: dc: Prepare for generic PM domains
+  PCI: tegra: Add support for generic PM domains
+  ata: ahci_tegra: Add support for generic PM domains
+  drm/tegra: gr3d: Add support for generic PM domains
+  Documentation: DT: bindings: Add power domain info for NVIDIA PMC
+  soc: tegra: pmc: Add generic PM domain support
+  soc: tegra: pmc: Remove the deprecated powergate APIs
+  ARM: tegra: Add PM domain device nodes to Tegra124 DT
 
-> 3) Add a new routing type KVM_IRQ_ROUTING_EXTENDED_MSI for
->    KVM_SET_GSI_ROUTING to add device IDs in struct kvm_irq_routing_msi.
-> 
-> Is that a sensible way to extend the KVM API?
+Vince Hsu (7):
+  reset: add of_reset_control_get_by_index()
+  memory: tegra: add flush operation for Tegra30 memory clients
+  memory: tegra: add flush operation for Tegra114 memory clients
+  memory: tegra: add flush operation for Tegra124 memory clients
+  clk: tegra: remove TEGRA_PLL_USE_LOCK for PLLD/PLLD2
+  ARM: tegra: add GPU power supply to Jetson TK1 DT
+  ARM: tegra: select PM_GENERIC_DOMAINS
+
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  99 ++++
+ arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   6 +-
+ arch/arm/boot/dts/tegra124.dtsi                    |  80 +++
+ arch/arm/mach-tegra/Kconfig                        |   1 +
+ arch/arm/mach-tegra/platsmp.c                      |  18 +-
+ drivers/ata/ahci_tegra.c                           |  51 +-
+ drivers/clk/tegra/clk-tegra114.c                   |   6 +-
+ drivers/gpu/drm/tegra/dc.c                         |  94 +--
+ drivers/gpu/drm/tegra/gr3d.c                       |  57 +-
+ drivers/memory/tegra/mc.c                          | 110 ++++
+ drivers/memory/tegra/mc.h                          |   2 +
+ drivers/memory/tegra/tegra114.c                    |  21 +
+ drivers/memory/tegra/tegra124.c                    |  31 +
+ drivers/memory/tegra/tegra30.c                     |  24 +
+ drivers/pci/host/pci-tegra.c                       |  49 +-
+ drivers/reset/core.c                               |  40 +-
+ drivers/soc/tegra/pmc.c                            | 647 ++++++++++++++++++---
+ include/dt-bindings/power/tegra-powergate.h        |  42 ++
+ include/linux/reset.h                              |   9 +
+ include/soc/tegra/mc.h                             |  34 ++
+ include/soc/tegra/pmc.h                            |  74 +--
+ 21 files changed, 1264 insertions(+), 231 deletions(-)
+ create mode 100644 include/dt-bindings/power/tegra-powergate.h
+
+-- 
+2.1.4
