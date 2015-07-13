@@ -1,56 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jul 2015 15:47:22 +0100
-Subject: [PATCH v2 01/10] arm64/debug: Eliminate magic number for size of
- BRK instruction
-In-Reply-To: <1436793967-7138-2-git-send-email-Dave.Martin@arm.com>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-2-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150713144721.GJ19083@leverpostej>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Mon, 13 Jul 2015 09:48:33 -0500
+Subject: [PATCH] rtc: snvs: select option REGMAP_MMIO
+In-Reply-To: <1436775075-15037-1-git-send-email-shawnguo@kernel.org>
+References: <1436775075-15037-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAHrpEqSi=BPuZrqSvozvggAFsnXy2DqnfkzP5dpsP2cShzM7Hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 02:25:48PM +0100, Dave P Martin wrote:
-> The size of an A64 BRK instruction is the same as the size of all other
-> A64 instructions, because all A64 instructions are the same size.
-> 
-> BREAK_INSTR_SIZE is retained for readibility, but it should not be
-> an independent constant from AARCH64_INSN_SIZE.
+On Mon, Jul 13, 2015 at 3:11 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Select REGMAP_MMIO to fix the following build error seen with x86_64
+> randconfig.
+>
+>   drivers/built-in.o: In function `snvs_rtc_probe':
+> rtc-snvs.c:(.text+0x567730): undefined reference to `devm_regmap_init_mmio_clk'
+>
+> Reported-by: kbuild test robot <fengguang.wu@intel.com>
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
 
-Given BREAK_INSTR_SIZE seems to be used by the core of the KGDB code I
-guess we have no choice. ;)
-
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
+Acked-by: Frank Li <Frank.Li@freescale.com>
 
 > ---
->  arch/arm64/include/asm/debug-monitors.h |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index 40ec68a..f3d2dbd 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -18,6 +18,8 @@
->  
->  #ifdef __KERNEL__
->  
-> +#include <asm/insn.h>
-> +
->  /* Low-level stepping controls. */
->  #define DBG_MDSCR_SS		(1 << 0)
->  #define DBG_SPSR_SS		(1 << 21)
-> @@ -38,7 +40,7 @@
->  /*
->   * Break point instruction encoding
->   */
-> -#define BREAK_INSTR_SIZE		4
-> +#define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
->  
->  /*
->   * ESR values expected for dynamic and compile time BRK instruction
-> -- 
-> 1.7.10.4
-> 
+> This is a fix to patch "rtc: snvs: use syscon to access register",
+> which I queued on IMX tree for 4.3.  So I will apply it to the same
+> branch.
+>
+> Shawn
+>
+>  drivers/rtc/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+> index 83b4b89b9d5a..533bfa3b6039 100644
+> --- a/drivers/rtc/Kconfig
+> +++ b/drivers/rtc/Kconfig
+> @@ -1523,6 +1523,7 @@ config RTC_DRV_MXC
+>
+>  config RTC_DRV_SNVS
+>         tristate "Freescale SNVS RTC support"
+> +       select REGMAP_MMIO
+>         depends on HAS_IOMEM
+>         depends on OF
+>         help
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
