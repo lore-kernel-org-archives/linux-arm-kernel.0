@@ -1,128 +1,181 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 13:39:47 +0100
-Subject: [PATCH V3 09/19] soc: tegra: pmc: Prepare for migrating to generic PM
- domains
+Date: Mon, 13 Jul 2015 13:39:48 +0100
+Subject: [PATCH V3 10/19] drm/tegra: dc: Prepare for generic PM domains
 In-Reply-To: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
 References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1436791197-32358-10-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When turning on and off power-domains it is necessary to enable specific
-clocks in order to de-assert/assert various reset signals to place the
-logic into a good state.
+Add support to the tegra dc driver for generic PM domains. However,
+to ensure backward compatibility with older device tree blobs ensure
+that the driver can work with or without generic PM domains. In order
+to migrate to generic PM domain infrastructure the necessary changes
+are:
 
-Currently, clocks required for turning on a power-domain are left enabled
-by the PMC driver because these clocks are also needed by the IP blocks
-to operated.
+1. If the "power-domains" property is present in the DT device node then
+   generic PM domains is supported and pm_runtime_enable() should be
+   called for the device. Furthermore, the enabling and disabling of the
+   power-domain is handled via calling pm_runtime_get/put, respectively.
 
-When migrating to the generic PM domain infrastructure, control of the
-powergates is abstracted from the drivers and therefore, it is desirable
-to disabled the clocks after turning on the power-domain and let the
-drivers enable the clocks it needs later. However, because this behaviour
-is different it is necessary to add a new API that drivers can use
-whether generic PM domains are used or not so that the behaviour is the
-same. Hence, add a new API that disables the clocks after turning on the
-power domain.
+2. To ensure that clocks are managed consistently when generic PM domains
+   are used and are not used, drivers should be migrated to use the
+   tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
+   functions instead of the current tegra_powergate_sequence_power_up()
+   and tegra_powergate_power_off(). The purpose of the
+   tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
+   APIs is to mimick the behaviour of the tegra generic power-domain code,
+   such that if generic power domains are not supported the functionality
+   is the same.
 
-Similarly, for disabling a power-domain add a new API to abstract the
-management of the clocks so that drivers can be migrated to generic PM
-domains.
+3. The main difference between the tegra_powergate_sequence_power_up() API
+   and the tegra_powergate_power_on_legacy() is that the clock used to
+   enable the powergate is not kept enabled when using the
+   tegra_powergate_power_on_legacy() API. Therefore, drivers must enable
+   the clocks they need after calling tegra_powergate_power_on_legacy()
+   and disable these clocks before calling
+   tegra_powergate_power_off_legacy().
+
+Helper functions have been added to the dc driver for handling power on
+and off the power-domains with and without generic PM domain support.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/soc/tegra/pmc.c | 23 +++++++++++++++++++++++
- include/soc/tegra/pmc.h | 30 ++++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+)
+ drivers/gpu/drm/tegra/dc.c | 94 +++++++++++++++++++++++++++++-----------------
+ 1 file changed, 59 insertions(+), 35 deletions(-)
 
-diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
-index 180d434deec5..934653785bb7 100644
---- a/drivers/soc/tegra/pmc.c
-+++ b/drivers/soc/tegra/pmc.c
-@@ -331,6 +331,29 @@ err_power:
+diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
+index a287e4fec865..a5b2475a7b9c 100644
+--- a/drivers/gpu/drm/tegra/dc.c
++++ b/drivers/gpu/drm/tegra/dc.c
+@@ -10,6 +10,7 @@
+ #include <linux/clk.h>
+ #include <linux/debugfs.h>
+ #include <linux/iommu.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ 
+ #include <soc/tegra/pmc.h>
+@@ -1880,6 +1881,49 @@ static int tegra_dc_parse_dt(struct tegra_dc *dc)
+ 	return 0;
  }
- EXPORT_SYMBOL(tegra_powergate_sequence_power_up);
  
-+int tegra_powergate_power_off_legacy(int id, struct clk *clk,
-+				     struct reset_control *rst)
++static void tegra_dc_power_off(struct tegra_dc *dc)
 +{
-+	int ret;
++	if (!dc->soc->has_powergate)
++		reset_control_assert(dc->rst);
 +
-+	ret = clk_prepare_enable(clk);
-+	if (ret)
-+		return ret;
++	clk_disable_unprepare(dc->clk);
 +
-+	usleep_range(10, 20);
-+
-+	reset_control_assert(rst);
-+
-+	usleep_range(10, 20);
-+
-+	clk_disable_unprepare(clk);
-+
-+	usleep_range(10, 20);
-+
-+	return tegra_powergate_power_off(id);
-+}
-+EXPORT_SYMBOL(tegra_powergate_power_off_legacy);
-+
- #ifdef CONFIG_SMP
- /**
-  * tegra_get_cpu_powergate_id() - convert from CPU ID to partition ID
-diff --git a/include/soc/tegra/pmc.h b/include/soc/tegra/pmc.h
-index 3a014c121399..4ca91d39304d 100644
---- a/include/soc/tegra/pmc.h
-+++ b/include/soc/tegra/pmc.h
-@@ -19,6 +19,8 @@
- #ifndef __SOC_TEGRA_PMC_H__
- #define __SOC_TEGRA_PMC_H__
- 
-+#include <linux/clk.h>
-+#include <linux/delay.h>
- #include <linux/reboot.h>
- 
- #include <soc/tegra/pm.h>
-@@ -117,6 +119,22 @@ int tegra_powergate_remove_clamping(int id);
- int tegra_powergate_sequence_power_up(int id, struct clk *clk,
- 				      struct reset_control *rst);
- 
-+static inline int tegra_powergate_power_on_legacy(int id, struct clk *clk,
-+						  struct reset_control *rst)
-+{
-+	int err = tegra_powergate_sequence_power_up(id, clk, rst);
-+
-+	if (!err) {
-+		usleep_range(10, 20);
-+		clk_disable_unprepare(clk);
++	if (dc->soc->has_powergate) {
++		if (pm_runtime_enabled(dc->dev))
++			pm_runtime_put_sync(dc->dev);
++		else
++			tegra_powergate_power_off_legacy(dc->powergate,
++							 dc->clk, dc->rst);
 +	}
++}
++
++static int tegra_dc_power_on(struct tegra_dc *dc)
++{
++	int err;
++
++	if (dc->soc->has_powergate) {
++		if (pm_runtime_enabled(dc->dev))
++			err = pm_runtime_get_sync(dc->dev);
++		else
++			err = tegra_powergate_power_on_legacy(dc->powergate,
++							      dc->clk, dc->rst);
++		if (err < 0) {
++			dev_err(dc->dev, "failed to power partition: %d\n",
++				err);
++			return err;
++		}
++	}
++
++	err = clk_prepare_enable(dc->clk);
++	if (err < 0)
++		dev_err(dc->dev, "failed to enable clock: %d\n", err);
++
++	if (!dc->soc->has_powergate)
++		reset_control_deassert(dc->rst);
 +
 +	return err;
 +}
 +
-+int tegra_powergate_power_off_legacy(int id, struct clk *clk,
-+				     struct reset_control *rst);
-+
- int tegra_io_rail_power_on(int id);
- int tegra_io_rail_power_off(int id);
- #else
-@@ -155,6 +173,18 @@ static inline int tegra_io_rail_power_off(int id)
+ static int tegra_dc_probe(struct platform_device *pdev)
  {
- 	return -ENOSYS;
- }
-+
-+static inline int tegra_powergate_power_on_legacy(int id, struct clk *clk,
-+						  struct reset_control *rst)
-+{
-+	return -ENOTSUPP;
-+}
-+
-+static inline int tegra_powergate_power_off_legacy(int id, struct clk *clk,
-+						   struct reset_control *rst)
-+{
-+	return -ENOTSUPP;
-+}
- #endif /* CONFIG_ARCH_TEGRA */
+ 	unsigned long flags = HOST1X_SYNCPT_CLIENT_MANAGED;
+@@ -1917,35 +1961,6 @@ static int tegra_dc_probe(struct platform_device *pdev)
+ 		return PTR_ERR(dc->rst);
+ 	}
  
- #endif /* __SOC_TEGRA_PMC_H__ */
+-	if (dc->soc->has_powergate) {
+-		if (dc->pipe == 0)
+-			dc->powergate = TEGRA_POWERGATE_DIS;
+-		else
+-			dc->powergate = TEGRA_POWERGATE_DISB;
+-
+-		err = tegra_powergate_sequence_power_up(dc->powergate, dc->clk,
+-							dc->rst);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to power partition: %d\n",
+-				err);
+-			return err;
+-		}
+-	} else {
+-		err = clk_prepare_enable(dc->clk);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to enable clock: %d\n",
+-				err);
+-			return err;
+-		}
+-
+-		err = reset_control_deassert(dc->rst);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to deassert reset: %d\n",
+-				err);
+-			return err;
+-		}
+-	}
+-
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dc->regs = devm_ioremap_resource(&pdev->dev, regs);
+ 	if (IS_ERR(dc->regs))
+@@ -1961,6 +1976,20 @@ static int tegra_dc_probe(struct platform_device *pdev)
+ 	dc->client.ops = &dc_client_ops;
+ 	dc->client.dev = &pdev->dev;
+ 
++	if (dc->soc->has_powergate) {
++		if (dc->pipe == 0)
++			dc->powergate = TEGRA_POWERGATE_DIS;
++		else
++			dc->powergate = TEGRA_POWERGATE_DISB;
++
++		if (of_property_read_bool(pdev->dev.of_node, "power-domains"))
++			pm_runtime_enable(&pdev->dev);
++	}
++
++	err = tegra_dc_power_on(dc);
++	if (err < 0)
++		return err;
++
+ 	err = tegra_dc_rgb_probe(dc);
+ 	if (err < 0 && err != -ENODEV) {
+ 		dev_err(&pdev->dev, "failed to probe RGB output: %d\n", err);
+@@ -2003,12 +2032,7 @@ static int tegra_dc_remove(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	reset_control_assert(dc->rst);
+-
+-	if (dc->soc->has_powergate)
+-		tegra_powergate_power_off(dc->powergate);
+-
+-	clk_disable_unprepare(dc->clk);
++	tegra_dc_power_off(dc);
+ 
+ 	return 0;
+ }
 -- 
 2.1.4
