@@ -1,53 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jul 2015 15:34:36 +0100
-Subject: [PATCH v2 08/10] arm64/debug: Add missing #include
-In-Reply-To: <1436793967-7138-9-git-send-email-Dave.Martin@arm.com>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-9-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150713143436.GG19083@leverpostej>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 13 Jul 2015 14:41:56 +0000
+Subject: [PATCH 1/5] ARM: prima2_defconfig: fix the outdated defconfig
+Message-ID: <1436798516-4206-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 02:25:55PM +0100, Dave P Martin wrote:
-> <asm/debug-monitors.h> relies on <asm/ptrace.h>, but doesn't
-> declare this dependency.  This becomes a problem once
-> debug-monitors.h starts getting included all over the place to get
-> the BRK immedates.
+From: Barry Song <Baohua.Song@csr.com>
 
-I take it that's for struct pt_regs down in the ifndef __ASSEMBLY__
-portion?
+this patch is againest v4.2-rc1, by doing:
 
-> 
-> This patch adds the missing #include.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/include/asm/debug-monitors.h |    1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index 6a17fb8..b5715cb 100644
-> --- a/arch/arm64/include/asm/debug-monitors.h
-> +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -20,6 +20,7 @@
->  
->  #include <asm/esr.h>
->  #include <asm/insn.h>
-> +#include <asm/ptrace.h>
+ $ make ARCH=arm prima2_defconfig
+ $ make ARCH=arm savedefconfig
+ $ cp defconfig arch/arm/configs/prima2_defconfig
 
-We're also missing <linux/types.h> (for struct list_head, u8, and u32),
-and <linux/errno.h> (for ENODEV in the reinstall_suspended_bps stub).
-Would you be able to fold those in?
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ arch/arm/configs/prima2_defconfig | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-With those:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
->  
->  /* Low-level stepping controls. */
->  #define DBG_MDSCR_SS		(1 << 0)
-> -- 
-> 1.7.10.4
-> 
+diff --git a/arch/arm/configs/prima2_defconfig b/arch/arm/configs/prima2_defconfig
+index f610230..ded0cad 100644
+--- a/arch/arm/configs/prima2_defconfig
++++ b/arch/arm/configs/prima2_defconfig
+@@ -1,4 +1,3 @@
+-CONFIG_EXPERIMENTAL=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_RELAY=y
+@@ -11,14 +10,12 @@ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
+ CONFIG_SOLARIS_X86_PARTITION=y
+ CONFIG_ARCH_SIRF=y
+-# CONFIG_SWP_EMULATE is not set
+ CONFIG_SMP=y
+ CONFIG_SCHED_MC=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_KEXEC=y
+ CONFIG_BINFMT_MISC=y
+-CONFIG_PM=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+@@ -60,12 +57,12 @@ CONFIG_ROMFS_FS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+-CONFIG_MAGIC_SYSRQ=y
++CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_SECTION_MISMATCH=y
++CONFIG_MAGIC_SYSRQ=y
+ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_DEBUG_PREEMPT is not set
+ CONFIG_DEBUG_RT_MUTEXES=y
+ CONFIG_DEBUG_SPINLOCK=y
+ CONFIG_DEBUG_MUTEXES=y
+-CONFIG_DEBUG_INFO=y
+ CONFIG_CRC_CCITT=y
+-- 
+2.3.5
