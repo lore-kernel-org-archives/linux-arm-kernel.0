@@ -1,44 +1,43 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jul 2015 23:10:04 +0800
-Subject: [PATCH] ARM: dts: vf-colibri: define stdout-path property
-In-Reply-To: <1435910799-11706-1-git-send-email-stefan@agner.ch>
-References: <1435910799-11706-1-git-send-email-stefan@agner.ch>
-Message-ID: <20150713151004.GA26642@tiger>
+Date: Mon, 13 Jul 2015 23:11:37 +0800
+Subject: [PATCH] ARM: ls1021a: dtsi: Add crypto node alias in device tree
+In-Reply-To: <1435918622-19121-1-git-send-email-ruchika.gupta@freescale.com>
+References: <1435918622-19121-1-git-send-email-ruchika.gupta@freescale.com>
+Message-ID: <20150713151137.GB26642@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 03, 2015 at 10:06:39AM +0200, Stefan Agner wrote:
-> Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
-> standard output.
+On Fri, Jul 03, 2015 at 03:47:02PM +0530, Ruchika Gupta wrote:
+> U-boot patches up the device tree crypto node for the era property.
 > 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> Signed-off-by: Ruchika Gupta <ruchika.gupta@freescale.com>
 > ---
->  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 1 +
+>  arch/arm/boot/dts/ls1021a.dtsi | 1 +
 >  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> index 2cbe663..cb199ae 100644
-> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-> @@ -10,6 +10,7 @@
->  / {
->  	chosen {
->  		bootargs = "console=ttyLP0,115200";
-> +		stdout-path = "serial0:115200n8";
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index c70bb27..1a99724 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -60,6 +60,7 @@
+>  		serial4 = &lpuart4;
+>  		serial5 = &lpuart5;
+>  		sysclk = &sysclk;
+> +		crypto = &crypto;
 
-With this change, can bootargs just be dropped?
+Please keep the list alphabetically sorted.
 
 Shawn
 
 >  	};
 >  
->  	clk16m: clk16m {
+>  	cpus {
 > -- 
-> 2.4.4
+> 1.8.1.4
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
