@@ -1,98 +1,124 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 13:39:38 +0100
-Subject: [PATCH V3 00/19] Add generic PM domain support for Tegra SoCs
-Message-ID: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+Date: Mon, 13 Jul 2015 13:39:39 +0100
+Subject: [PATCH V3 01/19] reset: add of_reset_control_get_by_index()
+In-Reply-To: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1436791197-32358-2-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based upon the V2 series from Vince Hsu [1]. The code
-for the MC flush operations and PMC code for the generic PM domains
-has been re-written to simplify and consolidate legacy/existing support
-for power-domains on the Tegra SoC.
+From: Vince Hsu <vinceh@nvidia.com>
 
-This series has been boot tested on various 32-bit Tegra platforms
-as well as compile tested for 64-bit ARM. A summary of the results is
-available here [2]. Would be great to get some more testing for PCI,
-SATA, GR3D and DRM.
+Add of_reset_control_get_by_index() to allow the drivers to get reset
+device without knowing its name.
 
-Summary:
+Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+[jonathanh at nvidia.com: Updated stub function to return -ENOTSUPP instead
+ of -ENOSYS which should only be used for system calls.]
+Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 
-Patch 1:     Adds the new function of_reset_control_get_by_index().
-Patch 2-5:   Add the MC flush operations for Tegra30/Tegra114/Tegra124.
-Patch 6:     Is a PLLD fix for Tegra114.
-Patch 7-9:   PMC preparation for generic PM domains.
-Patch 10-13: Update drivers to support generic PM domains
-Patch 14:    Add DT documentation for tegra generic PM domains
-Patch 15:    Add PMC generic DM domains support
-Patch 16:    Remove legacy functions
-Patch 17-18: Add DT bindings for tegra124
-Patch 19:    Enable generic PM domains for tegra
+---
+v3: addressed comments from Philipp
+v2: minor changes according to Alex's comments
+---
+ drivers/reset/core.c  | 40 +++++++++++++++++++++++++++++-----------
+ include/linux/reset.h |  9 +++++++++
+ 2 files changed, 38 insertions(+), 11 deletions(-)
 
-
-Changes:
-   v3:
-   * Re-wrote and simplified MC flush code
-   * Re-wrote PMC code for generic PM domains to permit devices to use
-     legacy DT blobs without generic PM domain info.
-   * Re-worked DRM, PCI, AHCI and GR3D drivers to allow then to work
-     with and without generic PM domains.
-   * Added DT documentation for tegra generic PM domain bindings.
-   * Dropped DT bindings for T30 and T114 (plan to add later)
-
-   v2 (Vince Hsu):
-   * Add support for Tegra30/Tegra114
-   * Address Alex's comments
-
-[1] https://lkml.org/lkml/2015/3/12/284
-[2] https://nvtb.github.io//epmt/jonathanh-tester/test_20150713051933_58fc293c9467f52c51f1e52e5d5a8da174b8550a/20150713051933/
-
-
-Jon Hunter (12):
-  memory: tegra: Add MC flush support
-  soc: tegra: pmc: Wait for powergate state to change
-  soc: tegra: pmc: Clean-up PMC helper functions
-  soc: tegra: pmc: Prepare for migrating to generic PM domains
-  drm/tegra: dc: Prepare for generic PM domains
-  PCI: tegra: Add support for generic PM domains
-  ata: ahci_tegra: Add support for generic PM domains
-  drm/tegra: gr3d: Add support for generic PM domains
-  Documentation: DT: bindings: Add power domain info for NVIDIA PMC
-  soc: tegra: pmc: Add generic PM domain support
-  soc: tegra: pmc: Remove the deprecated powergate APIs
-  ARM: tegra: Add PM domain device nodes to Tegra124 DT
-
-Vince Hsu (7):
-  reset: add of_reset_control_get_by_index()
-  memory: tegra: add flush operation for Tegra30 memory clients
-  memory: tegra: add flush operation for Tegra114 memory clients
-  memory: tegra: add flush operation for Tegra124 memory clients
-  clk: tegra: remove TEGRA_PLL_USE_LOCK for PLLD/PLLD2
-  ARM: tegra: add GPU power supply to Jetson TK1 DT
-  ARM: tegra: select PM_GENERIC_DOMAINS
-
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |  99 ++++
- arch/arm/boot/dts/tegra124-jetson-tk1.dts          |   6 +-
- arch/arm/boot/dts/tegra124.dtsi                    |  80 +++
- arch/arm/mach-tegra/Kconfig                        |   1 +
- arch/arm/mach-tegra/platsmp.c                      |  18 +-
- drivers/ata/ahci_tegra.c                           |  51 +-
- drivers/clk/tegra/clk-tegra114.c                   |   6 +-
- drivers/gpu/drm/tegra/dc.c                         |  94 +--
- drivers/gpu/drm/tegra/gr3d.c                       |  57 +-
- drivers/memory/tegra/mc.c                          | 110 ++++
- drivers/memory/tegra/mc.h                          |   2 +
- drivers/memory/tegra/tegra114.c                    |  21 +
- drivers/memory/tegra/tegra124.c                    |  31 +
- drivers/memory/tegra/tegra30.c                     |  24 +
- drivers/pci/host/pci-tegra.c                       |  49 +-
- drivers/reset/core.c                               |  40 +-
- drivers/soc/tegra/pmc.c                            | 647 ++++++++++++++++++---
- include/dt-bindings/power/tegra-powergate.h        |  42 ++
- include/linux/reset.h                              |   9 +
- include/soc/tegra/mc.h                             |  34 ++
- include/soc/tegra/pmc.h                            |  74 +--
- 21 files changed, 1264 insertions(+), 231 deletions(-)
- create mode 100644 include/dt-bindings/power/tegra-powergate.h
-
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index 7955e00d04d4..81ae17d15480 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -141,27 +141,24 @@ int reset_control_status(struct reset_control *rstc)
+ EXPORT_SYMBOL_GPL(reset_control_status);
+ 
+ /**
+- * of_reset_control_get - Lookup and obtain a reference to a reset controller.
++ * of_reset_control_get_by_index - Lookup and obtain a reference to a reset
++ * controller by index.
+  * @node: device to be reset by the controller
+- * @id: reset line name
+- *
+- * Returns a struct reset_control or IS_ERR() condition containing errno.
++ * @index: index of the reset controller
+  *
+- * Use of id names is optional.
++ * This is to be used to perform a list of resets for a device or power domain
++ * in whatever order. Returns a struct reset_control or IS_ERR() condition
++ * containing errno.
+  */
+-struct reset_control *of_reset_control_get(struct device_node *node,
+-					   const char *id)
++struct reset_control *of_reset_control_get_by_index(struct device_node *node,
++					   int index)
+ {
+ 	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
+ 	struct reset_controller_dev *r, *rcdev;
+ 	struct of_phandle_args args;
+-	int index = 0;
+ 	int rstc_id;
+ 	int ret;
+ 
+-	if (id)
+-		index = of_property_match_string(node,
+-						 "reset-names", id);
+ 	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
+ 					 index, &args);
+ 	if (ret)
+@@ -202,6 +199,27 @@ struct reset_control *of_reset_control_get(struct device_node *node,
+ 
+ 	return rstc;
+ }
++EXPORT_SYMBOL_GPL(of_reset_control_get_by_index);
++
++/**
++ * of_reset_control_get - Lookup and obtain a reference to a reset controller.
++ * @node: device to be reset by the controller
++ * @id: reset line name
++ *
++ * Returns a struct reset_control or IS_ERR() condition containing errno.
++ *
++ * Use of id names is optional.
++ */
++struct reset_control *of_reset_control_get(struct device_node *node,
++					   const char *id)
++{
++	int index = 0;
++
++	if (id)
++		index = of_property_match_string(node,
++						 "reset-names", id);
++	return of_reset_control_get_by_index(node, index);
++}
+ EXPORT_SYMBOL_GPL(of_reset_control_get);
+ 
+ /**
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index da5602bd77d7..26f1b53386d8 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -38,6 +38,9 @@ static inline struct reset_control *devm_reset_control_get_optional(
+ struct reset_control *of_reset_control_get(struct device_node *node,
+ 					   const char *id);
+ 
++struct reset_control *of_reset_control_get_by_index(
++					struct device_node *node, int index);
++
+ #else
+ 
+ static inline int reset_control_reset(struct reset_control *rstc)
+@@ -92,6 +95,12 @@ static inline struct reset_control *of_reset_control_get(
+ 	return ERR_PTR(-ENOSYS);
+ }
+ 
++static inline struct reset_control *of_reset_control_get_by_index(
++				struct device_node *node, int index)
++{
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ #endif /* CONFIG_RESET_CONTROLLER */
+ 
+ #endif
 -- 
 2.1.4
