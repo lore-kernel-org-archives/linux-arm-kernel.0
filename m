@@ -1,253 +1,56 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 13 Jul 2015 22:46:22 +0800
-Subject: [PATCH v3 4/5] clk: mediatek: Add USB clock support in MT8173
- APMIXEDSYS
-In-Reply-To: <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
-References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
- <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omBryA6f6gYje5RvF2XcJiebogYCHpyWNeN9K4B-MiHf1Q@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Jul 2015 15:47:22 +0100
+Subject: [PATCH v2 01/10] arm64/debug: Eliminate magic number for size of
+ BRK instruction
+In-Reply-To: <1436793967-7138-2-git-send-email-Dave.Martin@arm.com>
+References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+ <1436793967-7138-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150713144721.GJ19083@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Mon, Jul 13, 2015 at 02:25:48PM +0100, Dave P Martin wrote:
+> The size of an A64 BRK instruction is the same as the size of all other
+> A64 instructions, because all A64 instructions are the same size.
+> 
+> BREAK_INSTR_SIZE is retained for readibility, but it should not be
+> an independent constant from AARCH64_INSN_SIZE.
 
+Given BREAK_INSTR_SIZE seems to be used by the core of the KGDB code I
+guess we have no choice. ;)
 
-On Fri, Jul 10, 2015 at 6:00 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> Add REF2USB_TX clock support into MT8173 APMIXEDSYS. This clock
-> is needed by USB 3.0.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
->  drivers/clk/mediatek/clk-mt8173.c      | 143 +++++++++++++++++++++++++++++++++
->  drivers/clk/mediatek/clk-pll.c         |   7 +-
->  include/dt-bindings/clock/mt8173-clk.h |   3 +-
->  3 files changed, 146 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-> index 1d21e26..11f82cb 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -12,6 +12,7 @@
->   * GNU General Public License for more details.
+>  arch/arm64/include/asm/debug-monitors.h |    4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+> index 40ec68a..f3d2dbd 100644
+> --- a/arch/arm64/include/asm/debug-monitors.h
+> +++ b/arch/arm64/include/asm/debug-monitors.h
+> @@ -18,6 +18,8 @@
+>  
+>  #ifdef __KERNEL__
+>  
+> +#include <asm/insn.h>
+> +
+>  /* Low-level stepping controls. */
+>  #define DBG_MDSCR_SS		(1 << 0)
+>  #define DBG_SPSR_SS		(1 << 21)
+> @@ -38,7 +40,7 @@
+>  /*
+>   * Break point instruction encoding
 >   */
->
-> +#include <linux/delay.h>
->  #include <linux/of.h>
->  #include <linux/of_address.h>
->  #include <linux/slab.h>
-> @@ -968,6 +969,141 @@ static void __init mtk_pericfg_init(struct device_node *node)
->  }
->  CLK_OF_DECLARE(mtk_pericfg, "mediatek,mt8173-pericfg", mtk_pericfg_init);
->
-> +#define REF2USB_TX_EN          BIT(0)
-> +#define REF2USB_TX_LPF_EN      BIT(1)
-> +#define REF2USB_TX_OUT_EN      BIT(2)
-> +#define REF2USB_EN_MASK                (REF2USB_TX_EN | REF2USB_TX_LPF_EN | \
-> +                                REF2USB_TX_OUT_EN)
-> +
-> +struct mtk_ref2usb_tx {
-> +       struct clk_hw   hw;
-> +       void __iomem    *base_addr;
-> +};
-> +
-> +static inline struct mtk_ref2usb_tx *to_mtk_ref2usb_tx(struct clk_hw *hw)
-> +{
-> +       return container_of(hw, struct mtk_ref2usb_tx, hw);
-> +}
-> +
-> +static int mtk_ref2usb_tx_is_prepared(struct clk_hw *hw)
-> +{
-> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
-> +
-> +       return (readl(tx->base_addr) & REF2USB_EN_MASK) == REF2USB_EN_MASK;
-> +}
-> +
-> +static int mtk_ref2usb_tx_prepare(struct clk_hw *hw)
-> +{
-> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
-> +       u32 val;
-> +
-> +       val = readl(tx->base_addr);
-> +
-> +       val |= REF2USB_TX_EN;
-> +       writel(val, tx->base_addr);
-> +       udelay(100);
-> +
-> +       val |= REF2USB_TX_LPF_EN;
-> +       writel(val, tx->base_addr);
-> +
-> +       val |= REF2USB_TX_OUT_EN;
-> +       writel(val, tx->base_addr);
-> +
-> +       return 0;
-> +}
-> +
-> +static void mtk_ref2usb_tx_unprepare(struct clk_hw *hw)
-> +{
-> +       struct mtk_ref2usb_tx *tx = to_mtk_ref2usb_tx(hw);
-> +       u32 val;
-> +
-> +       val = readl(tx->base_addr);
-> +       val &= ~REF2USB_EN_MASK;
-> +       writel(val, tx->base_addr);
-> +}
-> +
-> +static const struct clk_ops mtk_ref2usb_tx_ops = {
-> +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
-> +       .prepare        = mtk_ref2usb_tx_prepare,
-> +       .unprepare      = mtk_ref2usb_tx_unprepare,
-> +};
-
-Burying the implementation of this special "mtk_ref2usb" clock in
-clk-mt8173,c seems a bit awkward.
-Can you please move it to its own file, like mediatek/clk-usb.c?
-
-
-> +
-> +static struct clk *mtk_clk_register_ref2usb_tx(const char *name,
-> +                       const char *parent_name, void __iomem *reg)
-> +{
-> +       struct mtk_ref2usb_tx *tx;
-> +       struct clk_init_data init = {};
-> +       struct clk *clk;
-> +
-> +       tx = kzalloc(sizeof(*tx), GFP_KERNEL);
-> +       if (!tx)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       tx->base_addr = reg;
-> +       tx->hw.init = &init;
-> +
-> +       init.name = name;
-> +       init.ops = &mtk_ref2usb_tx_ops;
-> +       init.parent_names = &parent_name;
-> +       init.num_parents = 1;
-> +
-> +       clk = clk_register(NULL, &tx->hw);
-> +
-> +       if (IS_ERR(clk)) {
-> +               pr_err("Failed to register clk %s: %ld\n", name, PTR_ERR(clk));
-> +               kfree(tx);
-> +       }
-> +
-> +       return clk;
-> +}
-> +
-> +struct mtk_apmixed_ex {
-> +       int id;
-> +       const char *name;
-> +       const char *parent;
-> +       u32 reg_ofs;
-> +};
-> +
-> +#define APMIXED_EX(_id, _name, _parent, _reg_ofs) {                    \
-> +               .id = _id,                                              \
-> +               .name = _name,                                          \
-> +               .parent = _parent,                                      \
-> +               .reg_ofs = _reg_ofs,                                    \
-> +       }
-> +
-> +static const struct mtk_apmixed_ex apmixed_ex[] = {
-
-__initconst
-
-> +       APMIXED_EX(CLK_APMIXED_REF2USB_TX, "ref2usb_tx", "clk26m", 0x8),
-> +};
-> +
-> +static void __init mtk_clk_register_apmixedsys_special(struct device_node *node,
-> +                       struct clk_onecell_data *clk_data)
-> +{
-> +       void __iomem *base;
-> +       struct clk *clk;
-> +       int i;
-> +
-> +       base = of_iomap(node, 0);
-> +       if (!base) {
-> +               pr_err("%s(): ioremap failed\n", __func__);
-> +               return;
-> +       }
-> +
-> +       for (i = 0; i < ARRAY_SIZE(apmixed_ex); i++) {
-> +               const struct mtk_apmixed_ex *ape = &apmixed_ex[i];
-> +
-> +               clk = mtk_clk_register_ref2usb_tx(ape->name, ape->parent,
-> +                                                       base + ape->reg_ofs);
-> +
-> +               if (IS_ERR(clk)) {
-> +                       pr_err("Failed to register clk %s: %ld\n", ape->name,
-> +                                       PTR_ERR(clk));
-> +                       continue;
-> +               }
-> +
-> +               clk_data->clks[CLK_APMIXED_REF2USB_TX] = clk;
-
-This works assuming ARRAY_SIZE(apmixed_ex) == 1.
-Either remove the loop since it is unnecessary, or do:
-  clk_data->clks[ape->id] = clk;
-
-> +       }
-> +}
-> +
->  #define MT8173_PLL_FMAX                (3000UL * MHZ)
->
->  #define CON0_MT8173_RST_BAR    BIT(24)
-> @@ -1010,12 +1146,19 @@ static const struct mtk_pll_data plls[] = {
->  static void __init mtk_apmixedsys_init(struct device_node *node)
->  {
->         struct clk_onecell_data *clk_data;
-> +       int r;
->
->         mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
->         if (!clk_data)
->                 return;
->
->         mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
-> +       mtk_clk_register_apmixedsys_special(node, clk_data);
-> +
-> +       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> +       if (r)
-> +               pr_err("%s(): could not register clock provider: %d\n",
-> +                       __func__, r);
->
->         mtk_clk_enable_critical();
->  }
-> diff --git a/drivers/clk/mediatek/clk-pll.c b/drivers/clk/mediatek/clk-pll.c
-> index 44409e9..813f0c7 100644
-> --- a/drivers/clk/mediatek/clk-pll.c
-> +++ b/drivers/clk/mediatek/clk-pll.c
-> @@ -302,7 +302,7 @@ void __init mtk_clk_register_plls(struct device_node *node,
->                 const struct mtk_pll_data *plls, int num_plls, struct clk_onecell_data *clk_data)
->  {
->         void __iomem *base;
-> -       int r, i;
-> +       int i;
->         struct clk *clk;
->
->         base = of_iomap(node, 0);
-> @@ -324,9 +324,4 @@ void __init mtk_clk_register_plls(struct device_node *node,
->
->                 clk_data->clks[pll->id] = clk;
->         }
-> -
-> -       r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-> -       if (r)
-> -               pr_err("%s(): could not register clock provider: %d\n",
-> -                       __func__, r);
->  }
-> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-> index 6ce88bf..7b7c555 100644
-> --- a/include/dt-bindings/clock/mt8173-clk.h
-> +++ b/include/dt-bindings/clock/mt8173-clk.h
-> @@ -172,7 +172,8 @@
->  #define CLK_APMIXED_APLL2              12
->  #define CLK_APMIXED_LVDSPLL            13
->  #define CLK_APMIXED_MSDCPLL2           14
-> -#define CLK_APMIXED_NR_CLK             15
-> +#define CLK_APMIXED_REF2USB_TX         15
-> +#define CLK_APMIXED_NR_CLK             16
->
->  /* INFRA_SYS */
->
-> --
-> 1.8.1.1.dirty
->
+> -#define BREAK_INSTR_SIZE		4
+> +#define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
+>  
+>  /*
+>   * ESR values expected for dynamic and compile time BRK instruction
+> -- 
+> 1.7.10.4
+> 
