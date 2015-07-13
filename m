@@ -1,173 +1,45 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 13 Jul 2015 11:58:44 +0200
-Subject: [PATCH v2 4/7] KVM: arm/arm64: enable irqchip routing
-In-Reply-To: <55A05228.4030203@arm.com>
-References: <1436430137-24205-1-git-send-email-eric.auger@linaro.org>
- <1436430137-24205-5-git-send-email-eric.auger@linaro.org>
- <55A05228.4030203@arm.com>
-Message-ID: <55A38BD4.50401@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jul 2015 12:00:06 +0200
+Subject: [PATCH 00/15] ARM: shmobile: Remove legacy sh73a0/kzm9g and
+ r8a7740/armadillo
+In-Reply-To: <CAMuHMdUqO2_rMpx0akeS1j+pNmQ_S150ei0B6a1ubFu_iTBF3g@mail.gmail.com>
+References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
+ <20150619034052.GA22912@verge.net.au>
+ <CAMuHMdUqO2_rMpx0akeS1j+pNmQ_S150ei0B6a1ubFu_iTBF3g@mail.gmail.com>
+Message-ID: <CACRpkdZFPCo8x0p6MnG-m4DVHBefRDj4PLC8zi3tj1zgUkT2fA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-On 07/11/2015 01:15 AM, Andre Przywara wrote:
-> Hi Eric,
-> 
-> On 09/07/15 09:22, Eric Auger wrote:
->> This patch adds compilation and link against irqchip.
+On Fri, Jun 19, 2015 at 9:30 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Fri, Jun 19, 2015 at 5:41 AM, Simon Horman <horms@verge.net.au> wrote:
+>> [ CC Linus, Laurent, linux-gpio ]
+
+>>>   pinctrl: sh-pfc: sh73a0: Remove obsolete multi-platform check
+>>>   pinctrl: sh-pfc: Remove obsolete sh73a0 platform_device_id entry
+>>>   pinctrl: sh-pfc: r8a7740: Remove obsolete multi-platform check
+>>>   pinctrl: sh-pfc: Remove obsolete r8a7740 platform_device_id entry
 >>
->> On ARM, irqchip routing is not really useful since there is
->> a single irqchip. However main motivation behind using irqchip
->> code is to enable MSI routing code. With the support of in-kernel
->> GICv3 ITS emulation, it now seems to be a MUST HAVE requirement.
+>> As the above patches are sh-pfc patches they would typically
+>> be steered through Linus's tree via Laurent. If they wish
+>> to take that path then I'm happy for this to be attached:
 >>
-> 
-> ....
-> 
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 3630971..6c6c25e 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -2215,44 +2215,65 @@ out_free_irq:
->>  	return ret;
->>  }
->>  
->> -int kvm_irq_map_gsi(struct kvm *kvm,
->> -		    struct kvm_kernel_irq_routing_entry *entries,
->> -		    int gsi)
->> +int vgic_irqfd_set_irq(struct kvm_kernel_irq_routing_entry *e,
->> +			struct kvm *kvm, int irq_source_id,
->> +			int level, bool line_status)
->>  {
->> -	return 0;
->> -}
->> -
->> -int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned irqchip, unsigned pin)
->> -{
->> -	return pin;
->> -}
->> -
->> -int kvm_set_irq(struct kvm *kvm, int irq_source_id,
->> -		u32 irq, int level, bool line_status)
->> -{
->> -	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
->> +	unsigned int spi_id = e->irqchip.pin + VGIC_NR_PRIVATE_IRQS;
->>  
->> -	trace_kvm_set_irq(irq, level, irq_source_id);
->> +	trace_kvm_set_irq(spi_id, level, irq_source_id);
->>  
->>  	BUG_ON(!vgic_initialized(kvm));
->>  
->> -	return kvm_vgic_inject_irq(kvm, 0, spi, level);
->> +	if (spi_id > min(kvm->arch.vgic.nr_irqs, 1020))
->> +		return -EINVAL;
->> +	return kvm_vgic_inject_irq(kvm, 0, spi_id, level);
->> +}
->> +
->> +/**
->> + * Populates a kvm routing entry from a user routing entry
->> + * @e: kvm internal formatted entry
->> + * @ue: user api formatted entry
->> + * return 0 on success, -EINVAL on errors.
->> + */
->> +int kvm_set_routing_entry(struct kvm_kernel_irq_routing_entry *e,
->> +			  const struct kvm_irq_routing_entry *ue)
->> +{
->> +	int r = -EINVAL;
->> +
->> +	switch (ue->type) {
->> +	case KVM_IRQ_ROUTING_IRQCHIP:
->> +		e->set = vgic_irqfd_set_irq;
->> +		e->irqchip.irqchip = ue->u.irqchip.irqchip;
->> +		e->irqchip.pin = ue->u.irqchip.pin;
->> +		if ((e->irqchip.pin >= KVM_IRQCHIP_NUM_PINS) ||
->> +		    (e->irqchip.irqchip >= KVM_NR_IRQCHIPS))
->> +			goto out;
->> +		break;
->> +	default:
->> +		goto out;
->> +	}
->> +	r = 0;
->> +out:
->> +	return r;
->>  }
->>  
->> -/* MSI not implemented yet */
->>  int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->>  		struct kvm *kvm, int irq_source_id,
->>  		int level, bool line_status)
->>  {
->> -	return 0;
->> -}
->> +	struct kvm_msi msi;
->> +
->> +	msi.address_lo = e->msi.address_lo;
->> +	msi.address_hi = e->msi.address_hi;
->> +	msi.data = e->msi.data;
->> +	if (e->type == KVM_IRQ_ROUTING_EXTENDED_MSI) {
->> +		msi.devid = e->devid;
->> +		msi.flags = KVM_MSI_VALID_DEVID;
->> +	}
-> 
-> Can't we make the assignment unconditional?
-> The GICv2m MSI code does not care about the devid and the ITS code
-> requires it.
-> This simplifies quite something in the following patches.
-> (This refers to the idea of not using the extended type in the kernel).
-
-How are we going to make sure the userspace provided a valid devid then?
-- we have this info at user struct level: kvm_irq_routing_msi
-- we wouldn't propagate the info at kernel struct level:
-kvm_kernel_irq_routing_entry
-- the only place where we could check the devid availability against the
-need is at kvm_set_routing_entry I think (routing adaptation on ARM).
-
-What is going to happen if devid == 0 since unset?
-
-> 
->>  
->> -#ifdef CONFIG_HAVE_KVM_MSI
->> -int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
->> -{
->>  	if (kvm->arch.vgic.vm_ops.inject_msi)
->> -		return kvm->arch.vgic.vm_ops.inject_msi(kvm, msi);
->> +		return kvm->arch.vgic.vm_ops.inject_msi(kvm, &msi);
->>  	else
->>  		return -ENODEV;
->>  }
->> -#endif
->> diff --git a/virt/kvm/irqchip.c b/virt/kvm/irqchip.c
->> index e678f8a..f26cadd 100644
->> --- a/virt/kvm/irqchip.c
->> +++ b/virt/kvm/irqchip.c
->> @@ -29,7 +29,9 @@
->>  #include <linux/srcu.h>
->>  #include <linux/export.h>
->>  #include <trace/events/kvm.h>
->> +#if !defined(CONFIG_ARM) && !defined(CONFIG_ARM64)
->>  #include "irq.h"
->> +#endif
-> 
-> To what irq.h is that referring to? And why is ARM not allowed to
-> include that?
-this refers to arch/x86/kvm/irq.h, arch/powerpc/kvm/irq.h, ...
-
-This typically declares things we have in include/kvm/arm_vgic.h
-like irqchip_in_kernel
-
-So currently I don't see things we should put in that header.
-
-Cheers
-
-Eric
-
-
-
-
-> Cheers,
-> Andre.
-> 
->>  
->>  struct kvm_irq_routing_table {
->>  	int chip[KVM_NR_IRQCHIPS][KVM_IRQCHIP_NUM_PINS];
+>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 >>
+>> FWIW the above path is the one that the removal of mackerel/sh7372 took.
+>>
+>> Alternatively, I am happy to take the above sh-pfc patches through
+>> my tree but I would like to do so with an Ack from at least Linus.
+>
+> I didn't CC Linus and linux-gpio at this stage yet, to prevent the pfc
+> patches from getting applied prematurely.
+> But things have gone more smoothly (esp. w.r.t. board staging) than expected,
+> which is always pleasant.
+
+I would prefer to take these four into the pin control tree when you
+consider them finished as there is obviously more PFC stuff coming
+for this next kernel cycle and I want to avoid collisions and keep
+things together. Will you send them to me separately?
+
+Yours,
+Linus Walleij
