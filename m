@@ -1,84 +1,60 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 13 Jul 2015 11:24:39 -0400
-Subject: [RFC 1/3] ftrace: adjust a function's pc to search for in
- check_stack() for arm64
-In-Reply-To: <1436765375-7119-2-git-send-email-takahiro.akashi@linaro.org>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-2-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20150713112439.079d275d@gandalf.local.home>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jul 2015 23:25:17 +0800
+Subject: [PATCH v2] ARM: dts: imx6qdl-sabreauto: Allow HDMI and LVDS to
+ work simultaneously
+In-Reply-To: <1436796692-8875-1-git-send-email-fabio.estevam@freescale.com>
+References: <1436796692-8875-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20150713152517.GE26642@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jul 2015 14:29:33 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> Ftace's stack tracer on arm64 returns wrong information about call stacks:
+On Mon, Jul 13, 2015 at 11:11:32AM -0300, Fabio Estevam wrote:
+> Currently it is not possible to have HDMI and LVDS working simultaneously,
+> because both ports try to use PLL5.
 > 
->         Depth    Size   Location    (50 entries)
->         -----    ----   --------
->   0)     5256       0   notifier_call_chain+0x30/0x94
->   1)     5256       0   ftrace_call+0x0/0x4
->   2)     5256       0   notifier_call_chain+0x2c/0x94
->   3)     5256       0   raw_notifier_call_chain+0x34/0x44
->   4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
->   5)     5256       0   update_wall_time+0x408/0x6dc
+> Move the LVDS clock parent to PLL3_USB_OTG, so that HDMI and LVDS can be
+> driven from independent sources.
 > 
-> Most of 'Size' fields are unexpectedly zero.
+> With this change the LDB pixel clock goes to 68.57 MHz, which is still
+> within the valid range for the HSD100PXN1 LVDS panel.
 > 
-> This is because stack tracer fails to recognize each function's stack frame
-> in check_stack(). Stack tracer searches for a function's pc in the stack
-> based on the list returned by save_stack_trace(), but save_stack_trace() on
-> arm64 does not return the exact return address saved in a stack frame, but
-> a value decrmented by 4 (which means a branch instruction's address).
-> This behavior was introduced by
->     commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
-> 
-> So the matching doesn't succeed in most cases.
-> 
-> This problem can be fixed either by
-> a) reverting the commit above
-> b) adding an arm64-specific hack to check_patch()
-> 
-> This patch does b).
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  kernel/trace/trace_stack.c |    4 ++++
->  1 file changed, 4 insertions(+)
+> Changes since v1:
+> - Rebased against latest imx/dt branch
 > 
-> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-> index 3f34496..7086fc3 100644
-> --- a/kernel/trace/trace_stack.c
-> +++ b/kernel/trace/trace_stack.c
-> @@ -143,7 +143,11 @@ check_stack(unsigned long ip, unsigned long *stack)
->  		p = start;
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 7 +++++++
+>  1 file changed, 7 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 6b17b85..2030de8 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -99,6 +99,13 @@
+>  	assigned-clock-rates = <0>, <0>, <24576000>;
+>  };
 >  
->  		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-> +#ifdef CONFIG_ARM64
-> +			if (*p == (stack_dump_trace[i] + 4)) {
-> +#else
->  			if (*p == stack_dump_trace[i]) {
-> +#endif
+> +&clks {
+> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
+> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
+> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
+> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
+> +};
+> +
 
-Instead of the ugly #ifdef in this code, please add a macro
-FTRACE_STACK_FRAME_OFFSET
+There is already an assigned-clocks in &clks added by audio support.
 
-Then in include/linux/ftrace.h have:
+Shawn
 
-#ifndef FTRACE_STACK_FRAME_OFFSET
-# define FTRACE_STACK_FRAME_OFFSET 0
-#endif
-
-And in arch/arm64/include/asm/ftrace.h
-
-#define FTRACE_STACK_FRAME_OFFSET 4
-
-And then just do:
-
-	if (*p == (stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET)) {
-
--- Steve
-
->  				this_size = stack_dump_index[i++] =
->  					(top - p) * sizeof(unsigned long);
->  				found = 1;
+>  &ecspi1 {
+>  	fsl,spi-num-chipselects = <1>;
+>  	cs-gpios = <&gpio3 19 0>;
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
