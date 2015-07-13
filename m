@@ -1,25 +1,31 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jul 2015 21:57:08 +0800
-Subject: [PATCH 1/3] ARM: dts: imx6qdl-sabrelite: Allow HDMI and LVDS to
- work simultaneously
-In-Reply-To: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
-References: <1435594615-9570-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20150713135708.GR23464@tiger>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 13 Jul 2015 15:02:54 +0100
+Subject: [PATCH V3 06/19] clk: tegra: remove TEGRA_PLL_USE_LOCK for
+ PLLD/PLLD2
+In-Reply-To: <20150713134151.GQ6287@tbergstrom-lnx.Nvidia.com>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-7-git-send-email-jonathanh@nvidia.com>
+ <20150713134151.GQ6287@tbergstrom-lnx.Nvidia.com>
+Message-ID: <55A3C50E.7060706@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 29, 2015 at 01:16:53PM -0300, Fabio Estevam wrote:
-> Currently it is not possible to have HDMI and LVDS working simultaneously,
-> because both ports try to use PLL5.
-> 
-> Move the LVDS clock parent to PLL3_USB_OTG, so that HDMI and LVDS can be
-> driven from independent sources.
-> 
-> With this change the LDB pixel clock goes to 68.57 MHz, which is still
-> within the valid range for the HSD100PXN1 LVDS panel.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Applied #1 and #2.  But #3 doesn't apply to my imx/dt branch.
 
-Shawn
+On 13/07/15 14:41, Peter De Schrijver wrote:
+> On Mon, Jul 13, 2015 at 01:39:44PM +0100, Jon Hunter wrote:
+>> From: Vince Hsu <vinceh@nvidia.com>
+>>
+>> Tegra114 has a HW bug that the PLLD/PLLD2 lock bit cannot be asserted when
+>> the DIS power domain is during up-powergating process but the clamp to this
+> 
+> I think there is missing 'off' in this sentence?
+> 
+> ie. ... 'the DIS power domain is off during up-powergating process'
+> 
+> Also 'un-powergating sequence' would be nicer.
+
+Yes agree. I will re-word that.
+
+Thanks
+Jon
