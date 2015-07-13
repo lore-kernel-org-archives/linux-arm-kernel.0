@@ -1,62 +1,102 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 13 Jul 2015 16:11:44 +0300
-Subject: [PATCH 2/3] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
-References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
- <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <55A3B910.9040009@cogentembedded.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jul 2015 06:19:02 -0700
+Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
+ "/chosen/linux,atags" entry
+In-Reply-To: <20150707115819.GF12087@pali>
+References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
+ <1436214373-12969-6-git-send-email-pali.rohar@gmail.com>
+ <20150707113213.GC7576@n2100.arm.linux.org.uk>
+ <20150707115819.GF12087@pali>
+Message-ID: <20150713131902.GH26485@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Pali Roh?r <pali.rohar@gmail.com> [150707 05:00]:
+> On Tuesday 07 July 2015 12:32:13 Russell King - ARM Linux wrote:
+> > On Mon, Jul 06, 2015 at 10:26:13PM +0200, Pali Roh?r wrote:
+> > > Legacy bootloaders can pass additional information for kernel or legacy
+> > > userspace applications. When booting DT kernel then ATAGs structure is not
+> > > more visible after running kernel uncompress code. This patch stores full
+> > > ATAGs structure into DT "/chosen/linux,atags" entry, so kernel can later
+> > > reuse it and export via /proc/atags to userspace.
+> > 
+> > I think you need to go through your commit messages and improve them,
+> > especially the ones with "TODO" in them.  As long as there's still things
+> > to be done, they're obviously not ready for merging.
+> > 
+> 
+> I know, in cover letter email I wrote that documentation is not ready...
+> I send patches for review and comments (like yours). I think it is still
+> better to send something and mark it as incomplete. It could prevent to
+> work on something which will be again rewritten...
+> 
+> > Moreover, exporting the ATAGS is questionable, even _if_ there are non-
+> > kexec programs making use of this.  The ATAGs have _never_ been exported
+> > to userspace when kexec disabled is the kernel - it was introduced for
+> > kexec, and has always had this:
+> > 
+> > config ATAGS_PROC
+> >         bool "Export atags in procfs"
+> >         depends on ATAGS && KEXEC
+> >         default y
+> > 
+> > Now, the fact that someone decided to start using it is pretty sad,
+> > because it means that if you disable KEXEC, userspace breaks.  That's
+> > not a kernel regression in any shape or form, because /proc/atags has
+> > never been there without KEXEC enabled.  That's a userspace bug, plain
+> > and simple.
+> > 
+> > Given that, I'm in two minds about whether to accept the last two
+> > patches which make this more than just "for KEXEC use to enable a KEXEC
+> > kernel to be booted."
+> > 
+> > Had it been provided without the KEXEC conditional, then I don't have
+> > a problem with these two patches.
+> > 
+> 
+> I understand it. Nokia originally invented their own entries in /proc/
+> which export needed ATAGs from kernel in human-readable form, but all
+> those entries were non-standard and specific for Nokia's kernels.
+> 
+> Do you have some other idea how to provide ATAGs information created
+> dynamically by legacy closed proprietary bootloader to userspace from DT
+> booted kernel?
+> 
+> Anyway, for supporting kexec (with passing ATAGs) it is needed to have
+> working /proc/atags file, right?
 
-On 7/13/2015 10:42 AM, Javier Martinez Canillas wrote:
-
-> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
-> a RTC and an I2C interface to program the individual components.
-
-> The are already DT bindings for the regulators and clocks and
-> these reference to a bindings/mfd/max77802.txt file, that didn't
-> exist, for the details about the PMIC.
-
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
+Yeah I think that since we already have it in /proc, we should just
+support it. And keep it behind CONFIG_KEXEC and CONFIG_ARM_APPENDED_DTB
+and hope we don't find other users for it.. Then reconsider the Kconfig
+dependencies if we do find other users.
+ 
+> > It also sets a precedent: by adding this into DT, it is creating a new
+> > DT ABI as well, and we'll end up seeing dts files with an ATAG block
+> > patched into them.
+> > 
+> > Are the ATAGs at a fixed address on the N900?
+> 
+> Yes, in board-rx51.c is:
+> 
+> .atag_offset	= 0x100
+> 
+> and Nokia Bootloader (proprietary) store them to that address.
 >
->   Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->   1 file changed, 26 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+> > Can that be handled in
+> > some kind of legacy file for the N900 which calls save_atags() on it, so
+> > we don't end up introducing yet more stuff that we have to maintain into
+> > the distant future?  If not, what about copying a known working atag
+> > structure into a legacy file for the N900?
+>
+> I already asked question if it is possible to read ATAGs from DT booted
+> kernel. And somebody (do not remember who) wrote to ML, that it is not
+> possible and it can be done in that uncompress code.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
-> new file mode 100644
-> index 000000000000..875ebebbc5b0
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
-> @@ -0,0 +1,26 @@
-> +Maxim MAX77802 multi-function device
-> +
-> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
-> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
-> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
-> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
-> +regulators, clocks outputs and the RTC.
-> +
-> +Binding for the built-in 32k clock generator block is defined separately
-> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
-> +is defined in the bindings/regulator/max77802.txt file.
-> +
-> +Required properties:
-> +- compatible : Must be "maxim,max77686";
-> +- reg : Specifies the i2c slave address of PMIC block.
-> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
-> +- interrupt-parent : The parent interrupt controller.
-> +
-> +Example:
-> +
-> +	max77802 at 09 {
+I guess the other option would be to keep the raw ATAG area reserved,
+and only initialize /proc/atags from a board specific initcall.
+But I think that would complicate the already fragile uncompress
+relocation code even further?
 
-    Sigh, I'm tired of saying this over and over again: please don't name the 
-nodes with teh chip names. The ePAPR standard says: "The name of a node should 
-be somewhat generic, reflecting the function of the device and not its 3 
-precise programming model."
+Regards,
 
-WBR, Sergei
+Tony
