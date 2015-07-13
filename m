@@ -1,29 +1,84 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jul 2015 23:20:35 +0800
-Subject: [PATCH] arm:irqchip: IRQCHIP_DECLARE macro is now accessible
-In-Reply-To: <1436299411-12329-1-git-send-email-joel@porquet.org>
-References: <1436299411-12329-1-git-send-email-joel@porquet.org>
-Message-ID: <20150713152035.GD26642@tiger>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 13 Jul 2015 11:24:39 -0400
+Subject: [RFC 1/3] ftrace: adjust a function's pc to search for in
+ check_stack() for arm64
+In-Reply-To: <1436765375-7119-2-git-send-email-takahiro.akashi@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+ <1436765375-7119-2-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20150713112439.079d275d@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 04:02:53PM -0400, Joel Porquet wrote:
-> The IRQCHIP_DECLARE macro migrated to 'include/linux/irqchip.h', making it
-> globally accessible.
+On Mon, 13 Jul 2015 14:29:33 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+
+> Ftace's stack tracer on arm64 returns wrong information about call stacks:
 > 
-> See commit 91e20b5040c67c51aad88cf87db4305c5bd7f79d
-> ("irqchip: Move IRQCHIP_DECLARE macro to include/linux/irqchip.h").
+>         Depth    Size   Location    (50 entries)
+>         -----    ----   --------
+>   0)     5256       0   notifier_call_chain+0x30/0x94
+>   1)     5256       0   ftrace_call+0x0/0x4
+>   2)     5256       0   notifier_call_chain+0x2c/0x94
+>   3)     5256       0   raw_notifier_call_chain+0x34/0x44
+>   4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
+>   5)     5256       0   update_wall_time+0x408/0x6dc
 > 
-> This patch adds inclusions of 'include/linux/irqchip.h' and replaces uses of
-> macro OF_DECLARE_2 with IRQCHIP_DECLARE.
+> Most of 'Size' fields are unexpectedly zero.
 > 
-> Signed-off-by: Joel Porquet <joel@porquet.org>
+> This is because stack tracer fails to recognize each function's stack frame
+> in check_stack(). Stack tracer searches for a function's pc in the stack
+> based on the list returned by save_stack_trace(), but save_stack_trace() on
+> arm64 does not return the exact return address saved in a stack frame, but
+> a value decrmented by 4 (which means a branch instruction's address).
+> This behavior was introduced by
+>     commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
+> 
+> So the matching doesn't succeed in most cases.
+> 
+> This problem can be fixed either by
+> a) reverting the commit above
+> b) adding an arm64-specific hack to check_patch()
+> 
+> This patch does b).
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
-...
->  arch/arm/mach-imx/gpc.c              | 7 ++-----
+>  kernel/trace/trace_stack.c |    4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index 3f34496..7086fc3 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -143,7 +143,11 @@ check_stack(unsigned long ip, unsigned long *stack)
+>  		p = start;
+>  
+>  		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+> +#ifdef CONFIG_ARM64
+> +			if (*p == (stack_dump_trace[i] + 4)) {
+> +#else
+>  			if (*p == stack_dump_trace[i]) {
+> +#endif
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Instead of the ugly #ifdef in this code, please add a macro
+FTRACE_STACK_FRAME_OFFSET
 
-How will this patch be sent to upstream?
+Then in include/linux/ftrace.h have:
 
-Shawn
+#ifndef FTRACE_STACK_FRAME_OFFSET
+# define FTRACE_STACK_FRAME_OFFSET 0
+#endif
+
+And in arch/arm64/include/asm/ftrace.h
+
+#define FTRACE_STACK_FRAME_OFFSET 4
+
+And then just do:
+
+	if (*p == (stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET)) {
+
+-- Steve
+
+>  				this_size = stack_dump_index[i++] =
+>  					(top - p) * sizeof(unsigned long);
+>  				found = 1;
