@@ -1,32 +1,62 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 08:58:51 +0200
-Subject: [PATCH] PM / devfreq: event: Remove incorrect property in exynos-ppmu
- DT binding
-Message-ID: <1436770732-9430-1-git-send-email-javier@osg.samsung.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Mon, 13 Jul 2015 12:39:53 +0530
+Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
+ master mode reset
+In-Reply-To: <20150710145628.GB6594@katana>
+References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
+ <20150710141440.GA6594@katana> <559FD5DB.9030308@linaro.org>
+ <20150710145628.GB6594@katana>
+Message-ID: <55A36441.2020206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exynos-ppmu driver is only a clock consumer and not a clock provider
-but its Device Tree binding listed #clock-cells as an optional property.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
----
+On Friday 10 July 2015 08:26 PM, Wolfram Sang wrote:
+> On Fri, Jul 10, 2015 at 07:55:31PM +0530, Vaibhav Hiremath wrote:
+>>
+>>
+>> On Friday 10 July 2015 07:44 PM, Wolfram Sang wrote:
+>>> On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
+>>>>
+>>>>
+>>>> On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
+>>>>> On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
+>>>>>> Normally i2c controller works as master, so slave addr is not needed, or it
+>>>>>> will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
+>>>>>> the same i2c address with controller.
+>>>>>
+>>>>> Just to make sure: Does it? As I read the code, slave interrupts are
+>>>>> enabled later only when slave mode is selected? Is that a HW bug? And if
+>>>>> so, can't the code just be moved into this #ifdef block later?
+>>>>>
+>>>>
+>>>> Yes we could, infact I thought about it;
+>>>> but I would break recommended sequence here.
+>>>
+>>> And did you set the "own slave address" to a value which one of your
+>>> existing i2c slaves also has (without enabling slave mode)? Did it
+>>> disturb communication?
+>>>
+>>
+>> Since slave and master mode are mutual exclusive,
+>> I did not try this.
+>
+> Ehrm, what I meant was. Did you see the issue mentioned in the above
+> commit message? Can you reproduce it? You don't need to enable slave
+> mode for that, no?
+>
 
- Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt | 1 -
- 1 file changed, 1 deletion(-)
+Ohh yes,
 
-diff --git a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
-index b54bf3a2ff57..aed486692880 100644
---- a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
-+++ b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
-@@ -17,7 +17,6 @@ Required properties:
- Optional properties:
- - clock-names : the name of clock used by the PPMU, "ppmu"
- - clocks : phandles for clock specified in "clock-names" property
--- #clock-cells: should be 1.
- 
- Example1 : PPMU nodes in exynos3250.dtsi are listed below.
- 
--- 
-2.4.3
+I am able to reproduce this issue.
+
+I have pxa1928 based board, where I have only PMIC 88PM860 connected to
+I2C bus, and whenever I set slave address to 0x30 (PMIC slave address)
+all I2C transaction for PMIC goes for toss.
+
+
+Thanks,
+Vaibhav
