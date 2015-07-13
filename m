@@ -1,62 +1,66 @@
-From: fainelli@broadcom.com (Florian Fainelli)
-Date: Mon, 13 Jul 2015 10:35:57 -0700
-Subject: [PATCH v3 2/4] dt-bindings: brcmstb-gpio: document properties
- for wakeup
-In-Reply-To: <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
-References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>	<1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
- <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
-Message-ID: <55A3F6FD.1070006@broadcom.com>
+From: joshc@ni.com (Josh Cartwright)
+Date: Mon, 13 Jul 2015 12:37:39 -0500
+Subject: [PATCH v3 1/2] rtc: add rtc-lpc24xx driver
+In-Reply-To: <1436635730-15617-2-git-send-email-manabian@gmail.com>
+References: <1436635730-15617-1-git-send-email-manabian@gmail.com>
+ <1436635730-15617-2-git-send-email-manabian@gmail.com>
+Message-ID: <20150713173739.GF25028@jcartwri.amer.corp.natinst.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/15 05:29, Linus Walleij wrote:
-> On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+On Sat, Jul 11, 2015 at 07:28:49PM +0200, Joachim Eastwood wrote:
+> Add driver for the RTC found on NXP LPC178x/18xx/408x/43xx devices.
+> The RTC provides calendar and clock functionality together with
+> alarm interrupt support.
 > 
->> Some brcmstb GPIO controllers can be used to wake from suspend, so use
->> the de facto standard property 'wakeup-source' to mark the nodes of
->> controllers with that capability.
->>
->> Also document interrupts-extended, which will be used for wakeup
->> handling because the interrupt parent for the wake IRQ is different
->> from the regular IRQ.
->>
->> While we're at it, a few more fixes: We don't actually use the
->> "interrupt-names" property, so remove it from the listed optional
->> properties and from the examples.  And since we're modifying the
->> examples, also follow Brian's suggestions to:
->> - change #gpio-cells, #interrupt-cells, and brcm,gpio-bank-widths from
->>   hex to dec
->> - use phandles
->>
->> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
->> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
->> ---
->> v3: Update per Brian's suggestions described in above message.
-> 
-> I'm very uncertain regarding these interrupts-extended etc.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> ---
+[..]
+> +static int lpc24xx_rtc_remove(struct platform_device *pdev)
+> +{
+> +	struct lpc24xx_rtc *rtc = platform_get_drvdata(pdev);
+> +
+> +	/* Ensure all interrupt sources are masked */
+> +	rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
+> +	rtc_writel(rtc, LPC24XX_CIIR, 0);
+> +
+> +	rtc_writel(rtc, LPC24XX_CCR, LPC178X_CCALEN);
+> +
+> +	clk_disable_unprepare(rtc->clk_rtc);
+> +	clk_disable_unprepare(rtc->clk_reg);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id lpc24xx_rtc_match[] = {
+> +	{ .compatible = "nxp,lpc1788-rtc" },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, lpc24xx_rtc_match);
+> +
+> +static struct platform_driver lpc24xx_rtc_driver = {
+> +	.probe	= lpc24xx_rtc_probe,
+> +	.remove	= lpc24xx_rtc_remove,
+> +	.driver	= {
+> +		.name = "lpc24xx-rtc",
+> +		.of_match_table	= lpc24xx_rtc_match,
+> +	},
+> +};
+> +module_platform_driver(lpc24xx_rtc_driver);
+> +
+> +MODULE_AUTHOR("Kevin Wells <wellsk40@gmail.com");
 
-Gregory's additions to the binding are correct and comply with how the
-'interrupts-extended' property is meant to be used. FYI, this is
-required because most wake-up capable HW on brcmstb chips have N
-interrupts feeding to a GIC, but their wake-up interrupt(s) feed to an
-always-on interrupt controller. With the 'interrupts' +
-'interrupt-parent' property, you can "cross" multiple interrupt domains.
+Missing closing '>'.
 
-The precedence and rules for interpreting the "legacy" interrupts
-property vs. interrupts-extended is documented in the tree.
+Otherwise,
 
-> 
-> Can someone who understands that ACK this?
+Reviewed-by: Josh Cartwright <joshc@ni.com>
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
-
-> 
-> E.g. Grant Likely, Bj?rn Helgaas, Rob Herring.
-> 
-> Yours,
-> Linus Walleij
-> 
-
-
--- 
-Florian
+  Josh
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150713/a7b93098/attachment-0001.sig>
