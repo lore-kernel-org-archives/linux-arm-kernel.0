@@ -1,61 +1,41 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Mon, 13 Jul 2015 12:15:10 -0500
-Subject: [PATCH v3 0/3] ARM: OMAP2+: wkup_m3_rproc support patches
-In-Reply-To: <20150713072750.GE26485@atomide.com>
-References: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
- <559ED0AB.4020703@ti.com> <20150713072529.GD26485@atomide.com>
- <20150713072750.GE26485@atomide.com>
-Message-ID: <55A3F21E.6050301@ti.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 13 Jul 2015 11:26:11 -0600
+Subject: [PATCH 0/5] coresight: Support context-ID tracing when PID
+ namespace is enabled
+In-Reply-To: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
+References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <CANLsYkwBmquLNiDfUXzZmwEDR7Ow2CPPCoiUrSQKgXTnoN0ohg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2015 02:27 AM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [150713 00:28]:
->> * Dave Gerlach <d-gerlach@ti.com> [150709 12:53]:
->>> Tony,
->>> On 04/01/2015 02:47 PM, Dave Gerlach wrote:
->>>> This series adds the mach-omap2 code and DT nodes for v3 of the
->>>> wkup_m3_rproc driver submitted here [1]. pdata-quirks patch requires
->>>> the pdata added with patch 4 of the aforementioned series. Based on
->>>> previous discussion here [2], the wkup_m3 DT node has been moved as a
->>>> child of the l4_wkup as is done for l4_wkup components in Tero Kristo's
->>>> series "PRCM+SCM cleanup against 4.0-rc1" found here [3]. Because of that,
->>>> this series applies cleanly on top of that series in order to leverage the
->>>> l4_wkup parent node introduced there.
->>>>
->>>> In addition to the move of the wkup_m3 node for am33xx, a new patch
->>>> has been added to introduce the wkup_m3 node in the same fashion for
->>>> am43xx as both SoCs use the same configuration. With this change
->>>> support was also added to pdata-quirks for passing reset handlers to
->>>> the driver for the am43xx binding as was already done for am33xx.
->>>>
->>>> I have pushed a branch containing all patches for am335x suspend
->>>> here for a big picture view of how all patches fit together with
->>>> these wkup_m3_rproc series [4].
->>>>
->>>> v2->v3:
->>>> -Change ti,am3353-wkup-m3 compat to ti,am3352-wkup-m3 to reflect
->>>>  binding documentation change
->>>> -Add ti,am4372-wkup-m3 node to am4372 SoC dt file
->>>> -Add am4372 support to pdata-quirks for reset handlers
->>>
->>> Now that Ohad has sent a pull request for the wkup_m3_rproc driver [1] and it
->>> has been merged is it possible for this series with the DT nodes and pdata-quirk
->>> to get picked up? Let me know and I can rebase and resend if you'd like.
->>
->> Yes this series looks good to me now, will queue for v4.3.
-> 
-> Looks like you need to repost this series again against v4.2-rc2 
-> to apply though.
+On 7 July 2015 at 02:41, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
+> The Coresight ETM drivers already support context-ID tracing, but it won't
+> work when PID namespace is enabled. This is because when using PID
+> namespace a process id (ie. VPID) seen from the current namespace differs
+> from the id (ie. PID) seen by kernel.
+>
+> This patch-set does add a translation between VPID and PID.
+>
+> Chunyan Zhang (5):
+>   coresight-etm3x: Change the name of the ctxid_val to ctxid_pid
+>   coresight-etm4x: Change the name of the ctxid_val to ctxid_pid
+>   Coresight: Add an interface for supporting ETM3/4 Context ID tracing
+>   coresight-etm3x: Support context-ID tracing when PID namespace is
+>     enabled
+>   coresight-etm4x: Support context-ID tracing when PID namespace is
+>     enabled
+>
+>  .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  2 +-
+>  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  2 +-
+>  drivers/hwtracing/coresight/coresight-etm.h        |  7 ++--
+>  drivers/hwtracing/coresight/coresight-etm3x.c      | 28 +++++++++-------
+>  drivers/hwtracing/coresight/coresight-etm4x.c      | 37 ++++++++++++++--------
+>  drivers/hwtracing/coresight/coresight-etm4x.h      |  7 ++--
+>  include/linux/coresight.h                          | 20 ++++++++++++
+>  7 files changed, 72 insertions(+), 31 deletions(-)
+>
+> --
+> 1.9.1
+>
 
-Ok will do, thanks!
-
-Regards,
-Dave
-
->  
-> Regards,
-> 
-> Tony
->  
->>> [1] https://lkml.org/lkml/2015/7/1/354
+Applied - thanks.
