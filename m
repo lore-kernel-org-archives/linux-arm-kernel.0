@@ -1,23 +1,22 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 13:39:50 +0100
-Subject: [PATCH V3 12/19] ata: ahci_tegra: Add support for generic PM domains
+Date: Mon, 13 Jul 2015 13:39:49 +0100
+Subject: [PATCH V3 11/19] PCI: tegra: Add support for generic PM domains
 In-Reply-To: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
 References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1436791197-32358-13-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1436791197-32358-12-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to the tegra AHCI driver for generic PM domains. However,
+Add support to the tegra PCI driver for generic PM domains. However,
 to ensure backward compatibility with older device tree blobs ensure
 that the driver can work with or without generic PM domains. In order
 to migrate to generic PM domain infrastructure the necessary changes
 are:
 
 1. If the "power-domains" property is present in the DT device node then
-   generic PM domains is supported and the variable has_genpd should be
-   set. The ahci_platform_get_resources()/put_resources() calls the
-   appropriate pm_runtime functions and so no further changes are needed
-   for rpm support.
+   generic PM domains is supported and pm_runtime_enable() should be
+   called for the device. Furthermore, the enabling and disabling of the
+   power-domain is handled via calling pm_runtime_get/put, respectively.
 
 2. To ensure that clocks are managed consistently when generic PM domains
    are used and are not used, drivers should be migrated to use the
@@ -37,135 +36,111 @@ are:
    and disable these clocks before calling
    tegra_powergate_power_off_legacy().
 
-The helper functions for handling the powering on and off of the AHCI
-controller have been updated to support generic PM domains and the
-following changes have been made:
-a). The clocks for the AHCI controller are managed by
-    the ahci_platform_enable_resources() and
-    ahci_platform_disable_resources() and so the calls to
-    clock_disable_unprepare() are not needed and can be removed.
-b). The tegra->sata_rst is handled by the tegra powergate code and
-    so does not need to be controlled by the driver.
-c). AHCI controller resets should be applied before the clocks are
-    disabled and so the call to ahci_platform_disable_resources()
-    has been moved to after the reset assertion.
+The helper functions for handling the powering on and off of the PCI
+controller have been updated to support generic PM domains. The
+tegra_pcie_power_off() was missing code to disable the clocks enabled in
+the tegra_pcie_power_on() function and so this has been added.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/ata/ahci_tegra.c | 51 ++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 36 insertions(+), 15 deletions(-)
+ drivers/pci/host/pci-tegra.c | 49 +++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 37 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/ata/ahci_tegra.c b/drivers/ata/ahci_tegra.c
-index 3a62eb246d80..438849c15e0e 100644
---- a/drivers/ata/ahci_tegra.c
-+++ b/drivers/ata/ahci_tegra.c
-@@ -23,6 +23,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 10c05718dbfd..acd1f311eee5 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -40,6 +40,7 @@
+ #include <linux/pci.h>
+ #include <linux/phy/phy.h>
  #include <linux/platform_device.h>
 +#include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
  #include <linux/reset.h>
+ #include <linux/sizes.h>
+ #include <linux/slab.h>
+@@ -908,19 +909,32 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
  
-@@ -108,6 +109,7 @@ struct tegra_ahci_priv {
- 	/* Needs special handling, cannot use ahci_platform */
- 	struct clk		   *sata_clk;
- 	struct regulator_bulk_data supplies[5];
-+	bool			   has_genpd;
- };
- 
- static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
-@@ -120,11 +122,13 @@ static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
- 	if (ret)
- 		return ret;
- 
--	ret = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_SATA,
--						tegra->sata_clk,
--						tegra->sata_rst);
--	if (ret)
--		goto disable_regulators;
-+	if (!tegra->has_genpd) {
-+		ret = tegra_powergate_power_on_legacy(TEGRA_POWERGATE_SATA,
-+						      tegra->sata_clk,
-+						      tegra->sata_rst);
-+		if (ret)
-+			goto disable_regulators;
-+	}
- 
- 	reset_control_assert(tegra->sata_oob_rst);
- 	reset_control_assert(tegra->sata_cold_rst);
-@@ -139,9 +143,8 @@ static int tegra_ahci_power_on(struct ahci_host_priv *hpriv)
- 	return 0;
- 
- disable_power:
--	clk_disable_unprepare(tegra->sata_clk);
--
--	tegra_powergate_power_off(TEGRA_POWERGATE_SATA);
-+	tegra_powergate_power_off_legacy(TEGRA_POWERGATE_SATA, tegra->sata_clk,
-+					 tegra->sata_rst);
- 
- disable_regulators:
- 	regulator_bulk_disable(ARRAY_SIZE(tegra->supplies), tegra->supplies);
-@@ -149,20 +152,27 @@ disable_regulators:
- 	return ret;
- }
- 
--static void tegra_ahci_power_off(struct ahci_host_priv *hpriv)
-+static int tegra_ahci_power_off(struct ahci_host_priv *hpriv)
+ static void tegra_pcie_power_off(struct tegra_pcie *pcie)
  {
- 	struct tegra_ahci_priv *tegra = hpriv->plat_data;
-+	int ret;
++	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
+ 	int err;
  
--	ahci_platform_disable_resources(hpriv);
+-	/* TODO: disable and unprepare clocks? */
 -
--	reset_control_assert(tegra->sata_rst);
- 	reset_control_assert(tegra->sata_oob_rst);
- 	reset_control_assert(tegra->sata_cold_rst);
+ 	err = phy_power_off(pcie->phy);
+ 	if (err < 0)
+ 		dev_warn(pcie->dev, "failed to power off PHY: %d\n", err);
  
--	clk_disable_unprepare(tegra->sata_clk);
--	tegra_powergate_power_off(TEGRA_POWERGATE_SATA);
-+	ahci_platform_disable_resources(hpriv);
+ 	reset_control_assert(pcie->pcie_xrst);
+ 	reset_control_assert(pcie->afi_rst);
+-	reset_control_assert(pcie->pex_rst);
+ 
+-	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
++	clk_disable_unprepare(pcie->pll_e);
++	if (soc->has_cml_clk)
++		clk_disable_unprepare(pcie->cml_clk);
++	clk_disable_unprepare(pcie->afi_clk);
++	clk_disable_unprepare(pcie->pex_clk);
 +
-+	if (!tegra->has_genpd) {
-+		ret = tegra_powergate_power_off_legacy(TEGRA_POWERGATE_SATA,
-+						       tegra->sata_clk,
-+						       tegra->sata_rst);
-+		if (ret)
-+			return ret;
++	if (pm_runtime_enabled(pcie->dev)) {
++		err = pm_runtime_put_sync(pcie->dev);
++	} else {
++		err = tegra_powergate_power_off_legacy(TEGRA_POWERGATE_PCIE,
++						       pcie->pex_clk,
++						       pcie->pex_rst);
 +	}
- 
- 	regulator_bulk_disable(ARRAY_SIZE(tegra->supplies), tegra->supplies);
 +
-+	return 0;
- }
++	if (err < 0)
++		dev_warn(pcie->dev, "powergate power-down failed: %d\n", err);
  
- static int tegra_ahci_controller_init(struct ahci_host_priv *hpriv)
-@@ -263,7 +273,15 @@ static int tegra_ahci_controller_init(struct ahci_host_priv *hpriv)
+ 	err = regulator_bulk_disable(pcie->num_supplies, pcie->supplies);
+ 	if (err < 0)
+@@ -934,20 +948,28 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
  
- static void tegra_ahci_controller_deinit(struct ahci_host_priv *hpriv)
- {
--	tegra_ahci_power_off(hpriv);
-+	struct tegra_ahci_priv *tegra = hpriv->plat_data;
-+	int ret;
-+
-+	ret = tegra_ahci_power_off(hpriv);
-+
-+	if (ret)
-+		dev_err(&tegra->pdev->dev,
-+			"failed to power off AHCI controller: %d\n", ret);
-+
- }
+ 	reset_control_assert(pcie->pcie_xrst);
+ 	reset_control_assert(pcie->afi_rst);
+-	reset_control_assert(pcie->pex_rst);
+-
+-	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
  
- static void tegra_ahci_host_stop(struct ata_host *host)
-@@ -356,6 +374,9 @@ static int tegra_ahci_probe(struct platform_device *pdev)
- 		return ret;
+ 	/* enable regulators */
+ 	err = regulator_bulk_enable(pcie->num_supplies, pcie->supplies);
+ 	if (err < 0)
+ 		dev_err(pcie->dev, "failed to enable regulators: %d\n", err);
+ 
+-	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
+-						pcie->pex_clk,
+-						pcie->pex_rst);
+-	if (err) {
+-		dev_err(pcie->dev, "powerup sequence failed: %d\n", err);
++	if (pm_runtime_enabled(pcie->dev)) {
++		err = pm_runtime_get_sync(pcie->dev);
++	} else {
++		err = tegra_powergate_power_on_legacy(TEGRA_POWERGATE_PCIE,
++						      pcie->pex_clk,
++						      pcie->pex_rst);
++	}
++
++	if (err < 0) {
++		dev_err(pcie->dev, "powergate power-up failed: %d\n", err);
++		return err;
++	}
++
++	err = clk_prepare_enable(pcie->pex_clk);
++	if (err < 0) {
++		dev_err(pcie->dev, "failed to enable PEX clock: %d\n", err);
+ 		return err;
  	}
  
+@@ -2001,6 +2023,9 @@ static int tegra_pcie_probe(struct platform_device *pdev)
+ 
+ 	pcibios_min_mem = 0;
+ 
 +	if (of_property_read_bool(pdev->dev.of_node, "power-domains"))
-+		tegra->has_genpd = true;
++		pm_runtime_enable(&pdev->dev);
 +
- 	ret = tegra_ahci_controller_init(hpriv);
- 	if (ret)
- 		return ret;
+ 	err = tegra_pcie_get_resources(pcie);
+ 	if (err < 0) {
+ 		dev_err(&pdev->dev, "failed to request resources: %d\n", err);
 -- 
 2.1.4
