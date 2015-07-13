@@ -1,109 +1,107 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 13 Jul 2015 11:26:55 -0500
-Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
-In-Reply-To: <alpine.DEB.2.11.1507121737030.20072@nanos>
-References: <1436711211-18223-1-git-send-email-robh@kernel.org>
- <1436711211-18223-7-git-send-email-robh@kernel.org>
- <alpine.DEB.2.11.1507121737030.20072@nanos>
-Message-ID: <CAL_JsqJfDdDAQ1gr1w3w8_FVqKzxqDag-PHnwguaPfT+6zqszw@mail.gmail.com>
+From: lina.iyer@linaro.org (Lina Iyer)
+Date: Mon, 13 Jul 2015 10:36:35 -0600
+Subject: [PATCH RFC v2 09/16] arm: domain: Add platform callbacks for
+ domain power on/off
+In-Reply-To: <20150706151853.GA1018@linaro.org>
+References: <1435374156-19214-1-git-send-email-lina.iyer@linaro.org>
+ <1435374156-19214-10-git-send-email-lina.iyer@linaro.org>
+ <CAMuHMdULThWEZmyLEK_9WeK6DSNhrQdiZQLWNhi1Q6dwZTkkMg@mail.gmail.com>
+ <20150629163201.GA1524@linaro.org>
+ <CAMuHMdWL09Loe2EFUMc-kRML7Ckn7a6G1_hvPnaqkDYnhkXjog@mail.gmail.com>
+ <20150702193826.GA885@linaro.org>
+ <CAMuHMdWQRy2RMfyeyNz=6AgTDem67a1VogN3RWSJ1Y+9yNFx6g@mail.gmail.com>
+ <20150706151853.GA1018@linaro.org>
+Message-ID: <20150713163635.GI2049@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 12, 2015 at 11:43 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Sun, 12 Jul 2015, Rob Herring wrote:
->
->> set_irq_flags is ARM specific with custom flags which have genirq
->> equivalents. Convert drivers to use the genirq interfaces directly, so we
->> can kill off set_irq_flags. The translation of flags is as follows:
+On Mon, Jul 06 2015 at 09:18 -0600, Lina Iyer wrote:
+>On Fri, Jul 03 2015 at 05:36 -0600, Geert Uytterhoeven wrote:
+>>Hi Lina,
 >>
->> IRQF_VALID -> !IRQ_NOREQUEST
->> IRQF_PROBE -> !IRQ_NOPROBE
->> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+>>On Thu, Jul 2, 2015 at 9:38 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>On Tue, Jun 30 2015 at 09:10 -0600, Geert Uytterhoeven wrote:
+>>>>On Mon, Jun 29, 2015 at 6:32 PM, Lina Iyer <lina.iyer@linaro.org> wrote:
+>>>>>On Mon, Jun 29 2015 at 07:36 -0600, Geert Uytterhoeven wrote:
+>
+>[...]
+>
+>>>With what you have suggested, the platform driver creates the genpd and
+>>>would pass the CPU genpd to the common code for common operations. (This
+>>>was what was done in [1]). The platform driver would set the power_on()
+>>>and power_off() callbacks and that would have to be overriden in order
+>>>handle common CPU domain suspend/resume activities. Overwriting members
+>>>of an object allocated by the platform driver, is something we should
+>>>avoid.
 >>
->> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
->> and setting IRQ_NOREQUEST already, so there is no need to do this in
->> .map() functions and we can simply remove the set_irq_flags calls. Some
->> users also set IRQ_NOPROBE and this has been maintained although it is not
+>>Instead of letting the generic code override the .power_{on,off}() callbacks,
+>>the platform code could call the generic CPU-related methods from its own
+>>.power_{on,off}() callbacks?
+>>
+>We dont want to impose on platform drivers to call back into the CPU
+>domain core code to do common domain power down activities. On a generic
+>ARM CPU domain, we may not even need a platform specific domain
+>callbacks. IMHO, this is not desirable.
 >
-> clear IRQ_NOPROBE, right?
+Any thoughts on this?
 
-Both set and clear really. The state of IRQ_NOPROBE is a don't care in
-most cases as you have outlined below. Are the cases of setting
-IRQ_NOPROBE really needed or simply a bunch of copy and paste?
-
-I've noticed I have a few places wrong with probe setting though, so
-I'll be sending a v3.
-
->> clear that is really needed. There appears to be a great deal of blind
->> copy and paste of this code.
+>>struct rmobile_pm_domain already has .suspend() and .resume() methods.
+>>The former is used to e.g. prevent the PM domains containing CPUs to be
+>>powered down (in the absence of cpuidle integration). That requires scanning
+>>the DT for CPUs, and it would indeed be good to have that scanning support
+>>in generic code.
+>>The latter became unused after the removal of sh7372 support, which did have
+>>some cpuidle integration.
+>>
+>The CPUs may still be attached to domain, even if they are not powered
+>off by CPUIdle. The code increases the reference count for every online
+>CPU and any CPUs that may come online. The reference count, only goes
+>down when the CPU powers down through CPUIdle or hotplug. So, if a CPU
+>is not integrated with CPUIdle, it would remain in use (unless powered
+>off by hotplug) and the domain would not be powered down.
 >
-> Looking at the irq probe users:
+>>>Or instead of allocating the memory in your platform driver for the CPU
+>>>genpd, you could query and get the genpd and then add your additions on
+>>>top. You could add other flags like GENPD_FLAG_PM_CLK, but *not*
+>>>overwrite the power on/off callbacks in the genpd. They still have to be
+>>>registered separately like in this patch. Again, not every elegant, IMO.
+>>
+>>Just wondering, can I set up the .attach_dev() and .detach_dev()?
+>>
+>I am presuming, you are concerned with the fore mentioned case of CPUs
+>not participating in CPUIdle. With pm_runtime_put_sync() not happening
+>for CPUs that do not power down, you should not have to worry about the
+>domain being powered down.
 >
-> drivers/input/touchscreen/ucb1400_ts.c
-> drivers/mfd/ucb1x00-core.c
+>Please correct me if I misunderstood your point.
 >
-> The probe function was added in the initial implementation of the
-> driver (2006), so it predates device tree.
-
-We still have lots of platforms which are not (and probably never will
-be) DT. Certainly, DT only irqchips should be easy to make consistent.
-The older stuff is harder and not frequently tested.
-
-> drivers/net/appletalk/ltpc.c
-> drivers/net/arcnet/com20020-isa.c
-> drivers/net/arcnet/com90io.c
-> drivers/net/arcnet/com90xx.c
+>>Actually, for R-Mobile hardware I don't have a need to set GENPD_FLAG_PM_CLK
+>>or .attach_dev() and .detach_dev() for CPU PM domains, as they are only
+>>needed for devices with MSTP clocks. CPU and L2 cache don't have these,
+>>and there are no other devices in e.g. a3sm and a2sl.
+>>
+>>The GIC has an MSTP clock, but it's part of a different power domain.
+>>
+>Okay.
 >
-> Surely not stuff you find on todays ARM systems
+>[...]
 >
-> drivers/net/ethernet/8390/ne.c
-> drivers/net/ethernet/8390/wd.c
-> drivers/net/ethernet/amd/lance.c
-> drivers/net/ethernet/amd/ni65.c
-> drivers/net/ethernet/amd/pcnet32.c
+>>>This the common code would get its own callbacks and when that genpd
+>>>powers off, the platform genpd would power down. But no new code is
+>>>needed in your platform driver. The benefit is that platform code and
+>>>generic CPU domain code may exist and act in parallel and may only be
+>>>related if specified in the DT and the problem with that approach is
+>>>that this virtual PM domain is not a h/w domain, hence specifying in DT
+>>>is questionable.
+>>
+>>Indeed, I don't like this option, as the DT would no longer describe HW,
+>>but the Linux implementation.
+>>
+>>So let's continue with your approach, and see how it turns out. We can
+>>always change and improvide code, while changing DT is more complicated.
+>>
+>Agreed.
 >
-> Ditto
+>Thanks for your time, Geert.
 >
-> drivers/net/ethernet/smsc/smc911x.c
-> drivers/net/ethernet/smsc/smc9194.c
-> drivers/net/ethernet/smsc/smc91x.c
->
-> Those might still be, but on the DT based boards the probing should be
-> completely irrelevant
-
-Yes, these are quite common on ARM boards, and probably few if any
-rely on irq probing regardless of DT.
-
-> drivers/net/hamradio/dmascc.c
-> drivers/net/wan/cosa.c
-> drivers/net/wan/sbni.c
-> drivers/parport/parport_pc.c
->
-> Surely not stuff you find on todays ARM systems
->
-> drivers/pcmcia/yenta_socket.c
->
-> Russell might still use that.
->
-> drivers/scsi/NCR53c406a.c
-> drivers/scsi/sym53c416.c
-> drivers/tty/cyclades.c
->
-> Surely not stuff you find on todays ARM systems
->
-> drivers/tty/serial/8250/8250_core.c
->
-> The irq probing is used by
->
->     mach-imx/mach-mx31ads.c
->     mach-iop32x/n2100.c
->
->     and X86
->
-> So in most of the irqchip drivers, this is irrelevant.
-
-Agreed, but that's a separate series I think. I'm trying not to change
-behavior with this series. Are you proposing I do something different
-with this patch?
-
-Rob
+>-- Lina
