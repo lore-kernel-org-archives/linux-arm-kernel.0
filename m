@@ -1,9 +1,9 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Jul 2015 20:29:00 -0000
-Subject: [patch 01/11] ARM/orion: Consolidate chained IRQ handler
+Date: Mon, 13 Jul 2015 20:29:01 -0000
+Subject: [patch 02/11] ARM/locomo: Consolidate chained IRQ handler
  install/remove
 References: <20150713090726.316699641@linutronix.de>
-Message-ID: <20150713090936.019766165@linutronix.de>
+Message-ID: <20150713090936.097948542@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,22 +19,20 @@ Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/plat-orion/gpio.c |    5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/common/locomo.c |    3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Index: tip/arch/arm/plat-orion/gpio.c
+Index: tip/arch/arm/common/locomo.c
 ===================================================================
---- tip.orig/arch/arm/plat-orion/gpio.c
-+++ tip/arch/arm/plat-orion/gpio.c
-@@ -582,8 +582,9 @@ void __init orion_gpio_init(struct devic
+--- tip.orig/arch/arm/common/locomo.c
++++ tip/arch/arm/common/locomo.c
+@@ -475,8 +475,7 @@ static void __locomo_remove(struct locom
+ 	device_for_each_child(lchip->dev, NULL, locomo_remove_child);
  
- 	for (i = 0; i < 4; i++) {
- 		if (irqs[i]) {
--			irq_set_handler_data(irqs[i], ochip);
--			irq_set_chained_handler(irqs[i], gpio_irq_handler);
-+			irq_set_chained_handler_and_data(irqs[i],
-+							 gpio_irq_handler,
-+							 ochip);
- 		}
+ 	if (lchip->irq != NO_IRQ) {
+-		irq_set_chained_handler(lchip->irq, NULL);
+-		irq_set_handler_data(lchip->irq, NULL);
++		irq_set_chained_handler_and_data(lchip->irq, NULL, NULL);
  	}
  
+ 	iounmap(lchip->base);
