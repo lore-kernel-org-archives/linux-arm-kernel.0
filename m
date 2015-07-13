@@ -1,43 +1,67 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 13 Jul 2015 17:32:49 +0800
-Subject: [PATCH 5/5] arm64: dts: mt8173: add timer node
-In-Reply-To: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
-References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1436779969-18610-6-git-send-email-yingjoe.chen@mediatek.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 13 Jul 2015 12:38:00 +0300
+Subject: [PATCH 7/7] ARM: OMAP2+: Include clk.h
+In-Reply-To: <1436568347-24554-8-git-send-email-sboyd@codeaurora.org>
+References: <1436568347-24554-1-git-send-email-sboyd@codeaurora.org>
+ <1436568347-24554-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <55A386F8.5010404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Kurtz <djkurtz@chromium.org>
+On 07/11/2015 01:45 AM, Stephen Boyd wrote:
+> These files use the consumer API, so include clk.h explicitly.
+>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Please ack so this can be routed through clk-tree. Otherwise
+> when clk.h is removed from clk-provider.h these files will
+> fail to compile.
 
-Add device node to enable GPT timer. This timer will be
-used as sched clock source.
+Acked-by: Tero Kristo <t-kristo@ti.com>
 
-Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
-Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 0696f8f..04bdd8f 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -219,6 +219,15 @@
- 			reg = <0 0x10007000 0 0x100>;
- 		};
- 
-+		timer: timer at 10008000 {
-+			compatible = "mediatek,mt8173-timer",
-+				     "mediatek,mt6577-timer";
-+			reg = <0 0x10008000 0 0x1000>;
-+			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_CLK_13M>,
-+				 <&topckgen CLK_TOP_RTC_SEL>;
-+		};
-+
- 		pwrap: pwrap at 1000d000 {
- 			compatible = "mediatek,mt8173-pwrap";
- 			reg = <0 0x1000d000 0 0x1000>;
--- 
-1.8.1.1.dirty
+>
+>   arch/arm/mach-omap2/clock.c      | 1 +
+>   arch/arm/mach-omap2/omap_hwmod.c | 1 +
+>   arch/arm/mach-omap2/pm24xx.c     | 1 +
+>   3 files changed, 3 insertions(+)
+>
+> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+> index a699d7169307..f664dc664ded 100644
+> --- a/arch/arm/mach-omap2/clock.c
+> +++ b/arch/arm/mach-omap2/clock.c
+> @@ -20,6 +20,7 @@
+>   #include <linux/errno.h>
+>   #include <linux/err.h>
+>   #include <linux/delay.h>
+> +#include <linux/clk.h>
+>   #include <linux/clk-provider.h>
+>   #include <linux/io.h>
+>   #include <linux/bitops.h>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index d78c12e7cb5e..de43e4c9a865 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -130,6 +130,7 @@
+>   #include <linux/kernel.h>
+>   #include <linux/errno.h>
+>   #include <linux/io.h>
+> +#include <linux/clk.h>
+>   #include <linux/clk-provider.h>
+>   #include <linux/delay.h>
+>   #include <linux/err.h>
+> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+> index b1aad7e1426c..2a1a4180d5d0 100644
+> --- a/arch/arm/mach-omap2/pm24xx.c
+> +++ b/arch/arm/mach-omap2/pm24xx.c
+> @@ -25,6 +25,7 @@
+>   #include <linux/sysfs.h>
+>   #include <linux/module.h>
+>   #include <linux/delay.h>
+> +#include <linux/clk.h>
+>   #include <linux/clk-provider.h>
+>   #include <linux/irq.h>
+>   #include <linux/time.h>
+>
