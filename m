@@ -1,62 +1,74 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 13 Jul 2015 12:39:53 +0530
-Subject: [PATCH-v3 02/11] i2c: pxa: No need to set slave addr for i2c
- master mode reset
-In-Reply-To: <20150710145628.GB6594@katana>
-References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436210695-19159-3-git-send-email-vaibhav.hiremath@linaro.org>
- <20150710081148.GB1528@katana> <559FBCD3.4050402@linaro.org>
- <20150710141440.GA6594@katana> <559FD5DB.9030308@linaro.org>
- <20150710145628.GB6594@katana>
-Message-ID: <55A36441.2020206@linaro.org>
+Date: Mon, 13 Jul 2015 12:40:57 +0530
+Subject: [PATCH 2/6] mfd: 88pm800: Add init time initial configuration
+ support
+In-Reply-To: <55A0BD78.8050005@samsung.com>
+References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436442431-3471-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <55A0BD78.8050005@samsung.com>
+Message-ID: <55A36481.80206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Friday 10 July 2015 08:26 PM, Wolfram Sang wrote:
-> On Fri, Jul 10, 2015 at 07:55:31PM +0530, Vaibhav Hiremath wrote:
+On Saturday 11 July 2015 12:23 PM, Krzysztof Kozlowski wrote:
+> W dniu 09.07.2015 o 20:47, Vaibhav Hiremath pisze:
+>> This patch adds init time configuration of 88PM800/805 and
+>> 88PM860. It includes,
 >>
+>>    - Enable BUCK clock gating in low power mode
+>>    - Full mode support for BUCK2 and 4
+>>    - Enable voltage change (LPF, DVC) in PMIC
 >>
->> On Friday 10 July 2015 07:44 PM, Wolfram Sang wrote:
->>> On Fri, Jul 10, 2015 at 06:08:43PM +0530, Vaibhav Hiremath wrote:
->>>>
->>>>
->>>> On Friday 10 July 2015 01:41 PM, Wolfram Sang wrote:
->>>>> On Tue, Jul 07, 2015 at 12:54:46AM +0530, Vaibhav Hiremath wrote:
->>>>>> Normally i2c controller works as master, so slave addr is not needed, or it
->>>>>> will impact some slave device (eg. ST NFC chip) i2c accesses, because it has
->>>>>> the same i2c address with controller.
->>>>>
->>>>> Just to make sure: Does it? As I read the code, slave interrupts are
->>>>> enabled later only when slave mode is selected? Is that a HW bug? And if
->>>>> so, can't the code just be moved into this #ifdef block later?
->>>>>
->>>>
->>>> Yes we could, infact I thought about it;
->>>> but I would break recommended sequence here.
->>>
->>> And did you set the "own slave address" to a value which one of your
->>> existing i2c slaves also has (without enabling slave mode)? Did it
->>> disturb communication?
->>>
+>> Note that both 88PM800 and 88PM860 do share common configurations,
+>> but since I can not validate the configuration on 88PM800,
+>> restricting myself only to 88PM860.
+>> If anyone can validate on 88PM800, we can move common code accordingly.
 >>
->> Since slave and master mode are mutual exclusive,
->> I did not try this.
+>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 >
-> Ehrm, what I meant was. Did you see the issue mentioned in the above
-> commit message? Can you reproduce it? You don't need to enable slave
-> mode for that, no?
+> Although I am not familiar with the device and driver, patch looks good
+> to me, except one idea below. Anyway feel free to add:
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 >
 
-Ohh yes,
+Thanks for your review.
 
-I am able to reproduce this issue.
+>
+>> ---
+>>   drivers/mfd/88pm800.c       | 64 +++++++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/mfd/88pm80x.h | 13 +++++++++
+>>   2 files changed, 77 insertions(+)
+>>
+>> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
+>> index 95c8ad4..80a1bc1 100644
+>> --- a/drivers/mfd/88pm800.c
+>> +++ b/drivers/mfd/88pm800.c
+>> @@ -521,6 +521,63 @@ out:
+>>   	return ret;
+>>   }
+>>
+>> +static int pm800_init_config(struct pm80x_chip *chip, struct device_node *np)
+>> +{
+>> +	int ret;
+>> +	unsigned int val;
+>> +
+>> +	switch (chip->type) {
+>> +	case CHIP_PM800:
+>> +	case CHIP_PM805:
+>> +		break;
+>
+> It may be useful for future generations to put short notice here why
+> there is no init for these devices? I saw the explanation in commit
+> message but still someone in the future may look at the code and wonder
+> why only 88PM860 is initialized and the others are not?
+>
 
-I have pxa1928 based board, where I have only PMIC 88PM860 connected to
-I2C bus, and whenever I set slave address to 0x30 (PMIC slave address)
-all I2C transaction for PMIC goes for toss.
+Yeup, Agreed.
 
+I will incorporate it in V2.
 
 Thanks,
 Vaibhav
