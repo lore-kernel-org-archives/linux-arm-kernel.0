@@ -1,45 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 13 Jul 2015 09:50:50 -0300
-Subject: Passing arguments to cmdline or changing the devicetree node??
-In-Reply-To: <559BD921.3080000@eurek.it>
-References: <559BD921.3080000@eurek.it>
-Message-ID: <CAOMZO5COZb08E-Bwkt+yBHwOxRwzOYuG9k9Q6nvsw+dwchz4uw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jul 2015 14:58:22 +0200
+Subject: [PATCH v3 3/4] gpio: brcmstb: Add interrupt and wakeup source
+ support
+In-Reply-To: <1434589243-502-4-git-send-email-gregory.0xf0@gmail.com>
+References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+ <1434589243-502-4-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <CACRpkdYNGdWHk1kqhFWHziLPy3mZXTcUjYFBCVo5dRCh60bQ_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 7, 2015 at 10:50 AM, gianluca <gianlucarenzi@eurek.it> wrote:
-> Hello list,
-> I was thinking which is the best method to ensure a fallback compatibility
-> to old boards when a single board has changed something in hardware.
->
-> I will explain better:
->
-> I designed a board running linux (on iMX28) which had 128MB and the first
-> stage bootstrap is programming the DDR2 controller to match the memory
-> timings.
-> The bootloader had the memory size hardcoded, but it is not a problem
-> because nothing on the bootloader is using it (maybe some atag for old
-> compatibility, I need to check this out)
-> The bootloader now loads linux and the devicetree flattened blob and pass it
-> to the kernel.
-> In the .dts I have a node called:
->
->>         memory {
->>                 reg = <0x40000000 0x08000000>;
->>         };
->
->
-> and it is fixed.
->
-> Now we need to update the memory onboard up to 256Mb or 512Mb, and if I can
-> test easily on the fist stage bootstrap (programming the DDR2 controller for
-> 256Mb and writing on memory above 128Mb and if it works I have could have
-> 256Mb or more, for example) I need a procedure to change the memory node on
-> the dts.
+On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
-You could simply remove the memory node from your dts and let the
-bootloader pass it to the kernel.
+> Uses the gpiolib irqchip helpers.  For this to work, the irq setup
+> function is called once per bank instead of once per device.  Note
+> that all known uses of this block have a BCM7120 L2 interrupt
+> controller as a parent.  Supports interrupts for all GPIOs.
+>
+> In the IRQ handler, we check for raised IRQs for invalid GPIOs and
+> warn (ratelimited) if they're encountered.
+>
+> Also, several drivers (e.g. gpio-keys) allow for GPIOs to be
+> configured as wakeup sources, and this GPIO controller supports that
+> through a separate interrupt path.
+>
+> The de-facto standard DT property "wakeup-source" is checked, since
+> that indicates whether the GPIO controller hardware can wake.  Uses
+> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+> any of its own wakeup source configuration.
+>
+> Aside regarding gpiolib irqchip helpers: It wasn't obvious (to me)
+> that you can have multiple chained irqchips and associated IRQ domains
+> for a single parent IRQ, and as long as the xlate function is written
+> correctly, a GPIO IRQ request end up checking the correct domain and
+> will get associated with the correct IRQ.  What helps make this clear
+> is to read
+>   drivers/gpio/gpiolib-of.c:
+>    - of_gpiochip_find_and_xlate()
+>    - of_get_named_gpiod_flags()
+>   drivers/gpio/gpiolib.c:
+>    - gpiochip_find()
 
-Regards,
+Sorry for the unclarities, this is a bit hairy. Suggestions as to
+how we can make it easier and/or bring code for this into gpiolib
+are welcome. Right now I have a hard time seeing any way to
+make this more generic and helpful :/
 
-Fabio Estevam
+Overall this patch looks real nice. Some nitpicks below.
+
+> @@ -164,6 +398,16 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>         priv->reg_base = reg_base;
+>         priv->pdev = pdev;
+>
+> +       if (of_property_read_bool(np, "interrupt-controller")) {
+> +               priv->parent_irq = platform_get_irq(pdev, 0);
+> +               if (priv->parent_irq < 0) {
+
+This should be <= 0 since 0 is NO_IRQ
+
+> +                       dev_err(dev, "Couldn't get IRQ");
+> +                       return -ENOENT;
+> +               }
+> +       } else {
+> +               priv->parent_irq = -ENOENT;
+> +       }
+
+Why should this code only execute if the node is marked
+"interrupt-controller"? It makes it seem like IRQs cannot arrive
+to it unless it is intended to serve other consumers.
+
+Maybe in practice this is true, but...
+
+> +               if (priv->parent_irq >= 0) {
+> +                       err = brcmstb_gpio_irq_setup(pdev, bank);
+> +                       if (err)
+> +                               goto fail;
+> +               }
+
+Again 0 is NO_IRQ so this should be > 0 not >= 0.
+
+Yours,
+Linus Walleij
