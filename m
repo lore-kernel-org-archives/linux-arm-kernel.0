@@ -1,122 +1,82 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 13 Jul 2015 13:20:41 +0200
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <CAJKOXPcX83C+=D-Fpstgu8N1y7-TFM3tXki_YfUyKkU1q3EfSA@mail.gmail.com>
-References: <'@samsung.com> <4721448.dpAUKITTdt@amdc1976>
- <CAJKOXPcX83C+=D-Fpstgu8N1y7-TFM3tXki_YfUyKkU1q3EfSA@mail.gmail.com>
-Message-ID: <1549704.AH5CyPJE5q@amdc1976>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jul 2015 12:22:27 +0100
+Subject: [PATCH 13/18] arm64: cmpxchg: avoid memory barrier on comparison
+ failure
+In-Reply-To: <20150713102848.GX19282@twins.programming.kicks-ass.net>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+ <1436779519-2232-14-git-send-email-will.deacon@arm.com>
+ <20150713102848.GX19282@twins.programming.kicks-ass.net>
+Message-ID: <20150713112226.GC2632@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 13, 2015 08:10:21 PM Krzysztof Kozlowski wrote:
-> 2015-07-13 20:02 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> >
-> > Hi,
-> >
-> > On Tuesday, June 23, 2015 09:24:40 AM Krzysztof Kozlowski wrote:
-> >> On 23.06.2015 08:46, Krzysztof Kozlowski wrote:
-> >> > On 23.06.2015 00:04, Michael Turquette wrote:
-> >> >> Quoting Kukjin Kim (2015-06-21 18:46:26)
-> >> >>> Krzysztof Kozlowski wrote:
-> >> >>>>
-> >> >>>> On 22.06.2015 10:38, Kukjin Kim wrote:
-> >> >>>>> Krzysztof Kozlowski wrote:
-> >> >>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> >> >>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> >> >>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
-> >> >>>>>>>>
-> >> >>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
-> >> >>>>>>>> regulator supply properties for migrating from Exynos specific
-> >> >>>>>>>> cpufreq driver to using generic cpufreq driver.
-> >> >>>>>>>>
-> >> >>>>>>>> Changes by Bartlomiej:
-> >> >>>>>>>> - removed Exynos5250 and Exynos5420 support for now
-> >> >>>>>>>>
-> >> >>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >> >>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
-> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >> >>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
-> >> >>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> >> >>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
-> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >> >>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >> >>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >> >>>>>>>
-> >> >>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> >>>>>>
-> >> >>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
-> >> >>>>>> picks it by himself from LKML.
-> >> >>>>>>
-> >> >>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
-> >> >>>>> v4.2-rc1 after v4.2-rc1 release.
-> >> >>>>
-> >> >>>> You mean it is for v4.3, not v4.2?
-> >> >>>>
-> >> >>> Oops, yes v4.3.
-> >> >>>
-> >> >>> Thanks for the correction.
-> >> >>
-> >> >> Kukjin & Krzysztof,
-> >> >>
-> >> >> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
-> >> >> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
-> >> >> week).
-> >> >>
-> >> >> Is patch 4 going out for 4.2 or 4.3?
-> >> >
-> >> > It is quite late for sending pull request to arm-soc for 4.2.
-> >> > For example SoCFPGA pull request from last week was rejected:
-> >> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
-> >>
-> >> Oh, that was wrong link. Here it is:
-> >> http://www.spinics.net/lists/arm-kernel/msg425911.html
-> >>
-> >> > If you want to take it for 4.2 then I am fine with it but this will
-> >> > cause some easy but annoying conflicts. There aren't difficult - just
-> >> > most of nodes in board DTS changed their place.
-> >> >
-> >> > Example of resolution (target file after merge, with cpu nodes reordered
-> >> > alphabetically):
-> >> > https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
-> >
-> > This patch is needed for v4.2 as other changes has been already
-> > merged.
-> >
-> > Krzysztof/Kukjin, could you please take care of it?
+On Mon, Jul 13, 2015 at 11:28:48AM +0100, Peter Zijlstra wrote:
+> On Mon, Jul 13, 2015 at 10:25:14AM +0100, Will Deacon wrote:
+> > cmpxchg doesn't require memory barrier semantics when the value
+> > comparison fails, so make the barrier conditional on success.
 > 
-> Of course! It is already in my queue. I'll send it later to Kukjin for
-> 4.3 (unless he picks it also).
+> So this isn't actually a documented condition.
 
-It is in your queue for v4.3 but the patch is needed for v4.2,
-without it cpufreq support will not work for Exynos4210 platforms.
+There's *something* in Documentation/atomic_ops.txt (literally, the last
+sentence in the file) but it's terrible at best:
 
-> BTW for other patchsets you still need acks from Samsung clock
-> maintainers. Did you poke Sylwester or Tomasz about it?
+"Note that this also means that for the case where the counter
+ is not dropping to zero, there are no memory ordering
+ requirements."
 
-Sylwester, please review/ack Samsung specific clock changes in
-Exynos5250 cpufreq and Exynos4x12 cpufreq patch series.
+[you probably want to see the example for some context]
 
-Patch series:
+> I would very much like a fwe extra words on this, that you've indeed
+> audited cmpxchg() users and preferably even a Documentation/ update to
+> match.
 
-* [PATCH v3 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
-  (http://lkml.org/lkml/2015/7/1/311)
+Happy to update the docs. In terms of code audit, I couldn't find any
+cmpxchg users that do something along the lines of "if the comparison
+fails, don't loop, and instead do something to an independent address,
+without barrier semantics that must be observed after the failed CAS":
 
-* [PATCH v2 0/7] cpufreq: use generic cpufreq drivers for Exynos4x12 platform
-  (http://lkml.org/lkml/2015/7/9/419)
+  - Most (as in, it's hard to find other cases) users just loop until
+    success, so there's no issue there.
 
-Samsung clock specific changes:
+  - One use-case with work on the failure path is stats update (e.g.
+    drivers/net/ethernet/intel/ixgbe/ixgbe.h), but barrier semantics
+    aren't required here anyway.
 
-* [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock configuration data
-  and instantiate cpu clock
-  (http://lkml.org/lkml/2015/7/1/313)
+  - Another use-case is where you optimistically try a cmpxchg, then
+    fall back on a lock if you fail (e.g. slub and cmpxchg_double).
 
-* [PATCH v2 4/7] clk: samsung: exynos4x12: add cpu clock configuration data
-  and instantiate cpu clock
-  (http://lkml.org/lkml/2015/7/9/424)
+  - Some other archs appear to do the same trick (alpha and powerpc).
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+So I'm confident with this change, but agree that a Docs update would
+be beneficial. Something like below, or do you want some additional text,
+too?
+
+Will
+
+--->8
+
+diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
+index 13feb697271f..18fc860df1be 100644
+--- a/Documentation/memory-barriers.txt
++++ b/Documentation/memory-barriers.txt
+@@ -2383,9 +2383,7 @@ about the state (old or new) implies an SMP-conditional general memory barrier
+ explicit lock operations, described later).  These include:
+ 
+ 	xchg();
+-	cmpxchg();
+ 	atomic_xchg();			atomic_long_xchg();
+-	atomic_cmpxchg();		atomic_long_cmpxchg();
+ 	atomic_inc_return();		atomic_long_inc_return();
+ 	atomic_dec_return();		atomic_long_dec_return();
+ 	atomic_add_return();		atomic_long_add_return();
+@@ -2398,7 +2396,9 @@ explicit lock operations, described later).  These include:
+ 	test_and_clear_bit();
+ 	test_and_change_bit();
+ 
+-	/* when succeeds (returns 1) */
++	/* when succeeds */
++	cmpxchg();
++	atomic_cmpxchg();		atomic_long_cmpxchg();
+ 	atomic_add_unless();		atomic_long_add_unless();
+ 
+ These are used for such things as implementing ACQUIRE-class and RELEASE-class
