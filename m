@@ -1,73 +1,57 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 15:26:58 +0200
-Subject: [PATCH 2/3] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <55A3B910.9040009@cogentembedded.com>
-References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
- <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
- <55A3B910.9040009@cogentembedded.com>
-Message-ID: <55A3BCA2.7040505@osg.samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 13 Jul 2015 14:25:53 +0100
+Subject: [PATCH v2 06/10] arm64/debug: Move BRK ESR template macro into
+ <asm/esr.h>
+In-Reply-To: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1436793967-7138-7-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+It makes sense to keep all the architectural exception syndrome
+definitions in the same place.
 
-On 07/13/2015 03:11 PM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 7/13/2015 10:42 AM, Javier Martinez Canillas wrote:
-> 
->> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
->> a RTC and an I2C interface to program the individual components.
-> 
->> The are already DT bindings for the regulators and clocks and
->> these reference to a bindings/mfd/max77802.txt file, that didn't
->> exist, for the details about the PMIC.
-> 
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->>
->>   Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->>   1 file changed, 26 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
-> 
->> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
->> new file mode 100644
->> index 000000000000..875ebebbc5b0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
->> @@ -0,0 +1,26 @@
->> +Maxim MAX77802 multi-function device
->> +
->> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
->> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
->> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
->> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
->> +regulators, clocks outputs and the RTC.
->> +
->> +Binding for the built-in 32k clock generator block is defined separately
->> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
->> +is defined in the bindings/regulator/max77802.txt file.
->> +
->> +Required properties:
->> +- compatible : Must be "maxim,max77686";
->> +- reg : Specifies the i2c slave address of PMIC block.
->> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
->> +- interrupt-parent : The parent interrupt controller.
->> +
->> +Example:
->> +
->> +    max77802 at 09 {
-> 
->    Sigh, I'm tired of saying this over and over again: please don't name the nodes with teh chip names. The ePAPR standard says: "The name of a node should be somewhat generic, reflecting the function of the device and not its 3 precise programming model."
-> 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+---
+ arch/arm64/include/asm/debug-monitors.h |    7 -------
+ arch/arm64/include/asm/esr.h            |    7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
-Ok, I'll change this to be pmic@ when re-spinning the patches.
-
-> WBR, Sergei
-> 
-
-Best regards,
+diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
+index bb97e9d..e28b1dd 100644
+--- a/arch/arm64/include/asm/debug-monitors.h
++++ b/arch/arm64/include/asm/debug-monitors.h
+@@ -44,13 +44,6 @@
+ #define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
+ 
+ /*
+- * ESR values expected for dynamic and compile time BRK instruction
+- */
+-#define ESR_ELx_VAL_BRK64(imm)					\
+-	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+-	 ((imm) & 0xffff))
+-
+-/*
+  * #imm16 values used for BRK instruction generation
+  * Allowed values for kgbd are 0x400 - 0x7ff
+  * 0x100: for triggering a fault on purpose (reserved)
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 8dab2a9..7568d14 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -101,6 +101,13 @@
+ #define ESR_ELx_WFx_ISS_WFE	(UINT(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((UINT(1) << 16) - 1)
+ 
++/* ESR value templates for specific events */
++
++/* BRK instruction trap from AArch64 state */
++#define ESR_ELx_VAL_BRK64(imm)					\
++	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
++	 ((imm) & 0xffff))
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
+ 
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.7.10.4
