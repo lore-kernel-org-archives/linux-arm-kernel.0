@@ -1,29 +1,32 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 13 Jul 2015 17:07:32 +0200
-Subject: [PATCH] rtc: snvs: select option REGMAP_MMIO
-In-Reply-To: <CAHrpEqSi=BPuZrqSvozvggAFsnXy2DqnfkzP5dpsP2cShzM7Hg@mail.gmail.com>
-References: <1436775075-15037-1-git-send-email-shawnguo@kernel.org>
- <CAHrpEqSi=BPuZrqSvozvggAFsnXy2DqnfkzP5dpsP2cShzM7Hg@mail.gmail.com>
-Message-ID: <20150713150732.GC20482@piout.net>
+From: claudiu.manoil@freescale.com (Manoil Claudiu)
+Date: Mon, 13 Jul 2015 15:08:39 +0000
+Subject: [PATCH] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and eTSEC2
+In-Reply-To: <20150713133138.GO23464@tiger>
+References: <1435213498-21025-1-git-send-email-b18965@freescale.com>
+ <20150712065101.GA14354@localhost>
+ <DM2PR03MB414BBD64BBDEB22DB0981619C9C0@DM2PR03MB414.namprd03.prod.outlook.com>
+ <20150713133138.GO23464@tiger>
+Message-ID: <DM2PR03MB414D321810928CDA131A2849C9C0@DM2PR03MB414.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/07/2015 at 09:48:33 -0500, Zhi Li wrote :
-> On Mon, Jul 13, 2015 at 3:11 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> > Select REGMAP_MMIO to fix the following build error seen with x86_64
-> > randconfig.
-> >
-> >   drivers/built-in.o: In function `snvs_rtc_probe':
-> > rtc-snvs.c:(.text+0x567730): undefined reference to `devm_regmap_init_mmio_clk'
-> >
-> > Reported-by: kbuild test robot <fengguang.wu@intel.com>
-> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, July 13, 2015 4:32 PM
+> To: Manoil Claudiu-B08782
+> Cc: Wang Huan-B18965; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> shawn.guo at linaro.org
+> Subject: Re: [PATCH] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
+> eTSEC2
 > 
-> Acked-by: Frank Li <Frank.Li@freescale.com>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> I would like to see patch for bindings documentation before I apply this
+> one.
 
+Agreed.  I just noticed that this is an old version of the patch (using an
+obsoleted property), so please expect a v2 of this patch as well,  besides
+the device tree binding document which I think will be named:
+./Documentation/devicetree/bindings/net/fsl-etsec2.txt.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks.
+Claudiu
