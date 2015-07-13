@@ -1,74 +1,66 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 Jul 2015 16:02:18 -0700
-Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
-In-Reply-To: <20150709223938.19450e75@bbrezillon>
-References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150708005748.GG30412@codeaurora.org>
- <20150708110005.704c49ff@bbrezillon>
- <559D66EE.4060707@codeaurora.org>
- <20150709223938.19450e75@bbrezillon>
-Message-ID: <20150713230217.GI30412@codeaurora.org>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 13 Jul 2015 16:13:26 -0700
+Subject: [PATCH] Input: pmic8xxx-pwrkey - Support shutdown
+In-Reply-To: <1436231329-17997-1-git-send-email-sboyd@codeaurora.org>
+References: <1436231329-17997-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150713231326.GG15178@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09, Boris Brezillon wrote:
-> Hi Stephen,
-> 
-> On Wed, 08 Jul 2015 11:07:42 -0700
-> Stephen Boyd <sboyd@codeaurora.org> wrote:
-> 
-> > On 07/08/2015 02:00 AM, Boris Brezillon wrote:
-> > > Hi Stephen,
-> > >
-> > > On Tue, 7 Jul 2015 17:57:48 -0700
-> > > Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > >
-> > >> On 07/07, Boris Brezillon wrote:
-> > >>>
-> > >>>  	} else {
-> > >>>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
-> > >>> +		req->rate = 0;
-> > >>>  		return 0;
-> > >> Shouldn't this return an error now? And then assigning req->rate
-> > >> wouldn't be necessary. Sorry I must have missed this last round.
-> > >>
-> > > Actually I wanted to keep the existing behavior: return a 0 rate (not
-> > > an error) when there is no mux or rate ops.
-> > >
-> > > That's something we can change afterwards, but it might reveals
-> > > new bugs if some users are checking for a 0 rate to detect errors.
-> > >
-> > 
-> > Ok. Care to send the patch now to do that while we're thinking about it?
-> > We can test it out for a month or two.
-> > 
-> 
-> Here is a patch modifying a few drivers to return errors instead of a 0
-> rate. Feel free to squash it in the previous one if you think this is
-> better.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> --- >8 ---
-> 
-> From dca9c28301042cf19dad4b1e4555cdb7c1063745 Mon Sep 17 00:00:00 2001
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Date: Thu, 9 Jul 2015 12:20:21 +0200
-> Subject: [PATCH] clk: fix some determine_rate implementations
-> 
-> Some determine_rate implementations are not returning an error when then
-> failed to adapt the rate according to the rate request.
-> Fix them so that they return an error instead of silently returning 0.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Mon 06 Jul 18:08 PDT 2015, Stephen Boyd wrote:
 
-The linewrap is seriously messed up here. Please fix your mailer
-next time. I had to hand edit the patch to get it to apply. I've
-applied this in top of the original patch as a different commit,
-in case we need to revert it later.
+> On pm8xxx PMICs, shutdown and restart are signaled to the PMIC
+> via a pin called PS_HOLD. When this pin goes low, the PMIC
+> performs a configurable power sequence. Add a .shutdown hook so
+> that we can properly configure this power sequence for shutdown
+> or restart depending on the system state.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/input/misc/pmic8xxx-pwrkey.c | 287 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 280 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+[..]
+
+>  
+>  /**
+>   * struct pmic8xxx_pwrkey - pmic8xxx pwrkey information
+>   * @key_press_irq: key press irq number
+> + * @regmap: device regmap
+
+Please also document the shutdown_fn.
+
+>   */
+>  struct pmic8xxx_pwrkey {
+>  	int key_press_irq;
+> +	struct regmap *regmap;
+> +	int (*shutdown_fn)(struct pmic8xxx_pwrkey *, bool);
+> +};
+> +
+> +struct pm8xxx_nbs {
+> +	int (*shutdown_fn)(struct pmic8xxx_pwrkey *, bool);
+>  };
+
+This struct is unused.
+
+[..]
+
+>  static struct platform_driver pmic8xxx_pwrkey_driver = {
+>  	.probe		= pmic8xxx_pwrkey_probe,
+>  	.remove		= pmic8xxx_pwrkey_remove,
+> +	.shutdown	= pmic8xxx_pwrkey_shutdown,
+
+I tried to find pros/cons of using this approach instead of register a
+reboot notifier like I did in the pm8941 driver, but I haven't come up
+with any good reason to pick one or the other.
+
+>  	.driver		= {
+>  		.name	= "pm8xxx-pwrkey",
+>  		.pm	= &pm8xxx_pwr_key_pm_ops,
+
+With above nits I think this looks good.
+
+Regards,
+Bjorn
