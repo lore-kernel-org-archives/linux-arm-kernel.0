@@ -1,26 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jul 2015 22:40:57 +0200
-Subject: [PATCH v2 5/8] ARM: dts: add i.mx6ul pin function include file
-In-Reply-To: <1434727951-4852-6-git-send-email-Frank.Li@freescale.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-6-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CACRpkdbgKhXgcnncrHKDPC1hC1QEdhTyxFH61J4vG8ftoasHPQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 13 Jul 2015 15:41:41 -0500
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+Message-ID: <1436820101-2172-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 5:32 PM,  <Frank.Li@freescale.com> wrote:
+According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+the realtime counter sits in the Wakeup Always-On Power domain.
+Furthermore, the counter will automatically switch the 32K clock source
+when MPU goes into standby and automatically switch back to SYS_CLK or
+ABE_LP when MPU goes out of standby.
 
-> From: Frank Li <Frank.Li@freescale.com>
->
-> add pin mux define file
->
-> Signed-off-by: Bai Ping <b51503@freescale.com>
-> Signed-off-by: Anson Huang <b20788@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Are you taking this through the ARM SoC tree?
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 8f1e25bcecbd..c1e6fd82485f 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -50,6 +50,7 @@
+ 			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+ 		interrupt-parent = <&gic>;
++		always-on;
+ 	};
+ 
+ 	gic: interrupt-controller at 48211000 {
+-- 
+2.4.4
