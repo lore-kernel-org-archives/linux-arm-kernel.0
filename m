@@ -1,37 +1,64 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 09:42:25 +0200
-Subject: [PATCH 0/3] mfd: Improve DT binding docs for max77686 and max77802
-Message-ID: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
+Date: Mon, 13 Jul 2015 09:42:26 +0200
+Subject: [PATCH 1/3] mfd: max77686: Don't suggest in binding to use a
+ deprecated property
+In-Reply-To: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
+References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1436773348-15316-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+The regulator-compatible property from the regulator DT binding was
+deprecated. But the max77686 DT binding doc still suggest to use it
+instead of the regulator node name's which is the correct approach.
 
-This series contains some improvements for the Device Tree bindings of
-the Maxim MAX77686 and MAX77802 multi-function devices.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Patch #1 changes the max77686 binding to not suggest using a deprecated
-property of the regulator DT binding.
+ Documentation/devicetree/bindings/mfd/max77686.txt | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-Patch #2 adds a DT binding for the mfd portion of the max77802 that was
-missing.
-
-Patch #3 moves the regulator portion of the max77686 to the regulator's
-DT binding sub-directory since it is a better fit for this information.
-This third patch needs an ack from the regulator sub-system maintainer.
-
-
-Javier Martinez Canillas (3):
-  mfd: max77686: Don't suggest in binding to use a deprecated property
-  mfd: Add DT binding for Maxim MAX77802 IC
-  mfd: max77686: Split out regulator part from the DT binding
-
- Documentation/devicetree/bindings/mfd/max77686.txt | 61 +------------------
- Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++
- .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
- 3 files changed, 100 insertions(+), 58 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
-
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index 163bd81a4607..8221102d3fc2 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -26,7 +26,7 @@ Optional node:
+ 	};
+ 	refer Documentation/devicetree/bindings/regulator/regulator.txt
+ 
+-  The regulator-compatible property of regulator should initialized with string
++  The regulator node's name should be initialized with a string
+ to get matched with their hardware counterparts as follow:
+ 
+ 	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
+@@ -55,16 +55,14 @@ Example:
+ 		reg = <0x09>;
+ 
+ 		voltage-regulators {
+-			ldo11_reg {
+-				regulator-compatible = "LDO11";
++			ldo11_reg: LDO11 {
+ 				regulator-name = "vdd_ldo11";
+ 				regulator-min-microvolt = <1900000>;
+ 				regulator-max-microvolt = <1900000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			buck1_reg {
+-				regulator-compatible = "BUCK1";
++			buck1_reg: BUCK1 {
+ 				regulator-name = "vdd_mif";
+ 				regulator-min-microvolt = <950000>;
+ 				regulator-max-microvolt = <1300000>;
+@@ -72,8 +70,7 @@ Example:
+ 				regulator-boot-on;
+ 			};
+ 
+-			buck9_reg {
+-				regulator-compatible = "BUCK9";
++			buck9_reg: BUCK9 {
+ 				regulator-name = "CAM_ISP_CORE_1.2V";
+ 				regulator-min-microvolt = <1000000>;
+ 				regulator-max-microvolt = <1200000>;
 -- 
 2.4.3
