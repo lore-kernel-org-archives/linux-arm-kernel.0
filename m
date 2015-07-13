@@ -1,28 +1,42 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Jul 2015 20:28:58 -0000
-Subject: [patch 00/11] ARM: Interrupt cleanups and API change preparation
-Message-ID: <20150713090726.316699641@linutronix.de>
+Date: Mon, 13 Jul 2015 20:29:03 -0000
+Subject: [patch 03/11] ARM/irq: Use access helper irq_data_get_affinity_mask()
+References: <20150713090726.316699641@linutronix.de>
+Message-ID: <20150713090936.176152466@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch series contains the following changes:
+From: Jiang Liu <jiang.liu@linux.intel.com>
 
-    - Consolidation of chained interrupt handler setup/removal
+This is a preparatory patch for moving irq_data struct members.
 
-    - Switch to functions which avoid a redundant interrupt
-      descriptor lookup
+Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ arch/arm/kernel/irq.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-    - Preparation of interrupt flow handlers for the 'irq' argument
-      removal
-
-The series has no dependencies and is also available as a git branch
-for your convenience:
-
- git://git.kernel.org/pub/scm/linux/kernel/git/tip/tip.git irq/arm
-
-If you want me to carry the patches in the irq/core branch of tip,
-please let me know.
-
-Thanks,
-
-	tglx
+Index: tip/arch/arm/kernel/irq.c
+===================================================================
+--- tip.orig/arch/arm/kernel/irq.c
++++ tip/arch/arm/kernel/irq.c
+@@ -140,7 +140,7 @@ int __init arch_probe_nr_irqs(void)
+ static bool migrate_one_irq(struct irq_desc *desc)
+ {
+ 	struct irq_data *d = irq_desc_get_irq_data(desc);
+-	const struct cpumask *affinity = d->affinity;
++	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
+ 	struct irq_chip *c;
+ 	bool ret = false;
+ 
+@@ -160,7 +160,7 @@ static bool migrate_one_irq(struct irq_d
+ 	if (!c->irq_set_affinity)
+ 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
+ 	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
+-		cpumask_copy(d->affinity, affinity);
++		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+ 
+ 	return ret;
+ }
