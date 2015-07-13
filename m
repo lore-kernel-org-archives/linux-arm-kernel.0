@@ -1,84 +1,218 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Jul 2015 10:25:13 +0100
-Subject: [PATCH 12/18] arm64: cmpxchg: avoid "cc" clobber in ll/sc routines
+Date: Mon, 13 Jul 2015 10:25:12 +0100
+Subject: [PATCH 11/18] arm64: cmpxchg_dbl: patch in lse instructions when
+ supported by the CPU
 In-Reply-To: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
 References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436779519-2232-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1436779519-2232-12-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can perform the cmpxchg comparison using eor and cbnz which avoids
-the "cc" clobber for the ll/sc case and consequently for the LSE case
-where we may have to fall-back on the ll/sc code at runtime.
+On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+it makes sense to use them in preference to ll/sc sequences.
+
+This patch introduces runtime patching of our cmpxchg_double primitives
+so that the LSE casp instruction is used instead.
 
 Reviewed-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 14 ++++++--------
- arch/arm64/include/asm/atomic_lse.h   |  4 ++--
- 2 files changed, 8 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/atomic_ll_sc.h | 34 ++++++++++++++++++
+ arch/arm64/include/asm/atomic_lse.h   | 45 +++++++++++++++++++++++
+ arch/arm64/include/asm/cmpxchg.h      | 68 +++++++++--------------------------
+ 3 files changed, 96 insertions(+), 51 deletions(-)
 
 diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index 77d3aabf52ad..d21091bae901 100644
+index b4298f9a898f..77d3aabf52ad 100644
 --- a/arch/arm64/include/asm/atomic_ll_sc.h
 +++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -96,14 +96,13 @@ __LL_SC_PREFIX(atomic_cmpxchg(atomic_t *ptr, int old, int new))
+@@ -243,4 +243,38 @@ __CMPXCHG_CASE( ,  , mb_8, dmb ish, "memory")
  
- 	asm volatile("// atomic_cmpxchg\n"
- "1:	ldxr	%w1, %2\n"
--"	cmp	%w1, %w3\n"
--"	b.ne	2f\n"
-+"	eor	%w0, %w1, %w3\n"
-+"	cbnz	%w0, 2f\n"
- "	stxr	%w0, %w4, %2\n"
- "	cbnz	%w0, 1b\n"
- "2:"
- 	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
-+	: "Lr" (old), "r" (new));
+ #undef __CMPXCHG_CASE
  
- 	smp_mb();
- 	return oldval;
-@@ -169,14 +168,13 @@ __LL_SC_PREFIX(atomic64_cmpxchg(atomic64_t *ptr, long old, long new))
- 
- 	asm volatile("// atomic64_cmpxchg\n"
- "1:	ldxr	%1, %2\n"
--"	cmp	%1, %3\n"
--"	b.ne	2f\n"
-+"	eor	%0, %1, %3\n"
-+"	cbnz	%w0, 2f\n"
- "	stxr	%w0, %4, %2\n"
- "	cbnz	%w0, 1b\n"
- "2:"
- 	: "=&r" (res), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
-+	: "Lr" (old), "r" (new));
- 
- 	smp_mb();
- 	return oldval;
++#define __CMPXCHG_DBL(name, mb, cl)					\
++__LL_SC_INLINE int							\
++__LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
++				      unsigned long old2,		\
++				      unsigned long new1,		\
++				      unsigned long new2,		\
++				      volatile void *ptr))		\
++{									\
++	unsigned long tmp, ret;						\
++									\
++	asm volatile("// __cmpxchg_double" #name "\n"			\
++	"	" #mb "\n"						\
++	"1:	ldxp	%0, %1, %2\n"					\
++	"	eor	%0, %0, %3\n"					\
++	"	eor	%1, %1, %4\n"					\
++	"	orr	%1, %0, %1\n"					\
++	"	cbnz	%1, 2f\n"					\
++	"	stxp	%w0, %5, %6, %2\n"				\
++	"	cbnz	%w0, 1b\n"					\
++	"	" #mb "\n"						\
++	"2:"								\
++	: "=&r" (tmp), "=&r" (ret), "+Q" (*(unsigned long *)ptr)	\
++	: "r" (old1), "r" (old2), "r" (new1), "r" (new2)		\
++	: cl);								\
++									\
++	return ret;							\
++}									\
++__LL_SC_EXPORT(__cmpxchg_double##name);
++
++__CMPXCHG_DBL(   ,        ,         )
++__CMPXCHG_DBL(_mb, dmb ish, "memory")
++
++#undef __CMPXCHG_DBL
++
+ #endif	/* __ASM_ATOMIC_LL_SC_H */
 diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index b1f55aac6d96..7adee6656d42 100644
+index a87ed3af6ced..b1f55aac6d96 100644
 --- a/arch/arm64/include/asm/atomic_lse.h
 +++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -105,7 +105,7 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
- 	"	mov	%w[ret], %w[tmp]")
- 	: [tmp] "=&r" (tmp), [ret] "+r" (x0), [v] "+Q" (ptr->counter)
- 	: [old] "r" (w1), [new] "r" (w2)
--	: "cc", "memory");
-+	: "memory");
+@@ -266,4 +266,49 @@ __CMPXCHG_CASE( ,  , mb_8, al, "memory")
+ #undef __LL_SC_CMPXCHG
+ #undef __CMPXCHG_CASE
  
- 	return x0;
++#define __LL_SC_CMPXCHG_DBL(op, tmp)					\
++	__LL_SC_SAVE_LR(tmp)						\
++	__LL_SC_CALL(__cmpxchg_double##op)				\
++	__LL_SC_RESTORE_LR(tmp)
++
++#define __CMPXCHG_DBL(name, mb, cl)					\
++static inline int __cmpxchg_double##name(unsigned long old1,		\
++					 unsigned long old2,		\
++					 unsigned long new1,		\
++					 unsigned long new2,		\
++					 volatile void *ptr)		\
++{									\
++	unsigned long tmp;						\
++	unsigned long oldval1 = old1;					\
++	unsigned long oldval2 = old2;					\
++	register unsigned long x0 asm ("x0") = old1;			\
++	register unsigned long x1 asm ("x1") = old2;			\
++	register unsigned long x2 asm ("x2") = new1;			\
++	register unsigned long x3 asm ("x3") = new2;			\
++	register unsigned long x4 asm ("x4") = (unsigned long)ptr;	\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	__LL_SC_CMPXCHG_DBL(name, %[tmp]),				\
++	/* LSE atomics */						\
++	"	casp" #mb "\t%[old1], %[old2], %[new1], %[new2], %[v]\n"\
++	"	eor	%[old1], %[old1], %[oldval1]\n"			\
++	"	eor	%[old2], %[old2], %[oldval2]\n"			\
++	"	orr	%[old1], %[old1], %[old2]")			\
++	: [tmp] "=&r" (tmp), [old1] "+r" (x0), [old2] "+r" (x1),	\
++	  [v] "+Q" (*(unsigned long *)ptr)				\
++	: [new1] "r" (x2), [new2] "r" (x3), [ptr] "r" (x4),		\
++	  [oldval1] "r" (oldval1), [oldval2] "r" (oldval2)		\
++	: cl);								\
++									\
++	return x0;							\
++}
++
++__CMPXCHG_DBL(   ,   ,         )
++__CMPXCHG_DBL(_mb, al, "memory")
++
++#undef __LL_SC_CMPXCHG_DBL
++#undef __CMPXCHG_DBL
++
+ #endif	/* __ASM_ATOMIC_LSE_H */
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index 60a558127cef..f70212629d02 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -128,51 +128,6 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	unreachable();
  }
-@@ -191,7 +191,7 @@ static inline long atomic64_cmpxchg(atomic64_t *ptr, long old, long new)
- 	"	mov	%[ret], %[tmp]")
- 	: [tmp] "=&r" (tmp), [ret] "+r" (x0), [v] "+Q" (ptr->counter)
- 	: [old] "r" (x1), [new] "r" (x2)
--	: "cc", "memory");
-+	: "memory");
  
- 	return x0;
- }
+-#define system_has_cmpxchg_double()     1
+-
+-static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
+-		unsigned long old1, unsigned long old2,
+-		unsigned long new1, unsigned long new2, int size)
+-{
+-	unsigned long loop, lost;
+-
+-	switch (size) {
+-	case 8:
+-		VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
+-		do {
+-			asm volatile("// __cmpxchg_double8\n"
+-			"	ldxp	%0, %1, %2\n"
+-			"	eor	%0, %0, %3\n"
+-			"	eor	%1, %1, %4\n"
+-			"	orr	%1, %0, %1\n"
+-			"	mov	%w0, #0\n"
+-			"	cbnz	%1, 1f\n"
+-			"	stxp	%w0, %5, %6, %2\n"
+-			"1:\n"
+-				: "=&r"(loop), "=&r"(lost), "+Q" (*(u64 *)ptr1)
+-				: "r" (old1), "r"(old2), "r"(new1), "r"(new2));
+-		} while (loop);
+-		break;
+-	default:
+-		BUILD_BUG();
+-	}
+-
+-	return !lost;
+-}
+-
+-static inline int __cmpxchg_double_mb(volatile void *ptr1, volatile void *ptr2,
+-			unsigned long old1, unsigned long old2,
+-			unsigned long new1, unsigned long new2, int size)
+-{
+-	int ret;
+-
+-	smp_mb();
+-	ret = __cmpxchg_double(ptr1, ptr2, old1, old2, new1, new2, size);
+-	smp_mb();
+-
+-	return ret;
+-}
+-
+ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 					 unsigned long new, int size)
+ {
+@@ -210,21 +165,32 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
+ 
++#define system_has_cmpxchg_double()     1
++
++#define __cmpxchg_double_check(ptr1, ptr2)					\
++({										\
++	if (sizeof(*(ptr1)) != 8)						\
++		BUILD_BUG();							\
++	VM_BUG_ON((unsigned long *)(ptr2) - (unsigned long *)(ptr1) != 1);	\
++})
++
+ #define cmpxchg_double(ptr1, ptr2, o1, o2, n1, n2) \
+ ({\
+ 	int __ret;\
+-	__ret = __cmpxchg_double_mb((ptr1), (ptr2), (unsigned long)(o1), \
+-			(unsigned long)(o2), (unsigned long)(n1), \
+-			(unsigned long)(n2), sizeof(*(ptr1)));\
++	__cmpxchg_double_check(ptr1, ptr2); \
++	__ret = !__cmpxchg_double_mb((unsigned long)(o1), (unsigned long)(o2), \
++				     (unsigned long)(n1), (unsigned long)(n2), \
++				     ptr1); \
+ 	__ret; \
+ })
+ 
+ #define cmpxchg_double_local(ptr1, ptr2, o1, o2, n1, n2) \
+ ({\
+ 	int __ret;\
+-	__ret = __cmpxchg_double((ptr1), (ptr2), (unsigned long)(o1), \
+-			(unsigned long)(o2), (unsigned long)(n1), \
+-			(unsigned long)(n2), sizeof(*(ptr1)));\
++	__cmpxchg_double_check(ptr1, ptr2); \
++	__ret = !__cmpxchg_double((unsigned long)(o1), (unsigned long)(o2), \
++				  (unsigned long)(n1), (unsigned long)(n2), \
++				  ptr1); \
+ 	__ret; \
+ })
+ 
 -- 
 2.1.4
