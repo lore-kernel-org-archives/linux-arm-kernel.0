@@ -1,60 +1,42 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Mon, 13 Jul 2015 14:24:31 +0200
-Subject: [PATCH v2 0/4] Allow to use leds-ns2 with n090401 boards
-In-Reply-To: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
-References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <55A3ADFF.4090500@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jul 2015 14:29:46 +0200
+Subject: [PATCH v3 2/4] dt-bindings: brcmstb-gpio: document properties for
+ wakeup
+In-Reply-To: <1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
+References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+ <1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
+Message-ID: <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
 
-On 07/02/2015 07:56 PM, Simon Guinot wrote:
-> Hello,
+> Some brcmstb GPIO controllers can be used to wake from suspend, so use
+> the de facto standard property 'wakeup-source' to mark the nodes of
+> controllers with that capability.
 >
-> This patch series allows to use the leds-ns2 driver with the n090401
-> boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
+> Also document interrupts-extended, which will be used for wakeup
+> handling because the interrupt parent for the wake IRQ is different
+> from the regular IRQ.
 >
-> Here is the list changes:
+> While we're at it, a few more fixes: We don't actually use the
+> "interrupt-names" property, so remove it from the listed optional
+> properties and from the examples.  And since we're modifying the
+> examples, also follow Brian's suggestions to:
+> - change #gpio-cells, #interrupt-cells, and brcm,gpio-bank-widths from
+>   hex to dec
+> - use phandles
 >
-> - Allow to configure the LED mode mapping.
-> - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
->    GPIO expander.
-> - Make leds-ns2 depends on MACH_ARMADA_370.
->
-> Changes for v2:
-> - Fix gpio_{get,set}_*_cansleep() usage while holding a spinlock:
->    Holding a spinlock at this places was not needed.
-> - Add Acked-by from Jacek Anaszewski for patch 4.
->
-> Simon
->
-> Simon Guinot (2):
->    leds: leds-ns2: handle can_sleep GPIOs
->    leds: leds-ns2: depends on MACH_ARMADA_370
->
-> Vincent Donnefort (2):
->    leds: leds-ns2: move LED modes mapping outside of the driver
->    ARM: Kirkwood: add modes-map property to ns2-leds nodes
->
->   .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
->   arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
->   arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
->   arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
->   arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
->   arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
->   drivers/leds/Kconfig                               |  12 +-
->   drivers/leds/leds-ns2.c                            | 169 ++++++++++++---------
->   include/dt-bindings/leds/leds-ns2.h                |   8 +
->   include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
->   10 files changed, 165 insertions(+), 72 deletions(-)
->   create mode 100644 include/dt-bindings/leds/leds-ns2.h
->
+> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+> ---
+> v3: Update per Brian's suggestions described in above message.
 
-For the whole patch set:
+I'm very uncertain regarding these interrupts-extended etc.
 
-Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+Can someone who understands that ACK this?
 
--- 
-Best Regards,
-Jacek Anaszewski
+E.g. Grant Likely, Bj?rn Helgaas, Rob Herring.
+
+Yours,
+Linus Walleij
