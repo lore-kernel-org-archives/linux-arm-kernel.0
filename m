@@ -1,187 +1,114 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 09:42:28 +0200
-Subject: [PATCH 3/3] mfd: max77686: Split out regulator part from the DT
- binding
-In-Reply-To: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
-References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1436773348-15316-4-git-send-email-javier@osg.samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 13 Jul 2015 16:44:28 +0900
+Subject: [PATCH 3/6] mfd: devicetree: bindings: 88pm800: Add DT property
+ for 32KHz output enable
+In-Reply-To: <55A36AE6.5070802@linaro.org>
+References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1436442431-3471-4-git-send-email-vaibhav.hiremath@linaro.org>
+ <55A0C1B8.4030402@samsung.com> <55A367BE.6040103@linaro.org>
+ <55A36939.7070607@samsung.com> <55A36AE6.5070802@linaro.org>
+Message-ID: <55A36C5C.7000903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Maxim MAX77686 PMIC is a multi-function device with regulators,
-clocks and a RTC. The DT bindings for the clocks are in a separate
-file but the bindings for the regulators are inside the mfd part.
+On 13.07.2015 16:38, Vaibhav Hiremath wrote:
+> 
+> 
+> On Monday 13 July 2015 01:01 PM, Krzysztof Kozlowski wrote:
+>> On 13.07.2015 16:24, Vaibhav Hiremath wrote:
+>>>
+>>>
+>>> On Saturday 11 July 2015 12:41 PM, Krzysztof Kozlowski wrote:
+>>>> W dniu 09.07.2015 o 20:47, Vaibhav Hiremath pisze:
+>>>>> 88PM800 family of device supports output of 32KHz clock (low jitter)
+>>>>> on CLK32K2/3 pin which can be supplied to other peripherals on the
+>>>>> board.
+>>>>>
+>>>>> This patch adds the devicetree binding to enable this feature.
+>>>>>
+>>>>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+>>>>> ---
+>>>>>    Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
+>>>>>    1 file changed, 6 insertions(+)
+>>>>>
+>>>>> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>> b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>> index dec842f..ae1311c 100644
+>>>>> --- a/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+>>>>> @@ -9,6 +9,12 @@ Required parent device properties:
+>>>>>    - #interrupt-cells     : should be 1.
+>>>>>                  The cell is the 88pm80x local IRQ number
+>>>>>
+>>>>> +Optional properties :
+>>>>> + - marvell,88pm800-32khz-xolj-out-en    : If set, driver will enable
+>>>>> low jitter
+>>>>> +   version of 32Khz clock output on
+>>>>
+>>>> I am not sure if I understand it correctly. The hardware always has
+>>>> such
+>>>> clocks and you only want to enable/disable it in DT? Any reasons why
+>>>> these should not be enabled always?
+>>>>
+>>>
+>>> Small amount of Power savings...
+>>> Although currently I do not have power numbers to justify this.
+>>>
+>>> As per spec, (it only talks about power consumption in power down state)
+>>>
+>>> Power-down State => VSYS > 2.8   => 4.5 ?A
+>>>                      CLK32K2 = 0  => 18 ?W
+>>
+>> This would be a power saving if it could be enabled/disabled runtime.
+>> But with DT you will either:
+>> 1. enable it always so there won't be any power saving,
+>> 2. disable it always so there won't be such clock.
+>>
+>> I can find a use case - when on some boards the clock output is not
+>> wired to anything so it cannot be used. In other cases (there is some
+>> potential user) this should be triggered per-use (runtime
+>> enabled/disabled).
+>>
+> 
+> Exactly,
+> 
+>> Do you have such case? I mean boards where this is not connected at all
+>> and boards where this is used?
+>>
+> 
+> The PXA1928 based board which I have,
+> 
+> CLK32K1 (G3 pad)  = Used by Wireless chip
+> CLK32K2 (G11 pad) = Not connected to anything, so we need to disable
+>                     this output
 
-To make it consistent with the clocks portion of the binding and
-because is more natural to look for regulator bindings under the
-bindings/regulator sub-directory, split the regulator portion of
-the DT binding and add it as a separate file.
+Okay... however still such binding is uncommon. Such cases are modelled
+by using (or not) the clock phandle. So the wireless driver would take
+phandle to CLK32K1 clock thus enabling it after probed/started. The
+CLK32K2 phandle would be unused and clock would remain disabled.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+The binding for device should describe hardware and device always has
+these clocks.
 
----
+> 
+>>>> Enabling it in DT does not look like a job for DT. Maybe you there
+>>>> should be just a clock driver (clock provider)?
+>>>>
+>>>
+>>> It's init time (and one time) settings, wouldn't clock-provider
+>>> be overkill for this?
+>>
+>> The clock provider would be a proper way to do it and some PMICs I know
+>> do this. Examples are max77686 and s5m8767/s2mps11. These are PMICs used
+>> for Samsung SoCs. They have two or three 32kHz clocks.
+>>
+> 
+> This is good to know.
+> Let me take a look at these drivers.
 
- Documentation/devicetree/bindings/mfd/max77686.txt | 58 +-----------------
- .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 55 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
+drivers/mfd/sec-core.c - MFD for the family of PMICs
+drivers/clk/clk-s2mps11.c for clocks
+The drivers are actually a little more complicated than they should... :)
 
-diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-index 8221102d3fc2..8a276dd5ea46 100644
---- a/Documentation/devicetree/bindings/mfd/max77686.txt
-+++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-@@ -8,7 +8,8 @@ client while probing.This document describes the binding for mfd device and
- PMIC submodule.
- 
- Binding for the built-in 32k clock generator block is defined separately
--in bindings/clk/maxim,max77686.txt file.
-+in the bindings/clk/maxim,max77686.txt file and binding for the regulators
-+is defined in the bindings/regulator/max77686.txt file.
- 
- Required properties:
- - compatible : Must be "maxim,max77686";
-@@ -16,36 +17,6 @@ Required properties:
- - interrupts : This i2c device has an IRQ line connected to the main SoC.
- - interrupt-parent : The parent interrupt controller.
- 
--Optional node:
--- voltage-regulators : The regulators of max77686 have to be instantiated
--  under subnode named "voltage-regulators" using the following format.
--
--	regulator_name {
--		regulator-compatible = LDOn/BUCKn
--		standard regulator constraints....
--	};
--	refer Documentation/devicetree/bindings/regulator/regulator.txt
--
--  The regulator node's name should be initialized with a string
--to get matched with their hardware counterparts as follow:
--
--	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
--		 	example: LDO1, LDO2, LDO26.
--	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 9.
--			example: BUCK1, BUCK5, BUCK9.
--
--  Regulators which can be turned off during system suspend:
--	-LDOn	:	2, 6-8, 10-12, 14-16,
--	-BUCKn	:	1-4.
--  Use standard regulator bindings for it ('regulator-off-in-suspend').
--
--  LDO20, LDO21, LDO22, BUCK8 and BUCK9 can be configured to GPIO enable
--  control. To turn this feature on this property must be added to the regulator
--  sub-node:
--	- maxim,ena-gpios :	one GPIO specifier enable control (the gpio
--				flags are actually ignored and always
--				ACTIVE_HIGH is used)
--
- Example:
- 
- 	max77686 at 09 {
-@@ -53,27 +24,4 @@ Example:
- 		interrupt-parent = <&wakeup_eint>;
- 		interrupts = <26 0>;
- 		reg = <0x09>;
--
--		voltage-regulators {
--			ldo11_reg: LDO11 {
--				regulator-name = "vdd_ldo11";
--				regulator-min-microvolt = <1900000>;
--				regulator-max-microvolt = <1900000>;
--				regulator-always-on;
--			};
--
--			buck1_reg: BUCK1 {
--				regulator-name = "vdd_mif";
--				regulator-min-microvolt = <950000>;
--				regulator-max-microvolt = <1300000>;
--				regulator-always-on;
--				regulator-boot-on;
--			};
--
--			buck9_reg: BUCK9 {
--				regulator-name = "CAM_ISP_CORE_1.2V";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1200000>;
--				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
--			};
--	}
-+	};
-diff --git a/Documentation/devicetree/bindings/regulator/max77686.txt b/Documentation/devicetree/bindings/regulator/max77686.txt
-new file mode 100644
-index 000000000000..04b7604c219e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/max77686.txt
-@@ -0,0 +1,71 @@
-+Binding for Maxim MAX77686 regulators
-+
-+This is a part of the device tree bindings of MAX77686 multi-function device.
-+More information can be found in bindings/mfd/max77686.txt file.
-+
-+The MAX77802 PMIC has 9 high-efficiency Buck and 26 Low-dropout (LDO)
-+regulators that can be controlled over I2C.
-+
-+Following properties should be present in main device node of the MFD chip.
-+
-+Optional node:
-+- voltage-regulators : The regulators of max77686 have to be instantiated
-+  under subnode named "voltage-regulators" using the following format.
-+
-+	regulator_name {
-+		regulator-compatible = LDOn/BUCKn
-+		standard regulator constraints....
-+	};
-+	refer Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+  The regulator node's name should be initialized with a string
-+to get matched with their hardware counterparts as follow:
-+
-+	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
-+			example: LDO1, LDO2, LDO26.
-+	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 9.
-+			example: BUCK1, BUCK5, BUCK9.
-+
-+  Regulators which can be turned off during system suspend:
-+	-LDOn	:	2, 6-8, 10-12, 14-16,
-+	-BUCKn	:	1-4.
-+  Use standard regulator bindings for it ('regulator-off-in-suspend').
-+
-+  LDO20, LDO21, LDO22, BUCK8 and BUCK9 can be configured to GPIO enable
-+  control. To turn this feature on this property must be added to the regulator
-+  sub-node:
-+	- maxim,ena-gpios :	one GPIO specifier enable control (the gpio
-+				flags are actually ignored and always
-+				ACTIVE_HIGH is used)
-+
-+Example:
-+
-+	max77686 at 09 {
-+		compatible = "maxim,max77686";
-+		interrupt-parent = <&wakeup_eint>;
-+		interrupts = <26 0>;
-+		reg = <0x09>;
-+
-+		voltage-regulators {
-+			ldo11_reg: LDO11 {
-+				regulator-name = "vdd_ldo11";
-+				regulator-min-microvolt = <1900000>;
-+				regulator-max-microvolt = <1900000>;
-+				regulator-always-on;
-+			};
-+
-+			buck1_reg: BUCK1 {
-+				regulator-name = "vdd_mif";
-+				regulator-min-microvolt = <950000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			buck9_reg: BUCK9 {
-+				regulator-name = "CAM_ISP_CORE_1.2V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1200000>;
-+				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
-+			};
-+	};
--- 
-2.4.3
+Best regards,
+Krzysztof
