@@ -1,20 +1,59 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Mon, 13 Jul 2015 10:59:55 +0800
-Subject: [PATCH 2/2] ASoC: Drop owner assignment from platform_driver
-In-Reply-To: <1436506231-8980-3-git-send-email-k.kozlowski@samsung.com>
-References: <1436506231-8980-1-git-send-email-k.kozlowski@samsung.com>
- <1436506231-8980-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1436756395.2090.2.camel@mtksdaap41>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jul 2015 11:19:01 +0800
+Subject: [PATCH v2 01/13] ARM: kill off set_irq_flags usage
+In-Reply-To: <1436711211-18223-2-git-send-email-robh@kernel.org>
+References: <1436711211-18223-1-git-send-email-robh@kernel.org>
+ <1436711211-18223-2-git-send-email-robh@kernel.org>
+Message-ID: <20150713031901.GM23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-10 at 14:30 +0900, Krzysztof Kozlowski wrote:
-> platform_driver does not need to set an owner because
-> platform_driver_register() will set it.
+On Sun, Jul 12, 2015 at 09:26:39AM -0500, Rob Herring wrote:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
 > 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@deeprootsystems.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Acked-by: Krzysztof Halasa <khalasa@piap.pl>
+> Cc: Greg Ungerer <gerg@uclinux.org>
+> Cc: Roland Stigge <stigge@antcom.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: Simtec Linux Team <linux@simtec.co.uk>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> ---
+...
+>  arch/arm/mach-imx/3ds_debugboard.c   |  2 +-
+>  arch/arm/mach-imx/mach-mx31ads.c     |  2 +-
 
-Acked-by: Koro Chen <koro.chen@mediatek.com>
-
-Thank you!
+Acked-by: Shawn Guo <shawnguo@kernel.org>
