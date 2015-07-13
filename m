@@ -1,53 +1,34 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 13 Jul 2015 16:00:03 +0100
-Subject: [PATCH v2 2/2] ARM64: kernel: unify ACPI and DT cpus
- initialization
-In-Reply-To: <5553C99A.5020706@redhat.com>
-References: <1431522769-11276-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1431522769-11276-3-git-send-email-lorenzo.pieralisi@arm.com>
- <5553C99A.5020706@redhat.com>
-Message-ID: <20150713150003.GA15311@red-moon>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 13 Jul 2015 15:59:07 +0100
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support in
+ Zynq MPSoC GQSPI controller
+In-Reply-To: <559F824B.70409@topic.nl>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <559F824B.70409@topic.nl>
+Message-ID: <20150713145907.GF11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 13, 2015 at 11:00:58PM +0100, Al Stone wrote:
-> On 05/13/2015 07:12 AM, Lorenzo Pieralisi wrote:
-> > The code that initializes cpus on arm64 is currently split in two
-> > different code paths that carry out DT and ACPI cpus initialization.
-> > 
-> > Most of the code executing SMP initialization is common and should
-> > be merged to reduce discrepancies between ACPI and DT initialization
-> > and to have code initializing cpus in a single common place in the
-> > kernel.
-> > 
-> > This patch refactors arm64 SMP cpus initialization code to merge
-> > ACPI and DT boot paths in a common file and to create sanity
-> > checks that can be reused by both boot methods.
-> > 
-> > Current code assumes PSCI is the only available boot method
-> > when arm64 boots with ACPI; this can be easily extended if/when
-> > the ACPI parking protocol is merged into the kernel.
-> > 
-> > Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Acked-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Acked-by: Mark Rutland <mark.rutland@arm.com>
-> > Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > Tested-by: Mark Rutland <mark.rutland@arm.com> [DT]
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> [snip...]
-> 
-> These patches look pretty good so far, but I've only just started
-> reviewing them.  This one raised the question: do we know if there
-> is someone already working on parking protocol?  I've seen a form
-> of it working on AMD Seattles but I don't recall seeing any patches
-> being submitted -- I'll search archives again, just in case I missed
-> it the first time, but if there is someone working on it, that would
-> be good to know.
+On Fri, Jul 10, 2015 at 10:28:59AM +0200, Mike Looijmans wrote:
+> ?On 09-07-15 14:44, Ranjit Waghmode wrote:
 
-FYI, I took M.Salter's initial patch for parking protocol and refactored it
-for upstream on top of 4.2-rc2, I will drop it on the list asap.
+> >ZynqMP GQSPI controller supports stacked mode with following functionalities:
+> >1) The Generic Quad-SPI controller also supports two SPI flash memories
+> >    in a shared bus arrangement to reduce IO pin count.
+> >2) Separate chip select lines
+> >3) Shared I/O lines
+> >4) This mode is targeted for increasing the flash memory and no performance
+> >    improvement when compared with single.
 
-Thanks,
-Lorenzo
+> One could also model the stacked mode as having two distinct flash chips
+> with separate chip selects and shared lines.
+
+Well, quite.  I'm confused about how the above differs from a just a SPI
+controller with two chip selects which is perfectly standard.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150713/da9eee36/attachment.sig>
