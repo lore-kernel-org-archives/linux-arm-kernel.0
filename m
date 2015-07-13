@@ -1,75 +1,40 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 13 Jul 2015 09:31:42 -0600
-Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
-In-Reply-To: <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
-References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
- <1436473148.20619.116.camel@tiscali.nl>
- <CAK-LDb+HSbM2zV8WxipLb8v7g+eL=5vMHcKGttEOdnCjSXSwPA@mail.gmail.com>
- <1436518813.20619.134.camel@tiscali.nl>
- <CAK-LDb+Yg+wQJ_bM3Usc=hoK-jDOxHy5AsUOAbmg+-dVnOM4KA@mail.gmail.com>
- <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
- <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
-Message-ID: <CANLsYkyZoC5H2QHHPnSh6jon=H+GYm4o2oEWLhrY28Y32FcBRw@mail.gmail.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 13 Jul 2015 17:32:26 +0200
+Subject: [PATCH 13/18] arm64: cmpxchg: avoid memory barrier on comparison
+ failure
+In-Reply-To: <20150713145225.GG2632@arm.com>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+ <1436779519-2232-14-git-send-email-will.deacon@arm.com>
+ <20150713102848.GX19282@twins.programming.kicks-ass.net>
+ <20150713112226.GC2632@arm.com>
+ <20150713133912.GZ19282@twins.programming.kicks-ass.net>
+ <20150713145225.GG2632@arm.com>
+Message-ID: <20150713153226.GA19282@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 July 2015 at 09:51, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
-> On Fri, Jul 10, 2015 at 8:00 PM, Mathieu Poirier
-> <mathieu.poirier@linaro.org> wrote:
->> On 10 July 2015 at 05:47, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
->>> On Fri, Jul 10, 2015 at 2:30 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
->>>> On vr, 2015-07-10 at 08:53 +0530, Vaishali Thakkar wrote:
->>>>> I thought about this solution before sending this patch. But I was not
->>>>> sure about it. Thanks for the explanation. I will send v3 with this
->>>>> change.
->>>>>
->>>>> Can I add Suggested By: Paul Bolle <pebolle@tiscali.nl>
->>>>
->>>> That should be "Suggested-by:". The net effect would be that, if my
->>>> suggestion turns out to be unwise, fan mail will also hit my INBOX,
->>>> right? Anyhow, fine with me.
->>>
->>> Ok. Thanks.
->>>
->>>> By the way, there's more module specific stuff in
->>>> drivers/hwtracing/coresight/. And there's no tristate symbol to be found
->>>> in its Kconfig file. So I'd guess there are a few other cleanups
->>>> possible too, if someone cared enough to have a closer look at that.
->>>>
->>>
->>> Yes. It seems that introducing something like builtin_amba_driver()
->>> can be useful for files which are using module_amba_driver now . But I'm
->>> not sure if Mathieu is ok with it or not? If it seems useful to him, then I
->>> can go for it.
->>
->> The ETB drivers could use a "module_amba_driver()"...
->
-> Why? Is there any specific reason behind this?
-> How about other drivers?? Will it be beneficial to introduce
-> builtin_amba_driver() for the others?
+On Mon, Jul 13, 2015 at 03:52:25PM +0100, Will Deacon wrote:
 
-All the other drivers (aside from the replicator) have been moved to
-"module_amba_driver()" to avoid boilerplate code.  The only one that
-was forgotten is the ETB.  A fix for ETM3x is already part of the 4.2
-cycle.
+> That's an interesting case, and I think it's also broken on Alpha and Power
+> (which don't use this code). It's fun actually, because a failed cmpxchg
+> on those architectures gives you the barrier *before* the cmpxchg, but not
+> the one afterwards so it doesn't actually help here.
+> 
+> So there's three options afaict:
+> 
+>   (1) Document failed cmpxchg as having ACQUIRE semantics, and change this
+>       patch (and propose changes for Alpha and Power).
+> 
+> -or-
+> 
+>   (2) Change pv_unhash to use fake dependency ordering across the hash.
+> 
+> -or-
+> 
+>   (3) Put down an smp_rmb() between the cmpxchg and pv_unhash
+> 
+> The first two sound horrible, so I'd err towards 3, particularly as this
+> is x86-only code atm and I don't think it will have an effect there.
 
-As for builtin_amba_driver(), that will be up to Russell to decide.
-Other than not calling the second half of the module_driver() macro, I
-don't see what else it could do.
-
->
-> Thank You.
->
->>>
->>>>
->>>> Paul Bolle
->>>
->>>
->>>
->>> --
->>> Vaishali
->
->
->
-> --
-> Vaishali
+Right, I would definitely go for 3, but it does show there is code out
+there :/
