@@ -1,49 +1,20 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 13 Jul 2015 11:25:53 +0100
-Subject: Extensions for KVM MSI related ioctls
-Message-ID: <55A39231.4050904@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 13 Jul 2015 12:28:48 +0200
+Subject: [PATCH 13/18] arm64: cmpxchg: avoid memory barrier on comparison
+ failure
+In-Reply-To: <1436779519-2232-14-git-send-email-will.deacon@arm.com>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+ <1436779519-2232-14-git-send-email-will.deacon@arm.com>
+Message-ID: <20150713102848.GX19282@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paolo,
+On Mon, Jul 13, 2015 at 10:25:14AM +0100, Will Deacon wrote:
+> cmpxchg doesn't require memory barrier semantics when the value
+> comparison fails, so make the barrier conditional on success.
 
-we (Pavel, Eric and me) need your quick advice on how to proceed with a
-small API extension:
-(tl;dr: skip to the numbered list at the end)
+So this isn't actually a documented condition.
 
-For using MSIs in a guest when running on an ARM(64) system using a
-GICv3 interrupt controller we need to have a device ID available. On
-real hardware this information is sampled from the bus by the ITS part
-of the interrupt controller.
-To make this work for guests, we need to extend two ioctls which deal
-with MSIs: KVM_SIGNAL_MSI and KVM_SET_GSI_ROUTING.
-
-The idea that we sketched so far in [1] and [2] is to use a new
-capability (KVM_CAP_MSI_DEVID) to advertise both a flag bit for
-KVM_SIGNAL_MSI and a new type for KVM_SET_GSI_ROUTING.
-
-Since current kernels bail out on any flag value != 0 in KVM_SIGNAL_MSI,
-we need the new capability to tell userland about it in a reliable and
-portable way (to avoid hacks like #ifdef ARM && USES_IRQ_ROUTING in
-userland).
-
-For KVM_SET_GSI_ROUTING there was the idea of using the very same flag
-value in it's own flag field, but I find it saner to use a new routing
-type instead (KVM_IRQ_ROUTING_EXTENDED_MSI). Both approaches would
-piggy-back on the existing struct kvm_irq_routing_msi and re-purpose the
-pad field in there.
-
-Summarized:
-1) Add a new KVM_CAP_MSI_DEVID to advertise the device ID extension.
-2) Use a KVM_MSI_VALID_DEVID flag in KVM_SIGNAL_MSI to re-purpose part
-   of struct kvm_msi.
-3) Add a new routing type KVM_IRQ_ROUTING_EXTENDED_MSI for
-   KVM_SET_GSI_ROUTING to add device IDs in struct kvm_irq_routing_msi.
-
-Is that a sensible way to extend the KVM API?
-
-Cheers,
-Andre.
-
-[1]:https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015622.html
-[2]:https://lists.cs.columbia.edu/pipermail/kvmarm/2015-July/015689.html
+I would very much like a fwe extra words on this, that you've indeed
+audited cmpxchg() users and preferably even a Documentation/ update to
+match.
