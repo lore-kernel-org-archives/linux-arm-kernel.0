@@ -1,36 +1,52 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Mon, 13 Jul 2015 15:52:21 -0500
-Subject: [PATCH v2 4/8] ARM: pinctrl: imx: add i.mx6ul pinctrl driver
-In-Reply-To: <CAHrpEqTYfGR=jH-jZqfhkbaeOdzVWY=v65xMxb2rPE_5Ld3tGA@mail.gmail.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-5-git-send-email-Frank.Li@freescale.com>
- <CACRpkdYszNKQqFuRrSqW0qmBp1ONO0vztG6e9LzKpG6f-_joJQ@mail.gmail.com>
- <CAHrpEqTYfGR=jH-jZqfhkbaeOdzVWY=v65xMxb2rPE_5Ld3tGA@mail.gmail.com>
-Message-ID: <CAHrpEqRaqUqrcPJmSXZ6iGUrU-8Bki-TWGsBt82kKMcw+QSjPQ@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 13 Jul 2015 15:53:55 -0500
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+In-Reply-To: <1436820101-2172-1-git-send-email-balbi@ti.com>
+References: <1436820101-2172-1-git-send-email-balbi@ti.com>
+Message-ID: <CAGo_u6oM2rtdvLp3deDsxJJWpJ6YZJ5b02m1qDdxhEjUH_69dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 3:50 PM, Zhi Li <lznuaa@gmail.com> wrote:
-> On Mon, Jul 13, 2015 at 3:38 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Fri, Jun 19, 2015 at 5:32 PM,  <Frank.Li@freescale.com> wrote:
->>
->>> From: Frank Li <Frank.Li@freescale.com>
->>>
->>> Add i.MX6UL pinctrl driver support.
->>>
->>> Signed-off-by: Anson Huang <b20788@freescale.com>
->>> Signed-off-by: Frank Li <Frank.Li@freescale.com>
->>
->> Can I get a review from Shawn and/or Sascha for this patch?
->>
->> Is it OK if I apply this to the pinctrl tree directly?
+On Mon, Jul 13, 2015 at 3:41 PM, Felipe Balbi <balbi@ti.com> wrote:
+> According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+> the realtime counter sits in the Wakeup Always-On Power domain.
+> Furthermore, the counter will automatically switch the 32K clock source
+> when MPU goes into standby and automatically switch back to SYS_CLK or
+> ABE_LP when MPU goes out of standby.
 >
-> Shawn already Acked in version 1.
-> I forget added his ACK at version 2.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-See,  http://www.spinics.net/lists/devicetree/msg86160.html
 
+Acked-by: NIshanth Menon <nm@ti.com>
+
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 >
->>
->> Yours,
->> Linus Walleij
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 8f1e25bcecbd..c1e6fd82485f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -50,6 +50,7 @@
+>                              <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>                              <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+>                 interrupt-parent = <&gic>;
+> +               always-on;
+>         };
+>
+>         gic: interrupt-controller at 48211000 {
+> --
+> 2.4.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+
+-- 
+---
+Regards,
+Nishanth Menon
