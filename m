@@ -1,40 +1,49 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 13 Jul 2015 17:32:26 +0200
-Subject: [PATCH 13/18] arm64: cmpxchg: avoid memory barrier on comparison
- failure
-In-Reply-To: <20150713145225.GG2632@arm.com>
-References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
- <1436779519-2232-14-git-send-email-will.deacon@arm.com>
- <20150713102848.GX19282@twins.programming.kicks-ass.net>
- <20150713112226.GC2632@arm.com>
- <20150713133912.GZ19282@twins.programming.kicks-ass.net>
- <20150713145225.GG2632@arm.com>
-Message-ID: <20150713153226.GA19282@twins.programming.kicks-ass.net>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 13 Jul 2015 09:57:57 -0600
+Subject: Build regressions/improvements in v4.2-rc2
+In-Reply-To: <CAMuHMdX9pW3n+sD6zGFezZvDEcGvMmZobUDik4GYESh6iCgY5g@mail.gmail.com>
+References: <1436779733-13678-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdX9pW3n+sD6zGFezZvDEcGvMmZobUDik4GYESh6iCgY5g@mail.gmail.com>
+Message-ID: <CANLsYkx4_Z-9xbhW82XKnRs38xhofmx+FNUATcNG-3AjOc8fzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 03:52:25PM +0100, Will Deacon wrote:
+On 13 July 2015 at 03:53, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Mon, Jul 13, 2015 at 11:28 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> JFYI, when comparing v4.2-rc2[1] to v4.2-rc1[3], the summaries are:
+>>   - build errors: +7/-5
+>
+>   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of
+> function 'copy_user_page' [-Werror=implicit-function-declaration]:  =>
+> 267:2
+>
+> sh-randconfig (patch from Arnd updated and forwarder)
+>
+>   + error: coresight-etm-cp14.c: undefined reference to
+> `clk_add_alias':  => .init.text+0x12b0c)
+>
+> arm-randconfig
+>
+>> [1] http://kisskb.ellerman.id.au/kisskb/head/9134/ (all 254 configs)
+>> [3] http://kisskb.ellerman.id.au/kisskb/head/9102/ (all 254 configs)
 
-> That's an interesting case, and I think it's also broken on Alpha and Power
-> (which don't use this code). It's fun actually, because a failed cmpxchg
-> on those architectures gives you the barrier *before* the cmpxchg, but not
-> the one afterwards so it doesn't actually help here.
-> 
-> So there's three options afaict:
-> 
->   (1) Document failed cmpxchg as having ACQUIRE semantics, and change this
->       patch (and propose changes for Alpha and Power).
-> 
-> -or-
-> 
->   (2) Change pv_unhash to use fake dependency ordering across the hash.
-> 
-> -or-
-> 
->   (3) Put down an smp_rmb() between the cmpxchg and pv_unhash
-> 
-> The first two sound horrible, so I'd err towards 3, particularly as this
-> is x86-only code atm and I don't think it will have an effect there.
+Is it possible to have more information on this?  There is no
+reference to "clk_add_alias()" in coresight-etm-cp14.c and in the
+config provided in [3], CONFIG_CORESIGHT isn't defined.  I will try to
+reproduce this on my side once I have enough to work with.
 
-Right, I would definitely go for 3, but it does show there is code out
-there :/
+Thanks,
+Mathieu
+
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
