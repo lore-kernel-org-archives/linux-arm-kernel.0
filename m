@@ -1,135 +1,105 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 13 Jul 2015 14:14:51 +0800
-Subject: [PATCH] pinctrl: at91: fix null pointer dereference
-In-Reply-To: <1435853202-1632-1-git-send-email-davidcdueck@googlemail.com>
-References: <1435853202-1632-1-git-send-email-davidcdueck@googlemail.com>
-Message-ID: <22EFD5CA-DAA3-46A9-A937-90A0A9C82917@jcrosoft.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 13 Jul 2015 08:44:26 +0200
+Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample
+ time
+In-Reply-To: <20150712064753.GA1199@Sanchayan-Arch>
+References: <cover.1435134626.git.maitysanchayan@gmail.com>
+ <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
+ <20150710085324.GL23464@tiger> <20150710180640.GB8723@Sanchayan-Arch>
+ <55A154BE.6000701@kernel.org> <20150712064753.GA1199@Sanchayan-Arch>
+Message-ID: <8550db3f2a5db8ec68fc9360dc7173e3@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> On Jul 3, 2015, at 12:06 AM, David Dueck <davidcdueck@googlemail.com> wrote:
+On 2015-07-12 08:47, maitysanchayan at gmail.com wrote:
+> Hello Jonathan,
 > 
-> Not all gpio banks are necessarily enabled, in the current code this can
-> lead to null pointer dereferences.
+> On 15-07-11 18:39:10, Jonathan Cameron wrote:
+>> On 10/07/15 19:06, maitysanchayan at gmail.com wrote:
+>> > Hello Shawn,
+>> >
+>> > On 15-07-10 16:53:24, Shawn Guo wrote:
+>> >> On Wed, Jun 24, 2015 at 02:03:41PM +0530, Sanchayan Maity wrote:
+>> >>> Add a device tree property which allows to specify the minimum sample
+>> >>> time which can be used to calculate the actual ADC cycles required
+>> >>> depending on the hardware.
+>> >>>
+>> >>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> >>> ---
+>> >>>  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+>> >>>  1 file changed, 2 insertions(+)
+>> >>>
+>> >>> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+>> >>> index 90a03d5..71d9c08 100644
+>> >>> --- a/arch/arm/boot/dts/vfxxx.dtsi
+>> >>> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+>> >>> @@ -229,6 +229,7 @@
+>> >>>  				status = "disabled";
+>> >>>  				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> >>>  							<20000000>;
+>> >>> +				min-sample-time = <1000>;
+>> >>>  			};
+>> >>>
+>> >>>  			wdoga5: wdog at 4003e000 {
+>> >>> @@ -447,6 +448,7 @@
+>> >>>  				status = "disabled";
+>> >>>  				fsl,adck-max-frequency = <30000000>, <40000000>,
+>> >>>  							<20000000>;
+>> >>> +				min-sample-time = <1000>;
+>> >>
+>> >> Can we code 1000 as the default in kernel driver, so that only boards
+>> >> requiring different value need to have this property?  Doing so makes
+>> >> the property optional rather than required.
+>> >>
+>> >
+>> > Not sure if hardcoding it in the driver is the right approach.
+>> If it is a true feature of the device (i.e. if in the case of perfect
+>> front end electronics) this is the right option, then a default makes
+>> a lot of sense.  If that isn't the case (I suspect not) then if we
+>> drop it be optional chances are no one will bother thinking about it
+>> or trying to tune this at all.
+>>
+>> Hence seems wrong to put a fairly arbitrary default value on it.
+>> However, we do need to still work with old device trees and new kernels
+>> so need to cope without it.
+>>
+>> Hence to my mind, if we had started out with this in the first driver
+>> version, then the default would be a bad idea.  As we didn't then we
+>> really need to cope with nothing specified (as best we can) and so
+>> we do need a sensible default (or perhaps even sensible worst
+>> case default) in there.
+
+I agree with Jonathan's argumentation, let's add a default if the dt
+propery is not there.
+
+1000ns seems to be a good default value over a wide range of external
+resistance/capacity according to the diagrams of the data sheet, so I
+would vote for that value as default.
+
 > 
-> [   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
-> [   51.130000] pgd = dee04000
-> [   51.130000] [00000058] *pgd=3f66d831, *pte=00000000, *ppte=00000000
-> [   51.140000] Internal error: Oops: 17 [#1] ARM
-> [   51.140000] Modules linked in:
-> [   51.140000] CPU: 0 PID: 1664 Comm: cat Not tainted 4.1.1+ #6
-> [   51.140000] Hardware name: Atmel SAMA5
-> [   51.140000] task: df6dd880 ti: dec60000 task.ti: dec60000
-> [   51.140000] PC is at at91_pinconf_get+0xb4/0x200
-> [   51.140000] LR is at at91_pinconf_get+0xb4/0x200
-> [   51.140000] pc : [<c01e71a0>]    lr : [<c01e71a0>]    psr: 600f0013
-> sp : dec61e48  ip : 600f0013  fp : df522538
-> [   51.140000] r10: df52250c  r9 : 00000058  r8 : 00000068
-> [   51.140000] r7 : 00000000  r6 : df53c910  r5 : 00000000  r4 : dec61e7c
-> [   51.140000] r3 : 00000000  r2 : c06746d4  r1 : 00000000  r0 : 00000003
-> [   51.140000] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> [   51.140000] Control: 10c53c7d  Table: 3ee04059  DAC: 00000015
-> [   51.140000] Process cat (pid: 1664, stack limit = 0xdec60208)
-> [   51.140000] Stack: (0xdec61e48 to 0xdec62000)
-> [   51.140000] 1e40:                   00000358 00000000 df522500 ded15f80 c05a9d08 ded15f80
-> [   51.140000] 1e60: 0000048c 00000061 df522500 ded15f80 c05a9d08 c01e7304 ded15f80 00000000
-> [   51.140000] 1e80: c01e6008 00000060 0000048c c01e6034 c01e5f6c ded15f80 dec61ec0 00000000
-> [   51.140000] 1ea0: 00020000 ded6f280 dec61f80 00000001 00000001 c00ae0b8 b6e80000 ded15fb0
-> [   51.140000] 1ec0: 00000000 00000000 df4bc974 00000055 00000800 ded6f280 b6e80000 ded6f280
-> [   51.140000] 1ee0: ded6f280 00020000 b6e80000 00000000 00020000 c0090dec c0671e1c dec61fb0
-> [   51.140000] 1f00: b6f8b510 00000001 00004201 c000924c 00000000 00000003 00000003 00000000
-> [   51.140000] 1f20: df4bc940 00022000 00000022 c066e188 b6e7f000 c00836f4 000b6e7f ded6f280
-> [   51.140000] 1f40: ded6f280 b6e80000 dec61f80 ded6f280 00020000 c0091508 00000000 00000003
-> [   51.140000] 1f60: 00022000 00000000 00000000 ded6f280 ded6f280 00020000 b6e80000 c0091d9c
-> [   51.140000] 1f80: 00000000 00000000 ffffffff 00020000 00020000 b6e80000 00000003 c000f124
-> [   51.140000] 1fa0: dec60000 c000efa0 00020000 00020000 00000003 b6e80000 00020000 000271c4
-> [   51.140000] 1fc0: 00020000 00020000 b6e80000 00000003 7fffe000 00000000 00000000 00020000
-> [   51.140000] 1fe0: 00000000 bef50b64 00013835 b6f29c76 400f0030 00000003 00000000 00000000
-> [   51.140000] [<c01e71a0>] (at91_pinconf_get) from [<c01e7304>] (at91_pinconf_dbg_show+0x18/0x2c0)
-> [   51.140000] [<c01e7304>] (at91_pinconf_dbg_show) from [<c01e6034>] (pinconf_pins_show+0xc8/0xf8)
-> [   51.140000] [<c01e6034>] (pinconf_pins_show) from [<c00ae0b8>] (seq_read+0x1a0/0x464)
-> [   51.140000] [<c00ae0b8>] (seq_read) from [<c0090dec>] (__vfs_read+0x20/0xd0)
-> [   51.140000] [<c0090dec>] (__vfs_read) from [<c0091508>] (vfs_read+0x7c/0x108)
-> [   51.140000] [<c0091508>] (vfs_read) from [<c0091d9c>] (SyS_read+0x40/0x94)
-> [   51.140000] [<c0091d9c>] (SyS_read) from [<c000efa0>] (ret_fast_syscall+0x0/0x3c)
-> [   51.140000] Code: eb010ec2 e30a0d08 e34c005a eb0ae5a7 (e5993000)
-> [   51.150000] ---[ end trace fb3c370da3ea4794 ]---
+> Just to be sure, do I understand you correctly that you agree with the
+> property being in device tree?
+
+I don't think that the device tree property is in discussion, it is just
+about whether to add a default value in the driver or not...
+
 > 
-> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
-> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-> CC: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> CC: Ludovic Desroches <ludovic.desroches@atmel.com>
-> CC: Boris Brezillon <boris.brezillon@free-electrons.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
-> ---
-> drivers/pinctrl/pinctrl-at91.c | 15 +++++++++++++++
-> 1 file changed, 15 insertions(+)
+> If the device tree property is not specified the driver will just go on
+> to use the value "3" which was hardcoded earlier. In my opinion it is
+> better to allow users to change the sampling cycles by specifying or not
+> specifying this in the device tree rather than have a default value coded
+> in the driver. However this is just my opinion.
 > 
-> diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-> index a082447..2deb130 100644
-> --- a/drivers/pinctrl/pinctrl-at91.c
-> +++ b/drivers/pinctrl/pinctrl-at91.c
-> @@ -320,6 +320,9 @@ static const struct pinctrl_ops at91_pctrl_ops = {
-> static void __iomem *pin_to_controller(struct at91_pinctrl *info,
-> 				 unsigned int bank)
-> {
-> +	if (!gpio_chips[bank])
-> +		return NULL;
+> Also, some users might not need the somewhat worst case value of 1000. I
+> guess we could keep the driver patch the way it is right now and migrate
+> the property to be specified in our board dts file? So the property can
+> be picked up from the vf-colibri.dtsi or vf500-colibri.dtsi in the adc
+> node? Other boards can do the same?
 
-if the bank is not enabled you should never arrived here
+I agree too, especially when we have a default value in the driver, the
+property belongs into the board file. I suggest to add the default value
+of 1000 to the vf-colibri.dtsi (even if this is the driver default, so
+we explicitly request that "verified" value..)
 
-
-> +
-> 	return gpio_chips[bank]->regbase;
-> }
-> 
-> @@ -729,6 +732,10 @@ static int at91_pmx_set(struct pinctrl_dev *pctldev, unsigned selector,
-> 		pin = &pins_conf[i];
-> 		at91_pin_dbg(info->dev, pin);
-> 		pio = pin_to_controller(info, pin->bank);
-> +
-> +		if (!pio)
-> +			continue;
-> +
-
-or here
-> 		mask = pin_to_mask(pin->pin);
-> 		at91_mux_disable_interrupt(pio, mask);
-> 		switch (pin->mux) {
-> @@ -848,6 +855,10 @@ static int at91_pinconf_get(struct pinctrl_dev *pctldev,
-> 	*config = 0;
-> 	dev_dbg(info->dev, "%s:%d, pin_id=%d", __func__, __LINE__, pin_id);
-> 	pio = pin_to_controller(info, pin_to_bank(pin_id));
-> +
-> +	if (!pio)
-> +		return -EINVAL;
-> +
-ditto
-> 	pin = pin_id % MAX_NB_GPIO_PER_BANK;
-> 
-> 	if (at91_mux_get_multidrive(pio, pin))
-> @@ -889,6 +900,10 @@ static int at91_pinconf_set(struct pinctrl_dev *pctldev,
-> 			"%s:%d, pin_id=%d, config=0x%lx",
-> 			__func__, __LINE__, pin_id, config);
-> 		pio = pin_to_controller(info, pin_to_bank(pin_id));
-> +
-> +		if (!pio)
-> +			return -EINVAL;
-> +
-
-ditoo
-
-NACK
-
-the problem is somewhere else
-
-Best Regards,
-J.
-> 		pin = pin_id % MAX_NB_GPIO_PER_BANK;
-> 		mask = pin_to_mask(pin);
-> 
-> -- 
-> 2.4.4
-> 
+--
+Stefan
