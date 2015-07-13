@@ -1,41 +1,35 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 13 Jul 2015 11:03:52 +0200
-Subject: [PATCH v3 3/5] usb: isp1760: udc: add missing
- usb_ep_set_maxpacket_limit()
-In-Reply-To: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
-References: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436778234-12787-4-git-send-email-r.baldyga@samsung.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Mon, 13 Jul 2015 17:04:51 +0800
+Subject: [PATCH v5 0/3] Add MediaTek display PWM driver
+Message-ID: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since maxpacket_limit was introduced all UDC drivers should use
-usb_ep_set_maxpacket_limit() function instead of setting maxpacket value
-manually. ep.maxpacket_limit contains actual maximum maxpacket value
-supported by hardware which is needed by epautoconf.
+This patch series add the use of display PWM driver, documentation 
+and device tree for Mediatek SoCs. The driver is used to support 
+the backlight of the panel. This is based on v4.2-rc1.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-Acked-by: Michal Nazarewicz <mina86@mina86.com>
----
- drivers/usb/isp1760/isp1760-udc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch: 
+clk: mediatek: Add subsystem clocks of MT8173
 
-diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
-index 18ebf5b1..3699962 100644
---- a/drivers/usb/isp1760/isp1760-udc.c
-+++ b/drivers/usb/isp1760/isp1760-udc.c
-@@ -1382,11 +1382,11 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
- 		 * This fits in the 8kB FIFO without double-buffering.
- 		 */
- 		if (ep_num == 0) {
--			ep->ep.maxpacket = 64;
-+			usb_ep_set_maxpacket_limit(&ep->ep, 64);
- 			ep->maxpacket = 64;
- 			udc->gadget.ep0 = &ep->ep;
- 		} else {
--			ep->ep.maxpacket = 512;
-+			usb_ep_set_maxpacket_limit(&ep->ep, 512);
- 			ep->maxpacket = 0;
- 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
- 		}
--- 
-1.9.1
+Change in v5:
+1. Configure PWM output via pinctrl
+2. Fix the parameter name in dtsi
+
+YH Huang (3):
+  dt-bindings: pwm: add MediaTek display PWM bindings
+  pwm: add MediaTek display PWM driver support
+  arm64: dts: mt8173: add MT8173 display PWM driver support node
+
+ .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  29 +++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  15 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  22 ++
+ drivers/pwm/Kconfig                                |  10 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-mtk-disp.c                         | 256 +++++++++++++++++++++
+ 6 files changed, 333 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+ create mode 100644 drivers/pwm/pwm-mtk-disp.c
+
+--
+1.8.1.1.dirty
