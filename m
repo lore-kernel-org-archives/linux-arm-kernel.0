@@ -1,46 +1,101 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 13 Jul 2015 21:48:40 +0200
-Subject: [PATCH v3] ARM: early fixmap support for earlycon
-In-Reply-To: <20150710112522.GR7557@n2100.arm.linux.org.uk>
-References: <1433593888-7142-1-git-send-email-stefan@agner.ch>
- <20150606124800.GR7557@n2100.arm.linux.org.uk>
- <20150710112522.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <2f1c4850e9e67e4f9fb8617e7352e796@agner.ch>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 13 Jul 2015 22:11:10 +0200 (CEST)
+Subject: [PATCH v7 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <55A4131C.7040700@linaro.org>
+References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1984575203.163267.1436813665815.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+ <55A4131C.7040700@linaro.org>
+Message-ID: <139301016.164015.1436818270753.JavaMail.open-xchange@oxbsltgw04.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-10 13:25, Russell King - ARM Linux wrote:
-> On Sat, Jun 06, 2015 at 01:48:00PM +0100, Russell King - ARM Linux wrote:
->> On Sat, Jun 06, 2015 at 02:31:28PM +0200, Stefan Agner wrote:
->> > @@ -1231,7 +1272,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
->> >
->> >  	early_trap_init(vectors);
->> >
->> > -	for (addr = VMALLOC_START; addr; addr += PMD_SIZE)
->> > +	for (addr = VMALLOC_START; addr < FIXADDR_START; addr += PMD_SIZE)
->> >  		pmd_clear(pmd_off_k(addr));
->>
->> You introduce a bug here - we no logner clear the very top entry of the
->> page tables, which means it could contain anything - and means that the
->> subsequent creation of the L2 table in early_pte_alloc() can fail.
-> 
-> You trimmed my reply hard, and seemingly ignored this; the v4 patch
-> contains exactly the same code here, and therefore continues to leave
-> the top of the page table uninitialised.
+Hi Srinivas,
 
-Maybe I get something wrong here, but the very top PMD is left out on
-purpose, since early_fixmap_shutdown takes care of that.
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 13. Juli 2015 um
+> 21:35 geschrieben:
+>
+> On 13/07/15 19:54, Stefan Wahren wrote:
+> > Hi Srinivas,
+> >
+> >> [...]
+> >>
+> >> Providers APIs:
+> >> nvmem_register/unregister();
+> >
+> > How do i get the cell info from the devicetree into the nvmem_config?
+> >
+> Not sure what is the real use-case here, But this is how it is supposed
+> to work.
+>
+> cellinfo in nvmem_config is used to pass cell information in non-dt
+> style to the core. The core would parse it and convert into nvmem-cells.
+> Am not sure why would you want to do other way round. Could you explain
+> the real use case here?
+>
 
-However v3 also did not clear the second to top PMD. I thought I did
-take care of that by using this slightly different for loop in v4:
-for (addr = VMALLOC_START; addr < (FIXADDR_TOP & PMD_MASK); addr +=
-PMD_SIZE)
+my question comes from porting mxs_ocotp to NVMEM framework.
 
-However, looking now@the code I'm not sure if this is right either. 
+Here is the devicetree part:
 
-I think what is needed is addr < (FIXADDR_TOP & ~PMD_MASK). This will
-make sure that only the top PMD is not cleared, which is taken care of
-by early fixmap...
+ocotp: ocotp at 8002c000 {
+	compatible = "fsl,imx28-ocotp", "fsl,ocotp";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	reg = <0x8002c000 0x2000>;
+	clocks = <&clks 25>;
+	read-only;
+				
+	/* Data cells */
+	ocotp_customer: costumer at 20 {
+		reg = <0x20 0x10>;
+	};
 
---
-Stefan
+	ocotp_rom0: rom0 at 1a0 {
+		reg = <0x1a0 0x4>;
+	};
+};
+
+After calling nvmem_register() in the provider driver [1] no data cell is
+registered. So
+i looked at the core code and i thought that retrieving the cell info and put it
+into the nvmem_config
+is job of the provider driver.
+
+Did i missed something?
+
+[1] -
+https://github.com/lategoodbye/fsl_ocotp/commit/7c98e19755b69f761885b0e1ceb2c258a7c47ade
+
+>
+>
+> >
+> ...
+>
+> >> userspace interface: binary file in /sys/bus/nvmem/devices/*/nvmem
+> >>
+> >> ex:
+> >> hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
+> >>
+> >> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
+> >> *
+> >> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+> >> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
+> >> ...
+> >> *
+> >> 0001000
+> >
+> > Since we're entering userspace the behavior should be clear.
+> >
+> > How do we treat register gaps? Fill them with zero?
+> nvmem file would read full nvmem size which is passed to it as regmap.
+> So It would dump whatever the provider returns.
+
+Sure, but wouldn't it be nice if different provider behave the same?
+
+>
+>
+> --srini
+> >
+> > Best regards
+> > Stefan
+> >
