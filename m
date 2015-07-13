@@ -1,94 +1,48 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Jul 2015 12:48:35 +0300
-Subject: [PATCHv3 00/27] ARM: OMAP2+: clock code move under clk driver
-In-Reply-To: <20150603231136.6017.65683@quantum>
-References: <1432566032-10860-1-git-send-email-t-kristo@ti.com>
- <20150526160557.GD16525@atomide.com> <20150526163216.GF16525@atomide.com>
- <20150526163931.GO26599@saruman.tx.rr.com> <55660D5B.8020607@ti.com>
- <20150527231536.GD30984@atomide.com> <556EF42A.9000207@ti.com>
- <20150603231136.6017.65683@quantum>
-Message-ID: <55A38973.3020802@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 13 Jul 2015 17:33:16 +0800
+Subject: [GIT PULL] CSR atlas7 pinctrl descriptions for 4.2
+In-Reply-To: <7hy4iqcpkb.fsf@deeprootsystems.com>
+References: <CAGsJ_4x7rSFCJW6=9=WpGSUBf0yaCpcxXA22W5k+mZ=9qk5SGg@mail.gmail.com>
+ <CAGsJ_4yXsmB9tSpwaLYPLAJHXVRqgZeaAO_VirOX2F3XE_o8bA@mail.gmail.com>
+ <7hy4iqcpkb.fsf@deeprootsystems.com>
+Message-ID: <CAGsJ_4xws97ajeUZb8v-MmP-f2fczs=cwOfXYxaRezxySQGemw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2015 02:11 AM, Michael Turquette wrote:
-> Quoting Tero Kristo (2015-06-03 05:33:46)
->> On 05/28/2015 02:15 AM, Tony Lindgren wrote:
->>> * Tero Kristo <t-kristo@ti.com> [150527 11:32]:
->>>> On 05/26/2015 07:39 PM, Felipe Balbi wrote:
->>>>> On Tue, May 26, 2015 at 09:32:16AM -0700, Tony Lindgren wrote:
->>>>>> * Tony Lindgren <tony@atomide.com> [150526 09:08]:
->>>>>>> * Tero Kristo <t-kristo@ti.com> [150525 08:01]:
->>>>>>>> Hi,
->>>>>>>>
->>>>>>>> As requested, posting v3 with somewhat changed diff parameters and
->>>>>>>> diffstat attached. Just some minor Makefile changes compared to v2,
->>>>>>>> these were discussed under that set.
->>>>>>>>
->>>>>>>> Set has been pushed to:
->>>>>>>> - tree: https://github.com/t-kristo/linux-pm.git
->>>>>>>> - branch: for-4.2/ti-clk-move
->>>>>>>
->>>>>>> Looks like this causes a build error for at least omap2 only .config:
->>>>>>>
->>>>>>> drivers/clk/ti/dpll3xxx.o:(.rodata+0x1c): multiple definition of `clkhwops_omap3_dpll'
->>>>>>> drivers/clk/ti/dpll.o:(.rodata+0x0): first defined here
->>>>>>>
->>>>>>> You may want to create a file selecting ARCH_OMAP2PLUS=y, then point
->>>>>>> KCONFIG_ALLCONFIG to that file for make randconfig. Then just build
->>>>>>> randconfigs :) Usually the issues like this are exposed within few
->>>>>>> randconfig builds, some take longer if the options have dependencies.
->>>>>
->>>>> alternatively, just clone the repository at [1] and use the example
->>>>> script provided in README.md.
->>>>>
->>>>> [1] https://github.com/felipebalbi/omap-seeds
->>>>>
->>>>
->>>> Ok, I pushed an updated branch named: for-4.2/ti-clk-move-v4
->>>>
->>>> This definitely compiles with OMAP2 / OMAP3 / OMAP4 / OMAP5 / DRA7 / AM33xx
->>>> / AM43xx only setups (tried it out.)
+2015-07-09 5:22 GMT+08:00 Kevin Hilman <khilman@kernel.org>:
+> Barry Song <21cnbao@gmail.com> writes:
+>
+>> 2015-06-10 15:35 GMT+08:00 Barry Song <21cnbao@gmail.com>:
+>>> Hi Arnd, Kevin, Olof,
 >>>
->>> Thanks yeah seems to work for me now.
+>>> The following changes since commit b787f68c36d49bb1d9236f403813641efa74a031:
 >>>
->>> Regards,
+>>>   Linux 4.1-rc1 (2015-04-26 17:59:10 -0700)
 >>>
->>> Tony
+>>> are available in the git repository at:
 >>>
+>>>   git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
+>>> tags/atlas7-pinctrl-dts-for-4.2
+>>>
+>>> for you to fetch changes up to 27b0d37e4209f3fc40c65e2b7936ee4154f4070d:
+>>>
+>>>   ARM: dts: atlas7: add pinctrl and gpio descriptions (2015-06-10
+>>> 15:00:50 +0800)
 >>
->> Question to Mike / Stephen, any chance of getting this in during the 4.2
->> merge anymore seeing we are already at 4.1-rc6?
+>> Hi Arnd, Kevin, Olof,
 >>
->> I can send a pull request if yes. Otherwise I just wait until we are
->> past the next merge.
+>> have you missed this one? it is a follow-up patch to "pinctrl: sirf:
+>> add sirf atlas7 pinctrl and gpio support"
 >
-> Hi Tero,
+> Sorry, I hadn't see the original, but found it in my spam folder.
 >
-> I'd like more time for any regressions this introduces to be fixed, so
-> lets push back to next merge window. The always-wrong-but-never-by-much
-> crystal ball[0] predicts June 14. This is less than two weeks away, so
-> the wait should be short.
+>> do we still have any chance to make it in 4.2?
+>
+> Yes, I've merged both of your pulls into the fixes branch for v4.2-rc.
 
-Hi Mike / Stephen,
-
-I am planning to send a pull-request out for this, but this set is going 
-to cause some minor merge conflicts with the recent header file change 
-patches from Stephen, and the determine rate prototype change from Boris.
-
-I can alternatively just ignore these issues and send these patches on 
-top of rc2 and let you handle the conflicts within clk-tree, or 
-cherry-pick some stable commits for the same if you like.
-
-Which way do you prefer?
-
--Tero
+thanks a lot, kevin.
 
 >
-> [0] http://phb-crystal-ball.org/
->
-> Thanks,
-> Mike
->
->>
->> -Tero
+> Kevin
+
+-barry
