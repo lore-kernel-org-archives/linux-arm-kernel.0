@@ -1,46 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 13 Jul 2015 07:45:49 +0200
-Subject: [PATCH v3 0/3] Fixes for MT8173 PLLs
-In-Reply-To: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <20150713054549.GC18700@pengutronix.de>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 13 Jul 2015 14:03:02 +0800
+Subject: [PATCH v2 2/2] drm/rockchip: Drop owner assignment from
+ platform_driver
+In-Reply-To: <1436524653-29132-3-git-send-email-k.kozlowski@samsung.com>
+References: <1436524653-29132-1-git-send-email-k.kozlowski@samsung.com>
+ <1436524653-29132-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <55A35496.5060206@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 04:39:31PM +0800, James Liao wrote:
-> Title changed. Previous title is "Add MT8173 MMPLL change rate support"
-> and can be found in [1].
-> 
-> This patchset contains some fixes for changing rate of PLLs, especially
-> for MMPLL.
-> 
-> The first 2 patches are common fixes for PLLs, and the last patch is a
-> fix to support MT8173 MMPLL changing rate because its frequency setting
-> is different from other PLLs.
-> 
-> changes since v2:
-> - Rebase to 4.2-rc1.
-> - Split fixes of PLL setting calculation to a separeted patch.
-> 
-> changes since v1:
-> - Add a separated patch for mtk_pll_set_rate_regs().
-> - Use a structure array to describe a div_table.
-> - Limit max frequency to div_table[0].
-> - Minor changes such as static and comments.
-> 
-> [1] https://lkml.org/lkml/2015/7/8/265
-> 
-> James Liao (3):
->   clk: mediatek: Fix PLL registers setting flow
->   clk: mediatek: Fix calculation of PLL rate settings
->   clk: mediatek: Add MT8173 MMPLL change rate support
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
+On 2015?07?10? 18:37, Krzysztof Kozlowski wrote:
+> platform_driver does not need to set an owner because
+> platform_driver_register() will set it.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+> ---
+> Changes since v1:
+> 1. Split owner removal from rockchip to separate patch (spotted by Mark
+>     Yao).
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 1 -
+>   1 file changed, 1 deletion(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> index 01b558fe3695..9a0c2911272a 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> @@ -555,7 +555,6 @@ static struct platform_driver rockchip_drm_platform_driver = {
+>   	.probe = rockchip_drm_platform_probe,
+>   	.remove = rockchip_drm_platform_remove,
+>   	.driver = {
+> -		.owner = THIS_MODULE,
+>   		.name = "rockchip-drm",
+>   		.of_match_table = rockchip_drm_dt_ids,
+>   		.pm = &rockchip_drm_pm_ops,
+Thanks for the fix, applied to my drm-next branch, :-)
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+?ark
