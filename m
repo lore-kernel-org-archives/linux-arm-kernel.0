@@ -1,56 +1,47 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Jul 2015 20:29:04 -0000
-Subject: [patch 04/11] ARM/LPC32xx: Use irq_set_handler_locked()
+Date: Mon, 13 Jul 2015 20:29:08 -0000
+Subject: [patch 06/11] ARM/locomo: Prepare locomo_handler for irq argument
+ removal
 References: <20150713090726.316699641@linutronix.de>
-Message-ID: <20150713090936.258523333@linutronix.de>
+Message-ID: <20150713090936.438905855@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use irq_set_handler_locked() as it avoids a redundant lookup of the
-irq descriptor.
+The irq argument of most interrupt flow handlers is unused or merily
+used instead of a local variable. The handlers which need the irq
+argument can retrieve the irq number from the irq descriptor.
 
-Search and replacement was done with coccinelle.
+Search and update was done with coccinelle and the invaluable help of
+Julia Lawall.
 
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 Cc: Jiang Liu <jiang.liu@linux.intel.com>
-Cc: Julia Lawall <julia.lawall@lip6.fr>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/mach-lpc32xx/irq.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/common/locomo.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Index: tip/arch/arm/mach-lpc32xx/irq.c
+Index: tip/arch/arm/common/locomo.c
 ===================================================================
---- tip.orig/arch/arm/mach-lpc32xx/irq.c
-+++ tip/arch/arm/mach-lpc32xx/irq.c
-@@ -283,25 +283,25 @@ static int lpc32xx_set_irq_type(struct i
- 	case IRQ_TYPE_EDGE_RISING:
- 		/* Rising edge sensitive */
- 		__lpc32xx_set_irq_type(d->hwirq, 1, 1);
--		__irq_set_handler_locked(d->irq, handle_edge_irq);
-+		irq_set_handler_locked(d, handle_edge_irq);
- 		break;
+--- tip.orig/arch/arm/common/locomo.c
++++ tip/arch/arm/common/locomo.c
+@@ -138,7 +138,7 @@ static struct locomo_dev_info locomo_dev
+ 	},
+ };
  
- 	case IRQ_TYPE_EDGE_FALLING:
- 		/* Falling edge sensitive */
- 		__lpc32xx_set_irq_type(d->hwirq, 0, 1);
--		__irq_set_handler_locked(d->irq, handle_edge_irq);
-+		irq_set_handler_locked(d, handle_edge_irq);
- 		break;
+-static void locomo_handler(unsigned int irq, struct irq_desc *desc)
++static void locomo_handler(unsigned int __irq, struct irq_desc *desc)
+ {
+ 	struct locomo *lchip = irq_desc_get_chip_data(desc);
+ 	int req, i;
+@@ -150,6 +150,8 @@ static void locomo_handler(unsigned int
+ 	req = locomo_readl(lchip->base + LOCOMO_ICR) & 0x0f00;
  
- 	case IRQ_TYPE_LEVEL_LOW:
- 		/* Low level sensitive */
- 		__lpc32xx_set_irq_type(d->hwirq, 0, 0);
--		__irq_set_handler_locked(d->irq, handle_level_irq);
-+		irq_set_handler_locked(d, handle_level_irq);
- 		break;
- 
- 	case IRQ_TYPE_LEVEL_HIGH:
- 		/* High level sensitive */
- 		__lpc32xx_set_irq_type(d->hwirq, 1, 0);
--		__irq_set_handler_locked(d->irq, handle_level_irq);
-+		irq_set_handler_locked(d, handle_level_irq);
- 		break;
- 
- 	/* Other modes are not supported */
+ 	if (req) {
++		unsigned int irq;
++
+ 		/* generate the next interrupt(s) */
+ 		irq = lchip->irq_base;
+ 		for (i = 0; i <= 3; i++, irq++) {
