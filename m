@@ -1,59 +1,50 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jul 2015 11:19:01 +0800
-Subject: [PATCH v2 01/13] ARM: kill off set_irq_flags usage
-In-Reply-To: <1436711211-18223-2-git-send-email-robh@kernel.org>
-References: <1436711211-18223-1-git-send-email-robh@kernel.org>
- <1436711211-18223-2-git-send-email-robh@kernel.org>
-Message-ID: <20150713031901.GM23464@tiger>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 13 Jul 2015 11:21:44 +0800
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <559FEED3.5080505@atmel.com>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+ <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
+ <559FEED3.5080505@atmel.com>
+Message-ID: <55A32EC8.4080309@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 12, 2015 at 09:26:39AM -0500, Rob Herring wrote:
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
-> 
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> 
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also set IRQ_NOPROBE and this has been maintained although it is not
-> clear that is really needed. There appears to be a great deal of blind
-> copy and paste of this code.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Acked-by: Krzysztof Halasa <khalasa@piap.pl>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Roland Stigge <stigge@antcom.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Daniel Mack <daniel@zonque.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Cc: Simtec Linux Team <linux@simtec.co.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> ---
-...
->  arch/arm/mach-imx/3ds_debugboard.c   |  2 +-
->  arch/arm/mach-imx/mach-mx31ads.c     |  2 +-
+On 7/11/2015 12:12 AM, Nicolas Ferre wrote:
+> Le 10/07/2015 14:31, Maxime Ripard a ?crit :
+>> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
+>>> Hi,
+>>>
+>>> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+>>>> I would agree with Maxime. Currently all latest chip reset function is
+>>>> compatible with the atmel,sama5d3-rstc.
+>>>> So check compatible string is enough for now.
+>>>> But of cause if we have other incompatible reset in future with new chip,
+>>>> the structure like you said is needed.
+>>> We managed to avoid using of_machine_is_compatible() in all the at91
+>>> drivers. I'd like to keep it that way. It was painful enough to remove
+>>> all those cpu_is_at91xxx calls.
+>> That's your call...
+>>
+>>> Also, using it is trying to match strings and will result in longer boot
+>>> times.
+>> Have you looked at the implementation of of_match_device? If that's
+>> really a concern to you, you should actually avoid it.
+> I agree: let's keep it simple and use of_match_device().
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+Ok. I will keep it as it is now:  use the (match->data != 
+sama5d3_restart) for the condition.
+
+About the of_match_device(), I prefer to keep not changing the code and 
+still use of_match_node().
+Since of_match_device() is a wrapper for the of_match_node(). And 
+dev->of_node and at91_reset_of_match is valid, so we can just use 
+of_match_node() directly.
+
+Is it sound okay for us?
+
+Best Regards,
+Josh Wu
+
+>
+> Bye,
