@@ -1,60 +1,75 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 13 Jul 2015 23:25:17 +0800
-Subject: [PATCH v2] ARM: dts: imx6qdl-sabreauto: Allow HDMI and LVDS to
- work simultaneously
-In-Reply-To: <1436796692-8875-1-git-send-email-fabio.estevam@freescale.com>
-References: <1436796692-8875-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20150713152517.GE26642@tiger>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 13 Jul 2015 09:31:42 -0600
+Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
+In-Reply-To: <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
+References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
+ <1436473148.20619.116.camel@tiscali.nl>
+ <CAK-LDb+HSbM2zV8WxipLb8v7g+eL=5vMHcKGttEOdnCjSXSwPA@mail.gmail.com>
+ <1436518813.20619.134.camel@tiscali.nl>
+ <CAK-LDb+Yg+wQJ_bM3Usc=hoK-jDOxHy5AsUOAbmg+-dVnOM4KA@mail.gmail.com>
+ <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
+ <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
+Message-ID: <CANLsYkyZoC5H2QHHPnSh6jon=H+GYm4o2oEWLhrY28Y32FcBRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 11:11:32AM -0300, Fabio Estevam wrote:
-> Currently it is not possible to have HDMI and LVDS working simultaneously,
-> because both ports try to use PLL5.
-> 
-> Move the LVDS clock parent to PLL3_USB_OTG, so that HDMI and LVDS can be
-> driven from independent sources.
-> 
-> With this change the LDB pixel clock goes to 68.57 MHz, which is still
-> within the valid range for the HSD100PXN1 LVDS panel.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Rebased against latest imx/dt branch
-> 
->  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> index 6b17b85..2030de8 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-> @@ -99,6 +99,13 @@
->  	assigned-clock-rates = <0>, <0>, <24576000>;
->  };
->  
-> +&clks {
-> +	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-> +			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-> +	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-> +				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-> +};
-> +
+On 10 July 2015 at 09:51, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+> On Fri, Jul 10, 2015 at 8:00 PM, Mathieu Poirier
+> <mathieu.poirier@linaro.org> wrote:
+>> On 10 July 2015 at 05:47, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+>>> On Fri, Jul 10, 2015 at 2:30 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+>>>> On vr, 2015-07-10 at 08:53 +0530, Vaishali Thakkar wrote:
+>>>>> I thought about this solution before sending this patch. But I was not
+>>>>> sure about it. Thanks for the explanation. I will send v3 with this
+>>>>> change.
+>>>>>
+>>>>> Can I add Suggested By: Paul Bolle <pebolle@tiscali.nl>
+>>>>
+>>>> That should be "Suggested-by:". The net effect would be that, if my
+>>>> suggestion turns out to be unwise, fan mail will also hit my INBOX,
+>>>> right? Anyhow, fine with me.
+>>>
+>>> Ok. Thanks.
+>>>
+>>>> By the way, there's more module specific stuff in
+>>>> drivers/hwtracing/coresight/. And there's no tristate symbol to be found
+>>>> in its Kconfig file. So I'd guess there are a few other cleanups
+>>>> possible too, if someone cared enough to have a closer look at that.
+>>>>
+>>>
+>>> Yes. It seems that introducing something like builtin_amba_driver()
+>>> can be useful for files which are using module_amba_driver now . But I'm
+>>> not sure if Mathieu is ok with it or not? If it seems useful to him, then I
+>>> can go for it.
+>>
+>> The ETB drivers could use a "module_amba_driver()"...
+>
+> Why? Is there any specific reason behind this?
+> How about other drivers?? Will it be beneficial to introduce
+> builtin_amba_driver() for the others?
 
-There is already an assigned-clocks in &clks added by audio support.
+All the other drivers (aside from the replicator) have been moved to
+"module_amba_driver()" to avoid boilerplate code.  The only one that
+was forgotten is the ETB.  A fix for ETM3x is already part of the 4.2
+cycle.
 
-Shawn
+As for builtin_amba_driver(), that will be up to Russell to decide.
+Other than not calling the second half of the module_driver() macro, I
+don't see what else it could do.
 
->  &ecspi1 {
->  	fsl,spi-num-chipselects = <1>;
->  	cs-gpios = <&gpio3 19 0>;
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+> Thank You.
+>
+>>>
+>>>>
+>>>> Paul Bolle
+>>>
+>>>
+>>>
+>>> --
+>>> Vaishali
+>
+>
+>
+> --
+> Vaishali
