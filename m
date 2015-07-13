@@ -1,56 +1,61 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Mon, 13 Jul 2015 18:05:35 +0100
-Subject: [PATCH v2 09/10] arm64/BUG: Use BRK instruction for generic BUG
- traps
-In-Reply-To: <20150713165638.GD22840@leverpostej>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-10-git-send-email-Dave.Martin@arm.com>
- <20150713164315.GC22840@leverpostej>
- <20150713165151.GC10670@e103592.cambridge.arm.com>
- <20150713165638.GD22840@leverpostej>
-Message-ID: <20150713170535.GF22651@e103592.cambridge.arm.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 13 Jul 2015 12:15:10 -0500
+Subject: [PATCH v3 0/3] ARM: OMAP2+: wkup_m3_rproc support patches
+In-Reply-To: <20150713072750.GE26485@atomide.com>
+References: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
+ <559ED0AB.4020703@ti.com> <20150713072529.GD26485@atomide.com>
+ <20150713072750.GE26485@atomide.com>
+Message-ID: <55A3F21E.6050301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 05:56:39PM +0100, Mark Rutland wrote:
-> On Mon, Jul 13, 2015 at 05:51:51PM +0100, Dave P Martin wrote:
-> > On Mon, Jul 13, 2015 at 05:43:15PM +0100, Mark Rutland wrote:
-> > > Hi,
-> > > 
-> > > On Mon, Jul 13, 2015 at 02:25:56PM +0100, Dave P Martin wrote:
-
-[...]
-
-> > > > +#ifdef CONFIG_DEBUG_BUGVERBOSE
-> > > > +#define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
-> > > > +#define __BUGVERBOSE_LOCATION(file, line)				\
-> > > > +		".pushsection .rodata.str,\"aMS\", at progbits,1\n"	\
-> > > > +	"2:	.string \"" file "\"\n\t"				\
-> > > > +		".popsection\n\t"					\
-> > > > +									\
-> > > > +		".long 2b - 0b\n\t"					\
-> > > > +		".short " #line "\n\t"
-> > > > +#else
-> > > > +#define _BUGVERBOSE_LOCATION(file, line)
-> > > > +#endif
-> > > 
-> > > Given the reliance on the labels in the caller, I think it might make
-> > 
-> > Not sure what you mean here, can you elaborate?
+On 07/13/2015 02:27 AM, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [150713 00:28]:
+>> * Dave Gerlach <d-gerlach@ti.com> [150709 12:53]:
+>>> Tony,
+>>> On 04/01/2015 02:47 PM, Dave Gerlach wrote:
+>>>> This series adds the mach-omap2 code and DT nodes for v3 of the
+>>>> wkup_m3_rproc driver submitted here [1]. pdata-quirks patch requires
+>>>> the pdata added with patch 4 of the aforementioned series. Based on
+>>>> previous discussion here [2], the wkup_m3 DT node has been moved as a
+>>>> child of the l4_wkup as is done for l4_wkup components in Tero Kristo's
+>>>> series "PRCM+SCM cleanup against 4.0-rc1" found here [3]. Because of that,
+>>>> this series applies cleanly on top of that series in order to leverage the
+>>>> l4_wkup parent node introduced there.
+>>>>
+>>>> In addition to the move of the wkup_m3 node for am33xx, a new patch
+>>>> has been added to introduce the wkup_m3 node in the same fashion for
+>>>> am43xx as both SoCs use the same configuration. With this change
+>>>> support was also added to pdata-quirks for passing reset handlers to
+>>>> the driver for the am43xx binding as was already done for am33xx.
+>>>>
+>>>> I have pushed a branch containing all patches for am335x suspend
+>>>> here for a big picture view of how all patches fit together with
+>>>> these wkup_m3_rproc series [4].
+>>>>
+>>>> v2->v3:
+>>>> -Change ti,am3353-wkup-m3 compat to ti,am3352-wkup-m3 to reflect
+>>>>  binding documentation change
+>>>> -Add ti,am4372-wkup-m3 node to am4372 SoC dt file
+>>>> -Add am4372 support to pdata-quirks for reset handlers
+>>>
+>>> Now that Ohad has sent a pull request for the wkup_m3_rproc driver [1] and it
+>>> has been merged is it possible for this series with the DT nodes and pdata-quirk
+>>> to get picked up? Let me know and I can rebase and resend if you'd like.
+>>
+>> Yes this series looks good to me now, will queue for v4.3.
 > 
-> We're relying on label "0:" in the caller/user of the macro when we emit
-> ".long 2b - 0b".
+> Looks like you need to repost this series again against v4.2-rc2 
+> to apply though.
+
+Ok will do, thanks!
+
+Regards,
+Dave
+
+>  
+> Regards,
 > 
-> I think it would be clearer if folded into the caller (even with the
-> inline ifdef this necessitates).
-
-Ah, I see what you're getting at.  I think there is room for improvement
-there.
-
-> Though I could be missing something here that renders that impossible.
-
-Well, you can't put an #ifdef in the middle of a macro definition as
-such, but there are other ways around that.  I'll see what I can do.
-
-Cheers
----Dave
+> Tony
+>  
+>>> [1] https://lkml.org/lkml/2015/7/1/354
