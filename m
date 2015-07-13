@@ -1,42 +1,40 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Jul 2015 20:29:03 -0000
-Subject: [patch 03/11] ARM/irq: Use access helper irq_data_get_affinity_mask()
+Date: Mon, 13 Jul 2015 20:29:00 -0000
+Subject: [patch 01/11] ARM/orion: Consolidate chained IRQ handler
+ install/remove
 References: <20150713090726.316699641@linutronix.de>
-Message-ID: <20150713090936.176152466@linutronix.de>
+Message-ID: <20150713090936.019766165@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jiang Liu <jiang.liu@linux.intel.com>
+Chained irq handlers usually set up handler data as well. We now have
+a function to set both under irq_desc->lock. Replace the two calls
+with one.
 
-This is a preparatory patch for moving irq_data struct members.
+Search and conversion was done with coccinelle.
 
-Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
+Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: Julia Lawall <Julia.Lawall@lip6.fr>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/arm/kernel/irq.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/plat-orion/gpio.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Index: tip/arch/arm/kernel/irq.c
+Index: tip/arch/arm/plat-orion/gpio.c
 ===================================================================
---- tip.orig/arch/arm/kernel/irq.c
-+++ tip/arch/arm/kernel/irq.c
-@@ -140,7 +140,7 @@ int __init arch_probe_nr_irqs(void)
- static bool migrate_one_irq(struct irq_desc *desc)
- {
- 	struct irq_data *d = irq_desc_get_irq_data(desc);
--	const struct cpumask *affinity = d->affinity;
-+	const struct cpumask *affinity = irq_data_get_affinity_mask(d);
- 	struct irq_chip *c;
- 	bool ret = false;
+--- tip.orig/arch/arm/plat-orion/gpio.c
++++ tip/arch/arm/plat-orion/gpio.c
+@@ -582,8 +582,9 @@ void __init orion_gpio_init(struct devic
  
-@@ -160,7 +160,7 @@ static bool migrate_one_irq(struct irq_d
- 	if (!c->irq_set_affinity)
- 		pr_debug("IRQ%u: unable to set affinity\n", d->irq);
- 	else if (c->irq_set_affinity(d, affinity, false) == IRQ_SET_MASK_OK && ret)
--		cpumask_copy(d->affinity, affinity);
-+		cpumask_copy(irq_data_get_affinity_mask(d), affinity);
+ 	for (i = 0; i < 4; i++) {
+ 		if (irqs[i]) {
+-			irq_set_handler_data(irqs[i], ochip);
+-			irq_set_chained_handler(irqs[i], gpio_irq_handler);
++			irq_set_chained_handler_and_data(irqs[i],
++							 gpio_irq_handler,
++							 ochip);
+ 		}
+ 	}
  
- 	return ret;
- }
