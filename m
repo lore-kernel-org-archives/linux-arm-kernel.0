@@ -1,289 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 13 Jul 2015 08:24:59 +0100
-Subject: [PATCH v3 2/2] mfd: axp20x: Add axp152 support
-In-Reply-To: <1436619596-11823-2-git-send-email-hdegoede@redhat.com>
-References: <1436619596-11823-1-git-send-email-hdegoede@redhat.com>
- <1436619596-11823-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150713072459.GH12199@x1>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jul 2015 00:25:30 -0700
+Subject: [PATCH v3 0/3] ARM: OMAP2+: wkup_m3_rproc support patches
+In-Reply-To: <559ED0AB.4020703@ti.com>
+References: <1427917630-43961-1-git-send-email-d-gerlach@ti.com>
+ <559ED0AB.4020703@ti.com>
+Message-ID: <20150713072529.GD26485@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jul 2015, Hans de Goede wrote:
-
-> From: Michal Suchanek <hramrach@gmail.com>
+* Dave Gerlach <d-gerlach@ti.com> [150709 12:53]:
+> Tony,
+> On 04/01/2015 02:47 PM, Dave Gerlach wrote:
+> > This series adds the mach-omap2 code and DT nodes for v3 of the
+> > wkup_m3_rproc driver submitted here [1]. pdata-quirks patch requires
+> > the pdata added with patch 4 of the aforementioned series. Based on
+> > previous discussion here [2], the wkup_m3 DT node has been moved as a
+> > child of the l4_wkup as is done for l4_wkup components in Tero Kristo's
+> > series "PRCM+SCM cleanup against 4.0-rc1" found here [3]. Because of that,
+> > this series applies cleanly on top of that series in order to leverage the
+> > l4_wkup parent node introduced there.
+> > 
+> > In addition to the move of the wkup_m3 node for am33xx, a new patch
+> > has been added to introduce the wkup_m3 node in the same fashion for
+> > am43xx as both SoCs use the same configuration. With this change
+> > support was also added to pdata-quirks for passing reset handlers to
+> > the driver for the am43xx binding as was already done for am33xx.
+> > 
+> > I have pushed a branch containing all patches for am335x suspend
+> > here for a big picture view of how all patches fit together with
+> > these wkup_m3_rproc series [4].
+> > 
+> > v2->v3:
+> > -Change ti,am3353-wkup-m3 compat to ti,am3352-wkup-m3 to reflect
+> >  binding documentation change
+> > -Add ti,am4372-wkup-m3 node to am4372 SoC dt file
+> > -Add am4372 support to pdata-quirks for reset handlers
 > 
-> The axp152 is a stripped down version of the axp202 pmic with the battery
-> charging function removed as it is intended for top-set boxes.
+> Now that Ohad has sent a pull request for the wkup_m3_rproc driver [1] and it
+> has been merged is it possible for this series with the DT nodes and pdata-quirk
+> to get picked up? Let me know and I can rebase and resend if you'd like.
+
+Yes this series looks good to me now, will queue for v4.3.
+
+Regards,
+
+Tony
+ 
+> [1] https://lkml.org/lkml/2015/7/1/354
 > 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Lee Jones <lee.jones@linaro.org>
-> ---
-> Changes in v2:
-> -Seperated out the devicetree binding documentation into a separate patch
-> -Use DEFINE_RES_IRQ_NAMED to define the irq resources
-> Changes in v3:
-> -s/ax20x/axp20x/ in the commit msg
-> -Added Michal Suchanek's S-o-b (with his permission)
-> ---
->  drivers/mfd/axp20x.c       | 83 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/mfd/axp20x.h | 61 +++++++++++++++++++++++++++++++++-
->  2 files changed, 143 insertions(+), 1 deletion(-)
-
-Applied, thanks.
-
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index ca4a604..9027fc3 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -30,12 +30,34 @@
->  #define AXP20X_OFF	0x80
->  
->  static const char * const axp20x_model_names[] = {
-> +	"AXP152",
->  	"AXP202",
->  	"AXP209",
->  	"AXP221",
->  	"AXP288",
->  };
->  
-> +static const struct regmap_range axp152_writeable_ranges[] = {
-> +	regmap_reg_range(AXP152_LDO3456_DC1234_CTRL, AXP152_IRQ3_STATE),
-> +	regmap_reg_range(AXP152_DCDC_MODE, AXP152_PWM1_DUTY_CYCLE),
-> +};
-> +
-> +static const struct regmap_range axp152_volatile_ranges[] = {
-> +	regmap_reg_range(AXP152_PWR_OP_MODE, AXP152_PWR_OP_MODE),
-> +	regmap_reg_range(AXP152_IRQ1_EN, AXP152_IRQ3_STATE),
-> +	regmap_reg_range(AXP152_GPIO_INPUT, AXP152_GPIO_INPUT),
-> +};
-> +
-> +static const struct regmap_access_table axp152_writeable_table = {
-> +	.yes_ranges	= axp152_writeable_ranges,
-> +	.n_yes_ranges	= ARRAY_SIZE(axp152_writeable_ranges),
-> +};
-> +
-> +static const struct regmap_access_table axp152_volatile_table = {
-> +	.yes_ranges	= axp152_volatile_ranges,
-> +	.n_yes_ranges	= ARRAY_SIZE(axp152_volatile_ranges),
-> +};
-> +
->  static const struct regmap_range axp20x_writeable_ranges[] = {
->  	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_IRQ5_STATE),
->  	regmap_reg_range(AXP20X_DCDC_MODE, AXP20X_FG_RES),
-> @@ -99,6 +121,11 @@ static const struct regmap_access_table axp288_volatile_table = {
->  	.n_yes_ranges	= ARRAY_SIZE(axp288_volatile_ranges),
->  };
->  
-> +static struct resource axp152_pek_resources[] = {
-> +	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
-> +	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
-> +};
-> +
->  static struct resource axp20x_pek_resources[] = {
->  	{
->  		.name	= "PEK_DBR",
-> @@ -167,6 +194,15 @@ static struct resource axp288_fuel_gauge_resources[] = {
->  	},
->  };
->  
-> +static const struct regmap_config axp152_regmap_config = {
-> +	.reg_bits	= 8,
-> +	.val_bits	= 8,
-> +	.wr_table	= &axp152_writeable_table,
-> +	.volatile_table	= &axp152_volatile_table,
-> +	.max_register	= AXP152_PWM1_DUTY_CYCLE,
-> +	.cache_type	= REGCACHE_RBTREE,
-> +};
-> +
->  static const struct regmap_config axp20x_regmap_config = {
->  	.reg_bits	= 8,
->  	.val_bits	= 8,
-> @@ -197,6 +233,26 @@ static const struct regmap_config axp288_regmap_config = {
->  #define INIT_REGMAP_IRQ(_variant, _irq, _off, _mask)			\
->  	[_variant##_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
->  
-> +static const struct regmap_irq axp152_regmap_irqs[] = {
-> +	INIT_REGMAP_IRQ(AXP152, LDO0IN_CONNECT,		0, 6),
-> +	INIT_REGMAP_IRQ(AXP152, LDO0IN_REMOVAL,		0, 5),
-> +	INIT_REGMAP_IRQ(AXP152, ALDO0IN_CONNECT,	0, 3),
-> +	INIT_REGMAP_IRQ(AXP152, ALDO0IN_REMOVAL,	0, 2),
-> +	INIT_REGMAP_IRQ(AXP152, DCDC1_V_LOW,		1, 5),
-> +	INIT_REGMAP_IRQ(AXP152, DCDC2_V_LOW,		1, 4),
-> +	INIT_REGMAP_IRQ(AXP152, DCDC3_V_LOW,		1, 3),
-> +	INIT_REGMAP_IRQ(AXP152, DCDC4_V_LOW,		1, 2),
-> +	INIT_REGMAP_IRQ(AXP152, PEK_SHORT,		1, 1),
-> +	INIT_REGMAP_IRQ(AXP152, PEK_LONG,		1, 0),
-> +	INIT_REGMAP_IRQ(AXP152, TIMER,			2, 7),
-> +	INIT_REGMAP_IRQ(AXP152, PEK_RIS_EDGE,		2, 6),
-> +	INIT_REGMAP_IRQ(AXP152, PEK_FAL_EDGE,		2, 5),
-> +	INIT_REGMAP_IRQ(AXP152, GPIO3_INPUT,		2, 3),
-> +	INIT_REGMAP_IRQ(AXP152, GPIO2_INPUT,		2, 2),
-> +	INIT_REGMAP_IRQ(AXP152, GPIO1_INPUT,		2, 1),
-> +	INIT_REGMAP_IRQ(AXP152, GPIO0_INPUT,		2, 0),
-> +};
-> +
->  static const struct regmap_irq axp20x_regmap_irqs[] = {
->  	INIT_REGMAP_IRQ(AXP20X, ACIN_OVER_V,		0, 7),
->  	INIT_REGMAP_IRQ(AXP20X, ACIN_PLUGIN,		0, 6),
-> @@ -306,6 +362,7 @@ static const struct regmap_irq axp288_regmap_irqs[] = {
->  };
->  
->  static const struct of_device_id axp20x_of_match[] = {
-> +	{ .compatible = "x-powers,axp152", .data = (void *) AXP152_ID },
->  	{ .compatible = "x-powers,axp202", .data = (void *) AXP202_ID },
->  	{ .compatible = "x-powers,axp209", .data = (void *) AXP209_ID },
->  	{ .compatible = "x-powers,axp221", .data = (void *) AXP221_ID },
-> @@ -330,6 +387,18 @@ static const struct acpi_device_id axp20x_acpi_match[] = {
->  };
->  MODULE_DEVICE_TABLE(acpi, axp20x_acpi_match);
->  
-> +static const struct regmap_irq_chip axp152_regmap_irq_chip = {
-> +	.name			= "axp152_irq_chip",
-> +	.status_base		= AXP152_IRQ1_STATE,
-> +	.ack_base		= AXP152_IRQ1_STATE,
-> +	.mask_base		= AXP152_IRQ1_EN,
-> +	.mask_invert		= true,
-> +	.init_ack_masked	= true,
-> +	.irqs			= axp152_regmap_irqs,
-> +	.num_irqs		= ARRAY_SIZE(axp152_regmap_irqs),
-> +	.num_regs		= 3,
-> +};
-> +
->  static const struct regmap_irq_chip axp20x_regmap_irq_chip = {
->  	.name			= "axp20x_irq_chip",
->  	.status_base		= AXP20X_IRQ1_STATE,
-> @@ -393,6 +462,14 @@ static struct mfd_cell axp22x_cells[] = {
->  	},
->  };
->  
-> +static struct mfd_cell axp152_cells[] = {
-> +	{
-> +		.name			= "axp20x-pek",
-> +		.num_resources		= ARRAY_SIZE(axp152_pek_resources),
-> +		.resources		= axp152_pek_resources,
-> +	},
-> +};
-> +
->  static struct resource axp288_adc_resources[] = {
->  	{
->  		.name  = "GPADC",
-> @@ -531,6 +608,12 @@ static int axp20x_match_device(struct axp20x_dev *axp20x, struct device *dev)
->  	}
->  
->  	switch (axp20x->variant) {
-> +	case AXP152_ID:
-> +		axp20x->nr_cells = ARRAY_SIZE(axp152_cells);
-> +		axp20x->cells = axp152_cells;
-> +		axp20x->regmap_cfg = &axp152_regmap_config;
-> +		axp20x->regmap_irq_chip = &axp152_regmap_irq_chip;
-> +		break;
->  	case AXP202_ID:
->  	case AXP209_ID:
->  		axp20x->nr_cells = ARRAY_SIZE(axp20x_cells);
-> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
-> index 650bd964..b24c771 100644
-> --- a/include/linux/mfd/axp20x.h
-> +++ b/include/linux/mfd/axp20x.h
-> @@ -14,7 +14,8 @@
->  #include <linux/regmap.h>
->  
->  enum {
-> -	AXP202_ID = 0,
-> +	AXP152_ID = 0,
-> +	AXP202_ID,
->  	AXP209_ID,
->  	AXP221_ID,
->  	AXP288_ID,
-> @@ -24,6 +25,24 @@ enum {
->  #define AXP20X_DATACACHE(m)		(0x04 + (m))
->  
->  /* Power supply */
-> +#define AXP152_PWR_OP_MODE		0x01
-> +#define AXP152_LDO3456_DC1234_CTRL	0x12
-> +#define AXP152_ALDO_OP_MODE		0x13
-> +#define AXP152_LDO0_CTRL		0x15
-> +#define AXP152_DCDC2_V_OUT		0x23
-> +#define AXP152_DCDC2_V_SCAL		0x25
-> +#define AXP152_DCDC1_V_OUT		0x26
-> +#define AXP152_DCDC3_V_OUT		0x27
-> +#define AXP152_ALDO12_V_OUT		0x28
-> +#define AXP152_DLDO1_V_OUT		0x29
-> +#define AXP152_DLDO2_V_OUT		0x2a
-> +#define AXP152_DCDC4_V_OUT		0x2b
-> +#define AXP152_V_OFF			0x31
-> +#define AXP152_OFF_CTRL			0x32
-> +#define AXP152_PEK_KEY			0x36
-> +#define AXP152_DCDC_FREQ		0x37
-> +#define AXP152_DCDC_MODE		0x80
-> +
->  #define AXP20X_PWR_INPUT_STATUS		0x00
->  #define AXP20X_PWR_OP_MODE		0x01
->  #define AXP20X_USB_OTG_STATUS		0x02
-> @@ -71,6 +90,13 @@ enum {
->  #define AXP22X_CHRG_CTRL3		0x35
->  
->  /* Interrupt */
-> +#define AXP152_IRQ1_EN			0x40
-> +#define AXP152_IRQ2_EN			0x41
-> +#define AXP152_IRQ3_EN			0x42
-> +#define AXP152_IRQ1_STATE		0x48
-> +#define AXP152_IRQ2_STATE		0x49
-> +#define AXP152_IRQ3_STATE		0x4a
-> +
->  #define AXP20X_IRQ1_EN			0x40
->  #define AXP20X_IRQ2_EN			0x41
->  #define AXP20X_IRQ3_EN			0x42
-> @@ -129,6 +155,19 @@ enum {
->  #define AXP22X_PWREN_CTRL2		0x8d
->  
->  /* GPIO */
-> +#define AXP152_GPIO0_CTRL		0x90
-> +#define AXP152_GPIO1_CTRL		0x91
-> +#define AXP152_GPIO2_CTRL		0x92
-> +#define AXP152_GPIO3_CTRL		0x93
-> +#define AXP152_LDOGPIO2_V_OUT		0x96
-> +#define AXP152_GPIO_INPUT		0x97
-> +#define AXP152_PWM0_FREQ_X		0x98
-> +#define AXP152_PWM0_FREQ_Y		0x99
-> +#define AXP152_PWM0_DUTY_CYCLE		0x9a
-> +#define AXP152_PWM1_FREQ_X		0x9b
-> +#define AXP152_PWM1_FREQ_Y		0x9c
-> +#define AXP152_PWM1_DUTY_CYCLE		0x9d
-> +
->  #define AXP20X_GPIO0_CTRL		0x90
->  #define AXP20X_LDO5_V_OUT		0x91
->  #define AXP20X_GPIO1_CTRL		0x92
-> @@ -226,6 +265,26 @@ enum {
->  
->  /* IRQs */
->  enum {
-> +	AXP152_IRQ_LDO0IN_CONNECT = 1,
-> +	AXP152_IRQ_LDO0IN_REMOVAL,
-> +	AXP152_IRQ_ALDO0IN_CONNECT,
-> +	AXP152_IRQ_ALDO0IN_REMOVAL,
-> +	AXP152_IRQ_DCDC1_V_LOW,
-> +	AXP152_IRQ_DCDC2_V_LOW,
-> +	AXP152_IRQ_DCDC3_V_LOW,
-> +	AXP152_IRQ_DCDC4_V_LOW,
-> +	AXP152_IRQ_PEK_SHORT,
-> +	AXP152_IRQ_PEK_LONG,
-> +	AXP152_IRQ_TIMER,
-> +	AXP152_IRQ_PEK_RIS_EDGE,
-> +	AXP152_IRQ_PEK_FAL_EDGE,
-> +	AXP152_IRQ_GPIO3_INPUT,
-> +	AXP152_IRQ_GPIO2_INPUT,
-> +	AXP152_IRQ_GPIO1_INPUT,
-> +	AXP152_IRQ_GPIO0_INPUT,
-> +};
-> +
-> +enum {
->  	AXP20X_IRQ_ACIN_OVER_V = 1,
->  	AXP20X_IRQ_ACIN_PLUGIN,
->  	AXP20X_IRQ_ACIN_REMOVAL,
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > 
+> > Regards,
+> > Dave
+> > 
+> > [1] https://www.mail-archive.com/linux-omap at vger.kernel.org/msg115869.html
+> > [2] http://www.spinics.net/lists/linux-omap/msg116366.html
+> > [3] http://www.spinics.net/lists/arm-kernel/msg409842.html
+> > [4] https://github.com/dgerlach/linux-pm/tree/pm-v4.0-rc5-am335x-suspend
+> > 
+> > Dave Gerlach (1):
+> >   ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset management
+> > 
+> > Suman Anna (2):
+> >   ARM: dts: AM33xx: Update and move wkup_m3 node to l4 node
+> >   ARM: dts: AM4372: Add the wkupm3 rproc node
+> > 
+> >  arch/arm/boot/dts/am33xx.dtsi      | 17 +++++++++--------
+> >  arch/arm/boot/dts/am4372.dtsi      |  9 +++++++++
+> >  arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++++++++
+> >  3 files changed, 33 insertions(+), 8 deletions(-)
+> > 
+> 
