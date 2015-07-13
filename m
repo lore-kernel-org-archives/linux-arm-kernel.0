@@ -1,76 +1,62 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 14:08:24 +0100
-Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
- Chromebooks
-In-Reply-To: <556EE8B0.2060205@nvidia.com>
-References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
- <556EE8B0.2060205@nvidia.com>
-Message-ID: <55A3B848.2080205@nvidia.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 13 Jul 2015 16:11:44 +0300
+Subject: [PATCH 2/3] mfd: Add DT binding for Maxim MAX77802 IC
+In-Reply-To: <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
+References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
+ <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <55A3B910.9040009@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/15 12:44, Jon Hunter wrote:
-> Adding LAKML. Jon
-> 
-> On 03/06/15 12:43, Jon Hunter wrote:
->> Add the device-tree DFLL clock node and CPU regulator phandle for
->> tegra124 chromebooks to enable CPUFreq support on these boards.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->>
->> ---
->> This has been tested on a tegra124 nyan-big by using the userspace
->> CPUFreq governor with a simple CPU benchmark to measure the time taken
->> for the test to execute.
->>
->> The tegra124 chromebooks use the same ams,as3722 PMIC as the Jetson TK1
->> board and hence, this change is based upon that for the Jetson TK1.
->>
->>  arch/arm/boot/dts/tegra124-nyan.dtsi | 15 ++++++++++++++-
->>  1 file changed, 14 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
->> index a9aec23e06f2..40c23a0b7cfc 100644
->> --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
->> +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
->> @@ -159,7 +159,7 @@
->>  				vin-ldo9-10-supply = <&vdd_5v0_sys>;
->>  				vin-ldo11-supply = <&vdd_3v3_run>;
->>  
->> -				sd0 {
->> +				vdd_cpu: sd0 {
->>  					regulator-name = "+VDD_CPU_AP";
->>  					regulator-min-microvolt = <700000>;
->>  					regulator-max-microvolt = <1350000>;
->> @@ -397,6 +397,13 @@
->>  		non-removable;
->>  	};
->>  
->> +	/* CPU DFLL clock */
->> +	clock at 0,70110000 {
->> +		status = "okay";
->> +		vdd-cpu-supply = <&vdd_cpu>;
->> +		nvidia,i2c-fs-rate = <400000>;
->> +	};
->> +
->>  	ahub at 0,70300000 {
->>  		i2s at 0,70301100 {
->>  			status = "okay";
->> @@ -487,6 +494,12 @@
->>  		};
->>  	};
->>  
->> +	cpus {
->> +		cpu at 0 {
->> +			vdd-cpu-supply = <&vdd_cpu>;
->> +		};
->> +	};
->> +
->>  	gpio-keys {
->>  		compatible = "gpio-keys";
+Hello.
 
-Stephen, Thierry,
+On 7/13/2015 10:42 AM, Javier Martinez Canillas wrote:
 
-Are you ok with this change?
+> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
+> a RTC and an I2C interface to program the individual components.
 
-Jon
+> The are already DT bindings for the regulators and clocks and
+> these reference to a bindings/mfd/max77802.txt file, that didn't
+> exist, for the details about the PMIC.
+
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+>
+>   Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
+>   1 file changed, 26 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+
+> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+> new file mode 100644
+> index 000000000000..875ebebbc5b0
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+> @@ -0,0 +1,26 @@
+> +Maxim MAX77802 multi-function device
+> +
+> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
+> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
+> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
+> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
+> +regulators, clocks outputs and the RTC.
+> +
+> +Binding for the built-in 32k clock generator block is defined separately
+> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
+> +is defined in the bindings/regulator/max77802.txt file.
+> +
+> +Required properties:
+> +- compatible : Must be "maxim,max77686";
+> +- reg : Specifies the i2c slave address of PMIC block.
+> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
+> +- interrupt-parent : The parent interrupt controller.
+> +
+> +Example:
+> +
+> +	max77802 at 09 {
+
+    Sigh, I'm tired of saying this over and over again: please don't name the 
+nodes with teh chip names. The ePAPR standard says: "The name of a node should 
+be somewhat generic, reflecting the function of the device and not its 3 
+precise programming model."
+
+WBR, Sergei
