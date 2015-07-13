@@ -1,194 +1,51 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 13 Jul 2015 20:34:13 +0800
-Subject: [PATCH v3 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <d1a97aaee42f30370b58b3f7ed6a3559633010ad.1436552949.git.robin.murphy@arm.com>
-References: <cover.1436552949.git.robin.murphy@arm.com>
- <d1a97aaee42f30370b58b3f7ed6a3559633010ad.1436552949.git.robin.murphy@arm.com>
-Message-ID: <1436790853.25951.20.camel@mhfsdcap03>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 13 Jul 2015 14:35:28 +0200
+Subject: Extensions for KVM MSI related ioctls
+In-Reply-To: <55A39231.4050904@arm.com>
+References: <55A39231.4050904@arm.com>
+Message-ID: <55A3B090.6090002@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-10 at 20:19 +0100, Robin Murphy wrote:
-> Taking inspiration from the existing arch/arm code, break out some
-> generic functions to interface the DMA-API to the IOMMU-API. This will
-> do the bulk of the heavy lifting for IOMMU-backed dma-mapping.
+
+
+On 13/07/2015 12:25, Andre Przywara wrote:
 > 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/Kconfig     |   7 +
->  drivers/iommu/Makefile    |   1 +
->  drivers/iommu/dma-iommu.c | 536 ++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/dma-iommu.h |  84 ++++++++
->  include/linux/iommu.h     |   1 +
->  5 files changed, 629 insertions(+)
->  create mode 100644 drivers/iommu/dma-iommu.c
->  create mode 100644 include/linux/dma-iommu.h
+> For using MSIs in a guest when running on an ARM(64) system using a
+> GICv3 interrupt controller we need to have a device ID available. On
+> real hardware this information is sampled from the bus by the ITS part
+> of the interrupt controller.
+> To make this work for guests, we need to extend two ioctls which deal
+> with MSIs: KVM_SIGNAL_MSI and KVM_SET_GSI_ROUTING.
 > 
-> diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-> index f1fb1d3..efb0e66 100644
-> --- a/drivers/iommu/Kconfig
-> +++ b/drivers/iommu/Kconfig
-> @@ -48,6 +48,13 @@ config OF_IOMMU
->         def_bool y
->         depends on OF && IOMMU_API
->  
-> +# IOMMU-agnostic DMA-mapping layer
-> +config IOMMU_DMA
-> +	bool
-> +	depends on NEED_SG_DMA_LENGTH
-> +	select IOMMU_API
-> +	select IOMMU_IOVA
-> +
->  config FSL_PAMU
->  	bool "Freescale IOMMU support"
->  	depends on PPC32
-> diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-> index c6dcc51..f465cfb 100644
-> --- a/drivers/iommu/Makefile
-> +++ b/drivers/iommu/Makefile
-> @@ -1,6 +1,7 @@
->  obj-$(CONFIG_IOMMU_API) += iommu.o
->  obj-$(CONFIG_IOMMU_API) += iommu-traces.o
->  obj-$(CONFIG_IOMMU_API) += iommu-sysfs.o
-> +obj-$(CONFIG_IOMMU_DMA) += dma-iommu.o
->  obj-$(CONFIG_IOMMU_IO_PGTABLE) += io-pgtable.o
->  obj-$(CONFIG_IOMMU_IO_PGTABLE_LPAE) += io-pgtable-arm.o
->  obj-$(CONFIG_IOMMU_IOVA) += iova.o
-[...]
-> +/**
-> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
-> + * @dev: Device to allocate memory for. Must be a real device
-> + *	 attached to an iommu_dma_domain
-> + * @size: Size of buffer in bytes
-> + * @gfp: Allocation flags
-> + * @prot: IOMMU mapping flags
-> + * @coherent: Which dma_mask to base IOVA allocation on
-> + * @handle: Out argument for allocated DMA handle
-> + * @flush_page: Arch callback to flush a single page from caches as
-> + *		necessary. May be NULL for coherent allocations
-> + *
-> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
-> + * but an IOMMU which supports smaller pages might not map the whole thing.
-> + * For now, the buffer is unconditionally zeroed for compatibility
-> + *
-> + * Return: Array of struct page pointers describing the buffer,
-> + *	   or NULL on failure.
-> + */
-> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-> +		int prot, bool coherent, dma_addr_t *handle,
-> +		void (*flush_page)(const void *, phys_addr_t))
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+> The idea that we sketched so far in [1] and [2] is to use a new
+> capability (KVM_CAP_MSI_DEVID) to advertise both a flag bit for
+> KVM_SIGNAL_MSI and a new type for KVM_SET_GSI_ROUTING.
+> 
+> Since current kernels bail out on any flag value != 0 in KVM_SIGNAL_MSI,
+> we need the new capability to tell userland about it in a reliable and
+> portable way (to avoid hacks like #ifdef ARM && USES_IRQ_ROUTING in
+> userland).
+> 
+> For KVM_SET_GSI_ROUTING there was the idea of using the very same flag
+> value in it's own flag field, but I find it saner to use a new routing
+> type instead (KVM_IRQ_ROUTING_EXTENDED_MSI). Both approaches would
+> piggy-back on the existing struct kvm_irq_routing_msi and re-purpose the
+> pad field in there.
 
-Compare with DMA-v2."struct iommu_dma_domain" is deleted and the iommu
-domain is got from its iommu_group->domain. So I have to create a
-iommu_group.
-And the struct iommu_group is defined in iommu.c, I can not write like
-this: group->domain = ****.
+I think I prefer the flag.  Offhand it sounds easier to add support for
+it to non-ARM architectures, compared to KVM_IRQ_ROUTING_EXTENDED_MSI.
 
-After check, I have to use iommu_attach_group.
-Then our code may like this:
-//====
-static int mtk_iommu_add_device(struct device *dev)
-{
-      *******
-	if (!dev->archdata.dma_ops)/* Not a iommu client device */
-		return -ENODEV;
-	group = iommu_group_get(dev);
-	if (!group)
-		group = iommu_group_alloc();
+> Summarized:
+> 1) Add a new KVM_CAP_MSI_DEVID to advertise the device ID extension.
+> 2) Use a KVM_MSI_VALID_DEVID flag in KVM_SIGNAL_MSI to re-purpose part
+>    of struct kvm_msi.
 
-	ret = iommu_group_add_device(group, dev);
+These two sounds good.
 
-	/* get the mtk_iommu_domain from the master iommu device */
-        mtkdom = ****;
-	iommu_attach_group(&mtkdom->domain, group); /*attach the iommu domain
-*/
-	iommu_group_put(group);
-	return ret;
-}
+Paolo
 
-static int mtk_iommu_attach_device(struct iommu_domain *domain,
-				   struct device *dev)
-{
-	struct mtk_iommu_domain *priv = to_mtk_domain(domain), *imudom;
-	struct iommu_group *group;
-
-	/* Reserve one iommu domain as the m4u domain which all 
-	 * Multimedia modules share and free the others */
-	if (!imudev->archdata.iommu)
-		imudev->archdata.iommu = priv;
-	else if (imudev->archdata.iommu != priv)
-		iommu_domain_free(domain);
-
-	group = iommu_group_get(dev);
-      /* return 0 while the attach device is from
-__iommu_attach_notifier.
-       * the iommu_group will be created in add_device after
-mtk-iommu-probe
-       */
-	if (!group)
-		return 0;
-	iommu_group_put(group);
-
-	mtk_iommu_init_domain_context(priv); /* init the pagetable */
-	mtk_iommu_config(priv, dev, true); /* config the iommu info */
-
-	return 0;
-}
-//====
-    Is it ok? I'm preparing the next patch like this, Could you help
-give some suggestion about the flow.
-    Thanks very much.
-
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	struct iova *iova;
-> +	struct page **pages;
-> +	struct sg_table sgt;
-> +	struct sg_mapping_iter miter;
-> +	dma_addr_t dma_addr;
-> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> +
-> +	*handle = DMA_ERROR_CODE;
-> +
-> +	pages = __iommu_dma_alloc_pages(count, gfp);
-> +	if (!pages)
-> +		return NULL;
-> +
-> +	iova = __alloc_iova(dev, size, coherent);
-> +	if (!iova)
-> +		goto out_free_pages;
-> +
-> +	size = iova_align(iovad, size);
-> +	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
-> +		goto out_free_iova;
-> +
-> +	dma_addr = iova_dma_addr(iovad, iova);
-> +	if (iommu_map_sg(domain, dma_addr, sgt.sgl, sgt.orig_nents, prot)
-> +			< size)
-> +		goto out_free_sg;
-> +
-> +	/* Using the non-flushing flag since we're doing our own */
-> +	sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
-> +	while (sg_miter_next(&miter)) {
-> +		memset(miter.addr, 0, PAGE_SIZE);
-> +		if (flush_page)
-> +			flush_page(miter.addr, page_to_phys(miter.page));
-> +	}
-> +	sg_miter_stop(&miter);
-> +	sg_free_table(&sgt);
-> +
-> +	*handle = dma_addr;
-> +	return pages;
-> +
-> +out_free_sg:
-> +	sg_free_table(&sgt);
-> +out_free_iova:
-> +	__free_iova(iovad, iova);
-> +out_free_pages:
-> +	__iommu_dma_free_pages(pages, count);
-> +	return NULL;
-> +}
-> +
-[...]
->  enum iommu_cap {
+> 3) Add a new routing type KVM_IRQ_ROUTING_EXTENDED_MSI for
+>    KVM_SET_GSI_ROUTING to add device IDs in struct kvm_irq_routing_msi.
+> 
+> Is that a sensible way to extend the KVM API?
