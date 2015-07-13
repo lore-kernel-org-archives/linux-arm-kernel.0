@@ -1,35 +1,118 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 13:39:57 +0100
-Subject: [PATCH V3 19/19] ARM: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1436791197-32358-20-git-send-email-jonathanh@nvidia.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Mon, 13 Jul 2015 15:42:52 +0300
+Subject: [PATCH] ARM: edma: Clear IRQ if we get interrupted by a unknown event
+Message-ID: <1436791372-14879-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vince Hsu <vinceh@nvidia.com>
+It looks like we can get an interrupt even when none of
+the events that we're expecting occur. This can typically
+happen due to incorrect usage of the dma engine by the
+clients. If we don't Ack this interrupt then we get a
+flood of them and then it gets disabled by the IRQ core.
+(e.g. see backtrace below on am437x-sk-evm)
 
-We have added generic power domain support for Tegra SoCs. So now the
-option M_GENERIC_DOMAINS must be enabled by default to have proper power
-sequence.
+Ack such an interrupt and print an error message so that
+developers can identify the problem.
 
-Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+The following error was seen at boot on am437x-sk-evm
+
+[    7.395763] irq 46: nobody cared (try booting with the "irqpoll" option)
+[    7.402499] CPU: 0 PID: 861 Comm: mmcqd/0 Not tainted 3.14.37-00337-g1b4e893 #1116
+[    7.410099] Backtrace:
+[    7.412588] [<c0011e84>] (dump_backtrace) from [<c0012020>] (show_stack+0x18/0x1c)
+[    7.420189]  r6:0000002e r5:00000000 r4:00000000 r3:00000000
+[    7.425910] [<c0012008>] (show_stack) from [<c0600e4c>] (dump_stack+0x78/0x94)
+[    7.433178] [<c0600dd4>] (dump_stack) from [<c007b0fc>] (__report_bad_irq+0x28/0xc8)
+[    7.440950]  r4:ec806500 r3:c088f358
+[    7.444558] [<c007b0d4>] (__report_bad_irq) from [<c007b6a4>] (note_interrupt+0x25c/0x2b8)
+[    7.452854]  r6:0000002e r5:00000000 r4:ec806500 r3:0001863c
+[    7.458569] [<c007b448>] (note_interrupt) from [<c00791a0>] (handle_irq_event_percpu+0xb0/0x1a0)
+[    7.467389]  r10:ec806500 r9:c08cb03b r8:0000002e r7:00000000 r6:00000000 r5:00000000
+[    7.475285]  r4:00000000 r3:00000000
+[    7.478892] [<c00790f0>] (handle_irq_event_percpu) from [<c00792dc>] (handle_irq_event+0x4c/0x6c)
+[    7.487797]  r10:00000006 r9:600f0113 r8:600f0113 r7:fa240100 r6:ecc3dcc0 r5:ec80655c
+[    7.495694]  r4:ec806500
+[    7.498247] [<c0079290>] (handle_irq_event) from [<c007c3e0>] (handle_fasteoi_irq+0x84/0x150)
+[    7.506804]  r6:ecc3dcc0 r5:0000002e r4:ec806500 r3:00000000
+[    7.512518] [<c007c35c>] (handle_fasteoi_irq) from [<c0078a7c>] (generic_handle_irq+0x28/0x38)
+[    7.521162]  r4:0000002e r3:c007c35c
+[    7.524769] [<c0078a54>] (generic_handle_irq) from [<c000f238>] (handle_IRQ+0x40/0x9c)
+[    7.532716]  r4:c0865ea8 r3:000001a0
+[    7.536321] [<c000f1f8>] (handle_IRQ) from [<c0008668>] (gic_handle_irq+0x30/0x64)
+[    7.543920]  r6:ecc3dbd8 r5:c08709a0 r4:fa24010c r3:00000100
+[    7.549640] [<c0008638>] (gic_handle_irq) from [<c06062c0>] (__irq_svc+0x40/0x50)
+[    7.557154] Exception stack(0xecc3dbd8 to 0xecc3dc20)
+[    7.562226] dbc0:                                                       c08cccc0 00000000
+[    7.570439] dbe0: 0000000a 00000000 00000040 0000002c 00000000 ecc3c000 600f0113 600f0113
+[    7.578652] dc00: 00000006 ecc3dc64 ecc3dc20 ecc3dc20 c0040630 c00406a8 200f0113 ffffffff
+[    7.586860]  r7:ecc3dc0c r6:ffffffff r5:200f0113 r4:c00406a8
+[    7.592581] [<c0040618>] (__do_softirq) from [<c0040ab8>] (irq_exit+0xa8/0xf8)
+[    7.599829]  r10:00000006 r9:600f0113 r8:600f0113 r7:fa240100 r6:00000000 r5:0000002c
+[    7.607724]  r4:ecc3c000
+[    7.610276] [<c0040a10>] (irq_exit) from [<c000f23c>] (handle_IRQ+0x44/0x9c)
+[    7.617351]  r4:c0865ea8 r3:000001a0
+[    7.620955] [<c000f1f8>] (handle_IRQ) from [<c0008668>] (gic_handle_irq+0x30/0x64)
+[    7.628552]  r6:ecc3dcc0 r5:c08709a0 r4:fa24010c r3:00000100
+[    7.634265] [<c0008638>] (gic_handle_irq) from [<c06062c0>] (__irq_svc+0x40/0x50)
+[    7.641777] Exception stack(0xecc3dcc0 to 0xecc3dd08)
+[    7.646850] dcc0: c08cf288 600f0193 c088f358 c088f358 c08cf288 00000001 00000027 c088f34c
+[    7.655062] dce0: 600f0113 600f0113 00000006 ecc3dd6c ecc3dcc0 ecc3dd08 c0076bac c00771f0
+[    7.663272] dd00: 600f0113 ffffffff
+[    7.666771]  r7:ecc3dcf4 r6:ffffffff r5:600f0113 r4:c00771f0
+[    7.672485] [<c0076fd0>] (vprintk_emit) from [<c05fef40>] (printk+0x3c/0x44)
+[    7.679560]  r10:00001ffe r9:00001000 r8:00000010 r7:00002000 r6:c08a5b00 r5:c08a5b2c
+[    7.687455]  r4:c08a5a60
+[    7.690011] [<c05fef08>] (printk) from [<c0359684>] (credit_entropy_bits+0x238/0x260)
+[    7.697870]  r3:00000002 r2:00000008 r1:c078cfa0 r0:c078cec4
+[    7.703583] [<c035944c>] (credit_entropy_bits) from [<c0359944>] (add_timer_randomness+0xd4/0xe4)
+[    7.712489]  r10:ecc24008 r9:ecc24c00 r8:ecc1fb08 r7:00000000 r6:00000000 r5:c08a5b00
+[    7.720386]  r4:ecc0b440
+[    7.722938] [<c0359870>] (add_timer_randomness) from [<c035a554>] (add_disk_randomness+0x2c/0x30)
+[    7.731844]  r5:00000000 r4:ecc1fb08
+[    7.735451] [<c035a528>] (add_disk_randomness) from [<c027d888>] (blk_update_bidi_request+0x50/0x74)
+[    7.744625] [<c027d838>] (blk_update_bidi_request) from [<c027dbb0>] (blk_end_bidi_request+0x1c/0x58)
+[    7.753879]  r6:00000000 r5:ecc28c00 r4:ecc1fb08 r3:00000000
+[    7.759592] [<c027db94>] (blk_end_bidi_request) from [<c027dc2c>] (blk_end_request+0x14/0x18)
+[    7.768149]  r8:ecc1fb08 r7:00000000 r6:ecc24000 r5:00000000 r4:ecc24250 r3:00000000
+[    7.775973] [<c027dc18>] (blk_end_request) from [<c04cb48c>] (mmc_blk_issue_rw_rq+0x8c4/0xbd8)
+[    7.784625] [<c04cabc8>] (mmc_blk_issue_rw_rq) from [<c04cb96c>] (mmc_blk_issue_rq+0x1cc/0x4b8)
+[    7.793358]  r10:00000001 r9:00000000 r8:ecc24000 r7:ecbfc29c r6:00000000 r5:ecc24008
+[    7.801255]  r4:ecc24c00
+[    7.803807] [<c04cb7a0>] (mmc_blk_issue_rq) from [<c04cc4f8>] (mmc_queue_thread+0xb8/0x14c)
+[    7.812191]  r10:00000001 r9:ecc24010 r8:00000000 r7:00000000 r6:ecc3c000 r5:ecc28c00
+[    7.820087]  r4:ecc24008
+[    7.822648] [<c04cc440>] (mmc_queue_thread) from [<c00582c8>] (kthread+0xcc/0xe8)
+[    7.830159]  r10:00000000 r9:00000000 r8:00000000 r7:c04cc440 r6:ecc24008 r5:ecc0b300
+[    7.838056]  r4:00000000 r3:ecb1db40
+[    7.841663] [<c00581fc>] (kthread) from [<c000e9d8>] (ret_from_fork+0x14/0x3c)
+[    7.848911]  r7:00000000 r6:00000000 r5:c00581fc r4:ecc0b300
+[    7.854618] handlers:
+[    7.856905] [<c001e8c0>] dma_ccerr_handler
+[    7.861020] Disabling IRQ #46
+
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/mach-tegra/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/common/edma.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 0fa4c5f8b1be..fdf86cae3b32 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ menuconfig ARCH_TEGRA
- 	select HAVE_ARM_TWD if SMP
- 	select PINCTRL
- 	select PM_OPP
-+	select PM_GENERIC_DOMAINS if PM
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select RESET_CONTROLLER
- 	select SOC_BUS
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index 873dbfc..356281d 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -435,8 +435,11 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ 	if ((edma_read_array(ctlr, EDMA_EMR, 0) == 0) &&
+ 	    (edma_read_array(ctlr, EDMA_EMR, 1) == 0) &&
+ 	    (edma_read(ctlr, EDMA_QEMR) == 0) &&
+-	    (edma_read(ctlr, EDMA_CCERR) == 0))
++	    (edma_read(ctlr, EDMA_CCERR) == 0)) {
++		dev_err(data, "%s: unmanaged event occured\n", __func__);
++		edma_write(ctlr, EDMA_EEVAL, 1);
+ 		return IRQ_NONE;
++	}
+ 
+ 	while (1) {
+ 		int j = -1;
 -- 
 2.1.4
