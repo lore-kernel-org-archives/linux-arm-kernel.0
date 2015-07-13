@@ -1,31 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jul 2015 14:24:12 +0200
-Subject: [PATCH v3 1/4] gpio: brcmstb: fix null ptr dereference in driver
- remove
-In-Reply-To: <1434589243-502-2-git-send-email-gregory.0xf0@gmail.com>
-References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
- <1434589243-502-2-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <CACRpkdY_ER-=ig=zeGNKaGFmVrrLrTqXPCJ+75F9eZZ9JOOmxA@mail.gmail.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Mon, 13 Jul 2015 14:24:31 +0200
+Subject: [PATCH v2 0/4] Allow to use leds-ns2 with n090401 boards
+In-Reply-To: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <55A3ADFF.4090500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+Hi Simon,
 
-> If a failure occurs during probe, brcmstb_gpio_remove() is called. In
-> remove, we call platform_get_drvdata(), but at the time of failure in
-> the probe the driver data hadn't yet been set which leads to a NULL
-> ptr dereference in the remove's list_for_each.  Call
-> platform_set_drvdata() and set up list head right after allocating the
-> priv struct to both avoid the null pointer dereference that could
-> occur today.  To guard against potential future changes, check for
-> null pointer in remove.
+On 07/02/2015 07:56 PM, Simon Guinot wrote:
+> Hello,
 >
-> Reported-by: Tim Ross <tross@broadcom.com>
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-> ---
-> New in v3.
+> This patch series allows to use the leds-ns2 driver with the n090401
+> boards (Seagate NAS 4-Bay), based on an Armada-370 SoC.
+>
+> Here is the list changes:
+>
+> - Allow to configure the LED mode mapping.
+> - Handle can_sleep GPIOs. On n090401, the LEDs are connected to an I2C
+>    GPIO expander.
+> - Make leds-ns2 depends on MACH_ARMADA_370.
+>
+> Changes for v2:
+> - Fix gpio_{get,set}_*_cansleep() usage while holding a spinlock:
+>    Holding a spinlock at this places was not needed.
+> - Add Acked-by from Jacek Anaszewski for patch 4.
+>
+> Simon
+>
+> Simon Guinot (2):
+>    leds: leds-ns2: handle can_sleep GPIOs
+>    leds: leds-ns2: depends on MACH_ARMADA_370
+>
+> Vincent Donnefort (2):
+>    leds: leds-ns2: move LED modes mapping outside of the driver
+>    ARM: Kirkwood: add modes-map property to ns2-leds nodes
+>
+>   .../devicetree/bindings/leds/leds-ns2.txt          |   9 ++
+>   arch/arm/boot/dts/kirkwood-d2net.dts               |   5 +
+>   arch/arm/boot/dts/kirkwood-is2.dts                 |   5 +
+>   arch/arm/boot/dts/kirkwood-ns2.dts                 |   5 +
+>   arch/arm/boot/dts/kirkwood-ns2max.dts              |   5 +
+>   arch/arm/boot/dts/kirkwood-ns2mini.dts             |   5 +
+>   drivers/leds/Kconfig                               |  12 +-
+>   drivers/leds/leds-ns2.c                            | 169 ++++++++++++---------
+>   include/dt-bindings/leds/leds-ns2.h                |   8 +
+>   include/linux/platform_data/leds-kirkwood-ns2.h    |  14 ++
+>   10 files changed, 165 insertions(+), 72 deletions(-)
+>   create mode 100644 include/dt-bindings/leds/leds-ns2.h
+>
 
-Patch applied.
+For the whole patch set:
 
-Yours,
-Linus Walleij
+Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+
+-- 
+Best Regards,
+Jacek Anaszewski
