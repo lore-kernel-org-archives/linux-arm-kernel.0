@@ -1,69 +1,62 @@
-From: me@kylehuey.com (Kyle Huey)
-Date: Mon, 13 Jul 2015 10:35:45 -0700
-Subject: [RESEND PATCH v3] ARM: tegra124: pmu support
-Message-ID: <1436808945-14524-1-git-send-email-khuey@kylehuey.com>
+From: fainelli@broadcom.com (Florian Fainelli)
+Date: Mon, 13 Jul 2015 10:35:57 -0700
+Subject: [PATCH v3 2/4] dt-bindings: brcmstb-gpio: document properties
+ for wakeup
+In-Reply-To: <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
+References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>	<1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
+ <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
+Message-ID: <55A3F6FD.1070006@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the device tree for tegra124 based devices to enable
-the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM
-DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
+On 13/07/15 05:29, Linus Walleij wrote:
+> On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+> 
+>> Some brcmstb GPIO controllers can be used to wake from suspend, so use
+>> the de facto standard property 'wakeup-source' to mark the nodes of
+>> controllers with that capability.
+>>
+>> Also document interrupts-extended, which will be used for wakeup
+>> handling because the interrupt parent for the wake IRQ is different
+>> from the regular IRQ.
+>>
+>> While we're at it, a few more fixes: We don't actually use the
+>> "interrupt-names" property, so remove it from the listed optional
+>> properties and from the examples.  And since we're modifying the
+>> examples, also follow Brian's suggestions to:
+>> - change #gpio-cells, #interrupt-cells, and brcm,gpio-bank-widths from
+>>   hex to dec
+>> - use phandles
+>>
+>> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+>> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
+>> ---
+>> v3: Update per Brian's suggestions described in above message.
+> 
+> I'm very uncertain regarding these interrupts-extended etc.
 
-Updated for proper ordering and to add interrupt-affinity values.
+Gregory's additions to the binding are correct and comply with how the
+'interrupts-extended' property is meant to be used. FYI, this is
+required because most wake-up capable HW on brcmstb chips have N
+interrupts feeding to a GIC, but their wake-up interrupt(s) feed to an
+always-on interrupt controller. With the 'interrupts' +
+'interrupt-parent' property, you can "cross" multiple interrupt domains.
 
-Signed-off-by: Kyle Huey <khuey@kylehuey.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 17 +++++++++++++----
- 1 file changed, 13 insertions(+), 4 deletions(-)
+The precedence and rules for interpreting the "legacy" interrupts
+property vs. interrupts-extended is documented in the tree.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 13cc7ca..de07d7e 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -918,31 +918,40 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 
--		cpu at 0 {
-+		A15_0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <0>;
- 		};
- 
--		cpu at 1 {
-+		A15_1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <1>;
- 		};
- 
--		cpu at 2 {
-+		A15_2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <2>;
- 		};
- 
--		cpu at 3 {
-+		A15_3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a15";
- 			reg = <3>;
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a15-pmu";
-+		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&A15_0>, <&A15_1>, <&A15_2>, <&A15_3>;
-+	};
-+
- 	thermal-zones {
- 		cpu {
- 			polling-delay-passive = <1000>;
+> 
+> Can someone who understands that ACK this?
+
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+
+> 
+> E.g. Grant Likely, Bj?rn Helgaas, Rob Herring.
+> 
+> Yours,
+> Linus Walleij
+> 
+
+
 -- 
-1.9.1
+Florian
