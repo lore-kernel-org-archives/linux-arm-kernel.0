@@ -1,40 +1,31 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 13 Jul 2015 09:32:51 +0000
-Subject: [PATCH 3/3] hwspinlock: sirf: remove useless header files
-Message-ID: <1436779971-3232-1-git-send-email-21cnbao@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jul 2015 10:25:19 +0100
+Subject: [PATCH 18/18] arm64: kconfig: select HAVE_CMPXCHG_LOCAL
+In-Reply-To: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1436779519-2232-19-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Chen <Wei.Chen@csr.com>
+We implement an optimised cmpxchg_local macro, so let the kernel know.
 
-Some header files are useless for atlas7 hwlock driver.
-remove them.
-
-Cc: Suman Anna <s-anna@ti.com>
-Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-Signed-off-by: Wei Chen <Wei.Chen@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Reviewed-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/hwspinlock/sirf_hwspinlock.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/hwspinlock/sirf_hwspinlock.c b/drivers/hwspinlock/sirf_hwspinlock.c
-index 692ac41..f35473c 100644
---- a/drivers/hwspinlock/sirf_hwspinlock.c
-+++ b/drivers/hwspinlock/sirf_hwspinlock.c
-@@ -6,13 +6,9 @@
-  * Licensed under GPLv2.
-  */
- 
--#include <linux/kernel.h>
- #include <linux/module.h>
--#include <linux/device.h>
- #include <linux/io.h>
- #include <linux/pm_runtime.h>
--#include <linux/slab.h>
--#include <linux/spinlock.h>
- #include <linux/hwspinlock.h>
- #include <linux/platform_device.h>
- #include <linux/of.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 682782ab6936..5a0646466622 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -53,6 +53,7 @@ config ARM64
+ 	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_CC_STACKPROTECTOR
+ 	select HAVE_CMPXCHG_DOUBLE
++	select HAVE_CMPXCHG_LOCAL
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_API_DEBUG
 -- 
-2.3.5
+2.1.4
