@@ -1,48 +1,57 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 13 Jul 2015 22:11:07 +0530
-Subject: [PATCH-v3 07/11] i2c: pxa: enable/disable i2c module across msg
- xfer
-In-Reply-To: <20150710082419.GE1528@katana>
-References: <1436210695-19159-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436210695-19159-8-git-send-email-vaibhav.hiremath@linaro.org>
- <20150710082419.GE1528@katana>
-Message-ID: <55A3EA23.8070009@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 13 Jul 2015 18:41:18 +0200
+Subject: Build regressions/improvements in v4.2-rc2
+In-Reply-To: <CANLsYkx4_Z-9xbhW82XKnRs38xhofmx+FNUATcNG-3AjOc8fzQ@mail.gmail.com>
+References: <1436779733-13678-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdX9pW3n+sD6zGFezZvDEcGvMmZobUDik4GYESh6iCgY5g@mail.gmail.com>
+ <CANLsYkx4_Z-9xbhW82XKnRs38xhofmx+FNUATcNG-3AjOc8fzQ@mail.gmail.com>
+Message-ID: <CAMuHMdXuG6-trLmNmNBjhrr2FRkcrCvKtXXUNS2dwxZavndU5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mathieu,
 
-
-On Friday 10 July 2015 01:54 PM, Wolfram Sang wrote:
-> On Tue, Jul 07, 2015 at 12:54:51AM +0530, Vaibhav Hiremath wrote:
->> From: Yi Zhang <yizhang@marvell.com>
+On Mon, Jul 13, 2015 at 5:57 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+> On 13 July 2015 at 03:53, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+>> On Mon, Jul 13, 2015 at 11:28 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> JFYI, when comparing v4.2-rc2[1] to v4.2-rc1[3], the summaries are:
+>>>   - build errors: +7/-5
 >>
->> Enable i2c module/unit before transmission and disable when it finishes.
+>>   + /home/kisskb/slave/src/fs/dax.c: error: implicit declaration of
+>> function 'copy_user_page' [-Werror=implicit-function-declaration]:  =>
+>> 267:2
 >>
->> why?
->> It's because the i2c bus may be distrubed if the slave device,
->> typically a touch, powers on.
+>> sh-randconfig (patch from Arnd updated and forwarder)
 >>
->> As we do not want to break slave mode support, this patch introduces
->> DT property to control disable of the I2C module after xfer in master mode
->> of operation.
+>>   + error: coresight-etm-cp14.c: undefined reference to
+>> `clk_add_alias':  => .init.text+0x12b0c)
 >>
->> i2c-disable-after-xfer : If set, driver will disable I2C module after msg xfer
+>> arm-randconfig
+>>
+>>> [1] http://kisskb.ellerman.id.au/kisskb/head/9134/ (all 254 configs)
+>>> [3] http://kisskb.ellerman.id.au/kisskb/head/9102/ (all 254 configs)
 >
-> Hmm, I am not sure this property fits into the "describing hardware"
-> category. And we can't make the below behaviour default, because the
-> udelay(100) will cause quite some latency.
->
->>
+> Is it possible to have more information on this?  There is no
+> reference to "clk_add_alias()" in coresight-etm-cp14.c and in the
 
-Sorry for delayed response,
-I thought I responded to this, but when I was preparing for V4,
-realized it that I did not :)
+That part I had noticed, too. And then I gave up...
 
-Yes, I agree that, this doesn't look like HW description. But I could
-not find any other mechanism to handle this.
-And also during V1 discussion, I did not get any objection to this
-approach.
+> config provided in [3], CONFIG_CORESIGHT isn't defined.  I will try to
+> reproduce this on my side once I have enough to work with.
 
+[3] is a link to the previous set of build results.
+You want to look at [1], where CONFIG_CORESIGHT=y:
+http://kisskb.ellerman.id.au/kisskb/buildresult/12462798/
 
-Thanks,
-Vaibhav
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
