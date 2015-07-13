@@ -1,66 +1,35 @@
-From: joshc@ni.com (Josh Cartwright)
-Date: Mon, 13 Jul 2015 12:37:39 -0500
-Subject: [PATCH v3 1/2] rtc: add rtc-lpc24xx driver
-In-Reply-To: <1436635730-15617-2-git-send-email-manabian@gmail.com>
-References: <1436635730-15617-1-git-send-email-manabian@gmail.com>
- <1436635730-15617-2-git-send-email-manabian@gmail.com>
-Message-ID: <20150713173739.GF25028@jcartwri.amer.corp.natinst.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jul 2015 19:17:55 +0100
+Subject: [PATCH 3/3] arm64, mm: Use IPIs for TLB invalidation.
+In-Reply-To: <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1436646323-10527-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150713181755.GP2632@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 11, 2015 at 07:28:49PM +0200, Joachim Eastwood wrote:
-> Add driver for the RTC found on NXP LPC178x/18xx/408x/43xx devices.
-> The RTC provides calendar and clock functionality together with
-> alarm interrupt support.
+On Sat, Jul 11, 2015 at 09:25:23PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
 > 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> ---
-[..]
-> +static int lpc24xx_rtc_remove(struct platform_device *pdev)
-> +{
-> +	struct lpc24xx_rtc *rtc = platform_get_drvdata(pdev);
-> +
-> +	/* Ensure all interrupt sources are masked */
-> +	rtc_writel(rtc, LPC24XX_AMR, LPC24XX_ALARM_DISABLE);
-> +	rtc_writel(rtc, LPC24XX_CIIR, 0);
-> +
-> +	rtc_writel(rtc, LPC24XX_CCR, LPC178X_CCALEN);
-> +
-> +	clk_disable_unprepare(rtc->clk_rtc);
-> +	clk_disable_unprepare(rtc->clk_reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id lpc24xx_rtc_match[] = {
-> +	{ .compatible = "nxp,lpc1788-rtc" },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc24xx_rtc_match);
-> +
-> +static struct platform_driver lpc24xx_rtc_driver = {
-> +	.probe	= lpc24xx_rtc_probe,
-> +	.remove	= lpc24xx_rtc_remove,
-> +	.driver	= {
-> +		.name = "lpc24xx-rtc",
-> +		.of_match_table	= lpc24xx_rtc_match,
-> +	},
-> +};
-> +module_platform_driver(lpc24xx_rtc_driver);
-> +
-> +MODULE_AUTHOR("Kevin Wells <wellsk40@gmail.com");
+> Most broadcast TLB invalidations are unnecessary.  So when
+> invalidating for a given mm/vma target the only the needed CPUs via
+> and IPI.
+> 
+> For global TLB invalidations, also use IPI.
+> 
+> Tested on Cavium ThunderX.
+> 
+> This change reduces 'time make -j48' on kernel from 139s to 116s (83%
+> as long).
 
-Missing closing '>'.
+Any idea *why* you're seeing such an improvement? Some older kernels had
+a bug where we'd try to flush a negative (i.e. huge) range by page, so it
+would be nice to rule that out. I assume these measurements are using
+mainline?
 
-Otherwise,
+Having TLBI responsible for that amount of a kernel build doesn't feel
+right to me and doesn't line-up with the profiles I'm used to seeing.
 
-Reviewed-by: Josh Cartwright <joshc@ni.com>
+You have 16-bit ASIDs, right?
 
-  Josh
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150713/a7b93098/attachment-0001.sig>
+Will
