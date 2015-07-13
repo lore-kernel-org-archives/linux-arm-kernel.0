@@ -1,82 +1,73 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 13 Jul 2015 09:28:48 +0000
-Subject: [PATCH 1/3] ARM: dts: atlas7: set right memory range and hwspinlock
- for IPC stuff
-Message-ID: <1436779729-3052-1-git-send-email-21cnbao@gmail.com>
+Date: Mon, 13 Jul 2015 09:28:49 +0000
+Subject: [PATCH 2/3] hwspinlock: sirf: fix the memory base and move to
+ devm_ioremap
+In-Reply-To: <1436779729-3052-1-git-send-email-21cnbao@gmail.com>
+References: <1436779729-3052-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <1436779729-3052-2-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Wei Chen <Wei.Chen@csr.com>
 
-this patch sets memory range for IPC stuff according to register layout.
-there is no memory overlap for all components.
-
-it also sets the right hwspinlock for these components.
+this patch moves to the right base since we fix the dts, then
+we can use devm_ioremap now.
 
 Cc: Suman Anna <s-anna@ti.com>
 Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 Signed-off-by: Wei Chen <Wei.Chen@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/boot/dts/atlas7.dtsi | 22 +++++++++++++---------
- 1 file changed, 13 insertions(+), 9 deletions(-)
+ drivers/hwspinlock/sirf_hwspinlock.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
-index 5dfd3a4..01ae884 100644
---- a/arch/arm/boot/dts/atlas7.dtsi
-+++ b/arch/arm/boot/dts/atlas7.dtsi
-@@ -94,39 +94,43 @@
- 		};
+diff --git a/drivers/hwspinlock/sirf_hwspinlock.c b/drivers/hwspinlock/sirf_hwspinlock.c
+index 1601854..692ac41 100644
+--- a/drivers/hwspinlock/sirf_hwspinlock.c
++++ b/drivers/hwspinlock/sirf_hwspinlock.c
+@@ -29,7 +29,7 @@ struct sirf_hwspinlock {
+ #define	HW_SPINLOCK_NUMBER	30
  
- 		ipc at 13240000 {
--			compatible = "sirf,atlas7-ipc";
-+			compatible = "sirf,atlas7-ipc", "simple-bus";
- 			ranges = <0x13240000 0x13240000 0x00010000>;
- 			#address-cells = <1>;
- 			#size-cells = <1>;
+ /* Hardware spinlock register offsets */
+-#define HW_SPINLOCK_BASE	0x404
++#define HW_SPINLOCK_BASE	0x04
+ #define HW_SPINLOCK_OFFSET(x)	(HW_SPINLOCK_BASE + 0x4 * (x))
  
--			hwspinlock {
-+			hwlock: hwlock at 0 {
- 				compatible = "sirf,hwspinlock";
--				reg = <0x13240000 0x00010000>;
+ static int sirf_hwspinlock_trylock(struct hwspinlock *lock)
+@@ -57,6 +57,7 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
+ {
+ 	struct sirf_hwspinlock *hwspin;
+ 	struct hwspinlock *hwlock;
++	struct resource *res;
+ 	int idx, ret;
+ 
+ 	if (!pdev->dev.of_node)
+@@ -68,7 +69,8 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	/* retrieve io base */
+-	hwspin->io_base = of_iomap(pdev->dev.of_node, 0);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	hwspin->io_base = devm_ioremap_resource(&pdev->dev, res);
+ 	if (!hwspin->io_base)
+ 		return -ENOMEM;
+ 
+@@ -91,7 +93,6 @@ static int sirf_hwspinlock_probe(struct platform_device *pdev)
+ 
+ reg_failed:
+ 	pm_runtime_disable(&pdev->dev);
+-	iounmap(hwspin->io_base);
+ 
+ 	return ret;
+ }
+@@ -109,8 +110,6 @@ static int sirf_hwspinlock_remove(struct platform_device *pdev)
+ 
+ 	pm_runtime_disable(&pdev->dev);
+ 
+-	iounmap(hwspin->io_base);
 -
--				num-spinlocks = <30>;
-+				reg = <0x13240400 0x0100>;
-+				#hwlock-cells = <1>;
- 			};
+ 	return 0;
+ }
  
- 			ns_m3_rproc at 0 {
- 				compatible = "sirf,ns2m30-rproc";
--				reg = <0x13240000 0x00010000>;
-+				reg = <0x13240108 0x4>,
-+					<0x13240208 0x4>;
- 				interrupts = <0 123 0>;
-+				hwlocks = <&hwlock 0>, <&hwlock 1>;
- 			};
- 
- 			ns_m3_rproc at 1 {
- 				compatible = "sirf,ns2m31-rproc";
--				reg = <0x13240000 0x00010000>;
-+				reg = <0x1324010C 0x4>,
-+					<0x1324020C 0x4>;
- 				interrupts = <0 126 0>;
- 			};
- 
- 			ns_kal_rproc at 0 {
- 				compatible = "sirf,ns2kal0-rproc";
--				reg = <0x13240000 0x00010000>;
-+				reg = <0x13240110 0x4>,
-+					<0x13240308 0x4>;
- 				interrupts = <0 124 0>;
- 			};
- 
- 			ns_kal_rproc at 1 {
- 				compatible = "sirf,ns2kal1-rproc";
--				reg = <0x13240000 0x00010000>;
-+				reg = <0x13240114 0x4>,
-+					<0x1324030C 0x4>;
- 				interrupts = <0 127 0>;
- 			};
- 		};
 -- 
 2.3.5
