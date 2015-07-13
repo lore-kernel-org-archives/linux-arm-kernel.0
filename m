@@ -1,37 +1,26 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:39:05 +0200
-Subject: [PATCH v2 17/48] usb: gadget: goku_udc: add ep capabilities support
-In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-18-git-send-email-r.baldyga@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 13 Jul 2015 23:47:22 +0200
+Subject: [PATCH] ARM: dts: cros-ec-keyboard: Add support for some
+ Japanese keys
+In-Reply-To: <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
+References: <1430791657-28014-1-git-send-email-zyw@rock-chips.com>
+ <CAD=FV=VW0s=PHUvATPC_XRPFh=49RcSYxUP56B4KRXDM6F4mnQ@mail.gmail.com>
+Message-ID: <20150713214722.GA16049@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+On Tue, May 05, 2015 at 11:10:42AM -0700, Doug Anderson wrote:
+> Chris,
+> 
+> Since there's no clear architecture here, I'd bet Olof would be the
+> one to take this.  I added him to this email, but he might request
+> that you resend the patch with him in the "To:" line.
+> 
+> Other than that:
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/udc/goku_udc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+Very belatedly applied for 4.2 fixes.
 
-diff --git a/drivers/usb/gadget/udc/goku_udc.c b/drivers/usb/gadget/udc/goku_udc.c
-index 9e8d842..46b8d14 100644
---- a/drivers/usb/gadget/udc/goku_udc.c
-+++ b/drivers/usb/gadget/udc/goku_udc.c
-@@ -1257,6 +1257,14 @@ static void udc_reinit (struct goku_udc *dev)
- 		INIT_LIST_HEAD (&ep->queue);
- 
- 		ep_reset(NULL, ep);
-+
-+		if (i == 0)
-+			ep->ep.caps.type_control = true;
-+		else
-+			ep->ep.caps.type_bulk = true;
-+
-+		ep->ep.caps.dir_in = true;
-+		ep->ep.caps.dir_out = true;
- 	}
- 
- 	dev->ep[0].reg_mode = NULL;
--- 
-1.9.1
+
+-Olof
