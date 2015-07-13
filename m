@@ -1,143 +1,111 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 13 Jul 2015 20:54:25 +0200 (CEST)
-Subject: [PATCH v7 0/9] Add simple NVMEM Framework via regmap.
-In-Reply-To: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1984575203.163267.1436813665815.JavaMail.open-xchange@oxbsltgw06.schlund.de>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 14 Jul 2015 00:27:54 +0530
+Subject: [PATCH-v6 0/6] mfd: 88pm800: Add Device tree support
+In-Reply-To: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436358392-15449-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <55A40A32.8060901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
 
-[add Ezequiel Garcia to CC]
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 10. Juli 2015 um
-> 11:43 geschrieben:
+On Wednesday 08 July 2015 05:56 PM, Vaibhav Hiremath wrote:
+> This patch-series adds support for Device tree to 88PM800 mfd driver.
+> It also sets default configuration of irq clear method if board file
+> doesn't exist.
 >
+> Testing::
+>   - Boot tested on PXA1928 based platform.
+>   - probe of mfd, rtc and regulator function passing successfully.
+>   - Basic read operations on registers
+>   - irq clear configuration
 >
-> Hi Greg,
->
-> This patchset adds a new simple NVMEM framework to kernel, and it is tested
-> with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
-> "begal bone cape manager" and few more on the way.
->
-> Thankyou all for providing inputs and comments on previous versions of this
-> patchset. Here is the v7 of the patchset addressing all the issues raised as
-> part of previous versions review.
->
-> Up until now, NVMEM drivers like eeprom were stored in drivers/misc, where
-> they
-> all had to duplicate pretty much the same code to register a sysfs file, allow
-> in-kernel users to access the content of the devices they were driving, etc.
-> This was also a problem as far as other in-kernel users were involved, since
-> the solutions used were pretty much different from on driver to another, there
-> was a rather big abstraction leak.
+> V5 => V6
+> =======
 
-i only want to mention that there are more places of NVMEM drivers like:
+I hope this will be queued for 4.2
 
-drivers/mfd/ab3100-otp.c
-drivers/soc/tegra/fuse/*.c
+Thanks,
+Vaibhav
 
+> Link to V5: https://lkml.org/lkml/2015/6/29/283
 >
-> Introduction of this framework aims at solving this. It also introduces DT
-> representation for consumer devices to go get the data they require (MAC
-> Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
+>   - Added new patch to the series PATCH [1/6]
+>     Cleanup patch to remove duplicate dev_err messages
+>   - Added new patch to the series PACTH [3/6]
+>     Cleanup patch to get pdata from 'device' pointer instead of
+>     passing as a parameter.
+>   - Removed irq_clr_mode/irq_mode field from 'struct pm80x_chip'
+>     and use pdata.irq_clr_method to set irq clear method.
+>   - Added acked-by and reviewed-by to respective patches.
 >
-> After learning few things about QCOM qfprom and other eeprom/efuses, which
-> has packed fields at bit level. Which makes it important to add support to
-> such memories. This version adds support to this type of non volatile
-> memories by adding support to bit level nvmem-cells.
+> V4 => V5
+> =======
+> Link to V4: https://lkml.org/lkml/2015/6/25/67
 >
-> Having regmap interface to this framework would give much better
-> abstraction for nvmems on different buses.
+>    - Renamed binding back again to 88pm800, as 'Yi Zhang' already started
+>      submitting 88pm88x, so 88pm8xx won't make sense. Better name would be to
+>      stick with 88pm80x.
+>    - Added new patch to series PATCH 2/4, to remove unwanted protection around
+>      padata
+>    - As suggested by Lee, added macro based implementation for CLEAR_ON_WRITE
+>      and CLEAR_ON_READ.
+>    - and fixed other trivial comments.
 >
-> patch 1-4 Introduces the NVMEM framework.
-> Patch 5-6 Adds Qualcomm specific qfprom driver.
-> Patch 7 migrates an existing driver to nvmem framework.
-> Patch 8 adds entry in MAINTAINERS.
+> V3 => V4
+> =======
+> Link to V3: https://lkml.org/lkml/2015/6/24/143
 >
-> Its also possible to migrate other nvmem drivers to this framework, and I
-> think
-> some of them already posted patches based on this framework.
+>    -  irq clear method is 88PM800 feature, which is not dependent on board or
+>       doesn't require any wiring changes, so DT is not the way.
+>       Hardcoded to "irq clear on write" if board file doesn't exist.
+>    - Updated binding patch (PATCH 3/3) to remove irq-clr-on-wr entry.
+>    - Since PATCH 3/3 changed from original, removed Rob's Acked-by.
 >
-> Providers APIs:
-> nvmem_register/unregister();
-
-How do i get the cell info from the devicetree into the nvmem_config?
-
-I expected a function something like of_nvmem_cell_info_get() in the Providers
-API.
-
+> V2 => V3
+> =======
+> Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg914299.html
 >
-> Consumers APIs:
-> Cell based apis for both DT/Non-DT:
-> nvmem_cell_get()/nvmem_cell_put();
-> devm_nvmem_cell_get()/devm_nvmem_cell_put();
-> of_nvmem_cell_get()
-> nvmem_cell_read()/nvmem_cell_write();
+>     - Replaced deprecated "regulator-compatible" property with "regulator-name".
+>     - Added Rob's Acked-by  to [PATCH 3/3]
 >
-> Raw byte access apis for both DT/non-DT.
-> nvmem_device_get()/nvmem_device_put()
-> devm_nvmem_device_get()/nvmem_device_put()
-> of_nvmem_device_get()
+> V1 => V2
+> =======
+> Link to V1: http://lkml.iu.edu/hypermail/linux/kernel/1505.3/04386.html
 >
-> nvmem_device_read()/nvmem_device_write();
-> nvmem_device_cell_read()/nvmem_device_cell_write();
+>    - Split binding changes from original commit
+>    - Updated binding info as per Rob's suggestion
+>    - Dropped PATCH 4/4, as discussed during review
+>    - Dropped PATCH 3/4, as it is independent RTC code change,
+>      so will submit it separately to ease merging.
+>    - Fixed all other minor comments
 >
-> Device Tree:
+> Attempt has been made to push some of the patches to the list sometime
+> back in 2013.
 >
-> /* Provider */
-> qfprom: qfprom at 00700000 {
-> ...
+> Link to previous patch submission:
+>          https://lkml.org/lkml/2013/8/14/86
 >
-> /* Data cells */
-> tsens_calibration: calib at 404 {
-> reg = <0x404 0x10>;
-> };
 >
-> tsens_calibration_bckp: calib_bckp at 504 {
-> reg = <0x504 0x11>;
-> bit-offset = 6;
-> nbits = 128;
-> };
+> TODO:
+> =====
+>    - init config for 88PM860 device
+>    - Rgulator driver changes to add support for 88PM860 device
 >
-> pvs_version: pvs-version at 6 {
-> reg = <0x6 0x2>
-> bit-offset = 7;
-> nbits = 2;
-> };
 >
-> speed_bin: speed-bin at c{
-> reg = <0xc 0x1>;
-> bit-offset = 2;
-> nbits = 3;
 >
-> };
-> ...
-> };
-> /* Consumer */
-> tsens {
-> ...
-> nvmem-cells = <&tsens_calibration>;
-> nvmem-cell-names = "calibration";
-> };
+> Vaibhav Hiremath (6):
+>    mfd: 88pm800: remove duplicate dev_err calls during probe
+>    mfd: 88pm800: Add device tree support
+>    mfd: 88pm800: Get pdata from 'device' rather than passing as a
+>      parameter
+>    mfd: 88pm800: Remove unnecessary protection around pdata
+>    mfd: 88pm800: Set default interrupt clear method
+>    mfd: devicetree: bindings: Add new 88pm800 mfd binding
 >
-> userspace interface: binary file in /sys/bus/nvmem/devices/*/nvmem
+>   Documentation/devicetree/bindings/mfd/88pm800.txt |  53 ++++++++++
+>   drivers/mfd/88pm800.c                             | 113 +++++++++++-----------
+>   include/linux/mfd/88pm80x.h                       |   9 +-
+>   3 files changed, 118 insertions(+), 57 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/mfd/88pm800.txt
 >
-> ex:
-> hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
->
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> *
-> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> ...
-> *
-> 0001000
-
-Since we're entering userspace the behavior should be clear.
-
-How do we treat register gaps? Fill them with zero?
-
-Best regards
-Stefan
