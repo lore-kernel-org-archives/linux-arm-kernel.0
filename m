@@ -1,80 +1,164 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Mon, 13 Jul 2015 16:14:17 +0700
-Subject: [RFCv2 PATCH 1/8] irqdomain: Introduce irq_domain_ops.init_alloc_info
+Date: Mon, 13 Jul 2015 16:14:18 +0700
+Subject: [RFCv2 PATCH 2/8] gic: Introduce gic_init_irq_alloc_info()
 In-Reply-To: <1436778864-17645-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1436778864-17645-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1436778864-17645-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1436778864-17645-3-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when calling irq_domain_alloc_irqs() on ARM64, it uses
-struct of_phandle_args to pass irq information. However, this is not
-appropriate for ACPI since of_phandle_args is specific to DT.
+Currently, gic_irq_domain_alloc assumes that the arg parameter must be
+a pointer to of_phandle_args. This is not appropriate for using with ACPI.
 
-Therefore, this patch introduces a new function pointer,
-irq_domain_ops.init_alloc_info, which can be used by irqchips to provide
-a way to initialize irqchip-specific data-structure for allocating IRQ.
+Furthermore, there are several irq mappings (i.e. SPI, PPI, and GSI),
+which can be used when allocating GIC irqs. This can be confusing
+when used in multiple initialization path (i.e. DT, ACPI, MSI, etc.).
+
+This patch introduces struct gic_irq_alloc_info, which replaces the
+of_phandle_args when calling gic_irq_domain_alloc(). Also, it introduces
+gic_init_irq_alloc_info(), a new helper function to help simplifying
+GIC irq allocation, which hooks into the new
+irq_domain_ops.init_alloc_info.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 ---
-NOTE:
-Similarly, x86 is currently using struct irq_alloc_info
-(see arch/x86/include/asm/hw_irq.h) and each irq_domain has different
-way of initializing this structure.
+ drivers/irqchip/irq-gic.c       | 82 ++++++++++++++++++++++++++++++++++-------
+ include/linux/irqchip/arm-gic.h | 11 ++++++
+ 2 files changed, 79 insertions(+), 14 deletions(-)
 
-Patch 2 also has an example of how I am planning to use this new op.
-
-Alternative would be to keep re-using of_phandle_args for ACPI as done
-currently. Any suggestions / feedbacks here are appreciated.
-
-Thanks,
-
-Suravee
-
- include/linux/irqdomain.h |  2 ++
- kernel/irq/irqdomain.c    | 10 +++++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index b4a74f7..1e51369 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -86,6 +86,8 @@ struct irq_domain_ops {
- 	/* extended V2 interfaces to support hierarchy irq_domains */
- 	int (*alloc)(struct irq_domain *d, unsigned int virq,
- 		     unsigned int nr_irqs, void *arg);
-+	int (*init_alloc_info)(uint32_t *data, int nr, void *ref,
-+			       void **info);
- 	void (*free)(struct irq_domain *d, unsigned int virq,
- 		     unsigned int nr_irqs);
- 	void (*activate)(struct irq_domain *d, struct irq_data *irq_data);
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 995d217..54434d2 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -478,6 +478,7 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 7f943ef..8ac8ec4 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -852,22 +852,18 @@ static struct notifier_block gic_cpu_notifier = {
+ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 				unsigned int nr_irqs, void *arg)
+ {
+-	int i;
++	int i, ret;
  	irq_hw_number_t hwirq;
- 	unsigned int type = IRQ_TYPE_NONE;
- 	int virq;
-+	void *info;
++	unsigned int type = IRQ_TYPE_NONE;
++	struct gic_irq_alloc_info *info = arg;
++	u32 intspec[3];
  
- 	domain = irq_data->np ? irq_find_host(irq_data->np) : irq_default_domain;
- 	if (!domain) {
-@@ -504,7 +505,14 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
- 		if (virq)
- 			return virq;
+-	if (acpi_disabled) {	/* DT case */
+-		int ret;
+-		unsigned int type = IRQ_TYPE_NONE;
+-		struct of_phandle_args *irq_data = arg;
+-
+-		ret = gic_irq_domain_xlate(domain, irq_data->np,
+-					irq_data->args,
+-					irq_data->args_count, &hwirq, &type);
+-		if (ret)
+-			return ret;
+-	} else {	/* ACPI case */
+-		hwirq = (irq_hw_number_t)*(u32 *)arg;
+-	}
++	intspec[0] = info->gic_int_type;
++	intspec[1] = info->hwirq;
++	intspec[2] = info->irq_type;
++	ret = gic_irq_domain_xlate(domain, info->ref, intspec, 3, &hwirq, &type);
++	if (ret)
++		return ret;
  
--		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, irq_data);
-+		if (domain->ops->init_alloc_info)
-+			if (domain->ops->init_alloc_info(irq_data->args,
-+							 irq_data->args_count,
-+							 irq_data->np,
-+							 &info))
-+				return 0;
+ 	for (i = 0; i < nr_irqs; i++)
+ 		gic_irq_domain_map(domain, virq + i, hwirq + i);
+@@ -875,10 +871,68 @@ static int gic_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
+ 	return 0;
+ }
+ 
++static int gic_init_irq_alloc_info(uint32_t *data, int nr, void *ref,
++				   void **info)
++{
++	struct gic_irq_alloc_info *alloc_info;
++	unsigned int gic_int_type;
++	unsigned int hwirq;
++	unsigned int irq_type;
 +
-+		virq = irq_domain_alloc_irqs(domain, 1, NUMA_NO_NODE, info);
- 		if (virq <= 0)
- 			return 0;
- 	} else {
++	if (nr != 3)
++		return -EINVAL;
++
++	gic_int_type = data[0];
++	hwirq = data[1];
++	irq_type = data[2];
++
++	alloc_info = kzalloc(sizeof(struct gic_irq_alloc_info), GFP_KERNEL);
++	if (!alloc_info)
++		return -ENOMEM;
++
++	if ((irq_type & IRQ_TYPE_SENSE_MASK) != IRQ_TYPE_LEVEL_HIGH &&
++	    (irq_type & IRQ_TYPE_SENSE_MASK) != IRQ_TYPE_EDGE_RISING)
++		return -EINVAL;
++
++	alloc_info->irq_type = irq_type;
++	alloc_info->ref = ref;
++
++	/*
++	 * ACPI have no bindings to indicate SPI or PPI, so we
++	 * use different mappings from DT in ACPI.
++	 *
++	 * For FDT
++	 * PPI interrupt: in the range [0, 15];
++	 * SPI interrupt: in the range [0, 987];
++	 *
++	 * For ACPI, GSI should be unique so using
++	 * the hwirq directly for the mapping:
++	 * PPI interrupt: in the range [16, 31];
++	 * SPI interrupt: in the range [32, 1019];
++	 */
++
++	if (gic_int_type != GIC_INT_TYPE_GSI) {
++		alloc_info->gic_int_type = gic_int_type;
++		alloc_info->hwirq = hwirq;
++	} else {
++		if (hwirq < 32) {
++			alloc_info->gic_int_type = GIC_INT_TYPE_PPI;
++			alloc_info->hwirq = hwirq - 16;
++		} else {
++			alloc_info->gic_int_type = GIC_INT_TYPE_SPI;
++			alloc_info->hwirq = hwirq - 32;
++		}
++	}
++
++	*info = alloc_info;
++	return 0;
++}
++
+ static const struct irq_domain_ops gic_irq_domain_hierarchy_ops = {
+ 	.xlate = gic_irq_domain_xlate,
+ 	.alloc = gic_irq_domain_alloc,
+ 	.free = irq_domain_free_irqs_top,
++	.init_alloc_info = gic_init_irq_alloc_info,
+ };
+ 
+ static const struct irq_domain_ops gic_irq_domain_ops = {
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b..4808514 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -89,12 +89,23 @@
+ #define GICH_MISR_EOI			(1 << 0)
+ #define GICH_MISR_U			(1 << 1)
+ 
++#define GIC_INT_TYPE_SPI		0
++#define GIC_INT_TYPE_PPI		1
++#define GIC_INT_TYPE_GSI		~0U
++
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/irqdomain.h>
+ 
+ struct device_node;
+ 
++struct gic_irq_alloc_info {
++	void *ref;
++	unsigned int irq_type;
++	unsigned int gic_int_type;
++	unsigned int hwirq;
++};
++
+ void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
 -- 
 2.1.0
