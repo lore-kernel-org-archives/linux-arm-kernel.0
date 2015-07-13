@@ -1,424 +1,262 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Jul 2015 10:25:03 +0100
-Subject: [PATCH 02/18] arm64: atomics: move ll/sc atomics into separate header
- file
+Date: Mon, 13 Jul 2015 10:25:08 +0100
+Subject: [PATCH 07/18] arm64: locks: patch in lse instructions when supported
+ by the CPU
 In-Reply-To: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
 References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436779519-2232-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1436779519-2232-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for the Large System Extension (LSE) atomic instructions
-introduced by ARM v8.1, move the current exclusive load/store (LL/SC)
-atomics into their own header file.
+On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+it makes sense to use them in preference to ll/sc sequences.
 
-Reviewed-by: Steve Capper <steve.capper@arm.com>
+This patch introduces runtime patching of our locking functions so that
+LSE atomic instructions are used for spinlocks and rwlocks.
+
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic.h       | 162 +--------------------------
- arch/arm64/include/asm/atomic_ll_sc.h | 205 ++++++++++++++++++++++++++++++++++
- 2 files changed, 207 insertions(+), 160 deletions(-)
- create mode 100644 arch/arm64/include/asm/atomic_ll_sc.h
+ arch/arm64/include/asm/spinlock.h | 132 +++++++++++++++++++++++++++++---------
+ 1 file changed, 103 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index 7047051ded40..9467450a5c03 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -30,6 +30,8 @@
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index cee128732435..7a1e852263be 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -16,6 +16,7 @@
+ #ifndef __ASM_SPINLOCK_H
+ #define __ASM_SPINLOCK_H
  
- #ifdef __KERNEL__
++#include <asm/lse.h>
+ #include <asm/spinlock_types.h>
+ #include <asm/processor.h>
  
-+#include <asm/atomic_ll_sc.h>
+@@ -38,11 +39,21 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+ 
+ 	asm volatile(
+ 	/* Atomically increment the next ticket. */
++	ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ "	prfm	pstl1strm, %3\n"
+ "1:	ldaxr	%w0, %3\n"
+ "	add	%w1, %w0, %w5\n"
+ "	stxr	%w2, %w1, %3\n"
+-"	cbnz	%w2, 1b\n"
++"	cbnz	%w2, 1b\n",
++	/* LSE atomics */
++"	mov	%w2, %w5\n"
++"	ldadda	%w2, %w0, %3\n"
++"	nop\n"
++"	nop\n"
++"	nop\n"
++	)
 +
- /*
-  * On ARM, ordinary assignment (str instruction) doesn't clear the local
-  * strex/ldrex monitor on some implementations. The reason we can use it for
-@@ -38,79 +40,6 @@
- #define atomic_read(v)	ACCESS_ONCE((v)->counter)
- #define atomic_set(v,i)	(((v)->counter) = (i))
+ 	/* Did we get the lock? */
+ "	eor	%w1, %w0, %w0, ror #16\n"
+ "	cbz	%w1, 3f\n"
+@@ -67,15 +78,25 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+ 	unsigned int tmp;
+ 	arch_spinlock_t lockval;
  
--/*
-- * AArch64 UP and SMP safe atomic ops.  We use load exclusive and
-- * store exclusive to ensure that these are atomic.  We may loop
-- * to ensure that the update happens.
-- */
--
--#define ATOMIC_OP(op, asm_op)						\
--static inline void atomic_##op(int i, atomic_t *v)			\
--{									\
--	unsigned long tmp;						\
--	int result;							\
--									\
--	asm volatile("// atomic_" #op "\n"				\
--"1:	ldxr	%w0, %2\n"						\
--"	" #asm_op "	%w0, %w0, %w3\n"				\
--"	stxr	%w1, %w0, %2\n"						\
--"	cbnz	%w1, 1b"						\
--	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
--	: "Ir" (i));							\
--}									\
--
--#define ATOMIC_OP_RETURN(op, asm_op)					\
--static inline int atomic_##op##_return(int i, atomic_t *v)		\
--{									\
--	unsigned long tmp;						\
--	int result;							\
--									\
--	asm volatile("// atomic_" #op "_return\n"			\
--"1:	ldxr	%w0, %2\n"						\
--"	" #asm_op "	%w0, %w0, %w3\n"				\
--"	stlxr	%w1, %w0, %2\n"						\
--"	cbnz	%w1, 1b"						\
--	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
--	: "Ir" (i)							\
--	: "memory");							\
--									\
--	smp_mb();							\
--	return result;							\
--}
--
--#define ATOMIC_OPS(op, asm_op)						\
--	ATOMIC_OP(op, asm_op)						\
--	ATOMIC_OP_RETURN(op, asm_op)
--
--ATOMIC_OPS(add, add)
--ATOMIC_OPS(sub, sub)
--
--#undef ATOMIC_OPS
--#undef ATOMIC_OP_RETURN
--#undef ATOMIC_OP
--
--static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
--{
--	unsigned long tmp;
--	int oldval;
--
--	smp_mb();
--
--	asm volatile("// atomic_cmpxchg\n"
--"1:	ldxr	%w1, %2\n"
--"	cmp	%w1, %w3\n"
--"	b.ne	2f\n"
--"	stxr	%w0, %w4, %2\n"
--"	cbnz	%w0, 1b\n"
--"2:"
--	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
--
--	smp_mb();
--	return oldval;
--}
--
- #define atomic_xchg(v, new) (xchg(&((v)->counter), new))
- 
- static inline int __atomic_add_unless(atomic_t *v, int a, int u)
-@@ -142,95 +71,8 @@ static inline int __atomic_add_unless(atomic_t *v, int a, int u)
- #define atomic64_read(v)	ACCESS_ONCE((v)->counter)
- #define atomic64_set(v,i)	(((v)->counter) = (i))
- 
--#define ATOMIC64_OP(op, asm_op)						\
--static inline void atomic64_##op(long i, atomic64_t *v)			\
--{									\
--	long result;							\
--	unsigned long tmp;						\
--									\
--	asm volatile("// atomic64_" #op "\n"				\
--"1:	ldxr	%0, %2\n"						\
--"	" #asm_op "	%0, %0, %3\n"					\
--"	stxr	%w1, %0, %2\n"						\
--"	cbnz	%w1, 1b"						\
--	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
--	: "Ir" (i));							\
--}									\
--
--#define ATOMIC64_OP_RETURN(op, asm_op)					\
--static inline long atomic64_##op##_return(long i, atomic64_t *v)	\
--{									\
--	long result;							\
--	unsigned long tmp;						\
--									\
--	asm volatile("// atomic64_" #op "_return\n"			\
--"1:	ldxr	%0, %2\n"						\
--"	" #asm_op "	%0, %0, %3\n"					\
--"	stlxr	%w1, %0, %2\n"						\
--"	cbnz	%w1, 1b"						\
--	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
--	: "Ir" (i)							\
--	: "memory");							\
--									\
--	smp_mb();							\
--	return result;							\
--}
--
--#define ATOMIC64_OPS(op, asm_op)					\
--	ATOMIC64_OP(op, asm_op)						\
--	ATOMIC64_OP_RETURN(op, asm_op)
--
--ATOMIC64_OPS(add, add)
--ATOMIC64_OPS(sub, sub)
--
--#undef ATOMIC64_OPS
--#undef ATOMIC64_OP_RETURN
--#undef ATOMIC64_OP
--
--static inline long atomic64_cmpxchg(atomic64_t *ptr, long old, long new)
--{
--	long oldval;
--	unsigned long res;
--
--	smp_mb();
--
--	asm volatile("// atomic64_cmpxchg\n"
--"1:	ldxr	%1, %2\n"
--"	cmp	%1, %3\n"
--"	b.ne	2f\n"
--"	stxr	%w0, %4, %2\n"
--"	cbnz	%w0, 1b\n"
--"2:"
--	: "=&r" (res), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
--
--	smp_mb();
--	return oldval;
--}
--
- #define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
- 
--static inline long atomic64_dec_if_positive(atomic64_t *v)
--{
--	long result;
--	unsigned long tmp;
--
--	asm volatile("// atomic64_dec_if_positive\n"
--"1:	ldxr	%0, %2\n"
--"	subs	%0, %0, #1\n"
--"	b.mi	2f\n"
--"	stlxr	%w1, %0, %2\n"
+-	asm volatile(
+-"	prfm	pstl1strm, %2\n"
+-"1:	ldaxr	%w0, %2\n"
+-"	eor	%w1, %w0, %w0, ror #16\n"
+-"	cbnz	%w1, 2f\n"
+-"	add	%w0, %w0, %3\n"
+-"	stxr	%w1, %w0, %2\n"
 -"	cbnz	%w1, 1b\n"
--"	dmb	ish\n"
 -"2:"
--	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
--	:
--	: "cc", "memory");
--
--	return result;
--}
--
- static inline int atomic64_add_unless(atomic64_t *v, long a, long u)
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	prfm	pstl1strm, %2\n"
++	"1:	ldaxr	%w0, %2\n"
++	"	eor	%w1, %w0, %w0, ror #16\n"
++	"	cbnz	%w1, 2f\n"
++	"	add	%w0, %w0, %3\n"
++	"	stxr	%w1, %w0, %2\n"
++	"	cbnz	%w1, 1b\n"
++	"2:",
++	/* LSE atomics */
++	"	ldar	%w0, %2\n"
++	"	eor	%w1, %w0, %w0, ror #16\n"
++	"	cbnz	%w1, 1f\n"
++	"	add	%w1, %w0, %3\n"
++	"	casa	%w0, %w1, %2\n"
++	"	and	%w1, %w1, #0xffff\n"
++	"	eor	%w1, %w1, %w0, lsr #16\n"
++	"1:")
+ 	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
+ 	: "I" (1 << TICKET_SHIFT)
+ 	: "memory");
+@@ -85,10 +106,19 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+ 
+ static inline void arch_spin_unlock(arch_spinlock_t *lock)
  {
- 	long c, old;
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-new file mode 100644
-index 000000000000..aef70f2d4cb8
---- /dev/null
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -0,0 +1,205 @@
-+/*
-+ * Based on arch/arm/include/asm/atomic.h
-+ *
-+ * Copyright (C) 1996 Russell King.
-+ * Copyright (C) 2002 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __ASM_ATOMIC_LL_SC_H
-+#define __ASM_ATOMIC_LL_SC_H
-+
-+/*
-+ * AArch64 UP and SMP safe atomic ops.  We use load exclusive and
-+ * store exclusive to ensure that these are atomic.  We may loop
-+ * to ensure that the update happens.
-+ *
-+ * NOTE: these functions do *not* follow the PCS and must explicitly
-+ * save any clobbered registers other than x0 (regardless of return
-+ * value).  This is achieved through -fcall-saved-* compiler flags for
-+ * this file, which unfortunately don't work on a per-function basis
-+ * (the optimize attribute silently ignores these options).
-+ */
-+
-+#ifndef __LL_SC_INLINE
-+#define __LL_SC_INLINE		static inline
-+#endif
-+
-+#ifndef __LL_SC_PREFIX
-+#define __LL_SC_PREFIX(x)	x
-+#endif
-+
-+#define ATOMIC_OP(op, asm_op)						\
-+__LL_SC_INLINE void							\
-+__LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
-+{									\
-+	unsigned long tmp;						\
-+	int result;							\
-+									\
-+	asm volatile("// atomic_" #op "\n"				\
-+"1:	ldxr	%w0, %2\n"						\
-+"	" #asm_op "	%w0, %w0, %w3\n"				\
-+"	stxr	%w1, %w0, %2\n"						\
-+"	cbnz	%w1, 1b"						\
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-+	: "Ir" (i));							\
-+}									\
-+
-+#define ATOMIC_OP_RETURN(op, asm_op)					\
-+__LL_SC_INLINE int							\
-+__LL_SC_PREFIX(atomic_##op##_return(int i, atomic_t *v))		\
-+{									\
-+	unsigned long tmp;						\
-+	int result;							\
-+									\
-+	asm volatile("// atomic_" #op "_return\n"			\
-+"1:	ldxr	%w0, %2\n"						\
-+"	" #asm_op "	%w0, %w0, %w3\n"				\
-+"	stlxr	%w1, %w0, %2\n"						\
-+"	cbnz	%w1, 1b"						\
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-+	: "Ir" (i)							\
-+	: "memory");							\
-+									\
-+	smp_mb();							\
-+	return result;							\
-+}
-+
-+#define ATOMIC_OPS(op, asm_op)						\
-+	ATOMIC_OP(op, asm_op)						\
-+	ATOMIC_OP_RETURN(op, asm_op)
-+
-+ATOMIC_OPS(add, add)
-+ATOMIC_OPS(sub, sub)
-+
-+#undef ATOMIC_OPS
-+#undef ATOMIC_OP_RETURN
-+#undef ATOMIC_OP
-+
-+__LL_SC_INLINE int
-+__LL_SC_PREFIX(atomic_cmpxchg(atomic_t *ptr, int old, int new))
-+{
-+	unsigned long tmp;
-+	int oldval;
-+
-+	smp_mb();
-+
-+	asm volatile("// atomic_cmpxchg\n"
-+"1:	ldxr	%w1, %2\n"
-+"	cmp	%w1, %w3\n"
-+"	b.ne	2f\n"
-+"	stxr	%w0, %w4, %2\n"
-+"	cbnz	%w0, 1b\n"
-+"2:"
-+	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
-+	: "Ir" (old), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+	return oldval;
-+}
-+
-+#define ATOMIC64_OP(op, asm_op)						\
-+__LL_SC_INLINE void							\
-+__LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
-+{									\
-+	long result;							\
-+	unsigned long tmp;						\
-+									\
-+	asm volatile("// atomic64_" #op "\n"				\
-+"1:	ldxr	%0, %2\n"						\
-+"	" #asm_op "	%0, %0, %3\n"					\
-+"	stxr	%w1, %0, %2\n"						\
-+"	cbnz	%w1, 1b"						\
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-+	: "Ir" (i));							\
-+}									\
-+
-+#define ATOMIC64_OP_RETURN(op, asm_op)					\
-+__LL_SC_INLINE long							\
-+__LL_SC_PREFIX(atomic64_##op##_return(long i, atomic64_t *v))		\
-+{									\
-+	long result;							\
-+	unsigned long tmp;						\
-+									\
-+	asm volatile("// atomic64_" #op "_return\n"			\
-+"1:	ldxr	%0, %2\n"						\
-+"	" #asm_op "	%0, %0, %3\n"					\
-+"	stlxr	%w1, %0, %2\n"						\
-+"	cbnz	%w1, 1b"						\
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)		\
-+	: "Ir" (i)							\
-+	: "memory");							\
-+									\
-+	smp_mb();							\
-+	return result;							\
-+}
-+
-+#define ATOMIC64_OPS(op, asm_op)					\
-+	ATOMIC64_OP(op, asm_op)						\
-+	ATOMIC64_OP_RETURN(op, asm_op)
-+
-+ATOMIC64_OPS(add, add)
-+ATOMIC64_OPS(sub, sub)
-+
-+#undef ATOMIC64_OPS
-+#undef ATOMIC64_OP_RETURN
-+#undef ATOMIC64_OP
-+
-+__LL_SC_INLINE long
-+__LL_SC_PREFIX(atomic64_cmpxchg(atomic64_t *ptr, long old, long new))
-+{
-+	long oldval;
-+	unsigned long res;
-+
-+	smp_mb();
-+
-+	asm volatile("// atomic64_cmpxchg\n"
-+"1:	ldxr	%1, %2\n"
-+"	cmp	%1, %3\n"
-+"	b.ne	2f\n"
-+"	stxr	%w0, %4, %2\n"
-+"	cbnz	%w0, 1b\n"
-+"2:"
-+	: "=&r" (res), "=&r" (oldval), "+Q" (ptr->counter)
-+	: "Ir" (old), "r" (new)
-+	: "cc");
-+
-+	smp_mb();
-+	return oldval;
-+}
-+
-+__LL_SC_INLINE long
-+__LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
-+{
-+	long result;
+-	asm volatile(
+-"	stlrh	%w1, %0\n"
+-	: "=Q" (lock->owner)
+-	: "r" (lock->owner + 1)
 +	unsigned long tmp;
 +
-+	asm volatile("// atomic64_dec_if_positive\n"
-+"1:	ldxr	%0, %2\n"
-+"	subs	%0, %0, #1\n"
-+"	b.mi	2f\n"
-+"	stlxr	%w1, %0, %2\n"
-+"	cbnz	%w1, 1b\n"
-+"	dmb	ish\n"
-+"2:"
-+	: "=&r" (result), "=&r" (tmp), "+Q" (v->counter)
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	ldr	%w1, %0\n"
++	"	add	%w1, %w1, #1\n"
++	"	stlrh	%w1, %0",
++	/* LSE atomics */
++	"	mov	%w1, #1\n"
++	"	nop\n"
++	"	staddlh	%w1, %0")
++	: "=Q" (lock->owner), "=&r" (tmp)
 +	:
+ 	: "memory");
+ }
+ 
+@@ -125,11 +155,19 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
+ 
+ 	asm volatile(
+ 	"	sevl\n"
++	ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	wfe\n"
+ 	"2:	ldaxr	%w0, %1\n"
+ 	"	cbnz	%w0, 1b\n"
+ 	"	stxr	%w0, %w2, %1\n"
+-	"	cbnz	%w0, 2b\n"
++	"	cbnz	%w0, 2b",
++	/* LSE atomics */
++	"1:	wfe\n"
++	"	mov	%w0, wzr\n"
++	"	casa	%w0, %w2, %1\n"
++	"	nop\n"
++	"	cbnz	%w0, 1b")
+ 	: "=&r" (tmp), "+Q" (rw->lock)
+ 	: "r" (0x80000000)
+ 	: "memory");
+@@ -139,11 +177,16 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+ {
+ 	unsigned int tmp;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"	ldaxr	%w0, %1\n"
+ 	"	cbnz	%w0, 1f\n"
+ 	"	stxr	%w0, %w2, %1\n"
+-	"1:\n"
++	"1:",
++	/* LSE atomics */
++	"	mov	%w0, wzr\n"
++	"	casa	%w0, %w2, %1\n"
++	"	nop")
+ 	: "=&r" (tmp), "+Q" (rw->lock)
+ 	: "r" (0x80000000)
+ 	: "memory");
+@@ -153,9 +196,10 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+ 
+ static inline void arch_write_unlock(arch_rwlock_t *rw)
+ {
+-	asm volatile(
+-	"	stlr	%w1, %0\n"
+-	: "=Q" (rw->lock) : "r" (0) : "memory");
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	"	stlr	wzr, %0",
++	"	swpl	wzr, wzr, %0")
++	: "=Q" (rw->lock) :: "memory");
+ }
+ 
+ /* write_can_lock - would write_trylock() succeed? */
+@@ -172,6 +216,10 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
+  *
+  * The memory barriers are implicit with the load-acquire and store-release
+  * instructions.
++ *
++ * Note that in UNDEFINED cases, such as unlocking a lock twice, the LL/SC
++ * and LSE implementations may exhibit different behaviour (although this
++ * will have no effect on lockdep).
+  */
+ static inline void arch_read_lock(arch_rwlock_t *rw)
+ {
+@@ -179,26 +227,43 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
+ 
+ 	asm volatile(
+ 	"	sevl\n"
++	ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	wfe\n"
+ 	"2:	ldaxr	%w0, %2\n"
+ 	"	add	%w0, %w0, #1\n"
+ 	"	tbnz	%w0, #31, 1b\n"
+ 	"	stxr	%w1, %w0, %2\n"
+-	"	cbnz	%w1, 2b\n"
++	"	nop\n"
++	"	cbnz	%w1, 2b",
++	/* LSE atomics */
++	"1:	wfe\n"
++	"2:	ldr	%w0, %2\n"
++	"	adds	%w1, %w0, #1\n"
++	"	tbnz	%w1, #31, 1b\n"
++	"	casa	%w0, %w1, %2\n"
++	"	sbc	%w0, %w1, %w0\n"
++	"	cbnz	%w0, 2b")
+ 	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+-	: "memory");
 +	: "cc", "memory");
-+
-+	return result;
-+}
-+
-+#endif	/* __ASM_ATOMIC_LL_SC_H */
+ }
+ 
+ static inline void arch_read_unlock(arch_rwlock_t *rw)
+ {
+ 	unsigned int tmp, tmp2;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	ldxr	%w0, %2\n"
+ 	"	sub	%w0, %w0, #1\n"
+ 	"	stlxr	%w1, %w0, %2\n"
+-	"	cbnz	%w1, 1b\n"
++	"	cbnz	%w1, 1b",
++	/* LSE atomics */
++	"	movn	%w0, #0\n"
++	"	nop\n"
++	"	nop\n"
++	"	staddl	%w0, %2")
+ 	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+ 	: "memory");
+@@ -206,17 +271,26 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
+ 
+ static inline int arch_read_trylock(arch_rwlock_t *rw)
+ {
+-	unsigned int tmp, tmp2 = 1;
++	unsigned int tmp, tmp2;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	mov	%w1, #1\n"
+ 	"	ldaxr	%w0, %2\n"
+ 	"	add	%w0, %w0, #1\n"
+ 	"	tbnz	%w0, #31, 1f\n"
+ 	"	stxr	%w1, %w0, %2\n"
+-	"1:\n"
+-	: "=&r" (tmp), "+r" (tmp2), "+Q" (rw->lock)
++	"1:",
++	/* LSE atomics */
++	"	ldr	%w0, %2\n"
++	"	adds	%w1, %w0, #1\n"
++	"	tbnz	%w1, #31, 1f\n"
++	"	casa	%w0, %w1, %2\n"
++	"	sbc	%w1, %w1, %w0\n"
++	"1:")
++	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+-	: "memory");
++	: "cc", "memory");
+ 
+ 	return !tmp2;
+ }
 -- 
 2.1.4
