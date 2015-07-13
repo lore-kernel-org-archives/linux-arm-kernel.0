@@ -1,45 +1,37 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 13 Jul 2015 11:03:50 +0200
-Subject: [PATCH v3 1/5] usb: gadget: ffs: call functionfs_unbind() if
- _ffs_func_bind() fails
+Date: Mon, 13 Jul 2015 11:03:54 +0200
+Subject: [PATCH v3 5/5] usb: gadget: atmel_usba_udc: add missing ret value
+ check
 In-Reply-To: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
 References: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436778234-12787-2-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436778234-12787-6-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function ffs_do_functionfs_bind() calls functionfs_bind() which allocates
-usb request and increments refcounts. These things needs to be cleaned
-up by if further steps of initialization fail by calling functionfs_unbind().
+Add missing return value check. In case of error print debug message
+and return error code.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Michal Nazarewicz <mina86@mina86.com>
 ---
- drivers/usb/gadget/function/f_fs.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
-index 6e7be91..adc6d52 100644
---- a/drivers/usb/gadget/function/f_fs.c
-+++ b/drivers/usb/gadget/function/f_fs.c
-@@ -2897,11 +2897,17 @@ static int ffs_func_bind(struct usb_configuration *c,
- 			 struct usb_function *f)
- {
- 	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
-+	struct ffs_function *func = ffs_func_from_usb(f);
-+	int ret;
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index 4095cce0..37d414e 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1989,6 +1989,10 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+ 		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
  
- 	if (IS_ERR(ffs_opts))
- 		return PTR_ERR(ffs_opts);
+ 		ret = of_property_read_string(pp, "name", &name);
++		if (ret) {
++			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
++			goto err;
++		}
+ 		ep->ep.name = name;
  
--	return _ffs_func_bind(c, f);
-+	ret = _ffs_func_bind(c, f);
-+	if (ret && !--ffs_opts->refcnt)
-+		functionfs_unbind(func->ffs);
-+
-+	return ret;
- }
- 
- 
+ 		ep->ep_regs = udc->regs + USBA_EPT_BASE(i);
 -- 
 1.9.1
