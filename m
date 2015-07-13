@@ -1,32 +1,44 @@
-From: claudiu.manoil@freescale.com (Manoil Claudiu)
-Date: Mon, 13 Jul 2015 15:08:39 +0000
-Subject: [PATCH] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and eTSEC2
-In-Reply-To: <20150713133138.GO23464@tiger>
-References: <1435213498-21025-1-git-send-email-b18965@freescale.com>
- <20150712065101.GA14354@localhost>
- <DM2PR03MB414BBD64BBDEB22DB0981619C9C0@DM2PR03MB414.namprd03.prod.outlook.com>
- <20150713133138.GO23464@tiger>
-Message-ID: <DM2PR03MB414D321810928CDA131A2849C9C0@DM2PR03MB414.namprd03.prod.outlook.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jul 2015 23:10:04 +0800
+Subject: [PATCH] ARM: dts: vf-colibri: define stdout-path property
+In-Reply-To: <1435910799-11706-1-git-send-email-stefan@agner.ch>
+References: <1435910799-11706-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150713151004.GA26642@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, July 13, 2015 4:32 PM
-> To: Manoil Claudiu-B08782
-> Cc: Wang Huan-B18965; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
-> shawn.guo at linaro.org
-> Subject: Re: [PATCH] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
-> eTSEC2
+On Fri, Jul 03, 2015 at 10:06:39AM +0200, Stefan Agner wrote:
+> Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
+> standard output.
 > 
-> I would like to see patch for bindings documentation before I apply this
-> one.
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> index 2cbe663..cb199ae 100644
+> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+> @@ -10,6 +10,7 @@
+>  / {
+>  	chosen {
+>  		bootargs = "console=ttyLP0,115200";
+> +		stdout-path = "serial0:115200n8";
 
-Agreed.  I just noticed that this is an old version of the patch (using an
-obsoleted property), so please expect a v2 of this patch as well,  besides
-the device tree binding document which I think will be named:
-./Documentation/devicetree/bindings/net/fsl-etsec2.txt.
+With this change, can bootargs just be dropped?
 
-Thanks.
-Claudiu
+Shawn
+
+>  	};
+>  
+>  	clk16m: clk16m {
+> -- 
+> 2.4.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
