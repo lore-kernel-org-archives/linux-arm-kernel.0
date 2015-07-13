@@ -1,83 +1,39 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 13 Jul 2015 10:11:15 +0200
-Subject: [PATCH 2/3] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <55A36E95.8030509@samsung.com>
-References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
- <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
- <55A36E95.8030509@samsung.com>
-Message-ID: <55A372A3.3030101@osg.samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jul 2015 16:11:15 +0800
+Subject: [PATCH] rtc: snvs: select option REGMAP_MMIO
+Message-ID: <1436775075-15037-1-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Select REGMAP_MMIO to fix the following build error seen with x86_64
+randconfig.
 
-Thanks a lot for the feedback.
+  drivers/built-in.o: In function `snvs_rtc_probe':
+rtc-snvs.c:(.text+0x567730): undefined reference to `devm_regmap_init_mmio_clk'
 
-On 07/13/2015 09:53 AM, Krzysztof Kozlowski wrote:
-> On 13.07.2015 16:42, Javier Martinez Canillas wrote:
->> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
->> a RTC and an I2C interface to program the individual components.
->>
->> The are already DT bindings for the regulators and clocks and
->> these reference to a bindings/mfd/max77802.txt file, that didn't
->> exist, for the details about the PMIC.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->>
->>  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
-> 
-> I wonder what happened with previous email...
-> http://www.spinics.net/lists/kernel/msg1784726.html
->
+Reported-by: kbuild test robot <fengguang.wu@intel.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+This is a fix to patch "rtc: snvs: use syscon to access register",
+which I queued on IMX tree for 4.3.  So I will apply it to the same
+branch.
 
-The story is that in v9 I split the series to add the max77802 clock and
-regulators support as different series to avoid the cross subsystem churn:
+Shawn
 
-[PATCH v9 0/6] Add Maxim 77802 clocks support
-https://lwn.net/Articles/608834/
+ drivers/rtc/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-[PATCH v9 0/2] Add Maxim 77802 regulator support
-https://lkml.org/lkml/2014/8/18/71
-
-But then forgot to add the common DT binding for the PMIC in bindings/mfd...
-
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
->> new file mode 100644
->> index 000000000000..875ebebbc5b0
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
->> @@ -0,0 +1,26 @@
->> +Maxim MAX77802 multi-function device
->> +
->> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
->> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
->> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
->> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
->> +regulators, clocks outputs and the RTC.
->> +
->> +Binding for the built-in 32k clock generator block is defined separately
->> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
->> +is defined in the bindings/regulator/max77802.txt file.
->> +
->> +Required properties:
->> +- compatible : Must be "maxim,max77686";
-> 
-> Shouldn't this be 77802?
->
-
-right, thanks for pointing out this. It is a copy & paste error. I'll wait a
-couple of days for more feedback and re-post.
-
-> Best regards,
-> Krzysztof
-> 
-
-Best regards,
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index 83b4b89b9d5a..533bfa3b6039 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1523,6 +1523,7 @@ config RTC_DRV_MXC
+ 
+ config RTC_DRV_SNVS
+ 	tristate "Freescale SNVS RTC support"
++	select REGMAP_MMIO
+ 	depends on HAS_IOMEM
+ 	depends on OF
+ 	help
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.9.1
