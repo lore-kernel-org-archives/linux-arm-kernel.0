@@ -1,13 +1,13 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 13 Jul 2015 13:39:49 +0100
-Subject: [PATCH V3 11/19] PCI: tegra: Add support for generic PM domains
+Date: Mon, 13 Jul 2015 13:39:51 +0100
+Subject: [PATCH V3 13/19] drm/tegra: gr3d: Add support for generic PM domains
 In-Reply-To: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
 References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1436791197-32358-12-git-send-email-jonathanh@nvidia.com>
+Message-ID: <1436791197-32358-14-git-send-email-jonathanh@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to the tegra PCI driver for generic PM domains. However,
+Add support to the tegra gr3d driver for generic PM domains. However,
 to ensure backward compatibility with older device tree blobs ensure
 that the driver can work with or without generic PM domains. In order
 to migrate to generic PM domain infrastructure the necessary changes
@@ -36,111 +36,117 @@ are:
    and disable these clocks before calling
    tegra_powergate_power_off_legacy().
 
-The helper functions for handling the powering on and off of the PCI
-controller have been updated to support generic PM domains. The
-tegra_pcie_power_off() was missing code to disable the clocks enabled in
-the tegra_pcie_power_on() function and so this has been added.
+Helper functions have been added to the gr3d driver for handling power on
+and off the power-domains with and without generic PM domain support.
 
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/pci/host/pci-tegra.c | 49 +++++++++++++++++++++++++++++++++-----------
- 1 file changed, 37 insertions(+), 12 deletions(-)
+ drivers/gpu/drm/tegra/gr3d.c | 57 ++++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 50 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index 10c05718dbfd..acd1f311eee5 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -40,6 +40,7 @@
- #include <linux/pci.h>
- #include <linux/phy/phy.h>
+diff --git a/drivers/gpu/drm/tegra/gr3d.c b/drivers/gpu/drm/tegra/gr3d.c
+index 0b3f2b977ba0..43a9d50e7e44 100644
+--- a/drivers/gpu/drm/tegra/gr3d.c
++++ b/drivers/gpu/drm/tegra/gr3d.c
+@@ -11,6 +11,7 @@
+ #include <linux/host1x.h>
+ #include <linux/module.h>
  #include <linux/platform_device.h>
 +#include <linux/pm_runtime.h>
  #include <linux/reset.h>
- #include <linux/sizes.h>
- #include <linux/slab.h>
-@@ -908,19 +909,32 @@ static int tegra_pcie_enable_controller(struct tegra_pcie *pcie)
  
- static void tegra_pcie_power_off(struct tegra_pcie *pcie)
+ #include <soc/tegra/pmc.h>
+@@ -238,6 +239,32 @@ static const u32 gr3d_addr_regs[] = {
+ 	GR3D_GLOBAL_SAMP23SURFADDR(15),
+ };
+ 
++static int gr3d_powergate_on(struct platform_device *pdev, int powergate_id,
++			     struct clk *clk, struct reset_control *rst)
++{
++	int err;
++
++	if (pm_runtime_enabled(&pdev->dev))
++		err = pm_runtime_get_sync(&pdev->dev);
++	else
++		err = tegra_powergate_power_on_legacy(powergate_id,
++						      clk, rst);
++	return err;
++}
++
++static int gr3d_powergate_off(struct platform_device *pdev, int powergate_id,
++			      struct clk *clk, struct reset_control *rst)
++{
++	int err;
++
++	if (pm_runtime_enabled(&pdev->dev))
++		err = pm_runtime_put_sync(&pdev->dev);
++	else
++		err = tegra_powergate_power_off_legacy(powergate_id,
++						       clk, rst);
++	return err;
++}
++
+ static int gr3d_probe(struct platform_device *pdev)
  {
-+	const struct tegra_pcie_soc_data *soc = pcie->soc_data;
- 	int err;
- 
--	/* TODO: disable and unprepare clocks? */
--
- 	err = phy_power_off(pcie->phy);
- 	if (err < 0)
- 		dev_warn(pcie->dev, "failed to power off PHY: %d\n", err);
- 
- 	reset_control_assert(pcie->pcie_xrst);
- 	reset_control_assert(pcie->afi_rst);
--	reset_control_assert(pcie->pex_rst);
- 
--	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
-+	clk_disable_unprepare(pcie->pll_e);
-+	if (soc->has_cml_clk)
-+		clk_disable_unprepare(pcie->cml_clk);
-+	clk_disable_unprepare(pcie->afi_clk);
-+	clk_disable_unprepare(pcie->pex_clk);
-+
-+	if (pm_runtime_enabled(pcie->dev)) {
-+		err = pm_runtime_put_sync(pcie->dev);
-+	} else {
-+		err = tegra_powergate_power_off_legacy(TEGRA_POWERGATE_PCIE,
-+						       pcie->pex_clk,
-+						       pcie->pex_rst);
-+	}
-+
-+	if (err < 0)
-+		dev_warn(pcie->dev, "powergate power-down failed: %d\n", err);
- 
- 	err = regulator_bulk_disable(pcie->num_supplies, pcie->supplies);
- 	if (err < 0)
-@@ -934,20 +948,28 @@ static int tegra_pcie_power_on(struct tegra_pcie *pcie)
- 
- 	reset_control_assert(pcie->pcie_xrst);
- 	reset_control_assert(pcie->afi_rst);
--	reset_control_assert(pcie->pex_rst);
--
--	tegra_powergate_power_off(TEGRA_POWERGATE_PCIE);
- 
- 	/* enable regulators */
- 	err = regulator_bulk_enable(pcie->num_supplies, pcie->supplies);
- 	if (err < 0)
- 		dev_err(pcie->dev, "failed to enable regulators: %d\n", err);
- 
--	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_PCIE,
--						pcie->pex_clk,
--						pcie->pex_rst);
--	if (err) {
--		dev_err(pcie->dev, "powerup sequence failed: %d\n", err);
-+	if (pm_runtime_enabled(pcie->dev)) {
-+		err = pm_runtime_get_sync(pcie->dev);
-+	} else {
-+		err = tegra_powergate_power_on_legacy(TEGRA_POWERGATE_PCIE,
-+						      pcie->pex_clk,
-+						      pcie->pex_rst);
-+	}
-+
-+	if (err < 0) {
-+		dev_err(pcie->dev, "powergate power-up failed: %d\n", err);
-+		return err;
-+	}
-+
-+	err = clk_prepare_enable(pcie->pex_clk);
-+	if (err < 0) {
-+		dev_err(pcie->dev, "failed to enable PEX clock: %d\n", err);
- 		return err;
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -281,22 +308,37 @@ static int gr3d_probe(struct platform_device *pdev)
+ 		}
  	}
  
-@@ -2001,6 +2023,9 @@ static int tegra_pcie_probe(struct platform_device *pdev)
- 
- 	pcibios_min_mem = 0;
- 
+-	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D, gr3d->clk,
+-						gr3d->rst);
 +	if (of_property_read_bool(pdev->dev.of_node, "power-domains"))
 +		pm_runtime_enable(&pdev->dev);
 +
- 	err = tegra_pcie_get_resources(pcie);
++	err = gr3d_powergate_on(pdev, TEGRA_POWERGATE_3D, gr3d->clk, gr3d->rst);
  	if (err < 0) {
- 		dev_err(&pdev->dev, "failed to request resources: %d\n", err);
+ 		dev_err(&pdev->dev, "failed to power up 3D unit\n");
+ 		return err;
+ 	}
+ 
++	err = clk_prepare_enable(gr3d->clk);
++	if (err < 0) {
++		dev_err(&pdev->dev, "failed to enable 3D unit clock\n");
++		return err;
++	}
++
+ 	if (gr3d->clk_secondary) {
+-		err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_3D1,
+-							gr3d->clk_secondary,
+-							gr3d->rst_secondary);
++		err = gr3d_powergate_on(pdev, TEGRA_POWERGATE_3D1,
++					gr3d->clk_secondary,
++					gr3d->rst_secondary);
+ 		if (err < 0) {
+ 			dev_err(&pdev->dev,
+ 				"failed to power up secondary 3D unit\n");
+ 			return err;
+ 		}
++
++		err = clk_prepare_enable(gr3d->clk_secondary);
++		if (err < 0) {
++			dev_err(&pdev->dev,
++				"failed to enable secondary 3D unit clock\n");
++			return err;
++		}
+ 	}
+ 
+ 	INIT_LIST_HEAD(&gr3d->client.base.list);
+@@ -338,12 +380,13 @@ static int gr3d_remove(struct platform_device *pdev)
+ 	}
+ 
+ 	if (gr3d->clk_secondary) {
+-		tegra_powergate_power_off(TEGRA_POWERGATE_3D1);
+ 		clk_disable_unprepare(gr3d->clk_secondary);
++		gr3d_powergate_off(pdev, TEGRA_POWERGATE_3D1,
++				   gr3d->clk_secondary, gr3d->rst_secondary);
+ 	}
+ 
+-	tegra_powergate_power_off(TEGRA_POWERGATE_3D);
+ 	clk_disable_unprepare(gr3d->clk);
++	gr3d_powergate_off(pdev, TEGRA_POWERGATE_3D, gr3d->clk, gr3d->rst);
+ 
+ 	return 0;
+ }
 -- 
 2.1.4
