@@ -1,52 +1,48 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 13 Jul 2015 15:53:55 -0500
-Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
-In-Reply-To: <1436820101-2172-1-git-send-email-balbi@ti.com>
-References: <1436820101-2172-1-git-send-email-balbi@ti.com>
-Message-ID: <CAGo_u6oM2rtdvLp3deDsxJJWpJ6YZJ5b02m1qDdxhEjUH_69dg@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 13 Jul 2015 23:20:10 +0200
+Subject: [PATCH v2 0/2] Add support for PL172 memory-controller
+Message-ID: <1436822412-20171-1-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 3:41 PM, Felipe Balbi <balbi@ti.com> wrote:
-> According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
-> the realtime counter sits in the Wakeup Always-On Power domain.
-> Furthermore, the counter will automatically switch the 32K clock source
-> when MPU goes into standby and automatically switch back to SYS_CLK or
-> ABE_LP when MPU goes out of standby.
->
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
+This patch set adds a memory driver and documentation for the ARM
+PL172. This driver  makes it possible to configure the static
+memory chip selects on the ARM PL172 MultiPort Memory Controller
+from a set of properties in DT. Configuration of dynamic memory
+(SDRAM) is not supported and is left to the boot loader. The
+intended usage is to setup timing and configuration for static
+memory devices like NAND and NOR Flash before they are probed by
+a driver. Pretty much what like all the other memory drivers do.
 
+As drivers/memory doesn't seem to have a maintainer of it's own
+I hope this patch set can go through the armsoc-drivers branch.
 
-Acked-by: NIshanth Menon <nm@ti.com>
+The previous version of the patch set didn't recive recivce much
+feedback and the cover letter can be found here:
+http://marc.info/?l=devicetree&m=143024189625522&w=2
 
-> ---
->  arch/arm/boot/dts/dra7.dtsi | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 8f1e25bcecbd..c1e6fd82485f 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -50,6 +50,7 @@
->                              <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
->                              <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
->                 interrupt-parent = <&gic>;
-> +               always-on;
->         };
->
->         gic: interrupt-controller at 48211000 {
-> --
-> 2.4.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+DT bindings for PL172 is based on the bindings for the TI AEMIF
+memory controller. PL172 can be found on a number of NXP devices
+like the LPC18xx family.
 
+Tested on Embedded Artists' LPC4357 Developer's Kit with NOR Flash
+(SST39VF320) and 74LCV16374 (gpio-74x164) on MPMC.
 
+Changes since v1:
+ - Add proper commit messages
+ - Misc clean ups
+
+Joachim Eastwood (2):
+  memory: add ARM PL172 MultiPort Memory Controller driver
+  doc: dt: add documentation for pl172 memory bindings
+
+ .../bindings/memory-controllers/arm,pl172.txt      | 125 +++++++++
+ drivers/memory/Kconfig                             |   8 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/pl172.c                             | 302 +++++++++++++++++++++
+ 4 files changed, 436 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/arm,pl172.txt
+ create mode 100644 drivers/memory/pl172.c
 
 -- 
----
-Regards,
-Nishanth Menon
+1.8.0
