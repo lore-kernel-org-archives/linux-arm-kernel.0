@@ -1,27 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jul 2015 22:35:28 +0200
-Subject: [PATCH v2 3/8] Document: dt: binding: imx: update document for
- imx6ul support
-In-Reply-To: <1434727951-4852-4-git-send-email-Frank.Li@freescale.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-4-git-send-email-Frank.Li@freescale.com>
-Message-ID: <CACRpkdZS3fa2cA-_y6mR0c6xNFYN=42+hKXcY+kMDzqEowpWFA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 13 Jul 2015 15:38:04 -0500
+Subject: [PATCH 3/3] i2c: omap: on ->remove() call pm_runtime_put_sync()
+In-Reply-To: <1436819884-1614-1-git-send-email-balbi@ti.com>
+References: <20150710172701.GB20408@saruman.tx.rr.com>
+ <1436819884-1614-1-git-send-email-balbi@ti.com>
+Message-ID: <1436819884-1614-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 19, 2015 at 5:32 PM,  <Frank.Li@freescale.com> wrote:
+we're about to remove the module, so we can't
+really schedule a PM transition in the future,
+we must wait for it to finish.
 
-> From: Frank Li <Frank.Li@freescale.com>
->
-> This part just add necessary change to boot imx6ul.
-> Update clock and pinctrl for imx6ul
->
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ drivers/i2c/busses/i2c-omap.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I guess you will take this through ARM SoC?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index 7030903a3057..133dd0db6f5b 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -1457,7 +1457,7 @@ static int omap_i2c_remove(struct platform_device *pdev)
+ 		return ret;
+ 
+ 	omap_i2c_write_reg(omap, OMAP_I2C_CON_REG, 0);
+-	pm_runtime_put(&pdev->dev);
++	pm_runtime_put_sync(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 	return 0;
+ }
+-- 
+2.4.4
