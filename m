@@ -1,100 +1,78 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 13 Jul 2015 20:50:41 +0900
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator
- supply property
-In-Reply-To: <1549704.AH5CyPJE5q@amdc1976>
-References: <'@samsung.com> <4721448.dpAUKITTdt@amdc1976>
- <CAJKOXPcX83C+=D-Fpstgu8N1y7-TFM3tXki_YfUyKkU1q3EfSA@mail.gmail.com>
- <1549704.AH5CyPJE5q@amdc1976>
-Message-ID: <CAJKOXPcwKG1JXs_MKqc4SnnRbpYfp22YdXa+yYuC3riZc0_Kug@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jul 2015 14:07:45 +0200
+Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
+ muxing controllers
+In-Reply-To: <55925EB1.1030500@atmel.com>
+References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
+ <557EF60D.8020007@wwwdotorg.org>
+ <20150617123816.GB12295@odux.rfo.atmel.com>
+ <5581988C.50000@wwwdotorg.org> <55925EB1.1030500@atmel.com>
+Message-ID: <CACRpkdb3+9=seJo7w5nrJS-iURH3SnH-PYVvJCQ-S619KOcKbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-13 20:20 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> On Monday, July 13, 2015 08:10:21 PM Krzysztof Kozlowski wrote:
->> 2015-07-13 20:02 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
->> >
->> > Hi,
->> >
->> > On Tuesday, June 23, 2015 09:24:40 AM Krzysztof Kozlowski wrote:
->> >> On 23.06.2015 08:46, Krzysztof Kozlowski wrote:
->> >> > On 23.06.2015 00:04, Michael Turquette wrote:
->> >> >> Quoting Kukjin Kim (2015-06-21 18:46:26)
->> >> >>> Krzysztof Kozlowski wrote:
->> >> >>>>
->> >> >>>> On 22.06.2015 10:38, Kukjin Kim wrote:
->> >> >>>>> Krzysztof Kozlowski wrote:
->> >> >>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->> >> >>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
->> >> >>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
->> >> >>>>>>>>
->> >> >>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
->> >> >>>>>>>> regulator supply properties for migrating from Exynos specific
->> >> >>>>>>>> cpufreq driver to using generic cpufreq driver.
->> >> >>>>>>>>
->> >> >>>>>>>> Changes by Bartlomiej:
->> >> >>>>>>>> - removed Exynos5250 and Exynos5420 support for now
->> >> >>>>>>>>
->> >> >>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> >> >>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
->> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> >> >>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
->> >> >>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
->> >> >>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
->> >> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
->> >> >>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> >> >>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> >> >>>>>>>
->> >> >>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> >> >>>>>>
->> >> >>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
->> >> >>>>>> picks it by himself from LKML.
->> >> >>>>>>
->> >> >>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
->> >> >>>>> v4.2-rc1 after v4.2-rc1 release.
->> >> >>>>
->> >> >>>> You mean it is for v4.3, not v4.2?
->> >> >>>>
->> >> >>> Oops, yes v4.3.
->> >> >>>
->> >> >>> Thanks for the correction.
->> >> >>
->> >> >> Kukjin & Krzysztof,
->> >> >>
->> >> >> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
->> >> >> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
->> >> >> week).
->> >> >>
->> >> >> Is patch 4 going out for 4.2 or 4.3?
->> >> >
->> >> > It is quite late for sending pull request to arm-soc for 4.2.
->> >> > For example SoCFPGA pull request from last week was rejected:
->> >> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
->> >>
->> >> Oh, that was wrong link. Here it is:
->> >> http://www.spinics.net/lists/arm-kernel/msg425911.html
->> >>
->> >> > If you want to take it for 4.2 then I am fine with it but this will
->> >> > cause some easy but annoying conflicts. There aren't difficult - just
->> >> > most of nodes in board DTS changed their place.
->> >> >
->> >> > Example of resolution (target file after merge, with cpu nodes reordered
->> >> > alphabetically):
->> >> > https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
->> >
->> > This patch is needed for v4.2 as other changes has been already
->> > merged.
->> >
->> > Krzysztof/Kukjin, could you please take care of it?
->>
->> Of course! It is already in my queue. I'll send it later to Kukjin for
->> 4.3 (unless he picks it also).
+On Tue, Jun 30, 2015 at 11:17 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+
+> - no agreement on 3 points:
+> 1/ ways to use groups in generic pinctrl
+> 2/ ways to describe a comprehensive configuration in device tree
+> 3/ readability of a sysfs information
 >
-> It is in your queue for v4.3 but the patch is needed for v4.2,
-> without it cpufreq support will not work for Exynos4210 platforms.
+> - no way out on the generic pinctrl little changes that Ludovic proposed
+> as Linus W. never gave his point of view (RFC posts on April the 2nd).
 
-Hmm... it makes sense to push it during this rc-cycle to bring back
-crippled feature.
+Yeah I know. I am battling with this, it is one of those topics
+where you feel "eeeehhhh" and try to avoid looking at it. Sadly
+I have to...
 
-Best regards,
-Krzysztof
+I refer to Documentation/ManagementStyle, chapter 1,
+"Decisions".
+
+What makes me feel uneasy about these things is that the decisions
+are irreversible due to the nature of the device tree bindings.
+
+I am not a manager, but a maintainer...
+
+> Ludovic explained at length our point of view and gave detailed
+> technical arguments. We don't intend to convince you, we just would like
+> the harmless modifications to be integrated.
+
+So is it universally agreed that the changes are harmless?
+
+If they are harmless, I would be able to revert the patch and
+nothing breaks in the world, I don't think that is the case. The
+case is a piece of code and functionality that is not AT91-specific
+but has to be maintained in the core pinctrl code forever.
+
+That is basically the big problem with anything device tree.
+It etches stuff in stone so it can't be changed, like ever.
+Further, the decision on whether to etch this or that is
+pushed to Linux subsystem maintainers, who are clearly
+unsuited for the task. :(
+
+> As we preferred to give a chance to the generic pinconf/pinctrl for our
+> use by adding a little bit of flexibility, we are now in a situation
+> where we are nearly obliged to give up this approach and write a new
+> driver without the use of the generic facilities: what a pity!
+> We lost several months of useless work to match what we thought the
+> maintainer would prefer.
+>
+> So Linus, do you confirm that we won't go further with this approach?
+>
+> We are pretty disappointed by the way this interaction with the pinctrl
+> sub-system went.
+
+I'm sorry, I am just trying to wait for consensus but it seems to
+be hard for that to happen.
+
+Things I need:
+
+- More DT bindings people to look at this patch.
+
+- More other driver maintainers to look at this patch.
+  Sacha is one of those I'd like to get an opinion from
+  for example. ACKs, Reviewed-by's are always good.
+
+Yours,
+Linus Walleij
