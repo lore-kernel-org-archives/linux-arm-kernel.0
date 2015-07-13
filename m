@@ -1,38 +1,40 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 13 Jul 2015 20:29:01 -0000
-Subject: [patch 02/11] ARM/locomo: Consolidate chained IRQ handler
- install/remove
+Date: Mon, 13 Jul 2015 20:29:09 -0000
+Subject: [patch 07/11] ARM/sa1111: Prepare sa1111_irq_handler for irq argument
+ removal
 References: <20150713090726.316699641@linutronix.de>
-Message-ID: <20150713090936.097948542@linutronix.de>
+Message-ID: <20150713090936.516105694@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chained irq handlers usually set up handler data as well. We now have
-a function to set both under irq_desc->lock. Replace the two calls
-with one.
+The irq argument of most interrupt flow handlers is unused or merily
+used instead of a local variable. The handlers which need the irq
+argument can retrieve the irq number from the irq descriptor.
 
-Search and conversion was done with coccinelle.
+Search and update was done with coccinelle and the invaluable help of
+Julia Lawall.
 
-Reported-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 Cc: Julia Lawall <Julia.Lawall@lip6.fr>
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
 Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/common/locomo.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/common/sa1111.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Index: tip/arch/arm/common/locomo.c
+Index: tip/arch/arm/common/sa1111.c
 ===================================================================
---- tip.orig/arch/arm/common/locomo.c
-+++ tip/arch/arm/common/locomo.c
-@@ -475,8 +475,7 @@ static void __locomo_remove(struct locom
- 	device_for_each_child(lchip->dev, NULL, locomo_remove_child);
- 
- 	if (lchip->irq != NO_IRQ) {
--		irq_set_chained_handler(lchip->irq, NULL);
--		irq_set_handler_data(lchip->irq, NULL);
-+		irq_set_chained_handler_and_data(lchip->irq, NULL, NULL);
- 	}
- 
- 	iounmap(lchip->base);
+--- tip.orig/arch/arm/common/sa1111.c
++++ tip/arch/arm/common/sa1111.c
+@@ -197,8 +197,9 @@ static struct sa1111_dev_info sa1111_dev
+  * will call us again if there are more interrupts to process.
+  */
+ static void
+-sa1111_irq_handler(unsigned int irq, struct irq_desc *desc)
++sa1111_irq_handler(unsigned int __irq, struct irq_desc *desc)
+ {
++	unsigned int irq = irq_desc_get_irq(desc);
+ 	unsigned int stat0, stat1, i;
+ 	struct sa1111 *sachip = irq_desc_get_handler_data(desc);
+ 	void __iomem *mapbase = sachip->base + SA1111_INTC;
