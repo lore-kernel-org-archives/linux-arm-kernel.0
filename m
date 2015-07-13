@@ -1,22 +1,21 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 13 Jul 2015 16:32:53 +0300
-Subject: Extensions for KVM MSI related ioctls
-In-Reply-To: <55A3B090.6090002@redhat.com>
-References: <55A39231.4050904@arm.com> <55A3B090.6090002@redhat.com>
-Message-ID: <03b901d0bd70$6c2f4b50$448de1f0$@samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 13 Jul 2015 21:37:57 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6sl-warp: Add changes for rev1.12
+In-Reply-To: <1435583143-4734-1-git-send-email-fabio.estevam@freescale.com>
+References: <1435583143-4734-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20150713133757.GP23464@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On Mon, Jun 29, 2015 at 10:05:42AM -0300, Fabio Estevam wrote:
+> Warp board rev1.12 is the version of the hardware that will be publicly
+> available for the customers.
+> 
+> It uses UART5 as the Bluetooth serial port as well as some
+> additional signals for HOSTWAKE on Wifi and Bluetooth.
+> 
+> Make the changes to support the rev1.12 hardware.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-> I think I prefer the flag.  Offhand it sounds easier to add support for
-> it to non-ARM architectures, compared to KVM_IRQ_ROUTING_EXTENDED_MSI.
-
- Actually i also voted for flag, because it is already introduced in (2), and i'm not a fan of
-adding new definitions where we can reuse existing ones. IMHO using flag would make an API more
-consistent.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Applied, thanks.
