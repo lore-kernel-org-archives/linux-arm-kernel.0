@@ -1,66 +1,36 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 13 Jul 2015 15:22:24 +0100
-Subject: [PATCH v2 02/10] arm64/debug: Mask off all reserved bits from
- generated ESR values
-In-Reply-To: <20150713141440.GC19083@leverpostej>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-3-git-send-email-Dave.Martin@arm.com>
- <20150713141440.GC19083@leverpostej>
-Message-ID: <20150713142012.GA10670@e103592.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 13 Jul 2015 16:24:23 +0200
+Subject: Extensions for KVM MSI related ioctls
+In-Reply-To: <03b901d0bd70$6c2f4b50$448de1f0$@samsung.com>
+References: <55A39231.4050904@arm.com> <55A3B090.6090002@redhat.com>
+ <03b901d0bd70$6c2f4b50$448de1f0$@samsung.com>
+Message-ID: <55A3CA17.1010500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 03:14:40PM +0100, Mark Rutland wrote:
-> On Mon, Jul 13, 2015 at 02:25:49PM +0100, Dave P Martin wrote:
-> > There are only 16 comment bits in a BRK instruction, which
-> > correspond to ESR bits 15:0.  Bits 24:16 of the ESR are RES0,
-> > and might have weird meanings in the future.
-> > 
-> > This code inserts 16 bits of comment in the ESR value instead of
-> > 20 (almost certainly a typo in the original code).
+On 07/13/2015 03:32 PM, Pavel Fedin wrote:
+>  Hello!
 > 
-> I'd guess that someone got confused with the instruction encoding where
-> the immediate lives in bits 20:5, though the mask would be wrong anyway.
+>> I think I prefer the flag.  Offhand it sounds easier to add support for
+>> it to non-ARM architectures, compared to KVM_IRQ_ROUTING_EXTENDED_MSI.
 > 
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> Looks sane to me.
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>  Actually i also voted for flag, because it is already introduced in (2), and i'm not a fan of
+> adding new definitions where we can reuse existing ones. IMHO using flag would make an API more
+> consistent.
 
-Cheers.
+OK I will respin with user space flag.
 
-This was harmless up to now, anyway.  It will only bite if someone
-passes x >= 0x10000, which they're not supposed to do.
+Andre, what about the kernel routing entry struct. You wanted me to get
+rid of  KVM_IRQ_ROUTING_EXTENDED_MSI there too. Will you be able to
+manage a usespace wrong setting if the type is not set?
 
----Dave
+Best Regards
 
+Eric
 > 
-> Mark.
+> Kind regards,
+> Pavel Fedin
+> Expert Engineer
+> Samsung Electronics Research center Russia
 > 
-> > ---
-> >  arch/arm64/include/asm/debug-monitors.h |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> > index f3d2dbd..ab7d5a8 100644
-> > --- a/arch/arm64/include/asm/debug-monitors.h
-> > +++ b/arch/arm64/include/asm/debug-monitors.h
-> > @@ -45,7 +45,7 @@
-> >  /*
-> >   * ESR values expected for dynamic and compile time BRK instruction
-> >   */
-> > -#define DBG_ESR_VAL_BRK(x)	(0xf2000000 | ((x) & 0xfffff))
-> > +#define DBG_ESR_VAL_BRK(x)	(0xf2000000 | ((x) & 0xffff))
-> >  
-> >  /*
-> >   * #imm16 values used for BRK instruction generation
-> > -- 
-> > 1.7.10.4
-> > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
