@@ -1,78 +1,105 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 13 Jul 2015 18:20:07 +0800
-Subject: [PATCH v5 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <1436778294-47635-2-git-send-email-yh.huang@mediatek.com>
-References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
- <1436778294-47635-2-git-send-email-yh.huang@mediatek.com>
-Message-ID: <CAGS+omCdLbNu03c2DdiLEqNmGVkEoGu3972-YDp8ne5G9WZJ0g@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 13 Jul 2015 11:21:58 +0100
+Subject: [PATCH v7 4/9] nvmem: Add bindings for simple nvmem framework
+In-Reply-To: <CAL_JsqKYT-+T=D=TKCb1TcydOvBTE8_yc-EEe1cwdmhr1B0dHQ@mail.gmail.com>
+References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1436521513-10838-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <CAL_JsqKYT-+T=D=TKCb1TcydOvBTE8_yc-EEe1cwdmhr1B0dHQ@mail.gmail.com>
+Message-ID: <55A39146.4080207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> Document the device-tree binding of MediatTek display PWM.
-> The PWM has one channel to control the backlight brightness for display.
-> It supports MT8173 and MT6595.
+
+Thanks Rob for quick review,
+
+On 10/07/15 20:04, Rob Herring wrote:
+> On Fri, Jul 10, 2015 at 4:45 AM, Srinivas Kandagatla
+> <srinivas.kandagatla@linaro.org> wrote:
+>> This patch adds bindings for simple nvmem framework which allows nvmem
+>> consumers to talk to nvmem providers to get access to nvmem cell data.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> [Maxime Ripard: intial version of eeprom framework]
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   Documentation/devicetree/bindings/nvmem/nvmem.txt | 85 +++++++++++++++++++++++
+>>   1 file changed, 85 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/nvmem/nvmem.txt b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> new file mode 100644
+>> index 0000000..849f1e1
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/nvmem/nvmem.txt
+>> @@ -0,0 +1,85 @@
+>> += NVMEM(Non Volatile Memory) Data Device Tree Bindings =
+>> +
+>> +This binding is intended to represent the location of hardware
+>> +configuration data stored in NVMEMs like eeprom, efuses and so on.
+>> +
+>> +On a significant proportion of boards, the manufacturer has stored
+>> +some data on NVMEM, for the OS to be able to retrieve these information
+>> +and act upon it. Obviously, the OS has to know about where to retrieve
+>> +these data from, and where they are stored on the storage device.
+>> +
+>> +This document is here to document this.
+>> +
+>> += Data providers =
+>> +Contains bindings specific to provider drivers and data cells as children
+>> +of this node.
 >
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> #address-cells and #size-cells are required here.
 >
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> new file mode 100644
-> index 0000000..aac29dc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> @@ -0,0 +1,29 @@
-> +MediaTek display PWM controller
-> +
-> +Required properties:
-> + - compatible: should be "mediatek,<name>-disp-pwm":
-> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
-> + - reg: physical base address and length of the controller's registers.
-> + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-> +   the cell format.
-> + - clocks: phandle and clock specifier of the PWM reference clock.
-> + - clock-names: must contain the following:
-> +   - "main": clock used to generate PWM signals.
-> +   - "mm": sync signals from the modules of mmsys.
-> + - pinctrl-names: Must contain a "default" entry.
-> + - pinctrl-0: One property must exist for each entry in pinctrl-names.
-> +   See pinctrl/pinctrl-bindings.txt for details of the property values.
-> +
-> +Example:
-> +       pwm0: pwm at 1401e000 {
-> +               compatible = "mediatek,mt8173-disp-pwm",
-> +                            "mediatek,mt6595-disp-pwm";
-> +               reg = <0 0x1401e000 0 0x1000>;
-> +               #pwm-cells = <2>;
-> +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-> +                        <&mmsys CLK_MM_DISP_PWM0MM>;
-> +               clock-names = "main", "mm";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&disp_pwm0_pins>;
-> +       };
-
-Please show an example consumer of the pwm phandle to show how to set
-the two properties required by the #pwm-cells.
-Although the pwm-specifier typically encodes the chip-relative PWM
-number and the PWM period in nanoseconds, it is technically controller
-specific.
-
-In fact, since the mtk-disp-pwm does not have a chip-relative PWM
-number, could we in fact set #pwm-cells = <1>, and only specify the
-requested PWM period?
-
--Dan
-
-
-> --
-> 1.8.1.1.dirty
+>> +
+>> +Optional properties:
+>> + read-only: Mark the provider as read only.
 >
+> Couldn't this be per field rather than global?
 >
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Not ATM, The reason for making this property global is to mark the 
+complete nvmem to be readonly/read-write. Which most of the use-cases 
+will have. Currently this property is used for setting permissions on 
+the sysfs binary file, also it would be impossible to apply per field 
+read-only property to such file.
+
+Am also planning to send few patches on top of these to expose fields in 
+sysfs which would then allow us to use per field read-only property.
+Again not sure how the direct access to nvmem would fit in with such 
+requirements. Need to evaluate this option in more detail though. :-)
+
+>> +
+>> += Data cells =
+>> +These are the child nodes of the provider which contain data cell
+>> +information like offset and size in nvmem provider.
+>> +
+>> +Required properties:
+>> +reg:   specifies the offset in byte within that storage device, start bit
+>> +       in the byte and the length in bytes of the data we care about.
+>> +       There could be more than one offset-length pairs in this property.
+>> +
+>> +Optional properties:
+>> +
+>> +bit-offset: specifies the offset in bit within the address range specified
+>> +       by reg property. Can take values from 0-7.
+>> +nbits: specifies number of bits this cell occupies starting from bit-offset.
+>
+> How about just: "bits = <<offset> <size>>"
+>
+Thats another possible way to specify the same info, Only reason I came 
+up with bit-offset and nbits is due to the fact that similar properties 
+were seen in other device DT bindings.
+
+I will try your suggestion and see how it looks before I send new version.
+
+> Then the bit specification is more aligned with the byte location
+> (i.e. reg property).
+>
+> You could also do this all in the reg property with 2 address cells
+> for byte and bit position and then size can be in bits. reg doesn't
+> have to match a memory mapped bus addressing meanings. If you wanted
+> to handle ranges and address translation, then you would need custom
+> functions like PCI does. I'm not sure you would need that.
+I wanted to keep things simple for this first version.
+>
+
+--srini
