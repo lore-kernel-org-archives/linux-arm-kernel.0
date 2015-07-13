@@ -1,114 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Jul 2015 10:25:10 +0100
-Subject: [PATCH 09/18] arm64: xchg: patch in lse instructions when supported
- by the CPU
+Date: Mon, 13 Jul 2015 10:25:05 +0100
+Subject: [PATCH 04/18] arm64: alternatives: add cpu feature for lse atomics
 In-Reply-To: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
 References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1436779519-2232-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1436779519-2232-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
-it makes sense to use them in preference to ll/sc sequences.
-
-This patch introduces runtime patching of our xchg primitives so that
-the LSE swp instruction (yes, you read right!) is used instead.
+Add a CPU feature for the LSE atomic instructions, so that they can be
+patched in at runtime when we detect that they are supported.
 
 Reviewed-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cmpxchg.h | 38 +++++++++++++++++++++++++++++++++-----
- 1 file changed, 33 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/cpufeature.h | 3 ++-
+ arch/arm64/kernel/setup.c           | 1 +
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index d8c25b7b18fb..d0cce8068902 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -22,6 +22,7 @@
- #include <linux/mmdebug.h>
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index eb09f1ee8036..d58db9d3b4fa 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -25,8 +25,9 @@
+ #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
+ #define ARM64_WORKAROUND_845719			2
+ #define ARM64_HAS_SYSREG_GIC_CPUIF		3
++#define ARM64_CPU_FEAT_LSE_ATOMICS		4
  
- #include <asm/barrier.h>
-+#include <asm/lse.h>
+-#define ARM64_NCAPS				4
++#define ARM64_NCAPS				5
  
- static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
- {
-@@ -29,37 +30,65 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+ #ifndef __ASSEMBLY__
  
- 	switch (size) {
- 	case 1:
--		asm volatile("//	__xchg1\n"
-+		asm volatile(ARM64_LSE_ATOMIC_INSN(
-+		/* LL/SC */
- 		"1:	ldxrb	%w0, %2\n"
- 		"	stlxrb	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
-+		"	dmb	ish",
-+		/* LSE atomics */
-+		"	nop\n"
-+		"	swpalb	%w3, %w0, %2\n"
-+		"	nop\n"
-+		"	nop")
- 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u8 *)ptr)
- 			: "r" (x)
- 			: "memory");
- 		break;
- 	case 2:
--		asm volatile("//	__xchg2\n"
-+		asm volatile(ARM64_LSE_ATOMIC_INSN(
-+		/* LL/SC */
- 		"1:	ldxrh	%w0, %2\n"
- 		"	stlxrh	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
-+		"	dmb	ish",
-+		/* LSE atomics */
-+		"	nop\n"
-+		"	swpalh	%w3, %w0, %2\n"
-+		"	nop\n"
-+		"	nop")
- 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u16 *)ptr)
- 			: "r" (x)
- 			: "memory");
- 		break;
- 	case 4:
--		asm volatile("//	__xchg4\n"
-+		asm volatile(ARM64_LSE_ATOMIC_INSN(
-+		/* LL/SC */
- 		"1:	ldxr	%w0, %2\n"
- 		"	stlxr	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
-+		"	dmb	ish",
-+		/* LSE atomics */
-+		"	nop\n"
-+		"	swpal	%w3, %w0, %2\n"
-+		"	nop\n"
-+		"	nop")
- 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u32 *)ptr)
- 			: "r" (x)
- 			: "memory");
- 		break;
- 	case 8:
--		asm volatile("//	__xchg8\n"
-+		asm volatile(ARM64_LSE_ATOMIC_INSN(
-+		/* LL/SC */
- 		"1:	ldxr	%0, %2\n"
- 		"	stlxr	%w1, %3, %2\n"
- 		"	cbnz	%w1, 1b\n"
-+		"	dmb	ish",
-+		/* LSE atomics */
-+		"	nop\n"
-+		"	swpal	%3, %0, %2\n"
-+		"	nop\n"
-+		"	nop")
- 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u64 *)ptr)
- 			: "r" (x)
- 			: "memory");
-@@ -68,7 +97,6 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 		BUILD_BUG();
- 	}
- 
--	smp_mb();
- 	return ret;
- }
- 
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index c7fd2c946374..5b170df96aaf 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -286,6 +286,7 @@ static void __init setup_processor(void)
+ 		default:
+ 		case 2:
+ 			elf_hwcap |= HWCAP_ATOMICS;
++			cpus_set_cap(ARM64_CPU_FEAT_LSE_ATOMICS);
+ 		case 1:
+ 			/* RESERVED */
+ 		case 0:
 -- 
 2.1.4
