@@ -1,67 +1,71 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jul 2015 15:18:30 +0100
-Subject: [PATCH v2 06/10] arm64/debug: Move BRK ESR template macro into
- <asm/esr.h>
-In-Reply-To: <1436793967-7138-7-git-send-email-Dave.Martin@arm.com>
+Date: Mon, 13 Jul 2015 15:19:20 +0100
+Subject: [PATCH v2 05/10] arm64/debug: More consistent naming for the BRK
+ ESR template macro
+In-Reply-To: <1436793967-7138-6-git-send-email-Dave.Martin@arm.com>
 References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20150713141830.GE19083@leverpostej>
+ <1436793967-7138-6-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150713141920.GF19083@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 02:25:53PM +0100, Dave P Martin wrote:
-> It makes sense to keep all the architectural exception syndrome
-> definitions in the same place.
+On Mon, Jul 13, 2015 at 02:25:52PM +0100, Dave P Martin wrote:
+> The naming of DBG_ESR_VAL_BRK is inconsistent with the way other
+> similar macros are named.
+> 
+> This patch makes the naming more consistent, and appends "64"
+> as a reminder that this ESR pattern only matches from AArch64
+> state.
 > 
 > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 
-It might make sense to merge this with the previous patch, but either
-way:
+Looks sane to me, though I think it should probably be merged with the
+subsequenty patch moving the definition out to esr.h.
 
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 
 Mark.
 
 > ---
->  arch/arm64/include/asm/debug-monitors.h |    7 -------
->  arch/arm64/include/asm/esr.h            |    7 +++++++
->  2 files changed, 7 insertions(+), 7 deletions(-)
+>  arch/arm64/include/asm/debug-monitors.h |    5 +++--
+>  arch/arm64/kernel/kgdb.c                |    4 ++--
+>  2 files changed, 5 insertions(+), 4 deletions(-)
 > 
 > diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-> index bb97e9d..e28b1dd 100644
+> index ff09058..bb97e9d 100644
 > --- a/arch/arm64/include/asm/debug-monitors.h
 > +++ b/arch/arm64/include/asm/debug-monitors.h
-> @@ -44,13 +44,6 @@
->  #define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
->  
+> @@ -46,8 +46,9 @@
 >  /*
-> - * ESR values expected for dynamic and compile time BRK instruction
-> - */
-> -#define ESR_ELx_VAL_BRK64(imm)					\
-> -	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
-> -	 ((imm) & 0xffff))
-> -
-> -/*
->   * #imm16 values used for BRK instruction generation
->   * Allowed values for kgbd are 0x400 - 0x7ff
->   * 0x100: for triggering a fault on purpose (reserved)
-> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
-> index 8dab2a9..7568d14 100644
-> --- a/arch/arm64/include/asm/esr.h
-> +++ b/arch/arm64/include/asm/esr.h
-> @@ -101,6 +101,13 @@
->  #define ESR_ELx_WFx_ISS_WFE	(UINT(1) << 0)
->  #define ESR_ELx_xVC_IMM_MASK	((UINT(1) << 16) - 1)
->  
-> +/* ESR value templates for specific events */
-> +
-> +/* BRK instruction trap from AArch64 state */
+>   * ESR values expected for dynamic and compile time BRK instruction
+>   */
+> -#define DBG_ESR_VAL_BRK(x) \
+> -	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL | ((x) & 0xffff))
 > +#define ESR_ELx_VAL_BRK64(imm)					\
 > +	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
 > +	 ((imm) & 0xffff))
-> +
->  #ifndef __ASSEMBLY__
->  #include <asm/types.h>
+>  
+>  /*
+>   * #imm16 values used for BRK instruction generation
+> diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
+> index a0d10c5..a5a838e 100644
+> --- a/arch/arm64/kernel/kgdb.c
+> +++ b/arch/arm64/kernel/kgdb.c
+> @@ -235,13 +235,13 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
+>  
+>  static struct break_hook kgdb_brkpt_hook = {
+>  	.esr_mask	= 0xffffffff,
+> -	.esr_val	= DBG_ESR_VAL_BRK(KGDB_DYN_DBG_BRK_IMM),
+> +	.esr_val	= ESR_ELx_VAL_BRK64(KGDB_DYN_DBG_BRK_IMM),
+>  	.fn		= kgdb_brk_fn
+>  };
+>  
+>  static struct break_hook kgdb_compiled_brkpt_hook = {
+>  	.esr_mask	= 0xffffffff,
+> -	.esr_val	= DBG_ESR_VAL_BRK(KGDB_COMPILED_DBG_BRK_IMM),
+> +	.esr_val	= ESR_ELx_VAL_BRK64(KGDB_COMPILED_DBG_BRK_IMM),
+>  	.fn		= kgdb_compiled_brk_fn
+>  };
 >  
 > -- 
 > 1.7.10.4
