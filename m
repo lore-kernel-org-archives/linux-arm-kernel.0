@@ -1,64 +1,57 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 13 Jul 2015 12:06:13 +0200
-Subject: [PATCH 00/15] ARM: shmobile: Remove legacy sh73a0/kzm9g and
- r8a7740/armadillo
-In-Reply-To: <CACRpkdZFPCo8x0p6MnG-m4DVHBefRDj4PLC8zi3tj1zgUkT2fA@mail.gmail.com>
-References: <1434533491-21979-1-git-send-email-geert+renesas@glider.be>
- <20150619034052.GA22912@verge.net.au>
- <CAMuHMdUqO2_rMpx0akeS1j+pNmQ_S150ei0B6a1ubFu_iTBF3g@mail.gmail.com>
- <CACRpkdZFPCo8x0p6MnG-m4DVHBefRDj4PLC8zi3tj1zgUkT2fA@mail.gmail.com>
-Message-ID: <CAMuHMdUcY56tWbD6r6mxLF_a1bpy0q7URY1qJGRvsxxvTx5gnA@mail.gmail.com>
+From: Thomas.Betker@rohde-schwarz.com (Thomas.Betker at rohde-schwarz.com)
+Date: Mon, 13 Jul 2015 12:04:54 +0200
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support
+ in Zynq MPSoC GQSPI controller
+In-Reply-To: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <OFDDDA0AA7.A583461A-ONC1257E81.0030FCED-C1257E81.003761EE@rohde-schwarz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hello Ranjit:
 
-On Mon, Jul 13, 2015 at 12:00 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
-> On Fri, Jun 19, 2015 at 9:30 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Fri, Jun 19, 2015 at 5:41 AM, Simon Horman <horms@verge.net.au> wrote:
->>> [ CC Linus, Laurent, linux-gpio ]
->
->>>>   pinctrl: sh-pfc: sh73a0: Remove obsolete multi-platform check
->>>>   pinctrl: sh-pfc: Remove obsolete sh73a0 platform_device_id entry
->>>>   pinctrl: sh-pfc: r8a7740: Remove obsolete multi-platform check
->>>>   pinctrl: sh-pfc: Remove obsolete r8a7740 platform_device_id entry
->>>
->>> As the above patches are sh-pfc patches they would typically
->>> be steered through Linus's tree via Laurent. If they wish
->>> to take that path then I'm happy for this to be attached:
->>>
->>> Acked-by: Simon Horman <horms+renesas@verge.net.au>
->>>
->>> FWIW the above path is the one that the removal of mackerel/sh7372 took.
->>>
->>> Alternatively, I am happy to take the above sh-pfc patches through
->>> my tree but I would like to do so with an Ack from at least Linus.
->>
->> I didn't CC Linus and linux-gpio at this stage yet, to prevent the pfc
->> patches from getting applied prematurely.
->> But things have gone more smoothly (esp. w.r.t. board staging) than expected,
->> which is always pleasant.
->
-> I would prefer to take these four into the pin control tree when you
-> consider them finished as there is obviously more PFC stuff coming
-> for this next kernel cycle and I want to avoid collisions and keep
-> things together. Will you send them to me separately?
+> What is dual parallel mode?
+> ---------------------------
+> ZynqMP GQSPI controller supports Dual Parallel mode with following 
+> functionalities:
+> 1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+> 2) Chip selects and clock are shared to both the flash devices
+> 3) This mode is targeted for faster read/write speed and also doubles 
+the size
+> 4) Commands/data can be transmitted/received from both the 
+devices(mirror),
+>    or only upper or only lower flash memory devices.
+> 5) Data arrangement:
+>    With stripe enabled,
+>    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+>    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
 
-OK, I will send them your way.
+In the dual-parallel configuration, odd and even _bits_ of each byte are 
+distributed over the flash chips; I am assuming this works just as in Zynq 
+QSPI (apparently, the TRM for ZynqMP isn't out yet).
 
-I think at this point we're quite sure the sh73a0/r8a7740 removal will hit v4.3.
-This does mean sh73a0/r8a7740-legacy will be broken in pinctrl/for-next,
-but we don't care, as the support is gone in -next anyway.
+Striping seems to be a different mechanism, though. Can you explain it a 
+bit more? Also, the wording seems to indicate that it belongs to 
+dual-stacked rather than dual-parallel.
 
-Gr{oetje,eeting}s,
+> Suggestions on MTD layer support
+> --------------------------------
+> In order to add above two specified modes, we may required to get some
+> support from MTD layer.
+> 
+> I'm trying to list the dependencies as follows:
+> 1) Support for two flashes
+> 2) Enable/Disable data stripe as and when required.
+> 3) May need to update read_sr() to get status of both flashes
+> 4) May also need to update read_fsr() to get status of both flashes
+> 5) Adjustment of offset value based on the parallel/stacked mode 
+configuration
+> 6) Setting either parallel or stacked mode during the scan process.
+> 7) In case of stacked mode, is there a MTD concatenation support?
 
-                        Geert
+In addition to 5), the MTD driver using a dual-parallel QSPI flash has to
+5a) add padding at the start of data for unaligned addresses,
+5b) add padding at the end of data for unaligned lengths.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Thomas Betker
