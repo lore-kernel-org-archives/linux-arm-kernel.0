@@ -1,35 +1,143 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 13 Jul 2015 19:17:55 +0100
-Subject: [PATCH 3/3] arm64, mm: Use IPIs for TLB invalidation.
-In-Reply-To: <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
-References: <1436646323-10527-1-git-send-email-ddaney.cavm@gmail.com>
- <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150713181755.GP2632@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 13 Jul 2015 20:54:25 +0200 (CEST)
+Subject: [PATCH v7 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1984575203.163267.1436813665815.JavaMail.open-xchange@oxbsltgw06.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 11, 2015 at 09:25:23PM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Most broadcast TLB invalidations are unnecessary.  So when
-> invalidating for a given mm/vma target the only the needed CPUs via
-> and IPI.
-> 
-> For global TLB invalidations, also use IPI.
-> 
-> Tested on Cavium ThunderX.
-> 
-> This change reduces 'time make -j48' on kernel from 139s to 116s (83%
-> as long).
+Hi Srinivas,
 
-Any idea *why* you're seeing such an improvement? Some older kernels had
-a bug where we'd try to flush a negative (i.e. huge) range by page, so it
-would be nice to rule that out. I assume these measurements are using
-mainline?
+[add Ezequiel Garcia to CC]
 
-Having TLBI responsible for that amount of a kernel build doesn't feel
-right to me and doesn't line-up with the profiles I'm used to seeing.
+> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 10. Juli 2015 um
+> 11:43 geschrieben:
+>
+>
+> Hi Greg,
+>
+> This patchset adds a new simple NVMEM framework to kernel, and it is tested
+> with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
+> "begal bone cape manager" and few more on the way.
+>
+> Thankyou all for providing inputs and comments on previous versions of this
+> patchset. Here is the v7 of the patchset addressing all the issues raised as
+> part of previous versions review.
+>
+> Up until now, NVMEM drivers like eeprom were stored in drivers/misc, where
+> they
+> all had to duplicate pretty much the same code to register a sysfs file, allow
+> in-kernel users to access the content of the devices they were driving, etc.
+> This was also a problem as far as other in-kernel users were involved, since
+> the solutions used were pretty much different from on driver to another, there
+> was a rather big abstraction leak.
 
-You have 16-bit ASIDs, right?
+i only want to mention that there are more places of NVMEM drivers like:
 
-Will
+drivers/mfd/ab3100-otp.c
+drivers/soc/tegra/fuse/*.c
+
+>
+> Introduction of this framework aims at solving this. It also introduces DT
+> representation for consumer devices to go get the data they require (MAC
+> Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
+>
+> After learning few things about QCOM qfprom and other eeprom/efuses, which
+> has packed fields at bit level. Which makes it important to add support to
+> such memories. This version adds support to this type of non volatile
+> memories by adding support to bit level nvmem-cells.
+>
+> Having regmap interface to this framework would give much better
+> abstraction for nvmems on different buses.
+>
+> patch 1-4 Introduces the NVMEM framework.
+> Patch 5-6 Adds Qualcomm specific qfprom driver.
+> Patch 7 migrates an existing driver to nvmem framework.
+> Patch 8 adds entry in MAINTAINERS.
+>
+> Its also possible to migrate other nvmem drivers to this framework, and I
+> think
+> some of them already posted patches based on this framework.
+>
+> Providers APIs:
+> nvmem_register/unregister();
+
+How do i get the cell info from the devicetree into the nvmem_config?
+
+I expected a function something like of_nvmem_cell_info_get() in the Providers
+API.
+
+>
+> Consumers APIs:
+> Cell based apis for both DT/Non-DT:
+> nvmem_cell_get()/nvmem_cell_put();
+> devm_nvmem_cell_get()/devm_nvmem_cell_put();
+> of_nvmem_cell_get()
+> nvmem_cell_read()/nvmem_cell_write();
+>
+> Raw byte access apis for both DT/non-DT.
+> nvmem_device_get()/nvmem_device_put()
+> devm_nvmem_device_get()/nvmem_device_put()
+> of_nvmem_device_get()
+>
+> nvmem_device_read()/nvmem_device_write();
+> nvmem_device_cell_read()/nvmem_device_cell_write();
+>
+> Device Tree:
+>
+> /* Provider */
+> qfprom: qfprom at 00700000 {
+> ...
+>
+> /* Data cells */
+> tsens_calibration: calib at 404 {
+> reg = <0x404 0x10>;
+> };
+>
+> tsens_calibration_bckp: calib_bckp at 504 {
+> reg = <0x504 0x11>;
+> bit-offset = 6;
+> nbits = 128;
+> };
+>
+> pvs_version: pvs-version at 6 {
+> reg = <0x6 0x2>
+> bit-offset = 7;
+> nbits = 2;
+> };
+>
+> speed_bin: speed-bin at c{
+> reg = <0xc 0x1>;
+> bit-offset = 2;
+> nbits = 3;
+>
+> };
+> ...
+> };
+> /* Consumer */
+> tsens {
+> ...
+> nvmem-cells = <&tsens_calibration>;
+> nvmem-cell-names = "calibration";
+> };
+>
+> userspace interface: binary file in /sys/bus/nvmem/devices/*/nvmem
+>
+> ex:
+> hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
+>
+> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
+> *
+> 00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+> 0000000 0000 0000 0000 0000 0000 0000 0000 0000
+> ...
+> *
+> 0001000
+
+Since we're entering userspace the behavior should be clear.
+
+How do we treat register gaps? Fill them with zero?
+
+Best regards
+Stefan
