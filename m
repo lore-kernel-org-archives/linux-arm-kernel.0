@@ -1,84 +1,88 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Mon, 13 Jul 2015 12:51:50 +0800
-Subject: [PATCH 2/4] dt-bindings: soc: Add documentation for the MediaTek
- SCPSYS unit
-In-Reply-To: <1435126625-9634-3-git-send-email-s.hauer@pengutronix.de>
-References: <1435126625-9634-1-git-send-email-s.hauer@pengutronix.de>
- <1435126625-9634-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <CAGS+omBt+0+pQ4P2kRqVOB5XJFB2BxgCcPn=j4MNVMYLY4TvBg@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 13 Jul 2015 14:29:32 +0900
+Subject: [RFC 0/3] arm64: ftrace: fix incorrect output from stack tracer
+Message-ID: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 24, 2015 at 2:17 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> This adds documentation for the MediaTek SCPSYS unit found in MT8173 SoCs.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> ---
->  .../devicetree/bindings/soc/mediatek/scpsys.txt    | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
->
-> diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> new file mode 100644
-> index 0000000..c051114
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-> @@ -0,0 +1,41 @@
-> +MediaTek SCPSYS
-> +===============
-> +
-> +The System Control Processor System (SCPSYS) has several power management
-> +related tasks in the system. The tasks include thermal measurement, dynamic
-> +voltage frequency scaling (DVFS), interrupt filter and lowlevel sleep control.
-> +The System Power Manager (SPM) inside the SCPSYS is for the MTCMOS power
-> +domain control.
-> +
-> +The driver implements the Generic PM domain bindings described in
-> +power/power_domain.txt. It provides the power domains defined in
-> +include/dt-bindings/power/mt8173-power.h.
-> +
-> +Required properties:
-> +- compatible: Must be "mediatek,mt8173-scpsys"
-> +- #power-domain-cells: Must be 1
-> +- reg: Address range of the SCPSYS unit
-> +- infracfg: must contain a phandle to the infracfg controller
-> +- clock, clock-names: clocks according to the common clock binding.
-> +                      The clocks needed "mm" and "mfg". These are the
-> +                     clocks which hardware needs to be enabled before
-> +                     enabling certain power domains.
-> +
-> +Example:
-> +
-> +       scpsys: scpsys at 10006000 {
+As reported in the thread below[1], the output from stack tracer using
+ftrace on arm64 seems to be incorrect due to different reasons. Each
+problem is described and fixed repsectively in the following patches.
+Please see the commit messages for the details.
 
-Perhaps it is too late, and/or too pedantic, but, since this node
-defines a PM domain provider as defined in [0], shouldn't its node
-have been the more generic:
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
 
-  scpsys: power-controller at 10006000
+If the patch[1/3], which adds "#ifdef CONFIG_ARM64" to generic ftrace code,
+is not acceptable, we will have to introduce an arch-dependent function,
+ie. arch_check_stack().
 
-[0] /Documentation/devicetree/bindings/power/power_domain.txt
+Even with those patches, we see another issue that the values in 'Size'
+field are *inaccurate*. This is simply because we have no way to estimate
+the value of stack pointer at each function from the content of stack.
+Thus the function's reported stack size does not include its own local
+variables, but includes *its child's* ones.
+See more details below.
 
-> +               #power-domain-cells = <1>;
-> +               compatible = "mediatek,mt8173-scpsys";
-> +               reg = <0 0x10006000 0 0x1000>;
-> +               infracfg = <&infracfg>;
-> +               clocks = <&clk26m>,
-> +                        <&topckgen CLK_TOP_MM_SEL>;
-> +               clock-names = "mfg", "mm";
-> +       };
-> +
-> +Example consumer:
-> +
-> +       afe: mt8173-afe-pcm at 11220000 {
-> +               compatible = "mediatek,mt8173-afe-pcm";
-> +               power-domains = <&scpsys MT8173_POWER_DOMAIN_AUDIO>;
-> +       };
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+In my opinion, we cannot fix this issue unless analyzing the function's
+first instruction, ie. "stp x29, x30, [sp, #xx]!".
+
+* How does stack tracer identify each function's stack size?
+
+Take an example, func-0 calls func-1 and func-1 calls func-2.
+The stack layout looks like the below:
+("p" is a temp variable in check_stack().)
+
+sp2     +-------+ <--------- func-2's stackframe
+        |       |
+        |       |
+fp2     +-------+
+        |  fp1  |
+        +-------+ <-- p1 (*p1 == stack_dump_trace[i] == lr1)
+        |  lr1  |
+        +-------+
+        |       |
+        |  func-2's local variables
+        |       |
+sp1     +-------+ <--------- func-1(lr1)'s stackframe
+        |       |             (stack_dump_index[i] = top - p1)
+        |  func-1's dynamic local variables
+        |       |
+fp1     +-------+
+        |  fp0  |
+        +-------+ <-- p0 (*p0 == stack_dump_trace[i+1] == lr0)
+        |  lr0  |
+        +-------+
+        |       |
+        |  func-1's local variables
+        |       |
+sp0     +-------+ <--------- func-0(lr0)'s stackframe
+        |       |             (stack_dump_index[i+1] = top - p0)
+        |       |
+        *-------+ top
+
+Stack tracer records the stack height of func-1 (== stack_dump_trace[i]):
+	stack_dump_index[i] = <stack top> - <estimated stack pointer>
+in check_stack() by searching for func-1's return address (lr1)
+and eventually calculates func-1's stack size by:
+	stack_dump_index[i] - stack_dump_index[i+1]
+		=> (top - p1) - (top - p0)
+		=> p1 - p0
+
+On x86, this calculation is correct because x86's call instruction pushes
+the return address to the stack and jump into the child(func-2) function,
+thus the func-1's stack pointer is "p1" where *p1 is equal to
+stack_dump_trace[i]. But this is not true on arm64.
+
+AKASHI Takahiro (3):
+  ftrace: adjust a function's pc to search for in check_stack() for
+    arm64
+  arm64: refactor save_stack_trace()
+  arm64: ftrace: mcount() should not create a stack frame
+
+ arch/arm64/kernel/entry-ftrace.S |   15 ++++++++-------
+ arch/arm64/kernel/stacktrace.c   |   31 +++++++++++++++++++++++--------
+ kernel/trace/trace_stack.c       |    4 ++++
+ 3 files changed, 35 insertions(+), 15 deletions(-)
+
+-- 
+1.7.9.5
