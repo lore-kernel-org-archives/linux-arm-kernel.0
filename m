@@ -1,45 +1,45 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 13 Jul 2015 11:03:49 +0200
-Subject: [PATCH v3 0/5] usb: gadget: miscellaneous fixes
-Message-ID: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
+Date: Mon, 13 Jul 2015 11:03:50 +0200
+Subject: [PATCH v3 1/5] usb: gadget: ffs: call functionfs_unbind() if
+ _ffs_func_bind() fails
+In-Reply-To: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
+References: <1436778234-12787-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436778234-12787-2-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Function ffs_do_functionfs_bind() calls functionfs_bind() which allocates
+usb request and increments refcounts. These things needs to be cleaned
+up by if further steps of initialization fail by calling functionfs_unbind().
 
-This patch set contains few small bugfixes found in usb gadget functions
-and UDC drivers. The most important is the [1] as it fixes bug causing
-BUG_ON() in f_fs driver. Remaining patches contain minor fixes.
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+Acked-by: Michal Nazarewicz <mina86@mina86.com>
+---
+ drivers/usb/gadget/function/f_fs.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-[1] usb: gadget: ffs: call functionfs_unbind() if _ffs_func_bind() fails
-
-Best regards,
-Robert Baldyga
-
-Changelog:
-
-v3:
-- Addressed comments from Sergei Shtylyov.
-- Applied Acks form Nicolas Ferre and Michal Nazarewicz.
-
-v2: https://lkml.org/lkml/2015/7/8/285
-- Addressed comments from Dan Carpenter and Sergei Shtylyov.
-
-v1: https://lkml.org/lkml/2015/7/7/445
-
-Robert Baldyga (5):
-  usb: gadget: ffs: call functionfs_unbind() if _ffs_func_bind() fails
-  usb: gadget: midi: avoid redundant f_midi_set_alt() call
-  usb: isp1760: udc: add missing usb_ep_set_maxpacket_limit()
-  staging: emxx_udc: add missing usb_ep_set_maxpacket_limit()
-  usb: gadget: atmel_usba_udc: add missing ret value check
-
- drivers/staging/emxx_udc/emxx_udc.c     | 3 ++-
- drivers/usb/gadget/function/f_fs.c      | 8 +++++++-
- drivers/usb/gadget/function/f_midi.c    | 4 ++++
- drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++++
- drivers/usb/isp1760/isp1760-udc.c       | 4 ++--
- 5 files changed, 19 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/usb/gadget/function/f_fs.c b/drivers/usb/gadget/function/f_fs.c
+index 6e7be91..adc6d52 100644
+--- a/drivers/usb/gadget/function/f_fs.c
++++ b/drivers/usb/gadget/function/f_fs.c
+@@ -2897,11 +2897,17 @@ static int ffs_func_bind(struct usb_configuration *c,
+ 			 struct usb_function *f)
+ {
+ 	struct f_fs_opts *ffs_opts = ffs_do_functionfs_bind(f, c);
++	struct ffs_function *func = ffs_func_from_usb(f);
++	int ret;
+ 
+ 	if (IS_ERR(ffs_opts))
+ 		return PTR_ERR(ffs_opts);
+ 
+-	return _ffs_func_bind(c, f);
++	ret = _ffs_func_bind(c, f);
++	if (ret && !--ffs_opts->refcnt)
++		functionfs_unbind(func->ffs);
++
++	return ret;
+ }
+ 
+ 
 -- 
 1.9.1
