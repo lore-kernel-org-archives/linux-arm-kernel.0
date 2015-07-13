@@ -1,57 +1,35 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Mon, 13 Jul 2015 16:13:24 -0400
-Subject: [PATCH v2 19/20] xen/privcmd: Add support for Linux 64KB page
- granularity
-In-Reply-To: <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
-Message-ID: <55A41BE4.3080104@oracle.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jul 2015 22:14:03 +0200
+Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
+In-Reply-To: <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/09/2015 04:42 PM, Julien Grall wrote:
-> -
->   struct remap_data {
->   	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
-> +	xen_pfn_t *efgmfn; /* pointer to the end of the fgmfn array */
+On Wed, Jun 17, 2015 at 3:42 PM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
 
-It might be better to keep size of fgmfn array instead.
-
-
+> If the gpio DT node has the gpio-ranges property, the range will be
+> added by the gpio core and doesn't need to be added by the pinctrl
+> driver.
 >
-> +static int unmap_gfn(struct page *page, unsigned long pfn, void *data)
-> +{
-> +	int *nr = data;
-> +	struct xen_remove_from_physmap xrp;
-> +
-> +	/* The Linux Page may not have been fully mapped to Xen */
-> +	if (!*nr)
-> +		return 0;
-> +
-> +	xrp.domid = DOMID_SELF;
-> +	xrp.gpfn = pfn;
-> +	(void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
-> +
-> +	(*nr)--;
-> +
-> +	return 0;
-> +}
-> +
->   int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
->   			      int nr, struct page **pages)
->   {
->   	int i;
-> +	int nr_page = round_up(nr, XEN_PFN_PER_PAGE);
->   
-> -	for (i = 0; i < nr; i++) {
-> -		struct xen_remove_from_physmap xrp;
-> -		unsigned long pfn;
-> +	for (i = 0; i < nr_page; i++) {
-> +		/* unmap_gfn guarantees ret == 0 */
-> +		BUG_ON(xen_apply_to_page(pages[i], unmap_gfn, &nr));
+> By having the gpio-ranges property, we have an explicit dependency from
+> the gpio node to the pinctrl node and we can stop using the deprecated
+> pinctrl_add_gpio_range() function.
+>
+> Note that when the GPIO device gets probed before the associated
+> princtrl device, the gpio core actually won't register the gpio range.
+> Thus, this patch is only safe to be merged after we have in place a way
+> to assure that gpio devices are probed after their associated pinctrl
+> devices (such as ordered probing).
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
+This doesn't look like it would hurt, but need Stephen's opinion
+on it, and I think he's on vacation. Would check with next-in-line
+Tegra maintainer, Thierry/Alexandre?
 
-TBH, I am not sure how useful xen_apply_to_page() routine is. In this 
-patch especially, but also in others.
-
--boris
+Yours,
+Linus Walleij
