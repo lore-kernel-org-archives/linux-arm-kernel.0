@@ -1,90 +1,146 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 13 Jul 2015 13:02:42 +0200
-Subject: [PATCH 4/6] ARM: dts: Exynos4210: add CPU OPP and regulator supply
- property
-In-Reply-To: <5588A748.2070407@samsung.com>
-References: <'@samsung.com> <55889E59.1070001@samsung.com>
- <5588A748.2070407@samsung.com>
-Message-ID: <4721448.dpAUKITTdt@amdc1976>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 13 Jul 2015 11:07:15 +0000
+Subject: [PATCH] Store PCIe controllers address in struct of_pci_range
+In-Reply-To: <CAL_JsqJA9WEWK+ywv7ou+88U3cQ7z6GHDTDjxOxRC9X4_K88FQ@mail.gmail.com>
+References: <1436518099-98633-1-git-send-email-gabriele.paoloni@huawei.com>
+ <CAL_JsqJA9WEWK+ywv7ou+88U3cQ7z6GHDTDjxOxRC9X4_K88FQ@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D5CD3D@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rob
 
-Hi,
+Many Thanks for your review
 
-On Tuesday, June 23, 2015 09:24:40 AM Krzysztof Kozlowski wrote:
-> On 23.06.2015 08:46, Krzysztof Kozlowski wrote:
-> > On 23.06.2015 00:04, Michael Turquette wrote:
-> >> Quoting Kukjin Kim (2015-06-21 18:46:26)
-> >>> Krzysztof Kozlowski wrote:
-> >>>>
-> >>>> On 22.06.2015 10:38, Kukjin Kim wrote:
-> >>>>> Krzysztof Kozlowski wrote:
-> >>>>>> 2015-05-08 9:18 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> >>>>>>> 2015-04-04 1:43 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
-> >>>>>>>> From: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>>>>>
-> >>>>>>>> For Exynos4210 platforms, add CPU operating points and CPU
-> >>>>>>>> regulator supply properties for migrating from Exynos specific
-> >>>>>>>> cpufreq driver to using generic cpufreq driver.
-> >>>>>>>>
-> >>>>>>>> Changes by Bartlomiej:
-> >>>>>>>> - removed Exynos5250 and Exynos5420 support for now
-> >>>>>>>>
-> >>>>>>>> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> >>>>>>>> Cc: Doug Anderson <dianders@chromium.org>
-> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>>>>>> Cc: Andreas Faerber <afaerber@suse.de>
-> >>>>>>>> Cc: Sachin Kamat <sachin.kamat@linaro.org>
-> >>>>>>>> Cc: Andreas Farber <afaerber@suse.de>
-> >>>>>>>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> >>>>>>>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> >>>>>>>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> >>>>>>>
-> >>>>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>>>>>
-> >>>>>> Rebased and applied to my tree, I'll sent it later to Kukjin unless he
-> >>>>>> picks it by himself from LKML.
-> >>>>>>
-> >>>>> Hi, as far as I know, this is for v4.2 not v4.1 so it will be applied based on
-> >>>>> v4.2-rc1 after v4.2-rc1 release.
-> >>>>
-> >>>> You mean it is for v4.3, not v4.2?
-> >>>>
-> >>> Oops, yes v4.3.
-> >>>
-> >>> Thanks for the correction.
-> >>
-> >> Kukjin & Krzysztof,
-> >>
-> >> I'm confused on this point. I was planning to take patches 1, 2, 3, 5
-> >> and 6 towards 4.2 (e.g. in the pull request that I'll send out this
-> >> week).
-> >>
-> >> Is patch 4 going out for 4.2 or 4.3?
-> > 
-> > It is quite late for sending pull request to arm-soc for 4.2.
-> > For example SoCFPGA pull request from last week was rejected:
-> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/417980
+> -----Original Message-----
+> From: Rob Herring [mailto:robherring2 at gmail.com]
+> Sent: Friday, July 10, 2015 8:56 PM
+> To: Gabriele Paoloni
+> Cc: Arnd Bergmann; Lorenzo Pieralisi; Wangzhou (B); Bjorn Helgaas; Rob
+> Herring; james.morse at arm.com; Liviu Dudau; linux-pci at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> Yuanzhichang; Zhudacai; zhangjukuo; qiuzhenfa; Liguozhu (Kenneth)
+> Subject: Re: [PATCH] Store PCIe controllers address in struct
+> of_pci_range
 > 
-> Oh, that was wrong link. Here it is:
-> http://www.spinics.net/lists/arm-kernel/msg425911.html
+> On Fri, Jul 10, 2015 at 3:48 AM, Gabriele Paoloni
+> <gabriele.paoloni@huawei.com> wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > This patch is needed port PCIe designware to new DT parsing API
+> > As discussed in
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> January/317743.html
+> > in designware we have a problem as the PCI addresses in the PCIe
+> controller
+> > address space are required in order to perform correct HW operation.
+> >
+> > In order to solve this problem commit
+> > f4c55c5a3f7f68c06cc559ed7af8b2d017cbb0a7 "PCI: designware:
 > 
-> > If you want to take it for 4.2 then I am fine with it but this will
-> > cause some easy but annoying conflicts. There aren't difficult - just
-> > most of nodes in board DTS changed their place.
-> > 
-> > Example of resolution (target file after merge, with cpu nodes reordered
-> > alphabetically):
-> > https://github.com/krzk/linux/commit/2cec3cb48abaf44848c62f1c0836b772eb4680dd
+> Please abbreviate hashs to 12 characters.
 
-This patch is needed for v4.2 as other changes has been already
-merged.
+Sure, will do.
 
-Krzysztof/Kukjin, could you please take care of it?
+> 
+> > Program ATU with untranslated address" added code to read the PCIe
+> > controller start address directly from the DT ranges.
+> >
+> > In the new DT parsing API of_pci_get_host_bridge_resources() hides
+> the
+> > DT parser from the host controller drivers, so it is not possible
+> > for drivers to parse values directly from the DT.
+> >
+> > In http://www.spinics.net/lists/linux-pci/msg42540.html we already
+> tried
+> > to use the new DT parsing API but there is a bug (obviously) in
+> setting
+> > the <*>_mod_base addresses
+> > Applying this patch we can easily set "<*>_mod_base = win-
+> >__res.start"
+> >
+> > This patch adds a new field in "struct of_pci_range" to store the
+> > pci controller start address; it fills the field in
+> of_pci_range_parser_one();
+> > in of_pci_get_host_bridge_resources() it retrieve the resource entry
+> > after it is created and added to the resource list and uses
+> > entry->__res.start to store the pci controller address
+> >
+> > the patch is based on 4.2-rc1
+> >
+> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > ---
+> >  drivers/of/address.c               | 1 +
+> >  drivers/of/of_pci.c                | 4 ++++
+> >  drivers/pci/host/pcie-designware.c | 9 +++------
+> >  include/linux/of_address.h         | 1 +
+> >  4 files changed, 9 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/of/address.c b/drivers/of/address.c
+> > index 8bfda6a..52f9321 100644
+> > --- a/drivers/of/address.c
+> > +++ b/drivers/of/address.c
+> > @@ -265,6 +265,7 @@ struct of_pci_range
+> *of_pci_range_parser_one(struct of_pci_range_parser *parser,
+> >         range->pci_addr = of_read_number(parser->range + 1, ns);
+> >         range->cpu_addr = of_translate_address(parser->node,
+> >                                 parser->range + na);
+> > +       range->pci_ctrl_addr = of_read_number(parser->range + na, ns) ;
+> 
+> This is wrong as the correct size to read is not "ns", but the parent
+> bus #size-cells value.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Ok I will replace "ns" with "of_n_size_cells(parser->node)" 
+
+> 
+> I think "bus_addr" would be a better name. It is not the PCI
+> controller's address (i.e. what is in reg prop). No "pci" because it
+> has nothing to do with PCI bus addresses.
+
+Ok I will change the name 
+
+> 
+> In general, this seems fragile as the dt address ranges/translation
+> may not align with the h/w ranges. For example, what if you have 2
+> levels of translations and you happen to need it translated with just
+> 1 level of translation. That said, I don't really have a better
+> suggestion and I guess we can deal with that case if needed later.
+
+Ok so, we'll leave it like this for now
+
+> 
+> >         range->size = of_read_number(parser->range + parser->pna + na,
+> ns);
+> >
+> >         parser->range += parser->np;
+> > diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+> > index 5751dc5..2ccc749 100644
+> > --- a/drivers/of/of_pci.c
+> > +++ b/drivers/of/of_pci.c
+> > @@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct
+> device_node *dev,
+> >
+> >         pr_debug("Parsing ranges property...\n");
+> >         for_each_of_pci_range(&parser, &range) {
+> > +               struct resource_entry *entry;
+> >                 /* Read next ranges element */
+> >                 if ((range.flags & IORESOURCE_TYPE_BITS) ==
+> IORESOURCE_IO)
+> >                         snprintf(range_type, 4, " IO");
+> > @@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct
+> device_node *dev,
+> >                 }
+> >
+> >                 pci_add_resource_offset(resources, res, res->start -
+> range.pci_addr);
+> > +               entry = list_last_entry(resources, struct
+> resource_entry, node);
+> > +               /*we are using __res for storing the PCI controller
+> address*/
+> > +               entry->__res.start = range.pci_ctrl_addr;
+> 
+> You will use this in a follow-up patch? I'd like to see this just
+> split into core changes and DW changes. This looks like you are making
+> intermediate DW changes which will be removed in subsequent patches.
+> 
+> Rob
