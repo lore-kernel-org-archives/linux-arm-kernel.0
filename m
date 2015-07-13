@@ -1,110 +1,83 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 13 Jul 2015 17:10:03 +0900
-Subject: [PATCH 5/6] mfd: devicetree: bindings: 88pm800: Add DT property
- for dual phase enable
-In-Reply-To: <55A36DBF.5020100@linaro.org>
-References: <1436442431-3471-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1436442431-3471-6-git-send-email-vaibhav.hiremath@linaro.org>
- <55A0C2CB.6060209@samsung.com> <55A36DBF.5020100@linaro.org>
-Message-ID: <55A3725B.2040801@samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 13 Jul 2015 10:11:15 +0200
+Subject: [PATCH 2/3] mfd: Add DT binding for Maxim MAX77802 IC
+In-Reply-To: <55A36E95.8030509@samsung.com>
+References: <1436773348-15316-1-git-send-email-javier@osg.samsung.com>
+ <1436773348-15316-3-git-send-email-javier@osg.samsung.com>
+ <55A36E95.8030509@samsung.com>
+Message-ID: <55A372A3.3030101@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.07.2015 16:50, Vaibhav Hiremath wrote:
-> 
-> 
-> On Saturday 11 July 2015 12:46 PM, Krzysztof Kozlowski wrote:
->> W dniu 09.07.2015 o 20:47, Vaibhav Hiremath pisze:
->>> 88PM860 family of device supports dual phase mode on BUCK1 supply
->>> providing total 6A capacity.
->>> Note that by default they operate independently with 3A capacity.
->>>
->>> This patch adds the devicetree binding to enable this
->>> feature.
->>>
->>> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
->>> ---
->>>   Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
->>>   1 file changed, 6 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> b/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> index ae1311c..c756b31 100644
->>> --- a/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
->>> @@ -15,6 +15,12 @@ Optional properties :
->>>         CLK32K3 - for 88pm800
->>>         CLK32K2 - for 88pm860
->>>
->>> +   (Applicable only to PXA910 family):
->>> +
->>> + - marvell,88pm860-buck1-dualphase-en    : If set, enable dual phase
->>> on BUCK1,
->>> +   providing 6A capacity.
->>> +   Without this both BUCK1A and BUCK1B operates independently with
->>> 3A capacity.
->>> +
->>
->> 1. How does this relates to regulator driver? The
->> drivers/regulator/88pm800.c defines constraints for regulator which may
->> be contradictory.
->>
->> 2. This looks like a job for regulator driver, not MFD. Then you could
->> use standard regulator bindings (setting maximum current to 6A would
->> change the regulator to different mode).
-> 
-> Make sense. and even better.
-> 
-> I believe you are referring to,
-> 
-> regulator-min-microamp = <3000000>;
-> regulator-max-microamp = <6000000>;
-> 
-> And provide set_current_limit() callback, to set the dualphase.
-> 
-> Just to clarify more on this,
-> 
-> The DT property would look something like,
-> 
-> regulators {
->     compatible = "marvell,88pm80x-regulator";
-> 
->     buck1a: BUCK1A {
->         regulator-compatible = "buck1";
->         regulator-min-microvolt = <600000>;
->         regulator-max-microvolt = <1800000>;
-> 
->         regulator-min-microamp = <3000000>;
->         regulator-max-microamp = <6000000>;
-> 
->         regulator-boot-on;
->         regulator-always-on;
->     };
-> 
->     buck1b: BUCK1B {
->         regulator-compatible = "buck1b";
->         regulator-min-microvolt = <600000>;
->         regulator-max-microvolt = <1800000>;
-> 
->         regulator-min-microamp = <3000000>;
->         regulator-max-microamp = <6000000>;
-> 
->         regulator-boot-on;
->         regulator-always-on;
->     };
-> };
-> 
-> 
-> And for the platforms, where dual phase is not required,
-> we can either choose not to set these properties or set it to
-> 
-> 
->         regulator-min-microamp = <3000000>;
->         regulator-max-microamp = <3000000>;
+Hello Krzysztof,
 
-Yes, exactly. I only wonder if regulator core would support properly
-such bindings - setting current limit for a voltage regulator. I didn't
-tried this but it should work.
+Thanks a lot for the feedback.
+
+On 07/13/2015 09:53 AM, Krzysztof Kozlowski wrote:
+> On 13.07.2015 16:42, Javier Martinez Canillas wrote:
+>> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
+>> a RTC and an I2C interface to program the individual components.
+>>
+>> The are already DT bindings for the regulators and clocks and
+>> these reference to a bindings/mfd/max77802.txt file, that didn't
+>> exist, for the details about the PMIC.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>
+>>  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
+> 
+> I wonder what happened with previous email...
+> http://www.spinics.net/lists/kernel/msg1784726.html
+>
+
+The story is that in v9 I split the series to add the max77802 clock and
+regulators support as different series to avoid the cross subsystem churn:
+
+[PATCH v9 0/6] Add Maxim 77802 clocks support
+https://lwn.net/Articles/608834/
+
+[PATCH v9 0/2] Add Maxim 77802 regulator support
+https://lkml.org/lkml/2014/8/18/71
+
+But then forgot to add the common DT binding for the PMIC in bindings/mfd...
+
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
+>> new file mode 100644
+>> index 000000000000..875ebebbc5b0
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
+>> @@ -0,0 +1,26 @@
+>> +Maxim MAX77802 multi-function device
+>> +
+>> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
+>> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
+>> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
+>> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
+>> +regulators, clocks outputs and the RTC.
+>> +
+>> +Binding for the built-in 32k clock generator block is defined separately
+>> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
+>> +is defined in the bindings/regulator/max77802.txt file.
+>> +
+>> +Required properties:
+>> +- compatible : Must be "maxim,max77686";
+> 
+> Shouldn't this be 77802?
+>
+
+right, thanks for pointing out this. It is a copy & paste error. I'll wait a
+couple of days for more feedback and re-post.
+
+> Best regards,
+> Krzysztof
+> 
 
 Best regards,
-Krzysztof
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
