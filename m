@@ -1,105 +1,32 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 13 Jul 2015 08:44:26 +0200
-Subject: [PATCH v2 2/2] ARM: dts: vfxxx: Add property for minimum sample
- time
-In-Reply-To: <20150712064753.GA1199@Sanchayan-Arch>
-References: <cover.1435134626.git.maitysanchayan@gmail.com>
- <36fa3cef10b6a21b39e96283ea5d6961e9f6d972.1435134626.git.maitysanchayan@gmail.com>
- <20150710085324.GL23464@tiger> <20150710180640.GB8723@Sanchayan-Arch>
- <55A154BE.6000701@kernel.org> <20150712064753.GA1199@Sanchayan-Arch>
-Message-ID: <8550db3f2a5db8ec68fc9360dc7173e3@agner.ch>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 13 Jul 2015 08:58:51 +0200
+Subject: [PATCH] PM / devfreq: event: Remove incorrect property in exynos-ppmu
+ DT binding
+Message-ID: <1436770732-9430-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-12 08:47, maitysanchayan at gmail.com wrote:
-> Hello Jonathan,
-> 
-> On 15-07-11 18:39:10, Jonathan Cameron wrote:
->> On 10/07/15 19:06, maitysanchayan at gmail.com wrote:
->> > Hello Shawn,
->> >
->> > On 15-07-10 16:53:24, Shawn Guo wrote:
->> >> On Wed, Jun 24, 2015 at 02:03:41PM +0530, Sanchayan Maity wrote:
->> >>> Add a device tree property which allows to specify the minimum sample
->> >>> time which can be used to calculate the actual ADC cycles required
->> >>> depending on the hardware.
->> >>>
->> >>> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> >>> ---
->> >>>  arch/arm/boot/dts/vfxxx.dtsi | 2 ++
->> >>>  1 file changed, 2 insertions(+)
->> >>>
->> >>> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
->> >>> index 90a03d5..71d9c08 100644
->> >>> --- a/arch/arm/boot/dts/vfxxx.dtsi
->> >>> +++ b/arch/arm/boot/dts/vfxxx.dtsi
->> >>> @@ -229,6 +229,7 @@
->> >>>  				status = "disabled";
->> >>>  				fsl,adck-max-frequency = <30000000>, <40000000>,
->> >>>  							<20000000>;
->> >>> +				min-sample-time = <1000>;
->> >>>  			};
->> >>>
->> >>>  			wdoga5: wdog at 4003e000 {
->> >>> @@ -447,6 +448,7 @@
->> >>>  				status = "disabled";
->> >>>  				fsl,adck-max-frequency = <30000000>, <40000000>,
->> >>>  							<20000000>;
->> >>> +				min-sample-time = <1000>;
->> >>
->> >> Can we code 1000 as the default in kernel driver, so that only boards
->> >> requiring different value need to have this property?  Doing so makes
->> >> the property optional rather than required.
->> >>
->> >
->> > Not sure if hardcoding it in the driver is the right approach.
->> If it is a true feature of the device (i.e. if in the case of perfect
->> front end electronics) this is the right option, then a default makes
->> a lot of sense.  If that isn't the case (I suspect not) then if we
->> drop it be optional chances are no one will bother thinking about it
->> or trying to tune this at all.
->>
->> Hence seems wrong to put a fairly arbitrary default value on it.
->> However, we do need to still work with old device trees and new kernels
->> so need to cope without it.
->>
->> Hence to my mind, if we had started out with this in the first driver
->> version, then the default would be a bad idea.  As we didn't then we
->> really need to cope with nothing specified (as best we can) and so
->> we do need a sensible default (or perhaps even sensible worst
->> case default) in there.
+The exynos-ppmu driver is only a clock consumer and not a clock provider
+but its Device Tree binding listed #clock-cells as an optional property.
 
-I agree with Jonathan's argumentation, let's add a default if the dt
-propery is not there.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-1000ns seems to be a good default value over a wide range of external
-resistance/capacity according to the diagrams of the data sheet, so I
-would vote for that value as default.
+---
 
-> 
-> Just to be sure, do I understand you correctly that you agree with the
-> property being in device tree?
+ Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt | 1 -
+ 1 file changed, 1 deletion(-)
 
-I don't think that the device tree property is in discussion, it is just
-about whether to add a default value in the driver or not...
-
-> 
-> If the device tree property is not specified the driver will just go on
-> to use the value "3" which was hardcoded earlier. In my opinion it is
-> better to allow users to change the sampling cycles by specifying or not
-> specifying this in the device tree rather than have a default value coded
-> in the driver. However this is just my opinion.
-> 
-> Also, some users might not need the somewhat worst case value of 1000. I
-> guess we could keep the driver patch the way it is right now and migrate
-> the property to be specified in our board dts file? So the property can
-> be picked up from the vf-colibri.dtsi or vf500-colibri.dtsi in the adc
-> node? Other boards can do the same?
-
-I agree too, especially when we have a default value in the driver, the
-property belongs into the board file. I suggest to add the default value
-of 1000 to the vf-colibri.dtsi (even if this is the driver default, so
-we explicitly request that "verified" value..)
-
---
-Stefan
+diff --git a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+index b54bf3a2ff57..aed486692880 100644
+--- a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
++++ b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+@@ -17,7 +17,6 @@ Required properties:
+ Optional properties:
+ - clock-names : the name of clock used by the PPMU, "ppmu"
+ - clocks : phandles for clock specified in "clock-names" property
+-- #clock-cells: should be 1.
+ 
+ Example1 : PPMU nodes in exynos3250.dtsi are listed below.
+ 
+-- 
+2.4.3
