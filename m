@@ -1,85 +1,61 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 13 Jul 2015 11:48:57 -0700
-Subject: [PATCH 4/4] irqchip: Add bcm2836 interrupt controller for
- Raspberry Pi 2.
-In-Reply-To: <55A0A5EB.4090007@wwwdotorg.org>
-References: <1436303617-17185-1-git-send-email-eric@anholt.net>
- <1436303617-17185-5-git-send-email-eric@anholt.net>
- <55A0A5EB.4090007@wwwdotorg.org>
-Message-ID: <87bnffao6e.fsf@eliezer.anholt.net>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 13 Jul 2015 11:58:24 -0700
+Subject: [PATCH 3/3] arm64, mm: Use IPIs for TLB invalidation.
+In-Reply-To: <20150713181755.GP2632@arm.com>
+References: <1436646323-10527-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150713181755.GP2632@arm.com>
+Message-ID: <55A40A50.8080902@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Warren <swarren@wwwdotorg.org> writes:
-
-> On 07/07/2015 03:13 PM, Eric Anholt wrote:
->> This interrupt controller is the new root interrupt controller with
->> the timer, PMU events, and IPIs, and the bcm2835's interrupt
->> controller is chained off of it to handle the peripherals.
->> 
->> SMP IPI support was mostly written by Andrea Merello, while I wrote
->> most of the rest of the IRQ handling.
->> 
->> Signed-off-by: Andrea Merello <andrea.merello@gmail.com>
->> Signed-off-by: Eric Anholt <eric@anholt.net>
+On 07/13/2015 11:17 AM, Will Deacon wrote:
+> On Sat, Jul 11, 2015 at 09:25:23PM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Most broadcast TLB invalidations are unnecessary.  So when
+>> invalidating for a given mm/vma target the only the needed CPUs via
+>> and IPI.
+>>
+>> For global TLB invalidations, also use IPI.
+>>
+>> Tested on Cavium ThunderX.
+>>
+>> This change reduces 'time make -j48' on kernel from 139s to 116s (83%
+>> as long).
 >
-> I'd expect the git patch author to be Andrea if he wrote the original
-> patch and you enhanced it.
+> Any idea *why* you're seeing such an improvement? Some older kernels had
+> a bug where we'd try to flush a negative (i.e. huge) range by page, so it
+> would be nice to rule that out. I assume these measurements are using
+> mainline?
 
-I wrote the IRQs patch, and Andrea added the IPI bits to it.
+I have an untested multi-part theory:
 
->> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+1) Most of the invalidations in the kernel build will be for a mm that 
+was only used on a single CPU (the current CPU), so IPIs are for the 
+most part not needed.  We win by not having to synchronize across all 
+CPUs waiting for the DSB to complete.  I think most of it occurs at 
+process exit.  Q: why do anything at process exit?  The use of ASIDs 
+should make TLB invalidations at process death unnecessary.
+
+2) By simplifying the VA range invalidations to just a single ASID based 
+invalidation, we are issuing many fewer TLBI broadcasts.  The overhead 
+of refilling the local TLB with still needed mappings may be lower than 
+the overhead of all those TLBI operations.
+
 >
->> +struct arm_local_intc {
->> +	struct irq_domain *domain;
->> +	void __iomem *base;
->> +};
->> +
->> +static struct arm_local_intc intc  __read_mostly;
+> Having TLBI responsible for that amount of a kernel build doesn't feel
+> right to me and doesn't line-up with the profiles I'm used to seeing.
+
+I don't have enough information to comment on this at the moment.
+
 >
-> It'd be nice to give everything (types, functions, variables) a
-> consistent symbol prefix; bcm2836_arm_irqchip_ sounds like a good
-> bikeshed to me, but perhaps just propagating the above arm_local_ to the
-> functions too would be good, although that seems to risk symbol name
-> collisions with other ARM SoCs.
+> You have 16-bit ASIDs, right?
 
-Done.
+Correct.  This means we aren't doing the rollover work very often, and 
+that it is therefore not a significant source of system overhead.
 
->> +static void bcm2836_mask_gpu_irq(struct irq_data *d)
->> +{
->> +}
->> +
->> +static void bcm2836_unmask_gpu_irq(struct irq_data *d)
->> +{
->> +}
+
 >
-> If the IRQs can't be masked, should these functions actually be implemented?
-
-They are called unconditionally at IRQ enable time.  I don't see a way
-to mask them.
-
->> +static void __exception_irq_entry bcm2836_handle_irq(struct pt_regs *regs)
->> +{
->> +	int cpu = smp_processor_id();
->> +	u32 stat;
->> +
->> +	stat = readl_relaxed(intc.base + LOCAL_IRQ_PENDING0 + 4 * cpu);
->> +	if (stat & 0x10) {
->> +		void __iomem *mailbox0 = (intc.base +
->> +					  LOCAL_MAILBOX0_CLR0 + 16 * cpu);
->> +		u32 mbox_val = readl(mailbox0);
->> +		u32 ipi = ffs(mbox_val) - 1;
->> +
->> +		writel(1 << ipi, mailbox0);
->> +		handle_IPI(ipi, regs);
+> Will
 >
-> Given that bcm2836_send_ipi() is #ifdef CONFIG_SMP, should this code be too?
-
-Sure, done.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150713/4d75b89e/attachment.sig>
