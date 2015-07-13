@@ -1,54 +1,43 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 13 Jul 2015 17:32:46 +0800
-Subject: [PATCH 2/5] clocksource: mediatek: Use GPT as sched clock source
+Date: Mon, 13 Jul 2015 17:32:49 +0800
+Subject: [PATCH 5/5] arm64: dts: mt8173: add timer node
 In-Reply-To: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1436779969-18610-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1436779969-18610-6-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When cpu is in deep idle, arch timer will stop counting. Setup GPT as
-sched clock source so it can keep counting in idle.
+From: Daniel Kurtz <djkurtz@chromium.org>
 
+Add device node to enable GPT timer. This timer will be
+used as sched clock source.
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- drivers/clocksource/mtk_timer.c | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-index 237c20b..ae95b29 100644
---- a/drivers/clocksource/mtk_timer.c
-+++ b/drivers/clocksource/mtk_timer.c
-@@ -24,6 +24,7 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/of_irq.h>
-+#include <linux/sched_clock.h>
- #include <linux/slab.h>
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 0696f8f..04bdd8f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -219,6 +219,15 @@
+ 			reg = <0 0x10007000 0 0x100>;
+ 		};
  
- #define GPT_IRQ_EN_REG		0x00
-@@ -59,6 +60,13 @@ struct mtk_clock_event_device {
- 	struct clock_event_device dev;
- };
- 
-+static void __iomem *gpt_sched_reg __read_mostly;
++		timer: timer at 10008000 {
++			compatible = "mediatek,mt8173-timer",
++				     "mediatek,mt6577-timer";
++			reg = <0 0x10008000 0 0x1000>;
++			interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&infracfg CLK_INFRA_CLK_13M>,
++				 <&topckgen CLK_TOP_RTC_SEL>;
++		};
 +
-+static u64 notrace mtk_read_sched_clock(void)
-+{
-+	return readl_relaxed(gpt_sched_reg);
-+}
-+
- static inline struct mtk_clock_event_device *to_mtk_clk(
- 				struct clock_event_device *c)
- {
-@@ -242,6 +250,8 @@ static void __init mtk_timer_init(struct device_node *node)
- 	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, true);
- 	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
- 			node->name, rate, 300, 32, clocksource_mmio_readl_up);
-+	gpt_sched_reg = evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC);
-+	sched_clock_register(mtk_read_sched_clock, 32, rate);
- 
- 	/* Configure clock event */
- 	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT, false);
+ 		pwrap: pwrap at 1000d000 {
+ 			compatible = "mediatek,mt8173-pwrap";
+ 			reg = <0 0x1000d000 0 0x1000>;
 -- 
 1.8.1.1.dirty
