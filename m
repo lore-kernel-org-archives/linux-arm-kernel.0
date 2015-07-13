@@ -1,56 +1,79 @@
 From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 13 Jul 2015 17:04:52 +0800
-Subject: [PATCH v5 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+Date: Mon, 13 Jul 2015 17:04:54 +0800
+Subject: [PATCH v5 3/3] arm64: dts: mt8173: add MT8173 display PWM driver
+ support node
 In-Reply-To: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
 References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1436778294-47635-2-git-send-email-yh.huang@mediatek.com>
+Message-ID: <1436778294-47635-4-git-send-email-yh.huang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree binding of MediatTek display PWM.
-The PWM has one channel to control the backlight brightness for display.
-It supports MT8173 and MT6595.
+Add display PWM node in mt8173-evb.dts and mt8173.dtsi.
 
 Signed-off-by: YH Huang <yh.huang@mediatek.com>
 ---
- .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 29 ++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 15 +++++++++++++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 22 ++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-new file mode 100644
-index 0000000..aac29dc
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-@@ -0,0 +1,29 @@
-+MediaTek display PWM controller
-+
-+Required properties:
-+ - compatible: should be "mediatek,<name>-disp-pwm":
-+   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-+   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
-+ - reg: physical base address and length of the controller's registers.
-+ - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-+   the cell format.
-+ - clocks: phandle and clock specifier of the PWM reference clock.
-+ - clock-names: must contain the following:
-+   - "main": clock used to generate PWM signals.
-+   - "mm": sync signals from the modules of mmsys.
-+ - pinctrl-names: Must contain a "default" entry.
-+ - pinctrl-0: One property must exist for each entry in pinctrl-names.
-+   See pinctrl/pinctrl-bindings.txt for details of the property values.
-+
-+Example:
-+	pwm0: pwm at 1401e000 {
-+		compatible = "mediatek,mt8173-disp-pwm",
-+			     "mediatek,mt6595-disp-pwm";
-+		reg = <0 0x1401e000 0 0x1000>;
-+		#pwm-cells = <2>;
-+		clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-+			 <&mmsys CLK_MM_DISP_PWM0MM>;
-+		clock-names = "main", "mm";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&disp_pwm0_pins>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index f433c21..b7c1d9f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -34,6 +34,21 @@
+ 	chosen { };
+ };
+ 
++&pio {
++	disp_pwm0_pins: disp_pwm0_pins {
++		pins1 {
++			pinmux = <MT8173_PIN_87_DISP_PWM0__FUNC_DISP_PWM0>;
++			bias-pull-up;
++		};
 +	};
++};
++
++&pwm0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&disp_pwm0_pins>;
++	status = "okay";
++};
++
+ &pwrap {
+ 	pmic: mt6397 {
+ 		compatible = "mediatek,mt6397";
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 0696f8f..44cab19 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -393,6 +393,28 @@
+ 			#size-cells = <0>;
+ 			status = "disabled";
+ 		};
++
++		pwm0: pwm at 1401e000 {
++			compatible = "mediatek,mt8173-disp-pwm",
++				     "mediatek,mt6595-disp-pwm";
++			reg = <0 0x1401e000 0 0x1000>;
++			#pwm-cells = <2>;
++			clocks = <&mmsys CLK_MM_DISP_PWM026M>,
++				 <&mmsys CLK_MM_DISP_PWM0MM>;
++			clock-names = "main", "mm";
++			status = "disabled";
++		};
++
++		pwm1: pwm at 1401f000 {
++			compatible = "mediatek,mt8173-disp-pwm",
++				     "mediatek,mt6595-disp-pwm";
++			reg = <0 0x1401f000 0 0x1000>;
++			#pwm-cells = <2>;
++			clocks = <&mmsys CLK_MM_DISP_PWM126M>,
++				 <&mmsys CLK_MM_DISP_PWM1MM>;
++			clock-names = "main", "mm";
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
 1.8.1.1.dirty
