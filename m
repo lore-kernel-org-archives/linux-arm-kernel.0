@@ -1,42 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jul 2015 14:29:46 +0200
-Subject: [PATCH v3 2/4] dt-bindings: brcmstb-gpio: document properties for
- wakeup
-In-Reply-To: <1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
-References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
- <1434589243-502-3-git-send-email-gregory.0xf0@gmail.com>
-Message-ID: <CACRpkdY5YH7MwGxA_UFg1bzwojT6XouBErBm86PtL_8RCSej0Q@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 13 Jul 2015 21:30:01 +0900
+Subject: [GIT PULL] ARM: EXYNOS: dts: Fixes for 4.2
+Message-ID: <1436790601-9598-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+Dear Kukjin,
 
-> Some brcmstb GPIO controllers can be used to wake from suspend, so use
-> the de facto standard property 'wakeup-source' to mark the nodes of
-> controllers with that capability.
->
-> Also document interrupts-extended, which will be used for wakeup
-> handling because the interrupt parent for the wake IRQ is different
-> from the regular IRQ.
->
-> While we're at it, a few more fixes: We don't actually use the
-> "interrupt-names" property, so remove it from the listed optional
-> properties and from the examples.  And since we're modifying the
-> examples, also follow Brian's suggestions to:
-> - change #gpio-cells, #interrupt-cells, and brcm,gpio-bank-widths from
->   hex to dec
-> - use phandles
->
-> Reviewed-by: Brian Norris <computersforpeace@gmail.com>
-> Signed-off-by: Gregory Fong <gregory.0xf0@gmail.com>
-> ---
-> v3: Update per Brian's suggestions described in above message.
+These are candidates for fixes during this RC cycle.
+Description below (under signed tag).
 
-I'm very uncertain regarding these interrupts-extended etc.
+Best regards,
+Krzysztof
 
-Can someone who understands that ACK this?
 
-E.g. Grant Likely, Bj?rn Helgaas, Rob Herring.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-Yours,
-Linus Walleij
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  https://github.com/krzk/linux.git tags/samsung-dt-fixes-4.2
+
+for you to fetch changes up to a419d78a6f97f8c977fe55d5d590cd0654ecd1ee:
+
+  ARM: dts: Exynos4210: add CPU OPP and regulator supply property (2015-07-13 21:16:05 +0900)
+
+----------------------------------------------------------------
+Samsung DTS fixes:
+1. Fix Exynos3250 MIPI DSI display and MIPI CSIS-2 camera sensor after
+   adding support for PMU regmap in exynos-video-mipi driver
+   (issue introduced in v4.0).
+2. Bring back cpufreq for Exynos4210 after incomplete switch to
+   cpufreq-dt driver in 4.2 merge window. The necessary DTS change
+   for Exynos4210 cpufreq was not applied to the same tree as
+   rest of patchset because of multiple conflicts between
+   clk and arm-soc DTS trees. It was also too late to send it
+   to arm-soc for 4.2. Unfortunately without the change the Exynos4210
+   boards loose cpufreq feature.
+
+----------------------------------------------------------------
+Beata Michalska (1):
+      ARM: dts: Update video-phy node with syscon phandle for Exynos3250
+
+Thomas Abraham (1):
+      ARM: dts: Exynos4210: add CPU OPP and regulator supply property
+
+ arch/arm/boot/dts/exynos3250.dtsi               |  2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts         |  4 ++++
+ arch/arm/boot/dts/exynos4210-trats.dts          |  4 ++++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++++
+ arch/arm/boot/dts/exynos4210.dtsi               | 12 ++++++++++++
+ 5 files changed, 25 insertions(+), 1 deletion(-)
