@@ -1,41 +1,71 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 13 Jul 2015 11:26:11 -0600
-Subject: [PATCH 0/5] coresight: Support context-ID tracing when PID
- namespace is enabled
-In-Reply-To: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
-References: <1436258518-9339-1-git-send-email-zhang.chunyan@linaro.org>
-Message-ID: <CANLsYkwBmquLNiDfUXzZmwEDR7Ow2CPPCoiUrSQKgXTnoN0ohg@mail.gmail.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Mon, 13 Jul 2015 12:34:53 -0500
+Subject: [PATCH v4 1/3] ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset
+ management
+In-Reply-To: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
+References: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1436808895-21206-2-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 July 2015 at 02:41, Chunyan Zhang <zhang.chunyan@linaro.org> wrote:
-> The Coresight ETM drivers already support context-ID tracing, but it won't
-> work when PID namespace is enabled. This is because when using PID
-> namespace a process id (ie. VPID) seen from the current namespace differs
-> from the id (ie. PID) seen by kernel.
->
-> This patch-set does add a translation between VPID and PID.
->
-> Chunyan Zhang (5):
->   coresight-etm3x: Change the name of the ctxid_val to ctxid_pid
->   coresight-etm4x: Change the name of the ctxid_val to ctxid_pid
->   Coresight: Add an interface for supporting ETM3/4 Context ID tracing
->   coresight-etm3x: Support context-ID tracing when PID namespace is
->     enabled
->   coresight-etm4x: Support context-ID tracing when PID namespace is
->     enabled
->
->  .../ABI/testing/sysfs-bus-coresight-devices-etm3x  |  2 +-
->  .../ABI/testing/sysfs-bus-coresight-devices-etm4x  |  2 +-
->  drivers/hwtracing/coresight/coresight-etm.h        |  7 ++--
->  drivers/hwtracing/coresight/coresight-etm3x.c      | 28 +++++++++-------
->  drivers/hwtracing/coresight/coresight-etm4x.c      | 37 ++++++++++++++--------
->  drivers/hwtracing/coresight/coresight-etm4x.h      |  7 ++--
->  include/linux/coresight.h                          | 20 ++++++++++++
->  7 files changed, 72 insertions(+), 31 deletions(-)
->
-> --
-> 1.9.1
->
+Use pdata-quirks to provide platform data required for reset
+management during boot and shutdown of the wkup_m3 processor
+on both the AM33xx and AM43xx SoCs. The WkupM3 remote processor
+is used to implement and achieve low-power functionality on
+the AM33xx & AM43xx SoCs.
 
-Applied - thanks.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 821171c..5417f2c 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -17,6 +17,7 @@
+ 
+ #include <linux/platform_data/pinctrl-single.h>
+ #include <linux/platform_data/iommu-omap.h>
++#include <linux/platform_data/wkup_m3.h>
+ 
+ #include "common.h"
+ #include "common-board-devices.h"
+@@ -278,6 +279,14 @@ static struct iommu_platform_data omap4_iommu_pdata = {
+ };
+ #endif
+ 
++#if defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_AM43XX)
++static struct wkup_m3_platform_data wkup_m3_data = {
++	.reset_name = "wkup_m3",
++	.assert_reset = omap_device_assert_hardreset,
++	.deassert_reset = omap_device_deassert_hardreset,
++};
++#endif
++
+ #ifdef CONFIG_SOC_OMAP5
+ static void __init omap5_uevm_legacy_init(void)
+ {
+@@ -340,6 +349,10 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,am3517-emac", 0x5c000000, "davinci_emac.0",
+ 		       &am35xx_emac_pdata),
+ #endif
++#ifdef CONFIG_SOC_AM33XX
++	OF_DEV_AUXDATA("ti,am3352-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
++		       &wkup_m3_data),
++#endif
+ #ifdef CONFIG_ARCH_OMAP4
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a100040, "4a100040.pinmux", &pcs_pdata),
+ 	OF_DEV_AUXDATA("ti,omap4-padconf", 0x4a31e040, "4a31e040.pinmux", &pcs_pdata),
+@@ -353,6 +366,8 @@ struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
+ #endif
+ #ifdef CONFIG_SOC_AM43XX
+ 	OF_DEV_AUXDATA("ti,am437-padconf", 0x44e10800, "44e10800.pinmux", &pcs_pdata),
++	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
++		       &wkup_m3_data),
+ #endif
+ #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
+ 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
+-- 
+2.4.5
