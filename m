@@ -1,84 +1,59 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 14 Jul 2015 11:40:01 +0900
-Subject: [PATCH v2 1/7] pinctrl: UniPhier: add UniPhier pinctrl core support
+Date: Tue, 14 Jul 2015 11:40:04 +0900
+Subject: [PATCH v2 4/7] pinctrl: UniPhier: add UniPhier PH1-sLD8 pinctrl driver
 In-Reply-To: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1436841607-7556-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1436841607-7556-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The core support for the pinctrl drivers for all the UniPhier SoCs.
+Add pin configuration and pinmux support for UniPhier PH1-sLD8 SoC.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
 Changes in v2:
-  - drop vogus THIS_MODULE because this file is always built-in
-  - drop vogus "include <linux/module.h> because this file is
-    always built-in
+  - sort groups and funcs alphabetically
+  - add i2c pin-mux settings
+  - sort members of platform_driver
+  - change to tristate
+  - add THIS_MODULE to pinctrl_desc
+  - use module_platform_driver
 
- drivers/pinctrl/Kconfig                          |   1 +
- drivers/pinctrl/Makefile                         |   1 +
- drivers/pinctrl/uniphier/Kconfig                 |   8 +
- drivers/pinctrl/uniphier/Makefile                |   1 +
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 684 +++++++++++++++++++++++
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      | 217 +++++++
- 6 files changed, 912 insertions(+)
- create mode 100644 drivers/pinctrl/uniphier/Kconfig
- create mode 100644 drivers/pinctrl/uniphier/Makefile
- create mode 100644 drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
- create mode 100644 drivers/pinctrl/uniphier/pinctrl-uniphier.h
+ drivers/pinctrl/uniphier/Kconfig            |   4 +
+ drivers/pinctrl/uniphier/Makefile           |   1 +
+ drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c | 794 ++++++++++++++++++++++++++++
+ 3 files changed, 799 insertions(+)
+ create mode 100644 drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c
 
-diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
-index 100d9ac..e6362c6 100644
---- a/drivers/pinctrl/Kconfig
-+++ b/drivers/pinctrl/Kconfig
-@@ -240,6 +240,7 @@ source "drivers/pinctrl/samsung/Kconfig"
- source "drivers/pinctrl/sh-pfc/Kconfig"
- source "drivers/pinctrl/spear/Kconfig"
- source "drivers/pinctrl/sunxi/Kconfig"
-+source "drivers/pinctrl/uniphier/Kconfig"
- source "drivers/pinctrl/vt8500/Kconfig"
- source "drivers/pinctrl/mediatek/Kconfig"
- 
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index f4216d9..f6710a8 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -51,5 +51,6 @@ obj-$(CONFIG_PINCTRL_SAMSUNG)	+= samsung/
- obj-$(CONFIG_PINCTRL_SH_PFC)	+= sh-pfc/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
-+obj-$(CONFIG_ARCH_UNIPHIER)	+= uniphier/
- obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
 diff --git a/drivers/pinctrl/uniphier/Kconfig b/drivers/pinctrl/uniphier/Kconfig
-new file mode 100644
-index 0000000..37e39c8
---- /dev/null
+index 944803f..f4a21fe 100644
+--- a/drivers/pinctrl/uniphier/Kconfig
 +++ b/drivers/pinctrl/uniphier/Kconfig
-@@ -0,0 +1,8 @@
-+if ARCH_UNIPHIER
+@@ -13,4 +13,8 @@ config PINCTRL_UNIPHIER_PH1_PRO4
+ 	tristate "UniPhier PH1-Pro4 SoC pinctrl driver"
+ 	select PINCTRL_UNIPHIER_CORE
+ 
++config PINCTRL_UNIPHIER_PH1_SLD8
++	tristate "UniPhier PH1-sLD8 SoC pinctrl driver"
++	select PINCTRL_UNIPHIER_CORE
 +
-+config PINCTRL_UNIPHIER_CORE
-+	bool
-+	select PINMUX
-+	select GENERIC_PINCONF
-+
-+endif
+ endif
 diff --git a/drivers/pinctrl/uniphier/Makefile b/drivers/pinctrl/uniphier/Makefile
-new file mode 100644
-index 0000000..748aa1b
---- /dev/null
+index b1b597e..3349fff 100644
+--- a/drivers/pinctrl/uniphier/Makefile
 +++ b/drivers/pinctrl/uniphier/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_PINCTRL_UNIPHIER_CORE)		+= pinctrl-uniphier-core.o
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+@@ -2,3 +2,4 @@ obj-$(CONFIG_PINCTRL_UNIPHIER_CORE)		+= pinctrl-uniphier-core.o
+ 
+ obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_LD4)		+= pinctrl-ph1-ld4.o
+ obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_PRO4)		+= pinctrl-ph1-pro4.o
++obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_SLD8)		+= pinctrl-ph1-sld8.o
+diff --git a/drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c b/drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c
 new file mode 100644
-index 0000000..918f3b6
+index 0000000..7e9dae5
 --- /dev/null
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -0,0 +1,684 @@
++++ b/drivers/pinctrl/uniphier/pinctrl-ph1-sld8.c
+@@ -0,0 +1,794 @@
 +/*
 + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -93,898 +68,785 @@ index 0000000..918f3b6
 + * GNU General Public License for more details.
 + */
 +
-+#include <linux/export.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/pinctrl/pinconf.h>
-+#include <linux/pinctrl/pinconf-generic.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
 +#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
 +#include <linux/platform_device.h>
-+#include <linux/regmap.h>
 +
-+#include "../core.h"
-+#include "../pinctrl-utils.h"
 +#include "pinctrl-uniphier.h"
 +
-+struct uniphier_pinctrl_priv {
-+	struct pinctrl_dev *pctldev;
-+	struct regmap *regmap;
-+	struct uniphier_pinctrl_socdata *socdata;
++#define DRIVER_NAME "ph1-sld8-pinctrl"
++
++static const struct pinctrl_pin_desc ph1_sld8_pins[] = {
++	UNIPHIER_PINCTRL_PIN(0, "PCA00", UNIPHIER_PIN_IECTRL_NONE,
++			     15, UNIPHIER_PIN_DRV_4_8,
++			     15, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(1, "PCA01", UNIPHIER_PIN_IECTRL_NONE,
++			     16, UNIPHIER_PIN_DRV_4_8,
++			     16, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(2, "PCA02", UNIPHIER_PIN_IECTRL_NONE,
++			     17, UNIPHIER_PIN_DRV_4_8,
++			     17, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(3, "PCA03", UNIPHIER_PIN_IECTRL_NONE,
++			     18, UNIPHIER_PIN_DRV_4_8,
++			     18, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(4, "PCA04", UNIPHIER_PIN_IECTRL_NONE,
++			     19, UNIPHIER_PIN_DRV_4_8,
++			     19, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(5, "PCA05", UNIPHIER_PIN_IECTRL_NONE,
++			     20, UNIPHIER_PIN_DRV_4_8,
++			     20, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(6, "PCA06", UNIPHIER_PIN_IECTRL_NONE,
++			     21, UNIPHIER_PIN_DRV_4_8,
++			     21, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(7, "PCA07", UNIPHIER_PIN_IECTRL_NONE,
++			     22, UNIPHIER_PIN_DRV_4_8,
++			     22, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(8, "PCA08", UNIPHIER_PIN_IECTRL_NONE,
++			     23, UNIPHIER_PIN_DRV_4_8,
++			     23, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(9, "PCA09", UNIPHIER_PIN_IECTRL_NONE,
++			     24, UNIPHIER_PIN_DRV_4_8,
++			     24, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(10, "PCA10", UNIPHIER_PIN_IECTRL_NONE,
++			     25, UNIPHIER_PIN_DRV_4_8,
++			     25, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(11, "PCA11", UNIPHIER_PIN_IECTRL_NONE,
++			     26, UNIPHIER_PIN_DRV_4_8,
++			     26, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(12, "PCA12", UNIPHIER_PIN_IECTRL_NONE,
++			     27, UNIPHIER_PIN_DRV_4_8,
++			     27, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(13, "PCA13", UNIPHIER_PIN_IECTRL_NONE,
++			     28, UNIPHIER_PIN_DRV_4_8,
++			     28, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(14, "PCA14", UNIPHIER_PIN_IECTRL_NONE,
++			     29, UNIPHIER_PIN_DRV_4_8,
++			     29, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(15, "XNFRE_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     30, UNIPHIER_PIN_DRV_4_8,
++			     30, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(16, "XNFWE_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     31, UNIPHIER_PIN_DRV_4_8,
++			     31, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(17, "NFALE_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     32, UNIPHIER_PIN_DRV_4_8,
++			     32, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(18, "NFCLE_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     33, UNIPHIER_PIN_DRV_4_8,
++			     33, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(19, "XNFWP_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     34, UNIPHIER_PIN_DRV_4_8,
++			     34, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(20, "XNFCE0_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     35, UNIPHIER_PIN_DRV_4_8,
++			     35, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(21, "NANDRYBY0_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     36, UNIPHIER_PIN_DRV_4_8,
++			     36, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(22, "XNFCE1_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     0, UNIPHIER_PIN_DRV_8_12_16_20,
++			     119, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(23, "NANDRYBY1_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     4, UNIPHIER_PIN_DRV_8_12_16_20,
++			     120, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(24, "NFD0_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     8, UNIPHIER_PIN_DRV_8_12_16_20,
++			     121, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(25, "NFD1_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     12, UNIPHIER_PIN_DRV_8_12_16_20,
++			     122, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(26, "NFD2_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     16, UNIPHIER_PIN_DRV_8_12_16_20,
++			     123, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(27, "NFD3_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     20, UNIPHIER_PIN_DRV_8_12_16_20,
++			     124, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(28, "NFD4_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     24, UNIPHIER_PIN_DRV_8_12_16_20,
++			     125, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(29, "NFD5_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     28, UNIPHIER_PIN_DRV_8_12_16_20,
++			     126, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(30, "NFD6_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     32, UNIPHIER_PIN_DRV_8_12_16_20,
++			     127, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(31, "NFD7_GB", UNIPHIER_PIN_IECTRL_NONE,
++			     36, UNIPHIER_PIN_DRV_8_12_16_20,
++			     128, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(32, "SDCLK", UNIPHIER_PIN_IECTRL_NONE,
++			     40, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(33, "SDCMD", UNIPHIER_PIN_IECTRL_NONE,
++			     44, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(34, "SDDAT0", UNIPHIER_PIN_IECTRL_NONE,
++			     48, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(35, "SDDAT1", UNIPHIER_PIN_IECTRL_NONE,
++			     52, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(36, "SDDAT2", UNIPHIER_PIN_IECTRL_NONE,
++			     56, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(37, "SDDAT3", UNIPHIER_PIN_IECTRL_NONE,
++			     60, UNIPHIER_PIN_DRV_8_12_16_20,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(38, "SDCD", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     129, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(39, "SDWP", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     130, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(40, "SDVOLC", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     131, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(41, "USB0VBUS", UNIPHIER_PIN_IECTRL_NONE,
++			     37, UNIPHIER_PIN_DRV_4_8,
++			     37, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(42, "USB0OD", UNIPHIER_PIN_IECTRL_NONE,
++			     38, UNIPHIER_PIN_DRV_4_8,
++			     38, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(43, "USB1VBUS", UNIPHIER_PIN_IECTRL_NONE,
++			     39, UNIPHIER_PIN_DRV_4_8,
++			     39, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(44, "USB1OD", UNIPHIER_PIN_IECTRL_NONE,
++			     40, UNIPHIER_PIN_DRV_4_8,
++			     40, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(45, "PCRESET", UNIPHIER_PIN_IECTRL_NONE,
++			     41, UNIPHIER_PIN_DRV_4_8,
++			     41, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(46, "PCREG", UNIPHIER_PIN_IECTRL_NONE,
++			     42, UNIPHIER_PIN_DRV_4_8,
++			     42, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(47, "PCCE2", UNIPHIER_PIN_IECTRL_NONE,
++			     43, UNIPHIER_PIN_DRV_4_8,
++			     43, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(48, "PCVS1", UNIPHIER_PIN_IECTRL_NONE,
++			     44, UNIPHIER_PIN_DRV_4_8,
++			     44, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(49, "PCCD2", UNIPHIER_PIN_IECTRL_NONE,
++			     45, UNIPHIER_PIN_DRV_4_8,
++			     45, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(50, "PCCD1", UNIPHIER_PIN_IECTRL_NONE,
++			     46, UNIPHIER_PIN_DRV_4_8,
++			     46, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(51, "PCREADY", UNIPHIER_PIN_IECTRL_NONE,
++			     47, UNIPHIER_PIN_DRV_4_8,
++			     47, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(52, "PCDOE", UNIPHIER_PIN_IECTRL_NONE,
++			     48, UNIPHIER_PIN_DRV_4_8,
++			     48, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(53, "PCCE1", UNIPHIER_PIN_IECTRL_NONE,
++			     49, UNIPHIER_PIN_DRV_4_8,
++			     49, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(54, "PCWE", UNIPHIER_PIN_IECTRL_NONE,
++			     50, UNIPHIER_PIN_DRV_4_8,
++			     50, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(55, "PCOE", UNIPHIER_PIN_IECTRL_NONE,
++			     51, UNIPHIER_PIN_DRV_4_8,
++			     51, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(56, "PCWAIT", UNIPHIER_PIN_IECTRL_NONE,
++			     52, UNIPHIER_PIN_DRV_4_8,
++			     52, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(57, "PCIOWR", UNIPHIER_PIN_IECTRL_NONE,
++			     53, UNIPHIER_PIN_DRV_4_8,
++			     53, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(58, "PCIORD", UNIPHIER_PIN_IECTRL_NONE,
++			     54, UNIPHIER_PIN_DRV_4_8,
++			     54, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(59, "HS0DIN0", UNIPHIER_PIN_IECTRL_NONE,
++			     55, UNIPHIER_PIN_DRV_4_8,
++			     55, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(60, "HS0DIN1", UNIPHIER_PIN_IECTRL_NONE,
++			     56, UNIPHIER_PIN_DRV_4_8,
++			     56, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(61, "HS0DIN2", UNIPHIER_PIN_IECTRL_NONE,
++			     57, UNIPHIER_PIN_DRV_4_8,
++			     57, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(62, "HS0DIN3", UNIPHIER_PIN_IECTRL_NONE,
++			     58, UNIPHIER_PIN_DRV_4_8,
++			     58, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(63, "HS0DIN4", UNIPHIER_PIN_IECTRL_NONE,
++			     59, UNIPHIER_PIN_DRV_4_8,
++			     59, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(64, "HS0DIN5", UNIPHIER_PIN_IECTRL_NONE,
++			     60, UNIPHIER_PIN_DRV_4_8,
++			     60, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(65, "HS0DIN6", UNIPHIER_PIN_IECTRL_NONE,
++			     61, UNIPHIER_PIN_DRV_4_8,
++			     61, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(66, "HS0DIN7", UNIPHIER_PIN_IECTRL_NONE,
++			     62, UNIPHIER_PIN_DRV_4_8,
++			     62, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(67, "HS0BCLKIN", UNIPHIER_PIN_IECTRL_NONE,
++			     63, UNIPHIER_PIN_DRV_4_8,
++			     63, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(68, "HS0VALIN", UNIPHIER_PIN_IECTRL_NONE,
++			     64, UNIPHIER_PIN_DRV_4_8,
++			     64, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(69, "HS0SYNCIN", UNIPHIER_PIN_IECTRL_NONE,
++			     65, UNIPHIER_PIN_DRV_4_8,
++			     65, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(70, "HSDOUT0", UNIPHIER_PIN_IECTRL_NONE,
++			     66, UNIPHIER_PIN_DRV_4_8,
++			     66, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(71, "HSDOUT1", UNIPHIER_PIN_IECTRL_NONE,
++			     67, UNIPHIER_PIN_DRV_4_8,
++			     67, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(72, "HSDOUT2", UNIPHIER_PIN_IECTRL_NONE,
++			     68, UNIPHIER_PIN_DRV_4_8,
++			     68, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(73, "HSDOUT3", UNIPHIER_PIN_IECTRL_NONE,
++			     69, UNIPHIER_PIN_DRV_4_8,
++			     69, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(74, "HSDOUT4", UNIPHIER_PIN_IECTRL_NONE,
++			     70, UNIPHIER_PIN_DRV_4_8,
++			     70, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(75, "HSDOUT5", UNIPHIER_PIN_IECTRL_NONE,
++			     71, UNIPHIER_PIN_DRV_4_8,
++			     71, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(76, "HSDOUT6", UNIPHIER_PIN_IECTRL_NONE,
++			     72, UNIPHIER_PIN_DRV_4_8,
++			     72, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(77, "HSDOUT7", UNIPHIER_PIN_IECTRL_NONE,
++			     73, UNIPHIER_PIN_DRV_4_8,
++			     73, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(78, "HSBCLKOUT", UNIPHIER_PIN_IECTRL_NONE,
++			     74, UNIPHIER_PIN_DRV_4_8,
++			     74, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(79, "HSVALOUT", UNIPHIER_PIN_IECTRL_NONE,
++			     75, UNIPHIER_PIN_DRV_4_8,
++			     75, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(80, "HSSYNCOUT", UNIPHIER_PIN_IECTRL_NONE,
++			     76, UNIPHIER_PIN_DRV_4_8,
++			     76, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(81, "HS1DIN0", UNIPHIER_PIN_IECTRL_NONE,
++			     77, UNIPHIER_PIN_DRV_4_8,
++			     77, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(82, "HS1DIN1", UNIPHIER_PIN_IECTRL_NONE,
++			     78, UNIPHIER_PIN_DRV_4_8,
++			     78, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(83, "HS1DIN2", UNIPHIER_PIN_IECTRL_NONE,
++			     79, UNIPHIER_PIN_DRV_4_8,
++			     79, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(84, "HS1DIN3", UNIPHIER_PIN_IECTRL_NONE,
++			     80, UNIPHIER_PIN_DRV_4_8,
++			     80, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(85, "HS1DIN4", UNIPHIER_PIN_IECTRL_NONE,
++			     81, UNIPHIER_PIN_DRV_4_8,
++			     81, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(86, "HS1DIN5", UNIPHIER_PIN_IECTRL_NONE,
++			     82, UNIPHIER_PIN_DRV_4_8,
++			     82, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(87, "HS1DIN6", UNIPHIER_PIN_IECTRL_NONE,
++			     83, UNIPHIER_PIN_DRV_4_8,
++			     83, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(88, "HS1DIN7", UNIPHIER_PIN_IECTRL_NONE,
++			     84, UNIPHIER_PIN_DRV_4_8,
++			     84, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(89, "HS1BCLKIN", UNIPHIER_PIN_IECTRL_NONE,
++			     85, UNIPHIER_PIN_DRV_4_8,
++			     85, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(90, "HS1VALIN", UNIPHIER_PIN_IECTRL_NONE,
++			     86, UNIPHIER_PIN_DRV_4_8,
++			     86, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(91, "HS1SYNCIN", UNIPHIER_PIN_IECTRL_NONE,
++			     87, UNIPHIER_PIN_DRV_4_8,
++			     87, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(92, "AGCI", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     132, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(93, "AGCR", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     133, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(94, "AGCBS", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     134, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(95, "IECOUT", UNIPHIER_PIN_IECTRL_NONE,
++			     88, UNIPHIER_PIN_DRV_4_8,
++			     88, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(96, "ASMCK", UNIPHIER_PIN_IECTRL_NONE,
++			     89, UNIPHIER_PIN_DRV_4_8,
++			     89, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(97, "ABCKO", UNIPHIER_PIN_IECTRL_NONE,
++			     90, UNIPHIER_PIN_DRV_4_8,
++			     90, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(98, "ALRCKO", UNIPHIER_PIN_IECTRL_NONE,
++			     91, UNIPHIER_PIN_DRV_4_8,
++			     91, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(99, "ASDOUT0", UNIPHIER_PIN_IECTRL_NONE,
++			     92, UNIPHIER_PIN_DRV_4_8,
++			     92, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(100, "ASDOUT1", UNIPHIER_PIN_IECTRL_NONE,
++			     93, UNIPHIER_PIN_DRV_4_8,
++			     93, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(101, "ARCOUT", UNIPHIER_PIN_IECTRL_NONE,
++			     94, UNIPHIER_PIN_DRV_4_8,
++			     94, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(102, "SDA0", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(103, "SCL0", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(104, "SDA1", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(105, "SCL1", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(106, "DMDSDA0", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(107, "DMDSCL0", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(108, "DMDSDA1", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(109, "DMDSCL1", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_4,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(110, "SBO0", UNIPHIER_PIN_IECTRL_NONE,
++			     95, UNIPHIER_PIN_DRV_4_8,
++			     95, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(111, "SBI0", UNIPHIER_PIN_IECTRL_NONE,
++			     96, UNIPHIER_PIN_DRV_4_8,
++			     96, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(112, "SBO1", UNIPHIER_PIN_IECTRL_NONE,
++			     97, UNIPHIER_PIN_DRV_4_8,
++			     97, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(113, "SBI1", UNIPHIER_PIN_IECTRL_NONE,
++			     98, UNIPHIER_PIN_DRV_4_8,
++			     98, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(114, "TXD1", UNIPHIER_PIN_IECTRL_NONE,
++			     99, UNIPHIER_PIN_DRV_4_8,
++			     99, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(115, "RXD1", UNIPHIER_PIN_IECTRL_NONE,
++			     100, UNIPHIER_PIN_DRV_4_8,
++			     100, UNIPHIER_PIN_PULL_UP),
++	UNIPHIER_PINCTRL_PIN(116, "HIN", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_5,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(117, "VIN", UNIPHIER_PIN_IECTRL_NONE,
++			     -1, UNIPHIER_PIN_DRV_FIXED_5,
++			     -1, UNIPHIER_PIN_PULL_NONE),
++	UNIPHIER_PINCTRL_PIN(118, "TCON0", UNIPHIER_PIN_IECTRL_NONE,
++			     101, UNIPHIER_PIN_DRV_4_8,
++			     101, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(119, "TCON1", UNIPHIER_PIN_IECTRL_NONE,
++			     102, UNIPHIER_PIN_DRV_4_8,
++			     102, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(120, "TCON2", UNIPHIER_PIN_IECTRL_NONE,
++			     103, UNIPHIER_PIN_DRV_4_8,
++			     103, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(121, "TCON3", UNIPHIER_PIN_IECTRL_NONE,
++			     104, UNIPHIER_PIN_DRV_4_8,
++			     104, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(122, "TCON4", UNIPHIER_PIN_IECTRL_NONE,
++			     105, UNIPHIER_PIN_DRV_4_8,
++			     105, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(123, "TCON5", UNIPHIER_PIN_IECTRL_NONE,
++			     106, UNIPHIER_PIN_DRV_4_8,
++			     106, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(124, "TCON6", UNIPHIER_PIN_IECTRL_NONE,
++			     107, UNIPHIER_PIN_DRV_4_8,
++			     107, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(125, "TCON7", UNIPHIER_PIN_IECTRL_NONE,
++			     108, UNIPHIER_PIN_DRV_4_8,
++			     108, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(126, "TCON8", UNIPHIER_PIN_IECTRL_NONE,
++			     109, UNIPHIER_PIN_DRV_4_8,
++			     109, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(127, "PWMA", UNIPHIER_PIN_IECTRL_NONE,
++			     110, UNIPHIER_PIN_DRV_4_8,
++			     110, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(128, "XIRQ0", UNIPHIER_PIN_IECTRL_NONE,
++			     111, UNIPHIER_PIN_DRV_4_8,
++			     111, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(129, "XIRQ1", UNIPHIER_PIN_IECTRL_NONE,
++			     112, UNIPHIER_PIN_DRV_4_8,
++			     112, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(130, "XIRQ2", UNIPHIER_PIN_IECTRL_NONE,
++			     113, UNIPHIER_PIN_DRV_4_8,
++			     113, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(131, "XIRQ3", UNIPHIER_PIN_IECTRL_NONE,
++			     114, UNIPHIER_PIN_DRV_4_8,
++			     114, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(132, "XIRQ4", UNIPHIER_PIN_IECTRL_NONE,
++			     115, UNIPHIER_PIN_DRV_4_8,
++			     115, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(133, "XIRQ5", UNIPHIER_PIN_IECTRL_NONE,
++			     116, UNIPHIER_PIN_DRV_4_8,
++			     116, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(134, "XIRQ6", UNIPHIER_PIN_IECTRL_NONE,
++			     117, UNIPHIER_PIN_DRV_4_8,
++			     117, UNIPHIER_PIN_PULL_DOWN),
++	UNIPHIER_PINCTRL_PIN(135, "XIRQ7", UNIPHIER_PIN_IECTRL_NONE,
++			     118, UNIPHIER_PIN_DRV_4_8,
++			     118, UNIPHIER_PIN_PULL_DOWN),
 +};
 +
-+static int uniphier_pctl_get_groups_count(struct pinctrl_dev *pctldev)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return priv->socdata->groups_count;
-+}
-+
-+static const char *uniphier_pctl_get_group_name(struct pinctrl_dev *pctldev,
-+						unsigned selector)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return priv->socdata->groups[selector].name;
-+}
-+
-+static int uniphier_pctl_get_group_pins(struct pinctrl_dev *pctldev,
-+					unsigned selector,
-+					const unsigned **pins,
-+					unsigned *num_pins)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*pins = priv->socdata->groups[selector].pins;
-+	*num_pins = priv->socdata->groups[selector].num_pins;
-+
-+	return 0;
-+}
-+
-+#ifdef CONFIG_DEBUG_FS
-+static void uniphier_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
-+				       struct seq_file *s, unsigned offset)
-+{
-+	const struct pinctrl_pin_desc *pin = &pctldev->desc->pins[offset];
-+	const char *pull_dir, *drv_str;
-+
-+	switch (uniphier_pin_get_pull_dir(pin->drv_data)) {
-+	case UNIPHIER_PIN_PULL_UP:
-+		pull_dir = "UP";
-+		break;
-+	case UNIPHIER_PIN_PULL_DOWN:
-+		pull_dir = "DOWN";
-+		break;
-+	case UNIPHIER_PIN_PULL_NONE:
-+		pull_dir = "NONE";
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	switch (uniphier_pin_get_drv_str(pin->drv_data)) {
-+	case UNIPHIER_PIN_DRV_4_8:
-+		drv_str = "4/8(mA)";
-+		break;
-+	case UNIPHIER_PIN_DRV_8_12_16_20:
-+		drv_str = "8/12/16/20(mA)";
-+		break;
-+	case UNIPHIER_PIN_DRV_FIXED_4:
-+		drv_str = "4(mA)";
-+		break;
-+	case UNIPHIER_PIN_DRV_FIXED_5:
-+		drv_str = "5(mA)";
-+		break;
-+	case UNIPHIER_PIN_DRV_FIXED_8:
-+		drv_str = "8(mA)";
-+		break;
-+	case UNIPHIER_PIN_DRV_NONE:
-+		drv_str = "NONE";
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	seq_printf(s, " PULL_DIR=%s  DRV_STR=%s", pull_dir, drv_str);
-+}
-+#endif
-+
-+static const struct pinctrl_ops uniphier_pctlops = {
-+	.get_groups_count = uniphier_pctl_get_groups_count,
-+	.get_group_name = uniphier_pctl_get_group_name,
-+	.get_group_pins = uniphier_pctl_get_group_pins,
-+#ifdef CONFIG_DEBUG_FS
-+	.pin_dbg_show = uniphier_pctl_pin_dbg_show,
-+#endif
-+	.dt_node_to_map = pinconf_generic_dt_node_to_map_all,
-+	.dt_free_map = pinctrl_utils_dt_free_map,
++static const unsigned emmc_pins[] = {21, 22, 23, 24, 25, 26, 27};
++static const unsigned emmc_muxvals[] = {1, 1, 1, 1, 1, 1, 1};
++static const unsigned emmc_dat8_pins[] = {28, 29, 30, 31};
++static const unsigned emmc_dat8_muxvals[] = {1, 1, 1, 1};
++static const unsigned i2c0_pins[] = {102, 103};
++static const unsigned i2c0_muxvals[] = {0, 0};
++static const unsigned i2c1_pins[] = {104, 105};
++static const unsigned i2c1_muxvals[] = {0, 0};
++static const unsigned i2c2_pins[] = {108, 109};
++static const unsigned i2c2_muxvals[] = {2, 2};
++static const unsigned i2c3_pins[] = {108, 109};
++static const unsigned i2c3_muxvals[] = {3, 3};
++static const unsigned nand_pins[] = {15, 16, 17, 18, 19, 20, 21, 24, 25, 26,
++				     27, 28, 29, 30, 31};
++static const unsigned nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
++					0, 0};
++static const unsigned nand_cs1_pins[] = {22, 23};
++static const unsigned nand_cs1_muxvals[] = {0, 0};
++static const unsigned uart0_pins[] = {70, 71};
++static const unsigned uart0_muxvals[] = {3, 3};
++static const unsigned uart1_pins[] = {114, 115};
++static const unsigned uart1_muxvals[] = {0, 0};
++static const unsigned uart2_pins[] = {112, 113};
++static const unsigned uart2_muxvals[] = {1, 1};
++static const unsigned uart3_pins[] = {110, 111};
++static const unsigned uart3_muxvals[] = {1, 1};
++static const unsigned usb0_pins[] = {41, 42};
++static const unsigned usb0_muxvals[] = {0, 0};
++static const unsigned usb1_pins[] = {43, 44};
++static const unsigned usb1_muxvals[] = {0, 0};
++static const unsigned usb2_pins[] = {114, 115};
++static const unsigned usb2_muxvals[] = {1, 1};
++static const unsigned port_range0_pins[] = {
++	0, 1, 2, 3, 4, 5, 6, 7,				/* PORT0x */
++	8, 9, 10, 11, 12, 13, 14, 15,			/* PORT1x */
++	32, 33, 34, 35, 36, 37, 38, 39,			/* PORT2x */
++	59, 60, 61, 62, 63, 64, 65, 66,			/* PORT3x */
++	95, 96, 97, 98, 99, 100, 101, 57,		/* PORT4x */
++	70, 71, 72, 73, 74, 75, 76, 77,			/* PORT5x */
++	81, 83, 84, 85, 86, 89, 90, 91,			/* PORT6x */
++	118, 119, 120, 121, 122, 53, 54, 55,		/* PORT7x */
++	41, 42, 43, 44, 79, 80, 18, 19,			/* PORT8x */
++	110, 111, 112, 113, 114, 115, 16, 17,		/* PORT9x */
++	40, 67, 68, 69, 78, 92, 93, 94,			/* PORT10x */
++	48, 49, 46, 45, 123, 124, 125, 126,		/* PORT11x */
++	47, 127, 20, 56, 22,				/* PORT120-124 */
++};
++static const unsigned port_range0_muxvals[] = {
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT0x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT1x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT2x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT3x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT4x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT5x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT6x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT7x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT8x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT9x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT10x */
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT11x */
++	15, 15, 15, 15, 15,				/* PORT120-124 */
++};
++static const unsigned port_range1_pins[] = {
++	116, 117,					/* PORT130-131 */
++};
++static const unsigned port_range1_muxvals[] = {
++	15, 15,						/* PORT130-131 */
++};
++static const unsigned port_range2_pins[] = {
++	102, 103, 104, 105, 106, 107, 108, 109,		/* PORT14x */
++};
++static const unsigned port_range2_muxvals[] = {
++	15, 15, 15, 15, 15, 15, 15, 15,			/* PORT14x */
++};
++static const unsigned port_range3_pins[] = {
++	23,						/* PORT166 */
++};
++static const unsigned port_range3_muxvals[] = {
++	15,						/* PORT166 */
++};
++static const unsigned xirq_range0_pins[] = {
++	128, 129, 130, 131, 132, 133, 134, 135,		/* XIRQ0-7 */
++	82, 87, 88, 50, 51,				/* XIRQ8-12 */
++};
++static const unsigned xirq_range0_muxvals[] = {
++	0, 0, 0, 0, 0, 0, 0, 0,				/* XIRQ0-7 */
++	14, 14, 14, 14, 14,				/* XIRQ8-12 */
++};
++static const unsigned xirq_range1_pins[] = {
++	52, 58,						/* XIRQ14-15 */
++};
++static const unsigned xirq_range1_muxvals[] = {
++	14, 14,						/* XIRQ14-15 */
 +};
 +
-+static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
-+				      const struct pinctrl_pin_desc *pin,
-+				      enum pin_config_param param)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	enum uniphier_pin_pull_dir pull_dir =
-+				uniphier_pin_get_pull_dir(pin->drv_data);
-+	unsigned int pupdctrl, reg, shift, val;
-+	unsigned int expected = 1;
-+	int ret;
-+
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_DISABLE:
-+		if (pull_dir == UNIPHIER_PIN_PULL_NONE)
-+			return 0;
-+		if (pull_dir == UNIPHIER_PIN_PULL_UP_FIXED ||
-+		    pull_dir == UNIPHIER_PIN_PULL_DOWN_FIXED)
-+			return -EINVAL;
-+		expected = 0;
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+		if (pull_dir == UNIPHIER_PIN_PULL_UP_FIXED)
-+			return 0;
-+		if (pull_dir != UNIPHIER_PIN_PULL_UP)
-+			return -EINVAL;
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		if (pull_dir == UNIPHIER_PIN_PULL_DOWN_FIXED)
-+			return 0;
-+		if (pull_dir != UNIPHIER_PIN_PULL_DOWN)
-+			return -EINVAL;
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	pupdctrl = uniphier_pin_get_pupdctrl(pin->drv_data);
-+
-+	reg = UNIPHIER_PINCTRL_PUPDCTRL_BASE + pupdctrl / 32 * 4;
-+	shift = pupdctrl % 32;
-+
-+	ret = regmap_read(priv->regmap, reg, &val);
-+	if (ret)
-+		return ret;
-+
-+	val = (val >> shift) & 1;
-+
-+	return (val == expected) ? 0 : -EINVAL;
-+}
-+
-+static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
-+				       const struct pinctrl_pin_desc *pin,
-+				       u16 *strength)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	enum uniphier_pin_drv_str drv_str =
-+				uniphier_pin_get_drv_str(pin->drv_data);
-+	const unsigned int strength_4_8[] = {4, 8};
-+	const unsigned int strength_8_12_16_20[] = {8, 12, 16, 20};
-+	const unsigned int *supported_strength;
-+	unsigned int drvctrl, reg, shift, mask, width, val;
-+	int ret;
-+
-+	switch (drv_str) {
-+	case UNIPHIER_PIN_DRV_4_8:
-+		supported_strength = strength_4_8;
-+		width = 1;
-+		break;
-+	case UNIPHIER_PIN_DRV_8_12_16_20:
-+		supported_strength = strength_8_12_16_20;
-+		width = 2;
-+		break;
-+	case UNIPHIER_PIN_DRV_FIXED_4:
-+		*strength = 4;
-+		return 0;
-+	case UNIPHIER_PIN_DRV_FIXED_5:
-+		*strength = 5;
-+		return 0;
-+	case UNIPHIER_PIN_DRV_FIXED_8:
-+		*strength = 8;
-+		return 0;
-+	default:
-+		/* drive strength control is not supported for this pin */
-+		return -EINVAL;
-+	}
-+
-+	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
-+	drvctrl *= width;
-+
-+	reg = (width == 2) ? UNIPHIER_PINCTRL_DRV2CTRL_BASE :
-+			     UNIPHIER_PINCTRL_DRVCTRL_BASE;
-+
-+	reg += drvctrl / 32 * 4;
-+	shift = drvctrl % 32;
-+	mask = (1U << width) - 1;
-+
-+	ret = regmap_read(priv->regmap, reg, &val);
-+	if (ret)
-+		return ret;
-+
-+	*strength = supported_strength[(val >> shift) & mask];
-+
-+	return 0;
-+}
-+
-+static int uniphier_conf_pin_input_enable_get(struct pinctrl_dev *pctldev,
-+					const struct pinctrl_pin_desc *pin)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned int iectrl = uniphier_pin_get_iectrl(pin->drv_data);
-+	unsigned int val;
-+	int ret;
-+
-+	if (iectrl == UNIPHIER_PIN_IECTRL_NONE)
-+		/* This pin is always input-enabled. */
-+		return 0;
-+
-+	ret = regmap_read(priv->regmap, UNIPHIER_PINCTRL_IECTRL, &val);
-+	if (ret)
-+		return ret;
-+
-+	return val & BIT(iectrl) ? 0 : -EINVAL;
-+}
-+
-+static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
-+					unsigned pin,
-+					unsigned long *configs)
-+{
-+	const struct pinctrl_pin_desc *pin_desc = &pctldev->desc->pins[pin];
-+	enum pin_config_param param = pinconf_to_config_param(*configs);
-+	bool has_arg = false;
-+	u16 arg;
-+	int ret;
-+
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_DISABLE:
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		ret = uniphier_conf_pin_bias_get(pctldev, pin_desc, param);
-+		break;
-+	case PIN_CONFIG_DRIVE_STRENGTH:
-+		ret = uniphier_conf_pin_drive_get(pctldev, pin_desc, &arg);
-+		has_arg = true;
-+		break;
-+	case PIN_CONFIG_INPUT_ENABLE:
-+		ret = uniphier_conf_pin_input_enable_get(pctldev, pin_desc);
-+		break;
-+	default:
-+		/* unsupported parameter */
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+	if (ret == 0 && has_arg)
-+		*configs = pinconf_to_config_packed(param, arg);
-+
-+	return ret;
-+}
-+
-+static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
-+				      const struct pinctrl_pin_desc *pin,
-+				      enum pin_config_param param,
-+				      u16 arg)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	enum uniphier_pin_pull_dir pull_dir =
-+				uniphier_pin_get_pull_dir(pin->drv_data);
-+	unsigned int pupdctrl, reg, shift;
-+	unsigned int val = 1;
-+
-+	switch (param) {
-+	case PIN_CONFIG_BIAS_DISABLE:
-+		if (pull_dir == UNIPHIER_PIN_PULL_NONE)
-+			return 0;
-+		if (pull_dir == UNIPHIER_PIN_PULL_UP_FIXED ||
-+		    pull_dir == UNIPHIER_PIN_PULL_DOWN_FIXED) {
-+			dev_err(pctldev->dev,
-+				"can not disable pull register for pin %u (%s)\n",
-+				pin->number, pin->name);
-+			return -EINVAL;
-+		}
-+		val = 0;
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_UP:
-+		if (pull_dir == UNIPHIER_PIN_PULL_UP_FIXED && arg != 0)
-+			return 0;
-+		if (pull_dir != UNIPHIER_PIN_PULL_UP) {
-+			dev_err(pctldev->dev,
-+				"pull-up is unsupported for pin %u (%s)\n",
-+				pin->number, pin->name);
-+			return -EINVAL;
-+		}
-+		if (arg == 0) {
-+			dev_err(pctldev->dev, "pull-up can not be total\n");
-+			return -EINVAL;
-+		}
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_DOWN:
-+		if (pull_dir == UNIPHIER_PIN_PULL_DOWN_FIXED && arg != 0)
-+			return 0;
-+		if (pull_dir != UNIPHIER_PIN_PULL_DOWN) {
-+			dev_err(pctldev->dev,
-+				"pull-down is unsupported for pin %u (%s)\n",
-+				pin->number, pin->name);
-+			return -EINVAL;
-+		}
-+		if (arg == 0) {
-+			dev_err(pctldev->dev, "pull-down can not be total\n");
-+			return -EINVAL;
-+		}
-+		break;
-+	case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
-+		if (pull_dir == UNIPHIER_PIN_PULL_NONE) {
-+			dev_err(pctldev->dev,
-+				"pull-up/down is unsupported for pin %u (%s)\n",
-+				pin->number, pin->name);
-+			return -EINVAL;
-+		}
-+
-+		if (arg == 0)
-+			return 0; /* configuration ingored */
-+		break;
-+	default:
-+		BUG();
-+	}
-+
-+	pupdctrl = uniphier_pin_get_pupdctrl(pin->drv_data);
-+
-+	reg = UNIPHIER_PINCTRL_PUPDCTRL_BASE + pupdctrl / 32 * 4;
-+	shift = pupdctrl % 32;
-+
-+	return regmap_update_bits(priv->regmap, reg, 1 << shift, val << shift);
-+}
-+
-+static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
-+				       const struct pinctrl_pin_desc *pin,
-+				       u16 strength)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	enum uniphier_pin_drv_str drv_str =
-+				uniphier_pin_get_drv_str(pin->drv_data);
-+	const unsigned int strength_4_8[] = {4, 8, -1};
-+	const unsigned int strength_8_12_16_20[] = {8, 12, 16, 20, -1};
-+	const unsigned int *supported_strength;
-+	unsigned int drvctrl, reg, shift, mask, width, val;
-+
-+	switch (drv_str) {
-+	case UNIPHIER_PIN_DRV_4_8:
-+		supported_strength = strength_4_8;
-+		width = 1;
-+		break;
-+	case UNIPHIER_PIN_DRV_8_12_16_20:
-+		supported_strength = strength_8_12_16_20;
-+		width = 2;
-+		break;
-+	default:
-+		dev_err(pctldev->dev,
-+			"cannot change drive strength for pin %u (%s)\n",
-+			pin->number, pin->name);
-+		return -EINVAL;
-+	}
-+
-+	for (val = 0; supported_strength[val] > 0; val++) {
-+		if (supported_strength[val] > strength)
-+			break;
-+	}
-+
-+	if (val == 0) {
-+		dev_err(pctldev->dev,
-+			"unsupported drive strength %u mA for pin %u (%s)\n",
-+			strength, pin->number, pin->name);
-+		return -EINVAL;
-+	}
-+
-+	val--;
-+
-+	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
-+	drvctrl *= width;
-+
-+	reg = (width == 2) ? UNIPHIER_PINCTRL_DRV2CTRL_BASE :
-+			     UNIPHIER_PINCTRL_DRVCTRL_BASE;
-+
-+	reg += drvctrl / 32 * 4;
-+	shift = drvctrl % 32;
-+	mask = (1U << width) - 1;
-+
-+	return regmap_update_bits(priv->regmap, reg,
-+				  mask << shift, val << shift);
-+}
-+
-+static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
-+					  const struct pinctrl_pin_desc *pin,
-+					  u16 enable)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned int iectrl = uniphier_pin_get_iectrl(pin->drv_data);
-+
-+	if (enable == 0) {
-+		/*
-+		 * Multiple pins share one input enable, so per-pin disabling
-+		 * is impossible.
-+		 */
-+		dev_err(pctldev->dev, "unable to disable input\n");
-+		return -EINVAL;
-+	}
-+
-+	if (iectrl == UNIPHIER_PIN_IECTRL_NONE)
-+		/* This pin is always input-enabled. nothing to do. */
-+		return 0;
-+
-+	return regmap_update_bits(priv->regmap, UNIPHIER_PINCTRL_IECTRL,
-+				  BIT(iectrl), BIT(iectrl));
-+}
-+
-+static int uniphier_conf_pin_config_set(struct pinctrl_dev *pctldev,
-+					unsigned pin,
-+					unsigned long *configs,
-+					unsigned num_configs)
-+{
-+	const struct pinctrl_pin_desc *pin_desc = &pctldev->desc->pins[pin];
-+	int i, ret;
-+
-+	for (i = 0; i < num_configs; i++) {
-+		enum pin_config_param param =
-+					pinconf_to_config_param(configs[i]);
-+		u16 arg = pinconf_to_config_argument(configs[i]);
-+
-+		switch (param) {
-+		case PIN_CONFIG_BIAS_DISABLE:
-+		case PIN_CONFIG_BIAS_PULL_UP:
-+		case PIN_CONFIG_BIAS_PULL_DOWN:
-+		case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
-+			ret = uniphier_conf_pin_bias_set(pctldev, pin_desc,
-+							 param, arg);
-+			break;
-+		case PIN_CONFIG_DRIVE_STRENGTH:
-+			ret = uniphier_conf_pin_drive_set(pctldev, pin_desc,
-+							  arg);
-+			break;
-+		case PIN_CONFIG_INPUT_ENABLE:
-+			ret = uniphier_conf_pin_input_enable(pctldev,
-+							     pin_desc, arg);
-+			break;
-+		default:
-+			dev_err(pctldev->dev,
-+				"unsupported configuration parameter %u\n",
-+				param);
-+			return -EINVAL;
-+		}
-+
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int uniphier_conf_pin_config_group_set(struct pinctrl_dev *pctldev,
-+					      unsigned selector,
-+					      unsigned long *configs,
-+					      unsigned num_configs)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	const unsigned *pins = priv->socdata->groups[selector].pins;
-+	unsigned num_pins = priv->socdata->groups[selector].num_pins;
-+	int i, ret;
-+
-+	for (i = 0; i < num_pins; i++) {
-+		ret = uniphier_conf_pin_config_set(pctldev, pins[i],
-+						   configs, num_configs);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct pinconf_ops uniphier_confops = {
-+	.is_generic = true,
-+	.pin_config_get = uniphier_conf_pin_config_get,
-+	.pin_config_set = uniphier_conf_pin_config_set,
-+	.pin_config_group_set = uniphier_conf_pin_config_group_set,
++static const struct uniphier_pinctrl_group ph1_sld8_groups[] = {
++	UNIPHIER_PINCTRL_GROUP(emmc),
++	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
++	UNIPHIER_PINCTRL_GROUP(i2c0),
++	UNIPHIER_PINCTRL_GROUP(i2c1),
++	UNIPHIER_PINCTRL_GROUP(i2c2),
++	UNIPHIER_PINCTRL_GROUP(i2c3),
++	UNIPHIER_PINCTRL_GROUP(nand),
++	UNIPHIER_PINCTRL_GROUP(nand_cs1),
++	UNIPHIER_PINCTRL_GROUP(uart0),
++	UNIPHIER_PINCTRL_GROUP(uart1),
++	UNIPHIER_PINCTRL_GROUP(uart2),
++	UNIPHIER_PINCTRL_GROUP(uart3),
++	UNIPHIER_PINCTRL_GROUP(usb0),
++	UNIPHIER_PINCTRL_GROUP(usb1),
++	UNIPHIER_PINCTRL_GROUP(usb2),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_PORT(port_range0),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_PORT(port_range1),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_PORT(port_range2),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_PORT(port_range3),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_IRQ(xirq_range0),
++	UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_IRQ(xirq_range1),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port00, port_range0, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port01, port_range0, 1),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port02, port_range0, 2),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port03, port_range0, 3),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port04, port_range0, 4),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port05, port_range0, 5),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port06, port_range0, 6),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port07, port_range0, 7),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port10, port_range0, 8),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port11, port_range0, 9),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port12, port_range0, 10),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port13, port_range0, 11),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port14, port_range0, 12),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port15, port_range0, 13),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port16, port_range0, 14),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port17, port_range0, 15),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port20, port_range0, 16),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port21, port_range0, 17),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port22, port_range0, 18),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port23, port_range0, 19),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port24, port_range0, 20),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port25, port_range0, 21),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port26, port_range0, 22),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port27, port_range0, 23),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port30, port_range0, 24),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port31, port_range0, 25),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port32, port_range0, 26),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port33, port_range0, 27),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port34, port_range0, 28),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port35, port_range0, 29),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port36, port_range0, 30),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port37, port_range0, 31),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port40, port_range0, 32),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port41, port_range0, 33),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port42, port_range0, 34),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port43, port_range0, 35),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port44, port_range0, 36),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port45, port_range0, 37),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port46, port_range0, 38),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port47, port_range0, 39),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port50, port_range0, 40),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port51, port_range0, 41),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port52, port_range0, 42),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port53, port_range0, 43),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port54, port_range0, 44),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port55, port_range0, 45),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port56, port_range0, 46),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port57, port_range0, 47),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port60, port_range0, 48),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port61, port_range0, 49),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port62, port_range0, 50),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port63, port_range0, 51),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port64, port_range0, 52),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port65, port_range0, 53),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port66, port_range0, 54),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port67, port_range0, 55),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port70, port_range0, 56),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port71, port_range0, 57),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port72, port_range0, 58),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port73, port_range0, 59),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port74, port_range0, 60),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port75, port_range0, 61),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port76, port_range0, 62),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port77, port_range0, 63),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port80, port_range0, 64),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port81, port_range0, 65),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port82, port_range0, 66),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port83, port_range0, 67),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port84, port_range0, 68),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port85, port_range0, 69),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port86, port_range0, 70),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port87, port_range0, 71),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port90, port_range0, 72),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port91, port_range0, 73),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port92, port_range0, 74),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port93, port_range0, 75),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port94, port_range0, 76),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port95, port_range0, 77),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port96, port_range0, 78),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port97, port_range0, 79),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port100, port_range0, 80),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port101, port_range0, 81),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port102, port_range0, 82),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port103, port_range0, 83),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port104, port_range0, 84),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port105, port_range0, 85),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port106, port_range0, 86),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port107, port_range0, 87),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port110, port_range0, 88),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port111, port_range0, 89),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port112, port_range0, 90),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port113, port_range0, 91),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port114, port_range0, 92),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port115, port_range0, 93),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port116, port_range0, 94),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port117, port_range0, 95),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port120, port_range0, 96),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port121, port_range0, 97),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port122, port_range0, 98),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port123, port_range0, 99),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port124, port_range0, 100),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port130, port_range1, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port131, port_range1, 1),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port140, port_range2, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port141, port_range2, 1),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port142, port_range2, 2),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port143, port_range2, 3),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port144, port_range2, 4),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port145, port_range2, 5),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port146, port_range2, 6),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port147, port_range2, 7),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(port166, port_range3, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq0, xirq_range0, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq1, xirq_range0, 1),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq2, xirq_range0, 2),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq3, xirq_range0, 3),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq4, xirq_range0, 4),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq5, xirq_range0, 5),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq6, xirq_range0, 6),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq7, xirq_range0, 7),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq8, xirq_range0, 8),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq9, xirq_range0, 9),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq10, xirq_range0, 10),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq11, xirq_range0, 11),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq12, xirq_range0, 12),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq14, xirq_range1, 0),
++	UNIPHIER_PINCTRL_GROUP_SINGLE(xirq15, xirq_range1, 1),
 +};
 +
-+static int uniphier_pmx_get_functions_count(struct pinctrl_dev *pctldev)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return priv->socdata->functions_count;
-+}
-+
-+static const char *uniphier_pmx_get_function_name(struct pinctrl_dev *pctldev,
-+						  unsigned selector)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return priv->socdata->functions[selector].name;
-+}
-+
-+static int uniphier_pmx_get_function_groups(struct pinctrl_dev *pctldev,
-+					    unsigned selector,
-+					    const char * const **groups,
-+					    unsigned *num_groups)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*groups = priv->socdata->functions[selector].groups;
-+	*num_groups = priv->socdata->functions[selector].num_groups;
-+
-+	return 0;
-+}
-+
-+static int uniphier_pmx_set_one_mux(struct pinctrl_dev *pctldev, unsigned pin,
-+				    unsigned muxval)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned mux_bits = priv->socdata->mux_bits;
-+	unsigned reg_stride = priv->socdata->reg_stride;
-+	unsigned reg, reg_end, shift, mask;
-+	int ret;
-+
-+	reg = UNIPHIER_PINCTRL_PINMUX_BASE + pin * mux_bits / 32 * reg_stride;
-+	reg_end = reg + reg_stride;
-+	shift = pin * mux_bits % 32;
-+	mask = (1U << mux_bits) - 1;
-+
-+	/*
-+	 * If reg_stride is greater than 4, the MSB of each pinsel shall be
-+	 * stored in the offset+4.
-+	 */
-+	for (; reg < reg_end; reg += 4) {
-+		ret = regmap_update_bits(priv->regmap, reg,
-+					 mask << shift, muxval << shift);
-+		if (ret)
-+			return ret;
-+		muxval >>= mux_bits;
-+	}
-+
-+	if (priv->socdata->load_pinctrl) {
-+		ret = regmap_write(priv->regmap,
-+				   UNIPHIER_PINCTRL_LOAD_PINMUX, 1);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* some pins need input-enabling */
-+	return uniphier_conf_pin_input_enable(pctldev,
-+					      &pctldev->desc->pins[pin], 1);
-+}
-+
-+static int uniphier_pmx_set_mux(struct pinctrl_dev *pctldev,
-+				unsigned func_selector,
-+				unsigned group_selector)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	const struct uniphier_pinctrl_group *grp =
-+					&priv->socdata->groups[group_selector];
-+	int i;
-+	int ret;
-+
-+	for (i = 0; i < grp->num_pins; i++) {
-+		ret = uniphier_pmx_set_one_mux(pctldev, grp->pins[i],
-+					       grp->muxvals[i]);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static int uniphier_pmx_gpio_request_enable(struct pinctrl_dev *pctldev,
-+					    struct pinctrl_gpio_range *range,
-+					    unsigned offset)
-+{
-+	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
-+	const struct uniphier_pinctrl_group *groups = priv->socdata->groups;
-+	int groups_count = priv->socdata->groups_count;
-+	enum uniphier_pinmux_gpio_range_type range_type;
-+	int i, j;
-+
-+	if (strstr(range->name, "irq"))
-+		range_type = UNIPHIER_PINMUX_GPIO_RANGE_IRQ;
-+	else
-+		range_type = UNIPHIER_PINMUX_GPIO_RANGE_PORT;
-+
-+	for (i = 0; i < groups_count; i++) {
-+		if (groups[i].range_type != range_type)
-+			continue;
-+
-+		for (j = 0; j < groups[i].num_pins; j++)
-+			if (groups[i].pins[j] == offset)
-+				goto found;
-+	}
-+
-+	dev_err(pctldev->dev, "pin %u does not support GPIO\n", offset);
-+	return -EINVAL;
-+
-+found:
-+	return uniphier_pmx_set_one_mux(pctldev, offset, groups[i].muxvals[j]);
-+}
-+
-+static const struct pinmux_ops uniphier_pmxops = {
-+	.get_functions_count = uniphier_pmx_get_functions_count,
-+	.get_function_name = uniphier_pmx_get_function_name,
-+	.get_function_groups = uniphier_pmx_get_function_groups,
-+	.set_mux = uniphier_pmx_set_mux,
-+	.gpio_request_enable = uniphier_pmx_gpio_request_enable,
-+	.strict = true,
++static const char * const emmc_groups[] = {"emmc", "emmc_dat8"};
++static const char * const i2c0_groups[] = {"i2c0"};
++static const char * const i2c1_groups[] = {"i2c1"};
++static const char * const i2c2_groups[] = {"i2c2"};
++static const char * const i2c3_groups[] = {"i2c3"};
++static const char * const nand_groups[] = {"nand", "nand_cs1"};
++static const char * const uart0_groups[] = {"uart0"};
++static const char * const uart1_groups[] = {"uart1"};
++static const char * const uart2_groups[] = {"uart2"};
++static const char * const uart3_groups[] = {"uart3"};
++static const char * const usb0_groups[] = {"usb0"};
++static const char * const usb1_groups[] = {"usb1"};
++static const char * const usb2_groups[] = {"usb2"};
++static const char * const port_groups[] = {
++	"port00",  "port01",  "port02",  "port03",
++	"port04",  "port05",  "port06",  "port07",
++	"port10",  "port11",  "port12",  "port13",
++	"port14",  "port15",  "port16",  "port17",
++	"port20",  "port21",  "port22",  "port23",
++	"port24",  "port25",  "port26",  "port27",
++	"port30",  "port31",  "port32",  "port33",
++	"port34",  "port35",  "port36",  "port37",
++	"port40",  "port41",  "port42",  "port43",
++	"port44",  "port45",  "port46",  "port47",
++	"port50",  "port51",  "port52",  "port53",
++	"port54",  "port55",  "port56",  "port57",
++	"port60",  "port61",  "port62",  "port63",
++	"port64",  "port65",  "port66",  "port67",
++	"port70",  "port71",  "port72",  "port73",
++	"port74",  "port75",  "port76",  "port77",
++	"port80",  "port81",  "port82",  "port83",
++	"port84",  "port85",  "port86",  "port87",
++	"port90",  "port91",  "port92",  "port93",
++	"port94",  "port95",  "port96",  "port97",
++	"port100", "port101", "port102", "port103",
++	"port104", "port105", "port106", "port107",
++	"port110", "port111", "port112", "port113",
++	"port114", "port115", "port116", "port117",
++	"port120", "port121", "port122", "port123",
++	"port124", "port125", "port126", "port127",
++	"port130", "port131", "port132", "port133",
++	"port134", "port135", "port136", "port137",
++	"port140", "port141", "port142", "port143",
++	"port144", "port145", "port146", "port147",
++	/* port150-164 missing */
++	/* none */ "port165",
++};
++static const char * const xirq_groups[] = {
++	"xirq0",  "xirq1",  "xirq2",  "xirq3",
++	"xirq4",  "xirq5",  "xirq6",  "xirq7",
++	"xirq8",  "xirq9",  "xirq10", "xirq11",
++	"xirq12", /* none*/ "xirq14", "xirq15",
 +};
 +
-+int uniphier_pinctrl_probe(struct platform_device *pdev,
-+			   struct pinctrl_desc *desc,
-+			   struct uniphier_pinctrl_socdata *socdata)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct uniphier_pinctrl_priv *priv;
-+
-+	if (!socdata ||
-+	    !socdata->groups ||
-+	    !socdata->groups_count ||
-+	    !socdata->functions ||
-+	    !socdata->functions_count ||
-+	    !socdata->mux_bits ||
-+	    !socdata->reg_stride) {
-+		dev_err(dev, "pinctrl socdata lacks necessary members\n");
-+		return -EINVAL;
-+	}
-+
-+	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
-+
-+	priv->regmap = syscon_node_to_regmap(dev->of_node);
-+	if (IS_ERR(priv->regmap)) {
-+		dev_err(dev, "failed to get regmap\n");
-+		return PTR_ERR(priv->regmap);
-+	}
-+
-+	priv->socdata = socdata;
-+	desc->pctlops = &uniphier_pctlops;
-+	desc->pmxops = &uniphier_pmxops;
-+	desc->confops = &uniphier_confops;
-+
-+	priv->pctldev = pinctrl_register(desc, dev, priv);
-+	if (IS_ERR(priv->pctldev)) {
-+		dev_err(dev, "failed to register UniPhier pinctrl driver\n");
-+		return PTR_ERR(priv->pctldev);
-+	}
-+
-+	platform_set_drvdata(pdev, priv);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(uniphier_pinctrl_probe);
-+
-+int uniphier_pinctrl_remove(struct platform_device *pdev)
-+{
-+	struct uniphier_pinctrl_priv *priv = platform_get_drvdata(pdev);
-+
-+	pinctrl_unregister(priv->pctldev);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(uniphier_pinctrl_remove);
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-new file mode 100644
-index 0000000..e1e98b8
---- /dev/null
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-@@ -0,0 +1,217 @@
-+/*
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __PINCTRL_UNIPHIER_H__
-+#define __PINCTRL_UNIPHIER_H__
-+
-+#include <linux/bug.h>
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+
-+#define UNIPHIER_PINCTRL_PINMUX_BASE	0x0
-+#define UNIPHIER_PINCTRL_LOAD_PINMUX	0x700
-+#define UNIPHIER_PINCTRL_DRVCTRL_BASE	0x800
-+#define UNIPHIER_PINCTRL_DRV2CTRL_BASE	0x900
-+#define UNIPHIER_PINCTRL_PUPDCTRL_BASE	0xa00
-+#define UNIPHIER_PINCTRL_IECTRL		0xd00
-+
-+/* input enable control register bit */
-+#define UNIPHIER_PIN_IECTRL_SHIFT	0
-+#define UNIPHIER_PIN_IECTRL_BITS	8
-+#define UNIPHIER_PIN_IECTRL_MASK	((1UL << (UNIPHIER_PIN_IECTRL_BITS)) \
-+					 - 1)
-+
-+/* drive strength control register number */
-+#define UNIPHIER_PIN_DRVCTRL_SHIFT	((UNIPHIER_PIN_IECTRL_SHIFT) + \
-+					(UNIPHIER_PIN_IECTRL_BITS))
-+#define UNIPHIER_PIN_DRVCTRL_BITS	9
-+#define UNIPHIER_PIN_DRVCTRL_MASK	((1UL << (UNIPHIER_PIN_DRVCTRL_BITS)) \
-+					 - 1)
-+
-+/* supported drive strength (mA) */
-+#define UNIPHIER_PIN_DRV_STR_SHIFT	((UNIPHIER_PIN_DRVCTRL_SHIFT) + \
-+					 (UNIPHIER_PIN_DRVCTRL_BITS))
-+#define UNIPHIER_PIN_DRV_STR_BITS	3
-+#define UNIPHIER_PIN_DRV_STR_MASK	((1UL << (UNIPHIER_PIN_DRV_STR_BITS)) \
-+					 - 1)
-+
-+/* pull-up / pull-down register number */
-+#define UNIPHIER_PIN_PUPDCTRL_SHIFT	((UNIPHIER_PIN_DRV_STR_SHIFT) + \
-+					 (UNIPHIER_PIN_DRV_STR_BITS))
-+#define UNIPHIER_PIN_PUPDCTRL_BITS	9
-+#define UNIPHIER_PIN_PUPDCTRL_MASK	((1UL << (UNIPHIER_PIN_PUPDCTRL_BITS))\
-+					 - 1)
-+
-+/* direction of pull register */
-+#define UNIPHIER_PIN_PULL_DIR_SHIFT	((UNIPHIER_PIN_PUPDCTRL_SHIFT) + \
-+					 (UNIPHIER_PIN_PUPDCTRL_BITS))
-+#define UNIPHIER_PIN_PULL_DIR_BITS	3
-+#define UNIPHIER_PIN_PULL_DIR_MASK	((1UL << (UNIPHIER_PIN_PULL_DIR_BITS))\
-+					 - 1)
-+
-+#if UNIPHIER_PIN_PULL_DIR_SHIFT + UNIPHIER_PIN_PULL_DIR_BITS > BITS_PER_LONG
-+#error "unable to pack pin attributes."
-+#endif
-+
-+#define UNIPHIER_PIN_IECTRL_NONE	(UNIPHIER_PIN_IECTRL_MASK)
-+
-+/* selectable drive strength */
-+enum uniphier_pin_drv_str {
-+	UNIPHIER_PIN_DRV_4_8,		/* 2 level control: 4/8 mA */
-+	UNIPHIER_PIN_DRV_8_12_16_20,	/* 4 level control: 8/12/16/20 mA */
-+	UNIPHIER_PIN_DRV_FIXED_4,	/* fixed to 4mA */
-+	UNIPHIER_PIN_DRV_FIXED_5,	/* fixed to 5mA */
-+	UNIPHIER_PIN_DRV_FIXED_8,	/* fixed to 8mA */
-+	UNIPHIER_PIN_DRV_NONE,		/* no support (input only pin) */
++static const struct uniphier_pinmux_function ph1_sld8_functions[] = {
++	UNIPHIER_PINMUX_FUNCTION(emmc),
++	UNIPHIER_PINMUX_FUNCTION(i2c0),
++	UNIPHIER_PINMUX_FUNCTION(i2c1),
++	UNIPHIER_PINMUX_FUNCTION(i2c2),
++	UNIPHIER_PINMUX_FUNCTION(i2c3),
++	UNIPHIER_PINMUX_FUNCTION(nand),
++	UNIPHIER_PINMUX_FUNCTION(uart0),
++	UNIPHIER_PINMUX_FUNCTION(uart1),
++	UNIPHIER_PINMUX_FUNCTION(uart2),
++	UNIPHIER_PINMUX_FUNCTION(uart3),
++	UNIPHIER_PINMUX_FUNCTION(usb0),
++	UNIPHIER_PINMUX_FUNCTION(usb1),
++	UNIPHIER_PINMUX_FUNCTION(usb2),
++	UNIPHIER_PINMUX_FUNCTION(port),
++	UNIPHIER_PINMUX_FUNCTION(xirq),
 +};
 +
-+/* direction of pull register (no pin supports bi-directional pull biasing) */
-+enum uniphier_pin_pull_dir {
-+	UNIPHIER_PIN_PULL_UP,		/* pull-up or disabled */
-+	UNIPHIER_PIN_PULL_DOWN,		/* pull-down or disabled */
-+	UNIPHIER_PIN_PULL_UP_FIXED,	/* always pull-up */
-+	UNIPHIER_PIN_PULL_DOWN_FIXED,	/* always pull-down */
-+	UNIPHIER_PIN_PULL_NONE,		/* no pull register */
++static struct uniphier_pinctrl_socdata ph1_sld8_pindata = {
++	.groups = ph1_sld8_groups,
++	.groups_count = ARRAY_SIZE(ph1_sld8_groups),
++	.functions = ph1_sld8_functions,
++	.functions_count = ARRAY_SIZE(ph1_sld8_functions),
++	.mux_bits = 8,
++	.reg_stride = 4,
++	.load_pinctrl = false,
 +};
 +
-+#define UNIPHIER_PIN_IECTRL(x) \
-+	(((x) & (UNIPHIER_PIN_IECTRL_MASK)) << (UNIPHIER_PIN_IECTRL_SHIFT))
-+#define UNIPHIER_PIN_DRVCTRL(x) \
-+	(((x) & (UNIPHIER_PIN_DRVCTRL_MASK)) << (UNIPHIER_PIN_DRVCTRL_SHIFT))
-+#define UNIPHIER_PIN_DRV_STR(x) \
-+	(((x) & (UNIPHIER_PIN_DRV_STR_MASK)) << (UNIPHIER_PIN_DRV_STR_SHIFT))
-+#define UNIPHIER_PIN_PUPDCTRL(x) \
-+	(((x) & (UNIPHIER_PIN_PUPDCTRL_MASK)) << (UNIPHIER_PIN_PUPDCTRL_SHIFT))
-+#define UNIPHIER_PIN_PULL_DIR(x) \
-+	(((x) & (UNIPHIER_PIN_PULL_DIR_MASK)) << (UNIPHIER_PIN_PULL_DIR_SHIFT))
-+
-+#define UNIPHIER_PIN_ATTR_PACKED(iectrl, drvctrl, drv_str, pupdctrl, pull_dir)\
-+				(UNIPHIER_PIN_IECTRL(iectrl) |		\
-+				 UNIPHIER_PIN_DRVCTRL(drvctrl) |	\
-+				 UNIPHIER_PIN_DRV_STR(drv_str) |	\
-+				 UNIPHIER_PIN_PUPDCTRL(pupdctrl) |	\
-+				 UNIPHIER_PIN_PULL_DIR(pull_dir))
-+
-+static inline unsigned int uniphier_pin_get_iectrl(void *drv_data)
-+{
-+	return ((unsigned long)drv_data >> UNIPHIER_PIN_IECTRL_SHIFT) &
-+						UNIPHIER_PIN_IECTRL_MASK;
-+}
-+
-+static inline unsigned int uniphier_pin_get_drvctrl(void *drv_data)
-+{
-+	return ((unsigned long)drv_data >> UNIPHIER_PIN_DRVCTRL_SHIFT) &
-+						UNIPHIER_PIN_DRVCTRL_MASK;
-+}
-+
-+static inline unsigned int uniphier_pin_get_drv_str(void *drv_data)
-+{
-+	return ((unsigned long)drv_data >> UNIPHIER_PIN_DRV_STR_SHIFT) &
-+						UNIPHIER_PIN_DRV_STR_MASK;
-+}
-+
-+static inline unsigned int uniphier_pin_get_pupdctrl(void *drv_data)
-+{
-+	return ((unsigned long)drv_data >> UNIPHIER_PIN_PUPDCTRL_SHIFT) &
-+						UNIPHIER_PIN_PUPDCTRL_MASK;
-+}
-+
-+static inline unsigned int uniphier_pin_get_pull_dir(void *drv_data)
-+{
-+	return ((unsigned long)drv_data >> UNIPHIER_PIN_PULL_DIR_SHIFT) &
-+						UNIPHIER_PIN_PULL_DIR_MASK;
-+}
-+
-+enum uniphier_pinmux_gpio_range_type {
-+	UNIPHIER_PINMUX_GPIO_RANGE_PORT,
-+	UNIPHIER_PINMUX_GPIO_RANGE_IRQ,
-+	UNIPHIER_PINMUX_GPIO_RANGE_NONE,
++static struct pinctrl_desc ph1_sld8_pinctrl_desc = {
++	.name = DRIVER_NAME,
++	.pins = ph1_sld8_pins,
++	.npins = ARRAY_SIZE(ph1_sld8_pins),
++	.owner = THIS_MODULE,
 +};
 +
-+struct uniphier_pinctrl_group {
-+	const char *name;
-+	const unsigned *pins;
-+	unsigned num_pins;
-+	const unsigned *muxvals;
-+	enum uniphier_pinmux_gpio_range_type range_type;
-+};
-+
-+struct uniphier_pinmux_function {
-+	const char *name;
-+	const char * const *groups;
-+	unsigned num_groups;
-+};
-+
-+struct uniphier_pinctrl_socdata {
-+	const struct uniphier_pinctrl_group *groups;
-+	int groups_count;
-+	const struct uniphier_pinmux_function *functions;
-+	int functions_count;
-+	unsigned mux_bits;
-+	unsigned reg_stride;
-+	bool load_pinctrl;
-+};
-+
-+#define UNIPHIER_PINCTRL_PIN(a, b, c, d, e, f, g)			\
-+{									\
-+	.number = a,							\
-+	.name = b,							\
-+	.drv_data = (void *)UNIPHIER_PIN_ATTR_PACKED(c, d, e, f, g),	\
++static int ph1_sld8_pinctrl_probe(struct platform_device *pdev)
++{
++	return uniphier_pinctrl_probe(pdev, &ph1_sld8_pinctrl_desc,
++				      &ph1_sld8_pindata);
 +}
 +
-+#define __UNIPHIER_PINCTRL_GROUP(grp, type)				\
-+	{								\
-+		.name = #grp,						\
-+		.pins = grp##_pins,					\
-+		.num_pins = ARRAY_SIZE(grp##_pins),			\
-+		.muxvals = grp##_muxvals +				\
-+			BUILD_BUG_ON_ZERO(ARRAY_SIZE(grp##_pins) !=	\
-+					  ARRAY_SIZE(grp##_muxvals)),	\
-+		.range_type = type,					\
-+	}
++static const struct of_device_id ph1_sld8_pinctrl_match[] = {
++	{ .compatible = "socionext,ph1-sld8-pinctrl" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, ph1_sld8_pinctrl_match);
 +
-+#define UNIPHIER_PINCTRL_GROUP(grp)					\
-+	__UNIPHIER_PINCTRL_GROUP(grp, UNIPHIER_PINMUX_GPIO_RANGE_NONE)
++static struct platform_driver ph1_sld8_pinctrl_driver = {
++	.probe = ph1_sld8_pinctrl_probe,
++	.remove = uniphier_pinctrl_remove,
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table = ph1_sld8_pinctrl_match,
++	},
++};
++module_platform_driver(ph1_sld8_pinctrl_driver);
 +
-+#define UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_PORT(grp)			\
-+	__UNIPHIER_PINCTRL_GROUP(grp, UNIPHIER_PINMUX_GPIO_RANGE_PORT)
-+
-+#define UNIPHIER_PINCTRL_GROUP_GPIO_RANGE_IRQ(grp)			\
-+	__UNIPHIER_PINCTRL_GROUP(grp, UNIPHIER_PINMUX_GPIO_RANGE_IRQ)
-+
-+#define UNIPHIER_PINCTRL_GROUP_SINGLE(grp, array, ofst)			\
-+	{								\
-+		.name = #grp,						\
-+		.pins = array##_pins + ofst,				\
-+		.num_pins = 1,						\
-+		.muxvals = array##_muxvals + ofst,			\
-+	}
-+
-+#define UNIPHIER_PINMUX_FUNCTION(func)					\
-+	{								\
-+		.name = #func,						\
-+		.groups = func##_groups,				\
-+		.num_groups = ARRAY_SIZE(func##_groups),		\
-+	}
-+
-+struct platform_device;
-+struct pinctrl_desc;
-+
-+int uniphier_pinctrl_probe(struct platform_device *pdev,
-+			   struct pinctrl_desc *desc,
-+			   struct uniphier_pinctrl_socdata *socdata);
-+
-+int uniphier_pinctrl_remove(struct platform_device *pdev);
-+
-+#endif /* __PINCTRL_UNIPHIER_H__ */
++MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
++MODULE_DESCRIPTION("UniPhier PH1-sLD8 pinctrl driver");
++MODULE_LICENSE("GPL");
 -- 
 1.9.1
