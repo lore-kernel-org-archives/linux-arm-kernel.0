@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:38:56 +0200
-Subject: [PATCH v2 08/48] usb: gadget: amd5536udc: add ep capabilities support
+Date: Tue, 14 Jul 2015 11:38:58 +0200
+Subject: [PATCH v2 10/48] usb: gadget: bcm63xx_udc: add ep capabilities support
 In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-9-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-11-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,25 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/amd5536udc.c | 57 ++++++++++++++++++++++++++++++-------
- 1 file changed, 47 insertions(+), 10 deletions(-)
+ drivers/usb/gadget/udc/bcm63xx_udc.c | 25 +++++++++++++++++++++----
+ 1 file changed, 21 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/amd5536udc.c b/drivers/usb/gadget/udc/amd5536udc.c
-index de7e5e2..1a1d91c 100644
---- a/drivers/usb/gadget/udc/amd5536udc.c
-+++ b/drivers/usb/gadget/udc/amd5536udc.c
-@@ -138,15 +138,51 @@ static DECLARE_TASKLET(disconnect_tasklet, udc_tasklet_disconnect,
+diff --git a/drivers/usb/gadget/udc/bcm63xx_udc.c b/drivers/usb/gadget/udc/bcm63xx_udc.c
+index 9db968b..c5e0894 100644
+--- a/drivers/usb/gadget/udc/bcm63xx_udc.c
++++ b/drivers/usb/gadget/udc/bcm63xx_udc.c
+@@ -44,9 +44,25 @@
+ #define DRV_MODULE_NAME		"bcm63xx_udc"
  
- /* endpoint names used for print */
- static const char ep0_string[] = "ep0in";
--static const char *const ep_string[] = {
--	ep0_string,
--	"ep1in-int", "ep2in-bulk", "ep3in-bulk", "ep4in-bulk", "ep5in-bulk",
--	"ep6in-bulk", "ep7in-bulk", "ep8in-bulk", "ep9in-bulk", "ep10in-bulk",
--	"ep11in-bulk", "ep12in-bulk", "ep13in-bulk", "ep14in-bulk",
--	"ep15in-bulk", "ep0out", "ep1out-bulk", "ep2out-bulk", "ep3out-bulk",
--	"ep4out-bulk", "ep5out-bulk", "ep6out-bulk", "ep7out-bulk",
--	"ep8out-bulk", "ep9out-bulk", "ep10out-bulk", "ep11out-bulk",
--	"ep12out-bulk", "ep13out-bulk", "ep14out-bulk", "ep15out-bulk"
+ static const char bcm63xx_ep0name[] = "ep0";
+-static const char *const bcm63xx_ep_name[] = {
+-	bcm63xx_ep0name,
+-	"ep1in-bulk", "ep2out-bulk", "ep3in-int", "ep4out-int",
++
 +static const struct {
 +	const char *name;
 +	const struct usb_ep_caps caps;
-+} ep_info[] = {
++} bcm63xx_ep_info[] = {
 +#define EP_INFO(_name, _type, _dir) \
 +	{ \
 +		.name = _name, \
@@ -42,52 +37,25 @@ index de7e5e2..1a1d91c 100644
 +				USB_EP_CAPS_DIR_ ## _dir), \
 +	}
 +
-+	EP_INFO(ep0_string,	CONTROL, IN),
-+	EP_INFO("ep1in-int",	BULK,	IN),
-+	EP_INFO("ep2in-bulk",	BULK,	IN),
-+	EP_INFO("ep3in-bulk",	BULK,	IN),
-+	EP_INFO("ep4in-bulk",	BULK,	IN),
-+	EP_INFO("ep5in-bulk",	BULK,	IN),
-+	EP_INFO("ep6in-bulk",	BULK,	IN),
-+	EP_INFO("ep7in-bulk",	BULK,	IN),
-+	EP_INFO("ep8in-bulk",	BULK,	IN),
-+	EP_INFO("ep9in-bulk",	BULK,	IN),
-+	EP_INFO("ep10in-bulk",	BULK,	IN),
-+	EP_INFO("ep11in-bulk",	BULK,	IN),
-+	EP_INFO("ep12in-bulk",	BULK,	IN),
-+	EP_INFO("ep13in-bulk",	BULK,	IN),
-+	EP_INFO("ep14in-bulk",	BULK,	IN),
-+	EP_INFO("ep15in-bulk",	BULK,	IN),
-+	EP_INFO("ep0out",	CONTROL, OUT),
-+	EP_INFO("ep1out-bulk",	BULK,	OUT),
++	EP_INFO(bcm63xx_ep0name, CONTROL, ALL),
++	EP_INFO("ep1in-bulk",	BULK,	IN),
 +	EP_INFO("ep2out-bulk",	BULK,	OUT),
-+	EP_INFO("ep3out-bulk",	BULK,	OUT),
-+	EP_INFO("ep4out-bulk",	BULK,	OUT),
-+	EP_INFO("ep5out-bulk",	BULK,	OUT),
-+	EP_INFO("ep6out-bulk",	BULK,	OUT),
-+	EP_INFO("ep7out-bulk",	BULK,	OUT),
-+	EP_INFO("ep8out-bulk",	BULK,	OUT),
-+	EP_INFO("ep9out-bulk",	BULK,	OUT),
-+	EP_INFO("ep10out-bulk",	BULK,	OUT),
-+	EP_INFO("ep11out-bulk",	BULK,	OUT),
-+	EP_INFO("ep12out-bulk",	BULK,	OUT),
-+	EP_INFO("ep13out-bulk",	BULK,	OUT),
-+	EP_INFO("ep14out-bulk",	BULK,	OUT),
-+	EP_INFO("ep15out-bulk",	BULK,	OUT),
++	EP_INFO("ep3in-int",	INT,	IN),
++	EP_INFO("ep4out-int",	INT,	OUT),
 +
 +#undef EP_INFO
  };
  
- /* DMA usage flag */
-@@ -1517,7 +1553,8 @@ static void udc_setup_endpoints(struct udc *dev)
- 	for (tmp = 0; tmp < UDC_EP_NUM; tmp++) {
- 		ep = &dev->ep[tmp];
- 		ep->dev = dev;
--		ep->ep.name = ep_string[tmp];
-+		ep->ep.name = ep_info[tmp].name;
-+		ep->ep.caps = ep_info[tmp].caps;
- 		ep->num = tmp;
- 		/* txfifo size is calculated at enable time */
- 		ep->txfifo = dev->txfifo;
+ static bool use_fullspeed;
+@@ -943,7 +959,8 @@ static int bcm63xx_init_udc_hw(struct bcm63xx_udc *udc)
+ 	for (i = 0; i < BCM63XX_NUM_EP; i++) {
+ 		struct bcm63xx_ep *bep = &udc->bep[i];
+ 
+-		bep->ep.name = bcm63xx_ep_name[i];
++		bep->ep.name = bcm63xx_ep_info[i].name;
++		bep->ep.caps = bcm63xx_ep_info[i].caps;
+ 		bep->ep_num = i;
+ 		bep->ep.ops = &bcm63xx_udc_ep_ops;
+ 		list_add_tail(&bep->ep.ep_list, &udc->gadget.ep_list);
 -- 
 1.9.1
