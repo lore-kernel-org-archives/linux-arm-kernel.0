@@ -1,53 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 15:25:38 +0800
-Subject: [PATCH][v2] ARM: ls1021a: dtsi: Add crypto node alias in device
- tree
-In-Reply-To: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
-References: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
-Message-ID: <20150714072538.GI4119@tiger>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 14 Jul 2015 15:34:10 +0800
+Subject: [PATCH 4/5] clk: mediatek: add 13mhz clock for MT8173
+In-Reply-To: <1436779969-18610-5-git-send-email-yingjoe.chen@mediatek.com>
+References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1436779969-18610-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CAGS+omCyfJW7YhfvRbX5as+Ta9gnSO4RQuzENrLOOy9iHnSytw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 09:43:15AM +0530, Ruchika Gupta wrote:
-> U-boot patches up the device tree crypto node for the era property.
-> 
-> Signed-off-by: Ruchika Gupta <ruchika.gupta@freescale.com>
+On Mon, Jul 13, 2015 at 5:32 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> Add 13mhz clock used by GPT timer in infracfg.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > ---
-> Changes from v1:
-> Rearranged the crypto node in alphabetic sorted order as suggested by Shawn 
-> 
->  arch/arm/boot/dts/ls1021a.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index c70bb27..42dffae 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -53,6 +53,7 @@
->  	interrupt-parent = <&gic>;
->  
->  	aliases {
-> +		crypto = &crypto;
+>  drivers/clk/mediatek/clk-mt8173.c      | 5 +++++
+>  include/dt-bindings/clock/mt8173-clk.h | 3 ++-
+>  2 files changed, 7 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> index 4b9e04c..540c5c3 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -618,6 +618,10 @@ static const struct mtk_gate infra_clks[] __initconst = {
+>         GATE_ICG(CLK_INFRA_PMICWRAP, "infra_pmicwrap", "axi_sel", 23),
+>  };
+>
+> +static const struct mtk_fixed_factor infra_divs[] __initconst = {
+> +       FACTOR(CLK_INFRA_CLK_13M, "clk13m", "clk26m", 1, 2),
+> +};
+> +
+>  static const struct mtk_gate_regs peri0_cg_regs = {
+>         .set_ofs = 0x0008,
+>         .clr_ofs = 0x0010,
+> @@ -737,6 +741,7 @@ static void __init mtk_infrasys_init(struct device_node *node)
+>
+>         mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
+>                                                 clk_data);
+> +       mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
+>
+>         r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>         if (r)
+> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+> index 4ad76ed..fa2a2bb 100644
+> --- a/include/dt-bindings/clock/mt8173-clk.h
+> +++ b/include/dt-bindings/clock/mt8173-clk.h
+> @@ -187,7 +187,8 @@
+>  #define CLK_INFRA_CEC                  9
+>  #define CLK_INFRA_PMICSPI              10
+>  #define CLK_INFRA_PMICWRAP             11
+> -#define CLK_INFRA_NR_CLK               12
+> +#define CLK_INFRA_CLK_13M              12
+> +#define CLK_INFRA_NR_CLK               13
 
-Wait.  Did miss any prerequisite patch?  I do not have the label in my
-tree.
+Note: this one conflicts slightly with pi-cheng's patch that adds CPU
+mux clocks for cpufreq driver, since they both add more INFRA clocks:
+https://patchwork.kernel.org/patch/6721511/
 
-  DTC     arch/arm/boot/dts/ls1021a-qds.dtb
-ERROR (path_references): Reference to non-existent node or label "crypto"
-
-Patch dropped.
-
-Shawn
-
->  		serial0 = &lpuart0;
->  		serial1 = &lpuart1;
->  		serial2 = &lpuart2;
-> -- 
-> 1.8.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>
+>  /* PERI_SYS */
+>
+> --
+> 1.8.1.1.dirty
+>
