@@ -1,67 +1,28 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 14 Jul 2015 14:19:51 +0800
-Subject: [PATCH v2 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
-In-Reply-To: <20150710051018.GU18700@pengutronix.de>
-References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
- <1436348468-4126-2-git-send-email-chunfeng.yun@mediatek.com>
- <20150710051018.GU18700@pengutronix.de>
-Message-ID: <1436854791.11289.11.camel@mhfsdcap03>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 14 Jul 2015 15:28:34 +0900
+Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <CAGc3s_fQmWR_LNz-jbRDdGb3B8g0d+gSQa2=p_0k7yfJUD0PvA@mail.gmail.com>
+References: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
+ <55A45C63.2030907@samsung.com> <06b101d0bdf2$8aad8fb0$a008af10$@kernel.org>
+ <CAGc3s_fQmWR_LNz-jbRDdGb3B8g0d+gSQa2=p_0k7yfJUD0PvA@mail.gmail.com>
+Message-ID: <55A4AC12.1090205@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-On Fri, 2015-07-10 at 07:10 +0200, Sascha Hauer wrote:
-> On Wed, Jul 08, 2015 at 05:41:03PM +0800, Chunfeng Yun wrote:
-> > add a DT binding documentation of usb3.0 phy for MT65xx
-> > SoCs from Mediatek.
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/usb/mt65xx-u3phy.txt       | 34 ++++++++++++++++++++++
-> >  1 file changed, 34 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
-> > new file mode 100644
-> > index 0000000..056b2aa
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
-> > @@ -0,0 +1,34 @@
-> > +MT65xx U3PHY
-> > +
-> > +The device node for Mediatek SOC usb3.0 phy
-> > +
-> > +Required properties:
-> > + - compatible : Should be "mediatek,mt8173-u3phy"
-> > + - reg        : Offset and length of registers, the first is for mac domain,
-> > +	another for phy domain
-> > + - power-domains: to enable usb's mtcmos
-> > + - usb-wakeup-ctrl : to access usb wakeup control register
-> > + - wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup mode; others
-> > +	means don't enable wakeup source of usb
-> > + - u2port-num : number of usb2.0 ports to support which should be 1 or 2
-> > + - clocks     : must support all clocks that phy need
-> > + - clock-names: should be "wakeup_deb_p0", "wakeup_deb_p1" for wakeup
-> > +	debounce control clocks, and "u3phya_ref" for u3phya reference clock.
-> > +
-> > +Example:
-> > +
-> > +u3phy: usb-phy at 11271000 {
-> > +	compatible = "mediatek,mt8173-u3phy";
-> > +	reg = <0 0x11271000 0 0x3000>,
-> > +	      <0 0x11280000 0 0x20000>;
+On 14.07.2015 14:36, Mauro Ribeiro wrote:
+> In my opinion since its something configurable by the board and not
+> SoC specific it should be defined (or re-defined) on the board dts.
 > 
-> 0x11271000 is the register space the xhci controller takes. You should
-> not expose the same register space to two different drivers.
-> 
+> If one makes a 5422 board booting from A15's that patch will be
+> already invalid and causing the issue that it fixes.
 
-usb: usb30 at 11270000 {
-   compatible = "mediatek,mt8173-xhci";
-   reg = <0 0x11270000 0 0x1000>;
+Indeed this is configurable by the board. For Odroid XU3 this is fixed
+(hard-wired) but other boards may have it in different way. We already
+discussed this and Chanho Park is here:
+http://www.spinics.net/lists/linux-samsung-soc/msg44924.html
+http://www.spinics.net/lists/linux-samsung-soc/msg44930.html
 
-the size of xhci register space is 0x1000, and the range is
-[0x11270000, 0x11271000 - 1], so the address of 0x11271000 is not
-included.
+There were no additional objections to the patchset in that time.
 
-> Sascha
-> 
+Best regards,
+Krzysztof
