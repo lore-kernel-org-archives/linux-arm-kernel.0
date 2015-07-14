@@ -1,41 +1,60 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 14 Jul 2015 15:39:51 +0530
-Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-In-Reply-To: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
-References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <55A4DFEF.6040005@ti.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 14 Jul 2015 18:15:58 +0800
+Subject: [PATCH v3 4/5] clk: mediatek: Add USB clock support in MT8173
+ APMIXEDSYS
+In-Reply-To: <1436867199.9416.16.camel@mtksdaap41>
+References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omBryA6f6gYje5RvF2XcJiebogYCHpyWNeN9K4B-MiHf1Q@mail.gmail.com>
+ <1436841935.9416.10.camel@mtksdaap41>
+ <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
+ <1436867199.9416.16.camel@mtksdaap41>
+Message-ID: <CAGS+omB=Fbdpr0jc0oXxbPP1pePOXzaAZi4yKAd_=HnpQDbacA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Wednesday 10 June 2015 02:56 PM, Lokesh Vutla wrote:
-> Some IP blocks like RTC, needs an additional unlocking mechanism for
-> writing to its registers. This patch adds optional lock and unlock
-> function pointers to the IP block's hwmod data which gets executed
-> before and after writing into IP sysconfig register.
-> And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod data,
-> so that sysconfig registers are updated properly.
-ping on this series.
+On Tue, Jul 14, 2015 at 5:46 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> Hi Daniel,
+>
+> On Tue, 2015-07-14 at 11:23 +0800, Daniel Kurtz wrote:
+>> On Tue, Jul 14, 2015 at 10:45 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+>> > On Mon, 2015-07-13 at 22:46 +0800, Daniel Kurtz wrote:
+>> >> > +static const struct clk_ops mtk_ref2usb_tx_ops = {
+>> >> > +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
+>> >> > +       .prepare        = mtk_ref2usb_tx_prepare,
+>> >> > +       .unprepare      = mtk_ref2usb_tx_unprepare,
+>> >> > +};
+>> >>
+>> >> Burying the implementation of this special "mtk_ref2usb" clock in
+>> >> clk-mt8173,c seems a bit awkward.
+>> >> Can you please move it to its own file, like mediatek/clk-usb.c?
+>> >
+>> > Do you mean clk/mediatek/clk-usb.c?
+>> >
+>> > This clock is a MT8173 specific clock, which may not be reused by other
+>> > SoCs. So I think it's not necessary to move it to a separated file.
+>>
+>> Yes, this is a wrapper for a type of clock.  I think it would be
+>> better in its own file, rather than embedded in clk-mt8173.c, which is
+>> more about enumerating and initializing the clock tree.
+>>
+>> Perhaps today it is only used for mt8173, but that may not be the case
+>> in the future.
+>
+> OK, I'll separate it from clk-mt8173.c.
+>
+> Ref2usb_tx's control register is located in APMIXEDSYS, which contains
+> most of PLL controlling. Is this clock suitable to implemented
+> mtk-pll.c? Or it's proper to be a separated file such as clk-usb.c?
 
-Thanks and regards,
-Lokesh
-> 
-> Tested on:
-> DRA7-evm: http://pastebin.ubuntu.com/11688889/
-> DRA72-evm: http://pastebin.ubuntu.com/11688901/
-> BeagleBoard-x15: http://pastebin.ubuntu.com/11688907/
-> BeagleBoneBlack: http://pastebin.ubuntu.com/11688923/ 
-> AM437x-gp-evm: http://pastebin.ubuntu.com/11689157/ (Used an out of tree patch to enable RTC)
-> 
-> Lokesh Vutla (3):
->   ARM: OMAP2+: hwmod: add support for lock and unlock hooks
->   ARM: DRA: hwmod: RTC: Add lock and unlock functions
->   ARM: AMx3xx: RTC: Add lock and unlock functions
-> 
->  arch/arm/mach-omap2/omap_hwmod.c                   | 13 ++++++
->  arch/arm/mach-omap2/omap_hwmod.h                   |  6 +++
->  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 +
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +
->  arch/arm/mach-omap2/omap_hwmod_reset.c             | 47 ++++++++++++++++++++++
->  5 files changed, 70 insertions(+)
-> 
+I think a separate clk-usb.c might be better since the driver is very
+different than what is used for the PLLs.
+
+Thanks!
+-Dan
+
+> Best regards,
+>
+> James
+>
+>
