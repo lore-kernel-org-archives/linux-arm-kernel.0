@@ -1,20 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 14:43:35 +0800
-Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: enable powerkey and syscon
- power off
-In-Reply-To: <1436376180-5891-2-git-send-email-Frank.Li@freescale.com>
-References: <1436376180-5891-1-git-send-email-Frank.Li@freescale.com>
- <1436376180-5891-2-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150714064335.GF4119@tiger>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jul 2015 23:49:31 -0700
+Subject: [PATCH v2] ARM: dts: configure regulators for Gumstix Pepper
+In-Reply-To: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
+References: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
+Message-ID: <20150714064931.GC17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 01:23:00AM +0800, Frank.Li at freescale.com wrote:
-> From: Frank Li <Frank.Li@freescale.com>
+* Adam YH Lee <adam.yh.lee@gmail.com> [150709 15:40]:
+> Boot process is halting in midway because some of the necessary voltage
+> regulators are deemed unused and subsequently powered off, leading to
+> a completely unresponsive system.
 > 
-> build in snvs powerkey
-> build in syscon power off support
+> Most of the device nodes had correct voltage regulator attachments.
+> Yet these nodes had to set stricter enforcement on them through
+> 'regulator-boot-on' and 'regulator-always-on' to function correctly.
 > 
-> Signed-off-by: Frank Li <Frank.Li@freescale.com>
+> The consumers of the regulators this commit affect are the followings:
+> 
+> 	DCDC1: vdd_1v8 system supply, USB-PHY, and ADC
+> 	DCDC2: Core domain
+> 	DCDC3: MPU core domain
+> 	 LDO1: RTC
+> 	 LDO2: 3v3 IO domain
+> 	 LDO3: USB-PHY; not a boot-time requirement
+> 	 LDO4: LCD [16:23]
+> 
+> All but LDO3 need to be always-on for the system to be functional.
+> 
+> Additionally regulator-name properties have been added for the kernel to
+> display the name from the schematic. This will improve diagnostics.
 
-Applied, thanks.
+Thanks for updating the description, applying this into
+omap-for-v4.2/fixes.
+
+Tony
