@@ -1,35 +1,23 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 14 Jul 2015 09:26:00 -0700
-Subject: mx6: suspicious RCU usage
-In-Reply-To: <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
-References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
- <20150714160006.GI3717@linux.vnet.ibm.com>
- <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
-Message-ID: <20150714162600.GJ3717@linux.vnet.ibm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jul 2015 17:26:27 +0100
+Subject: [RFC PATCH 1/2] spi: zynqmp: gqspi: add support for dual
+ parallel mode configuration
+In-Reply-To: <1436445895-25504-2-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <1436445895-25504-2-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <20150714162627.GC11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 01:06:32PM -0300, Fabio Estevam wrote:
-> Hi Paul,
-> 
-> On Tue, Jul 14, 2015 at 1:00 PM, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > Does this patch help?
-> >
-> >         https://lkml.org/lkml/2015/5/12/885
-> 
-> I am using an ARM 32-bit machine, so I used this one instead:
-> https://lkml.org/lkml/2015/5/12/892
-> 
-> , and it fixes the problem. Thanks!
-> 
-> Feel free to add:
-> 
-> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Thu, Jul 09, 2015 at 06:14:54PM +0530, Ranjit Waghmode wrote:
 
-Glad it helped!
+> +	if (qspi->master->flags & SPI_BOTH_FLASH) {
 
-Russell, did you want me to push this, or would you rather take it?
-
-							Thanx, Paul
+There's currently no SPI_BOTH_FLASH...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/f7a86762/attachment.sig>
