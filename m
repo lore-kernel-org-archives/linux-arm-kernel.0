@@ -1,95 +1,294 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 14 Jul 2015 21:47:10 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 14 Jul 2015 20:47:04 +0800
+Subject: [PATCH v4] clk: mediatek: Export CPU mux clocks for CPU frequency
+ control
+In-Reply-To: <1436866459-14217-1-git-send-email-pi-cheng.chen@linaro.org>
+References: <1436866459-14217-1-git-send-email-pi-cheng.chen@linaro.org>
+Message-ID: <CAGS+omAa=3W+SZLmFaDD6uJuhXtu2zX12TsvL2etDif+mKkoVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 13, 2015, at 2:29 PM, AKASHI Takahiro wrote:
+On Tue, Jul 14, 2015 at 5:34 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
+> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
+>
+> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
+> for intermediate clock source switching.
+>
+> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> ---
+> Changes in v4:
+> - Address comments for v3
+> - Rebase to the patch that adds 13mhz clock for MT8173[1]
+>
+> Changes in v3:
+> - Rebase to 4.2-rc1
+> - Fix some issues of v2
+>
+> Changes in v2:
+> - Remove use of .determine_rate callback
+>
+> [1] http://patchwork.kernerl.xyz/patch/6777041/
+> ---
+>  drivers/clk/mediatek/Makefile          |   2 +-
+>  drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
+>  drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
+>  drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
+>  include/dt-bindings/clock/mt8173-clk.h |   4 +-
+>  5 files changed, 176 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
+>  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
+>
+> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
+> index 8e4b2a4..299917a 100644
+> --- a/drivers/clk/mediatek/Makefile
+> +++ b/drivers/clk/mediatek/Makefile
+> @@ -1,4 +1,4 @@
+> -obj-y += clk-mtk.o clk-pll.o clk-gate.o
+> +obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
+>  obj-$(CONFIG_RESET_CONTROLLER) += reset.o
+>  obj-y += clk-mt8135.o
+>  obj-y += clk-mt8173.o
+> diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
+> new file mode 100644
+> index 0000000..fb04fe1
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-cpumux.c
+> @@ -0,0 +1,127 @@
+> +/*
+> + * Copyright (c) 2015 Linaro Ltd.
+> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/slab.h>
+> +
+> +#include "clk-mtk.h"
+> +#include "clk-cpumux.h"
+> +
+> +struct mtk_clk_cpumux {
+> +       struct clk_hw   hw;
+> +       struct regmap   *regmap;
+> +       u32             reg;
+> +       u32             mask;
+> +       u8              shift;
+> +};
+> +
+> +static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
+> +{
+> +       return container_of(_hw, struct mtk_clk_cpumux, hw);
+> +}
+> +
+> +static u8 clk_cpumux_get_parent(struct clk_hw *hw)
+> +{
+> +       struct mtk_clk_cpumux *mux = to_clk_mux(hw);
+> +       int num_parents = __clk_get_num_parents(hw->clk);
+> +       unsigned int val;
+> +
+> +       regmap_read(mux->regmap, mux->reg, &val);
+> +
+> +       val >>= mux->shift;
+> +       val &= mux->mask;
+> +
+> +       if (val >= num_parents)
+> +               return -EINVAL;
+> +
+> +       return val;
+> +}
+> +
+> +static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct mtk_clk_cpumux *mux = to_clk_mux(hw);
+> +       u32 mask, val;
+> +
+> +       val = index << mux->shift;
+> +       mask = mux->mask << mux->shift;
+> +
+> +       return regmap_update_bits(mux->regmap, mux->reg, mask, val);
+> +}
+> +
+> +static const struct clk_ops clk_cpumux_ops = {
+> +       .get_parent = clk_cpumux_get_parent,
+> +       .set_parent = clk_cpumux_set_parent,
+> +};
+> +
+> +static struct clk __init *mtk_clk_register_cpumux(const struct mtk_composite *mux,
+> +                                          struct regmap *regmap)
+> +{
+> +       struct mtk_clk_cpumux *cpumux;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
+> +       if (!cpumux)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       init.name = mux->name;
+> +       init.ops = &clk_cpumux_ops;
+> +       init.parent_names = mux->parent_names;
+> +       init.num_parents = mux->num_parents;
+> +       init.flags = mux->flags;
+> +
+> +       cpumux->reg = mux->mux_reg;
+> +       cpumux->shift = mux->mux_shift;
+> +       cpumux->mask = BIT(mux->mux_width) - 1;
+> +       cpumux->regmap = regmap;
+> +       cpumux->hw.init = &init;
+> +
+> +       clk = clk_register(NULL, &cpumux->hw);
+> +       if (IS_ERR(clk))
+> +               kfree(cpumux);
+> +
+> +       return clk;
+> +}
+> +
+> +int __init mtk_clk_register_cpumuxes(struct device_node *node,
+> +                             const struct mtk_composite *clks, int num,
+> +                             struct clk_onecell_data *clk_data)
+> +{
+> +       int i;
+> +       struct clk *clk;
+> +       struct regmap *regmap;
+> +
+> +       regmap = syscon_node_to_regmap(node);
+> +       if (IS_ERR(regmap)) {
+> +               pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
+> +                      PTR_ERR(regmap));
+> +               return PTR_ERR(regmap);
+> +       }
+> +
+> +       for (i = 0; i < num; i++) {
+> +               const struct mtk_composite *mux = &clks[i];
+> +
+> +               clk = mtk_clk_register_cpumux(mux, regmap);
+> +               if (IS_ERR(clk)) {
+> +                       pr_err("Failed to register clk %s: %ld\n",
+> +                              mux->name, PTR_ERR(clk));
+> +                       continue;
+> +               }
+> +
+> +               clk_data->clks[mux->id] = clk;
+> +       }
+> +
+> +       return 0;
+> +}
+> diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
+> new file mode 100644
+> index 0000000..52c769f
+> --- /dev/null
+> +++ b/drivers/clk/mediatek/clk-cpumux.h
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (c) 2015 Linaro Ltd.
+> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __DRV_CLK_CPUMUX_H
+> +#define __DRV_CLK_CPUMUX_H
+> +
+> +int mtk_clk_register_cpumuxes(struct device_node *node,
+> +                             const struct mtk_composite *clks, int num,
+> +                             struct clk_onecell_data *clk_data);
+> +
+> +#endif /* __DRV_CLK_CPUMUX_H */
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> index 540c5c3..3cf9ca9 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -19,6 +19,7 @@
+>
+>  #include "clk-mtk.h"
+>  #include "clk-gate.h"
+> +#include "clk-cpumux.h"
+>
+>  #include <dt-bindings/clock/mt8173-clk.h>
+>
+> @@ -517,6 +518,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
+>         "apll2_div5"
+>  };
+>
+> +static const char * const ca53_parents[] __initconst = {
+> +       "clk26m",
+> +       "armca7pll",
+> +       "mainpll",
+> +       "univpll"
+> +};
+> +
+> +static const char * const ca57_parents[] __initconst = {
+> +       "clk26m",
+> +       "armca15pll",
+> +       "mainpll",
+> +       "univpll"
+> +};
+> +
+> +static const struct mtk_composite cpu_muxes[] __initdata = {
 
-Hi, AKASHI
+This should be __initconst
 
-> Ftrace's stack tracer on arm64 returns wrong information about call stacks:
-> 
->        Depth    Size   Location    (50 entries)
->        -----    ----   --------
->  0)     5256       0   notifier_call_chain+0x30/0x94
->  1)     5256       0   ftrace_call+0x0/0x4
->  2)     5256       0   notifier_call_chain+0x2c/0x94
->  3)     5256       0   raw_notifier_call_chain+0x34/0x44
->  4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
->  5)     5256       0   update_wall_time+0x408/0x6dc
-> 
-> One of tracer functions, ftrace_call (or mcount), is unexpectedly listed.
-> The *bare* stack dump returned by save_stack_trace() is:
-> 	save_stack_trace_tsk()
-> 	save_stack_trace()
-> 	stack_trace_call()
-> 	ftrace_ops_no_ops()
-> 	ftrace_call()
-> 	notifier_call_chain()
-> 	raw_notifier_call_chain()
-> 	...
+Otherwise:
+drivers/clk/mediatek/clk-mt8173.c: In function 'mtk_infrasys_init':
+drivers/clk/mediatek/clk-mt8173.c:536:35: error: cpu_muxes causes a
+section type conflict with mt8173_top_clk_data
+ static const struct mtk_composite cpu_muxes[] __initdata = {
+                                   ^
+drivers/clk/mediatek/clk-mt8173.c:905:33: note: 'mt8173_top_clk_data'
+was declared here
+ static struct clk_onecell_data *mt8173_top_clk_data __initdata;
 
-Is the below example an unexpected result?
-Entry 17 and 18 are ftrace_call and ftrace_ops_no_ops, respectively.
+Thanks!
+-Dan
 
-        Depth    Size   Location    (51 entries)
-        -----    ----   --------
-  0)     5352      96   _raw_spin_unlock_irqrestore+0x1c/0x60
-  1)     5256      48   gic_raise_softirq+0xa0/0xbc
-  2)     5208      80   smp_cross_call+0x40/0xbc
-  3)     5128      48   smp_send_reschedule+0x38/0x48
-  4)     5080      32   trigger_load_balance+0x184/0x29c
-  5)     5048     112   scheduler_tick+0xac/0x104
-  6)     4936      64   update_process_times+0x5c/0x74
-  7)     4872      32   tick_sched_handle.isra.15+0x38/0x7c
-  8)     4840      48   tick_sched_timer+0x48/0x90
-  9)     4792      48   __run_hrtimer+0x60/0x258
- 10)     4744      64   hrtimer_interrupt+0xe8/0x260
- 11)     4680     128   arch_timer_handler_virt+0x38/0x48
- 12)     4552      32   handle_percpu_devid_irq+0x84/0x188
- 13)     4520      64   generic_handle_irq+0x38/0x54
- 14)     4456      32   __handle_domain_irq+0x68/0xbc
- 15)     4424      64   gic_handle_irq+0x38/0x88
- 16)     4360     280   el1_irq+0x64/0xd8
- 17)     4080     168   ftrace_ops_no_ops+0xb4/0x16c
- 18)     3912      32   ftrace_call+0x0/0x4
- 19)     3880     144   __alloc_skb+0x48/0x180
- 20)     3736      96   alloc_skb_with_frags+0x74/0x234
- 21)     3640     112   sock_alloc_send_pskb+0x1d0/0x294
- 22)     3528     160   sock_alloc_send_skb+0x44/0x54
- 23)     3368      64   __ip_append_data.isra.40+0x78c/0xb48
- 24)     3304     224   ip_append_data.part.42+0x98/0xe8
- 25)     3080     112   ip_append_data+0x68/0x7c
- 26)     2968      96   icmp_push_reply+0x7c/0x144
- 27)     2872      96   icmp_send+0x3c0/0x3c8
- 28)     2776     192   __udp4_lib_rcv+0x5b8/0x684
- 29)     2584      96   udp_rcv+0x2c/0x3c
- 30)     2488      32   ip_local_deliver+0xa0/0x224
- 31)     2456      48   ip_rcv+0x360/0x57c
- 32)     2408      64   __netif_receive_skb_core+0x4d0/0x80c
- 33)     2344     128   __netif_receive_skb+0x24/0x84
- 34)     2216      32   process_backlog+0x9c/0x15c
- 35)     2184      80   net_rx_action+0x1ec/0x32c
- 36)     2104     160   __do_softirq+0x114/0x2f0
- 37)     1944     128   do_softirq+0x60/0x68
- 38)     1816      32   __local_bh_enable_ip+0xb0/0xd4
- 39)     1784      32   ip_finish_output+0x1f4/0xabc
- 40)     1752      96   ip_output+0xf0/0x120
- 41)     1656      64   ip_local_out_sk+0x44/0x54
- 42)     1592      32   ip_send_skb+0x24/0xbc
- 43)     1560      48   udp_send_skb+0x1b4/0x2f4
- 44)     1512      80   udp_sendmsg+0x2a8/0x7a0
- 45)     1432     272   inet_sendmsg+0xa0/0xd0
- 46)     1160      48   sock_sendmsg+0x30/0x78
- 47)     1112      32   ___sys_sendmsg+0x15c/0x26c
- 48)     1080     400   __sys_sendmmsg+0x94/0x180
- 49)      680     320   SyS_sendmmsg+0x38/0x54
- 50)      360     360   el0_svc_naked+0x20/0x28
-
-Best Regards
-Jungseok Lee
+> +       MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
+> +       MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
+> +};
+> +
+>  static const struct mtk_composite top_muxes[] __initconst = {
+>         /* CLK_CFG_0 */
+>         MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
+> @@ -743,6 +763,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
+>                                                 clk_data);
+>         mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
+>
+> +       mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
+> +                                               clk_data);
+> +
+>         r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+>         if (r)
+>                 pr_err("%s(): could not register clock provider: %d\n",
+> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+> index fa2a2bb..a17cbaa 100644
+> --- a/include/dt-bindings/clock/mt8173-clk.h
+> +++ b/include/dt-bindings/clock/mt8173-clk.h
+> @@ -188,7 +188,9 @@
+>  #define CLK_INFRA_PMICSPI              10
+>  #define CLK_INFRA_PMICWRAP             11
+>  #define CLK_INFRA_CLK_13M              12
+> -#define CLK_INFRA_NR_CLK               13
+> +#define CLK_INFRA_CA53SEL              13
+> +#define CLK_INFRA_CA57SEL              14
+> +#define CLK_INFRA_NR_CLK               15
+>
+>  /* PERI_SYS */
+>
+> --
+> 1.9.1
+>
