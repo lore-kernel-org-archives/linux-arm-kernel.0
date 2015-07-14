@@ -1,73 +1,35 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 14 Jul 2015 11:15:55 -0300
-Subject: [PATCH] ARM: dts: sabresd: use simple-panel instead of
- display-timings for LVDS1
-Message-ID: <1436883355-11256-1-git-send-email-fabio.estevam@freescale.com>
+From: Nathan_Lynch@mentor.com (Nathan Lynch)
+Date: Tue, 14 Jul 2015 09:19:00 -0500
+Subject: [PATCH v3 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <1436851111-2369-5-git-send-email-yingjoe.chen@mediatek.com>
+References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1436851111-2369-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <55A51A54.7000208@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use the compatible string "hannstar,hsd100pxn1" for representing
-the LCD panel that is connected to the LVDS1 port.
+On 07/14/2015 12:18 AM, Yingjoe Chen wrote:
+> Add arch timer node to enable arch-timer support. MT8135 firmware
+> doesn't correctly setup arch-timer frequency and CNTVOFF, add
+> properties to workaround this.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 30 +++++++++++++++++-------------
- 1 file changed, 17 insertions(+), 13 deletions(-)
+[...]
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index cca847e..5fecb3a 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -115,7 +115,7 @@
- 		mux-ext-port = <3>;
- 	};
- 
--	backlight {
-+	backlight_lvds: backlight_lvds {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -123,6 +123,17 @@
- 		status = "okay";
- 	};
- 
-+	panel {
-+		compatible = "hannstar,hsd100pxn1";
-+		backlight = <&backlight_lvds>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds1_out>;
-+			};
-+		};
-+	};
-+
- 	leds {
- 		compatible = "gpio-leds";
- 		pinctrl-names = "default";
-@@ -508,18 +519,11 @@
- 		fsl,data-width = <18>;
- 		status = "okay";
- 
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: hsd100pxn1 {
--				clock-frequency = <65000000>;
--				hactive = <1024>;
--				vactive = <768>;
--				hback-porch = <220>;
--				hfront-porch = <40>;
--				vback-porch = <21>;
--				vfront-porch = <7>;
--				hsync-len = <60>;
--				vsync-len = <10>;
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds1_out: endpoint {
-+				remote-endpoint = <&panel_in>;
- 			};
- 		};
- 	};
--- 
-1.9.1
+>  
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
+> +					  IRQ_TYPE_LEVEL_LOW)>;
+> +		clock-frequency = <13000000>;
+> +		arm,cpu-registers-not-fw-configured;
+
+It's disappointing to see this property in new DTS submissions.  It
+prevents taking advantage of the VDSO for gettimeofday/clock_gettime.
