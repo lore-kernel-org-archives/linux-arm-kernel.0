@@ -1,62 +1,38 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 14 Jul 2015 12:27:34 +0800
-Subject: [PATCH 5/5] arm64: dts: mt8173: add timer node
-In-Reply-To: <CAGS+omAQ7bKD4Jqwm=hv=D_aMxXpT4dKgzU4QqntnLEa0Fup-g@mail.gmail.com>
-References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
- <1436779969-18610-6-git-send-email-yingjoe.chen@mediatek.com>
- <CAGS+omAQ7bKD4Jqwm=hv=D_aMxXpT4dKgzU4QqntnLEa0Fup-g@mail.gmail.com>
-Message-ID: <CAGS+omCU=phZABBbBw_ad04BBT=Vd2HtfiBmSxepGT9nOpvYaw@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 14 Jul 2015 13:41:29 +0900
+Subject: [PATCH] serial: samsung: Remove redundant DEBUG_LL check
+In-Reply-To: <55A46C4F.8050803@samsung.com>
+References: <1436786331-5188-1-git-send-email-javier@osg.samsung.com>
+ <55A46C4F.8050803@samsung.com>
+Message-ID: <069e01d0bdef$59a73c70$0cf5b550$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 12:26 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
-> On Mon, Jul 13, 2015 at 5:32 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> From: Daniel Kurtz <djkurtz@chromium.org>
->>
->> Add device node to enable GPT timer. This timer will be
->> used as sched clock source.
->>
->> Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
->> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
->> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
->
-> This binding needs documentation.
+Krzysztof Kozlowski wrote:
+> 
+> On 13.07.2015 20:18, Javier Martinez Canillas wrote:
+> > Commit 84f57d9e3685 ("tty: serial/samsung: fix modular build") fixed
+> > build issues when the driver was built as a module. One of those was
+> > that printascii is only accessible when the driver is built-in.
+> >
+> > But there is no need to check for defined(CONFIG_DEBUG_LL) since the
+> > SERIAL_SAMSUNG_DEBUG Kconfig symbol already depends on DEBUG_LL.
+> >
+> > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Whoops.  I just found it at:
-Documentation/devicetree/bindings/timer/mediatek,mtk-timer.txt
+Acked-by: Kukjin Kim <kgene@kernel.org>
 
->
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 9 +++++++++
->>  1 file changed, 9 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 0696f8f..04bdd8f 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -219,6 +219,15 @@
->>                         reg = <0 0x10007000 0 0x100>;
->>                 };
->>
->> +               timer: timer at 10008000 {
->> +                       compatible = "mediatek,mt8173-timer",
->> +                                    "mediatek,mt6577-timer";
->> +                       reg = <0 0x10008000 0 0x1000>;
->> +                       interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_LOW>;
->> +                       clocks = <&infracfg CLK_INFRA_CLK_13M>,
->> +                                <&topckgen CLK_TOP_RTC_SEL>;
->
-> Why two clocks?  The driver only uses one.
-> Please use a clock-names property.
->
-> Thanks,
-> -Dan
->
->> +               };
->> +
->>                 pwrap: pwrap at 1000d000 {
->>                         compatible = "mediatek,mt8173-pwrap";
->>                         reg = <0 0x1000d000 0 0x1000>;
->> --
->> 1.8.1.1.dirty
->>
+Thanks,
+Kukjin
+
+> >
+> > ---
+> >
+> >  drivers/tty/serial/samsung.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> 
+> Although this redundancy is not harmful the patch seems fine, so:
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Best regards,
+> Krzysztof
