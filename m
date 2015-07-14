@@ -1,37 +1,88 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jul 2015 12:08:19 +0100
-Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
- ->disable() and ->is_enabled methods
-In-Reply-To: <20150714130222.1bdfedc5@bbrezillon>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
- <20150714105019.GR11162@sirena.org.uk>
- <20150714130222.1bdfedc5@bbrezillon>
-Message-ID: <20150714110819.GU11162@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Jul 2015 12:09:05 +0100
+Subject: [PATCH v2 09/10] arm64/BUG: Use BRK instruction for generic BUG
+ traps
+In-Reply-To: <20150714102025.GD10670@e103592.cambridge.arm.com>
+References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+ <1436793967-7138-10-git-send-email-Dave.Martin@arm.com>
+ <20150713164315.GC22840@leverpostej>
+ <20150713165151.GC10670@e103592.cambridge.arm.com>
+ <20150713165638.GD22840@leverpostej>
+ <20150714102025.GD10670@e103592.cambridge.arm.com>
+Message-ID: <20150714110904.GB12675@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 01:02:22PM +0200, Boris Brezillon wrote:
-> Mark Brown <broonie@kernel.org> wrote:
+On Tue, Jul 14, 2015 at 11:20:27AM +0100, Dave P Martin wrote:
+> On Mon, Jul 13, 2015 at 05:56:39PM +0100, Mark Rutland wrote:
+> > On Mon, Jul 13, 2015 at 05:51:51PM +0100, Dave P Martin wrote:
+> > > On Mon, Jul 13, 2015 at 05:43:15PM +0100, Mark Rutland wrote:
+> 
+> [...]
+> 
+> > > > Given the reliance on the labels in the caller, I think it might make
+> > > 
+> > > Not sure what you mean here, can you elaborate?
+> > 
+> > We're relying on label "0:" in the caller/user of the macro when we emit
+> > ".long 2b - 0b".
+> > 
+> > I think it would be clearer if folded into the caller (even with the
+> > inline ifdef this necessitates).
+> > 
+> > Though I could be missing something here that renders that impossible.
+> 
+> Before I respin the series, can you cast your eye over this
+> alternative?
+> 
+> I'm testing it now, but in any case it should make the conditional
+> structure of the code clearer as per your suggestion.
 
-> > On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
-> > > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
-> > > the PWM call in ->set_voltage_sel().
+I think that style of macro is certainly more legible when applied to
+single lines, but I got a little confused when reading this before I
+noticed that each __BUGVERBOSE use covered a few lines.
 
-> > This doesn't apply, please check and resend.
+Thanks,
+Mark.
 
-> This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
-> and 15 were not meant to be applied without Thierry's approval (they
-> depend on other changes in the PWM framework).
-> I can rebase them on top of linux-next (or just on top of Linus'
-> 4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
-> on your regulator's for-next branch is a good idea.
-
-What is the dependency for the enable patch?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/257aec9f/attachment.sig>
+> 
+> Cheers
+> ---Dave
+> 
+> 
+> [...]
+> 
+> #ifdef CONFIG_DEBUG_BUGVERBOSE
+> #define __BUGVERBOSE(x...) x
+> #else
+> #define __BUGVERBOSE(x...)
+> #endif
+> 
+> #define _BUG_FLAGS(flags, file, line) __BUG_FLAGS(flags, file, line)
+> 
+> #define __BUG_FLAGS(flags, file, line) asm volatile (			\
+>  __BUGVERBOSE(	".pushsection .rodata.str,\"aMS\", at progbits,1\n"	\
+> 	"2:	.string \"" file "\"\n\t"				\
+> 		".popsection\n\t"				)	\
+> 									\
+> 		".pushsection __bug_table,\"a\"\n\t"			\
+> 		".align 2\n\t"						\
+> 	"0:	.long 1f - 0b\n\t"					\
+>  __BUGVERBOSE(	".long 2b - 0b\n\t"					\
+> 		".short " #line "\n\t"	)				\
+> 		".short " #flags "\n\t"					\
+> 		".popsection\n"						\
+> 									\
+> 	"1:	brk %[imm]"						\
+> 		:: [imm] "i" (BUG_BRK_IMM)				\
+> )
+> 
+> #define BUG() do {				\
+> 	_BUG_FLAGS(0, __FILE__, __LINE__);	\
+> 	unreachable();				\
+> } while (0)
+> 
+> #define __WARN_TAINT(taint)					\
+> 	_BUG_FLAGS(BUGFLAG_TAINT(taint), __FILE__, __LINE__)
+> 
+> [...]
