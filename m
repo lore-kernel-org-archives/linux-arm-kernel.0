@@ -1,158 +1,37 @@
-From: benoar@dolka.fr (Benjamin Cama)
-Date: Tue, 14 Jul 2015 16:25:58 +0200
-Subject: [PATCH] ARM: orion5x: fix legacy orion5x IRQ numbers
-In-Reply-To: <1436710916.5657.169.camel@dolka.fr>
-References: <5583DD23.90505@arm.com> <1434716194.17448.28.camel@x60s>
- <20150619131315.GR7557@n2100.arm.linux.org.uk>
- <d6d361113992920900137899ae4d1f7b@dolka.fr>
- <20150619152552.GF2936@io.lakedaemon.net>
- <20150619154850.GT7557@n2100.arm.linux.org.uk>
- <20150619171346.GG2936@io.lakedaemon.net>
- <1434908275.5657.17.camel@dolka.fr>
- <20150622120829.GL2936@io.lakedaemon.net>
- <1434995379.5657.49.camel@dolka.fr>
- <20150622180418.GO2936@io.lakedaemon.net>
- <1436710916.5657.169.camel@dolka.fr>
-Message-ID: <1436883958.13048.5.camel@dolka.fr>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Tue, 14 Jul 2015 16:28:46 +0200
+Subject: [PATCH v2] iio: adc: xilinx-xadc: Push interrupts into threaded
+ context
+In-Reply-To: <1436391502-2604-1-git-send-email-xander.huff@ni.com>
+References: <5574633F.7090004@kernel.org>
+ <1436391502-2604-1-git-send-email-xander.huff@ni.com>
+Message-ID: <20150714142846.GB21820@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since v3.18, attempts to deviler IRQ0 are rejected, breaking orion5x.
-Fix this by increasing all interrupts by one, as did 5d6bed2a9c8b for
-dove. Also, force MULTI_IRQ_HANDLER for all orion platforms (including
-dove) as the specific handler is needed to shift back IRQ numbers by
-one.
+* Xander Huff | 2015-07-08 16:38:22 [-0500]:
 
-Fixes: a71b092a9c68 ("ARM: Convert handle_IRQ to use __handle_domain_irq")
-Signed-off-by: Benjamin Cama <benoar@dolka.fr>
----
-Hi everyone,
+> drivers/iio/adc/xilinx-xadc-core.c | 35 ++++++++++++-----------------------
+> 1 file changed, 12 insertions(+), 23 deletions(-)
+>
+>diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+>index ce93bd8..b309ad3 100644
+>--- a/drivers/iio/adc/xilinx-xadc-core.c
+>+++ b/drivers/iio/adc/xilinx-xadc-core.c
+>@@ -1225,7 +1214,7 @@ static int xadc_probe(struct platform_device *pdev)
+> 	if (ret)
+> 		goto err_free_samplerate_trigger;
+> 
+>-	ret = request_threaded_irq(irq, xadc->ops->interrupt_handler,
+>+	ret = request_threaded_irq(irq, 0,
 
-I finally nailed it: my attempt at copying Russell's patch for dove did
-not work because MULTI_IRQ_HANDLER was not set. It is not in the
-defconfig; maybe it should be now? I hesitated to put it as a
-dependency for PLAT_ORION_LEGACY, but as the platform is globally
-broken without it, I added it.
+NULL not 0
+Other than that, it looks good. Thanks.
+If you managed to get this merged upstream then feel free to ping me and
+I pick this into -RT.
 
-What do you think?
+> 				xadc->ops->threaded_interrupt_handler,
+> 				0, dev_name(&pdev->dev), indio_dev);
+> 	if (ret)
 
- arch/arm/Kconfig                          |  1 +
- arch/arm/mach-orion5x/include/mach/irqs.h | 64 +++++++++++++++----------------
- arch/arm/mach-orion5x/irq.c               |  4 +-
- 3 files changed, 35 insertions(+), 34 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 45df48b..a55c63a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -968,6 +968,7 @@ config PLAT_ORION
- config PLAT_ORION_LEGACY
- 	bool
- 	select PLAT_ORION
-+	select MULTI_IRQ_HANDLER
- 
- config PLAT_PXA
- 	bool
-diff --git a/arch/arm/mach-orion5x/include/mach/irqs.h b/arch/arm/mach-orion5x/include/mach/irqs.h
-index a6fa9d8..2431d99 100644
---- a/arch/arm/mach-orion5x/include/mach/irqs.h
-+++ b/arch/arm/mach-orion5x/include/mach/irqs.h
-@@ -16,42 +16,42 @@
- /*
-  * Orion Main Interrupt Controller
-  */
--#define IRQ_ORION5X_BRIDGE		0
--#define IRQ_ORION5X_DOORBELL_H2C	1
--#define IRQ_ORION5X_DOORBELL_C2H	2
--#define IRQ_ORION5X_UART0		3
--#define IRQ_ORION5X_UART1		4
--#define IRQ_ORION5X_I2C			5
--#define IRQ_ORION5X_GPIO_0_7		6
--#define IRQ_ORION5X_GPIO_8_15		7
--#define IRQ_ORION5X_GPIO_16_23		8
--#define IRQ_ORION5X_GPIO_24_31		9
--#define IRQ_ORION5X_PCIE0_ERR		10
--#define IRQ_ORION5X_PCIE0_INT		11
--#define IRQ_ORION5X_USB1_CTRL		12
--#define IRQ_ORION5X_DEV_BUS_ERR		14
--#define IRQ_ORION5X_PCI_ERR		15
--#define IRQ_ORION5X_USB_BR_ERR		16
--#define IRQ_ORION5X_USB0_CTRL		17
--#define IRQ_ORION5X_ETH_RX		18
--#define IRQ_ORION5X_ETH_TX		19
--#define IRQ_ORION5X_ETH_MISC		20
--#define IRQ_ORION5X_ETH_SUM		21
--#define IRQ_ORION5X_ETH_ERR		22
--#define IRQ_ORION5X_IDMA_ERR		23
--#define IRQ_ORION5X_IDMA_0		24
--#define IRQ_ORION5X_IDMA_1		25
--#define IRQ_ORION5X_IDMA_2		26
--#define IRQ_ORION5X_IDMA_3		27
--#define IRQ_ORION5X_CESA		28
--#define IRQ_ORION5X_SATA		29
--#define IRQ_ORION5X_XOR0		30
--#define IRQ_ORION5X_XOR1		31
-+#define IRQ_ORION5X_BRIDGE		(1 + 0)
-+#define IRQ_ORION5X_DOORBELL_H2C	(1 + 1)
-+#define IRQ_ORION5X_DOORBELL_C2H	(1 + 2)
-+#define IRQ_ORION5X_UART0		(1 + 3)
-+#define IRQ_ORION5X_UART1		(1 + 4)
-+#define IRQ_ORION5X_I2C			(1 + 5)
-+#define IRQ_ORION5X_GPIO_0_7		(1 + 6)
-+#define IRQ_ORION5X_GPIO_8_15		(1 + 7)
-+#define IRQ_ORION5X_GPIO_16_23		(1 + 8)
-+#define IRQ_ORION5X_GPIO_24_31		(1 + 9)
-+#define IRQ_ORION5X_PCIE0_ERR		(1 + 10)
-+#define IRQ_ORION5X_PCIE0_INT		(1 + 11)
-+#define IRQ_ORION5X_USB1_CTRL		(1 + 12)
-+#define IRQ_ORION5X_DEV_BUS_ERR		(1 + 14)
-+#define IRQ_ORION5X_PCI_ERR		(1 + 15)
-+#define IRQ_ORION5X_USB_BR_ERR		(1 + 16)
-+#define IRQ_ORION5X_USB0_CTRL		(1 + 17)
-+#define IRQ_ORION5X_ETH_RX		(1 + 18)
-+#define IRQ_ORION5X_ETH_TX		(1 + 19)
-+#define IRQ_ORION5X_ETH_MISC		(1 + 20)
-+#define IRQ_ORION5X_ETH_SUM		(1 + 21)
-+#define IRQ_ORION5X_ETH_ERR		(1 + 22)
-+#define IRQ_ORION5X_IDMA_ERR		(1 + 23)
-+#define IRQ_ORION5X_IDMA_0		(1 + 24)
-+#define IRQ_ORION5X_IDMA_1		(1 + 25)
-+#define IRQ_ORION5X_IDMA_2		(1 + 26)
-+#define IRQ_ORION5X_IDMA_3		(1 + 27)
-+#define IRQ_ORION5X_CESA		(1 + 28)
-+#define IRQ_ORION5X_SATA		(1 + 29)
-+#define IRQ_ORION5X_XOR0		(1 + 30)
-+#define IRQ_ORION5X_XOR1		(1 + 31)
- 
- /*
-  * Orion General Purpose Pins
-  */
--#define IRQ_ORION5X_GPIO_START	32
-+#define IRQ_ORION5X_GPIO_START	33
- #define NR_GPIO_IRQS		32
- 
- #define NR_IRQS			(IRQ_ORION5X_GPIO_START + NR_GPIO_IRQS)
-diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
-index cd4bac4..086ecb8 100644
---- a/arch/arm/mach-orion5x/irq.c
-+++ b/arch/arm/mach-orion5x/irq.c
-@@ -42,7 +42,7 @@ __exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
- 	stat = readl_relaxed(MAIN_IRQ_CAUSE);
- 	stat &= readl_relaxed(MAIN_IRQ_MASK);
- 	if (stat) {
--		unsigned int hwirq = __fls(stat);
-+		unsigned int hwirq = 1 + __fls(stat);
- 		handle_IRQ(hwirq, regs);
- 		return;
- 	}
-@@ -51,7 +51,7 @@ __exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
- 
- void __init orion5x_init_irq(void)
- {
--	orion_irq_init(0, MAIN_IRQ_MASK);
-+	orion_irq_init(1, MAIN_IRQ_MASK);
- 
- #ifdef CONFIG_MULTI_IRQ_HANDLER
- 	set_handle_irq(orion5x_legacy_handle_irq);
--- 
-2.1.4
+Sebastian
