@@ -1,54 +1,22 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 14 Jul 2015 17:55:13 +0100
-Subject: [PATCH v2 09/10] arm64/BUG: Use BRK instruction for generic BUG
- traps
-In-Reply-To: <20150714161103.GI13555@e104818-lin.cambridge.arm.com>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-10-git-send-email-Dave.Martin@arm.com>
- <20150714161103.GI13555@e104818-lin.cambridge.arm.com>
-Message-ID: <20150714165513.GH10670@e103592.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jul 2015 17:57:58 +0100
+Subject: [PATCH 1/2] ASoC: Drop owner assignment from i2c_driver
+In-Reply-To: <1436506231-8980-2-git-send-email-k.kozlowski@samsung.com>
+References: <1436506231-8980-1-git-send-email-k.kozlowski@samsung.com>
+ <1436506231-8980-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20150714165758.GF11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 05:11:04PM +0100, Catalin Marinas wrote:
-> On Mon, Jul 13, 2015 at 02:25:56PM +0100, Dave P Martin wrote:
-> > Currently, the minimal default BUG() implementation from asm-
-> > generic is used for arm64.
-> > 
-> > This patch uses the BRK software breakpoint instruction to generate
-> > a trap instead, similarly to most other arches, with the generic
-> > BUG code generating the dmesg boilerplate.
-> > 
-> > This allows bug metadata to be moved to a separate table and
-> > reduces the amount of inline code at BUG and WARN sites.  This also
-> > avoids clobbering any registers before they can be dumped.
-> > 
-> > To mitigate the size of the bug table further, this patch makes
-> > use of the existing infrastructure for encoding addresses within
-> > the bug table as 32-bit offsets instead of absolute pointers.
-> > (Note that this limits the kernel size to 2GB.)
-> > 
-> > Traps are registered at arch_initcall time for aarch64, but BUG
-> > has minimal real dependencies and it is desirable to be able to
-> > generate bug splats as early as possible.  This patch redirects
-> > all debug exceptions caused by BRK directly to bug_handler() until
-> > the full debug exception support has been initialised.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> 
-> The patch looks fine to me and since I gave you feedback on it before,
-> you can add:
-> 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> For the rest of the series, feel free to add:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+On Fri, Jul 10, 2015 at 02:30:30PM +0900, Krzysztof Kozlowski wrote:
+> i2c_driver does not need to set an owner because i2c_register_driver()
+> will set it.
 
-OK, thanks.
-
-I have a final respin to do, but most stuff won't change -- I'll flag
-the differences.
-
-Cheers
----Dave
+This doesn't apply against current code, please check and resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/1bbc7fac/attachment.sig>
