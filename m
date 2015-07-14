@@ -1,57 +1,95 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Jul 2015 13:29:04 +0100
-Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <20150714110302.GA334@red-moon>
-References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
- <1436430685-2202-4-git-send-email-jszhang@marvell.com>
- <20150714103421.GU7557@n2100.arm.linux.org.uk>
- <20150714110302.GA334@red-moon>
-Message-ID: <20150714122904.GV7557@n2100.arm.linux.org.uk>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 14 Jul 2015 21:47:10 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+ <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 12:03:02PM +0100, Lorenzo Pieralisi wrote:
-> On Tue, Jul 14, 2015 at 11:34:21AM +0100, Russell King - ARM Linux wrote:
-> > > +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> > > +	.suspend = cpu_psci_cpu_suspend,
-> > > +	.init = cpu_psci_cpu_init_idle,
-> > > +};
-> > > +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+On Jul 13, 2015, at 2:29 PM, AKASHI Takahiro wrote:
+
+Hi, AKASHI
+
+> Ftrace's stack tracer on arm64 returns wrong information about call stacks:
 > 
-> I take this as an ACK to M.Rutland's PSCI code move to drivers/firmware,
-> right ?
-
-No, that's not something I've particularly looked at.  PSCI doesn't really
-interest me because I have no systems which (afaik) support it.
-
-> > We don't do this for other stuff - we don't have IRQ_CHIP_OF_DECLARE
-> > stuff in arch/arm but have the IRQ chip drivers in drivers/irqchip.
-> > We keep it all togehter in drivers/irqchip, even when the IRQ chip
-> > driver is only useful on ARM.
+>        Depth    Size   Location    (50 entries)
+>        -----    ----   --------
+>  0)     5256       0   notifier_call_chain+0x30/0x94
+>  1)     5256       0   ftrace_call+0x0/0x4
+>  2)     5256       0   notifier_call_chain+0x2c/0x94
+>  3)     5256       0   raw_notifier_call_chain+0x34/0x44
+>  4)     5256       0   timekeeping_update.constprop.9+0xb8/0x114
+>  5)     5256       0   update_wall_time+0x408/0x6dc
 > 
-> CPUidle operations are ARM only, they are not used on ARM64, so
-> they belong in arch/arm (that's the same thing as SMP ops, on ARM64
-> SMP ops and CPUidle ops are unified through CPU operations).
+> One of tracer functions, ftrace_call (or mcount), is unexpectedly listed.
+> The *bare* stack dump returned by save_stack_trace() is:
+> 	save_stack_trace_tsk()
+> 	save_stack_trace()
+> 	stack_trace_call()
+> 	ftrace_ops_no_ops()
+> 	ftrace_call()
+> 	notifier_call_chain()
+> 	raw_notifier_call_chain()
+> 	...
 
-I don't agree with that.  CPU idle isn't an "ARM thing" at all, it's
-generic kernel infrastructure.  OF is generic kernel infrastructure too.
+Is the below example an unexpected result?
+Entry 17 and 18 are ftrace_call and ftrace_ops_no_ops, respectively.
 
-Yet, we're stuffing _all_ the PSCI CPU idle code into
-drivers/firmware/psci.c, but then stuffing the PSCI OF data structures
-into arch/arm.  This is utterly _insane_.
+        Depth    Size   Location    (51 entries)
+        -----    ----   --------
+  0)     5352      96   _raw_spin_unlock_irqrestore+0x1c/0x60
+  1)     5256      48   gic_raise_softirq+0xa0/0xbc
+  2)     5208      80   smp_cross_call+0x40/0xbc
+  3)     5128      48   smp_send_reschedule+0x38/0x48
+  4)     5080      32   trigger_load_balance+0x184/0x29c
+  5)     5048     112   scheduler_tick+0xac/0x104
+  6)     4936      64   update_process_times+0x5c/0x74
+  7)     4872      32   tick_sched_handle.isra.15+0x38/0x7c
+  8)     4840      48   tick_sched_timer+0x48/0x90
+  9)     4792      48   __run_hrtimer+0x60/0x258
+ 10)     4744      64   hrtimer_interrupt+0xe8/0x260
+ 11)     4680     128   arch_timer_handler_virt+0x38/0x48
+ 12)     4552      32   handle_percpu_devid_irq+0x84/0x188
+ 13)     4520      64   generic_handle_irq+0x38/0x54
+ 14)     4456      32   __handle_domain_irq+0x68/0xbc
+ 15)     4424      64   gic_handle_irq+0x38/0x88
+ 16)     4360     280   el1_irq+0x64/0xd8
+ 17)     4080     168   ftrace_ops_no_ops+0xb4/0x16c
+ 18)     3912      32   ftrace_call+0x0/0x4
+ 19)     3880     144   __alloc_skb+0x48/0x180
+ 20)     3736      96   alloc_skb_with_frags+0x74/0x234
+ 21)     3640     112   sock_alloc_send_pskb+0x1d0/0x294
+ 22)     3528     160   sock_alloc_send_skb+0x44/0x54
+ 23)     3368      64   __ip_append_data.isra.40+0x78c/0xb48
+ 24)     3304     224   ip_append_data.part.42+0x98/0xe8
+ 25)     3080     112   ip_append_data+0x68/0x7c
+ 26)     2968      96   icmp_push_reply+0x7c/0x144
+ 27)     2872      96   icmp_send+0x3c0/0x3c8
+ 28)     2776     192   __udp4_lib_rcv+0x5b8/0x684
+ 29)     2584      96   udp_rcv+0x2c/0x3c
+ 30)     2488      32   ip_local_deliver+0xa0/0x224
+ 31)     2456      48   ip_rcv+0x360/0x57c
+ 32)     2408      64   __netif_receive_skb_core+0x4d0/0x80c
+ 33)     2344     128   __netif_receive_skb+0x24/0x84
+ 34)     2216      32   process_backlog+0x9c/0x15c
+ 35)     2184      80   net_rx_action+0x1ec/0x32c
+ 36)     2104     160   __do_softirq+0x114/0x2f0
+ 37)     1944     128   do_softirq+0x60/0x68
+ 38)     1816      32   __local_bh_enable_ip+0xb0/0xd4
+ 39)     1784      32   ip_finish_output+0x1f4/0xabc
+ 40)     1752      96   ip_output+0xf0/0x120
+ 41)     1656      64   ip_local_out_sk+0x44/0x54
+ 42)     1592      32   ip_send_skb+0x24/0xbc
+ 43)     1560      48   udp_send_skb+0x1b4/0x2f4
+ 44)     1512      80   udp_sendmsg+0x2a8/0x7a0
+ 45)     1432     272   inet_sendmsg+0xa0/0xd0
+ 46)     1160      48   sock_sendmsg+0x30/0x78
+ 47)     1112      32   ___sys_sendmsg+0x15c/0x26c
+ 48)     1080     400   __sys_sendmmsg+0x94/0x180
+ 49)      680     320   SyS_sendmmsg+0x38/0x54
+ 50)      360     360   el0_svc_naked+0x20/0x28
 
-There is nothing ARM specific about these CPU idle ops.  They don't
-belong on arch/arm.
-
-NAK on this series (and the move of the PSCI code to drivers/firmware)
-until people start seeing sense with stuff like this.  Having stuff split
-between arch/arm/ and drivers/ like this is totally crap.  It makes code
-unnecessary complex for no reason what so ever.
-
-Find a solution which doesn't involve leaving _just_ data structures to
-connect stuff to OF in arch/arm.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Best Regards
+Jungseok Lee
