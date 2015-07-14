@@ -1,35 +1,122 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:39:29 +0200
-Subject: [PATCH v2 41/48] usb: gadget: add 'ep_match' callback to
- usb_gadget_ops
+Date: Tue, 14 Jul 2015 11:39:31 +0200
+Subject: [PATCH v2 43/48] usb: gadget: udc: add usb_gadget_ep_match_desc()
+ function
 In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-42-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-44-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This callback will be called by epautoconf to allow UDC driver match best
-endpoint for specific descriptor. It's intended to supply mechanism which
-allows to get rid of chip-specific endpoint matching code from epautoconf.
+Add function matching endpoint with ep descriptor. This function checks if
+hardware endponit can fulfill requirements requested in descriptor. This
+function can be used by UDC drivers in match_ep() callback to avoid writing
+lots of repetitive code.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- include/linux/usb/gadget.h | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/usb/gadget/udc/udc-core.c | 69 +++++++++++++++++++++++++++++++++++++++
+ include/linux/usb/gadget.h        |  8 +++++
+ 2 files changed, 77 insertions(+)
 
+diff --git a/drivers/usb/gadget/udc/udc-core.c b/drivers/usb/gadget/udc/udc-core.c
+index d69c355..2dff8df 100644
+--- a/drivers/usb/gadget/udc/udc-core.c
++++ b/drivers/usb/gadget/udc/udc-core.c
+@@ -129,6 +129,75 @@ EXPORT_SYMBOL_GPL(usb_gadget_giveback_request);
+ 
+ /* ------------------------------------------------------------------------- */
+ 
++int usb_gadget_ep_match_desc(struct usb_gadget *gadget,
++		struct usb_ep *ep, struct usb_endpoint_descriptor *desc,
++		struct usb_ss_ep_comp_descriptor *ep_comp)
++{
++	u8              type;
++	u16             max;
++	int             num_req_streams = 0;
++
++	/* endpoint already claimed? */
++	if (ep->claimed)
++		return 0;
++
++	type = usb_endpoint_type(desc);
++	max = 0x7ff & usb_endpoint_maxp(desc);
++
++	if (usb_endpoint_dir_in(desc) && !ep->caps.dir_in)
++		return 0;
++	else if (!ep->caps.dir_out)
++		return 0;
++
++	if (max > ep->maxpacket_limit)
++		return 0;
++
++	/* "high bandwidth" works only at high speed */
++	if (!gadget_is_dualspeed(gadget) && usb_endpoint_maxp(desc) & (3<<11))
++		return 0;
++
++	switch (type) {
++	case USB_ENDPOINT_XFER_CONTROL:
++		/* only support ep0 for portable CONTROL traffic */
++		return 0;
++	case USB_ENDPOINT_XFER_ISOC:
++		if (!ep->caps.type_iso)
++			return 0;
++		/* ISO:  limit 1023 bytes full speed, 1024 high/super speed */
++		if (!gadget_is_dualspeed(gadget) && max > 1023)
++			return 0;
++		break;
++	case USB_ENDPOINT_XFER_BULK:
++		if (!ep->caps.type_bulk)
++			return 0;
++		if (ep_comp && gadget_is_superspeed(gadget)) {
++			/* Get the number of required streams from the
++			 * EP companion descriptor and see if the EP
++			 * matches it
++			 */
++			num_req_streams = ep_comp->bmAttributes & 0x1f;
++			if (num_req_streams > ep->max_streams)
++				return 0;
++		}
++		break;
++	case USB_ENDPOINT_XFER_INT:
++		/* Bulk endpoints handle interrupt transfers,
++		 * except the toggle-quirky iso-synch kind
++		 */
++		if (!ep->caps.type_int && !ep->caps.type_bulk)
++			return 0;
++		/* INT:  limit 64 bytes full speed, 1024 high/super speed */
++		if (!gadget_is_dualspeed(gadget) && max > 64)
++			return 0;
++		break;
++	}
++
++	return 1;
++}
++EXPORT_SYMBOL_GPL(usb_gadget_ep_match_desc);
++
++/* ------------------------------------------------------------------------- */
++
+ static void usb_gadget_state_work(struct work_struct *work)
+ {
+ 	struct usb_gadget *gadget = work_to_gadget(work);
 diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index e6cbc25..0041bb9 100644
+index 0041bb9..77e2c1e 100644
 --- a/include/linux/usb/gadget.h
 +++ b/include/linux/usb/gadget.h
-@@ -534,6 +534,9 @@ struct usb_gadget_ops {
- 	int	(*udc_start)(struct usb_gadget *,
- 			struct usb_gadget_driver *);
- 	int	(*udc_stop)(struct usb_gadget *);
-+	struct usb_ep *(*match_ep)(struct usb_gadget *,
-+			struct usb_endpoint_descriptor *,
-+			struct usb_ss_ep_comp_descriptor *);
- };
+@@ -1079,6 +1079,14 @@ extern void usb_gadget_giveback_request(struct usb_ep *ep,
  
- /**
+ /*-------------------------------------------------------------------------*/
+ 
++/* utility to check if endpoint caps match descriptor needs */
++
++extern int usb_gadget_ep_match_desc(struct usb_gadget *gadget,
++		struct usb_ep *ep, struct usb_endpoint_descriptor *desc,
++		struct usb_ss_ep_comp_descriptor *ep_comp);
++
++/*-------------------------------------------------------------------------*/
++
+ /* utility to update vbus status for udc core, it may be scheduled */
+ extern void usb_udc_vbus_handler(struct usb_gadget *gadget, bool status);
+ 
 -- 
 1.9.1
