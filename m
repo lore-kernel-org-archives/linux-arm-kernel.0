@@ -1,24 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jul 2015 00:01:40 -0700
-Subject: [PATCH 0/2] Add missing #iommu-cells on IOMMU nodes
-In-Reply-To: <1436549336-33456-1-git-send-email-s-anna@ti.com>
-References: <1436549336-33456-1-git-send-email-s-anna@ti.com>
-Message-ID: <20150714070140.GF17550@atomide.com>
+Date: Tue, 14 Jul 2015 00:03:17 -0700
+Subject: [PATCH] ARM: OMAP2+: Add HAVE_ARM_SCU for AM43XX
+In-Reply-To: <1436562348-53396-1-git-send-email-d-gerlach@ti.com>
+References: <1436562348-53396-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <20150714070317.GG17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Suman Anna <s-anna@ti.com> [150710 10:31]:
-> Hi Tony,
+* Dave Gerlach <d-gerlach@ti.com> [150710 14:08]:
+> CONFIG_HAVE_ARM_SCU only gets selected if CONFIG_SMP is selected in an OMAP
+> system, however AM43XX needs this option regardless of CONFIG_SMP and also
+> for an AM43XX only build as it is important for controlling power in the SoC.
+> Without this we cannot suspend the CPU for SoC suspend or cpuidle. The
+> ARM Cortex A9 needs SCU CPU Power Status bits to be set to off mode in order
+> for the PRCM to transition the MPU to low power modes.
 > 
-> This series adds the #iommu-cells property to the existing
-> IOMMU nodes on OMAP4 & OMAP5. It was already fixed for OMAP3
-> in commit 2055088b5e17 ("ARM: dts: omap3: Add #iommu-cells to
-> isp and iva iommu").
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+>  arch/arm/mach-omap2/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> OMAP4 and OMAP5 do not yet have users for these IOMMUs (remoteproc
-> nodes), so the warning as seen with the fix added for OMAP3 is not
-> seen yet, but will as soon as a user is added.
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index ecc04ff..4a023e8 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -60,6 +60,7 @@ config SOC_AM43XX
+>  	select ARM_GIC
+>  	select MACH_OMAP_GENERIC
+>  	select MIGHT_HAVE_CACHE_L2X0
+> +	select HAVE_ARM_SCU
+>  
+>  config SOC_DRA7XX
+>  	bool "TI DRA7XX"
 
-Applying both into omap-for-v4.2/fixes thanks.
+Applying into omap-for-v4.2/fixes thanks.
 
 Tony
