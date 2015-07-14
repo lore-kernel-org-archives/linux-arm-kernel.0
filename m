@@ -1,55 +1,40 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Jul 2015 19:04:24 +0100
-Subject: [PATCH 6/8] pcmcia: sa1111: simplify clk handing in
- sa1111_pcmcia_add()
-In-Reply-To: <20150715180342.GB7557@n2100.arm.linux.org.uk>
-References: <20150715180342.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZFR2e-0007Mf-Sp@rmk-PC.arm.linux.org.uk>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Tue, 14 Jul 2015 08:45:57 -0400
+Subject: [PATCH] ARM: Mark ret_fast_syscall as a function
+Message-ID: <1436877957-18127-1-git-send-email-drew.richardson@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_get(dev, NULL) will always refer to the same clock, so it's
-pointless calling this multiple times for the same device.  As we no
-longer have to worry about the cleanup (via use of devm_clk_get()) we
-can simplify sa1111_pcmcia_add() too.
+ret_fast_syscall runs when user space makes a syscall. However it
+needs to be marked as such so the ELF information is correct. Before
+it was:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+   101: 8000f300     0 NOTYPE  LOCAL  DEFAULT    2 ret_fast_syscall
+
+But with this change it correctly shows as:
+
+   101: 8000f300    96 FUNC    LOCAL  DEFAULT    2 ret_fast_syscall
+
+I see this function when using perf to unwind call stacks from kernel
+space to user space. Without this change I would need to add some
+special case logic when using the vmlinux ELF information.
+
+Signed-off-by: Drew Richardson <drew.richardson@arm.com>
 ---
- drivers/pcmcia/sa1111_generic.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/kernel/entry-common.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
-index fb902af8a5b7..a1531feb8460 100644
---- a/drivers/pcmcia/sa1111_generic.c
-+++ b/drivers/pcmcia/sa1111_generic.c
-@@ -135,8 +135,13 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
- 	int (*add)(struct soc_pcmcia_socket *))
- {
- 	struct sa1111_pcmcia_socket *s;
-+	struct clk *clk;
- 	int i, ret = 0;
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 92828a1dec80..b48dd4f37f80 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -61,6 +61,7 @@ work_pending:
+ 	movlt	scno, #(__NR_restart_syscall - __NR_SYSCALL_BASE)
+ 	ldmia	sp, {r0 - r6}			@ have to reload r0 - r6
+ 	b	local_restart			@ ... and off we go
++ENDPROC(ret_fast_syscall)
  
-+	clk = devm_clk_get(&dev->dev, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
- 	ops->socket_state = sa1111_pcmcia_socket_state;
- 
- 	for (i = 0; i < ops->nr; i++) {
-@@ -145,12 +150,8 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
- 			return -ENOMEM;
- 
- 		s->soc.nr = ops->first + i;
--		s->soc.clk = devm_clk_get(&dev->dev, NULL);
--		if (IS_ERR(s->soc.clk)) {
--			ret = PTR_ERR(s->soc.clk);
--			kfree(s);
--			return ret;
--		}
-+		s->soc.clk = clk;
-+
- 		soc_pcmcia_init_one(&s->soc, ops, &dev->dev);
- 		s->dev = dev;
- 		if (s->soc.nr) {
+ /*
+  * "slow" syscall return path.  "why" tells us if this was a real syscall.
 -- 
-2.1.0
+2.1.4
