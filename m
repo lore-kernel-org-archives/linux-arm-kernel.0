@@ -1,87 +1,91 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 14 Jul 2015 15:39:47 +0200
-Subject: [PATCH 12/17] ARM: dts: lpc4357-ea4357: add mmcsd
+Date: Tue, 14 Jul 2015 15:39:48 +0200
+Subject: [PATCH 13/17] ARM: dts: lpc4357-ea4357: add gpio joystick
 In-Reply-To: <1436881192-23930-1-git-send-email-manabian@gmail.com>
 References: <1436881192-23930-1-git-send-email-manabian@gmail.com>
-Message-ID: <1436881192-23930-13-git-send-email-manabian@gmail.com>
+Message-ID: <1436881192-23930-14-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the MMC/SD controller on EA4357 devkit and add pin
-muxing plus a regulator.
+Hook up the small joystick found on the EA4357 devkit.
 
 Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 ---
- arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 47 +++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ arch/arm/boot/dts/lpc4357-ea4357-devkit.dts | 52 +++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
 diff --git a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-index 06ba998d544f..d02f93f19bf5 100644
+index d02f93f19bf5..ee9d97350d34 100644
 --- a/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
 +++ b/arch/arm/boot/dts/lpc4357-ea4357-devkit.dts
-@@ -34,9 +34,48 @@
- 		device_type = "memory";
- 		reg = <0x28000000 0x2000000>; /* 32 MB */
+@@ -15,6 +15,9 @@
+ #include "lpc18xx.dtsi"
+ #include "lpc4357.dtsi"
+ 
++#include "dt-bindings/input/input.h"
++#include "dt-bindings/gpio/gpio.h"
++
+ / {
+ 	model = "Embedded Artists' LPC4357 Developer's Kit";
+ 	compatible = "ea,lpc4357-developers-kit", "nxp,lpc4357", "nxp,lpc4350";
+@@ -42,9 +45,58 @@
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
  	};
 +
-+	/* vmmc is controlled by sdmmc host internally */
-+	vmmc: vmmc_fixed {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vmmc-supply";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
++	gpio_joystick {
++		compatible = "gpio-keys-polled";
++		pinctrl-names = "default";
++		pinctrl-0 = <&gpio_joystick_pins>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		poll-interval = <100>;
++		autorepeat;
++
++		button at 0 {
++			label = "joy_enter";
++			linux,code = <KEY_ENTER>;
++			gpios = <&gpio LPC_GPIO(4,8) GPIO_ACTIVE_LOW>;
++		};
++
++		button at 1 {
++			label = "joy_left";
++			linux,code = <KEY_LEFT>;
++			gpios = <&gpio LPC_GPIO(4,9) GPIO_ACTIVE_LOW>;
++		};
++
++		button at 2 {
++			label = "joy_up";
++			linux,code = <KEY_UP>;
++			gpios = <&gpio LPC_GPIO(4,10) GPIO_ACTIVE_LOW>;
++		};
++
++		button at 3 {
++			label = "joy_right";
++			linux,code = <KEY_RIGHT>;
++			gpios = <&gpio LPC_GPIO(4,12) GPIO_ACTIVE_LOW>;
++		};
++
++		button at 4 {
++			label = "joy_down";
++			linux,code = <KEY_DOWN>;
++			gpios = <&gpio LPC_GPIO(4,13) GPIO_ACTIVE_LOW>;
++		};
 +	};
  };
  
  &pinctrl {
-+	sdmmc_pins: sdmmc-pins {
-+		sdmmc_clk_cfg {
-+			pins = "pc_0";
-+			function = "sdmmc";
-+			slew-rate = <1>;
-+			bias-pull-down;
-+		};
-+
-+		sdmmc_cmd_dat0_3_cfg {
-+			pins = "pc_4", "pc_5", "pc_6", "pc_7", "pc_10";
-+			function = "sdmmc";
-+			slew-rate = <1>;
++	gpio_joystick_pins: gpio-joystick-pins {
++		gpio_joystick_cfg {
++			pins =	"p9_0", "p9_1", "pa_1", "pa_2", "pa_3";
++			function = "gpio";
++			input-enable;
 +			bias-disable;
-+			input-enable;
-+			input-schmitt-disable;
-+		};
-+
-+		sdmmc_cd_cfg {
-+			pins = "pc_8";
-+			function = "sdmmc";
-+			bias-pull-down;
-+			input-enable;
-+		};
-+
-+		sdmmc_pow_cfg {
-+			pins = "pc_9";
-+			function = "sdmmc";
-+			bias-pull-down;
 +		};
 +	};
 +
- 	uart0_pins: uart0-pins {
- 		uart0_rx_cfg {
- 			pins = "pf_11";
-@@ -54,6 +93,14 @@
- 	};
- };
- 
-+&mmcsd {
-+	status = "okay";
-+	bus-width = <4>;
-+	vmmc-supply = <&vmmc>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdmmc_pins>;
-+};
-+
- &uart0 {
- 	status = "okay";
- 	pinctrl-names = "default";
+ 	sdmmc_pins: sdmmc-pins {
+ 		sdmmc_clk_cfg {
+ 			pins = "pc_0";
 -- 
 1.8.0
