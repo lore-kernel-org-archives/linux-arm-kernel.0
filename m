@@ -1,40 +1,31 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jul 2015 13:02:22 +0200
-Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
- ->disable() and ->is_enabled methods
-In-Reply-To: <20150714105019.GR11162@sirena.org.uk>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
- <20150714105019.GR11162@sirena.org.uk>
-Message-ID: <20150714130222.1bdfedc5@bbrezillon>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 14 Jul 2015 13:02:57 +0200
+Subject: [PATCH 1/3] i2c: omap: switch to dev_get_drvdata()
+In-Reply-To: <1436819884-1614-1-git-send-email-balbi@ti.com>
+References: <20150710172701.GB20408@saruman.tx.rr.com>
+ <1436819884-1614-1-git-send-email-balbi@ti.com>
+Message-ID: <20150714110257.GA1517@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Tue, 14 Jul 2015 11:50:19 +0100
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
-> > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
-> > the PWM call in ->set_voltage_sel().
+On Mon, Jul 13, 2015 at 03:38:02PM -0500, Felipe Balbi wrote:
+> there's no need to fetch the platform_device
+> in order to dereference it back to the dev
+> pointer to access drvdata, we can use
+> dev_get_drvdata() instead.
 > 
-> This doesn't apply, please check and resend.
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 
-This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
-and 15 were not meant to be applied without Thierry's approval (they
-depend on other changes in the PWM framework).
-I can rebase them on top of linux-next (or just on top of Linus'
-4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
-on your regulator's for-next branch is a good idea.
+All patches applied to for-next, thanks!
 
-Thierry, Mark, let me know what you prefer.
+Please send new series as a seperate thread, don't reply to the old one!
+You could have collected the tags from last version IMO, it was just a
+rebase, no code change.
 
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/6eea4404/attachment.sig>
