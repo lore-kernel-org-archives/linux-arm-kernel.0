@@ -1,78 +1,99 @@
-From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
-Date: Tue, 14 Jul 2015 13:48:25 +0200
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <55A4952A.3090309@wwwdotorg.org>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
- <55A09710.3030509@wwwdotorg.org> <55A135B4.1060309@tronnes.org>
- <55A4952A.3090309@wwwdotorg.org>
-Message-ID: <55A4F709.1000501@tronnes.org>
+From: vthakkar1994@gmail.com (Vaishali Thakkar)
+Date: Tue, 14 Jul 2015 17:19:30 +0530
+Subject: [PATCH v2] coresight: replicator: Use module_platform_driver
+In-Reply-To: <CANLsYkyZoC5H2QHHPnSh6jon=H+GYm4o2oEWLhrY28Y32FcBRw@mail.gmail.com>
+References: <20150709195944.GA4470@vaishali-Ideapad-Z570>
+ <1436473148.20619.116.camel@tiscali.nl>
+ <CAK-LDb+HSbM2zV8WxipLb8v7g+eL=5vMHcKGttEOdnCjSXSwPA@mail.gmail.com>
+ <1436518813.20619.134.camel@tiscali.nl>
+ <CAK-LDb+Yg+wQJ_bM3Usc=hoK-jDOxHy5AsUOAbmg+-dVnOM4KA@mail.gmail.com>
+ <CANLsYkzTDKh8iSupUz6QckGNJfh5iZtPxVebX4Uo1Jg3FhNqqA@mail.gmail.com>
+ <CAK-LDbL4vsz7sqY8Y9cFtCiYYYCX89ydDZLNSk3Gt0H91dPghA@mail.gmail.com>
+ <CANLsYkyZoC5H2QHHPnSh6jon=H+GYm4o2oEWLhrY28Y32FcBRw@mail.gmail.com>
+Message-ID: <CAK-LDbJNySRdg1bSEDxhxbTuQrXbSYGwBudv31mUwhvQd9k4aQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Den 14.07.2015 06:50, skrev Stephen Warren:
-> On 07/11/2015 09:26 AM, Noralf Tr?nnes wrote:
->> Den 11.07.2015 06:09, skrev Stephen Warren:
->>> (Sorry for the slow reply; I was on vacation)
->>>
->>> On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
->>>> Den 18.06.2015 04:26, skrev Stephen Warren:
->>>>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
->>>>>> Add a duplicate irq range with an offset on the hwirq's so the
->>>>>> driver can detect that enable_fiq() is used.
->>>>>> Tested with downstream dwc_otg USB controller driver.
->>>>> This basically looks OK, but a few comments/thoughts:
->>>>> b) Doesn't the driver need to refuse some operation (handler
->>>>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
->>>>> FIQ range, since the FIQ control register only allows routing 1 IRQ to
->>>>> FIQ.
->>>> claim_fiq() protects the FIQ. See d) answer below.
->>> That assumes the IRQ is "accessed" via the fiq-specific APIs. Since this
->>> patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
->>> doesn't do anything special to prevent clients from using IRQs n..2n-1
->>> via the existing IRQ APIs, it's quite possible the a buggy client would.
->> Yes, but doesn't this apply to all irq use, using the wrong one doesn't
->> work.
->> If FIQ's where in more common use, we might have seen a FIQ IRQ flag
->> instead
->> of special FIQ irqs.
->>
->>> (From another email):
->>>>>> c) The DT binding needs updating to describe the extra IRQs:
->>>>>>
->>>>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
->>>>>>>
->>>>> Ok.
->>>> I have seconds thoughts on this:
->>>> This patch does not change the DT bindings so I don't see what update
->>>> I should make. This patch only adds support for the Linux way of
->>>> handling FIQ's through enable_fiq(). It doesn't change how interrupts
->>>> are described in the DT.
->>> The intention of the patch may not be to expand the set of IRQs
->>> available via DT, but it does in practice. I think you need to add a
->>> custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
->>> be translated from DT, and not IRQs n..2n-1. If you do that, then I
->>> agree that no DT binding update should be required.
->> armctrl_xlate() maps to the same hwirqs as before. This patch adds a
->> new range of hwirqs at the end of the "real" hwirq range.
->> It's not possible to get to these FIQ shadow hwirqs through DT.
-> What prevents a DT from (incorrectly) referencing the extra hwirqs?
+On Mon, Jul 13, 2015 at 9:01 PM, Mathieu Poirier
+<mathieu.poirier@linaro.org> wrote:
+>
+> On 10 July 2015 at 09:51, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+> > On Fri, Jul 10, 2015 at 8:00 PM, Mathieu Poirier
+> > <mathieu.poirier@linaro.org> wrote:
+> >> On 10 July 2015 at 05:47, Vaishali Thakkar <vthakkar1994@gmail.com> wrote:
+> >>> On Fri, Jul 10, 2015 at 2:30 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> >>>> On vr, 2015-07-10 at 08:53 +0530, Vaishali Thakkar wrote:
+> >>>>> I thought about this solution before sending this patch. But I was not
+> >>>>> sure about it. Thanks for the explanation. I will send v3 with this
+> >>>>> change.
+> >>>>>
+> >>>>> Can I add Suggested By: Paul Bolle <pebolle@tiscali.nl>
+> >>>>
+> >>>> That should be "Suggested-by:". The net effect would be that, if my
+> >>>> suggestion turns out to be unwise, fan mail will also hit my INBOX,
+> >>>> right? Anyhow, fine with me.
+> >>>
+> >>> Ok. Thanks.
+> >>>
+> >>>> By the way, there's more module specific stuff in
+> >>>> drivers/hwtracing/coresight/. And there's no tristate symbol to be found
+> >>>> in its Kconfig file. So I'd guess there are a few other cleanups
+> >>>> possible too, if someone cared enough to have a closer look at that.
+> >>>>
+> >>>
+> >>> Yes. It seems that introducing something like builtin_amba_driver()
+> >>> can be useful for files which are using module_amba_driver now . But I'm
+> >>> not sure if Mathieu is ok with it or not? If it seems useful to him, then I
+> >>> can go for it.
+> >>
+> >> The ETB drivers could use a "module_amba_driver()"...
+> >
+> > Why? Is there any specific reason behind this?
+> > How about other drivers?? Will it be beneficial to introduce
+> > builtin_amba_driver() for the others?
+>
+> All the other drivers (aside from the replicator) have been moved to
+> "module_amba_driver()" to avoid boilerplate code.  The only one that
+> was forgotten is the ETB.  A fix for ETM3x is already part of the 4.2
+> cycle.
+>
 
-armctrl_xlate() has these limits:
+I see. Ok.
 
-if (WARN_ON(intspec[0] >= NR_BANKS))
-if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
-if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
+>
+> As for builtin_amba_driver(), that will be up to Russell to decide.
+> Other than not calling the second half of the module_driver() macro, I
+> don't see what else it could do.
 
-Thus the maximum values allowed are:
-intspec[0]: (NR_BANKS - 1) = 2
-intspec[1]: (IRQS_PER_BANK - 1) = 31
+I think there was a good conversation between Paul Gortmaker and other
+developers when he first introduced the idea of adding such macro
+(builtin_platform_driver). His commit explains that idea in a good way too.
+But yes I believe that it is a matter of taste. And at the end of the day it is
+upon maintainers whether such change is good for their drivers or not.
+Anyways I will be happy to work on this thing if Russell or you decides
+to go for builtin_amba_driver.
 
-This gives a maximum hwirq:
-*out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
-*out_hwirq = (2 << 5) | 31 = 95
+Thank You.
 
-The FIQ shadow hwirq range starts@96:
-irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i) + NUMBER_IRQS);
+> >
+> > Thank You.
+> >
+> >>>
+> >>>>
+> >>>> Paul Bolle
+> >>>
+> >>>
+> >>>
+> >>> --
+> >>> Vaishali
+> >
+> >
+> >
+> > --
+> > Vaishali
 
-NUMBER_IRQS = MAKE_HWIRQ(NR_BANKS, 0) = 96
+
+
+
+-- 
+Vaishali
