@@ -1,145 +1,392 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Tue, 14 Jul 2015 09:24:01 +0900
-Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-Message-ID: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 13 Jul 2015 17:25:04 -0700
+Subject: [PATCH v2] Input: pmic8xxx-pwrkey - Support shutdown
+In-Reply-To: <1436830234-28316-1-git-send-email-sboyd@codeaurora.org>
+References: <1436830234-28316-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150714002504.GC7945@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The odroid-xu3 board which is based on exynos5422 not exynos5800 is
-booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
-is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
-cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
-and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
-cpu4-7 are cortex-a15.
+Hi Stephen,
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Chanho Park <parkch98@gmail.com>
----
-Change from v4:
- - Resend patch with correct signed-off
+On Mon, Jul 13, 2015 at 04:30:34PM -0700, Stephen Boyd wrote:
+> On pm8xxx PMICs, shutdown and restart are signaled to the PMIC
+> via a pin called PS_HOLD. When this pin goes low, the PMIC
+> performs a configurable power sequence. Add a .shutdown hook so
+> that we can properly configure this power sequence for shutdown
+> or restart depending on the system state.
 
-Changes from v4:
- - Remove temporal patch in e-mail body
+Just a bit of bikeshedding on my part...
 
-Changes from v3:
- - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+> 
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/input/misc/pmic8xxx-pwrkey.c | 284 ++++++++++++++++++++++++++++++++++-
+>  1 file changed, 277 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+> index c4ca20e63221..1d1ee5951b3a 100644
+> --- a/drivers/input/misc/pmic8xxx-pwrkey.c
+> +++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+> @@ -20,17 +20,72 @@
+>  #include <linux/regmap.h>
+>  #include <linux/log2.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  
+>  #define PON_CNTL_1 0x1C
+>  #define PON_CNTL_PULL_UP BIT(7)
+>  #define PON_CNTL_TRIG_DELAY_MASK (0x7)
+> +#define PON_CNTL_1_PULL_UP_EN			0xe0
+> +#define PON_CNTL_1_USB_PWR_EN			0x10
+> +#define PON_CNTL_1_WD_EN_RESET			0x08
+> +
+> +#define PM8058_SLEEP_CTRL			0x02b
+> +#define PM8921_SLEEP_CTRL			0x10a
+> +
+> +#define SLEEP_CTRL_SMPL_EN_RESET		0x04
+> +
+> +/* Regulator master enable addresses */
+> +#define REG_PM8058_VREG_EN_MSM			0x018
+> +#define REG_PM8058_VREG_EN_GRP_5_4		0x1C8
+> +
+> +/* Regulator control registers for shutdown/reset */
+> +#define PM8058_S0_CTRL				0x004
+> +#define PM8058_S1_CTRL				0x005
+> +#define PM8058_S3_CTRL				0x111
+> +#define PM8058_L21_CTRL				0x120
+> +#define PM8058_L22_CTRL				0x121
+> +
+> +#define PM8058_REGULATOR_ENABLE_MASK		0x80
+> +#define PM8058_REGULATOR_ENABLE			0x80
+> +#define PM8058_REGULATOR_DISABLE		0x00
+> +#define PM8058_REGULATOR_PULL_DOWN_MASK		0x40
+> +#define PM8058_REGULATOR_PULL_DOWN_EN		0x40
+> +
+> +/* Buck CTRL register */
+> +#define PM8058_SMPS_LEGACY_VREF_SEL		0x20
+> +#define PM8058_SMPS_LEGACY_VPROG_MASK		0x1F
+> +#define PM8058_SMPS_ADVANCED_BAND_MASK		0xC0
+> +#define PM8058_SMPS_ADVANCED_BAND_SHIFT		6
+> +#define PM8058_SMPS_ADVANCED_VPROG_MASK		0x3F
+> +
+> +/* Buck TEST2 registers for shutdown/reset */
+> +#define PM8058_S0_TEST2				0x084
+> +#define PM8058_S1_TEST2				0x085
+> +#define PM8058_S3_TEST2				0x11A
+> +
+> +#define PM8058_REGULATOR_BANK_WRITE		0x80
+> +#define PM8058_REGULATOR_BANK_MASK		0x70
+> +#define PM8058_REGULATOR_BANK_SHIFT		4
+> +#define PM8058_REGULATOR_BANK_SEL(n)	((n) << PM8058_REGULATOR_BANK_SHIFT)
+> +
+> +/* Buck TEST2 register bank 1 */
+> +#define PM8058_SMPS_LEGACY_VLOW_SEL		0x01
+> +
+> +/* Buck TEST2 register bank 7 */
+> +#define PM8058_SMPS_ADVANCED_MODE_MASK		0x02
+> +#define PM8058_SMPS_ADVANCED_MODE		0x02
+> +#define PM8058_SMPS_LEGACY_MODE			0x00
+>  
+>  /**
+>   * struct pmic8xxx_pwrkey - pmic8xxx pwrkey information
+>   * @key_press_irq: key press irq number
+> + * @regmap: device regmap
+> + * @shutdown_fn: shutdown configuration function
+>   */
+>  struct pmic8xxx_pwrkey {
+>  	int key_press_irq;
+> +	struct regmap *regmap;
+> +	int (*shutdown_fn)(struct pmic8xxx_pwrkey *, bool);
+>  };
+>  
+>  static irqreturn_t pwrkey_press_irq(int irq, void *_pwr)
+> @@ -76,6 +131,220 @@ static int __maybe_unused pmic8xxx_pwrkey_resume(struct device *dev)
+>  static SIMPLE_DEV_PM_OPS(pm8xxx_pwr_key_pm_ops,
+>  		pmic8xxx_pwrkey_suspend, pmic8xxx_pwrkey_resume);
+>  
+> +static void pmic8xxx_pwrkey_shutdown(struct platform_device *pdev)
+> +{
+> +	struct pmic8xxx_pwrkey *pwrkey = platform_get_drvdata(pdev);
+> +	int ret;
+> +	u8 mask, val;
+> +	bool reset = system_state == SYSTEM_RESTART;
+> +
+> +	if (pwrkey->shutdown_fn) {
+> +		ret = pwrkey->shutdown_fn(pwrkey, reset);
+> +		if (ret)
+> +			return;
 
-Changes from v2:
- - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
- - drop compatibles from exynos5422-cpus.dtsi
+Can we call this variable "error" please?
 
-Changes from v1:
- - rename exynos5422.dtsi to exynos5422-cpus.dtsi
- - include the dtsi file top of the exynos5422-odroidxu3.dts
+> +	}
+> +
+> +	/*
+> +	 * Select action to perform (reset or shutdown) when PS_HOLD goes low.
+> +	 * Also ensure that KPD, CBL0, and CBL1 pull ups are enabled and that
+> +	 * USB charging is enabled.
+> +	 */
+> +	mask = PON_CNTL_1_PULL_UP_EN | PON_CNTL_1_USB_PWR_EN;
+> +	mask |= PON_CNTL_1_WD_EN_RESET;
+> +	val = mask;
+> +	if (!reset)
+> +		val &= ~PON_CNTL_1_WD_EN_RESET;
+> +
+> +	regmap_update_bits(pwrkey->regmap, PON_CNTL_1, mask, val);
+> +}
+> +
+> +/*
+> + * Set an SMPS regulator to be disabled in its CTRL register, but enabled
+> + * in the master enable register.  Also set it's pull down enable bit.
+> + * Take care to make sure that the output voltage doesn't change if switching
+> + * from advanced mode to legacy mode.
+> + */
+> +static int pm8058_disable_smps_locally_set_pull_down(struct regmap *regmap,
+> +	u16 ctrl_addr, u16 test2_addr, u16 master_enable_addr,
+> +	u8 master_enable_bit)
+> +{
+> +	int ret = 0;
 
-Secondary cpu booting problem[1] is not resolved yet. Need more investigations
-to work booting 8 cores correctly.
+Why does it need to be initialized? And "error" too please.
 
-[1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+> +	u8 vref_sel, vlow_sel, band, vprog, bank;
+> +	unsigned int reg;
+> +
+> +	bank = PM8058_REGULATOR_BANK_SEL(7);
+> +	ret = regmap_write(regmap, test2_addr, bank);
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = regmap_read(regmap, test2_addr, &reg);
+> +	if (ret)
+> +		return ret;
+> +
+> +	reg &= PM8058_SMPS_ADVANCED_MODE_MASK;
+> +	/* Check if in advanced mode. */
+> +	if (reg == PM8058_SMPS_ADVANCED_MODE) {
+> +		/* Determine current output voltage. */
+> +		ret = regmap_read(regmap, ctrl_addr, &reg);
+> +		if (ret)
+> +			return ret;
+> +
+> +		band = reg & PM8058_SMPS_ADVANCED_BAND_MASK;
+> +		band >>= PM8058_SMPS_ADVANCED_BAND_SHIFT;
+> +		switch (band) {
+> +		case 3:
+> +			vref_sel = 0;
+> +			vlow_sel = 0;
+> +			break;
+> +		case 2:
+> +			vref_sel = PM8058_SMPS_LEGACY_VREF_SEL;
+> +			vlow_sel = 0;
+> +			break;
+> +		case 1:
+> +			vref_sel = PM8058_SMPS_LEGACY_VREF_SEL;
+> +			vlow_sel = PM8058_SMPS_LEGACY_VLOW_SEL;
+> +			break;
+> +		default:
+> +			pr_err("%s: regulator already disabled\n", __func__);
+> +			return -EPERM;
+> +		}
+> +		vprog = reg & PM8058_SMPS_ADVANCED_VPROG_MASK;
+> +		/* Round up if fine step is in use. */
+> +		vprog = (vprog + 1) >> 1;
+> +		if (vprog > PM8058_SMPS_LEGACY_VPROG_MASK)
+> +			vprog = PM8058_SMPS_LEGACY_VPROG_MASK;
+> +
+> +		/* Set VLOW_SEL bit. */
+> +		bank = PM8058_REGULATOR_BANK_SEL(1);
+> +		ret = regmap_write(regmap, test2_addr, bank);
+> +		if (ret)
+> +			return ret;
+> +
+> +		ret = regmap_update_bits(regmap, test2_addr,
+> +			PM8058_REGULATOR_BANK_WRITE | PM8058_REGULATOR_BANK_MASK
+> +				| PM8058_SMPS_LEGACY_VLOW_SEL,
+> +			PM8058_REGULATOR_BANK_WRITE |
+> +			PM8058_REGULATOR_BANK_SEL(1) | vlow_sel);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/* Switch to legacy mode */
+> +		bank = PM8058_REGULATOR_BANK_SEL(7);
+> +		ret = regmap_write(regmap, test2_addr, bank);
+> +		if (ret)
+> +			return ret;
+> +
+> +		ret = regmap_update_bits(regmap, test2_addr,
+> +				PM8058_REGULATOR_BANK_WRITE |
+> +				PM8058_REGULATOR_BANK_MASK |
+> +				PM8058_SMPS_ADVANCED_MODE_MASK,
+> +				PM8058_REGULATOR_BANK_WRITE |
+> +				PM8058_REGULATOR_BANK_SEL(7) |
+> +				PM8058_SMPS_LEGACY_MODE);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/* Enable locally, enable pull down, keep voltage the same. */
+> +		ret = regmap_update_bits(regmap, ctrl_addr,
+> +			PM8058_REGULATOR_ENABLE_MASK |
+> +			PM8058_REGULATOR_PULL_DOWN_MASK |
+> +			PM8058_SMPS_LEGACY_VREF_SEL |
+> +			PM8058_SMPS_LEGACY_VPROG_MASK,
+> +			PM8058_REGULATOR_ENABLE | PM8058_REGULATOR_PULL_DOWN_EN
+> +				| vref_sel | vprog);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	/* Enable in master control register. */
+> +	ret = regmap_update_bits(regmap, master_enable_addr,
+> +			master_enable_bit, master_enable_bit);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Disable locally and enable pull down. */
+> +	return regmap_update_bits(regmap, ctrl_addr,
+> +		PM8058_REGULATOR_ENABLE_MASK | PM8058_REGULATOR_PULL_DOWN_MASK,
+> +		PM8058_REGULATOR_DISABLE | PM8058_REGULATOR_PULL_DOWN_EN);
+> +}
+> +
+> +static int pm8058_disable_ldo_locally_set_pull_down(struct regmap *regmap,
+> +		u16 ctrl_addr, u16 master_enable_addr, u8 master_enable_bit)
+> +{
+> +	int ret;
 
- arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
- arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
- 2 files changed, 82 insertions(+)
- create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+Here too.
 
-diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-new file mode 100644
-index 0000000..b7f60c8
---- /dev/null
-+++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
-@@ -0,0 +1,81 @@
-+/*
-+ * SAMSUNG EXYNOS5422 SoC cpu device tree source
-+ *
-+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * The only difference between EXYNOS5422 and EXYNOS5800 is cpu ordering. The
-+ * EXYNOS5422 is booting from Cortex-A7 core while the EXYNOS5800 is booting
-+ * from Cortex-A15 core.
-+ *
-+ * EXYNOS5422 based board files can include this file to provide cpu ordering
-+ * which could boot a cortex-a7 from cpu0.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+&cpu0 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a7";
-+	reg = <0x100>;
-+	clock-frequency = <1000000000>;
-+	cci-control-port = <&cci_control0>;
-+};
-+
-+&cpu1 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a7";
-+	reg = <0x101>;
-+	clock-frequency = <1000000000>;
-+	cci-control-port = <&cci_control0>;
-+};
-+
-+&cpu2 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a7";
-+	reg = <0x102>;
-+	clock-frequency = <1000000000>;
-+	cci-control-port = <&cci_control0>;
-+};
-+
-+&cpu3 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a7";
-+	reg = <0x103>;
-+	clock-frequency = <1000000000>;
-+	cci-control-port = <&cci_control0>;
-+};
-+
-+&cpu4 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a15";
-+	reg = <0x0>;
-+	clock-frequency = <1800000000>;
-+	cci-control-port = <&cci_control1>;
-+};
-+
-+&cpu5 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a15";
-+	reg = <0x1>;
-+	clock-frequency = <1800000000>;
-+	cci-control-port = <&cci_control1>;
-+};
-+
-+&cpu6 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a15";
-+	reg = <0x2>;
-+	clock-frequency = <1800000000>;
-+	cci-control-port = <&cci_control1>;
-+};
-+
-+&cpu7 {
-+	device_type = "cpu";
-+	compatible = "arm,cortex-a15";
-+	reg = <0x3>;
-+	clock-frequency = <1800000000>;
-+	cci-control-port = <&cci_control1>;
-+};
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-index 8adf455..f603133 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
-@@ -15,6 +15,7 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/sound/samsung-i2s.h>
- #include "exynos5800.dtsi"
-+#include "exynos5422-cpus.dtsi"
- 
- / {
- 	memory {
+> +
+> +	/* Enable LDO in master control register. */
+> +	ret = regmap_update_bits(regmap, master_enable_addr,
+> +			master_enable_bit, master_enable_bit);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Disable LDO in CTRL register and set pull down */
+> +	return regmap_update_bits(regmap, ctrl_addr,
+> +		PM8058_REGULATOR_ENABLE_MASK | PM8058_REGULATOR_PULL_DOWN_MASK,
+> +		PM8058_REGULATOR_DISABLE | PM8058_REGULATOR_PULL_DOWN_EN);
+> +}
+> +
+> +static int pm8058_pwrkey_shutdown(struct pmic8xxx_pwrkey *pwrkey, bool reset)
+> +{
+> +	int ret;
+
+And here.
+
+> +	struct regmap *regmap = pwrkey->regmap;
+> +	u8 mask, val;
+> +
+> +	/* When shutting down, enable active pulldowns on important rails. */
+> +	if (!reset) {
+> +		/* Disable SMPS's 0,1,3 locally and set pulldown enable bits. */
+> +		pm8058_disable_smps_locally_set_pull_down(regmap,
+> +			PM8058_S0_CTRL, PM8058_S0_TEST2,
+> +			REG_PM8058_VREG_EN_MSM, BIT(7));
+> +		pm8058_disable_smps_locally_set_pull_down(regmap,
+> +			PM8058_S1_CTRL, PM8058_S1_TEST2,
+> +			REG_PM8058_VREG_EN_MSM, BIT(6));
+> +		pm8058_disable_smps_locally_set_pull_down(regmap,
+> +			PM8058_S3_CTRL, PM8058_S3_TEST2,
+> +			REG_PM8058_VREG_EN_GRP_5_4, BIT(7) | BIT(4));
+> +		/* Disable LDO 21 locally and set pulldown enable bit. */
+> +		pm8058_disable_ldo_locally_set_pull_down(regmap,
+> +			PM8058_L21_CTRL, REG_PM8058_VREG_EN_GRP_5_4,
+> +			BIT(1));
+> +	}
+> +
+> +	/*
+> +	 * Fix-up: Set regulator LDO22 to 1.225 V in high power mode. Leave its
+> +	 * pull-down state intact. This ensures a safe shutdown.
+> +	 */
+> +	ret = regmap_update_bits(regmap, PM8058_L22_CTRL, 0xbf, 0x93);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Enable SMPL if resetting is desired */
+> +	mask = SLEEP_CTRL_SMPL_EN_RESET;
+> +	val = 0;
+> +	if (reset)
+> +		val = mask;
+> +	return regmap_update_bits(regmap, PM8058_SLEEP_CTRL, mask, val);
+> +
+
+Stray empty line.
+
+> +}
+> +
+> +static int pm8921_pwrkey_shutdown(struct pmic8xxx_pwrkey *pwrkey, bool reset)
+> +{
+> +	struct regmap *regmap = pwrkey->regmap;
+> +	u8 mask = SLEEP_CTRL_SMPL_EN_RESET;
+> +	u8 val = 0;
+> +
+> +	/* Enable SMPL if resetting is desired */
+> +	if (reset)
+> +		val = mask;
+> +	return regmap_update_bits(regmap, PM8921_SLEEP_CTRL, mask, val);
+> +}
+> +
+> +static const struct of_device_id pm8xxx_pwr_key_id_table[] = {
+> +	{ .compatible = "qcom,pm8058-pwrkey", .data = &pm8058_pwrkey_shutdown },
+> +	{ .compatible = "qcom,pm8921-pwrkey", .data = &pm8921_pwrkey_shutdown },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(of, pm8xxx_pwr_key_id_table);
+> +
+
+Can we please keep IDs and device table where it was, close to the
+driver definition?
+
+>  static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  {
+>  	struct input_dev *pwr;
+> @@ -88,6 +357,11 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  	struct pmic8xxx_pwrkey *pwrkey;
+>  	u32 kpd_delay;
+>  	bool pull_up;
+> +	const struct of_device_id *match;
+> +
+> +	match = of_match_device(pm8xxx_pwr_key_id_table, &pdev->dev);
+> +	if (!match)
+> +		return -ENODEV;
+>  
+>  	if (of_property_read_u32(pdev->dev.of_node, "debounce", &kpd_delay))
+>  		kpd_delay = 15625;
+> @@ -109,6 +383,8 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+>  	if (!pwrkey)
+>  		return -ENOMEM;
+>  
+> +	pwrkey->shutdown_fn = match->data;
+> +	pwrkey->regmap = regmap;
+>  	pwrkey->key_press_irq = key_press_irq;
+>  
+>  	pwr = devm_input_allocate_device(&pdev->dev);
+> @@ -181,16 +457,10 @@ static int pmic8xxx_pwrkey_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id pm8xxx_pwr_key_id_table[] = {
+> -	{ .compatible = "qcom,pm8058-pwrkey" },
+> -	{ .compatible = "qcom,pm8921-pwrkey" },
+> -	{ }
+> -};
+> -MODULE_DEVICE_TABLE(of, pm8xxx_pwr_key_id_table);
+> -
+>  static struct platform_driver pmic8xxx_pwrkey_driver = {
+>  	.probe		= pmic8xxx_pwrkey_probe,
+>  	.remove		= pmic8xxx_pwrkey_remove,
+> +	.shutdown	= pmic8xxx_pwrkey_shutdown,
+>  	.driver		= {
+>  		.name	= "pm8xxx-pwrkey",
+>  		.pm	= &pm8xxx_pwr_key_pm_ops,
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+> 
+
+Thanks.
+
 -- 
-2.1.0
+Dmitry
