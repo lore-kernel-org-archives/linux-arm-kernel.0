@@ -1,75 +1,106 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Jul 2015 14:18:31 -0700
-Subject: [PATCH v7 6/9] nvmem: qfprom: Add Qualcomm QFPROM support.
-In-Reply-To: <1436521529-10931-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1436521529-10931-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150714211831.GN30412@codeaurora.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 14 Jul 2015 14:20:43 -0700
+Subject: [PATCH 4/4] arm64: dts: Add Broadcom North Star 2 support
+In-Reply-To: <20150714092353.GA12675@leverpostej>
+References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
+ <1436837955-26279-5-git-send-email-rjui@broadcom.com>
+ <20150714092353.GA12675@leverpostej>
+Message-ID: <55A57D2B.4010207@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10, Srinivas Kandagatla wrote:
-> This patch adds QFPROM support driver which is used by other drivers
-> like thermal sensor and cpufreq.
+
+
+On 7/14/2015 2:23 AM, Mark Rutland wrote:
+> Hi,
 > 
-> On MSM parts there are some efuses (called qfprom) these fuses store
-> things like calibration data, speed bins.. etc. Drivers like cpufreq,
-> thermal sensors would read out this data for configuring the driver.
+>> +/dts-v1/;
+>> +
+>> +#include "ns2.dtsi"
+>> +
+>> +/ {
+>> +       model = "Broadcom NS2 SVK";
+>> +       compatible = "brcm,ns2-svk", "brcm,ns2";
+>> +
+>> +       chosen {
+>> +               bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x66130000";
+>> +       };
 > 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
+> Please use stdout-path instead (you can use /aliases to make it
+> simpler). It'll save a redundant description of the UART and will remove
+> the dependency on Linux-specific naming of the UART.
+> 
+> [...]
 
-I didn't see any reply on v6, but at least delay.h was removed.
-Same comments from v6 below.
+Saw that Arnd also has the same comment. I will fix this.
 
-> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-> new file mode 100644
-> index 0000000..0e22a03
-> --- /dev/null
-> +++ b/drivers/nvmem/qfprom.c
-> @@ -0,0 +1,87 @@
-> +/*
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/io.h>
+> 
+>> +/ {
+>> +       compatible = "brcm,ns2";
+>> +       interrupt-parent = <&gic>;
+>> +       #address-cells = <2>;
+>> +       #size-cells = <2>;
+>> +
+>> +       cpus {
+>> +               #address-cells = <2>;
+>> +               #size-cells = <0>;
+>> +
+>> +               cpu at 0 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a57", "arm,armv8";
+>> +                       reg = <0 0>;
+>> +                       enable-method = "spin-table";
+>> +                       cpu-release-addr = <0 0x84b00000>;
+>> +               };
+>> +       };
+> 
+> Shouldn't the other CPUs be described?
 
-Is this include used?
+Let me give that a try but there's a chance that I cannot enable other 3
+cores until we have a more stable bootloader configuration.
 
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-> +static struct regmap_config qfprom_regmap_config = {
+> 
+> Using spin-table for SMP is somewhat unfortunate, as it comes with a
+> number of problems (e.g. unwoken secondaries spinning in the kernel). I
+> would strongly advise using PSCI instead.
+>
 
-Can this be const?
+Yes I agree and I'm fully aware PSCI is the preferred way of bringing up
+ARMv8 cores. Unfortunately this is currently out of my control as this
+is done in ARM Trusted Firmware that was handled by a different team
+within Broadcom and they have very tight schedule and will not have time
+to add PSCI support in the near term.
 
-> +	.reg_bits = 32,
-> +	.val_bits = 8,
-> +	.reg_stride = 1,
-> +};
-> +
-> +static struct nvmem_config econfig = {
+The plan is to use spin-table for now and convert to PSCI when we have
+the support for it in our ATF. That should happen within the next couple
+months.
 
-Can this be const?
 
-> +	.name = "qfprom",
-> +	.owner = THIS_MODULE,
-> +};
-> +
+>> +
+>> +       timer {
+>> +               compatible = "arm,armv8-timer";
+>> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
+>> +                             IRQ_TYPE_EDGE_RISING)>,
+>> +                            <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
+>> +                             IRQ_TYPE_EDGE_RISING)>,
+>> +                            <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
+>> +                             IRQ_TYPE_EDGE_RISING)>,
+>> +                            <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
+>> +                             IRQ_TYPE_EDGE_RISING)>;
+>> +               clock-frequency = <25000000>;
+>> +       };
+> 
+> Please fix your firmware to configure CNTFRQ_EL0, it is simply a bug not
+> to, and using clock-frequency does not fix all the problems that not
+> configuring it causes.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Yes will do this.
+
+> 
+> Thanks,
+> Mark.
+> 
+
+Thanks,
+
+Ray
