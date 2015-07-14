@@ -1,15 +1,16 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 Jul 2015 17:40:23 -0700
-Subject: [PATCH 4/5] clk: mediatek: add 13mhz clock for MT8173
-In-Reply-To: <1436779969-18610-5-git-send-email-yingjoe.chen@mediatek.com>
+Date: Mon, 13 Jul 2015 17:40:48 -0700
+Subject: [PATCH 2/5] clocksource: mediatek: Use GPT as sched clock source
+In-Reply-To: <1436779969-18610-3-git-send-email-yingjoe.chen@mediatek.com>
 References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
- <1436779969-18610-5-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <20150714004023.GL30412@codeaurora.org>
+ <1436779969-18610-3-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <20150714004048.GM30412@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/13, Yingjoe Chen wrote:
-> Add 13mhz clock used by GPT timer in infracfg.
+> When cpu is in deep idle, arch timer will stop counting. Setup GPT as
+> sched clock source so it can keep counting in idle.
 > 
 > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 > ---
