@@ -1,27 +1,49 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jul 2015 04:15:57 -0700
-Subject: [PATCH - resend for 4.2-rc2] ARM: DTS: dra7x: Integrate sDMA
- crossbar
-In-Reply-To: <1435755149-10328-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1435755149-10328-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20150714111557.GT17550@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 Jul 2015 14:16:27 +0300
+Subject: [PATCH v2 48/48] usb: gadget: epautoconf: cleanup dead code
+In-Reply-To: <1436866776-5004-49-git-send-email-r.baldyga@samsung.com>
+References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+ <1436866776-5004-49-git-send-email-r.baldyga@samsung.com>
+Message-ID: <55A4EF8B.7090806@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [150701 05:54]:
-> The sDMA requests are routed through the DMA crossbar and without the
-> crossbar only peripherals using DMA request 0-127 can be used.
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Hello.
+
+On 7/14/2015 12:39 PM, Robert Baldyga wrote:
+
+> Function find_ep() is no longer needed here, so we can remove it.
+> We also don't use anything from gadget_chips.h header any longer.
+
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 > ---
-> Hi Tony,
-> 
-> as you have suggested: http://permalink.gmane.org/gmane.linux.ports.arm.omap/125999
-> the DTS change has not been taken by Vinod.
-> Now that the dmaengine pull request is in for 4.2 it would be great if you could
-> pick up the DTS part of the series and send it for -rc2.
+>   drivers/usb/gadget/epautoconf.c | 14 --------------
+>   1 file changed, 14 deletions(-)
 
-Thanks, looks like I also had the original patch still tagged.
-Applying this one instead although they look the same.
+> diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+> index e9a8682..9a80925 100644
+> --- a/drivers/usb/gadget/epautoconf.c
+> +++ b/drivers/usb/gadget/epautoconf.c
+> @@ -20,20 +20,6 @@
+>   #include <linux/usb/ch9.h>
+>   #include <linux/usb/gadget.h>
+>
+> -#include "gadget_chips.h"
+> -
+> -static struct usb_ep *
+> -find_ep (struct usb_gadget *gadget, const char *name)
+> -{
+> -	struct usb_ep	*ep;
+> -
+> -	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
+> -		if (0 == strcmp (ep->name, name))
+> -			return ep;
+> -	}
+> -	return NULL;
+> -}
+> -
 
-Tony
+    I don't think duplicating the function in each driver that needs it is 
+better than turniong this function into public.
+
+WBR, Sergei
