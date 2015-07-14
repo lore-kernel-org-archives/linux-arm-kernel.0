@@ -1,29 +1,101 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 14 Jul 2015 10:56:31 +0900
-Subject: [PATCH] serial: samsung: Remove redundant DEBUG_LL check
-In-Reply-To: <1436786331-5188-1-git-send-email-javier@osg.samsung.com>
-References: <1436786331-5188-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <55A46C4F.8050803@samsung.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Mon, 13 Jul 2015 19:29:33 -0700
+Subject: [PATCH v3 3/4] gpio: brcmstb: Add interrupt and wakeup source
+ support
+In-Reply-To: <CACRpkdYNGdWHk1kqhFWHziLPy3mZXTcUjYFBCVo5dRCh60bQ_A@mail.gmail.com>
+References: <1434589243-502-1-git-send-email-gregory.0xf0@gmail.com>
+ <1434589243-502-4-git-send-email-gregory.0xf0@gmail.com>
+ <CACRpkdYNGdWHk1kqhFWHziLPy3mZXTcUjYFBCVo5dRCh60bQ_A@mail.gmail.com>
+Message-ID: <CADtm3G6SMtG3AE2MA1Ft37EbK7_ZrmM0EWEn+Br-NCr4mwYb9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.07.2015 20:18, Javier Martinez Canillas wrote:
-> Commit 84f57d9e3685 ("tty: serial/samsung: fix modular build") fixed
-> build issues when the driver was built as a module. One of those was
-> that printascii is only accessible when the driver is built-in.
-> 
-> But there is no need to check for defined(CONFIG_DEBUG_LL) since the
-> SERIAL_SAMSUNG_DEBUG Kconfig symbol already depends on DEBUG_LL.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  drivers/tty/serial/samsung.c | 1 -
->  1 file changed, 1 deletion(-)
+On Mon, Jul 13, 2015 at 5:58 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Jun 18, 2015 at 3:00 AM, Gregory Fong <gregory.0xf0@gmail.com> wrote:
+>
+>> Uses the gpiolib irqchip helpers.  For this to work, the irq setup
+>> function is called once per bank instead of once per device.  Note
+>> that all known uses of this block have a BCM7120 L2 interrupt
+>> controller as a parent.  Supports interrupts for all GPIOs.
+>>
+>> In the IRQ handler, we check for raised IRQs for invalid GPIOs and
+>> warn (ratelimited) if they're encountered.
+>>
+>> Also, several drivers (e.g. gpio-keys) allow for GPIOs to be
+>> configured as wakeup sources, and this GPIO controller supports that
+>> through a separate interrupt path.
+>>
+>> The de-facto standard DT property "wakeup-source" is checked, since
+>> that indicates whether the GPIO controller hardware can wake.  Uses
+>> the IRQCHIP_MASK_ON_SUSPEND irq_chip flag because UPG GIO doesn't have
+>> any of its own wakeup source configuration.
+>>
+>> Aside regarding gpiolib irqchip helpers: It wasn't obvious (to me)
+>> that you can have multiple chained irqchips and associated IRQ domains
+>> for a single parent IRQ, and as long as the xlate function is written
+>> correctly, a GPIO IRQ request end up checking the correct domain and
+>> will get associated with the correct IRQ.  What helps make this clear
+>> is to read
+>>   drivers/gpio/gpiolib-of.c:
+>>    - of_gpiochip_find_and_xlate()
+>>    - of_get_named_gpiod_flags()
+>>   drivers/gpio/gpiolib.c:
+>>    - gpiochip_find()
+>
+> Sorry for the unclarities, this is a bit hairy. Suggestions as to
+> how we can make it easier and/or bring code for this into gpiolib
+> are welcome. Right now I have a hard time seeing any way to
+> make this more generic and helpful :/
 
-Although this redundancy is not harmful the patch seems fine, so:
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+I'll see about putting together an update to the documentation
+discussing more about the case where you have one IRQ shared by
+multiple GPIO banks.
 
-Best regards,
-Krzysztof
+>
+> Overall this patch looks real nice. Some nitpicks below.
+>
+>> @@ -164,6 +398,16 @@ static int brcmstb_gpio_probe(struct platform_device *pdev)
+>>         priv->reg_base = reg_base;
+>>         priv->pdev = pdev;
+>>
+>> +       if (of_property_read_bool(np, "interrupt-controller")) {
+>> +               priv->parent_irq = platform_get_irq(pdev, 0);
+>> +               if (priv->parent_irq < 0) {
+>
+> This should be <= 0 since 0 is NO_IRQ
+
+Will fix.
+
+>
+>> +                       dev_err(dev, "Couldn't get IRQ");
+>> +                       return -ENOENT;
+>> +               }
+>> +       } else {
+>> +               priv->parent_irq = -ENOENT;
+>> +       }
+>
+> Why should this code only execute if the node is marked
+> "interrupt-controller"? It makes it seem like IRQs cannot arrive
+> to it unless it is intended to serve other consumers.
+>
+> Maybe in practice this is true, but...
+
+If the node does not contain the "interrupt-controller" property, the
+hardware does not support GPIO interrupts, and I designed the driver
+specifically to allow that to work.
+If the node does contain that property, then being unable to complete
+IRQ setup is a fatal error, because something is badly misconfigured.
+
+>
+>> +               if (priv->parent_irq >= 0) {
+>> +                       err = brcmstb_gpio_irq_setup(pdev, bank);
+>> +                       if (err)
+>> +                               goto fail;
+>> +               }
+>
+> Again 0 is NO_IRQ so this should be > 0 not >= 0.
+
+OK, will change.
+
+Thanks,
+Gregory
