@@ -1,88 +1,50 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 14 Jul 2015 11:28:30 -0400
-Subject: [PATCH v2 19/20] xen/privcmd: Add support for Linux 64KB page
- granularity
-In-Reply-To: <55A43638.4030503@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
- <55A41BE4.3080104@oracle.com> <55A43638.4030503@citrix.com>
-Message-ID: <55A52A9E.2000400@oracle.com>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Tue, 14 Jul 2015 15:34:30 +0000
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <20150714150208.GD10792@redhat.com>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+ <87h9p7r0we.fsf@x220.int.ebiederm.org>
+ <20150714135919.GA18333@fifo99.com>
+ <20150714150208.GD10792@redhat.com>
+Message-ID: <20150714153430.GA18766@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13/2015 06:05 PM, Julien Grall wrote:
-> Hi Boris,
->
-> On 13/07/2015 22:13, Boris Ostrovsky wrote:
->> On 07/09/2015 04:42 PM, Julien Grall wrote:
->>> -
->>>   struct remap_data {
->>>       xen_pfn_t *fgmfn; /* foreign domain's gmfn */
->>> +    xen_pfn_t *efgmfn; /* pointer to the end of the fgmfn array */
->>
->> It might be better to keep size of fgmfn array instead.
->
-> It would means to have an other variable to check that we are at the 
-> end the array.
+On Tue, Jul 14, 2015 at 11:02:08AM -0400, Vivek Goyal wrote:
+> On Tue, Jul 14, 2015 at 01:59:19PM +0000, dwalker at fifo99.com wrote:
+> > On Mon, Jul 13, 2015 at 08:19:45PM -0500, Eric W. Biederman wrote:
+> > > dwalker at fifo99.com writes:
+> > > 
+> > > > On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+> > > >> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+> > > >> 
+> > > >> > You can call panic notifiers and kmsg dumpers before kdump by
+> > > >> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+> > > >> > However, it doesn't make sense if kdump is not available.  In that
+> > > >> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+> > > >> > you can't change the value of the parameter.
+> > > >> 
+> > > >> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> > > >
+> > > > I think it would make sense if he just replaced "kdump" with "kexec".
+> > > 
+> > > It would be less insane, however it still makes no sense as without
+> > > kexec on panic support crash_kexec is a noop.  So the value of the
+> > > seeting makes no difference.
+> > 
+> > Can you explain more, I don't really understand what you mean. Are you suggesting
+> > the whole "crash_kexec_post_notifiers" feature has no value ?
+> 
+> Daniel,
+> 
+> BTW, why are you using crash_kexec_post_notifiers commandline? Why not
+> without it?
 
+It was explained in the prior thread but to rehash, the notifiers are used to do a switch
+over from the crashed machine to another redundant machine.
 
-I thought that's what h_iter is. Is it not?
-
-
->
-> What about a variable which will be decremented?
->
->>>
->>> +static int unmap_gfn(struct page *page, unsigned long pfn, void *data)
->>> +{
->>> +    int *nr = data;
->>> +    struct xen_remove_from_physmap xrp;
->>> +
->>> +    /* The Linux Page may not have been fully mapped to Xen */
->>> +    if (!*nr)
->>> +        return 0;
->>> +
->>> +    xrp.domid = DOMID_SELF;
->>> +    xrp.gpfn = pfn;
->>> +    (void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
->>> +
->>> +    (*nr)--;
->>> +
->>> +    return 0;
->>> +}
->>> +
->>>   int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
->>>                     int nr, struct page **pages)
->>>   {
->>>       int i;
->>> +    int nr_page = round_up(nr, XEN_PFN_PER_PAGE);
->>> -    for (i = 0; i < nr; i++) {
->>> -        struct xen_remove_from_physmap xrp;
->>> -        unsigned long pfn;
->>> +    for (i = 0; i < nr_page; i++) {
->>> +        /* unmap_gfn guarantees ret == 0 */
->>> +        BUG_ON(xen_apply_to_page(pages[i], unmap_gfn, &nr));
->>
->>
->> TBH, I am not sure how useful xen_apply_to_page() routine is. In this
->> patch especially, but also in others.
->
-> It avoids an open loop in each place where it's needed (here, 
-> balloon...) which means another indentation layer. You can give a look 
-> it's quite ugly.
-
-I didn't notice that it was an inline, in which case it is indeed cleaner.
-
--boris
-
->
-> Furthermore, the helper will avoid possible done by developers who are 
-> working on PV drivers on x86. If you see code where the MFN 
-> translation is done directly via virt_to_mfn or page_to_mfn... it will 
-> likely means that the code will be broking when 64KB page granularity 
-> will be in used.
-> Though, there will still be some place where it's valid to use 
-> virt_to_mfn and page_to_mfn.
->
-> Regards,
->
+Daniel
