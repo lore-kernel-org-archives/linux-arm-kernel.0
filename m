@@ -1,42 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jul 2015 11:16:12 +0200
-Subject: [PATCH 2/2] ARM: ux500: fix MMC/SD card regression
-In-Reply-To: <1436361322-27732-1-git-send-email-linus.walleij@linaro.org>
-References: <1436361322-27732-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20150714091612.GB20686@localhost>
+Date: Tue, 14 Jul 2015 11:18:49 +0200
+Subject: [GIT PULL] SoCFPGA fixes for v4.2-rc1
+In-Reply-To: <1436543297-3254-1-git-send-email-dinh.linux@gmail.com>
+References: <1436543297-3254-1-git-send-email-dinh.linux@gmail.com>
+Message-ID: <20150714091849.GC20686@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 03:15:22PM +0200, Linus Walleij wrote:
-> Ux500 is regressing due to commit
-> a21763a0b1e5a5ab8310f581886d04beadc16616
-> "pinctrl: nomadik: activate strict mux mode" which disallows
-> Nomadik GPIO 5 to be muxed in as a level shifter voltage select
-> pin, as it is currently described as being used for RX on UART1.
+On Fri, Jul 10, 2015 at 10:48:17AM -0500, dinh.linux at gmail.com wrote:
+> Hi Arnd, Kevin, Olof:
 > 
-> The behaviour is correct, instead the hardware config has been
-> incorrecly specified: UART1 is indeed unused on HREFv60plus and
-> Snowball and that is why HREFv60plus can use the pins it would
-> normally occupy as the voltage select line for the MMC/SD
-> levelshifter (Snowball uses it for I2C4).
+> Please pull in these fixes for v4.2-rc1.
 > 
-> The reason UART1 was anyway enabled on these platforms was
-> probably to secure the port enumeration to userspace. This
-> can be solved by using aliases (done in a separate patch) so
-> we can now deactivate UART1 and let MMC/SD use it properly
-> on HREFv60plus. We explicitly activate it only for the
-> older HREFprev60 board.
+> Thanks,
 > 
-> To complete, we set up the pin configuration for these pins
-> properly in the sdi0 node.
+> Dinh
 > 
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC guys: if it looks OK, please apply this patch directly
-> for fixes along with 1/1.
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_fixes_for_v4.2-rc1
+> 
+> for you to fetch changes up to 93abc72bc7901cfc61a2871da7a565c9fdb26108:
+> 
+>   ARM: socfpga: dts: Fix entries order (2015-07-07 08:58:02 -0500)
 
-Thanks, applied together with the newer version of 1/2.
+Merged. However, a reordering of a DTS file isn't really a fix, in the
+future please queue up for next release instead (unless the order is
+somehow causing a problem that needs to be addressed).
 
 
 -Olof
