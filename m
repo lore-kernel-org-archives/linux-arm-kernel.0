@@ -1,12 +1,12 @@
 From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 14 Jul 2015 10:36:18 +0800
+Date: Tue, 14 Jul 2015 10:50:13 +0800
 Subject: [PATCH v2 2/5] dt-bindings: Add a binding for Mediatek xHCI
  host controller
 In-Reply-To: <559F82C7.5010202@ti.com>
 References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
  <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
  <559F82C7.5010202@ti.com>
-Message-ID: <1436841378.9516.4.camel@mhfsdcap03>
+Message-ID: <1436842213.11289.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -51,7 +51,6 @@ On Fri, 2015-07-10 at 11:31 +0300, Roger Quadros wrote:
 > vbus-supply:
 > 
 I will adjust it later, thanks a lot
-
 > 
 > > + - usb-phy : the phy that xhci will bind
 > > + - usb3-lpm-capable: supports USB3 LPM
