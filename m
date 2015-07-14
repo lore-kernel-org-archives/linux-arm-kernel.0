@@ -1,121 +1,75 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Jul 2015 10:14:25 +0100
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <20150714141703.0d77242c@xhacker>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-4-git-send-email-sudeep.holla@arm.com>
- <20150714141703.0d77242c@xhacker>
-Message-ID: <55A4D2F1.5070702@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Jul 2015 10:23:53 +0100
+Subject: [PATCH 4/4] arm64: dts: Add Broadcom North Star 2 support
+In-Reply-To: <1436837955-26279-5-git-send-email-rjui@broadcom.com>
+References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
+ <1436837955-26279-5-git-send-email-rjui@broadcom.com>
+Message-ID: <20150714092353.GA12675@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+> +/dts-v1/;
+> +
+> +#include "ns2.dtsi"
+> +
+> +/ {
+> +       model = "Broadcom NS2 SVK";
+> +       compatible = "brcm,ns2-svk", "brcm,ns2";
+> +
+> +       chosen {
+> +               bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x66130000";
+> +       };
 
-On 14/07/15 07:17, Jisheng Zhang wrote:
-> Hi Sudeep,
->
-> I'm sorry to being late. Just have some comments below.
->
-> On Thu, 18 Jun 2015 15:41:34 +0100
-> Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
->> provides the mechanism by which the calling OS can request entry into
->> the deepest possible system sleep state.
->>
->> It meets all the necessary preconditions for entering suspend to RAM
->> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
->> firmware and registers a psci system suspend operation to implement the
->> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
->> PSCI.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
->>   include/uapi/linux/psci.h |  3 +++
->>   2 files changed, 34 insertions(+)
->>
->> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
->> index 752ca7c9eb97..f2b2b3e1c6e4 100644
->> --- a/drivers/firmware/psci.c
->> +++ b/drivers/firmware/psci.c
->> @@ -20,11 +20,13 @@
->>   #include <linux/printk.h>
->>   #include <linux/psci.h>
->>   #include <linux/reboot.h>
->> +#include <linux/suspend.h>
->>
->>   #include <uapi/linux/psci.h>
->>
->>   #include <asm/system_misc.h>
->>   #include <asm/smp_plat.h>
->> +#include <asm/suspend.h>
->>
->>   /*
->>    * While a 64-bit OS can make calls with SMC32 calling conventions, for some
->> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
->>   			      psci_func_id, 0, 0);
->>   }
->>
->> +static int psci_system_suspend(unsigned long unused)
->> +{
->> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
->> +			      virt_to_phys(cpu_resume), 0, 0);
->> +}
->> +
->> +static int psci_system_suspend_enter(suspend_state_t state)
->> +{
->> +	return cpu_suspend(0, psci_system_suspend);
->> +}
->> +
->> +static const struct platform_suspend_ops psci_suspend_ops = {
->> +	.valid          = suspend_valid_only_mem,
->> +	.enter          = psci_system_suspend_enter,
->> +};
->> +
->> +static void __init psci_init_system_suspend(void)
->> +{
->> +	if (!IS_ENABLED(CONFIG_SUSPEND))
->> +		return;
->> +
->> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
->> +		return;
->
-> So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
-> until PSCI 1.0,
+Please use stdout-path instead (you can use /aliases to make it
+simpler). It'll save a redundant description of the UART and will remove
+the dependency on Linux-specific naming of the UART.
 
-Correct, if you need System to RAM in Linux on a platform with PSCI
-firmware, firmware *must implement* SYSTEM_SUSPEND.
+[...]
 
-> and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
+> +/ {
+> +       compatible = "brcm,ns2";
+> +       interrupt-parent = <&gic>;
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +
+> +       cpus {
+> +               #address-cells = <2>;
+> +               #size-cells = <0>;
+> +
+> +               cpu at 0 {
+> +                       device_type = "cpu";
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       reg = <0 0>;
+> +                       enable-method = "spin-table";
+> +                       cpu-release-addr = <0 0x84b00000>;
+> +               };
+> +       };
 
-Optional here means, that you may chose to implement or not in the
-firmware. It doesn't mean we can implement S2R in Linux using other
-PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
-in the kernel.
+Shouldn't the other CPUs be described?
 
->we also want
-> suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
+Using spin-table for SMP is somewhat unfortunate, as it comes with a
+number of problems (e.g. unwoken secondaries spinning in the kernel). I
+would strongly advise using PSCI instead.
 
-Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
-feature in Linux. Is it just because we can manage with workarounds ?
-Sorry, that's not an option.
+> +
+> +       timer {
+> +               compatible = "arm,armv8-timer";
+> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
+> +                             IRQ_TYPE_EDGE_RISING)>,
+> +                            <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
+> +                             IRQ_TYPE_EDGE_RISING)>,
+> +                            <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
+> +                             IRQ_TYPE_EDGE_RISING)>,
+> +                            <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
+> +                             IRQ_TYPE_EDGE_RISING)>;
+> +               clock-frequency = <25000000>;
+> +       };
 
-> is there
-> any possibility to bring your previous RFC patch[1] back? Or ARM expect all
-> PSCI users must have SYSTEM_SUSPEND implemented if they want s2ram?
+Please fix your firmware to configure CNTFRQ_EL0, it is simply a bug not
+to, and using clock-frequency does not fix all the problems that not
+configuring it causes.
 
-OK, we did expect response back then[1] when we clearly asked if the
-firmware can be upgraded to v1.0 from v0.2 as the delta is not much and
-helps up to avoid special DT bindings for that case. Since nobody
-responded for last 6 months, it's assumed that it's no longer required.
-
-So to answer you, no the RFC is dead and it's expected to have PSCI
-firmware support for SYSTEM_SUSPEND if S2R is desired feature in Linux.
-
-Regards,
-Sudeep
-
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322278.html
+Thanks,
+Mark.
