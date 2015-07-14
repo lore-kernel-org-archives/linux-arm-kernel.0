@@ -1,31 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jul 2015 11:46:42 +0200
-Subject: [PATCH v0] arm64: dts: Add APM X-Gene standby GPIO controller
- DTS entries
-In-Reply-To: <1433402344-20836-1-git-send-email-yvo@apm.com>
-References: <1433402344-20836-1-git-send-email-yvo@apm.com>
-Message-ID: <20150714094642.GH20686@localhost>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Jul 2015 12:47:48 +0200
+Subject: [PATCH v5] clk: change clk_ops' ->determine_rate() prototype
+In-Reply-To: <20150713230217.GI30412@codeaurora.org>
+References: <1436294888-25752-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150708005748.GG30412@codeaurora.org>
+ <20150708110005.704c49ff@bbrezillon>
+ <559D66EE.4060707@codeaurora.org>
+ <20150709223938.19450e75@bbrezillon>
+ <20150713230217.GI30412@codeaurora.org>
+Message-ID: <20150714124748.55dd6213@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 04, 2015 at 02:19:04PM +0700, Y Vo wrote:
-> Add standby domain gpio controller for APM X-Gene SoC platform.
+On Mon, 13 Jul 2015 16:02:18 -0700
+Stephen Boyd <sboyd@codeaurora.org> wrote:
+
+> On 07/09, Boris Brezillon wrote:
+> > Hi Stephen,
+> > 
+> > On Wed, 08 Jul 2015 11:07:42 -0700
+> > Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > 
+> > > On 07/08/2015 02:00 AM, Boris Brezillon wrote:
+> > > > Hi Stephen,
+> > > >
+> > > > On Tue, 7 Jul 2015 17:57:48 -0700
+> > > > Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > > >
+> > > >> On 07/07, Boris Brezillon wrote:
+> > > >>>
+> > > >>>  	} else {
+> > > >>>  		pr_err("clk: clk_composite_determine_rate function called, but no mux or rate callback set!\n");
+> > > >>> +		req->rate = 0;
+> > > >>>  		return 0;
+> > > >> Shouldn't this return an error now? And then assigning req->rate
+> > > >> wouldn't be necessary. Sorry I must have missed this last round.
+> > > >>
+> > > > Actually I wanted to keep the existing behavior: return a 0 rate (not
+> > > > an error) when there is no mux or rate ops.
+> > > >
+> > > > That's something we can change afterwards, but it might reveals
+> > > > new bugs if some users are checking for a 0 rate to detect errors.
+> > > >
+> > > 
+> > > Ok. Care to send the patch now to do that while we're thinking about it?
+> > > We can test it out for a month or two.
+> > > 
+> > 
+> > Here is a patch modifying a few drivers to return errors instead of a 0
+> > rate. Feel free to squash it in the previous one if you think this is
+> > better.
+> > 
+> > Best Regards,
+> > 
+> > Boris
+> > 
+> > --- >8 ---
+> > 
+> > From dca9c28301042cf19dad4b1e4555cdb7c1063745 Mon Sep 17 00:00:00 2001
+> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Date: Thu, 9 Jul 2015 12:20:21 +0200
+> > Subject: [PATCH] clk: fix some determine_rate implementations
+> > 
+> > Some determine_rate implementations are not returning an error when then
+> > failed to adapt the rate according to the rate request.
+> > Fix them so that they return an error instead of silently returning 0.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> Signed-off-by: Y Vo <yvo@apm.com>
+> The linewrap is seriously messed up here. Please fix your mailer
+> next time. I had to hand edit the patch to get it to apply. I've
+> applied this in top of the original patch as a different commit,
+> in case we need to revert it later.
 
-Hi,
-
-What does patch v0 mean here? Is this just an RFC for comments or do
-you want us to apply it?
-
-Again, same comments as I made on another patch from APM developers
-today: You all send patches to us without coordination. Please find one
-maintainer of the common pieces and have him/her coordinate or at least
-ack these patches so we have one submaintainer to deal with instead of
-the whole team. (Over time that can of course be expanded to several
-people, but it's easiest to start with a single person).
+Sorry about that, I forgot to remove the line wrapper when copying the
+content of the patch into my mailer :-/.
 
 
-Thanks,
-
--Olof
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
