@@ -1,88 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 14 Jul 2015 12:09:05 +0100
-Subject: [PATCH v2 09/10] arm64/BUG: Use BRK instruction for generic BUG
- traps
-In-Reply-To: <20150714102025.GD10670@e103592.cambridge.arm.com>
-References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
- <1436793967-7138-10-git-send-email-Dave.Martin@arm.com>
- <20150713164315.GC22840@leverpostej>
- <20150713165151.GC10670@e103592.cambridge.arm.com>
- <20150713165638.GD22840@leverpostej>
- <20150714102025.GD10670@e103592.cambridge.arm.com>
-Message-ID: <20150714110904.GB12675@leverpostej>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Tue, 14 Jul 2015 13:10:05 +0200
+Subject: [PATCH] i2c: omap: fix bus recovery setup
+In-Reply-To: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
+References: <1436366127-24756-1-git-send-email-jlu@pengutronix.de>
+Message-ID: <20150714111004.GB1517@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 11:20:27AM +0100, Dave P Martin wrote:
-> On Mon, Jul 13, 2015 at 05:56:39PM +0100, Mark Rutland wrote:
-> > On Mon, Jul 13, 2015 at 05:51:51PM +0100, Dave P Martin wrote:
-> > > On Mon, Jul 13, 2015 at 05:43:15PM +0100, Mark Rutland wrote:
-> 
-> [...]
-> 
-> > > > Given the reliance on the labels in the caller, I think it might make
-> > > 
-> > > Not sure what you mean here, can you elaborate?
-> > 
-> > We're relying on label "0:" in the caller/user of the macro when we emit
-> > ".long 2b - 0b".
-> > 
-> > I think it would be clearer if folded into the caller (even with the
-> > inline ifdef this necessitates).
-> > 
-> > Though I could be missing something here that renders that impossible.
-> 
-> Before I respin the series, can you cast your eye over this
-> alternative?
-> 
-> I'm testing it now, but in any case it should make the conditional
-> structure of the code clearer as per your suggestion.
+On Wed, Jul 08, 2015 at 04:35:27PM +0200, Jan Luebbe wrote:
+> At least on the AM335x, enabling OMAP_I2C_SYSTEST_ST_EN is not enough to
 
-I think that style of macro is certainly more legible when applied to
-single lines, but I got a little confused when reading this before I
-noticed that each __BUGVERBOSE use covered a few lines.
+Felipe: it seems you did not need this; is this AM335x specific?
 
-Thanks,
-Mark.
-
+> allow direct access to the SCL and SDA pins. In addition to ST_EN, we
+> need to set the TMODE to 0b11 (Loop back & SDA/SCL IO mode select).
+> Also, as the reset values of SCL_O and SDA_O are 0 (which means "drive
+> low level"), we need to set them to 1 (which means "high-impedance") to
+> avoid unwanted changes on the pins.
 > 
-> Cheers
-> ---Dave
+> As a precaution, reset all these bits to their default values after
+> recovery is complete.
 > 
+> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> ---
+>  drivers/i2c/busses/i2c-omap.c | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
 > 
-> [...]
+> diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+> index d1c22e3fdd14..fc9bf7f30e35 100644
+> --- a/drivers/i2c/busses/i2c-omap.c
+> +++ b/drivers/i2c/busses/i2c-omap.c
+> @@ -1247,7 +1247,14 @@ static void omap_i2c_prepare_recovery(struct i2c_adapter *adap)
+>  	u32 reg;
+>  
+>  	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+> +	/* enable test mode */
+>  	reg |= OMAP_I2C_SYSTEST_ST_EN;
+> +	/* select SDA/SCL IO mode */
+> +	reg |= 3 << OMAP_I2C_SYSTEST_TMODE_SHIFT;
+> +	/* set SCL to high-impedance state (reset value is 0) */
+> +	reg |= OMAP_I2C_SYSTEST_SCL_O;
+> +	/* set SDA to high-impedance state (reset value is 0) */
+> +	reg |= OMAP_I2C_SYSTEST_SDA_O;
+>  	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+>  }
+>  
+> @@ -1257,7 +1264,11 @@ static void omap_i2c_unprepare_recovery(struct i2c_adapter *adap)
+>  	u32 reg;
+>  
+>  	reg = omap_i2c_read_reg(dev, OMAP_I2C_SYSTEST_REG);
+> +	/* restore reset values */
+>  	reg &= ~OMAP_I2C_SYSTEST_ST_EN;
+> +	reg &= ~OMAP_I2C_SYSTEST_TMODE_MASK;
+> +	reg &= ~OMAP_I2C_SYSTEST_SCL_O;
+> +	reg &= ~OMAP_I2C_SYSTEST_SDA_O;
+>  	omap_i2c_write_reg(dev, OMAP_I2C_SYSTEST_REG, reg);
+>  }
+>  
+> -- 
+> 2.1.4
 > 
-> #ifdef CONFIG_DEBUG_BUGVERBOSE
-> #define __BUGVERBOSE(x...) x
-> #else
-> #define __BUGVERBOSE(x...)
-> #endif
-> 
-> #define _BUG_FLAGS(flags, file, line) __BUG_FLAGS(flags, file, line)
-> 
-> #define __BUG_FLAGS(flags, file, line) asm volatile (			\
->  __BUGVERBOSE(	".pushsection .rodata.str,\"aMS\", at progbits,1\n"	\
-> 	"2:	.string \"" file "\"\n\t"				\
-> 		".popsection\n\t"				)	\
-> 									\
-> 		".pushsection __bug_table,\"a\"\n\t"			\
-> 		".align 2\n\t"						\
-> 	"0:	.long 1f - 0b\n\t"					\
->  __BUGVERBOSE(	".long 2b - 0b\n\t"					\
-> 		".short " #line "\n\t"	)				\
-> 		".short " #flags "\n\t"					\
-> 		".popsection\n"						\
-> 									\
-> 	"1:	brk %[imm]"						\
-> 		:: [imm] "i" (BUG_BRK_IMM)				\
-> )
-> 
-> #define BUG() do {				\
-> 	_BUG_FLAGS(0, __FILE__, __LINE__);	\
-> 	unreachable();				\
-> } while (0)
-> 
-> #define __WARN_TAINT(taint)					\
-> 	_BUG_FLAGS(BUGFLAG_TAINT(taint), __FILE__, __LINE__)
-> 
-> [...]
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/d6115559/attachment.sig>
