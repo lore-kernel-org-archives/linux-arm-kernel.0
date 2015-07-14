@@ -1,49 +1,46 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 14 Jul 2015 14:16:27 +0300
-Subject: [PATCH v2 48/48] usb: gadget: epautoconf: cleanup dead code
-In-Reply-To: <1436866776-5004-49-git-send-email-r.baldyga@samsung.com>
-References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
- <1436866776-5004-49-git-send-email-r.baldyga@samsung.com>
-Message-ID: <55A4EF8B.7090806@cogentembedded.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Jul 2015 13:16:28 +0200
+Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
+ ->disable() and ->is_enabled methods
+In-Reply-To: <20150714110819.GU11162@sirena.org.uk>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
+ <20150714105019.GR11162@sirena.org.uk>
+ <20150714130222.1bdfedc5@bbrezillon>
+ <20150714110819.GU11162@sirena.org.uk>
+Message-ID: <20150714131628.0c87f0a4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, 14 Jul 2015 12:08:19 +0100
+Mark Brown <broonie@kernel.org> wrote:
 
-On 7/14/2015 12:39 PM, Robert Baldyga wrote:
+> On Tue, Jul 14, 2015 at 01:02:22PM +0200, Boris Brezillon wrote:
+> > Mark Brown <broonie@kernel.org> wrote:
+> 
+> > > On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
+> > > > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
+> > > > the PWM call in ->set_voltage_sel().
+> 
+> > > This doesn't apply, please check and resend.
+> 
+> > This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
+> > and 15 were not meant to be applied without Thierry's approval (they
+> > depend on other changes in the PWM framework).
+> > I can rebase them on top of linux-next (or just on top of Linus'
+> > 4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
+> > on your regulator's for-next branch is a good idea.
+> 
+> What is the dependency for the enable patch?
 
-> Function find_ep() is no longer needed here, so we can remove it.
-> We also don't use anything from gadget_chips.h header any longer.
+Oh, indeed. This patch has no dependency on the PWM changes. I'll send
+it on its own then.
 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->   drivers/usb/gadget/epautoconf.c | 14 --------------
->   1 file changed, 14 deletions(-)
+Thanks,
 
-> diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-> index e9a8682..9a80925 100644
-> --- a/drivers/usb/gadget/epautoconf.c
-> +++ b/drivers/usb/gadget/epautoconf.c
-> @@ -20,20 +20,6 @@
->   #include <linux/usb/ch9.h>
->   #include <linux/usb/gadget.h>
->
-> -#include "gadget_chips.h"
-> -
-> -static struct usb_ep *
-> -find_ep (struct usb_gadget *gadget, const char *name)
-> -{
-> -	struct usb_ep	*ep;
-> -
-> -	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
-> -		if (0 == strcmp (ep->name, name))
-> -			return ep;
-> -	}
-> -	return NULL;
-> -}
-> -
+Boris
 
-    I don't think duplicating the function in each driver that needs it is 
-better than turniong this function into public.
-
-WBR, Sergei
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
