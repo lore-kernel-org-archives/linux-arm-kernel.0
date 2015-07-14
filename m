@@ -1,10 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:39:03 +0200
-Subject: [PATCH v2 15/48] usb: gadget: fsl_udc_core: add ep capabilities
- support
+Date: Tue, 14 Jul 2015 11:39:05 +0200
+Subject: [PATCH v2 17/48] usb: gadget: goku_udc: add ep capabilities support
 In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-16-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-18-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +11,27 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/fsl_udc_core.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/usb/gadget/udc/goku_udc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/fsl_udc_core.c b/drivers/usb/gadget/udc/fsl_udc_core.c
-index c60022b..aab5221 100644
---- a/drivers/usb/gadget/udc/fsl_udc_core.c
-+++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-@@ -2313,6 +2313,19 @@ static int struct_ep_setup(struct fsl_udc *udc, unsigned char index,
- 	ep->ep.ops = &fsl_ep_ops;
- 	ep->stopped = 0;
+diff --git a/drivers/usb/gadget/udc/goku_udc.c b/drivers/usb/gadget/udc/goku_udc.c
+index 9e8d842..46b8d14 100644
+--- a/drivers/usb/gadget/udc/goku_udc.c
++++ b/drivers/usb/gadget/udc/goku_udc.c
+@@ -1257,6 +1257,14 @@ static void udc_reinit (struct goku_udc *dev)
+ 		INIT_LIST_HEAD (&ep->queue);
  
-+	if (index == 0) {
-+		ep->ep.caps.type_control = true;
-+	} else {
-+		ep->ep.caps.type_iso = true;
-+		ep->ep.caps.type_bulk = true;
-+		ep->ep.caps.type_int = true;
-+	}
+ 		ep_reset(NULL, ep);
 +
-+	if (index & 1)
++		if (i == 0)
++			ep->ep.caps.type_control = true;
++		else
++			ep->ep.caps.type_bulk = true;
++
 +		ep->ep.caps.dir_in = true;
-+	else
 +		ep->ep.caps.dir_out = true;
-+
- 	/* for ep0: maxP defined in desc
- 	 * for other eps, maxP is set by epautoconfig() called by gadget layer
- 	 */
+ 	}
+ 
+ 	dev->ep[0].reg_mode = NULL;
 -- 
 1.9.1
