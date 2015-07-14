@@ -1,80 +1,60 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 14 Jul 2015 12:59:01 +0100
-Subject: [PATCH V3 06/19] clk: tegra: remove TEGRA_PLL_USE_LOCK for
- PLLD/PLLD2
-In-Reply-To: <55A3C50E.7060706@nvidia.com>
+Date: Tue, 14 Jul 2015 12:59:50 +0100
+Subject: [PATCH V3 19/19] ARM: tegra: select PM_GENERIC_DOMAINS
+In-Reply-To: <55A3C53F.8090003@nvidia.com>
 References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-7-git-send-email-jonathanh@nvidia.com>
- <20150713134151.GQ6287@tbergstrom-lnx.Nvidia.com>
- <55A3C50E.7060706@nvidia.com>
-Message-ID: <55A4F985.7010503@nvidia.com>
+ <1436791197-32358-20-git-send-email-jonathanh@nvidia.com>
+ <20150713135047.GR6287@tbergstrom-lnx.Nvidia.com>
+ <55A3C53F.8090003@nvidia.com>
+Message-ID: <55A4F9B6.1070904@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 13/07/15 15:02, Jon Hunter wrote:
+
+On 13/07/15 15:03, Jon Hunter wrote:
 > 
 > 
-> On 13/07/15 14:41, Peter De Schrijver wrote:
->> On Mon, Jul 13, 2015 at 01:39:44PM +0100, Jon Hunter wrote:
+> On 13/07/15 14:50, Peter De Schrijver wrote:
+>> On Mon, Jul 13, 2015 at 01:39:57PM +0100, Jon Hunter wrote:
 >>> From: Vince Hsu <vinceh@nvidia.com>
 >>>
->>> Tegra114 has a HW bug that the PLLD/PLLD2 lock bit cannot be asserted when
->>> the DIS power domain is during up-powergating process but the clamp to this
+>>> We have added generic power domain support for Tegra SoCs. So now the
+>>> option M_GENERIC_DOMAINS must be enabled by default to have proper power
 >>
->> I think there is missing 'off' in this sentence?
->>
->> ie. ... 'the DIS power domain is off during up-powergating process'
->>
->> Also 'un-powergating sequence' would be nicer.
+>> Missing P :)
 > 
-> Yes agree. I will re-word that.
+> Ooops. I think introduced that error. Will fix.
 
 Updated version ...
 
 
->From d5cbecd4e97332cd8373b9c4893731eb8e063660 Mon Sep 17 00:00:00 2001
+>From f7b951cd05973d74fc25e33a1aaec5a6e77bfdc0 Mon Sep 17 00:00:00 2001
 From: Vince Hsu <vinceh@nvidia.com>
-Date: Wed, 11 Mar 2015 16:46:04 +0800
-Subject: [PATCH 06/19] clk: tegra: remove TEGRA_PLL_USE_LOCK for PLLD/PLLD2
+Date: Wed, 11 Mar 2015 13:40:46 +0800
+Subject: [PATCH 19/19] ARM: tegra: select PM_GENERIC_DOMAINS
 
-Tegra114 has a HW bug where the PLLD/PLLD2 lock bit cannot be asserted
-while turning on the Display power domain and before the clamp to this
-domain has been removed. This issue causes a timeout and aborts the power
-up sequence, even though the PLLD/PLLD2 has already locked. To avoid this,
-don't use the lock for PLLD/PLLD2, just wait 1ms and treat the clocks as
-locked.
+We have added generic power domain support for Tegra SoCs. So now the
+option PM_GENERIC_DOMAINS must be enabled by default to have proper power
+sequence.
 
 Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-[jonathanh at nvidia.com: Updated the changelog description]
 Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 ---
- drivers/clk/tegra/clk-tegra114.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/mach-tegra/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-index 8237d16b4075..2e5c20c7c088 100644
---- a/drivers/clk/tegra/clk-tegra114.c
-+++ b/drivers/clk/tegra/clk-tegra114.c
-@@ -456,8 +456,7 @@ static struct tegra_clk_pll_params pll_d_params = {
- 	.lock_delay = 1000,
- 	.div_nmp = &pllp_nmp,
- 	.freq_table = pll_d_freq_table,
--	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
--		 TEGRA_PLL_USE_LOCK,
-+	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON,
- };
- 
- static struct tegra_clk_pll_params pll_d2_params = {
-@@ -474,8 +473,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
- 	.lock_delay = 1000,
- 	.div_nmp = &pllp_nmp,
- 	.freq_table = pll_d_freq_table,
--	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON |
--		 TEGRA_PLL_USE_LOCK,
-+	.flags = TEGRA_PLL_HAS_CPCON | TEGRA_PLL_SET_LFCON,
- };
- 
- static struct pdiv_map pllu_p[] = {
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 0fa4c5f8b1be..fdf86cae3b32 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -9,6 +9,7 @@ menuconfig ARCH_TEGRA
+ 	select HAVE_ARM_TWD if SMP
+ 	select PINCTRL
+ 	select PM_OPP
++	select PM_GENERIC_DOMAINS if PM
+ 	select ARCH_HAS_RESET_CONTROLLER
+ 	select RESET_CONTROLLER
+ 	select SOC_BUS
 -- 
 2.1.4
