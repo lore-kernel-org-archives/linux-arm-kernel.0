@@ -1,111 +1,57 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Tue, 14 Jul 2015 21:28:14 +0900
-Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-In-Reply-To: <075c01d0be0e$587fe260$097fa720$@kernel.org>
-References: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
- <55A45C63.2030907@samsung.com>
- <06b101d0bdf2$8aad8fb0$a008af10$@kernel.org>
- <CAPTzV15+BWEo6PjJMwHVjqVdUnZuJ=PBAUprF_vZaSRTYiuNXw@mail.gmail.com>
- <075c01d0be0e$587fe260$097fa720$@kernel.org>
-Message-ID: <CAPTzV14nPH0PcRqf1na7a7wJTu23r8bZmCwGiEafAFbMyoRM2Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Jul 2015 13:29:04 +0100
+Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
+ backend
+In-Reply-To: <20150714110302.GA334@red-moon>
+References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
+ <1436430685-2202-4-git-send-email-jszhang@marvell.com>
+ <20150714103421.GU7557@n2100.arm.linux.org.uk>
+ <20150714110302.GA334@red-moon>
+Message-ID: <20150714122904.GV7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jul 14, 2015 at 12:03:02PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Jul 14, 2015 at 11:34:21AM +0100, Russell King - ARM Linux wrote:
+> > > +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+> > > +	.suspend = cpu_psci_cpu_suspend,
+> > > +	.init = cpu_psci_cpu_init_idle,
+> > > +};
+> > > +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+> 
+> I take this as an ACK to M.Rutland's PSCI code move to drivers/firmware,
+> right ?
 
-On Tue, Jul 14, 2015 at 5:23 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> Chanho Park wrote:
->>
->> Hi Kukjin,
->>
->> On Tue, Jul 14, 2015 at 2:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
->> > Krzysztof Kozlowski wrote:
->> >>
->> >> On 14.07.2015 09:24, Chanho Park wrote:
->> >> > The odroid-xu3 board which is based on exynos5422 not exynos5800 is
->> >> > booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
->> >> > is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
->> >> > cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
->> >> > and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
->> >> > cpu4-7 are cortex-a15.
->> >> >
->> >> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> >> > Signed-off-by: Chanho Park <parkch98@gmail.com>
->> >> > ---
->
-> [...]
->
->> >> >
->> >> > Secondary cpu booting problem[1] is not resolved yet. Need more investigations
->> >> > to work booting 8 cores correctly.
->> >> >
->> >> > [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
->> >> >
->> >> >  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
->> >> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
->> >> >  2 files changed, 82 insertions(+)
->> >> >  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
->> >>
->> >> Thanks, applied to my tree. I'll send it to Kukjin for v4.3 unless he
->> >> picks it also.
->> >>
->> > Well, let me see. I'm thinking we need to sort out the cpu ordering and dtsi
->> > inclusions for exynos5420, 5422 and 5800 related to DT files.
->> >
->> > See,
->> >
->> > 1) exynos5420 DT (cpu0~3: a15, cpu 4~7: a7)
->> > 2) exynos5800 DT is including exynos5420 DT
->> > 3) exynos5422 and exynos5800 based boards are including exynos5800 DT.
->> >
->> > Then making exynos5422-cpus DT for exynos5422 based boards?
->> > (cpu0~3: a7, cpu4~7: a15)
->> >
->> > I think, it could cause confusion when new board based on them are added
->> > because it's not clear and the boot cpu could be selected by bootloader part.
->>
->> The iROM will check the GPIO pin to select which core is run as cpu0.
->> I think no one will change the GPIO pin if a new board which is based
->> on exynos5422 :)
->>
-> Yes, I know the boot sequence and it means it depends on board configuration
-> not SoC. That?s why I'm saying it should be handled in board DT file. I think,
-> most of current exynos big.LITTLE model should do if it could be changed
-> according to board configuration.
+No, that's not something I've particularly looked at.  PSCI doesn't really
+interest me because I have no systems which (afaik) support it.
 
-I also agreed it's not a SoC configuration since second
-patch(exynos5422.dtsi -> exynos5422-cpu.dtsi).
+> > We don't do this for other stuff - we don't have IRQ_CHIP_OF_DECLARE
+> > stuff in arch/arm but have the IRQ chip drivers in drivers/irqchip.
+> > We keep it all togehter in drivers/irqchip, even when the IRQ chip
+> > driver is only useful on ARM.
+> 
+> CPUidle operations are ARM only, they are not used on ARM64, so
+> they belong in arch/arm (that's the same thing as SMP ops, on ARM64
+> SMP ops and CPUidle ops are unified through CPU operations).
 
->
->> >
->> > So how about creating exynos5422-cpus and exynos5420-cpus then including the
->> > cpus DT file in each board accordingly?
->> >
->> > Or more clear way to avoid confusion?
->>
->> In this situation, all exynos5422 boards(odroid xu3 series and mobile
->> phone) have same cpu configurations. If we move the exynos5420 cpu
->> configuration from exynos5420.dtsi, we should change all dts which
->> including exynos5420.dtsi.
->
-> Maybe same board configuration. Just adding inclusion should be fine at this
-> moment.
->
->> I think we'd better to defer the change until a new exynos5422 board
->> which has different cpu configurations is added.
->>
-> I mean, according to current inclusion of exynos5422 based boards' DT file, it
-> is including exynos5420 DT via exynos5800 DT and then override different cpu
-> ordering (5422-cpu DT) because of different board configuration (just GPIO
-> value) and it is not a good way in this case.
+I don't agree with that.  CPU idle isn't an "ARM thing" at all, it's
+generic kernel infrastructure.  OF is generic kernel infrastructure too.
 
-Actually, I don't want to disturb current dts hierarchy even though it
-looks strange. The common features of exynos5800 and exynos5422 should
-be in the exynos5800.dtsi because they shared many things except the
-cpu order.
-Please consider the exynos5422-cpu.dtsi is just board configurations
-to represent cpu order.
+Yet, we're stuffing _all_ the PSCI CPU idle code into
+drivers/firmware/psci.c, but then stuffing the PSCI OF data structures
+into arch/arm.  This is utterly _insane_.
+
+There is nothing ARM specific about these CPU idle ops.  They don't
+belong on arch/arm.
+
+NAK on this series (and the move of the PSCI code to drivers/firmware)
+until people start seeing sense with stuff like this.  Having stuff split
+between arch/arm/ and drivers/ like this is totally crap.  It makes code
+unnecessary complex for no reason what so ever.
+
+Find a solution which doesn't involve leaving _just_ data structures to
+connect stuff to OF in arch/arm.
 
 -- 
-Best Regards,
-Chanho Park
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
