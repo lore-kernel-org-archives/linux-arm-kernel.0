@@ -1,56 +1,33 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 14 Jul 2015 13:18:31 +0800
-Subject: [PATCH v3 5/5] ARM: dts: mt8127: enable basic SMP bringup for mt8127
+Date: Tue, 14 Jul 2015 13:18:28 +0800
+Subject: [PATCH v3 2/5] devicetree: bindings: add new SMP enable method
+ Mediatek SoC
 In-Reply-To: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
 References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
-Message-ID: <1436851111-2369-6-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1436851111-2369-3-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arch timer node to enable arch-timer support. MT8127 firmware
-doesn't correctly setup arch-timer frequency and CNTVOFF, add
-properties to workaround this.
-
-This also set cpu enable-method to enable SMP.
+This commit add new cpu enable method "mediatek,mt65xx-smp" and
+"mediatek,mt81xx-tz-smp".
 
 Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 ---
- arch/arm/boot/dts/mt8127.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ Documentation/devicetree/bindings/arm/cpus.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt8127.dtsi b/arch/arm/boot/dts/mt8127.dtsi
-index ca3402e..fae84ee 100644
---- a/arch/arm/boot/dts/mt8127.dtsi
-+++ b/arch/arm/boot/dts/mt8127.dtsi
-@@ -23,6 +23,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "mediatek,mt81xx-tz-smp";
- 
- 		cpu at 0 {
- 			device_type = "cpu";
-@@ -72,6 +73,21 @@
-                 };
- 	};
- 
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
-+					  IRQ_TYPE_LEVEL_LOW)>;
-+		clock-frequency = <13000000>;
-+		arm,cpu-registers-not-fw-configured;
-+	};
-+
- 	soc {
- 		#address-cells = <2>;
- 		#size-cells = <2>;
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index d6b794c..d58eb45 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -195,6 +195,8 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-390-smp"
+ 			    "marvell,armada-xp-smp"
++			    "mediatek,mt6589-smp"
++			    "mediatek,mt81xx-tz-smp"
+ 			    "qcom,gcc-msm8660"
+ 			    "qcom,kpss-acc-v1"
+ 			    "qcom,kpss-acc-v2"
 -- 
 1.8.1.1.dirty
