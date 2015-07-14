@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:38:58 +0200
-Subject: [PATCH v2 10/48] usb: gadget: bcm63xx_udc: add ep capabilities support
+Date: Tue, 14 Jul 2015 11:38:53 +0200
+Subject: [PATCH v2 05/48] usb: chipidea: udc: add ep capabilities support
 In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-11-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-6-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,51 +11,33 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/bcm63xx_udc.c | 25 +++++++++++++++++++++----
- 1 file changed, 21 insertions(+), 4 deletions(-)
+ drivers/usb/chipidea/udc.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/bcm63xx_udc.c b/drivers/usb/gadget/udc/bcm63xx_udc.c
-index 9db968b..c5e0894 100644
---- a/drivers/usb/gadget/udc/bcm63xx_udc.c
-+++ b/drivers/usb/gadget/udc/bcm63xx_udc.c
-@@ -44,9 +44,25 @@
- #define DRV_MODULE_NAME		"bcm63xx_udc"
+diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
+index 764f668..eff7cfb 100644
+--- a/drivers/usb/chipidea/udc.c
++++ b/drivers/usb/chipidea/udc.c
+@@ -1624,6 +1624,20 @@ static int init_eps(struct ci_hdrc *ci)
  
- static const char bcm63xx_ep0name[] = "ep0";
--static const char *const bcm63xx_ep_name[] = {
--	bcm63xx_ep0name,
--	"ep1in-bulk", "ep2out-bulk", "ep3in-int", "ep4out-int",
+ 			hwep->ep.name      = hwep->name;
+ 			hwep->ep.ops       = &usb_ep_ops;
 +
-+static const struct {
-+	const char *name;
-+	const struct usb_ep_caps caps;
-+} bcm63xx_ep_info[] = {
-+#define EP_INFO(_name, _type, _dir) \
-+	{ \
-+		.name = _name, \
-+		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## _type, \
-+				USB_EP_CAPS_DIR_ ## _dir), \
-+	}
++			if (i == 0) {
++				hwep->ep.caps.type_control = true;
++			} else {
++				hwep->ep.caps.type_iso = true;
++				hwep->ep.caps.type_bulk = true;
++				hwep->ep.caps.type_int = true;
++			}
 +
-+	EP_INFO(bcm63xx_ep0name, CONTROL, ALL),
-+	EP_INFO("ep1in-bulk",	BULK,	IN),
-+	EP_INFO("ep2out-bulk",	BULK,	OUT),
-+	EP_INFO("ep3in-int",	INT,	IN),
-+	EP_INFO("ep4out-int",	INT,	OUT),
++			if (j == TX)
++				hwep->ep.caps.dir_in = true;
++			else
++				hwep->ep.caps.dir_out = true;
 +
-+#undef EP_INFO
- };
- 
- static bool use_fullspeed;
-@@ -943,7 +959,8 @@ static int bcm63xx_init_udc_hw(struct bcm63xx_udc *udc)
- 	for (i = 0; i < BCM63XX_NUM_EP; i++) {
- 		struct bcm63xx_ep *bep = &udc->bep[i];
- 
--		bep->ep.name = bcm63xx_ep_name[i];
-+		bep->ep.name = bcm63xx_ep_info[i].name;
-+		bep->ep.caps = bcm63xx_ep_info[i].caps;
- 		bep->ep_num = i;
- 		bep->ep.ops = &bcm63xx_udc_ep_ops;
- 		list_add_tail(&bep->ep.ep_list, &udc->gadget.ep_list);
+ 			/*
+ 			 * for ep0: maxP defined in desc, for other
+ 			 * eps, maxP is set by epautoconfig() called
 -- 
 1.9.1
