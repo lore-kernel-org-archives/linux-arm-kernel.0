@@ -1,147 +1,52 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 Jul 2015 00:52:23 +0000
-Subject: [PATCH 2/2] serial: sirf: let uart's receive start in right place
-In-Reply-To: <1436835143-6697-1-git-send-email-21cnbao@gmail.com>
-References: <1436835143-6697-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1436835143-6697-2-git-send-email-21cnbao@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 14 Jul 2015 09:48:35 +0900
+Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
+References: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
+Message-ID: <55A45C63.2030907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+On 14.07.2015 09:24, Chanho Park wrote:
+> The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+> booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+> is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+> cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
+> and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+> cpu4-7 are cortex-a15.
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanho Park <parkch98@gmail.com>
+> ---
+> Change from v4:
+>  - Resend patch with correct signed-off
+> 
+> Changes from v4:
+>  - Remove temporal patch in e-mail body
+> 
+> Changes from v3:
+>  - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+> 
+> Changes from v2:
+>  - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+>  - drop compatibles from exynos5422-cpus.dtsi
+> 
+> Changes from v1:
+>  - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+>  - include the dtsi file top of the exynos5422-odroidxu3.dts
+> 
+> Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+> to work booting 8 cores correctly.
+> 
+> [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+> 
+>  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+>  2 files changed, 82 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
 
-While UART work in DMA mode, function start_rx will request descriptor
-from DMA engine, if there is no left descriptor UART, driver will give
-err logs "DMA slave single fail".
+Thanks, applied to my tree. I'll send it to Kukjin for v4.3 unless he
+picks it also.
 
-currently start_rx is called in set_termios function, so everytime, port
-setting will call start_rx once.
-
-Now put start_rx in startup, it will be called once while open the port.
-
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/tty/serial/sirfsoc_uart.c | 46 ++++++++++++++-------------------------
- drivers/tty/serial/sirfsoc_uart.h |  1 -
- 2 files changed, 16 insertions(+), 31 deletions(-)
-
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index 8cac7ac..c6657de 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -413,7 +413,6 @@ sirfsoc_uart_pio_rx_chars(struct uart_port *port, unsigned int max_rx_count)
- 			break;
- 	}
- 
--	sirfport->rx_io_count += rx_count;
- 	port->icount.rx += rx_count;
- 
- 	return rx_count;
-@@ -600,7 +599,6 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
- 	struct sirfsoc_uart_port *sirfport = to_sirfport(port);
- 	struct sirfsoc_register *ureg = &sirfport->uart_reg->uart_reg;
- 	struct sirfsoc_int_en *uint_en = &sirfport->uart_reg->uart_int_en;
--	sirfport->rx_io_count = 0;
- 	wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
- 		rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) &
- 		~SIRFUART_IO_MODE);
-@@ -632,31 +630,6 @@ static void sirfsoc_uart_start_next_rx_dma(struct uart_port *port)
- 				sirfport->uart_reg->uart_type));
- }
- 
--static void sirfsoc_uart_start_rx(struct uart_port *port)
--{
--	struct sirfsoc_uart_port *sirfport = to_sirfport(port);
--	struct sirfsoc_register *ureg = &sirfport->uart_reg->uart_reg;
--	struct sirfsoc_int_en *uint_en = &sirfport->uart_reg->uart_int_en;
--
--	sirfport->rx_io_count = 0;
--	wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_RESET);
--	wr_regl(port, ureg->sirfsoc_rx_fifo_op, 0);
--	wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_START);
--	if (sirfport->rx_dma_chan)
--		sirfsoc_uart_start_next_rx_dma(port);
--	else {
--		if (!sirfport->is_atlas7)
--			wr_regl(port, ureg->sirfsoc_int_en_reg,
--				rd_regl(port, ureg->sirfsoc_int_en_reg) |
--				SIRFUART_RX_IO_INT_EN(uint_en,
--					sirfport->uart_reg->uart_type));
--		else
--			wr_regl(port, ureg->sirfsoc_int_en_reg,
--				SIRFUART_RX_IO_INT_EN(uint_en,
--					sirfport->uart_reg->uart_type));
--	}
--}
--
- static unsigned int
- sirfsoc_usp_calc_sample_div(unsigned long set_rate,
- 		unsigned long ioclk_rate, unsigned long *sample_reg)
-@@ -850,7 +823,6 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
- 	rx_time_out = SIRFSOC_UART_RX_TIMEOUT(set_baud, 20000);
- 	rx_time_out = SIRFUART_RECV_TIMEOUT_VALUE(rx_time_out);
- 	txfifo_op_reg = rd_regl(port, ureg->sirfsoc_tx_fifo_op);
--	wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_STOP);
- 	wr_regl(port, ureg->sirfsoc_tx_fifo_op,
- 			(txfifo_op_reg & ~SIRFUART_FIFO_START));
- 	if (sirfport->uart_reg->uart_type == SIRF_REAL_UART) {
-@@ -906,7 +878,6 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
- 	txfifo_op_reg |= SIRFUART_FIFO_START;
- 	wr_regl(port, ureg->sirfsoc_tx_fifo_op, txfifo_op_reg);
- 	uart_update_timeout(port, termios->c_cflag, set_baud);
--	sirfsoc_uart_start_rx(port);
- 	wr_regl(port, ureg->sirfsoc_tx_rx_en, SIRFUART_TX_EN | SIRFUART_RX_EN);
- 	spin_unlock_irqrestore(&port->lock, flags);
- }
-@@ -925,6 +896,7 @@ static int sirfsoc_uart_startup(struct uart_port *port)
- {
- 	struct sirfsoc_uart_port *sirfport	= to_sirfport(port);
- 	struct sirfsoc_register *ureg = &sirfport->uart_reg->uart_reg;
-+	struct sirfsoc_int_en *uint_en = &sirfport->uart_reg->uart_int_en;
- 	unsigned int index			= port->line;
- 	int ret;
- 	irq_modify_status(port->irq, IRQ_NOREQUEST, IRQ_NOAUTOEN);
-@@ -994,7 +966,6 @@ static int sirfsoc_uart_startup(struct uart_port *port)
- 		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
- 			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) |
- 			SIRFSOC_USP_FRADDR_CLR_EN);
--	enable_irq(port->irq);
- 	if (sirfport->rx_dma_chan && !sirfport->is_hrt_enabled) {
- 		sirfport->is_hrt_enabled = true;
- 		sirfport->rx_period_time = 20000000;
-@@ -1006,6 +977,21 @@ static int sirfsoc_uart_startup(struct uart_port *port)
- 			ns_to_ktime(sirfport->rx_period_time),
- 			HRTIMER_MODE_REL);
- 	}
-+	wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_START);
-+	if (sirfport->rx_dma_chan)
-+		sirfsoc_uart_start_next_rx_dma(port);
-+	else {
-+		if (!sirfport->is_atlas7)
-+			wr_regl(port, ureg->sirfsoc_int_en_reg,
-+				rd_regl(port, ureg->sirfsoc_int_en_reg) |
-+				SIRFUART_RX_IO_INT_EN(uint_en,
-+					sirfport->uart_reg->uart_type));
-+		else
-+			wr_regl(port, ureg->sirfsoc_int_en_reg,
-+				SIRFUART_RX_IO_INT_EN(uint_en,
-+					sirfport->uart_reg->uart_type));
-+	}
-+	enable_irq(port->irq);
- 
- 	return 0;
- init_rx_err:
-diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
-index 671a08d..c3a885b 100644
---- a/drivers/tty/serial/sirfsoc_uart.h
-+++ b/drivers/tty/serial/sirfsoc_uart.h
-@@ -423,7 +423,6 @@ struct sirfsoc_uart_port {
- 	struct dma_chan			*tx_dma_chan;
- 	dma_addr_t			tx_dma_addr;
- 	struct dma_async_tx_descriptor	*tx_dma_desc;
--	unsigned int			rx_io_count;
- 	unsigned long			transfer_size;
- 	enum sirfsoc_tx_state		tx_dma_state;
- 	unsigned int			cts_gpio;
--- 
-2.3.5
+Best regards,
+Krzysztof
