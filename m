@@ -1,51 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Jul 2015 21:49:09 +0100
-Subject: mx6: suspicious RCU usage
-In-Reply-To: <20150714162600.GJ3717@linux.vnet.ibm.com>
-References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
- <20150714160006.GI3717@linux.vnet.ibm.com>
- <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
- <20150714162600.GJ3717@linux.vnet.ibm.com>
-Message-ID: <20150714204909.GX7557@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jul 2015 22:50:08 +0200
+Subject: [PATCH] ARM: orion5x: fix legacy orion5x IRQ numbers
+In-Reply-To: <1436883958.13048.5.camel@dolka.fr>
+References: <5583DD23.90505@arm.com> <1436710916.5657.169.camel@dolka.fr>
+ <1436883958.13048.5.camel@dolka.fr>
+Message-ID: <4168769.RaQL1yKSFF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 09:26:00AM -0700, Paul E. McKenney wrote:
-> On Tue, Jul 14, 2015 at 01:06:32PM -0300, Fabio Estevam wrote:
-> > Hi Paul,
-> > 
-> > On Tue, Jul 14, 2015 at 1:00 PM, Paul E. McKenney
-> > <paulmck@linux.vnet.ibm.com> wrote:
-> > 
-> > > Does this patch help?
-> > >
-> > >         https://lkml.org/lkml/2015/5/12/885
-> > 
-> > I am using an ARM 32-bit machine, so I used this one instead:
-> > https://lkml.org/lkml/2015/5/12/892
-> > 
-> > , and it fixes the problem. Thanks!
-> > 
-> > Feel free to add:
-> > 
-> > Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+On Tuesday 14 July 2015 16:25:58 Benjamin Cama wrote:
+> Hi everyone,
 > 
-> Glad it helped!
+> I finally nailed it: my attempt at copying Russell's patch for dove did
+> not work because MULTI_IRQ_HANDLER was not set. It is not in the
+> defconfig; maybe it should be now? I hesitated to put it as a
+> dependency for PLAT_ORION_LEGACY, but as the platform is globally
+> broken without it, I added it.
 > 
-> Russell, did you want me to push this, or would you rather take it?
+> What do you think?
+> 
 
-If it's the one I'm thinking of (using the generic code) because it
-doesn't actually solve the problem we have.  It may shut up the RCU
-warning, but it doesn't solve the underlying problem - one which is
-caused by the use of atomics (which use the exclusive instructions)
-vs cache line migration between CPUs vs speculative prefetching...
+I think it makes sense the way you did here.
 
-It's possible right now that _dirty_ cache lines can be migrated to
-the dying CPU, which are then lost on power down - and if we disable
-the caches on the dying CPU, we then can't use exclusives, so atomics
-(and all of the other normal kernel synchronisation mechanisms) are
-out of the question.
+See also my patch at
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/commit/?h=multiplatform-4.2-next&id=44b55cab3bd74739e4c39205d41e1b2ed8953155
+
+I'd be happy if we could just merge that one, along with the other
+plat-orion multiplatform patches at
+http://git.kernel.org/cgit/linux/kernel/git/arnd/playground.git/log/?h=b1f5b2f1a738d7f78b94856bfe7a1a7d4da1fbd1
+
+I did not manage to get them merged before my parental leave and
+certainly won't be able to do it before I get back to work, but maybe
+someone else can have a look. I think the five patches should all
+be fine there, they mainly need testing on real hardware.
+
+	Arnd
