@@ -1,231 +1,72 @@
-From: claudiu.manoil@freescale.com (Claudiu Manoil)
-Date: Tue, 14 Jul 2015 18:46:17 +0300
-Subject: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and eTSEC2
-In-Reply-To: <20150713133138.GO23464@tiger>
-References: <20150713133138.GO23464@tiger>
-Message-ID: <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Tue, 14 Jul 2015 15:48:33 +0000
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <20150714154040.GA3912@redhat.com>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+ <87h9p7r0we.fsf@x220.int.ebiederm.org>
+ <20150714135919.GA18333@fifo99.com>
+ <20150714150208.GD10792@redhat.com>
+ <20150714153430.GA18766@fifo99.com>
+ <20150714154040.GA3912@redhat.com>
+Message-ID: <20150714154833.GA18883@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds generic dts nodes for eTSEC0, eTSEC1 and eTSEC2.
+On Tue, Jul 14, 2015 at 11:40:40AM -0400, Vivek Goyal wrote:
+> On Tue, Jul 14, 2015 at 03:34:30PM +0000, dwalker at fifo99.com wrote:
+> > On Tue, Jul 14, 2015 at 11:02:08AM -0400, Vivek Goyal wrote:
+> > > On Tue, Jul 14, 2015 at 01:59:19PM +0000, dwalker at fifo99.com wrote:
+> > > > On Mon, Jul 13, 2015 at 08:19:45PM -0500, Eric W. Biederman wrote:
+> > > > > dwalker at fifo99.com writes:
+> > > > > 
+> > > > > > On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+> > > > > >> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+> > > > > >> 
+> > > > > >> > You can call panic notifiers and kmsg dumpers before kdump by
+> > > > > >> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+> > > > > >> > However, it doesn't make sense if kdump is not available.  In that
+> > > > > >> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+> > > > > >> > you can't change the value of the parameter.
+> > > > > >> 
+> > > > > >> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> > > > > >
+> > > > > > I think it would make sense if he just replaced "kdump" with "kexec".
+> > > > > 
+> > > > > It would be less insane, however it still makes no sense as without
+> > > > > kexec on panic support crash_kexec is a noop.  So the value of the
+> > > > > seeting makes no difference.
+> > > > 
+> > > > Can you explain more, I don't really understand what you mean. Are you suggesting
+> > > > the whole "crash_kexec_post_notifiers" feature has no value ?
+> > > 
+> > > Daniel,
+> > > 
+> > > BTW, why are you using crash_kexec_post_notifiers commandline? Why not
+> > > without it?
+> > 
+> > It was explained in the prior thread but to rehash, the notifiers are used to do a switch
+> > over from the crashed machine to another redundant machine.
+> 
+> So why not detect failure using polling or issue notifications from second
+> kernel.
+> 
+> IOW, expecting that a crashed machine will be able to deliver notification
+> reliably is falwed to begin with, IMHO.
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
+It's flawed to think you can kexec, but you still do it right ? I've not gotten into
+the deep details of this switching process, but that's how this interface is used.
+ 
+> If a machine is failing, there are high chance it can't deliver you the
+> notification. Detecting that failure suing some kind of polling mechanism
+> might be more reliable. And it will make even kdump mechanism more
+> reliable so that it does not have to run panic notifiers after the crash.
 
-Enable support for the second interrupt group register block
-and the corresponding Rx/Tx/Err interrupt sources, for each
-eTSEC node.  DT binding documentation updates.
+I think what your suggesting is that my company should change how it's hardware works
+and that's not really an option for me. This isn't a simple thing like checking over the
+network if the machine is down or not, this is way more complex hardware design.
 
-Signed-off-by: Claudiu Manoil <claudiu.manoil@freescale.com>
----
-v2:
- - register block size is 0x1000 (4kB memory page), not 0x8000;
- - reg property has 2 "address" and resp. 2 "size" cells;
- - remove optional/ obsoleted properties;
- - use register block address as queue-group id for consistency;
- - binding documentation updates for missing vendor properties;
-
-
- .../devicetree/bindings/net/fsl-tsec-phy.txt       |  6 +-
- arch/arm/boot/dts/ls1021a-qds.dts                  | 20 +++++
- arch/arm/boot/dts/ls1021a-twr.dts                  | 20 +++++
- arch/arm/boot/dts/ls1021a.dtsi                     | 92 ++++++++++++++++++++++
- 4 files changed, 137 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt b/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-index 1e97532..b3291c7 100644
---- a/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-@@ -45,7 +45,7 @@ Properties:
- 
-   - device_type : Should be "network"
-   - model : Model of the device.  Can be "TSEC", "eTSEC", or "FEC"
--  - compatible : Should be "gianfar"
-+  - compatible : "gianfar", "fsl-etsec2"
-   - reg : Offset and length of the register set for the device
-   - interrupts : For FEC devices, the first interrupt is the device's
-     interrupt.  For TSEC and eTSEC devices, the first interrupt is
-@@ -57,6 +57,10 @@ Properties:
-     "rgmii-id", as all other connection types are detected by hardware.
-   - fsl,magic-packet : If present, indicates that the hardware supports
-     waking up via magic packet.
-+  - fsl,wake-on-filer: Indicates that the device can wake up the system
-+    by generating a filer interrupt. Depending on the wake-on-lan mode
-+    set for this device, the filer interrupt can be triggered by certain
-+    user-defined ethernet packets (usually ARP or L2 unicast packets).
-   - bd-stash : If present, indicates that the hardware supports stashing
-     buffer descriptors in the L2.
-   - rx-stash-len : Denotes the number of bytes of a received buffer to stash
-diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-index 9c5e16b..f16a061 100644
---- a/arch/arm/boot/dts/ls1021a-qds.dts
-+++ b/arch/arm/boot/dts/ls1021a-qds.dts
-@@ -75,6 +75,26 @@
- 	};
- };
- 
-+&enet0 {
-+	tbi-handle = <&tbi0>;
-+	phy-handle = <&sgmii_phy1c>;
-+	phy-connection-type = "sgmii";
-+	status = "okay";
-+};
-+
-+&enet1 {
-+	tbi-handle = <&tbi0>;
-+	phy-handle = <&sgmii_phy1d>;
-+	phy-connection-type = "sgmii";
-+	status = "okay";
-+};
-+
-+&enet2 {
-+	phy-handle = <&rgmii_phy3>;
-+	phy-connection-type = "rgmii-id";
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	status = "okay";
- 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..4b61766 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -73,6 +73,26 @@
- 	};
- };
- 
-+&enet0 {
-+	tbi-handle = <&tbi1>;
-+	phy-handle = <&sgmii_phy2>;
-+	phy-connection-type = "sgmii";
-+	status = "okay";
-+};
-+
-+&enet1 {
-+	tbi-handle = <&tbi1>;
-+	phy-handle = <&sgmii_phy0>;
-+	phy-connection-type = "sgmii";
-+	status = "okay";
-+};
-+
-+&enet2 {
-+	phy-handle = <&rgmii_phy1>;
-+	phy-connection-type = "rgmii-id";
-+	status = "okay";
-+};
-+
- &i2c0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..cc48d56 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -59,6 +59,9 @@
- 		serial3 = &lpuart3;
- 		serial4 = &lpuart4;
- 		serial5 = &lpuart5;
-+		ethernet0 = &enet0;
-+		ethernet1 = &enet1;
-+		ethernet2 = &enet2;
- 		sysclk = &sysclk;
- 	};
- 
-@@ -391,6 +394,95 @@
- 			reg = <0x0 0x2d24000 0x0 0x4000>;
- 		};
- 
-+		enet0: ethernet at 2d10000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			fsl,magic-packet;
-+			fsl,wake-on-filer;
-+			local-mac-address = [ 00 00 00 00 00 00 ];
-+			ranges;
-+
-+			queue-group at 2d10000 {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d10000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			queue-group at 2d14000  {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d14000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		enet1: ethernet at 2d50000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			local-mac-address = [ 00 00 00 00 00 00 ];
-+			ranges;
-+
-+			queue-group at 2d50000  {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d50000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			queue-group at 2d54000  {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d54000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
-+		enet2: ethernet at 2d90000 {
-+			compatible = "fsl,etsec2";
-+			device_type = "network";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			interrupt-parent = <&gic>;
-+			model = "eTSEC";
-+			local-mac-address = [ 00 00 00 00 00 00 ];
-+			ranges;
-+
-+			queue-group at 2d90000  {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d90000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			queue-group at 2d94000  {
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				reg = <0x0 0x2d94000 0x0 0x1000>;
-+				interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-+					<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+		};
-+
- 		usb at 8600000 {
- 			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
- 			reg = <0x0 0x8600000 0x0 0x1000>;
--- 
-1.7.11.7
+Daniel
