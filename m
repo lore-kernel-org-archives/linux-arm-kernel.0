@@ -1,95 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 14 Jul 2015 08:54:15 +0200
-Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
- muxing controllers
-In-Reply-To: <CACRpkdb3+9=seJo7w5nrJS-iURH3SnH-PYVvJCQ-S619KOcKbg@mail.gmail.com>
-References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
- <557EF60D.8020007@wwwdotorg.org>
- <20150617123816.GB12295@odux.rfo.atmel.com>
- <5581988C.50000@wwwdotorg.org> <55925EB1.1030500@atmel.com>
- <CACRpkdb3+9=seJo7w5nrJS-iURH3SnH-PYVvJCQ-S619KOcKbg@mail.gmail.com>
-Message-ID: <20150714065415.GD5161@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jul 2015 23:57:45 -0700
+Subject: [PATCH 1/3] ARM: dts: Correct audio input route & set mic bias
+In-Reply-To: <1433441299-18887-2-git-send-email-arun@gumstix.com>
+References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+ <1433441299-18887-2-git-send-email-arun@gumstix.com>
+Message-ID: <20150714065745.GE17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 02:07:45PM +0200, Linus Walleij wrote:
-> On Tue, Jun 30, 2015 at 11:17 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+* Arun Bharadwaj <arun@gumstix.com> [150604 11:10]:
+> From: Adam YH Lee <adam.yh.lee@gmail.com>
 > 
-> > - no agreement on 3 points:
-> > 1/ ways to use groups in generic pinctrl
-> > 2/ ways to describe a comprehensive configuration in device tree
-> > 3/ readability of a sysfs information
-> >
-> > - no way out on the generic pinctrl little changes that Ludovic proposed
-> > as Linus W. never gave his point of view (RFC posts on April the 2nd).
+> Audio-in was incorrectly routed to Line In. It should be Mic3L as per
+> schematic.
 > 
-> Yeah I know. I am battling with this, it is one of those topics
-> where you feel "eeeehhhh" and try to avoid looking at it. Sadly
-> I have to...
+> Using mic-bias voltage at 2.0v (<0x1>) does not work for some reason. There
+> is no voltage seen on micbias (R127). Mic-bias voltage of 2.5v (<0x2>) works.
+> I see voltage of 2.475v across GND and micbias.
 > 
-> I refer to Documentation/ManagementStyle, chapter 1,
-> "Decisions".
+> With these changes, I can record audio with a pair of proliferate TRRS earbuds.
 > 
-> What makes me feel uneasy about these things is that the decisions
-> are irreversible due to the nature of the device tree bindings.
-> 
-> I am not a manager, but a maintainer...
-> 
-> > Ludovic explained at length our point of view and gave detailed
-> > technical arguments. We don't intend to convince you, we just would like
-> > the harmless modifications to be integrated.
-> 
-> So is it universally agreed that the changes are harmless?
-> 
-> If they are harmless, I would be able to revert the patch and
-> nothing breaks in the world, I don't think that is the case. The
-> case is a piece of code and functionality that is not AT91-specific
-> but has to be maintained in the core pinctrl code forever.
+> Signed-off-by: Ash Charles <ashcharles@gmail.com>
 
-If this change turns out to be wrong it doesn't necessarily have to stay
-in the core pinctrl code. It can be pushed back into the AT91 driver
-(and the others using it), won't be used for new bindings and after some
-years can be pushed into some dark corner.
+Can you please repost this with after checking From
+and Signed-off-by?
 
-> 
-> That is basically the big problem with anything device tree.
-> It etches stuff in stone so it can't be changed, like ever.
-> Further, the decision on whether to etch this or that is
-> pushed to Linux subsystem maintainers, who are clearly
-> unsuited for the task. :(
-> 
-> > As we preferred to give a chance to the generic pinconf/pinctrl for our
-> > use by adding a little bit of flexibility, we are now in a situation
-> > where we are nearly obliged to give up this approach and write a new
-> > driver without the use of the generic facilities: what a pity!
-> > We lost several months of useless work to match what we thought the
-> > maintainer would prefer.
-> >
-> > So Linus, do you confirm that we won't go further with this approach?
-> >
-> > We are pretty disappointed by the way this interaction with the pinctrl
-> > sub-system went.
-> 
-> I'm sorry, I am just trying to wait for consensus but it seems to
-> be hard for that to happen.
-> 
-> Things I need:
-> 
-> - More DT bindings people to look at this patch.
-> 
-> - More other driver maintainers to look at this patch.
->   Sacha is one of those I'd like to get an opinion from
->   for example. ACKs, Reviewed-by's are always good.
+Regards,
 
-I welcome the addition of the combined pin number / mux value
-properties like we have in the Mediatek driver. Making the pinctrl
-core aware of these defines like Ludovic did is a good idea IMO.
+Tony
 
-Sascha with two 's'
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> ---
+>  arch/arm/boot/dts/am335x-pepper.dts | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+> index 0d35ab6..473d8ee 100644
+> --- a/arch/arm/boot/dts/am335x-pepper.dts
+> +++ b/arch/arm/boot/dts/am335x-pepper.dts
+> @@ -74,6 +74,7 @@
+>  	audio_codec: tlv320aic3106 at 1b {
+>  		compatible = "ti,tlv320aic3106";
+>  		reg = <0x1b>;
+> +		ai3x-micbias-vg = <0x2>;
+>  	};
+>  
+>  	accel: lis331dlh at 1d {
+> @@ -153,7 +154,7 @@
+>  	ti,audio-routing =
+>  		"Headphone Jack",	"HPLOUT",
+>  		"Headphone Jack",	"HPROUT",
+> -		"LINE1L",		"Line In";
+> +		"MIC3L",		"Mic3L Switch";
+>  };
+>  
+>  &mcasp0 {
+> -- 
+> 2.1.4
+> 
