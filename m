@@ -1,118 +1,51 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:39:33 +0200
-Subject: [PATCH v2 45/48] usb: gadget: net2280: add net2280_match_ep() function
-In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-46-git-send-email-r.baldyga@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 14 Jul 2015 17:46:39 +0800
+Subject: [PATCH v3 4/5] clk: mediatek: Add USB clock support in MT8173
+ APMIXEDSYS
+In-Reply-To: <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
+References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omBryA6f6gYje5RvF2XcJiebogYCHpyWNeN9K4B-MiHf1Q@mail.gmail.com>
+ <1436841935.9416.10.camel@mtksdaap41>
+ <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
+Message-ID: <1436867199.9416.16.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
-process. Functions does the same that was done by chip-specific code inside
-of epautoconf. Now this code can be removed from there to separate generic code
-from platform specific logic.
+Hi Daniel,
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/epautoconf.c  | 23 +--------------------
- drivers/usb/gadget/udc/net2280.c | 44 ++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+), 22 deletions(-)
+On Tue, 2015-07-14 at 11:23 +0800, Daniel Kurtz wrote:
+> On Tue, Jul 14, 2015 at 10:45 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> > On Mon, 2015-07-13 at 22:46 +0800, Daniel Kurtz wrote:
+> >> > +static const struct clk_ops mtk_ref2usb_tx_ops = {
+> >> > +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
+> >> > +       .prepare        = mtk_ref2usb_tx_prepare,
+> >> > +       .unprepare      = mtk_ref2usb_tx_unprepare,
+> >> > +};
+> >>
+> >> Burying the implementation of this special "mtk_ref2usb" clock in
+> >> clk-mt8173,c seems a bit awkward.
+> >> Can you please move it to its own file, like mediatek/clk-usb.c?
+> >
+> > Do you mean clk/mediatek/clk-usb.c?
+> >
+> > This clock is a MT8173 specific clock, which may not be reused by other
+> > SoCs. So I think it's not necessary to move it to a separated file.
+> 
+> Yes, this is a wrapper for a type of clock.  I think it would be
+> better in its own file, rather than embedded in clk-mt8173.c, which is
+> more about enumerating and initializing the clock tree.
+> 
+> Perhaps today it is only used for mt8173, but that may not be the case
+> in the future.
 
-diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 7c43b7c..3ac92b4 100644
---- a/drivers/usb/gadget/epautoconf.c
-+++ b/drivers/usb/gadget/epautoconf.c
-@@ -98,28 +98,7 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 	/* First, apply chip-specific "best usage" knowledge.
- 	 * This might make a good usb_gadget_ops hook ...
- 	 */
--	if (gadget_is_net2280(gadget)) {
--		char name[8];
--
--		if (type == USB_ENDPOINT_XFER_INT) {
--			/* ep-e, ep-f are PIO with only 64 byte fifos */
--			ep = find_ep(gadget, "ep-e");
--			if (ep && usb_gadget_ep_match_desc(gadget,
--					ep, desc, ep_comp))
--				goto found_ep;
--			ep = find_ep(gadget, "ep-f");
--			if (ep && usb_gadget_ep_match_desc(gadget,
--					ep, desc, ep_comp))
--				goto found_ep;
--		}
--
--		/* USB3380: use same address for usb and hardware endpoints */
--		snprintf(name, sizeof(name), "ep%d%s", usb_endpoint_num(desc),
--				usb_endpoint_dir_in(desc) ? "in" : "out");
--		ep = find_ep(gadget, name);
--		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
--			goto found_ep;
--	} else if (gadget_is_goku (gadget)) {
-+	if (gadget_is_goku (gadget)) {
- 		if (USB_ENDPOINT_XFER_INT == type) {
- 			/* single buffering is enough */
- 			ep = find_ep(gadget, "ep3-bulk");
-diff --git a/drivers/usb/gadget/udc/net2280.c b/drivers/usb/gadget/udc/net2280.c
-index 0295cf7..4933321 100644
---- a/drivers/usb/gadget/udc/net2280.c
-+++ b/drivers/usb/gadget/udc/net2280.c
-@@ -1533,6 +1533,49 @@ static int net2280_pullup(struct usb_gadget *_gadget, int is_on)
- 	return 0;
- }
- 
-+static struct usb_ep *net2280_find_ep(struct usb_gadget *_gadget,
-+		const char *name)
-+{
-+	struct usb_ep *ep;
-+
-+	list_for_each_entry(ep, &_gadget->ep_list, ep_list) {
-+		if (0 == strcmp(ep->name, name))
-+			return ep;
-+	}
-+
-+	return NULL;
-+}
-+
-+static struct usb_ep *net2280_match_ep(struct usb_gadget *_gadget,
-+		struct usb_endpoint_descriptor *desc,
-+		struct usb_ss_ep_comp_descriptor *ep_comp)
-+{
-+	char name[8];
-+	struct usb_ep *ep;
-+	u8 type;
-+
-+	type = usb_endpoint_type(desc);
-+
-+	if (type == USB_ENDPOINT_XFER_INT) {
-+		/* ep-e, ep-f are PIO with only 64 byte fifos */
-+		ep = net2280_find_ep(_gadget, "ep-e");
-+		if (ep && usb_gadget_ep_match_desc(_gadget, ep, desc, ep_comp))
-+			return ep;
-+		ep = net2280_find_ep(_gadget, "ep-f");
-+		if (ep && usb_gadget_ep_match_desc(_gadget, ep, desc, ep_comp))
-+			return ep;
-+	}
-+
-+	/* USB3380: use same address for usb and hardware endpoints */
-+	snprintf(name, sizeof(name), "ep%d%s", usb_endpoint_num(desc),
-+			usb_endpoint_dir_in(desc) ? "in" : "out");
-+	ep = net2280_find_ep(_gadget, name);
-+	if (ep && usb_gadget_ep_match_desc(_gadget, ep, desc, ep_comp))
-+		return ep;
-+
-+	return NULL;
-+}
-+
- static int net2280_start(struct usb_gadget *_gadget,
- 		struct usb_gadget_driver *driver);
- static int net2280_stop(struct usb_gadget *_gadget);
-@@ -1544,6 +1587,7 @@ static const struct usb_gadget_ops net2280_ops = {
- 	.pullup		= net2280_pullup,
- 	.udc_start	= net2280_start,
- 	.udc_stop	= net2280_stop,
-+	.match_ep	= net2280_match_ep,
- };
- 
- /*-------------------------------------------------------------------------*/
--- 
-1.9.1
+OK, I'll separate it from clk-mt8173.c.
+
+Ref2usb_tx's control register is located in APMIXEDSYS, which contains
+most of PLL controlling. Is this clock suitable to implemented
+mtk-pll.c? Or it's proper to be a separated file such as clk-usb.c?
+
+
+Best regards,
+
+James
