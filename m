@@ -1,47 +1,52 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Jul 2015 12:13:55 +0100
-Subject: [PATCH 3/3] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <1436863074.25044.30.camel@hellion.org.uk>
-References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>	
- <1435754163-17929-4-git-send-email-sudeep.holla@arm.com>
- <1436863074.25044.30.camel@hellion.org.uk>
-Message-ID: <55A4EEF3.50801@arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 Jul 2015 14:14:54 +0300
+Subject: [PATCH v2 45/48] usb: gadget: net2280: add net2280_match_ep()
+ function
+In-Reply-To: <1436866776-5004-46-git-send-email-r.baldyga@samsung.com>
+References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+ <1436866776-5004-46-git-send-email-r.baldyga@samsung.com>
+Message-ID: <55A4EF2E.9090306@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
 
+On 7/14/2015 12:39 PM, Robert Baldyga wrote:
 
-On 14/07/15 09:37, Ian Campbell wrote:
-> On Wed, 2015-07-01 at 13:36 +0100, Sudeep Holla wrote:
+> Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
+> process. Functions does the same that was done by chip-specific code inside
+> of epautoconf. Now this code can be removed from there to separate generic code
+> from platform specific logic.
+
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+
+[...]
+> diff --git a/drivers/usb/gadget/udc/net2280.c b/drivers/usb/gadget/udc/net2280.c
+> index 0295cf7..4933321 100644
+> --- a/drivers/usb/gadget/udc/net2280.c
+> +++ b/drivers/usb/gadget/udc/net2280.c
+> @@ -1533,6 +1533,49 @@ static int net2280_pullup(struct usb_gadget *_gadget, int is_on)
+>   	return 0;
+>   }
 >
->> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
->> new file mode 100644
->> index 000000000000..5b1d0181023b
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> [...]
->> +		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
->
-> Unfortunately this causes some issues for the split device tree
-> repository[0], since things get moved around there.
->
-> This new file ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
->
+> +static struct usb_ep *net2280_find_ep(struct usb_gadget *_gadget,
+> +		const char *name)
 
-Ah sorry, wasn't aware of such a effort to move DTS files out.
+    Shouldn't this be a generic function as before?
 
-> Any ideas how best to deal with this?
->
+> +{
+> +	struct usb_ep *ep;
+> +
+> +	list_for_each_entry(ep, &_gadget->ep_list, ep_list) {
+> +		if (0 == strcmp(ep->name, name))
 
-Honestly no idea. We did discuss this internally with 2 options:
+    Please make 0 the 2nd operand to ==.
 
-1. Specifying the relative path as done in this patch
-2. Creating symlink, something like how kvm manages files today
+> +			return ep;
+> +	}
+> +
+> +	return NULL;
+> +}
+[...]
 
-I agree both are not elegant but (1) was chosen to be better of the two.
-We are open for any suggestions.
-
-Regards,
-Sudeep
+WBR, Sergei
