@@ -1,274 +1,187 @@
-From: pi-cheng.chen@linaro.org (Pi-Cheng Chen)
-Date: Tue, 14 Jul 2015 17:34:19 +0800
-Subject: [PATCH v4] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-Message-ID: <1436866459-14217-1-git-send-email-pi-cheng.chen@linaro.org>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Tue, 14 Jul 2015 11:38:48 +0200
+Subject: [PATCH v2 00/48] usb: gadget: rework ep matching and claiming
+ mechanism
+Message-ID: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
+Hello,
 
-This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
-for intermediate clock source switching.
+This patch series reworks endpoint matching and claiming mechanism in
+epautoconf. From v2 there are 11 additional patches adding 'ep_match'
+to usb_gadget_ops and removing chip-specific quirk handling from generic
+code of autoconfig.
 
-Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
----
-Changes in v4:
-- Address comments for v3
-- Rebase to the patch that adds 13mhz clock for MT8173[1]
+I'm not sure if this patch set isn't too long, as it has 48 patches,
+but I decided to send it as single series to avoid problems with patch
+applying order.
 
-Changes in v3:
-- Rebase to 4.2-rc1
-- Fix some issues of v2
+The aim of whole patchset is to rework epautoconf code to get rid of
+things like name-based endpoint matching and UDC name-based quirks in
+generic code. These needed to do some modifications in framework like
+adding 'endpoint capabilities flags' feature or adding 'match_ep'.
 
-Changes in v2:
-- Remove use of .determine_rate callback
+Following paragraphs contain brief description of what modifications are
+done by particular parts of this patch set:
 
-[1] http://patchwork.kernerl.xyz/patch/6777041/
----
- drivers/clk/mediatek/Makefile          |   2 +-
- drivers/clk/mediatek/clk-cpumux.c      | 127 +++++++++++++++++++++++++++++++++
- drivers/clk/mediatek/clk-cpumux.h      |  22 ++++++
- drivers/clk/mediatek/clk-mt8173.c      |  23 ++++++
- include/dt-bindings/clock/mt8173-clk.h |   4 +-
- 5 files changed, 176 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/mediatek/clk-cpumux.c
- create mode 100644 drivers/clk/mediatek/clk-cpumux.h
+The patch (1) introduces new safer endpoint claiming method, basing on
+new 'claimed' flag. It was discussed here [1]. I proposed this solution
+over year ago and it was accepted, but apparently I forgot to send the
+final version of patch.
 
-diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-index 8e4b2a4..299917a 100644
---- a/drivers/clk/mediatek/Makefile
-+++ b/drivers/clk/mediatek/Makefile
-@@ -1,4 +1,4 @@
--obj-y += clk-mtk.o clk-pll.o clk-gate.o
-+obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
- obj-$(CONFIG_RESET_CONTROLLER) += reset.o
- obj-y += clk-mt8135.o
- obj-y += clk-mt8173.o
-diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
-new file mode 100644
-index 0000000..fb04fe1
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-cpumux.c
-@@ -0,0 +1,127 @@
-+/*
-+ * Copyright (c) 2015 Linaro Ltd.
-+ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/slab.h>
-+
-+#include "clk-mtk.h"
-+#include "clk-cpumux.h"
-+
-+struct mtk_clk_cpumux {
-+	struct clk_hw	hw;
-+	struct regmap	*regmap;
-+	u32		reg;
-+	u32		mask;
-+	u8		shift;
-+};
-+
-+static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
-+{
-+	return container_of(_hw, struct mtk_clk_cpumux, hw);
-+}
-+
-+static u8 clk_cpumux_get_parent(struct clk_hw *hw)
-+{
-+	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-+	int num_parents = __clk_get_num_parents(hw->clk);
-+	unsigned int val;
-+
-+	regmap_read(mux->regmap, mux->reg, &val);
-+
-+	val >>= mux->shift;
-+	val &= mux->mask;
-+
-+	if (val >= num_parents)
-+		return -EINVAL;
-+
-+	return val;
-+}
-+
-+static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-+	u32 mask, val;
-+
-+	val = index << mux->shift;
-+	mask = mux->mask << mux->shift;
-+
-+	return regmap_update_bits(mux->regmap, mux->reg, mask, val);
-+}
-+
-+static const struct clk_ops clk_cpumux_ops = {
-+	.get_parent = clk_cpumux_get_parent,
-+	.set_parent = clk_cpumux_set_parent,
-+};
-+
-+static struct clk __init *mtk_clk_register_cpumux(const struct mtk_composite *mux,
-+					   struct regmap *regmap)
-+{
-+	struct mtk_clk_cpumux *cpumux;
-+	struct clk *clk;
-+	struct clk_init_data init;
-+
-+	cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
-+	if (!cpumux)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = mux->name;
-+	init.ops = &clk_cpumux_ops;
-+	init.parent_names = mux->parent_names;
-+	init.num_parents = mux->num_parents;
-+	init.flags = mux->flags;
-+
-+	cpumux->reg = mux->mux_reg;
-+	cpumux->shift = mux->mux_shift;
-+	cpumux->mask = BIT(mux->mux_width) - 1;
-+	cpumux->regmap = regmap;
-+	cpumux->hw.init = &init;
-+
-+	clk = clk_register(NULL, &cpumux->hw);
-+	if (IS_ERR(clk))
-+		kfree(cpumux);
-+
-+	return clk;
-+}
-+
-+int __init mtk_clk_register_cpumuxes(struct device_node *node,
-+			      const struct mtk_composite *clks, int num,
-+			      struct clk_onecell_data *clk_data)
-+{
-+	int i;
-+	struct clk *clk;
-+	struct regmap *regmap;
-+
-+	regmap = syscon_node_to_regmap(node);
-+	if (IS_ERR(regmap)) {
-+		pr_err("Cannot find regmap for %s: %ld\n", node->full_name,
-+		       PTR_ERR(regmap));
-+		return PTR_ERR(regmap);
-+	}
-+
-+	for (i = 0; i < num; i++) {
-+		const struct mtk_composite *mux = &clks[i];
-+
-+		clk = mtk_clk_register_cpumux(mux, regmap);
-+		if (IS_ERR(clk)) {
-+			pr_err("Failed to register clk %s: %ld\n",
-+			       mux->name, PTR_ERR(clk));
-+			continue;
-+		}
-+
-+		clk_data->clks[mux->id] = clk;
-+	}
-+
-+	return 0;
-+}
-diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
-new file mode 100644
-index 0000000..52c769f
---- /dev/null
-+++ b/drivers/clk/mediatek/clk-cpumux.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (c) 2015 Linaro Ltd.
-+ * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __DRV_CLK_CPUMUX_H
-+#define __DRV_CLK_CPUMUX_H
-+
-+int mtk_clk_register_cpumuxes(struct device_node *node,
-+			      const struct mtk_composite *clks, int num,
-+			      struct clk_onecell_data *clk_data);
-+
-+#endif /* __DRV_CLK_CPUMUX_H */
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 540c5c3..3cf9ca9 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -19,6 +19,7 @@
- 
- #include "clk-mtk.h"
- #include "clk-gate.h"
-+#include "clk-cpumux.h"
- 
- #include <dt-bindings/clock/mt8173-clk.h>
- 
-@@ -517,6 +518,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
- 	"apll2_div5"
- };
- 
-+static const char * const ca53_parents[] __initconst = {
-+	"clk26m",
-+	"armca7pll",
-+	"mainpll",
-+	"univpll"
-+};
-+
-+static const char * const ca57_parents[] __initconst = {
-+	"clk26m",
-+	"armca15pll",
-+	"mainpll",
-+	"univpll"
-+};
-+
-+static const struct mtk_composite cpu_muxes[] __initdata = {
-+	MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
-+	MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
-+};
-+
- static const struct mtk_composite top_muxes[] __initconst = {
- 	/* CLK_CFG_0 */
- 	MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
-@@ -743,6 +763,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
- 						clk_data);
- 	mtk_clk_register_factors(infra_divs, ARRAY_SIZE(infra_divs), clk_data);
- 
-+	mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
-+						clk_data);
-+
- 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
- 	if (r)
- 		pr_err("%s(): could not register clock provider: %d\n",
-diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-index fa2a2bb..a17cbaa 100644
---- a/include/dt-bindings/clock/mt8173-clk.h
-+++ b/include/dt-bindings/clock/mt8173-clk.h
-@@ -188,7 +188,9 @@
- #define CLK_INFRA_PMICSPI		10
- #define CLK_INFRA_PMICWRAP		11
- #define CLK_INFRA_CLK_13M		12
--#define CLK_INFRA_NR_CLK		13
-+#define CLK_INFRA_CA53SEL		13
-+#define CLK_INFRA_CA57SEL		14
-+#define CLK_INFRA_NR_CLK		15
- 
- /* PERI_SYS */
- 
+Patches (2-3) add the 'capabilities flags' structure and helper macros.
+This solution is inspired by the 'feature flags' originally proposed
+by Felipe Balbi in 2013 [2], but unfortunately implementation of this
+feature has never been completed.
+
+Patches (4-36) add' capabilites flags' support to all UDC drivers present
+in the kernel tree. It's needed to be done before replacing old endpoint
+matching mechanism, otherwise UDC drivers which doesn't set 'capabilities
+flags' won't work with new autoconfig.
+
+Patch (37) finally replaces old endpoint matching method with the new
+one basing on capabilities flags.
+
+These changes aims to get rid of code, which guesses endpoint capabilities
+basing on it's name, and introduce new better replacement. In result
+we have better way to describe types and directions supported by each
+endpoint.
+
+For example the old name-based method didn't allow to have endpoint
+supporing two types of transfers - there were only ability to support
+one or all endpoint types. The 'capabilities flags' feature supply
+precise, flexible and extendible mechanism of description of endpoint
+hardware limitations, which is desired for proper endpoint matching.
+
+Patch (38) removes chip-specific quirk from ep_matches() function.
+
+Patches (39-40) remove code modifying endpoint and descriptor structures
+from ep_matches() function and cleans it up to make it simpler and more
+readable.
+
+Patches (41-42) add 'match_ep' callback to usb_gadget_ops and make use
+of it in epautoconf. This callback allows UDC drivers to supply
+non-standard endpoint matching algorithms.
+
+Patches (43-44) add usb_gadget_ep_match_desc() function which makes the
+same thing as ep_matches(), but is located in udc-core where it's
+available for UDC drivers, which can use it as helper function in
+'match_ep' callback to avoid writing lots of repetitive code. Patch (44)
+replaces all calls of ep_matches() with usb_gadget_ep_match_desc() and
+removes the ep_matches() as a dead code.
+
+Patches (45-47) move chip-specific enpoint matching algorithms from
+generic code of usb_ep_autoconfig_ss() function to UDC controller drivers
+using 'match_ep' callback.
+
+Patch (48) makes final cleanup after whole operation.
+
+[1] https://lkml.org/lkml/2014/6/16/94
+[2] http://www.spinics.net/lists/linux-usb/msg99662.html
+
+Best regards,
+Robert Baldyga
+
+Changelog:
+
+v2:
+- remove PXA quirk from ep_matches() function without behaviour change
+  using ep capabilities flags
+- separate ep and desc configuration code from ep_match() function
+- add 'ep_match' to usb_gadget_ops and move chip-specific endpoint
+  matching algorithms from generic code to UDC controller drivers
+
+v1: https://lkml.org/lkml/2015/7/8/436
+
+Robert Baldyga (48):
+  usb: gadget: encapsulate endpoint claiming mechanism
+  usb: gadget: add endpoint capabilities flags
+  usb: gadget: add endpoint capabilities helper macros
+  staging: emxx_udc: add ep capabilities support
+  usb: chipidea: udc: add ep capabilities support
+  usb: dwc2: gadget: add ep capabilities support
+  usb: dwc3: gadget: add ep capabilities support
+  usb: gadget: amd5536udc: add ep capabilities support
+  usb: gadget: at91_udc: add ep capabilities support
+  usb: gadget: bcm63xx_udc: add ep capabilities support
+  usb: gadget: bdc: add ep capabilities support
+  usb: gadget: dummy-hcd: add ep capabilities support
+  usb: gadget: fotg210-udc: add ep capabilities support
+  usb: gadget: fsl_qe_udc: add ep capabilities support
+  usb: gadget: fsl_udc_core: add ep capabilities support
+  usb: gadget: fusb300_udc: add ep capabilities support
+  usb: gadget: goku_udc: add ep capabilities support
+  usb: gadget: gr_udc: add ep capabilities support
+  usb: gadget: lpc32xx_udc: add ep capabilities support
+  usb: gadget: m66592-udc: add ep capabilities support
+  usb: gadget: mv_u3d_core: add ep capabilities support
+  usb: gadget: mv_udc_core: add ep capabilities support
+  usb: gadget: net2272: add ep capabilities support
+  usb: gadget: net2280: add ep capabilities support
+  usb: gadget: omap_udc: add ep capabilities support
+  usb: gadget: pch_ud: add ep capabilities support
+  usb: gadget: pxa25x_udc: add ep capabilities support
+  usb: gadget: pxa27x_udc: add ep capabilities support
+  usb: gadget: r8a66597-udc: add ep capabilities support
+  usb: gadget: s3c-hsudc: add ep capabilities support
+  usb: gadget: s3c2410_udc: add ep capabilities support
+  usb: gadget: udc-xilinx: add ep capabilities support
+  usb: isp1760: udc: add ep capabilities support
+  usb: musb: gadget: add ep capabilities support
+  usb: renesas: gadget: add ep capabilities support
+  usb: gadget: atmel_usba_udc: add ep capabilities support
+  usb: gadget: epautoconf: add endpoint capabilities flags verification
+  usb: gadget: epautoconf: remove pxa quirk from ep_matches()
+  usb: gadget: epautoconf: remove ep and desc configuration from
+    ep_matches()
+  usb: gadget: epautoconf: rework ep_matches() function
+  usb: gadget: add 'ep_match' callback to usb_gadget_ops
+  usb: gadget: epautoconf: use 'ep_match' gadget callback
+  usb: gadget: udc: add usb_gadget_ep_match_desc() function
+  usb: gadget: epautoconf: remove ep_matches() function
+  usb: gadget: net2280: add net2280_match_ep() function
+  usb: gadget: goku_udc: add goku_match_ep() function
+  usb: musb: gadget: add musb_match_ep() function
+  usb: gadget: epautoconf: cleanup dead code
+
+ drivers/staging/emxx_udc/emxx_udc.c     |  60 ++++---
+ drivers/usb/chipidea/udc.c              |  14 ++
+ drivers/usb/dwc2/gadget.c               |  13 ++
+ drivers/usb/dwc3/gadget.c               |  13 ++
+ drivers/usb/gadget/epautoconf.c         | 282 +++++---------------------------
+ drivers/usb/gadget/udc/amd5536udc.c     |  57 +++++--
+ drivers/usb/gadget/udc/at91_udc.c       |  33 +++-
+ drivers/usb/gadget/udc/atmel_usba_udc.c |  11 ++
+ drivers/usb/gadget/udc/bcm63xx_udc.c    |  25 ++-
+ drivers/usb/gadget/udc/bdc/bdc_ep.c     |   9 +
+ drivers/usb/gadget/udc/dummy_hcd.c      |  65 ++++++--
+ drivers/usb/gadget/udc/fotg210-udc.c    |  11 ++
+ drivers/usb/gadget/udc/fsl_qe_udc.c     |  11 ++
+ drivers/usb/gadget/udc/fsl_udc_core.c   |  13 ++
+ drivers/usb/gadget/udc/fusb300_udc.c    |  11 ++
+ drivers/usb/gadget/udc/goku_udc.c       |  33 ++++
+ drivers/usb/gadget/udc/gr_udc.c         |  11 ++
+ drivers/usb/gadget/udc/lpc32xx_udc.c    |  32 ++++
+ drivers/usb/gadget/udc/m66592-udc.c     |  11 ++
+ drivers/usb/gadget/udc/mv_u3d_core.c    |   9 +
+ drivers/usb/gadget/udc/mv_udc_core.c    |   9 +
+ drivers/usb/gadget/udc/net2272.c        |  11 ++
+ drivers/usb/gadget/udc/net2280.c        |  94 +++++++++--
+ drivers/usb/gadget/udc/omap_udc.c       |  22 +++
+ drivers/usb/gadget/udc/pch_udc.c        |  14 +-
+ drivers/usb/gadget/udc/pxa25x_udc.c     |  29 ++++
+ drivers/usb/gadget/udc/pxa27x_udc.h     |  33 ++--
+ drivers/usb/gadget/udc/r8a66597-udc.c   |  10 ++
+ drivers/usb/gadget/udc/s3c-hsudc.c      |  15 ++
+ drivers/usb/gadget/udc/s3c2410_udc.c    |  10 ++
+ drivers/usb/gadget/udc/udc-core.c       |  69 ++++++++
+ drivers/usb/gadget/udc/udc-xilinx.c     |   9 +
+ drivers/usb/isp1760/isp1760-udc.c       |  11 ++
+ drivers/usb/musb/musb_gadget.c          |  56 +++++++
+ drivers/usb/renesas_usbhs/mod_gadget.c  |   6 +
+ include/linux/usb/gadget.h              |  53 ++++++
+ 36 files changed, 838 insertions(+), 337 deletions(-)
+
 -- 
 1.9.1
