@@ -1,56 +1,56 @@
 From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 14 Jul 2015 13:18:26 +0800
-Subject: [PATCH v3 0/5] Add SMP bringup support for mt65xx socs
-Message-ID: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+Date: Tue, 14 Jul 2015 13:18:30 +0800
+Subject: [PATCH v3 4/5] ARM: dts: mt8135: enable basic SMP bringup for mt8135
+In-Reply-To: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+References: <1436851111-2369-1-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <1436851111-2369-5-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series add SMP brinup support for MediaTek SoCs. This is based
-on v4.2-rc1 and Matthias' next branch (for dts parts).
+Add arch timer node to enable arch-timer support. MT8135 firmware
+doesn't correctly setup arch-timer frequency and CNTVOFF, add
+properties to workaround this.
 
-There are similar but different SMP bringup up methods on MediaTek
-mt65xx and mt81xx. On MT8135 & MT8127, system boots with a trustzone
-firmware. Others, like MT6589, doesn't have trustzone, and run kernel
-directly in secure world.
+This also set cpu enable-method to enable SMP.
 
-Patch 1 enable arch timer support.
-Patch 2,3 add support for cpu enable-method "mediatek,mt6589-smp" and
-"mediatek,mt81xx-tz-smp", which support Mediatek SMP bringup for non-TZ
-and TZ platform.
-Patch 4,5 finally enable SMP bringup for mt8135 and mt8127.
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
+ arch/arm/boot/dts/mt8135.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Changes in v3:
-- The first 2 patches in v2 are merged in v4.2-rc1.
-- Patch 3~4 in v2 are moved to another series [1]
-- platsmp.c changes based on Stephen's suggestion
-- Change cpu enable-method name to "mediatek,mt6589-smp"
-
-Changes in v2:
-- Fix boot issue for THUMB2 kernel.
-- Not enable GPT_CLK_EVT when setup to fix GPT spurious interrupt issue
-- Change platsmp.c according to Matthias' suggestion
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000714.html
-
-v1:
-http://lists.infradead.org/pipermail/linux-mediatek/2015-May/000528.html
-
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001544.html
-
-Matthias Brugger (1):
-  ARM: mediatek: enable gpt6 on boot up to make arch timer working
-
-Yingjoe Chen (4):
-  devicetree: bindings: add new SMP enable method Mediatek SoC
-  ARM: mediatek: add smp bringup code
-  ARM: dts: mt8135: enable basic SMP bringup for mt8135
-  ARM: dts: mt8127: enable basic SMP bringup for mt8127
-
- Documentation/devicetree/bindings/arm/cpus.txt |   2 +
- arch/arm/boot/dts/mt8127.dtsi                  |  16 +++
- arch/arm/boot/dts/mt8135.dtsi                  |  16 +++
- arch/arm/mach-mediatek/Makefile                |   3 +
- arch/arm/mach-mediatek/mediatek.c              |  27 +++++
- arch/arm/mach-mediatek/platsmp.c               | 144 +++++++++++++++++++++++++
- 6 files changed, 208 insertions(+)
- create mode 100644 arch/arm/mach-mediatek/platsmp.c
+diff --git a/arch/arm/boot/dts/mt8135.dtsi b/arch/arm/boot/dts/mt8135.dtsi
+index 0aba9eb..0264d2e 100644
+--- a/arch/arm/boot/dts/mt8135.dtsi
++++ b/arch/arm/boot/dts/mt8135.dtsi
+@@ -44,6 +44,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "mediatek,mt81xx-tz-smp";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -96,6 +97,21 @@
+ 
+ 	};
+ 
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) |
++					  IRQ_TYPE_LEVEL_LOW)>;
++		clock-frequency = <13000000>;
++		arm,cpu-registers-not-fw-configured;
++	};
++
+ 	soc {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
+-- 
+1.8.1.1.dirty
