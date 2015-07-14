@@ -1,21 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 14 Jul 2015 13:17:44 -0300
-Subject: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0,
- eTSEC1 and eTSEC2
-In-Reply-To: <BY2PR03MB409415EF1E3F398DBF096E49C9B0@BY2PR03MB409.namprd03.prod.outlook.com>
-References: <20150713133138.GO23464@tiger>
- <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
- <CAOMZO5A2ftfUhioXpSnbGMxiV-fTePgHqk6zj2ysHe2wUY7JFg@mail.gmail.com>
- <BY2PR03MB409415EF1E3F398DBF096E49C9B0@BY2PR03MB409.namprd03.prod.outlook.com>
-Message-ID: <CAOMZO5D8VrZePgdQiwanA34nTMK9dxDBmhzHVmYHFZLnhRZZQw@mail.gmail.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 14 Jul 2015 09:26:00 -0700
+Subject: mx6: suspicious RCU usage
+In-Reply-To: <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
+References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
+ <20150714160006.GI3717@linux.vnet.ibm.com>
+ <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
+Message-ID: <20150714162600.GJ3717@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 1:13 PM, Manoil Claudiu
-<claudiu.manoil@freescale.com> wrote:
+On Tue, Jul 14, 2015 at 01:06:32PM -0300, Fabio Estevam wrote:
+> Hi Paul,
+> 
+> On Tue, Jul 14, 2015 at 1:00 PM, Paul E. McKenney
+> <paulmck@linux.vnet.ibm.com> wrote:
+> 
+> > Does this patch help?
+> >
+> >         https://lkml.org/lkml/2015/5/12/885
+> 
+> I am using an ARM 32-bit machine, so I used this one instead:
+> https://lkml.org/lkml/2015/5/12/892
+> 
+> , and it fixes the problem. Thanks!
+> 
+> Feel free to add:
+> 
+> Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
 
->> You should also put his Signed-off-by tag just before yours.
->
-> Is this a rule invented by you?  Last time I checked this was a
+Glad it helped!
 
-No, just usual practice.
+Russell, did you want me to push this, or would you rather take it?
+
+							Thanx, Paul
