@@ -1,71 +1,53 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Tue, 14 Jul 2015 09:57:51 +0000
-Subject: [PATCH] arm: ls1021a: utilize hrtimer based broadcast mode
-In-Reply-To: <20150710150009.GD6564@leverpostej>
-References: <1436521145-21055-1-git-send-email-b18965@freescale.com>
- <20150710150009.GD6564@leverpostej>
-Message-ID: <BN3PR0301MB08675D5F0043133F62B33B0FFE9B0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 14 Jul 2015 15:25:26 +0530
+Subject: [PATCH-v2 0/2] mfd: 88pm800: Add 88pm860 device support
+Message-ID: <1436867728-30370-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark,
+88PM860 falls under 88pm800 family of devices, with some feature
+additions, for example, support for dual phase on BUCK1.
 
-> On Fri, Jul 10, 2015 at 10:39:05AM +0100, Alison Wang wrote:
-> > Hrtimer based broadcast mode is used instead of periodic tick
-> > broadcast to provide high resolution clock in SMP.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> > ---
-> >  arch/arm/mach-imx/mach-ls1021a.c | 11 +++++++++++
-> >  1 file changed, 11 insertions(+)
-> >
-> > diff --git a/arch/arm/mach-imx/mach-ls1021a.c
-> > b/arch/arm/mach-imx/mach-ls1021a.c
-> > index b89c858..1a1a115 100644
-> > --- a/arch/arm/mach-imx/mach-ls1021a.c
-> > +++ b/arch/arm/mach-imx/mach-ls1021a.c
-> > @@ -8,9 +8,19 @@
-> >   */
-> >
-> >  #include <asm/mach/arch.h>
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/clockchips.h>
-> > +#include <linux/clocksource.h>
-> >
-> >  #include "common.h"
-> >
-> > +static void __init ls1021a_init_time(void) {
-> > +	of_clk_init(NULL);
-> > +	clocksource_of_init();
-> > +	tick_setup_hrtimer_broadcast();
-> > +}
-> 
-> It would be nicer to place this in the arch time_init() function, as
-> already happens for arm64 and powerpc. That way everyone can benefit.
-[Alison Wang] Yes, I think so.
-Thanks.
-> 
-> Thanks,
-> Mark.
-> 
-> > +
-> >  static const char * const ls1021a_dt_compat[] __initconst = {
-> >  	"fsl,ls1021a",
-> >  	NULL,
-> > @@ -18,5 +28,6 @@ static const char * const ls1021a_dt_compat[]
-> > __initconst = {
-> >
-> >  DT_MACHINE_START(LS1021A, "Freescale LS1021A")
-> >  	.smp		= smp_ops(ls1021a_smp_ops),
-> > +	.init_time	= ls1021a_init_time,
-> >  	.dt_compat	= ls1021a_dt_compat,
-> >  MACHINE_END
-> > --
-> > 2.1.0.27.g96db324
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+This patch series, enabled chip ID support for 88pm860 in the driver
+and adds Init time configuration support based on chip ID
+
+V1 => V2
+========
+ - Dropped PATCH [03/06 to 06/06]
+    PATCH [03 & 04]: New clock provider driver is under development for
+    32KHz clock output enable/disable
+
+    PATCH [05 & 06]: Moved to regulator driver and will be part of regulator
+    changes patch-series, as dual-phase configuration belongs to regulator.
+
+ - Added Acked-by of "Krzysztof Kozlowski"
+
+ - Added comment into the code for missing init configuration for
+   88pm800 & 88pm805 device.
+
+TODO:
+ - Some of init time configurations are common to both 88pm800 and 88pm860
+   devices, but since I can not validate it, decided to move it to
+   88pm860 block only.
+   But if someone is willing to help me in validation, we can move it to
+   common code later. No issues there.
+ - Sleep/low-power-mode related configuration is also part of init time,
+   but since we are too far from sleep mode support and without testing
+   I do not want add anything, decided to take it later when we actually
+   start looking at sleep support.
+ - Init time configuration also includes pinmux setting for the device.
+   I am working on using pinctrl-single driver to have standard and generic
+   interface, hopefully it will get handled through pinctrl subsystem.
+     Link to RFC - https://patches.linaro.org/50604/
+
+Vaibhav Hiremath (2):
+  mfd: 88pm80x: Add 88pm860 chip type support
+  mfd: 88pm800: Add init time initial configuration support
+
+ drivers/mfd/88pm800.c       | 71 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/88pm80x.c       |  2 ++
+ include/linux/mfd/88pm80x.h | 14 +++++++++
+ 3 files changed, 87 insertions(+)
+
+-- 
+1.9.1
