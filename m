@@ -1,32 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 14 Jul 2015 11:21:17 +0200
-Subject: [PATCH 0/4] ARM: digicolor: misc updates for 4.3
-In-Reply-To: <cover.1436182214.git.baruch@tkos.co.il>
-References: <cover.1436182214.git.baruch@tkos.co.il>
-Message-ID: <20150714092117.GE20686@localhost>
+Date: Tue, 14 Jul 2015 11:22:07 +0200
+Subject: [PATCH v2 0/3] ARM: add UART and EHCI support for UniPhier DTS
+ and enable them.
+In-Reply-To: <1436504040-16375-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1436504040-16375-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150714092207.GF20686@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 02:41:42PM +0300, Baruch Siach wrote:
-> This series contains the following updates for Conexant Digicolor machines:
+On Fri, Jul 10, 2015 at 01:53:57PM +0900, Masahiro Yamada wrote:
+> The basic support for UniPhier SoC family (arch/arm/mach-uniphier)
+> was mainlined at Linux 4.2-rc1.
+> I am now tackling some drivers to support them in the mainline.
 > 
->    * Enable the watchdog driver that was added during the 4.2 merge window, 
->      both in .dtsi and in multi_v7_defconfig
+> I've got UART and EHCI done, so I'd like to enable them from
+> the ARM-SOC subsystem.
 > 
->    * Use the standard stdout-path property in the chosen node to configure the 
->      console
 > 
->    * Make .dts/.dtsi files to the Digicolor MAINTAINERS entry
+> Changes in v2:
+>   - Add chip-specific compatible strings "socionext,uniphier-ehci"
 > 
-> Based on v4.2-rc1.
-> 
-> Baruch Siach (4):
->   ARM: digicolor: enable watchdog device
->   ARM: multi_v7_defconfig: enable Conexant Digicolor watchdog
->   ARM: digicolor: dts: use stdout-path for console configuration
->   MAINTAINERS: digicolor: add dts files
 
-Thanks, I applied the two DT patches to next/dt, the defconfig change to next/defconfig.
+Applied 1-3 to next/dt and next/defconfig. Thanks!
 
 
 -Olof
