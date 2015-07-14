@@ -1,38 +1,23 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 14 Jul 2015 13:41:29 +0900
-Subject: [PATCH] serial: samsung: Remove redundant DEBUG_LL check
-In-Reply-To: <55A46C4F.8050803@samsung.com>
-References: <1436786331-5188-1-git-send-email-javier@osg.samsung.com>
- <55A46C4F.8050803@samsung.com>
-Message-ID: <069e01d0bdef$59a73c70$0cf5b550$@kernel.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jul 2015 21:49:45 -0700
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+In-Reply-To: <CAGo_u6oM2rtdvLp3deDsxJJWpJ6YZJ5b02m1qDdxhEjUH_69dg@mail.gmail.com>
+References: <1436820101-2172-1-git-send-email-balbi@ti.com>
+ <CAGo_u6oM2rtdvLp3deDsxJJWpJ6YZJ5b02m1qDdxhEjUH_69dg@mail.gmail.com>
+Message-ID: <20150714044944.GA11198@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
-> 
-> On 13.07.2015 20:18, Javier Martinez Canillas wrote:
-> > Commit 84f57d9e3685 ("tty: serial/samsung: fix modular build") fixed
-> > build issues when the driver was built as a module. One of those was
-> > that printascii is only accessible when the driver is built-in.
-> >
-> > But there is no need to check for defined(CONFIG_DEBUG_LL) since the
-> > SERIAL_SAMSUNG_DEBUG Kconfig symbol already depends on DEBUG_LL.
-> >
-> > Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+* Nishanth Menon <nm@ti.com> [150713 13:56]:
+> On Mon, Jul 13, 2015 at 3:41 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+> > the realtime counter sits in the Wakeup Always-On Power domain.
+> > Furthermore, the counter will automatically switch the 32K clock source
+> > when MPU goes into standby and automatically switch back to SYS_CLK or
+> > ABE_LP when MPU goes out of standby.
 
-Acked-by: Kukjin Kim <kgene@kernel.org>
+That's good to hear. Is that the case also for 5432?
 
-Thanks,
-Kukjin
+Regards,
 
-> >
-> > ---
-> >
-> >  drivers/tty/serial/samsung.c | 1 -
-> >  1 file changed, 1 deletion(-)
-> 
-> Although this redundancy is not harmful the patch seems fine, so:
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Best regards,
-> Krzysztof
+Tony
