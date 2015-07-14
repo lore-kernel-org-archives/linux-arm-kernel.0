@@ -1,16 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 15:15:42 +0800
-Subject: [PATCH][v2] ARM: ls1021a: dtsi: Add crypto node alias in device
- tree
-In-Reply-To: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
-References: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
-Message-ID: <20150714071542.GG4119@tiger>
+Date: Tue, 14 Jul 2015 15:16:20 +0800
+Subject: [PATCH v4 0/7] add basic support for i.mx6 ul chip
+In-Reply-To: <1436465387-5992-1-git-send-email-Frank.Li@freescale.com>
+References: <1436465387-5992-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <20150714071620.GH4119@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 09:43:15AM +0530, Ruchika Gupta wrote:
-> U-boot patches up the device tree crypto node for the era property.
+On Fri, Jul 10, 2015 at 02:09:40AM +0800, Frank.Li at freescale.com wrote:
+> Anson Huang (1):
+>   ARM: imx: add low-level debug support for i.mx6ul
 > 
-> Signed-off-by: Ruchika Gupta <ruchika.gupta@freescale.com>
+> Frank Li (6):
+>   ARM: imx: add i.mx6ul msl support
+>   ARM: imx: add imx6ul clk tree support
+>   Document: dt: binding: imx: update document for imx6ul support
+>   ARM: dts: add i.mx6ul pin function include file
+>   ARM: dts: imx: add imx6ul and imx6ul evk board support
+>   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
 
-Applied, thanks.
+Applied all, thanks.
