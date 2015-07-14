@@ -1,236 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Jul 2015 14:32:05 -0700
-Subject: [PATCH v7 5/9] Documentation: nvmem: add nvmem api level and
- how-to doc
-In-Reply-To: <1436521521-10889-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1436521427-10568-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1436521521-10889-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20150714213205.GO30412@codeaurora.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 14 Jul 2015 23:32:51 +0200
+Subject: [PATCH] ARM: pxa: Use setup_timer
+In-Reply-To: <20150611052734.GA3943@vaishali-Ideapad-Z570> (Vaishali Thakkar's
+ message of "Thu, 11 Jun 2015 10:57:35 +0530")
+References: <20150611052734.GA3943@vaishali-Ideapad-Z570>
+Message-ID: <87lheijugs.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10, Srinivas Kandagatla wrote:
-> diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-> new file mode 100644
-> index 0000000..b074b71
-> --- /dev/null
-> +++ b/Documentation/nvmem/nvmem.txt
-> @@ -0,0 +1,152 @@
-> +			    NVMEM SUBSYSTEM
-> +	  Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> +
-> +This document explains the Simple NVMEM Framework along with the APIs provided,
+Vaishali Thakkar <vthakkar1994@gmail.com> writes:
 
-Why is simple and framework capitalized? Is it the "Simple NVMEM
-Framework" or just the "NVMEM" framework?
+> Use the timer API function setup_timer instead of structure field
+> assignments to initialize a timer.
+>
+> A simplified version of the Coccinelle semantic patch that performs
+> this transformation is as follows:
+>
+> @change@
+> expression e1, e2, a;
+> @@
+>
+> -init_timer(&e1);
+> +setup_timer(&e1, a, 0UL);
+> ... when != a = e2
+> -e1.function = a;
+>
+> Signed-off-by: Vaishali Thakkar <vthakkar1994@gmail.com>
+Looks good to me.
+I'll queue that in pxa/for-next, thanks.
 
-> +and how-to-use.
-
-how to use it?
-
-> +
-> +1. Introduction
-> +===============
-> +*NVMEM* is the abbreviation for Non Volatile Memory layer. It is used to
-> +retrieve configuration or SOC or Device specific data from a non volatile memories
-                          ^                                   ^
-                          of                                  remove a?
-
-> +like eeprom, efuses and so on.
-> +
-> +Up until now, NVMEM drivers like eeprom were stored in drivers/misc, where they
-
-Up until now will soon be out of date, perhaps say "before this
-framework existed"?
-
-> +all had to duplicate pretty much the same code to register a sysfs file, allow
-> +in-kernel users to access the content of the devices they were driving, etc.
-> +
-> +This was also a problem as far as other in-kernel users were involved, since
-> +the solutions used were pretty much different from on driver to another, there
-                                                       ^
-                                                       one
-
-> +was a rather big abstraction leak.
-> +
-> +Introduction of this framework aims at solving this. It also introduces DT
-
-This framework aims to solve these problems.
-
-> +representation for consumer devices to go get the data they require (MAC
-> +Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
-> +This framework is based on regmap, so that most of the abstraction
-> +available in regmap can be reused, across multiple types of buses.
-> +
-> +NVMEM Providers
-> ++++++++++++++++
-> +
-> +NVMEM provider refers to an entity that implements methods to initialize, read
-> +and write the non-volatile memory.
-> +
-> +2. Registering/Unregistering the NVMEM provider
-> +===============================================
-> +
-> +A NVMEM provider can register with NVMEM core by suppling relevant
-                                                     ^
-                                                    supplying
-
-> +nvmem configuration to nvmem_register(), on success core would return a valid
-> +nvmem_device pointer.
-> +
-> +nvmem_unregister(nvmem) is used to unregister the already registered provider.
-
-unregister a previously registered provider?
-
-> +
-> +For example for simple qfprom case:
-
-For example, a simple qfprom case:
-
-> +
-> +static struct nvmem_config econfig = {
-> +	.name = "qfprom",
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static int qfprom_probe(struct platform_device *pdev)
-> +{
-> +	...
-> +	econfig.dev = &pdev->dev;
-> +	nvmem = nvmem_register(&econfig);
-> +	...
-> +}
-> +
-> +It is mandatory that the NVMEM provider has a regmap associated with its
-> +struct device.
-
-How do I ensure that?
-
-> +
-> +NVMEM Consumers
-> ++++++++++++++++
-> +
-> +NVMEM consumers are the entities which make use of the NVMEM provider to
-> +read/write into NVMEM.
-
-read from and write to NVMEM?
-
-> +
-> +3. NVMEM cell based consumer APIs.
-> +=================================
-> +
-> +NVMEM cells are the data entries/fields in the NVMEM.
-> +The NVMEM framework provides 3 APIs to read/write NVMEM cells.
-> +
-> +struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
-> +struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *name);
-> +
-> +void nvmem_cell_put(struct nvmem_cell *cell);
-> +void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
-> +
-> +void *nvmem_cell_read(struct nvmem_cell *cell, ssize_t *len);
-> +int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len);
-> +
-> +*nvmem_cell_get() apis will get a reference to nvmem cell for a given id,
-> +and nvmem_cell_read/write() can then directly read or write to the cell.
-
-Drop "directly"?
-
-> +Once the usage of the cell is finished the consumer should call *nvmem_cell_put()
-> +to free all the allocation memory for the cell.
-> +
-> +4. Direct NVMEM device based consumer APIs.
-                                             ^
-                                             Drop the full stop?
-
-> +==========================================
-> +
-> +In some instances it is necessary to directly read/write the NVMEM.
-> +To facilitate such consumers NVMEM framework provides below apis.
-> +
-> +struct nvmem_device *nvmem_device_get(struct device *dev, const char *name);
-> +struct nvmem_device *devm_nvmem_device_get(struct device *dev,
-> +					   const char *name);
-> +void nvmem_device_put(struct nvmem_device *nvmem);
-> +int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
-> +		      size_t bytes, void *buf);
-> +int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
-> +		       size_t bytes, void *buf);
-> +int nvmem_device_cell_read(struct nvmem_device *nvmem,
-> +			   struct nvmem_cell_info *info, void *buf);
-> +int nvmem_device_cell_write(struct nvmem_device *nvmem,
-> +			    struct nvmem_cell_info *info, void *buf);
-> +
-> +Before the consumers can read/write NVMEM directly, it should get hold
-                                                                    ^
-                                                                    a
-> +of nvmem_controller from one of the *nvmem_device_get() api.
-> +
-> +Difference between these apis and cell based apis is that these apis
-   ^
-   The
-
-> +always take nvmem_device as parameter.
-> +
-> +5. Releasing a reference to the NVMEM
-> +=====================================
-> +
-> +When the consumers no longer needs the NVMEM, it has to release the reference
-
-When a consumer no longer needs?
-
-> +to the NVMEM it has obtained using the APIs mentioned in the above section.
-> +NVMEM framework provides 2 APIs to release a reference to the NVMEM.
-   ^
-   The
-
-> +
-> +void nvmem_cell_put(struct nvmem_cell *cell);
-> +void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
-> +void nvmem_device_put(struct nvmem_device *nvmem);
-> +void devm_nvmem_device_put(struct device *dev, struct nvmem_device *nvmem);
-> +
-> +Both these APIs are used to release a reference to the NVMEM and
-> +devm_nvmem_cell_put and devm_nvmem_device_put destroys the devres associated
-> +with this NVMEM.
-
-       s/this/the/
-
-> +
-> +Userspace
-> ++++++++++
-> +
-> +6. Userspace binary interface.
-                                ^
-                                Drop the full stop?
-
-> +==============================
-> +
-> +Userspace can read/write the raw NVMEM file located at
-> +/sys/bus/nvmem/devices/*/nvmem
-> +
-> +ex:
-> +
-> +hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
-> +
-> +0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> +*
-> +00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-> +0000000 0000 0000 0000 0000 0000 0000 0000 0000
-> +...
-> +*
-> +0001000
-> +
-> +7. DeviceTree Binding
-> +=====================
-> +
-> +The documentation for NVMEM dt binding can be found @
-> +Documentation/devicetree/bindings/nvmem/nvmem.txt
-
-How about?
-
-See Documentation/devicetree/bindings/nvmem/nvmem.txt
+Cheers.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Robert
