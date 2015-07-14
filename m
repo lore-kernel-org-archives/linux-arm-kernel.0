@@ -1,40 +1,51 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 14 Jul 2015 10:49:46 -0300
-Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_IKCONFIG_PROC
-Message-ID: <1436881786-9886-1-git-send-email-fabio.estevam@freescale.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Tue, 14 Jul 2015 19:23:21 +0530
+Subject: [PATCH v3 0/2] Implement sample time consideration for Vybrid's ADC
+Message-ID: <cover.1436880513.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is useful to know how the kernel was configured via:
-zcat /proc/config.gz ,so select the CONFIG_IKCONFIG_PROC option.
+Hello,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+This patchset adds a dt binding for specifying sample time
+for the vybrid adc driver and takes this into account for
+sampling frequency calculation and related configuration in
+the driver.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e1ba3e2..a4ebc95 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -3,6 +3,8 @@ CONFIG_SYSVIPC=y
- CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_IKCONFIG=y
-+CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=18
- CONFIG_CGROUPS=y
- CONFIG_RELAY=y
-@@ -76,8 +78,8 @@ CONFIG_CAN=y
- CONFIG_CAN_FLEXCAN=y
- CONFIG_BT=y
- CONFIG_BT_HCIUART=y
--CONFIG_BT_HCIUART_LL=y
- CONFIG_BT_HCIUART_H4=y
-+CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=y
- CONFIG_MAC80211=y
- CONFIG_RFKILL=y
+The patchset is based on top of Stefan's patches here
+http://lkml.iu.edu/hypermail/linux/kernel/1505.3/02043.html
+
+which got recently applied.
+
+Changes since v2:
+
+- Use a default value of 1000ns for sample time in the driver
+  if the property is not specified in the device tree.
+- Specify the min-sample-time property in the board device tree
+  file instead of the top level vfxxx.dtsi file for Vybrid
+
+Changes since v1:
+
+Change from a vendor specific fsl,min-sample-time to non vendor
+specific min-sample-time.
+
+Version 2 of the patchset can be found here
+https://lkml.org/lkml/2015/6/24/97
+
+Version 1 of the patchset can be found here
+http://lkml.iu.edu/hypermail/linux/kernel/1506.1/00026.html
+
+- Sanchayan.
+
+Sanchayan Maity (2):
+  iio: adc: vf610: Determine sampling frequencies by using minimum
+    sample time
+  ARM: dts: vf-colibri: Add property for minimum sample time
+
+ .../devicetree/bindings/iio/adc/vf610-adc.txt      |  5 ++
+ arch/arm/boot/dts/vf-colibri.dtsi                  |  2 +
+ drivers/iio/adc/vf610_adc.c                        | 79 ++++++++++++++++++++--
+ 3 files changed, 82 insertions(+), 4 deletions(-)
+
 -- 
-1.9.1
+2.4.5
