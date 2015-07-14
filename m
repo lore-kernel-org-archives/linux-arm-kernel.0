@@ -1,90 +1,230 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 13 Jul 2015 18:39:12 -0700
-Subject: [PATCH 1/4] PCI: iproc: enable arm64 support for iProc PCIe
+Date: Mon, 13 Jul 2015 18:39:15 -0700
+Subject: [PATCH 4/4] arm64: dts: Add Broadcom North Star 2 support
 In-Reply-To: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
 References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1436837955-26279-2-git-send-email-rjui@broadcom.com>
+Message-ID: <1436837955-26279-5-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables arm64 support to iProc PCIe driver by wrapping
-ARM 32-bit specific PCI APIs with CONFIG_ARM
+Add Broadcom NS2 device tree binding document. Also add initial device
+tree dtsi for Broadcom North Star 2 (NS2) SoC and board support for NS2
+SVK board
 
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/pci/host/pcie-iproc.c |   12 ++++++++++++
- drivers/pci/host/pcie-iproc.h |    2 ++
- 2 files changed, 14 insertions(+)
+ Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
+ arch/arm64/boot/dts/Makefile                      |    1 +
+ arch/arm64/boot/dts/broadcom/Makefile             |    5 ++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   55 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi             |   95 +++++++++++++++++++++
+ 5 files changed, 165 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index d77481e..a76b4df 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -58,10 +58,12 @@
- #define SYS_RC_INTX_EN               0x330
- #define SYS_RC_INTX_MASK             0xf
- 
-+#ifdef CONFIG_ARM
- static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
- {
- 	return sys->private_data;
- }
-+#endif
- 
- /**
-  * Note access to the configuration registers are protected at the higher layer
-@@ -71,8 +73,12 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
- 					    unsigned int devfn,
- 					    int where)
- {
-+#ifdef CONFIG_ARM
- 	struct pci_sys_data *sys = bus->sysdata;
- 	struct iproc_pcie *pcie = sys_to_pcie(sys);
-+#else
-+	struct iproc_pcie *pcie = bus->sysdata;
-+#endif
- 	unsigned slot = PCI_SLOT(devfn);
- 	unsigned fn = PCI_FUNC(devfn);
- 	unsigned busno = bus->number;
-@@ -208,10 +214,14 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 
- 	iproc_pcie_reset(pcie);
- 
-+#ifdef CONFIG_ARM
- 	pcie->sysdata.private_data = pcie;
- 
- 	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
- 				  &pcie->sysdata, res);
-+#else
-+	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, pcie, res);
-+#endif
- 	if (!bus) {
- 		dev_err(pcie->dev, "unable to create PCI root bus\n");
- 		ret = -ENOMEM;
-@@ -229,7 +239,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
- 
- 	pci_scan_child_bus(bus);
- 	pci_assign_unassigned_bus_resources(bus);
-+#ifdef CONFIG_ARM
- 	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
-+#endif
- 	pci_bus_add_devices(bus);
- 
- 	return 0;
-diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-index ba0a108..12aaac4 100644
---- a/drivers/pci/host/pcie-iproc.h
-+++ b/drivers/pci/host/pcie-iproc.h
-@@ -29,7 +29,9 @@
- struct iproc_pcie {
- 	struct device *dev;
- 	void __iomem *base;
-+#ifdef CONFIG_ARM
- 	struct pci_sys_data sysdata;
-+#endif
- 	struct pci_bus *root_bus;
- 	struct phy *phy;
- 	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
+diff --git a/Documentation/devicetree/bindings/arm/bcm/ns2.txt b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
+new file mode 100644
+index 0000000..35f056f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
+@@ -0,0 +1,9 @@
++Broadcom North Star 2 (NS2) device tree bindings
++------------------------------------------------
++
++Boards with NS2 shall have the following properties:
++
++Required root node property:
++
++NS2 SVK board
++compatible = "brcm,ns2-svk", "brcm,ns2";
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 38913be..9f95941 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,6 +1,7 @@
+ dts-dirs += amd
+ dts-dirs += apm
+ dts-dirs += arm
++dts-dirs += broadcom
+ dts-dirs += cavium
+ dts-dirs += exynos
+ dts-dirs += freescale
+diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
+new file mode 100644
+index 0000000..9fda762
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_BCM_NS2) += ns2-svk.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+new file mode 100644
+index 0000000..08a7816
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -0,0 +1,55 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/dts-v1/;
++
++#include "ns2.dtsi"
++
++/ {
++	model = "Broadcom NS2 SVK";
++	compatible = "brcm,ns2-svk", "brcm,ns2";
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x66130000";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x000000000 0x80000000 0x00000000 0x40000000>;
++	};
++
++	soc: soc {
++		uart3: serial at 66130000 {
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+new file mode 100644
+index 0000000..9d34fe4
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -0,0 +1,95 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/memreserve/ 0x84b00000 0x00000008;
++
++/ {
++	compatible = "brcm,ns2";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0 0>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0x84b00000>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>;
++		clock-frequency = <25000000>;
++	};
++
++	soc: soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0xffffffff>;
++
++		gic: interrupt-controller at 65210000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x65210000 0x1000>,
++			      <0x65220000 0x1000>,
++			      <0x65240000 0x2000>,
++			      <0x65260000 0x1000>;
++		};
++
++		uart3: serial at 66130000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x66130000 0x100>;
++			interrupts = <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clock-frequency = <23961600>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 1.7.9.5
