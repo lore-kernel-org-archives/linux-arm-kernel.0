@@ -1,64 +1,42 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 13 Jul 2015 18:39:14 -0700
-Subject: [PATCH 3/4] arm64: Add Broadcom's North Star 2 support
-In-Reply-To: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
-References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1436837955-26279-4-git-send-email-rjui@broadcom.com>
+Date: Mon, 13 Jul 2015 18:39:11 -0700
+Subject: [PATCH 0/4] Add Broadcom North Star 2 support
+Message-ID: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to Broadcom's North Star 2 SoC in the arm64
-Kconfig and defconfig files
+This patch series adds Broadcom North Star 2 (NS2) SoC support. NS2 is an ARMv8
+based SoC and under the Broadcom iProc family.
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- arch/arm64/Kconfig           |   12 ++++++++++++
- arch/arm64/configs/defconfig |    2 ++
- 2 files changed, 14 insertions(+)
+Sorry for tying this with the Broadcom iProc PCIe driver fixes for ARM64. I
+have to tie them together because iProc PCIe support is enabled by default
+when ARCH_BCM_IPROC is enabled. Without the fixes in the iProc PCIe driver,
+enabling CONFIG_ARCH_BCM_IPROC would break the build for arm64 defconfig. Let
+me know if there's a better way to handle this.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 318175f..6c5c279 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -162,6 +162,18 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_BCM_IPROC
-+	bool
-+	help
-+	  This enables support for Broadcom iProc based SoCs
-+
-+config ARCH_BCM_NS2
-+	bool "Broadcom North Start 2 (BCM5871X)"
-+	select ARCH_BCM_IPROC
-+	help
-+	  This enables support for Broadcom NS2 (BCM5871X). NS2 is in
-+	  the iProc family of SoCs based on the ARMv8 architecture
-+
- config ARCH_EXYNOS
- 	bool
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4e17e7e..3138700 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_BCM_NS2=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
-@@ -102,6 +103,7 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+This patch series is generated based on v4.2-rc2 and tested on Broadcom NS2 SVK
+
+Ray Jui (4):
+  PCI: iproc: enable arm64 support for iProc PCIe
+  PCI: iproc: Fix ARM64 dependency in Kconfig
+  arm64: Add Broadcom's North Star 2 support
+  arm64: dts: Add Broadcom North Star 2 support
+
+ Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
+ arch/arm64/Kconfig                                |   12 +++
+ arch/arm64/boot/dts/Makefile                      |    1 +
+ arch/arm64/boot/dts/broadcom/Makefile             |    5 ++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   55 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi             |   95 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                      |    2 +
+ drivers/pci/host/Kconfig                          |    2 +-
+ drivers/pci/host/pcie-iproc.c                     |   12 +++
+ drivers/pci/host/pcie-iproc.h                     |    2 +
+ 10 files changed, 194 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
+
 -- 
 1.7.9.5
