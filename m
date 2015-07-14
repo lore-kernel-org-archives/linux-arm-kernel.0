@@ -1,36 +1,28 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 14 Jul 2015 12:26:24 -0700
-Subject: mx6: suspicious RCU usage
-In-Reply-To: <CAOMZO5C1+qQyFqfrfWatsY_yjO952gk1o9qmJJgMmjDEAix21g@mail.gmail.com>
-References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
- <20150714160006.GI3717@linux.vnet.ibm.com>
- <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
- <20150714162600.GJ3717@linux.vnet.ibm.com>
- <CAOMZO5AcegpqyDtsyawbSCDZcFnpHjq7uxRQJxBiFjzMH0hyDA@mail.gmail.com>
- <CAOMZO5C1+qQyFqfrfWatsY_yjO952gk1o9qmJJgMmjDEAix21g@mail.gmail.com>
-Message-ID: <20150714192624.GO3717@linux.vnet.ibm.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Tue, 14 Jul 2015 14:45:23 -0500
+Subject: [PATCH 0/4] spi: davinci: Improve prescaler limit support
+Message-ID: <1436903127-6777-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 01:59:10PM -0300, Fabio Estevam wrote:
-> On Tue, Jul 14, 2015 at 1:44 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> 
-> > With your patch applied I am running several suspend/resume cycles and
-> > I am seeing different problems now from time to time (like 1 out 10
-> > times). The kernel dump does not look like the same every time, but
-> > here is one example:
-> 
-> Here is another one I just got, and it seems to be more informative:
-> 
-> http://pastebin.com/T4YxuLCg
+Currently the prescale limit is treated as a one size fits all value even
+though their are differences depending on the SOC. This patchset insures
+that the proper prescale limit is used for each platform/SOC.
 
-This might simply be a symptom of the earlier "Unable to handle
-kernel paging request at virtual address 708ebbfa".  However, the
-usual cause of the later "rcu_read_lock() used illegally while idle!"
-is just that.  In this case, might the interrupt have occurred
-without irq_enter() being invoked?
+Franklin S Cooper Jr (4):
+  spi: davinci: Set prescale value based on register value
+  spi: davinci: Choose correct pre-scaler limit based on SOC
+  ARM: davinci: Set proper SPI prescale limit value
+  ARM: dts: keystone: Add ti,keystone-spi for SPI
 
-(But there are probably two interleaved stack traces, and I am not
-certain that I am getting them untangled properly.)
+ .../devicetree/bindings/spi/spi-davinci.txt        |  2 +
+ arch/arm/boot/dts/keystone.dtsi                    |  6 +--
+ arch/arm/mach-davinci/devices-da8xx.c              |  2 +
+ arch/arm/mach-davinci/dm355.c                      |  1 +
+ arch/arm/mach-davinci/dm365.c                      |  1 +
+ drivers/spi/spi-davinci.c                          | 50 +++++++++++++++++-----
+ include/linux/platform_data/spi-davinci.h          |  1 +
+ 7 files changed, 50 insertions(+), 13 deletions(-)
 
-							Thanx, Paul
+-- 
+1.9.1
