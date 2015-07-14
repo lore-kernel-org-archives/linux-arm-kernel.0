@@ -1,9 +1,9 @@
 From: manabian@gmail.com (Joachim Eastwood)
-Date: Tue, 14 Jul 2015 15:39:42 +0200
-Subject: [PATCH 07/17] ARM: dts: lpc18xx: add mmcsd node
+Date: Tue, 14 Jul 2015 15:39:44 +0200
+Subject: [PATCH 09/17] ARM: dts: lpc18xx: add ethernet node
 In-Reply-To: <1436881192-23930-1-git-send-email-manabian@gmail.com>
 References: <1436881192-23930-1-git-send-email-manabian@gmail.com>
-Message-ID: <1436881192-23930-8-git-send-email-manabian@gmail.com>
+Message-ID: <1436881192-23930-10-git-send-email-manabian@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,25 +13,25 @@ Signed-off-by: Joachim Eastwood <manabian@gmail.com>
  1 file changed, 10 insertions(+)
 
 diff --git a/arch/arm/boot/dts/lpc18xx.dtsi b/arch/arm/boot/dts/lpc18xx.dtsi
-index 813ed93d6570..0562f9629b9d 100644
+index 563435aaee57..be154749bf56 100644
 --- a/arch/arm/boot/dts/lpc18xx.dtsi
 +++ b/arch/arm/boot/dts/lpc18xx.dtsi
-@@ -68,6 +68,16 @@
- 	};
+@@ -78,6 +78,16 @@
+ 			status = "disabled";
+ 		};
  
- 	soc {
-+		mmcsd: mmcsd at 40004000 {
-+			compatible = "snps,dw-mshc";
-+			reg = <0x40004000 0x1000>;
-+			interrupts = <6>;
-+			num-slots = <1>;
-+			clocks = <&ccu2 CLK_SDIO>, <&ccu1 CLK_CPU_SDIO>;
-+			clock-names = "ciu", "biu";
++		mac: ethernet at 40010000 {
++			compatible = "nxp,lpc1850-dwmac", "snps,dwmac-3.611", "snps,dwmac";
++			reg = <0x40010000 0x2000>;
++			interrupts = <5>;
++			interrupt-names	= "macirq";
++			clocks = <&ccu1 CLK_CPU_ETHERNET>;
++			clock-names = "stmmaceth";
 +			status = "disabled";
 +		};
 +
- 		cgu: clock-controller at 40050000 {
- 			compatible = "nxp,lpc1850-cgu";
- 			reg = <0x40050000 0x1000>;
+ 		creg: syscon at 40043000 {
+ 			compatible = "nxp,lpc1850-creg", "syscon", "simple-mfd";
+ 			reg = <0x40043000 0x1000>;
 -- 
 1.8.0
