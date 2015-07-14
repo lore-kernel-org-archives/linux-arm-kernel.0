@@ -1,75 +1,180 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Jul 2015 14:09:22 +0100
-Subject: [PATCH 3/3] arm64, mm: Use IPIs for TLB invalidation.
-In-Reply-To: <20150714114029.GG16213@arm.com>
-References: <1436646323-10527-1-git-send-email-ddaney.cavm@gmail.com>
- <1436646323-10527-4-git-send-email-ddaney.cavm@gmail.com>
- <20150713181755.GP2632@arm.com>
- <55A40A50.8080902@caviumnetworks.com>
- <20150714111342.GD13555@e104818-lin.cambridge.arm.com>
- <20150714114029.GG16213@arm.com>
-Message-ID: <20150714130922.GE13555@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 14 Jul 2015 14:18:10 +0100
+Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
+In-Reply-To: <20150714194038.47ccf2e5@xhacker>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-4-git-send-email-sudeep.holla@arm.com>	<20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>	<20150714175011.31c3d714@xhacker>	<55A4EC37.7030900@arm.com>
+ <20150714194038.47ccf2e5@xhacker>
+Message-ID: <55A50C12.60901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 12:40:30PM +0100, Will Deacon wrote:
-> On Tue, Jul 14, 2015 at 12:13:42PM +0100, Catalin Marinas wrote:
-> > BTW, if we do the TLBI deferring to the ASID roll-over event, your
-> > flush_context() patch to use local TLBI would no longer work. It is
-> > called from __new_context() when allocating a new ASID, so it needs to
-> > be broadcast to all the CPUs.
-> 
-> What we can do instead is:
-> 
->  - Keep track of the CPUs on which an mm has been active
 
-We already do this in switch_mm().
 
->  - Do a local TLBI if only the current CPU is in the list
+On 14/07/15 12:40, Jisheng Zhang wrote:
+> Dear Sudeep,
+>
+> On Tue, 14 Jul 2015 12:02:15 +0100
+> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>>
+>>
+>> On 14/07/15 10:50, Jisheng Zhang wrote:
+>>> Dear Sudeep,
+>>>
+>>> On Tue, 14 Jul 2015 10:14:25 +0100
+>>> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>>
+>>>>
+>>>> On 14/07/15 07:17, Jisheng Zhang wrote:
+>>>>> Hi Sudeep,
+>>>>>
+>>>>> I'm sorry to being late. Just have some comments below.
+>>>>>
+>>>>> On Thu, 18 Jun 2015 15:41:34 +0100
+>>>>> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>>>
+>>>>>> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
+>>>>>> provides the mechanism by which the calling OS can request entry into
+>>>>>> the deepest possible system sleep state.
+>>>>>>
+>>>>>> It meets all the necessary preconditions for entering suspend to RAM
+>>>>>> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
+>>>>>> firmware and registers a psci system suspend operation to implement the
+>>>>>> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
+>>>>>> PSCI.
+>>>>>>
+>>>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>>>> ---
+>>>>>>     drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
+>>>>>>     include/uapi/linux/psci.h |  3 +++
+>>>>>>     2 files changed, 34 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>>>>>> index 752ca7c9eb97..f2b2b3e1c6e4 100644
+>>>>>> --- a/drivers/firmware/psci.c
+>>>>>> +++ b/drivers/firmware/psci.c
+>>>>>> @@ -20,11 +20,13 @@
+>>>>>>     #include <linux/printk.h>
+>>>>>>     #include <linux/psci.h>
+>>>>>>     #include <linux/reboot.h>
+>>>>>> +#include <linux/suspend.h>
+>>>>>>
+>>>>>>     #include <uapi/linux/psci.h>
+>>>>>>
+>>>>>>     #include <asm/system_misc.h>
+>>>>>>     #include <asm/smp_plat.h>
+>>>>>> +#include <asm/suspend.h>
+>>>>>>
+>>>>>>     /*
+>>>>>>      * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+>>>>>> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
+>>>>>>     			      psci_func_id, 0, 0);
+>>>>>>     }
+>>>>>>
+>>>>>> +static int psci_system_suspend(unsigned long unused)
+>>>>>> +{
+>>>>>> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+>>>>>> +			      virt_to_phys(cpu_resume), 0, 0);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static int psci_system_suspend_enter(suspend_state_t state)
+>>>>>> +{
+>>>>>> +	return cpu_suspend(0, psci_system_suspend);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static const struct platform_suspend_ops psci_suspend_ops = {
+>>>>>> +	.valid          = suspend_valid_only_mem,
+>>>>>> +	.enter          = psci_system_suspend_enter,
+>>>>>> +};
+>>>>>> +
+>>>>>> +static void __init psci_init_system_suspend(void)
+>>>>>> +{
+>>>>>> +	if (!IS_ENABLED(CONFIG_SUSPEND))
+>>>>>> +		return;
+>>>>>> +
+>>>>>> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
+>>>>>> +		return;
+>>>>>
+>>>>> So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
+>>>>> until PSCI 1.0,
+>>>>
+>>>> Correct, if you need System to RAM in Linux on a platform with PSCI
+>>>> firmware, firmware *must implement* SYSTEM_SUSPEND.
+>>>>
+>>>>> and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
+>>>>
+>>>> Optional here means, that you may chose to implement or not in the
+>>>> firmware. It doesn't mean we can implement S2R in Linux using other
+>>>> PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
+>>>> in the kernel.
+>>>>
+>>>>> we also want
+>>>>> suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
+>>>>
+>>>> Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
+>>>> feature in Linux. Is it just because we can manage with workarounds ?
+>>>> Sorry, that's not an option.
+>>>
+>>> The problem is the PSCI 1.0 SYSTEM_SUSPEND definition: we can't pass something
+>>> like stateid as in CPU_SUSPEND to firmware. The stateid is used to tell
+>>> firmware to go to different Sleep state, for example S2 or S3.
+>>>
+>>
+>> Can you elaborate on S2 here with an example ? You are using ACPI
+>> Sleep State definitions here which should not be mixed with PSCI.
+>
+> Yes, it's ACPI concept. Here "S2" can be the "S2" mentioned in PSCI 1.0 spec.
+>
+> PSCI 1.0 SPEC says:
+>
+> "While ACPI distinguishes between two system level suspend to RAM states,
+> S2 and S3, PSCI provides a single API. In practice, operating systems use
+> only one suspend to RAM state, so this is not seen as a limitation. Note
+> that this specification is using the state definitions of S2 and S3 provided
+> by ACPI, but does not limit use of this PSCI function to ACPI based systems.
+> Semantics such as those described for sleep states S2 and S3 are used in
+> non-ACPI based systems."
+>
 
-This would be beneficial independent of the following two items. I think
-it's worth doing.
+OK, though similar semantics may be used else where, we need to define
+the state similar to the way ACPI does it for x86 systems.
 
->  - Move to the same ASID allocation algorithm as arch/arm/
+> Here is an example:
+>
+> S3 is the state where All devices are suspended and power down,  memory is
+> placed in self-refresh mode. Usually this is the suspend to ram state.
+>
 
-This is useful to avoid the IPI on roll-over. With 16-bit ASIDs, I don't
-think this is too urgent but, well, the benchmarks may say otherwise.
+Agreed.
 
->  - Change the ASID re-use policy so that we only mark an ASID as free
->    if we succeeded in performing a local TLBI, postponing anything else
->    until rollover
-> 
-> That should handle the fork() + exec() case nicely, I reckon. I tried
-> something similar in the past for arch/arm/, but it didn't make a difference
-> on any of the platforms I have access to (where TLBI traffic was cheap).
-> 
-> It would *really* help if I had some Thunder-X hardware...
+> S2 is the state where devices except cpus are suspended and put in a
+> low-power state(not power off), if the deivce doesn't support lower power mode,
+> the device is left on. memory is placed in self-refresh mode. secondary CPUs
+> are powered off via. PSCI_CPU_OFF, boot cpu is put into WFI state and runs at
+> low freq.
+>
 
-I agree. With only 8 CPUs, we don't notice any difference with the above
-optimisations.
+Is this a standard state or custom tailored for some power optimization
+on particular system ? Anyway I am not sure if I quite understand the
+exact definition of this state. When and how often do you use this
+use this state ?
 
-> > That the munmap case usually. In our tests, we haven't seen large
-> > ranges, mostly 1-2 4KB pages (especially with kernbench when median file
-> > size fits in 4KB). Maybe the new batching code for x86 could help ARM as
-> > well if we implement it. We would still issue TLBIs but it allows us to
-> > issue a single DSB at the end.
-> 
-> Again, I looked at this in the past but it turns out that the DSB ISHST
-> needed to publish PTEs tends to sync TLBIs on most cores (even though
-> it's not an architectural requirement), so postponing the full DSB to
-> the end didn't help on existing microarchitectures.
+Have you looked at PM_SUSPEND_FREEZE state implemented in Linux ?
+For me this S2 you explained sounds similar to PM_SUSPEND_FREEZE state.
+In short, PM_SUSPEND_FREEZE = all the processes are frozen + all the
+devices are suspended + all the processors enter deepest idle state
+possible.
 
-We could postpone all the TLBI, including the first DSB ISHST. But I
-need to look in detail at the recent TLBI batching patches for x86, they
-do it to reduce IPIs but we could similarly use them to reduce the total
-sync time after broadcast (i.e. DSB for pte, lots of TLBIs, DSB for TLBI
-sync).
+Though I don't understand why you need to power-off secondary cpus
+and stay in WFI on boot cpu as that would have increased latency
+defeating the purpose of S2 state. Also why you are mixing DVFS here ?
+PSCI deals with just low power states and has nothing to do with DVFS.
 
-> Finally, it might be worth dusting off the leaf-only TLBI stuff you
-> looked at in the past. It doesn't reduce the message traffic, but I can't
-> see it making things worse.
+Further IMO we can also achieve a low power state almost close to
+PM_SUSPEND_FREEZE having run-time PM for all the devices and cpuidle.
 
-I didn't see a difference but I'll post them to the list.
-
--- 
-Catalin
+Regards,
+Sudeep
