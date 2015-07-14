@@ -1,28 +1,56 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 14 Jul 2015 14:45:23 -0500
-Subject: [PATCH 0/4] spi: davinci: Improve prescaler limit support
-Message-ID: <1436903127-6777-1-git-send-email-fcooper@ti.com>
+Date: Tue, 14 Jul 2015 14:45:24 -0500
+Subject: [PATCH 1/4] spi: davinci: Set prescale value based on register value
+In-Reply-To: <1436903127-6777-1-git-send-email-fcooper@ti.com>
+References: <1436903127-6777-1-git-send-email-fcooper@ti.com>
+Message-ID: <1436903127-6777-2-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the prescale limit is treated as a one size fits all value even
-though their are differences depending on the SOC. This patchset insures
-that the proper prescale limit is used for each platform/SOC.
+Within davinci_spi_get_prescale() the prescale has two meanings. First one
+being the calculated prescale value and then at the end translates it to the
+prescale value that will be written to the SPI register.
 
-Franklin S Cooper Jr (4):
-  spi: davinci: Set prescale value based on register value
-  spi: davinci: Choose correct pre-scaler limit based on SOC
-  ARM: davinci: Set proper SPI prescale limit value
-  ARM: dts: keystone: Add ti,keystone-spi for SPI
+At first glance this can be confusing especially when comparing the minimum
+prescale value against what is seen in the TRM.
 
- .../devicetree/bindings/spi/spi-davinci.txt        |  2 +
- arch/arm/boot/dts/keystone.dtsi                    |  6 +--
- arch/arm/mach-davinci/devices-da8xx.c              |  2 +
- arch/arm/mach-davinci/dm355.c                      |  1 +
- arch/arm/mach-davinci/dm365.c                      |  1 +
- drivers/spi/spi-davinci.c                          | 50 +++++++++++++++++-----
- include/linux/platform_data/spi-davinci.h          |  1 +
- 7 files changed, 50 insertions(+), 13 deletions(-)
+To simplify things make it clear that the calculated prescale value will always
+be based on the value that will be written into the SPI register.
 
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ drivers/spi/spi-davinci.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
+index 987afeb..b4605c4 100644
+--- a/drivers/spi/spi-davinci.c
++++ b/drivers/spi/spi-davinci.c
+@@ -255,7 +255,7 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
+  * This function calculates the prescale value that generates a clock rate
+  * less than or equal to the specified maximum.
+  *
+- * Returns: calculated prescale - 1 for easy programming into SPI registers
++ * Returns: calculated prescale value for easy programming into SPI registers
+  * or negative error number if valid prescalar cannot be updated.
+  */
+ static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
+@@ -263,12 +263,13 @@ static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
+ {
+ 	int ret;
+ 
+-	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz);
++	/* Subtract 1 to match what will be programmed into SPI register. */
++	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz) - 1;
+ 
+-	if (ret < 1 || ret > 256)
++	if (ret < 0 || ret > 255)
+ 		return -EINVAL;
+ 
+-	return ret - 1;
++	return ret;
+ }
+ 
+ /**
 -- 
 1.9.1
