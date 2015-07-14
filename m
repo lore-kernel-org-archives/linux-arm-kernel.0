@@ -1,33 +1,43 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 13 Jul 2015 18:39:13 -0700
-Subject: [PATCH 2/4] PCI: iproc: Fix ARM64 dependency in Kconfig
-In-Reply-To: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
-References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1436837955-26279-3-git-send-email-rjui@broadcom.com>
+From: hidehiro.kawai.ez@hitachi.com (Hidehiro Kawai)
+Date: Tue, 14 Jul 2015 10:56:13 +0900
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <20150713202611.GA16525@fifo99.com>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org> <20150713202611.GA16525@fifo99.com>
+Message-ID: <55A46C3D.7000208@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allow Broadcom iProc PCIe core driver to be compiled for ARM64
+Hello Eric and Daniel,
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Vikram Prakash <vikramp@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- drivers/pci/host/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+(2015/07/14 5:26), dwalker at fifo99.com wrote:
+> On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+>> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+>>
+>>> You can call panic notifiers and kmsg dumpers before kdump by
+>>> specifying "crash_kexec_post_notifiers" as a boot parameter.
+>>> However, it doesn't make sense if kdump is not available.  In that
+>>> case, disable "crash_kexec_post_notifiers" boot parameter so that
+>>> you can't change the value of the parameter.
+>>
+>> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+>>
+>> You are confusing kexec on panic and CONFIG_CRASH_DUMP
+>> which is about the tools for reading the state of the previous kernel.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index c132bdd..d2c6144 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -117,7 +117,7 @@ config PCI_VERSATILE
- 
- config PCIE_IPROC
- 	tristate "Broadcom iProc PCIe controller"
--	depends on OF && ARM
-+	depends on OF && (ARM || ARM64)
- 	default n
- 	help
- 	  This enables the iProc PCIe core controller support for Broadcom's
+You are right.  I mistook the meaning of CONFIG_CRASH_DUMP.
+
+> I think it would make sense if he just replaced "kdump" with "kexec".
+
+If a user specified crash_kexec_post_notifiers option with kexec
+being totally disabled, it just disables notifier and kmsg dumper calls
+(please see PATCH 3/3). So as Daniel said, I also think it makes sense
+to hide crash_kexec_post_notifiers option if kexec is disabled.
+
+Regards,
+
 -- 
-1.7.9.5
+Hidehiro Kawai
+Hitachi, Ltd. Research & Development Group
