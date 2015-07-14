@@ -1,51 +1,32 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:38:59 +0200
-Subject: [PATCH v2 11/48] usb: gadget: bdc: add ep capabilities support
-In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-12-git-send-email-r.baldyga@samsung.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 14 Jul 2015 18:41:39 +0900
+Subject: [GIT PULL] ARM: EXYNOS: dts: Fixes for 4.2
+In-Reply-To: <CAJKOXPd6OtiqwJYVGnC+Y3HYowTv86x6mt_txKnM-tsWWKrPeg@mail.gmail.com>
+References: <1436790601-9598-1-git-send-email-k.kozlowski@samsung.com>
+ <076601d0be0e$c4998780$4dcc9680$@kernel.org>
+ <CAJKOXPd6OtiqwJYVGnC+Y3HYowTv86x6mt_txKnM-tsWWKrPeg@mail.gmail.com>
+Message-ID: <07db01d0be19$48f9e1a0$daeda4e0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+Krzysztof Kozlowski wrote:
+> 
+> 2015-07-14 17:26 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
+> > Krzysztof Kozlowski wrote:
+> >>
+> >> Dear Kukjin,
+> >>
+> > Hi,
+> >
+> > Thanks for your pull-request and I'll sort them out for 4.2-rc soon.
+> >
+> > BTW, the Thomas' patch is enough to support exynos4210 cpufreq without other
+> > patches in the series? I didn't think so...
+> 
+> All other patches were already applied by Mike and sent to Linus
+> during 4.2 merge window.
+> 
+Sounds good. OK, I'll handle this series in this -rc round.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/udc/bdc/bdc_ep.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/usb/gadget/udc/bdc/bdc_ep.c b/drivers/usb/gadget/udc/bdc/bdc_ep.c
-index b04980c..f9a8f57 100644
---- a/drivers/usb/gadget/udc/bdc/bdc_ep.c
-+++ b/drivers/usb/gadget/udc/bdc/bdc_ep.c
-@@ -1952,12 +1952,18 @@ static int init_ep(struct bdc *bdc, u32 epnum, u32 dir)
- 	ep->bdc = bdc;
- 	ep->dir = dir;
- 
-+	if (dir)
-+		ep->usb_ep.caps.dir_in = true;
-+	else
-+		ep->usb_ep.caps.dir_out = true;
-+
- 	/* ep->ep_num is the index inside bdc_ep */
- 	if (epnum == 1) {
- 		ep->ep_num = 1;
- 		bdc->bdc_ep_array[ep->ep_num] = ep;
- 		snprintf(ep->name, sizeof(ep->name), "ep%d", epnum - 1);
- 		usb_ep_set_maxpacket_limit(&ep->usb_ep, EP0_MAX_PKT_SIZE);
-+		ep->usb_ep.caps.type_control = true;
- 		ep->comp_desc = NULL;
- 		bdc->gadget.ep0 = &ep->usb_ep;
- 	} else {
-@@ -1971,6 +1977,9 @@ static int init_ep(struct bdc *bdc, u32 epnum, u32 dir)
- 			 dir & 1 ? "in" : "out");
- 
- 		usb_ep_set_maxpacket_limit(&ep->usb_ep, 1024);
-+		ep->usb_ep.caps.type_iso = true;
-+		ep->usb_ep.caps.type_bulk = true;
-+		ep->usb_ep.caps.type_int = true;
- 		ep->usb_ep.max_streams = 0;
- 		list_add_tail(&ep->usb_ep.ep_list, &bdc->gadget.ep_list);
- 	}
--- 
-1.9.1
+Thanks,
+Kukjin
