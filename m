@@ -1,186 +1,78 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 14 Jul 2015 19:40:38 +0800
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <55A4EC37.7030900@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
- <20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>
- <20150714175011.31c3d714@xhacker>	<55A4EC37.7030900@arm.com>
-Message-ID: <20150714194038.47ccf2e5@xhacker>
+From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
+Date: Tue, 14 Jul 2015 13:48:25 +0200
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <55A4952A.3090309@wwwdotorg.org>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
+ <55A09710.3030509@wwwdotorg.org> <55A135B4.1060309@tronnes.org>
+ <55A4952A.3090309@wwwdotorg.org>
+Message-ID: <55A4F709.1000501@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sudeep,
+Den 14.07.2015 06:50, skrev Stephen Warren:
+> On 07/11/2015 09:26 AM, Noralf Tr?nnes wrote:
+>> Den 11.07.2015 06:09, skrev Stephen Warren:
+>>> (Sorry for the slow reply; I was on vacation)
+>>>
+>>> On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
+>>>> Den 18.06.2015 04:26, skrev Stephen Warren:
+>>>>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
+>>>>>> Add a duplicate irq range with an offset on the hwirq's so the
+>>>>>> driver can detect that enable_fiq() is used.
+>>>>>> Tested with downstream dwc_otg USB controller driver.
+>>>>> This basically looks OK, but a few comments/thoughts:
+>>>>> b) Doesn't the driver need to refuse some operation (handler
+>>>>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
+>>>>> FIQ range, since the FIQ control register only allows routing 1 IRQ to
+>>>>> FIQ.
+>>>> claim_fiq() protects the FIQ. See d) answer below.
+>>> That assumes the IRQ is "accessed" via the fiq-specific APIs. Since this
+>>> patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
+>>> doesn't do anything special to prevent clients from using IRQs n..2n-1
+>>> via the existing IRQ APIs, it's quite possible the a buggy client would.
+>> Yes, but doesn't this apply to all irq use, using the wrong one doesn't
+>> work.
+>> If FIQ's where in more common use, we might have seen a FIQ IRQ flag
+>> instead
+>> of special FIQ irqs.
+>>
+>>> (From another email):
+>>>>>> c) The DT binding needs updating to describe the extra IRQs:
+>>>>>>
+>>>>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
+>>>>>>>
+>>>>> Ok.
+>>>> I have seconds thoughts on this:
+>>>> This patch does not change the DT bindings so I don't see what update
+>>>> I should make. This patch only adds support for the Linux way of
+>>>> handling FIQ's through enable_fiq(). It doesn't change how interrupts
+>>>> are described in the DT.
+>>> The intention of the patch may not be to expand the set of IRQs
+>>> available via DT, but it does in practice. I think you need to add a
+>>> custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
+>>> be translated from DT, and not IRQs n..2n-1. If you do that, then I
+>>> agree that no DT binding update should be required.
+>> armctrl_xlate() maps to the same hwirqs as before. This patch adds a
+>> new range of hwirqs at the end of the "real" hwirq range.
+>> It's not possible to get to these FIQ shadow hwirqs through DT.
+> What prevents a DT from (incorrectly) referencing the extra hwirqs?
 
-On Tue, 14 Jul 2015 12:02:15 +0100
-Sudeep Holla <sudeep.holla@arm.com> wrote:
+armctrl_xlate() has these limits:
 
-> 
-> 
-> On 14/07/15 10:50, Jisheng Zhang wrote:
-> > Dear Sudeep,
-> >
-> > On Tue, 14 Jul 2015 10:14:25 +0100
-> > Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >
-> >>
-> >>
-> >> On 14/07/15 07:17, Jisheng Zhang wrote:
-> >>> Hi Sudeep,
-> >>>
-> >>> I'm sorry to being late. Just have some comments below.
-> >>>
-> >>> On Thu, 18 Jun 2015 15:41:34 +0100
-> >>> Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>>
-> >>>> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
-> >>>> provides the mechanism by which the calling OS can request entry into
-> >>>> the deepest possible system sleep state.
-> >>>>
-> >>>> It meets all the necessary preconditions for entering suspend to RAM
-> >>>> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
-> >>>> firmware and registers a psci system suspend operation to implement the
-> >>>> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
-> >>>> PSCI.
-> >>>>
-> >>>> Cc: Mark Rutland <mark.rutland@arm.com>
-> >>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>>> ---
-> >>>>    drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
-> >>>>    include/uapi/linux/psci.h |  3 +++
-> >>>>    2 files changed, 34 insertions(+)
-> >>>>
-> >>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> >>>> index 752ca7c9eb97..f2b2b3e1c6e4 100644
-> >>>> --- a/drivers/firmware/psci.c
-> >>>> +++ b/drivers/firmware/psci.c
-> >>>> @@ -20,11 +20,13 @@
-> >>>>    #include <linux/printk.h>
-> >>>>    #include <linux/psci.h>
-> >>>>    #include <linux/reboot.h>
-> >>>> +#include <linux/suspend.h>
-> >>>>
-> >>>>    #include <uapi/linux/psci.h>
-> >>>>
-> >>>>    #include <asm/system_misc.h>
-> >>>>    #include <asm/smp_plat.h>
-> >>>> +#include <asm/suspend.h>
-> >>>>
-> >>>>    /*
-> >>>>     * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-> >>>> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
-> >>>>    			      psci_func_id, 0, 0);
-> >>>>    }
-> >>>>
-> >>>> +static int psci_system_suspend(unsigned long unused)
-> >>>> +{
-> >>>> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
-> >>>> +			      virt_to_phys(cpu_resume), 0, 0);
-> >>>> +}
-> >>>> +
-> >>>> +static int psci_system_suspend_enter(suspend_state_t state)
-> >>>> +{
-> >>>> +	return cpu_suspend(0, psci_system_suspend);
-> >>>> +}
-> >>>> +
-> >>>> +static const struct platform_suspend_ops psci_suspend_ops = {
-> >>>> +	.valid          = suspend_valid_only_mem,
-> >>>> +	.enter          = psci_system_suspend_enter,
-> >>>> +};
-> >>>> +
-> >>>> +static void __init psci_init_system_suspend(void)
-> >>>> +{
-> >>>> +	if (!IS_ENABLED(CONFIG_SUSPEND))
-> >>>> +		return;
-> >>>> +
-> >>>> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
-> >>>> +		return;
-> >>>
-> >>> So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
-> >>> until PSCI 1.0,
-> >>
-> >> Correct, if you need System to RAM in Linux on a platform with PSCI
-> >> firmware, firmware *must implement* SYSTEM_SUSPEND.
-> >>
-> >>> and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
-> >>
-> >> Optional here means, that you may chose to implement or not in the
-> >> firmware. It doesn't mean we can implement S2R in Linux using other
-> >> PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
-> >> in the kernel.
-> >>
-> >>> we also want
-> >>> suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
-> >>
-> >> Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
-> >> feature in Linux. Is it just because we can manage with workarounds ?
-> >> Sorry, that's not an option.
-> >
-> > The problem is the PSCI 1.0 SYSTEM_SUSPEND definition: we can't pass something
-> > like stateid as in CPU_SUSPEND to firmware. The stateid is used to tell
-> > firmware to go to different Sleep state, for example S2 or S3.
-> >
-> 
-> Can you elaborate on S2 here with an example ? You are using ACPI
-> Sleep State definitions here which should not be mixed with PSCI.
+if (WARN_ON(intspec[0] >= NR_BANKS))
+if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
+if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
 
-Yes, it's ACPI concept. Here "S2" can be the "S2" mentioned in PSCI 1.0 spec.
+Thus the maximum values allowed are:
+intspec[0]: (NR_BANKS - 1) = 2
+intspec[1]: (IRQS_PER_BANK - 1) = 31
 
-PSCI 1.0 SPEC says:
+This gives a maximum hwirq:
+*out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
+*out_hwirq = (2 << 5) | 31 = 95
 
-"While ACPI distinguishes between two system level suspend to RAM states,
-S2 and S3, PSCI provides a single API. In practice, operating systems use
-only one suspend to RAM state, so this is not seen as a limitation. Note
-that this specification is using the state definitions of S2 and S3 provided
-by ACPI, but does not limit use of this PSCI function to ACPI based systems.
-Semantics such as those described for sleep states S2 and S3 are used in
-non-ACPI based systems."
+The FIQ shadow hwirq range starts@96:
+irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i) + NUMBER_IRQS);
 
-Here is an example:
-
-S3 is the state where All devices are suspended and power down,  memory is
-placed in self-refresh mode. Usually this is the suspend to ram state.
-
-S2 is the state where devices except cpus are suspended and put in a
-low-power state(not power off), if the deivce doesn't support lower power mode,
-the device is left on. memory is placed in self-refresh mode. secondary CPUs
-are powered off via. PSCI_CPU_OFF, boot cpu is put into WFI state and runs at
-low freq.
-
-Thanks,
-Jisheng
-
-> 
-> *Let's refrain ourselves from using ACPI S-states here* until it's well
-> defined on ARM systems. The current definition is x86 based and doesn't
-> suit ARM at all.
-> 
-> It's difficult to distinguish between the intermediate system suspend
-> sleep states you are referring and the composite cpu idle states. That's
-> the reason I am asking for the example to see if the sleep states you
-> referring can be considered as composite cpu idle states.
-> I strongly believe that's the case.
-> 
-> I would consider any other states as composite CPU idle states. In
-> order to utilize Linux PM features, we would use PSCI functions as
-> below.
-> 
-> /-----------------------------------\
-> | PSCI Feature   | Linux PM feature |
-> |-----------------------------------|
-> | SYSTEM_SUSPEND |  Suspend-to-RAM  |
-> |-----------------------------------|
-> | SYSTEM_SHUTDOWN|  Suspend-to-Disk |
-> \-----------------------------------/
-> 
-> > With your RFC patch, it's easy to extend to support this feature, but if we
-> > are limited to SYSTEM_SUSPEND in PSCI 1.0, we have to use a different code
-> > path for non-S3 sleep state.
-> >
-> 
-> As I said above can you provide examples for such states.
-> 
-> Regards,
-> Sudeep
+NUMBER_IRQS = MAKE_HWIRQ(NR_BANKS, 0) = 96
