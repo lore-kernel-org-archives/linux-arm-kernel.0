@@ -1,76 +1,31 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 14 Jul 2015 19:33:04 +0200 (CEST)
-Subject: [PATCH] serial: mxs-auart: keep the AUART unit in reset state
- when not in use
-In-Reply-To: <1436884864-6782-1-git-send-email-jbe@pengutronix.de>
-References: <1436884864-6782-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <1463261573.74606.1436895184420.JavaMail.open-xchange@oxbsltgw03.schlund.de>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 14 Jul 2015 10:54:25 -0700
+Subject: [PATCH] arm64: Define HAVE_ARCH_PIO_SIZE and related symbols.
+In-Reply-To: <20150714170408.GS16213@arm.com>
+References: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150714110039.GC16213@arm.com> <55A53509.4060202@caviumnetworks.com>
+ <20150714162955.GR16213@arm.com> <55A53FAC.30103@caviumnetworks.com>
+ <20150714170408.GS16213@arm.com>
+Message-ID: <55A54CD1.1010509@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Juergen,
-
-> Juergen Borleis <jbe@pengutronix.de> hat am 14. Juli 2015 um 16:41
-> geschrieben:
+On 07/14/2015 10:04 AM, Will Deacon wrote:
+> Hi David,
 >
+> On Tue, Jul 14, 2015 at 05:58:20PM +0100, David Daney wrote:
+[...]
+> We only get this definition if CONFIG_GENERIC_IOMAP=y. Why is that
+> selected?
 >
-> [...]
-> ---
-> drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
-> 1 file changed, 30 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-> index 13cf773..f42b6ad 100644
-> --- a/drivers/tty/serial/mxs-auart.c
-> +++ b/drivers/tty/serial/mxs-auart.c
-> @@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
-> writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-> }
->
-> +static void mxs_auart_do_reset(struct uart_port *u)
 
-i think the naming of this new function is too similiar to mxs_auart_reset() and
-doesn't represent the exact behavior. How about mxs_auart_keep_reset() or
-mxs_auart_gate()?
+OK, Good question.
 
-> +{
-> + int i;
-> + u32 reg;
-> +
-> + reg = readl(u->membase + AUART_CTRL0);
-> + /* if already in reset state, keep it untouched */
-> + if (reg & AUART_CTRL0_SFTRST)
-> + return;
-> +
-> + writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-> + writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
-> +
-> + for (i = 0; i < 1000; i++) {
-> + reg = readl(u->membase + AUART_CTRL0);
-> + /* reset is finished when the clock is gated */
-> + if (reg & AUART_CTRL0_CLKGATE)
-> + return;
-> + udelay(10);
+The original patch was against 3.18, but  commit 09a5723983e (arm64: Use 
+include/asm-generic/io.h) changed some of this, so it may need 
+reconsideration.
 
-The delay in mxs_auart_reset() has a value of 3 microseconds. Why not the same
-here?
+Let me reevaluate this patch.
 
-> + }
-> +
-> + dev_err(u->dev, "Failed to reset the unit.");
-> +}
-> +
-> static int mxs_auart_startup(struct uart_port *u)
-> {
-> int ret;
-> @@ -867,7 +891,10 @@ static int mxs_auart_startup(struct uart_port *u)
-> if (ret)
-> return ret;
->
-> - writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-> + /* reset the unit if not aready done */
-
-Just a typo: already?
-
-Thanks
-Stefan
+Thanks,
+David Daney
