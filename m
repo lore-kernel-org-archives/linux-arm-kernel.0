@@ -1,175 +1,97 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Jul 2015 18:16:41 +0100
-Subject: [PATCH v3 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <d1a97aaee42f30370b58b3f7ed6a3559633010ad.1436552949.git.robin.murphy@arm.com>
-References: <cover.1436552949.git.robin.murphy@arm.com>
- <d1a97aaee42f30370b58b3f7ed6a3559633010ad.1436552949.git.robin.murphy@arm.com>
-Message-ID: <20150714171640.GJ13555@e104818-lin.cambridge.arm.com>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Tue, 14 Jul 2015 17:29:53 +0000
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <87a8uyoeig.fsf@x220.int.ebiederm.org>
+References: <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+ <87h9p7r0we.fsf@x220.int.ebiederm.org>
+ <20150714135919.GA18333@fifo99.com>
+ <20150714150208.GD10792@redhat.com>
+ <20150714153430.GA18766@fifo99.com>
+ <20150714154040.GA3912@redhat.com>
+ <20150714154833.GA18883@fifo99.com>
+ <20150714161612.GH10792@redhat.com>
+ <87a8uyoeig.fsf@x220.int.ebiederm.org>
+Message-ID: <20150714172953.GA19135@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 08:19:33PM +0100, Robin Murphy wrote:
-> +/*
-> + * IOVAs are IOMMU _input_ addresses, so there still exists the possibility
-> + * for static bus translation between device output and IOMMU input (yuck).
-> + */
-> +static inline dma_addr_t dev_dma_addr(struct device *dev, dma_addr_t addr)
-> +{
-> +	dma_addr_t offset = (dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT;
-> +
-> +	BUG_ON(addr < offset);
-> +	return addr - offset;
-> +}
+On Tue, Jul 14, 2015 at 12:06:15PM -0500, Eric W. Biederman wrote:
+> Vivek Goyal <vgoyal@redhat.com> writes:
+> 
+> > On Tue, Jul 14, 2015 at 03:48:33PM +0000, dwalker at fifo99.com wrote:
+> >> On Tue, Jul 14, 2015 at 11:40:40AM -0400, Vivek Goyal wrote:
+> >> > On Tue, Jul 14, 2015 at 03:34:30PM +0000, dwalker at fifo99.com wrote:
+> >> > > On Tue, Jul 14, 2015 at 11:02:08AM -0400, Vivek Goyal wrote:
+> >> > > > On Tue, Jul 14, 2015 at 01:59:19PM +0000, dwalker at fifo99.com wrote:
+> >> > > > > On Mon, Jul 13, 2015 at 08:19:45PM -0500, Eric W. Biederman wrote:
+> >> > > > > > dwalker at fifo99.com writes:
+> >> > > > > > 
+> >> > > > > > > On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+> >> > > > > > >> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+> >> > > > > > >> 
+> >> > > > > > >> > You can call panic notifiers and kmsg dumpers before kdump by
+> >> > > > > > >> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+> >> > > > > > >> > However, it doesn't make sense if kdump is not available.  In that
+> >> > > > > > >> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+> >> > > > > > >> > you can't change the value of the parameter.
+> >> > > > > > >> 
+> >> > > > > > >> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> >> > > > > > >
+> >> > > > > > > I think it would make sense if he just replaced "kdump" with "kexec".
+> >> > > > > > 
+> >> > > > > > It would be less insane, however it still makes no sense as without
+> >> > > > > > kexec on panic support crash_kexec is a noop.  So the value of the
+> >> > > > > > seeting makes no difference.
+> >> > > > > 
+> >> > > > > Can you explain more, I don't really understand what you mean. Are you suggesting
+> >> > > > > the whole "crash_kexec_post_notifiers" feature has no value ?
+> >> > > > 
+> >> > > > Daniel,
+> >> > > > 
+> >> > > > BTW, why are you using crash_kexec_post_notifiers commandline? Why not
+> >> > > > without it?
+> >> > > 
+> >> > > It was explained in the prior thread but to rehash, the notifiers are used to do a switch
+> >> > > over from the crashed machine to another redundant machine.
+> >> > 
+> >> > So why not detect failure using polling or issue notifications from second
+> >> > kernel.
+> >> > 
+> >> > IOW, expecting that a crashed machine will be able to deliver notification
+> >> > reliably is falwed to begin with, IMHO.
+> >> 
+> >> It's flawed to think you can kexec, but you still do it right ? I've not gotten into
+> >> the deep details of this switching process, but that's how this interface is used.
+> >
+> > Sure. But the deal here is that users of interface know that sometimes it
+> > can be unreliable. And in the absence of more reliable mechanism, somewhat
+> > less reliable mechanism is fine. 
+> >
+> >>  
+> >> > If a machine is failing, there are high chance it can't deliver you the
+> >> > notification. Detecting that failure suing some kind of polling mechanism
+> >> > might be more reliable. And it will make even kdump mechanism more
+> >> > reliable so that it does not have to run panic notifiers after the crash.
+> >> 
+> >> I think what your suggesting is that my company should change how it's hardware works
+> >> and that's not really an option for me. This isn't a simple thing like checking over the
+> >> network if the machine is down or not, this is way more complex hardware design.
+> >
+> > That means you are ready to live with an unreliable design. There might be
+> > cases where notifier does not get run properly and you will not do switch
+> > despite the fact that OS has failed. I was just trying to nudge you in
+> > a direction which could be more reliable mechanism.
+> 
+> Sigh I see some deep confusion going on here.
+> 
+> The panic notifiers are just that panic notifiers.  They have not been
+> nor should they be tied to kexec.   If those notifiers force a switch
+> over of between machines I fail to see why you would care if it was
+> kexec or another panic situation that is forcing that switchover.
 
-Are these just theoretical or you expect to see some at some point? I
-think the dma_limit in __alloc_iova() may also need to take the offset
-into account (or just ignore them altogether for now).
+Hidehiro isn't fixing the failover situation on my side, he's fixing register
+information collection when crash_kexec_post_notifiers is used.
 
-> +
-> +/**
-> + * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
-> + * @dir: Direction of DMA transfer
-> + * @coherent: Is the DMA master cache-coherent?
-> + *
-> + * Return: corresponding IOMMU API page protection flags
-> + */
-> +int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
-> +{
-> +	int prot = coherent ? IOMMU_CACHE : 0;
-> +
-> +	switch (dir) {
-> +	case DMA_BIDIRECTIONAL:
-> +		return prot | IOMMU_READ | IOMMU_WRITE;
-> +	case DMA_TO_DEVICE:
-> +		return prot | IOMMU_READ;
-> +	case DMA_FROM_DEVICE:
-> +		return prot | IOMMU_WRITE;
-> +	default:
-> +		return 0;
-> +	}
-> +}
-> +
-> +static struct iova *__alloc_iova(struct device *dev, size_t size, bool coherent)
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	unsigned long shift = iova_shift(iovad);
-> +	unsigned long length = iova_align(iovad, size) >> shift;
-> +	u64 dma_limit = coherent ? dev->coherent_dma_mask : dma_get_mask(dev);
-
-"coherent" and "coherent_dma_mask" have related meanings here. As I can
-see in patch 3, the coherent information passed all the way to this
-function states whether the device is cache coherent or not (and whether
-cache maintenance is needed). The coherent_dma_mask refers to an
-allocation mask for the dma_alloc_coherent() API but that doesn't
-necessarily mean that the device is cache coherent. Similarly, dma_mask
-is used for streaming DMA.
-
-You can rename it to coherent_api or simply pass a u64 dma_mask
-directly.
-
-[...]
-> +/**
-> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
-> + * @dev: Device to allocate memory for. Must be a real device
-> + *	 attached to an iommu_dma_domain
-> + * @size: Size of buffer in bytes
-> + * @gfp: Allocation flags
-> + * @prot: IOMMU mapping flags
-> + * @coherent: Which dma_mask to base IOVA allocation on
-> + * @handle: Out argument for allocated DMA handle
-> + * @flush_page: Arch callback to flush a single page from caches as
-> + *		necessary. May be NULL for coherent allocations
-> + *
-> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
-> + * but an IOMMU which supports smaller pages might not map the whole thing.
-> + * For now, the buffer is unconditionally zeroed for compatibility
-> + *
-> + * Return: Array of struct page pointers describing the buffer,
-> + *	   or NULL on failure.
-> + */
-> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
-> +		int prot, bool coherent, dma_addr_t *handle,
-> +		void (*flush_page)(const void *, phys_addr_t))
-
-So for this function, coherent should always be true since this is only
-used with the coherent DMA API AFAICT.
-
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	struct iova *iova;
-> +	struct page **pages;
-> +	struct sg_table sgt;
-> +	struct sg_mapping_iter miter;
-> +	dma_addr_t dma_addr;
-> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
-> +
-> +	*handle = DMA_ERROR_CODE;
-> +
-> +	pages = __iommu_dma_alloc_pages(count, gfp);
-> +	if (!pages)
-> +		return NULL;
-> +
-> +	iova = __alloc_iova(dev, size, coherent);
-
-And here just __alloc_iova(dev, size, true);
-
-[...]
-> +dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
-> +		unsigned long offset, size_t size, int prot, bool coherent)
-> +{
-> +	dma_addr_t dma_addr;
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	phys_addr_t phys = page_to_phys(page) + offset;
-> +	size_t iova_off = iova_offset(iovad, phys);
-> +	size_t len = iova_align(iovad, size + iova_off);
-> +	struct iova *iova = __alloc_iova(dev, len, coherent);
-
-Here __alloc_iova(dev, len, false);
-
-[...]
-> +/*
-> + * The DMA API client is passing in a scatterlist which could describe
-> + * any old buffer layout, but the IOMMU API requires everything to be
-> + * aligned to IOMMU pages. Hence the need for this complicated bit of
-> + * impedance-matching, to be able to hand off a suitably-aligned list,
-> + * but still preserve the original offsets and sizes for the caller.
-> + */
-> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
-> +		int nents, int prot, bool coherent)
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	struct iova *iova;
-> +	struct scatterlist *s;
-> +	dma_addr_t dma_addr;
-> +	size_t iova_len = 0;
-> +	int i;
-> +
-> +	/*
-> +	 * Work out how much IOVA space we need, and align the segments to
-> +	 * IOVA granules for the IOMMU driver to handle. With some clever
-> +	 * trickery we can modify the list in-place, but reversibly, by
-> +	 * hiding the original data in the as-yet-unused DMA fields.
-> +	 */
-> +	for_each_sg(sg, s, nents, i) {
-> +		size_t s_offset = iova_offset(iovad, s->offset);
-> +		size_t s_length = s->length;
-> +
-> +		sg_dma_address(s) = s->offset;
-> +		sg_dma_len(s) = s_length;
-> +		s->offset -= s_offset;
-> +		s_length = iova_align(iovad, s_length + s_offset);
-> +		s->length = s_length;
-> +
-> +		iova_len += s_length;
-> +	}
-> +
-> +	iova = __alloc_iova(dev, iova_len, coherent);
-
-__alloc_iova(dev, iova_len, false);
-
--- 
-Catalin
+Daniel
