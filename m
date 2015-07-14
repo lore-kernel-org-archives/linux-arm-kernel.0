@@ -1,44 +1,37 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 14 Jul 2015 14:04:32 +0300
-Subject: [PATCH v2 42/48] usb: gadget: epautoconf: use 'ep_match' gadget
- callback
-In-Reply-To: <1436866776-5004-43-git-send-email-r.baldyga@samsung.com>
-References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
- <1436866776-5004-43-git-send-email-r.baldyga@samsung.com>
-Message-ID: <55A4ECC0.4030205@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jul 2015 12:08:19 +0100
+Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
+ ->disable() and ->is_enabled methods
+In-Reply-To: <20150714130222.1bdfedc5@bbrezillon>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
+ <20150714105019.GR11162@sirena.org.uk>
+ <20150714130222.1bdfedc5@bbrezillon>
+Message-ID: <20150714110819.GU11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jul 14, 2015 at 01:02:22PM +0200, Boris Brezillon wrote:
+> Mark Brown <broonie@kernel.org> wrote:
 
-On 7/14/2015 12:39 PM, Robert Baldyga wrote:
+> > On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
+> > > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
+> > > the PWM call in ->set_voltage_sel().
 
-> If gadget has set 'ep_match' callback we prefer to call it first to allow
-> UDC driver to find the best matching endpoint basing on chip-specific "best
-> usage" knowledge.
+> > This doesn't apply, please check and resend.
 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->   drivers/usb/gadget/epautoconf.c | 6 ++++++
->   1 file changed, 6 insertions(+)
+> This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
+> and 15 were not meant to be applied without Thierry's approval (they
+> depend on other changes in the PWM framework).
+> I can rebase them on top of linux-next (or just on top of Linus'
+> 4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
+> on your regulator's for-next branch is a good idea.
 
-> diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-> index ee0d4e6..92a1a4c 100644
-> --- a/drivers/usb/gadget/epautoconf.c
-> +++ b/drivers/usb/gadget/epautoconf.c
-> @@ -165,6 +165,12 @@ struct usb_ep *usb_ep_autoconfig_ss(
->
->   	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
->
-> +	if (gadget->ops->match_ep) {
-> +		ep = gadget->ops->match_ep(gadget, desc, ep_comp);
-> +		if (ep)
-> +			goto found_ep;
-> +	}
-> +
-
-    I think this patch should be merged with the previous one.
-
-[...]
-
-WBR, Sergei
+What is the dependency for the enable patch?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/257aec9f/attachment.sig>
