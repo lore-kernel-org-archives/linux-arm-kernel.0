@@ -1,55 +1,36 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Tue, 14 Jul 2015 14:31:03 -0700
-Subject: mx6: suspicious RCU usage
-In-Reply-To: <20150714204909.GX7557@n2100.arm.linux.org.uk>
-References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
- <20150714160006.GI3717@linux.vnet.ibm.com>
- <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
- <20150714162600.GJ3717@linux.vnet.ibm.com>
- <20150714204909.GX7557@n2100.arm.linux.org.uk>
-Message-ID: <20150714213103.GV3717@linux.vnet.ibm.com>
+From: fainelli@broadcom.com (Florian Fainelli)
+Date: Tue, 14 Jul 2015 14:29:31 -0700
+Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
+In-Reply-To: <4793510.M34v5PmKgi@wuerfel>
+References: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
+ <4793510.M34v5PmKgi@wuerfel>
+Message-ID: <55A57F3B.1080909@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 09:49:09PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jul 14, 2015 at 09:26:00AM -0700, Paul E. McKenney wrote:
-> > On Tue, Jul 14, 2015 at 01:06:32PM -0300, Fabio Estevam wrote:
-> > > Hi Paul,
-> > > 
-> > > On Tue, Jul 14, 2015 at 1:00 PM, Paul E. McKenney
-> > > <paulmck@linux.vnet.ibm.com> wrote:
-> > > 
-> > > > Does this patch help?
-> > > >
-> > > >         https://lkml.org/lkml/2015/5/12/885
-> > > 
-> > > I am using an ARM 32-bit machine, so I used this one instead:
-> > > https://lkml.org/lkml/2015/5/12/892
-> > > 
-> > > , and it fixes the problem. Thanks!
-> > > 
-> > > Feel free to add:
-> > > 
-> > > Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > 
-> > Glad it helped!
-> > 
-> > Russell, did you want me to push this, or would you rather take it?
+On 14/07/15 13:43, Arnd Bergmann wrote:
+> On Tuesday 14 July 2015 11:12:15 Florian Fainelli wrote:
+>> Cortex-A9 on at least BCM4708 SoCs are not LPAE capable, booting such a
+>> kernel will result in the following:
+>>
+>> Error: Kernel with LPAE support, but CPU does not support LPAE.
+>>
+>> Restrict such SoCs to be built in a configuration that does not enable
+>> ARM_LPAE.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>>
 > 
-> If it's the one I'm thinking of (using the generic code) because it
-> doesn't actually solve the problem we have.  It may shut up the RCU
-> warning, but it doesn't solve the underlying problem - one which is
-> caused by the use of atomics (which use the exclusive instructions)
-> vs cache line migration between CPUs vs speculative prefetching...
-> 
-> It's possible right now that _dirty_ cache lines can be migrated to
-> the dying CPU, which are then lost on power down - and if we disable
-> the caches on the dying CPU, we then can't use exclusives, so atomics
-> (and all of the other normal kernel synchronisation mechanisms) are
-> out of the question.
+> This is an old problem for all platforms, I think we want a more
+> generic solution though, instead of adding the !LPAE dependency
+> for each Cortex-A5/8/9 platform.
 
-OK, that could explain any number of failures.
+Fair enough, what do you have in mind? Should we introduce something
+like CONFIG_V7_A9 and such, and update all platforms to select such
+symbols such that we can then apply a restriction on other symbols if
+there needs to be?
 
-I will leave this issue in your hands, then.
-
-							Thanx, Paul
+What if any of these CPUs end-up supporting LPAE, but this cannot be
+flagged at build time?
+-- 
+Florian
