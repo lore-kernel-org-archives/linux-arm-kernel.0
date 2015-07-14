@@ -1,22 +1,53 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 15:16:20 +0800
-Subject: [PATCH v4 0/7] add basic support for i.mx6 ul chip
-In-Reply-To: <1436465387-5992-1-git-send-email-Frank.Li@freescale.com>
-References: <1436465387-5992-1-git-send-email-Frank.Li@freescale.com>
-Message-ID: <20150714071620.GH4119@tiger>
+Date: Tue, 14 Jul 2015 15:25:38 +0800
+Subject: [PATCH][v2] ARM: ls1021a: dtsi: Add crypto node alias in device
+ tree
+In-Reply-To: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
+References: <1436847195-12523-1-git-send-email-ruchika.gupta@freescale.com>
+Message-ID: <20150714072538.GI4119@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 02:09:40AM +0800, Frank.Li at freescale.com wrote:
-> Anson Huang (1):
->   ARM: imx: add low-level debug support for i.mx6ul
+On Tue, Jul 14, 2015 at 09:43:15AM +0530, Ruchika Gupta wrote:
+> U-boot patches up the device tree crypto node for the era property.
 > 
-> Frank Li (6):
->   ARM: imx: add i.mx6ul msl support
->   ARM: imx: add imx6ul clk tree support
->   Document: dt: binding: imx: update document for imx6ul support
->   ARM: dts: add i.mx6ul pin function include file
->   ARM: dts: imx: add imx6ul and imx6ul evk board support
->   ARM: imx: imx_v6_v7_defconfig enable imx6ul support
+> Signed-off-by: Ruchika Gupta <ruchika.gupta@freescale.com>
+> ---
+> Changes from v1:
+> Rearranged the crypto node in alphabetic sorted order as suggested by Shawn 
+> 
+>  arch/arm/boot/dts/ls1021a.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index c70bb27..42dffae 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -53,6 +53,7 @@
+>  	interrupt-parent = <&gic>;
+>  
+>  	aliases {
+> +		crypto = &crypto;
 
-Applied all, thanks.
+Wait.  Did miss any prerequisite patch?  I do not have the label in my
+tree.
+
+  DTC     arch/arm/boot/dts/ls1021a-qds.dtb
+ERROR (path_references): Reference to non-existent node or label "crypto"
+
+Patch dropped.
+
+Shawn
+
+>  		serial0 = &lpuart0;
+>  		serial1 = &lpuart1;
+>  		serial2 = &lpuart2;
+> -- 
+> 1.8.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
