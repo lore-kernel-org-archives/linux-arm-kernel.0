@@ -1,51 +1,32 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 14 Jul 2015 17:46:39 +0800
-Subject: [PATCH v3 4/5] clk: mediatek: Add USB clock support in MT8173
- APMIXEDSYS
-In-Reply-To: <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
-References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
- <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omBryA6f6gYje5RvF2XcJiebogYCHpyWNeN9K4B-MiHf1Q@mail.gmail.com>
- <1436841935.9416.10.camel@mtksdaap41>
- <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
-Message-ID: <1436867199.9416.16.camel@mtksdaap41>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Tue, 14 Jul 2015 09:52:52 +0000
+Subject: [PATCH] arm: dts: ls1021a: add wakeup device ftm0 node for ls1021a
+In-Reply-To: <20150714025324.GA4104@tiger>
+References: <1436150319-15122-1-git-send-email-b18965@freescale.com>
+ <20150714025324.GA4104@tiger>
+Message-ID: <BN3PR0301MB0867B5EA833973B2B7E0F179FE9B0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Shawn,
 
-On Tue, 2015-07-14 at 11:23 +0800, Daniel Kurtz wrote:
-> On Tue, Jul 14, 2015 at 10:45 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> > On Mon, 2015-07-13 at 22:46 +0800, Daniel Kurtz wrote:
-> >> > +static const struct clk_ops mtk_ref2usb_tx_ops = {
-> >> > +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
-> >> > +       .prepare        = mtk_ref2usb_tx_prepare,
-> >> > +       .unprepare      = mtk_ref2usb_tx_unprepare,
-> >> > +};
-> >>
-> >> Burying the implementation of this special "mtk_ref2usb" clock in
-> >> clk-mt8173,c seems a bit awkward.
-> >> Can you please move it to its own file, like mediatek/clk-usb.c?
+> On Mon, Jul 06, 2015 at 10:38:39AM +0800, Alison Wang wrote:
+> > From: Wang Dongsheng <dongsheng.wang@freescale.com>
 > >
-> > Do you mean clk/mediatek/clk-usb.c?
+> > Add ftm0 node, cause of ftm0 can be set as a alarm before system
+> going
+> > to deep sleep.
 > >
-> > This clock is a MT8173 specific clock, which may not be reused by other
-> > SoCs. So I think it's not necessary to move it to a separated file.
+> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
 > 
-> Yes, this is a wrapper for a type of clock.  I think it would be
-> better in its own file, rather than embedded in clk-mt8173.c, which is
-> more about enumerating and initializing the clock tree.
+> Since you're forwarding the patch, you should add your SoB.  Also, for
+> sake of consistency, please use "ARM: " as subject prefix for all
+> patches sent to me.
 > 
-> Perhaps today it is only used for mt8173, but that may not be the case
-> in the future.
+[Alison Wang] Ok. I will change in v2.
 
-OK, I'll separate it from clk-mt8173.c.
-
-Ref2usb_tx's control register is located in APMIXEDSYS, which contains
-most of PLL controlling. Is this clock suitable to implemented
-mtk-pll.c? Or it's proper to be a separated file such as clk-usb.c?
+Thanks.
 
 
-Best regards,
-
-James
+Best Regards,
+Alison Wang
