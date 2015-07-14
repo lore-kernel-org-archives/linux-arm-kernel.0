@@ -1,118 +1,38 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 14 Jul 2015 11:39:35 +0200
-Subject: [PATCH v2 47/48] usb: musb: gadget: add musb_match_ep() function
+Date: Tue, 14 Jul 2015 11:39:30 +0200
+Subject: [PATCH v2 42/48] usb: gadget: epautoconf: use 'ep_match' gadget
+ callback
 In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
 References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436866776-5004-48-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-43-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
-process. Functions does the same that was done by chip-specific code inside
-of epautoconf. Now this code can be removed from there to separate generic code
-from platform specific logic.
+If gadget has set 'ep_match' callback we prefer to call it first to allow
+UDC driver to find the best matching endpoint basing on chip-specific "best
+usage" knowledge.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/epautoconf.c | 23 ---------------------
- drivers/usb/musb/musb_gadget.c  | 44 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 44 insertions(+), 23 deletions(-)
+ drivers/usb/gadget/epautoconf.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 038b21d..e9a8682 100644
+index ee0d4e6..92a1a4c 100644
 --- a/drivers/usb/gadget/epautoconf.c
 +++ b/drivers/usb/gadget/epautoconf.c
-@@ -95,29 +95,6 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 			goto found_ep;
- 	}
+@@ -165,6 +165,12 @@ struct usb_ep *usb_ep_autoconfig_ss(
  
--	/* First, apply chip-specific "best usage" knowledge.
--	 * This might make a good usb_gadget_ops hook ...
--	 */
--#ifdef CONFIG_BLACKFIN
--	if (gadget_is_musbhdrc(gadget)) {
--		if ((USB_ENDPOINT_XFER_BULK == type) ||
--		    (USB_ENDPOINT_XFER_ISOC == type)) {
--			if (USB_DIR_IN & desc->bEndpointAddress)
--				ep = find_ep (gadget, "ep5in");
--			else
--				ep = find_ep (gadget, "ep6out");
--		} else if (USB_ENDPOINT_XFER_INT == type) {
--			if (USB_DIR_IN & desc->bEndpointAddress)
--				ep = find_ep(gadget, "ep1in");
--			else
--				ep = find_ep(gadget, "ep2out");
--		} else
--			ep = NULL;
--		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
--			goto found_ep;
--	}
--#endif
--
- 	/* Second, look at endpoints until an unclaimed one looks usable */
- 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
- 		if (usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
-diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
-index 043248a..5f1eb35 100644
---- a/drivers/usb/musb/musb_gadget.c
-+++ b/drivers/usb/musb/musb_gadget.c
-@@ -1684,6 +1684,49 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
- 	return 0;
- }
+ 	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
  
-+#ifdef CONFIG_BLACKFIN
-+static struct usb_ep *musb_find_ep(struct usb_gadget *g,
-+		const char *name)
-+{
-+	struct usb_ep *ep;
-+
-+	list_for_each_entry(ep, &g->ep_list, ep_list) {
-+		if (0 == strcmp(ep->name, name))
-+			return ep;
++	if (gadget->ops->match_ep) {
++		ep = gadget->ops->match_ep(gadget, desc, ep_comp);
++		if (ep)
++			goto found_ep;
 +	}
 +
-+	return NULL;
-+}
-+
-+static struct usb_ep *match_match_ep(struct usb_gadget *g,
-+		struct usb_endpoint_descriptor *desc,
-+		struct usb_ss_ep_comp_descriptor *ep_comp)
-+{
-+	struct usb_ep *ep = NULL;
-+	u8 type = usb_endpoint_type(desc);
-+
-+	if ((USB_ENDPOINT_XFER_BULK == type) ||
-+			(USB_ENDPOINT_XFER_ISOC == type)) {
-+		if (USB_DIR_IN & desc->bEndpointAddress)
-+			ep = musb_find_ep(g, "ep5in");
-+		else
-+			ep = musb_find_ep(g, "ep6out");
-+	} else if (USB_ENDPOINT_XFER_INT == type) {
-+		if (USB_DIR_IN & desc->bEndpointAddress)
-+			ep = musb_find_ep(g, "ep1in");
-+		else
-+			ep = musb_find_ep(g, "ep2out");
-+	}
-+
-+	if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
-+		return ep;
-+
-+	return NULL;
-+}
-+#else
-+#define musb_match_ep NULL
-+#endif
-+
- static int musb_gadget_start(struct usb_gadget *g,
- 		struct usb_gadget_driver *driver);
- static int musb_gadget_stop(struct usb_gadget *g);
-@@ -1697,6 +1740,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
- 	.pullup			= musb_gadget_pullup,
- 	.udc_start		= musb_gadget_start,
- 	.udc_stop		= musb_gadget_stop,
-+	.match_ep		= musb_match_ep,
- };
- 
- /* ----------------------------------------------------------------------- */
+ 	/* First, apply chip-specific "best usage" knowledge.
+ 	 * This might make a good usb_gadget_ops hook ...
+ 	 */
 -- 
 1.9.1
