@@ -1,49 +1,64 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 23:39:51 +0800
-Subject: [GIT PULL] ARM: imx: fixes for 4.2
-Message-ID: <20150714153951.GJ4119@tiger>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 14 Jul 2015 11:40:40 -0400
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <20150714153430.GA18766@fifo99.com>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+ <87h9p7r0we.fsf@x220.int.ebiederm.org>
+ <20150714135919.GA18333@fifo99.com>
+ <20150714150208.GD10792@redhat.com>
+ <20150714153430.GA18766@fifo99.com>
+Message-ID: <20150714154040.GA3912@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Tue, Jul 14, 2015 at 03:34:30PM +0000, dwalker at fifo99.com wrote:
+> On Tue, Jul 14, 2015 at 11:02:08AM -0400, Vivek Goyal wrote:
+> > On Tue, Jul 14, 2015 at 01:59:19PM +0000, dwalker at fifo99.com wrote:
+> > > On Mon, Jul 13, 2015 at 08:19:45PM -0500, Eric W. Biederman wrote:
+> > > > dwalker at fifo99.com writes:
+> > > > 
+> > > > > On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+> > > > >> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+> > > > >> 
+> > > > >> > You can call panic notifiers and kmsg dumpers before kdump by
+> > > > >> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+> > > > >> > However, it doesn't make sense if kdump is not available.  In that
+> > > > >> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+> > > > >> > you can't change the value of the parameter.
+> > > > >> 
+> > > > >> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> > > > >
+> > > > > I think it would make sense if he just replaced "kdump" with "kexec".
+> > > > 
+> > > > It would be less insane, however it still makes no sense as without
+> > > > kexec on panic support crash_kexec is a noop.  So the value of the
+> > > > seeting makes no difference.
+> > > 
+> > > Can you explain more, I don't really understand what you mean. Are you suggesting
+> > > the whole "crash_kexec_post_notifiers" feature has no value ?
+> > 
+> > Daniel,
+> > 
+> > BTW, why are you using crash_kexec_post_notifiers commandline? Why not
+> > without it?
+> 
+> It was explained in the prior thread but to rehash, the notifiers are used to do a switch
+> over from the crashed machine to another redundant machine.
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+So why not detect failure using polling or issue notifications from second
+kernel.
 
-are available in the git repository at:
+IOW, expecting that a crashed machine will be able to deliver notification
+reliably is falwed to begin with, IMHO.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2
+If a machine is failing, there are high chance it can't deliver you the
+notification. Detecting that failure suing some kind of polling mechanism
+might be more reliable. And it will make even kdump mechanism more
+reliable so that it does not have to run panic notifiers after the crash.
 
-for you to fetch changes up to d438462c20a300139c2e5e65b96cadaa21b58d9a:
-
-  ARM: imx6: gpc: always enable PU domain if CONFIG_PM is not set (2015-07-08 22:52:08 +0800)
-
-----------------------------------------------------------------
-The i.MX fixes for 4.2:
- - Correct compatible string for i.MX27 GPT which actually shares the
-   same programming model as i.MX21 GPT rather than i.MX1 one.
- - Add missing #io-channel-cells property for i.MX23 LRADC device, which
-   is required for the device to be an IIO provider.
- - Correct HSYNC/VSYNC pins and add ddc-i2c-bus property for TVE device
-   on imx53-qsb to work properly.
- - Always enable PU domain if CONFIG_PM is not set.  This fixes a couple
-   of failure scenarios which will hang the system if one of the devices
-   in the PU domain is accessed.
-
-----------------------------------------------------------------
-Fabio Estevam (1):
-      ARM: dts: imx27: Adjust the GPT compatible string
-
-Lucas Stach (1):
-      ARM: imx6: gpc: always enable PU domain if CONFIG_PM is not set
-
-Philipp Zabel (1):
-      ARM: dts: imx53-qsb: fix TVE entry
-
-Stefan Wahren (1):
-      ARM: dts: mx23: fix iio-hwmon support
-
- arch/arm/boot/dts/imx23.dtsi            |  1 +
- arch/arm/boot/dts/imx27.dtsi            | 12 ++++++------
- arch/arm/boot/dts/imx53-qsb-common.dtsi |  5 +++--
- arch/arm/mach-imx/gpc.c                 | 27 ++++++---------------------
- 4 files changed, 16 insertions(+), 29 deletions(-)
+Thanks
+Vivek
