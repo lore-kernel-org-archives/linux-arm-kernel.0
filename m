@@ -1,112 +1,144 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Jul 2015 16:04:45 +0100
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <559FFCA7.4060008@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
- <559FFCA7.4060008@samsung.com>
-Message-ID: <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
+Date: Tue, 14 Jul 2015 16:20:17 +0100
+Subject: [PATCH] arm64: Better native ptrace support for compat tasks
+Message-ID: <1436887217-13158-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 08:11:03PM +0300, Andrey Ryabinin wrote:
-> >> +#if CONFIG_PGTABLE_LEVELS > 3
-> >> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-> >> +#endif
-> >> +#if CONFIG_PGTABLE_LEVELS > 2
-> >> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-> >> +#endif
-> >> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
-> >> +
-> >> +static void __init kasan_early_pmd_populate(unsigned long start,
-> >> +					unsigned long end, pud_t *pud)
-> >> +{
-> >> +	unsigned long addr;
-> >> +	unsigned long next;
-> >> +	pmd_t *pmd;
-> >> +
-> >> +	pmd = pmd_offset(pud, start);
-> >> +	for (addr = start; addr < end; addr = next, pmd++) {
-> >> +		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-> >> +		next = pmd_addr_end(addr, end);
-> >> +	}
-> >> +}
-> >> +
-> >> +static void __init kasan_early_pud_populate(unsigned long start,
-> >> +					unsigned long end, pgd_t *pgd)
-> >> +{
-> >> +	unsigned long addr;
-> >> +	unsigned long next;
-> >> +	pud_t *pud;
-> >> +
-> >> +	pud = pud_offset(pgd, start);
-> >> +	for (addr = start; addr < end; addr = next, pud++) {
-> >> +		pud_populate(&init_mm, pud, kasan_zero_pmd);
-> >> +		next = pud_addr_end(addr, end);
-> >> +		kasan_early_pmd_populate(addr, next, pud);
-> >> +	}
-> >> +}
-> >> +
-> >> +static void __init kasan_map_early_shadow(pgd_t *pgdp)
-> >> +{
-> >> +	int i;
-> >> +	unsigned long start = KASAN_SHADOW_START;
-> >> +	unsigned long end = KASAN_SHADOW_END;
-> >> +	unsigned long addr;
-> >> +	unsigned long next;
-> >> +	pgd_t *pgd;
-> >> +
-> >> +	for (i = 0; i < PTRS_PER_PTE; i++)
-> >> +		set_pte(&kasan_zero_pte[i], pfn_pte(
-> >> +				virt_to_pfn(kasan_zero_page), PAGE_KERNEL));
-> >> +
-> >> +	pgd = pgd_offset_k(start);
-> >> +	for (addr = start; addr < end; addr = next, pgd++) {
-> >> +		pgd_populate(&init_mm, pgd, kasan_zero_pud);
-> >> +		next = pgd_addr_end(addr, end);
-> >> +		kasan_early_pud_populate(addr, next, pgd);
-> >> +	}
-> > 
-> > I prefer to use "do ... while" constructs similar to __create_mapping()
-> > (or zero_{pgd,pud,pmd}_populate as you are more familiar with them).
-> > 
-> > But what I don't get here is that you repopulate the pud page for every
-> > pgd (and so on for pmd). You don't need this recursive call all the way
-> > to kasan_early_pmd_populate() but just sequential:
-> 
-> This repopulation needed for 3,2 level page tables configurations.
-> 
-> E.g. for 3-level page tables we need to call pud_populate(&init_mm,
-> pud, kasan_zero_pmd) for each pud in [KASAN_SHADOW_START,
-> KASAN_SHADOW_END] range, this causes repopopulation for 4-level page
-> tables, since we need to pud_populate() only [KASAN_SHADOW_START,
-> KASAN_SHADOW_START + PGDIR_SIZE] range.
+The compat ptrace interface allows access to the TLS register, hardware
+breakpoints and watchpoints, syscall number. However, a native task
+using the native ptrace interface to debug compat tasks (e.g. multi-arch
+gdb) only has access to the general and VFP register sets. The compat
+ptrace interface cannot be accessed from a native task.
 
-I'm referring to writing the same information multiple times over the
-same entry. kasan_map_early_shadow() goes over each pgd entry and writes
-the address of kasan_zero_pud. That's fine so far. However, in the same
-loop you call kasan_early_pud_populate(). The latter retrieves the pud
-page via pud_offset(pgd, start) which would always be kasan_zero_pud
-because that's what you wrote via pgd_populate() in each pgd entry. So
-for each pgd entry, you keep populating the same kasan_zero_pud page
-with pointers to kasan_zero_pmd. And so on for the pmd.
+This patch adds a new user_aarch32_ptrace_view which contains the TLS,
+hardware breakpoint/watchpoint and syscall number regsets in addition to
+the existing GPR and VFP regsets. This view is backwards compatible with
+the previous kernels. Core dumping of 32-bit tasks and compat ptrace are
+not affected since the original user_aarch32_view is preserved.
 
-> > 	kasan_early_pte_populate();
-> > 	kasan_early_pmd_populate(..., pte);
-> > 	kasan_early_pud_populate(..., pmd);
-> > 	kasan_early_pgd_populate(..., pud);
-> > 
-> > (or in reverse order)
-> 
-> Unless, I'm missing something, this will either work only with 4-level
-> page tables. We could do this without repopulation by using
-> CONFIG_PGTABLE_LEVELS ifdefs.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Yao Qi <yao.qi@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/ptrace.c | 92 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 91 insertions(+), 1 deletion(-)
 
-Or you could move kasan_early_*_populate outside the loop. You already
-do this for the pte at the beginning of the kasan_map_early_shadow()
-function (and it probably makes more sense to create a separate
-kasan_early_pte_populate).
-
--- 
-Catalin
+diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
+index d882b833dbdb..1971f491bb90 100644
+--- a/arch/arm64/kernel/ptrace.c
++++ b/arch/arm64/kernel/ptrace.c
+@@ -826,6 +826,30 @@ static int compat_vfp_set(struct task_struct *target,
+ 	return ret;
+ }
+ 
++static int compat_tls_get(struct task_struct *target,
++			  const struct user_regset *regset, unsigned int pos,
++			  unsigned int count, void *kbuf, void __user *ubuf)
++{
++	compat_ulong_t tls = (compat_ulong_t)target->thread.tp_value;
++	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &tls, 0, -1);
++}
++
++static int compat_tls_set(struct task_struct *target,
++			  const struct user_regset *regset, unsigned int pos,
++			  unsigned int count, const void *kbuf,
++			  const void __user *ubuf)
++{
++	int ret;
++	compat_ulong_t tls;
++
++	ret = user_regset_copyin(&pos, &count, &kbuf, &ubuf, &tls, 0, -1);
++	if (ret)
++		return ret;
++
++	target->thread.tp_value = tls;
++	return ret;
++}
++
+ static const struct user_regset aarch32_regsets[] = {
+ 	[REGSET_COMPAT_GPR] = {
+ 		.core_note_type = NT_PRSTATUS,
+@@ -850,6 +874,64 @@ static const struct user_regset_view user_aarch32_view = {
+ 	.regsets = aarch32_regsets, .n = ARRAY_SIZE(aarch32_regsets)
+ };
+ 
++static const struct user_regset aarch32_ptrace_regsets[] = {
++	[REGSET_GPR] = {
++		.core_note_type = NT_PRSTATUS,
++		.n = COMPAT_ELF_NGREG,
++		.size = sizeof(compat_elf_greg_t),
++		.align = sizeof(compat_elf_greg_t),
++		.get = compat_gpr_get,
++		.set = compat_gpr_set
++	},
++	[REGSET_FPR] = {
++		.core_note_type = NT_ARM_VFP,
++		.n = VFP_STATE_SIZE / sizeof(compat_ulong_t),
++		.size = sizeof(compat_ulong_t),
++		.align = sizeof(compat_ulong_t),
++		.get = compat_vfp_get,
++		.set = compat_vfp_set
++	},
++	[REGSET_TLS] = {
++		.core_note_type = NT_ARM_TLS,
++		.n = 1,
++		.size = sizeof(compat_ulong_t),
++		.align = sizeof(compat_ulong_t),
++		.get = compat_tls_get,
++		.set = compat_tls_set,
++	},
++#ifdef CONFIG_HAVE_HW_BREAKPOINT
++	[REGSET_HW_BREAK] = {
++		.core_note_type = NT_ARM_HW_BREAK,
++		.n = sizeof(struct user_hwdebug_state) / sizeof(u32),
++		.size = sizeof(u32),
++		.align = sizeof(u32),
++		.get = hw_break_get,
++		.set = hw_break_set,
++	},
++	[REGSET_HW_WATCH] = {
++		.core_note_type = NT_ARM_HW_WATCH,
++		.n = sizeof(struct user_hwdebug_state) / sizeof(u32),
++		.size = sizeof(u32),
++		.align = sizeof(u32),
++		.get = hw_break_get,
++		.set = hw_break_set,
++	},
++#endif
++	[REGSET_SYSTEM_CALL] = {
++		.core_note_type = NT_ARM_SYSTEM_CALL,
++		.n = 1,
++		.size = sizeof(int),
++		.align = sizeof(int),
++		.get = system_call_get,
++		.set = system_call_set,
++	},
++};
++
++static const struct user_regset_view user_aarch32_ptrace_view = {
++	.name = "aarch32", .e_machine = EM_ARM,
++	.regsets = aarch32_ptrace_regsets, .n = ARRAY_SIZE(aarch32_ptrace_regsets)
++};
++
+ static int compat_ptrace_read_user(struct task_struct *tsk, compat_ulong_t off,
+ 				   compat_ulong_t __user *ret)
+ {
+@@ -1109,8 +1191,16 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
+ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
+ {
+ #ifdef CONFIG_COMPAT
+-	if (is_compat_thread(task_thread_info(task)))
++	/*
++	 * Core dumping of 32-bit tasks or compat ptrace requests must use the
++	 * user_aarch32_view compatible with arm32. Native ptrace requests on
++	 * 32-bit children use an extended user_aarch32_ptrace_view to allow
++	 * access to the TLS register.
++	 */
++	if (is_compat_task())
+ 		return &user_aarch32_view;
++	else if (is_compat_thread(task_thread_info(task)))
++		return &user_aarch32_ptrace_view;
+ #endif
+ 	return &user_aarch64_view;
+ }
