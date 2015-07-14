@@ -1,101 +1,214 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 14 Jul 2015 12:54:15 -0300
-Subject: mx6: suspicious RCU usage
-Message-ID: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 14 Jul 2015 16:54:46 +0100
+Subject: [PATCH v2 03/10] arm64: esr.h type fixes and cleanup
+In-Reply-To: <1436793967-7138-4-git-send-email-Dave.Martin@arm.com>
+References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+ <1436793967-7138-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20150714155446.GE12675@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 13, 2015 at 02:25:50PM +0100, Dave P Martin wrote:
+> ESR_ELx is a 32-bit register, so it is not necessary for all the
+> template values defined by esr.h to be forced to 64-bit (long).
 
-I am running 4.2-rc2 on a mx6q board and I see the following warning
-when doing a suspend/resume cycle:
+While it's potentially misleading, does forcing these to be 64-bit cause
+a real issue? If so, it would be good to mention in the commit message.
 
-$ echo mem > /sys/power/state
+Mark.
 
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.003 seconds) done.
-Freezing remaining freezable tasks ... (elapsed 0.003 seconds) done.
-Suspending console(s) (use no_console_suspend to debug)
-
-(Press GPIO button to wake up the system)
-
-PM: suspend of devices complete after 101.667 msecs
-PM: suspend devices took 0.110 seconds
-PM: late suspend of devices complete after 11.073 msecs
-PM: noirq suspend of devices complete after 9.432 msecs
-Disabling non-boot CPUs ...
-
-===============================
-[ INFO: suspicious RCU usage. ]
-4.2.0-rc2 #247 Not tainted
--------------------------------
-kernel/sched/fair.c:5032 suspicious rcu_dereference_check() usage!
-
-other info that might help us debug this:
-
-
-RCU used illegally from offline CPU!
-rcu_scheduler_active = 1, debug_locks = 0
-3 locks held by swapper/1/0:
- #0:  ((cpu_died).wait.lock){......}, at: [<800643e0>] complete+0x1c/0x4c
- #1:  (&p->pi_lock){-.-.-.}, at: [<8004f7e8>] try_to_wake_up+0x34/0x3c8
- #2:  (rcu_read_lock){......}, at: [<80057b68>] select_task_rq_fair+0x64/0x9e8
-
-stack backtrace:
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 4.2.0-rc2 #247
-Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-Backtrace:
-[<80012ee8>] (dump_backtrace) from [<80013084>] (show_stack+0x18/0x1c)
- r6:000013a8 r5:00000000 r4:00000000 r3:00000000
-[<8001306c>] (show_stack) from [<8078d364>] (dump_stack+0x88/0xa4)
-[<8078d2dc>] (dump_stack) from [<800676d8>] (lockdep_rcu_suspicious+0xbc/0x11c)
- r5:809497c4 r4:be076780
-[<8006761c>] (lockdep_rcu_suspicious) from [<80058200>]
-(select_task_rq_fair+0x6fc/0x9e8)
- r7:80a94fc0 r6:00000001 r5:00000000 r4:00000000
-[<80057b04>] (select_task_rq_fair) from [<8004f8cc>]
-(try_to_wake_up+0x118/0x3c8)
- r10:80a94fc0 r9:00000000 r8:00000000 r7:80000093 r6:80a98b2c r5:bd748f8c
- r4:bd748b80
-[<8004f7b4>] (try_to_wake_up) from [<8004fb90>]
-(default_wake_function+0x14/0x18)
- r10:00000003 r9:8004fb7c r8:00000000 r7:00000000 r6:80a9dc34 r5:00000001
- r4:80a9dc28
-[<8004fb7c>] (default_wake_function) from [<80063b18>]
-(__wake_up_common+0x58/0x98)
-[<80063ac0>] (__wake_up_common) from [<80063b74>] (__wake_up_locked+0x1c/0x24)
- r10:80a98b2c r9:807993ac r8:80a98a10 r7:80afc552 r6:60000093 r5:80a9dc10
- r4:80a9dc14
-[<80063b58>] (__wake_up_locked) from [<80064400>] (complete+0x3c/0x4c)
-[<800643c4>] (complete) from [<807870e0>] (cpu_die+0x3c/0xa4)
- r6:80a923e4 r5:00000001 r4:80a98968 r3:00000002
-[<807870a4>] (cpu_die) from [<80010798>] (arch_cpu_idle_dead+0x10/0x14)
- r5:80a989c4 r4:00000000
-[<80010788>] (arch_cpu_idle_dead) from [<80064798>]
-(cpu_startup_entry+0x1d8/0x200)
-[<800645c0>] (cpu_startup_entry) from [<80015e34>]
-(secondary_start_kernel+0x120/0x13c)
- r7:80aff360
-[<80015d14>] (secondary_start_kernel) from [<1000962c>] (0x1000962c)
- r5:00000015 r4:4e08806a
-CPU1: shutdown
-CPU2: shutdown
-CPU3: shutdown
-Enabling non-boot CPUs ...
-CPU1 is up
-CPU2 is up
-CPU3 is up
-PM: noirq resume of devices complete after 2.185 msecs
-PM: early resume of devices complete after 2.786 msecs
-PM: resume of devices complete after 204.223 msecs
-PM: resume devices took 0.200 seconds
-ata1: SATA link down (SStatus 0 SControl 300)
-PM: Finishing wakeup.
-Restarting tasks ... done.
-
-I haven't started bisecting it yet, but if someone has some ideas,
-please let me know.
-
-Regards,
-
-Fabio Estevam
+> This patch introduces a UINT() macro analogous to UL(), and applies
+> it consistently.  (Unfortunately, the more succinct U and UI names
+> are already used in unrelated code, and cause conflicts since
+> memory.h is widely included.)
+> 
+> Since this change touches many lines already, I've taken the
+> opportunity to squash some redundant parentheses and bogus
+> whitespace at the same time.
+> 
+> The missing include of <asm/memory.h> (for UL(), UINT() etc.) is
+> also added.
+> 
+> No functional change.
+> 
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> ---
+>  arch/arm64/include/asm/esr.h    |  128 ++++++++++++++++++++-------------------
+>  arch/arm64/include/asm/memory.h |    3 +-
+>  2 files changed, 67 insertions(+), 64 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+> index 7052245..8dab2a9 100644
+> --- a/arch/arm64/include/asm/esr.h
+> +++ b/arch/arm64/include/asm/esr.h
+> @@ -18,86 +18,88 @@
+>  #ifndef __ASM_ESR_H
+>  #define __ASM_ESR_H
+>  
+> -#define ESR_ELx_EC_UNKNOWN	(0x00)
+> -#define ESR_ELx_EC_WFx		(0x01)
+> +#include <asm/memory.h>
+> +
+> +#define ESR_ELx_EC_UNKNOWN	UINT(0x00)
+> +#define ESR_ELx_EC_WFx		UINT(0x01)
+>  /* Unallocated EC: 0x02 */
+> -#define ESR_ELx_EC_CP15_32	(0x03)
+> -#define ESR_ELx_EC_CP15_64	(0x04)
+> -#define ESR_ELx_EC_CP14_MR	(0x05)
+> -#define ESR_ELx_EC_CP14_LS	(0x06)
+> -#define ESR_ELx_EC_FP_ASIMD	(0x07)
+> -#define ESR_ELx_EC_CP10_ID	(0x08)
+> +#define ESR_ELx_EC_CP15_32	UINT(0x03)
+> +#define ESR_ELx_EC_CP15_64	UINT(0x04)
+> +#define ESR_ELx_EC_CP14_MR	UINT(0x05)
+> +#define ESR_ELx_EC_CP14_LS	UINT(0x06)
+> +#define ESR_ELx_EC_FP_ASIMD	UINT(0x07)
+> +#define ESR_ELx_EC_CP10_ID	UINT(0x08)
+>  /* Unallocated EC: 0x09 - 0x0B */
+> -#define ESR_ELx_EC_CP14_64	(0x0C)
+> +#define ESR_ELx_EC_CP14_64	UINT(0x0C)
+>  /* Unallocated EC: 0x0d */
+> -#define ESR_ELx_EC_ILL		(0x0E)
+> +#define ESR_ELx_EC_ILL		UINT(0x0E)
+>  /* Unallocated EC: 0x0F - 0x10 */
+> -#define ESR_ELx_EC_SVC32	(0x11)
+> -#define ESR_ELx_EC_HVC32	(0x12)
+> -#define ESR_ELx_EC_SMC32	(0x13)
+> +#define ESR_ELx_EC_SVC32	UINT(0x11)
+> +#define ESR_ELx_EC_HVC32	UINT(0x12)
+> +#define ESR_ELx_EC_SMC32	UINT(0x13)
+>  /* Unallocated EC: 0x14 */
+> -#define ESR_ELx_EC_SVC64	(0x15)
+> -#define ESR_ELx_EC_HVC64	(0x16)
+> -#define ESR_ELx_EC_SMC64	(0x17)
+> -#define ESR_ELx_EC_SYS64	(0x18)
+> +#define ESR_ELx_EC_SVC64	UINT(0x15)
+> +#define ESR_ELx_EC_HVC64	UINT(0x16)
+> +#define ESR_ELx_EC_SMC64	UINT(0x17)
+> +#define ESR_ELx_EC_SYS64	UINT(0x18)
+>  /* Unallocated EC: 0x19 - 0x1E */
+> -#define ESR_ELx_EC_IMP_DEF	(0x1f)
+> -#define ESR_ELx_EC_IABT_LOW	(0x20)
+> -#define ESR_ELx_EC_IABT_CUR	(0x21)
+> -#define ESR_ELx_EC_PC_ALIGN	(0x22)
+> +#define ESR_ELx_EC_IMP_DEF	UINT(0x1f)
+> +#define ESR_ELx_EC_IABT_LOW	UINT(0x20)
+> +#define ESR_ELx_EC_IABT_CUR	UINT(0x21)
+> +#define ESR_ELx_EC_PC_ALIGN	UINT(0x22)
+>  /* Unallocated EC: 0x23 */
+> -#define ESR_ELx_EC_DABT_LOW	(0x24)
+> -#define ESR_ELx_EC_DABT_CUR	(0x25)
+> -#define ESR_ELx_EC_SP_ALIGN	(0x26)
+> +#define ESR_ELx_EC_DABT_LOW	UINT(0x24)
+> +#define ESR_ELx_EC_DABT_CUR	UINT(0x25)
+> +#define ESR_ELx_EC_SP_ALIGN	UINT(0x26)
+>  /* Unallocated EC: 0x27 */
+> -#define ESR_ELx_EC_FP_EXC32	(0x28)
+> +#define ESR_ELx_EC_FP_EXC32	UINT(0x28)
+>  /* Unallocated EC: 0x29 - 0x2B */
+> -#define ESR_ELx_EC_FP_EXC64	(0x2C)
+> +#define ESR_ELx_EC_FP_EXC64	UINT(0x2C)
+>  /* Unallocated EC: 0x2D - 0x2E */
+> -#define ESR_ELx_EC_SERROR	(0x2F)
+> -#define ESR_ELx_EC_BREAKPT_LOW	(0x30)
+> -#define ESR_ELx_EC_BREAKPT_CUR	(0x31)
+> -#define ESR_ELx_EC_SOFTSTP_LOW	(0x32)
+> -#define ESR_ELx_EC_SOFTSTP_CUR	(0x33)
+> -#define ESR_ELx_EC_WATCHPT_LOW	(0x34)
+> -#define ESR_ELx_EC_WATCHPT_CUR	(0x35)
+> +#define ESR_ELx_EC_SERROR	UINT(0x2F)
+> +#define ESR_ELx_EC_BREAKPT_LOW	UINT(0x30)
+> +#define ESR_ELx_EC_BREAKPT_CUR	UINT(0x31)
+> +#define ESR_ELx_EC_SOFTSTP_LOW	UINT(0x32)
+> +#define ESR_ELx_EC_SOFTSTP_CUR	UINT(0x33)
+> +#define ESR_ELx_EC_WATCHPT_LOW	UINT(0x34)
+> +#define ESR_ELx_EC_WATCHPT_CUR	UINT(0x35)
+>  /* Unallocated EC: 0x36 - 0x37 */
+> -#define ESR_ELx_EC_BKPT32	(0x38)
+> +#define ESR_ELx_EC_BKPT32	UINT(0x38)
+>  /* Unallocated EC: 0x39 */
+> -#define ESR_ELx_EC_VECTOR32	(0x3A)
+> +#define ESR_ELx_EC_VECTOR32	UINT(0x3A)
+>  /* Unallocted EC: 0x3B */
+> -#define ESR_ELx_EC_BRK64	(0x3C)
+> +#define ESR_ELx_EC_BRK64	UINT(0x3C)
+>  /* Unallocated EC: 0x3D - 0x3F */
+> -#define ESR_ELx_EC_MAX		(0x3F)
+> +#define ESR_ELx_EC_MAX		UINT(0x3F)
+>  
+> -#define ESR_ELx_EC_SHIFT	(26)
+> -#define ESR_ELx_EC_MASK		(UL(0x3F) << ESR_ELx_EC_SHIFT)
+> +#define ESR_ELx_EC_SHIFT	26
+> +#define ESR_ELx_EC_MASK		(ESR_ELx_EC_MAX << ESR_ELx_EC_SHIFT)
+>  
+> -#define ESR_ELx_IL		(UL(1) << 25)
+> +#define ESR_ELx_IL		(UINT(1) << 25)
+>  #define ESR_ELx_ISS_MASK	(ESR_ELx_IL - 1)
+> -#define ESR_ELx_ISV		(UL(1) << 24)
+> -#define ESR_ELx_SAS_SHIFT	(22)
+> -#define ESR_ELx_SAS		(UL(3) << ESR_ELx_SAS_SHIFT)
+> -#define ESR_ELx_SSE		(UL(1) << 21)
+> -#define ESR_ELx_SRT_SHIFT	(16)
+> -#define ESR_ELx_SRT_MASK	(UL(0x1F) << ESR_ELx_SRT_SHIFT)
+> -#define ESR_ELx_SF 		(UL(1) << 15)
+> -#define ESR_ELx_AR 		(UL(1) << 14)
+> -#define ESR_ELx_EA 		(UL(1) << 9)
+> -#define ESR_ELx_CM 		(UL(1) << 8)
+> -#define ESR_ELx_S1PTW 		(UL(1) << 7)
+> -#define ESR_ELx_WNR		(UL(1) << 6)
+> -#define ESR_ELx_FSC		(0x3F)
+> -#define ESR_ELx_FSC_TYPE	(0x3C)
+> -#define ESR_ELx_FSC_EXTABT	(0x10)
+> -#define ESR_ELx_FSC_ACCESS	(0x08)
+> -#define ESR_ELx_FSC_FAULT	(0x04)
+> -#define ESR_ELx_FSC_PERM	(0x0C)
+> -#define ESR_ELx_CV		(UL(1) << 24)
+> -#define ESR_ELx_COND_SHIFT	(20)
+> -#define ESR_ELx_COND_MASK	(UL(0xF) << ESR_ELx_COND_SHIFT)
+> -#define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+> -#define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+> +#define ESR_ELx_ISV		(UINT(1) << 24)
+> +#define ESR_ELx_SAS_SHIFT	22
+> +#define ESR_ELx_SAS		(UINT(3) << ESR_ELx_SAS_SHIFT)
+> +#define ESR_ELx_SSE		(UINT(1) << 21)
+> +#define ESR_ELx_SRT_SHIFT	16
+> +#define ESR_ELx_SRT_MASK	(UINT(0x1F) << ESR_ELx_SRT_SHIFT)
+> +#define ESR_ELx_SF		(UINT(1) << 15)
+> +#define ESR_ELx_AR		(UINT(1) << 14)
+> +#define ESR_ELx_EA		(UINT(1) << 9)
+> +#define ESR_ELx_CM		(UINT(1) << 8)
+> +#define ESR_ELx_S1PTW		(UINT(1) << 7)
+> +#define ESR_ELx_WNR		(UINT(1) << 6)
+> +#define ESR_ELx_FSC		UINT(0x3F)
+> +#define ESR_ELx_FSC_TYPE	UINT(0x3C)
+> +#define ESR_ELx_FSC_EXTABT	UINT(0x10)
+> +#define ESR_ELx_FSC_ACCESS	UINT(0x08)
+> +#define ESR_ELx_FSC_FAULT	UINT(0x04)
+> +#define ESR_ELx_FSC_PERM	UINT(0x0C)
+> +#define ESR_ELx_CV		(UINT(1) << 24)
+> +#define ESR_ELx_COND_SHIFT	20
+> +#define ESR_ELx_COND_MASK	(UINT(0xF) << ESR_ELx_COND_SHIFT)
+> +#define ESR_ELx_WFx_ISS_WFE	(UINT(1) << 0)
+> +#define ESR_ELx_xVC_IMM_MASK	((UINT(1) << 16) - 1)
+>  
+>  #ifndef __ASSEMBLY__
+>  #include <asm/types.h>
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index f800d45..c6a6592a 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -28,9 +28,10 @@
+>  
+>  /*
+>   * Allow for constants defined here to be used from assembly code
+> - * by prepending the UL suffix only with actual C code compilation.
+> + * by prepending type suffixes only with actual C code compilation.
+>   */
+>  #define UL(x) _AC(x, UL)
+> +#define UINT(x) _AC(x, U)
+>  
+>  /*
+>   * Size of the PCI I/O space. This must remain a power of two so that
+> -- 
+> 1.7.10.4
+> 
