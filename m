@@ -1,38 +1,38 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Tue, 14 Jul 2015 19:23:23 +0530
-Subject: [PATCH v3 2/2] ARM: dts: vf-colibri: Add property for minimum sample
- time
-In-Reply-To: <cover.1436880513.git.maitysanchayan@gmail.com>
-References: <cover.1436880513.git.maitysanchayan@gmail.com>
-Message-ID: <20e2cfad3fbb1a45332e9936ea493ddc8bfaf51d.1436880513.git.maitysanchayan@gmail.com>
+From: dwalker@fifo99.com (dwalker at fifo99.com)
+Date: Tue, 14 Jul 2015 13:59:19 +0000
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump
+ is not available
+In-Reply-To: <87h9p7r0we.fsf@x220.int.ebiederm.org>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+ <87h9p7r0we.fsf@x220.int.ebiederm.org>
+Message-ID: <20150714135919.GA18333@fifo99.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree property which allows to specify the minimum sample
-time which can be used to calculate the actual ADC cycles required
-depending on the hardware.
+On Mon, Jul 13, 2015 at 08:19:45PM -0500, Eric W. Biederman wrote:
+> dwalker at fifo99.com writes:
+> 
+> > On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+> >> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+> >> 
+> >> > You can call panic notifiers and kmsg dumpers before kdump by
+> >> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+> >> > However, it doesn't make sense if kdump is not available.  In that
+> >> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+> >> > you can't change the value of the parameter.
+> >> 
+> >> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+> >
+> > I think it would make sense if he just replaced "kdump" with "kexec".
+> 
+> It would be less insane, however it still makes no sense as without
+> kexec on panic support crash_kexec is a noop.  So the value of the
+> seeting makes no difference.
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- arch/arm/boot/dts/vf-colibri.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+Can you explain more, I don't really understand what you mean. Are you suggesting
+the whole "crash_kexec_post_notifiers" feature has no value ?
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index ab10d2e..59f5deb 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -16,10 +16,12 @@
- };
- 
- &adc0 {
-+	min-sample-time = <1000>;
- 	status = "okay";
- };
- 
- &adc1 {
-+	min-sample-time = <1000>;
- 	status = "okay";
- };
- 
--- 
-2.4.5
+Daniel
