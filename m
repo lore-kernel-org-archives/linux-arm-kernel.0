@@ -1,44 +1,145 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 Jul 2015 00:28:25 +0000
-Subject: [PATCH] dmaengine: sirf: fix kernel panic under one race condition
-Message-ID: <1436833705-6550-1-git-send-email-21cnbao@gmail.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Tue, 14 Jul 2015 09:24:01 +0900
+Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+Message-ID: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yanchang Li <yl22@csr.com>
+The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
+and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+cpu4-7 are cortex-a15.
 
-If DMA interrupt comes and is latched by IRQ controller during the
-execution of dma_terminate_all(), dma_irq routine will be executed
-after dma terminated, and it will cause kernel panic.
-We clear DMA interrupts in dma_terminate_all() to avoid this useless
-interrupt.
-
-Signed-off-by: Yanchang Li <yl22@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanho Park <parkch98@gmail.com>
 ---
- drivers/dma/sirf-dma.c | 3 +++
- 1 file changed, 3 insertions(+)
+Change from v4:
+ - Resend patch with correct signed-off
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index 8c5186c..7d5598d 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -455,6 +455,7 @@ static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
- 	switch (sdma->type) {
- 	case SIRFSOC_DMA_VER_A7V1:
- 		writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_INT_EN_CLR);
-+		writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_INT);
- 		writel_relaxed((1 << cid) | 1 << (cid + 16),
- 			       sdma->base +
- 			       SIRFSOC_DMA_CH_LOOP_CTRL_CLR_ATLAS7);
-@@ -462,6 +463,8 @@ static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
- 		break;
- 	case SIRFSOC_DMA_VER_A7V2:
- 		writel_relaxed(0, sdma->base + SIRFSOC_DMA_INT_EN_ATLAS7);
-+		writel_relaxed(SIRFSOC_DMA_INT_ALL_ATLAS7,
-+			       sdma->base + SIRFSOC_DMA_INT_ATLAS7);
- 		writel_relaxed(0, sdma->base + SIRFSOC_DMA_LOOP_CTRL_ATLAS7);
- 		writel_relaxed(0, sdma->base + SIRFSOC_DMA_VALID_ATLAS7);
- 		break;
+Changes from v4:
+ - Remove temporal patch in e-mail body
+
+Changes from v3:
+ - include this exynos5422-cpus.dtsi in the exynos5422-odroidxu3-common.dtsi
+
+Changes from v2:
+ - drop inclusion of exynos5420.dtsi from exynos5422-cpus.dtsi
+ - drop compatibles from exynos5422-cpus.dtsi
+
+Changes from v1:
+ - rename exynos5422.dtsi to exynos5422-cpus.dtsi
+ - include the dtsi file top of the exynos5422-odroidxu3.dts
+
+Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+to work booting 8 cores correctly.
+
+[1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+
+ arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+ 2 files changed, 82 insertions(+)
+ create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+
+diff --git a/arch/arm/boot/dts/exynos5422-cpus.dtsi b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+new file mode 100644
+index 0000000..b7f60c8
+--- /dev/null
++++ b/arch/arm/boot/dts/exynos5422-cpus.dtsi
+@@ -0,0 +1,81 @@
++/*
++ * SAMSUNG EXYNOS5422 SoC cpu device tree source
++ *
++ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
++ *		http://www.samsung.com
++ *
++ * The only difference between EXYNOS5422 and EXYNOS5800 is cpu ordering. The
++ * EXYNOS5422 is booting from Cortex-A7 core while the EXYNOS5800 is booting
++ * from Cortex-A15 core.
++ *
++ * EXYNOS5422 based board files can include this file to provide cpu ordering
++ * which could boot a cortex-a7 from cpu0.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&cpu0 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x100>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu1 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x101>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu2 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x102>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu3 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a7";
++	reg = <0x103>;
++	clock-frequency = <1000000000>;
++	cci-control-port = <&cci_control0>;
++};
++
++&cpu4 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x0>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu5 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x1>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu6 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x2>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
++
++&cpu7 {
++	device_type = "cpu";
++	compatible = "arm,cortex-a15";
++	reg = <0x3>;
++	clock-frequency = <1800000000>;
++	cci-control-port = <&cci_control1>;
++};
+diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+index 8adf455..f603133 100644
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@ -15,6 +15,7 @@
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/sound/samsung-i2s.h>
+ #include "exynos5800.dtsi"
++#include "exynos5422-cpus.dtsi"
+ 
+ / {
+ 	memory {
 -- 
-2.3.5
+2.1.0
