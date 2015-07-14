@@ -1,148 +1,55 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 14 Jul 2015 16:23:07 -0500
-Subject: [PATCH] ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
-Message-ID: <1436908987-16038-1-git-send-email-dinguyen@opensource.altera.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 14 Jul 2015 14:31:03 -0700
+Subject: mx6: suspicious RCU usage
+In-Reply-To: <20150714204909.GX7557@n2100.arm.linux.org.uk>
+References: <CAOMZO5DeOLORXUAgYN2_BkB1BS8wuF8CoTf=QOfU1fB-je0UHQ@mail.gmail.com>
+ <20150714160006.GI3717@linux.vnet.ibm.com>
+ <CAOMZO5Bbj2FjWxNGDUHSHXCPFC1A7F6sO6AepZjRZoxHY-kgYg@mail.gmail.com>
+ <20150714162600.GJ3717@linux.vnet.ibm.com>
+ <20150714204909.GX7557@n2100.arm.linux.org.uk>
+Message-ID: <20150714213103.GV3717@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dalon Westergreen <dwesterg@gmail.com>
+On Tue, Jul 14, 2015 at 09:49:09PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jul 14, 2015 at 09:26:00AM -0700, Paul E. McKenney wrote:
+> > On Tue, Jul 14, 2015 at 01:06:32PM -0300, Fabio Estevam wrote:
+> > > Hi Paul,
+> > > 
+> > > On Tue, Jul 14, 2015 at 1:00 PM, Paul E. McKenney
+> > > <paulmck@linux.vnet.ibm.com> wrote:
+> > > 
+> > > > Does this patch help?
+> > > >
+> > > >         https://lkml.org/lkml/2015/5/12/885
+> > > 
+> > > I am using an ARM 32-bit machine, so I used this one instead:
+> > > https://lkml.org/lkml/2015/5/12/892
+> > > 
+> > > , and it fixes the problem. Thanks!
+> > > 
+> > > Feel free to add:
+> > > 
+> > > Tested-by: Fabio Estevam <fabio.estevam@freescale.com>
+> > 
+> > Glad it helped!
+> > 
+> > Russell, did you want me to push this, or would you rather take it?
+> 
+> If it's the one I'm thinking of (using the generic code) because it
+> doesn't actually solve the problem we have.  It may shut up the RCU
+> warning, but it doesn't solve the underlying problem - one which is
+> caused by the use of atomics (which use the exclusive instructions)
+> vs cache line migration between CPUs vs speculative prefetching...
+> 
+> It's possible right now that _dirty_ cache lines can be migrated to
+> the dying CPU, which are then lost on power down - and if we disable
+> the caches on the dying CPU, we then can't use exclusives, so atomics
+> (and all of the other normal kernel synchronisation mechanisms) are
+> out of the question.
 
-The Terasic DE0 Atlas board is also known as the DE0-Nano board.
+OK, that could explain any number of failures.
 
-Signed-off-by: Dalon Westergreen <dwesterg@gmail.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/Makefile                        |    1 +
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts |  109 +++++++++++++++++++++
- 2 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+I will leave this issue in your hands, then.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 246473a..29e33aa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -522,6 +522,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
- 	socfpga_arria5_socdk.dtb \
- 	socfpga_arria10_socdk_sdmmc.dtb \
- 	socfpga_cyclone5_socdk.dtb \
-+	socfpga_cyclone5_de0_sockit.dtb \
- 	socfpga_cyclone5_sockit.dtb \
- 	socfpga_cyclone5_socrates.dtb \
- 	socfpga_vt.dtb
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-new file mode 100644
-index 0000000..3172c82
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -0,0 +1,109 @@
-+/*
-+ * Copyright Altera Corporation (C) 2015. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "socfpga_cyclone5.dtsi"
-+
-+/ {
-+	model = "Terasic DE-0(Atlas)";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+
-+	aliases {
-+		/* this allow the ethaddr uboot environmnet variable contents
-+		 * to be added to the gmac1 device tree blob.
-+		 */
-+		ethernet0 = &gmac1;
-+	};
-+
-+	regulator_3_3v: 3-3-v-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		hps0 {
-+			label = "hps_led0";
-+			gpios = <&portb 24 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+
-+	rxd0-skew-ps = <0>;
-+	rxd1-skew-ps = <0>;
-+	rxd2-skew-ps = <0>;
-+	rxd3-skew-ps = <0>;
-+	txen-skew-ps = <0>;
-+	txc-skew-ps = <2600>;
-+	rxdv-skew-ps = <0>;
-+	rxc-skew-ps = <2000>;
-+	max-frame-size = <3800>;
-+};
-+
-+&gpio0 {
-+	status = "okay";
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&gpio2 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	speed-mode = <0>;
-+
-+	adxl345: adxl345 at 0 {
-+		compatible = "adi,adxl345";
-+		reg = <0x53>;
-+
-+		interrupt-parent = <&portc>;
-+		interrupts = <3 2>;
-+	};
-+	
-+};
-+
-+&mmc0 {
-+	vmmc-supply = <&regulator_3_3v>;
-+	vqmmc-supply = <&regulator_3_3v>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-1.7.9.5
+							Thanx, Paul
