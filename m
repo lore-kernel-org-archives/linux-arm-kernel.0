@@ -1,29 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 14 Jul 2015 09:16:17 +0800
-Subject: [PATCH v2 5/8] ARM: dts: add i.mx6ul pin function include file
-In-Reply-To: <CACRpkdbgKhXgcnncrHKDPC1hC1QEdhTyxFH61J4vG8ftoasHPQ@mail.gmail.com>
-References: <1434727951-4852-1-git-send-email-Frank.Li@freescale.com>
- <1434727951-4852-6-git-send-email-Frank.Li@freescale.com>
- <CACRpkdbgKhXgcnncrHKDPC1hC1QEdhTyxFH61J4vG8ftoasHPQ@mail.gmail.com>
-Message-ID: <20150714011617.GA3264@tiger>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Mon, 13 Jul 2015 20:19:45 -0500
+Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers if kdump is
+ not available
+In-Reply-To: <20150713202611.GA16525@fifo99.com> (dwalker@fifo99.com's message
+ of "Mon, 13 Jul 2015 20:26:11 +0000")
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.63745.stgit@softrs>
+ <87wpy82kqf.fsf@x220.int.ebiederm.org>
+ <20150713202611.GA16525@fifo99.com>
+Message-ID: <87h9p7r0we.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 10:40:57PM +0200, Linus Walleij wrote:
-> On Fri, Jun 19, 2015 at 5:32 PM,  <Frank.Li@freescale.com> wrote:
-> 
-> > From: Frank Li <Frank.Li@freescale.com>
-> >
-> > add pin mux define file
-> >
-> > Signed-off-by: Bai Ping <b51503@freescale.com>
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> > Signed-off-by: Frank Li <Frank.Li@freescale.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> Are you taking this through the ARM SoC tree?
+dwalker at fifo99.com writes:
 
-Yes, I plan to take it via IMX tree.
+> On Fri, Jul 10, 2015 at 08:41:28AM -0500, Eric W. Biederman wrote:
+>> Hidehiro Kawai <hidehiro.kawai.ez@hitachi.com> writes:
+>> 
+>> > You can call panic notifiers and kmsg dumpers before kdump by
+>> > specifying "crash_kexec_post_notifiers" as a boot parameter.
+>> > However, it doesn't make sense if kdump is not available.  In that
+>> > case, disable "crash_kexec_post_notifiers" boot parameter so that
+>> > you can't change the value of the parameter.
+>> 
+>> Nacked-by: "Eric W. Biederman" <ebiederm@xmission.com>
+>
+> I think it would make sense if he just replaced "kdump" with "kexec".
 
-Shawn
+It would be less insane, however it still makes no sense as without
+kexec on panic support crash_kexec is a noop.  So the value of the
+seeting makes no difference.
+
+Eric
