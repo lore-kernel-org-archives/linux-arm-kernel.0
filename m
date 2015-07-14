@@ -1,32 +1,44 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jul 2015 13:03:53 +0200
-Subject: [RFC PATCH 15/15] regulator: pwm: properly initialize the
- ->state field
-In-Reply-To: <20150714105155.GS11162@sirena.org.uk>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-16-git-send-email-boris.brezillon@free-electrons.com>
- <20150714105155.GS11162@sirena.org.uk>
-Message-ID: <20150714130353.5f5d9d69@bbrezillon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 Jul 2015 14:04:32 +0300
+Subject: [PATCH v2 42/48] usb: gadget: epautoconf: use 'ep_match' gadget
+ callback
+In-Reply-To: <1436866776-5004-43-git-send-email-r.baldyga@samsung.com>
+References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+ <1436866776-5004-43-git-send-email-r.baldyga@samsung.com>
+Message-ID: <55A4ECC0.4030205@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Jul 2015 11:51:55 +0100
-Mark Brown <broonie@kernel.org> wrote:
+Hello.
 
-> On Wed, Jul 01, 2015 at 10:22:01AM +0200, Boris Brezillon wrote:
-> > The ->state field is currently initialized to 0, thus referencing the
-> > voltage selector at index 0, which might not reflect the current voltage
-> > value.
-> 
-> This looks like it'll need reworking on top of Lee's recent changes to
-> implement continuous voltage support for PWM regulators - we may be
-> calculating the values to set dynamically at runtime.
+On 7/14/2015 12:39 PM, Robert Baldyga wrote:
 
-Yep, I was planning on doing that in the next iteration, but I'd like
-to have Thierry's feedback before sending a new version.
+> If gadget has set 'ep_match' callback we prefer to call it first to allow
+> UDC driver to find the best matching endpoint basing on chip-specific "best
+> usage" knowledge.
 
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> ---
+>   drivers/usb/gadget/epautoconf.c | 6 ++++++
+>   1 file changed, 6 insertions(+)
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+> index ee0d4e6..92a1a4c 100644
+> --- a/drivers/usb/gadget/epautoconf.c
+> +++ b/drivers/usb/gadget/epautoconf.c
+> @@ -165,6 +165,12 @@ struct usb_ep *usb_ep_autoconfig_ss(
+>
+>   	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
+>
+> +	if (gadget->ops->match_ep) {
+> +		ep = gadget->ops->match_ep(gadget, desc, ep_comp);
+> +		if (ep)
+> +			goto found_ep;
+> +	}
+> +
+
+    I think this patch should be merged with the previous one.
+
+[...]
+
+WBR, Sergei
