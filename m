@@ -1,37 +1,21 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Tue, 14 Jul 2015 16:28:46 +0200
-Subject: [PATCH v2] iio: adc: xilinx-xadc: Push interrupts into threaded
- context
-In-Reply-To: <1436391502-2604-1-git-send-email-xander.huff@ni.com>
-References: <5574633F.7090004@kernel.org>
- <1436391502-2604-1-git-send-email-xander.huff@ni.com>
-Message-ID: <20150714142846.GB21820@linutronix.de>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 14 Jul 2015 09:31:47 -0500
+Subject: [PATCH 1/2] ARM: dts: imx7d: enable snvs rtc,
+ onoffkey and power off
+In-Reply-To: <20150714034440.GE4119@tiger>
+References: <1436376180-5891-1-git-send-email-Frank.Li@freescale.com>
+ <20150714034440.GE4119@tiger>
+Message-ID: <CAHrpEqRTj_KDDHYVhwqczHWvtKEoAQ0qDfU=r=c5TKKOtgFWYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Xander Huff | 2015-07-08 16:38:22 [-0500]:
+On Mon, Jul 13, 2015 at 10:44 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> without any board level
+> configuration and pin-out, we should probably just leave it enabled by
+> default, i.e. drop status = "disabled" and save status = "okay" in board
+> level dts?
 
-> drivers/iio/adc/xilinx-xadc-core.c | 35 ++++++++++++-----------------------
-> 1 file changed, 12 insertions(+), 23 deletions(-)
->
->diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
->index ce93bd8..b309ad3 100644
->--- a/drivers/iio/adc/xilinx-xadc-core.c
->+++ b/drivers/iio/adc/xilinx-xadc-core.c
->@@ -1225,7 +1214,7 @@ static int xadc_probe(struct platform_device *pdev)
-> 	if (ret)
-> 		goto err_free_samplerate_trigger;
-> 
->-	ret = request_threaded_irq(irq, xadc->ops->interrupt_handler,
->+	ret = request_threaded_irq(irq, 0,
+Okay,  Did you need me send new version? or you can change it?
 
-NULL not 0
-Other than that, it looks good. Thanks.
-If you managed to get this merged upstream then feel free to ping me and
-I pick this into -RT.
-
-> 				xadc->ops->threaded_interrupt_handler,
-> 				0, dev_name(&pdev->dev), indio_dev);
-> 	if (ret)
-
-Sebastian
+best regards
+Frank Li
