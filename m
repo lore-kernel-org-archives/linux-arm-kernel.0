@@ -1,46 +1,32 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 14 Jul 2015 13:16:28 +0200
-Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
- ->disable() and ->is_enabled methods
-In-Reply-To: <20150714110819.GU11162@sirena.org.uk>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
- <20150714105019.GR11162@sirena.org.uk>
- <20150714130222.1bdfedc5@bbrezillon>
- <20150714110819.GU11162@sirena.org.uk>
-Message-ID: <20150714131628.0c87f0a4@bbrezillon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Jul 2015 04:29:33 -0700
+Subject: [PATCH v2 00/20] ARM: DTS: am335x/am43xx: Audio support and
+ fixes for audio
+In-Reply-To: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1435845995-19085-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20150714112933.GU17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Jul 2015 12:08:19 +0100
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Tue, Jul 14, 2015 at 01:02:22PM +0200, Boris Brezillon wrote:
-> > Mark Brown <broonie@kernel.org> wrote:
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [150702 07:08]:
+> Hi,
 > 
-> > > On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
-> > > > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
-> > > > the PWM call in ->set_voltage_sel().
+> Changes since v1:
+> - Add patch for omap2plus_defconfig to enable needed audio drivers
+> - Included other board patches since they all need the change in
+>   omap2plus_defconfig
 > 
-> > > This doesn't apply, please check and resend.
+> Enable the simple card in omap2plus_defconfig as more boards are using that for
+> audio support.
 > 
-> > This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
-> > and 15 were not meant to be applied without Thierry's approval (they
-> > depend on other changes in the PWM framework).
-> > I can rebase them on top of linux-next (or just on top of Linus'
-> > 4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
-> > on your regulator's for-next branch is a good idea.
+> am437x-sk-evm, am335x-evmsk and am335x-evm:
+> There is no reason to use the davinci-evm machine driver's compatible for audio
+> support since the setup is simple and the common simple-audio-card can handle it
+> just fine.
 > 
-> What is the dependency for the enable patch?
+> am43xx-epos-evm, am437x-gp-evm:
+> Add audio support via simple-card
 
-Oh, indeed. This patch has no dependency on the PWM changes. I'll send
-it on its own then.
+Applying all into omap-for-v4.3/dt thanks.
 
-Thanks,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Tony
