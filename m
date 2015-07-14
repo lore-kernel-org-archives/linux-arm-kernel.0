@@ -1,40 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jul 2015 03:28:56 -0700
-Subject: [PATCH v5 8/8] ARM: DTS: dra7x: Integrate sDMA crossbar
-In-Reply-To: <20150409191206.GU18048@atomide.com>
-References: <1428572154-3548-1-git-send-email-peter.ujfalusi@ti.com>
- <1428572154-3548-9-git-send-email-peter.ujfalusi@ti.com>
- <20150409151846.GR18048@atomide.com> <5526C9E5.4070601@ti.com>
- <20150409190126.GT18048@atomide.com> <5526CD6A.8010300@ti.com>
- <20150409191206.GU18048@atomide.com>
-Message-ID: <20150714102855.GL17550@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 14 Jul 2015 11:34:21 +0100
+Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
+ backend
+In-Reply-To: <1436430685-2202-4-git-send-email-jszhang@marvell.com>
+References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
+ <1436430685-2202-4-git-send-email-jszhang@marvell.com>
+Message-ID: <20150714103421.GU7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150409 12:17]:
-> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 12:07]:
-> > On 04/09/2015 10:01 PM, Tony Lindgren wrote:
-> > > * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 11:55]:
-> > >> On 04/09/2015 06:18 PM, Tony Lindgren wrote:
-> > >>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [150409 02:37]:
-> > >>>> The sDMA requests are routed through the DMA crossbar and without the
-> > >>>> crossbar only peripherals using DMA request 0-127 can be used.
-> > >>>
-> > >>> I assume this can be merged separately from the driver
-> > >>> changes?
-> > >>
-> > >> Unfortunately not. We need to have the drivers in place for the DTS changes to
-> > >> work.
-> > > 
-> > > Right but just merging the driver changes presumably won't
-> > > break things?
-> > 
-> > No, they will not break anything. We just do not have control over the DMA
-> > crossbar (in a same way as we don't have control right now).
+On Thu, Jul 09, 2015 at 04:31:25PM +0800, Jisheng Zhang wrote:
+> This patch implements cpuidle_ops using psci. After this patch, we can
+> use cpuidle-arm.c with psci backend for both arm and arm64.
 > 
-> OK good to hear.
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm/kernel/Makefile       |  1 +
+>  arch/arm/kernel/psci_cpuidle.c | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
+>  create mode 100644 arch/arm/kernel/psci_cpuidle.c
+> 
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index 3b995f5..96383d8 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
+>  ifeq ($(CONFIG_ARM_PSCI),y)
+>  obj-y				+= psci-call.o
+>  obj-$(CONFIG_SMP)		+= psci_smp.o
+> +obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
+>  endif
+>  
+>  extra-y := $(head-y) vmlinux.lds
+> diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
+> new file mode 100644
+> index 0000000..e7146d2
+> --- /dev/null
+> +++ b/arch/arm/kernel/psci_cpuidle.c
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (C) 2015 Marvell Technology Group Ltd.
+> + * Author: Jisheng Zhang <jszhang@marvell.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/cpuidle.h>
+> +#include <linux/psci.h>
+> +
+> +#include <asm/cpuidle.h>
+> +
+> +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+> +	.suspend = cpu_psci_cpu_suspend,
+> +	.init = cpu_psci_cpu_init_idle,
+> +};
+> +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
 
-Looks like the related DMA changes are now merged, so applying this
-into omap-for-v4.3/dt thanks.
+Is there any reason this can't live in the drivers sub-tree?  Is there
+anything specific to 32-bit ARM about this?
 
-Tony
+It looks to me like the right thing to do is to have it as part of
+drivers/firmware/psci.c.
+
+We don't do this for other stuff - we don't have IRQ_CHIP_OF_DECLARE
+stuff in arch/arm but have the IRQ chip drivers in drivers/irqchip.
+We keep it all togehter in drivers/irqchip, even when the IRQ chip
+driver is only useful on ARM.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
