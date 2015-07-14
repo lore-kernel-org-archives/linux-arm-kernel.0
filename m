@@ -1,84 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 14 Jul 2015 12:03:02 +0100
-Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <20150714103421.GU7557@n2100.arm.linux.org.uk>
-References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
- <1436430685-2202-4-git-send-email-jszhang@marvell.com>
- <20150714103421.GU7557@n2100.arm.linux.org.uk>
-Message-ID: <20150714110302.GA334@red-moon>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 14 Jul 2015 13:02:22 +0200
+Subject: [RFC PATCH 14/15] regulator: pwm: implement ->enable(),
+ ->disable() and ->is_enabled methods
+In-Reply-To: <20150714105019.GR11162@sirena.org.uk>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-15-git-send-email-boris.brezillon@free-electrons.com>
+ <20150714105019.GR11162@sirena.org.uk>
+Message-ID: <20150714130222.1bdfedc5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 11:34:21AM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 09, 2015 at 04:31:25PM +0800, Jisheng Zhang wrote:
-> > This patch implements cpuidle_ops using psci. After this patch, we can
-> > use cpuidle-arm.c with psci backend for both arm and arm64.
-> > 
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >  arch/arm/kernel/Makefile       |  1 +
-> >  arch/arm/kernel/psci_cpuidle.c | 19 +++++++++++++++++++
-> >  2 files changed, 20 insertions(+)
-> >  create mode 100644 arch/arm/kernel/psci_cpuidle.c
-> > 
-> > diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> > index 3b995f5..96383d8 100644
-> > --- a/arch/arm/kernel/Makefile
-> > +++ b/arch/arm/kernel/Makefile
-> > @@ -91,6 +91,7 @@ obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
-> >  ifeq ($(CONFIG_ARM_PSCI),y)
-> >  obj-y				+= psci-call.o
-> >  obj-$(CONFIG_SMP)		+= psci_smp.o
-> > +obj-$(CONFIG_CPU_IDLE)		+= psci_cpuidle.o
-> >  endif
-> >  
-> >  extra-y := $(head-y) vmlinux.lds
-> > diff --git a/arch/arm/kernel/psci_cpuidle.c b/arch/arm/kernel/psci_cpuidle.c
-> > new file mode 100644
-> > index 0000000..e7146d2
-> > --- /dev/null
-> > +++ b/arch/arm/kernel/psci_cpuidle.c
-> > @@ -0,0 +1,19 @@
-> > +/*
-> > + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> > + * Author: Jisheng Zhang <jszhang@marvell.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/cpuidle.h>
-> > +#include <linux/psci.h>
-> > +
-> > +#include <asm/cpuidle.h>
-> > +
-> > +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> > +	.suspend = cpu_psci_cpu_suspend,
-> > +	.init = cpu_psci_cpu_init_idle,
-> > +};
-> > +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+Hi Mark,
+
+On Tue, 14 Jul 2015 11:50:19 +0100
+Mark Brown <broonie@kernel.org> wrote:
+
+> On Wed, Jul 01, 2015 at 10:22:00AM +0200, Boris Brezillon wrote:
+> > Implement the ->enable(), ->disable() and ->is_enabled methods and remove
+> > the PWM call in ->set_voltage_sel().
 > 
-> Is there any reason this can't live in the drivers sub-tree?  Is there
-> anything specific to 32-bit ARM about this?
-> 
-> It looks to me like the right thing to do is to have it as part of
-> drivers/firmware/psci.c.
+> This doesn't apply, please check and resend.
 
-I take this as an ACK to M.Rutland's PSCI code move to drivers/firmware,
-right ?
+This series was made on top of Linus' tree (4.2-rc1 IIRC) and patch 14
+and 15 were not meant to be applied without Thierry's approval (they
+depend on other changes in the PWM framework).
+I can rebase them on top of linux-next (or just on top of Linus'
+4.2-rc2) if Thierry is okay with that, but I don't think rebasing them
+on your regulator's for-next branch is a good idea.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355643.html
-
-> We don't do this for other stuff - we don't have IRQ_CHIP_OF_DECLARE
-> stuff in arch/arm but have the IRQ chip drivers in drivers/irqchip.
-> We keep it all togehter in drivers/irqchip, even when the IRQ chip
-> driver is only useful on ARM.
-
-CPUidle operations are ARM only, they are not used on ARM64, so
-they belong in arch/arm (that's the same thing as SMP ops, on ARM64
-SMP ops and CPUidle ops are unified through CPU operations).
+Thierry, Mark, let me know what you prefer.
 
 Thanks,
-Lorenzo
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
