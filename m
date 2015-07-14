@@ -1,21 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jul 2015 14:49:34 +0100
-Subject: [PATCH] spi: imx: fix ecspi mode setup
-In-Reply-To: <1436880205-25023-1-git-send-email-qxovxp@gmail.com>
-References: <1436880205-25023-1-git-send-email-qxovxp@gmail.com>
-Message-ID: <20150714134934.GV11162@sirena.org.uk>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 14 Jul 2015 10:49:46 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Select CONFIG_IKCONFIG_PROC
+Message-ID: <1436881786-9886-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 04:23:25PM +0300, Andrew Y. Kuksov wrote:
-> Fixed problem with setting spi mode 0 or 1 after setting mode 2 or 3
+It is useful to know how the kernel was configured via:
+zcat /proc/config.gz ,so select the CONFIG_IKCONFIG_PROC option.
 
-What is the problem and how does this change fix it (this information
-should be in the changelog)?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/a1a1f951/attachment.sig>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index e1ba3e2..a4ebc95 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -3,6 +3,8 @@ CONFIG_SYSVIPC=y
+ CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_IKCONFIG=y
++CONFIG_IKCONFIG_PROC=y
+ CONFIG_LOG_BUF_SHIFT=18
+ CONFIG_CGROUPS=y
+ CONFIG_RELAY=y
+@@ -76,8 +78,8 @@ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
+ CONFIG_BT_HCIUART=y
+-CONFIG_BT_HCIUART_LL=y
+ CONFIG_BT_HCIUART_H4=y
++CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
+ CONFIG_MAC80211=y
+ CONFIG_RFKILL=y
+-- 
+1.9.1
