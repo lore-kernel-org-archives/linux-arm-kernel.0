@@ -1,32 +1,40 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 14 Jul 2015 18:41:39 +0900
-Subject: [GIT PULL] ARM: EXYNOS: dts: Fixes for 4.2
-In-Reply-To: <CAJKOXPd6OtiqwJYVGnC+Y3HYowTv86x6mt_txKnM-tsWWKrPeg@mail.gmail.com>
-References: <1436790601-9598-1-git-send-email-k.kozlowski@samsung.com>
- <076601d0be0e$c4998780$4dcc9680$@kernel.org>
- <CAJKOXPd6OtiqwJYVGnC+Y3HYowTv86x6mt_txKnM-tsWWKrPeg@mail.gmail.com>
-Message-ID: <07db01d0be19$48f9e1a0$daeda4e0$@kernel.org>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Tue, 14 Jul 2015 11:39:02 +0200
+Subject: [PATCH v2 14/48] usb: gadget: fsl_qe_udc: add ep capabilities support
+In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-15-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
-> 
-> 2015-07-14 17:26 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> > Krzysztof Kozlowski wrote:
-> >>
-> >> Dear Kukjin,
-> >>
-> > Hi,
-> >
-> > Thanks for your pull-request and I'll sort them out for 4.2-rc soon.
-> >
-> > BTW, the Thomas' patch is enough to support exynos4210 cpufreq without other
-> > patches in the series? I didn't think so...
-> 
-> All other patches were already applied by Mike and sent to Linus
-> during 4.2 merge window.
-> 
-Sounds good. OK, I'll handle this series in this -rc round.
+Convert endpoint configuration to new capabilities model.
 
-Thanks,
-Kukjin
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/gadget/udc/fsl_qe_udc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/usb/gadget/udc/fsl_qe_udc.c b/drivers/usb/gadget/udc/fsl_qe_udc.c
+index e0822f1..5fb6f8b 100644
+--- a/drivers/usb/gadget/udc/fsl_qe_udc.c
++++ b/drivers/usb/gadget/udc/fsl_qe_udc.c
+@@ -2417,6 +2417,17 @@ static int qe_ep_config(struct qe_udc *udc, unsigned char pipe_num)
+ 	strcpy(ep->name, ep_name[pipe_num]);
+ 	ep->ep.name = ep_name[pipe_num];
+ 
++	if (pipe_num == 0) {
++		ep->ep.caps.type_control = true;
++	} else {
++		ep->ep.caps.type_iso = true;
++		ep->ep.caps.type_bulk = true;
++		ep->ep.caps.type_int = true;
++	}
++
++	ep->ep.caps.dir_in = true;
++	ep->ep.caps.dir_out = true;
++
+ 	ep->ep.ops = &qe_ep_ops;
+ 	ep->stopped = 1;
+ 	usb_ep_set_maxpacket_limit(&ep->ep, (unsigned short) ~0);
+-- 
+1.9.1
