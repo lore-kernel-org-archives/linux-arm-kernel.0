@@ -1,38 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jul 2015 00:03:17 -0700
-Subject: [PATCH] ARM: OMAP2+: Add HAVE_ARM_SCU for AM43XX
-In-Reply-To: <1436562348-53396-1-git-send-email-d-gerlach@ti.com>
-References: <1436562348-53396-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20150714070317.GG17550@atomide.com>
+Date: Tue, 14 Jul 2015 00:05:26 -0700
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+In-Reply-To: <20150714044944.GA11198@atomide.com>
+References: <1436820101-2172-1-git-send-email-balbi@ti.com>
+ <CAGo_u6oM2rtdvLp3deDsxJJWpJ6YZJ5b02m1qDdxhEjUH_69dg@mail.gmail.com>
+ <20150714044944.GA11198@atomide.com>
+Message-ID: <20150714070525.GH17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150710 14:08]:
-> CONFIG_HAVE_ARM_SCU only gets selected if CONFIG_SMP is selected in an OMAP
-> system, however AM43XX needs this option regardless of CONFIG_SMP and also
-> for an AM43XX only build as it is important for controlling power in the SoC.
-> Without this we cannot suspend the CPU for SoC suspend or cpuidle. The
-> ARM Cortex A9 needs SCU CPU Power Status bits to be set to off mode in order
-> for the PRCM to transition the MPU to low power modes.
+* Tony Lindgren <tony@atomide.com> [150713 21:52]:
+> * Nishanth Menon <nm@ti.com> [150713 13:56]:
+> > On Mon, Jul 13, 2015 at 3:41 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+> > > the realtime counter sits in the Wakeup Always-On Power domain.
+> > > Furthermore, the counter will automatically switch the 32K clock source
+> > > when MPU goes into standby and automatically switch back to SYS_CLK or
+> > > ABE_LP when MPU goes out of standby.
 > 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  arch/arm/mach-omap2/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index ecc04ff..4a023e8 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -60,6 +60,7 @@ config SOC_AM43XX
->  	select ARM_GIC
->  	select MACH_OMAP_GENERIC
->  	select MIGHT_HAVE_CACHE_L2X0
-> +	select HAVE_ARM_SCU
->  
->  config SOC_DRA7XX
->  	bool "TI DRA7XX"
+> That's good to hear. Is that the case also for 5432?
 
-Applying into omap-for-v4.2/fixes thanks.
+Adding into omap-for-v4.2/fixes, if 5432 supports it too it
+can be patched separately.
+
+Regards,
 
 Tony
