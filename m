@@ -1,26 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 14 Jul 2015 17:28:06 +0100
-Subject: [RFC PATCH 2/2] spi: zynqmp: gqspi: add support for stacked mode
- configuration
-In-Reply-To: <1436445895-25504-3-git-send-email-ranjit.waghmode@xilinx.com>
-References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
- <1436445895-25504-3-git-send-email-ranjit.waghmode@xilinx.com>
-Message-ID: <20150714162806.GD11162@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 14 Jul 2015 17:29:56 +0100
+Subject: [PATCH] arm64: Define HAVE_ARCH_PIO_SIZE and related symbols.
+In-Reply-To: <55A53509.4060202@caviumnetworks.com>
+References: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150714110039.GC16213@arm.com>
+ <55A53509.4060202@caviumnetworks.com>
+Message-ID: <20150714162955.GR16213@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 06:14:55PM +0530, Ranjit Waghmode wrote:
-> This patch adds support of stacked mode configuration for
-> Zynq Ultrascale+ MPSoC GQSPI controller driver.
+On Tue, Jul 14, 2015 at 05:12:57PM +0100, David Daney wrote:
+> On 07/14/2015 04:00 AM, Will Deacon wrote:
+> > On Mon, Jul 13, 2015 at 10:31:36PM +0100, David Daney wrote:
+> >> From: David Daney <david.daney@cavium.com>
+> >>
+> >> Needed to make pci_iomap() work.
+> >
+> > Care to elaborate?
+> >
+> 
+> I should have explained what I am doing here a little better.
 
-> +	} else if (qspi->master->flags & SPI_MASTER_U_PAGE) {
+Yeah, thanks.
 
-Same here, there's no definition of SPI_MASTER_U_PAGE.  It doesn't sound
-very generic but I'm not entirely sure what "stacked mode" is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/7fcc581a/attachment-0001.sig>
+> Systems based on the Cavium ThunderX processor may have up to 8 
+> independent PCIe root complexes.  The I/O space on each bus occupies an 
+> independent physical address window.
+
+Hmm, so do you have 64k of I/O space per-bus? That gives 8x256x64k = 128M
+IIUC, so not sure what your 32MB is for.
+
+> So, in order to be able to map all of these (semi) contiguously, we need 
+> a lot more virtual address space than is supplied by the default values 
+> for all these constants.
+> 
+> The option I chose here was to unconditionally expand the I/O ranges for 
+> all arm64 systems.  If you think this breaks existing systems/drivers, I 
+> will have to look for other options.
+
+Hmm, but pci_iomap winds up calling __pci_ioport_map, which expands to
+ioport_map which just does:
+
+	return PCI_IOBASE + (port & IO_SPACE_LIMIT);
+
+so I'm struggling to see what your patch achieves.
+
+Will
