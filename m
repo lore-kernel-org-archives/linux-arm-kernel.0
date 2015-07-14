@@ -1,300 +1,93 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 14 Jul 2015 16:00:54 +0800
-Subject: [PATCH v3] clk: mediatek: Export CPU mux clocks for CPU frequency
- control
-In-Reply-To: <1436176874-5729-1-git-send-email-pi-cheng.chen@linaro.org>
-References: <1436176874-5729-1-git-send-email-pi-cheng.chen@linaro.org>
-Message-ID: <CAGS+omBOJhNcLricr6dkpz7Dk=2X5M5QDiZWnhCAHMKZzV6ytA@mail.gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 14 Jul 2015 17:23:21 +0900
+Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
+In-Reply-To: <CAPTzV15+BWEo6PjJMwHVjqVdUnZuJ=PBAUprF_vZaSRTYiuNXw@mail.gmail.com>
+References: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
+ <55A45C63.2030907@samsung.com> <06b101d0bdf2$8aad8fb0$a008af10$@kernel.org>
+ <CAPTzV15+BWEo6PjJMwHVjqVdUnZuJ=PBAUprF_vZaSRTYiuNXw@mail.gmail.com>
+Message-ID: <075c01d0be0e$587fe260$097fa720$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pi-Cheng,
+Chanho Park wrote:
+> 
+> Hi Kukjin,
+> 
+> On Tue, Jul 14, 2015 at 2:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
+> > Krzysztof Kozlowski wrote:
+> >>
+> >> On 14.07.2015 09:24, Chanho Park wrote:
+> >> > The odroid-xu3 board which is based on exynos5422 not exynos5800 is
+> >> > booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
+> >> > is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
+> >> > cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
+> >> > and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
+> >> > cpu4-7 are cortex-a15.
+> >> >
+> >> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> > Signed-off-by: Chanho Park <parkch98@gmail.com>
+> >> > ---
 
-On Mon, Jul 6, 2015 at 6:01 PM, Pi-Cheng Chen <pi-cheng.chen@linaro.org> wrote:
-> From: "pi-cheng.chen" <pi-cheng.chen@linaro.org>
->
-> This patch adds CPU mux clocks which are used by Mediatek cpufreq driver
-> for intermediate clock source switching.
+[...]
 
-Hopefully we will some day have regmap support for mux basic clocks.
-Until then, this patch looks good, just some minor comments inline...
+> >> >
+> >> > Secondary cpu booting problem[1] is not resolved yet. Need more investigations
+> >> > to work booting 8 cores correctly.
+> >> >
+> >> > [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
+> >> >
+> >> >  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
+> >> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
+> >> >  2 files changed, 82 insertions(+)
+> >> >  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
+> >>
+> >> Thanks, applied to my tree. I'll send it to Kukjin for v4.3 unless he
+> >> picks it also.
+> >>
+> > Well, let me see. I'm thinking we need to sort out the cpu ordering and dtsi
+> > inclusions for exynos5420, 5422 and 5800 related to DT files.
+> >
+> > See,
+> >
+> > 1) exynos5420 DT (cpu0~3: a15, cpu 4~7: a7)
+> > 2) exynos5800 DT is including exynos5420 DT
+> > 3) exynos5422 and exynos5800 based boards are including exynos5800 DT.
+> >
+> > Then making exynos5422-cpus DT for exynos5422 based boards?
+> > (cpu0~3: a7, cpu4~7: a15)
+> >
+> > I think, it could cause confusion when new board based on them are added
+> > because it's not clear and the boot cpu could be selected by bootloader part.
+> 
+> The iROM will check the GPIO pin to select which core is run as cpu0.
+> I think no one will change the GPIO pin if a new board which is based
+> on exynos5422 :)
+> 
+Yes, I know the boot sequence and it means it depends on board configuration
+not SoC. That?s why I'm saying it should be handled in board DT file. I think,
+most of current exynos big.LITTLE model should do if it could be changed
+according to board configuration.
 
->
-> Changes in v3:
-> - Rebase to 4.2-rc1
-> - Fix some issues of v2
->
-> Changes in v2:
-> - Remove use of .determine_rate callback
->
-> Signed-off-by: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> ---
->  drivers/clk/mediatek/Makefile          |   2 +-
->  drivers/clk/mediatek/clk-cpumux.c      | 119 +++++++++++++++++++++++++++++++++
->  drivers/clk/mediatek/clk-cpumux.h      |  30 +++++++++
->  drivers/clk/mediatek/clk-mt8173.c      |  23 +++++++
->  include/dt-bindings/clock/mt8173-clk.h |   4 +-
->  5 files changed, 176 insertions(+), 2 deletions(-)
->  create mode 100644 drivers/clk/mediatek/clk-cpumux.c
->  create mode 100644 drivers/clk/mediatek/clk-cpumux.h
->
-> diff --git a/drivers/clk/mediatek/Makefile b/drivers/clk/mediatek/Makefile
-> index 8e4b2a4..299917a 100644
-> --- a/drivers/clk/mediatek/Makefile
-> +++ b/drivers/clk/mediatek/Makefile
-> @@ -1,4 +1,4 @@
-> -obj-y += clk-mtk.o clk-pll.o clk-gate.o
-> +obj-y += clk-mtk.o clk-pll.o clk-gate.o clk-cpumux.o
->  obj-$(CONFIG_RESET_CONTROLLER) += reset.o
->  obj-y += clk-mt8135.o
->  obj-y += clk-mt8173.o
-> diff --git a/drivers/clk/mediatek/clk-cpumux.c b/drivers/clk/mediatek/clk-cpumux.c
-> new file mode 100644
-> index 0000000..593df45
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-cpumux.c
-> @@ -0,0 +1,119 @@
-> +/*
-> + * Copyright (c) 2015 Linaro Ltd.
-> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/slab.h>
-> +
-> +#include "clk-mtk.h"
-> +#include "clk-cpumux.h"
-> +
-> +static inline struct mtk_clk_cpumux *to_clk_mux(struct clk_hw *_hw)
-> +{
-> +       return container_of(_hw, struct mtk_clk_cpumux, hw);
-> +}
-> +
-> +static u8 clk_cpumux_get_parent(struct clk_hw *hw)
-> +{
-> +       struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-> +       int num_parents = __clk_get_num_parents(hw->clk);
-> +       unsigned int val;
-> +
-> +       regmap_read(mux->regmap, mux->reg, &val);
-> +
-> +       val >>= mux->shift;
-> +       val &= mux->mask;
-> +
-> +       if (val >= num_parents)
-> +               return -EINVAL;
-> +
-> +       return val;
-> +}
-> +
-> +static int clk_cpumux_set_parent(struct clk_hw *hw, u8 index)
-> +{
-> +       struct mtk_clk_cpumux *mux = to_clk_mux(hw);
-> +       u32 mask, val;
-> +
-> +       val = index << mux->shift;
-> +       mask = mux->mask << mux->shift;
-> +
-> +       return regmap_update_bits(mux->regmap, mux->reg, mask, val);
-> +}
-> +
-> +static const struct clk_ops clk_cpumux_ops = {
-> +       .get_parent = clk_cpumux_get_parent,
-> +       .set_parent = clk_cpumux_set_parent,
-> +};
-> +
-> +static struct clk *mtk_clk_register_cpumux(const struct mtk_composite *mux,
-> +                                          struct regmap *regmap)
+> >
+> > So how about creating exynos5422-cpus and exynos5420-cpus then including the
+> > cpus DT file in each board accordingly?
+> >
+> > Or more clear way to avoid confusion?
+> 
+> In this situation, all exynos5422 boards(odroid xu3 series and mobile
+> phone) have same cpu configurations. If we move the exynos5420 cpu
+> configuration from exynos5420.dtsi, we should change all dts which
+> including exynos5420.dtsi.
 
-__init
+Maybe same board configuration. Just adding inclusion should be fine at this
+moment.
 
-> +{
-> +       struct mtk_clk_cpumux *cpumux;
-> +       struct clk *clk;
-> +       struct clk_init_data init;
-> +
-> +       cpumux = kzalloc(sizeof(*cpumux), GFP_KERNEL);
-> +       if (!cpumux)
-> +               return ERR_PTR(-ENOMEM);
-> +
-> +       init.name = mux->name;
-> +       init.ops = &clk_cpumux_ops;
-> +       init.parent_names = mux->parent_names;
-> +       init.num_parents = mux->num_parents;
-> +       init.flags = mux->flags;
-> +
-> +       cpumux->reg = mux->mux_reg;
-> +       cpumux->shift = mux->mux_shift;
-> +       cpumux->mask = BIT(mux->mux_width) - 1;
-> +       cpumux->regmap = regmap;
-> +       cpumux->hw.init = &init;
-> +
-> +       clk = clk_register(NULL, &cpumux->hw);
-> +       if (IS_ERR(clk))
-> +               kfree(cpumux);
-> +
-> +       return clk;
-> +}
-> +
-> +int mtk_clk_register_cpumuxes(struct device_node *node,
-> +                             const struct mtk_composite *clks, int num,
-> +                             struct clk_onecell_data *clk_data)
+> I think we'd better to defer the change until a new exynos5422 board
+> which has different cpu configurations is added.
+> 
+I mean, according to current inclusion of exynos5422 based boards' DT file, it
+is including exynos5420 DT via exynos5800 DT and then override different cpu
+ordering (5422-cpu DT) because of different board configuration (just GPIO
+value) and it is not a good way in this case.
 
-__init
-
-> +{
-> +       int i;
-> +       struct clk *clk;
-> +       struct regmap *regmap;
-> +
-> +       regmap = syscon_node_to_regmap(node);
-> +       if (IS_ERR(regmap)) {
-> +               pr_err("Cannot find regmap for %s: %d\n", node->full_name,
-> +                      PTR_ERR(regmap));
-> +               return PTR_ERR(regmap);
-> +       }
-> +
-> +       for (i = 0; i < num; i++) {
-> +               const struct mtk_composite *mux = &clks[i];
-> +
-> +               clk = mtk_clk_register_cpumux(mux, regmap);
-> +               if (IS_ERR(clk)) {
-> +                       pr_err("Failed to register clk %s: %ld\n",
-> +                              mux->name, PTR_ERR(clk));
-> +                       continue;
-> +               }
-> +
-> +               clk_data->clks[mux->id] = clk;
-> +       }
-> +
-> +       return 0;
-> +}
-> diff --git a/drivers/clk/mediatek/clk-cpumux.h b/drivers/clk/mediatek/clk-cpumux.h
-> new file mode 100644
-> index 0000000..dddaad5
-> --- /dev/null
-> +++ b/drivers/clk/mediatek/clk-cpumux.h
-> @@ -0,0 +1,30 @@
-> +/*
-> + * Copyright (c) 2015 Linaro Ltd.
-> + * Author: Pi-Cheng Chen <pi-cheng.chen@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __DRV_CLK_CPUMUX_H
-> +#define __DRV_CLK_CPUMUX_H
-> +
-> +struct mtk_clk_cpumux {
-> +       struct clk_hw   hw;
-> +       struct regmap   *regmap;
-> +       u32             reg;
-> +       u32             mask;
-> +       u8              shift;
-> +};
-
-The struct definition can move inside clk-cpumux.c
-
-> +
-> +int mtk_clk_register_cpumuxes(struct device_node *node,
-> +                             const struct mtk_composite *clks, int num,
-> +                             struct clk_onecell_data *clk_data);
-> +
-> +#endif /* __DRV_CLK_CPUMUX_H */
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-> index 4b9e04c..d14183b 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -19,6 +19,7 @@
->
->  #include "clk-mtk.h"
->  #include "clk-gate.h"
-> +#include "clk-cpumux.h"
->
->  #include <dt-bindings/clock/mt8173-clk.h>
->
-> @@ -517,6 +518,25 @@ static const char * const i2s3_b_ck_parents[] __initconst = {
->         "apll2_div5"
->  };
->
-> +static const char * const ca53_parents[] __initconst = {
-> +       "clk26m",
-> +       "armca7pll",
-> +       "mainpll",
-> +       "univpll"
-> +};
-> +
-> +static const char * const ca57_parents[] __initconst = {
-> +       "clk26m",
-> +       "armca15pll",
-> +       "mainpll",
-> +       "univpll"
-> +};
-> +
-> +static struct mtk_composite cpu_muxes[] __initdata = {
-
-static const struct mtk_composite cpu_muxes[] __initconst = {
-
-
-With the above small fixes, this one is:
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
-
-> +       MUX(CLK_INFRA_CA53SEL, "infra_ca53_sel", ca53_parents, 0x0000, 0, 2),
-> +       MUX(CLK_INFRA_CA57SEL, "infra_ca57_sel", ca57_parents, 0x0000, 2, 2),
-> +};
-> +
->  static const struct mtk_composite top_muxes[] __initconst = {
->         /* CLK_CFG_0 */
->         MUX(CLK_TOP_AXI_SEL, "axi_sel", axi_parents, 0x0040, 0, 3),
-> @@ -738,6 +758,9 @@ static void __init mtk_infrasys_init(struct device_node *node)
->         mtk_clk_register_gates(node, infra_clks, ARRAY_SIZE(infra_clks),
->                                                 clk_data);
->
-> +       mtk_clk_register_cpumuxes(node, cpu_muxes, ARRAY_SIZE(cpu_muxes),
-> +                                               clk_data);
-> +
->         r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
->         if (r)
->                 pr_err("%s(): could not register clock provider: %d\n",
-> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-> index 4ad76ed..5501cec 100644
-> --- a/include/dt-bindings/clock/mt8173-clk.h
-> +++ b/include/dt-bindings/clock/mt8173-clk.h
-> @@ -187,7 +187,9 @@
->  #define CLK_INFRA_CEC                  9
->  #define CLK_INFRA_PMICSPI              10
->  #define CLK_INFRA_PMICWRAP             11
-> -#define CLK_INFRA_NR_CLK               12
-> +#define CLK_INFRA_CA53SEL              12
-> +#define CLK_INFRA_CA57SEL              13
-> +#define CLK_INFRA_NR_CLK               14
->
->  /* PERI_SYS */
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+- Kukjin
