@@ -1,106 +1,148 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 14 Jul 2015 14:20:43 -0700
-Subject: [PATCH 4/4] arm64: dts: Add Broadcom North Star 2 support
-In-Reply-To: <20150714092353.GA12675@leverpostej>
-References: <1436837955-26279-1-git-send-email-rjui@broadcom.com>
- <1436837955-26279-5-git-send-email-rjui@broadcom.com>
- <20150714092353.GA12675@leverpostej>
-Message-ID: <55A57D2B.4010207@broadcom.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 14 Jul 2015 16:23:07 -0500
+Subject: [PATCH] ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
+Message-ID: <1436908987-16038-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Dalon Westergreen <dwesterg@gmail.com>
 
+The Terasic DE0 Atlas board is also known as the DE0-Nano board.
 
-On 7/14/2015 2:23 AM, Mark Rutland wrote:
-> Hi,
-> 
->> +/dts-v1/;
->> +
->> +#include "ns2.dtsi"
->> +
->> +/ {
->> +       model = "Broadcom NS2 SVK";
->> +       compatible = "brcm,ns2-svk", "brcm,ns2";
->> +
->> +       chosen {
->> +               bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0x66130000";
->> +       };
-> 
-> Please use stdout-path instead (you can use /aliases to make it
-> simpler). It'll save a redundant description of the UART and will remove
-> the dependency on Linux-specific naming of the UART.
-> 
-> [...]
+Signed-off-by: Dalon Westergreen <dwesterg@gmail.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+ arch/arm/boot/dts/Makefile                        |    1 +
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts |  109 +++++++++++++++++++++
+ 2 files changed, 110 insertions(+)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
 
-Saw that Arnd also has the same comment. I will fix this.
-
-> 
->> +/ {
->> +       compatible = "brcm,ns2";
->> +       interrupt-parent = <&gic>;
->> +       #address-cells = <2>;
->> +       #size-cells = <2>;
->> +
->> +       cpus {
->> +               #address-cells = <2>;
->> +               #size-cells = <0>;
->> +
->> +               cpu at 0 {
->> +                       device_type = "cpu";
->> +                       compatible = "arm,cortex-a57", "arm,armv8";
->> +                       reg = <0 0>;
->> +                       enable-method = "spin-table";
->> +                       cpu-release-addr = <0 0x84b00000>;
->> +               };
->> +       };
-> 
-> Shouldn't the other CPUs be described?
-
-Let me give that a try but there's a chance that I cannot enable other 3
-cores until we have a more stable bootloader configuration.
-
-> 
-> Using spin-table for SMP is somewhat unfortunate, as it comes with a
-> number of problems (e.g. unwoken secondaries spinning in the kernel). I
-> would strongly advise using PSCI instead.
->
-
-Yes I agree and I'm fully aware PSCI is the preferred way of bringing up
-ARMv8 cores. Unfortunately this is currently out of my control as this
-is done in ARM Trusted Firmware that was handled by a different team
-within Broadcom and they have very tight schedule and will not have time
-to add PSCI support in the near term.
-
-The plan is to use spin-table for now and convert to PSCI when we have
-the support for it in our ATF. That should happen within the next couple
-months.
-
-
->> +
->> +       timer {
->> +               compatible = "arm,armv8-timer";
->> +               interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
->> +                             IRQ_TYPE_EDGE_RISING)>,
->> +                            <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
->> +                             IRQ_TYPE_EDGE_RISING)>,
->> +                            <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
->> +                             IRQ_TYPE_EDGE_RISING)>,
->> +                            <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
->> +                             IRQ_TYPE_EDGE_RISING)>;
->> +               clock-frequency = <25000000>;
->> +       };
-> 
-> Please fix your firmware to configure CNTFRQ_EL0, it is simply a bug not
-> to, and using clock-frequency does not fix all the problems that not
-> configuring it causes.
-
-Yes will do this.
-
-> 
-> Thanks,
-> Mark.
-> 
-
-Thanks,
-
-Ray
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 246473a..29e33aa 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -522,6 +522,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_arria5_socdk.dtb \
+ 	socfpga_arria10_socdk_sdmmc.dtb \
+ 	socfpga_cyclone5_socdk.dtb \
++	socfpga_cyclone5_de0_sockit.dtb \
+ 	socfpga_cyclone5_sockit.dtb \
+ 	socfpga_cyclone5_socrates.dtb \
+ 	socfpga_vt.dtb
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+new file mode 100644
+index 0000000..3172c82
+--- /dev/null
++++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+@@ -0,0 +1,109 @@
++/*
++ * Copyright Altera Corporation (C) 2015. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include "socfpga_cyclone5.dtsi"
++
++/ {
++	model = "Terasic DE-0(Atlas)";
++	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
++
++	chosen {
++		bootargs = "console=ttyS0,115200";
++	};
++
++	memory {
++		name = "memory";
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1GB */
++	};
++
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
++	regulator_3_3v: 3-3-v-regulator {
++		compatible = "regulator-fixed";
++		regulator-name = "3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		hps0 {
++			label = "hps_led0";
++			gpios = <&portb 24 0>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
++
++&gmac1 {
++	status = "okay";
++	phy-mode = "rgmii";
++
++	rxd0-skew-ps = <0>;
++	rxd1-skew-ps = <0>;
++	rxd2-skew-ps = <0>;
++	rxd3-skew-ps = <0>;
++	txen-skew-ps = <0>;
++	txc-skew-ps = <2600>;
++	rxdv-skew-ps = <0>;
++	rxc-skew-ps = <2000>;
++	max-frame-size = <3800>;
++};
++
++&gpio0 {
++	status = "okay";
++};
++
++&gpio1 {
++	status = "okay";
++};
++
++&gpio2 {
++	status = "okay";
++};
++
++&i2c0 {
++	status = "okay";
++	speed-mode = <0>;
++
++	adxl345: adxl345 at 0 {
++		compatible = "adi,adxl345";
++		reg = <0x53>;
++
++		interrupt-parent = <&portc>;
++		interrupts = <3 2>;
++	};
++	
++};
++
++&mmc0 {
++	vmmc-supply = <&regulator_3_3v>;
++	vqmmc-supply = <&regulator_3_3v>;
++};
++
++&uart0 {
++	status = "okay";
++};
++
++&usb1 {
++	status = "okay";
++};
+-- 
+1.7.9.5
