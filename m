@@ -1,37 +1,28 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jul 2015 23:49:31 -0700
-Subject: [PATCH v2] ARM: dts: configure regulators for Gumstix Pepper
-In-Reply-To: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
-References: <1436481477-18002-1-git-send-email-adam.yh.lee@gmail.com>
-Message-ID: <20150714064931.GC17550@atomide.com>
+Date: Mon, 13 Jul 2015 23:54:01 -0700
+Subject: [PATCH 3/3] ARM: dts: Fix frequency scaling on Gumstix Pepper.
+In-Reply-To: <CAK8F28kxuk0zPetCBPLmU5skQcOb2E47veZe5s7YaeE-ZJNMew@mail.gmail.com>
+References: <1433441299-18887-1-git-send-email-arun@gumstix.com>
+ <1433441299-18887-4-git-send-email-arun@gumstix.com>
+ <CAK8F28kxuk0zPetCBPLmU5skQcOb2E47veZe5s7YaeE-ZJNMew@mail.gmail.com>
+Message-ID: <20150714065400.GD17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adam YH Lee <adam.yh.lee@gmail.com> [150709 15:40]:
-> Boot process is halting in midway because some of the necessary voltage
-> regulators are deemed unused and subsequently powered off, leading to
-> a completely unresponsive system.
+* Ash Charles <ashcharles@gmail.com> [150609 08:47]:
+> This works well for me--cpufreq seems much happier.
 > 
-> Most of the device nodes had correct voltage regulator attachments.
-> Yet these nodes had to set stricter enforcement on them through
-> 'regulator-boot-on' and 'regulator-always-on' to function correctly.
+> Tested-by: Ash Charles <ashcharles@gmail.com>
 > 
-> The consumers of the regulators this commit affect are the followings:
-> 
-> 	DCDC1: vdd_1v8 system supply, USB-PHY, and ADC
-> 	DCDC2: Core domain
-> 	DCDC3: MPU core domain
-> 	 LDO1: RTC
-> 	 LDO2: 3v3 IO domain
-> 	 LDO3: USB-PHY; not a boot-time requirement
-> 	 LDO4: LCD [16:23]
-> 
-> All but LDO3 need to be always-on for the system to be functional.
-> 
-> Additionally regulator-name properties have been added for the kernel to
-> display the name from the schematic. This will improve diagnostics.
+> On Thu, Jun 4, 2015 at 11:08 AM, Arun Bharadwaj <arun@gumstix.com> wrote:
+> > The device tree for Gumstix Pepper has DCDC2 and
+> > DCDC3 correctly labelled but the upper limit values
+> > are wrong. The confusion is due to the hardware
+> > quirk where the DCDC2 and DCDC3 wires are flipped
+> > in Pepper.
+> >
+> > Signed-off-by: Arun Bharadwaj <arun@gumstix.com>
 
-Thanks for updating the description, applying this into
-omap-for-v4.2/fixes.
+Applying into omap-for-v4.2/fixes thanks.
 
 Tony
