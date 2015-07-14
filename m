@@ -1,60 +1,97 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 14 Jul 2015 12:59:50 +0100
-Subject: [PATCH V3 19/19] ARM: tegra: select PM_GENERIC_DOMAINS
-In-Reply-To: <55A3C53F.8090003@nvidia.com>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-20-git-send-email-jonathanh@nvidia.com>
- <20150713135047.GR6287@tbergstrom-lnx.Nvidia.com>
- <55A3C53F.8090003@nvidia.com>
-Message-ID: <55A4F9B6.1070904@nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 14 Jul 2015 14:05:14 +0200
+Subject: [PATCH 1/7] ARM: shmobile: r8a73a4 dtsi: Add missing
+ "gpio-ranges" to gpio node
+In-Reply-To: <32630741.rNENluEsDE@avalon>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+ <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
+ <32630741.rNENluEsDE@avalon>
+Message-ID: <CAMuHMdX4=C6DsbsaphndXQuPm8WFqv08kwq+cdQRJJQtDph1cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Laurent, Linus,
 
-
-On 13/07/15 15:03, Jon Hunter wrote:
-> 
-> 
-> On 13/07/15 14:50, Peter De Schrijver wrote:
->> On Mon, Jul 13, 2015 at 01:39:57PM +0100, Jon Hunter wrote:
->>> From: Vince Hsu <vinceh@nvidia.com>
->>>
->>> We have added generic power domain support for Tegra SoCs. So now the
->>> option M_GENERIC_DOMAINS must be enabled by default to have proper power
+On Tue, Jun 30, 2015 at 11:49 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Tuesday 30 June 2015 09:45:21 Geert Uytterhoeven wrote:
+>> If a GPIO driver uses gpiochip_add_pin_range() (which is usually the
+>> case for GPIO/PFC combos), the GPIO hogging mechanism configured from DT
+>> doesn't work:
 >>
->> Missing P :)
-> 
-> Ooops. I think introduced that error. Will fix.
+>>     requesting hog GPIO led1-high (chip r8a73a4_pfc, offset 28) failed
+>>
+>> The actual error code is -517 == -EPROBE_DEFER.
+>>
+>> The problem is that PFC+GPIO registration is handled in multiple steps:
+>>   1. pinctrl_register(),
+>>   2. gpiochip_add(),
+>>   3. gpiochip_add_pin_range().
+>>
+>> Configuration of the hogs is handled in gpiochip_add():
+>>
+>>     gpiochip_add
+>>         of_gpiochip_add
+>>             of_gpiochip_scan_hogs
+>>                 gpiod_hog
+>>                     gpiochip_request_own_desc
+>>                         __gpiod_request
+>>                             chip->request
+>>                                 pinctrl_request_gpio
+>>                                     pinctrl_get_device_gpio_range
+>>
+>> However, at this point the GPIO controller hasn't been added to
+>> pinctrldev_list yet, so the range can't be found, and the operation fails
+>> with -EPROBE_DEFER.
+>>
+>> To fix this, add a "gpio-ranges" property to the gpio device node, so
+>> the ranges are added by of_gpiochip_add_pin_range(), which is called by
+>> of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> This looks sane to me, even though referencing the same DT node seems a bit
+> dodgy. I'll let Linus comment on that, but for the implementation itself,
+>
+> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Updated version ...
+Thank you!
 
+Any wise words from Linus?
 
->From f7b951cd05973d74fc25e33a1aaec5a6e77bfdc0 Mon Sep 17 00:00:00 2001
-From: Vince Hsu <vinceh@nvidia.com>
-Date: Wed, 11 Mar 2015 13:40:46 +0800
-Subject: [PATCH 19/19] ARM: tegra: select PM_GENERIC_DOMAINS
+Thanks again!
 
-We have added generic power domain support for Tegra SoCs. So now the
-option PM_GENERIC_DOMAINS must be enabled by default to have proper power
-sequence.
+>
+>> ---
+>>  arch/arm/boot/dts/r8a73a4.dtsi | 7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+>> index 5090d1a8f652e8be..cb4f7b2798fe23be 100644
+>> --- a/arch/arm/boot/dts/r8a73a4.dtsi
+>> +++ b/arch/arm/boot/dts/r8a73a4.dtsi
+>> @@ -207,6 +207,13 @@
+>>               reg = <0 0xe6050000 0 0x9000>;
+>>               gpio-controller;
+>>               #gpio-cells = <2>;
+>> +             gpio-ranges =
+>> +                     <&pfc 0 0 31>, <&pfc 32 32 9>,
+>> +                     <&pfc 64 64 22>, <&pfc 96 96 31>,
+>> +                     <&pfc 128 128 7>, <&pfc 160 160 19>,
+>> +                     <&pfc 192 192 31>, <&pfc 224 224 27>,
+>> +                     <&pfc 256 256 28>, <&pfc 288 288 21>,
+>> +                     <&pfc 320 320 10>;
+>>               interrupts-extended =
+>>                       <&irqc0  0 0>, <&irqc0  1 0>, <&irqc0  2 0>, <&irqc0  3 0>,
+>>                       <&irqc0  4 0>, <&irqc0  5 0>, <&irqc0  6 0>, <&irqc0  7 0>,
 
-Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- arch/arm/mach-tegra/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Gr{oetje,eeting}s,
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 0fa4c5f8b1be..fdf86cae3b32 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ menuconfig ARCH_TEGRA
- 	select HAVE_ARM_TWD if SMP
- 	select PINCTRL
- 	select PM_OPP
-+	select PM_GENERIC_DOMAINS if PM
- 	select ARCH_HAS_RESET_CONTROLLER
- 	select RESET_CONTROLLER
- 	select SOC_BUS
--- 
-2.1.4
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
