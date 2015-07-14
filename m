@@ -1,41 +1,27 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 14 Jul 2015 18:02:06 -0500
-Subject: [PATCH] pci: Drop owner assignment from platform_driver
-In-Reply-To: <1436510306-5788-1-git-send-email-k.kozlowski@samsung.com>
-References: <1436510306-5788-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20150714230206.GR24416@google.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 15 Jul 2015 01:03:12 +0200
+Subject: [rtc-linux] [RESEND PATCH-v2] rtc: 88pm80x: add device tree
+ support
+In-Reply-To: <1436424952-29680-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1436424952-29680-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150714230312.GI20482@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 03:38:26PM +0900, Krzysztof Kozlowski wrote:
-> platform_driver does not need to set an owner because
-> platform_driver_register() will set it.
+On 09/07/2015 at 12:25:51 +0530, Vaibhav Hiremath wrote :
+> Along with DT support, this patch also cleans up the unnecessary
+> code around 'rtc_wakeup' initialization.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Applied to pci/host-xgene for v4.3, thanks!
-
-> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 > ---
+>  drivers/rtc/rtc-88pm80x.c | 28 +++++++++++++++++-----------
+>  1 file changed, 17 insertions(+), 11 deletions(-)
 > 
-> The coccinelle script which generated the patch was sent here:
-> http://www.spinics.net/lists/kernel/msg2029903.html
-> ---
->  drivers/pci/host/pci-xgene-msi.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-> index 2d31d4d6fd08..9e1889e6aec7 100644
-> --- a/drivers/pci/host/pci-xgene-msi.c
-> +++ b/drivers/pci/host/pci-xgene-msi.c
-> @@ -582,7 +582,6 @@ error:
->  static struct platform_driver xgene_msi_driver = {
->  	.driver = {
->  		.name = "xgene-msi",
-> -		.owner = THIS_MODULE,
->  		.of_match_table = xgene_msi_match_table,
->  	},
->  	.probe = xgene_msi_probe,
-> -- 
-> 1.9.1
-> 
+Applied, thanks.
+
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
