@@ -1,75 +1,45 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 14 Jul 2015 10:29:56 +0200
-Subject: [PATCH v2 3/3] ARM: tegra: Add gpio-ranges property
-In-Reply-To: <1436862596-27730-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1436862596-27730-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1436862596-27730-4-git-send-email-tomeu.vizoso@collabora.com>
+Date: Tue, 14 Jul 2015 10:34:09 +0200
+Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
+In-Reply-To: <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
+Message-ID: <CAAObsKBUoMmHOXBmEO4+8H1VVAkEHn_aFvLBOrXS5syLu5p1iA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify how the GPIOs map to the pins in Tegra SoCs, so the dependency is
-explicit.
+On 13 July 2015 at 22:14, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Jun 17, 2015 at 3:42 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>
+>> If the gpio DT node has the gpio-ranges property, the range will be
+>> added by the gpio core and doesn't need to be added by the pinctrl
+>> driver.
+>>
+>> By having the gpio-ranges property, we have an explicit dependency from
+>> the gpio node to the pinctrl node and we can stop using the deprecated
+>> pinctrl_add_gpio_range() function.
+>>
+>> Note that when the GPIO device gets probed before the associated
+>> princtrl device, the gpio core actually won't register the gpio range.
+>> Thus, this patch is only safe to be merged after we have in place a way
+>> to assure that gpio devices are probed after their associated pinctrl
+>> devices (such as ordered probing).
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+> This doesn't look like it would hurt, but need Stephen's opinion
+> on it, and I think he's on vacation. Would check with next-in-line
+> Tegra maintainer, Thierry/Alexandre?
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
----
+Sorry about that, but I have split these changes out into their own
+series after people complained about it.
 
-Changes in v2:
-- Remove outdated comment from the commit changelog
+Have just sent a new version which already has Stephen's ack:
 
- arch/arm/boot/dts/tegra114.dtsi | 1 +
- arch/arm/boot/dts/tegra124.dtsi | 1 +
- arch/arm/boot/dts/tegra20.dtsi  | 1 +
- arch/arm/boot/dts/tegra30.dtsi  | 1 +
- 4 files changed, 4 insertions(+)
+https://lkml.kernel.org/g/1436862596-27730-1-git-send-email-tomeu.vizoso at collabora.com
 
-diff --git a/arch/arm/boot/dts/tegra114.dtsi b/arch/arm/boot/dts/tegra114.dtsi
-index f58a3d9d5f13..7e1e1717e46a 100644
---- a/arch/arm/boot/dts/tegra114.dtsi
-+++ b/arch/arm/boot/dts/tegra114.dtsi
-@@ -234,6 +234,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 246>;
- 	};
- 
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 87318a72f615..4779df336cb6 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -255,6 +255,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 251>;
- 	};
- 
- 	apbdma: dma at 0,60020000 {
-diff --git a/arch/arm/boot/dts/tegra20.dtsi b/arch/arm/boot/dts/tegra20.dtsi
-index f444b67f55c6..b44277c63e8e 100644
---- a/arch/arm/boot/dts/tegra20.dtsi
-+++ b/arch/arm/boot/dts/tegra20.dtsi
-@@ -244,6 +244,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 224>;
- 	};
- 
- 	apbmisc at 70000800 {
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 782b11b2af6a..28c547f27ecd 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -349,6 +349,7 @@
- 		gpio-controller;
- 		#interrupt-cells = <2>;
- 		interrupt-controller;
-+		gpio-ranges = <&pinmux 0 0 248>;
- 	};
- 
- 	apbmisc at 70000800 {
--- 
-2.4.3
+Thanks,
+
+Tomeu
