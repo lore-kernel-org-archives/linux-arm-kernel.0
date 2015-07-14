@@ -1,32 +1,21 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Tue, 14 Jul 2015 09:52:52 +0000
-Subject: [PATCH] arm: dts: ls1021a: add wakeup device ftm0 node for ls1021a
-In-Reply-To: <20150714025324.GA4104@tiger>
-References: <1436150319-15122-1-git-send-email-b18965@freescale.com>
- <20150714025324.GA4104@tiger>
-Message-ID: <BN3PR0301MB0867B5EA833973B2B7E0F179FE9B0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 14 Jul 2015 11:48:58 +0200
+Subject: [GIT PULL] Renesas ARM Based SoC Cleanup for v4.3
+In-Reply-To: <cover.1436509680.git.horms+renesas@verge.net.au>
+References: <cover.1436509680.git.horms+renesas@verge.net.au>
+Message-ID: <20150714094858.GI20686@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-> On Mon, Jul 06, 2015 at 10:38:39AM +0800, Alison Wang wrote:
-> > From: Wang Dongsheng <dongsheng.wang@freescale.com>
-> >
-> > Add ftm0 node, cause of ftm0 can be set as a alarm before system
-> going
-> > to deep sleep.
-> >
-> > Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
+On Fri, Jul 10, 2015 at 03:37:01PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Since you're forwarding the patch, you should add your SoB.  Also, for
-> sake of consistency, please use "ARM: " as subject prefix for all
-> patches sent to me.
+> Please consider these Renesas ARM based SoC cleanup for v4.3.
 > 
-[Alison Wang] Ok. I will change in v2.
+> Amongst other things it removes almost 7000 lines of code :)
+> 
 
-Thanks.
+Nice! Merged. Thanks.
 
 
-Best Regards,
-Alison Wang
+-Olof
