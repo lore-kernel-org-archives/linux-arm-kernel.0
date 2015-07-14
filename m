@@ -1,40 +1,42 @@
-From: claudiu.manoil@freescale.com (Manoil Claudiu)
-Date: Tue, 14 Jul 2015 16:13:12 +0000
-Subject: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
- eTSEC2
-In-Reply-To: <CAOMZO5A2ftfUhioXpSnbGMxiV-fTePgHqk6zj2ysHe2wUY7JFg@mail.gmail.com>
-References: <20150713133138.GO23464@tiger>
- <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
- <CAOMZO5A2ftfUhioXpSnbGMxiV-fTePgHqk6zj2ysHe2wUY7JFg@mail.gmail.com>
-Message-ID: <BY2PR03MB409415EF1E3F398DBF096E49C9B0@BY2PR03MB409.namprd03.prod.outlook.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 14 Jul 2015 09:12:57 -0700
+Subject: [PATCH] arm64: Define HAVE_ARCH_PIO_SIZE and related symbols.
+In-Reply-To: <20150714110039.GC16213@arm.com>
+References: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
+ <20150714110039.GC16213@arm.com>
+Message-ID: <55A53509.4060202@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Tuesday, July 14, 2015 6:57 PM
-> To: Manoil Claudiu-B08782
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel; Shawn Guo; Wang Huan-B18965
-> Subject: Re: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
-> eTSEC2
-> 
-> On Tue, Jul 14, 2015 at 12:46 PM, Claudiu Manoil
-> <claudiu.manoil@freescale.com> wrote:
-> > This patch adds generic dts nodes for eTSEC0, eTSEC1 and eTSEC2.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> >
-> > Enable support for the second interrupt group register block
-> > and the corresponding Rx/Tx/Err interrupt sources, for each
-> > eTSEC node.  DT binding documentation updates.
-> >
-> > Signed-off-by: Claudiu Manoil <claudiu.manoil@freescale.com>
-> 
-> It seems you missed to put Alison in the From field.
-> 
-> You should also put his Signed-off-by tag just before yours.
+On 07/14/2015 04:00 AM, Will Deacon wrote:
+> On Mon, Jul 13, 2015 at 10:31:36PM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Needed to make pci_iomap() work.
+>
+> Care to elaborate?
+>
 
-Is this a rule invented by you?  Last time I checked this was a
-valid patch format.  Also, this time I sent the (updated) patch,
-not Alison, which should explain the "From" part. Thanks.
+I should have explained what I am doing here a little better.
+
+Systems based on the Cavium ThunderX processor may have up to 8 
+independent PCIe root complexes.  The I/O space on each bus occupies an 
+independent physical address window.
+
+So, in order to be able to map all of these (semi) contiguously, we need 
+a lot more virtual address space than is supplied by the default values 
+for all these constants.
+
+The option I chose here was to unconditionally expand the I/O ranges for 
+all arm64 systems.  If you think this breaks existing systems/drivers, I 
+will have to look for other options.
+
+David Daney
+
+
+> AFAICT, mapping an IO bar on arm64 just gives you back a VA into our
+> PCI_IOBASE region and the ioreadX accessors will just call the readX
+> macros, so there should be no need for further port adjustment.
+>
+> Will
+>
