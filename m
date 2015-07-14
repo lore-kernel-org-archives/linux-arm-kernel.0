@@ -1,243 +1,170 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 14 Jul 2015 00:52:22 +0000
-Subject: [PATCH 1/2] serial: sirf: workaround rx process to avoid possible
- data loss
-Message-ID: <1436835143-6697-1-git-send-email-21cnbao@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 13 Jul 2015 17:46:38 -0700
+Subject: [PATCH v2] Input: pmic8xxx-pwrkey - Support shutdown
+In-Reply-To: <55A45931.4010509@codeaurora.org>
+References: <1436830234-28316-1-git-send-email-sboyd@codeaurora.org>
+ <20150714002504.GC7945@dtor-ws> <55A45931.4010509@codeaurora.org>
+Message-ID: <20150714004638.GD7945@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qipan Li <Qipan.Li@csr.com>
+On Mon, Jul 13, 2015 at 05:34:57PM -0700, Stephen Boyd wrote:
+> On 07/13/2015 05:25 PM, Dmitry Torokhov wrote:
+> 
+> >>@@ -76,6 +131,220 @@ static int __maybe_unused pmic8xxx_pwrkey_resume(struct device *dev)
+> >>  static SIMPLE_DEV_PM_OPS(pm8xxx_pwr_key_pm_ops,
+> >>  		pmic8xxx_pwrkey_suspend, pmic8xxx_pwrkey_resume);
+> >>+static void pmic8xxx_pwrkey_shutdown(struct platform_device *pdev)
+> >>+{
+> >>+	struct pmic8xxx_pwrkey *pwrkey = platform_get_drvdata(pdev);
+> >>+	int ret;
+> >>+	u8 mask, val;
+> >>+	bool reset = system_state == SYSTEM_RESTART;
+> >>+
+> >>+	if (pwrkey->shutdown_fn) {
+> >>+		ret = pwrkey->shutdown_fn(pwrkey, reset);
+> >>+		if (ret)
+> >>+			return;
+> >Can we call this variable "error" please?
+> 
+> Ok.
+> 
+> >
+> >>+	}
+> >>+
+> >>+	/*
+> >>+	 * Select action to perform (reset or shutdown) when PS_HOLD goes low.
+> >>+	 * Also ensure that KPD, CBL0, and CBL1 pull ups are enabled and that
+> >>+	 * USB charging is enabled.
+> >>+	 */
+> >>+	mask = PON_CNTL_1_PULL_UP_EN | PON_CNTL_1_USB_PWR_EN;
+> >>+	mask |= PON_CNTL_1_WD_EN_RESET;
+> >>+	val = mask;
+> >>+	if (!reset)
+> >>+		val &= ~PON_CNTL_1_WD_EN_RESET;
+> >>+
+> >>+	regmap_update_bits(pwrkey->regmap, PON_CNTL_1, mask, val);
+> >>+}
+> >>+
+> >>+/*
+> >>+ * Set an SMPS regulator to be disabled in its CTRL register, but enabled
+> >>+ * in the master enable register.  Also set it's pull down enable bit.
+> >>+ * Take care to make sure that the output voltage doesn't change if switching
+> >>+ * from advanced mode to legacy mode.
+> >>+ */
+> >>+static int pm8058_disable_smps_locally_set_pull_down(struct regmap *regmap,
+> >>+	u16 ctrl_addr, u16 test2_addr, u16 master_enable_addr,
+> >>+	u8 master_enable_bit)
+> >>+{
+> >>+	int ret = 0;
+> >Why does it need to be initialized? And "error" too please.
+> 
+> Doesn't need to be.
+> 
+> >
+> >>+
+> >>+	/* Enable LDO in master control register. */
+> >>+	ret = regmap_update_bits(regmap, master_enable_addr,
+> >>+			master_enable_bit, master_enable_bit);
+> >>+	if (ret)
+> >>+		return ret;
+> >>+
+> >>+	/* Disable LDO in CTRL register and set pull down */
+> >>+	return regmap_update_bits(regmap, ctrl_addr,
+> >>+		PM8058_REGULATOR_ENABLE_MASK | PM8058_REGULATOR_PULL_DOWN_MASK,
+> >>+		PM8058_REGULATOR_DISABLE | PM8058_REGULATOR_PULL_DOWN_EN);
+> >>+}
+> >>+
+> >>+static int pm8058_pwrkey_shutdown(struct pmic8xxx_pwrkey *pwrkey, bool reset)
+> >>+{
+> >>+	int ret;
+> >And here.
+> 
+> Ok.
+> 
+> >
+> >>+	struct regmap *regmap = pwrkey->regmap;
+> >>+	u8 mask, val;
+> >>+
+> >>+	/* When shutting down, enable active pulldowns on important rails. */
+> >>+	if (!reset) {
+> >>+		/* Disable SMPS's 0,1,3 locally and set pulldown enable bits. */
+> >>+		pm8058_disable_smps_locally_set_pull_down(regmap,
+> >>+			PM8058_S0_CTRL, PM8058_S0_TEST2,
+> >>+			REG_PM8058_VREG_EN_MSM, BIT(7));
+> >>+		pm8058_disable_smps_locally_set_pull_down(regmap,
+> >>+			PM8058_S1_CTRL, PM8058_S1_TEST2,
+> >>+			REG_PM8058_VREG_EN_MSM, BIT(6));
+> >>+		pm8058_disable_smps_locally_set_pull_down(regmap,
+> >>+			PM8058_S3_CTRL, PM8058_S3_TEST2,
+> >>+			REG_PM8058_VREG_EN_GRP_5_4, BIT(7) | BIT(4));
+> >>+		/* Disable LDO 21 locally and set pulldown enable bit. */
+> >>+		pm8058_disable_ldo_locally_set_pull_down(regmap,
+> >>+			PM8058_L21_CTRL, REG_PM8058_VREG_EN_GRP_5_4,
+> >>+			BIT(1));
+> >>+	}
+> >>+
+> >>+	/*
+> >>+	 * Fix-up: Set regulator LDO22 to 1.225 V in high power mode. Leave its
+> >>+	 * pull-down state intact. This ensures a safe shutdown.
+> >>+	 */
+> >>+	ret = regmap_update_bits(regmap, PM8058_L22_CTRL, 0xbf, 0x93);
+> >>+	if (ret)
+> >>+		return ret;
+> >>+
+> >>+	/* Enable SMPL if resetting is desired */
+> >>+	mask = SLEEP_CTRL_SMPL_EN_RESET;
+> >>+	val = 0;
+> >>+	if (reset)
+> >>+		val = mask;
+> >>+	return regmap_update_bits(regmap, PM8058_SLEEP_CTRL, mask, val);
+> >>+
+> >Stray empty line.
+> 
+> Ok.
+> 
+> >
+> >>+}
+> >>+
+> >>+static int pm8921_pwrkey_shutdown(struct pmic8xxx_pwrkey *pwrkey, bool reset)
+> >>+{
+> >>+	struct regmap *regmap = pwrkey->regmap;
+> >>+	u8 mask = SLEEP_CTRL_SMPL_EN_RESET;
+> >>+	u8 val = 0;
+> >>+
+> >>+	/* Enable SMPL if resetting is desired */
+> >>+	if (reset)
+> >>+		val = mask;
+> >>+	return regmap_update_bits(regmap, PM8921_SLEEP_CTRL, mask, val);
+> >>+}
+> >>+
+> >>+static const struct of_device_id pm8xxx_pwr_key_id_table[] = {
+> >>+	{ .compatible = "qcom,pm8058-pwrkey", .data = &pm8058_pwrkey_shutdown },
+> >>+	{ .compatible = "qcom,pm8921-pwrkey", .data = &pm8921_pwrkey_shutdown },
+> >>+	{ }
+> >>+};
+> >>+MODULE_DEVICE_TABLE(of, pm8xxx_pwr_key_id_table);
+> >>+
+> >Can we please keep IDs and device table where it was, close to the
+> >driver definition?
+> 
+> That would require forward declaring the array here. Is that
+> desired? I moved it so that I could use it in the probe function.
 
-when UART works in DMA mode and left bytes in rx fifo less than
-a dma transfer unit, DMA engine can't transfer the bytes out
-to rx DMA buffer. so it need a way to fetch them out and
-flush them into tty buffer in time.
+Ah, yes, OF data is not passed into probe() :(... But we can always do:
 
-in the above case, we want UART switch from DMA mode to PIO mode and
-fetch && flush bytes into tty layer buffer until rxfifo become empty,
-after that done let UART switch from PIO mode back to DMA mode.
-(record as method1)
+	match = of_match_device(pdev->dev.driver->of_match_table, &pdev->dev);
 
-method1 result in the next receive result wrong. for example in PIO part
-of method1, we fetched && pushed X1...X3 bytes, when UART rxfifo newly
-received Y1...Y4 bytes, UART trigger a DMA unit transfer, the DMA unit's
-content is X1...X3Y1 and rxfifo fifo status is empty, so X1X2X3 pushed
-twice by PIO way and DMA way also the bytes Y2Y3Y4 missed. add rxfifo
-reset operation before UART switch back to DMA mode would resolve the
-issue. ([method1 + do fifo reset] record as method2)
+Maybe we could have a helper for this like:
 
-before the commit, UART driver use method2. but methd2 have a risk of
-data loss, as if UART's shift register receive a complete byte and
-transfer it into rxfifo before rxfifo reset operation the byte will
-loss.
+const struct of_device_id *of_get_current_match(struct device *dev)
+{
+	return dev->drv ?
+		of_match_device(dev->driver->of_match_table, dev) :
+		NULL;
+}
 
-UART and USP have the similar bits CLEAR_RX_ADDR_EN(uart)/FRADDR_CLR_EN(usp),
-When found UART controller changing I/O to DMA mode, UART controller
-clears the two low bits of read point (rx_fifo_addr[1:0]).
-when enable the bit + method1(record as method3), in above example
-the DMA unit's content is X1...X3Y1 and there are Y2Y3Y4 in rxfifo by
-experiment, we just push bytes in rx DMA buffer.
+Thanks.
 
-BTW, the workaround works only for UART receive DMA channel use SINGLE
-DMA mode.
-
-Signed-off-by: Qipan Li <Qipan.Li@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/tty/serial/sirfsoc_uart.c | 80 ++++++++++++++++++++++++++++++---------
- drivers/tty/serial/sirfsoc_uart.h |  4 ++
- 2 files changed, 66 insertions(+), 18 deletions(-)
-
-diff --git a/drivers/tty/serial/sirfsoc_uart.c b/drivers/tty/serial/sirfsoc_uart.c
-index 653cdd5..8cac7ac 100644
---- a/drivers/tty/serial/sirfsoc_uart.c
-+++ b/drivers/tty/serial/sirfsoc_uart.c
-@@ -886,9 +886,13 @@ static void sirfsoc_uart_set_termios(struct uart_port *port,
- 	else
- 		wr_regl(port, ureg->sirfsoc_tx_dma_io_ctrl, SIRFUART_IO_MODE);
- 	if (sirfport->rx_dma_chan)
--		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl, SIRFUART_DMA_MODE);
-+		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
-+			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) &
-+			~SIRFUART_IO_MODE);
- 	else
--		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl, SIRFUART_IO_MODE);
-+		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
-+			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) |
-+			SIRFUART_IO_MODE);
- 	sirfport->rx_period_time = 20000000;
- 	/* Reset Rx/Tx FIFO Threshold level for proper baudrate */
- 	if (set_baud < 1000000)
-@@ -958,9 +962,9 @@ static int sirfsoc_uart_startup(struct uart_port *port)
- 	wr_regl(port, ureg->sirfsoc_rx_fifo_ctrl, SIRFUART_FIFO_THD(port));
- 	if (sirfport->rx_dma_chan)
- 		wr_regl(port, ureg->sirfsoc_rx_fifo_level_chk,
--			SIRFUART_RX_FIFO_CHK_SC(port->line, 0x4) |
--			SIRFUART_RX_FIFO_CHK_LC(port->line, 0xe) |
--			SIRFUART_RX_FIFO_CHK_HC(port->line, 0x1b));
-+			SIRFUART_RX_FIFO_CHK_SC(port->line, 0x1) |
-+			SIRFUART_RX_FIFO_CHK_LC(port->line, 0x2) |
-+			SIRFUART_RX_FIFO_CHK_HC(port->line, 0x4));
- 	if (sirfport->tx_dma_chan) {
- 		sirfport->tx_dma_state = TX_DMA_IDLE;
- 		wr_regl(port, ureg->sirfsoc_tx_fifo_level_chk,
-@@ -981,10 +985,21 @@ static int sirfsoc_uart_startup(struct uart_port *port)
- 			goto init_rx_err;
- 		}
- 	}
-+	if (sirfport->uart_reg->uart_type == SIRF_REAL_UART &&
-+		sirfport->rx_dma_chan)
-+		wr_regl(port, ureg->sirfsoc_swh_dma_io,
-+			SIRFUART_CLEAR_RX_ADDR_EN);
-+	if (sirfport->uart_reg->uart_type == SIRF_USP_UART &&
-+			sirfport->rx_dma_chan)
-+		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
-+			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) |
-+			SIRFSOC_USP_FRADDR_CLR_EN);
- 	enable_irq(port->irq);
- 	if (sirfport->rx_dma_chan && !sirfport->is_hrt_enabled) {
- 		sirfport->is_hrt_enabled = true;
- 		sirfport->rx_period_time = 20000000;
-+		sirfport->rx_last_pos = -1;
-+		sirfport->pio_fetch_cnt = 0;
- 		sirfport->rx_dma_items.xmit.tail =
- 			sirfport->rx_dma_items.xmit.head = 0;
- 		hrtimer_start(&sirfport->hrt,
-@@ -1003,6 +1018,9 @@ static void sirfsoc_uart_shutdown(struct uart_port *port)
- {
- 	struct sirfsoc_uart_port *sirfport = to_sirfport(port);
- 	struct sirfsoc_register *ureg = &sirfport->uart_reg->uart_reg;
-+	struct circ_buf *xmit;
-+
-+	xmit = &sirfport->rx_dma_items.xmit;
- 	if (!sirfport->is_atlas7)
- 		wr_regl(port, ureg->sirfsoc_int_en_reg, 0);
- 	else
-@@ -1019,8 +1037,10 @@ static void sirfsoc_uart_shutdown(struct uart_port *port)
- 	if (sirfport->tx_dma_chan)
- 		sirfport->tx_dma_state = TX_DMA_IDLE;
- 	if (sirfport->rx_dma_chan && sirfport->is_hrt_enabled) {
--		while ((rd_regl(port, ureg->sirfsoc_rx_fifo_status) &
--			SIRFUART_RX_FIFO_MASK) > 0)
-+		while (((rd_regl(port, ureg->sirfsoc_rx_fifo_status) &
-+			SIRFUART_RX_FIFO_MASK) > sirfport->pio_fetch_cnt) &&
-+			!CIRC_CNT(xmit->head, xmit->tail,
-+			SIRFSOC_RX_DMA_BUF_SIZE))
- 			;
- 		sirfport->is_hrt_enabled = false;
- 		hrtimer_cancel(&sirfport->hrt);
-@@ -1169,6 +1189,8 @@ static enum hrtimer_restart
- 	struct tty_struct *tty;
- 	struct sirfsoc_register *ureg;
- 	struct circ_buf *xmit;
-+	struct sirfsoc_fifo_status *ufifo_st;
-+	int max_pio_cnt;
- 
- 	sirfport = container_of(hrt, struct sirfsoc_uart_port, hrt);
- 	port = &sirfport->port;
-@@ -1176,9 +1198,16 @@ static enum hrtimer_restart
- 	tty = port->state->port.tty;
- 	ureg = &sirfport->uart_reg->uart_reg;
- 	xmit = &sirfport->rx_dma_items.xmit;
-+	ufifo_st = &sirfport->uart_reg->fifo_status;
-+
- 	dmaengine_tx_status(sirfport->rx_dma_chan,
--		sirfport->rx_dma_items.cookie, &tx_state);
--	xmit->head = SIRFSOC_RX_DMA_BUF_SIZE - tx_state.residue;
-+			sirfport->rx_dma_items.cookie, &tx_state);
-+	if (SIRFSOC_RX_DMA_BUF_SIZE - tx_state.residue !=
-+		sirfport->rx_last_pos) {
-+		xmit->head = SIRFSOC_RX_DMA_BUF_SIZE - tx_state.residue;
-+		sirfport->rx_last_pos = xmit->head;
-+		sirfport->pio_fetch_cnt = 0;
-+	}
- 	count = CIRC_CNT_TO_END(xmit->head, xmit->tail,
- 			SIRFSOC_RX_DMA_BUF_SIZE);
- 	while (count > 0) {
-@@ -1200,23 +1229,38 @@ static enum hrtimer_restart
- 	 */
- 	if (!inserted && !count &&
- 		((rd_regl(port, ureg->sirfsoc_rx_fifo_status) &
--		SIRFUART_RX_FIFO_MASK) > 0)) {
-+		SIRFUART_RX_FIFO_MASK) > sirfport->pio_fetch_cnt)) {
-+		dmaengine_pause(sirfport->rx_dma_chan);
- 		/* switch to pio mode */
- 		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
- 			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) |
- 			SIRFUART_IO_MODE);
--		while ((rd_regl(port, ureg->sirfsoc_rx_fifo_status) &
--			SIRFUART_RX_FIFO_MASK) > 0) {
--			if (sirfsoc_uart_pio_rx_chars(port, 16) > 0)
--				tty_flip_buffer_push(tty->port);
-+		/*
-+		 * UART controller SWH_DMA_IO register have CLEAR_RX_ADDR_EN
-+		 * When found changing I/O to DMA mode, it clears
-+		 * two low bits of read point;
-+		 * USP have similar FRADDR_CLR_EN bit in USP_RX_DMA_IO_CTRL.
-+		 * Fetch data out from rxfifo into DMA buffer in PIO mode,
-+		 * while switch back to DMA mode, the data fetched will override
-+		 * by DMA, as hardware have a strange behaviour:
-+		 * after switch back to DMA mode, check rxfifo status it will
-+		 * be the number PIO fetched, so record the fetched data count
-+		 * to avoid the repeated fetch
-+		 */
-+		max_pio_cnt = 3;
-+		while (!(rd_regl(port, ureg->sirfsoc_rx_fifo_status) &
-+			ufifo_st->ff_empty(port)) && max_pio_cnt--) {
-+			xmit->buf[xmit->head] =
-+				rd_regl(port, ureg->sirfsoc_rx_fifo_data);
-+			xmit->head = (xmit->head + 1) &
-+					(SIRFSOC_RX_DMA_BUF_SIZE - 1);
-+			sirfport->pio_fetch_cnt++;
- 		}
--		wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_RESET);
--		wr_regl(port, ureg->sirfsoc_rx_fifo_op, 0);
--		wr_regl(port, ureg->sirfsoc_rx_fifo_op, SIRFUART_FIFO_START);
- 		/* switch back to dma mode */
- 		wr_regl(port, ureg->sirfsoc_rx_dma_io_ctrl,
- 			rd_regl(port, ureg->sirfsoc_rx_dma_io_ctrl) &
- 			~SIRFUART_IO_MODE);
-+		dmaengine_resume(sirfport->rx_dma_chan);
- 	}
- next_hrt:
- 	hrtimer_forward_now(hrt, ns_to_ktime(sirfport->rx_period_time));
-@@ -1239,7 +1283,7 @@ static int sirfsoc_uart_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	int ret;
- 	struct dma_slave_config slv_cfg = {
--		.src_maxburst = 2,
-+		.src_maxburst = 1,
- 	};
- 	struct dma_slave_config tx_slv_cfg = {
- 		.dst_maxburst = 2,
-diff --git a/drivers/tty/serial/sirfsoc_uart.h b/drivers/tty/serial/sirfsoc_uart.h
-index eb162b0..671a08d 100644
---- a/drivers/tty/serial/sirfsoc_uart.h
-+++ b/drivers/tty/serial/sirfsoc_uart.h
-@@ -296,6 +296,7 @@ struct sirfsoc_uart_register sirfsoc_uart = {
- #define SIRFUART_DMA_MODE			0x0
- #define SIRFUART_RX_DMA_FLUSH			0x4
- 
-+#define SIRFUART_CLEAR_RX_ADDR_EN		0x2
- /* Baud Rate Calculation */
- #define SIRF_USP_MIN_SAMPLE_DIV			0x1
- #define SIRF_MIN_SAMPLE_DIV			0xf
-@@ -325,6 +326,7 @@ struct sirfsoc_uart_register sirfsoc_uart = {
- #define SIRFSOC_USP_ASYNC_DIV2_MASK		0x3f
- #define SIRFSOC_USP_ASYNC_DIV2_OFFSET		16
- #define SIRFSOC_USP_LOOP_BACK_CTRL		BIT(2)
-+#define SIRFSOC_USP_FRADDR_CLR_EN		BIT(1)
- /* USP-UART Common */
- #define SIRFSOC_UART_RX_TIMEOUT(br, to)	(((br) * (((to) + 999) / 1000)) / 1000)
- #define SIRFUART_RECV_TIMEOUT_VALUE(x)	\
-@@ -431,6 +433,8 @@ struct sirfsoc_uart_port {
- 	struct hrtimer			hrt;
- 	bool				is_hrt_enabled;
- 	unsigned long			rx_period_time;
-+	unsigned long			rx_last_pos;
-+	unsigned long			pio_fetch_cnt;
- };
- 
- /* Register Access Control */
 -- 
-2.3.5
+Dmitry
