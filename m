@@ -1,60 +1,78 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 14 Jul 2015 18:15:58 +0800
-Subject: [PATCH v3 4/5] clk: mediatek: Add USB clock support in MT8173
- APMIXEDSYS
-In-Reply-To: <1436867199.9416.16.camel@mtksdaap41>
-References: <1436522405-13923-1-git-send-email-jamesjj.liao@mediatek.com>
- <1436522405-13923-5-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omBryA6f6gYje5RvF2XcJiebogYCHpyWNeN9K4B-MiHf1Q@mail.gmail.com>
- <1436841935.9416.10.camel@mtksdaap41>
- <CAGS+omAb8t0sLP1DHoa6z1-XweWUwOJQhqydofWZ+YiyPXzxhA@mail.gmail.com>
- <1436867199.9416.16.camel@mtksdaap41>
-Message-ID: <CAGS+omB=Fbdpr0jc0oXxbPP1pePOXzaAZi4yKAd_=HnpQDbacA@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 14 Jul 2015 11:20:27 +0100
+Subject: [PATCH v2 09/10] arm64/BUG: Use BRK instruction for generic BUG
+ traps
+In-Reply-To: <20150713165638.GD22840@leverpostej>
+References: <1436793967-7138-1-git-send-email-Dave.Martin@arm.com>
+ <1436793967-7138-10-git-send-email-Dave.Martin@arm.com>
+ <20150713164315.GC22840@leverpostej>
+ <20150713165151.GC10670@e103592.cambridge.arm.com>
+ <20150713165638.GD22840@leverpostej>
+Message-ID: <20150714102025.GD10670@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 5:46 PM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> Hi Daniel,
->
-> On Tue, 2015-07-14 at 11:23 +0800, Daniel Kurtz wrote:
->> On Tue, Jul 14, 2015 at 10:45 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
->> > On Mon, 2015-07-13 at 22:46 +0800, Daniel Kurtz wrote:
->> >> > +static const struct clk_ops mtk_ref2usb_tx_ops = {
->> >> > +       .is_prepared    = mtk_ref2usb_tx_is_prepared,
->> >> > +       .prepare        = mtk_ref2usb_tx_prepare,
->> >> > +       .unprepare      = mtk_ref2usb_tx_unprepare,
->> >> > +};
->> >>
->> >> Burying the implementation of this special "mtk_ref2usb" clock in
->> >> clk-mt8173,c seems a bit awkward.
->> >> Can you please move it to its own file, like mediatek/clk-usb.c?
->> >
->> > Do you mean clk/mediatek/clk-usb.c?
->> >
->> > This clock is a MT8173 specific clock, which may not be reused by other
->> > SoCs. So I think it's not necessary to move it to a separated file.
->>
->> Yes, this is a wrapper for a type of clock.  I think it would be
->> better in its own file, rather than embedded in clk-mt8173.c, which is
->> more about enumerating and initializing the clock tree.
->>
->> Perhaps today it is only used for mt8173, but that may not be the case
->> in the future.
->
-> OK, I'll separate it from clk-mt8173.c.
->
-> Ref2usb_tx's control register is located in APMIXEDSYS, which contains
-> most of PLL controlling. Is this clock suitable to implemented
-> mtk-pll.c? Or it's proper to be a separated file such as clk-usb.c?
+On Mon, Jul 13, 2015 at 05:56:39PM +0100, Mark Rutland wrote:
+> On Mon, Jul 13, 2015 at 05:51:51PM +0100, Dave P Martin wrote:
+> > On Mon, Jul 13, 2015 at 05:43:15PM +0100, Mark Rutland wrote:
 
-I think a separate clk-usb.c might be better since the driver is very
-different than what is used for the PLLs.
+[...]
 
-Thanks!
--Dan
+> > > Given the reliance on the labels in the caller, I think it might make
+> > 
+> > Not sure what you mean here, can you elaborate?
+> 
+> We're relying on label "0:" in the caller/user of the macro when we emit
+> ".long 2b - 0b".
+> 
+> I think it would be clearer if folded into the caller (even with the
+> inline ifdef this necessitates).
+> 
+> Though I could be missing something here that renders that impossible.
 
-> Best regards,
->
-> James
->
->
+Before I respin the series, can you cast your eye over this
+alternative?
+
+I'm testing it now, but in any case it should make the conditional
+structure of the code clearer as per your suggestion.
+
+Cheers
+---Dave
+
+
+[...]
+
+#ifdef CONFIG_DEBUG_BUGVERBOSE
+#define __BUGVERBOSE(x...) x
+#else
+#define __BUGVERBOSE(x...)
+#endif
+
+#define _BUG_FLAGS(flags, file, line) __BUG_FLAGS(flags, file, line)
+
+#define __BUG_FLAGS(flags, file, line) asm volatile (			\
+ __BUGVERBOSE(	".pushsection .rodata.str,\"aMS\", at progbits,1\n"	\
+	"2:	.string \"" file "\"\n\t"				\
+		".popsection\n\t"				)	\
+									\
+		".pushsection __bug_table,\"a\"\n\t"			\
+		".align 2\n\t"						\
+	"0:	.long 1f - 0b\n\t"					\
+ __BUGVERBOSE(	".long 2b - 0b\n\t"					\
+		".short " #line "\n\t"	)				\
+		".short " #flags "\n\t"					\
+		".popsection\n"						\
+									\
+	"1:	brk %[imm]"						\
+		:: [imm] "i" (BUG_BRK_IMM)				\
+)
+
+#define BUG() do {				\
+	_BUG_FLAGS(0, __FILE__, __LINE__);	\
+	unreachable();				\
+} while (0)
+
+#define __WARN_TAINT(taint)					\
+	_BUG_FLAGS(BUGFLAG_TAINT(taint), __FILE__, __LINE__)
+
+[...]
