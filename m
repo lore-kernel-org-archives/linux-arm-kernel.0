@@ -1,56 +1,50 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Tue, 14 Jul 2015 14:45:24 -0500
-Subject: [PATCH 1/4] spi: davinci: Set prescale value based on register value
+Date: Tue, 14 Jul 2015 14:45:27 -0500
+Subject: [PATCH 4/4] ARM: dts: keystone: Add ti,keystone-spi for SPI
 In-Reply-To: <1436903127-6777-1-git-send-email-fcooper@ti.com>
 References: <1436903127-6777-1-git-send-email-fcooper@ti.com>
-Message-ID: <1436903127-6777-2-git-send-email-fcooper@ti.com>
+Message-ID: <1436903127-6777-5-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Within davinci_spi_get_prescale() the prescale has two meanings. First one
-being the calculated prescale value and then at the end translates it to the
-prescale value that will be written to the SPI register.
-
-At first glance this can be confusing especially when comparing the minimum
-prescale value against what is seen in the TRM.
-
-To simplify things make it clear that the calculated prescale value will always
-be based on the value that will be written into the SPI register.
+Add ti,keystone-spi to the compatible field for the SPI node. This new
+entry insures that the proper prescaler limit is used for keystone devices
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- drivers/spi/spi-davinci.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/keystone.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 987afeb..b4605c4 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -255,7 +255,7 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
-  * This function calculates the prescale value that generates a clock rate
-  * less than or equal to the specified maximum.
-  *
-- * Returns: calculated prescale - 1 for easy programming into SPI registers
-+ * Returns: calculated prescale value for easy programming into SPI registers
-  * or negative error number if valid prescalar cannot be updated.
-  */
- static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
-@@ -263,12 +263,13 @@ static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
- {
- 	int ret;
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index c06542b..ea2e1cd 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -136,7 +136,7 @@
+ 		};
  
--	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz);
-+	/* Subtract 1 to match what will be programmed into SPI register. */
-+	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz) - 1;
+ 		spi0: spi at 21000400 {
+-			compatible = "ti,dm6441-spi";
++			compatible = "ti,keystone-spi", "ti,dm6441-spi";
+ 			reg = <0x21000400 0x200>;
+ 			num-cs = <4>;
+ 			ti,davinci-spi-intr-line = <0>;
+@@ -147,7 +147,7 @@
+ 		};
  
--	if (ret < 1 || ret > 256)
-+	if (ret < 0 || ret > 255)
- 		return -EINVAL;
+ 		spi1: spi at 21000600 {
+-			compatible = "ti,dm6441-spi";
++			compatible = "ti,keystone-spi", "ti,dm6441-spi";
+ 			reg = <0x21000600 0x200>;
+ 			num-cs = <4>;
+ 			ti,davinci-spi-intr-line = <0>;
+@@ -158,7 +158,7 @@
+ 		};
  
--	return ret - 1;
-+	return ret;
- }
- 
- /**
+ 		spi2: spi at 21000800 {
+-			compatible = "ti,dm6441-spi";
++			compatible = "ti,keystone-spi", "ti,dm6441-spi";
+ 			reg = <0x21000800 0x200>;
+ 			num-cs = <4>;
+ 			ti,davinci-spi-intr-line = <0>;
 -- 
 1.9.1
