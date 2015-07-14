@@ -1,21 +1,151 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jul 2015 12:00:39 +0100
-Subject: [PATCH] arm64: Define HAVE_ARCH_PIO_SIZE and related symbols.
-In-Reply-To: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <20150714110039.GC16213@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 14 Jul 2015 12:02:15 +0100
+Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
+In-Reply-To: <20150714175011.31c3d714@xhacker>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-4-git-send-email-sudeep.holla@arm.com>	<20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>
+ <20150714175011.31c3d714@xhacker>
+Message-ID: <55A4EC37.7030900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 10:31:36PM +0100, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Needed to make pci_iomap() work.
 
-Care to elaborate?
 
-AFAICT, mapping an IO bar on arm64 just gives you back a VA into our
-PCI_IOBASE region and the ioreadX accessors will just call the readX
-macros, so there should be no need for further port adjustment.
+On 14/07/15 10:50, Jisheng Zhang wrote:
+> Dear Sudeep,
+>
+> On Tue, 14 Jul 2015 10:14:25 +0100
+> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>>
+>>
+>> On 14/07/15 07:17, Jisheng Zhang wrote:
+>>> Hi Sudeep,
+>>>
+>>> I'm sorry to being late. Just have some comments below.
+>>>
+>>> On Thu, 18 Jun 2015 15:41:34 +0100
+>>> Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>
+>>>> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
+>>>> provides the mechanism by which the calling OS can request entry into
+>>>> the deepest possible system sleep state.
+>>>>
+>>>> It meets all the necessary preconditions for entering suspend to RAM
+>>>> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
+>>>> firmware and registers a psci system suspend operation to implement the
+>>>> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
+>>>> PSCI.
+>>>>
+>>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>> ---
+>>>>    drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
+>>>>    include/uapi/linux/psci.h |  3 +++
+>>>>    2 files changed, 34 insertions(+)
+>>>>
+>>>> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+>>>> index 752ca7c9eb97..f2b2b3e1c6e4 100644
+>>>> --- a/drivers/firmware/psci.c
+>>>> +++ b/drivers/firmware/psci.c
+>>>> @@ -20,11 +20,13 @@
+>>>>    #include <linux/printk.h>
+>>>>    #include <linux/psci.h>
+>>>>    #include <linux/reboot.h>
+>>>> +#include <linux/suspend.h>
+>>>>
+>>>>    #include <uapi/linux/psci.h>
+>>>>
+>>>>    #include <asm/system_misc.h>
+>>>>    #include <asm/smp_plat.h>
+>>>> +#include <asm/suspend.h>
+>>>>
+>>>>    /*
+>>>>     * While a 64-bit OS can make calls with SMC32 calling conventions, for some
+>>>> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
+>>>>    			      psci_func_id, 0, 0);
+>>>>    }
+>>>>
+>>>> +static int psci_system_suspend(unsigned long unused)
+>>>> +{
+>>>> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+>>>> +			      virt_to_phys(cpu_resume), 0, 0);
+>>>> +}
+>>>> +
+>>>> +static int psci_system_suspend_enter(suspend_state_t state)
+>>>> +{
+>>>> +	return cpu_suspend(0, psci_system_suspend);
+>>>> +}
+>>>> +
+>>>> +static const struct platform_suspend_ops psci_suspend_ops = {
+>>>> +	.valid          = suspend_valid_only_mem,
+>>>> +	.enter          = psci_system_suspend_enter,
+>>>> +};
+>>>> +
+>>>> +static void __init psci_init_system_suspend(void)
+>>>> +{
+>>>> +	if (!IS_ENABLED(CONFIG_SUSPEND))
+>>>> +		return;
+>>>> +
+>>>> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
+>>>> +		return;
+>>>
+>>> So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
+>>> until PSCI 1.0,
+>>
+>> Correct, if you need System to RAM in Linux on a platform with PSCI
+>> firmware, firmware *must implement* SYSTEM_SUSPEND.
+>>
+>>> and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
+>>
+>> Optional here means, that you may chose to implement or not in the
+>> firmware. It doesn't mean we can implement S2R in Linux using other
+>> PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
+>> in the kernel.
+>>
+>>> we also want
+>>> suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
+>>
+>> Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
+>> feature in Linux. Is it just because we can manage with workarounds ?
+>> Sorry, that's not an option.
+>
+> The problem is the PSCI 1.0 SYSTEM_SUSPEND definition: we can't pass something
+> like stateid as in CPU_SUSPEND to firmware. The stateid is used to tell
+> firmware to go to different Sleep state, for example S2 or S3.
+>
 
-Will
+Can you elaborate on S2 here with an example ? You are using ACPI
+Sleep State definitions here which should not be mixed with PSCI.
+
+*Let's refrain ourselves from using ACPI S-states here* until it's well
+defined on ARM systems. The current definition is x86 based and doesn't
+suit ARM at all.
+
+It's difficult to distinguish between the intermediate system suspend
+sleep states you are referring and the composite cpu idle states. That's
+the reason I am asking for the example to see if the sleep states you
+referring can be considered as composite cpu idle states.
+I strongly believe that's the case.
+
+I would consider any other states as composite CPU idle states. In
+order to utilize Linux PM features, we would use PSCI functions as
+below.
+
+/-----------------------------------\
+| PSCI Feature   | Linux PM feature |
+|-----------------------------------|
+| SYSTEM_SUSPEND |  Suspend-to-RAM  |
+|-----------------------------------|
+| SYSTEM_SHUTDOWN|  Suspend-to-Disk |
+\-----------------------------------/
+
+> With your RFC patch, it's easy to extend to support this feature, but if we
+> are limited to SYSTEM_SUSPEND in PSCI 1.0, we have to use a different code
+> path for non-S3 sleep state.
+>
+
+As I said above can you provide examples for such states.
+
+Regards,
+Sudeep
