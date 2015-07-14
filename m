@@ -1,38 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jul 2015 03:00:42 -0700
-Subject: [PATCH v4 0/3] ARM: OMAP2+: wkup_m3_rproc support patches
-In-Reply-To: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
-References: <1436808895-21206-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20150714100041.GK17550@atomide.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 14 Jul 2015 11:04:51 +0100
+Subject: [RFC PATCH v2 1/1] drivers: cpuidle: cpuidle-arm: heterogeneous
+ systems extension
+In-Reply-To: <CAGS+omBtraNBH43qsFn_YgO3ePbFav9VtwgqDUinbOBMPwOGXA@mail.gmail.com>
+References: <1429200617-9546-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1429200617-9546-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <554771D3.5010701@linaro.org> <20150505155615.GA23106@red-moon>
+ <20150512130339.GB15131@red-moon>
+ <CAGS+omBtraNBH43qsFn_YgO3ePbFav9VtwgqDUinbOBMPwOGXA@mail.gmail.com>
+Message-ID: <20150714100451.GA16165@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [150713 10:37]:
-> Hi,
-> 
-> Now that wkup_m3_rproc driver [1] has been merged the support code
-> contained in this series can be merged. This is v4 which is just a
-> rebase of v3 [2] code on v4.2-rc2, no other changes.
+Hi Daniel,
 
-Thanks applying into omap-for-v4.3/dt.
+On Tue, Jul 14, 2015 at 05:52:48AM +0100, Daniel Kurtz wrote:
 
-Tony
- 
-> [1] http://www.spinics.net/lists/linux-omap/msg118768.html
-> [2] http://www.spinics.net/lists/linux-omap/msg117614.html
+[...]
+
+> > Any further comments ? I can post a v2 with an updated idle_states_cmp()
+> > return value, if we think the multiple drivers approach is valid.
 > 
-> Dave Gerlach (1):
->   ARM: OMAP2+: Use pdata-quirks for wkup_m3 reset management
-> 
-> Suman Anna (2):
->   ARM: dts: AM33xx: Update and move wkup_m3 node to l4 node
->   ARM: dts: AM4372: Add the wkupm3 rproc node
-> 
->  arch/arm/boot/dts/am33xx.dtsi      | 17 +++++++++--------
->  arch/arm/boot/dts/am4372.dtsi      |  9 +++++++++
->  arch/arm/mach-omap2/pdata-quirks.c | 15 +++++++++++++++
->  3 files changed, 33 insertions(+), 8 deletions(-)
-> 
-> -- 
-> 2.4.5
-> 
+> Can you post v2?
+> From the silence on the list, I guess there is no strong objection to
+> your approach.
+
+I just wanted to make sure this patch is strictly required before asking
+for a merge in the mainline, it adds to the code complexity so it should
+not be taken lightly.
+
+> So, perhaps it is time to remove the "RFC" as well so this can get on
+> track to be merged.
+
+I will drop the RFC status and add a simple configuration to define
+a config entry to configure the max number of drivers statically so
+that we do not waste memory for nothing.
+
+Thanks,
+Lorenzo
