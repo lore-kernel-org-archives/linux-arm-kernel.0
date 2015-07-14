@@ -1,48 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 14 Jul 2015 17:29:56 +0100
-Subject: [PATCH] arm64: Define HAVE_ARCH_PIO_SIZE and related symbols.
-In-Reply-To: <55A53509.4060202@caviumnetworks.com>
-References: <1436823096-24059-1-git-send-email-ddaney.cavm@gmail.com>
- <20150714110039.GC16213@arm.com>
- <55A53509.4060202@caviumnetworks.com>
-Message-ID: <20150714162955.GR16213@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 14 Jul 2015 17:40:05 +0100
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support in
+ Zynq MPSoC GQSPI controller
+In-Reply-To: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+Message-ID: <20150714164005.GE11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 05:12:57PM +0100, David Daney wrote:
-> On 07/14/2015 04:00 AM, Will Deacon wrote:
-> > On Mon, Jul 13, 2015 at 10:31:36PM +0100, David Daney wrote:
-> >> From: David Daney <david.daney@cavium.com>
-> >>
-> >> Needed to make pci_iomap() work.
-> >
-> > Care to elaborate?
-> >
-> 
-> I should have explained what I am doing here a little better.
+On Thu, Jul 09, 2015 at 06:14:53PM +0530, Ranjit Waghmode wrote:
 
-Yeah, thanks.
 
-> Systems based on the Cavium ThunderX processor may have up to 8 
-> independent PCIe root complexes.  The I/O space on each bus occupies an 
-> independent physical address window.
+> What is dual parallel mode?
+> ---------------------------
+> ZynqMP GQSPI controller supports Dual Parallel mode with following functionalities:
+> 1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+> 2) Chip selects and clock are shared to both the flash devices
+> 3) This mode is targeted for faster read/write speed and also doubles the size
+> 4) Commands/data can be transmitted/received from both the devices(mirror),
+>    or only upper or only lower flash memory devices.
+> 5) Data arrangement:
+>    With stripe enabled,
+>    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+>    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
 
-Hmm, so do you have 64k of I/O space per-bus? That gives 8x256x64k = 128M
-IIUC, so not sure what your 32MB is for.
+For the SPI code this just seems like SPI with an 8 bit data width.
 
-> So, in order to be able to map all of these (semi) contiguously, we need 
-> a lot more virtual address space than is supplied by the default values 
-> for all these constants.
-> 
-> The option I chose here was to unconditionally expand the I/O ranges for 
-> all arm64 systems.  If you think this breaks existing systems/drivers, I 
-> will have to look for other options.
+> What is stacked mode?
+> ---------------------
+> ZynqMP GQSPI controller supports stacked mode with following functionalities:
+> 1) The Generic Quad-SPI controller also supports two SPI flash memories
+>    in a shared bus arrangement to reduce IO pin count.
+> 2) Separate chip select lines
+> 3) Shared I/O lines
+> 4) This mode is targeted for increasing the flash memory and no performance
+>    improvement when compared with single.
 
-Hmm, but pci_iomap winds up calling __pci_ioport_map, which expands to
-ioport_map which just does:
-
-	return PCI_IOBASE + (port & IO_SPACE_LIMIT);
-
-so I'm struggling to see what your patch achieves.
-
-Will
+This is just a normal SPI controller from a SPI point of view.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150714/6b2a0203/attachment.sig>
