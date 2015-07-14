@@ -1,123 +1,67 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 14 Jul 2015 14:17:03 +0800
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20150714141703.0d77242c@xhacker>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Tue, 14 Jul 2015 14:19:51 +0800
+Subject: [PATCH v2 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <20150710051018.GU18700@pengutronix.de>
+References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1436348468-4126-2-git-send-email-chunfeng.yun@mediatek.com>
+ <20150710051018.GU18700@pengutronix.de>
+Message-ID: <1436854791.11289.11.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
-
-I'm sorry to being late. Just have some comments below.
-
-On Thu, 18 Jun 2015 15:41:34 +0100
-Sudeep Holla <sudeep.holla@arm.com> wrote:
-
-> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
-> provides the mechanism by which the calling OS can request entry into
-> the deepest possible system sleep state.
+hi,
+On Fri, 2015-07-10 at 07:10 +0200, Sascha Hauer wrote:
+> On Wed, Jul 08, 2015 at 05:41:03PM +0800, Chunfeng Yun wrote:
+> > add a DT binding documentation of usb3.0 phy for MT65xx
+> > SoCs from Mediatek.
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/usb/mt65xx-u3phy.txt       | 34 ++++++++++++++++++++++
+> >  1 file changed, 34 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > new file mode 100644
+> > index 0000000..056b2aa
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > @@ -0,0 +1,34 @@
+> > +MT65xx U3PHY
+> > +
+> > +The device node for Mediatek SOC usb3.0 phy
+> > +
+> > +Required properties:
+> > + - compatible : Should be "mediatek,mt8173-u3phy"
+> > + - reg        : Offset and length of registers, the first is for mac domain,
+> > +	another for phy domain
+> > + - power-domains: to enable usb's mtcmos
+> > + - usb-wakeup-ctrl : to access usb wakeup control register
+> > + - wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup mode; others
+> > +	means don't enable wakeup source of usb
+> > + - u2port-num : number of usb2.0 ports to support which should be 1 or 2
+> > + - clocks     : must support all clocks that phy need
+> > + - clock-names: should be "wakeup_deb_p0", "wakeup_deb_p1" for wakeup
+> > +	debounce control clocks, and "u3phya_ref" for u3phya reference clock.
+> > +
+> > +Example:
+> > +
+> > +u3phy: usb-phy at 11271000 {
+> > +	compatible = "mediatek,mt8173-u3phy";
+> > +	reg = <0 0x11271000 0 0x3000>,
+> > +	      <0 0x11280000 0 0x20000>;
 > 
-> It meets all the necessary preconditions for entering suspend to RAM
-> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
-> firmware and registers a psci system suspend operation to implement the
-> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
-> PSCI.
+> 0x11271000 is the register space the xhci controller takes. You should
+> not expose the same register space to two different drivers.
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
->  include/uapi/linux/psci.h |  3 +++
->  2 files changed, 34 insertions(+)
+
+usb: usb30 at 11270000 {
+   compatible = "mediatek,mt8173-xhci";
+   reg = <0 0x11270000 0 0x1000>;
+
+the size of xhci register space is 0x1000, and the range is
+[0x11270000, 0x11271000 - 1], so the address of 0x11271000 is not
+included.
+
+> Sascha
 > 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 752ca7c9eb97..f2b2b3e1c6e4 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -20,11 +20,13 @@
->  #include <linux/printk.h>
->  #include <linux/psci.h>
->  #include <linux/reboot.h>
-> +#include <linux/suspend.h>
->  
->  #include <uapi/linux/psci.h>
->  
->  #include <asm/system_misc.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/suspend.h>
->  
->  /*
->   * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
->  			      psci_func_id, 0, 0);
->  }
->  
-> +static int psci_system_suspend(unsigned long unused)
-> +{
-> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
-> +			      virt_to_phys(cpu_resume), 0, 0);
-> +}
-> +
-> +static int psci_system_suspend_enter(suspend_state_t state)
-> +{
-> +	return cpu_suspend(0, psci_system_suspend);
-> +}
-> +
-> +static const struct platform_suspend_ops psci_suspend_ops = {
-> +	.valid          = suspend_valid_only_mem,
-> +	.enter          = psci_system_suspend_enter,
-> +};
-> +
-> +static void __init psci_init_system_suspend(void)
-> +{
-> +	if (!IS_ENABLED(CONFIG_SUSPEND))
-> +		return;
-> +
-> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
-> +		return;
-
-So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
-until PSCI 1.0, and even in PSCI 1.0 SYSTEM_SUSPEND is optional, we also want
-suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND, is there
-any possibility to bring your previous RFC patch[1] back? Or ARM expect all
-PSCI users must have SYSTEM_SUSPEND implemented if they want s2ram?
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/318541.html
-
-Thank you,
-Jisheng
-
-> +
-> +	suspend_set_ops(&psci_suspend_ops);
-> +}
-> +
->  static void __init psci_init_cpu_suspend(void)
->  {
->  	int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-> @@ -311,6 +340,8 @@ static int __init psci_probe(void)
->  
->  	psci_init_cpu_suspend();
->  
-> +	psci_init_system_suspend();
-> +
->  	return 0;
->  }
->  
-> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-> index 2598d7c9bf20..a1a2d85a91b9 100644
-> --- a/include/uapi/linux/psci.h
-> +++ b/include/uapi/linux/psci.h
-> @@ -47,6 +47,9 @@
->  #define PSCI_0_2_FN64_MIGRATE_INFO_UP_CPU	PSCI_0_2_FN64(7)
->  
->  #define PSCI_1_0_FN_PSCI_FEATURES		PSCI_0_2_FN(10)
-> +#define PSCI_1_0_FN_SYSTEM_SUSPEND		PSCI_0_2_FN(14)
-> +
-> +#define PSCI_1_0_FN64_SYSTEM_SUSPEND		PSCI_0_2_FN64(14)
->  
->  /* PSCI v0.2 power state encoding for CPU_SUSPEND function */
->  #define PSCI_0_2_POWER_STATE_ID_MASK		0xffff
