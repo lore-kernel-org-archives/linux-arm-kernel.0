@@ -1,34 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 14 Jul 2015 11:12:15 -0700
-Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
-Message-ID: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Tue, 14 Jul 2015 11:17:24 -0700
+Subject: [PATCH V2] arm:DTS Correct audio input route & set mic bias
+Message-ID: <1436897844-6908-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex-A9 on at least BCM4708 SoCs are not LPAE capable, booting such a
-kernel will result in the following:
+Audio-in was incorrectly routed to Line In. It should be Mic3L as per
+schematic.
 
-Error: Kernel with LPAE support, but CPU does not support LPAE.
+Using mic-bias voltage at 2.0v (<0x1>) does not work for some reason. There
+is no voltage seen on micbias (R127). Mic-bias voltage of 2.5v (<0x2>) works.
+I see voltage of 2.475v across GND and micbias.
 
-Restrict such SoCs to be built in a configuration that does not enable
-ARM_LPAE.
+With these changes, I can record audio with a pair of proliferate TRRS earbuds.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
 ---
- arch/arm/mach-bcm/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am335x-pepper.dts | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 0ac9e4b3b265..153a660da004 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -38,6 +38,7 @@ config ARCH_BCM_CYGNUS
- config ARCH_BCM_5301X
- 	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
- 	select ARCH_BCM_IPROC
-+	depends on !ARM_LPAE
- 	help
- 	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+index d627dc6..73b4cc3 100644
+--- a/arch/arm/boot/dts/am335x-pepper.dts
++++ b/arch/arm/boot/dts/am335x-pepper.dts
+@@ -74,6 +74,7 @@
+ 	audio_codec: tlv320aic3106 at 1b {
+ 		compatible = "ti,tlv320aic3106";
+ 		reg = <0x1b>;
++		ai3x-micbias-vg = <0x2>;
+ 	};
  
+ 	accel: lis331dlh at 1d {
+@@ -152,7 +153,7 @@
+ 	ti,audio-routing =
+ 		"Headphone Jack",	"HPLOUT",
+ 		"Headphone Jack",	"HPROUT",
+-		"LINE1L",		"Line In";
++		"MIC3L",		"Mic3L Switch";
+ };
+ 
+ &mcasp0 {
 -- 
-2.1.0
+2.1.4
