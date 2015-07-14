@@ -1,100 +1,97 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Tue, 14 Jul 2015 16:41:04 +0200
-Subject: [PATCH] serial: mxs-auart: keep the AUART unit in reset state when
- not in use
-Message-ID: <1436884864-6782-1-git-send-email-jbe@pengutronix.de>
+From: vgoyal@redhat.com (Vivek Goyal)
+Date: Tue, 14 Jul 2015 10:42:48 -0400
+Subject: [PATCH 3/3] kexec: Change the timing of callbacks related to
+ "crash_kexec_post_notifiers" boot option
+In-Reply-To: <20150710113331.4368.77050.stgit@softrs>
+References: <20150710113331.4368.10495.stgit@softrs>
+ <20150710113331.4368.77050.stgit@softrs>
+Message-ID: <20150714144248.GC10792@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the UART device driver gets closed from userland, the driver
-disables the UART unit and then stops the clocks to save power.
+On Fri, Jul 10, 2015 at 08:33:31PM +0900, Hidehiro Kawai wrote:
+> This patch fixes problems reported by Daniel Walker
+> (https://lkml.org/lkml/2015/6/24/44), and also replaces the bug fix
+> commits 5375b70 and f45d85f.
+> 
+> If "crash_kexec_post_notifiers" boot option is specified,
+> other cpus are stopped by smp_send_stop() before entering
+> crash_kexec(), while usually machine_crash_shutdown() called by
+> crash_kexec() does that.  This behavior change leads two problems.
+> 
+>  Problem 1:
+>  Some function in the crash_kexec() path depend on other cpus being
+>  still online.  If other cpus have been offlined already, they
+>  doesn't work properly.
+> 
+>   Example:
+>    panic()
+>     crash_kexec()
+>      machine_crash_shutdown()
+>       octeon_generic_shutdown() // shutdown watchdog for ONLINE cpus
+>      machine_kexec()
+> 
+>  Problem 2:
+>  Most of architectures stop other cpus in the machine_crash_shutdown()
+>  path and save register information at the same time.  However, if
+>  smp_send_stop() is called before that, we can't save the register
+>  information.
+> 
+> To solve these problems, this patch changes the timing of calling
+> the callbacks instead of changing the timing of crash_kexec() if
+> crash_kexec_post_notifiers boot option is specified.
+> 
+>  Before:
+>   if (!crash_kexec_post_notifiers)
+>       crash_kexec()
+> 
+>   smp_send_stop()
+>   atomic_notifier_call_chain()
+>   kmsg_dump()
+> 
+>   if (crash_kexec_post_notifiers)
+>       crash_kexec()
+> 
+>  After:
+>   crash_kexec()
+>       machine_crash_shutdown()
+>       if (crash_kexec_post_notifiers) {
+>           atomic_notifier_call_chain()
+>           kmsg_dump()
+>       }
+>       machine_kexec()
+> 
+>   smp_send_stop()
+>   if (!crash_kexec_post_notifiers) {
+>       atomic_notifier_call_chain()
+>       kmsg_dump()
+>   }
+> 
 
-The bit which disabled the UART unit is described as:
+I think this new code flow looks bad. Now we are calling kmsg_dump()
+and atomic_notifier_call_chain() from inside the crash_kexec() as well
+as from inside panic(). This is bad.
 
-?"UART Enable. If this bit is set to 1, the UART is enabled. Data
-  transmission and reception occurs for the UART signals. When the
-  UART is disabled in the middle of transmission or reception, it
-  completes the current character before stopping."
+So basic problem seems to be that cpus need to be stopped once (with
+or without panic notifiers. So why don't we look into desiginig a 
+function which stops cpus, saves register states first and then does
+rest of the processing.
 
-The important part is the "it completes the current character". Whenever
-a reception is ongoing when the UART gets disabled (including the clock
-off) the statemachine freezes and "remembers" this state on the next
-open() and re-enabling of the unit's clock.
+Something like.
 
-In this case we end up receiving an additional bogus character
-immediately.
+stop_cpus_save_register_state;
 
-The solution in this change is to move the AUART unit into its reset
-state on close() and only release it from its reset state on the next
-open().
+if (!crash_kexec_post_notifiers)
+	crash_kexec()
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
----
- drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
- 1 file changed, 30 insertions(+), 8 deletions(-)
+atomic_notifier_call_chain()
+kmsg_dump()
 
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 13cf773..f42b6ad 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
- 	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
- }
- 
-+static void mxs_auart_do_reset(struct uart_port *u)
-+{
-+	int i;
-+	u32 reg;
-+
-+	reg = readl(u->membase + AUART_CTRL0);
-+	/* if already in reset state, keep it untouched */
-+	if (reg & AUART_CTRL0_SFTRST)
-+		return;
-+
-+	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
-+
-+	for (i = 0; i < 1000; i++) {
-+		reg = readl(u->membase + AUART_CTRL0);
-+		/* reset is finished when the clock is gated */
-+		if (reg & AUART_CTRL0_CLKGATE)
-+			return;
-+		udelay(10);
-+	}
-+
-+	dev_err(u->dev, "Failed to reset the unit.");
-+}
-+
- static int mxs_auart_startup(struct uart_port *u)
- {
- 	int ret;
-@@ -867,7 +891,10 @@ static int mxs_auart_startup(struct uart_port *u)
- 	if (ret)
- 		return ret;
- 
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	/* reset the unit if not aready done */
-+	mxs_auart_do_reset(u);
-+	/* bring it out of reset now */
-+	mxs_auart_reset(u);
- 
- 	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_SET);
- 
-@@ -899,13 +926,8 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 	if (auart_dma_enabled(s))
- 		mxs_auart_dma_exit(s);
- 
--	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
--
--	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
--			u->membase + AUART_INTR_CLR);
--
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
--
-+	/* reset the unit and keep it in reset state */
-+	mxs_auart_do_reset(u);
- 	clk_disable_unprepare(s->clk);
- }
- 
--- 
-2.1.4
+Here crash_kexec() will have to be modified and it will assume that cpus
+have already been stopped and register states have already been saved.
+
+IOW, is there a reason that we can't get rid of smp_send_stop() and
+use the mechanism crash_kexec() is using to stop cpus after panic()?
+
+Thanks
+Vivek
