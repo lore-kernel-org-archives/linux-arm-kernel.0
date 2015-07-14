@@ -1,142 +1,118 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 14 Jul 2015 17:50:11 +0800
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <55A4D2F1.5070702@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
- <20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>
-Message-ID: <20150714175011.31c3d714@xhacker>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Tue, 14 Jul 2015 11:39:35 +0200
+Subject: [PATCH v2 47/48] usb: musb: gadget: add musb_match_ep() function
+In-Reply-To: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+References: <1436866776-5004-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436866776-5004-48-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sudeep,
+Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
+process. Functions does the same that was done by chip-specific code inside
+of epautoconf. Now this code can be removed from there to separate generic code
+from platform specific logic.
 
-On Tue, 14 Jul 2015 10:14:25 +0100
-Sudeep Holla <sudeep.holla@arm.com> wrote:
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/gadget/epautoconf.c | 23 ---------------------
+ drivers/usb/musb/musb_gadget.c  | 44 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+), 23 deletions(-)
 
-> 
-> 
-> On 14/07/15 07:17, Jisheng Zhang wrote:
-> > Hi Sudeep,
-> >
-> > I'm sorry to being late. Just have some comments below.
-> >
-> > On Thu, 18 Jun 2015 15:41:34 +0100
-> > Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >
-> >> PSCI v1.0 introduces a new API called PSCI_SYSTEM_SUSPEND. This API
-> >> provides the mechanism by which the calling OS can request entry into
-> >> the deepest possible system sleep state.
-> >>
-> >> It meets all the necessary preconditions for entering suspend to RAM
-> >> state in Linux. This patch adds support for PSCI_SYSTEM_SUSPEND in psci
-> >> firmware and registers a psci system suspend operation to implement the
-> >> suspend-to-RAM(s2r) in a generic way on all the platforms implementing
-> >> PSCI.
-> >>
-> >> Cc: Mark Rutland <mark.rutland@arm.com>
-> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >> ---
-> >>   drivers/firmware/psci.c   | 31 +++++++++++++++++++++++++++++++
-> >>   include/uapi/linux/psci.h |  3 +++
-> >>   2 files changed, 34 insertions(+)
-> >>
-> >> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> >> index 752ca7c9eb97..f2b2b3e1c6e4 100644
-> >> --- a/drivers/firmware/psci.c
-> >> +++ b/drivers/firmware/psci.c
-> >> @@ -20,11 +20,13 @@
-> >>   #include <linux/printk.h>
-> >>   #include <linux/psci.h>
-> >>   #include <linux/reboot.h>
-> >> +#include <linux/suspend.h>
-> >>
-> >>   #include <uapi/linux/psci.h>
-> >>
-> >>   #include <asm/system_misc.h>
-> >>   #include <asm/smp_plat.h>
-> >> +#include <asm/suspend.h>
-> >>
-> >>   /*
-> >>    * While a 64-bit OS can make calls with SMC32 calling conventions, for some
-> >> @@ -222,6 +224,33 @@ static int __init psci_features(u32 psci_func_id)
-> >>   			      psci_func_id, 0, 0);
-> >>   }
-> >>
-> >> +static int psci_system_suspend(unsigned long unused)
-> >> +{
-> >> +	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
-> >> +			      virt_to_phys(cpu_resume), 0, 0);
-> >> +}
-> >> +
-> >> +static int psci_system_suspend_enter(suspend_state_t state)
-> >> +{
-> >> +	return cpu_suspend(0, psci_system_suspend);
-> >> +}
-> >> +
-> >> +static const struct platform_suspend_ops psci_suspend_ops = {
-> >> +	.valid          = suspend_valid_only_mem,
-> >> +	.enter          = psci_system_suspend_enter,
-> >> +};
-> >> +
-> >> +static void __init psci_init_system_suspend(void)
-> >> +{
-> >> +	if (!IS_ENABLED(CONFIG_SUSPEND))
-> >> +		return;
-> >> +
-> >> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
-> >> +		return;
-> >
-> > So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
-> > until PSCI 1.0,
-> 
-> Correct, if you need System to RAM in Linux on a platform with PSCI
-> firmware, firmware *must implement* SYSTEM_SUSPEND.
-> 
-> > and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
-> 
-> Optional here means, that you may chose to implement or not in the
-> firmware. It doesn't mean we can implement S2R in Linux using other
-> PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
-> in the kernel.
-> 
-> >we also want
-> > suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
-> 
-> Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
-> feature in Linux. Is it just because we can manage with workarounds ?
-> Sorry, that's not an option.
-
-The problem is the PSCI 1.0 SYSTEM_SUSPEND definition: we can't pass something
-like stateid as in CPU_SUSPEND to firmware. The stateid is used to tell
-firmware to go to different Sleep state, for example S2 or S3.
-
-With your RFC patch, it's easy to extend to support this feature, but if we
-are limited to SYSTEM_SUSPEND in PSCI 1.0, we have to use a different code
-path for non-S3 sleep state.
-
-Is there any elegant solution?
-
-Thanks,
-Jisheng
-
-> 
-> > is there
-> > any possibility to bring your previous RFC patch[1] back? Or ARM expect all
-> > PSCI users must have SYSTEM_SUSPEND implemented if they want s2ram?
-> 
-> OK, we did expect response back then[1] when we clearly asked if the
-> firmware can be upgraded to v1.0 from v0.2 as the delta is not much and
-> helps up to avoid special DT bindings for that case. Since nobody
-> responded for last 6 months, it's assumed that it's no longer required.
-> 
-> So to answer you, no the RFC is dead and it's expected to have PSCI
-> firmware support for SYSTEM_SUSPEND if S2R is desired feature in Linux.
-> 
-> Regards,
-> Sudeep
-> 
-> [1] 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-February/322278.html
+diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+index 038b21d..e9a8682 100644
+--- a/drivers/usb/gadget/epautoconf.c
++++ b/drivers/usb/gadget/epautoconf.c
+@@ -95,29 +95,6 @@ struct usb_ep *usb_ep_autoconfig_ss(
+ 			goto found_ep;
+ 	}
+ 
+-	/* First, apply chip-specific "best usage" knowledge.
+-	 * This might make a good usb_gadget_ops hook ...
+-	 */
+-#ifdef CONFIG_BLACKFIN
+-	if (gadget_is_musbhdrc(gadget)) {
+-		if ((USB_ENDPOINT_XFER_BULK == type) ||
+-		    (USB_ENDPOINT_XFER_ISOC == type)) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = find_ep (gadget, "ep5in");
+-			else
+-				ep = find_ep (gadget, "ep6out");
+-		} else if (USB_ENDPOINT_XFER_INT == type) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = find_ep(gadget, "ep1in");
+-			else
+-				ep = find_ep(gadget, "ep2out");
+-		} else
+-			ep = NULL;
+-		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
+-			goto found_ep;
+-	}
+-#endif
+-
+ 	/* Second, look at endpoints until an unclaimed one looks usable */
+ 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
+ 		if (usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+index 043248a..5f1eb35 100644
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1684,6 +1684,49 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_BLACKFIN
++static struct usb_ep *musb_find_ep(struct usb_gadget *g,
++		const char *name)
++{
++	struct usb_ep *ep;
++
++	list_for_each_entry(ep, &g->ep_list, ep_list) {
++		if (0 == strcmp(ep->name, name))
++			return ep;
++	}
++
++	return NULL;
++}
++
++static struct usb_ep *match_match_ep(struct usb_gadget *g,
++		struct usb_endpoint_descriptor *desc,
++		struct usb_ss_ep_comp_descriptor *ep_comp)
++{
++	struct usb_ep *ep = NULL;
++	u8 type = usb_endpoint_type(desc);
++
++	if ((USB_ENDPOINT_XFER_BULK == type) ||
++			(USB_ENDPOINT_XFER_ISOC == type)) {
++		if (USB_DIR_IN & desc->bEndpointAddress)
++			ep = musb_find_ep(g, "ep5in");
++		else
++			ep = musb_find_ep(g, "ep6out");
++	} else if (USB_ENDPOINT_XFER_INT == type) {
++		if (USB_DIR_IN & desc->bEndpointAddress)
++			ep = musb_find_ep(g, "ep1in");
++		else
++			ep = musb_find_ep(g, "ep2out");
++	}
++
++	if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
++		return ep;
++
++	return NULL;
++}
++#else
++#define musb_match_ep NULL
++#endif
++
+ static int musb_gadget_start(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver);
+ static int musb_gadget_stop(struct usb_gadget *g);
+@@ -1697,6 +1740,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
+ 	.pullup			= musb_gadget_pullup,
+ 	.udc_start		= musb_gadget_start,
+ 	.udc_stop		= musb_gadget_stop,
++	.match_ep		= musb_match_ep,
+ };
+ 
+ /* ----------------------------------------------------------------------- */
+-- 
+1.9.1
