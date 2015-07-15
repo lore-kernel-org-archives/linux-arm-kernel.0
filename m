@@ -1,83 +1,111 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 15 Jul 2015 15:38:28 +0100
-Subject: [PATCH 1/2] irqchip: gic: enable SKIP_SET_WAKE and MASK_ON_SUSPEND
-Message-ID: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
+Date: Wed, 15 Jul 2015 15:38:29 +0100
+Subject: [PATCH 2/2] irqchip: gic: remove reduntant gic_set_irqchip_flags
+In-Reply-To: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
+References: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1436971109-20189-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC controller doesn't provides any facility to configure the wakeup
-sources. For the same reason, GIC chip implementation can't provide
-irq_set_wake functionality, but that results in the irqchip core
-preventing the systems from entering sleep states like "suspend to RAM".
+Now that the GIC chip implementation enables IRQCHIP_SKIP_SET_WAKE and
+IRQCHIP_MASK_ON_SUSPEND by default, the platforms requiring them need
+not override the irqchip flags as before.
 
-The GICv1/v2 controllers supports wakeup events. It signals these wakeup
-events even when CPU interface is disabled which means the wakeup
-outputs are always enabled with the required logic in always-on domain.
-An implementation can powerdown the GIC completely, but then the wake-up
-must be relayed to some control logic within the power controller that
-acts as wake-up interrupt controller.
+This patch removes all the users of gic_set_irqchip_flags and the
+function itself.
 
-Setting the IRQCHIP_SKIP_SET_WAKE flags will ensure that the interrupts
-from GIC can work as wakeup interrupts and resume from suspend-to-{idle,
-ram}. The wakeup interrupt sources need to use enable_irq_wake() and the
-irqchip core will then set the IRQD_WAKEUP_STATE flag.
-
-Also it's always safer to mask all the non wakeup interrupts are masked
-at the chip level when suspending. The irqchip infrastructure can handle
-masking of those interrupts at the chip level. The chip implementation
-just have to indicate that with IRQCHIP_MASK_ON_SUSPEND.
-
-This patch enables IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND so
-that the irqchip core allows and handles the power managemant wake up
-modes.
-
+Cc: Simon Horman <horms@verge.net.au>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Michal Simek <michal.simek@xilinx.com>
 Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: Jason Cooper <jason@lakedaemon.net>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/irqchip/irq-gic.c   | 4 +++-
- drivers/irqchip/irq-hip04.c | 4 +++-
- 2 files changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/intc-sh73a0.c   | 1 -
+ arch/arm/mach-shmobile/setup-r8a7779.c | 1 -
+ arch/arm/mach-ux500/cpu.c              | 1 -
+ arch/arm/mach-zynq/common.c            | 1 -
+ drivers/irqchip/irq-gic.c              | 5 -----
+ include/linux/irqchip/arm-gic.h        | 1 -
+ 6 files changed, 10 deletions(-)
 
-Hi,
-
-Most of the platforms with GICv1/v2 implementing S2R are setting up
-these flags already. This patch moves the logic to the GIC driver so
-that any further duplication is avoided.
-
-Regards,
-Sudeep
-
+diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
+index fd63ae6532fc..151a71a41fe3 100644
+--- a/arch/arm/mach-shmobile/intc-sh73a0.c
++++ b/arch/arm/mach-shmobile/intc-sh73a0.c
+@@ -313,7 +313,6 @@ void __init sh73a0_init_irq(void)
+ 	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
+ 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
+ 
+-	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+ 
+ 	register_intc_controller(&intcs_desc);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index c03e562be12b..aea5cff9495d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -719,7 +719,6 @@ void __init r8a7779_init_irq_dt(void)
+ 	void __iomem *gic_dist_base = ioremap_nocache(0xf0001000, 0x1000);
+ 	void __iomem *gic_cpu_base = ioremap_nocache(0xf0000100, 0x1000);
+ #endif
+-	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
+ 
+ #ifdef CONFIG_ARCH_SHMOBILE_LEGACY
+ 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
+diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
+index e31d3d61c998..6cb10c77afd8 100644
+--- a/arch/arm/mach-ux500/cpu.c
++++ b/arch/arm/mach-ux500/cpu.c
+@@ -56,7 +56,6 @@ void __init ux500_init_irq(void)
+ 	struct device_node *np;
+ 	struct resource r;
+ 
+-	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
+ 	irqchip_init();
+ 	np = of_find_compatible_node(NULL, NULL, "stericsson,db8500-prcmu");
+ 	of_address_to_resource(np, 0, &r);
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 616d5840fc2e..2ad1accfba35 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -186,7 +186,6 @@ static void __init zynq_map_io(void)
+ 
+ static void __init zynq_irq_init(void)
+ {
+-	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
+ 	irqchip_init();
+ }
+ 
 diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 4dd88264dff5..eda24604a0f3 100644
+index eda24604a0f3..d1fe884d770e 100644
 --- a/drivers/irqchip/irq-gic.c
 +++ b/drivers/irqchip/irq-gic.c
-@@ -324,7 +324,9 @@ static struct irq_chip gic_chip = {
- #endif
- 	.irq_get_irqchip_state	= gic_irq_get_irqchip_state,
- 	.irq_set_irqchip_state	= gic_irq_set_irqchip_state,
--	.flags			= IRQCHIP_SET_TYPE_MASKED,
-+	.flags			= IRQCHIP_SET_TYPE_MASKED |
-+				  IRQCHIP_SKIP_SET_WAKE |
-+				  IRQCHIP_MASK_ON_SUSPEND,
+@@ -882,11 +882,6 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.xlate = gic_irq_domain_xlate,
  };
-
- void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
-diff --git a/drivers/irqchip/irq-hip04.c b/drivers/irqchip/irq-hip04.c
-index 0cae45d10695..91a9fa3d3b11 100644
---- a/drivers/irqchip/irq-hip04.c
-+++ b/drivers/irqchip/irq-hip04.c
-@@ -202,7 +202,9 @@ static struct irq_chip hip04_irq_chip = {
- #ifdef CONFIG_SMP
- 	.irq_set_affinity	= hip04_irq_set_affinity,
- #endif
--	.flags			= IRQCHIP_SET_TYPE_MASKED,
-+	.flags			= IRQCHIP_SET_TYPE_MASKED |
-+				  IRQCHIP_SKIP_SET_WAKE |
-+				  IRQCHIP_MASK_ON_SUSPEND,
- };
-
- static u16 hip04_get_cpumask(struct hip04_irq_data *intc)
---
+ 
+-void gic_set_irqchip_flags(unsigned long flags)
+-{
+-	gic_chip.flags |= flags;
+-}
+-
+ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 			   void __iomem *dist_base, void __iomem *cpu_base,
+ 			   u32 percpu_offset, struct device_node *node)
+diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+index 9de976b4f9a7..61a2007eb49a 100644
+--- a/include/linux/irqchip/arm-gic.h
++++ b/include/linux/irqchip/arm-gic.h
+@@ -95,7 +95,6 @@
+ 
+ struct device_node;
+ 
+-void gic_set_irqchip_flags(unsigned long flags);
+ void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+ 		    u32 offset, struct device_node *);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+-- 
 1.9.1
