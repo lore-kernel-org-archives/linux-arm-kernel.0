@@ -1,83 +1,140 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Wed, 15 Jul 2015 14:23:52 -0500
-Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
- socfpga_secondary_startup
-In-Reply-To: <20150708210734.GN7557@n2100.arm.linux.org.uk>
-References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
- <20150708165115.GM7557@n2100.arm.linux.org.uk>
- <559D765C.30102@opensource.altera.com>
- <20150708210734.GN7557@n2100.arm.linux.org.uk>
-Message-ID: <55A6B348.4030109@opensource.altera.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 15 Jul 2015 19:49:20 +0000 (UTC)
+Subject: OMAP baseline test results for v4.2-rc2
+Message-ID: <alpine.DEB.2.02.1507151937150.32764@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/08/2015 04:07 PM, Russell King - ARM Linux wrote:
-> On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
->> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
->> user mode access.
-> 
-> Hmm.
-> 
-> I think what you've found is a(nother) latent bug in the CPU bring up
-> code.
-> 
-> For SMP CPUs, the sequence we're following during early initialisation is:
-> 
-> 1. Enable SMP coherency.
-> 2. Invalidate the caches.
-> 
-> If the cache contains rubbish, enabling SMP coherency before invalidating
-> the cache is plainly an absurd thing to do.
-> 
-> Can you try the patch below - not tested in any way, so you may need to
-> tweak it, but it should allow us to prove that point.
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 0716bbe19872..db5137fc297d 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -275,6 +275,10 @@ __v7_b15mp_setup:
->  __v7_ca17mp_setup:
->  	mov	r10, #0
->  1:
-> +	adr	r12, __v7_setup_stack		@ the local stack
-> +	stmia	r12, {r0-r5, r7, r9-r11, lr}
-> +	bl      v7_invalidate_l1
-> +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
->  #ifdef CONFIG_SMP
->  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
->  	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
-> @@ -283,7 +287,7 @@ __v7_ca17mp_setup:
->  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
->  	mcreq	p15, 0, r0, c1, c0, 1
->  #endif
-> -	b	__v7_setup
-> +	b	__v7_setup_cont
->  
->  /*
->   * Errata:
-> @@ -417,6 +421,7 @@ __v7_setup:
->  	bl      v7_invalidate_l1
->  	ldmia	r12, {r0-r5, r7, r9, r11, lr}
->  
-> +__v7_setup_cont:
->  	and	r0, r9, #0xff000000		@ ARM?
->  	teq	r0, #0x41000000
->  	bne	__errata_finish
-> @@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
->  
->  	.align	2
->  __v7_setup_stack:
-> -	.space	4 * 11				@ 11 registers
-> +	.space	4 * 12				@ 12 registers
->  
->  	__INITDATA
->  
-> 
 
-For this patch, please feel free to add:
+Here are some basic OMAP test results for Linux v4.2-rc2.
+Logs and other details at:
 
-Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+    http://www.pwsan.com/omap/testlogs/test_v4.2-rc2/20150714130012/
 
-Thanks,
-Dinh
+
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/17): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/17): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 1/20): multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc1 (d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754)):
+   text     data      bss    total  kernel
+    +57        0        0      +57  omap1_defconfig
+    +69        0        0      +69  omap1_defconfig_1510innovator_only
+    +57        0        0      +57  omap1_defconfig_5912osk_only
+   +403     +416        0     +819  multi_v7_defconfig
+     +5        0        0       +5  omap2plus_defconfig
+   +585        0        0     +585  omap2plus_defconfig_2430sdp_only
+   +101        0        0     +101  omap2plus_defconfig_am33xx_only
+   +101        0        0     +101  omap2plus_defconfig_am43xx_only
+  +4101        0        0    +4101  omap2plus_defconfig_cpupm
+  +4193        0        0    +4193  omap2plus_defconfig_dra7xx_only
+   +289        0        0     +289  omap2plus_defconfig_n800_multi_omap2xxx
+   +213        0        0     +213  omap2plus_defconfig_n800_only_a
+  +4205        0        0    +4205  omap2plus_defconfig_no_pm
+    +77        0        0      +77  omap2plus_defconfig_omap2_4_only
+    +25        0        0      +25  omap2plus_defconfig_omap3_4_only
+   +153        0        0     +153  omap2plus_defconfig_omap5_only
+   -468      -16       +4     -480  rmk_omap3430_ldp_allnoconfig
+   -191        0        0     -191  rmk_omap3430_ldp_oldconfig
+   -416       -4       +4     -416  rmk_omap4430_sdp_allnoconfig
+     +9        0        0       +9  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc1 (d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754))
+  avail  rsrvd   high  freed  board          kconfig
+  (no differences)
