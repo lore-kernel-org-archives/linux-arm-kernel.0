@@ -1,134 +1,81 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 15 Jul 2015 10:34:08 +0800
-Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
-In-Reply-To: <55A50C12.60901@arm.com>
-References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-1-git-send-email-sudeep.holla@arm.com>
- <1434638494-514-4-git-send-email-sudeep.holla@arm.com>
- <20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>
- <20150714175011.31c3d714@xhacker>	<55A4EC37.7030900@arm.com>
- <20150714194038.47ccf2e5@xhacker>	<55A50C12.60901@arm.com>
-Message-ID: <20150715103408.07523347@xhacker>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 14 Jul 2015 22:51:05 -0400
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <55A5A75A.1060401@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+ <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
+ <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
+ <20150714093154.4d73e551@gandalf.local.home>
+ <55A5A75A.1060401@linaro.org>
+Message-ID: <20150714225105.6c1e4f15@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sudeep,
+On Wed, 15 Jul 2015 09:20:42 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-On Tue, 14 Jul 2015 14:18:10 +0100
-Sudeep Holla wrote:
-
-> >>>>>> +
-> >>>>>> +static void __init psci_init_system_suspend(void)
-> >>>>>> +{
-> >>>>>> +	if (!IS_ENABLED(CONFIG_SUSPEND))
-> >>>>>> +		return;
-> >>>>>> +
-> >>>>>> +	if (psci_features(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND)))
-> >>>>>> +		return;
-> >>>>>
-> >>>>> So this requires the firmware implements SYSTEM_SUSPEND which doesn't exist
-> >>>>> until PSCI 1.0,
-> >>>>
-> >>>> Correct, if you need System to RAM in Linux on a platform with PSCI
-> >>>> firmware, firmware *must implement* SYSTEM_SUSPEND.
-> >>>>
-> >>>>> and even in PSCI 1.0 SYSTEM_SUSPEND is optional,
-> >>>>
-> >>>> Optional here means, that you may chose to implement or not in the
-> >>>> firmware. It doesn't mean we can implement S2R in Linux using other
-> >>>> PSCI methods. SYSTEM_SUSPEND was added mainly to avoid since workarounds
-> >>>> in the kernel.
-> >>>>
-> >>>>> we also want
-> >>>>> suspend to ram feature on PSCI 0.2 or PSCI 1.0 w/o SYSTEM_SUSPEND,
-> >>>>
-> >>>> Why do you choose to have PSCIv1.0 w/o SYSTEM_SUSPEND when you need that
-> >>>> feature in Linux. Is it just because we can manage with workarounds ?
-> >>>> Sorry, that's not an option.
-> >>>
-> >>> The problem is the PSCI 1.0 SYSTEM_SUSPEND definition: we can't pass something
-> >>> like stateid as in CPU_SUSPEND to firmware. The stateid is used to tell
-> >>> firmware to go to different Sleep state, for example S2 or S3.
-> >>>
-> >>
-> >> Can you elaborate on S2 here with an example ? You are using ACPI
-> >> Sleep State definitions here which should not be mixed with PSCI.
+> On 07/14/2015 10:31 PM, Steven Rostedt wrote:
+> > On Tue, 14 Jul 2015 21:47:10 +0900
+> > Jungseok Lee <jungseoklee85@gmail.com> wrote:
 > >
-> > Yes, it's ACPI concept. Here "S2" can be the "S2" mentioned in PSCI 1.0 spec.
-> >
-> > PSCI 1.0 SPEC says:
-> >
-> > "While ACPI distinguishes between two system level suspend to RAM states,
-> > S2 and S3, PSCI provides a single API. In practice, operating systems use
-> > only one suspend to RAM state, so this is not seen as a limitation. Note
-> > that this specification is using the state definitions of S2 and S3 provided
-> > by ACPI, but does not limit use of this PSCI function to ACPI based systems.
-> > Semantics such as those described for sleep states S2 and S3 are used in
-> > non-ACPI based systems."
-> >
+> >> Is the below example an unexpected result?
+> >> Entry 17 and 18 are ftrace_call and ftrace_ops_no_ops, respectively.
 > 
-> OK, though similar semantics may be used else where, we need to define
-> the state similar to the way ACPI does it for x86 systems.
+> [snip]
 > 
-> > Here is an example:
-> >
-> > S3 is the state where All devices are suspended and power down,  memory is
-> > placed in self-refresh mode. Usually this is the suspend to ram state.
-> >
+> > Note, function tracing does not disable interrupts. This looks to be
+> > that an interrupt came in while __aloc_skb() was being traced.
 > 
-> Agreed.
+> Yeah, I think so, too. But if my insight is correct, it's not __alloc_skb()
+> but one of functions that it calls. As I said in the commit log message
+> of patch[1/3], the exact traced function will not be listed by
+> save_stack_trace() because we don't create a stack frame at mcount().
+> I think this is a flaw in the current implementation (on x86).
 > 
-> > S2 is the state where devices except cpus are suspended and put in a
-> > low-power state(not power off), if the deivce doesn't support lower power mode,
-> > the device is left on. memory is placed in self-refresh mode. secondary CPUs
-> > are powered off via. PSCI_CPU_OFF, boot cpu is put into WFI state and runs at
-> > low freq.
-> >
+> what do you think, Steve?
 > 
-> Is this a standard state or custom tailored for some power optimization
-> on particular system ? Anyway I am not sure if I quite understand the
 
-This is customized state.
+mcount (well ftrace_call actually) does indeed create a stack frame for
+itself *and* for what called it. At least on x86_64. See mcount_64.S.
 
-> exact definition of this state. When and how often do you use this
-> use this state ?
+With -pg -mfentry, it creates a stack frame. Without -mfentry, mcount
+is called after the current function's frame is made so we don't need
+to do much.
 
-Very often. When we want s2ram similar state but low-latency back transition,
-we want to use this state.
+Here's what the -mfentry version does:
 
-> 
-> Have you looked at PM_SUSPEND_FREEZE state implemented in Linux ?
-> For me this S2 you explained sounds similar to PM_SUSPEND_FREEZE state.
-> In short, PM_SUSPEND_FREEZE = all the processes are frozen + all the
-> devices are suspended + all the processors enter deepest idle state
-> possible.
+	pushq %rbp
+	pushq 8*2(%rsp)  /* this is the parent pointer */
+	pushq %rbp
+	movq %rsp, %rbp
+	pushq 8*3(%rsp)   /* Return address to ftrace_call */
+	pushq %rbp
+	movq %rsp, %rbp
 
-The S2 in my example is a bit different with freeze. It's looks more like
-the S1 or standby in Documentation/power/states.txt. The biggest difference
-with freeze is whether putting memory in self-refresh state or not.
 
-> 
-> Though I don't understand why you need to power-off secondary cpus
-> and stay in WFI on boot cpu as that would have increased latency
+Thus the stack looks like this:
 
-we want save more power, the increased latency is affordable.
+                                         <---+
+	|                              |     |
+	+------------------------------+     |
+	| return address for func      |     |
+	| return address for func_call |     |
+	| original %rbp                |     |
+	+------------------------------+     |
+	| return address for func      |     |
+	| ptr to parent frame (%rbp)   | ----+
+ 	+------------------------------| <-----+
+	| return address for func_call |       |
+        | ptr to next frame (%rbp)     | ------+
+	+------------------------------+ <---+
+                                             |
+                                             |
+ Current %rbp points to func_call frame -----+
 
-> defeating the purpose of S2 state. Also why you are mixing DVFS here ?
-> PSCI deals with just low power states and has nothing to do with DVFS.
+ The first box isn't used as a frame, but is used by ftrace_call to save
+ information to restore everything properly.
 
-It's not DVFS related, but to put the boot cpu in a low power state while
-still keeping its power.
+Thus, __alloc_skb() is what is currently being traced.
 
-> 
-> Further IMO we can also achieve a low power state almost close to
-> PM_SUSPEND_FREEZE having run-time PM for all the devices and cpuidle.
 
-we want one more sleep state which saves more power than freeze.
-
-Or let's change the question: how to implement "standby" or "s1" in
-Documentation/power/states.txt with the help of PSCI? Seems the PSCI spec
-expects "operating systems use only one suspend to RAM state", but this
-is a limitation in the long run.
-
-Thanks,
-Jisheng
+-- Steve
