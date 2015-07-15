@@ -1,63 +1,61 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 15 Jul 2015 09:54:43 -0700
-Subject: [PATCH 3/5] arm64,
- pci: Allow RC drivers to supply pcibios_add_device() implementation.
+Date: Wed, 15 Jul 2015 09:54:42 -0700
+Subject: [PATCH 2/5] gic-its: Allow pci_requester_id to be overridden.
 In-Reply-To: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1436979285-8177-3-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-The default is to continue doing the what we have done before, but add
-a hook so that this can be overridden.
-
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/arm64/include/asm/pci.h |  3 +++
- arch/arm64/kernel/pci.c      | 10 ++++++++++
- 2 files changed, 13 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c   | 14 +++++++++++++-
+ include/linux/irqchip/arm-gic-v3.h |  2 ++
+ 2 files changed, 15 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
-index b008a72..ad3fb18 100644
---- a/arch/arm64/include/asm/pci.h
-+++ b/arch/arm64/include/asm/pci.h
-@@ -37,6 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
- {
- 	return 1;
- }
-+
-+void set_pcibios_add_device(int (*arg)(struct pci_dev *));
-+
- #endif  /* CONFIG_PCI */
- 
- #endif  /* __KERNEL__ */
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 4095379..3356023 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return res->start;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 1b7e155..4580970 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1189,11 +1189,23 @@ static int its_pci_msi_vec_count(struct pci_dev *pdev)
+ 	return max(msi, msix);
  }
  
-+static int (*pcibios_add_device_impl)(struct pci_dev *);
-+
-+void set_pcibios_add_device(int (*arg)(struct pci_dev *))
++static u32 its_dflt_pci_requester_id(struct pci_dev *pdev, u16 alias)
 +{
-+	pcibios_add_device_impl = arg;
++	return alias;
 +}
 +
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
- int pcibios_add_device(struct pci_dev *dev)
- {
-+	if (pcibios_add_device_impl)
-+		return pcibios_add_device_impl(dev);
++static its_pci_requester_id_t its_pci_requester_id = its_dflt_pci_requester_id;
++void set_its_pci_requester_id(its_pci_requester_id_t fn)
++{
++	its_pci_requester_id = fn;
++}
++EXPORT_SYMBOL(set_its_pci_requester_id);
 +
- 	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+ static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+ {
+ 	struct its_pci_alias *dev_alias = data;
  
- 	return 0;
+-	dev_alias->dev_id = alias;
++	dev_alias->dev_id = its_pci_requester_id(pdev, alias);
+ 	if (pdev != dev_alias->pdev)
+ 		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
+ 
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index ffbc034..18e3757 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -389,6 +389,8 @@ int its_cpu_init(void);
+ int its_init(struct device_node *node, struct rdists *rdists,
+ 	     struct irq_domain *domain);
+ 
++typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
++void set_its_pci_requester_id(its_pci_requester_id_t fn);
+ #endif
+ 
+ #endif
 -- 
 1.9.1
