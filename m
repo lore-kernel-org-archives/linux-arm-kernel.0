@@ -1,43 +1,29 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 15 Jul 2015 13:01:34 +0300
-Subject: [PATCH v2 15/15] KVM: arm64: enable ITS emulation as a virtual MSI
- controller
-In-Reply-To: <55A62D50.9080101@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-16-git-send-email-andre.przywara@arm.com>
- <00fa01d0bede$098f5570$1cae0050$@samsung.com> <55A62D50.9080101@arm.com>
-Message-ID: <012501d0bee5$3b9f2ca0$b2dd85e0$@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester nawrocki)
+Date: Wed, 15 Jul 2015 19:01:37 +0900
+Subject: [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
+ <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <55A62F81.3080801@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 07/01/2015 10:10 PM, Bartlomiej Zolnierkiewicz wrote:
+> From: Thomas Abraham<thomas.ab@samsung.com>
+>
+> With the addition of the new Samsung specific cpu-clock type, the
+> arm clock can be represented as a cpu-clock type. Add the CPU clock
+> configuration data and instantiate the CPU clock type for Exynos5250.
+>
+> Changes by Bartlomiej:
+> - split Exynos5250 support from the original patch
+> - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
+>
+> Cc: Tomasz Figa<tomasz.figa@gmail.com>
+> Cc: Michael Turquette<mturquette@baylibre.com>
+> Cc: Javier Martinez Canillas<javier@dowhile0.org>
+> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
 
-> But why would it need the capability to create models?
-
- Actually it doesn't.
-
-> The idea is to
-> check the capability before the actual KVM_SIGNAL_MSI or
-> KVM_SET_GSI_ROUTING ioctl (and cache that result). I have a function
-> with a static variable to do that, so it looks like:
-> 
-> +  if (check_for_msi_devid(kvm)) {
-> +    irq_routing->entries[irq_routing->nr].flags = KVM_MSI_VALID_DEVID;
-> +    irq_routing->entries[irq_routing->nr].u.msi.devid = device_id;
-> +  }
-> 
-> > May be we should just set the capability to TRUE for
-> > ARM architecture in general, and make GICv2m MSIs simply ignoring this flag and device ID?
-> 
-> Possibly, but it would be saner to tell userland that it's a per VM
-> decision for ARM. Since you need extra support bits in the userland
-> anyway (to set up GICv2M or ITS emulation), I think it is acceptable to
-> require a late, per-VM capability check in userland in that case.
-
- Well, agree, and formally this is more correct. Just it would require slightly more additions to
-qemu. But it's not a real problem.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
