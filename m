@@ -1,43 +1,47 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 15 Jul 2015 13:16:40 +0100
-Subject: [PATCH v4 06/19] PCI/MSI: of: Allow msi_domain lookup using the host
- bridge node
+Date: Wed, 15 Jul 2015 13:16:53 +0100
+Subject: [PATCH v4 19/19] PCI/MSI: Drop domain field from msi_controller
 In-Reply-To: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
 References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1436962613-17359-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1436962613-17359-20-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A number of platforms do not need to use the msi-parent property,
-as the host bridge itself provides the MSI controller.
-
-Allow this configuration by performing an irq domain lookup based
-on the host bridge node if it doesn't have a valid msi-parent property.
+The only three users of that field are not using the msi_controller
+structure anymore, so drop it altogether.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/of.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/pci/msi.c   | 2 --
+ include/linux/msi.h | 3 ---
+ 2 files changed, 5 deletions(-)
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index 09df465..9d61cef 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -69,9 +69,14 @@ void pci_set_phb_of_msi_domain(struct pci_bus *bus)
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index c77fdaf..31bae50 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -42,8 +42,6 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+ 	struct irq_domain *domain = NULL;
  
- 	if (!bus->dev.of_node)
- 		return;
-+	/* Start looking for a phandle to an MSI controller. */
- 	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-+	/*
-+	 * If we don't have an msi-parent property, look for a domain
-+	 * directly attached to the host bridge.
-+	 */
- 	if (!np)
--		return;
-+		np = bus->dev.of_node;
- 	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
- 	if (!d)
- 		d = irq_find_host(np);
+ 	domain = dev_get_msi_domain(&dev->dev);
+-	if (!domain && dev->bus->msi)
+-		domain = dev->bus->msi->domain;
+ 	if (!domain)
+ 		domain = arch_get_pci_msi_domain(dev);
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index b55cf63..e29c31f 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -124,9 +124,6 @@ struct msi_controller {
+ 	struct device *dev;
+ 	struct device_node *of_node;
+ 	struct list_head list;
+-#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+-	struct irq_domain *domain;
+-#endif
+ 
+ 	int (*setup_irq)(struct msi_controller *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
 -- 
 2.1.4
