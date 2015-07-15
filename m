@@ -1,90 +1,43 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Jul 2015 21:39:42 +0100
-Subject: [PATCH 3/3] ARM: add basic support for on-demand backtrace of other
- CPUs
-In-Reply-To: <20150715203911.GF7557@n2100.arm.linux.org.uk>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jul 2015 22:41:51 +0200
+Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
+In-Reply-To: <55A68C9C.8000303@gmail.com>
+References: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
+ <9845978.JUsldTlF3B@wuerfel> <55A68C9C.8000303@gmail.com>
+Message-ID: <5941809.XWvPzT6esn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we now have generic infrastructure to support backtracing of other
-CPUs in the system on lockups, we can start to implement this for ARM.
-Initially, we add an IPI based implementation, as the GIC code needs
-modification to support the generation of FIQ IPIs, and not all ARM
-platforms have the ability to raise a FIQ in the non-secure world.
+On Wednesday 15 July 2015 09:38:52 Florian Fainelli wrote:
+> 
+> I like the idea in general, but I think this is going to be a very
+> tedious job to collect every single CR values for ARMv7 processors to
+> determine whether they are pure v7 or v7e... Maybe we could use
+> kernelci.org to start extracting the relevant lines in bootlogs and
+> people can start adding their own chips one by one?
 
-This provides us with a "best efforts" implementation in the absence
-of FIQs.
+No, we know most of them:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/irq.h |  5 +++++
- arch/arm/kernel/smp.c      | 18 ++++++++++++++++++
- 2 files changed, 23 insertions(+)
+Cortex-A5, A8, A9: ARMv7, no LPAE, no IDIV
+Cortex-A7, A15, A12, A17: ARMv7VE, no LPAE, no IDIV
 
-diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
-index 53c15dec7af6..be1d07d59ee9 100644
---- a/arch/arm/include/asm/irq.h
-+++ b/arch/arm/include/asm/irq.h
-@@ -35,6 +35,11 @@ extern void (*handle_arch_irq)(struct pt_regs *);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- #endif
- 
-+#ifdef CONFIG_SMP
-+extern void arch_trigger_all_cpu_backtrace(bool);
-+#define arch_trigger_all_cpu_backtrace(x) arch_trigger_all_cpu_backtrace(x)
-+#endif
-+
- #endif
- 
- #endif
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 90dfbedfbfb8..3a20c386fd33 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -21,6 +21,7 @@
- #include <linux/cpu.h>
- #include <linux/seq_file.h>
- #include <linux/irq.h>
-+#include <linux/nmi.h>
- #include <linux/percpu.h>
- #include <linux/clockchips.h>
- #include <linux/completion.h>
-@@ -72,6 +73,7 @@ enum ipi_msg_type {
- 	IPI_CPU_STOP,
- 	IPI_IRQ_WORK,
- 	IPI_COMPLETION,
-+	IPI_CPU_BACKTRACE = 15,
- };
- 
- static DECLARE_COMPLETION(cpu_running);
-@@ -630,6 +632,12 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+	case IPI_CPU_BACKTRACE:
-+		irq_enter();
-+		nmi_cpu_backtrace(regs);
-+		irq_exit();
-+		break;
-+
- 	default:
- 		pr_crit("CPU%u: Unknown IPI message 0x%x\n",
- 		        cpu, ipinr);
-@@ -724,3 +732,13 @@ static int __init register_cpufreq_notifier(void)
- core_initcall(register_cpufreq_notifier);
- 
- #endif
-+
-+static void raise_nmi(cpumask_t *mask)
-+{
-+	smp_cross_call(mask, IPI_CPU_BACKTRACE);
-+}
-+
-+void arch_trigger_all_cpu_backtrace(bool include_self)
-+{
-+	nmi_trigger_all_cpu_backtrace(include_self, raise_nmi);
-+}
--- 
-2.1.0
+
+Almost everyone uses the above cores unmodified.
+
+The ones I'm not 100% sure about are:
+
+Marvell PJ4 (almost certainly ARMv7)
+Marvell PJ4B (probably ARMv7 plus IDIV without LPAE)
+Qualcomm Scorpion (probably ARMv7)
+Qualcomm Krait (probably ARMv7 plus IDIV without LPAE)
+Broadcom Brahma-B15 (almost certainly ARMv7VE)
+
+We basically just need to find out from the mach-qcom and
+mach-mvebu maintainers what combination of LPAE and IDIV
+they need to support, and you can find out about B15.
+
+If my list above is correct, there are no CPUs that have
+LPAE but don't have IDIV, and we just need to decide how
+to represent that.
+
+	Arnd
