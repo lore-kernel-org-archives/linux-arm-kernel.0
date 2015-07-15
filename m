@@ -1,627 +1,525 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Jul 2015 19:59:31 +0100
-Subject: [PATCH 2/7] ARM: dt: Add PMU node, making PMU child devices childs of
- this node
+Date: Wed, 15 Jul 2015 19:59:36 +0100
+Subject: [PATCH 3/7] ARM: dove: create a proper PMU driver for power domains,
+ PMU IRQs and resets
 In-Reply-To: <20150715185859.GC7557@n2100.arm.linux.org.uk>
 References: <20150715185859.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZFRtz-0003m0-Jf@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZFRu4-0003m7-O3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the PMU node, and move the child devices of the PMU node beneath
-this new node, giving it a "simple-bus" so that the OF platform
-device creator will create these child devices.  No functional change
-from this is expected.
+The PMU device contains an interrupt controller, power control and
+resets.  The interrupt controller is a little sub-standard in that
+there is no race free way to clear down pending interrupts, so we try
+to avoid problems by reducing the window as much as possible, and
+clearing as infrequently as possible.
 
-The PMU provides multiple features, including an interrupt, reset,
-power and isolation controller.
+The interrupt support is implemented using an IRQ domain, and the
+parent interrupt referenced in the standard DT way.
+
+The power domains and reset support is closely related - there is a
+defined sequence for powering down a domain which is tightly coupled
+with asserting the reset.  Hence, it makes sense to group these two
+together, and in order to avoid any locking contention disrupting this
+sequence, we avoid the use of syscon or regmap.
+
+This patch adds the core PMU driver: power domains must be defined in
+the DT file in order to make use of them.  The reset controller can
+be referenced in the standard way for reset controllers.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/boot/dts/dove.dtsi | 590 +++++++++++++++++++++++---------------------
- 1 file changed, 304 insertions(+), 286 deletions(-)
+ arch/arm/mach-mvebu/Kconfig  |   1 +
+ arch/arm/mach-mvebu/dove.c   |   2 +
+ drivers/soc/Makefile         |   1 +
+ drivers/soc/dove/Makefile    |   1 +
+ drivers/soc/dove/pmu.c       | 412 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/soc/dove/pmu.h |   6 +
+ 6 files changed, 423 insertions(+)
+ create mode 100644 drivers/soc/dove/Makefile
+ create mode 100644 drivers/soc/dove/pmu.c
+ create mode 100644 include/linux/soc/dove/pmu.h
 
-diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
-index 9ad829523a13..4f20278f2a20 100644
---- a/arch/arm/boot/dts/dove.dtsi
-+++ b/arch/arm/boot/dts/dove.dtsi
-@@ -383,293 +383,311 @@
- 				status = "disabled";
- 			};
+diff --git a/arch/arm/mach-mvebu/Kconfig b/arch/arm/mach-mvebu/Kconfig
+index 97473168d6b6..c86a5a0aefac 100644
+--- a/arch/arm/mach-mvebu/Kconfig
++++ b/arch/arm/mach-mvebu/Kconfig
+@@ -96,6 +96,7 @@ config MACH_DOVE
+ 	select MACH_MVEBU_ANY
+ 	select ORION_IRQCHIP
+ 	select ORION_TIMER
++	select PM_GENERIC_DOMAINS if PM
+ 	select PINCTRL_DOVE
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+diff --git a/arch/arm/mach-mvebu/dove.c b/arch/arm/mach-mvebu/dove.c
+index 5a1741500a30..1aebb82e3d7b 100644
+--- a/arch/arm/mach-mvebu/dove.c
++++ b/arch/arm/mach-mvebu/dove.c
+@@ -12,6 +12,7 @@
+ #include <linux/mbus.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/soc/dove/pmu.h>
+ #include <asm/hardware/cache-tauros2.h>
+ #include <asm/mach/arch.h>
+ #include "common.h"
+@@ -24,6 +25,7 @@ static void __init dove_init(void)
+ 	tauros2_init(0);
+ #endif
+ 	BUG_ON(mvebu_mbus_dt_init(false));
++	dove_init_pmu();
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
  
--			thermal: thermal-diode at d001c {
--				compatible = "marvell,dove-thermal";
--				reg = <0xd001c 0x0c>, <0xd005c 0x08>;
--			};
--
--			gate_clk: clock-gating-ctrl at d0038 {
--				compatible = "marvell,dove-gating-clock";
--				reg = <0xd0038 0x4>;
--				clocks = <&core_clk 0>;
--				#clock-cells = <1>;
--			};
--
--			pinctrl: pin-ctrl at d0200 {
--				compatible = "marvell,dove-pinctrl";
--				reg = <0xd0200 0x14>,
--				      <0xd0440 0x04>;
--				clocks = <&gate_clk 22>;
--
--				pmx_gpio_0: pmx-gpio-0 {
--					marvell,pins = "mpp0";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_1: pmx-gpio-1 {
--					marvell,pins = "mpp1";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_2: pmx-gpio-2 {
--					marvell,pins = "mpp2";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_3: pmx-gpio-3 {
--					marvell,pins = "mpp3";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_4: pmx-gpio-4 {
--					marvell,pins = "mpp4";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_5: pmx-gpio-5 {
--					marvell,pins = "mpp5";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_6: pmx-gpio-6 {
--					marvell,pins = "mpp6";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_7: pmx-gpio-7 {
--					marvell,pins = "mpp7";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_8: pmx-gpio-8 {
--					marvell,pins = "mpp8";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_9: pmx-gpio-9 {
--					marvell,pins = "mpp9";
--					marvell,function = "gpio";
--				};
--
--				pmx_pcie1_clkreq: pmx-pcie1-clkreq {
--					marvell,pins = "mpp9";
--					marvell,function = "pex1";
--				};
--
--				pmx_gpio_10: pmx-gpio-10 {
--					marvell,pins = "mpp10";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_11: pmx-gpio-11 {
--					marvell,pins = "mpp11";
--					marvell,function = "gpio";
--				};
--
--				pmx_pcie0_clkreq: pmx-pcie0-clkreq {
--					marvell,pins = "mpp11";
--					marvell,function = "pex0";
--				};
--
--				pmx_gpio_12: pmx-gpio-12 {
--					marvell,pins = "mpp12";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_13: pmx-gpio-13 {
--					marvell,pins = "mpp13";
--					marvell,function = "gpio";
--				};
--
--				pmx_audio1_extclk: pmx-audio1-extclk {
--					marvell,pins = "mpp13";
--					marvell,function = "audio1";
--				};
--
--				pmx_gpio_14: pmx-gpio-14 {
--					marvell,pins = "mpp14";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_15: pmx-gpio-15 {
--					marvell,pins = "mpp15";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_16: pmx-gpio-16 {
--					marvell,pins = "mpp16";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_17: pmx-gpio-17 {
--					marvell,pins = "mpp17";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_18: pmx-gpio-18 {
--					marvell,pins = "mpp18";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_19: pmx-gpio-19 {
--					marvell,pins = "mpp19";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_20: pmx-gpio-20 {
--					marvell,pins = "mpp20";
--					marvell,function = "gpio";
--				};
--
--				pmx_gpio_21: pmx-gpio-21 {
--					marvell,pins = "mpp21";
--					marvell,function = "gpio";
--				};
--
--				pmx_camera: pmx-camera {
--					marvell,pins = "mpp_camera";
--					marvell,function = "camera";
--				};
--
--				pmx_camera_gpio: pmx-camera-gpio {
--					marvell,pins = "mpp_camera";
--					marvell,function = "gpio";
--				};
--
--				pmx_sdio0: pmx-sdio0 {
--					marvell,pins = "mpp_sdio0";
--					marvell,function = "sdio0";
--				};
--
--				pmx_sdio0_gpio: pmx-sdio0-gpio {
--					marvell,pins = "mpp_sdio0";
--					marvell,function = "gpio";
--				};
--
--				pmx_sdio1: pmx-sdio1 {
--					marvell,pins = "mpp_sdio1";
--					marvell,function = "sdio1";
--				};
--
--				pmx_sdio1_gpio: pmx-sdio1-gpio {
--					marvell,pins = "mpp_sdio1";
--					marvell,function = "gpio";
--				};
--
--				pmx_audio1_gpio: pmx-audio1-gpio {
--					marvell,pins = "mpp_audio1";
--					marvell,function = "gpio";
--				};
--
--				pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
--					marvell,pins = "mpp_audio1";
--					marvell,function = "i2s1/spdifo";
--				};
--
--				pmx_spi0: pmx-spi0 {
--					marvell,pins = "mpp_spi0";
--					marvell,function = "spi0";
--				};
--
--				pmx_spi0_gpio: pmx-spi0-gpio {
--					marvell,pins = "mpp_spi0";
--					marvell,function = "gpio";
--				};
--
--				pmx_spi1_4_7: pmx-spi1-4-7 {
--					marvell,pins = "mpp4", "mpp5",
--						"mpp6", "mpp7";
--					marvell,function = "spi1";
--				};
--
--				pmx_spi1_20_23: pmx-spi1-20-23 {
--					marvell,pins = "mpp20", "mpp21",
--						"mpp22", "mpp23";
--					marvell,function = "spi1";
--				};
--
--				pmx_uart1: pmx-uart1 {
--					marvell,pins = "mpp_uart1";
--					marvell,function = "uart1";
--				};
--
--				pmx_uart1_gpio: pmx-uart1-gpio {
--					marvell,pins = "mpp_uart1";
--					marvell,function = "gpio";
--				};
--
--				pmx_nand: pmx-nand {
--					marvell,pins = "mpp_nand";
--					marvell,function = "nand";
--				};
--
--				pmx_nand_gpo: pmx-nand-gpo {
--					marvell,pins = "mpp_nand";
--					marvell,function = "gpo";
--				};
--
--				pmx_i2c1: pmx-i2c1 {
--					marvell,pins = "mpp17", "mpp19";
--					marvell,function = "twsi";
--				};
--
--				pmx_i2c2: pmx-i2c2 {
--					marvell,pins = "mpp_audio1";
--					marvell,function = "twsi";
--				};
--
--				pmx_ssp_i2c2: pmx-ssp-i2c2 {
--					marvell,pins = "mpp_audio1";
--					marvell,function = "ssp/twsi";
--				};
--
--				pmx_i2cmux_0: pmx-i2cmux-0 {
--					marvell,pins = "twsi";
--					marvell,function = "twsi-opt1";
--				};
--
--				pmx_i2cmux_1: pmx-i2cmux-1 {
--					marvell,pins = "twsi";
--					marvell,function = "twsi-opt2";
--				};
--
--				pmx_i2cmux_2: pmx-i2cmux-2 {
--					marvell,pins = "twsi";
--					marvell,function = "twsi-opt3";
--				};
--			};
--
--			core_clk: core-clocks at d0214 {
--				compatible = "marvell,dove-core-clock";
--				reg = <0xd0214 0x4>;
--				#clock-cells = <1>;
--			};
--
--			gpio0: gpio-ctrl at d0400 {
--				compatible = "marvell,orion-gpio";
--				#gpio-cells = <2>;
--				gpio-controller;
--				reg = <0xd0400 0x20>;
--				ngpios = <32>;
--				interrupt-controller;
--				#interrupt-cells = <2>;
--				interrupts = <12>, <13>, <14>, <60>;
--			};
--
--			gpio1: gpio-ctrl at d0420 {
--				compatible = "marvell,orion-gpio";
--				#gpio-cells = <2>;
--				gpio-controller;
--				reg = <0xd0420 0x20>;
--				ngpios = <32>;
-+			pmu: power-management at d0000 {
-+				compatible = "marvell,dove-pmu", "simple-bus";
-+				reg = <0xd0000 0x8000>, <0xd8000 0x8000>;
-+				ranges = <0x00000000 0x000d0000 0x8000
-+					  0x00008000 0x000d8000 0x8000>;
-+				interrupts = <33>;
- 				interrupt-controller;
--				#interrupt-cells = <2>;
--				interrupts = <61>;
--			};
--
--			rtc: real-time-clock at d8500 {
--				compatible = "marvell,orion-rtc";
--				reg = <0xd8500 0x20>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				#interrupt-cells = <1>;
-+				#reset-cells = <1>;
-+
-+				domains {
-+				};
-+
-+				thermal: thermal-diode at 001c {
-+					compatible = "marvell,dove-thermal";
-+					reg = <0x001c 0x0c>, <0x005c 0x08>;
-+				};
-+
-+				gate_clk: clock-gating-ctrl at 0038 {
-+					compatible = "marvell,dove-gating-clock";
-+					reg = <0x0038 0x4>;
-+					clocks = <&core_clk 0>;
-+					#clock-cells = <1>;
-+				};
-+
-+				pinctrl: pin-ctrl at 0200 {
-+					compatible = "marvell,dove-pinctrl";
-+					reg = <0x0200 0x14>,
-+					      <0x0440 0x04>;
-+					clocks = <&gate_clk 22>;
-+
-+					pmx_gpio_0: pmx-gpio-0 {
-+						marvell,pins = "mpp0";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_1: pmx-gpio-1 {
-+						marvell,pins = "mpp1";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_2: pmx-gpio-2 {
-+						marvell,pins = "mpp2";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_3: pmx-gpio-3 {
-+						marvell,pins = "mpp3";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_4: pmx-gpio-4 {
-+						marvell,pins = "mpp4";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_5: pmx-gpio-5 {
-+						marvell,pins = "mpp5";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_6: pmx-gpio-6 {
-+						marvell,pins = "mpp6";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_7: pmx-gpio-7 {
-+						marvell,pins = "mpp7";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_8: pmx-gpio-8 {
-+						marvell,pins = "mpp8";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_9: pmx-gpio-9 {
-+						marvell,pins = "mpp9";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_pcie1_clkreq: pmx-pcie1-clkreq {
-+						marvell,pins = "mpp9";
-+						marvell,function = "pex1";
-+					};
-+
-+					pmx_gpio_10: pmx-gpio-10 {
-+						marvell,pins = "mpp10";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_11: pmx-gpio-11 {
-+						marvell,pins = "mpp11";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_pcie0_clkreq: pmx-pcie0-clkreq {
-+						marvell,pins = "mpp11";
-+						marvell,function = "pex0";
-+					};
-+
-+					pmx_gpio_12: pmx-gpio-12 {
-+						marvell,pins = "mpp12";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_13: pmx-gpio-13 {
-+						marvell,pins = "mpp13";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_audio1_extclk: pmx-audio1-extclk {
-+						marvell,pins = "mpp13";
-+						marvell,function = "audio1";
-+					};
-+
-+					pmx_gpio_14: pmx-gpio-14 {
-+						marvell,pins = "mpp14";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_15: pmx-gpio-15 {
-+						marvell,pins = "mpp15";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_16: pmx-gpio-16 {
-+						marvell,pins = "mpp16";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_17: pmx-gpio-17 {
-+						marvell,pins = "mpp17";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_18: pmx-gpio-18 {
-+						marvell,pins = "mpp18";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_19: pmx-gpio-19 {
-+						marvell,pins = "mpp19";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_20: pmx-gpio-20 {
-+						marvell,pins = "mpp20";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_gpio_21: pmx-gpio-21 {
-+						marvell,pins = "mpp21";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_camera: pmx-camera {
-+						marvell,pins = "mpp_camera";
-+						marvell,function = "camera";
-+					};
-+
-+					pmx_camera_gpio: pmx-camera-gpio {
-+						marvell,pins = "mpp_camera";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_sdio0: pmx-sdio0 {
-+						marvell,pins = "mpp_sdio0";
-+						marvell,function = "sdio0";
-+					};
-+
-+					pmx_sdio0_gpio: pmx-sdio0-gpio {
-+						marvell,pins = "mpp_sdio0";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_sdio1: pmx-sdio1 {
-+						marvell,pins = "mpp_sdio1";
-+						marvell,function = "sdio1";
-+					};
-+
-+					pmx_sdio1_gpio: pmx-sdio1-gpio {
-+						marvell,pins = "mpp_sdio1";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_audio1_gpio: pmx-audio1-gpio {
-+						marvell,pins = "mpp_audio1";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_audio1_i2s1_spdifo: pmx-audio1-i2s1-spdifo {
-+						marvell,pins = "mpp_audio1";
-+						marvell,function = "i2s1/spdifo";
-+					};
-+
-+					pmx_spi0: pmx-spi0 {
-+						marvell,pins = "mpp_spi0";
-+						marvell,function = "spi0";
-+					};
-+
-+					pmx_spi0_gpio: pmx-spi0-gpio {
-+						marvell,pins = "mpp_spi0";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_spi1_4_7: pmx-spi1-4-7 {
-+						marvell,pins = "mpp4", "mpp5",
-+							"mpp6", "mpp7";
-+						marvell,function = "spi1";
-+					};
-+
-+					pmx_spi1_20_23: pmx-spi1-20-23 {
-+						marvell,pins = "mpp20", "mpp21",
-+							"mpp22", "mpp23";
-+						marvell,function = "spi1";
-+					};
-+
-+					pmx_uart1: pmx-uart1 {
-+						marvell,pins = "mpp_uart1";
-+						marvell,function = "uart1";
-+					};
-+
-+					pmx_uart1_gpio: pmx-uart1-gpio {
-+						marvell,pins = "mpp_uart1";
-+						marvell,function = "gpio";
-+					};
-+
-+					pmx_nand: pmx-nand {
-+						marvell,pins = "mpp_nand";
-+						marvell,function = "nand";
-+					};
-+
-+					pmx_nand_gpo: pmx-nand-gpo {
-+						marvell,pins = "mpp_nand";
-+						marvell,function = "gpo";
-+					};
-+
-+					pmx_i2c1: pmx-i2c1 {
-+						marvell,pins = "mpp17", "mpp19";
-+						marvell,function = "twsi";
-+					};
-+
-+					pmx_i2c2: pmx-i2c2 {
-+						marvell,pins = "mpp_audio1";
-+						marvell,function = "twsi";
-+					};
-+
-+					pmx_ssp_i2c2: pmx-ssp-i2c2 {
-+						marvell,pins = "mpp_audio1";
-+						marvell,function = "ssp/twsi";
-+					};
-+
-+					pmx_i2cmux_0: pmx-i2cmux-0 {
-+						marvell,pins = "twsi";
-+						marvell,function = "twsi-opt1";
-+					};
-+
-+					pmx_i2cmux_1: pmx-i2cmux-1 {
-+						marvell,pins = "twsi";
-+						marvell,function = "twsi-opt2";
-+					};
-+
-+					pmx_i2cmux_2: pmx-i2cmux-2 {
-+						marvell,pins = "twsi";
-+						marvell,function = "twsi-opt3";
-+					};
-+				};
-+
-+				core_clk: core-clocks at 0214 {
-+					compatible = "marvell,dove-core-clock";
-+					reg = <0x0214 0x4>;
-+					#clock-cells = <1>;
-+				};
-+
-+				gpio0: gpio-ctrl at 0400 {
-+					compatible = "marvell,orion-gpio";
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					reg = <0x0400 0x20>;
-+					ngpios = <32>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupt-parent = <&intc>;
-+					interrupts = <12>, <13>, <14>, <60>;
-+				};
-+
-+				gpio1: gpio-ctrl at 0420 {
-+					compatible = "marvell,orion-gpio";
-+					#gpio-cells = <2>;
-+					gpio-controller;
-+					reg = <0x0420 0x20>;
-+					ngpios = <32>;
-+					interrupt-controller;
-+					#interrupt-cells = <2>;
-+					interrupt-parent = <&intc>;
-+					interrupts = <61>;
-+				};
-+
-+				rtc: real-time-clock at 8500 {
-+					compatible = "marvell,orion-rtc";
-+					reg = <0x8500 0x20>;
-+				};
- 			};
+diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
+index 70042b259744..e01d9856d7a1 100644
+--- a/drivers/soc/Makefile
++++ b/drivers/soc/Makefile
+@@ -2,6 +2,7 @@
+ # Makefile for the Linux Kernel SOC specific device drivers.
+ #
  
- 			gconf: global-config at e802c {
++obj-$(CONFIG_MACH_DOVE)		+= dove/
+ obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
+ obj-$(CONFIG_ARCH_QCOM)		+= qcom/
+ obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+diff --git a/drivers/soc/dove/Makefile b/drivers/soc/dove/Makefile
+new file mode 100644
+index 000000000000..2db8e65513a3
+--- /dev/null
++++ b/drivers/soc/dove/Makefile
+@@ -0,0 +1 @@
++obj-y		+= pmu.o
+diff --git a/drivers/soc/dove/pmu.c b/drivers/soc/dove/pmu.c
+new file mode 100644
+index 000000000000..6792aae9e2e5
+--- /dev/null
++++ b/drivers/soc/dove/pmu.c
+@@ -0,0 +1,412 @@
++/*
++ * Marvell Dove PMU support
++ */
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++#include <linux/of.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/reset.h>
++#include <linux/reset-controller.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++#include <linux/soc/dove/pmu.h>
++#include <linux/spinlock.h>
++
++#define NR_PMU_IRQS		7
++
++#define PMC_SW_RST		0x30
++#define PMC_IRQ_CAUSE		0x50
++#define PMC_IRQ_MASK		0x54
++
++#define PMU_PWR			0x10
++#define PMU_ISO			0x58
++
++struct pmu_data {
++	spinlock_t lock;
++	struct device_node *of_node;
++	void __iomem *pmc_base;
++	void __iomem *pmu_base;
++	struct irq_chip_generic *irq_gc;
++	struct irq_domain *irq_domain;
++#ifdef CONFIG_RESET_CONTROLLER
++	struct reset_controller_dev reset;
++#endif
++};
++
++/*
++ * The PMU contains a register to reset various subsystems within the
++ * SoC.  Export this as a reset controller.
++ */
++#ifdef CONFIG_RESET_CONTROLLER
++#define rcdev_to_pmu(rcdev) container_of(rcdev, struct pmu_data, reset)
++
++static int pmu_reset_reset(struct reset_controller_dev *rc, unsigned long id)
++{
++	struct pmu_data *pmu = rcdev_to_pmu(rc);
++	unsigned long flags;
++	u32 val;
++
++	spin_lock_irqsave(&pmu->lock, flags);
++	val = readl_relaxed(pmu->pmc_base + PMC_SW_RST);
++	writel_relaxed(val & ~BIT(id), pmu->pmc_base + PMC_SW_RST);
++	writel_relaxed(val | BIT(id), pmu->pmc_base + PMC_SW_RST);
++	spin_unlock_irqrestore(&pmu->lock, flags);
++
++	return 0;
++}
++
++static int pmu_reset_assert(struct reset_controller_dev *rc, unsigned long id)
++{
++	struct pmu_data *pmu = rcdev_to_pmu(rc);
++	unsigned long flags;
++	u32 val = ~BIT(id);
++
++	spin_lock_irqsave(&pmu->lock, flags);
++	val &= readl_relaxed(pmu->pmc_base + PMC_SW_RST);
++	writel_relaxed(val, pmu->pmc_base + PMC_SW_RST);
++	spin_unlock_irqrestore(&pmu->lock, flags);
++
++	return 0;
++}
++
++static int pmu_reset_deassert(struct reset_controller_dev *rc, unsigned long id)
++{
++	struct pmu_data *pmu = rcdev_to_pmu(rc);
++	unsigned long flags;
++	u32 val = BIT(id);
++
++	spin_lock_irqsave(&pmu->lock, flags);
++	val |= readl_relaxed(pmu->pmc_base + PMC_SW_RST);
++	writel_relaxed(val, pmu->pmc_base + PMC_SW_RST);
++	spin_unlock_irqrestore(&pmu->lock, flags);
++
++	return 0;
++}
++
++static struct reset_control_ops pmu_reset_ops = {
++	.reset = pmu_reset_reset,
++	.assert = pmu_reset_assert,
++	.deassert = pmu_reset_deassert,
++};
++
++static struct reset_controller_dev pmu_reset __initdata = {
++	.ops = &pmu_reset_ops,
++	.owner = THIS_MODULE,
++	.nr_resets = 32,
++};
++
++static void __init pmu_reset_init(struct pmu_data *pmu)
++{
++	int ret;
++
++	pmu->reset = pmu_reset;
++	pmu->reset.of_node = pmu->of_node;
++
++	ret = reset_controller_register(&pmu->reset);
++	if (ret)
++		pr_err("pmu: %s failed: %d\n", "reset_controller_register", ret);
++}
++#else
++static void __init pmu_reset_init(struct pmu_data *pmu)
++{
++}
++#endif
++
++struct pmu_domain {
++	struct pmu_data *pmu;
++	u32 pwr_mask;
++	u32 rst_mask;
++	u32 iso_mask;
++	struct generic_pm_domain base;
++};
++
++#define to_pmu_domain(dom) container_of(dom, struct pmu_domain, base)
++
++/*
++ * This deals with the "old" Marvell sequence of bringing a power domain
++ * down/up, which is: apply power, release reset, disable isolators.
++ *
++ * Later devices apparantly use a different sequence: power up, disable
++ * isolators, assert repair signal, enable SRMA clock, enable AXI clock,
++ * enable module clock, deassert reset.
++ *
++ * Note: reading the assembly, it seems that the IO accessors have an
++ * unfortunate side-effect - they cause memory already read into registers
++ * for the if () to be re-read for the bit-set or bit-clear operation.
++ * The code is written to avoid this.
++ */
++static int pmu_domain_power_off(struct generic_pm_domain *domain)
++{
++	struct pmu_domain *pmu_dom = to_pmu_domain(domain);
++	struct pmu_data *pmu = pmu_dom->pmu;
++	unsigned long flags;
++	unsigned int val;
++	void __iomem *pmu_base = pmu->pmu_base;
++	void __iomem *pmc_base = pmu->pmc_base;
++
++	spin_lock_irqsave(&pmu->lock, flags);
++
++	/* Enable isolators */
++	if (pmu_dom->iso_mask) {
++		val = ~pmu_dom->iso_mask;
++		val &= readl_relaxed(pmu_base + PMU_ISO);
++		writel_relaxed(val, pmu_base + PMU_ISO);
++	}
++
++	/* Reset unit */
++	if (pmu_dom->rst_mask) {
++		val = ~pmu_dom->rst_mask;
++		val &= readl_relaxed(pmc_base + PMC_SW_RST);
++		writel_relaxed(val, pmc_base + PMC_SW_RST);
++	}
++
++	/* Power down */
++	val = readl_relaxed(pmu_base + PMU_PWR) | pmu_dom->pwr_mask;
++	writel_relaxed(val, pmu_base + PMU_PWR);
++
++	spin_unlock_irqrestore(&pmu->lock, flags);
++
++	return 0;
++}
++
++static int pmu_domain_power_on(struct generic_pm_domain *domain)
++{
++	struct pmu_domain *pmu_dom = to_pmu_domain(domain);
++	struct pmu_data *pmu = pmu_dom->pmu;
++	unsigned long flags;
++	unsigned int val;
++	void __iomem *pmu_base = pmu->pmu_base;
++	void __iomem *pmc_base = pmu->pmc_base;
++
++	spin_lock_irqsave(&pmu->lock, flags);
++
++	/* Power on */
++	val = ~pmu_dom->pwr_mask & readl_relaxed(pmu_base + PMU_PWR);
++	writel_relaxed(val, pmu_base + PMU_PWR);
++
++	/* Release reset */
++	if (pmu_dom->rst_mask) {
++		val = pmu_dom->rst_mask;
++		val |= readl_relaxed(pmc_base + PMC_SW_RST);
++		writel_relaxed(val, pmc_base + PMC_SW_RST);
++	}
++
++	/* Disable isolators */
++	if (pmu_dom->iso_mask) {
++		val = pmu_dom->iso_mask;
++		val |= readl_relaxed(pmu_base + PMU_ISO);
++		writel_relaxed(val, pmu_base + PMU_ISO);
++	}
++
++	spin_unlock_irqrestore(&pmu->lock, flags);
++
++	return 0;
++}
++
++static void __pmu_domain_register(struct pmu_domain *domain,
++	struct device_node *np)
++{
++	unsigned int val = readl_relaxed(domain->pmu->pmu_base + PMU_PWR);
++
++	domain->base.power_off = pmu_domain_power_off;
++	domain->base.power_on = pmu_domain_power_on;
++
++	pm_genpd_init(&domain->base, NULL, !(val & domain->pwr_mask));
++
++	if (np)
++		of_genpd_add_provider_simple(np, &domain->base);
++}
++
++/* PMU IRQ controller */
++static void pmu_irq_handler(unsigned int irq, struct irq_desc *desc)
++{
++	struct pmu_data *pmu = irq_get_handler_data(irq);
++	struct irq_chip_generic *gc = pmu->irq_gc;
++	struct irq_domain *domain = pmu->irq_domain;
++	void __iomem *base = gc->reg_base;
++	u32 stat = readl_relaxed(base + PMC_IRQ_CAUSE) & gc->mask_cache;
++	u32 done = ~0;
++
++	if (stat == 0) {
++		handle_bad_irq(irq, desc);
++		return;
++	}
++
++	while (stat) {
++		u32 hwirq = fls(stat) - 1;
++
++		stat &= ~(1 << hwirq);
++		done &= ~(1 << hwirq);
++
++		generic_handle_irq(irq_find_mapping(domain, hwirq));
++	}
++
++	/*
++	 * The PMU mask register is not RW0C: it is RW.  This means that
++	 * the bits take whatever value is written to them; if you write
++	 * a '1', you will set the interrupt.
++	 *
++	 * Unfortunately this means there is NO race free way to clear
++	 * these interrupts.
++	 *
++	 * So, let's structure the code so that the window is as small as
++	 * possible.
++	 */
++	irq_gc_lock(gc);
++	done &= readl_relaxed(base + PMC_IRQ_CAUSE);
++	writel_relaxed(done, base + PMC_IRQ_CAUSE);
++	irq_gc_unlock(gc);
++}
++
++static int __init dove_init_pmu_irq(struct pmu_data *pmu, int irq)
++{
++	const char *name = "pmu_irq";
++	struct irq_chip_generic *gc;
++	struct irq_domain *domain;
++	int ret;
++
++	/* mask and clear all interrupts */
++	writel(0, pmu->pmc_base + PMC_IRQ_MASK);
++	writel(0, pmu->pmc_base + PMC_IRQ_CAUSE);
++
++	domain = irq_domain_add_linear(pmu->of_node, NR_PMU_IRQS,
++				       &irq_generic_chip_ops, NULL);
++	if (!domain) {
++		pr_err("%s: unable to add irq domain\n", name);
++		return -ENOMEM;
++	}
++
++	ret = irq_alloc_domain_generic_chips(domain, NR_PMU_IRQS, 1, name,
++					     handle_level_irq,
++					     IRQ_NOREQUEST | IRQ_NOPROBE, 0,
++					     IRQ_GC_INIT_MASK_CACHE);
++	if (ret) {
++		pr_err("%s: unable to alloc irq domain gc: %d\n", name, ret);
++		irq_domain_remove(domain);
++		return ret;
++	}
++
++	gc = irq_get_domain_generic_chip(domain, 0);
++	gc->reg_base = pmu->pmc_base;
++	gc->chip_types[0].regs.mask = PMC_IRQ_MASK;
++	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
++	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
++
++	pmu->irq_domain = domain;
++	pmu->irq_gc = gc;
++
++	irq_set_handler_data(irq, pmu);
++	irq_set_chained_handler(irq, pmu_irq_handler);
++
++	return 0;
++}
++
++/*
++ * pmu: power-manager at d0000 {
++ *	compatible = "marvell,dove-pmu";
++ *	reg = <0xd0000 0x8000> <0xd8000 0x8000>;
++ *	interrupts = <33>;
++ *	interrupt-controller;
++ *	#reset-cells = 1;
++ *	vpu_domain: vpu-domain {
++ *		#power-domain-cells = <0>;
++ *		marvell,pmu_pwr_mask = <0x00000008>;
++ *		marvell,pmu_iso_mask = <0x00000001>;
++ *		resets = <&pmu 16>;
++ *	};
++ *	gpu_domain: gpu-domain {
++ *		#power-domain-cells = <0>;
++ *		marvell,pmu_pwr_mask = <0x00000004>;
++ *		marvell,pmu_iso_mask = <0x00000002>;
++ *		resets = <&pmu 18>;
++ *	};
++ * };
++ */
++int __init dove_init_pmu(void)
++{
++	struct device_node *np_pmu, *domains_node, *np;
++	struct pmu_data *pmu;
++	int ret, parent_irq;
++
++	/* Lookup the PMU node */
++	np_pmu = of_find_compatible_node(NULL, NULL, "marvell,dove-pmu");
++	if (!np_pmu)
++		return 0;
++
++	domains_node = of_get_child_by_name(np_pmu, "domains");
++	if (!domains_node) {
++		pr_err("%s: failed to find domains sub-node\n", np_pmu->name);
++		return 0;
++	}
++
++	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
++	if (!pmu)
++		return -ENOMEM;
++
++	spin_lock_init(&pmu->lock);
++	pmu->of_node = np_pmu;
++	pmu->pmc_base = of_iomap(pmu->of_node, 0);
++	pmu->pmu_base = of_iomap(pmu->of_node, 1);
++	if (!pmu->pmc_base || !pmu->pmu_base) {
++		pr_err("%s: failed to map PMU\n", np_pmu->name);
++		iounmap(pmu->pmu_base);
++		iounmap(pmu->pmc_base);
++		kfree(pmu);
++		return -ENOMEM;
++	}
++
++	pmu_reset_init(pmu);
++
++	for_each_available_child_of_node(domains_node, np) {
++		struct of_phandle_args args;
++		struct pmu_domain *domain;
++
++		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
++		if (!domain)
++			break;
++
++		domain->pmu = pmu;
++		domain->base.name = kstrdup(np->name, GFP_KERNEL);
++		if (!domain->base.name) {
++			kfree(domain);
++			break;
++		}
++
++		of_property_read_u32(np, "marvell,pmu_pwr_mask",
++				     &domain->pwr_mask);
++		of_property_read_u32(np, "marvell,pmu_iso_mask",
++				     &domain->iso_mask);
++
++		/*
++		 * We parse the reset controller property directly here
++		 * to ensure that we can operate when the reset controller
++		 * support is not configured into the kernel.
++		 */
++		ret = of_parse_phandle_with_args(np, "resets", "#reset-cells",
++						 0, &args);
++		if (ret == 0) {
++			if (args.np == pmu->of_node)
++				domain->rst_mask = BIT(args.args[0]);
++			of_node_put(args.np);
++		}
++
++		__pmu_domain_register(domain, np);
++	}
++	pm_genpd_poweroff_unused();
++
++	/* Loss of the interrupt controller is not a fatal error. */
++	parent_irq = irq_of_parse_and_map(pmu->of_node, 0);
++	if (!parent_irq) {
++		pr_err("%s: no interrupt specified\n", np_pmu->name);
++	} else {
++		ret = dove_init_pmu_irq(pmu, parent_irq);
++		if (ret)
++			pr_err("dove_init_pmu_irq() failed: %d\n", ret);
++	}
++
++	return 0;
++}
+diff --git a/include/linux/soc/dove/pmu.h b/include/linux/soc/dove/pmu.h
+new file mode 100644
+index 000000000000..9c99f84bcc0e
+--- /dev/null
++++ b/include/linux/soc/dove/pmu.h
+@@ -0,0 +1,6 @@
++#ifndef LINUX_SOC_DOVE_PMU_H
++#define LINUX_SOC_DOVE_PMU_H
++
++int dove_init_pmu(void);
++
++#endif
 -- 
 2.1.0
