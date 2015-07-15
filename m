@@ -1,239 +1,151 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 15 Jul 2015 12:10:03 +0300
-Subject: [PATCH v2 15/15] KVM: arm64: enable ITS emulation as a virtual MSI
- controller
-In-Reply-To: <1436538111-4294-16-git-send-email-andre.przywara@arm.com>
-References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
- <1436538111-4294-16-git-send-email-andre.przywara@arm.com>
-Message-ID: <00fa01d0bede$098f5570$1cae0050$@samsung.com>
+From: luis.henriques@canonical.com (Luis Henriques)
+Date: Wed, 15 Jul 2015 10:11:51 +0100
+Subject: [PATCH 3.16.y-ckt 116/185] clocksource: exynos_mct: Avoid blocking
+ calls in the cpu hotplug notifier
+In-Reply-To: <1436951580-15977-1-git-send-email-luis.henriques@canonical.com>
+References: <1436951580-15977-1-git-send-email-luis.henriques@canonical.com>
+Message-ID: <1436951580-15977-117-git-send-email-luis.henriques@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+3.16.7-ckt15 -stable review patch.  If anyone has any objections, please let me know.
 
+------------------
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+From: Damian Eppel <d.eppel@samsung.com>
 
+commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
 
-> -----Original Message-----
-> From: kvm-owner at vger.kernel.org [mailto:kvm-owner at vger.kernel.org] On Behalf Of Andre Przywara
-> Sent: Friday, July 10, 2015 5:22 PM
-> To: marc.zyngier at arm.com; christoffer.dall at linaro.org; kvmarm at lists.cs.columbia.edu
-> Cc: eric.auger at linaro.org; Pavel Fedin; linux-arm-kernel at lists.infradead.org; kvm at vger.kernel.org
-> Subject: [PATCH v2 15/15] KVM: arm64: enable ITS emulation as a virtual MSI controller
-> 
-> If userspace has provided a base address for the ITS register frame,
-> we enable the bits that advertise LPIs in the GICv3.
-> When the guest has enabled LPIs and the ITS, we enable the emulation
-> part by initializing the ITS data structures and trapping on ITS
-> register frame accesses by the guest.
-> Also we enable the KVM_SIGNAL_MSI feature to allow userland to inject
-> MSIs into the guest. Not having enabled the ITS emulation will lead
-> to a -ENODEV when trying to inject a MSI.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  Documentation/virtual/kvm/api.txt |  2 +-
->  arch/arm64/kvm/Kconfig            |  1 +
->  arch/arm64/kvm/reset.c            |  6 ++++++
->  include/kvm/arm_vgic.h            |  6 ++++++
->  virt/kvm/arm/its-emul.c           | 10 +++++++++-
->  virt/kvm/arm/vgic-v3-emul.c       | 20 ++++++++++++++------
->  virt/kvm/arm/vgic.c               |  8 ++++++++
->  7 files changed, 45 insertions(+), 8 deletions(-)
-> 
-> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> index cb04095..1b53155 100644
-> --- a/Documentation/virtual/kvm/api.txt
-> +++ b/Documentation/virtual/kvm/api.txt
-> @@ -2134,7 +2134,7 @@ after pausing the vcpu, but before it is resumed.
->  4.71 KVM_SIGNAL_MSI
-> 
->  Capability: KVM_CAP_SIGNAL_MSI
-> -Architectures: x86
-> +Architectures: x86 arm64
->  Type: vm ioctl
->  Parameters: struct kvm_msi (in)
->  Returns: >0 on delivery, 0 if guest blocked the MSI, and -1 on error
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index bfffe8f..ff9722f 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -31,6 +31,7 @@ config KVM
->  	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
-> +	select HAVE_KVM_MSI
->  	---help---
->  	  Support hosting virtualized guest machines.
-> 
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 866502b..aff209e 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -64,6 +64,12 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_EL1_32BIT:
->  		r = cpu_has_32bit_el1();
->  		break;
-> +	case KVM_CAP_MSI_DEVID:
-> +		if (!kvm)
-> +			r = -EINVAL;
-> +		else
-> +			r = kvm->arch.vgic.msis_require_devid;
-> +		break;
->  	default:
->  		r = 0;
->  	}
+Whilst testing cpu hotplug events on kernel configured with
+DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+caused by calling request_irq() and free_irq() in the context of
+hotplug notification (which is in this case atomic context).
 
- This can be very inconvenient to use IMHO. The problem here is that capability is set to TRUE only
-after everything has been instantiated, and the VM is about to run. And, for example, qemu first
-queries for capabilities, then creates models. May be we should just set the capability to TRUE for
-ARM architecture in general, and make GICv2m MSIs simply ignoring this flag and device ID?
- Of course, we can explicitly check for the capability after vGICv3 + ITS instantiation, however in
-this case it IMHO simply loses sense, because since we are using ITS, we already know for sure that
-device IDs are required, because ITS requires them by design.
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 9e1abf9..f50081c 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -162,6 +162,7 @@ struct vgic_io_device {
-> 
->  struct vgic_its {
->  	bool			enabled;
-> +	struct vgic_io_device	iodev;
->  	spinlock_t		lock;
->  	u64			cbaser;
->  	int			creadr;
-> @@ -180,6 +181,9 @@ struct vgic_dist {
->  	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
->  	u32			vgic_model;
-> 
-> +	/* Do injected MSIs require an additional device ID? */
-> +	bool			msis_require_devid;
-> +
->  	int			nr_cpus;
->  	int			nr_irqs;
-> 
-> @@ -371,4 +375,6 @@ static inline int vgic_v3_probe(struct device_node *vgic_node,
->  }
->  #endif
-> 
-> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi);
-> +
->  #endif
-> diff --git a/virt/kvm/arm/its-emul.c b/virt/kvm/arm/its-emul.c
-> index a1c12bb..b6caefd 100644
-> --- a/virt/kvm/arm/its-emul.c
-> +++ b/virt/kvm/arm/its-emul.c
-> @@ -1073,6 +1073,7 @@ int vits_init(struct kvm *kvm)
->  {
->  	struct vgic_dist *dist = &kvm->arch.vgic;
->  	struct vgic_its *its = &dist->its;
-> +	int ret;
-> 
->  	dist->pendbaser = kmalloc(sizeof(u64) * dist->nr_cpus, GFP_KERNEL);
->  	if (!dist->pendbaser)
-> @@ -1087,9 +1088,16 @@ int vits_init(struct kvm *kvm)
->  	INIT_LIST_HEAD(&its->device_list);
->  	INIT_LIST_HEAD(&its->collection_list);
-> 
-> +	ret = vgic_register_kvm_io_dev(kvm, dist->vgic_its_base,
-> +				       KVM_VGIC_V3_ITS_SIZE, vgicv3_its_ranges,
-> +				       -1, &its->iodev);
-> +	if (ret)
-> +		return ret;
-> +
->  	its->enabled = false;
-> +	dist->msis_require_devid = true;
-> 
-> -	return -ENXIO;
-> +	return 0;
->  }
-> 
->  void vits_destroy(struct kvm *kvm)
-> diff --git a/virt/kvm/arm/vgic-v3-emul.c b/virt/kvm/arm/vgic-v3-emul.c
-> index 30bf7035..9fd1238 100644
-> --- a/virt/kvm/arm/vgic-v3-emul.c
-> +++ b/virt/kvm/arm/vgic-v3-emul.c
-> @@ -8,7 +8,6 @@
->   *
->   * Limitations of the emulation:
->   * (RAZ/WI: read as zero, write ignore, RAO/WI: read as one, write ignore)
-> - * - We do not support LPIs (yet). TYPER.LPIS is reported as 0 and is RAZ/WI.
->   * - We do not support the message based interrupts (MBIs) triggered by
->   *   writes to the GICD_{SET,CLR}SPI_* registers. TYPER.MBIS is reported as 0.
->   * - We do not support the (optional) backwards compatibility feature.
-> @@ -87,10 +86,10 @@ static bool handle_mmio_ctlr(struct kvm_vcpu *vcpu,
->  /*
->   * As this implementation does not provide compatibility
->   * with GICv2 (ARE==1), we report zero CPUs in bits [5..7].
-> - * Also LPIs and MBIs are not supported, so we set the respective bits to 0.
-> - * Also we report at most 2**10=1024 interrupt IDs (to match 1024 SPIs).
-> + * Also we report at most 2**10=1024 interrupt IDs (to match 1024 SPIs)
-> + * and provide 16 bits worth of LPI number space (to give 8192 LPIs).
->   */
-> -#define INTERRUPT_ID_BITS 10
-> +#define INTERRUPT_ID_BITS_SPIS 10
->  static bool handle_mmio_typer(struct kvm_vcpu *vcpu,
->  			      struct kvm_exit_mmio *mmio, phys_addr_t offset)
->  {
-> @@ -98,7 +97,12 @@ static bool handle_mmio_typer(struct kvm_vcpu *vcpu,
-> 
->  	reg = (min(vcpu->kvm->arch.vgic.nr_irqs, 1024) >> 5) - 1;
-> 
-> -	reg |= (INTERRUPT_ID_BITS - 1) << 19;
-> +	if (vgic_has_its(vcpu->kvm)) {
-> +		reg |= GICD_TYPER_LPIS;
-> +		reg |= (INTERRUPT_ID_BITS_ITS - 1) << 19;
-> +	} else {
-> +		reg |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
-> +	}
-> 
->  	vgic_reg_access(mmio, &reg, offset,
->  			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
-> @@ -543,7 +547,9 @@ static bool handle_mmio_ctlr_redist(struct kvm_vcpu *vcpu,
->  	vgic_reg_access(mmio, &reg, offset,
->  			ACCESS_READ_VALUE | ACCESS_WRITE_VALUE);
->  	if (!dist->lpis_enabled && (reg & GICR_CTLR_ENABLE_LPIS)) {
-> -		/* Eventually do something */
-> +		vgic_enable_lpis(vcpu);
-> +		dist->lpis_enabled = true;
-> +		return true;
->  	}
->  	return false;
->  }
-> @@ -570,6 +576,8 @@ static bool handle_mmio_typer_redist(struct kvm_vcpu *vcpu,
->  	reg = redist_vcpu->vcpu_id << 8;
->  	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
->  		reg |= GICR_TYPER_LAST;
-> +	if (vgic_has_its(vcpu->kvm))
-> +		reg |= GICR_TYPER_PLPIS;
->  	vgic_reg_access(mmio, &reg, offset,
->  			ACCESS_READ_VALUE | ACCESS_WRITE_IGNORED);
->  	return false;
-> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-> index 9dfd094..081a1ef 100644
-> --- a/virt/kvm/arm/vgic.c
-> +++ b/virt/kvm/arm/vgic.c
-> @@ -2246,3 +2246,11 @@ int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
->  {
->  	return 0;
->  }
-> +
-> +int kvm_send_userspace_msi(struct kvm *kvm, struct kvm_msi *msi)
-> +{
-> +	if (kvm->arch.vgic.vm_ops.inject_msi)
-> +		return kvm->arch.vgic.vm_ops.inject_msi(kvm, msi);
-> +	else
-> +		return -ENODEV;
-> +}
-> --
-> 2.3.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+notifications which run on the hotplugged cpu with interrupts and
+preemption disabled.
+
+To avoid the issue, request the interrupts for all possible cpus in
+the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+request_irq/disable_irq() sequence. The flag prevents the
+request_irq() code from enabling the interrupt immediately.
+
+The interrupt is then enabled in the CPU_STARTING notifier of the
+hotplugged cpu and again disabled with disable_irq_nosync() in the
+CPU_DYING notifier.
+
+[ tglx: Massaged changelog to match the patch ]
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: m.szyprowski at samsung.com
+Cc: kyungmin.park at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: kgene at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Luis Henriques <luis.henriques@canonical.com>
+---
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 336a60fbabf9..5d1b7f64947c 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -441,15 +441,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+ 
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -462,10 +459,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
+ 
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -497,7 +496,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+ 
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+ 
+@@ -524,7 +523,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+ 
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
