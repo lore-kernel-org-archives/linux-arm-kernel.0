@@ -1,50 +1,55 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 Jul 2015 16:20:09 +0530
-Subject: [PATCH v4 0/2] USB OTG PHY driver for NXP LPC18xx family
-In-Reply-To: <1436474906-2669-1-git-send-email-manabian@gmail.com>
-References: <1436474906-2669-1-git-send-email-manabian@gmail.com>
-Message-ID: <55A63AE1.50701@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jul 2015 03:50:53 -0700
+Subject: [GIT PULL] omap fixes against v4.2-rc2
+Message-ID: <20150715105053.GC17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
 
+  Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
 
-On Friday 10 July 2015 02:18 AM, Joachim Eastwood wrote:
-> This patch set adds support for the internal USB OTG PHY found
-> on NXP LPC18xx and LPC43xx devices. Driver takes care of
-> enabling the PHY and setting the clock rate which is need for
-> USB0 support on this platform.
-> 
-> This version address moves the dt node under the creg syscon
-> and rebases the patch set on 4.2-rc1.
+are available in the git repository at:
 
-merged this to linux-phy tree.
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.2/fixes-rc2-v2
 
-Cheers
-Kishon
+for you to fetch changes up to 9908ac3daa3da2d236b5406b95d0865ddb8b29c4:
 
-> 
-> Changes in v4:
->  - rebase on 4.2-rc1
->  - move dt node under creg where the control reg is
-> 
-> Changes in v3:
->  - depend on MFD_SYSCON
-> 
-> Changes in v2:
->  - use PTR_ERR_OR_ZERO in phy driver
->  - rename binding doc
->  - update doc commit message
-> 
-> Joachim Eastwood (2):
->   phy: add lpc18xx usb otg phy driver
->   phy: dt bindings: add NXP LPC18xx/43xx USB OTG PHY bindings
-> 
->  .../bindings/phy/phy-lpc18xx-usb-otg.txt           |  26 ++++
->  drivers/phy/Kconfig                                |  11 ++
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-lpc18xx-usb-otg.c                  | 143 +++++++++++++++++++++
->  4 files changed, 181 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-lpc18xx-usb-otg.txt
->  create mode 100644 drivers/phy/phy-lpc18xx-usb-otg.c
-> 
+  ARM: dts: Correct audio input route & set mic bias for am335x-pepper (2015-07-15 03:03:01 -0700)
+
+----------------------------------------------------------------
+Fixes for omaps, all dts changes except for one:
+
+- Fix up LCD panel name for overo boards
+
+- Three fixes for pepper board for regulators, freqeuncy
+  scaling and audio input. Note that there is still one
+  issue being worked on for booting with multi_v7_defconfig
+
+- Add missing #iommu-cells for omap4 and 5
+
+- Add missing HAVE_ARM_SCU for am43xx
+
+----------------------------------------------------------------
+Adam YH Lee (3):
+      ARM: dts: omap3: overo: Update LCD panel names
+      ARM: dts: configure regulators for Gumstix Pepper
+      ARM: dts: Correct audio input route & set mic bias for am335x-pepper
+
+Arun Bharadwaj (1):
+      ARM: dts: Fix frequency scaling on Gumstix Pepper
+
+Dave Gerlach (1):
+      ARM: OMAP2+: Add HAVE_ARM_SCU for AM43XX
+
+Suman Anna (2):
+      ARM: dts: OMAP4: Add #iommu-cells property to IOMMUs
+      ARM: dts: OMAP5: Add #iommu-cells property to IOMMUs
+
+ arch/arm/boot/dts/am335x-pepper.dts             | 16 +++++++++++++---
+ arch/arm/boot/dts/omap3-overo-common-lcd35.dtsi |  2 +-
+ arch/arm/boot/dts/omap3-overo-common-lcd43.dtsi |  2 +-
+ arch/arm/boot/dts/omap4.dtsi                    |  2 ++
+ arch/arm/boot/dts/omap5.dtsi                    |  2 ++
+ arch/arm/mach-omap2/Kconfig                     |  1 +
+ 6 files changed, 20 insertions(+), 5 deletions(-)
