@@ -1,35 +1,34 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 15 Jul 2015 18:32:43 +0200
-Subject: [PATCH 1/3] ARM: multi_v7_defconfig: Enable max77802 regulator
-In-Reply-To: <1436977965-7078-1-git-send-email-javier@osg.samsung.com>
-References: <1436977965-7078-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1436977965-7078-2-git-send-email-javier@osg.samsung.com>
+From: lkurusa@redhat.com (Levente Kurusa)
+Date: Wed, 15 Jul 2015 17:30:50 +0200
+Subject: [PATCH] arm: fault.c: fix unhandled page fault message
+Message-ID: <1436974250-4999-1-git-send-email-lkurusa@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Maxim max77802 Power Management IC has besides other devices, a set of
-regulators. Commit f3caa529c6f5 ("ARM: multi_v7_defconfig: Enable max77802
-regulator, rtc and clock drivers") was supposed to enable the config option
-for the regulator driver as a module but the final version that landed did
-not include this. So this patch enables the needed Kconfig option.
+Even if the signal was handled using signal(2) the message
+would be printed. Fix that by checking whether the signal
+is handled.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Levente Kurusa <lkurusa@redhat.com>
 ---
+ arch/arm/mm/fault.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 4b93761d58d2..b07493997993 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -402,6 +402,7 @@ CONFIG_REGULATOR_MAX14577=m
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_MAX77686=y
-+CONFIG_REGULATOR_MAX77802=m
- CONFIG_REGULATOR_MAX77693=m
- CONFIG_REGULATOR_PALMAS=y
- CONFIG_REGULATOR_S2MPS11=y
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 0d629b8..bbf5d73 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -164,8 +164,9 @@ __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	struct siginfo si;
+ 
+ #ifdef CONFIG_DEBUG_USER
+-	if (((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
+-	    ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) {
++	if ((((user_debug & UDBG_SEGV) && (sig == SIGSEGV)) ||
++	     ((user_debug & UDBG_BUS)  && (sig == SIGBUS))) &&
++	     unhandled_signal(tsk, sig)) {
+ 		printk(KERN_DEBUG "%s: unhandled page fault (%d) at 0x%08lx, code 0x%03x\n",
+ 		       tsk->comm, sig, addr, fsr);
+ 		show_pte(tsk->mm, addr);
 -- 
 2.4.3
