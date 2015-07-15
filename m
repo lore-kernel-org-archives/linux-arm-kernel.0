@@ -1,61 +1,48 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 15 Jul 2015 09:54:42 -0700
-Subject: [PATCH 2/5] gic-its: Allow pci_requester_id to be overridden.
+Date: Wed, 15 Jul 2015 09:54:41 -0700
+Subject: [PATCH 1/5] pci: Add is_pcierc element to struct pci_bus
 In-Reply-To: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1436979285-8177-3-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1436979285-8177-2-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
+... and use is to force only_one_child() to return true.
+
+Needed because the ThunderX PCIe RC cannot be identified by existing methods.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 14 +++++++++++++-
- include/linux/irqchip/arm-gic-v3.h |  2 ++
- 2 files changed, 15 insertions(+), 1 deletion(-)
+ drivers/pci/probe.c | 2 ++
+ include/linux/pci.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 1b7e155..4580970 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1189,11 +1189,23 @@ static int its_pci_msi_vec_count(struct pci_dev *pdev)
- 	return max(msi, msix);
- }
- 
-+static u32 its_dflt_pci_requester_id(struct pci_dev *pdev, u16 alias)
-+{
-+	return alias;
-+}
-+
-+static its_pci_requester_id_t its_pci_requester_id = its_dflt_pci_requester_id;
-+void set_its_pci_requester_id(its_pci_requester_id_t fn)
-+{
-+	its_pci_requester_id = fn;
-+}
-+EXPORT_SYMBOL(set_its_pci_requester_id);
-+
- static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index cefd636..11ec2e7 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1643,6 +1643,8 @@ static int only_one_child(struct pci_bus *bus)
  {
- 	struct its_pci_alias *dev_alias = data;
+ 	struct pci_dev *parent = bus->self;
  
--	dev_alias->dev_id = alias;
-+	dev_alias->dev_id = its_pci_requester_id(pdev, alias);
- 	if (pdev != dev_alias->pdev)
- 		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
++	if (bus->is_pcierc)
++		return 1;
+ 	if (!parent || !pci_is_pcie(parent))
+ 		return 0;
+ 	if (pci_pcie_type(parent) == PCI_EXP_TYPE_ROOT_PORT)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 8a0321a..1f1ce73 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -473,6 +473,7 @@ struct pci_bus {
+ 	struct bin_attribute	*legacy_io; /* legacy I/O for this bus */
+ 	struct bin_attribute	*legacy_mem; /* legacy mem */
+ 	unsigned int		is_added:1;
++	unsigned int		is_pcierc:1;
+ };
  
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index ffbc034..18e3757 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -389,6 +389,8 @@ int its_cpu_init(void);
- int its_init(struct device_node *node, struct rdists *rdists,
- 	     struct irq_domain *domain);
- 
-+typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
-+void set_its_pci_requester_id(its_pci_requester_id_t fn);
- #endif
- 
- #endif
+ #define to_pci_bus(n)	container_of(n, struct pci_bus, dev)
 -- 
 1.9.1
