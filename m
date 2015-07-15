@@ -1,29 +1,26 @@
-From: s.nawrocki@samsung.com (Sylwester nawrocki)
-Date: Wed, 15 Jul 2015 19:01:37 +0900
-Subject: [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
- <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55A62F81.3080801@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 15 Jul 2015 05:30:19 -0400
+Subject: [GIT PULL] ARM: imx: fixes for 4.2
+In-Reply-To: <20150714153951.GJ4119@tiger>
+References: <20150714153951.GJ4119@tiger>
+Message-ID: <20150715093019.GA10795@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/01/2015 10:10 PM, Bartlomiej Zolnierkiewicz wrote:
-> From: Thomas Abraham<thomas.ab@samsung.com>
->
-> With the addition of the new Samsung specific cpu-clock type, the
-> arm clock can be represented as a cpu-clock type. Add the CPU clock
-> configuration data and instantiate the CPU clock type for Exynos5250.
->
-> Changes by Bartlomiej:
-> - split Exynos5250 support from the original patch
-> - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
->
-> Cc: Tomasz Figa<tomasz.figa@gmail.com>
-> Cc: Michael Turquette<mturquette@baylibre.com>
-> Cc: Javier Martinez Canillas<javier@dowhile0.org>
-> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz<b.zolnierkie@samsung.com>
+On Tue, Jul 14, 2015 at 11:39:51PM +0800, Shawn Guo wrote:
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2
+> 
+> for you to fetch changes up to d438462c20a300139c2e5e65b96cadaa21b58d9a:
+> 
+>   ARM: imx6: gpc: always enable PU domain if CONFIG_PM is not set (2015-07-08 22:52:08 +0800)
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Merged, thanks!
+
+
+-Olof
