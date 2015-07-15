@@ -1,64 +1,102 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jul 2015 21:47:47 +0100
-Subject: [PATCH 1/7] dt-bindings: add Marvell PMU documentation
-In-Reply-To: <CAL_JsqJRyasT49x6JLhy-X0psfT=cUom_RMkFQScqqLzeggUzQ@mail.gmail.com>
-References: <20150715185859.GC7557@n2100.arm.linux.org.uk>
- <E1ZFRtu-0003lu-Ft@rmk-PC.arm.linux.org.uk>
- <CAL_JsqJRyasT49x6JLhy-X0psfT=cUom_RMkFQScqqLzeggUzQ@mail.gmail.com>
-Message-ID: <20150715204747.GG7557@n2100.arm.linux.org.uk>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 15 Jul 2015 15:46:31 -0500
+Subject: [PATCH] ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
+In-Reply-To: <20150715080258.GA29885@pengutronix.de>
+References: <1436908987-16038-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150715080258.GA29885@pengutronix.de>
+Message-ID: <55A6C6A7.5040100@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 03:39:19PM -0500, Rob Herring wrote:
-> On Wed, Jul 15, 2015 at 1:59 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > Add the required DT binding documentation for the Marvell PMU driver.
+On 07/15/2015 03:02 AM, Steffen Trumtrar wrote:
+> Hi!
 > 
-> Looks mostly fine to me.
+> On Tue, Jul 14, 2015 at 04:23:07PM -0500, dinguyen at opensource.altera.com wrote:
+>> From: Dalon Westergreen <dwesterg@gmail.com>
+>>
+>> The Terasic DE0 Atlas board is also known as the DE0-Nano board.
+>>
+>> Signed-off-by: Dalon Westergreen <dwesterg@gmail.com>
+>> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile                        |    1 +
+>>  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts |  109 +++++++++++++++++++++
+>>  2 files changed, 110 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 246473a..29e33aa 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -522,6 +522,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+>>  	socfpga_arria5_socdk.dtb \
+>>  	socfpga_arria10_socdk_sdmmc.dtb \
+>>  	socfpga_cyclone5_socdk.dtb \
+>> +	socfpga_cyclone5_de0_sockit.dtb \
+>                              ^^^^^^
 > 
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  Documentation/devicetree/bindings/soc/dove/pmu.txt | 56 ++++++++++++++++++++++
-> >  1 file changed, 56 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/soc/dove/pmu.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/soc/dove/pmu.txt b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> > new file mode 100644
-> > index 000000000000..edd40b796b74
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/soc/dove/pmu.txt
-> > @@ -0,0 +1,56 @@
-> > +Device Tree bindings for Marvell PMU
-> > +
-> > +Required properties:
-> > + - compatible: value should be "marvell,dove-pmu".
-> > +    May also include "simple-bus" if there are child devices, in which
-> > +    case the ranges node is required.
-> > + - reg: two base addresses and sizes of the PM controller and PMU.
-> > + - interrupts: single interrupt number for the PMU interrupt
-> > + - interrupt-controller: must be specified as the PMU itself is an
-> > +    interrupt controller.
-> > + - #interrupt-cells: must be 1.
-> > + - #reset-cells: must be 1.
-> > + - domains: sub-node containing domain descriptions
-> > +
-> > +Optional properties:
-> > + - ranges: defines the address mapping for child devices, as per the
-> > +   standard property of this name.  Required when compatible includes
-> > +   "simple-bus".
+> Is that intentional? Terasic doesn't mention sockit at all in the name
+> of the board.
 > 
-> When would this be used? Your example has child devices, but not this.
 
-Precisely as it says.  No, my example does not have child devices, it
-has child nodes which describe the power domains.
+Yes. From the Terasic website[1], they name it DE0-Nano-SoCKit/Atlas-SoCKit.
 
-"simple-bus" is needed when we list sub-devices of the PMU below it,
-such as the RTC, pinmux, clock gating, and GPIO, all of which already
-exist today above the PMU, incorrectly (IMHO) described as individual
-separate devices.  Please see patch 2, which modifies the Dove DT
-file moving these devices below the PMU, as I previously stated was
-my intent to do during discussion of the last submission.
+>>  	socfpga_cyclone5_sockit.dtb \
+>>  	socfpga_cyclone5_socrates.dtb \
+>>  	socfpga_vt.dtb
+>> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+>> new file mode 100644
+>> index 0000000..3172c82
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
+>> @@ -0,0 +1,109 @@
+>> +/*
+>> + * Copyright Altera Corporation (C) 2015. All rights reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include "socfpga_cyclone5.dtsi"
+>> +
+>> +/ {
+>> +	model = "Terasic DE-0(Atlas)";
+>> +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
+>> +
+>> +	chosen {
+>> +		bootargs = "console=ttyS0,115200";
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Use stdpath-out here.
+
+>> +	};
+>> +
+>> +	memory {
+>> +		name = "memory";
+>> +		device_type = "memory";
+>> +		reg = <0x0 0x40000000>; /* 1GB */
+>> +	};
+>> +
+>> +	aliases {
+>> +		/* this allow the ethaddr uboot environmnet variable contents
+>> +		 * to be added to the gmac1 device tree blob.
+>> +		 */
+> 
+> I'd personally like to get rid of these types of comments in the dts.
+> It doesn't matter what uboot needs or does IMHO.
+> 
+
+Thats fine, I can remove the comment.
+
+Dinh
+
+[1]
+http://www.terasic.com.tw/cgi-bin/page/archive.pl?Language=English&CategoryNo=165&No=941
