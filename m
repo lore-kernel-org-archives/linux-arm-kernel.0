@@ -1,53 +1,40 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 15 Jul 2015 09:57:26 +0800
-Subject: [PATCH v3 2/2] ARM: dts: vf-colibri: Add property for minimum
- sample time
-In-Reply-To: <20e2cfad3fbb1a45332e9936ea493ddc8bfaf51d.1436880513.git.maitysanchayan@gmail.com>
-References: <cover.1436880513.git.maitysanchayan@gmail.com>
- <20e2cfad3fbb1a45332e9936ea493ddc8bfaf51d.1436880513.git.maitysanchayan@gmail.com>
-Message-ID: <20150715015725.GK4119@tiger>
+From: parkch98@gmail.com (Chanho Park)
+Date: Wed, 15 Jul 2015 11:31:27 +0900
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <55A5BB5A.2040807@samsung.com>
+References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+ <55A5BB5A.2040807@samsung.com>
+Message-ID: <CAPTzV16VFu_0BN1xpuki3gN3btB-zFwuj+A8ibza14JKqaXXfA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 07:23:23PM +0530, Sanchayan Maity wrote:
-> Add a device tree property which allows to specify the minimum sample
-> time which can be used to calculate the actual ADC cycles required
-> depending on the hardware.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vf-colibri.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-> index ab10d2e..59f5deb 100644
-> --- a/arch/arm/boot/dts/vf-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf-colibri.dtsi
-> @@ -16,10 +16,12 @@
->  };
->  
->  &adc0 {
-> +	min-sample-time = <1000>;
->  	status = "okay";
->  };
->  
->  &adc1 {
-> +	min-sample-time = <1000>;
+Hi,
 
-Since this is the default value anyway, we can just save the patch,
-right?
+On Wed, Jul 15, 2015 at 10:46 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 15.07.2015 10:36, Chanho Park wrote:
+>> The cpu booting of exynos5422 has been still broken since we discussed
+>> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
+>> hardkernel, it could help to boot 8 cores well. This patch need to have
+>> more test like STR and other SoC especially exynos5800 which is variant
+>> of exynos5422. If this patch is broken on exynos5800, I'll find another
+>> way to check exynos5422.
+>>
+>> This patch is top of my previous exynos5422 cpu ordering patch[2] and
+>> need to enable CONFIG_EXYNOS5420_MCPM=y
+>
+> 1. Why the ordering patch is required? It seems unrelated...
 
-Shawn
+Because it related with my booting log :)
 
->  	status = "okay";
->  };
->  
-> -- 
-> 2.4.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> 2. I tried this already (as in vendor sources from
+> opensource.samsung.com) and it did not help on my Odroid. Are you sure
+> that this patch solely fixes the problem?
+
+If you turned on CONFIG_DEBUG_LL, you'll need Joonyoung's patch to
+correct uart address of exynos5422.
+http://www.spinics.net/lists/linux-samsung-soc/msg37318.html
+
+-- 
+Best Regards,
+Chanho Park
