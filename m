@@ -1,111 +1,80 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 15 Jul 2015 15:38:29 +0100
-Subject: [PATCH 2/2] irqchip: gic: remove reduntant gic_set_irqchip_flags
-In-Reply-To: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
-References: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1436971109-20189-2-git-send-email-sudeep.holla@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jul 2015 15:45:07 +0100
+Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
+ backend
+In-Reply-To: <20150715134603.GA14862@red-moon>
+References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
+ <1436430685-2202-4-git-send-email-jszhang@marvell.com>
+ <20150714103421.GU7557@n2100.arm.linux.org.uk>
+ <20150714110302.GA334@red-moon>
+ <20150714122904.GV7557@n2100.arm.linux.org.uk>
+ <20150714145546.GA14556@red-moon>
+ <20150714204138.GW7557@n2100.arm.linux.org.uk>
+ <20150715134603.GA14862@red-moon>
+Message-ID: <20150715144507.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the GIC chip implementation enables IRQCHIP_SKIP_SET_WAKE and
-IRQCHIP_MASK_ON_SUSPEND by default, the platforms requiring them need
-not override the irqchip flags as before.
+On Wed, Jul 15, 2015 at 02:46:03PM +0100, Lorenzo Pieralisi wrote:
+> On Tue, Jul 14, 2015 at 09:41:38PM +0100, Russell King - ARM Linux wrote:
+> > Sorry, NAK, and end of discussion.  There is nothing more to be said
+> > here.
+> 
+> I beg to differ. To solve the issue that you brought up with this series,
+> we can create an arch function that allows to set CPUidle operations, which
+> would remove the need for the OF construct you did not like, this mirrors
+> what's done for PSCI smp operations (something similar to smp_set_ops),
+> does that sound a reasonable approach to you ?
 
-This patch removes all the users of gic_set_irqchip_flags and the
-function itself.
+What's the point of that?
 
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm/mach-shmobile/intc-sh73a0.c   | 1 -
- arch/arm/mach-shmobile/setup-r8a7779.c | 1 -
- arch/arm/mach-ux500/cpu.c              | 1 -
- arch/arm/mach-zynq/common.c            | 1 -
- drivers/irqchip/irq-gic.c              | 5 -----
- include/linux/irqchip/arm-gic.h        | 1 -
- 6 files changed, 10 deletions(-)
+This is _all_ that arch/arm/kernel/psci_cpuidle.c will contain after this
+series:
 
-diff --git a/arch/arm/mach-shmobile/intc-sh73a0.c b/arch/arm/mach-shmobile/intc-sh73a0.c
-index fd63ae6532fc..151a71a41fe3 100644
---- a/arch/arm/mach-shmobile/intc-sh73a0.c
-+++ b/arch/arm/mach-shmobile/intc-sh73a0.c
-@@ -313,7 +313,6 @@ void __init sh73a0_init_irq(void)
- 	void __iomem *gic_cpu_base = IOMEM(0xf0000100);
- 	void __iomem *intevtsa = ioremap_nocache(0xffd20100, PAGE_SIZE);
- 
--	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
- 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
- 
- 	register_intc_controller(&intcs_desc);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index c03e562be12b..aea5cff9495d 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -719,7 +719,6 @@ void __init r8a7779_init_irq_dt(void)
- 	void __iomem *gic_dist_base = ioremap_nocache(0xf0001000, 0x1000);
- 	void __iomem *gic_cpu_base = ioremap_nocache(0xf0000100, 0x1000);
- #endif
--	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE);
- 
- #ifdef CONFIG_ARCH_SHMOBILE_LEGACY
- 	gic_init(0, 29, gic_dist_base, gic_cpu_base);
-diff --git a/arch/arm/mach-ux500/cpu.c b/arch/arm/mach-ux500/cpu.c
-index e31d3d61c998..6cb10c77afd8 100644
---- a/arch/arm/mach-ux500/cpu.c
-+++ b/arch/arm/mach-ux500/cpu.c
-@@ -56,7 +56,6 @@ void __init ux500_init_irq(void)
- 	struct device_node *np;
- 	struct resource r;
- 
--	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
- 	irqchip_init();
- 	np = of_find_compatible_node(NULL, NULL, "stericsson,db8500-prcmu");
- 	of_address_to_resource(np, 0, &r);
-diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-index 616d5840fc2e..2ad1accfba35 100644
---- a/arch/arm/mach-zynq/common.c
-+++ b/arch/arm/mach-zynq/common.c
-@@ -186,7 +186,6 @@ static void __init zynq_map_io(void)
- 
- static void __init zynq_irq_init(void)
- {
--	gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE | IRQCHIP_MASK_ON_SUSPEND);
- 	irqchip_init();
- }
- 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index eda24604a0f3..d1fe884d770e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -882,11 +882,6 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
- 	.xlate = gic_irq_domain_xlate,
- };
- 
--void gic_set_irqchip_flags(unsigned long flags)
--{
--	gic_chip.flags |= flags;
--}
--
- void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
- 			   u32 percpu_offset, struct device_node *node)
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 9de976b4f9a7..61a2007eb49a 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -95,7 +95,6 @@
- 
- struct device_node;
- 
--void gic_set_irqchip_flags(unsigned long flags);
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
- 		    u32 offset, struct device_node *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
++#include <linux/cpuidle.h>
++#include <linux/psci.h>
++
++#include <asm/cpuidle.h>
++
++static struct cpuidle_ops psci_cpuidle_ops __initdata = {
++       .suspend = cpu_psci_cpu_suspend,
++       .init = cpu_psci_cpu_init_idle,
++};
++CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+
+There is _nothing_ ARM specific there.  All it's doing is providing an
+entry in the DT linker-built table for that data structure, and that
+data structure contains a pair of function pointers to code which _will_
+be located in drivers/firmware/psci.c.
+
+I'm saying _that_ is totally pointless, that data structure and
+CPUIDLE_METHOD_OF_DECLARE() _should_ live with the code in
+drivers/firmware/psci.c.
+
+There's nothing in the above quoted code which points anything to any
+32bit ARM specific stuff at all (so there's no need for a smp_set_ops()
+type thing), it's all about giving DT a way to specify the CPU idle
+operations which should be used, in this case, allowing DT to specify
+that the _generic_ PSCI CPU idle operations are to be used.
+
+> As for M.Rutland's series[1], and the patch that moves common PSCI code to
+> drivers/firmware I reiterate my point, please review it[1] and provide us
+> with feedback if any otherwise acknowledge the code move, which is the
+> basis on top of which everything else can be developed, I do not understand
+> why you are stopping [1] from getting into the kernel since it moves
+> code from arch/arm to drivers/firmware to have it in a common and shared
+> place between ARM and ARM64, what's the issue you have with that or put
+> it differently why are you NAKing it ?
+
+I'm NAKing everything related to moving the PSCI code around until
+someone in the PSCI maintainer pool (that's not me - that's ARM Ltd)
+clearly demonstrates that they know what they're talking about, and
+has a plan behind this reorganisation.
+
+Right now, I'm getting the impression that there is _no_ plan, or if
+there is, it's an absurd plan which results in data structures which
+should not be in arch/arm being left behind there.
+
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
