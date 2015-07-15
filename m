@@ -1,58 +1,89 @@
-From: ijc@hellion.org.uk (Ian Campbell)
-Date: Wed, 15 Jul 2015 16:28:54 +0100
-Subject: [PATCH 3/3] arm64: dts: add device tree for ARM SMM-A53x2 on
- LogicTile Express 20MG
-In-Reply-To: <55A4EEF3.50801@arm.com>
-References: <1435754163-17929-1-git-send-email-sudeep.holla@arm.com>
- <1435754163-17929-4-git-send-email-sudeep.holla@arm.com>
- <1436863074.25044.30.camel@hellion.org.uk> <55A4EEF3.50801@arm.com>
-Message-ID: <1436974134.32371.112.camel@hellion.org.uk>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 15 Jul 2015 23:37:14 +0800
+Subject: [PATCH v5 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <CAGS+omCdLbNu03c2DdiLEqNmGVkEoGu3972-YDp8ne5G9WZJ0g@mail.gmail.com>
+References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
+ <1436778294-47635-2-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omCdLbNu03c2DdiLEqNmGVkEoGu3972-YDp8ne5G9WZJ0g@mail.gmail.com>
+Message-ID: <1436974634.15774.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-14 at 12:13 +0100, Sudeep Holla wrote:
-> 
-> On 14/07/15 09:37, Ian Campbell wrote:
-> > On Wed, 2015-07-01 at 13:36 +0100, Sudeep Holla wrote:
+On Mon, 2015-07-13 at 18:20 +0800, Daniel Kurtz wrote:
+> On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > Document the device-tree binding of MediatTek display PWM.
+> > The PWM has one channel to control the backlight brightness for display.
+> > It supports MT8173 and MT6595.
 > >
-> >> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> >> new file mode 100644
-> >> index 000000000000..5b1d0181023b
-> >> --- /dev/null
-> >> +++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-> > [...]
-> >> +		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
+> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 29 ++++++++++++++++++++++
+> >  1 file changed, 29 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
 > >
-> > Unfortunately this causes some issues for the split device tree
-> > repository[0], since things get moved around there.
-> >
-> > This new file ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
-> >
+> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> > new file mode 100644
+> > index 0000000..aac29dc
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> > @@ -0,0 +1,29 @@
+> > +MediaTek display PWM controller
+> > +
+> > +Required properties:
+> > + - compatible: should be "mediatek,<name>-disp-pwm":
+> > +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+> > +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
+> > + - reg: physical base address and length of the controller's registers.
+> > + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+> > +   the cell format.
+> > + - clocks: phandle and clock specifier of the PWM reference clock.
+> > + - clock-names: must contain the following:
+> > +   - "main": clock used to generate PWM signals.
+> > +   - "mm": sync signals from the modules of mmsys.
+> > + - pinctrl-names: Must contain a "default" entry.
+> > + - pinctrl-0: One property must exist for each entry in pinctrl-names.
+> > +   See pinctrl/pinctrl-bindings.txt for details of the property values.
+> > +
+> > +Example:
+> > +       pwm0: pwm at 1401e000 {
+> > +               compatible = "mediatek,mt8173-disp-pwm",
+> > +                            "mediatek,mt6595-disp-pwm";
+> > +               reg = <0 0x1401e000 0 0x1000>;
+> > +               #pwm-cells = <2>;
+> > +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
+> > +                        <&mmsys CLK_MM_DISP_PWM0MM>;
+> > +               clock-names = "main", "mm";
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&disp_pwm0_pins>;
+> > +       };
 > 
-> Ah sorry, wasn't aware of such a effort to move DTS files out.
+> Please show an example consumer of the pwm phandle to show how to set
+> the two properties required by the #pwm-cells.
+> Although the pwm-specifier typically encodes the chip-relative PWM
+> number and the PWM period in nanoseconds, it is technically controller
+> specific.
 > 
-> > Any ideas how best to deal with this?
-> >
-> 
-> Honestly no idea. We did discuss this internally with 2 options:
-> 
-> 1. Specifying the relative path as done in this patch
-> 2. Creating symlink, something like how kvm manages files today
-> 
-> I agree both are not elegant but (1) was chosen to be better of the two.
-> We are open for any suggestions.
+> In fact, since the mtk-disp-pwm does not have a chip-relative PWM
+> number, could we in fact set #pwm-cells = <1>, and only specify the
+> requested PWM period?
+OK. I will add the example like the following.
 
-3. Some path for DTSI files which are not specific to a particular
-architecture, picked up by dtc by default (via -I in default flags)?
+backlight_lcd: backlight_lcd {
+	compatible = "pwm-backlight";
+	pwms = <&pwm0 0 1000000>;
+	brightness-levels = <
+		  0  16  32  48  64  80  96 112
+		128 144 160 176 192 208 224 240
+		255
+	>;
+	default-brightness-level = <9>;
+	power-supply = <&mt6397_vio18_reg>;
+	enable-gpios = <&pio 95 GPIO_ACTIVE_HIGH>;
+};
 
-4. DTC_FLAGS += -I../../../../arm/boot/dts in
-arch/arm64/boot/dts/Makefile and using #include "vexpress....dtsi", with
-the split repo using a different -I in its build system (essentially
-codifying the relationship between arm64 and arm in the build system
-instead of the code).
+The core in PWM driver can only take two or three cells.
+In our case, we don't need to set polarity of PWM.
+So it should be 2.
 
-IMHO 4 is better than 1 or 3, although still not great. Not sure about 2
-myself (from the PoV of working in both contexts).
-
-Ian.
+Regards,
+YH Huang
