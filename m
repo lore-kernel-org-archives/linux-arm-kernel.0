@@ -1,42 +1,92 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 15 Jul 2015 10:30:56 -0700
-Subject: [PATCH v2 4/4] arm64: dts: Add Broadcom North Star 2 support
-In-Reply-To: <20150715092101.GB9627@leverpostej>
-References: <1436935343-4437-1-git-send-email-rjui@broadcom.com>
- <1436935343-4437-5-git-send-email-rjui@broadcom.com>
- <20150715092101.GB9627@leverpostej>
-Message-ID: <55A698D0.3070203@broadcom.com>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Wed, 15 Jul 2015 19:34:09 +0200 (CEST)
+Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
+In-Reply-To: <alpine.LNX.2.00.1507150917470.32721@localhost.localdomain>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <1435667250-28299-4-git-send-email-pawelo@king.net.pl>
+ <CACRpkdasMqFCwy=ZEvMLeG2Z-xV01dbf8cXaPACP1=RSz2gdjw@mail.gmail.com>
+ <alpine.LNX.2.00.1507150917470.32721@localhost.localdomain>
+Message-ID: <alpine.LNX.2.00.1507151931200.7048@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+I had some discussion with an expert here and now I see drawbacks of using 
+struct for regs, I'll turn it into defines as you suggested.
 
-On 7/15/2015 2:21 AM, Mark Rutland wrote:
-> Hi,
+On Wed, 15 Jul 2015, Paul Osmialowski wrote:
+
+> Hi Linus,
 > 
->> +	chosen {
->> +		stdout-path = "serial0:115200n8";
->> +		bootargs = "earlycon=uart8250,mmio32,0x66130000";
->> +	};
+> Thanks for all of your comments, I'll consider them during my works on the 
+> next iteration. However, I have doubts about this one:
 > 
-> You shouldn't need those earlycon arguments if your driver has
-> of_earlycon support. If that's currently missing, could you add that
-> instead?
+> On Tue, 14 Jul 2015, Linus Walleij wrote:
+> 
+> > On Tue, Jun 30, 2015 at 2:27 PM, Paul Osmialowski <pawelo@king.net.pl> wrote:
+> > 
+> > > Based on K70P256M150SF3RM.pdf K70 Sub-Family Reference Manual, Rev. 3.
+> > >
+> > > Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
+> > (...)
+> > > +struct kinetis_sim_regs {
+> > > +       u32 sopt1;      /* System Options Register 1 */
+> > > +       u32 rsv0[1024];
+> > > +       u32 sopt2;      /* System Options Register 2 */
+> > > +       u32 rsv1;
+> > > +       u32 sopt4;      /* System Options Register 4 */
+> > > +       u32 sopt5;      /* System Options Register 5 */
+> > > +       u32 sopt6;      /* System Options Register 6 */
+> > > +       u32 sopt7;      /* System Options Register 7 */
+> > > +       u32 rsv2[2];
+> > > +       u32 sdid;       /* System Device Identification Register */
+> > > +       u32 scgc[KINETIS_SIM_CG_NUMREGS];       /* Clock Gating Regs 1...7 */
+> > > +       u32 clkdiv1;    /* System Clock Divider Register 1 */
+> > > +       u32 clkdiv2;    /* System Clock Divider Register 2 */
+> > > +       u32 fcfg1;      /* Flash Configuration Register 1 */
+> > > +       u32 fcfg2;      /* Flash Configuration Register 2 */
+> > > +       u32 uidh;       /* Unique Identification Register High */
+> > > +       u32 uidmh;      /* Unique Identification Register Mid-High */
+> > > +       u32 uidml;      /* Unique Identification Register Mid Low */
+> > > +       u32 uidl;       /* Unique Identification Register Low */
+> > > +       u32 clkdiv3;    /* System Clock Divider Register 3 */
+> > > +       u32 clkdiv4;    /* System Clock Divider Register 4 */
+> > > +       u32 mcr;        /* Misc Control Register */
+> > > +};
+> > 
+> > Now there is this design pattern where you copy the datasheet
+> > register map to a struct again.
+> > 
+> > This is not good if there is a second revision of the hardware and some
+> > registers are shuffled around. IMO it is better to just use #defines
+> > for register
+> > offsets, so you can do exceptions later. Else a new hardware revision
+> > leads to a new struct with new accessor functions etc etc.
+> > 
+> 
+> I don't see how replacing this structure with bunch of defines could make 
+> anyones life easier. As registers are shuffled around due to updated 
+> hardware revision they could be shuffled in this structure too. Doing 
+> this with buch of defines would require eager and careful adaptation of 
+> all the defines. I don't see how this could be easier.
+> 
+> Note that I'm not making any instances of the structure (it is used only 
+> for casting), so shuffling its fields around should not affect the code 
+> that follows.
+> 
+> After recent purge it is only used within this macro:
+> 
+> #define KINETIS_SIM_PTR(base, reg) \
+>         (&(((struct kinetis_sim_regs *)(base))->reg))
+> 
+> ...and used like this:
+> 
+>         ioread32(KINETIS_SIM_PTR(sim, clkdiv1));
+> 
+> IMHO changing the struct internals does not require subsequent changes in 
+> any of those.
 > 
 > Thanks,
-> Mark.
+> Paul
 > 
-
-I can look into this and add the of_earlycon support for
-8250_dw. It looks like it may be only a matter of hooking it up to the
-setup function in 8250_early.c, which is quite straightforward.
-
-So does it make more sense for me to do the following?
-1) Drop the earlycon bootargs from ns2-svk.dts and continue the Broadcom
-iProc arm64 upstreaming process with the current patch series
-2) Start a separate, new patch series with OF_EARLYCON support to 8250
-DW driver
-
-Thanks,
-
-Ray
