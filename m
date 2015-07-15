@@ -1,77 +1,45 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 15 Jul 2015 20:29:56 +0800
-Subject: [PATCH v2 1/5] clk: remove duplicated code with
- __clk_set_parent_after
-In-Reply-To: <20150715122522.GA30570@shlinux1.ap.freescale.net>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
- <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
- <20150528040919.22384.79189@quantum>
- <20150715122522.GA30570@shlinux1.ap.freescale.net>
-Message-ID: <20150715122955.GB30570@shlinux1.ap.freescale.net>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 15 Jul 2015 14:36:54 +0200 (CEST)
+Subject: [PATCH] irqchip: omap-intc: improve IRQ handler
+In-Reply-To: <20150715064923.GA17550@atomide.com>
+References: <1420224433-27001-1-git-send-email-balbi@ti.com>
+ <20150119213458.GK18552@atomide.com> <20150715064923.GA17550@atomide.com>
+Message-ID: <alpine.DEB.2.11.1507151435480.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 08:25:24PM +0800, Dong Aisheng wrote:
-> Hi Mike,
+On Wed, 15 Jul 2015, Tony Lindgren wrote:
+> Felipe,
 > 
-> On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
-> > Quoting Dong Aisheng (2015-05-14 06:28:59)
-> > > __clk_set_parent_after() actually used the second argument then we
-> > > could put this duplicate logic in there and call it with a different
-> > > order of arguments in the success vs. error paths in this function.
+> * Tony Lindgren <tony@atomide.com> [150119 13:41]:
+> > * Felipe Balbi <balbi@ti.com> [150102 10:50]:
+> > > as it turns out the current IRQ number will
+> > > *always* be available from SIR register which
+> > > renders the reads of PENDING registers as plain
+> > > unnecessary overhead.
 > > > 
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > 
-> > Patch looks good to me.
-> > 
-> > Also just noticed that the second argument to __clk_set_parent_after is
-> > never used :-(
-> > 
-> 
-> Ping...
-> 
-> I did not see this patch series in your tree for v4.2 rc.
-> Is this got missed?
-> 
-
-Updated Mike's email address.
-
-Regards
-Dong Aisheng
-
-> Regards
-> Dong Aisheng
-> 
-> > Regards,
-> > Mike
-> > 
-> > > ---
-> > >  drivers/clk/clk.c | 8 +-------
-> > >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > > In order to catch any situation where SIR reads
+> > > as zero, we're adding a WARN() to turn it into
+> > > a very verbose error and users actually report
+> > > it.
 > > > 
-> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > index 659f2b0..0e813ea 100644
-> > > --- a/drivers/clk/clk.c
-> > > +++ b/drivers/clk/clk.c
-> > > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
-> > >                 flags = clk_enable_lock();
-> > >                 clk_reparent(core, old_parent);
-> > >                 clk_enable_unlock(flags);
-> > > +               __clk_set_parent_after(core, old_parent, parent);
-> > >  
-> > > -               if (core->prepare_count) {
-> > > -                       flags = clk_enable_lock();
-> > > -                       clk_core_disable(core);
-> > > -                       clk_core_disable(parent);
-> > > -                       clk_enable_unlock(flags);
-> > > -                       clk_core_unprepare(parent);
-> > > -               }
-> > >                 return ret;
-> > >         }
-> > >  
-> > > -- 
-> > > 1.9.1
+> > > With this patch average running time of
+> > > omap_intc_handle_irq() reduced from about 28.5us
+> > > to 19.8us as measured by the kernel function
+> > > profiler.
 > > > 
+> > > Tested with BeagleBoneBlack Rev A5C.
+> > > 
+> > > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> > 
+> > Jason, looks like this is not showing up in Linux next. The
+> > same for the changes I did for dm81xx.
+> 
+> Can you please resend this to Jason? Looks like this
+> is still not merged.
+
+Please send it to me asap and please cc lkml on irqchip patches.
+
+Thanks,
+
+	tglx
