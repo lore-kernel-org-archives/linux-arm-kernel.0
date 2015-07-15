@@ -1,116 +1,137 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 15 Jul 2015 09:29:42 +0000
-Subject: [PATCH 2/2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <BL2PR03MB33868673832B44DD03ED841839B0@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <BL2PR03MB33868673832B44DD03ED841839B0@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <BL2PR03MB3383F459B7A2E5E15A0E641839A0@BL2PR03MB338.namprd03.prod.outlook.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Jul 2015 10:31:29 +0100
+Subject: [PATCH v3 3/4] arm64: Add IOMMU dma_ops
+In-Reply-To: <a074dfeffc8c8168bef2668de2499f072fdcfac7.1436552949.git.robin.murphy@arm.com>
+References: <cover.1436552949.git.robin.murphy@arm.com>
+ <a074dfeffc8c8168bef2668de2499f072fdcfac7.1436552949.git.robin.murphy@arm.com>
+Message-ID: <20150715093128.GA20186@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On Fri, Jul 10, 2015 at 08:19:34PM +0100, Robin Murphy wrote:
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index d16a1ce..ccadfd4 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -526,3 +526,426 @@ static int __init dma_debug_do_init(void)
+>  	return 0;
+>  }
+>  fs_initcall(dma_debug_do_init);
+> +
+> +
+> +#ifdef CONFIG_IOMMU_DMA
+> +#include <linux/dma-iommu.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/amba/bus.h>
+> +
+> +/* Thankfully, all cache ops are by VA so we can ignore phys here */
+> +static void flush_page(const void *virt, phys_addr_t phys)
+> +{
+> +	__dma_flush_range(virt, virt + PAGE_SIZE);
+> +}
+> +
+> +static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+> +				 dma_addr_t *handle, gfp_t gfp,
+> +				 struct dma_attrs *attrs)
+> +{
+> +	bool coherent = is_device_dma_coherent(dev);
+> +	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
+> +	void *addr;
+> +
+> +	if (WARN(!dev, "cannot create IOMMU mapping for unknown device\n"))
+> +		return NULL;
+> +
+> +	if (gfp & __GFP_WAIT) {
+> +		struct page **pages;
+> +		pgprot_t pgprot = coherent ? __pgprot(PROT_NORMAL) :
+> +					     __pgprot(PROT_NORMAL_NC);
+> +
+> +		pgprot = __get_dma_pgprot(attrs, pgprot, coherent);
+> +		pages = iommu_dma_alloc(dev, size, gfp, ioprot,	coherent,
+> +					handle, coherent ? NULL : flush_page);
 
-Thanks for your review, now I will take over the eDMA.
-I have some different in understanding with PM suspend/resume support. And I will send a patch for RFC later.
-Also please check my comment in line for this patch.
-I hope you can help to review it for me.
+As I replied already on the other patch, the "coherent" argument here
+should always be true.
 
-Thanks.
+BTW, why do we need to call flush_page via iommu_dma_alloc() and not
+flush the buffer directly in the arch __iommu_alloc_attrs()? We already
+have the pointer and size after remapping in the CPU address space), it
+would keep the iommu_dma_alloc() simpler.
 
-Best Regards,
-Yuan Yao
+> +		if (!pages)
+> +			return NULL;
+> +
+> +		addr = dma_common_pages_remap(pages, size, VM_USERMAP, pgprot,
+> +					      __builtin_return_address(0));
+> +		if (!addr)
+> +			iommu_dma_free(dev, pages, size, handle);
+> +	} else {
+> +		struct page *page;
+> +		/*
+> +		 * In atomic context we can't remap anything, so we'll only
+> +		 * get the virtually contiguous buffer we need by way of a
+> +		 * physically contiguous allocation.
+> +		 */
+> +		if (coherent) {
+> +			page = alloc_pages(gfp, get_order(size));
+> +			addr = page ? page_address(page) : NULL;
 
-On 2015-5-5 18:35, Vinod Koul wrote:
-> On 2014-12-30 09:41, Jingchang Lu wrote:
-> > This adds power management suspend/resume support for the fsl-edma
-> > driver.
-> >
-> > Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> > ---
-> >  drivers/dma/fsl-edma.c | 38
-> ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >
-> > diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c index
-> > e0bd517..6a81699 100644
-> > --- a/drivers/dma/fsl-edma.c
-> > +++ b/drivers/dma/fsl-edma.c
-> > @@ -1017,6 +1017,43 @@ static int fsl_edma_remove(struct
-> platform_device *pdev)
-> >  	return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int fsl_edma_pm_suspend(struct device *dev) {
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		fsl_edma_chan_mux(fsl_chan, 0, false);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int fsl_edma_pm_resume(struct device *dev) {
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		edma_writew(fsl_edma, 0x0, fsl_edma->membase +
-> EDMA_TCD_CSR(i));
-> 
-> What is the expectation of the suspend mode, are the registers and descriptors
-> cleared during suspend? So this makes sure we have all descriptors disabled on
-> wake-up, right?
-Yes, suspend mode will power down the eDMA controller.
+We could even use __get_free_pages(gfp & ~__GFP_HIGHMEM) since we don't
+have/need highmem on arm64.
 
-> 
-> > +		/* restore the channel slave id configuration */
-> > +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-> 
-> And here the channel gets muxed again.
-> 
-> But the user is expected to reconfigure a channel, e.g. using
-> dmaengine_slave_config and the dmaengine_prep*? Also and cyclic DMA
-> which has been paused before would be interrupted, is this correct?
+> +		} else {
+> +			addr = __alloc_from_pool(size, &page, gfp);
+> +		}
+> +		if (addr) {
+> +			*handle = iommu_dma_map_page(dev, page, 0, size,
+> +						     ioprot, false);
 
-No, In fact the channel in eDMA is a little different form the other channel. Every IP just have only one channel. The IP should get his corresponding channel when boot up and release it until power down or IP removed.
+Why coherent == false?
 
-> I don't know what the common exception of the API is, I'm just asking so I now
-> what I can expect when using the DMA driver in other device drivers...
-> 
-> --
-> Stefan
-> 
-> > +	}
-> > +
-> > +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> > +		    fsl_edma->membase + EDMA_CR);
-> > +
-> > +	return 0;
-> > +}
-> > +#endif
-> > +static
-> > +SIMPLE_DEV_PM_OPS(fsl_edma_pm_ops, fsl_edma_pm_suspend,
-> > +fsl_edma_pm_resume);
-> > +
-> >  static const struct of_device_id fsl_edma_dt_ids[] = {
-> >  	{ .compatible = "fsl,vf610-edma", },
-> >  	{ /* sentinel */ }
-> > @@ -1027,6 +1064,7 @@ static struct platform_driver fsl_edma_driver = {
-> >  	.driver		= {
-> >  		.name	= "fsl-edma",
-> >  		.of_match_table = fsl_edma_dt_ids,
-> > +		.pm	= &fsl_edma_pm_ops,
-> >  	},
-> >  	.probe          = fsl_edma_probe,
-> >  	.remove		= fsl_edma_remove,
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> +			if (iommu_dma_mapping_error(dev, *handle)) {
+> +				if (coherent)
+> +					__free_pages(page, get_order(size));
+> +				else
+> +					__free_from_pool(addr, size);
+> +				addr = NULL;
+> +			}
+> +		}
+> +	}
+> +	return addr;
+> +}
+
+In the second case here (!__GFP_WAIT), do we do any cache maintenance? I
+can't see it and it's needed for the !coherent case.
+
+> +static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+> +			       dma_addr_t handle, struct dma_attrs *attrs)
+> +{
+> +	/*
+> +	 * @cpu_addr will be one of 3 things depending on how it was allocated:
+> +	 * - A remapped array of pages from iommu_dma_alloc(), for all
+> +	 *   non-atomic allocations.
+> +	 * - A non-cacheable alias from the atomic pool, for atomic
+> +	 *   allocations by non-coherent devices.
+> +	 * - A normal lowmem address, for atomic allocations by
+> +	 *   coherent devices.
+> +	 * Hence how dodgy the below logic looks...
+> +	 */
+> +	if (__free_from_pool(cpu_addr, size)) {
+> +		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
+> +	} else if (is_vmalloc_addr(cpu_addr)){
+> +		struct vm_struct *area = find_vm_area(cpu_addr);
+> +
+> +		if (WARN_ON(!area || !area->pages))
+> +			return;
+> +		iommu_dma_free(dev, area->pages, size, &handle);
+> +		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
+> +	} else {
+> +		__free_pages(virt_to_page(cpu_addr), get_order(size));
+> +		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
+
+Just slightly paranoid but it's better to unmap the page from the iommu
+space before freeing (in case there is some rogue device still accessing
+it).
+
+-- 
+Catalin
