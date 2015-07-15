@@ -1,45 +1,64 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 15 Jul 2015 12:42:30 +0900
-Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <CAPTzV16VFu_0BN1xpuki3gN3btB-zFwuj+A8ibza14JKqaXXfA@mail.gmail.com>
-References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
- <55A5BB5A.2040807@samsung.com>
- <CAPTzV16VFu_0BN1xpuki3gN3btB-zFwuj+A8ibza14JKqaXXfA@mail.gmail.com>
-Message-ID: <55A5D6A6.8080604@samsung.com>
+From: nathan_lynch@mentor.com (Nathan Lynch)
+Date: Tue, 14 Jul 2015 23:34:12 -0500
+Subject: [PATCH] ARM: VDSO: fix regression with toolchains lacking ld.bfd
+ executable
+Message-ID: <1436934852-27547-1-git-send-email-nathan_lynch@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15.07.2015 11:31, Chanho Park wrote:
-> Hi,
-> 
-> On Wed, Jul 15, 2015 at 10:46 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> On 15.07.2015 10:36, Chanho Park wrote:
->>> The cpu booting of exynos5422 has been still broken since we discussed
->>> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
->>> hardkernel, it could help to boot 8 cores well. This patch need to have
->>> more test like STR and other SoC especially exynos5800 which is variant
->>> of exynos5422. If this patch is broken on exynos5800, I'll find another
->>> way to check exynos5422.
->>>
->>> This patch is top of my previous exynos5422 cpu ordering patch[2] and
->>> need to enable CONFIG_EXYNOS5420_MCPM=y
->>
->> 1. Why the ordering patch is required? It seems unrelated...
-> 
-> Because it related with my booting log :)
-> 
->> 2. I tried this already (as in vendor sources from
->> opensource.samsung.com) and it did not help on my Odroid. Are you sure
->> that this patch solely fixes the problem?
-> 
-> If you turned on CONFIG_DEBUG_LL, you'll need Joonyoung's patch to
-> correct uart address of exynos5422.
-> http://www.spinics.net/lists/linux-samsung-soc/msg37318.html
+The Sourcery CodeBench Lite 2014.05 toolchain (gcc 4.8.3, binutils
+2.24.51) has a GCC which implements -fuse-ld, and it doesn't include
+the gold linker, but it lacks an ld.bfd executable in its
+installation.  This means that passing -fuse-ld=bfd fails with:
 
-I mean that you don't need anything else to fix the problem? I'll give
-it a try later on my board but I was quite sure that I checked this
-before :) .
+      VDSO    arch/arm/vdso/vdso.so.raw
+    collect2: fatal error: cannot find 'ld'
 
-Best regards,
-Krzysztof
+Arguably this is a deficiency in the toolchain, but I suspect it's
+commonly used enough that it's worth accommodating: just use
+cc-ldoption (to cause a link attempt) instead of cc-option to test
+whether we can use -fuse-ld.  So -fuse-ld=bfd won't be used with this
+toolchain, but the build will rightly succeed, just as it does for
+toolchains which don't implement -fuse-ld (and don't use gold as the
+default linker).
+
+Note: this will change the failure mode for a corner case I was trying
+to handle in d2b30cd4b722, where the toolchain defaults to the gold
+linker and the BFD linker is not found in PATH, from:
+
+      VDSO    arch/arm/vdso/vdso.so.raw
+    collect2: fatal error: cannot find 'ld'
+
+i.e. the BFD linker is not found, to:
+
+      OBJCOPY arch/arm/vdso/vdso.so
+    BFD: arch/arm/vdso/vdso.so: Not enough room for program headers, try
+    linking with -N
+
+that is, we fail to prevent gold from being used as the linker, and it
+produces an object that objcopy can't digest.
+
+Reported-by: Baruch Siach <baruch@tkos.co.il>
+Tested-by: Baruch Siach <baruch@tkos.co.il>
+Fixes: d2b30cd4b722 ("ARM: 8384/1: VDSO: force use of BFD linker")
+Cc: stable at vger.kernel.org
+Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+---
+ arch/arm/vdso/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/vdso/Makefile b/arch/arm/vdso/Makefile
+index 9d259d94e429..1160434eece0 100644
+--- a/arch/arm/vdso/Makefile
++++ b/arch/arm/vdso/Makefile
+@@ -14,7 +14,7 @@ VDSO_LDFLAGS += -Wl,-z,max-page-size=4096 -Wl,-z,common-page-size=4096
+ VDSO_LDFLAGS += -nostdlib -shared
+ VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+ VDSO_LDFLAGS += $(call cc-ldoption, -Wl$(comma)--build-id)
+-VDSO_LDFLAGS += $(call cc-option, -fuse-ld=bfd)
++VDSO_LDFLAGS += $(call cc-ldoption, -fuse-ld=bfd)
+ 
+ obj-$(CONFIG_VDSO) += vdso.o
+ extra-$(CONFIG_VDSO) += vdso.lds
+-- 
+2.1.0
