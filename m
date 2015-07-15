@@ -1,89 +1,131 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Wed, 15 Jul 2015 23:37:14 +0800
-Subject: [PATCH v5 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <CAGS+omCdLbNu03c2DdiLEqNmGVkEoGu3972-YDp8ne5G9WZJ0g@mail.gmail.com>
-References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
- <1436778294-47635-2-git-send-email-yh.huang@mediatek.com>
- <CAGS+omCdLbNu03c2DdiLEqNmGVkEoGu3972-YDp8ne5G9WZJ0g@mail.gmail.com>
-Message-ID: <1436974634.15774.8.camel@mtksdaap41>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 15 Jul 2015 16:40:56 +0100
+Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
+ backend
+In-Reply-To: <20150715144507.GZ7557@n2100.arm.linux.org.uk>
+References: <1436430685-2202-1-git-send-email-jszhang@marvell.com>
+ <1436430685-2202-4-git-send-email-jszhang@marvell.com>
+ <20150714103421.GU7557@n2100.arm.linux.org.uk>
+ <20150714110302.GA334@red-moon>
+ <20150714122904.GV7557@n2100.arm.linux.org.uk>
+ <20150714145546.GA14556@red-moon>
+ <20150714204138.GW7557@n2100.arm.linux.org.uk>
+ <20150715134603.GA14862@red-moon>
+ <20150715144507.GZ7557@n2100.arm.linux.org.uk>
+Message-ID: <20150715154056.GA10418@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-07-13 at 18:20 +0800, Daniel Kurtz wrote:
-> On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> > Document the device-tree binding of MediatTek display PWM.
-> > The PWM has one channel to control the backlight brightness for display.
-> > It supports MT8173 and MT6595.
-> >
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 29 ++++++++++++++++++++++
-> >  1 file changed, 29 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >
-> > diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > new file mode 100644
-> > index 0000000..aac29dc
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> > @@ -0,0 +1,29 @@
-> > +MediaTek display PWM controller
-> > +
-> > +Required properties:
-> > + - compatible: should be "mediatek,<name>-disp-pwm":
-> > +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-> > +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
-> > + - reg: physical base address and length of the controller's registers.
-> > + - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-> > +   the cell format.
-> > + - clocks: phandle and clock specifier of the PWM reference clock.
-> > + - clock-names: must contain the following:
-> > +   - "main": clock used to generate PWM signals.
-> > +   - "mm": sync signals from the modules of mmsys.
-> > + - pinctrl-names: Must contain a "default" entry.
-> > + - pinctrl-0: One property must exist for each entry in pinctrl-names.
-> > +   See pinctrl/pinctrl-bindings.txt for details of the property values.
-> > +
-> > +Example:
-> > +       pwm0: pwm at 1401e000 {
-> > +               compatible = "mediatek,mt8173-disp-pwm",
-> > +                            "mediatek,mt6595-disp-pwm";
-> > +               reg = <0 0x1401e000 0 0x1000>;
-> > +               #pwm-cells = <2>;
-> > +               clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-> > +                        <&mmsys CLK_MM_DISP_PWM0MM>;
-> > +               clock-names = "main", "mm";
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&disp_pwm0_pins>;
-> > +       };
+On Wed, Jul 15, 2015 at 03:45:07PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jul 15, 2015 at 02:46:03PM +0100, Lorenzo Pieralisi wrote:
+> > On Tue, Jul 14, 2015 at 09:41:38PM +0100, Russell King - ARM Linux wrote:
+> > > Sorry, NAK, and end of discussion.  There is nothing more to be said
+> > > here.
+> > 
+> > I beg to differ. To solve the issue that you brought up with this series,
+> > we can create an arch function that allows to set CPUidle operations, which
+> > would remove the need for the OF construct you did not like, this mirrors
+> > what's done for PSCI smp operations (something similar to smp_set_ops),
+> > does that sound a reasonable approach to you ?
 > 
-> Please show an example consumer of the pwm phandle to show how to set
-> the two properties required by the #pwm-cells.
-> Although the pwm-specifier typically encodes the chip-relative PWM
-> number and the PWM period in nanoseconds, it is technically controller
-> specific.
+> What's the point of that?
 > 
-> In fact, since the mtk-disp-pwm does not have a chip-relative PWM
-> number, could we in fact set #pwm-cells = <1>, and only specify the
-> requested PWM period?
-OK. I will add the example like the following.
+> This is _all_ that arch/arm/kernel/psci_cpuidle.c will contain after this
+> series:
+> 
+> +#include <linux/cpuidle.h>
+> +#include <linux/psci.h>
+> +
+> +#include <asm/cpuidle.h>
+> +
+> +static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+> +       .suspend = cpu_psci_cpu_suspend,
+> +       .init = cpu_psci_cpu_init_idle,
+> +};
+> +CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
+> 
+> There is _nothing_ ARM specific there.  All it's doing is providing an
+> entry in the DT linker-built table for that data structure, and that
+> data structure contains a pair of function pointers to code which _will_
+> be located in drivers/firmware/psci.c.
+> 
+> I'm saying _that_ is totally pointless, that data structure and
+> CPUIDLE_METHOD_OF_DECLARE() _should_ live with the code in
+> drivers/firmware/psci.c.
+> 
+> There's nothing in the above quoted code which points anything to any
+> 32bit ARM specific stuff at all (so there's no need for a smp_set_ops()
+> type thing), it's all about giving DT a way to specify the CPU idle
+> operations which should be used, in this case, allowing DT to specify
+> that the _generic_ PSCI CPU idle operations are to be used.
 
-backlight_lcd: backlight_lcd {
-	compatible = "pwm-backlight";
-	pwms = <&pwm0 0 1000000>;
-	brightness-levels = <
-		  0  16  32  48  64  80  96 112
-		128 144 160 176 192 208 224 240
-		255
-	>;
-	default-brightness-level = <9>;
-	power-supply = <&mt6397_vio18_reg>;
-	enable-gpios = <&pio 95 GPIO_ACTIVE_HIGH>;
+No it is not. struct cpuidle_ops (as struct smp_operations) is ARM
+specific. You can't add that to generic code (unless guarded
+by CONFIG_ARM).
+
+You can't move that struct declaration above to drivers/firmware
+for the same reason you can't move CPU_METHOD_OF_DECLARE code (that
+is used as a mechanism to initialize SMP ops on ARM) to
+drivers/firmware.
+
+On ARM64 this is done differently. On ARM64 SMP operations and
+CPUidle operations are merged into struct cpu_operations, that
+is initialized through DT at boot (it does not use linker script
+mechanism because all enable-method are statically defined in
+the kernel in an array to avoid SMP methods du jour
+proliferation - see arch/arm64/kernel/cpu_ops.c and the
+supported_cpu_ops array).
+
+Now, we have to initialize cpuidle_ops on ARM (and SMP ops too) if
+those operations are implemented with PSCI.
+
+For SMP operations, this is done in arch/arm/kernel/setup.c through
+smp_set_ops. What I was saying is that we can do the same, without
+resorting to the linker script based approch above for CPUidle operations.
+
+We can't move:
+
+static struct cpuidle_ops psci_cpuidle_ops __initdata = {
+	.suspend = cpu_psci_cpu_suspend,
+	.init = cpu_psci_cpu_init_idle,
 };
+CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
 
-The core in PWM driver can only take two or three cells.
-In our case, we don't need to set polarity of PWM.
-So it should be 2.
+to drivers/firmware unless it is guarded by CONFIG_ARM, that's what
+I am saying, is that clear ?
 
-Regards,
-YH Huang
+How do you want us to do it ?
+
+> > As for M.Rutland's series[1], and the patch that moves common PSCI code to
+> > drivers/firmware I reiterate my point, please review it[1] and provide us
+> > with feedback if any otherwise acknowledge the code move, which is the
+> > basis on top of which everything else can be developed, I do not understand
+> > why you are stopping [1] from getting into the kernel since it moves
+> > code from arch/arm to drivers/firmware to have it in a common and shared
+> > place between ARM and ARM64, what's the issue you have with that or put
+> > it differently why are you NAKing it ?
+> 
+> I'm NAKing everything related to moving the PSCI code around until
+> someone in the PSCI maintainer pool (that's not me - that's ARM Ltd)
+> clearly demonstrates that they know what they're talking about, and
+> has a plan behind this reorganisation.
+
+M.Rutland's patch series represents the code reorganisation and as far
+as I am concerned that's a complete and well defined plan, I still do
+not understand why you are NAKing that piece of code, it is completely
+orthogonal to what we are debating above, please have a look at it
+otherwise we are going around in circles here.
+
+> Right now, I'm getting the impression that there is _no_ plan, or if
+> there is, it's an absurd plan which results in data structures which
+> should not be in arch/arm being left behind there.
+
+Mark's series does not leave any data structure behind, it is moving
+code to a common place in the kernel so that the _current_ PSCI
+implementation can be shared between ARM and ARM64, again please
+have a look at it, we can tackle how to define cpuidle_ops in a way
+that you deem reasonable later, it is a separate issue, please
+understand.
+
+Thank you,
+Lorenzo
