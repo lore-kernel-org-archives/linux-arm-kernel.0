@@ -1,138 +1,113 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 15 Jul 2015 20:35:43 +0900
-Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
-References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
-Message-ID: <CAJKOXPdcdREhwQZ22RcqbUSTpOn0XmqJ_3n5uUyzEgPihRYwNQ@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 15 Jul 2015 20:41:34 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150714225105.6c1e4f15@gandalf.local.home>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>	<1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>
+ <20150714225105.6c1e4f15@gandalf.local.home>
+Message-ID: <55A646EE.6030402@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-15 10:36 GMT+09:00 Chanho Park <parkch98@gmail.com>:
-> The cpu booting of exynos5422 has been still broken since we discussed
-> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
-> hardkernel, it could help to boot 8 cores well. This patch need to have
-> more test like STR and other SoC especially exynos5800 which is variant
-> of exynos5422. If this patch is broken on exynos5800, I'll find another
-> way to check exynos5422.
+Steve,
+
+On 07/15/2015 11:51 AM, Steven Rostedt wrote:
+> On Wed, 15 Jul 2015 09:20:42 +0900
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 >
-> This patch is top of my previous exynos5422 cpu ordering patch[2] and
-> need to enable CONFIG_EXYNOS5420_MCPM=y
+>> On 07/14/2015 10:31 PM, Steven Rostedt wrote:
+>>> On Tue, 14 Jul 2015 21:47:10 +0900
+>>> Jungseok Lee <jungseoklee85@gmail.com> wrote:
+>>>
+>>>> Is the below example an unexpected result?
+>>>> Entry 17 and 18 are ftrace_call and ftrace_ops_no_ops, respectively.
+>>
+>> [snip]
+>>
+>>> Note, function tracing does not disable interrupts. This looks to be
+>>> that an interrupt came in while __aloc_skb() was being traced.
+>>
+>> Yeah, I think so, too. But if my insight is correct, it's not __alloc_skb()
+>> but one of functions that it calls. As I said in the commit log message
+>> of patch[1/3], the exact traced function will not be listed by
+
+not patch[1/3], but patch[3/3]
+
+>> save_stack_trace() because we don't create a stack frame at mcount().
+>> I think this is a flaw in the current implementation (on x86).
+>>
+>> what do you think, Steve?
+>>
 >
-> [    0.047509] CPU0: update cpu_capacity 448
-> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
-> [    0.047874] Setting up static identity map for 0x400082c0 -
-> 0x40008318
-> [    0.048340] ARM CCI driver probed
-> [    0.048597] Exynos MCPM support installed
-> [    0.065676] CPU1: update cpu_capacity 448
-> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
-> [    0.070672] CPU2: update cpu_capacity 448
-> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
-> [    0.075644] CPU3: update cpu_capacity 448
-> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
-> [    0.080590] CPU4: update cpu_capacity 1535
-> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
-> [    0.085591] CPU5: update cpu_capacity 1535
-> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
-> [    0.090590] CPU6: update cpu_capacity 1535
-> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
-> [    0.095585] CPU7: update cpu_capacity 1535
-> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
-> [    0.095720] Brought up 8 CPUs
+> mcount (well ftrace_call actually) does indeed create a stack frame for
+> itself *and* for what called it. At least on x86_64. See mcount_64.S.
 >
-> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
-> [2]:https://patchwork.kernel.org/patch/6782891/
+> With -pg -mfentry, it creates a stack frame. Without -mfentry, mcount
+> is called after the current function's frame is made so we don't need
+> to do much.
 
-Few questions/issues:
-1. For the proper patch the commit message needs to be fixed a little.
-The dmesg above is meaningless but instead you can put short dmesg (2
-or 4 lines) with failed booting of CPUs.
-2. Why only MCPM? Isn't this also needed without MCPM?
+Thank you for the explanation. But what I don't really understand here
+is why we need to add the "current function" to the stack dump list
+returned by save_stack_trace():
 
+In check_stack(),
+ >        /*
+ >         * Add the passed in ip from the function tracer.
+ >         * Searching for this on the stack will skip over
+ >         * most of the overhead from the stack tracer itself.
+ >         */
+ >        stack_dump_trace[0] = ip;
+ >        max_stack_trace.nr_entries++;
+
+I think that "ip" here is the "return address for func" in your
+ascii art, and it should be already in the list if a frame is made
+by mcount (or func_call).
+
+In fact, stack tracer on arm64 works OK even without the patch[3/3]
+if the code quoted above is commented out.
+Even on x86, the code is conditional and not activated if the kernel
+is compiled without -mfentry before the following commit:
+     commit 4df297129f62 ("tracing: Remove most or all of stack tracer stack size from stack_max_size")
+
+So what do I misunderstand here?
+
+Thanks,
+-Takahiro AKASHI
+
+> Here's what the -mfentry version does:
 >
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Chanwoo Choi <cw00.choi@samsung.com>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Heesub Shin <heesub.shin@samsung.com>
-> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
-> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
-> Signed-off-by: Chanho Park <parkch98@gmail.com>
-
-I think both Chanho Parks are the same person :) so you may leave only
-one (the one matching "From").
-
-> ---
->  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
->  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->  2 files changed, 18 insertions(+), 1 deletion(-)
+> 	pushq %rbp
+> 	pushq 8*2(%rsp)  /* this is the parent pointer */
+> 	pushq %rbp
+> 	movq %rsp, %rbp
+> 	pushq 8*3(%rsp)   /* Return address to ftrace_call */
+> 	pushq %rbp
+> 	movq %rsp, %rbp
 >
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 9bdf547..a076dde 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
->                 cluster >= EXYNOS5420_NR_CLUSTERS)
->                 return -EINVAL;
 >
-> -       exynos_cpu_power_up(cpunr);
-> +       if (!exynos_cpu_power_state(cpunr)) {
-> +               exynos_cpu_power_up(cpunr);
-
-This second exynos_cpu_power_up() is needed? Do you know why?
-
-> +
-> +               if (soc_is_exynos5800() && cluster) {
-
-If of_machine_is_compatible() can be used then please use it. Javier
-also mentioned it and he pointed that this is not necessary on
-Chromebooks.
-
-> +                       while (!pmu_raw_readl(S5P_PMU_SPARE2))
-> +                               udelay(10);
-> +
-> +                       pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
-> +                                       EXYNOS_SWRESET);
-
-This is quite similar to existing exynos_core_restart(). Can you
-extend it for this purpose? Or at least put it as separate function
-near exynos_core_restart() so this would be grouped close to each
-other?
-
-Documenting this behaviour would be really nice (you can combine some
-of my findings on SPARE2 from previous discussion, if they are useful
-of course).
-
-> +               }
-> +       }
-> +
->         return 0;
->  }
+> Thus the stack looks like this:
 >
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
-> index b761433..fba9068 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/arch/arm/mach-exynos/regs-pmu.h
-> @@ -513,6 +513,12 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
->  #define SPREAD_ENABLE                                          0xF
->  #define SPREAD_USE_STANDWFI                                    0xF
+>                                           <---+
+> 	|                              |     |
+> 	+------------------------------+     |
+> 	| return address for func      |     |
+> 	| return address for func_call |     |
+> 	| original %rbp                |     |
+> 	+------------------------------+     |
+> 	| return address for func      |     |
+> 	| ptr to parent frame (%rbp)   | ----+
+>   	+------------------------------| <-----+
+> 	| return address for func_call |       |
+>          | ptr to next frame (%rbp)     | ------+
+> 	+------------------------------+ <---+
+>                                               |
+>                                               |
+>   Current %rbp points to func_call frame -----+
 >
-> +#define EXYNOS5420_KFC_CORE_RESET0                             BIT(8)
-> +#define EXYNOS5420_KFC_ETM_RESET0                              BIT(20)
-> +
-> +#define EXYNOS5420_KFC_CORE_RESET(_nr)                         \
-> +       ((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
-> +
->  #define EXYNOS5420_BB_CON1                                     0x0784
->  #define EXYNOS5420_BB_SEL_EN                                   BIT(31)
->  #define EXYNOS5420_BB_PMOS_EN                                  BIT(7)
-> --
-> 2.1.0
+>   The first box isn't used as a frame, but is used by ftrace_call to save
+>   information to restore everything properly.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Thus, __alloc_skb() is what is currently being traced.
+>
+>
+> -- Steve
+>
