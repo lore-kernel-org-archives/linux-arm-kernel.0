@@ -1,53 +1,94 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 Jul 2015 18:53:39 +0530
-Subject: [PATCH 0/4] phy: berlin-usb: PLL divider fixes
-In-Reply-To: <20150703092243.GD5634@kwain>
-References: <5594C650.8000405@gmail.com> <20150703092243.GD5634@kwain>
-Message-ID: <55A65EDB.3020800@ti.com>
+Date: Wed, 15 Jul 2015 18:57:47 +0530
+Subject: [PATCH] phy: Drop owner assignment from platform_driver
+In-Reply-To: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
+References: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <55A65FD3.70100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Friday 03 July 2015 02:52 PM, Antoine Tenart wrote:
-> Hi Thomas,
-> 
-> Thanks for this series!
-> 
-> On Thu, Jul 02, 2015 at 01:04:16AM -0400, Thomas Hebb wrote:
->> The USB PLL dividers currently set by phy-berlin-usb are incorrect for
->> BG2 and BG2CD (i.e. all Berlin variants but BG2Q). This series fixes the
->> divider values for those two chips and additionally corrects the name of
->> the of_match table to no longer contain "sata" (which was presumably
->> mistakenly carried over from phy-berlin-sata).
->>
->> I have verified that the new divider values work on BG2CD and Antoine
->> Tenart has verified that they work on BG2Q. The divider value for BG2
->> was taken from bootloader source but has not been tested.
-> 
-> For the BG2Q,
-> 
-> Tested-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 
-merged this series except
-"ARM: dts: berlin: change BG2Q's USB PHY compatible"
-
-Cheers
-Kishon
-
+On Friday 10 July 2015 11:56 AM, Krzysztof Kozlowski wrote:
+> platform_driver does not need to set an owner because
+> platform_driver_register() will set it.
 > 
->>
->> Thomas Hebb (4):
->>   phy: berlin-usb: fix divider for BG2CD
->>   ARM: dts: berlin: change BG2Q's USB PHY compatible
->>   phy: berlin-usb: fix divider for BG2
->>   phy: berlin-usb: rename table copied from SATA PHY
->>
->>  arch/arm/boot/dts/berlin2q.dtsi |  6 +++---
->>  drivers/phy/phy-berlin-usb.c    | 12 ++++++------
->>  2 files changed, 9 insertions(+), 9 deletions(-)
->>
->> -- 
->> 2.4.4
->>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+merged.
+
+-Kishon
+> 
+> ---
+> 
+> The coccinelle script which generated the patch was sent here:
+> http://www.spinics.net/lists/kernel/msg2029903.html
+> ---
+>  drivers/phy/phy-berlin-usb.c        | 1 -
+>  drivers/phy/phy-miphy28lp.c         | 1 -
+>  drivers/phy/phy-qcom-ufs-qmp-14nm.c | 1 -
+>  drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
+>  drivers/phy/phy-rockchip-usb.c      | 1 -
+>  5 files changed, 5 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+> index c6fc95b53083..d7431f6ab975 100644
+> --- a/drivers/phy/phy-berlin-usb.c
+> +++ b/drivers/phy/phy-berlin-usb.c
+> @@ -207,7 +207,6 @@ static struct platform_driver phy_berlin_usb_driver = {
+>  	.probe	= phy_berlin_usb_probe,
+>  	.driver	= {
+>  		.name		= "phy-berlin-usb",
+> -		.owner		= THIS_MODULE,
+>  		.of_match_table	= phy_berlin_sata_of_match,
+>  	 },
+>  };
+> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+> index 5e257ef7ac05..677c290f4b14 100644
+> --- a/drivers/phy/phy-miphy28lp.c
+> +++ b/drivers/phy/phy-miphy28lp.c
+> @@ -1268,7 +1268,6 @@ static struct platform_driver miphy28lp_driver = {
+>  	.probe = miphy28lp_probe,
+>  	.driver = {
+>  		.name = "miphy28lp-phy",
+> -		.owner = THIS_MODULE,
+>  		.of_match_table = miphy28lp_of_match,
+>  	}
+>  };
+> diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> index f5fc50a9fce7..e1eea1b379fc 100644
+> --- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> +++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> @@ -191,7 +191,6 @@ static struct platform_driver ufs_qcom_phy_qmp_14nm_driver = {
+>  	.driver = {
+>  		.of_match_table = ufs_qcom_phy_qmp_14nm_of_match,
+>  		.name = "ufs_qcom_phy_qmp_14nm",
+> -		.owner = THIS_MODULE,
+>  	},
+>  };
+>  
+> diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> index 8332f96b2c4a..fde8c876823b 100644
+> --- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> +++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> @@ -247,7 +247,6 @@ static struct platform_driver ufs_qcom_phy_qmp_20nm_driver = {
+>  	.driver = {
+>  		.of_match_table = ufs_qcom_phy_qmp_20nm_of_match,
+>  		.name = "ufs_qcom_phy_qmp_20nm",
+> -		.owner = THIS_MODULE,
+>  	},
+>  };
+>  
+> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> index 7d4c33643768..bf78721b58f4 100644
+> --- a/drivers/phy/phy-rockchip-usb.c
+> +++ b/drivers/phy/phy-rockchip-usb.c
+> @@ -146,7 +146,6 @@ static struct platform_driver rockchip_usb_driver = {
+>  	.probe		= rockchip_usb_phy_probe,
+>  	.driver		= {
+>  		.name	= "rockchip-usb-phy",
+> -		.owner	= THIS_MODULE,
+>  		.of_match_table = rockchip_usb_phy_dt_ids,
+>  	},
+>  };
 > 
