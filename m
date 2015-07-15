@@ -1,39 +1,39 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Jul 2015 17:53:16 +0100
-Subject: [PATCH v3 3/4] arm64: Add IOMMU dma_ops
-In-Reply-To: <55A689EA.8030306@arm.com>
-References: <cover.1436552949.git.robin.murphy@arm.com>
- <a074dfeffc8c8168bef2668de2499f072fdcfac7.1436552949.git.robin.murphy@arm.com>
- <20150715093128.GA20186@e104818-lin.cambridge.arm.com>
- <55A689EA.8030306@arm.com>
-Message-ID: <20150715165316.GG20186@e104818-lin.cambridge.arm.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Wed, 15 Jul 2015 09:54:40 -0700
+Subject: [PATCH 0/5] arm64, pci: Add ECAM/PCIe support for Cavium ThunderX
+Message-ID: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 05:27:22PM +0100, Robin Murphy wrote:
-> On 15/07/15 10:31, Catalin Marinas wrote:
-> >On Fri, Jul 10, 2015 at 08:19:34PM +0100, Robin Murphy wrote:
-> >>+			if (iommu_dma_mapping_error(dev, *handle)) {
-> >>+				if (coherent)
-> >>+					__free_pages(page, get_order(size));
-> >>+				else
-> >>+					__free_from_pool(addr, size);
-> >>+				addr = NULL;
-> >>+			}
-> >>+		}
-> >>+	}
-> >>+	return addr;
-> >>+}
-> >
-> >In the second case here (!__GFP_WAIT), do we do any cache maintenance? I
-> >can't see it and it's needed for the !coherent case.
-> 
-> In the atomic non-coherent case, we're stealing from the atomic pool, so
-> addr is already a non-cacheable alias (and alloc_from_pool does memset(0)
-> through that). That shouldn't need anything extra, right?
+From: David Daney <david.daney@cavium.com>
 
-You are right, we already flushed the cache for the atomic pool when we
-allocated it in atomic_pool_init().
+The subject pretty much says it all.  The first four patches tweak the
+infrastructure a little so that we can get required behavior.  The
+final patch adds the drivers.
+
+David Daney (5):
+  pci: Add is_pcierc element to struct pci_bus
+  gic-its: Allow pci_requester_id to be overridden.
+  arm64, pci: Allow RC drivers to supply pcibios_add_device()
+    implementation.
+  irqchip: gic-v3: Add gic_get_irq_domain() to get the irqdomain of the
+    GIC.
+  PCI: Add host drivers for Cavium ThunderX processors.
+
+ arch/arm64/include/asm/pci.h        |   3 +
+ arch/arm64/kernel/pci.c             |  10 +
+ drivers/irqchip/irq-gic-v3-its.c    |  14 +-
+ drivers/irqchip/irq-gic-v3.c        |   5 +
+ drivers/pci/host/Kconfig            |  12 +
+ drivers/pci/host/Makefile           |   2 +
+ drivers/pci/host/pcie-thunder-pem.c | 462 ++++++++++++++++++++++++++++++++++++
+ drivers/pci/host/pcie-thunder.c     | 422 ++++++++++++++++++++++++++++++++
+ drivers/pci/probe.c                 |   2 +
+ include/linux/irqchip/arm-gic-v3.h  |   3 +
+ include/linux/pci.h                 |   1 +
+ 11 files changed, 935 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/pci/host/pcie-thunder-pem.c
+ create mode 100644 drivers/pci/host/pcie-thunder.c
 
 -- 
-Catalin
+1.9.1
