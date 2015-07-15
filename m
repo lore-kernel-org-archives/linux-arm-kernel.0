@@ -1,43 +1,49 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Wed, 15 Jul 2015 19:00:01 -0400
-Subject: [PATCH] ARM: keystone: dts: disable pcie dt bindings by default
-Message-ID: <1437001202-19582-1-git-send-email-m-karicheri2@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 15 Jul 2015 16:48:23 -0700
+Subject: [PATCH 1/3] drivers: clk: st: Support for enable/disable in
+ Clockgen PLLs
+In-Reply-To: <1436443060-12866-2-git-send-email-gabriel.fernandez@linaro.org>
+References: <1436443060-12866-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1436443060-12866-2-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <20150715234823.GT30412@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the status of PCIe DT bindings in the SoC specific DTS to
-"disabled" so that it can be enabled on a specific board by
-setting the status to "Ok" in the board specific DTS.
+On 07/09, Gabriel Fernandez wrote:
+> @@ -270,6 +285,73 @@ static int clkgen_pll_is_enabled(struct clk_hw *hw)
+>  	return !poweroff;
+>  }
+>  
+> +static int __clkgen_pll_enable(struct clk_hw *hw)
+> +{
+> +	struct clkgen_pll *pll = to_clkgen_pll(hw);
+> +	unsigned long timeout;
+> +	int ret = 0;
+> +
+> +	if (clkgen_pll_is_enabled(hw))
+> +		return 0;
+> +
+> +	CLKGEN_WRITE(pll, pdn_ctrl, 0);
+> +
+> +	timeout = jiffies + msecs_to_jiffies(10);
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- arch/arm/boot/dts/k2e.dtsi      | 1 +
- arch/arm/boot/dts/keystone.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+Jiffies isn't guaranteed to increment here because
+.enable/.disable is called with irqs disabled and if this is the
+only CPU running it won't be getting interrupts to update
+jiffies.
 
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 50e555e..ecb9cd6 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -96,6 +96,7 @@
- 			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
- 				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
- 
-+			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
- 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c06542b..0d6be74 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -296,6 +296,7 @@
- 			ranges = <0x81000000 0 0 0x23250000 0 0x4000
- 				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
- 
-+			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
- 
+> +
+> +	while (!clkgen_pll_is_locked(hw)) {
+> +		if (time_after(jiffies, timeout))
+> +			return -ETIMEDOUT;
+> +		cpu_relax();
+> +	}
+> +
+> +	pr_debug("%s:%s enabled\n", __clk_get_name(hw->clk), __func__);
+> +
+> +	return ret;
+> +}
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
