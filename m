@@ -1,100 +1,97 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Wed, 15 Jul 2015 09:36:17 +0200
-Subject: [PATCH v2] serial: mxs-auart: keep the AUART unit in reset state when
- not in use
-Message-ID: <1436945777-4332-1-git-send-email-jbe@pengutronix.de>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Wed, 15 Jul 2015 09:37:37 +0200
+Subject: [PATCH] phy: Drop owner assignment from platform_driver
+In-Reply-To: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
+References: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <55A60DC1.2080901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the UART device driver gets closed from userland, the driver
-disables the UART unit and then stops its clock to save power.
+Hi Krysztof
 
-The bit which disabled the UART unit is described as:
+On 07/10/2015 08:26 AM, Krzysztof Kozlowski wrote:
+> platform_driver does not need to set an owner because
+> platform_driver_register() will set it.
+>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+> ---
+>
+> The coccinelle script which generated the patch was sent here:
+> http://www.spinics.net/lists/kernel/msg2029903.html
+> ---
+>   drivers/phy/phy-berlin-usb.c        | 1 -
+>   drivers/phy/phy-miphy28lp.c         | 1 -
+>   drivers/phy/phy-qcom-ufs-qmp-14nm.c | 1 -
+>   drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
+>   drivers/phy/phy-rockchip-usb.c      | 1 -
+>   5 files changed, 5 deletions(-)
+>
+> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
+> index c6fc95b53083..d7431f6ab975 100644
+> --- a/drivers/phy/phy-berlin-usb.c
+> +++ b/drivers/phy/phy-berlin-usb.c
+> @@ -207,7 +207,6 @@ static struct platform_driver phy_berlin_usb_driver = {
+>   	.probe	= phy_berlin_usb_probe,
+>   	.driver	= {
+>   		.name		= "phy-berlin-usb",
+> -		.owner		= THIS_MODULE,
+>   		.of_match_table	= phy_berlin_sata_of_match,
+>   	 },
+>   };
+> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+> index 5e257ef7ac05..677c290f4b14 100644
+> --- a/drivers/phy/phy-miphy28lp.c
+> +++ b/drivers/phy/phy-miphy28lp.c
+> @@ -1268,7 +1268,6 @@ static struct platform_driver miphy28lp_driver = {
+>   	.probe = miphy28lp_probe,
+>   	.driver = {
+>   		.name = "miphy28lp-phy",
+> -		.owner = THIS_MODULE,
+>   		.of_match_table = miphy28lp_of_match,
+>   	}
+>   };
+> diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> index f5fc50a9fce7..e1eea1b379fc 100644
+> --- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> +++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> @@ -191,7 +191,6 @@ static struct platform_driver ufs_qcom_phy_qmp_14nm_driver = {
+>   	.driver = {
+>   		.of_match_table = ufs_qcom_phy_qmp_14nm_of_match,
+>   		.name = "ufs_qcom_phy_qmp_14nm",
+> -		.owner = THIS_MODULE,
+>   	},
+>   };
+>   
+> diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> index 8332f96b2c4a..fde8c876823b 100644
+> --- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> +++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+> @@ -247,7 +247,6 @@ static struct platform_driver ufs_qcom_phy_qmp_20nm_driver = {
+>   	.driver = {
+>   		.of_match_table = ufs_qcom_phy_qmp_20nm_of_match,
+>   		.name = "ufs_qcom_phy_qmp_20nm",
+> -		.owner = THIS_MODULE,
+>   	},
+>   };
+>   
+> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> index 7d4c33643768..bf78721b58f4 100644
+> --- a/drivers/phy/phy-rockchip-usb.c
+> +++ b/drivers/phy/phy-rockchip-usb.c
+> @@ -146,7 +146,6 @@ static struct platform_driver rockchip_usb_driver = {
+>   	.probe		= rockchip_usb_phy_probe,
+>   	.driver		= {
+>   		.name	= "rockchip-usb-phy",
+> -		.owner	= THIS_MODULE,
+>   		.of_match_table = rockchip_usb_phy_dt_ids,
+>   	},
+>   };
 
- ?"UART Enable. If this bit is set to 1, the UART is enabled. Data
-  transmission and reception occurs for the UART signals. When the
-  UART is disabled in the middle of transmission or reception, it
-  completes the current character before stopping."
 
-The important part is the "it completes the current character". Whenever
-a reception is ongoing when the UART gets disabled (including the clock
-off) the statemachine freezes and "remembers" this state on the next
-open() and re-enabling of the unit's clock.
+for drivers/phy/phy-miphy28lp.c
 
-In this case we end up receiving an additional bogus character
-immediately.
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
 
-The solution in this change is to move the AUART unit into its reset
-state on close() and only release it from its reset state on the next
-open().
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
----
- drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
- 1 file changed, 30 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 13cf773..13b3e3c 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
- 	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
- }
- 
-+static void mxs_auart_keep_reset(struct uart_port *u)
-+{
-+	int i;
-+	u32 reg;
-+
-+	reg = readl(u->membase + AUART_CTRL0);
-+	/* if already in reset state, keep it untouched */
-+	if (reg & AUART_CTRL0_SFTRST)
-+		return;
-+
-+	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
-+
-+	for (i = 0; i < 10000; i++) {
-+		reg = readl(u->membase + AUART_CTRL0);
-+		/* reset is finished when the clock is gated */
-+		if (reg & AUART_CTRL0_CLKGATE)
-+			return;
-+		udelay(3);
-+	}
-+
-+	dev_err(u->dev, "Failed to reset the unit.");
-+}
-+
- static int mxs_auart_startup(struct uart_port *u)
- {
- 	int ret;
-@@ -867,7 +891,10 @@ static int mxs_auart_startup(struct uart_port *u)
- 	if (ret)
- 		return ret;
- 
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	/* reset the unit if not aleady done */
-+	mxs_auart_keep_reset(u);
-+	/* bring it out of reset now */
-+	mxs_auart_reset(u);
- 
- 	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_SET);
- 
-@@ -899,13 +926,8 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 	if (auart_dma_enabled(s))
- 		mxs_auart_dma_exit(s);
- 
--	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
--
--	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
--			u->membase + AUART_INTR_CLR);
--
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
--
-+	/* reset the unit and keep it in reset state */
-+	mxs_auart_keep_reset(u);
- 	clk_disable_unprepare(s->clk);
- }
- 
--- 
-2.1.4
+Thanks
