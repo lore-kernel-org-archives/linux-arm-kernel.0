@@ -1,9 +1,10 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Wed, 15 Jul 2015 08:32:20 +0200
-Subject: [PATCH v3 33/46] usb: isp1760: udc: add ep capabilities support
+Date: Wed, 15 Jul 2015 08:32:16 +0200
+Subject: [PATCH v3 29/46] usb: gadget: r8a66597-udc: add ep capabilities
+ support
 In-Reply-To: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
 References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1436941953-1327-34-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1436941953-1327-30-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,37 +12,29 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/isp1760/isp1760-udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/gadget/udc/r8a66597-udc.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
-index 3699962..1c3d0fd 100644
---- a/drivers/usb/isp1760/isp1760-udc.c
-+++ b/drivers/usb/isp1760/isp1760-udc.c
-@@ -1383,13 +1383,24 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
- 		 */
- 		if (ep_num == 0) {
- 			usb_ep_set_maxpacket_limit(&ep->ep, 64);
+diff --git a/drivers/usb/gadget/udc/r8a66597-udc.c b/drivers/usb/gadget/udc/r8a66597-udc.c
+index 0293f71..baa0609 100644
+--- a/drivers/usb/gadget/udc/r8a66597-udc.c
++++ b/drivers/usb/gadget/udc/r8a66597-udc.c
+@@ -1935,6 +1935,16 @@ static int r8a66597_probe(struct platform_device *pdev)
+ 		ep->ep.name = r8a66597_ep_name[i];
+ 		ep->ep.ops = &r8a66597_ep_ops;
+ 		usb_ep_set_maxpacket_limit(&ep->ep, 512);
++
++		if (i == 0) {
 +			ep->ep.caps.type_control = true;
-+			ep->ep.caps.dir_in = true;
-+			ep->ep.caps.dir_out = true;
- 			ep->maxpacket = 64;
- 			udc->gadget.ep0 = &ep->ep;
- 		} else {
- 			usb_ep_set_maxpacket_limit(&ep->ep, 512);
++		} else {
 +			ep->ep.caps.type_iso = true;
 +			ep->ep.caps.type_bulk = true;
 +			ep->ep.caps.type_int = true;
- 			ep->maxpacket = 0;
- 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
- 		}
-+
-+		if (is_in)
-+			ep->ep.caps.dir_in = true;
-+		else
-+			ep->ep.caps.dir_out = true;
++		}
++		ep->ep.caps.dir_in = true;
++		ep->ep.caps.dir_out = true;
  	}
- }
- 
+ 	usb_ep_set_maxpacket_limit(&r8a66597->ep[0].ep, 64);
+ 	r8a66597->ep[0].pipenum = 0;
 -- 
 1.9.1
