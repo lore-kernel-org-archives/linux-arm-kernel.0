@@ -1,27 +1,70 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 15 Jul 2015 11:37:35 -0700
-Subject: [PATCH] [v2] pinctrl: add support for Qualcomm Technologies
- QDF2xxx ARM64 SoCs
-In-Reply-To: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
-References: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
-Message-ID: <20150715183735.GG32767@usrtlx11787.corpusers.net>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Wed, 15 Jul 2015 11:57:35 -0700
+Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
+ the irqdomain of the GIC.
+In-Reply-To: <55A6947F.8070903@arm.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
+ <55A6947F.8070903@arm.com>
+Message-ID: <55A6AD1F.902@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 15 Jul 09:47 PDT 2015, Timur Tabi wrote:
+On 07/15/2015 10:12 AM, Marc Zyngier wrote:
+> On 15/07/15 17:54, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+>> Needed to map SPI interrupt sources.
+>>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3.c       | 5 +++++
+>>   include/linux/irqchip/arm-gic-v3.h | 1 +
+>>   2 files changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index c52f7ba..0019fed 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
+>>   /* Our default, arbitrary priority value. Linux only uses one anyway. */
+>>   #define DEFAULT_PMR_VALUE	0xf0
+>>
+>> +struct irq_domain *gic_get_irq_domain(void)
+>> +{
+>> +	return gic_data.domain;
+>> +}
+>> +
+>>   static inline unsigned int gic_irq(struct irq_data *d)
+>>   {
+>>   	return d->hwirq;
+>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>> index 18e3757..5992224 100644
+>> --- a/include/linux/irqchip/arm-gic-v3.h
+>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
+>>
+>>   typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
+>>   void set_its_pci_requester_id(its_pci_requester_id_t fn);
+>> +struct irq_domain *gic_get_irq_domain(void);
+>>   #endif
+>>
+>>   #endif
+>>
+>
+> Hmmmffff... You need the domain for SPIs??
+>
+> What is wrong with putting these interrupts in your device tree?
+>
 
-> Add the pinctrl driver for the Qualcomm Technologies QDF2xxx ARM64 SoCs,
-> which uses the Qualcomm Technologies TLMM pinctrl/gpio device.  This
-> driver is probed via ACPI and uses the pinctrl-msm.c backend driver.
-> 
-> This driver is intended to be used only an ACPI-enabled system.  As such,
-> UEFI will handle all pin control configuration, so this driver does not
-> provide pin control functions.  It is effectively a GPIO-only driver.
-> 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
+There is no device tree node for ECAM based "PCIe" devices, they are 
+discovered in the PCI bus scan, yet they still need to use SPI interrupts.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+We need a way to be able to map these.
 
-Regards,
-Bjorn
+David Daney
+
+
+
+> 	M.
+>
