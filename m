@@ -1,198 +1,86 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 15 Jul 2015 16:50:08 +0100
-Subject: [PATCH v3 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <20150714171640.GJ13555@e104818-lin.cambridge.arm.com>
-References: <cover.1436552949.git.robin.murphy@arm.com>
- <d1a97aaee42f30370b58b3f7ed6a3559633010ad.1436552949.git.robin.murphy@arm.com>
- <20150714171640.GJ13555@e104818-lin.cambridge.arm.com>
-Message-ID: <55A68130.8010306@arm.com>
+From: aalonso@freescale.com (Alonso Adrian)
+Date: Wed, 15 Jul 2015 15:55:59 +0000
+Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+ lpsr
+In-Reply-To: <20150715072307.GM4119@tiger>
+References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
+ <20150715072307.GM4119@tiger>
+Message-ID: <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Hi Shawn,
 
-Thanks for the review.
+Comments inline, thanks for reviewing :)
 
-On 14/07/15 18:16, Catalin Marinas wrote:
-> On Fri, Jul 10, 2015 at 08:19:33PM +0100, Robin Murphy wrote:
->> +/*
->> + * IOVAs are IOMMU _input_ addresses, so there still exists the possibility
->> + * for static bus translation between device output and IOMMU input (yuck).
->> + */
->> +static inline dma_addr_t dev_dma_addr(struct device *dev, dma_addr_t addr)
->> +{
->> +	dma_addr_t offset = (dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT;
->> +
->> +	BUG_ON(addr < offset);
->> +	return addr - offset;
->> +}
->
-> Are these just theoretical or you expect to see some at some point? I
-> think the dma_limit in __alloc_iova() may also need to take the offset
-> into account (or just ignore them altogether for now).
+Regards
+Adrian
 
-Right now I'm not aware of any platform which has both DMA offsets and 
-an IOMMU on the same bus, and I would really hope it stays that way. 
-This is just extra complication out of attempting to cover every 
-possibility, and you're right about the alloc_iova oversight. I'll rip 
-it out for simplicity, and remain hopeful that nobody ever builds 
-anything mad enough to need it put back.
+-----Original Message-----
+From: Shawn Guo [mailto:shawnguo at kernel.org] 
+Sent: Wednesday, July 15, 2015 2:23 AM
+To: Alonso Lazcano Adrian-B38018
+Cc: linux-arm-kernel at lists.infradead.org; shawn.guo at linaro.org; linus.walleij at linaro.org; lznuaa at gmail.com; devicetree at vger.kernel.org; Li Frank-B20596; Garg Nitin-B37173; Huang Yongcai-B20788; linux-gpio at vger.kernel.org; robh+dt at kernel.org; Gong Yibin-B38343
+Subject: Re: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc lpsr
 
->> +
->> +/**
->> + * dma_direction_to_prot - Translate DMA API directions to IOMMU API page flags
->> + * @dir: Direction of DMA transfer
->> + * @coherent: Is the DMA master cache-coherent?
->> + *
->> + * Return: corresponding IOMMU API page protection flags
->> + */
->> +int dma_direction_to_prot(enum dma_data_direction dir, bool coherent)
->> +{
->> +	int prot = coherent ? IOMMU_CACHE : 0;
->> +
->> +	switch (dir) {
->> +	case DMA_BIDIRECTIONAL:
->> +		return prot | IOMMU_READ | IOMMU_WRITE;
->> +	case DMA_TO_DEVICE:
->> +		return prot | IOMMU_READ;
->> +	case DMA_FROM_DEVICE:
->> +		return prot | IOMMU_WRITE;
->> +	default:
->> +		return 0;
->> +	}
->> +}
->> +
->> +static struct iova *__alloc_iova(struct device *dev, size_t size, bool coherent)
->> +{
->> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iova_domain *iovad = domain->dma_api_cookie;
->> +	unsigned long shift = iova_shift(iovad);
->> +	unsigned long length = iova_align(iovad, size) >> shift;
->> +	u64 dma_limit = coherent ? dev->coherent_dma_mask : dma_get_mask(dev);
->
-> "coherent" and "coherent_dma_mask" have related meanings here. As I can
-> see in patch 3, the coherent information passed all the way to this
-> function states whether the device is cache coherent or not (and whether
-> cache maintenance is needed). The coherent_dma_mask refers to an
-> allocation mask for the dma_alloc_coherent() API but that doesn't
-> necessarily mean that the device is cache coherent. Similarly, dma_mask
-> is used for streaming DMA.
->
-> You can rename it to coherent_api or simply pass a u64 dma_mask
-> directly.
+On Tue, Jul 07, 2015 at 02:02:05PM -0500, Adrian Alonso wrote:
+> * Extend pinctrl-imx driver to support iomux lpsr conntroller,
+> * iMX7D has two iomuxc controllers, iomuxc controller similar as
+>   previous iMX SoC generation and iomuxc-lpsr which provides
+>   low power state rentetion capabilities on gpios that are part of
+>   iomuxc-lpsr (GPIO1_IO7..GPIO1_IO0).
+> * Use IOMUXC_LPSR_SUPPORT and iput_val most significant bits to
+>   properly configure iomuxc/iomuxc-lpsr settings.
+> 
+> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
 
-Bleh, it seems that at some point along the way I got confused and 
-started mistakenly thinking the DMA masks were about the device's 
-ability to issue coherent/non-coherent transactions. I'll clean up the 
-mess...
+It took me quite some time to understand what the patch does.  Before I gave specific comments on your implementation, I would discuss if there is a better solution, as I do not like the idea of encoding these artificial pin id of LPSR pads in the input_val.
 
-> [...]
->> +/**
->> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
->> + * @dev: Device to allocate memory for. Must be a real device
->> + *	 attached to an iommu_dma_domain
->> + * @size: Size of buffer in bytes
->> + * @gfp: Allocation flags
->> + * @prot: IOMMU mapping flags
->> + * @coherent: Which dma_mask to base IOVA allocation on
->> + * @handle: Out argument for allocated DMA handle
->> + * @flush_page: Arch callback to flush a single page from caches as
->> + *		necessary. May be NULL for coherent allocations
->> + *
->> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
->> + * but an IOMMU which supports smaller pages might not map the whole thing.
->> + * For now, the buffer is unconditionally zeroed for compatibility
->> + *
->> + * Return: Array of struct page pointers describing the buffer,
->> + *	   or NULL on failure.
->> + */
->> +struct page **iommu_dma_alloc(struct device *dev, size_t size, gfp_t gfp,
->> +		int prot, bool coherent, dma_addr_t *handle,
->> +		void (*flush_page)(const void *, phys_addr_t))
->
-> So for this function, coherent should always be true since this is only
-> used with the coherent DMA API AFAICT.
+Ideally, the LPSR controller should be implemented as a second instance of IOMUXC.  But the problem seems to be the select input register is shared between these two instances.  Is my understanding correct?
 
-Indeed.
+[Adrian] Yes that's the case SELECT_INPUT register is shared between IOMUXC and IOMUXC-LPSR controllers.
 
->> +{
->> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iova_domain *iovad = domain->dma_api_cookie;
->> +	struct iova *iova;
->> +	struct page **pages;
->> +	struct sg_table sgt;
->> +	struct sg_mapping_iter miter;
->> +	dma_addr_t dma_addr;
->> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
->> +
->> +	*handle = DMA_ERROR_CODE;
->> +
->> +	pages = __iommu_dma_alloc_pages(count, gfp);
->> +	if (!pages)
->> +		return NULL;
->> +
->> +	iova = __alloc_iova(dev, size, coherent);
->
-> And here just __alloc_iova(dev, size, true);
+How select input register is shared?  With different bits in a single register which is only laid on normal IOMUXC controller?
 
-In fact, everything it wanted dev for is now available at all the 
-callsites, so I'll rejig the whole interface.
+[Adrian] IOMUXC and IOMUXC-LPSR are in different base address; each controller provides SW_PAD_CTL  (CONF_REG) and SW_MUX_CTL (MUX_REG) but only IOMUXC provides SELECT_INPUT registers for pad daisy chain configuration, so pads from IOMUXC-LPSR that need daisy chain settings need to access the IOMUXC register space address to access SELECT_INPUT.
 
-Robin.
+[Adrian] One disadvantage that we found if we created two driver instances for IOMUXC and IOMUXC-LPSR controllers is that in the device tree machine files "end-users" could be creating pinctrl nodes mixing pads from different IOMUXC controllers resulting that pad that doesn't belong to that domain controller it will not be configured properly.
 
-> [...]
->> +dma_addr_t iommu_dma_map_page(struct device *dev, struct page *page,
->> +		unsigned long offset, size_t size, int prot, bool coherent)
->> +{
->> +	dma_addr_t dma_addr;
->> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iova_domain *iovad = domain->dma_api_cookie;
->> +	phys_addr_t phys = page_to_phys(page) + offset;
->> +	size_t iova_off = iova_offset(iovad, phys);
->> +	size_t len = iova_align(iovad, size + iova_off);
->> +	struct iova *iova = __alloc_iova(dev, len, coherent);
->
-> Here __alloc_iova(dev, len, false);
->
-> [...]
->> +/*
->> + * The DMA API client is passing in a scatterlist which could describe
->> + * any old buffer layout, but the IOMMU API requires everything to be
->> + * aligned to IOMMU pages. Hence the need for this complicated bit of
->> + * impedance-matching, to be able to hand off a suitably-aligned list,
->> + * but still preserve the original offsets and sizes for the caller.
->> + */
->> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
->> +		int nents, int prot, bool coherent)
->> +{
->> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iova_domain *iovad = domain->dma_api_cookie;
->> +	struct iova *iova;
->> +	struct scatterlist *s;
->> +	dma_addr_t dma_addr;
->> +	size_t iova_len = 0;
->> +	int i;
->> +
->> +	/*
->> +	 * Work out how much IOVA space we need, and align the segments to
->> +	 * IOVA granules for the IOMMU driver to handle. With some clever
->> +	 * trickery we can modify the list in-place, but reversibly, by
->> +	 * hiding the original data in the as-yet-unused DMA fields.
->> +	 */
->> +	for_each_sg(sg, s, nents, i) {
->> +		size_t s_offset = iova_offset(iovad, s->offset);
->> +		size_t s_length = s->length;
->> +
->> +		sg_dma_address(s) = s->offset;
->> +		sg_dma_len(s) = s_length;
->> +		s->offset -= s_offset;
->> +		s_length = iova_align(iovad, s_length + s_offset);
->> +		s->length = s_length;
->> +
->> +		iova_len += s_length;
->> +	}
->> +
->> +	iova = __alloc_iova(dev, iova_len, coherent);
->
-> __alloc_iova(dev, iova_len, false);
->
+For example a valid pad configuration for I2C1 could use pads as shown below: 
+&iomuxc {
+	pinctrl_i2c1_1: i2c1grp-1 {
+		fsl,pins = <
+			MX7D_PAD_GPIO1_IO04__I2C1_SCL  	/* IOMUXC-LPSR domain */
+			MX7D_PAD_I2C1_SDA__I2C1_SDA   	/* IOMUXC domain */
+		>;
+	};
+};
+
+By extending pinctrl-imx to support both controllers the above configuration is supported,
+Otherwise using two driver instances "end-users" will need to do something like:
+
+&iomuxc {
+	pinctrl_i2c1_1: i2c1grp-1 {
+		fsl,pins = <
+			MX7D_PAD_I2C1_SDA__I2C1_SDA   	/* IOMUXC domain */
+		>;
+	};
+};
+
+&iomuxc_lpsr {
+	pinctrl_i2c1_1: i2c1grp-1 {
+		fsl,pins = <
+			MX7D_PAD_GPIO1_IO04__I2C1_SCL  	/* IOMUXC-LPSR domain */
+		>;
+	};
+};
+
+And this is something that we will like to avoid so "end-user" don't have to worry about and configure pads as they are used to.
+
+[Adrian] For the artificial encoding of pad group id's for IOMUXC-LPSR, I think there is no other way to do it (limited imagination here :P);
+Pad group id's are extracted from MUX_REG offset address (pad_id = mux_reg / 4) but when combining both IOMUXC and IOMUXC-LPSR
+Pad group ID's overlap so end up encoding the pad_id for IOMUXC-LPSR to resolve the proper pad group ID.
+
+I need more details to understand the problem.
+
+Shawn
