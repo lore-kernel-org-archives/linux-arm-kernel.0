@@ -1,18 +1,19 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 15 Jul 2015 09:43:40 +0200
-Subject: [PATCH] ARM: shmobile: Enable fixed voltage regulator in
- shmobile_defconfig
-In-Reply-To: <1436942555-4851-1-git-send-email-horms+renesas@verge.net.au>
-References: <1436942555-4851-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdU+FBMGvAz10g=W80iR4O1d=f5+tsXw=nN=q3qw_F_NMw@mail.gmail.com>
+Date: Wed, 15 Jul 2015 09:44:14 +0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Remove Marzen
+In-Reply-To: <1436942723-5934-1-git-send-email-horms+renesas@verge.net.au>
+References: <1436942723-5934-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUx-XmvbdRFgAiOAw43oyBHmme-V7QF3QKBZFTaB4SQkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 8:42 AM, Simon Horman
+On Wed, Jul 15, 2015 at 8:45 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
-> however, MACH_MARZEN is going away along with the board code it enables.
+> Kill of the defconfig bits now when the marzen-reference board code is gone.
 >
+> Based on work by Magnus Damm.
+>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
