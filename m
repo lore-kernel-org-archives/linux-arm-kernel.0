@@ -1,157 +1,52 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 15 Jul 2015 11:55:20 +0300
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
- <559FFCA7.4060008@samsung.com>
- <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
-Message-ID: <55A61FF8.9000603@samsung.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 15 Jul 2015 10:56:50 +0200
+Subject: [Xen-devel] [PATCH v2 09/20] xen/biomerge: Don't allow biovec
+ to be merge when Linux is not using 4KB page
+In-Reply-To: <20150710191245.GA31063@l.oracle.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
+ <20150710191245.GA31063@l.oracle.com>
+Message-ID: <55A62052.7020008@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2015 06:04 PM, Catalin Marinas wrote:
-> On Fri, Jul 10, 2015 at 08:11:03PM +0300, Andrey Ryabinin wrote:
->>>> +#if CONFIG_PGTABLE_LEVELS > 3
->>>> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
->>>> +#endif
->>>> +#if CONFIG_PGTABLE_LEVELS > 2
->>>> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
->>>> +#endif
->>>> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
->>>> +
->>>> +static void __init kasan_early_pmd_populate(unsigned long start,
->>>> +					unsigned long end, pud_t *pud)
->>>> +{
->>>> +	unsigned long addr;
->>>> +	unsigned long next;
->>>> +	pmd_t *pmd;
->>>> +
->>>> +	pmd = pmd_offset(pud, start);
->>>> +	for (addr = start; addr < end; addr = next, pmd++) {
->>>> +		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
->>>> +		next = pmd_addr_end(addr, end);
->>>> +	}
->>>> +}
->>>> +
->>>> +static void __init kasan_early_pud_populate(unsigned long start,
->>>> +					unsigned long end, pgd_t *pgd)
->>>> +{
->>>> +	unsigned long addr;
->>>> +	unsigned long next;
->>>> +	pud_t *pud;
->>>> +
->>>> +	pud = pud_offset(pgd, start);
->>>> +	for (addr = start; addr < end; addr = next, pud++) {
->>>> +		pud_populate(&init_mm, pud, kasan_zero_pmd);
->>>> +		next = pud_addr_end(addr, end);
->>>> +		kasan_early_pmd_populate(addr, next, pud);
->>>> +	}
->>>> +}
->>>> +
->>>> +static void __init kasan_map_early_shadow(pgd_t *pgdp)
->>>> +{
->>>> +	int i;
->>>> +	unsigned long start = KASAN_SHADOW_START;
->>>> +	unsigned long end = KASAN_SHADOW_END;
->>>> +	unsigned long addr;
->>>> +	unsigned long next;
->>>> +	pgd_t *pgd;
->>>> +
->>>> +	for (i = 0; i < PTRS_PER_PTE; i++)
->>>> +		set_pte(&kasan_zero_pte[i], pfn_pte(
->>>> +				virt_to_pfn(kasan_zero_page), PAGE_KERNEL));
->>>> +
->>>> +	pgd = pgd_offset_k(start);
->>>> +	for (addr = start; addr < end; addr = next, pgd++) {
->>>> +		pgd_populate(&init_mm, pgd, kasan_zero_pud);
->>>> +		next = pgd_addr_end(addr, end);
->>>> +		kasan_early_pud_populate(addr, next, pgd);
->>>> +	}
->>>
->>> I prefer to use "do ... while" constructs similar to __create_mapping()
->>> (or zero_{pgd,pud,pmd}_populate as you are more familiar with them).
->>>
->>> But what I don't get here is that you repopulate the pud page for every
->>> pgd (and so on for pmd). You don't need this recursive call all the way
->>> to kasan_early_pmd_populate() but just sequential:
->>
->> This repopulation needed for 3,2 level page tables configurations.
->>
->> E.g. for 3-level page tables we need to call pud_populate(&init_mm,
->> pud, kasan_zero_pmd) for each pud in [KASAN_SHADOW_START,
->> KASAN_SHADOW_END] range, this causes repopopulation for 4-level page
->> tables, since we need to pud_populate() only [KASAN_SHADOW_START,
->> KASAN_SHADOW_START + PGDIR_SIZE] range.
-> 
-> I'm referring to writing the same information multiple times over the
-> same entry. kasan_map_early_shadow() goes over each pgd entry and writes
-> the address of kasan_zero_pud. That's fine so far. However, in the same
-> loop you call kasan_early_pud_populate(). The latter retrieves the pud
-> page via pud_offset(pgd, start) which would always be kasan_zero_pud
+Hi Konrad,
 
-Not always. E.g. if we have 3-level page tables pud = pgd, pgd_populate() is nop, and
-pud_populate in fact populates pgd.
+On 10/07/2015 21:12, Konrad Rzeszutek Wilk wrote:
+> On Thu, Jul 09, 2015 at 09:42:21PM +0100, Julien Grall wrote:
+>> When Linux is using 64K page granularity, every page will be slipt in
+>> multiple non-contiguous 4K MFN (page granularity of Xen).
+>
+> But you don't care about that on the Linux layer I think?
 
-pud_offset(pgd, start) will return (swapper_pg_dir + pgd_index(start)) and pud_populate()
-will fill that entry with the address of kasan_zero_pmd. So we need to pud_populate() for
-each pgd.
+In general use case (i.e arch agnostic) we care about it. We don't want 
+to merge 2 biovec if they are not living on the same MFNs.
 
-> because that's what you wrote via pgd_populate() in each pgd entry. So
-> for each pgd entry, you keep populating the same kasan_zero_pud page
-> with pointers to kasan_zero_pmd. And so on for the pmd.
-> 
-
-Yes, I'm perfectly understand that. And this was done intentionally since I don't
-see the way to make this work for all possible CONFIG_PGTABLE_LEVELS without rewrites
-or without #ifdefs (and you didn't like them in v1).
+> As in, is there an SWIOTLB that does PFN to MFN and vice-versa
+> translation?
+>
+> I thought that ARM guests are not exposed to the MFN<->PFN logic
+> and trying to figure that out to not screw up the DMA engine
+> on a PCIe device slurping up contingous MFNs which don't map
+> to contingous PFNs?
 
 
->>> 	kasan_early_pte_populate();
->>> 	kasan_early_pmd_populate(..., pte);
->>> 	kasan_early_pud_populate(..., pmd);
->>> 	kasan_early_pgd_populate(..., pud);
->>>
->>> (or in reverse order)
->>
->> Unless, I'm missing something, this will either work only with 4-level
->> page tables. We could do this without repopulation by using
->> CONFIG_PGTABLE_LEVELS ifdefs.
-> 
-> Or you could move kasan_early_*_populate outside the loop. You already
-> do this for the pte at the beginning of the kasan_map_early_shadow()
-> function (and it probably makes more sense to create a separate
-> kasan_early_pte_populate).
-> 
+I will let these 2 questions for Stefano. He knows better than me 
+swiotlb for ARM.
 
+So far, I skipped swiotlb implementation for 64KB page granularity as 
+I'm not sure what to do when a page is split across multiple MFNs.
 
-Ok, let's try to implement that.
-And for example, let's consider CONFIG_PGTABLE_LEVELS=3 case:
+Although I don't think this can happen with this specific series as:
+	- The memory is a direct mapping so any Linux page is using contiguous 
+MFNs.
+	- Foreign mapping is using the 4KB of the Linux page. This is for an 
+easier implementation.
 
- * pgd_populate() is nop, so kasan_early_pgd_populate() won't do anything.
+For the latter, I plan to work on using the Linux page to map multiple 
+foreign gfn. I have to talk with Stefano about it how to handle it.
 
- * pud_populate() in kasan_early_pud_populate() actually will setup pgd entries in swapper_pg_dir,
-   so pud_populate() should be called for the whole shadow range: [KASAN_SHADOW_START, KASAN_SHADOW_END]
-	IOW: kasan_early_pud_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pmd);
-	
-	We will need to slightly change kasan_early_pud_populate() implementation for that
-	(Current implementation implies that [start, end) addresses belong to one pgd)
+Regards,
 
-	void kasan_early_pud_populate(unsigned long start, unsigned long end, pmd_t *pmd)
-	{
-		unsigned long addr;
-		long next;
-
-		for (addr = start; addr < end; addr = next) {
-			pud_t *pud = pud_offset(pgd_offset_k(addr), addr);
-			pud_populate(&init_mm, pud, pmd);
-			next = pud_addr_end(addr, pgd_addr_end(addr, end));
-		}
-	}
-
-	But, wait! In 4-level page tables case this will be the same repopulation as we had before!
-
-See? The problem here is that pud_populate() but not pgd_populate() populates pgds (3-level page tables case).
-So I still don't see the way to avoid repopulation without ifdefs.
-Did I miss anything?
+-- 
+Julien Grall
