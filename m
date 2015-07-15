@@ -1,97 +1,29 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Wed, 15 Jul 2015 09:37:37 +0200
-Subject: [PATCH] phy: Drop owner assignment from platform_driver
-In-Reply-To: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
-References: <1436509587-27258-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <55A60DC1.2080901@st.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 15 Jul 2015 09:43:40 +0200
+Subject: [PATCH] ARM: shmobile: Enable fixed voltage regulator in
+ shmobile_defconfig
+In-Reply-To: <1436942555-4851-1-git-send-email-horms+renesas@verge.net.au>
+References: <1436942555-4851-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU+FBMGvAz10g=W80iR4O1d=f5+tsXw=nN=q3qw_F_NMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krysztof
-
-On 07/10/2015 08:26 AM, Krzysztof Kozlowski wrote:
-> platform_driver does not need to set an owner because
-> platform_driver_register() will set it.
+On Wed, Jul 15, 2015 at 8:42 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
+> however, MACH_MARZEN is going away along with the board code it enables.
 >
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
-> ---
->
-> The coccinelle script which generated the patch was sent here:
-> http://www.spinics.net/lists/kernel/msg2029903.html
-> ---
->   drivers/phy/phy-berlin-usb.c        | 1 -
->   drivers/phy/phy-miphy28lp.c         | 1 -
->   drivers/phy/phy-qcom-ufs-qmp-14nm.c | 1 -
->   drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
->   drivers/phy/phy-rockchip-usb.c      | 1 -
->   5 files changed, 5 deletions(-)
->
-> diff --git a/drivers/phy/phy-berlin-usb.c b/drivers/phy/phy-berlin-usb.c
-> index c6fc95b53083..d7431f6ab975 100644
-> --- a/drivers/phy/phy-berlin-usb.c
-> +++ b/drivers/phy/phy-berlin-usb.c
-> @@ -207,7 +207,6 @@ static struct platform_driver phy_berlin_usb_driver = {
->   	.probe	= phy_berlin_usb_probe,
->   	.driver	= {
->   		.name		= "phy-berlin-usb",
-> -		.owner		= THIS_MODULE,
->   		.of_match_table	= phy_berlin_sata_of_match,
->   	 },
->   };
-> diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
-> index 5e257ef7ac05..677c290f4b14 100644
-> --- a/drivers/phy/phy-miphy28lp.c
-> +++ b/drivers/phy/phy-miphy28lp.c
-> @@ -1268,7 +1268,6 @@ static struct platform_driver miphy28lp_driver = {
->   	.probe = miphy28lp_probe,
->   	.driver = {
->   		.name = "miphy28lp-phy",
-> -		.owner = THIS_MODULE,
->   		.of_match_table = miphy28lp_of_match,
->   	}
->   };
-> diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-> index f5fc50a9fce7..e1eea1b379fc 100644
-> --- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-> +++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-> @@ -191,7 +191,6 @@ static struct platform_driver ufs_qcom_phy_qmp_14nm_driver = {
->   	.driver = {
->   		.of_match_table = ufs_qcom_phy_qmp_14nm_of_match,
->   		.name = "ufs_qcom_phy_qmp_14nm",
-> -		.owner = THIS_MODULE,
->   	},
->   };
->   
-> diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-> index 8332f96b2c4a..fde8c876823b 100644
-> --- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-> +++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-> @@ -247,7 +247,6 @@ static struct platform_driver ufs_qcom_phy_qmp_20nm_driver = {
->   	.driver = {
->   		.of_match_table = ufs_qcom_phy_qmp_20nm_of_match,
->   		.name = "ufs_qcom_phy_qmp_20nm",
-> -		.owner = THIS_MODULE,
->   	},
->   };
->   
-> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-> index 7d4c33643768..bf78721b58f4 100644
-> --- a/drivers/phy/phy-rockchip-usb.c
-> +++ b/drivers/phy/phy-rockchip-usb.c
-> @@ -146,7 +146,6 @@ static struct platform_driver rockchip_usb_driver = {
->   	.probe		= rockchip_usb_phy_probe,
->   	.driver		= {
->   		.name	= "rockchip-usb-phy",
-> -		.owner	= THIS_MODULE,
->   		.of_match_table = rockchip_usb_phy_dt_ids,
->   	},
->   };
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-for drivers/phy/phy-miphy28lp.c
+Gr{oetje,eeting}s,
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+                        Geert
 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
