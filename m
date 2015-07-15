@@ -1,53 +1,121 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jul 2015 12:08:08 +0200
-Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
-In-Reply-To: <55A57F3B.1080909@broadcom.com>
-References: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
- <4793510.M34v5PmKgi@wuerfel> <55A57F3B.1080909@broadcom.com>
-Message-ID: <9845978.JUsldTlF3B@wuerfel>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 15 Jul 2015 11:20:27 +0100
+Subject: [PATCH v2 3/3] drivers: firmware: psci: add system suspend support
+In-Reply-To: <20150715103408.07523347@xhacker>
+References: <1434462640-19613-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-1-git-send-email-sudeep.holla@arm.com>	<1434638494-514-4-git-send-email-sudeep.holla@arm.com>	<20150714141703.0d77242c@xhacker>	<55A4D2F1.5070702@arm.com>	<20150714175011.31c3d714@xhacker>	<55A4EC37.7030900@arm.com>	<20150714194038.47ccf2e5@xhacker>	<55A50C12.60901@arm.com>
+ <20150715103408.07523347@xhacker>
+Message-ID: <55A633EB.2000609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 July 2015 14:29:31 Florian Fainelli wrote:
-> On 14/07/15 13:43, Arnd Bergmann wrote:
-> > On Tuesday 14 July 2015 11:12:15 Florian Fainelli wrote:
-> >> Cortex-A9 on at least BCM4708 SoCs are not LPAE capable, booting such a
-> >> kernel will result in the following:
-> >>
-> >> Error: Kernel with LPAE support, but CPU does not support LPAE.
-> >>
-> >> Restrict such SoCs to be built in a configuration that does not enable
-> >> ARM_LPAE.
-> >>
-> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> >>
-> > 
-> > This is an old problem for all platforms, I think we want a more
-> > generic solution though, instead of adding the !LPAE dependency
-> > for each Cortex-A5/8/9 platform.
-> 
-> Fair enough, what do you have in mind? Should we introduce something
-> like CONFIG_V7_A9 and such, and update all platforms to select such
-> symbols such that we can then apply a restriction on other symbols if
-> there needs to be?
-> 
-> What if any of these CPUs end-up supporting LPAE, but this cannot be
-> flagged at build time?
+Hi Jisheng,
 
-I would introduce special architecture levels for ARMv7+LPAE and/or
-ARMv7VE. I am not entirely sure what combinations exist and whether
-it's enough to add ARMv7VE.
+On 15/07/15 03:34, Jisheng Zhang wrote:
+> Dear Sudeep,
+>
+> On Tue, 14 Jul 2015 14:18:10 +0100
+> Sudeep Holla wrote:
 
-Basically, I think ARM_LPAE should only be selectable if ARMv7VE
-is the lowest architecture level that is enabled, and all ARMv7VE
-based platforms would have to be changed to depend on ARCH_MULTI_V7VE
-instead of ARCH_MULTI_V7.
+[...]
 
-Also, when building an ARMv7VE kernel, we really want to build with
-gcc -march=armv7ve (as long as that is available, possibly falling
-back to -mcpu=cortex-a15), so we build with the idiv instructions.
-The part I'm unclear about is whether there are CPU cores that support
-only idiv but not LPAE or vice versa. If there are, we need an extra
-level.
+>>
+>> OK, though similar semantics may be used else where, we need to define
+>> the state similar to the way ACPI does it for x86 systems.
+>>
+>>> Here is an example:
+>>>
+>>> S3 is the state where All devices are suspended and power down,  memory is
+>>> placed in self-refresh mode. Usually this is the suspend to ram state.
+>>>
+>>
+>> Agreed.
+>>
+>>> S2 is the state where devices except cpus are suspended and put in a
+>>> low-power state(not power off), if the deivce doesn't support lower power mode,
+>>> the device is left on. memory is placed in self-refresh mode. secondary CPUs
+>>> are powered off via. PSCI_CPU_OFF, boot cpu is put into WFI state and runs at
+>>> low freq.
+>>>
+>>
+>> Is this a standard state or custom tailored for some power optimization
+>> on particular system ? Anyway I am not sure if I quite understand the
+>
+> This is customized state.
+>
 
-	Arnd
+OK, but I do have concern as you mention that you leave certain device
+on, what if that device initiate some DMA operation which might not be
+possible when DDR is in self-refresh mode. IMO this is highly customized
+state.
+
+>> exact definition of this state. When and how often do you use this
+>> use this state ?
+>
+> Very often. When we want s2ram similar state but low-latency back transition,
+> we want to use this state.
+>
+
+I don't understand this. You want secondaries hot-plugged out which is
+quite expensive yet you mention this is low-latency. That could be
+possible as you leave last CPU in WFI but again highly customized state.
+
+>>
+>> Have you looked at PM_SUSPEND_FREEZE state implemented in Linux ?
+>> For me this S2 you explained sounds similar to PM_SUSPEND_FREEZE state.
+>> In short, PM_SUSPEND_FREEZE = all the processes are frozen + all the
+>> devices are suspended + all the processors enter deepest idle state
+>> possible.
+>
+> The S2 in my example is a bit different with freeze. It's looks more like
+> the S1 or standby in Documentation/power/states.txt. The biggest difference
+> with freeze is whether putting memory in self-refresh state or not.
+>
+
+OK I am still struggling to map these(S1/S2) to ARM systems as they
+designed and map well for x86 systems. Since the idle states on include
+state where CPU power is lost, I wonder if the state you are explaining
+provides any more power save compared to system freeze.
+
+>>
+>> Though I don't understand why you need to power-off secondary cpus
+>> and stay in WFI on boot cpu as that would have increased latency
+>
+> we want save more power, the increased latency is affordable.
+>
+
+Which clearly contradicts what you said above.
+
+>> defeating the purpose of S2 state. Also why you are mixing DVFS here ?
+>> PSCI deals with just low power states and has nothing to do with DVFS.
+>
+> It's not DVFS related, but to put the boot cpu in a low power state while
+> still keeping its power.
+>
+
+If there's nothing for CPU to do, some CPUFreq governors(e.g.
+interactive) will ensure lowest OPP is chosen so you need not do
+anything extra I believe.
+
+>>
+>> Further IMO we can also achieve a low power state almost close to
+>> PM_SUSPEND_FREEZE having run-time PM for all the devices and cpuidle.
+>
+> we want one more sleep state which saves more power than freeze.
+>
+
+Do you have any power/latency number that indicates freeze is not that
+power efficient ? Also I imagine you S2 state has higher latency as you
+are doing CPU hot-plug.
+
+> Or let's change the question: how to implement "standby" or "s1" in
+> Documentation/power/states.txt with the help of PSCI? Seems the PSCI spec
+> expects "operating systems use only one suspend to RAM state", but this
+> is a limitation in the long run.
+>
+
+OK, this one I leave it for you to take up discussion in PSCI forum with
+justification(power/latency numbers to prove an extra system state is
+really worthy)
+
+Regards,
+Sudeep
