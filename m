@@ -1,92 +1,76 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Wed, 15 Jul 2015 19:34:09 +0200 (CEST)
-Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
-In-Reply-To: <alpine.LNX.2.00.1507150917470.32721@localhost.localdomain>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <1435667250-28299-4-git-send-email-pawelo@king.net.pl>
- <CACRpkdasMqFCwy=ZEvMLeG2Z-xV01dbf8cXaPACP1=RSz2gdjw@mail.gmail.com>
- <alpine.LNX.2.00.1507150917470.32721@localhost.localdomain>
-Message-ID: <alpine.LNX.2.00.1507151931200.7048@localhost.localdomain>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 16 Jul 2015 01:41:02 +0800
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <1436783694-30717-2-git-send-email-s.hauer@pengutronix.de>
+References: <1436783694-30717-1-git-send-email-s.hauer@pengutronix.de>
+ <1436783694-30717-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <CAGS+omDjXrZSns7b+NMz1pUYbDK1ndW=NOdDtUXLuzTQUtcUPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Jul 13, 2015 at 6:34 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  .../bindings/thermal/mediatek-thermal.txt          | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> new file mode 100644
+> index 0000000..d90e4dc
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> @@ -0,0 +1,38 @@
+> +* Mediatek Thermal
+> +
+> +This describes the device tree binding for the Mediatek thermal controller
+> +which measures the on-SoC temperatures. This device does not have its own ADC,
+> +instead it directly controls the AUXADC via AHB bus accesses. For this reason
+> +this device needs phandles to the AUXADC. Also it controls a mux in the
+> +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+> +is also needed.
+> +
+> +Required properties:
+> +- compatible: "mediatek,mt8173-thermal"
+> +- reg: Address range of the thermal controller
+> +- interrupts: IRQ for the thermal controller
+> +- clocks, clock-names: Clocks needed for the thermal controller. required
+> +                       clocks are:
+> +               "therm":        Main clock needed for register access
+> +               "auxadc":       The AUXADC clock
+> +- resets, reset-names: Reference to the reset controller controlling the thermal
+> +                       controller. Required reset-names:
+> +               "therm":        The main reset line
+> +- auxadc: A phandle to the AUXADC which the thermal controller uses
+> +- apmixedsys: A phandle to the APMIXEDSYS controller.
 
-I had some discussion with an expert here and now I see drawbacks of using 
-struct for regs, I'll turn it into defines as you suggested.
+Hmm, shouldn't these custom properties be prefixed with:
+  "mediatek,..."
 
-On Wed, 15 Jul 2015, Paul Osmialowski wrote:
+-Dan
 
-> Hi Linus,
-> 
-> Thanks for all of your comments, I'll consider them during my works on the 
-> next iteration. However, I have doubts about this one:
-> 
-> On Tue, 14 Jul 2015, Linus Walleij wrote:
-> 
-> > On Tue, Jun 30, 2015 at 2:27 PM, Paul Osmialowski <pawelo@king.net.pl> wrote:
-> > 
-> > > Based on K70P256M150SF3RM.pdf K70 Sub-Family Reference Manual, Rev. 3.
-> > >
-> > > Signed-off-by: Paul Osmialowski <pawelo@king.net.pl>
-> > (...)
-> > > +struct kinetis_sim_regs {
-> > > +       u32 sopt1;      /* System Options Register 1 */
-> > > +       u32 rsv0[1024];
-> > > +       u32 sopt2;      /* System Options Register 2 */
-> > > +       u32 rsv1;
-> > > +       u32 sopt4;      /* System Options Register 4 */
-> > > +       u32 sopt5;      /* System Options Register 5 */
-> > > +       u32 sopt6;      /* System Options Register 6 */
-> > > +       u32 sopt7;      /* System Options Register 7 */
-> > > +       u32 rsv2[2];
-> > > +       u32 sdid;       /* System Device Identification Register */
-> > > +       u32 scgc[KINETIS_SIM_CG_NUMREGS];       /* Clock Gating Regs 1...7 */
-> > > +       u32 clkdiv1;    /* System Clock Divider Register 1 */
-> > > +       u32 clkdiv2;    /* System Clock Divider Register 2 */
-> > > +       u32 fcfg1;      /* Flash Configuration Register 1 */
-> > > +       u32 fcfg2;      /* Flash Configuration Register 2 */
-> > > +       u32 uidh;       /* Unique Identification Register High */
-> > > +       u32 uidmh;      /* Unique Identification Register Mid-High */
-> > > +       u32 uidml;      /* Unique Identification Register Mid Low */
-> > > +       u32 uidl;       /* Unique Identification Register Low */
-> > > +       u32 clkdiv3;    /* System Clock Divider Register 3 */
-> > > +       u32 clkdiv4;    /* System Clock Divider Register 4 */
-> > > +       u32 mcr;        /* Misc Control Register */
-> > > +};
-> > 
-> > Now there is this design pattern where you copy the datasheet
-> > register map to a struct again.
-> > 
-> > This is not good if there is a second revision of the hardware and some
-> > registers are shuffled around. IMO it is better to just use #defines
-> > for register
-> > offsets, so you can do exceptions later. Else a new hardware revision
-> > leads to a new struct with new accessor functions etc etc.
-> > 
-> 
-> I don't see how replacing this structure with bunch of defines could make 
-> anyones life easier. As registers are shuffled around due to updated 
-> hardware revision they could be shuffled in this structure too. Doing 
-> this with buch of defines would require eager and careful adaptation of 
-> all the defines. I don't see how this could be easier.
-> 
-> Note that I'm not making any instances of the structure (it is used only 
-> for casting), so shuffling its fields around should not affect the code 
-> that follows.
-> 
-> After recent purge it is only used within this macro:
-> 
-> #define KINETIS_SIM_PTR(base, reg) \
->         (&(((struct kinetis_sim_regs *)(base))->reg))
-> 
-> ...and used like this:
-> 
->         ioread32(KINETIS_SIM_PTR(sim, clkdiv1));
-> 
-> IMHO changing the struct internals does not require subsequent changes in 
-> any of those.
-> 
-> Thanks,
-> Paul
-> 
+> +- #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description
+> +
+> +Example:
+> +
+> +       thermal: thermal at 1100b000 {
+> +               #thermal-sensor-cells = <1>;
+> +               compatible = "mediatek,mt8173-thermal";
+> +               reg = <0 0x1100b000 0 0x1000>;
+> +               interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
+> +               clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> +               clock-names = "therm", "auxadc";
+> +               resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
+> +               reset-names = "therm";
+> +               auxadc = <&auxadc>;
+> +               apmixedsys = <&apmixedsys>;
+> +       };
+> --
+> 2.1.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
