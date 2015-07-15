@@ -1,17 +1,101 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 14 Jul 2015 18:23:29 -0700
-Subject: [PATCHv7 1/2] dts: Adding docs for Xilinx LogiCORE IP mailbox
- driver.
-In-Reply-To: <1436922022-17564-2-git-send-email-moritz.fischer@ettus.com>
-References: <1436922022-17564-1-git-send-email-moritz.fischer@ettus.com>
- <1436922022-17564-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <20150715012329.GZ3129@xsjsorenbubuntu>
+From: parkch98@gmail.com (Chanho Park)
+Date: Wed, 15 Jul 2015 10:36:53 +0900
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+Message-ID: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-14 at 06:00PM -0700, Moritz Fischer wrote:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> Acked-by: Michal Simek <michal.simek@xilinx.com>
-Acked-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+The cpu booting of exynos5422 has been still broken since we discussed
+it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
+hardkernel, it could help to boot 8 cores well. This patch need to have
+more test like STR and other SoC especially exynos5800 which is variant
+of exynos5422. If this patch is broken on exynos5800, I'll find another
+way to check exynos5422.
 
-	S?ren
+This patch is top of my previous exynos5422 cpu ordering patch[2] and
+need to enable CONFIG_EXYNOS5420_MCPM=y
+
+[    0.047509] CPU0: update cpu_capacity 448
+[    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
+[    0.047874] Setting up static identity map for 0x400082c0 -
+0x40008318
+[    0.048340] ARM CCI driver probed
+[    0.048597] Exynos MCPM support installed
+[    0.065676] CPU1: update cpu_capacity 448
+[    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
+[    0.070672] CPU2: update cpu_capacity 448
+[    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
+[    0.075644] CPU3: update cpu_capacity 448
+[    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
+[    0.080590] CPU4: update cpu_capacity 1535
+[    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
+[    0.085591] CPU5: update cpu_capacity 1535
+[    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
+[    0.090590] CPU6: update cpu_capacity 1535
+[    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
+[    0.095585] CPU7: update cpu_capacity 1535
+[    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
+[    0.095720] Brought up 8 CPUs
+
+[1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+[2]:https://patchwork.kernel.org/patch/6782891/
+
+Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: Chanwoo Choi <cw00.choi@samsung.com>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Heesub Shin <heesub.shin@samsung.com>
+Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+Signed-off-by: Chanho Park <parkch98@gmail.com>
+---
+ arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
+ arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+index 9bdf547..a076dde 100644
+--- a/arch/arm/mach-exynos/mcpm-exynos.c
++++ b/arch/arm/mach-exynos/mcpm-exynos.c
+@@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+ 		cluster >= EXYNOS5420_NR_CLUSTERS)
+ 		return -EINVAL;
+
+-	exynos_cpu_power_up(cpunr);
++	if (!exynos_cpu_power_state(cpunr)) {
++		exynos_cpu_power_up(cpunr);
++
++		if (soc_is_exynos5800() && cluster) {
++			while (!pmu_raw_readl(S5P_PMU_SPARE2))
++				udelay(10);
++
++			pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
++					EXYNOS_SWRESET);
++		}
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+index b761433..fba9068 100644
+--- a/arch/arm/mach-exynos/regs-pmu.h
++++ b/arch/arm/mach-exynos/regs-pmu.h
+@@ -513,6 +513,12 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+ #define SPREAD_ENABLE						0xF
+ #define SPREAD_USE_STANDWFI					0xF
+ 
++#define EXYNOS5420_KFC_CORE_RESET0				BIT(8)
++#define EXYNOS5420_KFC_ETM_RESET0				BIT(20)
++
++#define EXYNOS5420_KFC_CORE_RESET(_nr)				\
++	((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
++
+ #define EXYNOS5420_BB_CON1					0x0784
+ #define EXYNOS5420_BB_SEL_EN					BIT(31)
+ #define EXYNOS5420_BB_PMOS_EN					BIT(7)
+-- 
+2.1.0
