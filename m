@@ -1,56 +1,67 @@
 From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 15 Jul 2015 08:57:54 -0500
-Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
- lpsr
-In-Reply-To: <20150715072307.GM4119@tiger>
-References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
- <20150715072307.GM4119@tiger>
-Message-ID: <CAHrpEqT3GGoZTpM03Mo=YwxhxCQ=Z277d5X6EOY_dV=3c21L6w@mail.gmail.com>
+Date: Wed, 15 Jul 2015 09:00:12 -0500
+Subject: [PATCH] input: snvs_pwrkey: add linux prefix for wakeup property
+In-Reply-To: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
+References: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <CAHrpEqS2o6_B6dNrnWJ06ASWaB0SGxur1o3VuN2A-QywWhbWVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 2:23 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Jul 07, 2015 at 02:02:05PM -0500, Adrian Alonso wrote:
->> * Extend pinctrl-imx driver to support iomux lpsr conntroller,
->> * iMX7D has two iomuxc controllers, iomuxc controller similar as
->>   previous iMX SoC generation and iomuxc-lpsr which provides
->>   low power state rentetion capabilities on gpios that are part of
->>   iomuxc-lpsr (GPIO1_IO7..GPIO1_IO0).
->> * Use IOMUXC_LPSR_SUPPORT and iput_val most significant bits to
->>   properly configure iomuxc/iomuxc-lpsr settings.
->>
->> Signed-off-by: Adrian Alonso <aalonso@freescale.com>
+On Tue, Jul 14, 2015 at 10:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> The wakeup capability is somehow linux specific, and all existing
+> bindings name the property "linux,wakeup" to reflect that, e.g.
+> Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt.  Let's
+> follow the convention.
 >
-> It took me quite some time to understand what the patch does.  Before I
-> gave specific comments on your implementation, I would discuss if there
-> is a better solution, as I do not like the idea of encoding these
-> artificial pin id of LPSR pads in the input_val.
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+> This is a fixup for Frank's patch which is queued on i.MX tree, so I
+> will apply it to the same branch.
 >
-> Ideally, the LPSR controller should be implemented as a second instance
-> of IOMUXC.  But the problem seems to be the select input register is
-> shared between these two instances.  Is my understanding correct?
+> Shawn
+>
+>  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 2 +-
+>  drivers/input/keyboard/snvs_pwrkey.c                  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> index 71a39c5bd486..fa821c6a0b5b 100644
+> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> @@ -408,7 +408,7 @@ System ON/OFF key driver
+>        Value type: <int>
+>        Definition: Keycode to emit, KEY_POWER by default.
+>
+> -  - wakeup:
+> +  - linux,wakeup:
 
-There are two problem.
-1. LPSR IOMUX share input select with IOMUX.
-2. If use two instance,  the pin ID will be the same.  If there are a group
-mix use LPSR IOMUX and normal IOMUX,  system will be confused.
-For example:
-
-UART_pin:
-{
-          LPSR_IOMUX_RX,
-          NORMAL_IOMUX_TX,
-}
-
-IOMUX driver don't distinguish it.
+I remember Dmitry Torokhov said use wakeup, instead of linux, wakeup
+when I sent patch to review.
 
 best regards
 Frank Li
 
+>        Usage: option
+>        Value type: <boo>
+>        Definition: Button can wake-up the system.
+> diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
+> index 512a1fc2a864..021b7c1ddc2f 100644
+> --- a/drivers/input/keyboard/snvs_pwrkey.c
+> +++ b/drivers/input/keyboard/snvs_pwrkey.c
+> @@ -122,7 +122,7 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
+>                 dev_warn(&pdev->dev, "KEY_POWER without setting in dts\n");
+>         }
 >
-> How select input register is shared?  With different bits in a single
-> register which is only laid on normal IOMUXC controller?
+> -       pdata->wakeup = of_property_read_bool(np, "wakeup");
+> +       pdata->wakeup = of_property_read_bool(np, "linux,wakeup");
 >
-> I need more details to understand the problem.
+>         pdata->irq = platform_get_irq(pdev, 0);
+>         if (pdata->irq < 0) {
+> --
+> 1.9.1
 >
-> Shawn
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
