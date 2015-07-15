@@ -1,31 +1,33 @@
-From: s.nawrocki@samsung.com (Sylwester nawrocki)
-Date: Wed, 15 Jul 2015 18:58:17 +0900
-Subject: [PATCH v2 4/7] clk: samsung: exynos4x12: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <1436456621-29839-5-git-send-email-b.zolnierkie@samsung.com>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-5-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55A62EB9.7040902@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jul 2015 03:00:36 -0700
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+In-Reply-To: <20150715092437.GC9627@leverpostej>
+References: <1436820101-2172-1-git-send-email-balbi@ti.com>
+ <20150715092437.GC9627@leverpostej>
+Message-ID: <20150715100035.GB17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/10/2015 12:43 AM, Bartlomiej Zolnierkiewicz wrote:
-> With the addition of the new Samsung specific cpu-clock type, the
-> arm clock can be represented as a cpu-clock type. Add the CPU clock
-> configuration data and instantiate the CPU clock type for Exynos4x12.
->
-> Based on the earlier work by Thomas Abraham.
->
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->   drivers/clk/samsung/clk-exynos4.c | 50 +++++++++++++++++++++++++++++++++++++++
->   1 file changed, 50 insertions(+)
+* Mark Rutland <mark.rutland@arm.com> [150715 02:27]:
+> On Mon, Jul 13, 2015 at 09:41:41PM +0100, Felipe Balbi wrote:
+> > According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+> > the realtime counter sits in the Wakeup Always-On Power domain.
+> > Furthermore, the counter will automatically switch the 32K clock source
+> > when MPU goes into standby and automatically switch back to SYS_CLK or
+> > ABE_LP when MPU goes out of standby.
+> 
+> While the counter is in an always-on domain (the architecture mandates
+> this) I don't think that applies to the timers (i.e. the comparators
+> within a CPU), which are almost certainly not in an always-on domain.
+> 
+> I suspect that this is incorrect, and it will be very painful to debug
+> if it is...
 
-I guess you prefer to have this whole series applied through one,
-e.g samsung-soc tree? If so, here is my ack.
+OK good point. And there would have to be some wake-up line wired to the
+IO chain or the PMIC in this case if the comparator was always on.
 
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Dropping this patch for now anyways.
+
+Regards,
+
+Tony
