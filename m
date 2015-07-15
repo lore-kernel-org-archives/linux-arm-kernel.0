@@ -1,50 +1,63 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Wed, 15 Jul 2015 09:54:44 -0700
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get the
- irqdomain of the GIC.
+Date: Wed, 15 Jul 2015 09:54:43 -0700
+Subject: [PATCH 3/5] arm64,
+ pci: Allow RC drivers to supply pcibios_add_device() implementation.
 In-Reply-To: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-Needed to map SPI interrupt sources.
+The default is to continue doing the what we have done before, but add
+a hook so that this can be overridden.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3.c       | 5 +++++
- include/linux/irqchip/arm-gic-v3.h | 1 +
- 2 files changed, 6 insertions(+)
+ arch/arm64/include/asm/pci.h |  3 +++
+ arch/arm64/kernel/pci.c      | 10 ++++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index c52f7ba..0019fed 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
- /* Our default, arbitrary priority value. Linux only uses one anyway. */
- #define DEFAULT_PMR_VALUE	0xf0
+diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+index b008a72..ad3fb18 100644
+--- a/arch/arm64/include/asm/pci.h
++++ b/arch/arm64/include/asm/pci.h
+@@ -37,6 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+ {
+ 	return 1;
+ }
++
++void set_pcibios_add_device(int (*arg)(struct pci_dev *));
++
+ #endif  /* CONFIG_PCI */
  
-+struct irq_domain *gic_get_irq_domain(void)
+ #endif  /* __KERNEL__ */
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 4095379..3356023 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return res->start;
+ }
+ 
++static int (*pcibios_add_device_impl)(struct pci_dev *);
++
++void set_pcibios_add_device(int (*arg)(struct pci_dev *))
 +{
-+	return gic_data.domain;
++	pcibios_add_device_impl = arg;
 +}
 +
- static inline unsigned int gic_irq(struct irq_data *d)
+ /*
+  * Try to assign the IRQ number from DT when adding a new device
+  */
+ int pcibios_add_device(struct pci_dev *dev)
  {
- 	return d->hwirq;
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 18e3757..5992224 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
++	if (pcibios_add_device_impl)
++		return pcibios_add_device_impl(dev);
++
+ 	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
  
- typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
- void set_its_pci_requester_id(its_pci_requester_id_t fn);
-+struct irq_domain *gic_get_irq_domain(void);
- #endif
- 
- #endif
+ 	return 0;
 -- 
 1.9.1
