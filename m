@@ -1,30 +1,99 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 15 Jul 2015 10:29:18 +0200
-Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
- muxing controllers
-In-Reply-To: <20150715074642.GA14886@odux.rfo.atmel.com>
+Date: Wed, 15 Jul 2015 10:45:42 +0200
+Subject: [RESEND PATCH 2/2] pinctrl: introduce complex pin description
+In-Reply-To: <20150714061359.GC5161@pengutronix.de>
 References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
- <557EF60D.8020007@wwwdotorg.org>
- <20150617123816.GB12295@odux.rfo.atmel.com>
- <5581988C.50000@wwwdotorg.org>
- <20150618123348.GB20227@odux.rfo.atmel.com>
- <20150714055749.GB5161@pengutronix.de>
- <20150715074642.GA14886@odux.rfo.atmel.com>
-Message-ID: <20150715082918.GB14886@odux.rfo.atmel.com>
+ <1433948699-19800-3-git-send-email-ludovic.desroches@atmel.com>
+ <20150714061359.GC5161@pengutronix.de>
+Message-ID: <20150715084542.GC14886@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 09:46:42AM +0200, Ludovic Desroches wrote:
-> This driver fits most of my needs but I didn't do it in this way for the
-> two previous reasons. If it is not an issue to add a new
-> dt_node_to_map() implementation which should be quite close to the
-> mediatek one, let's do it.
+On Tue, Jul 14, 2015 at 08:13:59AM +0200, Sascha Hauer wrote:
+> On Wed, Jun 10, 2015 at 05:04:57PM +0200, Ludovic Desroches wrote:
+> > Using a string to describe a pin in the device tree can be not enough.
+> > Some controllers may need extra information to fully describe a pin. It
+> > concerns mainly controllers which have a per pin muxing approach which
+> > don't fit well the notions of groups and functions.
+> > Instead of using a pin name, a 32 bit value is used. The 16 least
+> > significant bits are used for the pin number. Other 16 bits can be used to
+> > store extra parameters.
+> 
+> In the Mediatek driver we use 'pinmux' as name for the property
+> containing the combined pin number / mux value defines. 'pinmux' better
+> describes what it is...
+> 
 
-Thinking more about it, there is something I have missed that can change
-many things is that one pin is one group in Mediatek driver.
+At the moment, I don't mix pin number and pin mux. I mix pin number and
+ioset. It allows to check that all the pins belong to the same ioset.
 
-If I add the pin mux value in my macros with the pin number and the
-ioset, group_defs node is still useful to declare group of pins.
+As said previously, I didn't want to mix pin mux and pin conf in the
+same node (but it is something I can do, it's not a problem on my side).
+If I do it I will have to mux three values: pin number, pin mux value
+and pin ioset.
+
+So assuming I do this change, your advice is to add a 'pinmux' property in
+addition of 'pins' instead of trying to use it?
+
+> > +
+> > +	if (pctldesc->complex_pin_desc)
+> > +		ret = of_property_count_u32_elems(np, "pins");
+> > +	else
+> > +		ret = of_property_count_strings(np, "pins");
+> 
+> ... and has the advantage that you don't have to pass in a
+> complex_pin_desc variable from the driver as the different property
+> name inherently carries this information. 'pins' can then stay a
+> property containing only strings.
+> 
+> >  	if (ret < 0) {
+> >  		ret = of_property_count_strings(np, "groups");
+> >  		if (ret < 0)
+> > @@ -297,11 +305,12 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+> >  		if (type == PIN_MAP_TYPE_INVALID)
+> >  			type = PIN_MAP_TYPE_CONFIGS_GROUP;
+> >  		subnode_target_type = "groups";
+> > +		pins_prop = false;
+> >  	} else {
+> >  		if (type == PIN_MAP_TYPE_INVALID)
+> >  			type = PIN_MAP_TYPE_CONFIGS_PIN;
+> >  	}
+> > -	strings_count = ret;
+> > +	items_count = ret;
+> >  
+> >  	ret = of_property_read_string(np, "function", &function);
+> >  	if (ret < 0) {
+> > @@ -326,17 +335,31 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+> >  	if (num_configs)
+> >  		reserve++;
+> >  
+> > -	reserve *= strings_count;
+> > +	reserve *= items_count;
+> >  
+> >  	ret = pinctrl_utils_reserve_map(pctldev, map, reserved_maps,
+> >  			num_maps, reserve);
+> >  	if (ret < 0)
+> >  		goto exit;
+> >  
+> > -	of_property_for_each_string(np, subnode_target_type, prop, group) {
+> > +	items_name = kmalloc_array(items_count, sizeof(char *), GFP_KERNEL);
+> > +	if (!items_name)
+> > +		goto exit;
+> > +	if (pctldesc->complex_pin_desc && pins_prop) {
+> > +		of_property_for_each_u32(np, subnode_target_type, prop, cur, val) {
+> > +			pin_id = val & PINCTRL_PIN_MASK;
+> > +			items_name[i++] = pctldesc->pins[pin_id].name;
+> > +		}
+> 
+> I don't like that even though pins have numbers here they are converted
+> to strings which the driver later has to search in a list just to
+> convert it back into the number. This is quite inefficient.
+> 
+> I guess this could be optimized later, but it would be nice to have the
+> pin number directly in the driver.
+
+I know that is something you don't like but, at the moment, I need a string for
+pinctrl_utils_add_map_mux and pinctrl_utils_add_map_configs.
+
 
 Ludovic
