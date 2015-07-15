@@ -1,30 +1,26 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 15 Jul 2015 16:50:17 +0200
-Subject: [PATCH v2] ARM: dts: vf-colibri: define stdout-path property
-Message-ID: <1436971817-28523-1-git-send-email-stefan@agner.ch>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jul 2015 16:54:33 +0200
+Subject: [PATCH] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <BL2PR03MB338DF493E475876FF6C6038839A0@BL2PR03MB338.namprd03.prod.outlook.com>
+References: <1436952778-28000-1-git-send-email-yao.yuan@freescale.com>
+ <3074236.7KNCYXgBBY@wuerfel>
+ <BL2PR03MB338DF493E475876FF6C6038839A0@BL2PR03MB338.namprd03.prod.outlook.com>
+Message-ID: <2042080.Y9rzRSQLpW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
-standard output.
+On Wednesday 15 July 2015 10:29:55 Yao Yuan wrote:
+> Hi Arnd,
+> 
+> Thanks for your review.
+> And can you give me more information?
+> In my opinion, The fsl_edma_pm_state will just be used when CONFIG_PM support. So why not use the #ifdefs to remove the 
+> unnecessary code? Since the PM will not be selected in many use cases.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I would consider code readability more important than saving a
+few instructions, and the #ifdef interrupts the reading flow.
+Another aspect is that the compiler does not produce warnings
+for incorrect code in an #ifdef, so we try to use e.g. 'if (IS_ENABLED(CONFIG_FOO))'
+instead of '#ifdef CONFIG_FOO' wherever possible.
 
-diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-index 77e1a45..2ce6fe5 100644
---- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
-@@ -9,7 +9,7 @@
- 
- / {
- 	chosen {
--		bootargs = "console=ttyLP0,115200";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	clk16m: clk16m {
--- 
-2.4.5
+	Arnd
