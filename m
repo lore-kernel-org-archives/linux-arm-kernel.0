@@ -1,75 +1,42 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 15 Jul 2015 18:30:36 +0100
-Subject: [PATCH 2/5] gic-its: Allow pci_requester_id to be overridden.
-In-Reply-To: <1436979285-8177-3-git-send-email-ddaney.cavm@gmail.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-3-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <55A698BC.2060308@arm.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 15 Jul 2015 10:30:56 -0700
+Subject: [PATCH v2 4/4] arm64: dts: Add Broadcom North Star 2 support
+In-Reply-To: <20150715092101.GB9627@leverpostej>
+References: <1436935343-4437-1-git-send-email-rjui@broadcom.com>
+ <1436935343-4437-5-git-send-email-rjui@broadcom.com>
+ <20150715092101.GB9627@leverpostej>
+Message-ID: <55A698D0.3070203@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/15 17:54, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
+
+
+On 7/15/2015 2:21 AM, Mark Rutland wrote:
+> Hi,
 > 
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c   | 14 +++++++++++++-
->  include/linux/irqchip/arm-gic-v3.h |  2 ++
->  2 files changed, 15 insertions(+), 1 deletion(-)
+>> +	chosen {
+>> +		stdout-path = "serial0:115200n8";
+>> +		bootargs = "earlycon=uart8250,mmio32,0x66130000";
+>> +	};
 > 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 1b7e155..4580970 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1189,11 +1189,23 @@ static int its_pci_msi_vec_count(struct pci_dev *pdev)
->  	return max(msi, msix);
->  }
->  
-> +static u32 its_dflt_pci_requester_id(struct pci_dev *pdev, u16 alias)
-> +{
-> +	return alias;
-> +}
-> +
-> +static its_pci_requester_id_t its_pci_requester_id = its_dflt_pci_requester_id;
-> +void set_its_pci_requester_id(its_pci_requester_id_t fn)
-> +{
-> +	its_pci_requester_id = fn;
-> +}
-> +EXPORT_SYMBOL(set_its_pci_requester_id);
-> +
->  static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
->  {
->  	struct its_pci_alias *dev_alias = data;
->  
-> -	dev_alias->dev_id = alias;
-> +	dev_alias->dev_id = its_pci_requester_id(pdev, alias);
->  	if (pdev != dev_alias->pdev)
->  		dev_alias->count += its_pci_msi_vec_count(dev_alias->pdev);
->  
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index ffbc034..18e3757 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -389,6 +389,8 @@ int its_cpu_init(void);
->  int its_init(struct device_node *node, struct rdists *rdists,
->  	     struct irq_domain *domain);
->  
-> +typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
-> +void set_its_pci_requester_id(its_pci_requester_id_t fn);
->  #endif
->  
->  #endif
+> You shouldn't need those earlycon arguments if your driver has
+> of_earlycon support. If that's currently missing, could you add that
+> instead?
+> 
+> Thanks,
+> Mark.
 > 
 
-This has already been proposed, and I already spoke my mind about that
-sort of approach (just in case you had any doubt, this is a NAK).
+I can look into this and add the of_earlycon support for
+8250_dw. It looks like it may be only a matter of hooking it up to the
+setup function in 8250_early.c, which is quite straightforward.
 
-If you have a new fancy kind of aliasing, please extend the capabilities
-of pci_for_each_dma_alias or describe it in terms of topological
-information that can be parsed.
+So does it make more sense for me to do the following?
+1) Drop the earlycon bootargs from ns2-svk.dts and continue the Broadcom
+iProc arm64 upstreaming process with the current patch series
+2) Start a separate, new patch series with OF_EARLYCON support to 8250
+DW driver
 
 Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Ray
