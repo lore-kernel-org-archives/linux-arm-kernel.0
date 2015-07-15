@@ -1,108 +1,53 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Wed, 15 Jul 2015 09:23:33 +0000
-Subject: [PATCH 2/2] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <BL2PR03MB3383F18A5096A989DF7DE8F839B0@BL2PR03MB338.namprd03.prod.outlook.com>
-References: <BL2PR03MB3383F18A5096A989DF7DE8F839B0@BL2PR03MB338.namprd03.prod.outlook.com>
-Message-ID: <BL2PR03MB338405EB3506D758CECF786839A0@BL2PR03MB338.namprd03.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 15 Jul 2015 10:24:37 +0100
+Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
+In-Reply-To: <1436820101-2172-1-git-send-email-balbi@ti.com>
+References: <1436820101-2172-1-git-send-email-balbi@ti.com>
+Message-ID: <20150715092437.GC9627@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On Mon, Jul 13, 2015 at 09:41:41PM +0100, Felipe Balbi wrote:
+> According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
+> the realtime counter sits in the Wakeup Always-On Power domain.
+> Furthermore, the counter will automatically switch the 32K clock source
+> when MPU goes into standby and automatically switch back to SYS_CLK or
+> ABE_LP when MPU goes out of standby.
 
-Thanks for your review, now I will take over the eDMA.
-I have some different in understanding with PM suspend/resume support. And I will send a patch for RFC later.
-Also please check my comment in line for this patch.
-I hope you can help to review it for me.
+While the counter is in an always-on domain (the architecture mandates
+this) I don't think that applies to the timers (i.e. the comparators
+within a CPU), which are almost certainly not in an always-on domain.
 
-Thanks.
+I suspect that this is incorrect, and it will be very painful to debug
+if it is...
 
-Best Regards,
-Yuan Yao
+Thanks,
+Mark.
 
-On 2015-1-30 21:01,  Stefan Agner wrote:
-> On Tue, Dec 30, 2014 at 04:41:47PM +0800, Jingchang Lu wrote:
-> > This adds power management suspend/resume support for the fsl-edma
-> > driver.
-> >
-> > Signed-off-by: Jingchang Lu <jingchang.lu@freescale.com>
-> > ---
-> >  drivers/dma/fsl-edma.c | 38
-> ++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 38 insertions(+)
-> >
-> > diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c index
-> > e0bd517..6a81699 100644
-> > --- a/drivers/dma/fsl-edma.c
-> > +++ b/drivers/dma/fsl-edma.c
-> > @@ -1017,6 +1017,43 @@ static int fsl_edma_remove(struct
-> platform_device *pdev)
-> >  	return 0;
-> >  }
-> >
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static int fsl_edma_pm_suspend(struct device *dev) {
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		fsl_edma_chan_mux(fsl_chan, 0, false);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int fsl_edma_pm_resume(struct device *dev) {
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		edma_writew(fsl_edma, 0x0, fsl_edma->membase +
-> EDMA_TCD_CSR(i));
-> > +		/* restore the channel slave id configuration */
-> > +		fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-> Wouldnt this be reconfigured? Should you do this for all channels or active ones.
-> Also I dont see you pausing or suspending active channels or checking for them?
 > 
-No, here is no need more reconfigured. I will send a new patch for what your consideration.
-Thanks.
-
-> --
-> ~Vinod
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/boot/dts/dra7.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> > +	}
-> > +
-> > +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> > +		    fsl_edma->membase + EDMA_CR);
-> > +
-> > +	return 0;
-> > +}
-> > +#endif
-> > +static
-> > +SIMPLE_DEV_PM_OPS(fsl_edma_pm_ops, fsl_edma_pm_suspend,
-> > +fsl_edma_pm_resume);
-> > +
-> >  static const struct of_device_id fsl_edma_dt_ids[] = {
-> >  	{ .compatible = "fsl,vf610-edma", },
-> >  	{ /* sentinel */ }
-> > @@ -1027,6 +1064,7 @@ static struct platform_driver fsl_edma_driver = {
-> >  	.driver		= {
-> >  		.name	= "fsl-edma",
-> >  		.of_match_table = fsl_edma_dt_ids,
-> > +		.pm	= &fsl_edma_pm_ops,
-> >  	},
-> >  	.probe          = fsl_edma_probe,
-> >  	.remove		= fsl_edma_remove,
-> > --
-> > 1.8.0
-> >
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index 8f1e25bcecbd..c1e6fd82485f 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -50,6 +50,7 @@
+>  			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>,
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) | IRQ_TYPE_LEVEL_LOW)>;
+>  		interrupt-parent = <&gic>;
+> +		always-on;
+>  	};
+>  
+>  	gic: interrupt-controller at 48211000 {
+> -- 
+> 2.4.4
 > 
-> --
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
