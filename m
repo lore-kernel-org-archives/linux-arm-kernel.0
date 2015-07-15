@@ -1,186 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 15 Jul 2015 11:47:14 -0500
-Subject: [PATCH] [v2] pinctrl: add support for Qualcomm Technologies QDF2xxx
- ARM64 SoCs
-Message-ID: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 15 Jul 2015 17:53:16 +0100
+Subject: [PATCH v3 3/4] arm64: Add IOMMU dma_ops
+In-Reply-To: <55A689EA.8030306@arm.com>
+References: <cover.1436552949.git.robin.murphy@arm.com>
+ <a074dfeffc8c8168bef2668de2499f072fdcfac7.1436552949.git.robin.murphy@arm.com>
+ <20150715093128.GA20186@e104818-lin.cambridge.arm.com>
+ <55A689EA.8030306@arm.com>
+Message-ID: <20150715165316.GG20186@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the pinctrl driver for the Qualcomm Technologies QDF2xxx ARM64 SoCs,
-which uses the Qualcomm Technologies TLMM pinctrl/gpio device.  This
-driver is probed via ACPI and uses the pinctrl-msm.c backend driver.
+On Wed, Jul 15, 2015 at 05:27:22PM +0100, Robin Murphy wrote:
+> On 15/07/15 10:31, Catalin Marinas wrote:
+> >On Fri, Jul 10, 2015 at 08:19:34PM +0100, Robin Murphy wrote:
+> >>+			if (iommu_dma_mapping_error(dev, *handle)) {
+> >>+				if (coherent)
+> >>+					__free_pages(page, get_order(size));
+> >>+				else
+> >>+					__free_from_pool(addr, size);
+> >>+				addr = NULL;
+> >>+			}
+> >>+		}
+> >>+	}
+> >>+	return addr;
+> >>+}
+> >
+> >In the second case here (!__GFP_WAIT), do we do any cache maintenance? I
+> >can't see it and it's needed for the !coherent case.
+> 
+> In the atomic non-coherent case, we're stealing from the atomic pool, so
+> addr is already a non-cacheable alias (and alloc_from_pool does memset(0)
+> through that). That shouldn't need anything extra, right?
 
-This driver is intended to be used only an ACPI-enabled system.  As such,
-UEFI will handle all pin control configuration, so this driver does not
-provide pin control functions.  It is effectively a GPIO-only driver.
+You are right, we already flushed the cache for the atomic pool when we
+allocated it in atomic_pool_init().
 
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/pinctrl/qcom/Kconfig           |   8 +++
- drivers/pinctrl/qcom/Makefile          |   1 +
- drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 122 +++++++++++++++++++++++++++++++++
- 3 files changed, 131 insertions(+)
- create mode 100644 drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-
-diff --git a/drivers/pinctrl/qcom/Kconfig b/drivers/pinctrl/qcom/Kconfig
-index 58f5632..8a38323 100644
---- a/drivers/pinctrl/qcom/Kconfig
-+++ b/drivers/pinctrl/qcom/Kconfig
-@@ -63,6 +63,14 @@ config PINCTRL_MSM8916
- 	  This is the pinctrl, pinmux, pinconf and gpiolib driver for the
- 	  Qualcomm TLMM block found on the Qualcomm 8916 platform.
- 
-+config PINCTRL_QDF2XXX
-+	tristate "Qualcomm Technologies QDF2xxx pin controller driver"
-+	depends on GPIOLIB && ACPI
-+	select PINCTRL_MSM
-+	help
-+	  This is the GPIO driver for the TLMM block found on the
-+	  Qualcomm Technologies QDF2xxx SOCs.
-+
- config PINCTRL_QCOM_SPMI_PMIC
-        tristate "Qualcomm SPMI PMIC pin controller driver"
-        depends on GPIOLIB && OF && SPMI
-diff --git a/drivers/pinctrl/qcom/Makefile b/drivers/pinctrl/qcom/Makefile
-index 3666c70..798d662 100644
---- a/drivers/pinctrl/qcom/Makefile
-+++ b/drivers/pinctrl/qcom/Makefile
-@@ -7,5 +7,6 @@ obj-$(CONFIG_PINCTRL_MSM8660)	+= pinctrl-msm8660.o
- obj-$(CONFIG_PINCTRL_MSM8960)	+= pinctrl-msm8960.o
- obj-$(CONFIG_PINCTRL_MSM8X74)	+= pinctrl-msm8x74.o
- obj-$(CONFIG_PINCTRL_MSM8916)	+= pinctrl-msm8916.o
-+obj-$(CONFIG_PINCTRL_QDF2XXX)	+= pinctrl-qdf2xxx.o
- obj-$(CONFIG_PINCTRL_QCOM_SPMI_PMIC) += pinctrl-spmi-gpio.o
- obj-$(CONFIG_PINCTRL_QCOM_SPMI_PMIC) += pinctrl-spmi-mpp.o
-diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-new file mode 100644
-index 0000000..e9ff3bc
---- /dev/null
-+++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-@@ -0,0 +1,122 @@
-+/*
-+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * GPIO and pin control functions on this SOC are handled by the "TLMM"
-+ * device.  The driver which controls this device is pinctrl-msm.c.  Each
-+ * SOC with a TLMM is expected to create a client driver that registers
-+ * with pinctrl-msm.c.  This means that all TLMM drivers are pin control
-+ * drivers.
-+ *
-+ * This pin control driver is intended to be used only an ACPI-enabled
-+ * system.  As such, UEFI will handle all pin control configuration, so
-+ * this driver does not provide pin control functions.  It is effectively
-+ * a GPIO-only driver.  The alternative is to duplicate the GPIO code of
-+ * pinctrl-msm.c into another driver.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/acpi.h>
-+
-+#include "pinctrl-msm.h"
-+
-+static struct msm_pinctrl_soc_data qdf2xxx_pinctrl;
-+
-+static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
-+{
-+	struct pinctrl_pin_desc *pins;
-+	struct msm_pingroup *groups;
-+	unsigned int i;
-+	u32 num_gpios;
-+	int ret;
-+
-+	/* Query the number of GPIOs from ACPI */
-+	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
-+	if (ret < 0)
-+		return ret;
-+
-+	if (!num_gpios) {
-+		dev_warn(&pdev->dev, "missing num-gpios property\n");
-+		return -ENODEV;
-+	}
-+
-+	pins = devm_kcalloc(&pdev->dev, num_gpios,
-+		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
-+	groups = devm_kcalloc(&pdev->dev, num_gpios,
-+		sizeof(struct msm_pingroup), GFP_KERNEL);
-+
-+	for (i = 0; i < num_gpios; i++) {
-+		pins[i].number = i;
-+
-+		groups[i].npins = 1,
-+		groups[i].pins = &pins[i].number;
-+		groups[i].ctl_reg = 0x10000 * i;
-+		groups[i].io_reg = 0x04 + 0x10000 * i;
-+		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
-+		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
-+		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
-+
-+		groups[i].mux_bit = 2;
-+		groups[i].pull_bit = 0;
-+		groups[i].drv_bit = 6;
-+		groups[i].oe_bit = 9;
-+		groups[i].in_bit = 0;
-+		groups[i].out_bit = 1;
-+		groups[i].intr_enable_bit = 0;
-+		groups[i].intr_status_bit = 0;
-+		groups[i].intr_target_bit = 5;
-+		groups[i].intr_target_kpss_val = 1;
-+		groups[i].intr_raw_status_bit = 4;
-+		groups[i].intr_polarity_bit = 1;
-+		groups[i].intr_detection_bit = 2;
-+		groups[i].intr_detection_width = 2;
-+	}
-+
-+	qdf2xxx_pinctrl.pins = pins;
-+	qdf2xxx_pinctrl.groups = groups;
-+	qdf2xxx_pinctrl.npins = num_gpios;
-+	qdf2xxx_pinctrl.ngroups = num_gpios;
-+	qdf2xxx_pinctrl.ngpios = num_gpios;
-+
-+	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
-+}
-+
-+static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-+	{"QCOM8001"},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-+
-+static struct platform_driver qdf2xxx_pinctrl_driver = {
-+	.driver = {
-+		.name = "qdf2xxx-pinctrl",
-+		.acpi_match_table = ACPI_PTR(qdf2xxx_acpi_ids),
-+	},
-+	.probe = qdf2xxx_pinctrl_probe,
-+	.remove = msm_pinctrl_remove,
-+};
-+
-+static int __init qdf2xxx_pinctrl_init(void)
-+{
-+	return platform_driver_register(&qdf2xxx_pinctrl_driver);
-+}
-+arch_initcall(qdf2xxx_pinctrl_init);
-+
-+static void __exit qdf2xxx_pinctrl_exit(void)
-+{
-+	platform_driver_unregister(&qdf2xxx_pinctrl_driver);
-+}
-+module_exit(qdf2xxx_pinctrl_exit);
-+
-+MODULE_DESCRIPTION("Qualcomm Technologies QDF2xxx pin control driver");
-+MODULE_LICENSE("GPL v2");
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Catalin
