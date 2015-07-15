@@ -1,70 +1,27 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 15 Jul 2015 11:57:35 -0700
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
- the irqdomain of the GIC.
-In-Reply-To: <55A6947F.8070903@arm.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
- <55A6947F.8070903@arm.com>
-Message-ID: <55A6AD1F.902@caviumnetworks.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jul 2015 19:58:59 +0100
+Subject: [PATCH 0/7] Another posting of the Dove PMU series
+Message-ID: <20150715185859.GC7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/15/2015 10:12 AM, Marc Zyngier wrote:
-> On 15/07/15 17:54, David Daney wrote:
->> From: David Daney <david.daney@cavium.com>
->>
->> Needed to map SPI interrupt sources.
->>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   drivers/irqchip/irq-gic-v3.c       | 5 +++++
->>   include/linux/irqchip/arm-gic-v3.h | 1 +
->>   2 files changed, 6 insertions(+)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->> index c52f7ba..0019fed 100644
->> --- a/drivers/irqchip/irq-gic-v3.c
->> +++ b/drivers/irqchip/irq-gic-v3.c
->> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
->>   /* Our default, arbitrary priority value. Linux only uses one anyway. */
->>   #define DEFAULT_PMR_VALUE	0xf0
->>
->> +struct irq_domain *gic_get_irq_domain(void)
->> +{
->> +	return gic_data.domain;
->> +}
->> +
->>   static inline unsigned int gic_irq(struct irq_data *d)
->>   {
->>   	return d->hwirq;
->> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->> index 18e3757..5992224 100644
->> --- a/include/linux/irqchip/arm-gic-v3.h
->> +++ b/include/linux/irqchip/arm-gic-v3.h
->> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
->>
->>   typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
->>   void set_its_pci_requester_id(its_pci_requester_id_t fn);
->> +struct irq_domain *gic_get_irq_domain(void);
->>   #endif
->>
->>   #endif
->>
->
-> Hmmmffff... You need the domain for SPIs??
->
-> What is wrong with putting these interrupts in your device tree?
->
+What it says in the subject.  Not hopeful of a successful outcome, so I'm
+not going to bother wasting time writing stuff here.
 
-There is no device tree node for ECAM based "PCIe" devices, they are 
-discovered in the PCI bus scan, yet they still need to use SPI interrupts.
+ Documentation/devicetree/bindings/soc/dove/pmu.txt |  56 ++
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/boot/dts/dove.dtsi                        | 604 +++++++++++----------
+ arch/arm/mach-dove/common.c                        |  25 +
+ arch/arm/mach-dove/include/mach/pm.h               |  17 -
+ arch/arm/mach-dove/irq.c                           |  87 ---
+ arch/arm/mach-mvebu/Kconfig                        |   1 +
+ arch/arm/mach-mvebu/dove.c                         |   2 +
+ drivers/soc/Makefile                               |   2 +
+ drivers/soc/dove/Makefile                          |   1 +
+ drivers/soc/dove/pmu.c                             | 512 +++++++++++++++++
+ include/linux/soc/dove/pmu.h                       |  24 +
+ 12 files changed, 942 insertions(+), 390 deletions(-)
 
-We need a way to be able to map these.
-
-David Daney
-
-
-
-> 	M.
->
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
