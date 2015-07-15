@@ -1,48 +1,43 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 15 Jul 2015 15:52:56 -0700 (PDT)
-Subject: [PATCH] net: mvneta: fix refilling for Rx DMA buffers
-In-Reply-To: <1436738697-21652-1-git-send-email-simon.guinot@sequanux.org>
-References: <1436738697-21652-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150715.155256.1854323748613951804.davem@davemloft.net>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Wed, 15 Jul 2015 19:00:01 -0400
+Subject: [PATCH] ARM: keystone: dts: disable pcie dt bindings by default
+Message-ID: <1437001202-19582-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <simon.guinot@sequanux.org>
-Date: Mon, 13 Jul 2015 00:04:57 +0200
+Fix the status of PCIe DT bindings in the SoC specific DTS to
+"disabled" so that it can be enabled on a specific board by
+setting the status to "Ok" in the board specific DTS.
 
-> On some Armada 370-based NAS, I have experimented kernel bugs and
-> crashes when the mvneta Ethernet driver fails to refill Rx DMA buffers
-> due to memory shortage.
-> 
-> With the actual code, if the memory allocation fails while refilling a
-> Rx DMA buffer, then the corresponding descriptor is let with the address
-> of an unmapped DMA buffer already passed to the network stack. Since the
-> driver still increments the non-occupied counter for Rx descriptor (if a
-> next packet is handled successfully), then the Ethernet controller is
-> allowed to reuse the unfilled Rx descriptor...
-> 
-> As a fix, this patch first refills a Rx descriptor before handling the
-> stored data and unmapping the associated Rx DMA buffer. Additionally the
-> occupied and non-occupied counters for the Rx descriptors queues are now
-> both updated with the rx_done value: the number of descriptors ready to
-> be returned to the networking controller. Moreover note that there is no
-> point in using different values for this counters because both the
-> mvneta driver and the Ethernet controller are unable to handle holes in
-> the Rx descriptors queues.
-> 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-> Cc: <stable@vger.kernel.org> # v3.8+
-> Tested-by: Yoann Sculo <yoann@sculo.fr>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ arch/arm/boot/dts/k2e.dtsi      | 1 +
+ arch/arm/boot/dts/keystone.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-Failed memory allocations, are normal and if necessary kernel log
-messages will be triggered by the core memory allocator.  So there is
-zero reason to do anything other than bump the drop counter in your
-driver.
-
-If I understand the rest of your logic, if the allocator fails, we
-will reuse the original SKB and place it back into the RX ring?
-Right?
-
-If not, that's the approach you should be using and it is what we
-advise all networking driver authors to do.
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index 50e555e..ecb9cd6 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -96,6 +96,7 @@
+ 			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
+ 				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
+ 
++			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
+ 
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index c06542b..0d6be74 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -296,6 +296,7 @@
+ 			ranges = <0x81000000 0 0 0x23250000 0 0x4000
+ 				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
+ 
++			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
+ 
+-- 
+1.9.1
