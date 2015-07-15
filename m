@@ -1,29 +1,48 @@
-From: const@makelinux.com (Constantine Shulyupin)
-Date: Thu, 16 Jul 2015 01:24:59 +0300
-Subject: Linux on Armada 370
-Message-ID: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 15 Jul 2015 15:52:56 -0700 (PDT)
+Subject: [PATCH] net: mvneta: fix refilling for Rx DMA buffers
+In-Reply-To: <1436738697-21652-1-git-send-email-simon.guinot@sequanux.org>
+References: <1436738697-21652-1-git-send-email-simon.guinot@sequanux.org>
+Message-ID: <20150715.155256.1854323748613951804.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Simon Guinot <simon.guinot@sequanux.org>
+Date: Mon, 13 Jul 2015 00:04:57 +0200
 
-I want to run the mainstream Linux on Armada 370 and then contribute to it.
+> On some Armada 370-based NAS, I have experimented kernel bugs and
+> crashes when the mvneta Ethernet driver fails to refill Rx DMA buffers
+> due to memory shortage.
+> 
+> With the actual code, if the memory allocation fails while refilling a
+> Rx DMA buffer, then the corresponding descriptor is let with the address
+> of an unmapped DMA buffer already passed to the network stack. Since the
+> driver still increments the non-occupied counter for Rx descriptor (if a
+> next packet is handled successfully), then the Ethernet controller is
+> allowed to reuse the unfilled Rx descriptor...
+> 
+> As a fix, this patch first refills a Rx descriptor before handling the
+> stored data and unmapping the associated Rx DMA buffer. Additionally the
+> occupied and non-occupied counters for the Rx descriptors queues are now
+> both updated with the rx_done value: the number of descriptors ready to
+> be returned to the networking controller. Moreover note that there is no
+> point in using different values for this counters because both the
+> mvneta driver and the Ethernet controller are unable to handle holes in
+> the Rx descriptors queues.
+> 
+> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
+> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
+> Cc: <stable@vger.kernel.org> # v3.8+
+> Tested-by: Yoann Sculo <yoann@sculo.fr>
 
-I use custom board derived from DB-88F6710-BP
-Now I successfully run Marvell's linux-3.2.54-2014_T1.1 with u-boot
-"Marvell version: v2011.12 2013_Q1.0p2"
-U-boot and Linux are patched by our OEM according HW changes.
+Failed memory allocations, are normal and if necessary kernel log
+messages will be triggered by the core memory allocator.  So there is
+zero reason to do anything other than bump the drop counter in your
+driver.
 
-I unsuccessfully tried to to run linux-4.2 with armada-370-db.dts.
+If I understand the rest of your logic, if the allocator fails, we
+will reuse the original SKB and place it back into the RX ring?
+Right?
 
-Can you please tell me, were can I find the latest Linux, which runs
-on Armada 370?
-What is proper configuration etc?
-
-
-Thanks
--- 
-Constantine Shulyupin
-http://www.MakeLinux.com/
-Embedded Linux Systems
-and Device Drivers
+If not, that's the approach you should be using and it is what we
+advise all networking driver authors to do.
