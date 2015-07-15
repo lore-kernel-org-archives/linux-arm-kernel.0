@@ -1,55 +1,41 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Jul 2015 19:04:14 +0100
-Subject: [PATCH 4/8] pcmcia: pxa2xx: convert memory allocation to devm_* API
+Date: Wed, 15 Jul 2015 19:04:19 +0100
+Subject: [PATCH 5/8] pcmcia: sa1111: update socket driver to use
+ devm_clk_get() API
 In-Reply-To: <20150715180342.GB7557@n2100.arm.linux.org.uk>
 References: <20150715180342.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZFR2U-0007MS-Lr@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZFR2Z-0007MZ-Pr@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the pxa2xx socket driver memory allocation to use devm_kzalloc()
-to simplify the cleanup path.
+Update the pxa2xx socket driver to use the devm_clk_get() API so that
+the cleanup paths are simplified.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/pxa2xx_base.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/pcmcia/sa1111_generic.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 197c77a64ce0..0f42d55e7c7f 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -302,7 +302,8 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index 80b8e9d05275..fb902af8a5b7 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -145,7 +145,7 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 			return -ENOMEM;
  
- 	pxa2xx_drv_pcmcia_ops(ops);
- 
--	sinfo = kzalloc(SKT_DEV_INFO_SIZE(ops->nr), GFP_KERNEL);
-+	sinfo = devm_kzalloc(&dev->dev, SKT_DEV_INFO_SIZE(ops->nr),
-+			     GFP_KERNEL);
- 	if (!sinfo)
- 		return -ENOMEM;
- 
-@@ -330,7 +331,7 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- err1:
- 	while (--i >= 0)
- 		soc_pcmcia_remove_one(&sinfo->skt[i]);
--	kfree(sinfo);
-+
- err0:
- 	return ret;
- }
-@@ -340,12 +341,9 @@ static int pxa2xx_drv_pcmcia_remove(struct platform_device *dev)
- 	struct skt_dev_info *sinfo = platform_get_drvdata(dev);
- 	int i;
- 
--	platform_set_drvdata(dev, NULL);
--
- 	for (i = 0; i < sinfo->nskt; i++)
- 		soc_pcmcia_remove_one(&sinfo->skt[i]);
- 
--	kfree(sinfo);
- 	return 0;
- }
+ 		s->soc.nr = ops->first + i;
+-		s->soc.clk = clk_get(&dev->dev, NULL);
++		s->soc.clk = devm_clk_get(&dev->dev, NULL);
+ 		if (IS_ERR(s->soc.clk)) {
+ 			ret = PTR_ERR(s->soc.clk);
+ 			kfree(s);
+@@ -226,7 +226,6 @@ static int pcmcia_remove(struct sa1111_dev *dev)
+ 	for (; s; s = next) {
+ 		next = s->next;
+ 		soc_pcmcia_remove_one(&s->soc);
+-		clk_put(s->soc.clk);
+ 		kfree(s);
+ 	}
  
 -- 
 2.1.0
