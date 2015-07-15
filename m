@@ -1,67 +1,42 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 15 Jul 2015 09:00:12 -0500
-Subject: [PATCH] input: snvs_pwrkey: add linux prefix for wakeup property
-In-Reply-To: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
-References: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
-Message-ID: <CAHrpEqS2o6_B6dNrnWJ06ASWaB0SGxur1o3VuN2A-QywWhbWVA@mail.gmail.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 15 Jul 2015 16:05:50 +0200
+Subject: [PATCH] ARM: dts: vf-colibri: define stdout-path property
+In-Reply-To: <20150713151004.GA26642@tiger>
+References: <1435910799-11706-1-git-send-email-stefan@agner.ch>
+ <20150713151004.GA26642@tiger>
+Message-ID: <bed79bcac594f3efece6acb3c24ae543@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 10:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
-> The wakeup capability is somehow linux specific, and all existing
-> bindings name the property "linux,wakeup" to reflect that, e.g.
-> Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt.  Let's
-> follow the convention.
->
-> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
-> ---
-> This is a fixup for Frank's patch which is queued on i.MX tree, so I
-> will apply it to the same branch.
->
-> Shawn
->
->  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 2 +-
->  drivers/input/keyboard/snvs_pwrkey.c                  | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> index 71a39c5bd486..fa821c6a0b5b 100644
-> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
-> @@ -408,7 +408,7 @@ System ON/OFF key driver
->        Value type: <int>
->        Definition: Keycode to emit, KEY_POWER by default.
->
-> -  - wakeup:
-> +  - linux,wakeup:
+On 2015-07-13 17:10, Shawn Guo wrote:
+> On Fri, Jul 03, 2015 at 10:06:39AM +0200, Stefan Agner wrote:
+>> Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
+>> standard output.
+>>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> index 2cbe663..cb199ae 100644
+>> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
+>> @@ -10,6 +10,7 @@
+>>  / {
+>>  	chosen {
+>>  		bootargs = "console=ttyLP0,115200";
+>> +		stdout-path = "serial0:115200n8";
+> 
+> With this change, can bootargs just be dropped?
 
-I remember Dmitry Torokhov said use wakeup, instead of linux, wakeup
-when I sent patch to review.
+I guess it would break a (fairly old) kernel which does not support
+stdout-path yet?
 
-best regards
-Frank Li
+However, the newer Vybrid DT's anyway do not work on old kernels due to
+the interrupt hierarchy changes...
 
->        Usage: option
->        Value type: <boo>
->        Definition: Button can wake-up the system.
-> diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
-> index 512a1fc2a864..021b7c1ddc2f 100644
-> --- a/drivers/input/keyboard/snvs_pwrkey.c
-> +++ b/drivers/input/keyboard/snvs_pwrkey.c
-> @@ -122,7 +122,7 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
->                 dev_warn(&pdev->dev, "KEY_POWER without setting in dts\n");
->         }
->
-> -       pdata->wakeup = of_property_read_bool(np, "wakeup");
-> +       pdata->wakeup = of_property_read_bool(np, "linux,wakeup");
->
->         pdata->irq = platform_get_irq(pdev, 0);
->         if (pdata->irq < 0) {
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Will send a v2 without default bootargs.
+
+--
+Stefan
