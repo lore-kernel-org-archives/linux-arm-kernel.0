@@ -1,94 +1,34 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 15 Jul 2015 15:48:58 -0500
-Subject: [PATCH] ARM: dts: socfpga: use stdout-path for chosen node
-Message-ID: <1436993338-32172-1-git-send-email-dinguyen@opensource.altera.com>
+From: gregory.0xf0@gmail.com (Gregory Fong)
+Date: Wed, 15 Jul 2015 13:58:15 -0700
+Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
+In-Reply-To: <5941809.XWvPzT6esn@wuerfel>
+References: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
+ <9845978.JUsldTlF3B@wuerfel> <55A68C9C.8000303@gmail.com>
+ <5941809.XWvPzT6esn@wuerfel>
+Message-ID: <CADtm3G6A=VO7eB4nDMnWEj+1BAjEN4OJnO1Msf8KPBn2tx6DJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Wed, Jul 15, 2015 at 1:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 15 July 2015 09:38:52 Florian Fainelli wrote:
+>>
+>> I like the idea in general, but I think this is going to be a very
+>> tedious job to collect every single CR values for ARMv7 processors to
+>> determine whether they are pure v7 or v7e... Maybe we could use
+>> kernelci.org to start extracting the relevant lines in bootlogs and
+>> people can start adding their own chips one by one?
+>
+> No, we know most of them:
+>
+> Cortex-A5, A8, A9: ARMv7, no LPAE, no IDIV
+> Cortex-A7, A15, A12, A17: ARMv7VE, no LPAE, no IDIV
+>
+>
+> Almost everyone uses the above cores unmodified.
+>
+> The ones I'm not 100% sure about are:
+>
+> [...]
+> Broadcom Brahma-B15 (almost certainly ARMv7VE)
 
-Use stdout-path dts property for kernel console.
-
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi        | 5 +++++
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi  | 3 ++-
- arch/arm/boot/dts/socfpga_arria5_socdk.dts    | 3 ++-
- arch/arm/boot/dts/socfpga_cyclone5_socdk.dts  | 3 ++-
- arch/arm/boot/dts/socfpga_cyclone5_sockit.dts | 3 ++-
- 5 files changed, 13 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 4779b07..a252905 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -21,6 +21,11 @@
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index 94a0709..99aa9a1 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -21,7 +21,8 @@
- 	compatible = "altr,socfpga-arria10", "altr,socfpga";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200 rootwait";
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial1:115200n8";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/socfpga_arria5_socdk.dts b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-index ccaf417..a75a666 100644
---- a/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_arria5_socdk.dts
-@@ -22,7 +22,8 @@
- 	compatible = "altr,socfpga-arria5", "altr,socfpga";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-index 258865d..d4d0a28 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_socdk.dts
-@@ -22,7 +22,8 @@
- 	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	memory {
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-index 71468a7..42d6092 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_sockit.dts
-@@ -22,7 +22,8 @@
- 	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
- 
- 	chosen {
--		bootargs = "console=ttyS0,115200";
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
- 	};
- 
- 	memory {
--- 
-2.4.5
+Confirmed, B15 is ARMv7VE.
