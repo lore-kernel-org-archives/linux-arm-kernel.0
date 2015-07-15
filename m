@@ -1,63 +1,104 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 15 Jul 2015 10:13:40 +0200
-Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
-In-Reply-To: <CAAVeFu+L+Qrja4gWEA=FnnbtBFkX43zpmJLJq0PSWLx5m4w6kA@mail.gmail.com>
-References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
- <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
- <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
- <CAAObsKBUoMmHOXBmEO4+8H1VVAkEHn_aFvLBOrXS5syLu5p1iA@mail.gmail.com>
- <CAAVeFu+L+Qrja4gWEA=FnnbtBFkX43zpmJLJq0PSWLx5m4w6kA@mail.gmail.com>
-Message-ID: <CAAObsKC15XrBhDLb08_dBxPhcX+4i9YxqT963c0LDvziZVQhZA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 15 Jul 2015 01:15:42 -0700
+Subject: [PATCH] irqchip: omap-intc: improve IRQ handler
+In-Reply-To: <20150119213458.GK18552@atomide.com>
+References: <1420224433-27001-1-git-send-email-balbi@ti.com>
+ <20150119213458.GK18552@atomide.com>
+Message-ID: <20150715064923.GA17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 July 2015 at 05:17, Alexandre Courbot <gnurou@gmail.com> wrote:
-> On Tue, Jul 14, 2015 at 5:34 PM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> On 13 July 2015 at 22:14, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> On Wed, Jun 17, 2015 at 3:42 PM, Tomeu Vizoso
->>> <tomeu.vizoso@collabora.com> wrote:
->>>
->>>> If the gpio DT node has the gpio-ranges property, the range will be
->>>> added by the gpio core and doesn't need to be added by the pinctrl
->>>> driver.
->>>>
->>>> By having the gpio-ranges property, we have an explicit dependency from
->>>> the gpio node to the pinctrl node and we can stop using the deprecated
->>>> pinctrl_add_gpio_range() function.
->>>>
->>>> Note that when the GPIO device gets probed before the associated
->>>> princtrl device, the gpio core actually won't register the gpio range.
->>>> Thus, this patch is only safe to be merged after we have in place a way
->>>> to assure that gpio devices are probed after their associated pinctrl
->>>> devices (such as ordered probing).
->>>>
->>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>
->>> This doesn't look like it would hurt, but need Stephen's opinion
->>> on it, and I think he's on vacation. Would check with next-in-line
->>> Tegra maintainer, Thierry/Alexandre?
->>
->> Sorry about that, but I have split these changes out into their own
->> series after people complained about it.
->>
->> Have just sent a new version which already has Stephen's ack:
->>
->> https://lkml.kernel.org/g/1436862596-27730-1-git-send-email-tomeu.vizoso at collabora.com
->
-> The change looks ok, but why limit it to Tegra? It seems like it could
-> apply to any driver that supports gpio-range. Or is it because this
-> will only work with drivers that use ordered probing?
+Felipe,
 
-It has to be SoC specific because we need to find out if a node
-representing the in-SoC gpio controller is present, and has the
-gpio-ranges property.
+* Tony Lindgren <tony@atomide.com> [150119 13:41]:
+> * Felipe Balbi <balbi@ti.com> [150102 10:50]:
+> > as it turns out the current IRQ number will
+> > *always* be available from SIR register which
+> > renders the reads of PENDING registers as plain
+> > unnecessary overhead.
+> > 
+> > In order to catch any situation where SIR reads
+> > as zero, we're adding a WARN() to turn it into
+> > a very verbose error and users actually report
+> > it.
+> > 
+> > With this patch average running time of
+> > omap_intc_handle_irq() reduced from about 28.5us
+> > to 19.8us as measured by the kernel function
+> > profiler.
+> > 
+> > Tested with BeagleBoneBlack Rev A5C.
+> > 
+> > Signed-off-by: Felipe Balbi <balbi@ti.com>
+> 
+> Jason, looks like this is not showing up in Linux next. The
+> same for the changes I did for dm81xx.
 
-I guess we could move the code to the pinctrl core and parametrize the
-property name but given that pinctrl_add_gpio_range is deprecated and
-that we are doing this only for DT compatibility, I'm not sure it
-would be a good idea.
+Can you please resend this to Jason? Looks like this
+is still not merged.
 
 Regards,
 
-Tomeu
+Tony
+
+> > Before applying, it would be very nice to get reports
+> > from other folks on different platforms, specially OMAP2/3
+> > ones which I don't have (easy) access.
+> > 
+> >  drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
+> >  1 file changed, 5 insertions(+), 30 deletions(-)
+> > 
+> > diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+> > index 28718d3..a2da6d5 100644
+> > --- a/drivers/irqchip/irq-omap-intc.c
+> > +++ b/drivers/irqchip/irq-omap-intc.c
+> > @@ -315,37 +315,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+> >  static asmlinkage void __exception_irq_entry
+> >  omap_intc_handle_irq(struct pt_regs *regs)
+> >  {
+> > -	u32 irqnr = 0;
+> > -	int handled_irq = 0;
+> > -	int i;
+> > -
+> > -	do {
+> > -		for (i = 0; i < omap_nr_pending; i++) {
+> > -			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
+> > -			if (irqnr)
+> > -				goto out;
+> > -		}
+> > -
+> > -out:
+> > -		if (!irqnr)
+> > -			break;
+> > -
+> > -		irqnr = intc_readl(INTC_SIR);
+> > -		irqnr &= ACTIVEIRQ_MASK;
+> > +	u32 irqnr;
+> >  
+> > -		if (irqnr) {
+> > -			handle_domain_irq(domain, irqnr, regs);
+> > -			handled_irq = 1;
+> > -		}
+> > -	} while (irqnr);
+> > -
+> > -	/*
+> > -	 * If an irq is masked or deasserted while active, we will
+> > -	 * keep ending up here with no irq handled. So remove it from
+> > -	 * the INTC with an ack.
+> > -	 */
+> > -	if (!handled_irq)
+> > -		omap_ack_irq(NULL);
+> > +	irqnr = intc_readl(INTC_SIR);
+> > +	irqnr &= ACTIVEIRQ_MASK;
+> > +	WARN(!irqnr, "Spuriour IRQ ?\n");
+> > +	handle_domain_irq(domain, irqnr, regs);
+> >  }
+> >  
+> >  void __init omap2_init_irq(void)
+> > -- 
+> > 2.2.0
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
