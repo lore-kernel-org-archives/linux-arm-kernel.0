@@ -1,171 +1,251 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 15 Jul 2015 10:02:58 +0200
-Subject: [PATCH] ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
-In-Reply-To: <1436908987-16038-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1436908987-16038-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20150715080258.GA29885@pengutronix.de>
+From: b18965@freescale.com (Alison Wang)
+Date: Wed, 15 Jul 2015 16:02:46 +0800
+Subject: [PATCH v2] ARM: dts: ls1021a: audio: Add dts nodes for audio on
+ LS1021A
+Message-ID: <1436947366-36547-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patch adds dts nodes for audio on LS1021A.
 
-On Tue, Jul 14, 2015 at 04:23:07PM -0500, dinguyen at opensource.altera.com wrote:
-> From: Dalon Westergreen <dwesterg@gmail.com>
-> 
-> The Terasic DE0 Atlas board is also known as the DE0-Nano board.
-> 
-> Signed-off-by: Dalon Westergreen <dwesterg@gmail.com>
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/Makefile                        |    1 +
->  arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts |  109 +++++++++++++++++++++
->  2 files changed, 110 insertions(+)
->  create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 246473a..29e33aa 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -522,6 +522,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
->  	socfpga_arria5_socdk.dtb \
->  	socfpga_arria10_socdk_sdmmc.dtb \
->  	socfpga_cyclone5_socdk.dtb \
-> +	socfpga_cyclone5_de0_sockit.dtb \
-                             ^^^^^^
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+---
+Changes since v1:
+- Remove "clocks" container, and use a unit node name.
 
-Is that intentional? Terasic doesn't mention sockit at all in the name
-of the board.
+ arch/arm/boot/dts/ls1021a-qds.dts | 69 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a-twr.dts | 61 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ls1021a.dtsi    | 14 ++++----
+ 3 files changed, 138 insertions(+), 6 deletions(-)
 
->  	socfpga_cyclone5_sockit.dtb \
->  	socfpga_cyclone5_socrates.dtb \
->  	socfpga_vt.dtb
-> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> new file mode 100644
-> index 0000000..3172c82
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-> @@ -0,0 +1,109 @@
-> +/*
-> + * Copyright Altera Corporation (C) 2015. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include "socfpga_cyclone5.dtsi"
-> +
-> +/ {
-> +	model = "Terasic DE-0(Atlas)";
-> +	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200";
-> +	};
-> +
-> +	memory {
-> +		name = "memory";
-> +		device_type = "memory";
-> +		reg = <0x0 0x40000000>; /* 1GB */
-> +	};
-> +
-> +	aliases {
-> +		/* this allow the ethaddr uboot environmnet variable contents
-> +		 * to be added to the gmac1 device tree blob.
-> +		 */
-
-I'd personally like to get rid of these types of comments in the dts.
-It doesn't matter what uboot needs or does IMHO.
-
-> +		ethernet0 = &gmac1;
-> +	};
-> +
-> +	regulator_3_3v: 3-3-v-regulator {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "3.3V";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		hps0 {
-> +			label = "hps_led0";
-> +			gpios = <&portb 24 0>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +	};
-> +};
-> +
-> +&gmac1 {
-> +	status = "okay";
-> +	phy-mode = "rgmii";
-> +
-> +	rxd0-skew-ps = <0>;
-> +	rxd1-skew-ps = <0>;
-> +	rxd2-skew-ps = <0>;
-> +	rxd3-skew-ps = <0>;
-> +	txen-skew-ps = <0>;
-> +	txc-skew-ps = <2600>;
-> +	rxdv-skew-ps = <0>;
-> +	rxc-skew-ps = <2000>;
-> +	max-frame-size = <3800>;
-> +};
-> +
-> +&gpio0 {
-> +	status = "okay";
-> +};
-> +
-> +&gpio1 {
-> +	status = "okay";
-> +};
-> +
-> +&gpio2 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	status = "okay";
-> +	speed-mode = <0>;
-> +
-> +	adxl345: adxl345 at 0 {
-> +		compatible = "adi,adxl345";
-> +		reg = <0x53>;
-> +
-> +		interrupt-parent = <&portc>;
-> +		interrupts = <3 2>;
-> +	};
-> +	
-> +};
-> +
-> +&mmc0 {
-> +	vmmc-supply = <&regulator_3_3v>;
-> +	vqmmc-supply = <&regulator_3_3v>;
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +};
-
-Rest looks okay to me.
-
-Regards,
-Steffen
-
+diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
+index f14731b..f5f4194 100644
+--- a/arch/arm/boot/dts/ls1021a-qds.dts
++++ b/arch/arm/boot/dts/ls1021a-qds.dts
+@@ -58,6 +58,55 @@
+ 		enet0_sgmii_phy = &sgmii_phy1c;
+ 		enet1_sgmii_phy = &sgmii_phy1d;
+ 	};
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p3v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai2>;
++			frame-master;
++			bitclock-master;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++		};
++	};
+ };
+ 
+ &dspi0 {
+@@ -83,6 +132,7 @@
+ 	status = "okay";
+ 
+ 	pca9547: mux at 77 {
++		compatible = "nxp,pca9547";
+ 		reg = <0x77>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -137,6 +187,21 @@
+ 				reg = <0x4c>;
+ 			};
+ 		};
++
++		i2c at 4 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x4>;
++
++			codec: sgtl5000 at 2a {
++				#sound-dai-cells = <0>;
++				compatible = "fsl,sgtl5000";
++				reg = <0x2a>;
++				VDDA-supply = <&reg_3p3v>;
++				VDDIO-supply = <&reg_3p3v>;
++				clocks = <&sys_mclk 1>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -235,6 +300,10 @@
+ 	};
+ };
+ 
++&sai2 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index a2c591e..db41e4f 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -56,6 +56,55 @@
+ 		enet0_sgmii_phy = &sgmii_phy2;
+ 		enet1_sgmii_phy = &sgmii_phy0;
+ 	};
++
++	sys_mclk: clock-mclk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg_3p3v: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "3P3V";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++		};
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,widgets =
++			"Microphone", "Microphone Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Speaker Ext",
++			"Line", "Line In Jack";
++		simple-audio-card,routing =
++			"MIC_IN", "Microphone Jack",
++			"Microphone Jack", "Mic Bias",
++			"LINE_IN", "Line In Jack",
++			"Headphone Jack", "HP_OUT",
++			"Speaker Ext", "LINE_OUT";
++
++		simple-audio-card,cpu {
++			sound-dai = <&sai1>;
++			frame-master;
++			bitclock-master;
++		};
++
++		simple-audio-card,codec {
++			sound-dai = <&codec>;
++			frame-master;
++			bitclock-master;
++		};
++	};
+ };
+ 
+ &dspi1 {
+@@ -79,6 +128,14 @@
+ 
+ &i2c1 {
+ 	status = "okay";
++	codec: sgtl5000 at a {
++		#sound-dai-cells = <0>;
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		VDDA-supply = <&reg_3p3v>;
++		VDDIO-supply = <&reg_3p3v>;
++		clocks = <&sys_mclk 1>;
++	};
+ };
+ 
+ &ifc {
+@@ -118,6 +175,10 @@
+ 	};
+ };
+ 
++&sai1 {
++	status = "okay";
++};
++
+ &uart0 {
+ 	status = "okay";
+ };
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 7e9e122..b65f11f 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -350,28 +350,30 @@
+ 		};
+ 
+ 		sai1: sai at 2b50000 {
++			#sound-dai-cells = <0>;
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b50000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
+-			clock-names = "sai";
++			clocks = <&platform_clk 1>, <&platform_clk 1>,
++				 <&platform_clk 1>, <&platform_clk 1>;
++			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 47>,
+ 			       <&edma0 1 46>;
+-			big-endian;
+ 			status = "disabled";
+ 		};
+ 
+ 		sai2: sai at 2b60000 {
++			#sound-dai-cells = <0>;
+ 			compatible = "fsl,vf610-sai";
+ 			reg = <0x0 0x2b60000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&platform_clk 1>;
+-			clock-names = "sai";
++			clocks = <&platform_clk 1>, <&platform_clk 1>,
++				 <&platform_clk 1>, <&platform_clk 1>;
++			clock-names = "bus", "mclk1", "mclk2", "mclk3";
+ 			dma-names = "tx", "rx";
+ 			dmas = <&edma0 1 45>,
+ 			       <&edma0 1 44>;
+-			big-endian;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.0.27.g96db324
