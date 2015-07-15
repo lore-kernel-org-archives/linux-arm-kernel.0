@@ -1,104 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 15 Jul 2015 17:37:32 +0100
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <55A61FF8.9000603@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
- <559FFCA7.4060008@samsung.com>
- <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
- <55A61FF8.9000603@samsung.com>
-Message-ID: <20150715163732.GF20186@e104818-lin.cambridge.arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 15 Jul 2015 09:38:52 -0700
+Subject: [PATCH] ARM: BCM: Restrict Broadcom BCM470X / BCM5301X to non-LPAE
+In-Reply-To: <9845978.JUsldTlF3B@wuerfel>
+References: <1436897535-3782-1-git-send-email-f.fainelli@gmail.com>
+ <4793510.M34v5PmKgi@wuerfel> <55A57F3B.1080909@broadcom.com>
+ <9845978.JUsldTlF3B@wuerfel>
+Message-ID: <55A68C9C.8000303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 11:55:20AM +0300, Andrey Ryabinin wrote:
-> On 07/14/2015 06:04 PM, Catalin Marinas wrote:
-> > On Fri, Jul 10, 2015 at 08:11:03PM +0300, Andrey Ryabinin wrote:
-> >>> 	kasan_early_pte_populate();
-> >>> 	kasan_early_pmd_populate(..., pte);
-> >>> 	kasan_early_pud_populate(..., pmd);
-> >>> 	kasan_early_pgd_populate(..., pud);
-> >>>
-> >>> (or in reverse order)
-> >>
-> >> Unless, I'm missing something, this will either work only with 4-level
-> >> page tables. We could do this without repopulation by using
-> >> CONFIG_PGTABLE_LEVELS ifdefs.
-> > 
-> > Or you could move kasan_early_*_populate outside the loop. You already
-> > do this for the pte at the beginning of the kasan_map_early_shadow()
-> > function (and it probably makes more sense to create a separate
-> > kasan_early_pte_populate).
+On 15/07/15 03:08, Arnd Bergmann wrote:
+> On Tuesday 14 July 2015 14:29:31 Florian Fainelli wrote:
+>> On 14/07/15 13:43, Arnd Bergmann wrote:
+>>> On Tuesday 14 July 2015 11:12:15 Florian Fainelli wrote:
+>>>> Cortex-A9 on at least BCM4708 SoCs are not LPAE capable, booting such a
+>>>> kernel will result in the following:
+>>>>
+>>>> Error: Kernel with LPAE support, but CPU does not support LPAE.
+>>>>
+>>>> Restrict such SoCs to be built in a configuration that does not enable
+>>>> ARM_LPAE.
+>>>>
+>>>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>>>>
+>>>
+>>> This is an old problem for all platforms, I think we want a more
+>>> generic solution though, instead of adding the !LPAE dependency
+>>> for each Cortex-A5/8/9 platform.
+>>
+>> Fair enough, what do you have in mind? Should we introduce something
+>> like CONFIG_V7_A9 and such, and update all platforms to select such
+>> symbols such that we can then apply a restriction on other symbols if
+>> there needs to be?
+>>
+>> What if any of these CPUs end-up supporting LPAE, but this cannot be
+>> flagged at build time?
 > 
-> Ok, let's try to implement that.
-> And for example, let's consider CONFIG_PGTABLE_LEVELS=3 case:
+> I would introduce special architecture levels for ARMv7+LPAE and/or
+> ARMv7VE. I am not entirely sure what combinations exist and whether
+> it's enough to add ARMv7VE.
 > 
->  * pgd_populate() is nop, so kasan_early_pgd_populate() won't do anything.
+> Basically, I think ARM_LPAE should only be selectable if ARMv7VE
+> is the lowest architecture level that is enabled, and all ARMv7VE
+> based platforms would have to be changed to depend on ARCH_MULTI_V7VE
+> instead of ARCH_MULTI_V7.
 > 
->  * pud_populate() in kasan_early_pud_populate() actually will setup pgd entries in swapper_pg_dir,
->    so pud_populate() should be called for the whole shadow range: [KASAN_SHADOW_START, KASAN_SHADOW_END]
-> 	IOW: kasan_early_pud_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pmd);
-> 	
-> 	We will need to slightly change kasan_early_pud_populate() implementation for that
-> 	(Current implementation implies that [start, end) addresses belong to one pgd)
-> 
-> 	void kasan_early_pud_populate(unsigned long start, unsigned long end, pmd_t *pmd)
-> 	{
-> 		unsigned long addr;
-> 		long next;
-> 
-> 		for (addr = start; addr < end; addr = next) {
-> 			pud_t *pud = pud_offset(pgd_offset_k(addr), addr);
-> 			pud_populate(&init_mm, pud, pmd);
-> 			next = pud_addr_end(addr, pgd_addr_end(addr, end));
-> 		}
-> 	}
-> 
-> 	But, wait! In 4-level page tables case this will be the same repopulation as we had before!
+> Also, when building an ARMv7VE kernel, we really want to build with
+> gcc -march=armv7ve (as long as that is available, possibly falling
+> back to -mcpu=cortex-a15), so we build with the idiv instructions.
+> The part I'm unclear about is whether there are CPU cores that support
+> only idiv but not LPAE or vice versa. If there are, we need an extra
+> level.
 
-Ok, so simply taking the call out of the loop won't work unless we
-conditionally define these functions (wouldn't be too bad since we have
-some #if CONFIG_PGTABLE_LEVELS already introduced by this patch but it
-would be nicer without).
-
-Anyway, I think we can keep the current iterations but exit early if
-!pud_none() because it means we already populated it (reworked to match
-other such patterns throughout the kernel with pgd_populate called from
-the pud function; and untested):
-
-void kasan_early_pmd_populate(pud_t *pud, unsigned long addr, unsigned long end)
-{
-	pmd_t *pmd;
-	unsigned long next;
-
-	if (pud_none(*pud))
-		pud_populate(&init_mm, pud, kasan_zero_pmd);
-
-	pmd = pmd_offset(pud, addr);
-	do {
-		next = pmd_addr_end(addr, end);
-		kasan_early_pte_populate(pmd, addr, next);
-	} while (pmd++, addr = next, addr != end && pmd_none(*pmd));
-}
-
-void kasan_early_pud_populate(pgd_t *pgd, unsigned long addr, unsigned long end)
-{
-	pud_t *pud;
-	unsigned long next;
-
-	if (pgd_none(*pgd))
-		pgd_populate(&init_mm, pgd, kasan_zero_pud);
-
-	pud = pud_offset(pgd, addr);
-	do {
-		next = pud_addr_end(addr, end);
-		kasan_early_pmd_populate(pud, addr, next);
-	} while (pud++, addr = next, addr != end && pud_none(*pud));
-}
-
-Given that we check pud_none() after the first iterations, it covers the
-lower levels if needed.
-
+I like the idea in general, but I think this is going to be a very
+tedious job to collect every single CR values for ARMv7 processors to
+determine whether they are pure v7 or v7e... Maybe we could use
+kernelci.org to start extracting the relevant lines in bootlogs and
+people can start adding their own chips one by one?
 -- 
-Catalin
+Florian
