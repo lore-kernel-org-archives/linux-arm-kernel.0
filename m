@@ -1,251 +1,63 @@
-From: b18965@freescale.com (Alison Wang)
-Date: Wed, 15 Jul 2015 16:02:46 +0800
-Subject: [PATCH v2] ARM: dts: ls1021a: audio: Add dts nodes for audio on
- LS1021A
-Message-ID: <1436947366-36547-1-git-send-email-b18965@freescale.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 15 Jul 2015 10:13:40 +0200
+Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
+In-Reply-To: <CAAVeFu+L+Qrja4gWEA=FnnbtBFkX43zpmJLJq0PSWLx5m4w6kA@mail.gmail.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
+ <CAAObsKBUoMmHOXBmEO4+8H1VVAkEHn_aFvLBOrXS5syLu5p1iA@mail.gmail.com>
+ <CAAVeFu+L+Qrja4gWEA=FnnbtBFkX43zpmJLJq0PSWLx5m4w6kA@mail.gmail.com>
+Message-ID: <CAAObsKC15XrBhDLb08_dBxPhcX+4i9YxqT963c0LDvziZVQhZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds dts nodes for audio on LS1021A.
+On 15 July 2015 at 05:17, Alexandre Courbot <gnurou@gmail.com> wrote:
+> On Tue, Jul 14, 2015 at 5:34 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> On 13 July 2015 at 22:14, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Wed, Jun 17, 2015 at 3:42 PM, Tomeu Vizoso
+>>> <tomeu.vizoso@collabora.com> wrote:
+>>>
+>>>> If the gpio DT node has the gpio-ranges property, the range will be
+>>>> added by the gpio core and doesn't need to be added by the pinctrl
+>>>> driver.
+>>>>
+>>>> By having the gpio-ranges property, we have an explicit dependency from
+>>>> the gpio node to the pinctrl node and we can stop using the deprecated
+>>>> pinctrl_add_gpio_range() function.
+>>>>
+>>>> Note that when the GPIO device gets probed before the associated
+>>>> princtrl device, the gpio core actually won't register the gpio range.
+>>>> Thus, this patch is only safe to be merged after we have in place a way
+>>>> to assure that gpio devices are probed after their associated pinctrl
+>>>> devices (such as ordered probing).
+>>>>
+>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>
+>>> This doesn't look like it would hurt, but need Stephen's opinion
+>>> on it, and I think he's on vacation. Would check with next-in-line
+>>> Tegra maintainer, Thierry/Alexandre?
+>>
+>> Sorry about that, but I have split these changes out into their own
+>> series after people complained about it.
+>>
+>> Have just sent a new version which already has Stephen's ack:
+>>
+>> https://lkml.kernel.org/g/1436862596-27730-1-git-send-email-tomeu.vizoso at collabora.com
+>
+> The change looks ok, but why limit it to Tegra? It seems like it could
+> apply to any driver that supports gpio-range. Or is it because this
+> will only work with drivers that use ordered probing?
 
-Signed-off-by: Alison Wang <alison.wang@freescale.com>
-Signed-off-by: Shawn Guo <shawnguo@kernel.org>
----
-Changes since v1:
-- Remove "clocks" container, and use a unit node name.
+It has to be SoC specific because we need to find out if a node
+representing the in-SoC gpio controller is present, and has the
+gpio-ranges property.
 
- arch/arm/boot/dts/ls1021a-qds.dts | 69 +++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ls1021a-twr.dts | 61 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ls1021a.dtsi    | 14 ++++----
- 3 files changed, 138 insertions(+), 6 deletions(-)
+I guess we could move the code to the pinctrl core and parametrize the
+property name but given that pinctrl_add_gpio_range is deprecated and
+that we are doing this only for DT compatibility, I'm not sure it
+would be a good idea.
 
-diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-index f14731b..f5f4194 100644
---- a/arch/arm/boot/dts/ls1021a-qds.dts
-+++ b/arch/arm/boot/dts/ls1021a-qds.dts
-@@ -58,6 +58,55 @@
- 		enet0_sgmii_phy = &sgmii_phy1c;
- 		enet1_sgmii_phy = &sgmii_phy1d;
- 	};
-+
-+	sys_mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24576000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_3p3v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack",
-+			"Speaker", "Speaker Ext",
-+			"Line", "Line In Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Microphone Jack",
-+			"Microphone Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT",
-+			"Speaker Ext", "LINE_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai2>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+	};
- };
- 
- &dspi0 {
-@@ -83,6 +132,7 @@
- 	status = "okay";
- 
- 	pca9547: mux at 77 {
-+		compatible = "nxp,pca9547";
- 		reg = <0x77>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -137,6 +187,21 @@
- 				reg = <0x4c>;
- 			};
- 		};
-+
-+		i2c at 4 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x4>;
-+
-+			codec: sgtl5000 at 2a {
-+				#sound-dai-cells = <0>;
-+				compatible = "fsl,sgtl5000";
-+				reg = <0x2a>;
-+				VDDA-supply = <&reg_3p3v>;
-+				VDDIO-supply = <&reg_3p3v>;
-+				clocks = <&sys_mclk 1>;
-+			};
-+		};
- 	};
- };
- 
-@@ -235,6 +300,10 @@
- 	};
- };
- 
-+&sai2 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..db41e4f 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -56,6 +56,55 @@
- 		enet0_sgmii_phy = &sgmii_phy2;
- 		enet1_sgmii_phy = &sgmii_phy0;
- 	};
-+
-+	sys_mclk: clock-mclk {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <24576000>;
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_3p3v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,widgets =
-+			"Microphone", "Microphone Jack",
-+			"Headphone", "Headphone Jack",
-+			"Speaker", "Speaker Ext",
-+			"Line", "Line In Jack";
-+		simple-audio-card,routing =
-+			"MIC_IN", "Microphone Jack",
-+			"Microphone Jack", "Mic Bias",
-+			"LINE_IN", "Line In Jack",
-+			"Headphone Jack", "HP_OUT",
-+			"Speaker Ext", "LINE_OUT";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&sai1>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+
-+		simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			frame-master;
-+			bitclock-master;
-+		};
-+	};
- };
- 
- &dspi1 {
-@@ -79,6 +128,14 @@
- 
- &i2c1 {
- 	status = "okay";
-+	codec: sgtl5000 at a {
-+		#sound-dai-cells = <0>;
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+		clocks = <&sys_mclk 1>;
-+	};
- };
- 
- &ifc {
-@@ -118,6 +175,10 @@
- 	};
- };
- 
-+&sai1 {
-+	status = "okay";
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 7e9e122..b65f11f 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -350,28 +350,30 @@
- 		};
- 
- 		sai1: sai at 2b50000 {
-+			#sound-dai-cells = <0>;
- 			compatible = "fsl,vf610-sai";
- 			reg = <0x0 0x2b50000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&platform_clk 1>;
--			clock-names = "sai";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+				 <&platform_clk 1>, <&platform_clk 1>;
-+			clock-names = "bus", "mclk1", "mclk2", "mclk3";
- 			dma-names = "tx", "rx";
- 			dmas = <&edma0 1 47>,
- 			       <&edma0 1 46>;
--			big-endian;
- 			status = "disabled";
- 		};
- 
- 		sai2: sai at 2b60000 {
-+			#sound-dai-cells = <0>;
- 			compatible = "fsl,vf610-sai";
- 			reg = <0x0 0x2b60000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 133 IRQ_TYPE_LEVEL_HIGH>;
--			clocks = <&platform_clk 1>;
--			clock-names = "sai";
-+			clocks = <&platform_clk 1>, <&platform_clk 1>,
-+				 <&platform_clk 1>, <&platform_clk 1>;
-+			clock-names = "bus", "mclk1", "mclk2", "mclk3";
- 			dma-names = "tx", "rx";
- 			dmas = <&edma0 1 45>,
- 			       <&edma0 1 44>;
--			big-endian;
- 			status = "disabled";
- 		};
- 
--- 
-2.1.0.27.g96db324
+Regards,
+
+Tomeu
