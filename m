@@ -1,39 +1,77 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 15 Jul 2015 18:05:59 +0530
-Subject: [PATCH v6 1/4] phy-sun4i-usb: Add missing EXPORT_SYMBOL for
- sun4i_usb_phy_set_squelch_detect
-In-Reply-To: <1436366500-12555-2-git-send-email-hdegoede@redhat.com>
-References: <1436366500-12555-1-git-send-email-hdegoede@redhat.com>
- <1436366500-12555-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <55A653AF.608@ti.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 15 Jul 2015 20:29:56 +0800
+Subject: [PATCH v2 1/5] clk: remove duplicated code with
+ __clk_set_parent_after
+In-Reply-To: <20150715122522.GA30570@shlinux1.ap.freescale.net>
+References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+ <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+ <20150528040919.22384.79189@quantum>
+ <20150715122522.GA30570@shlinux1.ap.freescale.net>
+Message-ID: <20150715122955.GB30570@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 08 July 2015 08:11 PM, Hans de Goede wrote:
-> sun4i_usb_phy_set_squelch_detect is used by other code, which may be built
-> as a module, so it should be exported.
+On Wed, Jul 15, 2015 at 08:25:24PM +0800, Dong Aisheng wrote:
+> Hi Mike,
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v6:
-> -New patch in v6 of the sunxi musb support series
-> ---
->  drivers/phy/phy-sun4i-usb.c | 1 +
->  1 file changed, 1 insertion(+)
+> On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
+> > Quoting Dong Aisheng (2015-05-14 06:28:59)
+> > > __clk_set_parent_after() actually used the second argument then we
+> > > could put this duplicate logic in there and call it with a different
+> > > order of arguments in the success vs. error paths in this function.
+> > > 
+> > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > 
+> > Patch looks good to me.
+> > 
+> > Also just noticed that the second argument to __clk_set_parent_after is
+> > never used :-(
+> > 
 > 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index e17c539..b82aa26 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -212,6 +212,7 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
->  
->  	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
->  }
-> +EXPORT_SYMBOL(sun4i_usb_phy_set_squelch_detect);
+> Ping...
+> 
+> I did not see this patch series in your tree for v4.2 rc.
+> Is this got missed?
+> 
 
-EXPORT_SYMBOL_GPL?
+Updated Mike's email address.
 
-Thanks
-Kishon
+Regards
+Dong Aisheng
+
+> Regards
+> Dong Aisheng
+> 
+> > Regards,
+> > Mike
+> > 
+> > > ---
+> > >  drivers/clk/clk.c | 8 +-------
+> > >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > > 
+> > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > index 659f2b0..0e813ea 100644
+> > > --- a/drivers/clk/clk.c
+> > > +++ b/drivers/clk/clk.c
+> > > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
+> > >                 flags = clk_enable_lock();
+> > >                 clk_reparent(core, old_parent);
+> > >                 clk_enable_unlock(flags);
+> > > +               __clk_set_parent_after(core, old_parent, parent);
+> > >  
+> > > -               if (core->prepare_count) {
+> > > -                       flags = clk_enable_lock();
+> > > -                       clk_core_disable(core);
+> > > -                       clk_core_disable(parent);
+> > > -                       clk_enable_unlock(flags);
+> > > -                       clk_core_unprepare(parent);
+> > > -               }
+> > >                 return ret;
+> > >         }
+> > >  
+> > > -- 
+> > > 1.9.1
+> > > 
