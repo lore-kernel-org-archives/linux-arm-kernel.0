@@ -1,57 +1,55 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Wed, 15 Jul 2015 19:04:35 +0100
-Subject: [PATCH 8/8] pcmcia: soc_common: remove skt_dev_info's clk pointer
+Date: Wed, 15 Jul 2015 19:04:24 +0100
+Subject: [PATCH 6/8] pcmcia: sa1111: simplify clk handing in
+ sa1111_pcmcia_add()
 In-Reply-To: <20150715180342.GB7557@n2100.arm.linux.org.uk>
 References: <20150715180342.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZFR2p-0007Ms-4w@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZFR2e-0007Mf-Sp@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We no longer need to store the clk pointer in struct skt_dev_info as we
-no longer need to remember the clk pointer for the cleanup paths.
+clk_get(dev, NULL) will always refer to the same clock, so it's
+pointless calling this multiple times for the same device.  As we no
+longer have to worry about the cleanup (via use of devm_clk_get()) we
+can simplify sa1111_pcmcia_add() too.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/pcmcia/pxa2xx_base.c | 1 -
- drivers/pcmcia/sa11xx_base.c | 1 -
- drivers/pcmcia/soc_common.h  | 1 -
- 3 files changed, 3 deletions(-)
+ drivers/pcmcia/sa1111_generic.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pcmcia/pxa2xx_base.c b/drivers/pcmcia/pxa2xx_base.c
-index 0f42d55e7c7f..483f919e0d2e 100644
---- a/drivers/pcmcia/pxa2xx_base.c
-+++ b/drivers/pcmcia/pxa2xx_base.c
-@@ -308,7 +308,6 @@ static int pxa2xx_drv_pcmcia_probe(struct platform_device *dev)
- 		return -ENOMEM;
+diff --git a/drivers/pcmcia/sa1111_generic.c b/drivers/pcmcia/sa1111_generic.c
+index fb902af8a5b7..a1531feb8460 100644
+--- a/drivers/pcmcia/sa1111_generic.c
++++ b/drivers/pcmcia/sa1111_generic.c
+@@ -135,8 +135,13 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 	int (*add)(struct soc_pcmcia_socket *))
+ {
+ 	struct sa1111_pcmcia_socket *s;
++	struct clk *clk;
+ 	int i, ret = 0;
  
- 	sinfo->nskt = ops->nr;
--	sinfo->clk = clk;
++	clk = devm_clk_get(&dev->dev, NULL);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
+ 	ops->socket_state = sa1111_pcmcia_socket_state;
  
- 	/* Initialize processor specific parameters */
  	for (i = 0; i < ops->nr; i++) {
-diff --git a/drivers/pcmcia/sa11xx_base.c b/drivers/pcmcia/sa11xx_base.c
-index 815b6950975c..9f6ec87b9f9e 100644
---- a/drivers/pcmcia/sa11xx_base.c
-+++ b/drivers/pcmcia/sa11xx_base.c
-@@ -233,7 +233,6 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops,
- 		return -ENOMEM;
+@@ -145,12 +150,8 @@ int sa1111_pcmcia_add(struct sa1111_dev *dev, struct pcmcia_low_level *ops,
+ 			return -ENOMEM;
  
- 	sinfo->nskt = nr;
--	sinfo->clk = clk;
- 
- 	/* Initialize processor specific parameters */
- 	for (i = 0; i < nr; i++) {
-diff --git a/drivers/pcmcia/soc_common.h b/drivers/pcmcia/soc_common.h
-index e6fcbea5b682..94762a54d731 100644
---- a/drivers/pcmcia/soc_common.h
-+++ b/drivers/pcmcia/soc_common.h
-@@ -68,7 +68,6 @@ struct soc_pcmcia_socket {
- 
- struct skt_dev_info {
- 	int nskt;
--	struct clk *clk;
- 	struct soc_pcmcia_socket skt[0];
- };
- 
+ 		s->soc.nr = ops->first + i;
+-		s->soc.clk = devm_clk_get(&dev->dev, NULL);
+-		if (IS_ERR(s->soc.clk)) {
+-			ret = PTR_ERR(s->soc.clk);
+-			kfree(s);
+-			return ret;
+-		}
++		s->soc.clk = clk;
++
+ 		soc_pcmcia_init_one(&s->soc, ops, &dev->dev);
+ 		s->dev = dev;
+ 		if (s->soc.nr) {
 -- 
 2.1.0
