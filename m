@@ -1,33 +1,43 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Jul 2015 03:00:36 -0700
-Subject: [PATCH] arm: dts: dra7: arch timer sits in always-on power domain
-In-Reply-To: <20150715092437.GC9627@leverpostej>
-References: <1436820101-2172-1-git-send-email-balbi@ti.com>
- <20150715092437.GC9627@leverpostej>
-Message-ID: <20150715100035.GB17550@atomide.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 15 Jul 2015 13:01:34 +0300
+Subject: [PATCH v2 15/15] KVM: arm64: enable ITS emulation as a virtual MSI
+ controller
+In-Reply-To: <55A62D50.9080101@arm.com>
+References: <1436538111-4294-1-git-send-email-andre.przywara@arm.com>
+ <1436538111-4294-16-git-send-email-andre.przywara@arm.com>
+ <00fa01d0bede$098f5570$1cae0050$@samsung.com> <55A62D50.9080101@arm.com>
+Message-ID: <012501d0bee5$3b9f2ca0$b2dd85e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mark Rutland <mark.rutland@arm.com> [150715 02:27]:
-> On Mon, Jul 13, 2015 at 09:41:41PM +0100, Felipe Balbi wrote:
-> > According to DRA7x TRM section 4.3.5 Realtime Counter (Master Counter),
-> > the realtime counter sits in the Wakeup Always-On Power domain.
-> > Furthermore, the counter will automatically switch the 32K clock source
-> > when MPU goes into standby and automatically switch back to SYS_CLK or
-> > ABE_LP when MPU goes out of standby.
+ Hello!
+
+> But why would it need the capability to create models?
+
+ Actually it doesn't.
+
+> The idea is to
+> check the capability before the actual KVM_SIGNAL_MSI or
+> KVM_SET_GSI_ROUTING ioctl (and cache that result). I have a function
+> with a static variable to do that, so it looks like:
 > 
-> While the counter is in an always-on domain (the architecture mandates
-> this) I don't think that applies to the timers (i.e. the comparators
-> within a CPU), which are almost certainly not in an always-on domain.
+> +  if (check_for_msi_devid(kvm)) {
+> +    irq_routing->entries[irq_routing->nr].flags = KVM_MSI_VALID_DEVID;
+> +    irq_routing->entries[irq_routing->nr].u.msi.devid = device_id;
+> +  }
 > 
-> I suspect that this is incorrect, and it will be very painful to debug
-> if it is...
+> > May be we should just set the capability to TRUE for
+> > ARM architecture in general, and make GICv2m MSIs simply ignoring this flag and device ID?
+> 
+> Possibly, but it would be saner to tell userland that it's a per VM
+> decision for ARM. Since you need extra support bits in the userland
+> anyway (to set up GICv2M or ITS emulation), I think it is acceptable to
+> require a late, per-VM capability check in userland in that case.
 
-OK good point. And there would have to be some wake-up line wired to the
-IO chain or the PMIC in this case if the comparator was always on.
+ Well, agree, and formally this is more correct. Just it would require slightly more additions to
+qemu. But it's not a real problem.
 
-Dropping this patch for now anyways.
-
-Regards,
-
-Tony
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
