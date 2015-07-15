@@ -1,69 +1,98 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 15 Jul 2015 20:25:24 +0800
-Subject: [PATCH v2 1/5] clk: remove duplicated code with
- __clk_set_parent_after
-In-Reply-To: <20150528040919.22384.79189@quantum>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
- <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
- <20150528040919.22384.79189@quantum>
-Message-ID: <20150715122522.GA30570@shlinux1.ap.freescale.net>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Wed, 15 Jul 2015 20:33:22 +0800
+Subject: [PATCH v2 1/5] dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+In-Reply-To: <20150714074555.GR18700@pengutronix.de>
+References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1436348468-4126-2-git-send-email-chunfeng.yun@mediatek.com>
+ <20150710051018.GU18700@pengutronix.de>
+ <1436854791.11289.11.camel@mhfsdcap03>
+ <20150714074555.GR18700@pengutronix.de>
+Message-ID: <1436963602.11289.17.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
-> Quoting Dong Aisheng (2015-05-14 06:28:59)
-> > __clk_set_parent_after() actually used the second argument then we
-> > could put this duplicate logic in there and call it with a different
-> > order of arguments in the success vs. error paths in this function.
+On Tue, 2015-07-14 at 09:45 +0200, Sascha Hauer wrote:
+> On Tue, Jul 14, 2015 at 02:19:51PM +0800, chunfeng yun wrote:
+> > hi,
+> > On Fri, 2015-07-10 at 07:10 +0200, Sascha Hauer wrote:
+> > > On Wed, Jul 08, 2015 at 05:41:03PM +0800, Chunfeng Yun wrote:
+> > > > add a DT binding documentation of usb3.0 phy for MT65xx
+> > > > SoCs from Mediatek.
+> > > > 
+> > > > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > > > ---
+> > > >  .../devicetree/bindings/usb/mt65xx-u3phy.txt       | 34 ++++++++++++++++++++++
+> > > >  1 file changed, 34 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > > > 
+> > > > diff --git a/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > > > new file mode 100644
+> > > > index 0000000..056b2aa
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/usb/mt65xx-u3phy.txt
+> > > > @@ -0,0 +1,34 @@
+> > > > +MT65xx U3PHY
+> > > > +
+> > > > +The device node for Mediatek SOC usb3.0 phy
+> > > > +
+> > > > +Required properties:
+> > > > + - compatible : Should be "mediatek,mt8173-u3phy"
+> > > > + - reg        : Offset and length of registers, the first is for mac domain,
+> > > > +	another for phy domain
+> > > > + - power-domains: to enable usb's mtcmos
+> > > > + - usb-wakeup-ctrl : to access usb wakeup control register
+> > > > + - wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup mode; others
+> > > > +	means don't enable wakeup source of usb
+> > > > + - u2port-num : number of usb2.0 ports to support which should be 1 or 2
+> > > > + - clocks     : must support all clocks that phy need
+> > > > + - clock-names: should be "wakeup_deb_p0", "wakeup_deb_p1" for wakeup
+> > > > +	debounce control clocks, and "u3phya_ref" for u3phya reference clock.
+> > > > +
+> > > > +Example:
+> > > > +
+> > > > +u3phy: usb-phy at 11271000 {
+> > > > +	compatible = "mediatek,mt8173-u3phy";
+> > > > +	reg = <0 0x11271000 0 0x3000>,
+> > > > +	      <0 0x11280000 0 0x20000>;
+> > > 
+> > > 0x11271000 is the register space the xhci controller takes. You should
+> > > not expose the same register space to two different drivers.
+> > > 
 > > 
-> > Cc: Mike Turquette <mturquette@linaro.org>
-> > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> 
-> Patch looks good to me.
-> 
-> Also just noticed that the second argument to __clk_set_parent_after is
-> never used :-(
-> 
-
-Ping...
-
-I did not see this patch series in your tree for v4.2 rc.
-Is this got missed?
-
-Regards
-Dong Aisheng
-
-> Regards,
-> Mike
-> 
-> > ---
-> >  drivers/clk/clk.c | 8 +-------
-> >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > usb: usb30 at 11270000 {
+> >    compatible = "mediatek,mt8173-xhci";
+> >    reg = <0 0x11270000 0 0x1000>;
 > > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 659f2b0..0e813ea 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
-> >                 flags = clk_enable_lock();
-> >                 clk_reparent(core, old_parent);
-> >                 clk_enable_unlock(flags);
-> > +               __clk_set_parent_after(core, old_parent, parent);
-> >  
-> > -               if (core->prepare_count) {
-> > -                       flags = clk_enable_lock();
-> > -                       clk_core_disable(core);
-> > -                       clk_core_disable(parent);
-> > -                       clk_enable_unlock(flags);
-> > -                       clk_core_unprepare(parent);
-> > -               }
-> >                 return ret;
-> >         }
-> >  
-> > -- 
-> > 1.9.1
-> > 
+> > the size of xhci register space is 0x1000, and the range is
+> > [0x11270000, 0x11271000 - 1], so the address of 0x11271000 is not
+> > included.
+> 
+> Indeed, you are right. Nevertheless my datasheet lists these resources:
+> 
+> 0x11270000 - 0x1127ffff: SSUSB CSR
+> 0x11280000 - 0x1128ffff: SSUSB SIF
+> 0x11290000 - 0x1129ffff: SSUSB
+> 
+> It seems that with the current binding you are not modelling the
+> hardware but something that reflects your current implementation. This
+> is not a good sign. Normally I would expect device nodes that match the
+> above resources, but your USB phy spans most of the SSUSB CSR register
+> space and both the SSUSB SIF and SSUSB regster space. I think it would
+> be good if you could give an overview over the USB hardware and explain
+> why you have to violate the above resources.
+> 
+> Also something to consider: Is your binding suitable for adding OTG
+> support later? You don't have to add OTG support to the Kernel now,
+> but your binding should be suitable to add it later.
+> 
+> Sascha
+> 
+
+I agree with you, but timing parameter settings of super speed port are
+put in [0x11272400 - 0x11272800], which is not included by xhci register
+space. SSUSB SIF includes some control and status registers of each
+ports and also OTG etc. It is better to put them into the node of gadget
+device node which is not supported now, so put them into phy device
+node.
+
+Do you have any good idea to deal with the special case?
