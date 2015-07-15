@@ -1,39 +1,79 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 15 Jul 2015 17:01:46 +0100
-Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support in
- Zynq MPSoC GQSPI controller
-In-Reply-To: <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
- <20150714164005.GE11162@sirena.org.uk>
- <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20150715160146.GS11162@sirena.org.uk>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 15 Jul 2015 18:06:26 +0200
+Subject: [PATCH v2] serial: mxs-auart: keep the AUART unit in reset state
+ when not in use
+In-Reply-To: <1436945777-4332-1-git-send-email-jbe@pengutronix.de>
+References: <1436945777-4332-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <55A68502.1090609@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 02:12:54PM +0000, Ranjit Abhimanyu Waghmode wrote:
+Hi Juergen,
 
-> > > What is stacked mode?
-> > > ---------------------
-> > > ZynqMP GQSPI controller supports stacked mode with following
-> > functionalities:
-> > > 1) The Generic Quad-SPI controller also supports two SPI flash memories
-> > >    in a shared bus arrangement to reduce IO pin count.
-> > > 2) Separate chip select lines
-> > > 3) Shared I/O lines
-> > > 4) This mode is targeted for increasing the flash memory and no performance
-> > >    improvement when compared with single.
+Am 15.07.2015 um 09:36 schrieb Juergen Borleis:
+> Whenever the UART device driver gets closed from userland, the driver
+> disables the UART unit and then stops its clock to save power.
+>
+> The bit which disabled the UART unit is described as:
+>
+>   "UART Enable. If this bit is set to 1, the UART is enabled. Data
+>   transmission and reception occurs for the UART signals. When the
+>   UART is disabled in the middle of transmission or reception, it
+>   completes the current character before stopping."
+>
+> The important part is the "it completes the current character". Whenever
+> a reception is ongoing when the UART gets disabled (including the clock
+> off) the statemachine freezes and "remembers" this state on the next
+> open() and re-enabling of the unit's clock.
+>
+> In this case we end up receiving an additional bogus character
+> immediately.
+>
+> The solution in this change is to move the AUART unit into its reset
+> state on close() and only release it from its reset state on the next
+> open().
+>
+> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> ---
 
-> > This is just a normal SPI controller from a SPI point of view.
+changelog for v2?
 
-> How can we really represent the stacked mode in current configuration?
+>  drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
+>  1 file changed, 30 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index 13cf773..13b3e3c 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
+>  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+>  }
+>  
+> +static void mxs_auart_keep_reset(struct uart_port *u)
+> +{
+> +	int i;
+> +	u32 reg;
+> +
+> +	reg = readl(u->membase + AUART_CTRL0);
+> +	/* if already in reset state, keep it untouched */
+> +	if (reg & AUART_CTRL0_SFTRST)
+> +		return;
+> +
+> +	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> +	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
+> +
+> +	for (i = 0; i < 10000; i++) {
+> +		reg = readl(u->membase + AUART_CTRL0);
+> +		/* reset is finished when the clock is gated */
+> +		if (reg & AUART_CTRL0_CLKGATE)
+> +			return;
+> +		udelay(3);
+> +	}
+> +
+> +	dev_err(u->dev, "Failed to reset the unit.");
 
-In the same way as any other controller with two chip selects...  there
-are quite a few other drivers that provide examples of this, you should
-look for one that has hardware control similar to yours.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150715/3f47889c/attachment.sig>
+Sorry, i missed that in my first review. It looks like that the newline
+at the end of the error message is missing.
+
+Regards
+Stefan
