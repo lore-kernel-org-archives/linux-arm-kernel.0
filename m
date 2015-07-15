@@ -1,99 +1,157 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 15 Jul 2015 10:45:42 +0200
-Subject: [RESEND PATCH 2/2] pinctrl: introduce complex pin description
-In-Reply-To: <20150714061359.GC5161@pengutronix.de>
-References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
- <1433948699-19800-3-git-send-email-ludovic.desroches@atmel.com>
- <20150714061359.GC5161@pengutronix.de>
-Message-ID: <20150715084542.GC14886@odux.rfo.atmel.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Wed, 15 Jul 2015 11:55:20 +0300
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
+ <559FFCA7.4060008@samsung.com>
+ <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
+Message-ID: <55A61FF8.9000603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 08:13:59AM +0200, Sascha Hauer wrote:
-> On Wed, Jun 10, 2015 at 05:04:57PM +0200, Ludovic Desroches wrote:
-> > Using a string to describe a pin in the device tree can be not enough.
-> > Some controllers may need extra information to fully describe a pin. It
-> > concerns mainly controllers which have a per pin muxing approach which
-> > don't fit well the notions of groups and functions.
-> > Instead of using a pin name, a 32 bit value is used. The 16 least
-> > significant bits are used for the pin number. Other 16 bits can be used to
-> > store extra parameters.
+On 07/14/2015 06:04 PM, Catalin Marinas wrote:
+> On Fri, Jul 10, 2015 at 08:11:03PM +0300, Andrey Ryabinin wrote:
+>>>> +#if CONFIG_PGTABLE_LEVELS > 3
+>>>> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
+>>>> +#endif
+>>>> +#if CONFIG_PGTABLE_LEVELS > 2
+>>>> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
+>>>> +#endif
+>>>> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+>>>> +
+>>>> +static void __init kasan_early_pmd_populate(unsigned long start,
+>>>> +					unsigned long end, pud_t *pud)
+>>>> +{
+>>>> +	unsigned long addr;
+>>>> +	unsigned long next;
+>>>> +	pmd_t *pmd;
+>>>> +
+>>>> +	pmd = pmd_offset(pud, start);
+>>>> +	for (addr = start; addr < end; addr = next, pmd++) {
+>>>> +		pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
+>>>> +		next = pmd_addr_end(addr, end);
+>>>> +	}
+>>>> +}
+>>>> +
+>>>> +static void __init kasan_early_pud_populate(unsigned long start,
+>>>> +					unsigned long end, pgd_t *pgd)
+>>>> +{
+>>>> +	unsigned long addr;
+>>>> +	unsigned long next;
+>>>> +	pud_t *pud;
+>>>> +
+>>>> +	pud = pud_offset(pgd, start);
+>>>> +	for (addr = start; addr < end; addr = next, pud++) {
+>>>> +		pud_populate(&init_mm, pud, kasan_zero_pmd);
+>>>> +		next = pud_addr_end(addr, end);
+>>>> +		kasan_early_pmd_populate(addr, next, pud);
+>>>> +	}
+>>>> +}
+>>>> +
+>>>> +static void __init kasan_map_early_shadow(pgd_t *pgdp)
+>>>> +{
+>>>> +	int i;
+>>>> +	unsigned long start = KASAN_SHADOW_START;
+>>>> +	unsigned long end = KASAN_SHADOW_END;
+>>>> +	unsigned long addr;
+>>>> +	unsigned long next;
+>>>> +	pgd_t *pgd;
+>>>> +
+>>>> +	for (i = 0; i < PTRS_PER_PTE; i++)
+>>>> +		set_pte(&kasan_zero_pte[i], pfn_pte(
+>>>> +				virt_to_pfn(kasan_zero_page), PAGE_KERNEL));
+>>>> +
+>>>> +	pgd = pgd_offset_k(start);
+>>>> +	for (addr = start; addr < end; addr = next, pgd++) {
+>>>> +		pgd_populate(&init_mm, pgd, kasan_zero_pud);
+>>>> +		next = pgd_addr_end(addr, end);
+>>>> +		kasan_early_pud_populate(addr, next, pgd);
+>>>> +	}
+>>>
+>>> I prefer to use "do ... while" constructs similar to __create_mapping()
+>>> (or zero_{pgd,pud,pmd}_populate as you are more familiar with them).
+>>>
+>>> But what I don't get here is that you repopulate the pud page for every
+>>> pgd (and so on for pmd). You don't need this recursive call all the way
+>>> to kasan_early_pmd_populate() but just sequential:
+>>
+>> This repopulation needed for 3,2 level page tables configurations.
+>>
+>> E.g. for 3-level page tables we need to call pud_populate(&init_mm,
+>> pud, kasan_zero_pmd) for each pud in [KASAN_SHADOW_START,
+>> KASAN_SHADOW_END] range, this causes repopopulation for 4-level page
+>> tables, since we need to pud_populate() only [KASAN_SHADOW_START,
+>> KASAN_SHADOW_START + PGDIR_SIZE] range.
 > 
-> In the Mediatek driver we use 'pinmux' as name for the property
-> containing the combined pin number / mux value defines. 'pinmux' better
-> describes what it is...
+> I'm referring to writing the same information multiple times over the
+> same entry. kasan_map_early_shadow() goes over each pgd entry and writes
+> the address of kasan_zero_pud. That's fine so far. However, in the same
+> loop you call kasan_early_pud_populate(). The latter retrieves the pud
+> page via pud_offset(pgd, start) which would always be kasan_zero_pud
+
+Not always. E.g. if we have 3-level page tables pud = pgd, pgd_populate() is nop, and
+pud_populate in fact populates pgd.
+
+pud_offset(pgd, start) will return (swapper_pg_dir + pgd_index(start)) and pud_populate()
+will fill that entry with the address of kasan_zero_pmd. So we need to pud_populate() for
+each pgd.
+
+> because that's what you wrote via pgd_populate() in each pgd entry. So
+> for each pgd entry, you keep populating the same kasan_zero_pud page
+> with pointers to kasan_zero_pmd. And so on for the pmd.
 > 
 
-At the moment, I don't mix pin number and pin mux. I mix pin number and
-ioset. It allows to check that all the pins belong to the same ioset.
+Yes, I'm perfectly understand that. And this was done intentionally since I don't
+see the way to make this work for all possible CONFIG_PGTABLE_LEVELS without rewrites
+or without #ifdefs (and you didn't like them in v1).
 
-As said previously, I didn't want to mix pin mux and pin conf in the
-same node (but it is something I can do, it's not a problem on my side).
-If I do it I will have to mux three values: pin number, pin mux value
-and pin ioset.
 
-So assuming I do this change, your advice is to add a 'pinmux' property in
-addition of 'pins' instead of trying to use it?
-
-> > +
-> > +	if (pctldesc->complex_pin_desc)
-> > +		ret = of_property_count_u32_elems(np, "pins");
-> > +	else
-> > +		ret = of_property_count_strings(np, "pins");
+>>> 	kasan_early_pte_populate();
+>>> 	kasan_early_pmd_populate(..., pte);
+>>> 	kasan_early_pud_populate(..., pmd);
+>>> 	kasan_early_pgd_populate(..., pud);
+>>>
+>>> (or in reverse order)
+>>
+>> Unless, I'm missing something, this will either work only with 4-level
+>> page tables. We could do this without repopulation by using
+>> CONFIG_PGTABLE_LEVELS ifdefs.
 > 
-> ... and has the advantage that you don't have to pass in a
-> complex_pin_desc variable from the driver as the different property
-> name inherently carries this information. 'pins' can then stay a
-> property containing only strings.
+> Or you could move kasan_early_*_populate outside the loop. You already
+> do this for the pte at the beginning of the kasan_map_early_shadow()
+> function (and it probably makes more sense to create a separate
+> kasan_early_pte_populate).
 > 
-> >  	if (ret < 0) {
-> >  		ret = of_property_count_strings(np, "groups");
-> >  		if (ret < 0)
-> > @@ -297,11 +305,12 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
-> >  		if (type == PIN_MAP_TYPE_INVALID)
-> >  			type = PIN_MAP_TYPE_CONFIGS_GROUP;
-> >  		subnode_target_type = "groups";
-> > +		pins_prop = false;
-> >  	} else {
-> >  		if (type == PIN_MAP_TYPE_INVALID)
-> >  			type = PIN_MAP_TYPE_CONFIGS_PIN;
-> >  	}
-> > -	strings_count = ret;
-> > +	items_count = ret;
-> >  
-> >  	ret = of_property_read_string(np, "function", &function);
-> >  	if (ret < 0) {
-> > @@ -326,17 +335,31 @@ int pinconf_generic_dt_subnode_to_map(struct pinctrl_dev *pctldev,
-> >  	if (num_configs)
-> >  		reserve++;
-> >  
-> > -	reserve *= strings_count;
-> > +	reserve *= items_count;
-> >  
-> >  	ret = pinctrl_utils_reserve_map(pctldev, map, reserved_maps,
-> >  			num_maps, reserve);
-> >  	if (ret < 0)
-> >  		goto exit;
-> >  
-> > -	of_property_for_each_string(np, subnode_target_type, prop, group) {
-> > +	items_name = kmalloc_array(items_count, sizeof(char *), GFP_KERNEL);
-> > +	if (!items_name)
-> > +		goto exit;
-> > +	if (pctldesc->complex_pin_desc && pins_prop) {
-> > +		of_property_for_each_u32(np, subnode_target_type, prop, cur, val) {
-> > +			pin_id = val & PINCTRL_PIN_MASK;
-> > +			items_name[i++] = pctldesc->pins[pin_id].name;
-> > +		}
-> 
-> I don't like that even though pins have numbers here they are converted
-> to strings which the driver later has to search in a list just to
-> convert it back into the number. This is quite inefficient.
-> 
-> I guess this could be optimized later, but it would be nice to have the
-> pin number directly in the driver.
-
-I know that is something you don't like but, at the moment, I need a string for
-pinctrl_utils_add_map_mux and pinctrl_utils_add_map_configs.
 
 
-Ludovic
+Ok, let's try to implement that.
+And for example, let's consider CONFIG_PGTABLE_LEVELS=3 case:
+
+ * pgd_populate() is nop, so kasan_early_pgd_populate() won't do anything.
+
+ * pud_populate() in kasan_early_pud_populate() actually will setup pgd entries in swapper_pg_dir,
+   so pud_populate() should be called for the whole shadow range: [KASAN_SHADOW_START, KASAN_SHADOW_END]
+	IOW: kasan_early_pud_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pmd);
+	
+	We will need to slightly change kasan_early_pud_populate() implementation for that
+	(Current implementation implies that [start, end) addresses belong to one pgd)
+
+	void kasan_early_pud_populate(unsigned long start, unsigned long end, pmd_t *pmd)
+	{
+		unsigned long addr;
+		long next;
+
+		for (addr = start; addr < end; addr = next) {
+			pud_t *pud = pud_offset(pgd_offset_k(addr), addr);
+			pud_populate(&init_mm, pud, pmd);
+			next = pud_addr_end(addr, pgd_addr_end(addr, end));
+		}
+	}
+
+	But, wait! In 4-level page tables case this will be the same repopulation as we had before!
+
+See? The problem here is that pud_populate() but not pgd_populate() populates pgds (3-level page tables case).
+So I still don't see the way to avoid repopulation without ifdefs.
+Did I miss anything?
