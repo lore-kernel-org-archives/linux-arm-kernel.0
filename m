@@ -1,37 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed, 15 Jul 2015 15:42:35 +0900
-Subject: [PATCH] ARM: shmobile: Enable fixed voltage regulator in
- shmobile_defconfig
-Message-ID: <1436942555-4851-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 15 Jul 2015 15:45:23 +0900
+Subject: [PATCH] ARM: multi_v7_defconfig: Remove Marzen
+Message-ID: <1436942723-5934-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
-however, MACH_MARZEN is going away along with the board code it enables.
+Kill of the defconfig bits now when the marzen-reference board code is gone.
 
+Based on work by Magnus Damm.
+
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
 ---
-
 Tested on top of renesas-next-20150715-v4.2-rc1
 
-This patch is intended to be queued up before the patch that removes
-MACH_MARZEN, thus the wording above.
----
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 38f0da00114e..fc15a19bfaf0 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -120,6 +120,7 @@ CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6d83a1bf0c74..b34cd868daa5 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -82,7 +82,6 @@ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
+ CONFIG_ARCH_R8A7794=y
+ CONFIG_ARCH_SH73A0=y
+-CONFIG_MACH_MARZEN=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
 -- 
 2.1.4
