@@ -1,88 +1,115 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Wed, 15 Jul 2015 14:16:51 +0900
-Subject: [PATCH 1/3] panic: Disable crash_kexec_post_notifiers
- if kdump is not available
-In-Reply-To: <20150714182336.GB3912@redhat.com>
-References: <20150714135919.GA18333@fifo99.com>
- <20150714150208.GD10792@redhat.com> <20150714153430.GA18766@fifo99.com>
- <20150714154040.GA3912@redhat.com> <20150714154833.GA18883@fifo99.com>
- <20150714161612.GH10792@redhat.com> <87a8uyoeig.fsf@x220.int.ebiederm.org>
- <20150714172953.GA19135@fifo99.com> <20150714175527.GI10792@redhat.com>
- <87si8qmxef.fsf@x220.int.ebiederm.org> <20150714182336.GB3912@redhat.com>
-Message-ID: <55A5ECC3.5060803@hitachi.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 15 Jul 2015 10:50:53 +0530
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+Message-ID: <CANAwSgQayHCka26zZ+E_jnERmVdSaG-1jFmGPX2dqcoT52HHNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/07/15 3:23, Vivek Goyal wrote:
-> On Tue, Jul 14, 2015 at 01:01:12PM -0500, Eric W. Biederman wrote:
->> Vivek Goyal <vgoyal@redhat.com> writes:
->>
->>> On Tue, Jul 14, 2015 at 05:29:53PM +0000, dwalker at fifo99.com wrote:
->>>
->>> [..]
->>>>>>>> If a machine is failing, there are high chance it can't deliver you the
->>>>>>>> notification. Detecting that failure suing some kind of polling mechanism
->>>>>>>> might be more reliable. And it will make even kdump mechanism more
->>>>>>>> reliable so that it does not have to run panic notifiers after the crash.
->>>>>>>
->>>>>>> I think what your suggesting is that my company should change how it's hardware works
->>>>>>> and that's not really an option for me. This isn't a simple thing like checking over the
->>>>>>> network if the machine is down or not, this is way more complex hardware design.
->>>>>>
->>>>>> That means you are ready to live with an unreliable design. There might be
->>>>>> cases where notifier does not get run properly and you will not do switch
->>>>>> despite the fact that OS has failed. I was just trying to nudge you in
->>>>>> a direction which could be more reliable mechanism.
->>>>>
->>>>> Sigh I see some deep confusion going on here.
->>>>>
->>>>> The panic notifiers are just that panic notifiers.  They have not been
->>>>> nor should they be tied to kexec.   If those notifiers force a switch
->>>>> over of between machines I fail to see why you would care if it was
->>>>> kexec or another panic situation that is forcing that switchover.
->>>>
->>>> Hidehiro isn't fixing the failover situation on my side, he's fixing register
->>>> information collection when crash_kexec_post_notifiers is used.
->>>
->>> Sure. Given that we have created this new parameter, let us fix it so that
->>> we can capture the other cpu register state in crash dump.
->>>
->>> I am little disappointed that it was not tested well when this parameter was
->>> introuced. We should have atleast tested it to the extent to see if there
->>> is proper cpu state present for all cpus in the crash dump.
->>>
->>> At that point of time it looked like a simple modification
->>> to allow panic notifiers before crash_kexec().
->>
->> Either that or we say no one cares enough, and it known broken so let's
->> just revert the fool thing.
-> 
-> Masami, you introduced this option. Are you fine with the revert? Is it
-> really being used and tested?
+Hi Chanho,
 
-Actually, it is tested but under very limited situation. I think we
-need a clear acceptance criteria, IOW, we need a testset for kdump
-so that we can make things better.
-Would you have it? maybe we can push it into kselftest.
+On 15 July 2015 at 07:06, Chanho Park <parkch98@gmail.com> wrote:
+> The cpu booting of exynos5422 has been still broken since we discussed
+> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
+> hardkernel, it could help to boot 8 cores well. This patch need to have
+> more test like STR and other SoC especially exynos5800 which is variant
+> of exynos5422. If this patch is broken on exynos5800, I'll find another
+> way to check exynos5422.
+>
+> This patch is top of my previous exynos5422 cpu ordering patch[2] and
+> need to enable CONFIG_EXYNOS5420_MCPM=y
+>
+> [    0.047509] CPU0: update cpu_capacity 448
+> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
+> [    0.047874] Setting up static identity map for 0x400082c0 -
+> 0x40008318
+> [    0.048340] ARM CCI driver probed
+> [    0.048597] Exynos MCPM support installed
+> [    0.065676] CPU1: update cpu_capacity 448
+> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
+> [    0.070672] CPU2: update cpu_capacity 448
+> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
+> [    0.075644] CPU3: update cpu_capacity 448
+> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
+> [    0.080590] CPU4: update cpu_capacity 1535
+> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.085591] CPU5: update cpu_capacity 1535
+> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
+> [    0.090590] CPU6: update cpu_capacity 1535
+> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
+> [    0.095585] CPU7: update cpu_capacity 1535
+> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
+> [    0.095720] Brought up 8 CPUs
+>
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+> [2]:https://patchwork.kernel.org/patch/6782891/
+>
+> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Heesub Shin <heesub.shin@samsung.com>
+> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Signed-off-by: Chanho Park <parkch98@gmail.com>
+> ---
+>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
+>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>  2 files changed, 18 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 9bdf547..a076dde 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>                 cluster >= EXYNOS5420_NR_CLUSTERS)
+>                 return -EINVAL;
+>
+> -       exynos_cpu_power_up(cpunr);
+> +       if (!exynos_cpu_power_state(cpunr)) {
+> +               exynos_cpu_power_up(cpunr);
+> +
+> +               if (soc_is_exynos5800() && cluster) {
+> +                       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+> +                               udelay(10);
+> +
+> +                       pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
+> +                                       EXYNOS_SWRESET);
+> +               }
+> +       }
+> +
+>         return 0;
+>  }
+>
+> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/arch/arm/mach-exynos/regs-pmu.h
+> index b761433..fba9068 100644
+> --- a/arch/arm/mach-exynos/regs-pmu.h
+> +++ b/arch/arm/mach-exynos/regs-pmu.h
+> @@ -513,6 +513,12 @@ static inline unsigned int exynos_pmu_cpunr(unsigned int mpidr)
+>  #define SPREAD_ENABLE                                          0xF
+>  #define SPREAD_USE_STANDWFI                                    0xF
+>
+> +#define EXYNOS5420_KFC_CORE_RESET0                             BIT(8)
+> +#define EXYNOS5420_KFC_ETM_RESET0                              BIT(20)
+> +
+> +#define EXYNOS5420_KFC_CORE_RESET(_nr)                         \
+> +       ((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
+> +
+>  #define EXYNOS5420_BB_CON1                                     0x0784
+>  #define EXYNOS5420_BB_SEL_EN                                   BIT(31)
+>  #define EXYNOS5420_BB_PMOS_EN                                  BIT(7)
+> --
+> 2.1.0
+>
 
->> I honestly can't see how to support panic notifiers, before kexec.
->> There is no way to tell what is being done and all of the pieces
->> including smp_send_stop are known to be buggy.
-> 
-> we should be able to replace smp_send_stop() with what crash_kexec() is
-> doing to stop the machine? If yes, then it should be fine I guess. This
-> parameter description clearly says that specify it at your own risk. So
-> we are not issuing a big support statement for successful kdump after
-> panic notifiers. If it is something fixable, otherwise user needs
-> to deal with it.
+It brought all the 8 core up on my Odroid-XU3
 
-Agreed (as I've sent in other replay).
-
-Thank you,
-
--- 
-Masami HIRAMATSU
-Linux Technology Research Center, System Productivity Research Dept.
-Center for Technology Innovation - Systems Engineering
-Hitachi, Ltd., Research & Development Group
-E-mail: masami.hiramatsu.pt at hitachi.com
+Tested-by: Anand Moon <linux.amoon@gmail.com>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
