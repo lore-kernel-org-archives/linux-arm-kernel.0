@@ -1,209 +1,101 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 15 Jul 2015 11:23:15 +0300
-Subject: [PATCH] ARM: pxa: fix dm9000 platform data regression
-In-Reply-To: <1436657520-16972-1-git-send-email-robert.jarzmik@free.fr>
-References: <1436657520-16972-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <55A61873.7090209@compulab.co.il>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 15 Jul 2015 10:24:38 +0200
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+Message-ID: <55A618C6.3020603@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+Hello Chanho,
 
-On 07/12/15 02:32, Robert Jarzmik wrote:
-> Since dm9000 driver added support for a vcc regulator, platform data
-> based platforms have their ethernet broken, as the regulator claiming
-> returns -EPROBE_DEFER and prevents dm9000 loading.
+On 07/15/2015 03:36 AM, Chanho Park wrote:
+> The cpu booting of exynos5422 has been still broken since we discussed
+> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
+> hardkernel, it could help to boot 8 cores well. This patch need to have
+> more test like STR and other SoC especially exynos5800 which is variant
+> of exynos5422. If this patch is broken on exynos5800, I'll find another
+> way to check exynos5422.
 > 
-> This patch fixes this for all pxa boards using dm9000, by using the
-> specific regulator_has_full_constraints() function.
+> This patch is top of my previous exynos5422 cpu ordering patch[2] and
+> need to enable CONFIG_EXYNOS5420_MCPM=y
 > 
-> This was discovered and tested on the cm-x300 board.
+> [    0.047509] CPU0: update cpu_capacity 448
+> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
+> [    0.047874] Setting up static identity map for 0x400082c0 -
+> 0x40008318
+> [    0.048340] ARM CCI driver probed
+> [    0.048597] Exynos MCPM support installed
+> [    0.065676] CPU1: update cpu_capacity 448
+> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
+> [    0.070672] CPU2: update cpu_capacity 448
+> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
+> [    0.075644] CPU3: update cpu_capacity 448
+> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
+> [    0.080590] CPU4: update cpu_capacity 1535
+> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
+> [    0.085591] CPU5: update cpu_capacity 1535
+> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
+> [    0.090590] CPU6: update cpu_capacity 1535
+> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
+> [    0.095585] CPU7: update cpu_capacity 1535
+> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
+> [    0.095720] Brought up 8 CPUs
 > 
-> Fixes: 7994fe55a4a2 ("dm9000: Add regulator and reset support to dm9000")
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-
-Thanks for the patch!
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
-
+> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+> [2]:https://patchwork.kernel.org/patch/6782891/
+> 
+> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Heesub Shin <heesub.shin@samsung.com>
+> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+> Signed-off-by: Chanho Park <parkch98@gmail.com>
 > ---
->  arch/arm/mach-pxa/capc7117.c       | 3 +++
->  arch/arm/mach-pxa/cm-x2xx.c        | 3 +++
->  arch/arm/mach-pxa/cm-x300.c        | 2 ++
->  arch/arm/mach-pxa/colibri-pxa270.c | 3 +++
->  arch/arm/mach-pxa/em-x270.c        | 2 ++
->  arch/arm/mach-pxa/icontrol.c       | 3 +++
->  arch/arm/mach-pxa/trizeps4.c       | 3 +++
->  arch/arm/mach-pxa/vpac270.c        | 3 +++
->  arch/arm/mach-pxa/zeus.c           | 2 ++
->  9 files changed, 24 insertions(+)
+>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
+>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>  2 files changed, 18 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-pxa/capc7117.c b/arch/arm/mach-pxa/capc7117.c
-> index c092730749b9..bf366b39fa61 100644
-> --- a/arch/arm/mach-pxa/capc7117.c
-> +++ b/arch/arm/mach-pxa/capc7117.c
-> @@ -24,6 +24,7 @@
->  #include <linux/ata_platform.h>
->  #include <linux/serial_8250.h>
->  #include <linux/gpio.h>
-> +#include <linux/regulator/machine.h>
->  
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
-> @@ -144,6 +145,8 @@ static void __init capc7117_init(void)
->  
->  	capc7117_uarts_init();
->  	capc7117_ide_init();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  MACHINE_START(CAPC7117,
-> diff --git a/arch/arm/mach-pxa/cm-x2xx.c b/arch/arm/mach-pxa/cm-x2xx.c
-> index bb99f59a36d8..a17a91eb8e9a 100644
-> --- a/arch/arm/mach-pxa/cm-x2xx.c
-> +++ b/arch/arm/mach-pxa/cm-x2xx.c
-> @@ -13,6 +13,7 @@
->  #include <linux/syscore_ops.h>
->  #include <linux/irq.h>
->  #include <linux/gpio.h>
-> +#include <linux/regulator/machine.h>
->  
->  #include <linux/dm9000.h>
->  #include <linux/leds.h>
-> @@ -466,6 +467,8 @@ static void __init cmx2xx_init(void)
->  	cmx2xx_init_ac97();
->  	cmx2xx_init_touchscreen();
->  	cmx2xx_init_leds();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  static void __init cmx2xx_init_irq(void)
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index 4d3588d26c2a..5851f4c254c1 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -835,6 +835,8 @@ static void __init cm_x300_init(void)
->  	cm_x300_init_ac97();
->  	cm_x300_init_wi2wi();
->  	cm_x300_init_bl();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  static void __init cm_x300_fixup(struct tag *tags, char **cmdline)
-> diff --git a/arch/arm/mach-pxa/colibri-pxa270.c b/arch/arm/mach-pxa/colibri-pxa270.c
-> index 5f9d9303b346..3503826333c7 100644
-> --- a/arch/arm/mach-pxa/colibri-pxa270.c
-> +++ b/arch/arm/mach-pxa/colibri-pxa270.c
-> @@ -18,6 +18,7 @@
->  #include <linux/mtd/partitions.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/platform_device.h>
-> +#include <linux/regulator/machine.h>
->  #include <linux/ucb1400.h>
->  
->  #include <asm/mach/arch.h>
-> @@ -294,6 +295,8 @@ static void __init colibri_pxa270_init(void)
->  		printk(KERN_ERR "Illegal colibri_pxa270_baseboard type %d\n",
->  				colibri_pxa270_baseboard);
->  	}
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  /* The "Income s.r.o. SH-Dmaster PXA270 SBC" board can be booted either
-> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-> index 51531ecffca8..9d7072b04045 100644
-> --- a/arch/arm/mach-pxa/em-x270.c
-> +++ b/arch/arm/mach-pxa/em-x270.c
-> @@ -1306,6 +1306,8 @@ static void __init em_x270_init(void)
->  	em_x270_init_i2c();
->  	em_x270_init_camera();
->  	em_x270_userspace_consumers_init();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  MACHINE_START(EM_X270, "Compulab EM-X270")
-> diff --git a/arch/arm/mach-pxa/icontrol.c b/arch/arm/mach-pxa/icontrol.c
-> index c98511c5abd1..9b0eb0252af6 100644
-> --- a/arch/arm/mach-pxa/icontrol.c
-> +++ b/arch/arm/mach-pxa/icontrol.c
-> @@ -26,6 +26,7 @@
->  #include <linux/spi/spi.h>
->  #include <linux/spi/pxa2xx_spi.h>
->  #include <linux/can/platform/mcp251x.h>
-> +#include <linux/regulator/machine.h>
->  
->  #include "generic.h"
->  
-> @@ -185,6 +186,8 @@ static void __init icontrol_init(void)
->  	mxm_8x10_mmc_init();
->  
->  	icontrol_can_init();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  MACHINE_START(ICONTROL, "iControl/SafeTcam boards using Embedian MXM-8x10 CoM")
-> diff --git a/arch/arm/mach-pxa/trizeps4.c b/arch/arm/mach-pxa/trizeps4.c
-> index 872dcb20e757..066e3a250ee0 100644
-> --- a/arch/arm/mach-pxa/trizeps4.c
-> +++ b/arch/arm/mach-pxa/trizeps4.c
-> @@ -26,6 +26,7 @@
->  #include <linux/dm9000.h>
->  #include <linux/mtd/physmap.h>
->  #include <linux/mtd/partitions.h>
-> +#include <linux/regulator/machine.h>
->  #include <linux/i2c/pxa-i2c.h>
->  
->  #include <asm/types.h>
-> @@ -534,6 +535,8 @@ static void __init trizeps4_init(void)
->  
->  	BCR_writew(trizeps_conxs_bcr);
->  	board_backlight_power(1);
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  static void __init trizeps4_map_io(void)
-> diff --git a/arch/arm/mach-pxa/vpac270.c b/arch/arm/mach-pxa/vpac270.c
-> index aa89488f961e..54122a983ae3 100644
-> --- a/arch/arm/mach-pxa/vpac270.c
-> +++ b/arch/arm/mach-pxa/vpac270.c
-> @@ -24,6 +24,7 @@
->  #include <linux/dm9000.h>
->  #include <linux/ucb1400.h>
->  #include <linux/ata_platform.h>
-> +#include <linux/regulator/machine.h>
->  #include <linux/regulator/max1586.h>
->  #include <linux/i2c/pxa-i2c.h>
->  
-> @@ -711,6 +712,8 @@ static void __init vpac270_init(void)
->  	vpac270_ts_init();
->  	vpac270_rtc_init();
->  	vpac270_ide_init();
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  MACHINE_START(VPAC270, "Voipac PXA270")
-> diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
-> index ac2ae5c71ab4..6158566fa0f7 100644
-> --- a/arch/arm/mach-pxa/zeus.c
-> +++ b/arch/arm/mach-pxa/zeus.c
-> @@ -868,6 +868,8 @@ static void __init zeus_init(void)
->  	i2c_register_board_info(0, ARRAY_AND_SIZE(zeus_i2c_devices));
->  	pxa2xx_set_spi_info(3, &pxa2xx_spi_ssp3_master_info);
->  	spi_register_board_info(zeus_spi_board_info, ARRAY_SIZE(zeus_spi_board_info));
-> +
-> +	regulator_has_full_constraints();
->  }
->  
->  static struct map_desc zeus_io_desc[] __initdata = {
+> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+> index 9bdf547..a076dde 100644
+> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>  		cluster >= EXYNOS5420_NR_CLUSTERS)
+>  		return -EINVAL;
 > 
+> -	exynos_cpu_power_up(cpunr);
+> +	if (!exynos_cpu_power_state(cpunr)) {
+> +		exynos_cpu_power_up(cpunr);
+> +
+> +		if (soc_is_exynos5800() && cluster) {
 
+I believe of_machine_is_compatible("samsung,exynos5800") is preferred
+nowadays over soc_is_exynos5800().
+
+Now, is correct to do this for all Exynos5422/5800 based boards? AFAIU
+from the previous discussions, this behavior is specific to the Odroid
+XU3 so maybe of_machine_is_compatible("hardkernel,odroid-xu3") instead?
+
+I know this can affect other Exynos5800 boards that are shipped with a
+similar binary BL1/BL2 blobs that also use SPARE2 as a sync mechanism
+but maybe is better to add more exceptions later rather than do it for
+all Exynos5800?
+
+The Exynos5800 based Chromebook doesn't have this issue for example and
+all the 8 cores are brought up correctly.
+
+Having said that, I tested this patch on an Exynos5800 Peach Pi and all
+the 8 cores are up and also after a S2R so seems to be a no-op when the
+PMU_SPARE2 is not used for this.
+
+Best regards,
 -- 
-Regards,
-Igor.
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
