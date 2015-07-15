@@ -1,28 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jul 2015 20:08:19 +0100
-Subject: [PATCH] arm: fault.c: fix unhandled page fault message
-In-Reply-To: <1436974250-4999-1-git-send-email-lkurusa@redhat.com>
-References: <1436974250-4999-1-git-send-email-lkurusa@redhat.com>
-Message-ID: <20150715190819.GE7557@n2100.arm.linux.org.uk>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Wed, 15 Jul 2015 14:23:52 -0500
+Subject: [PATCH] ARM: socfpga: put back v7_invalidate_l1 in
+ socfpga_secondary_startup
+In-Reply-To: <20150708210734.GN7557@n2100.arm.linux.org.uk>
+References: <1436370711-18524-1-git-send-email-dinguyen@opensource.altera.com>
+ <20150708165115.GM7557@n2100.arm.linux.org.uk>
+ <559D765C.30102@opensource.altera.com>
+ <20150708210734.GN7557@n2100.arm.linux.org.uk>
+Message-ID: <55A6B348.4030109@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 05:30:50PM +0200, Levente Kurusa wrote:
-> Even if the signal was handled using signal(2) the message
-> would be printed. Fix that by checking whether the signal
-> is handled.
+On 07/08/2015 04:07 PM, Russell King - ARM Linux wrote:
+> On Wed, Jul 08, 2015 at 02:13:32PM -0500, Dinh Nguyen wrote:
+>> The value of CPACR is 0x00F00000. So cp11 and cp10 are privileged and
+>> user mode access.
+> 
+> Hmm.
+> 
+> I think what you've found is a(nother) latent bug in the CPU bring up
+> code.
+> 
+> For SMP CPUs, the sequence we're following during early initialisation is:
+> 
+> 1. Enable SMP coherency.
+> 2. Invalidate the caches.
+> 
+> If the cache contains rubbish, enabling SMP coherency before invalidating
+> the cache is plainly an absurd thing to do.
+> 
+> Can you try the patch below - not tested in any way, so you may need to
+> tweak it, but it should allow us to prove that point.
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index 0716bbe19872..db5137fc297d 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -275,6 +275,10 @@ __v7_b15mp_setup:
+>  __v7_ca17mp_setup:
+>  	mov	r10, #0
+>  1:
+> +	adr	r12, __v7_setup_stack		@ the local stack
+> +	stmia	r12, {r0-r5, r7, r9-r11, lr}
+> +	bl      v7_invalidate_l1
+> +	ldmia	r12, {r0-r5, r7, r9-r11, lr}
+>  #ifdef CONFIG_SMP
+>  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+>  	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
+> @@ -283,7 +287,7 @@ __v7_ca17mp_setup:
+>  	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
+>  	mcreq	p15, 0, r0, c1, c0, 1
+>  #endif
+> -	b	__v7_setup
+> +	b	__v7_setup_cont
+>  
+>  /*
+>   * Errata:
+> @@ -417,6 +421,7 @@ __v7_setup:
+>  	bl      v7_invalidate_l1
+>  	ldmia	r12, {r0-r5, r7, r9, r11, lr}
+>  
+> +__v7_setup_cont:
+>  	and	r0, r9, #0xff000000		@ ARM?
+>  	teq	r0, #0x41000000
+>  	bne	__errata_finish
+> @@ -480,7 +485,7 @@ ENDPROC(__v7_setup)
+>  
+>  	.align	2
+>  __v7_setup_stack:
+> -	.space	4 * 11				@ 11 registers
+> +	.space	4 * 12				@ 12 registers
+>  
+>  	__INITDATA
+>  
+> 
 
-Why?
+For this patch, please feel free to add:
 
-Even if the application handles the signal, the point of this debugging is
-to have the kernel report the reason for the fault.
+Tested-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Just because the application has installed a SIGSEGV handler to print some
-nice "oops" message, and to cleanly shut down (eg, like Xorg) doesn't mean
-we should hide this debugging.  In fact, as such handlers generally get in
-the way of getting a decent dump from the application, having the kernel
-report this information is even more valuable in this situation.
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Dinh
