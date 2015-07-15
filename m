@@ -1,42 +1,46 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed, 15 Jul 2015 16:05:50 +0200
-Subject: [PATCH] ARM: dts: vf-colibri: define stdout-path property
-In-Reply-To: <20150713151004.GA26642@tiger>
-References: <1435910799-11706-1-git-send-email-stefan@agner.ch>
- <20150713151004.GA26642@tiger>
-Message-ID: <bed79bcac594f3efece6acb3c24ae543@agner.ch>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Wed, 15 Jul 2015 14:12:54 +0000
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support
+ in Zynq MPSoC GQSPI controller
+In-Reply-To: <20150714164005.GE11162@sirena.org.uk>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150714164005.GE11162@sirena.org.uk>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015-07-13 17:10, Shawn Guo wrote:
-> On Fri, Jul 03, 2015 at 10:06:39AM +0200, Stefan Agner wrote:
->> Define Vybrid's UART0, connected to the Colibri pinout UART_A, as
->> standard output.
->>
->> Signed-off-by: Stefan Agner <stefan@agner.ch>
->> ---
->>  arch/arm/boot/dts/vf-colibri-eval-v3.dtsi | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> index 2cbe663..cb199ae 100644
->> --- a/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> +++ b/arch/arm/boot/dts/vf-colibri-eval-v3.dtsi
->> @@ -10,6 +10,7 @@
->>  / {
->>  	chosen {
->>  		bootargs = "console=ttyLP0,115200";
->> +		stdout-path = "serial0:115200n8";
+Hi Mark,
+
+> > What is dual parallel mode?
+> > ---------------------------
+> > ZynqMP GQSPI controller supports Dual Parallel mode with following
+> functionalities:
+> > 1) Supporting two SPI flash memories operating in parallel. 8 I/O lines.
+> > 2) Chip selects and clock are shared to both the flash devices
+> > 3) This mode is targeted for faster read/write speed and also doubles the size
+> > 4) Commands/data can be transmitted/received from both the devices(mirror),
+> >    or only upper or only lower flash memory devices.
+> > 5) Data arrangement:
+> >    With stripe enabled,
+> >    Even bytes i.e. 0, 2, 4,... are transmitted on Lower Data Bus
+> >    Odd bytes i.e. 1, 3, 5,.. are transmitted on Upper Data Bus.
 > 
-> With this change, can bootargs just be dropped?
+> For the SPI code this just seems like SPI with an 8 bit data width.
+> 
+> > What is stacked mode?
+> > ---------------------
+> > ZynqMP GQSPI controller supports stacked mode with following
+> functionalities:
+> > 1) The Generic Quad-SPI controller also supports two SPI flash memories
+> >    in a shared bus arrangement to reduce IO pin count.
+> > 2) Separate chip select lines
+> > 3) Shared I/O lines
+> > 4) This mode is targeted for increasing the flash memory and no performance
+> >    improvement when compared with single.
+> 
+> This is just a normal SPI controller from a SPI point of view.
 
-I guess it would break a (fairly old) kernel which does not support
-stdout-path yet?
+How can we really represent the stacked mode in current configuration?
 
-However, the newer Vybrid DT's anyway do not work on old kernels due to
-the interrupt hierarchy changes...
-
-Will send a v2 without default bootargs.
-
---
-Stefan
+Thanks & Regards,
+Ranjit
