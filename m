@@ -1,82 +1,54 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 14 Jul 2015 22:21:32 -0700
-Subject: [PATCH] pinctrl: add support for Qualcomm Technologies QDF2xxx
- ARM64 SoCs
-In-Reply-To: <1436916544-811-1-git-send-email-timur@codeaurora.org>
-References: <1436916544-811-1-git-send-email-timur@codeaurora.org>
-Message-ID: <20150715052132.GF32767@usrtlx11787.corpusers.net>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Jul 2015 22:30:05 -0700
+Subject: [PATCH V2] arm:DTS Correct audio input route & set mic bias
+In-Reply-To: <CAK8F28=0ttDiyzNKkYog7Pe_qWXGSRXkE_vOZ1QNpQiwbY0Vxw@mail.gmail.com>
+References: <1436897844-6908-1-git-send-email-adam.yh.lee@gmail.com>
+ <CAK8F28=0ttDiyzNKkYog7Pe_qWXGSRXkE_vOZ1QNpQiwbY0Vxw@mail.gmail.com>
+Message-ID: <20150715053005.GX17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 14 Jul 16:29 PDT 2015, Timur Tabi wrote:
+* Ash Charles <ashcharles@gmail.com> [150714 11:41]:
+> On Tue, Jul 14, 2015 at 11:17 AM, Adam YH Lee <adam.yh.lee@gmail.com> wrote:
+> > Audio-in was incorrectly routed to Line In. It should be Mic3L as per
+> > schematic.
+> >
+> > Using mic-bias voltage at 2.0v (<0x1>) does not work for some reason. There
+> > is no voltage seen on micbias (R127). Mic-bias voltage of 2.5v (<0x2>) works.
+> > I see voltage of 2.475v across GND and micbias.
+> >
+> > With these changes, I can record audio with a pair of proliferate TRRS earbuds.
+> >
+> > Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/am335x-pepper.dts | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+> > index d627dc6..73b4cc3 100644
+> > --- a/arch/arm/boot/dts/am335x-pepper.dts
+> > +++ b/arch/arm/boot/dts/am335x-pepper.dts
+> > @@ -74,6 +74,7 @@
+> >         audio_codec: tlv320aic3106 at 1b {
+> >                 compatible = "ti,tlv320aic3106";
+> >                 reg = <0x1b>;
+> > +               ai3x-micbias-vg = <0x2>;
+> >         };
+> >
+> >         accel: lis331dlh at 1d {
+> > @@ -152,7 +153,7 @@
+> >         ti,audio-routing =
+> >                 "Headphone Jack",       "HPLOUT",
+> >                 "Headphone Jack",       "HPROUT",
+> > -               "LINE1L",               "Line In";
+> > +               "MIC3L",                "Mic3L Switch";
+> >  };
+> >
+> >  &mcasp0 {
+> Note, this is getting resent to correct the sign-offs as requested
+> https://lkml.org/lkml/2015/7/14/56
+> Acked-by: Ash Charles <ashcharles@gmail.com>
 
-[..]
+Thanks applying into omap-for-v4.2/fixes.
 
-> diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-
-[..]
-
-> + *
-> + * GPIO and pin control functions on this SOC are handled by the "TLMM"
-> + * device.  The driver which controls this device is pinctrl-msm.c.  Each
-> + * SOC with a TLMM is expected to create a client driver that registers
-> + * with pinctrl-msm.c.  This means that all TLMM drivers are pin control
-> + * drivers.
-> + *
-> + * This pin control driver is intended to be used only an ACPI-enabled
-> + * system.  As such, UEFI will handle all pin control configuration, so
-> + * this driver does not provide pin control functions.  It is effectively
-> + * a GPIO-only driver.  The alternative is to duplicate the GPIO code of
-> + * pinctrl-msm.c into another driver.
-> + */
-
-That should be fine, better reuse the existing code than duplicating it.
-
-> +
-> +#include <linux/module.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pinctrl/pinctrl.h>
-> +#include <linux/pinctrl/pinmux.h>
-
-Do you really need pinmux.h?
-
-> +#include <linux/acpi.h>
-> +
-> +#include "pinctrl-msm.h"
-> +
-
-[..]
-
-> +
-> +static struct platform_driver qdf2xxx_pinctrl_driver = {
-> +	.driver = {
-> +		.name = "qdf2xxx-pinctrl",
-> +		.owner = THIS_MODULE,
-
-No need to specify 'owner' of a platform_driver, so please drop this.
-
-> +		.acpi_match_table = ACPI_PTR(qdf2xxx_acpi_ids),
-> +	},
-> +	.probe = qdf2xxx_pinctrl_probe,
-> +	.remove = msm_pinctrl_remove,
-> +};
-> +
-> +static int __init qdf2xxx_pinctrl_init(void)
-> +{
-> +	return platform_driver_register(&qdf2xxx_pinctrl_driver);
-> +}
-> +arch_initcall(qdf2xxx_pinctrl_init);
-> +
-> +static void __exit qdf2xxx_pinctrl_exit(void)
-> +{
-> +	platform_driver_unregister(&qdf2xxx_pinctrl_driver);
-> +}
-> +module_exit(qdf2xxx_pinctrl_exit);
-> +
-> +MODULE_DESCRIPTION("Qualcomm Technologies QDF2xxx pin control driver");
-> +MODULE_LICENSE("GPL v2");
-
-Looks good with above nits fixed.
-
-Regards,
-Bjorn
+Tony
