@@ -1,31 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 09:36:13 +0200
-Subject: [PATCH v2 7/7] pinctrl: UniPhier: add UniPhier PH1-LD6b pinctrl
- driver
-In-Reply-To: <1436841607-7556-8-git-send-email-yamada.masahiro@socionext.com>
-References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-8-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZPDq+gW4e+rKpiZbfYaYr6O1KUuXW93_qY_d5FUSi5FQ@mail.gmail.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Thu, 16 Jul 2015 09:41:10 +0200
+Subject: [PATCH v2] serial: mxs-auart: keep the AUART unit in reset state
+ when not in use
+In-Reply-To: <55A68502.1090609@i2se.com>
+References: <1436945777-4332-1-git-send-email-jbe@pengutronix.de>
+ <55A68502.1090609@i2se.com>
+Message-ID: <201507160941.11261.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 4:40 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+Hi Stefan,
 
-> Add pin configuration and pinmux support for UniPhier PH1-LD6b SoC.
+On Wednesday 15 July 2015 18:06:26 Stefan Wahren wrote:
+> [...]
+> > ---
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> Changes in v2:
->   - sort groups and funcs alphabetically
->   - add i2c pin-mux settings
->   - sort members of platform_driver
->   - change to tristate
->   - add THIS_MODULE to pinctrl_desc
->   - use module_platform_driver
+> changelog for v2?
 
-Patch applied.
+:) follows. Will send v3 which also contains the missing newline fix.
 
-Yours,
-Linus Walleij
+Thanks,
+Juergen
+
+-- 
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions ? ? ? ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
