@@ -1,152 +1,107 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 16 Jul 2015 14:36:02 -0500
-Subject: [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
-In-Reply-To: <55A80262.2010401@ti.com>
-References: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
- <20150516140230.GF31666@google.com> <55A80262.2010401@ti.com>
-Message-ID: <CAErSpo5uMkr+fQnG4G6mT_34ERNT_1mSbSpyWyaf3s8_RutUJw@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 16 Jul 2015 21:55:34 +0200
+Subject: [PATCH 04/18] KVM: ARM64: Add reset and access handlers for
+ PMCR_EL0 register
+In-Reply-To: <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <20150716195534.GD14024@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 2:13 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
-> On 05/16/2015 10:02 AM, Bjorn Helgaas wrote:
->>
->> On Wed, May 28, 2014 at 01:14:53PM -0400, Murali Karicheri wrote:
->>>
->>> Call pcie_bus_configure_settings on ARM, like for other platforms.
->>> pcie_bus_configure_settings makes sure the MPS across the bus is
->>> uniform and provides the ability to tune the MRSS and MPS to higher
->>> performance values. This is particularly important for embedded where
->>> there is no firmware to program these PCI-E settings for the OS.
->>>
->>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->>>
->>> CC: Russell King <linux@arm.linux.org.uk>
->>> CC: Bjorn Helgaas <bhelgaas@google.com>
->>> CC: Arnd Bergmann <arnd@arndb.de>
->>> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>
->>> ---
->>>   - Fixed comments against initial version
->>>   arch/arm/kernel/bios32.c |   12 ++++++++++++
->>>   1 file changed, 12 insertions(+)
->>>
->>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
->>> index 16d43cd..17a26c1 100644
->>> --- a/arch/arm/kernel/bios32.c
->>> +++ b/arch/arm/kernel/bios32.c
->>> @@ -545,6 +545,18 @@ void pci_common_init_dev(struct device *parent,
->>> struct hw_pci *hw)
->>>                  */
->>>                 pci_bus_add_devices(bus);
->>>         }
->>> +
->>> +       list_for_each_entry(sys, &head, node) {
->>> +               struct pci_bus *bus = sys->bus;
->>> +
->>> +               /* Configure PCI Express settings */
->>> +               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>> +                       struct pci_bus *child;
->>> +
->>> +                       list_for_each_entry(child, &bus->children, node)
->>> +                               pcie_bus_configure_settings(child);
->>
->>
->> This patch (8b5742ad156d ("ARM/PCI: Call pcie_bus_configure_settings() to
->> set MPS")) has been upstream since v3.16-rc1, but I think we goofed.
->>
->> The MPS configuration should be done *before* pci_bus_add_devices().
->> After
->> pci_bus_add_devices(), drivers may be bound to devices, and the PCI core
->> shouldn't touch device configuration while a driver owns the device.
->>
->> Looking at the code, it seems like it would have been simpler to do this
->> in
->> the existing loop:
->>
->>    list_for_each_entry(sys, &head, node) {
->>      struct pci_bus *bus = sys->bus;
->>
->>      if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
->>        pci_bus_size_bridges(bus);
->>        pci_bus_assign_resources(bus);
->>        list_for_each_entry(child, &bus->children, node)
->>          pcie_bus_configure_settings(child);
->>      }
->>
->>      pci_bus_add_devices(bus);
->>    }
->>
->> so maybe there's some reason I'm not aware of for not doing it that way?
->
->
-> Bjorn,
->
-> This one has escaped my radar and I found it recently while I was searching
-> for something else. I can't recall why this was not done this way. However I
-> have tried the below code on Keystone and it works fine.
->
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1..17efde7 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct
-> hw_pci *hw)
->         list_for_each_entry(sys, &head, node) {
->                 struct pci_bus *bus = sys->bus;
->
-> -               if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> +               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> +                       struct pci_bus *child;
->                         /*
->                          * Size the bridge windows.
->                          */
-> @@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct
-> hw_pci *hw)
->                          * Assign resources.
->                          */
->                         pci_bus_assign_resources(bus);
-> -               }
->
-> +                       list_for_each_entry(child, &bus->children, node)
-> +                               pcie_bus_configure_settings(child);
-> +               }
->                 /*
->                  * Tell drivers about devices found.
->                  */
->                 pci_bus_add_devices(bus);
->         }
-> -
-> -       list_for_each_entry(sys, &head, node) {
-> -               struct pci_bus *bus = sys->bus;
-> -
-> -               /* Configure PCI Express settings */
-> -               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> -                       struct pci_bus *child;
-> -
-> -                       list_for_each_entry(child, &bus->children, node)
-> -                               pcie_bus_configure_settings(child);
-> -               }
-> -       }
+On Mon, Jul 06, 2015 at 10:17:34AM +0800, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Add reset handler which gets host value of PMCR_EL0 and make writable
+> bits architecturally UNKNOWN. Add access handler which emulates
+> writing and reading PMCR_EL0 register.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 40 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index c370b40..152ee17 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -33,6 +33,7 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_host.h>
+>  #include <asm/kvm_mmu.h>
+> +#include <asm/pmu.h>
+>  
+>  #include <trace/events/kvm.h>
+>  
+> @@ -236,6 +237,44 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
 >  }
->
-> The SATA comes up fine and ahci is able to override the mrrs value as shown
-> by the log below.
->
-> [    1.581526] ahci 0001:01:00.0: limiting MRRS to 256
-> [    1.586521] ahci 0001:01:00.0: AHCI 0001.0000 32 slots 2 ports 6 Gbps 0x3
-> impl SATA mode
-> [    1.594604] ahci 0001:01:00.0: flags: 64bit ncq sntf led only pmp fbs pio
-> slum part sxs
-> [    1.603772] scsi host0: ahci
-> [    1.606976] scsi host1: ahci
-> [
->
-> If you are fine, I can send a patch for this. Please confirm.
+>  
+> +static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> +{
+> +	u32 pmcr;
+> +
+> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+> +	vcpu_sys_reg(vcpu, PMCR_EL0) = (pmcr & ~ARMV8_PMCR_MASK)
+> +				       | (ARMV8_PMCR_MASK & 0xdecafbad);
 
-Yes, please!  I think the existing code that calls
-pci_bus_add_devices() before configuring MPS is wrong, because MPS
-should be configured before drivers can claim the device.
+You could add a comment that this resets to UNKNOWN as to not make
+people confused about the pseudo-random hex value.
 
-Bjorn
+Have we thought about whether we want to tell the guest that it has the
+same PMU as available on the real hardware, or does the virtualization
+layer suggest to us that we should adjust this somehow?
+
+
+> +}
+> +
+> +/* PMCR_EL0 accessor. Only called as long as MDCR_EL2.TPMCR is set. */
+> +static bool access_pmcr(struct kvm_vcpu *vcpu,
+> +			const struct sys_reg_params *p,
+> +			const struct sys_reg_desc *r)
+> +{
+> +	unsigned long val;
+> +
+> +	if (p->is_write) {
+> +		/* Only update writeable bits of PMCR */
+> +		if (!p->is_aarch32)
+> +			val = vcpu_sys_reg(vcpu, r->reg);
+> +		else
+> +			val = vcpu_cp15(vcpu, r->reg);
+
+don't you need to add this function as the handler in the cp15_regs
+array as well?
+
+> +		val &= ~ARMV8_PMCR_MASK;
+> +		val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
+> +		if (!p->is_aarch32)
+> +			vcpu_sys_reg(vcpu, r->reg) = val;
+> +		else
+> +			vcpu_cp15(vcpu, r->reg) = val;
+> +	} else {
+> +		if (!p->is_aarch32)
+> +			*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
+> +		else
+> +			*vcpu_reg(vcpu, p->Rt) = vcpu_cp15(vcpu, r->reg);
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
+>  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
+>  	/* DBGBVRn_EL1 */						\
+> @@ -427,7 +466,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+>  
+>  	/* PMCR_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
+> -	  trap_raz_wi },
+> +	  access_pmcr, reset_pmcr_el0, PMCR_EL0, },
+>  	/* PMCNTENSET_EL0 */
+>  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+>  	  trap_raz_wi },
+> -- 
+> 2.1.0
+> 
+Thanks,
+-Christoffer
