@@ -1,18 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 09:29:36 +0200
-Subject: [PATCH v2 4/7] pinctrl: UniPhier: add UniPhier PH1-sLD8 pinctrl
+Date: Thu, 16 Jul 2015 09:31:45 +0200
+Subject: [PATCH v2 5/7] pinctrl: UniPhier: add UniPhier PH1-Pro5 pinctrl
  driver
-In-Reply-To: <1436841607-7556-5-git-send-email-yamada.masahiro@socionext.com>
+In-Reply-To: <1436841607-7556-6-git-send-email-yamada.masahiro@socionext.com>
 References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-5-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdbEd962ecENVvGLG7ziifq53FcTyWvw6G0yZNqr-KLS3A@mail.gmail.com>
+ <1436841607-7556-6-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdb6Mu59-EXsu3AEck9O7yt_npUXt-zHUT6srJUC+Avu=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jul 14, 2015 at 4:40 AM, Masahiro Yamada
 <yamada.masahiro@socionext.com> wrote:
 
-> Add pin configuration and pinmux support for UniPhier PH1-sLD8 SoC.
+> Add pin configuration and pinmux support for UniPhier PH1-Pro5 SoC.
 >
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
