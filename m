@@ -1,35 +1,50 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 16 Jul 2015 10:55:19 +0100
-Subject: [PATCH 0/3] Shared NMI backtracing support for ARM/x86
-In-Reply-To: <20150715203911.GF7557@n2100.arm.linux.org.uk>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
-Message-ID: <55A77F87.4050508@linaro.org>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 16 Jul 2015 10:13:37 +0000 (UTC)
+Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+In-Reply-To: <55A758A3.2070108@ti.com>
+References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+ <55A4DFEF.6040005@ti.com> <55A52208.5060302@ti.com>
+ <alpine.DEB.2.02.1507160014371.32764@utopia.booyaka.com>
+ <55A758A3.2070108@ti.com>
+Message-ID: <alpine.DEB.2.02.1507161012090.32764@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/15 21:39, Russell King - ARM Linux wrote:
-> Back in September, I stumbled across a single CPU IRQs-off lockup of an
-> ARM SMP system, and decided to hack something together based on a much
-> older hacky implementation used with StrongARM CPUs from early 2000s.
->
-> This resulted in a copy of the x86 NMI backtrace code into ARM as it was
-> back then, and feedback indicated that it wasn't a good time to push
-> such an effort forward, as printk() in NMI context is dodgy.
->
-> Over time, the x86 code has had this problem addressed, and last week
-> I updated the patch which I've been carrying in my tree to move the
-> shared code out of arch/x86 into lib/ rather than duplicating it, and
-> switch the ARM implementation to use it.
->
-> Discussing this with Thomas Gliexner, he agreed to give it a test over
-> last weekend, and he has reported to me this evening "no explosion so
-> far".  Since then, I've made a change to add the NOKPROBE_SYMBOL() to
-> the generic handler as per the x86 original code.
->
-> I'm aware that there are other competing implementations out there -
-> Daniel has one based on my patch from September time, but I don't think
-> that goes far enough with code sharing.  I'm also partially aware of
-> an implementation from Petr too.
+On Thu, 16 Jul 2015, Tero Kristo wrote:
 
-No worries. I agree this approach is much cleaner with regards to code 
-sharing.
+> On 07/16/2015 03:15 AM, Paul Walmsley wrote:
+> > On Tue, 14 Jul 2015, Tero Kristo wrote:
+> > 
+> > > On 07/14/2015 01:09 PM, Lokesh Vutla wrote:
+> > > > Hi,
+> > > > On Wednesday 10 June 2015 02:56 PM, Lokesh Vutla wrote:
+> > > > > Some IP blocks like RTC, needs an additional unlocking mechanism for
+> > > > > writing to its registers. This patch adds optional lock and unlock
+> > > > > function pointers to the IP block's hwmod data which gets executed
+> > > > > before and after writing into IP sysconfig register.
+> > > > > And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod
+> > > > > data,
+> > > > > so that sysconfig registers are updated properly.
+> > > > ping on this series.
+> > > > 
+> > > > Thanks and regards,
+> > > > Lokesh
+> > > 
+> > 
+> > [...]
+> > 
+> > > It is also racy, as there is no locking in place to avoid concurrent
+> > > access to
+> > > the lock/unlock registers across hwmod+driver.
+> > 
+> > I don't see the race.  Where is it?
+> 
+> See drivers/rtc/rtc-omap.c, am3352_rtc_unlock and am3352_rtc_lock.
+> 
+> That code is accessing the exact same registers.
+
+I guess my question is, when is it possible that code could race with the 
+hwmod code for the same device?
+
+
+- Paul
