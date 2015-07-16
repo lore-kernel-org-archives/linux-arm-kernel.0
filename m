@@ -1,19 +1,18 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 09:33:29 +0200
-Subject: [PATCH v2 6/7] pinctrl: UniPhier: add UniPhier ProXstream2
- pinctrl driver
-In-Reply-To: <1436841607-7556-7-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 16 Jul 2015 09:36:13 +0200
+Subject: [PATCH v2 7/7] pinctrl: UniPhier: add UniPhier PH1-LD6b pinctrl
+ driver
+In-Reply-To: <1436841607-7556-8-git-send-email-yamada.masahiro@socionext.com>
 References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-7-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZjiMc81F1=FeG7jGY7kxeaFOc-gKNZ9-Ud2f_x5b9KBg@mail.gmail.com>
+ <1436841607-7556-8-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdZPDq+gW4e+rKpiZbfYaYr6O1KUuXW93_qY_d5FUSi5FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Jul 14, 2015 at 4:40 AM, Masahiro Yamada
 <yamada.masahiro@socionext.com> wrote:
 
-> Add pin configuration and pinmux support for UniPhier ProXstream2
-> SoC.
+> Add pin configuration and pinmux support for UniPhier PH1-LD6b SoC.
 >
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
