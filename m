@@ -1,35 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 21:57:35 +0200
-Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
-In-Reply-To: <2694937.qjRpGCMvqj@wuerfel>
-References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
- <2120032.PN20RpmoKe@wuerfel>
- <CACRpkdaL6DHChx7mSWiGk65LZNxkMGtw=aef2zyHaE7dDhXz8A@mail.gmail.com>
- <2694937.qjRpGCMvqj@wuerfel>
-Message-ID: <CACRpkdb3k+s65tOR13iKNLqJ+CWvxSH6d3Z2Ra4OJ9rw+t2Q3w@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Jul 2015 20:57:23 +0100
+Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
+In-Reply-To: <1437063765.21215.18.camel@tiscali.nl>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+ <1437033944.27428.11.camel@tiscali.nl>
+ <20150716110032.GU11162@sirena.org.uk>
+ <1437047261.28351.6.camel@tiscali.nl>
+ <20150716125529.GG4039@sirena.org.uk>
+ <1437056116.28351.19.camel@tiscali.nl>
+ <20150716150500.GO4039@sirena.org.uk>
+ <1437063765.21215.18.camel@tiscali.nl>
+Message-ID: <20150716195723.GC11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 4:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 16 July 2015 16:03:18 Linus Walleij wrote:
+On Thu, Jul 16, 2015 at 06:22:45PM +0200, Paul Bolle wrote:
+> On do, 2015-07-16 at 16:05 +0100, Mark Brown wrote:
+> > Why would this not be the case - what is the difference you beleive
+> > this driver has to other platform drivers?
 
->> The aliases are set also to disabled ports to ensure enumeration
->> for the cases where a board file enabled a previously disabled
->> UART.
->>
->
-> Well, both really. The status property tells the kernel to not
-> ever touch a device, while the alias is what traditionally gets
-> used to assign an OS visible device name to a device in the tree.
-> This is more true for MacOS and AIX than Linux, which sometimes
-> does its own naming, but we really should not have an alias pointing
-> at a disabled device node.
+> It's my believe that for MODULE_ALIAS("platform:[...]") to be useful
+> there needs to be corresponding struct platform_device. For this patch
+> that would be a platform device named "rockchip-snd-max98090". (This is
+> something that I try to check rather carefully, because these devices
+> can be generated on the fly.)
 
-OK ... I will make a patch that remove the aliases for the disabled
-nodes.
+> I'm happy to drop this believe if someone shows me another way that
+> MODULE_ALIAS("platform:[...]") can actually be used.
 
-But this makes me think of whether the DT compiler should allow
-it or at least warn about it?
+> So, in short, the difference between this driver and other platform
+> drivers is that, as far as I'm aware, this platform driver lacks a
+> corresponding platform device. Probably because OF support suffices to
+> get this module autoloaded.
 
-Yours,
-Linus Walleij
+This is a patch adding a device driver.  We do not require that patches
+adding device drivers also add architecture code to load the driver or
+even be part of the same patch series since that isn't really helpful
+for anything.  We don't even require that board code be part of mainline
+at all, though obviously we do encourage it.
+
+If you want to make a tree wide effort to remove MODULE_ALIAS()s that
+do not have any in tree users please do that separately.  Right now it's
+perfectly OK to do it.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/b278afbb/attachment.sig>
