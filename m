@@ -1,33 +1,152 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Thu, 16 Jul 2015 21:32:20 +0200
-Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
-References: <1436711211-18223-1-git-send-email-robh@kernel.org>
- <1436711211-18223-7-git-send-email-robh@kernel.org>
- <alpine.DEB.2.11.1507121737030.20072@nanos>
- <20150716132632.GK7557@n2100.arm.linux.org.uk>
-Message-ID: <87pp3rj3uj.fsf@belgarion.home>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 16 Jul 2015 14:36:02 -0500
+Subject: [PATCH v1] ARM: pci: add call to pcie_bus_configure_settings()
+In-Reply-To: <55A80262.2010401@ti.com>
+References: <1401297293-3950-1-git-send-email-m-karicheri2@ti.com>
+ <20150516140230.GF31666@google.com> <55A80262.2010401@ti.com>
+Message-ID: <CAErSpo5uMkr+fQnG4G6mT_34ERNT_1mSbSpyWyaf3s8_RutUJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
-
->> drivers/net/ethernet/smsc/smc911x.c
->> drivers/net/ethernet/smsc/smc9194.c
->> drivers/net/ethernet/smsc/smc91x.c
->> 
->> Those might still be, but on the DT based boards the probing should be
->> completely irrelevant
+On Thu, Jul 16, 2015 at 2:13 PM, Murali Karicheri <m-karicheri2@ti.com> wrote:
+> On 05/16/2015 10:02 AM, Bjorn Helgaas wrote:
+>>
+>> On Wed, May 28, 2014 at 01:14:53PM -0400, Murali Karicheri wrote:
+>>>
+>>> Call pcie_bus_configure_settings on ARM, like for other platforms.
+>>> pcie_bus_configure_settings makes sure the MPS across the bus is
+>>> uniform and provides the ability to tune the MRSS and MPS to higher
+>>> performance values. This is particularly important for embedded where
+>>> there is no firmware to program these PCI-E settings for the OS.
+>>>
+>>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>>>
+>>> CC: Russell King <linux@arm.linux.org.uk>
+>>> CC: Bjorn Helgaas <bhelgaas@google.com>
+>>> CC: Arnd Bergmann <arnd@arndb.de>
+>>> CC: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+>>> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>>>
+>>> ---
+>>>   - Fixed comments against initial version
+>>>   arch/arm/kernel/bios32.c |   12 ++++++++++++
+>>>   1 file changed, 12 insertions(+)
+>>>
+>>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>>> index 16d43cd..17a26c1 100644
+>>> --- a/arch/arm/kernel/bios32.c
+>>> +++ b/arch/arm/kernel/bios32.c
+>>> @@ -545,6 +545,18 @@ void pci_common_init_dev(struct device *parent,
+>>> struct hw_pci *hw)
+>>>                  */
+>>>                 pci_bus_add_devices(bus);
+>>>         }
+>>> +
+>>> +       list_for_each_entry(sys, &head, node) {
+>>> +               struct pci_bus *bus = sys->bus;
+>>> +
+>>> +               /* Configure PCI Express settings */
+>>> +               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>> +                       struct pci_bus *child;
+>>> +
+>>> +                       list_for_each_entry(child, &bus->children, node)
+>>> +                               pcie_bus_configure_settings(child);
+>>
+>>
+>> This patch (8b5742ad156d ("ARM/PCI: Call pcie_bus_configure_settings() to
+>> set MPS")) has been upstream since v3.16-rc1, but I think we goofed.
+>>
+>> The MPS configuration should be done *before* pci_bus_add_devices().
+>> After
+>> pci_bus_add_devices(), drivers may be bound to devices, and the PCI core
+>> shouldn't touch device configuration while a driver owns the device.
+>>
+>> Looking at the code, it seems like it would have been simpler to do this
+>> in
+>> the existing loop:
+>>
+>>    list_for_each_entry(sys, &head, node) {
+>>      struct pci_bus *bus = sys->bus;
+>>
+>>      if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+>>        pci_bus_size_bridges(bus);
+>>        pci_bus_assign_resources(bus);
+>>        list_for_each_entry(child, &bus->children, node)
+>>          pcie_bus_configure_settings(child);
+>>      }
+>>
+>>      pci_bus_add_devices(bus);
+>>    }
+>>
+>> so maybe there's some reason I'm not aware of for not doing it that way?
 >
-> SA11x0 stuff uses smc91x.c
-PXA uses it also for lubbock, mainstone and zylonite boards, which are not yet
-converted to DT, and won't drop platform_data, even if they are DT converted.
-I remember testing this patchset on lubbock at least.
+>
+> Bjorn,
+>
+> This one has escaped my radar and I found it recently while I was searching
+> for something else. I can't recall why this was not done this way. However I
+> have tried the below code on Keystone and it works fine.
+>
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..17efde7 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct
+> hw_pci *hw)
+>         list_for_each_entry(sys, &head, node) {
+>                 struct pci_bus *bus = sys->bus;
+>
+> -               if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+> +                       struct pci_bus *child;
+>                         /*
+>                          * Size the bridge windows.
+>                          */
+> @@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct
+> hw_pci *hw)
+>                          * Assign resources.
+>                          */
+>                         pci_bus_assign_resources(bus);
+> -               }
+>
+> +                       list_for_each_entry(child, &bus->children, node)
+> +                               pcie_bus_configure_settings(child);
+> +               }
+>                 /*
+>                  * Tell drivers about devices found.
+>                  */
+>                 pci_bus_add_devices(bus);
+>         }
+> -
+> -       list_for_each_entry(sys, &head, node) {
+> -               struct pci_bus *bus = sys->bus;
+> -
+> -               /* Configure PCI Express settings */
+> -               if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+> -                       struct pci_bus *child;
+> -
+> -                       list_for_each_entry(child, &bus->children, node)
+> -                               pcie_bus_configure_settings(child);
+> -               }
+> -       }
+>  }
+>
+> The SATA comes up fine and ahci is able to override the mrrs value as shown
+> by the log below.
+>
+> [    1.581526] ahci 0001:01:00.0: limiting MRRS to 256
+> [    1.586521] ahci 0001:01:00.0: AHCI 0001.0000 32 slots 2 ports 6 Gbps 0x3
+> impl SATA mode
+> [    1.594604] ahci 0001:01:00.0: flags: 64bit ncq sntf led only pmp fbs pio
+> slum part sxs
+> [    1.603772] scsi host0: ahci
+> [    1.606976] scsi host1: ahci
+> [
+>
+> If you are fine, I can send a patch for this. Please confirm.
 
-> ucb1x00.c definitely uses IRQ probing on SA11x0 platforms.
-For PXA I must admit I don't yet know. I know lubbock has an UCB1400, but I
-don't have it working yet, so I can't foresee the problems yet.
+Yes, please!  I think the existing code that calls
+pci_bus_add_devices() before configuring MPS is wrong, because MPS
+should be configured before drivers can claim the device.
 
-Cheers.
-
--- 
-Robert
+Bjorn
