@@ -1,39 +1,38 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 17 Jul 2015 00:33:51 +0200
-Subject: [PATCH 1/3] arm64: add Rockchip architecture entry
+Date: Fri, 17 Jul 2015 00:34:23 +0200
+Subject: [PATCH 2/3] arm64: defconfig: enable ARCH_ROCKCHIP
 In-Reply-To: <2820374.NgluYWXZkW@diego>
 References: <2820374.NgluYWXZkW@diego>
-Message-ID: <2658910.AevvbvQ8ln@diego>
+Message-ID: <2272837.iN99Vuxs2j@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3368 is Rockchip's first ARM64 soc, build around 8 Cortex-A53 cores.
+Enable building Rockchip support in the defconfig.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm64/Kconfig | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0f6edb1..6ad9971 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -202,6 +202,16 @@ config ARCH_QCOM
- 	help
- 	  This enables support for the ARMv8 based Qualcomm chipsets.
- 
-+config ARCH_ROCKCHIP
-+	bool "Rockchip Platforms"
-+	select ARCH_HAS_RESET_CONTROLLER
-+	select ARCH_REQUIRE_GPIOLIB
-+	select PINCTRL
-+	select PINCTRL_ROCKCHIP
-+	help
-+	  This enables support for the ARMv8 based Rockchip chipsets,
-+	  like the RK3368.
-+
- config ARCH_SEATTLE
- 	bool "AMD Seattle SoC Family"
- 	help
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f38c94f..410646f 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -35,6 +35,7 @@ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_HISI=y
+ CONFIG_ARCH_MEDIATEK=y
++CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_TEGRA=y
+ CONFIG_ARCH_TEGRA_132_SOC=y
+@@ -101,6 +102,7 @@ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_LEGACY_PTY_COUNT=16
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_DW=y
+ CONFIG_SERIAL_8250_MT6577=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
 -- 
 2.1.4
