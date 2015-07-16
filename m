@@ -1,147 +1,75 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 16 Jul 2015 17:04:35 +0800
-Subject: [PATCH v3 6/6] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
-Message-ID: <1437037475-9065-7-git-send-email-yong.wu@mediatek.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 16 Jul 2015 11:06:06 +0200
+Subject: [PATCH 0/7] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <CACRpkdYFE1xDV75_ecR36OTePPm8Ta_O1G1fSqOHO=s4TQw20A@mail.gmail.com>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+ <CACRpkdYFE1xDV75_ecR36OTePPm8Ta_O1G1fSqOHO=s4TQw20A@mail.gmail.com>
+Message-ID: <CAMuHMdVvaFN_zQCcAog2akUJNxCZ2RzdENvmMqk2G33jb=0sWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the iommu/larbs nodes for mt8173
+Hi Linus,
 
-Signed-off-by: Yong Wu <yong.wu@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |   81 ++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+On Thu, Jul 16, 2015 at 11:00 AM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Jun 30, 2015 at 9:45 AM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+>> This patch series moves the setup of the GPIO-PFC pin mapping for
+>> Renesas PFC/GPIO combos from C code to DT, and does some cleanups.
+>> The move to DT is needed to make the GPIO hogging mechanism work, cfr.
+>> the discussion following "[PATCH] [RFC] gpio: Retry deferred GPIO
+>> hogging on pin range change" (https://lkml.org/lkml/2015/6/16/455).
+>>
+>> The series consists of 3 parts:
+>>   a. Patches 1-3 add the missing "gpio-ranges" properties to the dtsi
+>>      files for all affected SoCs,
+>>   b. Patch 4 disables the C code to set up the mapping on DT platforms
+>>      (it's still needed on SH or ARM-legacy),
+>>   c. Patches 5-7 do a few more cleanups in the sh-pfc gpio code.
+>>
+>> Dependencies:
+>>   - This series applies against next-next-20150630.
+>>   - Part a must go in first, to avoid regressions.
+>>     In addition, it's a prerequisite for "ARM: shmobile: armadillo800eva
+>>     dts: Add pinctrl and gpio-hog for lcdc0", which has been queued up
+>>     already in Simon's dt-for-v4.3 branch. Perhaps it can still be
+>>     reordered?
+>>   - While I didn't notice any bad behavior by having part a only, part b
+>>     should go in immediately after part a. Hence I think it's best if
+>>     Simon can take this one, too.
+>>   - Part c is independent (it doesn't touch the same code), so it can go
+>>     in before or after the other parts, or in parallel.
+>>
+>> Thanks for applying!
+>>
+>> Geert Uytterhoeven (7):
+>>   ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
+>>   ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
+>>   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
+>>   pinctrl: sh-pfc: Stop calling gpiochip_add_pin_range() on DT platforms
+>>   pinctrl: sh-pfc: Remove empty gpio_function_free()
+>>   pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up
+>>   pinctrl: sh-pfc: Confine legacy function GPIOs to SH
+>
+> I'm happy of shmobile people are happy.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index e81ac1f..7b8e73c 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -14,6 +14,7 @@
- #include <dt-bindings/clock/mt8173-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt8173-larb-port.h>
- #include <dt-bindings/power/mt8173-power.h>
- #include <dt-bindings/reset-controller/mt8173-resets.h>
- #include "mt8173-pinfunc.h"
-@@ -240,6 +241,17 @@
- 			reg = <0 0x10200620 0 0x20>;
- 		};
- 
-+		iommu: mmsys_iommu at 10205000 {
-+			compatible = "mediatek,mt8173-m4u";
-+			reg = <0 0x10205000 0 0x1000>;
-+			interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_M4U>;
-+			clock-names = "bclk";
-+			mediatek,larb = <&larb0 &larb1 &larb2
-+					&larb3 &larb4 &larb5>;
-+			#iommu-cells = <2>;
-+		};
-+
- 		apmixedsys: clock-controller at 10209000 {
- 			compatible = "mediatek,mt8173-apmixedsys";
- 			reg = <0 0x10209000 0 0x1000>;
-@@ -401,29 +413,98 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		larb0: larb at 14021000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14021000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+				 <&mmsys CLK_MM_SMI_LARB0>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		smi_common: smi at 14022000 {
-+			compatible = "mediatek,mt8173-smi";
-+			reg = <0 0x14022000 0 0x1000>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_COMMON>,
-+				 <&mmsys CLK_MM_SMI_COMMON>;
-+			clock-names = "apb", "smi";
-+		};
-+
-+		larb4: larb at 14027000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x14027000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-+			clocks = <&mmsys CLK_MM_SMI_LARB4>,
-+				 <&mmsys CLK_MM_SMI_LARB4>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		imgsys: imgsys at 15000000 {
- 			compatible = "mediatek,mt8173-imgsys", "syscon";
- 			reg = <0 0x15000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb2: larb at 15001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x15001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-+			clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-+				 <&imgsys CLK_IMG_LARB2_SMI>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vdecsys: vdecsys at 16000000 {
- 			compatible = "mediatek,mt8173-vdecsys", "syscon";
- 			reg = <0 0x16000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb1: larb at 16010000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x16010000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-+			clocks = <&vdecsys CLK_VDEC_CKEN>,
-+				 <&vdecsys CLK_VDEC_LARB_CKEN>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencsys: vencsys at 18000000 {
- 			compatible = "mediatek,mt8173-vencsys", "syscon";
- 			reg = <0 0x18000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
- 
-+		larb3: larb at 18001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x18001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-+			clocks = <&vencsys CLK_VENC_CKE1>,
-+				 <&vencsys CLK_VENC_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
-+
- 		vencltsys: vencltsys at 19000000 {
- 			compatible = "mediatek,mt8173-vencltsys", "syscon";
- 			reg = <0 0x19000000 0 0x1000>;
- 			#clock-cells = <1>;
- 		};
-+
-+		larb5: larb at 19001000 {
-+			compatible = "mediatek,mt8173-smi-larb";
-+			reg = <0 0x19001000 0 0x1000>;
-+			mediatek,smi = <&smi_common>;
-+			power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-+			clocks = <&vencltsys CLK_VENCLT_CKE1>,
-+				 <&vencltsys CLK_VENCLT_CKE0>;
-+			clock-names = "apb", "smi";
-+		};
- 	};
- };
- 
--- 
-1.7.9.5
+Laurent was mostly worried about the phandle in the "gpio-ranges" property
+pointing to the gpio/pfc combo node itself. Do you see any issues with that?
+
+As there were comments on some of the patches, I have to resend this
+series anyway...
+
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
