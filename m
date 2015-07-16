@@ -1,63 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jul 2015 11:23:26 +0100
-Subject: [PATCH 1/2] of: base: Allow more args than MAX_PHANDLE_ARGS if
- required
-In-Reply-To: <1437035444-13867-2-git-send-email-joro@8bytes.org>
-References: <1437035444-13867-1-git-send-email-joro@8bytes.org>
- <1437035444-13867-2-git-send-email-joro@8bytes.org>
-Message-ID: <20150716102325.GC26390@arm.com>
+From: standby24x7@gmail.com (Masanari Iida)
+Date: Thu, 16 Jul 2015 19:57:46 +0900
+Subject: [PATCH] Doc: trace: Fix typo in coresight.txt
+Message-ID: <1437044266-17500-1-git-send-email-standby24x7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 09:30:43AM +0100, Joerg Roedel wrote:
-> From: Joerg Roedel <jroedel@suse.de>
-> 
-> The main use of MAX_PHANDLE_ARGS is to define the number of
-> args elements in 'struct of_phandle_args'. This struct is
-> often declared on the stack and thus it is impractical to
-> increase MAX_PHANDLE_ARGS again and again.
-> 
-> To handle situations where more than MAX_PHANDLE_ARGS
-> elements may appear in a device-tree, introduce functions
-> to allocate/free 'struct of_phandle_args' with more than
-> MAX_PHANDLE_ARGS elements and provide the new function
-> of_parse_phandle_with_var_args(), which can handle those
-> variable-size structs.
-> 
-> This is necessary for the ARM-SMMU driver, where the number
-> of mmu-masters can be up to 128.
-> 
-> Signed-off-by: Joerg Roedel <jroedel@suse.de>
-> ---
->  drivers/of/base.c  | 43 ++++++++++++++++++++++++++++++++++++-------
->  include/linux/of.h |  7 +++++++
->  2 files changed, 43 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/of/base.c b/drivers/of/base.c
-> index 8b5a187..2b288db 100644
-> --- a/drivers/of/base.c
-> +++ b/drivers/of/base.c
-> @@ -54,6 +54,24 @@ DEFINE_MUTEX(of_mutex);
->   */
->  DEFINE_RAW_SPINLOCK(devtree_lock);
->  
-> +struct of_phandle_args *of_alloc_phandle_args(int size)
-> +{
-> +	struct of_phandle_args *args;
-> +	int e = max(0, size - MAX_PHANDLE_ARGS);
-> +
-> +	args =  kzalloc(sizeof(struct of_phandle_args) + e * sizeof(uint32_t),
-> +			GFP_KERNEL);
+This patch fix spelling typos found in coresight.txt
 
-Should you also update args->args_count to reflect the extended array?
+Signed-off-by: Masanari Iida <standby24x7@gmail.com>
+---
+ Documentation/trace/coresight.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-That said, extending the fixed-size array member like this feels a bit
-fragile. Does GCC not complain about out-of-bounds accesses if you
-statically address args->args[MAX_PHANDLE_ARGS]? Admittedly, I can't
-think *why* this would be break (things like additional padding will be
-harmless), but I'm not intimate with the C standard.
-
-I guess the more worrying possibility is if somebody adds a new member to
-the end of of_phandle_args.
-
-Will
+diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
+index 77d14d5..0a5c329 100644
+--- a/Documentation/trace/coresight.txt
++++ b/Documentation/trace/coresight.txt
+@@ -15,7 +15,7 @@ HW assisted tracing is becoming increasingly useful when dealing with systems
+ that have many SoCs and other components like GPU and DMA engines.  ARM has
+ developed a HW assisted tracing solution by means of different components, each
+ being added to a design at synthesis time to cater to specific tracing needs.
+-Compoments are generally categorised as source, link and sinks and are
++Components are generally categorised as source, link and sinks and are
+ (usually) discovered using the AMBA bus.
+ 
+ "Sources" generate a compressed stream representing the processor instruction
+@@ -138,7 +138,7 @@ void coresight_unregister(struct coresight_device *csdev);
+ 
+ The registering function is taking a "struct coresight_device *csdev" and
+ register the device with the core framework.  The unregister function takes
+-a reference to a "strut coresight_device", obtained at registration time.
++a reference to a "struct coresight_device", obtained at registration time.
+ 
+ If everything goes well during the registration process the new devices will
+ show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
+-- 
+2.5.0.rc2.13.g961abca
