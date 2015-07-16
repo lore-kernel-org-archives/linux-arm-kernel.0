@@ -1,82 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jul 2015 08:38:51 +0100
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
- the irqdomain of the GIC.
-In-Reply-To: <55A6AD1F.902@caviumnetworks.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
- <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
-Message-ID: <55A75F8B.3080009@arm.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 16 Jul 2015 16:35:24 +0900
+Subject: [PATCH v3] gpio: UniPhier: add driver for UniPhier GPIO controller
+In-Reply-To: <CACRpkdZK41P-1JQsL6RiywqFEUj6=g5xJMKy86wDdp6BxLJNzQ@mail.gmail.com>
+References: <1436841787-7734-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYaAMw5U3pctf96j0QpY2Qf+e=LX740F0okCmVU6pXkhA@mail.gmail.com>
+ <CAK7LNAQ+_ynWT944fPZsHCzMBLtfNu5AnppzaOxNgPSBTvj_tw@mail.gmail.com>
+ <CACRpkdZK41P-1JQsL6RiywqFEUj6=g5xJMKy86wDdp6BxLJNzQ@mail.gmail.com>
+Message-ID: <CAK7LNASd9z99RBmUgLVEM1WuLNSzGFM8qzrHwDf58tgGDy2SAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/15 19:57, David Daney wrote:
-> On 07/15/2015 10:12 AM, Marc Zyngier wrote:
->> On 15/07/15 17:54, David Daney wrote:
->>> From: David Daney <david.daney@cavium.com>
+Hi Linus,
+
+
+
+2015-07-16 16:07 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, Jul 16, 2015 at 5:44 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> 2015-07-15 23:15 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>
+>>>> +       for (i = 0; i < chip->ngpio; i += UNIPHIER_GPIO_PORTS_PER_BANK) {
+>>>> +               bank = i / UNIPHIER_GPIO_PORTS_PER_BANK;
+>>>> +               shift = i % BITS_PER_LONG;
+>>>> +               bank_mask = (mask[BIT_WORD(i)] >> shift) &
+>>>> +                                               UNIPHIER_GPIO_BANK_MASK;
+>>>> +               bank_bits = bits[BIT_WORD(i)] >> shift;
+>>>> +
+>>>> +               uniphier_gpio_bank_write(chip, bank, UNIPHIER_GPIO_REG_DATA,
+>>>> +                                        bank_mask, bank_bits);
+>>>> +       }
 >>>
->>> Needed to map SPI interrupt sources.
->>>
->>> Signed-off-by: David Daney <david.daney@cavium.com>
->>> ---
->>>   drivers/irqchip/irq-gic-v3.c       | 5 +++++
->>>   include/linux/irqchip/arm-gic-v3.h | 1 +
->>>   2 files changed, 6 insertions(+)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>> index c52f7ba..0019fed 100644
->>> --- a/drivers/irqchip/irq-gic-v3.c
->>> +++ b/drivers/irqchip/irq-gic-v3.c
->>> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
->>>   /* Our default, arbitrary priority value. Linux only uses one anyway. */
->>>   #define DEFAULT_PMR_VALUE	0xf0
->>>
->>> +struct irq_domain *gic_get_irq_domain(void)
->>> +{
->>> +	return gic_data.domain;
->>> +}
->>> +
->>>   static inline unsigned int gic_irq(struct irq_data *d)
->>>   {
->>>   	return d->hwirq;
->>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->>> index 18e3757..5992224 100644
->>> --- a/include/linux/irqchip/arm-gic-v3.h
->>> +++ b/include/linux/irqchip/arm-gic-v3.h
->>> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
->>>
->>>   typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
->>>   void set_its_pci_requester_id(its_pci_requester_id_t fn);
->>> +struct irq_domain *gic_get_irq_domain(void);
->>>   #endif
->>>
->>>   #endif
->>>
+>>> This looks like a piece of algorithm that we could make generic like in a
+>>> static function in drivers/gpio/gpiolib.h or so, that it may be shared with
+>>> other drivers. Do you see some clear way to break out the core of this?
+>>> Or is it as generic as I think?
 >>
->> Hmmmffff... You need the domain for SPIs??
+>> I assume this comment has no intention to block my patch.
+>
+> Nah. Just thinking the code looks neat.
+>
+>>>> +       ret = of_property_read_u32(dev->of_node, "ngpio", &ngpio);
+>>>> +       if (ret) {
+>>>> +               dev_err(dev, "failed to get ngpio property\n");
+>>>> +               return ret;
+>>>> +       }
+>>>
+>>> This needs to be documented, plus I don't see why it's needed.
+>>> The driver for this very specific hardware should already know
+>>> how many GPIOs there are in this hardware, it should not come
+>>> from the device tree.
 >>
->> What is wrong with putting these interrupts in your device tree?
+>> I want to use this driver on various SoCs, but
+>> the number of GPIO pins varies by SoC.
 >>
-> 
-> There is no device tree node for ECAM based "PCIe" devices, they are 
-> discovered in the PCI bus scan, yet they still need to use SPI interrupts.
+>> ngpio == 248 for some SoCs,
+>> and ngpio == 136 for some, etc.
+>
+> That is the wrong way to handle different SoC. That should be handled
+> by different compatible strings, and then you select the number of GPIOs
+> for the version corresponding to that compatibe string.
+>
+>>>> +static const struct of_device_id uniphier_gpio_match[] = {
+>>>> +       { .compatible = "socionext,uniphier-gpio" },
+>>>> +       { /* sentinel */ }
+>>>> +};
+>
+> i.e. you should use the .data field of of_device_id to carry variant-specific
+> information.
 
-What is different between these and the normal legacy interrupts that
-are normally expressed in the RC node using an interrupt map? Sorry if
-I'm only showing my ignorance here, but I'd like to understand the exact
-nature of the problem.
 
-> We need a way to be able to map these.
+Currently, I want to use this driver on 7 SoCs
 
-However you're going to map them, it will not be by just blindly
-exporting random irqdomains from an unsuspecting interrupt controller.
+PH1-sLD3:    ngpio == 136
+PH1-LD4 :    ngpio == 136
+PH1-Pro4:    ngpio == 248
+PH1-sLD8:    ngpio == 136
+PH1-Pro5:    ngpio == 248
+ProXstream2: ngpio == 232
+PH1-LD6b:    ngpio == 232
 
-Patch 5 has established that you're using "virtual wire" SPIs, so we
-need to work on exposing that with the normal kernel abstraction, and
-not by messing with the internals of the GIC.
+So, should I describe the OF match table like this?
 
-Thanks,
+static const struct of_device_id uniphier_gpio_match[] = {
+       { .compatible = "socionext,ph1-sld3-gpio"       .data = (void *)136 },
+       { .compatible = "socionext,ph1-ld4-gpio"        .data = (void *)136 },
+       { .compatible = "socionext,ph1-pro4-gpio"       .data = (void *)248 },
+       { .compatible = "socionext,ph1-sld8-gpio"       .data = (void *)136 },
+       { .compatible = "socionext,ph1-pro5-gpio"       .data = (void *)248 },
+       { .compatible = "socionext,proxstream2-gpio",   .data = (void *)232 },
+       { .compatible = "socionext,ph1-ld6b-gpio",      .data = (void *)232 },
+       { /* sentinel */ }
+};
 
-	M.
+
+One disadvantage for this way is that
+I need to touch the driver file every time I add a new SoC support.
+
+If I could support "ngpio" property, I would only have to add a device
+tree for a new SoC.
+
+
+
+
 -- 
-Jazz is not dead. It just smells funny...
+Best Regards
+Masahiro Yamada
