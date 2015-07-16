@@ -1,179 +1,56 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Jul 2015 16:11:40 +0100
-Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn
- in the grant structure
-In-Reply-To: <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 16 Jul 2015 17:14:48 +0200
+Subject: Linux on Armada 370
+In-Reply-To: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
+References: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
+Message-ID: <20150716171448.59eb45e5@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jul 2015, Julien Grall wrote:
-> All the usage of the field pfn are done using the same idiom:
-> 
-> pfn_to_page(grant->pfn)
-> 
-> This will  return always the same page. Store directly the page in the
-> grant to clean up the code.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Roger Pau Monn? <roger.pau@citrix.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
-> ---
->     Changes in v2:
->         - Patch added
-> ---
->  drivers/block/xen-blkfront.c | 37 ++++++++++++++++++-------------------
->  1 file changed, 18 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
-> index 7107d58..7b81d23 100644
-> --- a/drivers/block/xen-blkfront.c
-> +++ b/drivers/block/xen-blkfront.c
-> @@ -67,7 +67,7 @@ enum blkif_state {
->  
->  struct grant {
->  	grant_ref_t gref;
-> -	unsigned long pfn;
-> +	struct page *page;
->  	struct list_head node;
->  };
->  
-> @@ -219,7 +219,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
->  				kfree(gnt_list_entry);
->  				goto out_of_memory;
->  			}
-> -			gnt_list_entry->pfn = page_to_pfn(granted_page);
-> +			gnt_list_entry->page = granted_page;
->  		}
->  
->  		gnt_list_entry->gref = GRANT_INVALID_REF;
-> @@ -234,7 +234,7 @@ out_of_memory:
->  	                         &info->grants, node) {
->  		list_del(&gnt_list_entry->node);
->  		if (info->feature_persistent)
-> -			__free_page(pfn_to_page(gnt_list_entry->pfn));
-> +			__free_page(gnt_list_entry->page);
->  		kfree(gnt_list_entry);
->  		i--;
->  	}
-> @@ -243,7 +243,7 @@ out_of_memory:
->  }
->  
->  static struct grant *get_grant(grant_ref_t *gref_head,
-> -                               unsigned long pfn,
-> +			       struct page *page,
->                                 struct blkfront_info *info)
+Hello,
 
-indentation
+On Thu, 16 Jul 2015 01:24:59 +0300, Constantine Shulyupin wrote:
 
-Aside from this:
-
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
->  {
->  	struct grant *gnt_list_entry;
-> @@ -263,10 +263,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
->  	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
->  	BUG_ON(gnt_list_entry->gref == -ENOSPC);
->  	if (!info->feature_persistent) {
-> -		BUG_ON(!pfn);
-> -		gnt_list_entry->pfn = pfn;
-> +		BUG_ON(!page);
-> +		gnt_list_entry->page = page;
->  	}
-> -	buffer_mfn = pfn_to_mfn(gnt_list_entry->pfn);
-> +	buffer_mfn = page_to_mfn(gnt_list_entry->page);
->  	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
->  	                                info->xbdev->otherend_id,
->  	                                buffer_mfn, 0);
-> @@ -522,7 +522,7 @@ static int blkif_queue_rw_req(struct request *req)
->  
->  		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
->  		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
-> -			unsigned long uninitialized_var(pfn);
-> +			struct page *uninitialized_var(page);
->  
->  			if (segments)
->  				kunmap_atomic(segments);
-> @@ -536,15 +536,15 @@ static int blkif_queue_rw_req(struct request *req)
->  				indirect_page = list_first_entry(&info->indirect_pages,
->  				                                 struct page, lru);
->  				list_del(&indirect_page->lru);
-> -				pfn = page_to_pfn(indirect_page);
-> +				page = indirect_page;
->  			}
-> -			gnt_list_entry = get_grant(&gref_head, pfn, info);
-> +			gnt_list_entry = get_grant(&gref_head, page, info);
->  			info->shadow[id].indirect_grants[n] = gnt_list_entry;
-> -			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-> +			segments = kmap_atomic(gnt_list_entry->page);
->  			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
->  		}
->  
-> -		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
-> +		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
->  		ref = gnt_list_entry->gref;
->  
->  		info->shadow[id].grants_used[i] = gnt_list_entry;
-> @@ -555,7 +555,7 @@ static int blkif_queue_rw_req(struct request *req)
->  
->  			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
->  
-> -			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
-> +			shared_data = kmap_atomic(gnt_list_entry->page);
->  			bvec_data = kmap_atomic(sg_page(sg));
->  
->  			/*
-> @@ -1002,7 +1002,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
->  				info->persistent_gnts_c--;
->  			}
->  			if (info->feature_persistent)
-> -				__free_page(pfn_to_page(persistent_gnt->pfn));
-> +				__free_page(persistent_gnt->page);
->  			kfree(persistent_gnt);
->  		}
->  	}
-> @@ -1037,7 +1037,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
->  			persistent_gnt = info->shadow[i].grants_used[j];
->  			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
->  			if (info->feature_persistent)
-> -				__free_page(pfn_to_page(persistent_gnt->pfn));
-> +				__free_page(persistent_gnt->page);
->  			kfree(persistent_gnt);
->  		}
->  
-> @@ -1051,7 +1051,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
->  		for (j = 0; j < INDIRECT_GREFS(segs); j++) {
->  			persistent_gnt = info->shadow[i].indirect_grants[j];
->  			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
-> -			__free_page(pfn_to_page(persistent_gnt->pfn));
-> +			__free_page(persistent_gnt->page);
->  			kfree(persistent_gnt);
->  		}
->  
-> @@ -1102,8 +1102,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
->  	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
->  		for_each_sg(s->sg, sg, nseg, i) {
->  			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
-> -			shared_data = kmap_atomic(
-> -				pfn_to_page(s->grants_used[i]->pfn));
-> +			shared_data = kmap_atomic(s->grants_used[i]->page);
->  			bvec_data = kmap_atomic(sg_page(sg));
->  			memcpy(bvec_data   + sg->offset,
->  			       shared_data + sg->offset,
-> @@ -1154,7 +1153,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
->  				 * Add the used indirect page back to the list of
->  				 * available pages for indirect grefs.
->  				 */
-> -				indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
-> +				indirect_page = s->indirect_grants[i]->page;
->  				list_add(&indirect_page->lru, &info->indirect_pages);
->  				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
->  				list_add_tail(&s->indirect_grants[i]->node, &info->grants);
-> -- 
-> 2.1.4
+> I want to run the mainstream Linux on Armada 370 and then contribute to it.
 > 
+> I use custom board derived from DB-88F6710-BP
+> Now I successfully run Marvell's linux-3.2.54-2014_T1.1 with u-boot
+> "Marvell version: v2011.12 2013_Q1.0p2"
+> U-boot and Linux are patched by our OEM according HW changes.
+> 
+> I unsuccessfully tried to to run linux-4.2 with armada-370-db.dts.
+> 
+> Can you please tell me, were can I find the latest Linux, which runs
+> on Armada 370?
+> What is proper configuration etc?
+
+Most likely you're hitting the internal register issue. Can you
+make sure you have either an A0 or B0 stepping or the 370 (it's shown
+in the U-Boot messages at boot), and then check whether your internal
+registers are at 0xd0000000 or 0xf1000000. To achieve this, please run:
+
+	md 0xd0020080
+	md 0xf1020080
+
+One of the two may crash the system. If the first command returns
+0xd0000000, then your internal registers are at that location. If the
+second command returns 0xf1000000, then your internal registers are at
+that location.
+
+I suspect that you might be using an old U-Boot that still maps
+registers at 0xd0000000. You have two choices:
+
+ 1/ Update your U-Boot. This is the best option obviously. An updated
+    U-Boot is available for the Armada 370 DB.
+
+ 2/ Change the kernel armada-370-db.dts to use the internal registers
+    at 0xd0000000. Basically, you can revert commit
+    4f054d445139d63868f931328f897ac5ef87242e.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
