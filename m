@@ -1,43 +1,173 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jul 2015 09:51:28 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: Remove old Samsung USB PHY
- configs
-In-Reply-To: <55A68DBF.3070309@osg.samsung.com>
-References: <1436395246-17540-1-git-send-email-javier@osg.samsung.com>
- <07fa01d0be1d$4ea7c050$ebf740f0$@kernel.org>
- <55A68DBF.3070309@osg.samsung.com>
-Message-ID: <55A70010.1060701@samsung.com>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Wed, 15 Jul 2015 18:06:43 -0700
+Subject: [3.19.y-ckt stable] Patch "clocksource: exynos_mct: Avoid blocking
+ calls in the cpu hotplug notifier" has been added to staging queue
+Message-ID: <1437008803-4656-1-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.07.2015 01:43, Javier Martinez Canillas wrote:
-> Hello Kukjin,
-> 
-> On 07/14/2015 12:10 PM, Kukjin Kim wrote:
->> Javier Martinez Canillas wrote:
->>>
->>> The old drivers/usb/phy/phy-samsung-usb{2,3} are now deleted since
->>> were replaced by newers drivers that use the Generic PHY framework
->>> but their Kconfig options were left over in multi_v7_defconfig.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>
->> Acked-by: Kukjin Kim <kgene@kernel.org>
->>
->> I think, this can be handled by arm-soc guy directly.
->>
-> 
-> As far as I know, arm-soc maintainers now wanted sub-arch maintainers
-> to pick the multi_v7_defconfig patches for them and send it as a part
-> of the SoC specific pull requests.
-> 
-> I just posted another series that includes 2 more multi_v7_defconfig
-> patches for Exynos [0]. Please let me know if you prefer post to the
-> arm-soc maintainers instead so I can split the exynos_defconfig part
-> and the multi_v7_defconfig patches send to arm at kernel.org.
+This is a note to let you know that I have just added a patch titled
 
-Especially that there is already a defconfig patch from Anand Moon.
-Let's handle all of them in samsung-soc.
+    clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier
 
-Best regards,
-Krzysztof
+to the linux-3.19.y-queue branch of the 3.19.y-ckt extended stable tree 
+which can be found at:
+
+    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-3.19.y-queue
+
+This patch is scheduled to be released in version 3.19.y-ckt4.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.19.y-ckt tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Kamal
+
+------
+
+>From 01da542b994df5f37541b7f6975f7679cecd1f43 Mon Sep 17 00:00:00 2001
+From: Damian Eppel <d.eppel@samsung.com>
+Date: Fri, 26 Jun 2015 15:23:04 +0200
+Subject: clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug
+ notifier
+
+commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
+
+Whilst testing cpu hotplug events on kernel configured with
+DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+caused by calling request_irq() and free_irq() in the context of
+hotplug notification (which is in this case atomic context).
+
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+notifications which run on the hotplugged cpu with interrupts and
+preemption disabled.
+
+To avoid the issue, request the interrupts for all possible cpus in
+the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+request_irq/disable_irq() sequence. The flag prevents the
+request_irq() code from enabling the interrupt immediately.
+
+The interrupt is then enabled in the CPU_STARTING notifier of the
+hotplugged cpu and again disabled with disable_irq_nosync() in the
+CPU_DYING notifier.
+
+[ tglx: Massaged changelog to match the patch ]
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: m.szyprowski at samsung.com
+Cc: kyungmin.park at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: kgene at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 83564c9..c844616 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
+
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+
+@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+--
+1.9.1
