@@ -1,33 +1,42 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 16 Jul 2015 17:23:43 +0100
-Subject: [Xen-devel] [PATCH v2 14/20] xen/grant-table: Make it running
- on 64KB granularity
-In-Reply-To: <alpine.DEB.2.02.1507161643380.17378@kaball.uk.xensource.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-15-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507161643380.17378@kaball.uk.xensource.com>
-Message-ID: <55A7DA8F.2040805@citrix.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Jul 2015 09:26:16 -0700
+Subject: [PATCH 2/2] ARM: OMAP2+: Remove legacy booting support for Pandora
+In-Reply-To: <CANOLnOPQHOY5Up8+uKQn-JTK4zN=iK+owSN2KjhJGNFLVzN9yQ@mail.gmail.com>
+References: <1437047951-22300-1-git-send-email-tony@atomide.com>
+ <1437047951-22300-3-git-send-email-tony@atomide.com>
+ <CANOLnOPQHOY5Up8+uKQn-JTK4zN=iK+owSN2KjhJGNFLVzN9yQ@mail.gmail.com>
+Message-ID: <20150716162616.GO17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+* Grazvydas Ignotas <notasas@gmail.com> [150716 07:16]:
+> Hi,
+> 
+> On Thu, Jul 16, 2015 at 2:59 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > We've been moving all omap2+ based systems to boot in device tree only
+> > mode for a few years now. Only omap3 has legacy booting support
+> > remaining. Most omap3 boards already have related arch/arm/boot/*.dts*
+> > files for booting with device tree.
+> >
+> > This board has support for device tree based booting, and we've been
+> > printing warnings about the legacy booting being deprecated for a
+> > few merge cycles now. Let's attempt to remove the legacy booting
+> > for it.
+> >
+> > The reason for removing the legacy booting support now rather than
+> > later is we can simply revert this patch if necessary if we run
+> > into some unexpected issues that are not trivial to fix for the
+> > device tree based booting.
+> 
+> It seems we lose wifi, backlight, audio and usb host mainline support
+> with this as pandora's .dts currently lacks all that stuff.
+> That said I'm not aware of any mainline users (everyone seems to be on
+> our "vendor" kernel), so maybe we can add those later.
 
-On 16/07/2015 16:47, Stefano Stabellini wrote:
-  >> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
->> index 3679293..0a1f903 100644
->> --- a/drivers/xen/grant-table.c
->> +++ b/drivers/xen/grant-table.c
->
-> The arm part is fine, but aren't you missing the change to RPP and SPP?
+Hmm wifi should be easy, isn't that just libertas_sdio?
 
-SPP has been removed by commit 548f7c94759ac58d4744ef2663e2a66a106e21c5 
-as it was unused.
+> > Cc: Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+> 
+> I have not signed this off...
 
-For RPP, it's used internally so there is no need to switch to 
-XEN_PAGE_SIZE. Otherwise we will waste 60KB for each internal page 
-allocated (see gnttab_init).
-
-Regards,
-
--- 
-Julien Grall
+Oops sorry I copied your email address from git log.
