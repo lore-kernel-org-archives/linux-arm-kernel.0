@@ -1,19 +1,30 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Thu, 16 Jul 2015 17:17:29 -0500
-Subject: [PATCH] ARM: VDSO: fix regression with toolchains lacking ld.bfd
- executable
-In-Reply-To: <CACqcpZBnU+17Ob85hYhikQUdNxtNiUs47PGQXfZDQyXYrTgnyg@mail.gmail.com>
-References: <1436934852-27547-1-git-send-email-nathan_lynch@mentor.com>
- <CACqcpZBnU+17Ob85hYhikQUdNxtNiUs47PGQXfZDQyXYrTgnyg@mail.gmail.com>
-Message-ID: <55A82D79.3000106@mentor.com>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Thu, 16 Jul 2015 15:20:26 -0700
+Subject: [PATCH] Fix incomplete initialization of ADC[3:6]
+Message-ID: <1437085227-28845-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 03:34 PM, Rapha?l Poggi wrote:
-> Hi Nathan,
-> 
-> I just tested it right now and it works, you can add my:
-> 
-> Tested-by: Rapha?l Poggi <poggi.raph@gmail.com>
+TPS65950(TWL4030) paired with OMAP3 is used in devices such as Beagleboard and
+Gumstix Overo COMs. Its ADCs from 3 to 6 seem to be broken [1][2][3].
 
-Thanks.  Are you also using a CodeBench toolchain, or something else?
+The ADC readings for these pins are stuck at near 0v for these two reasons:
+        - 3v1 bias regulator (vusb3v1) is off unless USB-otg is being used
+        - pins are not configured to attach as ADC
+
+This patch attempts to fix these issues by making sure 3v1 regulator is enabled
+and pins are correctly configured as ADC inputs.
+
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/83698
+[2] http://gumstix.8.x6.nabble.com/twl4030-madc-low-read-value-td4967139.html#none
+[3] https://e2e.ti.com/support/power_management/pmu/f/43/t/732
+
+Adam YH Lee (1):
+  [TWL4030 MADC] Fix ADC[3:6] readings
+
+ drivers/iio/adc/twl4030-madc.c | 14 ++++++++++++++
+ drivers/phy/phy-twl4030-usb.c  |  7 +++++++
+ 2 files changed, 21 insertions(+)
+
+-- 
+2.1.4
