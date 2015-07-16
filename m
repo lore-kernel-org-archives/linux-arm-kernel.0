@@ -1,47 +1,42 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu, 16 Jul 2015 20:43:18 +0530
-Subject: [PATCH v2 0/4]  Add support for touchscreen on Colibri VF50
-Message-ID: <cover.1437058481.git.maitysanchayan@gmail.com>
+Date: Thu, 16 Jul 2015 20:43:19 +0530
+Subject: [PATCH v2 1/4] ARM: dts: vfxxx: Add io-channel-cells property for ADC
+ node
+In-Reply-To: <cover.1437058481.git.maitysanchayan@gmail.com>
+References: <cover.1437058481.git.maitysanchayan@gmail.com>
+Message-ID: <2832d45c2a04c45a583d95a1e351f62c115e8065.1437058481.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds io-channel-cells property to the ADC node. This
+property is required in order for an IIO consumer driver to work.
+Especially required for Colibri VF50, as the touchscreen driver
+uses ADC channels with the ADC driver based on IIO framework.
 
-The patchset adds support for 4 wire touchscreen on Toradex Colibri
-VF50 modules. Patches are based on top of shawn's branch.
+Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+---
+ arch/arm/boot/dts/vfxxx.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes since v1:
-1. Fix/drop comments
-2. Use an inline function for multiple gpiod_get calls in probe
-3. Remove the pull up in the pinmux specified in DT for touchctrl_gpios
-4. Add the io-channel-cells property before status property.
-5. Add GPIOLIB as dependency in the Kconfig file
-
-Version 1 of the patchset can be found here
-https://lkml.org/lkml/2015/6/30/103
-
-Thank you for the feedback Stefan.
-
-Thanks & Regards,
-Sanchayan.
-
-
-Sanchayan Maity (4):
-  ARM: dts: vfxxx: Add io-channel-cells property for ADC node
-  ARM: dts: vf500-colibri: Add device tree node for touchscreen support
-  touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
-  input: Add DT binding documentation for Colibri VF50 touchscreen
-
- .../bindings/input/touchscreen/colibri-vf50-ts.txt |  34 ++
- arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
- arch/arm/boot/dts/vf500-colibri.dtsi               |  46 +++
- arch/arm/boot/dts/vfxxx.dtsi                       |   2 +
- drivers/input/touchscreen/Kconfig                  |  12 +
- drivers/input/touchscreen/Makefile                 |   1 +
- drivers/input/touchscreen/colibri-vf50-ts.c        | 451 +++++++++++++++++++++
- 7 files changed, 550 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
- create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
-
+diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+index 2c20f3f..9f63bf0 100644
+--- a/arch/arm/boot/dts/vfxxx.dtsi
++++ b/arch/arm/boot/dts/vfxxx.dtsi
+@@ -226,6 +226,7 @@
+ 				interrupts = <53 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_ADC0>;
+ 				clock-names = "adc";
++				#io-channel-cells = <1>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -460,6 +461,7 @@
+ 				interrupts = <54 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&clks VF610_CLK_ADC1>;
+ 				clock-names = "adc";
++				#io-channel-cells = <1>;
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.4.6
