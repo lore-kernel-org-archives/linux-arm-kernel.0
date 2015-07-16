@@ -1,24 +1,31 @@
-From: pebolle@tiscali.nl (Paul Bolle)
-Date: Thu, 16 Jul 2015 13:49:34 +0200
-Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
-In-Reply-To: <55A79394.5090905@rock-chips.com>
-References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
- <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
- <1437033944.27428.11.camel@tiscali.nl> <55A79394.5090905@rock-chips.com>
-Message-ID: <1437047374.28351.8.camel@tiscali.nl>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Jul 2015 04:59:09 -0700
+Subject: [PATCH 0/2] Drop two more omap3 legacy board files for v4.3 merge
+ window
+Message-ID: <1437047951-22300-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi all,
 
-On do, 2015-07-16 at 19:20 +0800, zhengxing wrote:
-> > Did I miss something? Or is there another way this alias is useful 
-> > here?
-> Yes, I didn't care about this but I think it maybe correct.
+I think we can drop these now. This just leaves n900 and ldp with
+n900 pending patches for legacy proc support.
 
-What is correct: my comment or the use of MODALIAS() in this patch?
+Regards,
 
-Thanks,
+Tony
 
+Tony Lindgren (2):
+  ARM: OMAP2+: Remove legacy booting support for LogicPD Torpedo
+  ARM: OMAP2+: Remove legacy booting support for Pandora
 
-Paul Bolle
+ arch/arm/mach-omap2/Kconfig              |  20 -
+ arch/arm/mach-omap2/Makefile             |   3 -
+ arch/arm/mach-omap2/board-omap3logic.c   | 249 ------------
+ arch/arm/mach-omap2/board-omap3pandora.c | 633 -------------------------------
+ 4 files changed, 905 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/board-omap3logic.c
+ delete mode 100644 arch/arm/mach-omap2/board-omap3pandora.c
+
+-- 
+2.1.4
