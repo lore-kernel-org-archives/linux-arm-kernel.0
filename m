@@ -1,284 +1,318 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 16 Jul 2015 18:12:21 +0100
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1437063431.3583.2.camel@redhat.com>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437063431.3583.2.camel@redhat.com>
-Message-ID: <20150716171221.GB18582@red-moon>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 16 Jul 2015 18:12:54 +0100
+Subject: [PATCH v2 19/20] xen/privcmd: Add support for Linux 64KB page
+ granularity
+In-Reply-To: <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507161707300.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 05:17:11PM +0100, Mark Salter wrote:
-> On Wed, 2015-07-15 at 12:33 +0100, Lorenzo Pieralisi wrote:
+On Thu, 9 Jul 2015, Julien Grall wrote:
+> The hypercall interface (as well as the toolstack) is always using 4KB
+> page granularity. When the toolstack is asking for mapping a series of
+> guest PFN in a batch, it expects to have the page map contiguously in
+> its virtual memory.
 > 
-> > The SBBR and ACPI specifications allow ACPI based systems that do not
-> > implement PSCI (eg systems with no EL3) to boot through the ACPI parking
-> > protocol specification[1].
-> >
-> > This patch implements the ACPI parking protocol CPU operations, and adds
-> > code that eases parsing the parking protocol data structures to the
-> > ARM64 SMP initializion carried out at the same time as cpus enumeration.
-> >
-> > To wake-up the CPUs from the parked state, this patch implements a
-> > wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
-> > ARM one, so that a specific IPI is sent for wake-up purpose in order
-> > to distinguish it from other IPI sources.
-> >
-> > Given the current ACPI MADT parsing API, the patch implements a glue
-> > layer that helps passing MADT GICC data structure from SMP initialization
+> When Linux is using 64KB page granularity, the privcmd driver will have
+> to map multiple Xen PFN in a single Linux page.
 > 
-> Somewhat off topic, but this reminds once again, that it might be
-> better to generalize the ACPI_MADT_TYPE_GENERIC_INTERRUPT so that it
-> could be done in one pass. Currently, the SMP code and the GIC code
-> need boot-time info from ACPI_MADT_TYPE_GENERIC_INTERRUPT tables. This
-> patch adds parking protocol, and this patch:
+> Note that this solution works on page granularity which is a multiple of
+> 4KB.
 > 
->  https://lkml.org/lkml/2015/5/1/203
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+> ---
+> Changes in v2:
+>     - Use xen_apply_to_page
+> ---
+>  drivers/xen/privcmd.c   |   8 +--
+>  drivers/xen/xlate_mmu.c | 127 +++++++++++++++++++++++++++++++++---------------
+>  2 files changed, 92 insertions(+), 43 deletions(-)
 > 
-> need to get the PMU irq from the same table. I've been thinking of
-> something like a single loop through the table in setup.c with
-> callouts to registered users of the various bits of data.
+> diff --git a/drivers/xen/privcmd.c b/drivers/xen/privcmd.c
+> index 5a29616..e8714b4 100644
+> --- a/drivers/xen/privcmd.c
+> +++ b/drivers/xen/privcmd.c
+> @@ -446,7 +446,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+>  		return -EINVAL;
+>  	}
+>  
+> -	nr_pages = m.num;
+> +	nr_pages = DIV_ROUND_UP_ULL(m.num, PAGE_SIZE / XEN_PAGE_SIZE);
+>  	if ((m.num <= 0) || (nr_pages > (LONG_MAX >> PAGE_SHIFT)))
+>  		return -EINVAL;
 
-It is not off topic at all, it is bang on topic. I hate the code
-as it stands forcing parsing the MADT in multiple places at different
-times, that's why I added hooks to set the parking protocol entries
-from smp.c and I know that's ugly, I posted it like this on purpose
-to get feedback.
+DIV_ROUND_UP is enough, neither arguments are unsigned long long
 
-> Those users could register a handler function with something like an
-> ACPI_MADT_GIC_DECLARE() macro which would add a handler to a
-> special linker section.
-> 
-> I could work up a separate patch if others think it a worthwhile
-> thing to do.
 
-Something simpler ? Like stashing the GICC entries (I know we need
-permanent table mappings for that to work unless we create data
-structures out of the MADT entries with the fields we are interested in)
-for possible CPUS ?
+> @@ -494,7 +494,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+>  			goto out_unlock;
+>  		}
+>  		if (xen_feature(XENFEAT_auto_translated_physmap)) {
+> -			ret = alloc_empty_pages(vma, m.num);
+> +			ret = alloc_empty_pages(vma, nr_pages);
+>  			if (ret < 0)
+>  				goto out_unlock;
+>  		} else
+> @@ -518,6 +518,7 @@ static long privcmd_ioctl_mmap_batch(void __user *udata, int version)
+>  	state.global_error  = 0;
+>  	state.version       = version;
+>  
+> +	BUILD_BUG_ON(((PAGE_SIZE / sizeof(xen_pfn_t)) % XEN_PFN_PER_PAGE) != 0);
+>  	/* mmap_batch_fn guarantees ret == 0 */
+>  	BUG_ON(traverse_pages_block(m.num, sizeof(xen_pfn_t),
+>  				    &pagelist, mmap_batch_fn, &state));
+> @@ -582,12 +583,13 @@ static void privcmd_close(struct vm_area_struct *vma)
+>  {
+>  	struct page **pages = vma->vm_private_data;
+>  	int numpgs = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
+> +	int nr_pfn = (vma->vm_end - vma->vm_start) >> XEN_PAGE_SHIFT;
+>  	int rc;
+>  
+>  	if (!xen_feature(XENFEAT_auto_translated_physmap) || !numpgs || !pages)
+>  		return;
+>  
+> -	rc = xen_unmap_domain_mfn_range(vma, numpgs, pages);
+> +	rc = xen_unmap_domain_mfn_range(vma, nr_pfn, pages);
+>  	if (rc == 0)
+>  		free_xenballooned_pages(numpgs, pages);
 
-> > code to the parking protocol implementation somewhat overriding the CPU
-> > operations interfaces. This to avoid creating a completely trasparent
->                                                              ^^^ transparent
+If you intend to pass the number of xen pages as nr argument to
+xen_unmap_domain_mfn_range, then I think that the changes to
+xen_xlate_unmap_gfn_range below are wrong.
 
-Ok.
 
-[...]
+>  	else
+> diff --git a/drivers/xen/xlate_mmu.c b/drivers/xen/xlate_mmu.c
+> index 58a5389..1fac17c 100644
+> --- a/drivers/xen/xlate_mmu.c
+> +++ b/drivers/xen/xlate_mmu.c
+> @@ -38,31 +38,9 @@
+>  #include <xen/interface/xen.h>
+>  #include <xen/interface/memory.h>
+>  
+> -/* map fgmfn of domid to lpfn in the current domain */
+> -static int map_foreign_page(unsigned long lpfn, unsigned long fgmfn,
+> -			    unsigned int domid)
+> -{
+> -	int rc;
+> -	struct xen_add_to_physmap_range xatp = {
+> -		.domid = DOMID_SELF,
+> -		.foreign_domid = domid,
+> -		.size = 1,
+> -		.space = XENMAPSPACE_gmfn_foreign,
+> -	};
+> -	xen_ulong_t idx = fgmfn;
+> -	xen_pfn_t gpfn = lpfn;
+> -	int err = 0;
+> -
+> -	set_xen_guest_handle(xatp.idxs, &idx);
+> -	set_xen_guest_handle(xatp.gpfns, &gpfn);
+> -	set_xen_guest_handle(xatp.errs, &err);
+> -
+> -	rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+> -	return rc < 0 ? rc : err;
+> -}
+> -
+>  struct remap_data {
+>  	xen_pfn_t *fgmfn; /* foreign domain's gmfn */
+> +	xen_pfn_t *efgmfn; /* pointer to the end of the fgmfn array */
+>  	pgprot_t prot;
+>  	domid_t  domid;
+>  	struct vm_area_struct *vma;
+> @@ -71,24 +49,75 @@ struct remap_data {
+>  	struct xen_remap_mfn_info *info;
+>  	int *err_ptr;
+>  	int mapped;
+> +
+> +	/* Hypercall parameters */
+> +	int h_errs[XEN_PFN_PER_PAGE];
+> +	xen_ulong_t h_idxs[XEN_PFN_PER_PAGE];
+> +	xen_pfn_t h_gpfns[XEN_PFN_PER_PAGE];
 
-> > +static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
-> > +{
-> > +     struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-> > +     struct parking_protocol_mailbox __iomem *mailbox;
-> > +     __le32 cpu_id;
-> > +
-> > +     /*
-> > +      * Map mailbox memory with attribute device nGnRE (ie ioremap -
-> > +      * this deviates from the parking protocol specifications since
-> > +      * the mailboxes are required to be mapped nGnRnE; the attribute
-> > +      * discrepancy is harmless insofar as the protocol specification
-> > +      * is concerned).
-> > +      * If the mailbox is mistakenly allocated in the linear mapping
-> > +      * by FW ioremap will fail since the mapping will be prevented
-> > +      * by the kernel (it clashes with the linear mapping attributes
-> > +      * specifications).
-> > +      */
-> > +     mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
-> > +     if (!mailbox)
-> > +             return -EIO;
-> > +
-> > +     cpu_id = readl_relaxed(&mailbox->cpu_id);
-> > +     /*
-> > +      * Check if firmware has set-up the mailbox entry properly
-> > +      * before kickstarting the respective cpu.
-> > +      */
-> > +     if (cpu_id != ~0U) {
-> > +             iounmap(mailbox);
-> > +             return -ENXIO;
-> > +     }
-> > +
-> > +     /*
-> > +      * We write the entry point and cpu id as LE regardless of the
-> > +      * native endianness of the kernel. Therefore, any boot-loaders
-> > +      * that read this address need to convert this address to the
-> > +      * Boot-Loader's endianness before jumping.
-> > +      */
-> > +     writeq_relaxed(__pa(secondary_entry), &mailbox->entry_point);
-> > +     writel_relaxed(cpu_entry->gic_cpu_id, &mailbox->cpu_id);
-> > +
-> > +     arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> > +
-> > +     iounmap(mailbox);
-> > +
-> > +     return 0;
-> > +}
-> > +
-> > +static void acpi_parking_protocol_cpu_postboot(void)
-> > +{
-> > +     int cpu = smp_processor_id();
-> > +     struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
-> > +     struct parking_protocol_mailbox __iomem *mailbox;
-> > +     __le64 entry_point;
-> > +
-> > +     /*
-> > +      * Map mailbox memory with attribute device nGnRE (ie ioremap -
-> > +      * this deviates from the parking protocol specifications since
-> > +      * the mailboxes are required to be mapped nGnRnE; the attribute
-> 
-> Where is the nGnRnE requirement? I couldn't find it in the protocol doc.
-> Just curious.
+I don't think you should be adding these fields to struct remap_data:
+struct remap_data is used to pass multi pages arguments from
+xen_xlate_remap_gfn_array to remap_pte_fn.
 
-Page 11 (3.5 Mailbox Access Rules), in the Note
-"...On ARM v8 Systems, the OS must map the memory as Device-nGnRnE".
+I think you need to introduce a different struct to pass per linux page
+arguments from remap_pte_fn to setup_hparams.
 
-> > +      * discrepancy is harmless insofar as the protocol specification
-> > +      * is concerned).
-> > +      * If the mailbox is mistakenly allocated in the linear mapping
-> > +      * by FW ioremap will fail since the mapping will be prevented
-> > +      * by the kernel (it clashes with the linear mapping attributes
-> > +      * specifications).
-> 
-> The kernel will only add cached memory regions to linear mapping and
-> presumably, the FW will mark the mailboxes as uncached. Otherwise, it
-> is a FW bug. But I suppose we could run into problems with kernels
-> using 64K pagesize since firmware assumes 4k.
 
-Nope, ioremap takes care of that, everything should be fine.
+> +	int h_iter;	/* Iterator */
+>  };
+>  
+> +static int setup_hparams(struct page *page, unsigned long pfn, void *data)
+> +{
+> +	struct remap_data *info = data;
+> +
+> +	/* We may not have enough domain's gmfn to fill a Linux Page */
+> +	if (info->fgmfn == info->efgmfn)
+> +		return 0;
+> +
+> +	info->h_idxs[info->h_iter] = *info->fgmfn;
+> +	info->h_gpfns[info->h_iter] = pfn;
+> +	info->h_errs[info->h_iter] = 0;
+> +	info->h_iter++;
+> +
+> +	info->fgmfn++;
+> +
+> +	return 0;
+> +}
+> +
+>  static int remap_pte_fn(pte_t *ptep, pgtable_t token, unsigned long addr,
+>  			void *data)
+>  {
+>  	struct remap_data *info = data;
+>  	struct page *page = info->pages[info->index++];
+> -	unsigned long pfn = page_to_pfn(page);
+> -	pte_t pte = pte_mkspecial(pfn_pte(pfn, info->prot));
+> +	pte_t pte = pte_mkspecial(pfn_pte(page_to_pfn(page), info->prot));
+>  	int rc;
+> +	uint32_t i;
+> +	struct xen_add_to_physmap_range xatp = {
+> +		.domid = DOMID_SELF,
+> +		.foreign_domid = info->domid,
+> +		.space = XENMAPSPACE_gmfn_foreign,
+> +	};
+>  
+> -	rc = map_foreign_page(pfn, *info->fgmfn, info->domid);
+> -	*info->err_ptr++ = rc;
+> -	if (!rc) {
+> -		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
+> -		info->mapped++;
+> +	info->h_iter = 0;
+> +
+> +	/* setup_hparams guarantees ret == 0 */
+> +	BUG_ON(xen_apply_to_page(page, setup_hparams, info));
+> +
+> +	set_xen_guest_handle(xatp.idxs, info->h_idxs);
+> +	set_xen_guest_handle(xatp.gpfns, info->h_gpfns);
+> +	set_xen_guest_handle(xatp.errs, info->h_errs);
+> +	xatp.size = info->h_iter;
+> +
+> +	rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
 
-Did you give this patch a go ?
+I would have thought that XENMEM_add_to_physmap_range operates at 4K
+granularity, regardless of how the guest decides to layout its
+pagetables. If so, the call to XENMEM_add_to_physmap_range needs to be
+moved within the function passed to xen_apply_to_page.
 
-Thanks,
-Lorenzo
 
-> > +      */
-> > +     mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
-> > +     if (!mailbox)
-> > +             return;
-> > +
-> > +     entry_point = readl_relaxed(&mailbox->entry_point);
-> > +     /*
-> > +      * Check if firmware has cleared the entry_point as expected
-> > +      * by the protocol specification.
-> > +      */
-> > +     WARN_ON(entry_point);
-> > +
-> > +     iounmap(mailbox);
-> > +}
-> > +
-> > +const struct cpu_operations acpi_parking_protocol_ops = {
-> > +     .name           = "parking-protocol",
-> > +     .cpu_init       = acpi_parking_protocol_cpu_init,
-> > +     .cpu_prepare    = acpi_parking_protocol_cpu_prepare,
-> > +     .cpu_boot       = acpi_parking_protocol_cpu_boot,
-> > +     .cpu_postboot   = acpi_parking_protocol_cpu_postboot
-> > +};
-> > diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-> > index 5ea337d..db31991 100644
-> > --- a/arch/arm64/kernel/cpu_ops.c
-> > +++ b/arch/arm64/kernel/cpu_ops.c
-> > @@ -25,11 +25,12 @@
-> >  #include <asm/smp_plat.h>
-> >
-> >  extern const struct cpu_operations smp_spin_table_ops;
-> > +extern const struct cpu_operations acpi_parking_protocol_ops;
-> >  extern const struct cpu_operations cpu_psci_ops;
-> >
-> >  const struct cpu_operations *cpu_ops[NR_CPUS];
-> >
-> > -static const struct cpu_operations *supported_cpu_ops[] __initconst = {
-> > +static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
-> >  #ifdef CONFIG_SMP
-> >       &smp_spin_table_ops,
-> >  #endif
-> > @@ -37,9 +38,19 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
-> >       NULL,
-> >  };
-> >
-> > +static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
-> > +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
-> > +     &acpi_parking_protocol_ops,
-> > +#endif
-> > +     &cpu_psci_ops,
-> > +     NULL,
-> > +};
-> > +
-> >  static const struct cpu_operations * __init cpu_get_ops(const char *name)
-> >  {
-> > -     const struct cpu_operations **ops = supported_cpu_ops;
-> > +     const struct cpu_operations **ops;
-> > +
-> > +     ops = acpi_disabled ? dt_supported_cpu_ops : acpi_supported_cpu_ops;
-> >
-> >       while (*ops) {
-> >               if (!strcmp(name, (*ops)->name))
-> > @@ -77,8 +88,16 @@ static const char *__init cpu_read_enable_method(int cpu)
-> >               }
-> >       } else {
-> >               enable_method = acpi_get_enable_method(cpu);
-> > -             if (!enable_method)
-> > -                     pr_err("Unsupported ACPI enable-method\n");
-> > +             if (!enable_method) {
-> > +                     /*
-> > +                      * In ACPI systems the boot CPU does not require
-> > +                      * checking the enable method since for some
-> > +                      * boot protocol (ie parking protocol) it need not
-> > +                      * be initialized. Don't warn spuriously.
-> > +                      */
-> > +                     if (cpu != 0)
-> > +                             pr_err("Unsupported ACPI enable-method\n");
-> > +             }
-> >       }
-> >
-> >       return enable_method;
-> > diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> > index 50fb469..1d98f2d 100644
-> > --- a/arch/arm64/kernel/smp.c
-> > +++ b/arch/arm64/kernel/smp.c
-> > @@ -69,6 +69,7 @@ enum ipi_msg_type {
-> >       IPI_CPU_STOP,
-> >       IPI_TIMER,
-> >       IPI_IRQ_WORK,
-> > +     IPI_WAKEUP
-> >  };
-> >
-> >  /*
-> > @@ -428,6 +429,8 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-> >       /* map the logical cpu id to cpu MPIDR */
-> >       cpu_logical_map(cpu_count) = hwid;
-> >
-> > +     acpi_set_mailbox_entry(cpu_count, processor);
-> > +
-> >       cpu_count++;
-> >  }
-> >
-> > @@ -610,6 +613,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
-> >       S(IPI_CPU_STOP, "CPU stop interrupts"),
-> >       S(IPI_TIMER, "Timer broadcast interrupts"),
-> >       S(IPI_IRQ_WORK, "IRQ work interrupts"),
-> > +     S(IPI_WAKEUP, "CPU wakeup interrupts"),
-> >  };
-> >
-> >  static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
-> > @@ -653,6 +657,13 @@ void arch_send_call_function_single_ipi(int cpu)
-> >       smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
-> >  }
-> >
-> > +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
-> > +void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
-> > +{
-> > +     smp_cross_call(mask, IPI_WAKEUP);
-> > +}
-> > +#endif
-> > +
-> >  #ifdef CONFIG_IRQ_WORK
-> >  void arch_irq_work_raise(void)
-> >  {
-> > @@ -729,6 +740,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
-> >               irq_exit();
-> >               break;
-> >  #endif
-> > +     case IPI_WAKEUP:
-> > +             break;
-> >
-> >       default:
-> >               pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
+> +	/* info->err_ptr expect to have one error status per Xen PFN */
+> +	for (i = 0; i < info->h_iter; i++) {
+> +		int err = (rc < 0) ? rc : info->h_errs[i];
+> +
+> +		*(info->err_ptr++) = err;
+> +		if (!err)
+> +			info->mapped++;
+>  	}
+> -	info->fgmfn++;
+> +
+> +	/*
+> +	 * Note: The hypercall will return 0 in most of the case if even if
+                                         ^ in most cases
+
+> +	 * all the fgmfn are not mapped. We still have to update the pte
+       ^ not all the fgmfn are mapped.
+
+> +	 * as the userspace may decide to continue.
+> +	 */
+> +	if (!rc)
+> +		set_pte_at(info->vma->vm_mm, addr, ptep, pte);
+>  
+>  	return 0;
+>  }
+> @@ -102,13 +131,14 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+>  {
+>  	int err;
+>  	struct remap_data data;
+> -	unsigned long range = nr << PAGE_SHIFT;
+> +	unsigned long range = round_up(nr, XEN_PFN_PER_PAGE) << XEN_PAGE_SHIFT;
+
+If would just BUG_ON(nr % XEN_PFN_PER_PAGE) and avoid the round_up;
+
+
+
+>  	/* Kept here for the purpose of making sure code doesn't break
+>  	   x86 PVOPS */
+>  	BUG_ON(!((vma->vm_flags & (VM_PFNMAP | VM_IO)) == (VM_PFNMAP | VM_IO)));
+>  
+>  	data.fgmfn = mfn;
+> +	data.efgmfn = mfn + nr;
+
+If we assume that nr is a multiple of XEN_PFN_PER_PAGE, then we can get
+rid of efgmfn.
+
+
+>  	data.prot  = prot;
+>  	data.domid = domid;
+>  	data.vma   = vma;
+> @@ -123,21 +153,38 @@ int xen_xlate_remap_gfn_array(struct vm_area_struct *vma,
+>  }
+>  EXPORT_SYMBOL_GPL(xen_xlate_remap_gfn_array);
+>  
+> +static int unmap_gfn(struct page *page, unsigned long pfn, void *data)
+> +{
+> +	int *nr = data;
+> +	struct xen_remove_from_physmap xrp;
+> +
+> +	/* The Linux Page may not have been fully mapped to Xen */
+> +	if (!*nr)
+> +		return 0;
+> +
+> +	xrp.domid = DOMID_SELF;
+> +	xrp.gpfn = pfn;
+> +	(void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
+> +
+> +	(*nr)--;
+
+I don't understand why you are passing nr as private argument. I would
+just call XENMEM_remove_from_physmap unconditionally here. Am I missing
+something? After all XENMEM_remove_from_physmap is just unmapping
+at 4K granularity, right?
+
+
+> +	return 0;
+> +}
+> +
+>  int xen_xlate_unmap_gfn_range(struct vm_area_struct *vma,
+>  			      int nr, struct page **pages)
+>  {
+>  	int i;
+> +	int nr_page = round_up(nr, XEN_PFN_PER_PAGE);
+
+If nr is the number of xen pages, then this should be:
+
+    int nr_pages = DIV_ROUND_UP(nr, XEN_PFN_PER_PAGE);
+
+
+
+> -	for (i = 0; i < nr; i++) {
+> -		struct xen_remove_from_physmap xrp;
+> -		unsigned long pfn;
+> +	for (i = 0; i < nr_page; i++) {
+> +		/* unmap_gfn guarantees ret == 0 */
+> +		BUG_ON(xen_apply_to_page(pages[i], unmap_gfn, &nr));
+> +	}
+>  
+> -		pfn = page_to_pfn(pages[i]);
+> +	/* We should have consume every xen page */
+                        ^ consumed
+
+
+> +	BUG_ON(nr != 0);
+>  
+> -		xrp.domid = DOMID_SELF;
+> -		xrp.gpfn = pfn;
+> -		(void)HYPERVISOR_memory_op(XENMEM_remove_from_physmap, &xrp);
+> -	}
+>  	return 0;
+>  }
+>  EXPORT_SYMBOL_GPL(xen_xlate_unmap_gfn_range);
+> -- 
+> 2.1.4
 > 
