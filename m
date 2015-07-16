@@ -1,35 +1,17 @@
-From: zhengxing@rock-chips.com (zhengxing)
-Date: Thu, 16 Jul 2015 19:59:07 +0800
-Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
-In-Reply-To: <1437047374.28351.8.camel@tiscali.nl>
-References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
- <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
- <1437033944.27428.11.camel@tiscali.nl> <55A79394.5090905@rock-chips.com>
- <1437047374.28351.8.camel@tiscali.nl>
-Message-ID: <55A79C8B.7020402@rock-chips.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 16 Jul 2015 14:22:25 +0200
+Subject: [PATCH] ARM: dts: rockchip: add missing device_type = "memory" to
+ boards
+In-Reply-To: <1521614.R7mMBQe0OX@diego>
+References: <1521614.R7mMBQe0OX@diego>
+Message-ID: <3631471.OSGgxp8WLq@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-     I mean that the use of MODALIAS() in this patch, and I refered to 
-tegra_max98090.c(have been upstreamed) that used it like this also. So I 
-didn't care the using.
+Am Mittwoch, 15. Juli 2015, 23:21:05 schrieb Heiko St?bner:
+> The memory node is supposed to contain a device_type property marking
+> it as memory. The currently included boards miss this property.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-Thanks.
-
-On 2015?07?16? 19:49, Paul Bolle wrote:
-> Hi,
->
-> On do, 2015-07-16 at 19:20 +0800, zhengxing wrote:
->>> Did I miss something? Or is there another way this alias is useful
->>> here?
->> Yes, I didn't care about this but I think it maybe correct.
-> What is correct: my comment or the use of MODALIAS() in this patch?
->
-> Thanks,
->
->
-> Paul Bolle
->
->
->
+applied to my dts branch for 4.3
