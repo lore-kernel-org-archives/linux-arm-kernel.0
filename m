@@ -1,61 +1,21 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 16 Jul 2015 11:04:12 -0700
-Subject: [PATCH] arm64: enable more compressed Image formats
-Message-ID: <1437069852-8393-1-git-send-email-olof@lixom.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Jul 2015 19:04:41 +0100
+Subject: [PATCH 03/13] arm64: Add ARM64_HAS_VIRT_HOST_EXTN feature
+In-Reply-To: <1436372356-30410-4-git-send-email-marc.zyngier@arm.com>
+References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
+ <1436372356-30410-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150716180441.GR26390@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Plumb up Makefile arguments for the already supported formats in the kbuild
-system: lz4, bzip2, lzma, and lzo.
+On Wed, Jul 08, 2015 at 05:19:06PM +0100, Marc Zyngier wrote:
+> Add a new ARM64_HAS_VIRT_HOST_EXTN features to indicate that the
+> CPU has the ARMv8,1 VHE capability.
+> 
+> This will be used to trigger kernel patching in KVM.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Note that just as with Image.gz, these images are not self-decompressing and
-the booting firmware still needs to handle decompression before launching the
-kernel image.
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm64/Makefile      |  2 +-
- arch/arm64/boot/Makefile | 12 ++++++++++++
- 2 files changed, 13 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 4d2a925998f9..435618941c24 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -58,7 +58,7 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
- 
- boot := arch/arm64/boot
- 
--Image Image.gz: vmlinux
-+Image Image.%: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
- 
- zinstall install: vmlinux
-diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-index 5a0e3ab854a5..abcbba2f01ba 100644
---- a/arch/arm64/boot/Makefile
-+++ b/arch/arm64/boot/Makefile
-@@ -19,9 +19,21 @@ targets := Image Image.gz
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
- 
-+$(obj)/Image.bz2: $(obj)/Image FORCE
-+	$(call if_changed,bzip2)
-+
- $(obj)/Image.gz: $(obj)/Image FORCE
- 	$(call if_changed,gzip)
- 
-+$(obj)/Image.lz4: $(obj)/Image FORCE
-+	$(call if_changed,lz4)
-+
-+$(obj)/Image.lzma: $(obj)/Image FORCE
-+	$(call if_changed,lzma)
-+
-+$(obj)/Image.lzo: $(obj)/Image FORCE
-+	$(call if_changed,lzo)
-+
- install: $(obj)/Image
- 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
- 	$(obj)/Image System.map "$(INSTALL_PATH)"
--- 
-2.0.1.473.gc4d58ca
+Will
