@@ -1,49 +1,136 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 16 Jul 2015 19:01:50 +0300
-Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
-In-Reply-To: <2232801.mhgotKSpyF@avalon>
-References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
- <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
- <55A7D192.7080301@iki.fi> <2232801.mhgotKSpyF@avalon>
-Message-ID: <55A7D56E.3000200@iki.fi>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 16 Jul 2015 17:03:13 +0100
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <55A7CE03.301@samsung.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
+ <559FFCA7.4060008@samsung.com>
+ <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
+ <55A61FF8.9000603@samsung.com>
+ <20150715163732.GF20186@e104818-lin.cambridge.arm.com>
+ <55A7CE03.301@samsung.com>
+Message-ID: <20150716160313.GC26865@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart wrote:
-> Hi Sakari,
+On Thu, Jul 16, 2015 at 06:30:11PM +0300, Andrey Ryabinin wrote:
+> On 07/15/2015 07:37 PM, Catalin Marinas wrote:
+> > Ok, so simply taking the call out of the loop won't work unless we
+> > conditionally define these functions (wouldn't be too bad since we have
+> > some #if CONFIG_PGTABLE_LEVELS already introduced by this patch but it
+> > would be nicer without).
+> > 
+> > Anyway, I think we can keep the current iterations but exit early if
+> > !pud_none() because it means we already populated it (reworked to match
+> > other such patterns throughout the kernel with pgd_populate called from
+> > the pud function; and untested):
+> > 
+> > void kasan_early_pmd_populate(pud_t *pud, unsigned long addr, unsigned long end)
+> > {
+> > 	pmd_t *pmd;
+> > 	unsigned long next;
+> > 
+> > 	if (pud_none(*pud))
+> > 		pud_populate(&init_mm, pud, kasan_zero_pmd);
+> > 
+> > 	pmd = pmd_offset(pud, addr);
+> > 	do {
+> > 		next = pmd_addr_end(addr, end);
+> > 		kasan_early_pte_populate(pmd, addr, next);
+> > 	} while (pmd++, addr = next, addr != end && pmd_none(*pmd));
+> > }
+> > 
+> > void kasan_early_pud_populate(pgd_t *pgd, unsigned long addr, unsigned long end)
+> > {
+> > 	pud_t *pud;
+> > 	unsigned long next;
+> > 
+> > 	if (pgd_none(*pgd))
+> > 		pgd_populate(&init_mm, pgd, kasan_zero_pud);
+> > 
+> > 	pud = pud_offset(pgd, addr);
+> > 	do {
+> > 		next = pud_addr_end(addr, end);
+> > 		kasan_early_pmd_populate(pud, addr, next);
+> > 	} while (pud++, addr = next, addr != end && pud_none(*pud));
+> > }
+> > 
+> > Given that we check pud_none() after the first iterations, it covers the
+> > lower levels if needed.
 > 
-> On Thursday 16 July 2015 18:45:22 Sakari Ailus wrote:
->> Laurent Pinchart wrote:
->>> The OMAP3 ISP is now fully supported in DT, remove its instantiation
->>> from C code.
->>>
->>> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->>> ---
->>>
->>>  arch/arm/mach-omap2/devices.c | 53 --------------------------------------
->>>  arch/arm/mach-omap2/devices.h | 19 ----------------
->>>  2 files changed, 72 deletions(-)
->>>  delete mode 100644 arch/arm/mach-omap2/devices.h
->>
->> If you remove the definitions, arch/arm/mach-omap2/board-cm-t35.c will
->> no longer compile. Could you remove the camera support there as well?
->>
->> My understanding is the board might be supported in DT but I'm not sure
->> about camera.
->>
->> Cc Mike and Igor.
-> 
-> commit 11cd7b8c2773d01e4b40e38568ae62c471a2ea10
-> Author: Tony Lindgren <tony@atomide.com>
-> Date:   Mon May 4 10:48:07 2015 -0700
-> 
->     ARM: OMAP2+: Remove legacy booting support for cm-t35
-> 
-> 
-> Merged in v4.2-rc1 :-)
+> I think this may work, if pud_none(*pud) will be replaced with !pud_val(*pud).
+> We can't use pud_none() because with 2-level page tables it's always false, so
+> we will never go down to pmd level where swapper_pg_dir populated.
 
-Oh, I missed that one. Good!
+The reason I used "do ... while" vs "while" or "for" is so that it gets
+down to the pmd level. The iteration over pgd is always done in the top
+loop via pgd_addr_end while the loops for missing levels (nopud, nopmd)
+are always a single iteration whether we check for pud_none or not. But
+when the level is present, we avoid looping when !pud_none().
+
+> But you gave me another idea how we could use p?d_none() and avoid rewriting table entries:
+> 
+> 
+> void kasan_early_pmd_populate(unsigned long start, unsigned long end, pte_t *pte)
+> {
+> 	unsigned long addr = start;
+> 	long next;
+> 
+> 	do {
+> 		pgd_t *pgd = pgd_offset_k(addr);
+> 		pud_t *pud = pud_offset(pgd, addr);
+> 		pmd_t *pmd = pmd_offset(pud, addr);
+> 
+> 		if (!pmd_none(*pmd))
+> 			break;
+> 
+> 		pmd_populate_kernel(&init_mm, pmd, pte);
+> 		next = pgd_addr_end(addr, end);
+> 		next = pud_addr_end(addr, next)
+> 		next = pmd_addr_end(addr, next);
+> 	} while(addr = next, addr != end);
+> }
+> 
+> void kasan_early_pud_populate(unsigned long start, unsigned long end, pmd_t *pmd)
+> {
+> 	unsigned long addr = start;
+> 	long next;
+> 
+> 	do {
+> 		pgd_t *pgd = pgd_offset_k(addr);
+> 		pud_t *pud = pud_offset(pgd, addr);
+> 
+> 		if (!pud_none(*pud))
+> 			break;
+> 
+> 		pud_populate(&init_mm, pud, pmd);
+> 		next = pud_addr_end(addr, pgd_addr_end(addr, end));
+> 	} while(addr = next, addr != end);
+> }
+> 
+> 
+> void kasan_early_pgd_populate(...)
+> {
+> 	//something similar to above
+> 	....
+> }
+> 
+> static void __init kasan_map_early_shadow(void)
+> {
+> 	kasan_early_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pud);
+> 	kasan_early_pud_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pmd);
+> 	kasan_early_pmd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pte);
+> 	kasan_early_pte_populate();
+> }
+
+While this would probably work, you still need #ifdef's since
+kasan_zero_pud is not defined with 2 and 3 levels. That's what I
+initially thought we should do but since you didn't like the #ifdef's, I
+came up with another proposal.
+
+So, I still prefer my suggestion above unless you find a problem with
+it.
 
 -- 
-Sakari Ailus
-sakari.ailus at iki.fi
+Catalin
