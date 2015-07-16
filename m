@@ -1,48 +1,62 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Thu, 16 Jul 2015 17:13:49 +0300
-Subject: [PATCH 2/2] ARM: OMAP2+: Remove legacy booting support for Pandora
-In-Reply-To: <1437047951-22300-3-git-send-email-tony@atomide.com>
-References: <1437047951-22300-1-git-send-email-tony@atomide.com>
- <1437047951-22300-3-git-send-email-tony@atomide.com>
-Message-ID: <CANOLnOPQHOY5Up8+uKQn-JTK4zN=iK+owSN2KjhJGNFLVzN9yQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 16 Jul 2015 16:11:05 +0200
+Subject: [PATCH 2/2] dmaengine: xdmac: Add scatter gathered memset support
+In-Reply-To: <20150716120154.GN5086@localhost>
+References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1436177964-19380-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20150716120154.GN5086@localhost>
+Message-ID: <20150716141105.GJ28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vinod,
 
-On Thu, Jul 16, 2015 at 2:59 PM, Tony Lindgren <tony@atomide.com> wrote:
-> We've been moving all omap2+ based systems to boot in device tree only
-> mode for a few years now. Only omap3 has legacy booting support
-> remaining. Most omap3 boards already have related arch/arm/boot/*.dts*
-> files for booting with device tree.
+> > +		/*
+> > +		 * The scatterlist API gives us only the address and
+> > +		 * length of each elements.
+> > +		 *
+> > +		 * Unfortunately, we don't have the stride, which we
+> > +		 * will need to compute.
+> > +		 *
+> > +		 * That make us end up in a situation like this one:
+> > +		 *    len    stride    len    stride    len
+> > +		 * +-------+        +-------+        +-------+
+> > +		 * |  N-2  |        |  N-1  |        |   N   |
+> > +		 * +-------+        +-------+        +-------+
+> > +		 *
+> > +		 * We need all these three elements (N-2, N-1 and N)
+> > +		 * to actually take the decision on whether we need to
+> > +		 * queue N-1 or reuse N-2.
+> > +		 *
+> > +		 * We will only consider N if it is the last element.
+> > +		 */
 >
-> This board has support for device tree based booting, and we've been
-> printing warnings about the legacy booting being deprecated for a
-> few merge cycles now. Let's attempt to remove the legacy booting
-> for it.
->
-> The reason for removing the legacy booting support now rather than
-> later is we can simply revert this patch if necessary if we run
-> into some unexpected issues that are not trivial to fix for the
-> device tree based booting.
+> Why do you need stride?
+> 
+> This is scatterlist so the computation of stride sounds odd here. Ideally
+> you should take the scatterlist and program the lli for controller.
 
-It seems we lose wifi, backlight, audio and usb host mainline support
-with this as pandora's .dts currently lacks all that stuff.
-That said I'm not aware of any mainline users (everyone seems to be on
-our "vendor" kernel), so maybe we can add those later.
+Because it is sub-optimal if the length and stride are equals from one
+descriptors to another. The XDMAC is able to repeat any given
+descriptor a given number of time (which is one by default), which
+means that if the parameters of the transfer don't change, we simply
+have to increment the number of time the descriptor has to be used,
+instead of creating a new one that the controller will have to fetch.
 
->
-> Cc: Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+In the non-optimal case (ie the length and/or stride change from one
+scatterlist element to another), we simply fallback to a one LLI per
+scatter list element.
 
-I have not signed this off...
+Maxime
 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/Makefile             |   1 -
->  arch/arm/mach-omap2/board-omap3pandora.c | 633 -------------------------------
->  2 files changed, 634 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/board-omap3pandora.c
->
-
-
-Gra?vydas
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/6bf563a7/attachment.sig>
