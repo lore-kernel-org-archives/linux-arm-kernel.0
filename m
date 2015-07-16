@@ -1,83 +1,137 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 16 Jul 2015 14:24:54 -0400
-Subject: arm: dts: update for 4.2-rcx
-In-Reply-To: <55A7E1F2.7000100@oracle.com>
-References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
- <55A7E0D0.9070104@ti.com> <55A7E1F2.7000100@oracle.com>
-Message-ID: <55A7F6F6.40202@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 16 Jul 2015 11:25:06 -0700
+Subject: [PATCH 05/12] ARM: OMAP2+: Add support for initializing dm814x
+ clocks
+In-Reply-To: <20150716093746.GL17550@atomide.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+ <1433348601-8966-6-git-send-email-tony@atomide.com>
+ <20150604184254.GJ490@codeaurora.org> <20150604222823.GC30984@atomide.com>
+ <20150716093746.GL17550@atomide.com>
+Message-ID: <55A7F702.6040408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 12:55 PM, santosh shilimkar wrote:
-> On 7/16/2015 9:50 AM, Murali Karicheri wrote:
->> On 07/16/2015 12:40 PM, santosh shilimkar wrote:
->>> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
->>>> Santosh,
->>>>
->>>> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
->>>> This one should be applied to v4.2-rc kernel with priority.
->>>> Please review and do the needful.
->>>>
->>> Yes I have it for next merge window. It won't be qualified as a
->>> fix rather more of enhancement. Do you have also patches for
->>> board DTS files which enables PCIE. I can queue them together
->>> for next merge window.
->> No this is a fix for v4.2-rc. PCIe driver is not complete without having
->> a SerDes driver. Currently the version we send is not accepted since the
->> config blobs are used. On K2E EVM, this causes problem since the EVM has
->> Marvell SATA controller present and with default values in the SerDes
->> register, it seems to pass the PCIe link check, but causes issues since
->> the configuration is not correct. The manifestation is that when EVM is
->> booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM
->> since to work, SerDes driver has to be present as well. So by default,
->> the PCIe DT binding should be disabled in SoC specific DTS. It can be
->> enabled in the board specific DTS when the SerDes device driver is also
->> present. We plan to upstream a common SerDes driver soon. But at this
->> point this has to be disabled by default.
->>
-> Please add this information and respin the patch. Thanks for explaining
-> it.
+On 07/16/2015 02:37 AM, Tony Lindgren wrote:
 >
->> I can provide more details if needed in the patch commit description,
->> but I though it is not correct to keep the PCIe DT bindings to be
->> enabled in the SoC specific DTS to begin with. So this is a fix for
->> v4.2-rc.
->>
-> Please do. It wasn't clear from the patch description. With above added
-> description its a legitimate fix which I can queue it up for rc's.
+> Here's this patch updated with the above removed.
 >
-Ok. Will do. Need an additional patch to rename the PCI nodes such that 
-status can be overridden in a board specific DTS.
 
-+
-+&pcie1 {
-+       status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 71e2b1c..0055477 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -94,7 +94,7 @@
-                         status = "disabled";
-                 };
+Ok. I fixed up Mike's email in case he wants to look at it. Looks fine 
+to me though.
 
--               pcie at 21020000 {
-+               pcie1: pcie at 21020000 {
-                         compatible = "ti,keystone-pcie","snps,dw-pcie";
-                         clocks = <&clkpcie1>;
-                         clock-names = "pcie";
-
-
-Same for pcie0 in keystone.dtsi. Do you prefer to put both in the same 
-patch or a separate one for this?
-
-Murali
-> Regards,
-> Santosh
 >
+> 8< -------------
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Thu, 16 Jul 2015 01:55:57 -0700
+> Subject: [PATCH] ARM: OMAP2+: Add support for initializing dm814x clocks
 >
+> Let's add a minimal clocks for dm814x to get it booted. This is
+> mostly a placeholder and relies on the PLLs being on from the
+> bootloader.
+>
+> Note that the divider clocks work the same way as on dm816x and
+> am335x.
+>
+> Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
+>
+> --- a/arch/arm/mach-omap2/io.c
+> +++ b/arch/arm/mach-omap2/io.c
+> @@ -558,7 +558,7 @@ void __init ti814x_init_early(void)
+>   	ti81xx_hwmod_init();
+>   	omap_hwmod_init_postsetup();
+>   	if (of_have_populated_dt())
+> -		omap_clk_soc_init = ti81xx_dt_clk_init;
+> +		omap_clk_soc_init = dm814x_dt_clk_init;
+>   }
+>   
+>   void __init ti816x_init_early(void)
+> @@ -575,7 +575,7 @@ void __init ti816x_init_early(void)
+>   	ti81xx_hwmod_init();
+>   	omap_hwmod_init_postsetup();
+>   	if (of_have_populated_dt())
+> -		omap_clk_soc_init = ti81xx_dt_clk_init;
+> +		omap_clk_soc_init = dm816x_dt_clk_init;
+>   }
+>   #endif
+>   
+> --- a/drivers/clk/ti/Makefile
+> +++ b/drivers/clk/ti/Makefile
+> @@ -2,7 +2,7 @@ obj-y					+= clk.o autoidle.o clockdomain.o
+>   clk-common				= dpll.o composite.o divider.o gate.o \
+>   					  fixed-factor.o mux.o apll.o
+>   obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
+> -obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
+> +obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-814x.o clk-816x.o
+>   obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
+>   obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
+>   					   clk-3xxx.o
+> --- /dev/null
+> +++ b/drivers/clk/ti/clk-814x.c
+> @@ -0,0 +1,31 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk/ti.h>
+> +
+> +static struct ti_dt_clk dm814_clks[] = {
+> +	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
+> +	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
+> +	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
+> +	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
+> +	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
+> +	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
+> +	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
+> +	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
+> +	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
+> +	{ .node_name = NULL },
+> +};
+> +
+> +int __init dm814x_dt_clk_init(void)
+> +{
+> +	ti_dt_clocks_register(dm814_clks);
+> +	omap2_clk_disable_autoidle_all();
+> +	omap2_clk_enable_init_clocks(NULL, 0);
+> +
+> +	return 0;
+> +}
+> --- a/drivers/clk/ti/clk-816x.c
+> +++ b/drivers/clk/ti/clk-816x.c
+> @@ -42,7 +42,7 @@ static const char *enable_init_clks[] = {
+>   	"ddr_pll_clk3",
+>   };
+>   
+> -int __init ti81xx_dt_clk_init(void)
+> +int __init dm816x_dt_clk_init(void)
+>   {
+>   	ti_dt_clocks_register(dm816x_clks);
+>   	omap2_clk_disable_autoidle_all();
+> --- a/include/linux/clk/ti.h
+> +++ b/include/linux/clk/ti.h
+> @@ -329,7 +329,8 @@ int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
+>   int omap3430_dt_clk_init(void);
+>   int omap3630_dt_clk_init(void);
+>   int am35xx_dt_clk_init(void);
+> -int ti81xx_dt_clk_init(void);
+> +int dm814x_dt_clk_init(void);
+> +int dm816x_dt_clk_init(void);
+>   int omap4xxx_dt_clk_init(void);
+>   int omap5xxx_dt_clk_init(void);
+>   int dra7xx_dt_clk_init(void);
 
 
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
