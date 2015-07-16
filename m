@@ -1,44 +1,52 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 16 Jul 2015 10:13:26 +0100
-Subject: [PATCH 3/3] ARM: add basic support for on-demand backtrace of
- other CPUs
-In-Reply-To: <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
- <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
-Message-ID: <55A775B6.8080505@linaro.org>
+From: majun258@huawei.com (majun (F))
+Date: Thu, 16 Jul 2015 17:22:05 +0800
+Subject: [PATCH v3 1/3] IRQ/Gic-V3: Add mbigen driver to support mbigen
+ interrupt controller
+In-Reply-To: <55A770E2.2040300@arm.com>
+References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
+ <1436166548-34920-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1507061248090.3916@nanos> <559CA530.2090508@huawei.com>
+ <559D3EB5.4060408@arm.com> <55A76CBE.2030508@huawei.com>
+ <55A770E2.2040300@arm.com>
+Message-ID: <55A777BD.4080504@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/15 21:39, Russell King wrote:
-> As we now have generic infrastructure to support backtracing of other
-> CPUs in the system on lockups, we can start to implement this for ARM.
-> Initially, we add an IPI based implementation, as the GIC code needs
-> modification to support the generation of FIQ IPIs, and not all ARM
-> platforms have the ability to raise a FIQ in the non-secure world.
->
-> This provides us with a "best efforts" implementation in the absence
-> of FIQs.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> index 90dfbedfbfb8..3a20c386fd33 100644
-> --- a/arch/arm/kernel/smp.c
-> +++ b/arch/arm/kernel/smp.c
-> @@ -21,6 +21,7 @@
->   #include <linux/cpu.h>
->   #include <linux/seq_file.h>
->   #include <linux/irq.h>
-> +#include <linux/nmi.h>
->   #include <linux/percpu.h>
->   #include <linux/clockchips.h>
->   #include <linux/completion.h>
-> @@ -72,6 +73,7 @@ enum ipi_msg_type {
->   	IPI_CPU_STOP,
->   	IPI_IRQ_WORK,
->   	IPI_COMPLETION,
-> +	IPI_CPU_BACKTRACE = 15,
 
-Even with the potential for (eventually) being signalled by FIQ, is this 
-IPI really so special it needs to be placed outside the scope of NR_IPI 
-and the accounting and tracing support it brings with it?
+
+? 2015/7/16 16:52, Marc Zyngier ??:
+> On 16/07/15 09:35, majun (F) wrote:
+
+>>> I'm a bit puzzled.
+>>
+>> For interrupts connect to mbigen , the interrupt trigger type, device id and
+>> event id value are encoded in mbigen chip already.
+>>
+>> There are two types of mbigen node within a mbigen chip.
+>> Type1: event id valud can't be programmed.
+>> Type2: event id value can be programmed.
+>>
+>> For example: An device with 5 interrupts connected to Mbigen node
+>> type 1.The default event id vlaue encoded in mbigen chip for these 5 interrupt
+>> is from 0 to 4.
+>>
+>> Because the event id value can't be programmed, we need to define all of
+>> 5 interrupts in dts file so that these 5 interrupt has
+> 
+> You can define what you want in the device tree, the ITS doesn't care!
+> Nothing in the ITS code parses this property, and there is absolutely
+> zero chance that the even the ITS has allocated will actually match what
+> you expect.
+> 
+> The ITS *relies* on the principle that the evenID can be programmed,
+> just like any MSI controller relies on the device to be programmed with
+> whatever payload has been provided. If all of a sudden we have to
+> support HW that has its own view of the payload, what you have here will
+> simply not work.
+> 
+"If all of a sudden we have to
+ support HW that has its own view of the payload, what you have here will
+ simply not work."
+
+I am not very unstand this case, would you please explain this more detail?
+Thanks!
