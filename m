@@ -1,137 +1,281 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Jul 2015 11:25:06 -0700
-Subject: [PATCH 05/12] ARM: OMAP2+: Add support for initializing dm814x
- clocks
-In-Reply-To: <20150716093746.GL17550@atomide.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
- <1433348601-8966-6-git-send-email-tony@atomide.com>
- <20150604184254.GJ490@codeaurora.org> <20150604222823.GC30984@atomide.com>
- <20150716093746.GL17550@atomide.com>
-Message-ID: <55A7F702.6040408@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 16 Jul 2015 20:25:53 +0200
+Subject: [PATCH 02/18] KVM: ARM64: Add initial support for PMU
+In-Reply-To: <1436149068-3784-3-git-send-email-shannon.zhao@linaro.org>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-3-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <20150716182553.GB14024@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 02:37 AM, Tony Lindgren wrote:
->
-> Here's this patch updated with the above removed.
->
+On Mon, Jul 06, 2015 at 10:17:32AM +0800, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> Here we plan to support virtual PMU for guest by full software
+> emulation, so define some basic structs and functions preparing for
+> futher steps. Define struct kvm_pmc for performance monitor counter and
+> struct kvm_pmu for performance monitor unit for each vcpu. According to
+> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
+> Initialize PMU for each vcpu when kvm initialize vcpus, while reset PMU
+> when kvm reset vcpus.
+> Since this only supports ARM64 (or PMUv3), add a separate config symbol
+> for it.
+> 
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm/kvm/arm.c                |  4 +++
+>  arch/arm64/include/asm/kvm_host.h |  2 ++
+>  arch/arm64/include/asm/pmu.h      |  2 ++
+>  arch/arm64/kvm/Kconfig            |  7 +++++
+>  arch/arm64/kvm/Makefile           |  1 +
+>  arch/arm64/kvm/reset.c            |  3 +++
+>  include/kvm/arm_pmu.h             | 54 ++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/pmu.c                | 55 +++++++++++++++++++++++++++++++++++++++
+>  8 files changed, 128 insertions(+)
+>  create mode 100644 include/kvm/arm_pmu.h
+>  create mode 100644 virt/kvm/arm/pmu.c
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index bc738d2..4e82625 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/kvm.h>
+>  #include <trace/events/kvm.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include "trace.h"
+> @@ -278,6 +279,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+>  	/* Set up the timer */
+>  	kvm_timer_vcpu_init(vcpu);
+>  
+> +	/* Set up the PMU */
+> +	kvm_pmu_init(vcpu);
+> +
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2709db2..3c88873 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -42,6 +42,7 @@
+>  
+>  #include <kvm/arm_vgic.h>
+>  #include <kvm/arm_arch_timer.h>
+> +#include <kvm/arm_pmu.h>
+>  
+>  #define KVM_VCPU_MAX_FEATURES 3
+>  
+> @@ -116,6 +117,7 @@ struct kvm_vcpu_arch {
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+>  	struct arch_timer_cpu timer_cpu;
+> +	struct kvm_pmu pmu;
+>  
+>  	/*
+>  	 * Anything that is not used directly from assembly code goes
+> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+> index b9f394a..95681e6 100644
+> --- a/arch/arm64/include/asm/pmu.h
+> +++ b/arch/arm64/include/asm/pmu.h
+> @@ -19,6 +19,8 @@
+>  #ifndef __ASM_PMU_H
+>  #define __ASM_PMU_H
+>  
+> +#include <linux/perf_event.h>
+> +
+>  #define ARMV8_MAX_COUNTERS      32
+>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
+>  
+> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
+> index bfffe8f..eae3a1b 100644
+> --- a/arch/arm64/kvm/Kconfig
+> +++ b/arch/arm64/kvm/Kconfig
+> @@ -31,6 +31,7 @@ config KVM
+>  	select KVM_VFIO
+>  	select HAVE_KVM_EVENTFD
+>  	select HAVE_KVM_IRQFD
+> +	select KVM_ARM_PMU
+>  	---help---
+>  	  Support hosting virtualized guest machines.
+>  
+> @@ -52,4 +53,10 @@ config KVM_ARM_MAX_VCPUS
+>  	  large, so only choose a reasonable number that you expect to
+>  	  actually use.
+>  
+> +config KVM_ARM_PMU
+> +	bool
+> +	depends on KVM_ARM_HOST
+> +	---help---
+> +	  Adds support for the Performance Monitoring in virtual machines.
 
-Ok. I fixed up Mike's email in case he wants to look at it. Looks fine 
-to me though.
+Adds support for a virtual Performance Monitoring Unit (PMU) in virtual
+machines.
 
->
-> 8< -------------
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 16 Jul 2015 01:55:57 -0700
-> Subject: [PATCH] ARM: OMAP2+: Add support for initializing dm814x clocks
->
-> Let's add a minimal clocks for dm814x to get it booted. This is
-> mostly a placeholder and relies on the PLLs being on from the
-> bootloader.
->
-> Note that the divider clocks work the same way as on dm816x and
-> am335x.
->
-> Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Tero Kristo <t-kristo@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-
->
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -558,7 +558,7 @@ void __init ti814x_init_early(void)
->   	ti81xx_hwmod_init();
->   	omap_hwmod_init_postsetup();
->   	if (of_have_populated_dt())
-> -		omap_clk_soc_init = ti81xx_dt_clk_init;
-> +		omap_clk_soc_init = dm814x_dt_clk_init;
->   }
->   
->   void __init ti816x_init_early(void)
-> @@ -575,7 +575,7 @@ void __init ti816x_init_early(void)
->   	ti81xx_hwmod_init();
->   	omap_hwmod_init_postsetup();
->   	if (of_have_populated_dt())
-> -		omap_clk_soc_init = ti81xx_dt_clk_init;
-> +		omap_clk_soc_init = dm816x_dt_clk_init;
->   }
->   #endif
->   
-> --- a/drivers/clk/ti/Makefile
-> +++ b/drivers/clk/ti/Makefile
-> @@ -2,7 +2,7 @@ obj-y					+= clk.o autoidle.o clockdomain.o
->   clk-common				= dpll.o composite.o divider.o gate.o \
->   					  fixed-factor.o mux.o apll.o
->   obj-$(CONFIG_SOC_AM33XX)		+= $(clk-common) clk-33xx.o
-> -obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-816x.o
-> +obj-$(CONFIG_SOC_TI81XX)		+= $(clk-common) fapll.o clk-814x.o clk-816x.o
->   obj-$(CONFIG_ARCH_OMAP2)		+= $(clk-common) interface.o clk-2xxx.o
->   obj-$(CONFIG_ARCH_OMAP3)		+= $(clk-common) interface.o \
->   					   clk-3xxx.o
+> +
+>  endif # VIRTUALIZATION
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index f90f4aa..78db4ee 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+> +kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> index 0b43265..ee2c2e9 100644
+> --- a/arch/arm64/kvm/reset.c
+> +++ b/arch/arm64/kvm/reset.c
+> @@ -107,5 +107,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+>  	/* Reset timer */
+>  	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+>  
+> +	/* Reset PMU */
+> +	kvm_pmu_vcpu_reset(vcpu);
+> +
+>  	return 0;
+>  }
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> new file mode 100644
+> index 0000000..27d14ca
 > --- /dev/null
-> +++ b/drivers/clk/ti/clk-814x.c
-> @@ -0,0 +1,31 @@
+> +++ b/include/kvm/arm_pmu.h
+> @@ -0,0 +1,54 @@
 > +/*
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 > + */
 > +
-> +#include <linux/kernel.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/clk/ti.h>
+> +#ifndef __ASM_ARM_KVM_PMU_H
+> +#define __ASM_ARM_KVM_PMU_H
 > +
-> +static struct ti_dt_clk dm814_clks[] = {
-> +	DT_CLK(NULL, "devosc_ck", "devosc_ck"),
-> +	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
-> +	DT_CLK(NULL, "sysclk4_ck", "sysclk4_ck"),
-> +	DT_CLK(NULL, "sysclk6_ck", "sysclk6_ck"),
-> +	DT_CLK(NULL, "sysclk10_ck", "sysclk10_ck"),
-> +	DT_CLK(NULL, "sysclk18_ck", "sysclk18_ck"),
-> +	DT_CLK(NULL, "timer_sys_ck", "devosc_ck"),
-> +	DT_CLK(NULL, "cpsw_125mhz_gclk", "cpsw_125mhz_gclk"),
-> +	DT_CLK(NULL, "cpsw_cpts_rft_clk", "cpsw_cpts_rft_clk"),
-> +	{ .node_name = NULL },
+> +#include <asm/pmu.h>
+> +#include <linux/irq_work.h>
+> +
+> +struct kvm_pmc {
+> +	u8 idx;
+
+which index is this?  Does it map to something architecturally or is it
+just the array index number?
+
+> +	u64 counter;
+> +	u64 eventsel;
+
+does this map to PMEVTYPER<n>_EL0.evtCount?
+
+> +	bool interrupt;
+
+is this that an interrupt which is pending or which is enabled?
+
+> +	bool enable;
+> +	struct perf_event *perf_event;
+> +	struct kvm_vcpu *vcpu;
 > +};
 > +
-> +int __init dm814x_dt_clk_init(void)
-> +{
-> +	ti_dt_clocks_register(dm814_clks);
-> +	omap2_clk_disable_autoidle_all();
-> +	omap2_clk_enable_init_clocks(NULL, 0);
+> +struct kvm_pmu {
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +	/* PMU IRQ Number per VCPU */
+> +	int irq_num;
+> +	int overflow_status;
+> +	/* IRQ pending flag */
+> +	bool irq_pending;
+> +	struct irq_work irq_work;
+> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
+> +#endif
+> +};
 > +
-> +	return 0;
+> +#ifdef CONFIG_KVM_ARM_PMU
+> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+> +void kvm_pmu_init(struct kvm_vcpu *vcpu);
+> +#else
+> +static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_pmu_init(struct kvm_vcpu *vcpu) {}
+> +#endif
+> +
+> +#endif
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> new file mode 100644
+> index 0000000..dc252d0
+> --- /dev/null
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -0,0 +1,55 @@
+> +/*
+> + * Copyright (C) 2015 Linaro Ltd.
+> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/kvm.h>
+> +#include <linux/kvm_host.h>
+> +#include <kvm/arm_pmu.h>
+> +
+> +/**
+> + * kvm_pmu_vcpu_reset - reset pmu state for cpu
+> + * @vcpu: The vcpu pointer
+> + *
+> + */
+> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +	pmu->irq_pending = false;
 > +}
-> --- a/drivers/clk/ti/clk-816x.c
-> +++ b/drivers/clk/ti/clk-816x.c
-> @@ -42,7 +42,7 @@ static const char *enable_init_clks[] = {
->   	"ddr_pll_clk3",
->   };
->   
-> -int __init ti81xx_dt_clk_init(void)
-> +int __init dm816x_dt_clk_init(void)
->   {
->   	ti_dt_clocks_register(dm816x_clks);
->   	omap2_clk_disable_autoidle_all();
-> --- a/include/linux/clk/ti.h
-> +++ b/include/linux/clk/ti.h
-> @@ -329,7 +329,8 @@ int ti_clk_add_component(struct device_node *node, struct clk_hw *hw, int type);
->   int omap3430_dt_clk_init(void);
->   int omap3630_dt_clk_init(void);
->   int am35xx_dt_clk_init(void);
-> -int ti81xx_dt_clk_init(void);
-> +int dm814x_dt_clk_init(void);
-> +int dm816x_dt_clk_init(void);
->   int omap4xxx_dt_clk_init(void);
->   int omap5xxx_dt_clk_init(void);
->   int dra7xx_dt_clk_init(void);
+> +
+> +/**
+> + * kvm_pmu_init - Initialize global PMU state for per vcpu
 
+how is this both global and per VCPU?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> + * @vcpu: The vcpu pointer
+> + *
+> + * Initialize PMC and Set all the PMU IRQ numbers to invalid
+
+s/Set/set/
+
+> + * value so that user space has to explicitly provide PMU
+> + * IRQ numbers using set device address ioctl.
+> + */
+> +void kvm_pmu_init(struct kvm_vcpu *vcpu)
+> +{
+> +	int i;
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +
+> +	memset(pmu, 0, sizeof(*pmu));
+> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
+> +		pmu->pmc[i].idx = i;
+> +		pmu->pmc[i].vcpu = vcpu;
+> +	}
+> +
+> +	pmu->irq_num = -1;
+> +}
+> -- 
+> 2.1.0
+> 
