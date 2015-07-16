@@ -1,77 +1,39 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Jul 2015 16:33:19 +0100
-Subject: [PATCH v2 09/20] xen/biomerge: Don't allow biovec to be merge
- when Linux is not using 4KB page
-In-Reply-To: <20150710191245.GA31063@l.oracle.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
- <20150710191245.GA31063@l.oracle.com>
-Message-ID: <alpine.DEB.2.02.1507161627010.17378@kaball.uk.xensource.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 16 Jul 2015 17:36:17 +0200
+Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset state
+ when not in use
+In-Reply-To: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+References: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <55A7CF71.7050507@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jul 2015, Konrad Rzeszutek Wilk wrote:
-> On Thu, Jul 09, 2015 at 09:42:21PM +0100, Julien Grall wrote:
-> > When Linux is using 64K page granularity, every page will be slipt in
-> > multiple non-contiguous 4K MFN (page granularity of Xen).
-> 
-> But you don't care about that on the Linux layer I think?
-> 
-> As in, is there an SWIOTLB that does PFN to MFN and vice-versa
-> translation?
-> 
-> I thought that ARM guests are not exposed to the MFN<->PFN logic
-> and trying to figure that out to not screw up the DMA engine
-> on a PCIe device slurping up contingous MFNs which don't map
-> to contingous PFNs?
+> Whenever the UART device driver gets closed from userland, the driver
+> disables the UART unit and then stops its clock to save power.
+>
+> The bit which disabled the UART unit is described as:
+>
+>   "UART Enable. If this bit is set to 1, the UART is enabled. Data
+>   transmission and reception occurs for the UART signals. When the
+>   UART is disabled in the middle of transmission or reception, it
+>   completes the current character before stopping."
+>
+> The important part is the "it completes the current character". Whenever
+> a reception is ongoing when the UART gets disabled (including the clock
+> off) the statemachine freezes and "remembers" this state on the next
+> open() and re-enabling of the unit's clock.
+>
+> In this case we end up receiving an additional bogus character
+> immediately.
+>
+> The solution in this change is to move the AUART unit into its reset
+> state on close() and only release it from its reset state on the next
+> open().
+>
+> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> ---
 
-Dom0 is mapped 1:1, so pfn == mfn normally, however grant maps
-unavoidably screw up the 1:1, so the swiotlb jumps in to save the day
-when a foreign granted page is involved in a dma operation.
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 
-Regarding xen_biovec_phys_mergeable, we could check that all the pfn ==
-mfn and return true in that case.
-
-
-> > I'm not sure how to handle efficiently the check to know whether we can
-> > merge 2 biovec with a such case. So for now, always says that biovec are
-> > not mergeable.
-> > 
-> > Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> > Cc: David Vrabel <david.vrabel@citrix.com>
-> > ---
-> >     Changes in v2:
-> >         - Remove the workaround and check if the Linux page granularity
-> >         is the same as Xen or not
-> > ---
-> >  drivers/xen/biomerge.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-> > index 0edb91c..571567c 100644
-> > --- a/drivers/xen/biomerge.c
-> > +++ b/drivers/xen/biomerge.c
-> > @@ -6,10 +6,17 @@
-> >  bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
-> >  			       const struct bio_vec *vec2)
-> >  {
-> > +#if XEN_PAGE_SIZE == PAGE_SIZE
-> >  	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
-> >  	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
-> >  
-> >  	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
-> >  		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
-> > +#else
-> > +	/* XXX: bio_vec are not mergeable when using different page size in
-> > +	 * Xen and Linux
-> > +	 */
-> > +	return 0;
-> > +#endif
-> >  }
-> >  EXPORT_SYMBOL(xen_biovec_phys_mergeable);
-> > -- 
-> > 2.1.4
-> > 
-> 
+Thanks
+Stefan
