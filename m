@@ -1,54 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jul 2015 10:39:02 +0100
-Subject: [PATCH 3/3] ARM: add basic support for on-demand backtrace of
- other CPUs
-In-Reply-To: <55A775B6.8080505@linaro.org>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
- <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
- <55A775B6.8080505@linaro.org>
-Message-ID: <20150716093901.GJ7557@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jul 2015 11:42:06 +0200
+Subject: [PATCH 1/7] ARM: shmobile: r8a73a4 dtsi: Add missing
+ "gpio-ranges" to gpio node
+In-Reply-To: <CAMuHMdX4=C6DsbsaphndXQuPm8WFqv08kwq+cdQRJJQtDph1cg@mail.gmail.com>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+ <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
+ <32630741.rNENluEsDE@avalon>
+ <CAMuHMdX4=C6DsbsaphndXQuPm8WFqv08kwq+cdQRJJQtDph1cg@mail.gmail.com>
+Message-ID: <CACRpkdbB6mLZAxpvPq8X5cWVLYD05ruF2XbwZSYn16Kj8tXvdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 10:13:26AM +0100, Daniel Thompson wrote:
-> On 15/07/15 21:39, Russell King wrote:
-> >As we now have generic infrastructure to support backtracing of other
-> >CPUs in the system on lockups, we can start to implement this for ARM.
-> >Initially, we add an IPI based implementation, as the GIC code needs
-> >modification to support the generation of FIQ IPIs, and not all ARM
-> >platforms have the ability to raise a FIQ in the non-secure world.
-> >
-> >This provides us with a "best efforts" implementation in the absence
-> >of FIQs.
-> >
-> >Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> >---
-> >diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-> >index 90dfbedfbfb8..3a20c386fd33 100644
-> >--- a/arch/arm/kernel/smp.c
-> >+++ b/arch/arm/kernel/smp.c
-> >@@ -21,6 +21,7 @@
-> >  #include <linux/cpu.h>
-> >  #include <linux/seq_file.h>
-> >  #include <linux/irq.h>
-> >+#include <linux/nmi.h>
-> >  #include <linux/percpu.h>
-> >  #include <linux/clockchips.h>
-> >  #include <linux/completion.h>
-> >@@ -72,6 +73,7 @@ enum ipi_msg_type {
-> >  	IPI_CPU_STOP,
-> >  	IPI_IRQ_WORK,
-> >  	IPI_COMPLETION,
-> >+	IPI_CPU_BACKTRACE = 15,
-> 
-> Even with the potential for (eventually) being signalled by FIQ, is this IPI
-> really so special it needs to be placed outside the scope of NR_IPI and the
-> accounting and tracing support it brings with it?
+On Tue, Jul 14, 2015 at 2:05 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Tue, Jun 30, 2015 at 11:49 AM, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
 
-That's exactly why it's placed outside that range.  We don't want the
-accounting and tracing stuff at all in that path - that's more code which
-needs to be run which could be the cause of the lockup.  More fragility.
+>>> To fix this, add a "gpio-ranges" property to the gpio device node, so
+>>> the ranges are added by of_gpiochip_add_pin_range(), which is called by
+>>> of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
+>>>
+>>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>
+>> This looks sane to me, even though referencing the same DT node seems a bit
+>> dodgy. I'll let Linus comment on that, but for the implementation itself,
+>>
+>> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>
+> Thank you!
+>
+> Any wise words from Linus?
 
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+I don't know if I'm wise but I'm OK with this:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
