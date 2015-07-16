@@ -1,48 +1,118 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 16 Jul 2015 17:29:02 +0200
-Subject: [PATCH 2/2] at91: use request_irq/free_irq instead of
- setup_irq/remove_irq
-In-Reply-To: <alpine.DEB.2.11.1507052341420.3916@nanos>
-References: <1435937609-18623-1-git-send-email-davidcdueck@googlemail.com>
- <1435937609-18623-2-git-send-email-davidcdueck@googlemail.com>
- <alpine.DEB.2.11.1507052341420.3916@nanos>
-Message-ID: <20150716152902.GN20482@piout.net>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Thu, 16 Jul 2015 18:30:11 +0300
+Subject: [PATCH v2 5/5] arm64: add KASan support
+In-Reply-To: <20150715163732.GF20186@e104818-lin.cambridge.arm.com>
+References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
+ <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
+ <20150708154803.GE6944@e104818-lin.cambridge.arm.com>
+ <559FFCA7.4060008@samsung.com>
+ <20150714150445.GH13555@e104818-lin.cambridge.arm.com>
+ <55A61FF8.9000603@samsung.com>
+ <20150715163732.GF20186@e104818-lin.cambridge.arm.com>
+Message-ID: <55A7CE03.301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 05/07/2015 at 23:48:26 +0200, Thomas Gleixner wrote :
-> On Fri, 3 Jul 2015, David Dueck wrote:
+On 07/15/2015 07:37 PM, Catalin Marinas wrote:
+> Ok, so simply taking the call out of the loop won't work unless we
+> conditionally define these functions (wouldn't be too bad since we have
+> some #if CONFIG_PGTABLE_LEVELS already introduced by this patch but it
+> would be nicer without).
 > 
-> > This fixes a warning when using RT-Preempt.
+> Anyway, I think we can keep the current iterations but exit early if
+> !pud_none() because it means we already populated it (reworked to match
+> other such patterns throughout the kernel with pgd_populate called from
+> the pud function; and untested):
 > 
-> That's not a proper explanation for the patch and by all means it
-> cannot fix anything because free_irq() is just a different wrapper
-> around __free_irq() than remove_irq(). So how on earth fixes that the
-> problem at hand?
+> void kasan_early_pmd_populate(pud_t *pud, unsigned long addr, unsigned long end)
+> {
+> 	pmd_t *pmd;
+> 	unsigned long next;
+> 
+> 	if (pud_none(*pud))
+> 		pud_populate(&init_mm, pud, kasan_zero_pmd);
+> 
+> 	pmd = pmd_offset(pud, addr);
+> 	do {
+> 		next = pmd_addr_end(addr, end);
+> 		kasan_early_pte_populate(pmd, addr, next);
+> 	} while (pmd++, addr = next, addr != end && pmd_none(*pmd));
+> }
+> 
+> void kasan_early_pud_populate(pgd_t *pgd, unsigned long addr, unsigned long end)
+> {
+> 	pud_t *pud;
+> 	unsigned long next;
+> 
+> 	if (pgd_none(*pgd))
+> 		pgd_populate(&init_mm, pgd, kasan_zero_pud);
+> 
+> 	pud = pud_offset(pgd, addr);
+> 	do {
+> 		next = pud_addr_end(addr, end);
+> 		kasan_early_pmd_populate(pud, addr, next);
+> 	} while (pud++, addr = next, addr != end && pud_none(*pud));
+> }
+> 
+> Given that we check pud_none() after the first iterations, it covers the
+> lower levels if needed.
 > 
 
-Hum, that is quite simple, the following patch
-http://git.kernel.org/cgit/linux/kernel/git/rt/linux-rt-devel.git/commit/?id=227cd21851456fb08e87f5a35e0e51280a9fd439
-bitrotted and should be rewritten completely or at least dropped.
+I think this may work, if pud_none(*pud) will be replaced with !pud_val(*pud).
+We can't use pud_none() because with 2-level page tables it's always false, so
+we will never go down to pmd level where swapper_pg_dir populated.
 
-For drivers/clocksource/timer-atmel-st.c, the patch is broken since at
-least 3.18 as NR_IRQS_LEGACY + AT91_ID_SYS is 17 and the actual irq
-allocated by irq_of_parse_and_map is 16.
-Since 4.1, AT91_ID_SYS doesn't exist anymore and this is not compiling
-at all.
+But you gave me another idea how we could use p?d_none() and avoid rewriting table entries:
 
-For drivers/clocksource/timer-atmel-pit.c, struct irqaction
-at91sam926x_pit_irq is never initialized but then it is used in
-setup_irq()/remove_irq(). This basically ends up registering a null
-handler for IRQ 0.
 
-I'm preparing a replacement patch. I'd even say that this is probably
-something we would want to mainline. Meanwhile, can you drop the
-mentioned patch?
+void kasan_early_pmd_populate(unsigned long start, unsigned long end, pte_t *pte)
+{
+	unsigned long addr = start;
+	long next;
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	do {
+		pgd_t *pgd = pgd_offset_k(addr);
+		pud_t *pud = pud_offset(pgd, addr);
+		pmd_t *pmd = pmd_offset(pud, addr);
+
+		if (!pmd_none(*pmd))
+			break;
+
+		pmd_populate_kernel(&init_mm, pmd, pte);
+		next = pgd_addr_end(addr, end);
+		next = pud_addr_end(addr, next)
+		next = pmd_addr_end(addr, next);
+	} while(addr = next, addr != end);
+}
+
+void kasan_early_pud_populate(unsigned long start, unsigned long end, pmd_t *pmd)
+{
+	unsigned long addr = start;
+	long next;
+
+	do {
+		pgd_t *pgd = pgd_offset_k(addr);
+		pud_t *pud = pud_offset(pgd, addr);
+
+		if (!pud_none(*pud))
+			break;
+
+		pud_populate(&init_mm, pud, pmd);
+		next = pud_addr_end(addr, pgd_addr_end(addr, end));
+	} while(addr = next, addr != end);
+}
+
+
+void kasan_early_pgd_populate(...)
+{
+	//something similar to above
+	....
+}
+
+static void __init kasan_map_early_shadow(void)
+{
+	kasan_early_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pud);
+	kasan_early_pud_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pmd);
+	kasan_early_pmd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, kasan_zero_pte);
+	kasan_early_pte_populate();
+}
