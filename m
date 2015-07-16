@@ -1,55 +1,36 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 16 Jul 2015 15:44:45 +0200
-Subject: [PATCH] ARM: kvm: prevent freeing boot_hyp_pgd when CPU_PM is
- selected
-In-Reply-To: <1436433835-26030-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1436433835-26030-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150716134445.GG7845@cbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Jul 2015 14:54:13 +0100
+Subject: [PATCH 4/4] ARM: omap2: restore OMAP4 barrier behaviour
+In-Reply-To: <20150716064854.GG17550@atomide.com>
+References: <20150715174647.GA7557@n2100.arm.linux.org.uk>
+ <E1ZFQmM-0006GN-5Y@rmk-PC.arm.linux.org.uk>
+ <20150716064854.GG17550@atomide.com>
+Message-ID: <20150716135413.GD7576@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 09, 2015 at 10:23:55AM +0100, Lorenzo Pieralisi wrote:
-> The boot_hyp_pgd is required to install HYP context through
-> cpu_init_hyp_mode, on cold-boot for primary and secondary cpus, but
-> also on the warm-boot path for secondaries (ie when a CPU is hotplugged
-> in). On platforms with power management capabilities (eg suspend to RAM
-> or idle-states that allow the core to enter deep idle where core is
-> shutdown on power down entry), the boot_hyp_pgd is required to restore
-> HYP context too upon CPU_PM notification, so the boot_hyp_pgd must not be
-> freed to guarantee a proper HYP context restore, which in turn ensures
-> proper core resume from low-power.
+On Wed, Jul 15, 2015 at 11:48:54PM -0700, Tony Lindgren wrote:
+> Hi,
 > 
-> This patch adds an additional guard to free_boot_hyp_pgd() to remove
-> its call from the kernel if CPU_PM is enabled, so that on platforms
-> where HOTPLUG_CPU is disabled (eg UP), CPU_PM operations (suspend and
-> CPUidle) are still guaranteed to function.
+> * Russell King <rmk+kernel@arm.linux.org.uk> [150715 10:50]:
+> > Restore the OMAP4 barrier behaviour using the new implementation which
+> > allows multiplatform systems to hook into the mb() and wmb() ARM
+> > implementations to perform any necessary additional barrier maintanence.
 > 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm/kvm/arm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+> I'm getthing this with omap2plus_defconfig with the last patch
+> applied:
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bc738d2..5e050c2 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -1068,7 +1068,7 @@ static int init_hyp_mode(void)
->  	if (err)
->  		goto out_free_mappings;
->  
-> -#ifndef CONFIG_HOTPLUG_CPU
-> +#if !defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_CPU_PM)
->  	free_boot_hyp_pgd();
->  #endif
->  
-> -- 
-> 2.2.1
-> 
+> arch/arm/mach-omap2/omap4-common.c: In function ?omap4_sram_init?:
+> arch/arm/mach-omap2/omap4-common.c:138:14: error: implicit declaration of function ?of_get_named_gen_pool? [-Werror=implicit-function-declaration]
+>   sram_pool = of_get_named_gen_pool(np, "sram", 0);
+>               ^
+> arch/arm/mach-omap2/omap4-common.c:138:12: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+>   sram_pool = of_get_named_gen_pool(np, "sram", 0);
+>             ^
 
-Without knowing a lot about power management in Linux and exactly what
-these defines mean, I'm fine with this:
+I'd forgotten to merge in the merge window fixes for this... which have now
+been lost.  This needs to become of_gen_pool_get() in 4.2-rc1 and later.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
