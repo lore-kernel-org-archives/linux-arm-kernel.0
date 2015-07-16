@@ -1,49 +1,62 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 16 Jul 2015 09:55:14 -0700
-Subject: arm: dts: update for 4.2-rcx
-In-Reply-To: <55A7E0D0.9070104@ti.com>
-References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
- <55A7E0D0.9070104@ti.com>
-Message-ID: <55A7E1F2.7000100@oracle.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 16 Jul 2015 10:00:36 -0700
+Subject: [PATCH 3/5] arm64,
+ pci: Allow RC drivers to supply pcibios_add_device() implementation.
+In-Reply-To: <20150716090426.GA17097@red-moon>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150716090426.GA17097@red-moon>
+Message-ID: <55A7E334.3030101@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/16/2015 9:50 AM, Murali Karicheri wrote:
-> On 07/16/2015 12:40 PM, santosh shilimkar wrote:
->> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
->>> Santosh,
->>>
->>> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
->>> This one should be applied to v4.2-rc kernel with priority.
->>> Please review and do the needful.
->>>
->> Yes I have it for next merge window. It won't be qualified as a
->> fix rather more of enhancement. Do you have also patches for
->> board DTS files which enables PCIE. I can queue them together
->> for next merge window.
-> No this is a fix for v4.2-rc. PCIe driver is not complete without having
-> a SerDes driver. Currently the version we send is not accepted since the
-> config blobs are used. On K2E EVM, this causes problem since the EVM has
-> Marvell SATA controller present and with default values in the SerDes
-> register, it seems to pass the PCIe link check, but causes issues since
-> the configuration is not correct. The manifestation is that when EVM is
-> booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM
-> since to work, SerDes driver has to be present as well. So by default,
-> the PCIe DT binding should be disabled in SoC specific DTS. It can be
-> enabled in the board specific DTS when the SerDes device driver is also
-> present. We plan to upstream a common SerDes driver soon. But at this
-> point this has to be disabled by default.
+On 07/16/2015 02:04 AM, Lorenzo Pieralisi wrote:
+> Hi David,
 >
-Please add this information and respin the patch. Thanks for explaining
-it.
-
-> I can provide more details if needed in the patch commit description,
-> but I though it is not correct to keep the PCIe DT bindings to be
-> enabled in the SoC specific DTS to begin with. So this is a fix for
-> v4.2-rc.
+> On Wed, Jul 15, 2015 at 05:54:43PM +0100, David Daney wrote:
+>> From: David Daney <david.daney@cavium.com>
+>>
+[...]
+>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>> index 4095379..3356023 100644
+>> --- a/arch/arm64/kernel/pci.c
+>> +++ b/arch/arm64/kernel/pci.c
+>> @@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>>   	return res->start;
+>>   }
+>>
+>> +static int (*pcibios_add_device_impl)(struct pci_dev *);
+>> +
+>> +void set_pcibios_add_device(int (*arg)(struct pci_dev *))
+>> +{
+>> +	pcibios_add_device_impl = arg;
+>> +}
+>> +
+>>   /*
+>>    * Try to assign the IRQ number from DT when adding a new device
+>>    */
+>>   int pcibios_add_device(struct pci_dev *dev)
+>>   {
+>> +	if (pcibios_add_device_impl)
+>> +		return pcibios_add_device_impl(dev);
 >
-Please do. It wasn't clear from the patch description. With above added
-description its a legitimate fix which I can queue it up for rc's.
+> I am totally against this (and to be honest by reading the other
+> patches I failed to understand why you even need it), see above.
+>
 
-Regards,
-Santosh
+It is because ...
+
+
+> Thanks,
+> Lorenzo
+>
+>> +
+>>   	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+
+
+  ... this is total crap.  But I didn't want to break existing systems.
+
+The PCI RC drivers need a way to configure the legacy virtual-wire 
+interrupts, because the existing code doesn't do it.
+
+David Daney
