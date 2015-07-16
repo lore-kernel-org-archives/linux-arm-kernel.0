@@ -1,405 +1,78 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Thu, 16 Jul 2015 10:30:48 +0200
-Subject: [PATCH 1/2] ARM: dts: Add support for phyCORE-AM335x SoM
-Message-ID: <1437035449-26956-1-git-send-email-t.remmet@phytec.de>
+From: majun258@huawei.com (majun (F))
+Date: Thu, 16 Jul 2015 16:35:33 +0800
+Subject: [PATCH v3 1/3] IRQ/Gic-V3: Add mbigen driver to support mbigen
+ interrupt controller
+In-Reply-To: <559D422D.1000307@arm.com>
+References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
+ <1436166548-34920-2-git-send-email-majun258@huawei.com>
+ <559D422D.1000307@arm.com>
+Message-ID: <55A76CD5.1050301@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phyCORE-AM335x is a SoM (System on Module) containing
-a AM335x SOC. The module can be connected to different
-carrier boards.
 
-Some hardware parts are configurable on the phyCORE-AM335x.
-So they are disabled on default in this som dtsi file.
-They will be enabled in the board dts files, when populated.
 
-* RAM up to 1GiB
-* PMIC
-* NAND flash up to 1GiB
-* Eth PHY on SOM: 1x RMII
-* SPI NOR flash 8MiB (optional)
-* i2c RTC (optional)
-* i2c EEPROM 4kiB (optional)
+? 2015/7/8 23:30, Marc Zyngier ??:
+> Hi,
+> 
+> Aside from all the comments Thomas had, the following aspect is worrying
+> me a bit:
+> 
+> On 06/07/15 08:09, Ma Jun wrote:
+>> This patch contains the mbigen interrupt controller driver.
+> 
+> [...]
+> 
+>> +static int mbigen_set_type(struct irq_data *d, unsigned int type)
+>> +{
+>> +       struct mbigen_chip *chip = d->domain->host_data;
+>> +       u32 ofst, mask;
+>> +       u32 val, nid, hwirq;
+>> +       void __iomem *addr;
+>> +
+>> +       if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
+>> +               return -EINVAL;
+> 
+> You seem to be supporting both edge and level triggered interrupts.
+> 
+> Given that the ITS is edge triggered only, I must assume you have some
+> code to regenerate an edge if the wired interrupt is level triggered,
+> and that the line level is still high when you perform the EOI...
+> 
+For each interrupt, there is state machine in mbigen chip.
+inactive-->pending--> active(pending & active)
 
-Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
----
- arch/arm/boot/dts/am335x-phycore-som.dtsi | 368 ++++++++++++++++++++++++++++++
- 1 file changed, 368 insertions(+)
- create mode 100644 arch/arm/boot/dts/am335x-phycore-som.dtsi
+The level triggered interrupt process flow list as below:
+device---->mbigen---->ITS---->GIC--->CPU
 
-diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-new file mode 100644
-index 0000000..4d28fc3
---- /dev/null
-+++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-@@ -0,0 +1,368 @@
-+/*
-+ * Copyright (C) 2015 Phytec Messtechnik GmbH
-+ * Author: Teresa Remmet <t.remmet@phytec.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include "am33xx.dtsi"
-+
-+/ {
-+	model = "Phytec AM335x phyCORE";
-+	compatible = "phytec,am335x-phycore-som", "ti,am33xx";
-+
-+	aliases {
-+		rtc0 = &i2c_rtc;
-+		rtc1 = &rtc;
-+	};
-+
-+	cpus {
-+		cpu at 0 {
-+			cpu0-supply = <&vdd1_reg>;
-+		};
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x80000000 0x10000000>; /* 256 MB */
-+	};
-+
-+	vbat: fixedregulator at 0 {
-+		compatible = "regulator-fixed";
-+	};
-+};
-+
-+/* Crypto Module */
-+&aes {
-+	status = "okay";
-+};
-+
-+&sham {
-+	status = "okay";
-+};
-+
-+/* Ethernet */
-+&am33xx_pinmux {
-+	ethernet0_pins: pinmux_ethernet0 {
-+		pinctrl-single,pins = <
-+			0x10c (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* mii1_crs.rmii1_crs_dv */
-+			0x110 (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* mii1_rxerr.rmii1_rxerr */
-+			0x114 (PIN_OUTPUT | MUX_MODE1)		/* mii1_txen.rmii1_txen */
-+			0x124 (PIN_OUTPUT | MUX_MODE1)		/* mii1_txd1.rmii1_txd1 */
-+			0x128 (PIN_OUTPUT | MUX_MODE1)		/* mii1_txd0.rmii1_txd0 */
-+			0x13c (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* mii1_rxd1.rmii1_rxd1 */
-+			0x140 (PIN_INPUT_PULLDOWN | MUX_MODE1)	/* mii1_rxd0.rmii1_rxd0 */
-+			0x144 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* rmii1_refclk.rmii1_refclk */
-+		>;
-+	};
-+
-+	mdio_pins: pinmux_mdio {
-+		pinctrl-single,pins = <
-+			/* MDIO */
-+			0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+			0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-+		>;
-+	};
-+};
-+
-+&cpsw_emac0 {
-+	phy_id = <&davinci_mdio>, <0>;
-+	phy-mode = "rmii";
-+	dual_emac_res_vlan = <1>;
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mdio_pins>;
-+	status = "okay";
-+};
-+
-+&mac {
-+	slaves = <1>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ethernet0_pins>;
-+	status = "okay";
-+};
-+
-+&phy_sel {
-+	rmii-clock-ext;
-+};
-+
-+/* I2C Busses */
-+&am33xx_pinmux {
-+	i2c0_pins: pinmux_i2c0 {
-+		pinctrl-single,pins = <
-+			0x188 (PIN_INPUT | MUX_MODE0)	/* i2c0_sda.i2c0_sda */
-+			0x18c (PIN_INPUT | MUX_MODE0)	/* i2c0_scl.i2c0_scl */
-+		>;
-+	};
-+};
-+
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins>;
-+	clock-frequency = <400000>;
-+	status = "okay";
-+
-+	tps: pmic at 2d {
-+		reg = <0x2d>;
-+	};
-+
-+	i2c_eeprom: eeprom at 52 {
-+		compatible = "atmel,24c32";
-+		pagesize = <32>;
-+		reg = <0x52>;
-+		status = "disabled";
-+	};
-+
-+	i2c_rtc: rtc at 68 {
-+		compatible = "rv4162";
-+		reg = <0x68>;
-+		status = "disabled";
-+	};
-+};
-+
-+/* NAND memory */
-+&am33xx_pinmux {
-+		nandflash_pins: pinmux_nandflash {
-+			pinctrl-single,pins = <
-+			0x0 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad0.gpmc_ad0 */
-+			0x4 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad1.gpmc_ad1 */
-+			0x8 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad2.gpmc_ad2 */
-+			0xc (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad3.gpmc_ad3 */
-+			0x10 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad4.gpmc_ad4 */
-+			0x14 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad5.gpmc_ad5 */
-+			0x18 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad6.gpmc_ad6 */
-+			0x1c (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_ad7.gpmc_ad7 */
-+			0x70 (PIN_INPUT_PULLUP | MUX_MODE0)	/* gpmc_wait0.gpmc_wait0 */
-+			0x7c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_csn0.gpmc_csn0 */
-+			0x90 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_advn_ale.gpmc_advn_ale */
-+			0x94 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_oen_ren.gpmc_oen_ren */
-+			0x98 (PIN_OUTPUT | MUX_MODE0)		/* gpmc_wen.gpmc_wen */
-+			0x9c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_be0n_cle.gpmc_be0n_cle */
-+		>;
-+	};
-+};
-+
-+&elm {
-+	status = "okay";
-+};
-+
-+&gpmc {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nandflash_pins>;
-+	ranges = <0 0 0x08000000 0x1000000>;   /* CS0: NAND */
-+	nandflash: nand at 0,0 {
-+		reg = <0 0 4>; /* CS0, offset 0, IO size 4 */
-+		nand-bus-width = <8>;
-+		ti,nand-ecc-opt = "bch8";
-+		gpmc,device-nand = "true";
-+		gpmc,device-width = <1>;
-+		gpmc,sync-clk-ps = <0>;
-+		gpmc,cs-on-ns = <0>;
-+		gpmc,cs-rd-off-ns = <30>;
-+		gpmc,cs-wr-off-ns = <30>;
-+		gpmc,adv-on-ns = <0>;
-+		gpmc,adv-rd-off-ns = <30>;
-+		gpmc,adv-wr-off-ns = <30>;
-+		gpmc,we-on-ns = <0>;
-+		gpmc,we-off-ns = <20>;
-+		gpmc,oe-on-ns = <10>;
-+		gpmc,oe-off-ns = <30>;
-+		gpmc,access-ns = <30>;
-+		gpmc,rd-cycle-ns = <30>;
-+		gpmc,wr-cycle-ns = <30>;
-+		gpmc,wait-on-read = "true";
-+		gpmc,wait-on-write = "true";
-+		gpmc,bus-turnaround-ns = <0>;
-+		gpmc,cycle2cycle-delay-ns = <50>;
-+		gpmc,cycle2cycle-diffcsen;
-+		gpmc,clk-activation-ns = <0>;
-+		gpmc,wait-monitoring-ns = <0>;
-+		gpmc,wr-access-ns = <30>;
-+		gpmc,wr-data-mux-bus-ns = <0>;
-+
-+		elm_id = <&elm>;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "xload";
-+			reg = <0x0 0x20000>;
-+		};
-+		partition at 1 {
-+			label = "xload_backup1";
-+			reg = <0x20000 0x20000>;
-+		};
-+		partition at 2 {
-+			label = "xload_backup2";
-+			reg = <0x40000 0x20000>;
-+		};
-+		partition at 3 {
-+			label = "xload_backup3";
-+			reg = <0x60000 0x20000>;
-+		};
-+		partition at 4 {
-+			label = "barebox";
-+			reg = <0x80000 0x80000>;
-+		};
-+		partition at 5 {
-+			label = "bareboxenv";
-+			reg = <0x100000 0x40000>;
-+		};
-+		partition at 6 {
-+			label = "oftree";
-+			reg = <0x140000 0x40000>;
-+		};
-+		partition at 7 {
-+			label = "kernel";
-+			reg = <0x180000 0x800000>;
-+		};
-+		partition at 8 {
-+			label = "root";
-+			reg = <0x980000 0x0>;
-+		};
-+	};
-+};
-+
-+/* Power */
-+#include "tps65910.dtsi"
-+
-+&tps {
-+	vcc1-supply = <&vbat>;
-+	vcc2-supply = <&vbat>;
-+	vcc3-supply = <&vbat>;
-+	vcc4-supply = <&vbat>;
-+	vcc5-supply = <&vbat>;
-+	vcc6-supply = <&vbat>;
-+	vcc7-supply = <&vbat>;
-+	vccio-supply = <&vbat>;
-+
-+	regulators {
-+		vrtc_reg: regulator at 0 {
-+			regulator-always-on;
-+		};
-+
-+		vio_reg: regulator at 1 {
-+			regulator-always-on;
-+		};
-+
-+		vdd1_reg: regulator at 2 {
-+			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
-+			regulator-name = "vdd_mpu";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1312500>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd2_reg: regulator at 3 {
-+			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
-+			regulator-name = "vdd_core";
-+			regulator-min-microvolt = <912500>;
-+			regulator-max-microvolt = <1150000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+
-+		vdd3_reg: regulator at 4 {
-+			regulator-always-on;
-+		};
-+
-+		vdig1_reg: regulator at 5 {
-+			regulator-name = "vdig1_1p8v";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+		};
-+
-+		vdig2_reg: regulator at 6 {
-+			regulator-always-on;
-+		};
-+
-+		vpll_reg: regulator at 7 {
-+			regulator-always-on;
-+		};
-+
-+		vdac_reg: regulator at 8 {
-+			regulator-always-on;
-+		};
-+
-+		vaux1_reg: regulator at 9 {
-+			regulator-always-on;
-+		};
-+
-+		vaux2_reg: regulator at 10 {
-+			regulator-always-on;
-+		};
-+
-+		vaux33_reg: regulator at 11 {
-+			regulator-always-on;
-+		};
-+
-+		vmmc_reg: regulator at 12 {
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+	};
-+};
-+
-+&vbat {
-+	regulator-name = "vbat";
-+	regulator-min-microvolt = <5000000>;
-+	regulator-max-microvolt = <5000000>;
-+	regulator-boot-on;
-+};
-+
-+/* SPI Busses */
-+&am33xx_pinmux {
-+	spi0_pins: pinmux_spi0 {
-+		pinctrl-single,pins = <
-+			0x150 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* spi0_clk.spi0_clk */
-+			0x154 (PIN_INPUT_PULLDOWN | MUX_MODE0)	/* spi0_d0.spi0_d0 */
-+			0x158 (PIN_INPUT_PULLUP | MUX_MODE0)	/* spi0_d1.spi0_d1 */
-+			0x15c (PIN_INPUT_PULLUP | MUX_MODE0)	/* spi0_cs0.spi0_cs0 */
-+		>;
-+	};
-+};
-+
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins>;
-+	status = "okay";
-+
-+	serial_flash: m25p80 at 0 {
-+		compatible = "m25p80";
-+		spi-max-frequency = <48000000>;
-+		reg = <0x0>;
-+		m25p,fast-read;
-+		status = "disabled";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		partition at 0 {
-+			label = "xload";
-+			reg = <0x0 0x20000>;
-+		};
-+		partition at 1 {
-+			label = "barebox";
-+			reg = <0x20000 0x80000>;
-+		};
-+		partition at 2 {
-+			label = "bareboxenv";
-+			reg = <0xa0000 0x20000>;
-+		};
-+		partition at 3 {
-+			label = "oftree";
-+			reg = <0xc0000 0x20000>;
-+		};
-+		partition at 4 {
-+			label = "kernel";
-+			reg = <0xe0000 0x0>;
-+		};
-+	};
-+};
--- 
-1.9.1
+[1]: device triggered interrupt A and line level changes to high
+[2]: Mbigen receive interrupt A and changes the status of A to pending in mbigen(mbigen.state = pending)
+[3]: Mbigen send interrupt A to ITS , the A status in mbigen will be changed to pending
+	& active (mbigen.state = pending & active)
+[4]: ITS receive the interrupt A and send A to gic (A status in gic is pending. gic.state=pending)
+[5]: CPU ack the interrupt A ( gic.state = active)
+[6]: Enter interrupt handler. The interrupt line level is cleared in device irq handler.
+[7]: When detects the low level on interrupt A line, mbigen change the interrupt A status
+	from pending & active to inactive (mbigen.state = inactive).
+[8]: Send EOI . a): write register to clear the status in mbigen .
+	b):clear the status in gic. (gic.state = inactive)
+
+[....]
+>> +static void mbigen_irq_eoi(struct irq_data *d)
+>> +{
+>> +       irq_chip_eoi_parent(d);
+> 
+> ... but this function doesn't have any code dealing with injecting an
+> edge on detecting a level high.
+> 
+
+Yes, before irq_chip_eoi_parent is called, some code should be added to
+clear the interrupt status in mbigen.
+
+> So how does it work? Either you're missing some logic here, or you don't
+> really support level interrupts.
+> 
+> Thanks,
+> 
+> 	M.
+> 
