@@ -1,115 +1,79 @@
-From: a0131933@ti.com (Lokesh Vutla)
-Date: Thu, 16 Jul 2015 17:56:39 +0530
-Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-In-Reply-To: <55A79DA6.4070206@ti.com>
-References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
- <55A4DFEF.6040005@ti.com> <55A52208.5060302@ti.com>
- <alpine.DEB.2.02.1507160014371.32764@utopia.booyaka.com>
- <55A758A3.2070108@ti.com>
- <alpine.DEB.2.02.1507161012090.32764@utopia.booyaka.com>
- <55A79DA6.4070206@ti.com>
-Message-ID: <55A7A2FF.2010307@ti.com>
+From: majun258@huawei.com (majun (F))
+Date: Thu, 16 Jul 2015 20:26:33 +0800
+Subject: [PATCH v3 1/3] IRQ/Gic-V3: Add mbigen driver to support mbigen
+ interrupt controller
+In-Reply-To: <55A77999.9000203@arm.com>
+References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
+ <1436166548-34920-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1507061248090.3916@nanos> <559CA530.2090508@huawei.com>
+ <559D3EB5.4060408@arm.com> <55A76CBE.2030508@huawei.com>
+ <55A770E2.2040300@arm.com> <55A777BD.4080504@huawei.com>
+ <55A77999.9000203@arm.com>
+Message-ID: <55A7A2F9.3000306@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tero,
-On Thursday 16 July 2015 05:33 PM, Tero Kristo wrote:
-> On 07/16/2015 01:13 PM, Paul Walmsley wrote:
->> On Thu, 16 Jul 2015, Tero Kristo wrote:
->>
->>> On 07/16/2015 03:15 AM, Paul Walmsley wrote:
->>>> On Tue, 14 Jul 2015, Tero Kristo wrote:
->>>>
->>>>> On 07/14/2015 01:09 PM, Lokesh Vutla wrote:
->>>>>> Hi,
->>>>>> On Wednesday 10 June 2015 02:56 PM, Lokesh Vutla wrote:
->>>>>>> Some IP blocks like RTC, needs an additional unlocking mechanism for
->>>>>>> writing to its registers. This patch adds optional lock and unlock
->>>>>>> function pointers to the IP block's hwmod data which gets executed
->>>>>>> before and after writing into IP sysconfig register.
->>>>>>> And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod
->>>>>>> data,
->>>>>>> so that sysconfig registers are updated properly.
->>>>>> ping on this series.
->>>>>>
->>>>>> Thanks and regards,
->>>>>> Lokesh
->>>>>
->>>>
->>>> [...]
->>>>
->>>>> It is also racy, as there is no locking in place to avoid concurrent
->>>>> access to
->>>>> the lock/unlock registers across hwmod+driver.
->>>>
->>>> I don't see the race.  Where is it?
->>>
->>> See drivers/rtc/rtc-omap.c, am3352_rtc_unlock and am3352_rtc_lock.
->>>
->>> That code is accessing the exact same registers.
->>
->> I guess my question is, when is it possible that code could race with the
->> hwmod code for the same device?
->
-> Hmm yea I think you are right, this only gets potentially called within
-> pm_runtime_get/put_sync for RTC.
-Yes, sysc is written from hwmod_init code and pm_runtime_get/put_sysnc.
-And we write into rtc registers only after pm_runtime_get_sync and 
-rtc_unlock.
-There cannot be a race condition here.
->
-> The current sequence is highly inefficient though, as we are doing
-> multiple lock/unlock operations to the RTC from multiple sources. See
-> following rtcwake trace on am43xx-gp-evm as an example.
-Initially I had a patch which leaves rtc unlocked at hwmod_init instead 
-of doing
-unlock and lock for each set of register writes in the driver.
-But it was rejected stating that deviates the purpose of locking mechanism.
-So I updated the driver for adapting this locking and unlocking mechanism.
 
-Thanks and regards,
-Lokesh
 
->
->
-> / # rtcwake -s 4 -m mem
-> [    7.425322] am3352_rtc_unlock
-> [    7.428330] am3352_rtc_lock
-> [    7.431139] am3352_rtc_unlock
-> [    7.434116] am3352_rtc_lock
-> wakeup from "mem" at Sat Jan  1 00:00:11 2000
-> [    7.448549] PM: Syncing filesystems ... done.
-> [    7.455425] Freezing user space processes ... (elapsed 0.001 seconds)
-> done.
-> [    7.463738] Freezing remaining freezable tasks ... (elapsed 0.001
-> seconds) do
-> ne.
-> [    7.472532] Suspending console(s) (use no_console_suspend to debug)
-> [    7.481878] am3352_rtc_unlock
-> [    7.481889] am3352_rtc_lock
-> [    7.482307] PM: suspend of devices complete after 2.713 msecs
-> [    7.483479] PM: late suspend of devices complete after 1.153 msecs
-> [    7.484727] omap_hwmod_rtc_unlock
-> [    7.484733] omap_hwmod_rtc_lock
-> [    7.485182] PM: noirq suspend of devices complete after 1.685 msecs
-> [    7.485190] Disabling non-boot CPUs ...
-> [    7.485199] PM: Successfully put all powerdomains to target state
-> [    7.485199] PM: Wakeup source RTC Alarm
-> [    7.499853] PM: noirq resume of devices complete after 14.558 msecs
-> [    7.500047] am3352_rtc_unlock
-> [    7.500052] am3352_rtc_lock
-> [    7.500123] am3352_rtc_unlock
-> [    7.500128] am3352_rtc_lock
-> [    7.501019] PM: early resume of devices complete after 0.809 msecs
-> [    7.501464] am3352_rtc_unlock
-> [    7.501472] am3352_rtc_lock
-> [    7.558046] PM: resume of devices complete after 57.007 msecs
-> [    7.638807] Restarting tasks ... done.
-> [    7.643173] am3352_rtc_unlock
-> [    7.646162] am3352_rtc_lock
->
-> But, I guess this is for some interested party to optimize if needed,
-> and it is mostly an issue with the RTC driver itself.
->
-> -Tero
->
+? 2015/7/16 17:30, Marc Zyngier ??:
+> On 16/07/15 10:22, majun (F) wrote:
+>>
+>>
+>> ? 2015/7/16 16:52, Marc Zyngier ??:
+>>> On 16/07/15 09:35, majun (F) wrote:
+>>
+>>>>> I'm a bit puzzled.
+>>>>
+>>>> For interrupts connect to mbigen , the interrupt trigger type, device id and
+>>>> event id value are encoded in mbigen chip already.
+>>>>
+>>>> There are two types of mbigen node within a mbigen chip.
+>>>> Type1: event id valud can't be programmed.
+>>>> Type2: event id value can be programmed.
+>>>>
+>>>> For example: An device with 5 interrupts connected to Mbigen node
+>>>> type 1.The default event id vlaue encoded in mbigen chip for these 5 interrupt
+>>>> is from 0 to 4.
+>>>>
+>>>> Because the event id value can't be programmed, we need to define all of
+>>>> 5 interrupts in dts file so that these 5 interrupt has
+>>>
+>>> You can define what you want in the device tree, the ITS doesn't care!
+>>> Nothing in the ITS code parses this property, and there is absolutely
+>>> zero chance that the even the ITS has allocated will actually match what
+>>> you expect.
+>>>
+>>> The ITS *relies* on the principle that the evenID can be programmed,
+>>> just like any MSI controller relies on the device to be programmed with
+>>> whatever payload has been provided. If all of a sudden we have to
+>>> support HW that has its own view of the payload, what you have here will
+>>> simply not work.
+>>>
+>> "If all of a sudden we have to
+>>  support HW that has its own view of the payload, what you have here will
+>>  simply not work."
+>>
+>> I am not very unstand this case, would you please explain this more detail?
+> 
+> It is the ITS driver that allocates the eventID, not the device. If your
+> hardware has decided that it will use event 5, while the ITS expect it
+> to use event 3, nothing will work. And there is no way for the ITS to
+> know which event your device is using (it doesn't parse your device's
+> device tree).
+> 
+Yes, I agree with you that eventID should be allocated by ITS driver.
+But I want to explain the case you said above can be avoided.
+
+For example, An device with total 5 interrupts connected to Mbigen node.
+In mbigen chip, the default eventID value for each device starts from 0.
+So, for these 5 interrupts the default eventID value is from 0 to 4.
+
+Because the default eventID is fixed in mbigen chip, to make these 5 interrupt
+work, the only way is define all these 5 interrupts in dts file.
+
+When irq initializing, ITS driver will allocat LPI interrupt number for these
+5 interrupts, for example : from 8192 to 8196. and the eventID value is from 0 to 4.
+Now, the allocated eventID value same as the eventID value encoded in mbigen chip,
+The interrupt can work.
+
+I know this is not a good method,but for current mbigen chip,it's the only solution.
