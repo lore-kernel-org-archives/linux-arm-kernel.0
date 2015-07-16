@@ -1,78 +1,36 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Jul 2015 16:43:04 +0100
-Subject: [PATCH v2 13/20] xen/events: fifo: Make it running on 64KB
- granularity
-In-Reply-To: <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1507161642130.17378@kaball.uk.xensource.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 16 Jul 2015 18:45:22 +0300
+Subject: [PATCH 1/2] ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
+In-Reply-To: <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
+ <1437051319-9904-2-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <55A7D192.7080301@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jul 2015, Julien Grall wrote:
-> Only use the first 4KB of the page to store the events channel info. It
-> means that we will wast 60KB every time we allocate page for:
-                      ^ waste
+Hi Laurent,
 
->      * control block: a page is allocating per CPU
->      * event array: a page is allocating everytime we need to expand it
+Laurent Pinchart wrote:
+> The OMAP3 ISP is now fully supported in DT, remove its instantiation
+> from C code.
 > 
-> I think we can reduce the memory waste for the 2 areas by:
-> 
->     * control block: sharing between multiple vCPUs. Although it will
->     require some bookkeeping in order to not free the page when the CPU
->     goes offline and the other CPUs sharing the page still there
-> 
->     * event array: always extend the array event by 64K (i.e 16 4K
->     chunk). That would require more care when we fail to expand the
->     event channel.
-
-But this is not implemented in this series, right?
-
-
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > ---
->  drivers/xen/events/events_base.c | 2 +-
->  drivers/xen/events/events_fifo.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-> index 96093ae..858d2f6 100644
-> --- a/drivers/xen/events/events_base.c
-> +++ b/drivers/xen/events/events_base.c
-> @@ -40,11 +40,11 @@
->  #include <asm/idle.h>
->  #include <asm/io_apic.h>
->  #include <asm/xen/pci.h>
-> -#include <xen/page.h>
->  #endif
->  #include <asm/sync_bitops.h>
->  #include <asm/xen/hypercall.h>
->  #include <asm/xen/hypervisor.h>
-> +#include <xen/page.h>
->  
->  #include <xen/xen.h>
->  #include <xen/hvm.h>
+>  arch/arm/mach-omap2/devices.c | 53 -------------------------------------------
+>  arch/arm/mach-omap2/devices.h | 19 ----------------
+>  2 files changed, 72 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/devices.h
 
-Spurious change?
+If you remove the definitions, arch/arm/mach-omap2/board-cm-t35.c will
+no longer compile. Could you remove the camera support there as well?
 
+My understanding is the board might be supported in DT but I'm not sure
+about camera.
 
-> diff --git a/drivers/xen/events/events_fifo.c b/drivers/xen/events/events_fifo.c
-> index ed673e1..d53c297 100644
-> --- a/drivers/xen/events/events_fifo.c
-> +++ b/drivers/xen/events/events_fifo.c
-> @@ -54,7 +54,7 @@
->  
->  #include "events_internal.h"
->  
-> -#define EVENT_WORDS_PER_PAGE (PAGE_SIZE / sizeof(event_word_t))
-> +#define EVENT_WORDS_PER_PAGE (XEN_PAGE_SIZE / sizeof(event_word_t))
->  #define MAX_EVENT_ARRAY_PAGES (EVTCHN_FIFO_NR_CHANNELS / EVENT_WORDS_PER_PAGE)
->  
->  struct evtchn_fifo_queue {
-> -- 
-> 2.1.4
-> 
+Cc Mike and Igor.
+
+-- 
+Regards,
+
+Sakari Ailus
+sakari.ailus at iki.fi
