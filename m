@@ -1,135 +1,167 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri, 17 Jul 2015 00:01:25 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150716102405.2cc8c406@gandalf.local.home>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
- <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
- <20150714093154.4d73e551@gandalf.local.home> <55A5A75A.1060401@linaro.org>
- <20150714225105.6c1e4f15@gandalf.local.home> <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
- <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <20150716102405.2cc8c406@gandalf.local.home>
-Message-ID: <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 16 Jul 2015 16:01:11 +0100
+Subject: [PATCH v2 03/20] xen/grant: Introduce helpers to split a page
+ into grant
+In-Reply-To: <1436474552-31789-4-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-4-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507161526030.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 16, 2015, at 11:24 PM, Steven Rostedt wrote:
-
-Hi, Steve
-
-> On Thu, 16 Jul 2015 22:29:05 +0900
-> Jungseok Lee <jungseoklee85@gmail.com> wrote:
-
-[ snip ]
-
->> The data looks odd in two points.
->> 1) the number of entry
->> There is a mismatch between start token and real data
+On Thu, 9 Jul 2015, Julien Grall wrote:
+> Currently, a grant is always based on the Xen page granularity (i.e
+> 4KB). When Linux is using a different page granularity, a single page
+> will be split between multiple grants.
 > 
-> Yep, good catch. As soon as I read that, I realized exactly what the
-> issue was ;-)
+> The new helpers will be in charge to split the Linux page into grant and
+                                                                  ^
+                                                                  grants
+
+> call a function given by the caller on each grant.
 > 
->> 
->> 2) 80-byte gap
->> stack_max_size is not aligned with "Depth" field of the first entry of stack_trace.
->> 
->> IMHO, two items are not considered in this series as digging them out.
->> 
->> 1) skipped entries
->> As x variable is introduced in Steve's patch, it is needed to track down
->> how many entries are recorded in both stack_dump_trace and stack_dump_index.
+> In order to help some PV drivers, the callback is allowed to use less
+> data and must update the resulting length. This is useful for netback.
 > 
-> Yep.
+> Also provide and helper to count the number of grants within a given
+> contiguous region.
 > 
->> 
->> 2) max_stack_trace.skip value
->> max_stack_trace.skip is 0 as applying Steve's patch. The above gap could be
->> observed unless the value is not considered in arch code. In the above example,
->> 80-byte gap is save_stack_trace function in arch/arm64/kernel/stacktrace.c.
->> 
->> As applying the following fix, stack_trace and stack_max_size are okay.
->> However, I'm not sure which code, arch or generic ftrace, should handle trace->skip.
->> The latter one is responsible for it under current implementation, not Steve's change.
->> 
->> Please correct me if I am wrong.
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+> ---
+>     Changes in v2:
+>         - Patch added
+> ---
+>  drivers/xen/grant-table.c | 26 ++++++++++++++++++++++++++
+>  include/xen/grant_table.h | 41 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
 > 
-> No, it's a bug in my patch. I'll make an update.
-> 
-> Does this new patch fix it for you?
+> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+> index 62f591f..3679293 100644
+> --- a/drivers/xen/grant-table.c
+> +++ b/drivers/xen/grant-table.c
+> @@ -296,6 +296,32 @@ int gnttab_end_foreign_access_ref(grant_ref_t ref, int readonly)
+>  }
+>  EXPORT_SYMBOL_GPL(gnttab_end_foreign_access_ref);
+>  
+> +void gnttab_foreach_grant(struct page *page, unsigned int offset,
+> +			  unsigned int len, xen_grant_fn_t fn,
+> +			  void *data)
+> +{
+> +	unsigned int goffset;
+> +	unsigned int glen;
+> +	unsigned long pfn;
 
-I've gathered stack tracer data with your update.
+I would s/pfn/xen_pfn/ inside this function for clarity
 
-1) stack_trace
-        Depth    Size   Location    (35 entries)
-        -----    ----   --------
-  0)     4424      16   put_cpu_partial+0x28/0x1d0
-  1)     4408      80   get_partial_node.isra.64+0x13c/0x344
-  2)     4328     256   __slab_alloc.isra.65.constprop.67+0xd8/0x37c
-  3)     4072      32   kmem_cache_alloc+0x258/0x294
-  4)     4040     304   __alloc_skb+0x48/0x180
-  5)     3736      96   alloc_skb_with_frags+0x74/0x234
-  6)     3640     112   sock_alloc_send_pskb+0x1d0/0x294
-  7)     3528     160   sock_alloc_send_skb+0x44/0x54
-  8)     3368      64   __ip_append_data.isra.40+0x78c/0xb48
-  9)     3304     224   ip_append_data.part.42+0x98/0xe8
- 10)     3080     112   ip_append_data+0x68/0x7c
- 11)     2968      96   icmp_push_reply+0x7c/0x144
- 12)     2872      96   icmp_send+0x3c0/0x3c8
- 13)     2776     192   __udp4_lib_rcv+0x5b8/0x684
- 14)     2584      96   udp_rcv+0x2c/0x3c
- 15)     2488      32   ip_local_deliver+0xa0/0x224
- 16)     2456      48   ip_rcv+0x360/0x57c
- 17)     2408      64   __netif_receive_skb_core+0x4d0/0x80c
- 18)     2344     128   __netif_receive_skb+0x24/0x84
- 19)     2216      32   process_backlog+0x9c/0x15c
- 20)     2184      80   net_rx_action+0x1ec/0x32c
- 21)     2104     160   __do_softirq+0x114/0x2f0
- 22)     1944     128   do_softirq+0x60/0x68
- 23)     1816      32   __local_bh_enable_ip+0xb0/0xd4
- 24)     1784      32   ip_finish_output+0x1f4/0xabc
- 25)     1752      96   ip_output+0xf0/0x120
- 26)     1656      64   ip_local_out_sk+0x44/0x54
- 27)     1592      32   ip_send_skb+0x24/0xbc
- 28)     1560      48   udp_send_skb+0x1b4/0x2f4
- 29)     1512      80   udp_sendmsg+0x2a8/0x7a0
- 30)     1432     272   inet_sendmsg+0xa0/0xd0
- 31)     1160      48   sock_sendmsg+0x30/0x78
- 32)     1112      32   ___sys_sendmsg+0x15c/0x26c
- 33)     1080     400   __sys_sendmmsg+0x94/0x180
- 34)      680     320   SyS_sendmmsg+0x38/0x54
- 35)      360     360   el0_svc_naked+0x20/0x28
 
-2) stack_max_size
-4504
+> +	len = min_t(unsigned int, PAGE_SIZE - offset, len);
+> +	goffset = offset & ~XEN_PAGE_MASK;
 
-In case of the number of entries, the following diff might be needed
-as I suggested in the previous reply. ;)
+I don't think we want to support cases where (offset & ~XEN_PAGE_MASK)
+!= 0, we should just return error.
 
-----8<----
 
-@@ -330,7 +333,7 @@ static int t_show(struct seq_file *m, void *v)
- 		seq_printf(m, "        Depth    Size   Location"
- 			   "    (%d entries)\n"
- 			   "        -----    ----   --------\n",
--			   max_stack_trace.nr_entries - 1);
-+			   max_stack_trace.nr_entries);
- 
- 		if (!stack_tracer_enabled && !max_stack_size)
- 			print_disabled(m);
+> +	pfn = xen_page_to_pfn(page) + (offset >> XEN_PAGE_SHIFT);
+> +
+> +	while (len) {
+> +		glen = min_t(unsigned int, XEN_PAGE_SIZE - goffset, len);
 
-----8<----
+Similarly I don't think we want to support glen != XEN_PAGE_SIZE here
 
-However, 80-byte gap still appears.
 
-Since max_stack_trace.skip is 3 in your update, save_stack_trace in arm64
-should be refactored to align with this value. 
+> +		fn(pfn_to_mfn(pfn), goffset, &glen, data);
 
-max_stack_trace.skip should be set to 4 if AKASHI's [RFC 2/3] patch is merged.
-However, arch code is supposed to follow generic framework's rule in this case.
-Isn't it?
+Allowing the callee to change glen makes the interface more complex and
+certainly doesn't match the gnttab_foreach_grant function name anymore.
 
-Best Regards
-Jungseok Lee
+If netback needs it, could it just do the work inside its own function?
+I would rather keep gnttab_foreach_grant simple and move the complexity
+there.
+
+
+> +		goffset += glen;
+> +		if (goffset == XEN_PAGE_SIZE) {
+> +			goffset = 0;
+> +			pfn++;
+> +		}
+
+With the assumptions above you can simplify this
+
+
+> +		len -= glen;
+> +	}
+> +}
+> +
+>  struct deferred_entry {
+>  	struct list_head list;
+>  	grant_ref_t ref;
+> diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+> index 4478f4b..6f77378 100644
+> --- a/include/xen/grant_table.h
+> +++ b/include/xen/grant_table.h
+> @@ -45,8 +45,10 @@
+>  #include <asm/xen/hypervisor.h>
+>  
+>  #include <xen/features.h>
+> +#include <xen/page.h>
+>  #include <linux/mm_types.h>
+>  #include <linux/page-flags.h>
+> +#include <linux/kernel.h>
+>  
+>  #define GNTTAB_RESERVED_XENSTORE 1
+>  
+> @@ -224,4 +226,43 @@ static inline struct xen_page_foreign *xen_page_foreign(struct page *page)
+>  #endif
+>  }
+>  
+> +/* Split Linux page in chunk of the size of the grant and call fn
+> + *
+> + * Parameters of fn:
+> + *	mfn: machine frame number based on grant granularity
+> + *	offset: offset in the grant
+> + *	len: length of the data in the grant. If fn decides to use less data,
+> + *	it must update len.
+> + *	data: internal information
+> + */
+> +typedef void (*xen_grant_fn_t)(unsigned long mfn, unsigned int offset,
+> +			       unsigned int *len, void *data);
+> +
+> +void gnttab_foreach_grant(struct page *page, unsigned int offset,
+> +			  unsigned int len, xen_grant_fn_t fn,
+> +			  void *data);
+> +
+> +/* Helper to get to call fn only on the first "grant chunk" */
+> +static inline void gnttab_one_grant(struct page *page, unsigned int offset,
+> +				    unsigned len, xen_grant_fn_t fn,
+> +				    void *data)
+> +{
+> +	/* The first request is limited to the size of one grant */
+> +	len = min_t(unsigned int, XEN_PAGE_SIZE - (offset & ~XEN_PAGE_MASK),
+> +		    len);
+
+I would just BUG_ON(offset & ~XEN_PAGE_MASK) and simply len = XEN_PAGE_SIZE;
+
+
+> +	gnttab_foreach_grant(page, offset, len, fn, data);
+> +}
+> +
+> +/* Get the number of grant in a specified region
+> + *
+> + * offset: Offset in the first page
+
+I would generalize this function and support offset > PAGE_SIZE. At that
+point you could rename offset to "start".
+
+
+> + * len: total lenght of data (can cross multiple page)
+> + */
+> +static inline unsigned int gnttab_count_grant(unsigned int offset,
+> +					      unsigned int len)
+> +{
+> +	return (XEN_PFN_UP((offset & ~XEN_PAGE_MASK) + len));
+> +}
+> +
+>  #endif /* __ASM_GNTTAB_H__ */
