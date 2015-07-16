@@ -1,79 +1,33 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Fri, 17 Jul 2015 04:03:16 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6ul: add usb host and function support
-Message-ID: <1437076996-1194-1-git-send-email-Frank.Li@freescale.com>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Thu, 16 Jul 2015 16:14:28 -0500
+Subject: [PATCH] ARM: dts: socfpga: enable the data and instruction prefetch
+ for the l2 cache
+Message-ID: <1437081268-19225-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Enable usb host and function driver
+Just in case the firmware did not enable data and instruction prefetch in
+the L2 cache controller, we enable it in the kernel.
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 11 +++++++++++
- arch/arm/boot/dts/imx6ul.dtsi          | 27 +++++++++++++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm/boot/dts/socfpga.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 61b41ee..3d676ef 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -57,6 +57,17 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 80f924d..1e3c833 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -639,6 +639,8 @@
+ 			cache-level = <2>;
+ 			arm,tag-latency = <1 1 1>;
+ 			arm,data-latency = <2 1 1>;
++			prefetch-data = <1>;
++			prefetch-instr = <1>;
+ 		};
  
-+&usbotg1 {
-+	dr_mode = "peripheral";
-+	status = "okay";
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+	disable-over-current;
-+	status = "okay";
-+};
-+
- &usdhc1 {
- 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
- 	pinctrl-0 = <&pinctrl_usdhc1>;
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index f0cfc64..61507ef 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -511,6 +511,33 @@
- 			reg = <0x02100000 0x100000>;
- 			ranges;
- 
-+			usbotg1: usb at 02184000 {
-+				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
-+				reg = <0x02184000 0x200>;
-+				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphy1>;
-+				fsl,usbmisc = <&usbmisc 0>;
-+				fsl,anatop = <&anatop>;
-+				status = "disabled";
-+			};
-+
-+			usbotg2: usb at 02184200 {
-+				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
-+				reg = <0x02184200 0x200>;
-+				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_USBOH3>;
-+				fsl,usbphy = <&usbphy2>;
-+				fsl,usbmisc = <&usbmisc 1>;
-+				status = "disabled";
-+			};
-+
-+			usbmisc: usbmisc at 02184800 {
-+				#index-cells = <1>;
-+				compatible = "fsl,imx6ul-usbmisc", "fsl,imx6q-usbmisc";
-+				reg = <0x02184800 0x200>;
-+			};
-+
- 			usdhc1: usdhc at 02190000 {
- 				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
- 				reg = <0x02190000 0x4000>;
+ 		mmc: dwmmc0 at ff704000 {
 -- 
-1.9.1
+2.4.5
