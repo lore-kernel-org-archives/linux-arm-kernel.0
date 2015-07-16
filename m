@@ -1,58 +1,48 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 16 Jul 2015 17:51:31 -0400
-Subject: [PATCH v1 1/2] ARM: keystone: dts: fix dt bindings for PCIe
-Message-ID: <1437083492-28208-1-git-send-email-m-karicheri2@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 17 Jul 2015 00:09:26 +0200
+Subject: [GIT PULL] ARM: mvebu: cleanup changes for v4.3
+Message-ID: <55A82B96.3080803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently PCIe DT bindings are broken. PCIe driver can't function
-without having a SerDes driver that provide the phy configuration.
-On K2E EVM, this causes problem since the EVM has Marvell SATA
-controller present and with default values in the SerDes register,
-it seems to pass the PCIe link check, but causes issues since
-the configuration is not correct. The manifestation is that when
-EVM is booted with NFS rootfs, the boot hangs. We shouldn't enable
-PCIe on this EVM since to work, SerDes driver has to be present as
-well. So by default, the PCIe DT binding should be disabled in SoC
-specific DTS. It can be enabled in the board specific DTS when the
-SerDes device driver is also present.
+Hi,
 
-So fix the status of PCIe DT bindings in the SoC specific DTS to
-"disabled". To enable PCIe, the status should be set to "ok" in
-the EVM DTS file when SerDes driver support becomes available in
-the upstream tree.
+Here is the first pull request for cleanup for mvebu for v4.3
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- - updated commit description to make it clear that it is fix
-   to be applied to v4.2-rc.
- arch/arm/boot/dts/k2e.dtsi      | 1 +
- arch/arm/boot/dts/keystone.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+Gregory
 
-diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-index 50e555e..ecb9cd6 100644
---- a/arch/arm/boot/dts/k2e.dtsi
-+++ b/arch/arm/boot/dts/k2e.dtsi
-@@ -96,6 +96,7 @@
- 			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
- 				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
- 
-+			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
- 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c06542b..0d6be74 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -296,6 +296,7 @@
- 			ranges = <0x81000000 0 0 0x23250000 0 0x4000
- 				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
- 
-+			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
- 
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-cleanup-4.3-1
+
+for you to fetch changes up to 7a1436d58027f84ae2167b5ec359c15cb1d80837:
+
+  ARM: orion5x: Use vsprintf %pM extension (2015-07-09 14:17:22 +0200)
+
+----------------------------------------------------------------
+mvebu cleanup changes for v4.3 (part #1)
+
+- Use vsprintf %pM extension on orion5x board to format mac address
+- Add missing newline at end of messages on pr_warn when CPU Idle on
+  Armada 38x is disabled
+
+----------------------------------------------------------------
+Joe Perches (1):
+      ARM: orion5x: Use vsprintf %pM extension
+
+Thomas Petazzoni (1):
+      ARM: mvebu: add missing newline at end of messages
+
+ arch/arm/mach-mvebu/pmsu.c           | 4 ++--
+ arch/arm/mach-orion5x/dns323-setup.c | 4 +---
+ arch/arm/mach-orion5x/tsx09-common.c | 4 +---
+ 3 files changed, 4 insertions(+), 8 deletions(-)
 -- 
-1.9.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
