@@ -1,66 +1,448 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 16 Jul 2015 12:16:58 -0400
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150716113115.45a17f17@gandalf.local.home>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
- <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
- <20150714093154.4d73e551@gandalf.local.home>
- <55A5A75A.1060401@linaro.org>
- <20150714225105.6c1e4f15@gandalf.local.home>
- <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home>
- <55A6FA82.9000901@linaro.org> <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
-Message-ID: <20150716121658.7982fdf5@gandalf.local.home>
+From: msalter@redhat.com (Mark Salter)
+Date: Thu, 16 Jul 2015 12:17:11 -0400
+Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
+In-Reply-To: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1437063431.3583.2.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jul 2015 11:31:15 -0400
-Steven Rostedt <rostedt@goodmis.org> wrote:
+On Wed, 2015-07-15 at 12:33 +0100, Lorenzo Pieralisi wrote:
 
-> > 
-> > In case of the number of entries, the following diff might be needed
-> > as I suggested in the previous reply. ;)
-> > 
-> > ----8<----
-> > 
-> > @@ -330,7 +333,7 @@ static int t_show(struct seq_file *m, void *v)
-> >  		seq_printf(m, "        Depth    Size   Location"
-> >  			   "    (%d entries)\n"
-> >  			   "        -----    ----   --------\n",
-> > -			   max_stack_trace.nr_entries - 1);
-> > +			   max_stack_trace.nr_entries);
+> The SBBR and ACPI specifications allow ACPI based systems that do not
+> implement PSCI (eg systems with no EL3) to boot through the ACPI parking
+> protocol specification[1].
 > 
-> This would break x86.
+> This patch implements the ACPI parking protocol CPU operations, and adds
+> code that eases parsing the parking protocol data structures to the
+> ARM64 SMP initializion carried out at the same time as cpus enumeration.
+> 
+> To wake-up the CPUs from the parked state, this patch implements a
+> wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
+> ARM one, so that a specific IPI is sent for wake-up purpose in order
+> to distinguish it from other IPI sources.
+> 
+> Given the current ACPI MADT parsing API, the patch implements a glue
+> layer that helps passing MADT GICC data structure from SMP initialization
 
-Nope, you were correct. But it was also missing another change:
+Somewhat off topic, but this reminds once again, that it might be
+better to generalize the ACPI_MADT_TYPE_GENERIC_INTERRUPT so that it
+could be done in one pass. Currently, the SMP code and the GIC code
+need boot-time info from ACPI_MADT_TYPE_GENERIC_INTERRUPT tables. This
+patch adds parking protocol, and this patch:
 
--- Steve
+ https://lkml.org/lkml/2015/5/1/203
 
-Index: linux-trace.git/kernel/trace/trace_stack.c
-===================================================================
---- linux-trace.git.orig/kernel/trace/trace_stack.c	2015-07-16 11:45:17.816249113 -0400
-+++ linux-trace.git/kernel/trace/trace_stack.c	2015-07-16 12:01:51.051403333 -0400
-@@ -284,7 +260,7 @@ __next(struct seq_file *m, loff_t *pos)
- {
- 	long n = *pos - 1;
- 
--	if (n >= max_stack_trace.nr_entries || stack_dump_trace[n] == ULONG_MAX)
-+	if (n > max_stack_trace.nr_entries || stack_dump_trace[n] == ULONG_MAX)
- 		return NULL;
- 
- 	m->private = (void *)n;
-@@ -354,7 +330,7 @@ static int t_show(struct seq_file *m, vo
- 		seq_printf(m, "        Depth    Size   Location"
- 			   "    (%d entries)\n"
- 			   "        -----    ----   --------\n",
--			   max_stack_trace.nr_entries - 1);
-+			   max_stack_trace.nr_entries);
- 
- 		if (!stack_tracer_enabled && !max_stack_size)
- 			print_disabled(m);
+need to get the PMU irq from the same table. I've been thinking of
+something like a single loop through the table in setup.c with
+callouts to registered users of the various bits of data. Those
+users could register a handler function with something like an
+ACPI_MADT_GIC_DECLARE() macro which would add a handler to a
+special linker section.
+
+I could work up a separate patch if others think it a worthwhile
+thing to do.
+
+> code to the parking protocol implementation somewhat overriding the CPU
+> operations interfaces. This to avoid creating a completely trasparent
+                                                             ^^^ transparent
+> DT/ACPI CPU operations layer that would require creating opaque
+> structure handling for CPUs data (DT represents CPU through DT nodes, ACPI
+> through static MADT table entries), which seems overkill given that ACPI
+> on ARM64 mandates only two booting protocols (PSCI and parking protocol),
+> so there is no need for further protocol additions.
+> 
+> Based on the original work by Mark Salter <msalter@redhat.com>
+> 
+> [1] https://acpica.org/sites/acpica/files/MP%20Startup%20for%20ARM%20platforms.docx
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Mark Salter <msalter@redhat.com>
+> Cc: Al Stone <ahs3@redhat.com>
+> ---
+>  arch/arm64/Kconfig                        |   4 +
+>  arch/arm64/include/asm/acpi.h             |  19 +++-
+>  arch/arm64/include/asm/hardirq.h          |   2 +-
+>  arch/arm64/include/asm/smp.h              |   9 ++
+>  arch/arm64/kernel/Makefile                |   1 +
+>  arch/arm64/kernel/acpi_parking_protocol.c | 153 ++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/cpu_ops.c               |  27 +++++-
+>  arch/arm64/kernel/smp.c                   |  13 +++
+>  8 files changed, 222 insertions(+), 6 deletions(-)
+>  create mode 100644 arch/arm64/kernel/acpi_parking_protocol.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 318175f..b01891e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -517,6 +517,10 @@ config HOTPLUG_CPU
+>  	  Say Y here to experiment with turning CPUs off and on.  CPUs
+>  	  can be controlled through /sys/devices/system/cpu.
+>  
+> +config ARM64_ACPI_PARKING_PROTOCOL
+> +	def_bool y
+> +	depends on ACPI && SMP
+> +
+>  source kernel/Kconfig.preempt
+>  
+>  config UP_LATE_INIT
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 406485e..7127db8 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -88,8 +88,25 @@ void __init acpi_init_cpus(void);
+>  static inline void acpi_init_cpus(void) { }
+>  #endif /* CONFIG_ACPI */
+>  
+> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+> +bool acpi_parking_protocol_valid(int cpu);
+> +void __init
+> +acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor);
+> +#else
+> +static inline bool acpi_parking_protocol_valid(int cpu) { return false; }
+> +static inline void
+> +acpi_set_mailbox_entry(int cpu, struct acpi_madt_generic_interrupt *processor)
+> +{}
+> +#endif
+> +
+>  static inline const char *acpi_get_enable_method(int cpu)
+>  {
+> -	return acpi_psci_present() ? "psci" : NULL;
+> +	if (acpi_psci_present())
+> +		return "psci";
+> +
+> +	if (acpi_parking_protocol_valid(cpu))
+> +		return "parking-protocol";
+> +
+> +	return NULL;
+>  }
+>  #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+> index 6aae421..e8a3268 100644
+> --- a/arch/arm64/include/asm/hardirq.h
+> +++ b/arch/arm64/include/asm/hardirq.h
+> @@ -20,7 +20,7 @@
+>  #include <linux/threads.h>
+>  #include <asm/irq.h>
+>  
+> -#define NR_IPI	5
+> +#define NR_IPI	6
+>  
+>  typedef struct {
+>  	unsigned int __softirq_pending;
+> diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+> index db02be8..b73ca99 100644
+> --- a/arch/arm64/include/asm/smp.h
+> +++ b/arch/arm64/include/asm/smp.h
+> @@ -68,6 +68,15 @@ extern void secondary_entry(void);
+>  extern void arch_send_call_function_single_ipi(int cpu);
+>  extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
+>  
+> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+> +extern void arch_send_wakeup_ipi_mask(const struct cpumask *mask);
+> +#else
+> +static inline void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+> +{
+> +	BUILD_BUG();
+> +}
+> +#endif
+> +
+>  extern int __cpu_disable(void);
+>  
+>  extern void __cpu_die(unsigned int cpu);
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 426d076..a766566 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+>  arm64-obj-$(CONFIG_PCI)			+= pci.o
+>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+>  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+> +arm64-obj-$(CONFIG_ARM64_ACPI_PARKING_PROTOCOL)	+= acpi_parking_protocol.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/
+>  obj-m					+= $(arm64-obj-m)
+> diff --git a/arch/arm64/kernel/acpi_parking_protocol.c b/arch/arm64/kernel/acpi_parking_protocol.c
+> new file mode 100644
+> index 0000000..531c3ad
+> --- /dev/null
+> +++ b/arch/arm64/kernel/acpi_parking_protocol.c
+> @@ -0,0 +1,153 @@
+> +/*
+> + * ARM64 ACPI Parking Protocol implementation
+> + *
+> + * Authors: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> + *	    Mark Salter <msalter@redhat.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#include <linux/acpi.h>
+> +#include <linux/types.h>
+> +
+> +#include <asm/cpu_ops.h>
+> +
+> +struct cpu_mailbox_entry {
+> +	phys_addr_t mailbox_addr;
+> +	u8 version;
+> +	u8 gic_cpu_id;
+> +};
+> +
+> +static struct cpu_mailbox_entry cpu_mailbox_entries[NR_CPUS];
+> +
+> +void __init acpi_set_mailbox_entry(int cpu,
+> +				   struct acpi_madt_generic_interrupt *p)
+> +{
+> +	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +
+> +	cpu_entry->mailbox_addr = p->parked_address;
+> +	cpu_entry->version = p->parking_version;
+> +	cpu_entry->gic_cpu_id = p->cpu_interface_number;
+> +}
+> +
+> +bool __init acpi_parking_protocol_valid(int cpu)
+> +{
+> +	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +
+> +	return cpu_entry->mailbox_addr && cpu_entry->version;
+> +}
+> +
+> +static int acpi_parking_protocol_cpu_init(unsigned int cpu)
+> +{
+> +	pr_debug("%s: ACPI parked addr=%llx\n", __func__,
+> +		  cpu_mailbox_entries[cpu].mailbox_addr);
+> +
+> +	return 0;
+> +}
+> +
+> +static int acpi_parking_protocol_cpu_prepare(unsigned int cpu)
+> +{
+> +	return 0;
+> +}
+> +
+> +struct parking_protocol_mailbox {
+> +	__le32 cpu_id;
+> +	__le32 reserved;
+> +	__le64 entry_point;
+> +};
+> +
+> +static int acpi_parking_protocol_cpu_boot(unsigned int cpu)
+> +{
+> +	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +	struct parking_protocol_mailbox __iomem *mailbox;
+> +	__le32 cpu_id;
+> +
+> +	/*
+> +	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+> +	 * this deviates from the parking protocol specifications since
+> +	 * the mailboxes are required to be mapped nGnRnE; the attribute
+> +	 * discrepancy is harmless insofar as the protocol specification
+> +	 * is concerned).
+> +	 * If the mailbox is mistakenly allocated in the linear mapping
+> +	 * by FW ioremap will fail since the mapping will be prevented
+> +	 * by the kernel (it clashes with the linear mapping attributes
+> +	 * specifications).
+> +	 */
+> +	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+> +	if (!mailbox)
+> +		return -EIO;
+> +
+> +	cpu_id = readl_relaxed(&mailbox->cpu_id);
+> +	/*
+> +	 * Check if firmware has set-up the mailbox entry properly
+> +	 * before kickstarting the respective cpu.
+> +	 */
+> +	if (cpu_id != ~0U) {
+> +		iounmap(mailbox);
+> +		return -ENXIO;
+> +	}
+> +
+> +	/*
+> +	 * We write the entry point and cpu id as LE regardless of the
+> +	 * native endianness of the kernel. Therefore, any boot-loaders
+> +	 * that read this address need to convert this address to the
+> +	 * Boot-Loader's endianness before jumping.
+> +	 */
+> +	writeq_relaxed(__pa(secondary_entry), &mailbox->entry_point);
+> +	writel_relaxed(cpu_entry->gic_cpu_id, &mailbox->cpu_id);
+> +
+> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
+> +
+> +	iounmap(mailbox);
+> +
+> +	return 0;
+> +}
+> +
+> +static void acpi_parking_protocol_cpu_postboot(void)
+> +{
+> +	int cpu = smp_processor_id();
+> +	struct cpu_mailbox_entry *cpu_entry = &cpu_mailbox_entries[cpu];
+> +	struct parking_protocol_mailbox __iomem *mailbox;
+> +	__le64 entry_point;
+> +
+> +	/*
+> +	 * Map mailbox memory with attribute device nGnRE (ie ioremap -
+> +	 * this deviates from the parking protocol specifications since
+> +	 * the mailboxes are required to be mapped nGnRnE; the attribute
+
+Where is the nGnRnE requirement? I couldn't find it in the protocol doc.
+Just curious.
+
+> +	 * discrepancy is harmless insofar as the protocol specification
+> +	 * is concerned).
+> +	 * If the mailbox is mistakenly allocated in the linear mapping
+> +	 * by FW ioremap will fail since the mapping will be prevented
+> +	 * by the kernel (it clashes with the linear mapping attributes
+> +	 * specifications).
+
+The kernel will only add cached memory regions to linear mapping and
+presumably, the FW will mark the mailboxes as uncached. Otherwise, it
+is a FW bug. But I suppose we could run into problems with kernels
+using 64K pagesize since firmware assumes 4k.
+
+> +	 */
+> +	mailbox = ioremap(cpu_entry->mailbox_addr, sizeof(*mailbox));
+> +	if (!mailbox)
+> +		return;
+> +
+> +	entry_point = readl_relaxed(&mailbox->entry_point);
+> +	/*
+> +	 * Check if firmware has cleared the entry_point as expected
+> +	 * by the protocol specification.
+> +	 */
+> +	WARN_ON(entry_point);
+> +
+> +	iounmap(mailbox);
+> +}
+> +
+> +const struct cpu_operations acpi_parking_protocol_ops = {
+> +	.name		= "parking-protocol",
+> +	.cpu_init	= acpi_parking_protocol_cpu_init,
+> +	.cpu_prepare	= acpi_parking_protocol_cpu_prepare,
+> +	.cpu_boot	= acpi_parking_protocol_cpu_boot,
+> +	.cpu_postboot	= acpi_parking_protocol_cpu_postboot
+> +};
+> diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+> index 5ea337d..db31991 100644
+> --- a/arch/arm64/kernel/cpu_ops.c
+> +++ b/arch/arm64/kernel/cpu_ops.c
+> @@ -25,11 +25,12 @@
+>  #include <asm/smp_plat.h>
+>  
+>  extern const struct cpu_operations smp_spin_table_ops;
+> +extern const struct cpu_operations acpi_parking_protocol_ops;
+>  extern const struct cpu_operations cpu_psci_ops;
+>  
+>  const struct cpu_operations *cpu_ops[NR_CPUS];
+>  
+> -static const struct cpu_operations *supported_cpu_ops[] __initconst = {
+> +static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
+>  #ifdef CONFIG_SMP
+>  	&smp_spin_table_ops,
+>  #endif
+> @@ -37,9 +38,19 @@ static const struct cpu_operations *supported_cpu_ops[] __initconst = {
+>  	NULL,
+>  };
+>  
+> +static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
+> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+> +	&acpi_parking_protocol_ops,
+> +#endif
+> +	&cpu_psci_ops,
+> +	NULL,
+> +};
+> +
+>  static const struct cpu_operations * __init cpu_get_ops(const char *name)
+>  {
+> -	const struct cpu_operations **ops = supported_cpu_ops;
+> +	const struct cpu_operations **ops;
+> +
+> +	ops = acpi_disabled ? dt_supported_cpu_ops : acpi_supported_cpu_ops;
+>  
+>  	while (*ops) {
+>  		if (!strcmp(name, (*ops)->name))
+> @@ -77,8 +88,16 @@ static const char *__init cpu_read_enable_method(int cpu)
+>  		}
+>  	} else {
+>  		enable_method = acpi_get_enable_method(cpu);
+> -		if (!enable_method)
+> -			pr_err("Unsupported ACPI enable-method\n");
+> +		if (!enable_method) {
+> +			/*
+> +			 * In ACPI systems the boot CPU does not require
+> +			 * checking the enable method since for some
+> +			 * boot protocol (ie parking protocol) it need not
+> +			 * be initialized. Don't warn spuriously.
+> +			 */
+> +			if (cpu != 0)
+> +				pr_err("Unsupported ACPI enable-method\n");
+> +		}
+>  	}
+>  
+>  	return enable_method;
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 50fb469..1d98f2d 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -69,6 +69,7 @@ enum ipi_msg_type {
+>  	IPI_CPU_STOP,
+>  	IPI_TIMER,
+>  	IPI_IRQ_WORK,
+> +	IPI_WAKEUP
+>  };
+>  
+>  /*
+> @@ -428,6 +429,8 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  	/* map the logical cpu id to cpu MPIDR */
+>  	cpu_logical_map(cpu_count) = hwid;
+>  
+> +	acpi_set_mailbox_entry(cpu_count, processor);
+> +
+>  	cpu_count++;
+>  }
+>  
+> @@ -610,6 +613,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+>  	S(IPI_CPU_STOP, "CPU stop interrupts"),
+>  	S(IPI_TIMER, "Timer broadcast interrupts"),
+>  	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+> +	S(IPI_WAKEUP, "CPU wakeup interrupts"),
+>  };
+>  
+>  static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+> @@ -653,6 +657,13 @@ void arch_send_call_function_single_ipi(int cpu)
+>  	smp_cross_call(cpumask_of(cpu), IPI_CALL_FUNC);
+>  }
+>  
+> +#ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+> +void arch_send_wakeup_ipi_mask(const struct cpumask *mask)
+> +{
+> +	smp_cross_call(mask, IPI_WAKEUP);
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_IRQ_WORK
+>  void arch_irq_work_raise(void)
+>  {
+> @@ -729,6 +740,8 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>  		irq_exit();
+>  		break;
+>  #endif
+> +	case IPI_WAKEUP:
+> +		break;
+>  
+>  	default:
+>  		pr_crit("CPU%u: Unknown IPI message 0x%x\n", cpu, ipinr);
