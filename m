@@ -1,33 +1,59 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 Jul 2015 09:57:39 +0100
-Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support in
- Zynq MPSoC GQSPI controller
-In-Reply-To: <7CFCFE83B8145347A1D424EC939F1C3CA7E758@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
- <20150714164005.GE11162@sirena.org.uk>
- <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20150715160146.GS11162@sirena.org.uk>
- <7CFCFE83B8145347A1D424EC939F1C3CA7E758@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20150716085739.GT11162@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jul 2015 11:00:34 +0200
+Subject: [PATCH 0/7] ARM: shmobile: Move gpio ranges from C code to DT
+In-Reply-To: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CACRpkdYFE1xDV75_ecR36OTePPm8Ta_O1G1fSqOHO=s4TQw20A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 07:27:34AM +0000, Ranjit Abhimanyu Waghmode wrote:
+On Tue, Jun 30, 2015 at 9:45 AM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
 
-> For an example take two flashes connected in stacked mode.
-> For user it doesn't matter whether how many flashes are really connected. 
-> There will be situation like, single partition is spread across two flashes (partition staring at the end of one flash and continued to the second flash). But it has to be shown contiguous to user.
-> In this scenario, I am not clear how MTD layer will handle the case.
-> It would be great if you could just put some light on it.
+>         Hi Linus, Alex, Laurent, Simon, Magnus,
+>
+> This patch series moves the setup of the GPIO-PFC pin mapping for
+> Renesas PFC/GPIO combos from C code to DT, and does some cleanups.
+> The move to DT is needed to make the GPIO hogging mechanism work, cfr.
+> the discussion following "[PATCH] [RFC] gpio: Retry deferred GPIO
+> hogging on pin range change" (https://lkml.org/lkml/2015/6/16/455).
+>
+> The series consists of 3 parts:
+>   a. Patches 1-3 add the missing "gpio-ranges" properties to the dtsi
+>      files for all affected SoCs,
+>   b. Patch 4 disables the C code to set up the mapping on DT platforms
+>      (it's still needed on SH or ARM-legacy),
+>   c. Patches 5-7 do a few more cleanups in the sh-pfc gpio code.
+>
+> Dependencies:
+>   - This series applies against next-next-20150630.
+>   - Part a must go in first, to avoid regressions.
+>     In addition, it's a prerequisite for "ARM: shmobile: armadillo800eva
+>     dts: Add pinctrl and gpio-hog for lcdc0", which has been queued up
+>     already in Simon's dt-for-v4.3 branch. Perhaps it can still be
+>     reordered?
+>   - While I didn't notice any bad behavior by having part a only, part b
+>     should go in immediately after part a. Hence I think it's best if
+>     Simon can take this one, too.
+>   - Part c is independent (it doesn't touch the same code), so it can go
+>     in before or after the other parts, or in parallel.
+>
+> Thanks for applying!
+>
+> Geert Uytterhoeven (7):
+>   ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
+>   ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
+>   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
+>   pinctrl: sh-pfc: Stop calling gpiochip_add_pin_range() on DT platforms
+>   pinctrl: sh-pfc: Remove empty gpio_function_free()
+>   pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up
+>   pinctrl: sh-pfc: Confine legacy function GPIOs to SH
 
-That's something for the MTD layer or possibly even a layer above it to
-worry about - this situation is the same as we have with disks where we
-have md which combines other devices, if something similar is needed for
-flash we should use a similar pattern.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/46121986/attachment.sig>
+I'm happy of shmobile people are happy.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+For all.
+
+Yours,
+Linus Walleij
