@@ -1,26 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 Jul 2015 22:34:29 +0100
-Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
-In-Reply-To: <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150716213429.GE1602@sirena.org.uk>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 16 Jul 2015 17:51:32 -0400
+Subject: [PATCH v1 2/2] ARM: keystone: dts: rename pcie nodes to help override
+ status
+In-Reply-To: <1437083492-28208-1-git-send-email-m-karicheri2@ti.com>
+References: <1437083492-28208-1-git-send-email-m-karicheri2@ti.com>
+Message-ID: <1437083492-28208-2-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 11:46:57PM +0530, Vaibhav Hiremath wrote:
-> 88PM860 falls under 88pm800 family of devices, with
-> additional feature enhancements, like,
->   - 88pm860 had additional BUCK regulator (BUCK6 and BUCK1B)
->   - Additional LDO (LDO20)
->   - different voltage and current capability
+Now that PCIe DT binding is disabled in SoC specific DTS,
+we need a way to override it in a board specific DTS. So
+rename the PCIe nodes accordingly.
 
-...and reverted since this doesn't build as the kbuild test robot
-reported.  :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/2a0a1808/attachment.sig>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ - initial version. Added to the original series
+ arch/arm/boot/dts/k2e.dtsi      | 2 +-
+ arch/arm/boot/dts/keystone.dtsi | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index ecb9cd6..1b6494f 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -86,7 +86,7 @@
+ 			gpio,syscon-dev = <&devctrl 0x240>;
+ 		};
+ 
+-		pcie at 21020000 {
++		pcie1: pcie at 21020000 {
+ 			compatible = "ti,keystone-pcie","snps,dw-pcie";
+ 			clocks = <&clkpcie1>;
+ 			clock-names = "pcie";
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 0d6be74..e7a6f6d 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -286,7 +286,7 @@
+ 			ti,syscon-dev = <&devctrl 0x2a0>;
+ 		};
+ 
+-		pcie at 21800000 {
++		pcie0: pcie at 21800000 {
+ 			compatible = "ti,keystone-pcie", "snps,dw-pcie";
+ 			clocks = <&clkpcie>;
+ 			clock-names = "pcie";
+-- 
+1.9.1
