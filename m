@@ -1,31 +1,19 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 14:58:13 +0200
-Subject: [RFC PATCH] pinctrl-single: Use of pinctrl-single for external
- device over I2C
-In-Reply-To: <1435855992-10312-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1435855992-10312-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CACRpkdZwucqETn3OkX1GPO43JpwWL67OB1FExHFD5CzWTA3D5g@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 16 Jul 2015 18:32:37 +0530
+Subject: [PATCH] dmaengine: xgene-dma: Fix the resource map to handle
+ overlapping
+In-Reply-To: <1436263465-7677-1-git-send-email-rsahu@apm.com>
+References: <1436263465-7677-1-git-send-email-rsahu@apm.com>
+Message-ID: <20150716130237.GR5086@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 2, 2015 at 6:53 PM, Vaibhav Hiremath
-<vaibhav.hiremath@linaro.org> wrote:
+On Tue, Jul 07, 2015 at 03:34:25PM +0530, Rameshwar Prasad Sahu wrote:
+> There is an overlap in dma ring cmd csr region due to sharing of ethernet
+> ring cmd csr region. This patch fix the resource overlapping by mapping
+> the entire dma ring cmd csr region.
 
-> In some usecases, the external device (in my case it PMIC over I2C)
-> does support pin in multiple configuration, we may need to control/configure them
-> during boot or runtime.
+Applied thanks
 
-What is missing from this patch is an explanation why pinctrl-single should
-be used for this PMIC.
-
-Repeat: pinctrl-single: when you have exactly one register per pin, and
-the description of the pins is delivered in an opaque ASIC-specific format
-without developers knowing much about how the hardware actually works,
-just "set these magic values".
-
-I strongly prefer that this PMIC has its own pin controller using standard
-bindings with groups and functions, see eg. drivers/pinctrl/nomadik/pinctrl-ab*
-for a PMIC pinctrl driver.
-
-Yours,
-Linus Walleij
+-- 
+~Vinod
