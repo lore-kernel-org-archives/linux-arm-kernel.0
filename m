@@ -1,99 +1,36 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Thu, 16 Jul 2015 23:46:58 +0530
-Subject: [PATCH 5/5] regulator: 88pm800: Add support for configuration of dual
- phase on BUCK1
-In-Reply-To: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1437070618-21330-6-git-send-email-vaibhav.hiremath@linaro.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 16 Jul 2015 11:23:08 -0700
+Subject: [PATCH v4 0/2] arm/arm64: KVM: Optimize arm64 fp/simd,
+ saves 30-50% on exits for non-VHE
+In-Reply-To: <20150716155253.GU7845@cbox>
+References: <1436577547-5646-1-git-send-email-m.smarduch@samsung.com>
+ <20150716155253.GU7845@cbox>
+Message-ID: <55A7F68C.6020903@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-88PM860 device supports dual phase mode on BUCK1 output.
-In normal usecase, BUCK1A and BUCK1B operates independently with 3A
-capacity. And they both can work as a dual phase providing 6A capacity.
+On 07/16/2015 08:52 AM, Christoffer Dall wrote:
+> On Fri, Jul 10, 2015 at 06:19:05PM -0700, Mario Smarduch wrote:
+>> This is a followp to previous iteration but implemented on top of VHE patches. 
+>> Only non-VHE path is addressied by this patch. In second patch 32-bit handler 
+>> is updated to keep exit handling consistent with 64-bit code, and nothing
+>> has changed.
+>>
+> Why not simply preserve this the way it was in v3 and have it merged
+> first - after all we have reviewed it and I thought it was more or less
+> ready to be merged - I suspect the VHE patches may have a way to go
+> still ?
 
-This patch adds support for regulator_ops.set_current_limit() callback fn,
-in turn enabling support for current min and max supply constraint on BUCK1
-(and optionally on BUCK1B). Based on that driver enables dual-phase mode.
+Definitely, that's a better path. After looking at VHE patches,
+I would probably leave V3 the way it is (keeping deactivate_xxxx:
+symmetric). Marc has Reviewed V3 and you commented either way was
+fine with you, so V3 should be ok.
 
-Note that, if max current supply constraint is > 3A on BUCK1(A) then driver
-enables the dual-phase mode, irrespective of BUCK1B constraint.
+Jumping on VHE is little too much at this time, thanks for the
+alternative I kind of got myself into a jam here.
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
----
- drivers/regulator/88pm800.c | 38 ++++++++++++++++++++++++++++++++++++++
- include/linux/mfd/88pm80x.h |  3 +++
- 2 files changed, 41 insertions(+)
+- Mario
 
-diff --git a/drivers/regulator/88pm800.c b/drivers/regulator/88pm800.c
-index e846e4c..1da18fa 100644
---- a/drivers/regulator/88pm800.c
-+++ b/drivers/regulator/88pm800.c
-@@ -185,6 +185,43 @@ static int pm800_get_current_limit(struct regulator_dev *rdev)
- 	return info->max_ua;
- }
- 
-+/*
-+ * 88pm860 device supports dual-phase mode on BUCK1, where BUCK1A and BUCK1B can
-+ * be used together to supply 6A current.  Note that, independently, they can
-+ * source 3A each.
-+ *
-+ * So, this function checks for max_uA for BUCK1 (only), and if it is more than
-+ * 3A, then enable dual-phase mode.
-+ */
-+static int pm800_set_current_limit(struct regulator_dev *rdev,
-+				int min_uA, int max_uA)
-+{
-+	struct pm800_regulators *pm800_data =
-+				dev_get_drvdata(rdev_get_dev(rdev)->parent);
-+	struct pm80x_chip *chip = pm800_data->chip;
-+	int ret;
-+
-+	/* Currently only supported on 88pm860 device */
-+	if (chip->type != CHIP_PM860)
-+		return 0;
-+
-+	if (rdev->desc->id == PM800_ID_BUCK1) {
-+		/* If max_uA is greater that 3A, enable dual-phase on BUCK1 */
-+		if (max_uA > 3000000) {
-+			ret = regmap_update_bits(chip->subchip->regmap_power,
-+					PM860_BUCK1_MISC,
-+					BUCK1_DUAL_PHASE_SEL,
-+					BUCK1_DUAL_PHASE_SEL);
-+			if (ret) {
-+				dev_err(chip->dev, "failed to access registers\n");
-+				return ret;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static struct regulator_ops pm800_volt_range_ops = {
- 	.list_voltage		= regulator_list_voltage_linear_range,
- 	.map_voltage		= regulator_map_voltage_linear_range,
-@@ -194,6 +231,7 @@ static struct regulator_ops pm800_volt_range_ops = {
- 	.disable		= regulator_disable_regmap,
- 	.is_enabled		= regulator_is_enabled_regmap,
- 	.get_current_limit	= pm800_get_current_limit,
-+	.set_current_limit	= pm800_set_current_limit,
- };
- 
- static struct regulator_ops pm800_volt_table_ops = {
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index a92d173..05d9bad 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -295,6 +295,9 @@ enum {
- #define PM860_BUCK4_MISC2		(0x82)
- #define PM860_BUCK4_FULL_DRV		BIT(2)
- 
-+#define PM860_BUCK1_MISC		(0x8E)
-+#define BUCK1_DUAL_PHASE_SEL		BIT(2)
-+
- struct pm80x_rtc_pdata {
- 	int		vrtc;
- 	int		rtc_wakeup;
--- 
-1.9.1
+> 
+> -Christoffer
+> 
