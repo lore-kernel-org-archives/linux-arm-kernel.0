@@ -1,42 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 09:22:48 +0200
-Subject: [PATCH v2 2/7] pinctrl: UniPhier: add UniPhier PH1-LD4 pinctrl
- driver
-In-Reply-To: <1436841607-7556-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYb+f1OnH5Tdy62gw=0g_3+S0Un0NTTGj1Jodv+wE5jKA@mail.gmail.com>
+From: ranjit.waghmode@xilinx.com (Ranjit Abhimanyu Waghmode)
+Date: Thu, 16 Jul 2015 07:27:34 +0000
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support
+ in Zynq MPSoC GQSPI controller
+In-Reply-To: <20150715160146.GS11162@sirena.org.uk>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150714164005.GE11162@sirena.org.uk>
+ <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20150715160146.GS11162@sirena.org.uk>
+Message-ID: <7CFCFE83B8145347A1D424EC939F1C3CA7E758@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 4:40 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+Hi Mark,
 
-> Add pin configuration and pinmux support for UniPhier PH1-LD4 SoC.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> Changes in v2:
->   - sort groups and funcs alphabetically
->   - add missing "emmc_dat8" group
->   - add i2c pin-mux settings
->   - sort members of platform_driver
->   - change to tristate
->   - add THIS_MODULE to pinctrl_desc
->   - use module_platform_driver
+> > > > What is stacked mode?
+> > > > ---------------------
+> > > > ZynqMP GQSPI controller supports stacked mode with following
+> > > functionalities:
+> > > > 1) The Generic Quad-SPI controller also supports two SPI flash memories
+> > > >    in a shared bus arrangement to reduce IO pin count.
+> > > > 2) Separate chip select lines
+> > > > 3) Shared I/O lines
+> > > > 4) This mode is targeted for increasing the flash memory and no
+> performance
+> > > >    improvement when compared with single.
+> 
+> > > This is just a normal SPI controller from a SPI point of view.
+> 
+> > How can we really represent the stacked mode in current configuration?
+> 
+> In the same way as any other controller with two chip selects...  there are quite
+> a few other drivers that provide examples of this, you should look for one that
+> has hardware control similar to yours.
 
-Patch applied.
+Thanks Mark for your suggestion. But I have minor doubts.
 
-> +static const struct of_device_id ph1_ld4_pinctrl_match[] = {
-> +       { .compatible = "socionext,ph1-ld4-pinctrl" },
-> +       { /* sentinel */ }
-> +};
+For an example take two flashes connected in stacked mode.
+For user it doesn't matter whether how many flashes are really connected. 
+There will be situation like, single partition is spread across two flashes (partition staring at the end of one flash and continued to the second flash). But it has to be shown contiguous to user.
+In this scenario, I am not clear how MTD layer will handle the case.
+It would be great if you could just put some light on it.
 
-I didn't see any device tree bindings in this patch series.
-
-That is OK, send them separate, I see only compatible strings
-and standard bindings.
-
-Yours,
-Linus Walleij
+Regards,
+Ranjit
