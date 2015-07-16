@@ -1,24 +1,36 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 16 Jul 2015 22:40:19 +0200
-Subject: [PATCH] i2c: s3c2410: remove unused variable
-In-Reply-To: <1437078976-29145-1-git-send-email-laurent.navet@gmail.com>
-References: <1437078976-29145-1-git-send-email-laurent.navet@gmail.com>
-Message-ID: <20150716204019.GA1533@katana>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 16 Jul 2015 22:44:42 +0200
+Subject: [PATCH] ARM: pxa: fix dm9000 platform data regression
+In-Reply-To: <55A61873.7090209@compulab.co.il> (Igor Grinberg's message of
+ "Wed, 15 Jul 2015 11:23:15 +0300")
+References: <1436657520-16972-1-git-send-email-robert.jarzmik@free.fr>
+ <55A61873.7090209@compulab.co.il>
+Message-ID: <87lhefj0hx.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 10:36:16PM +0200, Laurent Navet wrote:
-> ret is assigned zero and just used to return. remove it.
-> Found by using coccinelle.
-> 
-> Signed-off-by: Laurent Navet <laurent.navet@gmail.com>
+Igor Grinberg <grinberg@compulab.co.il> writes:
 
-Why not make it void?
+> Hi Robert,
+>
+> On 07/12/15 02:32, Robert Jarzmik wrote:
+>> Since dm9000 driver added support for a vcc regulator, platform data
+>> based platforms have their ethernet broken, as the regulator claiming
+>> returns -EPROBE_DEFER and prevents dm9000 loading.
+>> 
+>> This patch fixes this for all pxa boards using dm9000, by using the
+>> specific regulator_has_full_constraints() function.
+>> 
+>> This was discovered and tested on the cm-x300 board.
+>> 
+>> Fixes: 7994fe55a4a2 ("dm9000: Add regulator and reset support to dm9000")
+>> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+>
+> Thanks for the patch!
+> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Thanks. Queued into pxa/fixes.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/97a5b17e/attachment.sig>
+Cheers.
+
+--
+Robert
