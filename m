@@ -1,39 +1,85 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 16 Jul 2015 17:36:17 +0200
-Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset state
- when not in use
-In-Reply-To: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
-References: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
-Message-ID: <55A7CF71.7050507@i2se.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 16 Jul 2015 16:35:56 +0100
+Subject: [PATCH v2 10/20] xen/xenbus: Use Xen page definition
+In-Reply-To: <1436474552-31789-11-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-11-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507161635460.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Whenever the UART device driver gets closed from userland, the driver
-> disables the UART unit and then stops its clock to save power.
->
-> The bit which disabled the UART unit is described as:
->
->   "UART Enable. If this bit is set to 1, the UART is enabled. Data
->   transmission and reception occurs for the UART signals. When the
->   UART is disabled in the middle of transmission or reception, it
->   completes the current character before stopping."
->
-> The important part is the "it completes the current character". Whenever
-> a reception is ongoing when the UART gets disabled (including the clock
-> off) the statemachine freezes and "remembers" this state on the next
-> open() and re-enabling of the unit's clock.
->
-> In this case we end up receiving an additional bogus character
-> immediately.
->
-> The solution in this change is to move the AUART unit into its reset
-> state on close() and only release it from its reset state on the next
-> open().
->
-> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+On Thu, 9 Jul 2015, Julien Grall wrote:
+> All the ring (xenstore, and PV rings) are always based on the page
+> granularity of Xen.
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
+
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+
+>     Changes in v2:
+>         - Also update the ring mapping function
 > ---
-
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Thanks
-Stefan
+>  drivers/xen/xenbus/xenbus_client.c | 6 +++---
+>  drivers/xen/xenbus/xenbus_probe.c  | 4 ++--
+>  2 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
+> index 9ad3272..80272f6 100644
+> --- a/drivers/xen/xenbus/xenbus_client.c
+> +++ b/drivers/xen/xenbus/xenbus_client.c
+> @@ -388,7 +388,7 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
+>  		}
+>  		grefs[i] = err;
+>  
+> -		vaddr = vaddr + PAGE_SIZE;
+> +		vaddr = vaddr + XEN_PAGE_SIZE;
+>  	}
+>  
+>  	return 0;
+> @@ -555,7 +555,7 @@ static int xenbus_map_ring_valloc_pv(struct xenbus_device *dev,
+>  	if (!node)
+>  		return -ENOMEM;
+>  
+> -	area = alloc_vm_area(PAGE_SIZE * nr_grefs, ptes);
+> +	area = alloc_vm_area(XEN_PAGE_SIZE * nr_grefs, ptes);
+>  	if (!area) {
+>  		kfree(node);
+>  		return -ENOMEM;
+> @@ -750,7 +750,7 @@ static int xenbus_unmap_ring_vfree_pv(struct xenbus_device *dev, void *vaddr)
+>  		unsigned long addr;
+>  
+>  		memset(&unmap[i], 0, sizeof(unmap[i]));
+> -		addr = (unsigned long)vaddr + (PAGE_SIZE * i);
+> +		addr = (unsigned long)vaddr + (XEN_PAGE_SIZE * i);
+>  		unmap[i].host_addr = arbitrary_virt_to_machine(
+>  			lookup_address(addr, &level)).maddr;
+>  		unmap[i].dev_bus_addr = 0;
+> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
+> index 4308fb3..c67e5ba 100644
+> --- a/drivers/xen/xenbus/xenbus_probe.c
+> +++ b/drivers/xen/xenbus/xenbus_probe.c
+> @@ -713,7 +713,7 @@ static int __init xenstored_local_init(void)
+>  
+>  	xen_store_mfn = xen_start_info->store_mfn =
+>  		pfn_to_mfn(virt_to_phys((void *)page) >>
+> -			   PAGE_SHIFT);
+> +			   XEN_PAGE_SHIFT);
+>  
+>  	/* Next allocate a local port which xenstored can bind to */
+>  	alloc_unbound.dom        = DOMID_SELF;
+> @@ -804,7 +804,7 @@ static int __init xenbus_init(void)
+>  			goto out_error;
+>  		xen_store_mfn = (unsigned long)v;
+>  		xen_store_interface =
+> -			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
+> +			xen_remap(xen_store_mfn << XEN_PAGE_SHIFT, XEN_PAGE_SIZE);
+>  		break;
+>  	default:
+>  		pr_warn("Xenstore state unknown\n");
+> -- 
+> 2.1.4
+> 
