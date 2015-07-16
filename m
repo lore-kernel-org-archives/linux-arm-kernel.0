@@ -1,281 +1,278 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 16 Jul 2015 20:25:53 +0200
-Subject: [PATCH 02/18] KVM: ARM64: Add initial support for PMU
-In-Reply-To: <1436149068-3784-3-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-3-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20150716182553.GB14024@cbox>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 16 Jul 2015 23:46:57 +0530
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:17:32AM +0800, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Here we plan to support virtual PMU for guest by full software
-> emulation, so define some basic structs and functions preparing for
-> futher steps. Define struct kvm_pmc for performance monitor counter and
-> struct kvm_pmu for performance monitor unit for each vcpu. According to
-> ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-> Initialize PMU for each vcpu when kvm initialize vcpus, while reset PMU
-> when kvm reset vcpus.
-> Since this only supports ARM64 (or PMUv3), add a separate config symbol
-> for it.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/kvm/arm.c                |  4 +++
->  arch/arm64/include/asm/kvm_host.h |  2 ++
->  arch/arm64/include/asm/pmu.h      |  2 ++
->  arch/arm64/kvm/Kconfig            |  7 +++++
->  arch/arm64/kvm/Makefile           |  1 +
->  arch/arm64/kvm/reset.c            |  3 +++
->  include/kvm/arm_pmu.h             | 54 ++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/pmu.c                | 55 +++++++++++++++++++++++++++++++++++++++
->  8 files changed, 128 insertions(+)
->  create mode 100644 include/kvm/arm_pmu.h
->  create mode 100644 virt/kvm/arm/pmu.c
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index bc738d2..4e82625 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -28,6 +28,7 @@
->  #include <linux/sched.h>
->  #include <linux/kvm.h>
->  #include <trace/events/kvm.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
-> @@ -278,6 +279,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
->  	/* Set up the timer */
->  	kvm_timer_vcpu_init(vcpu);
->  
-> +	/* Set up the PMU */
-> +	kvm_pmu_init(vcpu);
-> +
->  	return 0;
->  }
->  
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 2709db2..3c88873 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -42,6 +42,7 @@
->  
->  #include <kvm/arm_vgic.h>
->  #include <kvm/arm_arch_timer.h>
-> +#include <kvm/arm_pmu.h>
->  
->  #define KVM_VCPU_MAX_FEATURES 3
->  
-> @@ -116,6 +117,7 @@ struct kvm_vcpu_arch {
->  	/* VGIC state */
->  	struct vgic_cpu vgic_cpu;
->  	struct arch_timer_cpu timer_cpu;
-> +	struct kvm_pmu pmu;
->  
->  	/*
->  	 * Anything that is not used directly from assembly code goes
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> index b9f394a..95681e6 100644
-> --- a/arch/arm64/include/asm/pmu.h
-> +++ b/arch/arm64/include/asm/pmu.h
-> @@ -19,6 +19,8 @@
->  #ifndef __ASM_PMU_H
->  #define __ASM_PMU_H
->  
-> +#include <linux/perf_event.h>
-> +
->  #define ARMV8_MAX_COUNTERS      32
->  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
->  
-> diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> index bfffe8f..eae3a1b 100644
-> --- a/arch/arm64/kvm/Kconfig
-> +++ b/arch/arm64/kvm/Kconfig
-> @@ -31,6 +31,7 @@ config KVM
->  	select KVM_VFIO
->  	select HAVE_KVM_EVENTFD
->  	select HAVE_KVM_IRQFD
-> +	select KVM_ARM_PMU
->  	---help---
->  	  Support hosting virtualized guest machines.
->  
-> @@ -52,4 +53,10 @@ config KVM_ARM_MAX_VCPUS
->  	  large, so only choose a reasonable number that you expect to
->  	  actually use.
->  
-> +config KVM_ARM_PMU
-> +	bool
-> +	depends on KVM_ARM_HOST
-> +	---help---
-> +	  Adds support for the Performance Monitoring in virtual machines.
+88PM860 falls under 88pm800 family of devices, with
+additional feature enhancements, like,
+  - 88pm860 had additional BUCK regulator (BUCK6 and BUCK1B)
+  - Additional LDO (LDO20)
+  - different voltage and current capability
 
-Adds support for a virtual Performance Monitoring Unit (PMU) in virtual
-machines.
+This patch adds 88PM860 related buck/ldo voltage/current data to
+the driver, and creates the regulator_desc table.
 
-> +
->  endif # VIRTUALIZATION
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index f90f4aa..78db4ee 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> +kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> index 0b43265..ee2c2e9 100644
-> --- a/arch/arm64/kvm/reset.c
-> +++ b/arch/arm64/kvm/reset.c
-> @@ -107,5 +107,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
->  	/* Reset timer */
->  	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
->  
-> +	/* Reset PMU */
-> +	kvm_pmu_vcpu_reset(vcpu);
-> +
->  	return 0;
->  }
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> new file mode 100644
-> index 0000000..27d14ca
-> --- /dev/null
-> +++ b/include/kvm/arm_pmu.h
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ASM_ARM_KVM_PMU_H
-> +#define __ASM_ARM_KVM_PMU_H
-> +
-> +#include <asm/pmu.h>
-> +#include <linux/irq_work.h>
-> +
-> +struct kvm_pmc {
-> +	u8 idx;
+With addition of new device to the driver, couple of unavoidable
+changes,
 
-which index is this?  Does it map to something architecturally or is it
-just the array index number?
+  - The table gets referenced using regulator ID (PM800_ID_xxx),
+    so table also needs to be created using ID.
 
-> +	u64 counter;
-> +	u64 eventsel;
+   - The naming convention of voltage tables would no longer be
+     mapped to respective ldos/bucks, so this patch also renames
+     to more generic name.
 
-does this map to PMEVTYPER<n>_EL0.evtCount?
+TODO:
+  - Validation on 88PM800 device, looking for some help here, as I do
+    not have any platform with 88PM800 device.
 
-> +	bool interrupt;
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/regulator/88pm800.c | 125 ++++++++++++++++++++++++++++++--------------
+ include/linux/mfd/88pm80x.h |   3 ++
+ 2 files changed, 90 insertions(+), 38 deletions(-)
 
-is this that an interrupt which is pending or which is enabled?
-
-> +	bool enable;
-> +	struct perf_event *perf_event;
-> +	struct kvm_vcpu *vcpu;
-> +};
-> +
-> +struct kvm_pmu {
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +	/* PMU IRQ Number per VCPU */
-> +	int irq_num;
-> +	int overflow_status;
-> +	/* IRQ pending flag */
-> +	bool irq_pending;
-> +	struct irq_work irq_work;
-> +	struct kvm_pmc pmc[ARMV8_MAX_COUNTERS];
-> +#endif
-> +};
-> +
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
-> +void kvm_pmu_init(struct kvm_vcpu *vcpu);
-> +#else
-> +static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
-> +static inline void kvm_pmu_init(struct kvm_vcpu *vcpu) {}
-> +#endif
-> +
-> +#endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> new file mode 100644
-> index 0000000..dc252d0
-> --- /dev/null
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -0,0 +1,55 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <kvm/arm_pmu.h>
-> +
-> +/**
-> + * kvm_pmu_vcpu_reset - reset pmu state for cpu
-> + * @vcpu: The vcpu pointer
-> + *
-> + */
-> +void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +	pmu->irq_pending = false;
-> +}
-> +
-> +/**
-> + * kvm_pmu_init - Initialize global PMU state for per vcpu
-
-how is this both global and per VCPU?
-
-> + * @vcpu: The vcpu pointer
-> + *
-> + * Initialize PMC and Set all the PMU IRQ numbers to invalid
-
-s/Set/set/
-
-> + * value so that user space has to explicitly provide PMU
-> + * IRQ numbers using set device address ioctl.
-> + */
-> +void kvm_pmu_init(struct kvm_vcpu *vcpu)
-> +{
-> +	int i;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +	memset(pmu, 0, sizeof(*pmu));
-> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++) {
-> +		pmu->pmc[i].idx = i;
-> +		pmu->pmc[i].vcpu = vcpu;
-> +	}
-> +
-> +	pmu->irq_num = -1;
-> +}
-> -- 
-> 2.1.0
-> 
+diff --git a/drivers/regulator/88pm800.c b/drivers/regulator/88pm800.c
+index 26c277f..e846e4c 100644
+--- a/drivers/regulator/88pm800.c
++++ b/drivers/regulator/88pm800.c
+@@ -44,6 +44,7 @@
+ #define PM800_LDO17_VOUT	(0x1A)
+ #define PM800_LDO18_VOUT	(0x1B)
+ #define PM800_LDO19_VOUT	(0x1C)
++#define PM800_LDO20_VOUT	(0x1D)
+ 
+ /* BUCK1 with DVC[0..3] */
+ #define PM800_BUCK1		(0x3C)
+@@ -57,6 +58,8 @@
+ #define PM800_BUCK4_2		(0x44)
+ #define PM800_BUCK4_3		(0x45)
+ #define PM800_BUCK5		(0x46)
++#define PM800_BUCK6		(0x4A)
++#define PM800_BUCK1B		(0x4B)
+ 
+ #define PM800_BUCK_ENA		(0x50)
+ #define PM800_LDO_ENA1_1	(0x51)
+@@ -92,7 +95,7 @@ struct pm800_regulators {
+  * n_volt - Number of available selectors
+  */
+ #define PM800_BUCK(match, vreg, ereg, ebit, amax, volt_ranges, n_volt)	\
+-{									\
++[PM800_ID_##vreg] = {							\
+ 	.desc	= {							\
+ 		.name			= #vreg,			\
+ 		.of_match		= of_match_ptr(#match),		\
+@@ -122,7 +125,7 @@ struct pm800_regulators {
+  * simpler and faster.
+  */
+ #define PM800_LDO(match, vreg, ereg, ebit, amax, ldo_volt_table)	\
+-{									\
++[PM800_ID_##vreg] = {							\
+ 	.desc	= {							\
+ 		.name			= #vreg,			\
+ 		.of_match		= of_match_ptr(#match),		\
+@@ -142,34 +145,36 @@ struct pm800_regulators {
+ }
+ 
+ /* Ranges are sorted in ascending order. */
+-static const struct regulator_linear_range buck1_volt_range[] = {
++static const struct regulator_linear_range buck_volt_range1[] = {
+ 	REGULATOR_LINEAR_RANGE(600000, 0, 0x4f, 12500),
+ 	REGULATOR_LINEAR_RANGE(1600000, 0x50, 0x54, 50000),
+ };
+ 
+ /* BUCK 2~5 have same ranges. */
+-static const struct regulator_linear_range buck2_5_volt_range[] = {
++static const struct regulator_linear_range buck_volt_range2[] = {
+ 	REGULATOR_LINEAR_RANGE(600000, 0, 0x4f, 12500),
+ 	REGULATOR_LINEAR_RANGE(1600000, 0x50, 0x72, 50000),
+ };
+ 
+-static const unsigned int ldo1_volt_table[] = {
++/* 88pm800: LDO1, 88pm860: LDO19  */
++static const unsigned int ldo_volt_table1[] = {
+ 	600000,  650000,  700000,  750000,  800000,  850000,  900000,  950000,
+ 	1000000, 1050000, 1100000, 1150000, 1200000, 1300000, 1400000, 1500000,
+ };
+ 
+-static const unsigned int ldo2_volt_table[] = {
++/* 88pm800: LDO2, 88pm860: LDO20 */
++static const unsigned int ldo_volt_table2[] = {
+ 	1700000, 1800000, 1900000, 2000000, 2100000, 2500000, 2700000, 2800000,
+ };
+ 
+-/* LDO 3~17 have same voltage table. */
+-static const unsigned int ldo3_17_volt_table[] = {
++/* 88pm800: LDO 3~17, 88pm860: LDO 4~18 */
++static const unsigned int ldo_volt_table3[] = {
+ 	1200000, 1250000, 1700000, 1800000, 1850000, 1900000, 2500000, 2600000,
+ 	2700000, 2750000, 2800000, 2850000, 2900000, 3000000, 3100000, 3300000,
+ };
+ 
+-/* LDO 18~19 have same voltage table. */
+-static const unsigned int ldo18_19_volt_table[] = {
++/* LDO 18~19, 88pm860: 1~3 */
++static const unsigned int ldo_volt_table4[] = {
+ 	1700000, 1800000, 1900000, 2500000, 2800000, 2900000, 3100000, 3300000,
+ };
+ 
+@@ -204,31 +209,62 @@ static struct regulator_ops pm800_volt_table_ops = {
+ 
+ /* The array is indexed by id(PM800_ID_XXX) */
+ static struct pm800_regulator_info pm800_regulator_info[] = {
+-	PM800_BUCK(buck1, BUCK1, BUCK_ENA, 0, 3000000, buck1_volt_range, 0x55),
+-	PM800_BUCK(buck2, BUCK2, BUCK_ENA, 1, 1200000, buck2_5_volt_range, 0x73),
+-	PM800_BUCK(buck3, BUCK3, BUCK_ENA, 2, 1200000, buck2_5_volt_range, 0x73),
+-	PM800_BUCK(buck4, BUCK4, BUCK_ENA, 3, 1200000, buck2_5_volt_range, 0x73),
+-	PM800_BUCK(buck5, BUCK5, BUCK_ENA, 4, 1200000, buck2_5_volt_range, 0x73),
+-
+-	PM800_LDO(ldo1, LDO1, LDO_ENA1_1, 0, 200000, ldo1_volt_table),
+-	PM800_LDO(ldo2, LDO2, LDO_ENA1_1, 1, 10000, ldo2_volt_table),
+-	PM800_LDO(ldo3, LDO3, LDO_ENA1_1, 2, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo4, LDO4, LDO_ENA1_1, 3, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo5, LDO5, LDO_ENA1_1, 4, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo6, LDO6, LDO_ENA1_1, 5, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo7, LDO7, LDO_ENA1_1, 6, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo8, LDO8, LDO_ENA1_1, 7, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo9, LDO9, LDO_ENA1_2, 0, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo10, LDO10, LDO_ENA1_2, 1, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo11, LDO11, LDO_ENA1_2, 2, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo12, LDO12, LDO_ENA1_2, 3, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo13, LDO13, LDO_ENA1_2, 4, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo14, LDO14, LDO_ENA1_2, 5, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo15, LDO15, LDO_ENA1_2, 6, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo16, LDO16, LDO_ENA1_2, 7, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo17, LDO17, LDO_ENA1_3, 0, 300000, ldo3_17_volt_table),
+-	PM800_LDO(ldo18, LDO18, LDO_ENA1_3, 1, 200000, ldo18_19_volt_table),
+-	PM800_LDO(ldo19, LDO19, LDO_ENA1_3, 2, 200000, ldo18_19_volt_table),
++	PM800_BUCK(buck1, BUCK1, BUCK_ENA, 0, 3000000, buck_volt_range1, 0x55),
++	PM800_BUCK(buck2, BUCK2, BUCK_ENA, 1, 1200000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck3, BUCK3, BUCK_ENA, 2, 1200000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck4, BUCK4, BUCK_ENA, 3, 1200000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck5, BUCK5, BUCK_ENA, 4, 1200000, buck_volt_range2, 0x73),
++
++	PM800_LDO(ldo1, LDO1, LDO_ENA1_1, 0, 200000, ldo_volt_table1),
++	PM800_LDO(ldo2, LDO2, LDO_ENA1_1, 1, 10000, ldo_volt_table2),
++	PM800_LDO(ldo3, LDO3, LDO_ENA1_1, 2, 300000, ldo_volt_table3),
++	PM800_LDO(ldo4, LDO4, LDO_ENA1_1, 3, 300000, ldo_volt_table3),
++	PM800_LDO(ldo5, LDO5, LDO_ENA1_1, 4, 300000, ldo_volt_table3),
++	PM800_LDO(ldo6, LDO6, LDO_ENA1_1, 5, 300000, ldo_volt_table3),
++	PM800_LDO(ldo7, LDO7, LDO_ENA1_1, 6, 300000, ldo_volt_table3),
++	PM800_LDO(ldo8, LDO8, LDO_ENA1_1, 7, 300000, ldo_volt_table3),
++	PM800_LDO(ldo9, LDO9, LDO_ENA1_2, 0, 300000, ldo_volt_table3),
++	PM800_LDO(ldo10, LDO10, LDO_ENA1_2, 1, 300000, ldo_volt_table3),
++	PM800_LDO(ldo11, LDO11, LDO_ENA1_2, 2, 300000, ldo_volt_table3),
++	PM800_LDO(ldo12, LDO12, LDO_ENA1_2, 3, 300000, ldo_volt_table3),
++	PM800_LDO(ldo13, LDO13, LDO_ENA1_2, 4, 300000, ldo_volt_table3),
++	PM800_LDO(ldo14, LDO14, LDO_ENA1_2, 5, 300000, ldo_volt_table3),
++	PM800_LDO(ldo15, LDO15, LDO_ENA1_2, 6, 300000, ldo_volt_table3),
++	PM800_LDO(ldo16, LDO16, LDO_ENA1_2, 7, 300000, ldo_volt_table3),
++	PM800_LDO(ldo17, LDO17, LDO_ENA1_3, 0, 300000, ldo_volt_table3),
++	PM800_LDO(ldo18, LDO18, LDO_ENA1_3, 1, 200000, ldo_volt_table4),
++	PM800_LDO(ldo19, LDO19, LDO_ENA1_3, 2, 200000, ldo_volt_table4),
++};
++
++static struct pm800_regulator_info pm860_regulator_info[] = {
++	PM800_BUCK(buck1, BUCK1, BUCK_ENA, 0, 3000000, buck_volt_range1, 0x55),
++	PM800_BUCK(buck2, BUCK2, BUCK_ENA, 1, 750000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck3, BUCK3, BUCK_ENA, 2, 1500000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck4, BUCK4, BUCK_ENA, 3, 750000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck5, BUCK5, BUCK_ENA, 4, 1500000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck6, BUCK6, BUCK_ENA, 5, 800000, buck_volt_range2, 0x73),
++	PM800_BUCK(buck1b, BUCK1B, BUCK_ENA, 6, 3000000, buck_volt_range2, 0x55),
++
++	PM800_LDO(ldo1, LDO1, LDO_ENA1_1, 0, 100000, ldo_volt_table4),
++	PM800_LDO(ldo2, LDO2, LDO_ENA1_1, 1, 100000, ldo_volt_table4),
++	PM800_LDO(ldo3, LDO3, LDO_ENA1_1, 2, 100000, ldo_volt_table4),
++	PM800_LDO(ldo4, LDO4, LDO_ENA1_1, 3, 400000, ldo_volt_table3),
++	PM800_LDO(ldo5, LDO5, LDO_ENA1_1, 4, 400000, ldo_volt_table3),
++	PM800_LDO(ldo6, LDO6, LDO_ENA1_1, 5, 400000, ldo_volt_table3),
++	PM800_LDO(ldo7, LDO7, LDO_ENA1_1, 6, 400000, ldo_volt_table3),
++	PM800_LDO(ldo8, LDO8, LDO_ENA1_1, 7, 400000, ldo_volt_table3),
++	PM800_LDO(ldo9, LDO9, LDO_ENA1_2, 0, 400000, ldo_volt_table3),
++	PM800_LDO(ldo10, LDO10, LDO_ENA1_2, 1, 200000, ldo_volt_table3),
++	PM800_LDO(ldo11, LDO11, LDO_ENA1_2, 2, 200000, ldo_volt_table3),
++	PM800_LDO(ldo12, LDO12, LDO_ENA1_2, 3, 200000, ldo_volt_table3),
++	PM800_LDO(ldo13, LDO13, LDO_ENA1_2, 4, 200000, ldo_volt_table3),
++	PM800_LDO(ldo14, LDO14, LDO_ENA1_2, 5, 200000, ldo_volt_table3),
++	PM800_LDO(ldo15, LDO15, LDO_ENA1_2, 6, 200000, ldo_volt_table3),
++	PM800_LDO(ldo16, LDO16, LDO_ENA1_2, 7, 200000, ldo_volt_table3),
++	PM800_LDO(ldo17, LDO17, LDO_ENA1_3, 0, 200000, ldo_volt_table3),
++	PM800_LDO(ldo18, LDO18, LDO_ENA1_3, 1, 200000, ldo_volt_table3),
++	PM800_LDO(ldo19, LDO19, LDO_ENA1_3, 2, 400000, ldo_volt_table1),
++	PM800_LDO(ldo20, LDO20, LDO_ENA1_3, 3, 10000, ldo_volt_table2),
+ };
+ 
+ static int pm800_regulator_probe(struct platform_device *pdev)
+@@ -238,6 +274,7 @@ static int pm800_regulator_probe(struct platform_device *pdev)
+ 	struct pm800_regulators *pm800_data;
+ 	struct regulator_config config = { };
+ 	struct regulator_init_data *init_data;
++	struct pm800_regulator_info *info = NULL;
+ 	int i, ret;
+ 
+ 	if (pdata && pdata->num_regulators) {
+@@ -262,6 +299,18 @@ static int pm800_regulator_probe(struct platform_device *pdev)
+ 
+ 	platform_set_drvdata(pdev, pm800_data);
+ 
++	switch (chip->type) {
++	case CHIP_PM800:
++	case CHIP_PM805:
++		info = pm800_regulator_info;
++		break;
++	case CHIP_PM860:
++		info = pm860_regulator_info;
++		break;
++	default:
++		return -ENODEV;
++	}
++
+ 	config.dev = chip->dev;
+ 	config.regmap = pm800_data->map;
+ 	for (i = 0; i < PM800_ID_RG_MAX; i++) {
+@@ -275,14 +324,14 @@ static int pm800_regulator_probe(struct platform_device *pdev)
+ 			config.init_data = init_data;
+ 		}
+ 
+-		config.driver_data = &pm800_regulator_info[i];
++		config.driver_data = &info[i];
+ 
+ 		regulator = devm_regulator_register(&pdev->dev,
+-				&pm800_regulator_info[i].desc, &config);
++				&info[i].desc, &config);
+ 		if (IS_ERR(regulator)) {
+ 			ret = PTR_ERR(regulator);
+ 			dev_err(&pdev->dev, "Failed to register %s\n",
+-					pm800_regulator_info[i].desc.name);
++					info[i].desc.name);
+ 			return ret;
+ 		}
+ 	}
+diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+index 2ef62af..a92d173 100644
+--- a/include/linux/mfd/88pm80x.h
++++ b/include/linux/mfd/88pm80x.h
+@@ -31,6 +31,8 @@ enum {
+ 	PM800_ID_BUCK3,
+ 	PM800_ID_BUCK4,
+ 	PM800_ID_BUCK5,
++	PM800_ID_BUCK6,
++	PM800_ID_BUCK1B,
+ 
+ 	PM800_ID_LDO1,
+ 	PM800_ID_LDO2,
+@@ -51,6 +53,7 @@ enum {
+ 	PM800_ID_LDO17,
+ 	PM800_ID_LDO18,
+ 	PM800_ID_LDO19,
++	PM800_ID_LDO20,
+ 
+ 	PM800_ID_RG_MAX,
+ };
+-- 
+1.9.1
