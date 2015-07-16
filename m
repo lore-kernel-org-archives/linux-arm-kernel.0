@@ -1,57 +1,193 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Jul 2015 23:23:06 -0700
-Subject: [PATCH] ARM: OMAP2: Delete unnecessary checks before three
- function calls
-In-Reply-To: <alpine.DEB.2.02.1507160548040.32764@utopia.booyaka.com>
-References: <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
- <54705EC3.90708@users.sourceforge.net>
- <55928739.5040809@users.sourceforge.net>
- <alpine.DEB.2.02.1507160548040.32764@utopia.booyaka.com>
-Message-ID: <20150716062305.GF17550@atomide.com>
+From: fugang.duan@freescale.com (Duan Andy)
+Date: Thu, 16 Jul 2015 06:37:32 +0000
+Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+ blocking calls in the cpu hotplug notifier
+In-Reply-To: <1437008972-9140-174-git-send-email-kamal@canonical.com>
+References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
+ <1437008972-9140-174-git-send-email-kamal@canonical.com>
+Message-ID: <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [150715 22:58]:
-> Hello Markus
+From: Kamal Mostafa <kamal@canonical.com> Sent: Thursday, July 16, 2015 9:08 AM
+> To: linux-kernel at vger.kernel.org; stable at vger.kernel.org; kernel-
+> team at lists.ubuntu.com
+> Cc: Kamal Mostafa; daniel.lezcano at linaro.org; kyungmin.park at samsung.com;
+> Damian Eppel; kgene at kernel.org; Thomas Gleixner; linux-arm-
+> kernel at lists.infradead.org; m.szyprowski at samsung.com
+> Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+> blocking calls in the cpu hotplug notifier
 > 
-> On Tue, 30 Jun 2015, SF Markus Elfring wrote:
+> 3.19.8-ckt4 -stable review patch.  If anyone has any objections, please
+> let me know.
 > 
-> > From: Markus Elfring <elfring@users.sourceforge.net>
-> > Date: Tue, 30 Jun 2015 14:00:16 +0200
-> > 
-> > The functions clk_disable(), of_node_put() and omap_device_delete() test
-> > whether their argument is NULL and then return immediately.
-> > Thus the test around the call is not needed.
-> > 
-> > This issue was detected by using the Coccinelle software.
-> > 
-> > Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ------------------
 > 
-> Thanks for the patch.  I have to say, I am a bit leery about applying the 
-> omap_device.c and omap_hwmod.c changes, since the called functions -- 
-> omap_device_delete() and clk_disable() -- don't explicitly document that 
-> NULLs are allowed to be passed in.  So there's no explicit contract that 
-> callers can rely upon, to (at least in theory) prevent those internal NULL 
-> pointer checks from being removed.
+> From: Damian Eppel <d.eppel@samsung.com>
 > 
-> So I would suggest that those two functions' kerneldoc be patched first to 
-> explicitly state that passing in a NULL pointer is allowed.  Then I would 
-> feel a bit more comfortable applying the omap_device.c and omap_hwmod.c 
-> changes.
+> commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
 > 
-> The kerneldoc for of_node_put() does explicitly allow NULLs to be passed 
-> in.  So I'll apply that change now for v4.3, touching up the commit 
-> message accordingly.
+> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+> request_irq() and free_irq() in the context of hotplug notification
+> (which is in this case atomic context).
+> 
+> [   40.785859] CPU1: Software reset
+> [   40.786660] BUG: sleeping function called from invalid context at
+> mm/slub.c:1241
+> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name:
+> swapper/1
+> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
+> [   40.786681]
+> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-
+> 00024-g7dca860 #36
+> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>]
+> (show_stack+0x10/0x14)
+> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>]
+> (dump_stack+0x70/0xbc)
+> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>]
+> (kmem_cache_alloc+0xd8/0x170)
+> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>]
+> (request_threaded_irq+0x64/0x128)
+> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>]
+> (exynos4_local_timer_setup+0xc0/0x13c)
+> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>]
+> (exynos4_mct_cpu_notify+0x30/0xa8)
+> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>]
+> (notifier_call_chain+0x44/0x84)
+> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>]
+> (__cpu_notify+0x28/0x44)
+> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>]
+> (secondary_start_kernel+0xec/0x150)
+> [   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>]
+> (0x40008764)
+> 
+> Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+> notifications which run on the hotplugged cpu with interrupts and
+> preemption disabled.
+> 
+> To avoid the issue, request the interrupts for all possible cpus in the
+> boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+> request_irq/disable_irq() sequence. The flag prevents the
+> request_irq() code from enabling the interrupt immediately.
+> 
+> The interrupt is then enabled in the CPU_STARTING notifier of the
+> hotplugged cpu and again disabled with disable_irq_nosync() in the
+> CPU_DYING notifier.
+> 
+> [ tglx: Massaged changelog to match the patch ]
+> 
+> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq
+> calls for local timer registration")
+> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+> Cc: m.szyprowski at samsung.com
+> Cc: kyungmin.park at samsung.com
+> Cc: daniel.lezcano at linaro.org
+> Cc: kgene at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-
+> d.eppel at samsung.com
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+> ---
+>  drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------
+> ------
+>  1 file changed, 30 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/clocksource/exynos_mct.c
+> b/drivers/clocksource/exynos_mct.c
+> index 83564c9..c844616 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct
+> clock_event_device *evt)
+>  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+> 
+>  	if (mct_int_type == MCT_INT_SPI) {
+> -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> -				IRQF_TIMER | IRQF_NOBALANCING,
+> -				evt->name, mevt)) {
+> -			pr_err("exynos-mct: cannot register IRQ %d\n",
+> -				evt->irq);
+> +
+> +		if (evt->irq == -1)
+>  			return -EIO;
+> -		}
+> -		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
+> cpumask_of(cpu));
+> +
+> +		irq_force_affinity(evt->irq, cpumask_of(cpu));
+> +		enable_irq(evt->irq);
+>  	} else {
+>  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
 
-I have them applied from a later thread already, but will drop both in
-my branch as I have not pushed them out yet.
+In here, why not use enable_percpu_irq(evt->irq) ?
 
-Regards,
+>  	}
+> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct
+> clock_event_device *evt)  static void exynos4_local_timer_stop(struct
+> clock_event_device *evt)  {
+>  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> -	if (mct_int_type == MCT_INT_SPI)
+> -		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> -	else
+> +	if (mct_int_type == MCT_INT_SPI) {
+> +		if (evt->irq != -1)
+> +			disable_irq_nosync(evt->irq);
+> +	} else {
+>  		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
 
-Tony
+In here, why not use disable_percpu_irq(evt->irq) ?
+
+
+> +	}
+>  }
+> 
+>  static int exynos4_mct_cpu_notify(struct notifier_block *self, @@ -522,7
+> +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+> 
+>  static void __init exynos4_timer_resources(struct device_node *np, void
+> __iomem *base)  {
+> -	int err;
+> +	int err, cpu;
+>  	struct mct_clock_event_device *mevt =
+> this_cpu_ptr(&percpu_mct_tick);
+>  	struct clk *mct_clk, *tick_clk;
+> 
+> @@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct
+> device_node *np, void __iomem
+>  		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+>  		     mct_irqs[MCT_L0_IRQ], err);
+>  	} else {
+> -		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
+> +		for_each_possible_cpu(cpu) {
+> +			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
+> +			struct mct_clock_event_device *pcpu_mevt =
+> +				per_cpu_ptr(&percpu_mct_tick, cpu);
+> +
+> +			pcpu_mevt->evt.irq = -1;
+> +
+> +			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
+> +			if (request_irq(mct_irq,
+> +					exynos4_mct_tick_isr,
+> +					IRQF_TIMER | IRQF_NOBALANCING,
+> +					pcpu_mevt->name, pcpu_mevt)) {
+> +				pr_err("exynos-mct: cannot register IRQ
+> (cpu%d)\n",
+> +									cpu);
+> +
+> +				continue;
+> +			}
+> +			pcpu_mevt->evt.irq = mct_irq;
+> +		}
+>  	}
+> 
+>  	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+> --
+> 1.9.1
