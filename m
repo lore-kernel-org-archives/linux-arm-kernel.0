@@ -1,154 +1,100 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Thu, 16 Jul 2015 10:36:21 +0900
-Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <CAJKOXPdcdREhwQZ22RcqbUSTpOn0XmqJ_3n5uUyzEgPihRYwNQ@mail.gmail.com>
-References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
- <CAJKOXPdcdREhwQZ22RcqbUSTpOn0XmqJ_3n5uUyzEgPihRYwNQ@mail.gmail.com>
-Message-ID: <CAPTzV17TRxTXKSucMWEk-5k6TtYsXkO0XFuuaCXKgNc2AoGQjA@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Wed, 15 Jul 2015 21:38:18 -0400
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <55A703F3.8050203@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
+ <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
+ <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
+ <20150714093154.4d73e551@gandalf.local.home>
+ <55A5A75A.1060401@linaro.org>
+ <20150714225105.6c1e4f15@gandalf.local.home>
+ <55A646EE.6030402@linaro.org>
+ <20150715105536.42949ea9@gandalf.local.home>
+ <20150715121337.3b31aa84@gandalf.local.home>
+ <55A6FA82.9000901@linaro.org> <55A703F3.8050203@linaro.org>
+Message-ID: <20150715213818.55c5b3d8@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 16 Jul 2015 10:08:03 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-On Wed, Jul 15, 2015 at 8:35 PM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> 2015-07-15 10:36 GMT+09:00 Chanho Park <parkch98@gmail.com>:
->> The cpu booting of exynos5422 has been still broken since we discussed
->> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
->> hardkernel, it could help to boot 8 cores well. This patch need to have
->> more test like STR and other SoC especially exynos5800 which is variant
->> of exynos5422. If this patch is broken on exynos5800, I'll find another
->> way to check exynos5422.
->>
->> This patch is top of my previous exynos5422 cpu ordering patch[2] and
->> need to enable CONFIG_EXYNOS5420_MCPM=y
->>
->> [    0.047509] CPU0: update cpu_capacity 448
->> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
->> [    0.047874] Setting up static identity map for 0x400082c0 -
->> 0x40008318
->> [    0.048340] ARM CCI driver probed
->> [    0.048597] Exynos MCPM support installed
->> [    0.065676] CPU1: update cpu_capacity 448
->> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
->> [    0.070672] CPU2: update cpu_capacity 448
->> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
->> [    0.075644] CPU3: update cpu_capacity 448
->> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
->> [    0.080590] CPU4: update cpu_capacity 1535
->> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
->> [    0.085591] CPU5: update cpu_capacity 1535
->> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
->> [    0.090590] CPU6: update cpu_capacity 1535
->> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
->> [    0.095585] CPU7: update cpu_capacity 1535
->> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
->> [    0.095720] Brought up 8 CPUs
->>
->> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
->> [2]:https://patchwork.kernel.org/patch/6782891/
->
-> Few questions/issues:
-> 1. For the proper patch the commit message needs to be fixed a little.
-> The dmesg above is meaningless but instead you can put short dmesg (2
-> or 4 lines) with failed booting of CPUs.
+> On 07/16/2015 09:27 AM, AKASHI Takahiro wrote:
+> > On 07/16/2015 01:13 AM, Steven Rostedt wrote:
+> >> On Wed, 15 Jul 2015 10:55:36 -0400
+> >> Steven Rostedt <rostedt@goodmis.org> wrote:
+> >>
+> >>
+> >>> I'll take a look at it and try to clean up the code.
+> >>
+> >> Does the  following patch make sense for you?
+> >
+> > Looks nice. The patch greatly simplifies changes on arm64 side.
+> 
+> As follows:
+> 
+> - Takahiro AKASHI
+> 
 
-They will be gone when I make a official patch.
+How should we go forward with this. Want me to make my change to my
+tree, and pull this patch in with it? I can set up for a 4.3 release.
 
-> 2. Why only MCPM? Isn't this also needed without MCPM?
+Then if I can get an Acked-by from one of the arm64 maintainers, I can
+have this go through my tree?
 
-Current exynos platsmp is not aware multi clusters. MCPM covered
-secondary cpu booting of exynos big.Little cores. Without MCPM, same
-approach and codes will be required on platsmp thus I think it's
-redundant.
-
->
->>
->> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
->> Cc: Chanwoo Choi <cw00.choi@samsung.com>
->> Cc: Kevin Hilman <khilman@kernel.org>
->> Cc: Heesub Shin <heesub.shin@samsung.com>
->> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
->> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->> Signed-off-by: Chanho Park <parkch98@gmail.com>
->
-> I think both Chanho Parks are the same person :) so you may leave only
-> one (the one matching "From").
->
->> ---
->>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
->>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->>  2 files changed, 18 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
->> index 9bdf547..a076dde 100644
->> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
->>                 cluster >= EXYNOS5420_NR_CLUSTERS)
->>                 return -EINVAL;
->>
->> -       exynos_cpu_power_up(cpunr);
->> +       if (!exynos_cpu_power_state(cpunr)) {
->> +               exynos_cpu_power_up(cpunr);
->
-> This second exynos_cpu_power_up() is needed? Do you know why?
-
-It's redirected to exynos's platsmp and it turned on CPU through pmu registers.
- -> exynos_cpu_powerup: mcpm-exynos.c
- -> exynos_cpu_power_up: platsmp.c
-
-Current mcpm exynos tried to run exynos_cpu_power_up twice during
-secondary cpu is up. The first is from cpu_power_up of mcpm and the
-second is from cpu_is_up. I want to avoid second power up the cpu if
-it already turned on.
-
-static void exynos_cpu_is_up(unsigned int cpu, unsigned int cluster)
-{
-        /* especially when resuming: make sure power control is set */
-
-        exynos_cpu_powerup(cpu, cluster);
-}
+-- Steve
 
 
->
->> +
->> +               if (soc_is_exynos5800() && cluster) {
->
-> If of_machine_is_compatible() can be used then please use it. Javier
-> also mentioned it and he pointed that this is not necessary on
-> Chromebooks.
-
-Okay. I'll use of_machine_is_compatible() instead of soc_is_exynos5800
-to avoid running it from exynos5800.
-
->
->> +                       while (!pmu_raw_readl(S5P_PMU_SPARE2))
->> +                               udelay(10);
->> +
->> +                       pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
->> +                                       EXYNOS_SWRESET);
->
-> This is quite similar to existing exynos_core_restart(). Can you
-> extend it for this purpose? Or at least put it as separate function
-> near exynos_core_restart() so this would be grouped close to each
-> other?
-
-As I said above, the platsmp is not aware multi clusters. I feel like
-it would be dirty if I try to merge them.
-
->
-> Documenting this behaviour would be really nice (you can combine some
-> of my findings on SPARE2 from previous discussion, if they are useful
-> of course).
-
-No one knows exactly why we should wait until SPARE2 is up. I'll
-specify known issue of it with your findings.
-
--- 
-Best Regards,
-Chanho Park
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index c5534fa..868d6f1 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -15,6 +15,7 @@
+> 
+>   #define MCOUNT_ADDR		((unsigned long)_mcount)
+>   #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
+> 
+>   #ifndef __ASSEMBLY__
+>   #include <linux/compat.h>
+> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+> index 1da6029..2c1bf7d 100644
+> --- a/include/linux/ftrace.h
+> +++ b/include/linux/ftrace.h
+> @@ -260,6 +260,13 @@ static inline void ftrace_kill(void) { }
+>   #endif /* CONFIG_FUNCTION_TRACER */
+> 
+>   #ifdef CONFIG_STACK_TRACER
+> +/*
+> + * the offset value to add to return address from save_stack_trace()
+> + */
+> +#ifndef FTRACE_STACK_FRAME_OFFSET
+> +#define FTRACE_STACK_FRAME_OFFSET 0
+> +#endif
+> +
+>   extern int stack_tracer_enabled;
+>   int
+>   stack_trace_sysctl(struct ctl_table *table, int write,
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index 9384647..c5b9748 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+> 
+>   	/* Skip over the overhead of the stack tracer itself */
+>   	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+> -		if (stack_dump_trace[i] == ip)
+> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+>   			break;
+>   	}
+> 
+> @@ -131,7 +131,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   		p = start;
+> 
+>   		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+> -			if (*p == stack_dump_trace[i]) {
+> +			if (*p == (stack_dump_trace[i]
+> +					+ FTRACE_STACK_FRAME_OFFSET)) {
+>   				stack_dump_trace[x] = stack_dump_trace[i++];
+>   				this_size = stack_dump_index[x++] =
+>   					(top - p) * sizeof(unsigned long);
