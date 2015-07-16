@@ -1,77 +1,141 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 16 Jul 2015 17:18:29 +0100
-Subject: [Xen-devel] [PATCH v2 13/20] xen/events: fifo: Make it running
- on 64KB granularity
-In-Reply-To: <alpine.DEB.2.02.1507161642130.17378@kaball.uk.xensource.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507161642130.17378@kaball.uk.xensource.com>
-Message-ID: <55A7D955.5090203@citrix.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Thu, 16 Jul 2015 11:22:27 -0500
+Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+ lpsr
+In-Reply-To: <20150716155034.GN4119@tiger>
+References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
+ <20150715072307.GM4119@tiger>
+ <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
+ <20150716155034.GN4119@tiger>
+Message-ID: <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On 16/07/2015 16:43, Stefano Stabellini wrote:
-> On Thu, 9 Jul 2015, Julien Grall wrote:
->> Only use the first 4KB of the page to store the events channel info. It
->> means that we will wast 60KB every time we allocate page for:
->                        ^ waste
+On Thu, Jul 16, 2015 at 10:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Adrian,
 >
->>       * control block: a page is allocating per CPU
->>       * event array: a page is allocating everytime we need to expand it
->>
->> I think we can reduce the memory waste for the 2 areas by:
->>
->>      * control block: sharing between multiple vCPUs. Although it will
->>      require some bookkeeping in order to not free the page when the CPU
->>      goes offline and the other CPUs sharing the page still there
->>
->>      * event array: always extend the array event by 64K (i.e 16 4K
->>      chunk). That would require more care when we fail to expand the
->>      event channel.
+> Please configure your email client to use bottom-posting rather than
+> top-posting.
 >
-> But this is not implemented in this series, right?
-
-Yes, it's some ideas to improve the code.
-
->
->
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: David Vrabel <david.vrabel@citrix.com>
->> ---
->>   drivers/xen/events/events_base.c | 2 +-
->>   drivers/xen/events/events_fifo.c | 2 +-
->>   2 files changed, 2 insertions(+), 2 deletions(-)
+> On Wed, Jul 15, 2015 at 03:55:59PM +0000, Alonso Adrian wrote:
+>> [Adrian] IOMUXC and IOMUXC-LPSR are in different base address; each controller provides SW_PAD_CTL  (CONF_REG) and SW_MUX_CTL (MUX_REG) but only IOMUXC provides SELECT_INPUT registers for pad daisy chain configuration, so pads from IOMUXC-LPSR that need daisy chain settings need to access the IOMUXC register space address to access SELECT_INPUT.
 >>
->> diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
->> index 96093ae..858d2f6 100644
->> --- a/drivers/xen/events/events_base.c
->> +++ b/drivers/xen/events/events_base.c
->> @@ -40,11 +40,11 @@
->>   #include <asm/idle.h>
->>   #include <asm/io_apic.h>
->>   #include <asm/xen/pci.h>
->> -#include <xen/page.h>
->>   #endif
->>   #include <asm/sync_bitops.h>
->>   #include <asm/xen/hypercall.h>
->>   #include <asm/xen/hypervisor.h>
->> +#include <xen/page.h>
->>
->>   #include <xen/xen.h>
->>   #include <xen/hvm.h>
 >
-> Spurious change?
+> Thanks for the explanation.
+>
+>> [Adrian] One disadvantage that we found if we created two driver instances for IOMUXC and IOMUXC-LPSR controllers is that in the device tree machine files "end-users" could be creating pinctrl nodes mixing pads from different IOMUXC controllers resulting that pad that doesn't belong to that domain controller it will not be configured properly.
+>>
+>> For example a valid pad configuration for I2C1 could use pads as shown below:
+>> &iomuxc {
+>>       pinctrl_i2c1_1: i2c1grp-1 {
+>>               fsl,pins = <
+>>                       MX7D_PAD_GPIO1_IO04__I2C1_SCL   /* IOMUXC-LPSR domain */
+>>                       MX7D_PAD_I2C1_SDA__I2C1_SDA     /* IOMUXC domain */
+>>               >;
+>>       };
+>> };
+>>
+>> By extending pinctrl-imx to support both controllers the above configuration is supported,
+>> Otherwise using two driver instances "end-users" will need to do something like:
+>>
+>> &iomuxc {
+>>       pinctrl_i2c1_1: i2c1grp-1 {
+>>               fsl,pins = <
+>>                       MX7D_PAD_I2C1_SDA__I2C1_SDA     /* IOMUXC domain */
+>>               >;
+>>       };
+>> };
+>>
+>> &iomuxc_lpsr {
+>>       pinctrl_i2c1_1: i2c1grp-1 {
+>>               fsl,pins = <
+>>                       MX7D_PAD_GPIO1_IO04__I2C1_SCL   /* IOMUXC-LPSR domain */
+>>               >;
+>>       };
+>> };
+>>
+>> And this is something that we will like to avoid so "end-user" don't have to worry about and configure pads as they are used to.
+>>
+>
+> This is exactly how hardware is designed, and having device tree
+> describe how hardware is laid out is the right thing to do.  In that
+> case, when people check the device tree source with a i.MX7D Reference
+> Manual on hands, they can easily understand how hardware is represented
+> in device tree.
+>
+> Also, your example with pins for a single device across IOMUXC and
+> IOMUXC-LPSR should be the rare case except GPIO pins.
 
-No, xen/page.h was only included for x86 before. Now, it's included for 
-every architecture.
+Although cross IOMUX and IOMUXC-LPSR is rare,  it will be headache if there are
+one boards.
 
-This is required in order to get XEN_PAGE_SIZE.
+Some SD card, ENET have reset\wp\cd pin.
 
-Regards,
+pinctrl_usdhc1: usdhc1grp {
+                        fsl,pins = <
+                                MX7D_PAD_SD1_CMD__SD1_CMD               0x59
+                                MX7D_PAD_SD1_CLK__SD1_CLK               0x19
+                                MX7D_PAD_SD1_DATA0__SD1_DATA0           0x59
+                                MX7D_PAD_SD1_DATA1__SD1_DATA1           0x59
+                                MX7D_PAD_SD1_DATA2__SD1_DATA2           0x59
+                                MX7D_PAD_SD1_DATA3__SD1_DATA3           0x59
+                                MX7D_PAD_SD1_CD_B__GPIO5_IO0
+ 0x59 /* CD */
+                                MX7D_PAD_SD1_WP__GPIO5_IO1
+ 0x59 /* WP */
+                                MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+ 0x59 /* vmmc */
+                        >;
 
--- 
-Julien Grall
+Customer may choose below pin to IOMUX-lPSR.
+
+MX7D_PAD_SD1_CD_B__GPIO5_IO0
+MX7D_PAD_SD1_WP__GPIO5_IO1
+MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+
+FEC have Phy Reset GPIO, which possibly choose IOMUX-lPSR.
+
+
+
+> For your I2C1
+> example, a sane hardware design would chose one group among the
+> following instead of the one you put above.
+>
+>   MX7D_PAD_I2C1_SCL__I2C1_SCL
+>   MX7D_PAD_I2C1_SDA__I2C1_SDA
+>
+>   MX7D_PAD_UART1_RX_DATA__I2C1_SCL
+>   MX7D_PAD_UART1_TX_DATA__I2C1_SDA
+>
+>   MX7D_PAD_GPIO1_IO04__I2C1_SCL
+>   MX7D_PAD_GPIO1_IO05__I2C1_SDA
+>
+> So this is not really a problem for us to implement two IOMUXC instances.
+> The only problem we need to solve is the select input register access
+> for IOMUXC-LPSR driver.  I have some idea for that, i.e. honestly
+> represent how hardware is laid out.  I will give more details on that
+> tomorrow.
+
+It is very easy to make mistake.
+According to pin NAME macro, it is not easy to distinguish between
+IOMUX and IOMUX-LPSR.
+
+Internal kernel tree use two pinctrl instance.
+
+It will be simple if we think IOMUX and IOMUX-LPSR together, and one
+module have two group registers.
+
+best regards
+Frank Li
+
+>
+>> [Adrian] For the artificial encoding of pad group id's for IOMUXC-LPSR, I think there is no other way to do it (limited imagination here :P);
+>> Pad group id's are extracted from MUX_REG offset address (pad_id = mux_reg / 4) but when combining both IOMUXC and IOMUXC-LPSR
+>> Pad group ID's overlap so end up encoding the pad_id for IOMUXC-LPSR to resolve the proper pad group ID.
+>
+> One big missing piece from your patch is the update to bindings document
+> Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt.  Have you
+> thought about how you will document all these magics and hacks you have
+> done here?
+>
+> Shawn
