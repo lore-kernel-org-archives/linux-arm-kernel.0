@@ -1,42 +1,35 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Thu, 16 Jul 2015 18:46:30 +0200
-Subject: [PATCH 1/6] ARM: net: fix condition for load_order > 0 when
- translating load instructions.
-In-Reply-To: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-References: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1437065195-10887-2-git-send-email-nschichan@freebox.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 16 Jul 2015 17:46:43 +0100
+Subject: drm/edid: sound/core: pcm_drm_eld.c compilation error in 4.2
+In-Reply-To: <20150716181658.553e6da7@armhf>
+References: <20150716181658.553e6da7@armhf>
+Message-ID: <20150716164643.GM7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To check whether the load should take the fast path or not, the code
-would check that (r_skb_hlen - load_order) is greater than the offset
-of the access using an "Unsigned higher or same" condition. For
-halfword accesses and an skb length of 1 at offset 0, that test is
-valid, as we end up comparing 0xffffffff(-1) and 0, so the fast path
-is taken and the filter allows the load to wrongly succeed. A similar
-issue exists for word loads at offset 0 and an skb length of less than
-4.
+On Thu, Jul 16, 2015 at 06:16:58PM +0200, Jean-Francois Moine wrote:
+> The file sound/core/pcm_drm_eld.c which was added by the commit
+> 
+> 	838d1631b766529213684f07dd71cdf2e92f0623
+> 	ALSA: pcm: add DRM ELD helper
+> 
+> lacks the function drm_eld_sad() which was defined by Russell's patch
+> 
+> 	http://article.gmane.org/gmane.linux.ports.arm.kernel/411574
+> 	drm/edid: add function to help find SADs
+> 
+> This patch has not been applied.
 
-Fix that by using the condition "Signed greater than or equal"
-condition for the fast path code for load orders greater than 0.
+Grr, that's the danger of trying to split changes which cross between
+subsystems.  I hate todays fragmented nature of kernel development,
+it's really a nightmare.
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'm not sure how this can be resolved now, I asked Dave Airlie to pull
+the next set of patches which include the one adding the SAD helper;
+he's probably already pulled that for -next, so to pull out just that
+patch and try to get it merged into -rc is going to be far from nice,
+and will probably introduce conflicts.
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 4550d24..21f5ace 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -547,7 +547,7 @@ load_common:
- 				emit(ARM_SUB_I(r_scratch, r_skb_hl,
- 					       1 << load_order), ctx);
- 				emit(ARM_CMP_R(r_scratch, r_off), ctx);
--				condt = ARM_COND_HS;
-+				condt = ARM_COND_GE;
- 			} else {
- 				emit(ARM_CMP_R(r_skb_hl, r_off), ctx);
- 				condt = ARM_COND_HI;
 -- 
-1.9.1
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
