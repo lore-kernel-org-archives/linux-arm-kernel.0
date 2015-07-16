@@ -1,59 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 11:00:34 +0200
-Subject: [PATCH 0/7] ARM: shmobile: Move gpio ranges from C code to DT
-In-Reply-To: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
-References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdYFE1xDV75_ecR36OTePPm8Ta_O1G1fSqOHO=s4TQw20A@mail.gmail.com>
+From: danindrey@mail.ru (Andrey Danin)
+Date: Thu, 16 Jul 2015 12:03:43 +0300
+Subject: How to encode being an I2C slave in DT?
+In-Reply-To: <20150519061619.GA4448@schokonusskuchen.bad>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
+ <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
+ <20150506161712.GA4003@katana>
+ <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
+ <20150519061619.GA4448@schokonusskuchen.bad>
+Message-ID: <55A7736F.5090802@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 30, 2015 at 9:45 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
+Hello Wolfram,
 
->         Hi Linus, Alex, Laurent, Simon, Magnus,
+On 19.05.2015 9:16, Wolfram Sang wrote:
 >
-> This patch series moves the setup of the GPIO-PFC pin mapping for
-> Renesas PFC/GPIO combos from C code to DT, and does some cleanups.
-> The move to DT is needed to make the GPIO hogging mechanism work, cfr.
-> the discussion following "[PATCH] [RFC] gpio: Retry deferred GPIO
-> hogging on pin range change" (https://lkml.org/lkml/2015/6/16/455).
+>>> I give in to the flag idea. I also noticed that we'd need another flag
+>>> anyhow to mark 10 bit addresses. I am still thinking between using two
+>>> address-cells in that case (clean seperation between address and flags)
+>>> or to encode the flags as MSB in the current address (all busses will
+>>> have same address-cells and child description, less code paths and no
+>>> overhead in dtbs).
+>>
+>> Reading thru the thread, this seems good to me. I would go with adding
+>> flags in the MSB of the reg cell rather than adding a cell.
 >
-> The series consists of 3 parts:
->   a. Patches 1-3 add the missing "gpio-ranges" properties to the dtsi
->      files for all affected SoCs,
->   b. Patch 4 disables the C code to set up the mapping on DT platforms
->      (it's still needed on SH or ARM-legacy),
->   c. Patches 5-7 do a few more cleanups in the sh-pfc gpio code.
+> Thanks. I was leaning to the MSB idea, too, and am currently checking
+> how the code would look like. Feels much better to do knowing that it is
+> basically upstream compatible ;)
 >
-> Dependencies:
->   - This series applies against next-next-20150630.
->   - Part a must go in first, to avoid regressions.
->     In addition, it's a prerequisite for "ARM: shmobile: armadillo800eva
->     dts: Add pinctrl and gpio-hog for lcdc0", which has been queued up
->     already in Simon's dt-for-v4.3 branch. Perhaps it can still be
->     reordered?
->   - While I didn't notice any bad behavior by having part a only, part b
->     should go in immediately after part a. Hence I think it's best if
->     Simon can take this one, too.
->   - Part c is independent (it doesn't touch the same code), so it can go
->     in before or after the other parts, or in parallel.
->
-> Thanks for applying!
->
-> Geert Uytterhoeven (7):
->   ARM: shmobile: r8a73a4 dtsi: Add missing "gpio-ranges" to gpio node
->   ARM: shmobile: r8a7740 dtsi: Add missing "gpio-ranges" to gpio node
->   ARM: shmobile: sh73a0 dtsi: Add missing "gpio-ranges" to gpio node
->   pinctrl: sh-pfc: Stop calling gpiochip_add_pin_range() on DT platforms
->   pinctrl: sh-pfc: Remove empty gpio_function_free()
->   pinctrl: sh-pfc: Move sh_pfc_add_gpiochip() up
->   pinctrl: sh-pfc: Confine legacy function GPIOs to SH
+Did you have enough time to check this ?
+(sorry for the noise, if I missed patch(es) in the ml)
 
-I'm happy of shmobile people are happy.
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-For all.
-
-Yours,
-Linus Walleij
+Thanks.
