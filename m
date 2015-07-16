@@ -1,37 +1,47 @@
-From: parkch98@gmail.com (Chanho Park)
-Date: Thu, 16 Jul 2015 09:34:02 +0900
-Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <55A618C6.3020603@osg.samsung.com>
-References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
- <55A618C6.3020603@osg.samsung.com>
-Message-ID: <CAPTzV15kQjrnJCuwXGBdzzY6rjP1495Q=PbuCYHic0JakxD2QQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 16 Jul 2015 09:45:20 +0900
+Subject: [PATCH 1/3] ARM: multi_v7_defconfig: Enable max77802 regulator
+In-Reply-To: <1436977965-7078-2-git-send-email-javier@osg.samsung.com>
+References: <1436977965-7078-1-git-send-email-javier@osg.samsung.com>
+ <1436977965-7078-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <55A6FEA0.8090202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Javier,
+On 16.07.2015 01:32, Javier Martinez Canillas wrote:
+> The Maxim max77802 Power Management IC has besides other devices, a set of
+> regulators. Commit f3caa529c6f5 ("ARM: multi_v7_defconfig: Enable max77802
+> regulator, rtc and clock drivers") was supposed to enable the config option
+> for the regulator driver as a module but the final version that landed did
+> not include this. So this patch enables the needed Kconfig option.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> I believe of_machine_is_compatible("samsung,exynos5800") is preferred
-> nowadays over soc_is_exynos5800().
->
-> Now, is correct to do this for all Exynos5422/5800 based boards? AFAIU
-> from the previous discussions, this behavior is specific to the Odroid
-> XU3 so maybe of_machine_is_compatible("hardkernel,odroid-xu3") instead?
->
-> I know this can affect other Exynos5800 boards that are shipped with a
-> similar binary BL1/BL2 blobs that also use SPARE2 as a sync mechanism
-> but maybe is better to add more exceptions later rather than do it for
-> all Exynos5800?
->
-> The Exynos5800 based Chromebook doesn't have this issue for example and
-> all the 8 cores are brought up correctly.
->
-> Having said that, I tested this patch on an Exynos5800 Peach Pi and all
-> the 8 cores are up and also after a S2R so seems to be a no-op when the
-> PMU_SPARE2 is not used for this.
+Please describe why do you want to enable it (IOW who will benefit from
+enabling it?). This symbol was removed by Kukjin from your commit:
+	[kgene at kernel.org: removing useless REGULATOR_MAX77802 config]
+so justification would be welcomed.
 
-Thanks for the testing. I'll find more proper way it could be applied
-only for exynos5422 boards.
+Beside the commit description I agree with the patch.
 
--- 
-Best Regards,
-Chanho Park
+Best regards,
+Krzysztof
+
+> ---
+> 
+>  arch/arm/configs/multi_v7_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 4b93761d58d2..b07493997993 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -402,6 +402,7 @@ CONFIG_REGULATOR_MAX14577=m
+>  CONFIG_REGULATOR_MAX8907=y
+>  CONFIG_REGULATOR_MAX8973=y
+>  CONFIG_REGULATOR_MAX77686=y
+> +CONFIG_REGULATOR_MAX77802=m
+>  CONFIG_REGULATOR_MAX77693=m
+>  CONFIG_REGULATOR_PALMAS=y
+>  CONFIG_REGULATOR_S2MPS11=y
+> 
