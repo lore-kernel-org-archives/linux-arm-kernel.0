@@ -1,100 +1,167 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Wed, 15 Jul 2015 21:38:18 -0400
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <55A703F3.8050203@linaro.org>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
- <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
- <20150714093154.4d73e551@gandalf.local.home>
- <55A5A75A.1060401@linaro.org>
- <20150714225105.6c1e4f15@gandalf.local.home>
- <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home>
- <55A6FA82.9000901@linaro.org> <55A703F3.8050203@linaro.org>
-Message-ID: <20150715213818.55c5b3d8@gandalf.local.home>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 16 Jul 2015 10:38:51 +0900
+Subject: [PATCH v3 2/4] ARM: dts: Exynos5250: add CPU OPP and regulator
+ supply property
+In-Reply-To: <55A70A3E.5020600@samsung.com>
+References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
+ <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
+ <55A70A3E.5020600@samsung.com>
+Message-ID: <55A70B2B.1060100@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jul 2015 10:08:03 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+On 16.07.2015 10:34, Krzysztof Kozlowski wrote:
+> On 01.07.2015 22:10, Bartlomiej Zolnierkiewicz wrote:
+>> From: Thomas Abraham <thomas.ab@samsung.com>
+>>
+>> For Exynos5250 platforms, add CPU operating points and CPU
+>> regulator supply properties for migrating from Exynos specific
+>> cpufreq driver to using generic cpufreq driver.
+>>
+>> Changes by Bartlomiej:
+>> - split Exynos5250 support from the original patch
+>> - added CPU regulator supply property for Google Spring board
+>> - put the new cpu nodes in alphabetical order
+>>
+>> Cc: Kukjin Kim <kgene.kim@samsung.com>
+>> Cc: Doug Anderson <dianders@chromium.org>
+>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+>> Cc: Andreas Faerber <afaerber@suse.de>
+>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+>> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos5250-arndale.dts  |  4 ++++
+>>  arch/arm/boot/dts/exynos5250-smdk5250.dts |  4 ++++
+>>  arch/arm/boot/dts/exynos5250-snow.dts     |  4 ++++
+>>  arch/arm/boot/dts/exynos5250-spring.dts   |  4 ++++
+>>  arch/arm/boot/dts/exynos5250.dtsi         | 22 ++++++++++++++++++++++
+>>  5 files changed, 38 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> index 7e728a1..db3f65f 100644
+>> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+>> @@ -117,6 +117,10 @@
+>>  	};
+>>  };
+>>  
+>> +&cpu0 {
+>> +	cpu0-supply = <&buck2_reg>;
+>> +};
+>> +
+>>  &dp {
+>>  	status = "okay";
+>>  	samsung,color-space = <0>;
+>> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> index 4fe186d..15aea76 100644
+>> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+>> @@ -74,6 +74,10 @@
+>>  	};
+>>  };
+>>  
+>> +&cpu0 {
+>> +	cpu0-supply = <&buck2_reg>;
+>> +};
+>> +
+>>  &dp {
+>>  	samsung,color-space = <0>;
+>>  	samsung,dynamic-range = <0>;
+>> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
+>> index b7f4122..a4133df 100644
+>> --- a/arch/arm/boot/dts/exynos5250-snow.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
+>> @@ -235,6 +235,10 @@
+>>  	};
+>>  };
+>>  
+>> +&cpu0 {
+>> +	cpu0-supply = <&buck2_reg>;
+>> +};
+>> +
+>>  &dp {
+>>  	status = "okay";
+>>  	pinctrl-names = "default";
+>> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
+>> index d03f9b8..c1edd6d 100644
+>> --- a/arch/arm/boot/dts/exynos5250-spring.dts
+>> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
+>> @@ -65,6 +65,10 @@
+>>  	};
+>>  };
+>>  
+>> +&cpu0 {
+>> +	cpu0-supply = <&buck2_reg>;
+>> +};
+>> +
+>>  &dp {
+>>  	status = "okay";
+>>  	pinctrl-names = "default";
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>> index bf9bee6..0c7ef12 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -63,6 +63,28 @@
+>>  			compatible = "arm,cortex-a15";
+>>  			reg = <0>;
+>>  			clock-frequency = <1700000000>;
+>> +			clocks = <&clock CLK_ARM_CLK>;
+>> +			clock-names = "cpu";
+>> +			clock-latency = <140000>;
+>> +
+>> +			operating-points = <
+>> +				1700000 1300000
+>> +				1600000 1250000
+>> +				1500000 1225000
+>> +				1400000 1200000
+>> +				1300000 1150000
+>> +				1200000 1125000
+>> +				1100000 1100000
+>> +				1000000 1075000
+>> +				 900000 1050000
+>> +				 800000 1025000
+>> +				 700000 1012500
+>> +				 600000 1000000
+>> +				 500000  975000
+>> +				 400000  950000
+>> +				 300000  937500
+>> +				 200000  925000
+>> +			>;
+>>  			cooling-min-level = <15>;
+>>  			cooling-max-level = <9>;
+>>  			#cooling-cells = <2>; /* min followed by max */
+>>
+> 
+> 
+> I see you have all necessary acks so this can go through samsung-soc. I
+> started applying everything. Patch 4/4 does not apply cleanly but this
+> was easy to solve (I think it is better to rebase on Linus tree not on
+> next in such case; subsystems cannot apply easily something depending on
+> next).
+> 
+> Unfortunately this patch (2/4) has build errors:
+> 
+>   DTC     arch/arm/boot/dts/exynos5250-arndale.dtb
+> Error: ../arch/arm/boot/dts/exynos5250.dtsi:65.21-22 syntax error
+> FATAL ERROR: Unable to parse input tree
+> make[2]: *** [arch/arm/boot/dts/exynos5250-arndale.dtb] Error 1
+> make[1]: *** [dtbs] Error 2
+> make[1]: *** Waiting for unfinished jobs....
+> make[1]: Leaving directory `/home/kozik/dev/linux/krzk/out'
+> make: *** [sub-make] Error 2
+> Fail: Make error
+> 
+> I tried to apply this patch on my dt-for-next branch:
+> https://github.com/krzk/linux/commits/dt-for-next
+> 
+> I hold back other patches until this is clarified.
 
-> On 07/16/2015 09:27 AM, AKASHI Takahiro wrote:
-> > On 07/16/2015 01:13 AM, Steven Rostedt wrote:
-> >> On Wed, 15 Jul 2015 10:55:36 -0400
-> >> Steven Rostedt <rostedt@goodmis.org> wrote:
-> >>
-> >>
-> >>> I'll take a look at it and try to clean up the code.
-> >>
-> >> Does the  following patch make sense for you?
-> >
-> > Looks nice. The patch greatly simplifies changes on arm64 side.
-> 
-> As follows:
-> 
-> - Takahiro AKASHI
-> 
+Stupid me, it should not be split into separate branches as it depends
+on clock id from headers.
 
-How should we go forward with this. Want me to make my change to my
-tree, and pull this patch in with it? I can set up for a 4.3 release.
+Everything is fine, I applied patchset with respective tags (Javier's
+reviewed/tested, Sylwester's and Viresh's acks). I'll send later to
+Kukjin for v4.3 unless he picks it also.
 
-Then if I can get an Acked-by from one of the arm64 maintainers, I can
-have this go through my tree?
-
--- Steve
-
-
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> index c5534fa..868d6f1 100644
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -15,6 +15,7 @@
-> 
->   #define MCOUNT_ADDR		((unsigned long)_mcount)
->   #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
-> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
-> 
->   #ifndef __ASSEMBLY__
->   #include <linux/compat.h>
-> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-> index 1da6029..2c1bf7d 100644
-> --- a/include/linux/ftrace.h
-> +++ b/include/linux/ftrace.h
-> @@ -260,6 +260,13 @@ static inline void ftrace_kill(void) { }
->   #endif /* CONFIG_FUNCTION_TRACER */
-> 
->   #ifdef CONFIG_STACK_TRACER
-> +/*
-> + * the offset value to add to return address from save_stack_trace()
-> + */
-> +#ifndef FTRACE_STACK_FRAME_OFFSET
-> +#define FTRACE_STACK_FRAME_OFFSET 0
-> +#endif
-> +
->   extern int stack_tracer_enabled;
->   int
->   stack_trace_sysctl(struct ctl_table *table, int write,
-> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-> index 9384647..c5b9748 100644
-> --- a/kernel/trace/trace_stack.c
-> +++ b/kernel/trace/trace_stack.c
-> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 
->   	/* Skip over the overhead of the stack tracer itself */
->   	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-> -		if (stack_dump_trace[i] == ip)
-> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
->   			break;
->   	}
-> 
-> @@ -131,7 +131,8 @@ check_stack(unsigned long ip, unsigned long *stack)
->   		p = start;
-> 
->   		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-> -			if (*p == stack_dump_trace[i]) {
-> +			if (*p == (stack_dump_trace[i]
-> +					+ FTRACE_STACK_FRAME_OFFSET)) {
->   				stack_dump_trace[x] = stack_dump_trace[i++];
->   				this_size = stack_dump_index[x++] =
->   					(top - p) * sizeof(unsigned long);
+Best regards,
+Krzysztof
