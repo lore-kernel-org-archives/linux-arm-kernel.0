@@ -1,38 +1,28 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jul 2015 19:08:03 +0100
-Subject: [PATCH 01/13] arm/arm64: Add new is_kernel_in_hyp_mode predicate
-In-Reply-To: <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <1436372356-30410-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150716180802.GS26390@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 16 Jul 2015 20:14:51 +0200
+Subject: How to encode being an I2C slave in DT?
+In-Reply-To: <55A7736F.5090802@mail.ru>
+References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
+ <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
+ <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
+ <20150506161712.GA4003@katana>
+ <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
+ <20150519061619.GA4448@schokonusskuchen.bad>
+ <55A7736F.5090802@mail.ru>
+Message-ID: <20150716181451.GA1528@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:19:04PM +0100, Marc Zyngier wrote:
-> With ARMv8.1 VHE extension, it will be possible to run the kernel
-> at EL2 (aka HYP mode). In order for the kernel to easily find out
-> where it is running, add a new predicate that returns whether or
-> not the kernel is in HYP mode.
-> 
-> For completeness, the 32bit code also get such a predicate (always
-> returning false) so that code common to both architecture (timers,
-> KVM) can use it transparently.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/include/asm/virt.h   |  5 +++++
->  arch/arm64/include/asm/virt.h | 10 ++++++++++
->  2 files changed, 15 insertions(+)
 
-[...]
+> Did you have enough time to check this ?
+> (sorry for the noise, if I missed patch(es) in the ml)
 
-> +static inline bool is_kernel_in_hyp_mode(void)
-> +{
-> +	u64 el;
-> +
-> +	asm("mrs %0, CurrentEL" : "=r" (el));
-> +	return el == CurrentEL_EL2;
+Nice coincidence, scheduled for tomorrow...
 
-Missing mask?
-
-Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/ef4382ec/attachment.sig>
