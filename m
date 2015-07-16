@@ -1,59 +1,41 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 16 Jul 2015 14:06:44 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP2: Delete unnecessary checks before three
- function calls
-In-Reply-To: <20150716062305.GF17550@atomide.com>
-References: <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <54705EC3.90708@users.sourceforge.net>
- <55928739.5040809@users.sourceforge.net>
- <alpine.DEB.2.02.1507160548040.32764@utopia.booyaka.com>
- <20150716062305.GF17550@atomide.com>
-Message-ID: <alpine.DEB.2.02.1507161406190.12339@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jul 2015 16:09:42 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+In-Reply-To: <CACRpkdaL6DHChx7mSWiGk65LZNxkMGtw=aef2zyHaE7dDhXz8A@mail.gmail.com>
+References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+ <2120032.PN20RpmoKe@wuerfel>
+ <CACRpkdaL6DHChx7mSWiGk65LZNxkMGtw=aef2zyHaE7dDhXz8A@mail.gmail.com>
+Message-ID: <2694937.qjRpGCMvqj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jul 2015, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [150715 22:58]:
-> > Hello Markus
-> > 
-> > On Tue, 30 Jun 2015, SF Markus Elfring wrote:
-> > 
-> > > From: Markus Elfring <elfring@users.sourceforge.net>
-> > > Date: Tue, 30 Jun 2015 14:00:16 +0200
-> > > 
-> > > The functions clk_disable(), of_node_put() and omap_device_delete() test
-> > > whether their argument is NULL and then return immediately.
-> > > Thus the test around the call is not needed.
-> > > 
-> > > This issue was detected by using the Coccinelle software.
-> > > 
-> > > Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
-> > 
-> > Thanks for the patch.  I have to say, I am a bit leery about applying the 
-> > omap_device.c and omap_hwmod.c changes, since the called functions -- 
-> > omap_device_delete() and clk_disable() -- don't explicitly document that 
-> > NULLs are allowed to be passed in.  So there's no explicit contract that 
-> > callers can rely upon, to (at least in theory) prevent those internal NULL 
-> > pointer checks from being removed.
-> > 
-> > So I would suggest that those two functions' kerneldoc be patched first to 
-> > explicitly state that passing in a NULL pointer is allowed.  Then I would 
-> > feel a bit more comfortable applying the omap_device.c and omap_hwmod.c 
-> > changes.
-> > 
-> > The kerneldoc for of_node_put() does explicitly allow NULLs to be passed 
-> > in.  So I'll apply that change now for v4.3, touching up the commit 
-> > message accordingly.
+On Thursday 16 July 2015 16:03:18 Linus Walleij wrote:
+> On Tue, Jul 14, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Monday 13 July 2015 10:21:51 Linus Walleij wrote:
+> >>
+> >> Since the original code just defined all three serial ports
+> >> for all boards by them including ste-dbx500.dtsi I first made
+> >> the patch to that file, and then as you said it had to be done
+> >> on a per-toplevel file, I did it in the individual DTS files instead.
+> >
+> > I'm not following here. If you have boards that want port 1 to be
+> > disabled, shouldn't you remove that alias?
 > 
-> I have them applied from a later thread already, but will drop both in
-> my branch as I have not pushed them out yet.
+> No, that is done by not changing status = "disabled"; to
+> status = "okay"; on a per-board basis.
+> 
+> This is what the second patch is doing.
+> 
+> The aliases are set also to disabled ports to ensure enumeration
+> for the cases where a board file enabled a previously disabled
+> UART.
+> 
 
-Oops sorry about stepping on your toes - I obviously missed that followup.
+Well, both really. The status property tells the kernel to not
+ever touch a device, while the alias is what traditionally gets
+used to assign an OS visible device name to a device in the tree.
+This is more true for MacOS and AIX than Linux, which sometimes
+does its own naming, but we really should not have an alias pointing
+at a disabled device node.
 
-- Paul
+	Arnd
