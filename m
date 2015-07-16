@@ -1,41 +1,60 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Thu, 16 Jul 2015 08:01:38 +0000
-Subject: [PATCH] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <2042080.Y9rzRSQLpW@wuerfel>
-References: <1436952778-28000-1-git-send-email-yao.yuan@freescale.com>
- <3074236.7KNCYXgBBY@wuerfel>
- <BL2PR03MB338DF493E475876FF6C6038839A0@BL2PR03MB338.namprd03.prod.outlook.com>
- <2042080.Y9rzRSQLpW@wuerfel>
-Message-ID: <BL2PR03MB3380E34F751336BA0C0C5F283990@BL2PR03MB338.namprd03.prod.outlook.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 16 Jul 2015 10:05:44 +0200
+Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
+In-Reply-To: <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1437033944.27428.11.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-Ok, I will remove the #ifdef in the next version.
-Thanks.
+On wo, 2015-07-15 at 11:15 +0800, Xing Zheng wrote:
+> --- /dev/null
+> +++ b/sound/soc/rockchip/rockchip_max98090.c
 
-Hi All,
-Is there any others comments?
+> +#define DRV_NAME "rockchip-snd-max98090"
 
-Thanks for your review.
+> +static const struct of_device_id rockchip_max98090_of_match[] = {
+> +	{ .compatible = "rockchip,rockchip-audio-max98090", },
+> +	{},
+> +};
+> +
+> +static struct platform_driver snd_rk_mc_driver = {
+> +	.probe = snd_rk_mc_probe,
+> +	.remove = snd_rk_mc_remove,
+> +	.driver = {
+> +		.name = DRV_NAME,
+> +		.owner = THIS_MODULE,
+> +		.pm = &snd_soc_pm_ops,
+> +		.of_match_table = rockchip_max98090_of_match,
+> +	},
+> +};
+> +
+> +module_platform_driver(snd_rk_mc_driver);
 
-Best Regards,
-Yuan Yao
+Nit: empty line here.
 
-On Wednesday, July 15, 2015 10:55 PM Arnd wrote:
-> On Wednesday 15 July 2015 10:29:55 Yao Yuan wrote:
-> > Hi Arnd,
-> >
-> > Thanks for your review.
-> > And can you give me more information?
-> > In my opinion, The fsl_edma_pm_state will just be used when CONFIG_PM
-> > support. So why not use the #ifdefs to remove the unnecessary code? Since
-> the PM will not be selected in many use cases.
-> 
-> I would consider code readability more important than saving a few instructions,
-> and the #ifdef interrupts the reading flow.
-> Another aspect is that the compiler does not produce warnings for incorrect
-> code in an #ifdef, so we try to use e.g. 'if (IS_ENABLED(CONFIG_FOO))'
-> instead of '#ifdef CONFIG_FOO' wherever possible.
-> 
-> 	Arnd
+> +MODULE_AUTHOR("jianqun <jay.xu@rock-chips.com>");
+> +MODULE_DESCRIPTION("Rockchip max98090 machine ASoC driver");
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_ALIAS("platform:" DRV_NAME);
+
+This seems only useful if there's a corresponding struct
+platform_device. Ie, a platform_device with a "rockchip-snd-max98090"
+.name, which will trigger a "MODALIAS=platform:rockchip-snd-max98090"
+uevent when it's created. But I couldn't find where such a
+platform_device is created.
+
+Did I miss something? Or is there another way this alias is useful here?
+
+> +MODULE_DEVICE_TABLE(of, rockchip_max98090_of_match);
+
+The common pattern is to put MODULE_DEVICE_TABLE() directly after the
+table it exports.
+
+Likewise for 2/2 (except the empty line nit, that is).
+
+Thanks,
+
+
+Paul Bolle
