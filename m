@@ -1,162 +1,162 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 16 Jul 2015 18:05:48 +0530
-Subject: [PATCH v3 2/2] dma: Add Xilinx zynqmp dma engine driver support
-In-Reply-To: <1434422083-8653-2-git-send-email-punnaia@xilinx.com>
-References: <1434422083-8653-1-git-send-email-punnaia@xilinx.com>
- <1434422083-8653-2-git-send-email-punnaia@xilinx.com>
-Message-ID: <20150716123548.GO5086@localhost>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Thu, 16 Jul 2015 18:04:53 +0530
+Subject: [PATCH 2/3] ARM: DRA: hwmod: RTC: Add lock and unlock functions
+In-Reply-To: <alpine.DEB.2.02.1507160007550.32764@utopia.booyaka.com>
+References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+ <1433928386-24891-3-git-send-email-lokeshvutla@ti.com>
+ <alpine.DEB.2.02.1507160007550.32764@utopia.booyaka.com>
+Message-ID: <55A7A4ED.2080802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 08:04:43AM +0530, Punnaiah Choudary Kalluri wrote:
-> +/* Register Offsets */
-> +#define ISR				0x100
-> +#define IMR				0x104
-> +#define IER				0x108
-> +#define IDS				0x10C
-> +#define CTRL0				0x110
-> +#define CTRL1				0x114
-> +#define STATUS				0x11C
-> +#define DATA_ATTR			0x120
-> +#define DSCR_ATTR			0x124
-> +#define SRC_DSCR_WRD0			0x128
-> +#define SRC_DSCR_WRD1			0x12C
-> +#define SRC_DSCR_WRD2			0x130
-> +#define SRC_DSCR_WRD3			0x134
-> +#define DST_DSCR_WRD0			0x138
-> +#define DST_DSCR_WRD1			0x13C
-> +#define DST_DSCR_WRD2			0x140
-> +#define DST_DSCR_WRD3			0x144
-> +#define SRC_START_LSB			0x158
-> +#define SRC_START_MSB			0x15C
-> +#define DST_START_LSB			0x160
-> +#define DST_START_MSB			0x164
-> +#define TOTAL_BYTE			0x188
-> +#define RATE_CTRL			0x18C
-> +#define IRQ_SRC_ACCT			0x190
-> +#define IRQ_DST_ACCT			0x194
-> +#define CTRL2				0x200
-Can you namespace these and other defines
+Hi Paul,
+On Thursday 16 July 2015 05:43 AM, Paul Walmsley wrote:
+> Hi,
+>
+> some comments.
+>
+> On Wed, 10 Jun 2015, Lokesh Vutla wrote:
+>
+>> RTC IP have kicker feature which prevents spurious writes to its registers.
+>> In order to write into any of the RTC registers, KICK values has to be
+>> written to KICK registers.
+>>
+>> Introduce omap_hwmod_rtc_unlock/lock functions, which  writes into these
+>> KICK registers inorder to lock and unlock RTC registers.
+>> Also hook these functions to RTC hwmod.
+>>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> ---
+>>   arch/arm/mach-omap2/omap_hwmod.h          |  2 ++
+>>   arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  2 ++
+>>   arch/arm/mach-omap2/omap_hwmod_reset.c    | 47 +++++++++++++++++++++++++++++++
+>>   3 files changed, 51 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
+>> index 44c7db9..04855ab 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod.h
+>> +++ b/arch/arm/mach-omap2/omap_hwmod.h
+>> @@ -742,6 +742,8 @@ const char *omap_hwmod_get_main_clk(struct omap_hwmod *oh);
+>>    */
+>>
+>>   extern int omap_hwmod_aess_preprogram(struct omap_hwmod *oh);
+>> +void omap_hwmod_rtc_unlock(struct omap_hwmod *oh);
+>> +void omap_hwmod_rtc_lock(struct omap_hwmod *oh);
+>>
+>>   /*
+>>    * Chip variant-specific hwmod init routines - XXX should be converted
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> index 0e64c2f..983042f 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>> @@ -1548,6 +1548,8 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
+>>   static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
+>>   	.name	= "rtcss",
+>>   	.sysc	= &dra7xx_rtcss_sysc,
+>> +	.unlock	= &omap_hwmod_rtc_unlock,
+>> +	.lock	= &omap_hwmod_rtc_lock,
+>>   };
+>>
+>>   /* rtcss */
+>
+> Is the DRA7xx the only chip that has this lock/unlock feature, or do other
+> OMAP chips use the same RTC IP block?
+>
+>> diff --git a/arch/arm/mach-omap2/omap_hwmod_reset.c b/arch/arm/mach-omap2/omap_hwmod_reset.c
+>> index 65e186c..1fb106d 100644
+>> --- a/arch/arm/mach-omap2/omap_hwmod_reset.c
+>> +++ b/arch/arm/mach-omap2/omap_hwmod_reset.c
+>> @@ -25,11 +25,20 @@
+>>    */
+>>   #include <linux/kernel.h>
+>>   #include <linux/errno.h>
+>> +#include <linux/delay.h>
+>>
+>>   #include <sound/aess.h>
+>>
+>>   #include "omap_hwmod.h"
+>>
+>> +#define OMAP_RTC_STATUS_REG	0x44
+>> +#define OMAP_RTC_KICK0_REG	0x6c
+>> +#define OMAP_RTC_KICK1_REG	0x70
+>> +
+>> +#define OMAP_RTC_KICK0_VALUE	0x83E70B13
+>> +#define OMAP_RTC_KICK1_VALUE	0x95A4F1E0
+>> +#define OMAP_RTC_STATUS_BUSY	BIT(0)
+>> +
+>>   /**
+>>    * omap_hwmod_aess_preprogram - enable AESS internal autogating
+>>    * @oh: struct omap_hwmod *
+>> @@ -51,3 +60,41 @@ int omap_hwmod_aess_preprogram(struct omap_hwmod *oh)
+>>
+>>   	return 0;
+>>   }
+>> +
+>> +static void omap_rtc_wait_not_busy(struct omap_hwmod *oh)
+>
+> This function is missing kerneldoc and desperately needs it.
+I should have written it, sorry about that.
+For updating certain RTC registers, the MPU must wait for the BUSY 
+status to become zero. Once the BUSY flag is zero, there is a 15-?s 
+access period in which the MPU can program.
 
-> +struct zynqmp_dma_chan {
-> +	struct zynqmp_dma_device *xdev;
-xdev seems an odd name, i suspect copy paste error!
+>
+>> +{
+>> +	int count;
+>> +	u8 status;
+>> +
+>> +	/* BUSY may stay active for 1/32768 second (~30 usec) */
+>> +	for (count = 0; count < 50; count++) {
+>
+> OK, I give up.  Where does 50 come from?  This should be moved into a
+> macro with a comment, at the very least.
+>
+>> +		status = omap_hwmod_read(oh, OMAP_RTC_STATUS_REG);
+>> +		if (!(status & OMAP_RTC_STATUS_BUSY))
+>> +			break;
+>> +		udelay(1);
+>> +	}
+>> +	/* now we have ~15 usec to read/write various registers */
+>> +}
+>> +
+>> +/**
+>> + * omap_hwmod_rtc_unlock - Reset and unlock the Kicker mechanism.
+>> + * @oh: struct omap_hwmod *
+>> + *
+>> + * RTC IP have kicker feature.  This prevents spurious writes to its registers.
+>> + * In order to write into any of the RTC registers, KICK values has te be
+>> + * written in respective KICK registers. This is needed for hwmod to write into
+>> + * sysconfig register.
+>> + */
+>> +void omap_hwmod_rtc_unlock(struct omap_hwmod *oh)
+>> +{
+>> +	omap_rtc_wait_not_busy(oh);
+>
+> What prevents the CPU from context-switching away after the BUSY bit test
+> and not returning back here by the time the ~15 ?s interval has ended?
+> Looks to me like this whole thing needs to run with interrupts disabled.
+Yes, you are correct. Ill update it and repost.
 
-> +	void __iomem *regs;
-> +	spinlock_t lock;
-> +	struct list_head pending_list;
-> +	struct list_head free_list;
-> +	struct list_head active_list;
-> +	struct zynqmp_dma_desc_sw *sw_desc_pool;
-> +	struct list_head done_list;
-> +	struct dma_chan common;
-> +	void *desc_pool_v;
-> +	dma_addr_t desc_pool_p;
-why two pools and one void *?
-
-> +/**
-> + * zynqmp_dma_alloc_chan_resources - Allocate channel resources
-> + * @dchan: DMA channel
-> + *
-> + * Return: '0' on success and failure value on error
-wrong, its number of descriptors which maybe 0
-
-> + */
-> +static int zynqmp_dma_alloc_chan_resources(struct dma_chan *dchan)
-> +{
-> +	struct zynqmp_dma_chan *chan = to_chan(dchan);
-> +	struct zynqmp_dma_desc_sw *desc;
-> +	int i;
-> +
-> +	chan->sw_desc_pool = kzalloc(sizeof(*desc) * ZYNQMP_DMA_NUM_DESCS,
-> +				     GFP_KERNEL);
-and you are allocating the number so pls return that
-
-Btw is ZYNQMP_DMA_NUM_DESCS sw or HW limit
-
-> +static void zynqmp_dma_start_transfer(struct zynqmp_dma_chan *chan)
-> +{
-> +	struct zynqmp_dma_desc_sw *desc;
-> +
-> +	if (!zynqmp_dma_chan_is_idle(chan))
-> +		return;
-> +
-> +	desc = list_first_entry_or_null(&chan->pending_list,
-> +					struct zynqmp_dma_desc_sw, node);
-> +	if (!desc)
-> +		return;
-> +
-> +	if (chan->has_sg)
-> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> +	else
-> +		list_move_tail(&desc->node, &chan->active_list);
-> +
-> +	if (chan->has_sg)
-> +		zynqmp_dma_update_desc_to_ctrlr(chan, desc);
-> +	else
-> +		zynqmp_dma_config_simple_desc(chan, desc->src, desc->dst,
-> +					      desc->len);
-> +	zynqmp_dma_start(chan);
-> +}
-Lots of the list management will get simplified if you use the vchan to do
-so
-
-> +
-> +
-> +/**
-> + * zynqmp_dma_chan_desc_cleanup - Cleanup the completed descriptors
-> + * @chan: ZynqMP DMA channel
-> + */
-> +static void zynqmp_dma_chan_desc_cleanup(struct zynqmp_dma_chan *chan)
-> +{
-> +	struct zynqmp_dma_desc_sw *desc, *next;
-> +
-> +	list_for_each_entry_safe(desc, next, &chan->done_list, node) {
-> +		dma_async_tx_callback callback;
-> +		void *callback_param;
-> +
-> +		list_del(&desc->node);
-> +
-> +		callback = desc->async_tx.callback;
-> +		callback_param = desc->async_tx.callback_param;
-> +		if (callback)
-> +			callback(callback_param);
-> +
-and you are calling the callback with lock held and user can do further
-submissions so this is wrong!
-
-> +static enum dma_status zynqmp_dma_tx_status(struct dma_chan *dchan,
-> +				      dma_cookie_t cookie,
-> +				      struct dma_tx_state *txstate)
-> +{
-> +	return dma_cookie_status(dchan, cookie, txstate);
-
-no residue calculation?
-
-> +static struct dma_async_tx_descriptor *zynqmp_dma_prep_memcpy(
-> +				struct dma_chan *dchan, dma_addr_t dma_dst,
-> +				dma_addr_t dma_src, size_t len, ulong flags)
-> +{
-> +	struct zynqmp_dma_chan *chan;
-> +	struct zynqmp_dma_desc_sw *new, *first = NULL;
-> +	void *desc = NULL, *prev = NULL;
-> +	size_t copy;
-> +	u32 desc_cnt;
-> +
-> +	chan = to_chan(dchan);
-> +
-> +	if ((len > ZYNQMP_DMA_MAX_TRANS_LEN) && !chan->has_sg)
-why sg?
-
-> +static int zynqmp_dma_remove(struct platform_device *pdev)
-> +{
-> +	struct zynqmp_dma_device *xdev = platform_get_drvdata(pdev);
-> +
-> +	of_dma_controller_free(pdev->dev.of_node);
-> +	dma_async_device_unregister(&xdev->common);
-> +
-> +	zynqmp_dma_chan_remove(xdev->chan);
-Please free up irq here explictly and also ensure tasklet is not running
-
--- 
-~Vinod
+Thanks and regards,
+Lokesh
+>
+>> +	omap_hwmod_write(OMAP_RTC_KICK0_VALUE, oh, OMAP_RTC_KICK0_REG);
+>> +	omap_hwmod_write(OMAP_RTC_KICK1_VALUE, oh, OMAP_RTC_KICK1_REG);
+>> +}
+>> +
+>> +void omap_hwmod_rtc_lock(struct omap_hwmod *oh)
+>> +{
+>> +	omap_rtc_wait_not_busy(oh);
+>
+> Same comment as the above.
+>
+>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK0_REG);
+>> +	omap_hwmod_write(0x0, oh, OMAP_RTC_KICK1_REG);
+>> +}
+>> --
+>> 1.9.1
+>>
+>
+>
+> - Paul
+>
