@@ -1,62 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 16 Jul 2015 16:11:05 +0200
-Subject: [PATCH 2/2] dmaengine: xdmac: Add scatter gathered memset support
-In-Reply-To: <20150716120154.GN5086@localhost>
-References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
- <1436177964-19380-3-git-send-email-maxime.ripard@free-electrons.com>
- <20150716120154.GN5086@localhost>
-Message-ID: <20150716141105.GJ28632@lukather>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Thu, 16 Jul 2015 16:15:16 +0200
+Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
+In-Reply-To: <20150716125529.GG4039@sirena.org.uk>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+ <1437033944.27428.11.camel@tiscali.nl>
+ <20150716110032.GU11162@sirena.org.uk>
+ <1437047261.28351.6.camel@tiscali.nl> <20150716125529.GG4039@sirena.org.uk>
+Message-ID: <1437056116.28351.19.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On do, 2015-07-16 at 13:55 +0100, Mark Brown wrote:
+> No, in that case you've not understood what the MODULE_ALIAS is
+> for.  It's there so that userspace knows which module to load if it 
+> gets
+> a device with no driver, it goes in the driver not in the code
+> registering the device.
 
-> > +		/*
-> > +		 * The scatterlist API gives us only the address and
-> > +		 * length of each elements.
-> > +		 *
-> > +		 * Unfortunately, we don't have the stride, which we
-> > +		 * will need to compute.
-> > +		 *
-> > +		 * That make us end up in a situation like this one:
-> > +		 *    len    stride    len    stride    len
-> > +		 * +-------+        +-------+        +-------+
-> > +		 * |  N-2  |        |  N-1  |        |   N   |
-> > +		 * +-------+        +-------+        +-------+
-> > +		 *
-> > +		 * We need all these three elements (N-2, N-1 and N)
-> > +		 * to actually take the decision on whether we need to
-> > +		 * queue N-1 or reuse N-2.
-> > +		 *
-> > +		 * We will only consider N if it is the last element.
-> > +		 */
->
-> Why do you need stride?
-> 
-> This is scatterlist so the computation of stride sounds odd here. Ideally
-> you should take the scatterlist and program the lli for controller.
+That's exactly how I understood MODULE_ALIAS() to work.
 
-Because it is sub-optimal if the length and stride are equals from one
-descriptors to another. The XDMAC is able to repeat any given
-descriptor a given number of time (which is one by default), which
-means that if the parameters of the transfer don't change, we simply
-have to increment the number of time the descriptor has to be used,
-instead of creating a new one that the controller will have to fetch.
+And it works, in short, because a platform device fires a
+"MODALIAS=platform:[...]" uevent when it's created. And userspace uses
+that uevent to load the module carrying that alias.
 
-In the non-optimal case (ie the length and/or stride change from one
-scatterlist element to another), we simply fallback to a one LLI per
-scatter list element.
+Let's put it this was. If one does
+    sudo find /sys -perm -o=r -name uevent -exec grep -H MODALIAS=platform: {} \;
 
-Maxime
+or
+    sudo find /sys -perm -o=r -name modalias -exec grep -H platform: {} \;
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/6bf563a7/attachment.sig>
+(both lists should be similar)
+
+on the systems this patch is targeting, will
+   platform:rockchip-snd-max98090
+
+then show up?
+
+Thanks,
+
+
+Paul Bolle
