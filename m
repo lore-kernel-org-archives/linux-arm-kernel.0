@@ -1,26 +1,150 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 16 Jul 2015 13:10:18 +0200 (CEST)
-Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
-In-Reply-To: <CAL_JsqJfDdDAQ1gr1w3w8_FVqKzxqDag-PHnwguaPfT+6zqszw@mail.gmail.com>
-References: <1436711211-18223-1-git-send-email-robh@kernel.org>
- <1436711211-18223-7-git-send-email-robh@kernel.org>
- <alpine.DEB.2.11.1507121737030.20072@nanos>
- <CAL_JsqJfDdDAQ1gr1w3w8_FVqKzxqDag-PHnwguaPfT+6zqszw@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1507161309370.18576@nanos>
+From: Jianwei.Wang@freescale.com (Wang J.W.)
+Date: Thu, 16 Jul 2015 11:15:09 +0000
+Subject: [PATCH v9 2/4] drm/panel: simple: Add support for NEC
+ NL4827HC19-05B 480x272 panel
+In-Reply-To: <20150714105328.GJ12465@ulmo.nvidia.com>
+References: <1436784692-40560-1-git-send-email-jianwei.wang@freescale.com>
+ <1436784692-40560-2-git-send-email-jianwei.wang@freescale.com>
+ <20150714105328.GJ12465@ulmo.nvidia.com>
+Message-ID: <DM2PR0301MB1229470A1906E844A185E4BE9F990@DM2PR0301MB1229.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jul 2015, Rob Herring wrote:
-> On Sun, Jul 12, 2015 at 11:43 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> > So in most of the irqchip drivers, this is irrelevant.
+
+
+> -----Original Message-----
+> From: Thierry Reding [mailto:thierry.reding at gmail.com]
+> Sent: Tuesday, July 14, 2015 6:54 PM
+> To: Wang Jianwei-B52261
+> Cc: dri-devel at lists.freedesktop.org; linux-kernel at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> airlied at linux.ie; daniel.vetter at ffwll.ch; mark.yao at rock-chips.com; Wood
+> Scott-B07421; Wang Huan-B18965; Xiubo Li
+> Subject: Re: [PATCH v9 2/4] drm/panel: simple: Add support for NEC
+> NL4827HC19-05B 480x272 panel
 > 
-> Agreed, but that's a separate series I think. I'm trying not to change
-> behavior with this series. Are you proposing I do something different
-> with this patch?
+> On Mon, Jul 13, 2015 at 06:51:30PM +0800, Jianwei Wang wrote:
+> > This adds support for the NEC NL4827HC19-05B 480x272 panel to the DRM
+> > simple panel driver.
+> >
+> > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> > Signed-off-by: Jianwei Wang <jianwei.wang@freescale.com>
+> > Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> > ---
+> >  .../bindings/panel/nec,nl4827hc19_05b.txt          |  7 ++++++
+> >  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+> >  MAINTAINERS                                        |  1 -
+> >  drivers/gpu/drm/panel/panel-simple.c               | 26
+> ++++++++++++++++++++++
+> >  4 files changed, 34 insertions(+), 1 deletion(-)  create mode 100644
+> > Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+> >
+> > diff --git
+> > a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+> > b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+> > new file mode 100644
+> > index 0000000..20e9473
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+> > @@ -0,0 +1,7 @@
+> > +NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
+> > +
+> > +Required properties:
+> > +- compatible: should be "nec,nl4827hc19_05b"
+> > +
+> > +This binding is compatible with the simple-panel binding, which is
+> > +specified in simple-panel.txt in this directory.
+> > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > index 8033919..9f22b3e 100644
+> > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> > @@ -131,6 +131,7 @@ mundoreader	Mundo Reader S.L.
+> >  murata	Murata Manufacturing Co., Ltd.
+> >  mxicy	Macronix International Co., Ltd.
+> >  national	National Semiconductor
+> > +nec	NEC LCD Technologies, Ltd.
+> >  neonode		Neonode Inc.
+> >  netgear	NETGEAR
+> >  netlogic	Broadcom Corporation (formerly NetLogic Microsystems)
+> 
+> This belongs in a separate patch.
+> 
+ 
+Ok!
 
-No, consolidating it with no functional change is certainly the right
-thing to do first.
+> > diff --git a/MAINTAINERS b/MAINTAINERS index fffb8c9..e191ded 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -3410,7 +3410,6 @@ M:	Alison Wang <alison.wang@freescale.com>
+> >  L:	dri-devel at lists.freedesktop.org
+> >  S:	Supported
+> >  F:	drivers/gpu/drm/fsl-dcu/
+> > -F:      Documentation/devicetree/bindings/drm/fsl-dcu/
+> 
+> What's this doing here?
+> 
+ 
 
-Thanks,
+It's a mistake. I must be very careful next time.
 
-	tglx
+
+
+> >  F:      Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+> >
+> >  DRM DRIVERS FOR NVIDIA TEGRA
+> > diff --git a/drivers/gpu/drm/panel/panel-simple.c
+> > b/drivers/gpu/drm/panel/panel-simple.c
+> > index f94201b..eb12fe4 100644
+> > --- a/drivers/gpu/drm/panel/panel-simple.c
+> > +++ b/drivers/gpu/drm/panel/panel-simple.c
+> > @@ -1036,6 +1036,29 @@ static const struct panel_desc
+> shelly_sca07010_bfn_lnn = {
+> >  	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,  };
+> >
+> > +static const struct drm_display_mode nec_nl4827hc19_05b_mode = {
+> > +	.clock = 10870,
+> > +	.hdisplay = 480,
+> > +	.hsync_start = 480 + 2,
+> > +	.hsync_end = 480 + 2 + 41,
+> > +	.htotal = 480 + 2 + 41 + 2,
+> > +	.vdisplay = 272,
+> > +	.vsync_start = 272 + 2,
+> > +	.vsync_end = 272 + 2 + 4,
+> > +	.vtotal = 272 + 2 + 4 + 2,
+> > +	.vrefresh = 74,
+> > +};
+> > +
+> > +static const struct panel_desc nec_nl4827hc19_05b = {
+> > +	.modes = &nec_nl4827hc19_05b_mode,
+> > +	.num_modes = 1,
+> > +	.size = {
+> > +		.width = 95,
+> > +		.height = 54,
+> > +	},
+> > +	.bus_format = MEDIA_BUS_FMT_RGB888_1X24 };
+> > +
+> 
+> Please keep these...
+> 
+> >  static const struct of_device_id platform_of_match[] = {
+> >  	{
+> >  		.compatible = "ampire,am800480r3tmqwa1h", @@ -1125,6 +1148,9
+> @@
+> > static const struct of_device_id platform_of_match[] = {
+> >  		.compatible = "shelly,sca07010-bfn-lnn",
+> >  		.data = &shelly_sca07010_bfn_lnn,
+> >  	}, {
+> > +		.compatible = "nec,nl4827hc19_05b",
+> > +		.data = &nec_nl4827hc19_05b,
+> > +	}, {
+> 
+> and this sorted alphabetically.
+> 
+> Thierry
+
+Ok!
+
+Thanks for your guidance
+Jianwei
