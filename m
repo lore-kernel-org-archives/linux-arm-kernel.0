@@ -1,198 +1,94 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 16 Jul 2015 14:34:41 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <20150708160227.GJ9283@arm.com>
-References: <20150324155007.GC23005@leverpostej>
- <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
- <20150527173953.GC23176@leverpostej>
- <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
- <20150601102208.GD22406@leverpostej>
- <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
- <20150605090534.GC1198@arm.com>
- <20150609101515.GA28474@leverpostej>
- <20150708133049.GD7025@leverpostej> <20150708160227.GJ9283@arm.com>
-Message-ID: <20150716133441.GC28631@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Jul 2015 14:37:41 +0100
+Subject: [PATCH v3 1/3] IRQ/Gic-V3: Add mbigen driver to support mbigen
+ interrupt controller
+In-Reply-To: <55A7A2F9.3000306@huawei.com>
+References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
+ <1436166548-34920-2-git-send-email-majun258@huawei.com>
+ <alpine.DEB.2.11.1507061248090.3916@nanos> <559CA530.2090508@huawei.com>
+ <559D3EB5.4060408@arm.com> <55A76CBE.2030508@huawei.com>
+ <55A770E2.2040300@arm.com> <55A777BD.4080504@huawei.com>
+ <55A77999.9000203@arm.com> <55A7A2F9.3000306@huawei.com>
+Message-ID: <55A7B3A5.6010008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 16/07/15 13:26, majun (F) wrote:
+> 
+> 
+> ? 2015/7/16 17:30, Marc Zyngier ??:
+>> On 16/07/15 10:22, majun (F) wrote:
+>>>
+>>>
+>>> ? 2015/7/16 16:52, Marc Zyngier ??:
+>>>> On 16/07/15 09:35, majun (F) wrote:
+>>>
+>>>>>> I'm a bit puzzled.
+>>>>>
+>>>>> For interrupts connect to mbigen , the interrupt trigger type, device id and
+>>>>> event id value are encoded in mbigen chip already.
+>>>>>
+>>>>> There are two types of mbigen node within a mbigen chip.
+>>>>> Type1: event id valud can't be programmed.
+>>>>> Type2: event id value can be programmed.
+>>>>>
+>>>>> For example: An device with 5 interrupts connected to Mbigen node
+>>>>> type 1.The default event id vlaue encoded in mbigen chip for these 5 interrupt
+>>>>> is from 0 to 4.
+>>>>>
+>>>>> Because the event id value can't be programmed, we need to define all of
+>>>>> 5 interrupts in dts file so that these 5 interrupt has
+>>>>
+>>>> You can define what you want in the device tree, the ITS doesn't care!
+>>>> Nothing in the ITS code parses this property, and there is absolutely
+>>>> zero chance that the even the ITS has allocated will actually match what
+>>>> you expect.
+>>>>
+>>>> The ITS *relies* on the principle that the evenID can be programmed,
+>>>> just like any MSI controller relies on the device to be programmed with
+>>>> whatever payload has been provided. If all of a sudden we have to
+>>>> support HW that has its own view of the payload, what you have here will
+>>>> simply not work.
+>>>>
+>>> "If all of a sudden we have to
+>>>  support HW that has its own view of the payload, what you have here will
+>>>  simply not work."
+>>>
+>>> I am not very unstand this case, would you please explain this more detail?
+>>
+>> It is the ITS driver that allocates the eventID, not the device. If your
+>> hardware has decided that it will use event 5, while the ITS expect it
+>> to use event 3, nothing will work. And there is no way for the ITS to
+>> know which event your device is using (it doesn't parse your device's
+>> device tree).
+>>
+> Yes, I agree with you that eventID should be allocated by ITS driver.
+> But I want to explain the case you said above can be avoided.
+> 
+> For example, An device with total 5 interrupts connected to Mbigen node.
+> In mbigen chip, the default eventID value for each device starts from 0.
+> So, for these 5 interrupts the default eventID value is from 0 to 4.
+> 
+> Because the default eventID is fixed in mbigen chip, to make these 5 interrupt
+> work, the only way is define all these 5 interrupts in dts file.
 
-The below is an attempt at an MSI binding, derived from my original
-example. It extends msi-parent inoto a phandle+(optional args) style
-property.
+But the ITS doesn't read these interrupts, and won't let you program the
+translation either.
 
-I haven't yet managed to come up with a sane way of describing
-the Bus-ID/BDF -> {iommu,msi}-cells translation, but this should
-hopefully cover the platform device case.
+> When irq initializing, ITS driver will allocat LPI interrupt number for these
+> 5 interrupts, for example : from 8192 to 8196. and the eventID value is from 0 to 4.
+> Now, the allocated eventID value same as the eventID value encoded in mbigen chip,
+> The interrupt can work.
 
-For the Bus-ID translation case I'm not sure it's sane to attempt to use
-msi-parent, given that the transformation description will necessarily
-have to describe the parents anyway.
+But that's pure luck! What if I decide to change the allocation method
+so that all the devices share a common ITT?
 
-Thanks,
-Mark.
+Have you really hardcoded the Linux behaviour in your hardware?
 
----->8----
->From 429dca4bba98732c492e95bdf395aa2ccc634e69 Mon Sep 17 00:00:00 2001
-From: Mark Rutland <mark.rutland@arm.com>
-Date: Thu, 9 Jul 2015 17:53:00 +0100
-Subject: [PATCH] Documentation: dt: add generic MSI bindings
+> I know this is not a good method,but for current mbigen chip,it's the only solution.
 
-Currently msi-parent is in use in a couple of drviers despite being
-fairly underspecified. This patch adds a generic binding for MSIs
-(including the existing msi-parent property) enabling the description of
-platform devices capable of using MSIs.
+I'm sorry, I can't call this a solution.
 
-This binding does not yet cover the general case. Currently the binding
-does not cover the relationship between bus IDs (e.g. PCIe BDF) and
-sideband data.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
----
- .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
- 1 file changed, 135 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
-
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-new file mode 100644
-index 0000000..c60c034
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-@@ -0,0 +1,135 @@
-+This document describes the generic device tree binding for MSI controllers and
-+their master(s).
-+
-+Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
-+write to an MMIO address.
-+
-+MSIs were originally specified by PCI (and are used with PCIe), but may also be
-+used with other busses, and hence a mechanism is required to relate devices on
-+those busses to the MSI controllers which they are capable of using,
-+potentially including additional information.
-+
-+MSIs are distinguished by some combination of:
-+
-+- The doorbell (the MMIO address written to).
-+  
-+  Devices may be configured by software to write to arbitrary doorbells which
-+  they can address. An MSI controller may feature a number of doorbells.
-+
-+- The payload (the value written to the doorbell).
-+  
-+  Devices may be configured to write an arbitrary payload chosen by software.
-+  MSI controllers may have restrictions on permitted payloads.
-+
-+- Sideband information accompanying the write.
-+  
-+  Typically this is neither configurable nor probeable, and depends on the path
-+  taken through the memory system (i.e. it is a property of the combination of
-+  MSI controller and device rather than a property of either in isolation).
-+
-+
-+MSI controllers:
-+================
-+
-+An MSI controller signals interrupts to a CPU when a write is made to an MMIO
-+address by some master. An MSI controller may feature a number of doorbells.
-+
-+Required properties:
-+--------------------
-+
-+- msi-controller: Identifies the node as an MSI controller.
-+
-+Optional properties:
-+--------------------
-+
-+- #msi-cells: The number of cells in an msi-specifier, required if not zero.
-+
-+  Typically this will encode information related to sideband data, and will
-+  not encode doorbells or payloads as these can be configured dynamically.
-+
-+  The meaning of the msi-specifier is defined by the device tree binding of
-+  the specific MSI controller. 
-+
-+
-+MSI clients
-+===========
-+
-+MSI clients are devices which generate MSIs. For each MSI they wish to
-+generate, the doorbell and payload may be configured, though sideband
-+information may not be configurable.
-+
-+Required properties:
-+--------------------
-+
-+- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
-+  controller which the device is capable of using.
-+
-+  This property is unordered, and MSIs may be allocated from any combination of
-+  MSI controllers listed in the msi-parent property.
-+
-+  If a device has restrictions on the allocation of MSIs, these restrictions
-+  must be described with additional properties.
-+
-+  When #msi-cells is non-zero, busses with an msi-parent will require
-+  additional properties to describe the relationship between devices on the bus
-+  and the set of MSIs they can potentially generate.
-+
-+
-+Example
-+=======
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi_a: msi-controller at a {
-+		reg = <0xa 0xf00>;
-+		compatible = "vendor-a,some-controller";
-+		msi-controller;
-+		/* No sideband data, so #msi-cells omitted */
-+	};
-+
-+	msi_b: msi-controller at b {
-+		reg = <0xb 0xf00>;
-+		compatible = "vendor-b,another-controller";
-+		msi-controller;
-+		/* Each device has some unique ID */
-+		#msi-cells = <1>;
-+	};
-+
-+	msi_c: msi-controller at c {
-+		reg = <0xb 0xf00>;
-+		compatible = "vendor-b,another-controller";
-+		msi-controller;
-+		/* Each device has some unique ID */
-+		#msi-cells = <1>;
-+	};
-+
-+	dev at 0 {
-+		reg = <0x0 0xf00>;
-+		compatible = "vendor-c,some-device";
-+
-+		/* Can only generate MSIs to msi_a */
-+		msi-parent = <&msi_a>;
-+	};
-+
-+	dev at 1 {
-+		reg = <0x1 0xf00>;
-+		compatible = "vendor-c,some-device";
-+
-+		/* 
-+		 * Can generate MSIs to either A or B.
-+		 */
-+		msi-parent = <&msi_a>, <&msi_b 0x17>;
-+	};
-+
-+	dev at 2 {
-+		reg = <0x2 0xf00>;
-+		compatible = "vendor-c,some-device";
-+		/*
-+		 * Has different IDs at each MSI controller.
-+		 * Can generate MSIs to all of the MSI controllers.
-+		 */
-+		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
-+	};
-+};
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
