@@ -1,73 +1,44 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Jul 2015 02:11:09 -0700
-Subject: [PATCH 02/12] ARM: OMAP2+: Fix scrm compatible for dm814x
-In-Reply-To: <20150603193806.GW30984@atomide.com>
-References: <1433348601-8966-1-git-send-email-tony@atomide.com>
- <1433348601-8966-3-git-send-email-tony@atomide.com>
- <556F50B8.6000903@cogentembedded.com>
- <20150603193806.GW30984@atomide.com>
-Message-ID: <20150716091109.GK17550@atomide.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Thu, 16 Jul 2015 10:13:26 +0100
+Subject: [PATCH 3/3] ARM: add basic support for on-demand backtrace of
+ other CPUs
+In-Reply-To: <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
+References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
+ <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
+Message-ID: <55A775B6.8080505@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [150603 12:39]:
-> * Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150603 12:10]:
-> > Hello.
-> > 
-> > On 06/03/2015 07:23 PM, Tony Lindgren wrote:
-> > 
-> > >Fix scrm compatible for dm814x.
-> > 
-> >    So, scrm...
-> > 
-> > >Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-> > >Signed-off-by: Tony Lindgren <tony@atomide.com>
-> > >---
-> > >  arch/arm/mach-omap2/control.c | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > >
-> > >diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
-> > >index af95a62..364925c 100644
-> > >--- a/arch/arm/mach-omap2/control.c
-> > >+++ b/arch/arm/mach-omap2/control.c
-> > >@@ -649,6 +649,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
-> > >  	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
-> > >  	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
-> > >  	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
-> > >+	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
-> > 
-> >    ... or scm? :-)
-> > 
-> > >  	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
-> > >  	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
-> > >  	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
-> 
-> Thanks, yeah we should standardize on scm.
+On 15/07/15 21:39, Russell King wrote:
+> As we now have generic infrastructure to support backtracing of other
+> CPUs in the system on lockups, we can start to implement this for ARM.
+> Initially, we add an IPI based implementation, as the GIC code needs
+> modification to support the generation of FIQ IPIs, and not all ARM
+> platforms have the ability to raise a FIQ in the non-secure world.
+>
+> This provides us with a "best efforts" implementation in the absence
+> of FIQs.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 90dfbedfbfb8..3a20c386fd33 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -21,6 +21,7 @@
+>   #include <linux/cpu.h>
+>   #include <linux/seq_file.h>
+>   #include <linux/irq.h>
+> +#include <linux/nmi.h>
+>   #include <linux/percpu.h>
+>   #include <linux/clockchips.h>
+>   #include <linux/completion.h>
+> @@ -72,6 +73,7 @@ enum ipi_msg_type {
+>   	IPI_CPU_STOP,
+>   	IPI_IRQ_WORK,
+>   	IPI_COMPLETION,
+> +	IPI_CPU_BACKTRACE = 15,
 
-Below is this one updated to use scm instead of scrm in the
-description.
-
-Regards,
-
-Tony
-
-8< -------------------
-From: Tony Lindgren <tony@atomide.com>
-Date: Thu, 16 Jul 2015 01:55:57 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix scm compatible for dm814x
-
-Fix scm compatible for dm814x.
-
-Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
-
---- a/arch/arm/mach-omap2/control.c
-+++ b/arch/arm/mach-omap2/control.c
-@@ -652,6 +652,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
- 	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
- 	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
- 	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
-+	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
- 	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
- 	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
- 	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
+Even with the potential for (eventually) being signalled by FIQ, is this 
+IPI really so special it needs to be placed outside the scope of NR_IPI 
+and the accounting and tracing support it brings with it?
