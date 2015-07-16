@@ -1,89 +1,56 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 16 Jul 2015 17:27:52 +0200
-Subject: [PATCH 5/7] mtd: spi-nor: allow the set the latency code on Spansion
- memories
+Date: Thu, 16 Jul 2015 17:27:53 +0200
+Subject: [PATCH 6/7] Documentation: atmel-quadspi: add binding file for Atmel
+ QSPI driver
 In-Reply-To: <cover.1437059658.git.cyrille.pitchen@atmel.com>
 References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
-Message-ID: <12f0bceb57e1bf25279a995f76103b4e75091e82.1437059658.git.cyrille.pitchen@atmel.com>
+Message-ID: <f4bb1c68fcc19b3642110ab0ef9850d6eeca3112.1437059658.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both the SPI controller and the flash memory must agree on the number of
-dummy cycles to use for Fast Read commands. For Spansion memories, this
-number of dummy cycles is configured through a so called latency code in
-their Control Register.
-The right latency code can be found in the memory datasheet and depends
-on the SPI clock frequency, the op code of the Fast Read command and the
-Single/Dual Data Rate mode.
+This patch documents the DT bindings for the driver of the Atmel QSPI
+controller embedded inside sama5d2x SoCs.
 
 Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 ---
- drivers/mtd/spi-nor/spi-nor.c | 46 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
 
-diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
-index 5df6e4712a9e..32fddf06da3f 100644
---- a/drivers/mtd/spi-nor/spi-nor.c
-+++ b/drivers/mtd/spi-nor/spi-nor.c
-@@ -989,6 +989,50 @@ static int set_quad_mode(struct spi_nor *nor, struct flash_info *info)
- 	}
- }
- 
-+static int spansion_set_latency_code(struct spi_nor *nor)
-+{
-+	struct device_node *np = nor->dev->of_node;
-+	u8 cr, mask = GENMASK(7, 6);
-+	u32 lc;
-+	int ret;
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+new file mode 100644
+index 000000000000..a0d60ac7ae10
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+@@ -0,0 +1,29 @@
++* Atmel Quad Serial Peripheral Interface (QSPI)
 +
-+	if (!np || of_property_read_u32(np, "spansion,latency-code", &lc))
-+		return 0;
++Required properties:
++  - compatible : Should be "atmel,sama5d2-qspi"
++  - reg : the first contains the register location and length,
++          the second contains the memory mapping address and length
++  - interrupts : Should contain the interrupt for the device
++  - clocks : The clock needed by the QSPI controller
++  - #address-cells : should be 1
++  - #size-cells : should be 0
 +
-+	if (lc & ~(mask >> 6)) {
-+		dev_err(nor->dev, "invalid latency code: %u\n", lc);
-+		return -EINVAL;
-+	}
++Example:
 +
-+	ret = read_cr(nor);
-+	if (ret < 0) {
-+		dev_err(nor->dev,
-+			"error while reading configuration register\n");
-+		return ret;
-+	}
++qspi0: qspi at f0020000 {
++	compatible = "atmel,sama5d2-qspi";
++	reg = <0xf0020000 0x100>,
++	      <0xd0000000 0x08000000>;
++	interrupts = <52 IRQ_TYPE_LEVEL_HIGH 7>;
++	clocks = <&qspi0_clk>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi0_default>;
++	status = "okay";
 +
-+	write_enable(nor);
-+
-+	cr = ret;
-+	cr &= ~mask;
-+	cr |= (lc << 6);
-+	ret = write_sr_cr(nor, cr << 8);
-+	if (ret < 0) {
-+		dev_err(nor->dev,
-+			"error while updating configuration register\n");
-+		return -EINVAL;
-+	}
-+
-+	/* read back and check it */
-+	ret = read_cr(nor);
-+	if (!(ret >= 0 && (ret & mask) == (lc << 6))) {
-+		dev_err(nor->dev, "Spansion latency code not set\n");
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int micron_set_dummy_cycles(struct spi_nor *nor)
- {
- 	int ret;
-@@ -1045,6 +1089,8 @@ static int spi_nor_read_dummy_cycles(struct spi_nor *nor,
- 		 * backward compatibility.
- 		 */
- 		switch (JEDEC_MFR(info)) {
-+		case CFI_MFR_AMD:
-+			return spansion_set_latency_code(nor);
- 		case CFI_MFR_ST:
- 			return micron_set_dummy_cycles(nor);
- 		default:
++	m25p80 at 0 {
++		...
++	};
++};
 -- 
 1.8.2.2
