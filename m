@@ -1,79 +1,179 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 16 Jul 2015 13:35:57 -0700
-Subject: arm: dts: update for 4.2-rcx
-In-Reply-To: <55A7F6F6.40202@ti.com>
-References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
- <55A7E0D0.9070104@ti.com> <55A7E1F2.7000100@oracle.com>
- <55A7F6F6.40202@ti.com>
-Message-ID: <55A815AD.8020604@oracle.com>
+From: aalonso@freescale.com (Alonso Adrian)
+Date: Thu, 16 Jul 2015 20:39:33 +0000
+Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+ lpsr
+In-Reply-To: <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
+References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
+ <20150715072307.GM4119@tiger>
+ <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
+ <20150716155034.GN4119@tiger>
+ <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
+Message-ID: <BN3PR03MB15095AD84AD5738B142F6F8CA8990@BN3PR03MB1509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/16/2015 11:24 AM, Murali Karicheri wrote:
-> On 07/16/2015 12:55 PM, santosh shilimkar wrote:
->> On 7/16/2015 9:50 AM, Murali Karicheri wrote:
->>> On 07/16/2015 12:40 PM, santosh shilimkar wrote:
->>>> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
->>>>> Santosh,
->>>>>
->>>>> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
->>>>> This one should be applied to v4.2-rc kernel with priority.
->>>>> Please review and do the needful.
->>>>>
->>>> Yes I have it for next merge window. It won't be qualified as a
->>>> fix rather more of enhancement. Do you have also patches for
->>>> board DTS files which enables PCIE. I can queue them together
->>>> for next merge window.
->>> No this is a fix for v4.2-rc. PCIe driver is not complete without having
->>> a SerDes driver. Currently the version we send is not accepted since the
->>> config blobs are used. On K2E EVM, this causes problem since the EVM has
->>> Marvell SATA controller present and with default values in the SerDes
->>> register, it seems to pass the PCIe link check, but causes issues since
->>> the configuration is not correct. The manifestation is that when EVM is
->>> booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM
->>> since to work, SerDes driver has to be present as well. So by default,
->>> the PCIe DT binding should be disabled in SoC specific DTS. It can be
->>> enabled in the board specific DTS when the SerDes device driver is also
->>> present. We plan to upstream a common SerDes driver soon. But at this
->>> point this has to be disabled by default.
->>>
->> Please add this information and respin the patch. Thanks for explaining
->> it.
->>
->>> I can provide more details if needed in the patch commit description,
->>> but I though it is not correct to keep the PCIe DT bindings to be
->>> enabled in the SoC specific DTS to begin with. So this is a fix for
->>> v4.2-rc.
->>>
->> Please do. It wasn't clear from the patch description. With above added
->> description its a legitimate fix which I can queue it up for rc's.
->>
-> Ok. Will do. Need an additional patch to rename the PCI nodes such that
-> status can be overridden in a board specific DTS.
->
-> +
-> +&pcie1 {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
-> index 71e2b1c..0055477 100644
-> --- a/arch/arm/boot/dts/k2e.dtsi
-> +++ b/arch/arm/boot/dts/k2e.dtsi
-> @@ -94,7 +94,7 @@
->                          status = "disabled";
->                  };
->
-> -               pcie at 21020000 {
-> +               pcie1: pcie at 21020000 {
->                          compatible = "ti,keystone-pcie","snps,dw-pcie";
->                          clocks = <&clkpcie1>;
->                          clock-names = "pcie";
->
->
-> Same for pcie0 in keystone.dtsi. Do you prefer to put both in the same
-> patch or a separate one for this?
->
-Two patches please.
+Hi All,
 
-Regards,
-Santosh
+I will sent a new patch series including documentation for pad group id encoding in
+Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+
+Thanks for your comments :)
+-
+Adrian
+
+> -----Original Message-----
+> From: Zhi Li [mailto:lznuaa at gmail.com]
+> Sent: Thursday, July 16, 2015 11:22 AM
+> To: Shawn Guo
+> Cc: Alonso Lazcano Adrian-B38018; devicetree at vger.kernel.org; Li Frank-
+> B20596; Garg Nitin-B37173; linus.walleij at linaro.org; linux-
+> gpio at vger.kernel.org; robh+dt at kernel.org; shawn.guo at linaro.org; Huang
+> Yongcai-B20788; linux-arm-kernel at lists.infradead.org; Gong Yibin-B38343
+> Subject: Re: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+> lpsr
+> 
+> On Thu, Jul 16, 2015 at 10:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > Adrian,
+> >
+> > Please configure your email client to use bottom-posting rather than
+> > top-posting.
+> >
+> > On Wed, Jul 15, 2015 at 03:55:59PM +0000, Alonso Adrian wrote:
+> >> [Adrian] IOMUXC and IOMUXC-LPSR are in different base address; each
+> controller provides SW_PAD_CTL  (CONF_REG) and SW_MUX_CTL (MUX_REG)
+> but only IOMUXC provides SELECT_INPUT registers for pad daisy chain
+> configuration, so pads from IOMUXC-LPSR that need daisy chain settings need
+> to access the IOMUXC register space address to access SELECT_INPUT.
+> >>
+> >
+> > Thanks for the explanation.
+> >
+> >> [Adrian] One disadvantage that we found if we created two driver instances
+> for IOMUXC and IOMUXC-LPSR controllers is that in the device tree machine
+> files "end-users" could be creating pinctrl nodes mixing pads from different
+> IOMUXC controllers resulting that pad that doesn't belong to that domain
+> controller it will not be configured properly.
+> >>
+> >> For example a valid pad configuration for I2C1 could use pads as shown
+> below:
+> >> &iomuxc {
+> >>       pinctrl_i2c1_1: i2c1grp-1 {
+> >>               fsl,pins = <
+> >>                       MX7D_PAD_GPIO1_IO04__I2C1_SCL   /* IOMUXC-LPSR domain
+> */
+> >>                       MX7D_PAD_I2C1_SDA__I2C1_SDA     /* IOMUXC domain */
+> >>               >;
+> >>       };
+> >> };
+> >>
+> >> By extending pinctrl-imx to support both controllers the above
+> >> configuration is supported, Otherwise using two driver instances "end-
+> users" will need to do something like:
+> >>
+> >> &iomuxc {
+> >>       pinctrl_i2c1_1: i2c1grp-1 {
+> >>               fsl,pins = <
+> >>                       MX7D_PAD_I2C1_SDA__I2C1_SDA     /* IOMUXC domain */
+> >>               >;
+> >>       };
+> >> };
+> >>
+> >> &iomuxc_lpsr {
+> >>       pinctrl_i2c1_1: i2c1grp-1 {
+> >>               fsl,pins = <
+> >>                       MX7D_PAD_GPIO1_IO04__I2C1_SCL   /* IOMUXC-LPSR domain
+> */
+> >>               >;
+> >>       };
+> >> };
+> >>
+> >> And this is something that we will like to avoid so "end-user" don't have to
+> worry about and configure pads as they are used to.
+> >>
+> >
+> > This is exactly how hardware is designed, and having device tree
+> > describe how hardware is laid out is the right thing to do.  In that
+> > case, when people check the device tree source with a i.MX7D Reference
+> > Manual on hands, they can easily understand how hardware is
+> > represented in device tree.
+> >
+> > Also, your example with pins for a single device across IOMUXC and
+> > IOMUXC-LPSR should be the rare case except GPIO pins.
+> 
+> Although cross IOMUX and IOMUXC-LPSR is rare,  it will be headache if there
+> are one boards.
+> 
+> Some SD card, ENET have reset\wp\cd pin.
+> 
+> pinctrl_usdhc1: usdhc1grp {
+>                         fsl,pins = <
+>                                 MX7D_PAD_SD1_CMD__SD1_CMD               0x59
+>                                 MX7D_PAD_SD1_CLK__SD1_CLK               0x19
+>                                 MX7D_PAD_SD1_DATA0__SD1_DATA0           0x59
+>                                 MX7D_PAD_SD1_DATA1__SD1_DATA1           0x59
+>                                 MX7D_PAD_SD1_DATA2__SD1_DATA2           0x59
+>                                 MX7D_PAD_SD1_DATA3__SD1_DATA3           0x59
+>                                 MX7D_PAD_SD1_CD_B__GPIO5_IO0
+>  0x59 /* CD */
+>                                 MX7D_PAD_SD1_WP__GPIO5_IO1
+>  0x59 /* WP */
+>                                 MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+>  0x59 /* vmmc */
+>                         >;
+> 
+> Customer may choose below pin to IOMUX-lPSR.
+> 
+> MX7D_PAD_SD1_CD_B__GPIO5_IO0
+> MX7D_PAD_SD1_WP__GPIO5_IO1
+> MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+> 
+> FEC have Phy Reset GPIO, which possibly choose IOMUX-lPSR.
+> 
+> 
+> 
+> > For your I2C1
+> > example, a sane hardware design would chose one group among the
+> > following instead of the one you put above.
+> >
+> >   MX7D_PAD_I2C1_SCL__I2C1_SCL
+> >   MX7D_PAD_I2C1_SDA__I2C1_SDA
+> >
+> >   MX7D_PAD_UART1_RX_DATA__I2C1_SCL
+> >   MX7D_PAD_UART1_TX_DATA__I2C1_SDA
+> >
+> >   MX7D_PAD_GPIO1_IO04__I2C1_SCL
+> >   MX7D_PAD_GPIO1_IO05__I2C1_SDA
+> >
+> > So this is not really a problem for us to implement two IOMUXC instances.
+> > The only problem we need to solve is the select input register access
+> > for IOMUXC-LPSR driver.  I have some idea for that, i.e. honestly
+> > represent how hardware is laid out.  I will give more details on that
+> > tomorrow.
+> 
+> It is very easy to make mistake.
+> According to pin NAME macro, it is not easy to distinguish between IOMUX and
+> IOMUX-LPSR.
+> 
+> Internal kernel tree use two pinctrl instance.
+> 
+> It will be simple if we think IOMUX and IOMUX-LPSR together, and one module
+> have two group registers.
+> 
+> best regards
+> Frank Li
+> 
+> >
+> >> [Adrian] For the artificial encoding of pad group id's for
+> >> IOMUXC-LPSR, I think there is no other way to do it (limited
+> >> imagination here :P); Pad group id's are extracted from MUX_REG offset
+> address (pad_id = mux_reg / 4) but when combining both IOMUXC and
+> IOMUXC-LPSR Pad group ID's overlap so end up encoding the pad_id for
+> IOMUXC-LPSR to resolve the proper pad group ID.
+> >
+> > One big missing piece from your patch is the update to bindings
+> > document
+> > Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt.  Have
+> > you thought about how you will document all these magics and hacks you
+> have done here?
+> >
+> > Shawn
