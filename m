@@ -1,96 +1,50 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 16 Jul 2015 09:50:10 -0700
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
- the irqdomain of the GIC.
-In-Reply-To: <55A75F8B.3080009@arm.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
- <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
- <55A75F8B.3080009@arm.com>
-Message-ID: <55A7E0C2.8020704@caviumnetworks.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 16 Jul 2015 12:50:24 -0400
+Subject: arm: dts: update for 4.2-rcx
+In-Reply-To: <55A7DE91.7050003@oracle.com>
+References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
+Message-ID: <55A7E0D0.9070104@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 12:38 AM, Marc Zyngier wrote:
-> On 15/07/15 19:57, David Daney wrote:
->> On 07/15/2015 10:12 AM, Marc Zyngier wrote:
->>> On 15/07/15 17:54, David Daney wrote:
->>>> From: David Daney <david.daney@cavium.com>
->>>>
->>>> Needed to map SPI interrupt sources.
->>>>
->>>> Signed-off-by: David Daney <david.daney@cavium.com>
->>>> ---
->>>>    drivers/irqchip/irq-gic-v3.c       | 5 +++++
->>>>    include/linux/irqchip/arm-gic-v3.h | 1 +
->>>>    2 files changed, 6 insertions(+)
->>>>
->>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>>> index c52f7ba..0019fed 100644
->>>> --- a/drivers/irqchip/irq-gic-v3.c
->>>> +++ b/drivers/irqchip/irq-gic-v3.c
->>>> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
->>>>    /* Our default, arbitrary priority value. Linux only uses one anyway. */
->>>>    #define DEFAULT_PMR_VALUE	0xf0
->>>>
->>>> +struct irq_domain *gic_get_irq_domain(void)
->>>> +{
->>>> +	return gic_data.domain;
->>>> +}
->>>> +
->>>>    static inline unsigned int gic_irq(struct irq_data *d)
->>>>    {
->>>>    	return d->hwirq;
->>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
->>>> index 18e3757..5992224 100644
->>>> --- a/include/linux/irqchip/arm-gic-v3.h
->>>> +++ b/include/linux/irqchip/arm-gic-v3.h
->>>> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
->>>>
->>>>    typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
->>>>    void set_its_pci_requester_id(its_pci_requester_id_t fn);
->>>> +struct irq_domain *gic_get_irq_domain(void);
->>>>    #endif
-[...]
->
->> We need a way to be able to map these.
->
-> However you're going to map them, it will not be by just blindly
-> exporting random irqdomains from an unsuspecting interrupt controller.
+On 07/16/2015 12:40 PM, santosh shilimkar wrote:
+> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
+>> Santosh,
+>>
+>> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
+>> This one should be applied to v4.2-rc kernel with priority.
+>> Please review and do the needful.
+>>
+> Yes I have it for next merge window. It won't be qualified as a
+> fix rather more of enhancement. Do you have also patches for
+> board DTS files which enables PCIE. I can queue them together
+> for next merge window.
+No this is a fix for v4.2-rc. PCIe driver is not complete without having 
+a SerDes driver. Currently the version we send is not accepted since the 
+config blobs are used. On K2E EVM, this causes problem since the EVM has 
+Marvell SATA controller present and with default values in the SerDes 
+register, it seems to pass the PCIe link check, but causes issues since 
+the configuration is not correct. The manifestation is that when EVM is 
+booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM 
+since to work, SerDes driver has to be present as well. So by default, 
+the PCIe DT binding should be disabled in SoC specific DTS. It can be 
+enabled in the board specific DTS when the SerDes device driver is also 
+present. We plan to upstream a common SerDes driver soon. But at this 
+point this has to be disabled by default.
 
-There is nothing random about it.  The ARM architects specified that 
-there is exactly One True GIC in a system.  If we need to do something 
-with the GIC, it is not a "random ... unsuspecting interrupt 
-controller", it is *The* GIC.
+I can provide more details if needed in the patch commit description, 
+but I though it is not correct to keep the PCIe DT bindings to be 
+enabled in the SoC specific DTS to begin with. So this is a fix for v4.2-rc.
+
+Murali
 
 >
-> Patch 5 has established that you're using "virtual wire" SPIs, so we
-> need to work on exposing that with the normal kernel abstraction, and
-> not by messing with the internals of the GIC.
+> Regards,
+> Santosh
+>
 >
 
-Agreed.
 
-The MSI system has pci_enable_msix()/pci_disable_msix().
-
-I would propose something like:
-
-struct gic_spi_entry {
-	int spi   /* SPI number */
-	int irq;  /* kernel irq number mapped to the spi*/
-	u32 msg;  /* message to be written */
-	u64 assert_addr;
-	u64 deassert_addr;
-};
-
-/* Fill in the SPI processing information */
-int gic_map_spi(int spi, struct gic_spi_entry *data);
-
-David Daney
-
-
-
-> Thanks,
->
-> 	M.
->
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
