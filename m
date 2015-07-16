@@ -1,67 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 16 Jul 2015 13:26:16 -0700
-Subject: [PATCH v2] arm64: enable more compressed Image formats
-Message-ID: <1437078376-13068-1-git-send-email-olof@lixom.net>
+From: laurent.navet@gmail.com (Laurent Navet)
+Date: Thu, 16 Jul 2015 22:36:16 +0200
+Subject: [PATCH] i2c: s3c2410: remove unused variable
+Message-ID: <1437078976-29145-1-git-send-email-laurent.navet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Plumb up Makefile arguments for the already supported formats in the kbuild
-system: lz4, bzip2, lzma, and lzo.
+ret is assigned zero and just used to return. remove it.
+Found by using coccinelle.
 
-Note that just as with Image.gz, these images are not self-decompressing and
-the booting firmware still needs to handle decompression before launching the
-kernel image.
-
-Signed-off-by: Olof Johansson <olof@lixom.net>
+Signed-off-by: Laurent Navet <laurent.navet@gmail.com>
 ---
+ drivers/i2c/busses/i2c-s3c2410.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-New in v2: Split Image and Image.% targets due to make warnings.
-
- arch/arm64/Makefile      |  5 ++++-
- arch/arm64/boot/Makefile | 12 ++++++++++++
- 2 files changed, 16 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 4d2a925998f9..0953a97b5119 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -58,7 +58,10 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
+index 50bfd8c..cf3c6c0 100644
+--- a/drivers/i2c/busses/i2c-s3c2410.c
++++ b/drivers/i2c/busses/i2c-s3c2410.c
+@@ -409,7 +409,6 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
+ {
+ 	unsigned long tmp;
+ 	unsigned char byte;
+-	int ret = 0;
  
- boot := arch/arm64/boot
+ 	switch (i2c->state) {
  
--Image Image.gz: vmlinux
-+Image: vmlinux
-+	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
-+
-+Image.%: vmlinux
- 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+@@ -565,7 +564,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
+ 	tmp &= ~S3C2410_IICCON_IRQPEND;
+ 	writel(tmp, i2c->regs + S3C2410_IICCON);
+  out:
+-	return ret;
++	return 0;
+ }
  
- zinstall install: vmlinux
-diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
-index 5a0e3ab854a5..abcbba2f01ba 100644
---- a/arch/arm64/boot/Makefile
-+++ b/arch/arm64/boot/Makefile
-@@ -19,9 +19,21 @@ targets := Image Image.gz
- $(obj)/Image: vmlinux FORCE
- 	$(call if_changed,objcopy)
- 
-+$(obj)/Image.bz2: $(obj)/Image FORCE
-+	$(call if_changed,bzip2)
-+
- $(obj)/Image.gz: $(obj)/Image FORCE
- 	$(call if_changed,gzip)
- 
-+$(obj)/Image.lz4: $(obj)/Image FORCE
-+	$(call if_changed,lz4)
-+
-+$(obj)/Image.lzma: $(obj)/Image FORCE
-+	$(call if_changed,lzma)
-+
-+$(obj)/Image.lzo: $(obj)/Image FORCE
-+	$(call if_changed,lzo)
-+
- install: $(obj)/Image
- 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
- 	$(obj)/Image System.map "$(INSTALL_PATH)"
+ /* s3c24xx_i2c_irq
 -- 
-2.0.1.473.gc4d58ca
+2.1.4
