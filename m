@@ -1,91 +1,179 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Jul 2015 16:05:12 +0100
-Subject: [PATCH v2 04/20] xen/grant: Add helper
- gnttab_page_grant_foreign_access_ref
-In-Reply-To: <1436474552-31789-5-git-send-email-julien.grall@citrix.com>
+Date: Thu, 16 Jul 2015 16:11:40 +0100
+Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn
+ in the grant structure
+In-Reply-To: <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-5-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1507161603490.17378@kaball.uk.xensource.com>
+ <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 9 Jul 2015, Julien Grall wrote:
-> Many PV drivers contain the idiom:
+> All the usage of the field pfn are done using the same idiom:
 > 
-> pfn = page_to_mfn(...) /* Or similar */
-> gnttab_grant_foreign_access_ref
+> pfn_to_page(grant->pfn)
 > 
-> Replace it by a new helper. Note that when Linux is using a different
-> page granularity than Xen, the helper only gives access to the first 4KB
-> grant.
+> This will  return always the same page. Store directly the page in the
+> grant to clean up the code.
 > 
-> This is useful where drivers are allocating a full Linux page for each
-> grant.
-> 
-> Also include xen/interface/grant_table.h rather than xen/grant_table.h in
-> asm/page.h for x86 to fix a compilation issue [1]. Only the former is
-> useful in order to get the structure definition.
-> 
-> [1] Interpendency between asm/page.h and xen/grant_table.h which result
-> to page_mfn not being defined when necessary.
-> 
-> Signed-off-by: Julien Grall <julien.grall@linaro.org>
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Roger Pau Monn? <roger.pau@citrix.com>
 > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 > Cc: David Vrabel <david.vrabel@citrix.com>
 > ---
 >     Changes in v2:
 >         - Patch added
 > ---
->  arch/x86/include/asm/xen/page.h | 2 +-
->  include/xen/grant_table.h       | 9 +++++++++
->  2 files changed, 10 insertions(+), 1 deletion(-)
+>  drivers/block/xen-blkfront.c | 37 ++++++++++++++++++-------------------
+>  1 file changed, 18 insertions(+), 19 deletions(-)
 > 
-> diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-> index c44a5d5..fb2e037 100644
-> --- a/arch/x86/include/asm/xen/page.h
-> +++ b/arch/x86/include/asm/xen/page.h
-> @@ -12,7 +12,7 @@
->  #include <asm/pgtable.h>
+> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+> index 7107d58..7b81d23 100644
+> --- a/drivers/block/xen-blkfront.c
+> +++ b/drivers/block/xen-blkfront.c
+> @@ -67,7 +67,7 @@ enum blkif_state {
 >  
->  #include <xen/interface/xen.h>
-> -#include <xen/grant_table.h>
-> +#include <xen/interface/grant_table.h>
->  #include <xen/features.h>
+>  struct grant {
+>  	grant_ref_t gref;
+> -	unsigned long pfn;
+> +	struct page *page;
+>  	struct list_head node;
+>  };
 >  
->  /* Xen machine address */
-> diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-> index 6f77378..6a1ef86 100644
-> --- a/include/xen/grant_table.h
-> +++ b/include/xen/grant_table.h
-> @@ -131,6 +131,15 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
->  void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
->  				     unsigned long frame, int readonly);
+> @@ -219,7 +219,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
+>  				kfree(gnt_list_entry);
+>  				goto out_of_memory;
+>  			}
+> -			gnt_list_entry->pfn = page_to_pfn(granted_page);
+> +			gnt_list_entry->page = granted_page;
+>  		}
 >  
-> +/* Give access to the first 4K of the page */
-> +static inline void gnttab_page_grant_foreign_access_ref(
-> +	grant_ref_t ref, domid_t domid,
-> +	struct page *page, int readonly)
-> +{
+>  		gnt_list_entry->gref = GRANT_INVALID_REF;
+> @@ -234,7 +234,7 @@ out_of_memory:
+>  	                         &info->grants, node) {
+>  		list_del(&gnt_list_entry->node);
+>  		if (info->feature_persistent)
+> -			__free_page(pfn_to_page(gnt_list_entry->pfn));
+> +			__free_page(gnt_list_entry->page);
+>  		kfree(gnt_list_entry);
+>  		i--;
+>  	}
+> @@ -243,7 +243,7 @@ out_of_memory:
+>  }
+>  
+>  static struct grant *get_grant(grant_ref_t *gref_head,
+> -                               unsigned long pfn,
+> +			       struct page *page,
+>                                 struct blkfront_info *info)
 
-I like this. I think it might make sense to call it
-gnttab_page_grant_foreign_access_ref_one to make clear that it is only
-granting the first 4K.
+indentation
 
-In the future we could introduce a new function, called
-gnttab_page_grant_foreign_access_ref, that grants all 4K in the page.
-
-In any case
+Aside from this:
 
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-> +	gnttab_grant_foreign_access_ref(ref, domid, page_to_mfn(page),
-> +					readonly);
-> +}
-> +
->  void gnttab_grant_foreign_transfer_ref(grant_ref_t, domid_t domid,
->  				       unsigned long pfn);
+>  {
+>  	struct grant *gnt_list_entry;
+> @@ -263,10 +263,10 @@ static struct grant *get_grant(grant_ref_t *gref_head,
+>  	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
+>  	BUG_ON(gnt_list_entry->gref == -ENOSPC);
+>  	if (!info->feature_persistent) {
+> -		BUG_ON(!pfn);
+> -		gnt_list_entry->pfn = pfn;
+> +		BUG_ON(!page);
+> +		gnt_list_entry->page = page;
+>  	}
+> -	buffer_mfn = pfn_to_mfn(gnt_list_entry->pfn);
+> +	buffer_mfn = page_to_mfn(gnt_list_entry->page);
+>  	gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
+>  	                                info->xbdev->otherend_id,
+>  	                                buffer_mfn, 0);
+> @@ -522,7 +522,7 @@ static int blkif_queue_rw_req(struct request *req)
 >  
+>  		if ((ring_req->operation == BLKIF_OP_INDIRECT) &&
+>  		    (i % SEGS_PER_INDIRECT_FRAME == 0)) {
+> -			unsigned long uninitialized_var(pfn);
+> +			struct page *uninitialized_var(page);
+>  
+>  			if (segments)
+>  				kunmap_atomic(segments);
+> @@ -536,15 +536,15 @@ static int blkif_queue_rw_req(struct request *req)
+>  				indirect_page = list_first_entry(&info->indirect_pages,
+>  				                                 struct page, lru);
+>  				list_del(&indirect_page->lru);
+> -				pfn = page_to_pfn(indirect_page);
+> +				page = indirect_page;
+>  			}
+> -			gnt_list_entry = get_grant(&gref_head, pfn, info);
+> +			gnt_list_entry = get_grant(&gref_head, page, info);
+>  			info->shadow[id].indirect_grants[n] = gnt_list_entry;
+> -			segments = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
+> +			segments = kmap_atomic(gnt_list_entry->page);
+>  			ring_req->u.indirect.indirect_grefs[n] = gnt_list_entry->gref;
+>  		}
+>  
+> -		gnt_list_entry = get_grant(&gref_head, page_to_pfn(sg_page(sg)), info);
+> +		gnt_list_entry = get_grant(&gref_head, sg_page(sg), info);
+>  		ref = gnt_list_entry->gref;
+>  
+>  		info->shadow[id].grants_used[i] = gnt_list_entry;
+> @@ -555,7 +555,7 @@ static int blkif_queue_rw_req(struct request *req)
+>  
+>  			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+>  
+> -			shared_data = kmap_atomic(pfn_to_page(gnt_list_entry->pfn));
+> +			shared_data = kmap_atomic(gnt_list_entry->page);
+>  			bvec_data = kmap_atomic(sg_page(sg));
+>  
+>  			/*
+> @@ -1002,7 +1002,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+>  				info->persistent_gnts_c--;
+>  			}
+>  			if (info->feature_persistent)
+> -				__free_page(pfn_to_page(persistent_gnt->pfn));
+> +				__free_page(persistent_gnt->page);
+>  			kfree(persistent_gnt);
+>  		}
+>  	}
+> @@ -1037,7 +1037,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+>  			persistent_gnt = info->shadow[i].grants_used[j];
+>  			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
+>  			if (info->feature_persistent)
+> -				__free_page(pfn_to_page(persistent_gnt->pfn));
+> +				__free_page(persistent_gnt->page);
+>  			kfree(persistent_gnt);
+>  		}
+>  
+> @@ -1051,7 +1051,7 @@ static void blkif_free(struct blkfront_info *info, int suspend)
+>  		for (j = 0; j < INDIRECT_GREFS(segs); j++) {
+>  			persistent_gnt = info->shadow[i].indirect_grants[j];
+>  			gnttab_end_foreign_access(persistent_gnt->gref, 0, 0UL);
+> -			__free_page(pfn_to_page(persistent_gnt->pfn));
+> +			__free_page(persistent_gnt->page);
+>  			kfree(persistent_gnt);
+>  		}
+>  
+> @@ -1102,8 +1102,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+>  	if (bret->operation == BLKIF_OP_READ && info->feature_persistent) {
+>  		for_each_sg(s->sg, sg, nseg, i) {
+>  			BUG_ON(sg->offset + sg->length > PAGE_SIZE);
+> -			shared_data = kmap_atomic(
+> -				pfn_to_page(s->grants_used[i]->pfn));
+> +			shared_data = kmap_atomic(s->grants_used[i]->page);
+>  			bvec_data = kmap_atomic(sg_page(sg));
+>  			memcpy(bvec_data   + sg->offset,
+>  			       shared_data + sg->offset,
+> @@ -1154,7 +1153,7 @@ static void blkif_completion(struct blk_shadow *s, struct blkfront_info *info,
+>  				 * Add the used indirect page back to the list of
+>  				 * available pages for indirect grefs.
+>  				 */
+> -				indirect_page = pfn_to_page(s->indirect_grants[i]->pfn);
+> +				indirect_page = s->indirect_grants[i]->page;
+>  				list_add(&indirect_page->lru, &info->indirect_pages);
+>  				s->indirect_grants[i]->gref = GRANT_INVALID_REF;
+>  				list_add_tail(&s->indirect_grants[i]->node, &info->grants);
 > -- 
 > 2.1.4
 > 
