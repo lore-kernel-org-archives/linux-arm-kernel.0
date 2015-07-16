@@ -1,51 +1,57 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Thu, 16 Jul 2015 14:30:59 -0400
-Subject: [Xen-devel] [PATCH v2 09/20] xen/biomerge: Don't allow biovec to
- be merge when Linux is not using 4KB page
-In-Reply-To: <55A7D8AD.1090102@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
- <20150710191245.GA31063@l.oracle.com>
- <alpine.DEB.2.02.1507161627010.17378@kaball.uk.xensource.com>
- <55A7D8AD.1090102@citrix.com>
-Message-ID: <20150716183059.GC14309@x230.dumpdata.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 16 Jul 2015 11:34:08 -0700
+Subject: [PATCH] input: snvs_pwrkey: add linux prefix for wakeup property
+In-Reply-To: <CAHrpEqS2o6_B6dNrnWJ06ASWaB0SGxur1o3VuN2A-QywWhbWVA@mail.gmail.com>
+References: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
+ <CAHrpEqS2o6_B6dNrnWJ06ASWaB0SGxur1o3VuN2A-QywWhbWVA@mail.gmail.com>
+Message-ID: <20150716183408.GD32571@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 05:15:41PM +0100, Julien Grall wrote:
-> Hi Stefano,
-> 
-> On 16/07/2015 16:33, Stefano Stabellini wrote:
-> >On Fri, 10 Jul 2015, Konrad Rzeszutek Wilk wrote:
-> >>On Thu, Jul 09, 2015 at 09:42:21PM +0100, Julien Grall wrote:
-> >>>When Linux is using 64K page granularity, every page will be slipt in
-> >>>multiple non-contiguous 4K MFN (page granularity of Xen).
-> >>
-> >>But you don't care about that on the Linux layer I think?
-> >>
-> >>As in, is there an SWIOTLB that does PFN to MFN and vice-versa
-> >>translation?
-> >>
-> >>I thought that ARM guests are not exposed to the MFN<->PFN logic
-> >>and trying to figure that out to not screw up the DMA engine
-> >>on a PCIe device slurping up contingous MFNs which don't map
-> >>to contingous PFNs?
-> >
-> >Dom0 is mapped 1:1, so pfn == mfn normally, however grant maps
-> >unavoidably screw up the 1:1, so the swiotlb jumps in to save the day
-> >when a foreign granted page is involved in a dma operation.
-> >
-> >Regarding xen_biovec_phys_mergeable, we could check that all the pfn ==
-> >mfn and return true in that case.
-> 
-> I mentioned it in the commit message. Although, we would have to loop on
-> every pfn which is slow on 64KB (16 times for every page). Given the biovec
-> is called often, I don't think we can do a such things.
+On Wed, Jul 15, 2015 at 09:00:12AM -0500, Zhi Li wrote:
+> On Tue, Jul 14, 2015 at 10:20 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > The wakeup capability is somehow linux specific, and all existing
+> > bindings name the property "linux,wakeup" to reflect that, e.g.
+> > Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt.  Let's
+> > follow the convention.
 
-OK - it would be good to have the gist of this email thread in the
-commit message. Thanks.
+I do not believe it is Linux specific, it describes desired behavior of
+hardware regardless of OS. I mean you want your device to wake up if you
+press power button whether it runes Linux, Windows, FreeBSD or whatever.
+
+> >
+> > Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> > ---
+> > This is a fixup for Frank's patch which is queued on i.MX tree, so I
+> > will apply it to the same branch.
+> >
+> > Shawn
+> >
+> >  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 2 +-
+> >  drivers/input/keyboard/snvs_pwrkey.c                  | 2 +-
+> >  2 files changed, 2 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > index 71a39c5bd486..fa821c6a0b5b 100644
+> > --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> > @@ -408,7 +408,7 @@ System ON/OFF key driver
+> >        Value type: <int>
+> >        Definition: Keycode to emit, KEY_POWER by default.
+> >
+> > -  - wakeup:
+> > +  - linux,wakeup:
 > 
-> Regards,
-> 
-> -- 
-> Julien Grall
+> I remember Dmitry Torokhov said use wakeup, instead of linux, wakeup
+> when I sent patch to review.
+
+I should have said to use "wakeup-source", not simply "wakeup" so that
+we'd match with I2C annotation.
+
+I think I'll go over input driver and convert them (keeping old names
+for compatibility reasons).
+
+Thanks.
+
+-- 
+Dmitry
