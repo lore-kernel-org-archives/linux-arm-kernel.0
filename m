@@ -1,20 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 10:21:02 +0200
-Subject: [patch v2 1/2] pinctrl: samsung: don't truncate the last char
-In-Reply-To: <20150622151223.GA14156@mwanda>
+Date: Thu, 16 Jul 2015 10:22:33 +0200
+Subject: [patch v2 2/2] pinctrl: samsung: remove "out of memory" messages
+In-Reply-To: <20150622151315.GB14156@mwanda>
 References: <20150619085203.GO28762@mwanda>
-	<20150622151223.GA14156@mwanda>
-Message-ID: <CACRpkdbG8Qm6tyrNqJJBb=cg9jR=CZsdhTksn_7XQXHGf5fNng@mail.gmail.com>
+	<20150622151315.GB14156@mwanda>
+Message-ID: <CACRpkdaKn+vv2Mf=G=YpisokpvQfxGaHMkgA4aGNpL9-zr9Vqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 22, 2015 at 5:12 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+On Mon, Jun 22, 2015 at 5:13 PM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
 
-> We were allocating enough space because sizeof("-grp") and
-> sizeof("-mux") are both equal to 5 but in the snprintf() we only allowed
-> for 4 characters so the last 'p' and 'x' characters were truncated.
+> Checkpatch.pl complains about these:
 >
-> The allocate and sprintf can be done in one step with the kasprintf().
+> WARNING: Possible unnecessary 'out of memory' message
+>
+> The messages use a little extra RAM and they add a few extra lines of
+> code.  We're probably never going to hit these out of memory situations
+> but if we did then kmalloc() has pretty good error messages built-in.
 >
 > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
