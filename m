@@ -1,80 +1,96 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Thu, 16 Jul 2015 18:46:35 +0200
-Subject: [PATCH 6/6] ARM: net: add support for BPF_ANC | SKF_AD_HATYPE in ARM
- JIT.
-In-Reply-To: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-References: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1437065195-10887-7-git-send-email-nschichan@freebox.fr>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 16 Jul 2015 09:50:10 -0700
+Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
+ the irqdomain of the GIC.
+In-Reply-To: <55A75F8B.3080009@arm.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
+ <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
+ <55A75F8B.3080009@arm.com>
+Message-ID: <55A7E0C2.8020704@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 22 ++++++++++++++++++++--
- arch/arm/net/bpf_jit_32.h |  3 +++
- 2 files changed, 23 insertions(+), 2 deletions(-)
+On 07/16/2015 12:38 AM, Marc Zyngier wrote:
+> On 15/07/15 19:57, David Daney wrote:
+>> On 07/15/2015 10:12 AM, Marc Zyngier wrote:
+>>> On 15/07/15 17:54, David Daney wrote:
+>>>> From: David Daney <david.daney@cavium.com>
+>>>>
+>>>> Needed to map SPI interrupt sources.
+>>>>
+>>>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>>> ---
+>>>>    drivers/irqchip/irq-gic-v3.c       | 5 +++++
+>>>>    include/linux/irqchip/arm-gic-v3.h | 1 +
+>>>>    2 files changed, 6 insertions(+)
+>>>>
+>>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>>> index c52f7ba..0019fed 100644
+>>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>>> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
+>>>>    /* Our default, arbitrary priority value. Linux only uses one anyway. */
+>>>>    #define DEFAULT_PMR_VALUE	0xf0
+>>>>
+>>>> +struct irq_domain *gic_get_irq_domain(void)
+>>>> +{
+>>>> +	return gic_data.domain;
+>>>> +}
+>>>> +
+>>>>    static inline unsigned int gic_irq(struct irq_data *d)
+>>>>    {
+>>>>    	return d->hwirq;
+>>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>>>> index 18e3757..5992224 100644
+>>>> --- a/include/linux/irqchip/arm-gic-v3.h
+>>>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>>>> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
+>>>>
+>>>>    typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
+>>>>    void set_its_pci_requester_id(its_pci_requester_id_t fn);
+>>>> +struct irq_domain *gic_get_irq_domain(void);
+>>>>    #endif
+[...]
+>
+>> We need a way to be able to map these.
+>
+> However you're going to map them, it will not be by just blindly
+> exporting random irqdomains from an unsuspecting interrupt controller.
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 3c73caf..876060b 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -857,7 +857,9 @@ b_epilogue:
- 			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
- 			break;
- 		case BPF_ANC | SKF_AD_IFINDEX:
-+		case BPF_ANC | SKF_AD_HATYPE:
- 			/* A = skb->dev->ifindex */
-+			/* A = skb->dev->type */
- 			ctx->seen |= SEEN_SKB;
- 			off = offsetof(struct sk_buff, dev);
- 			emit(ARM_LDR_I(r_scratch, r_skb, off), ctx);
-@@ -867,8 +869,24 @@ b_epilogue:
- 
- 			BUILD_BUG_ON(FIELD_SIZEOF(struct net_device,
- 						  ifindex) != 4);
--			off = offsetof(struct net_device, ifindex);
--			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
-+			BUILD_BUG_ON(FIELD_SIZEOF(struct net_device,
-+						  type) != 2);
-+
-+			if (code == (BPF_ANC | SKF_AD_IFINDEX)) {
-+				off = offsetof(struct net_device, ifindex);
-+				emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
-+			} else {
-+				/*
-+				 * offset of field "type" in "struct
-+				 * net_device" is above what can be
-+				 * used in the ldrh rd, [rn, #imm]
-+				 * instruction, so load the offset in
-+				 * a register and use ldrh rd, [rn, rm]
-+				 */
-+				off = offsetof(struct net_device, type);
-+				emit_mov_i(ARM_R3, off, ctx);
-+				emit(ARM_LDRH_R(r_A, r_scratch, ARM_R3), ctx);
-+			}
- 			break;
- 		case BPF_ANC | SKF_AD_MARK:
- 			ctx->seen |= SEEN_SKB;
-diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
-index b2d7d92..4b17d5ab 100644
---- a/arch/arm/net/bpf_jit_32.h
-+++ b/arch/arm/net/bpf_jit_32.h
-@@ -74,6 +74,7 @@
- #define ARM_INST_LDRB_I		0x05d00000
- #define ARM_INST_LDRB_R		0x07d00000
- #define ARM_INST_LDRH_I		0x01d000b0
-+#define ARM_INST_LDRH_R		0x019000b0
- #define ARM_INST_LDR_I		0x05900000
- 
- #define ARM_INST_LDM		0x08900000
-@@ -160,6 +161,8 @@
- 				 | (rm))
- #define ARM_LDRH_I(rt, rn, off)	(ARM_INST_LDRH_I | (rt) << 12 | (rn) << 16 \
- 				 | (((off) & 0xf0) << 4) | ((off) & 0xf))
-+#define ARM_LDRH_R(rt, rn, rm)	(ARM_INST_LDRH_R | (rt) << 12 | (rn) << 16 \
-+				 | (rm))
- 
- #define ARM_LDM(rn, regs)	(ARM_INST_LDM | (rn) << 16 | (regs))
- 
--- 
-1.9.1
+There is nothing random about it.  The ARM architects specified that 
+there is exactly One True GIC in a system.  If we need to do something 
+with the GIC, it is not a "random ... unsuspecting interrupt 
+controller", it is *The* GIC.
+
+>
+> Patch 5 has established that you're using "virtual wire" SPIs, so we
+> need to work on exposing that with the normal kernel abstraction, and
+> not by messing with the internals of the GIC.
+>
+
+Agreed.
+
+The MSI system has pci_enable_msix()/pci_disable_msix().
+
+I would propose something like:
+
+struct gic_spi_entry {
+	int spi   /* SPI number */
+	int irq;  /* kernel irq number mapped to the spi*/
+	u32 msg;  /* message to be written */
+	u64 assert_addr;
+	u64 deassert_addr;
+};
+
+/* Fill in the SPI processing information */
+int gic_map_spi(int spi, struct gic_spi_entry *data);
+
+David Daney
+
+
+
+> Thanks,
+>
+> 	M.
+>
