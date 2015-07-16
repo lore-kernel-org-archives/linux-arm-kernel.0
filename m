@@ -1,158 +1,154 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jul 2015 10:34:54 +0900
-Subject: [PATCH v3 2/4] ARM: dts: Exynos5250: add CPU OPP and regulator
- supply property
-In-Reply-To: <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
-References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
- <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <55A70A3E.5020600@samsung.com>
+From: parkch98@gmail.com (Chanho Park)
+Date: Thu, 16 Jul 2015 10:36:21 +0900
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <CAJKOXPdcdREhwQZ22RcqbUSTpOn0XmqJ_3n5uUyzEgPihRYwNQ@mail.gmail.com>
+References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+ <CAJKOXPdcdREhwQZ22RcqbUSTpOn0XmqJ_3n5uUyzEgPihRYwNQ@mail.gmail.com>
+Message-ID: <CAPTzV17TRxTXKSucMWEk-5k6TtYsXkO0XFuuaCXKgNc2AoGQjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.07.2015 22:10, Bartlomiej Zolnierkiewicz wrote:
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> For Exynos5250 platforms, add CPU operating points and CPU
-> regulator supply properties for migrating from Exynos specific
-> cpufreq driver to using generic cpufreq driver.
-> 
-> Changes by Bartlomiej:
-> - split Exynos5250 support from the original patch
-> - added CPU regulator supply property for Google Spring board
-> - put the new cpu nodes in alphabetical order
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
-> Cc: Doug Anderson <dianders@chromium.org>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Andreas Faerber <afaerber@suse.de>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5250-arndale.dts  |  4 ++++
->  arch/arm/boot/dts/exynos5250-smdk5250.dts |  4 ++++
->  arch/arm/boot/dts/exynos5250-snow.dts     |  4 ++++
->  arch/arm/boot/dts/exynos5250-spring.dts   |  4 ++++
->  arch/arm/boot/dts/exynos5250.dtsi         | 22 ++++++++++++++++++++++
->  5 files changed, 38 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index 7e728a1..db3f65f 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -117,6 +117,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &dp {
->  	status = "okay";
->  	samsung,color-space = <0>;
-> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> index 4fe186d..15aea76 100644
-> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> @@ -74,6 +74,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &dp {
->  	samsung,color-space = <0>;
->  	samsung,dynamic-range = <0>;
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index b7f4122..a4133df 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -235,6 +235,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &dp {
->  	status = "okay";
->  	pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
-> index d03f9b8..c1edd6d 100644
-> --- a/arch/arm/boot/dts/exynos5250-spring.dts
-> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
-> @@ -65,6 +65,10 @@
->  	};
->  };
->  
-> +&cpu0 {
-> +	cpu0-supply = <&buck2_reg>;
-> +};
-> +
->  &dp {
->  	status = "okay";
->  	pinctrl-names = "default";
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-> index bf9bee6..0c7ef12 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -63,6 +63,28 @@
->  			compatible = "arm,cortex-a15";
->  			reg = <0>;
->  			clock-frequency = <1700000000>;
-> +			clocks = <&clock CLK_ARM_CLK>;
-> +			clock-names = "cpu";
-> +			clock-latency = <140000>;
-> +
-> +			operating-points = <
-> +				1700000 1300000
-> +				1600000 1250000
-> +				1500000 1225000
-> +				1400000 1200000
-> +				1300000 1150000
-> +				1200000 1125000
-> +				1100000 1100000
-> +				1000000 1075000
-> +				 900000 1050000
-> +				 800000 1025000
-> +				 700000 1012500
-> +				 600000 1000000
-> +				 500000  975000
-> +				 400000  950000
-> +				 300000  937500
-> +				 200000  925000
-> +			>;
->  			cooling-min-level = <15>;
->  			cooling-max-level = <9>;
->  			#cooling-cells = <2>; /* min followed by max */
-> 
+Hi,
+
+On Wed, Jul 15, 2015 at 8:35 PM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> 2015-07-15 10:36 GMT+09:00 Chanho Park <parkch98@gmail.com>:
+>> The cpu booting of exynos5422 has been still broken since we discussed
+>> it in last year[1]. I found this resetting codes from odroid-xu3 kernel of
+>> hardkernel, it could help to boot 8 cores well. This patch need to have
+>> more test like STR and other SoC especially exynos5800 which is variant
+>> of exynos5422. If this patch is broken on exynos5800, I'll find another
+>> way to check exynos5422.
+>>
+>> This patch is top of my previous exynos5422 cpu ordering patch[2] and
+>> need to enable CONFIG_EXYNOS5420_MCPM=y
+>>
+>> [    0.047509] CPU0: update cpu_capacity 448
+>> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
+>> [    0.047874] Setting up static identity map for 0x400082c0 -
+>> 0x40008318
+>> [    0.048340] ARM CCI driver probed
+>> [    0.048597] Exynos MCPM support installed
+>> [    0.065676] CPU1: update cpu_capacity 448
+>> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
+>> [    0.070672] CPU2: update cpu_capacity 448
+>> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
+>> [    0.075644] CPU3: update cpu_capacity 448
+>> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
+>> [    0.080590] CPU4: update cpu_capacity 1535
+>> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
+>> [    0.085591] CPU5: update cpu_capacity 1535
+>> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
+>> [    0.090590] CPU6: update cpu_capacity 1535
+>> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
+>> [    0.095585] CPU7: update cpu_capacity 1535
+>> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
+>> [    0.095720] Brought up 8 CPUs
+>>
+>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/350632.html
+>> [2]:https://patchwork.kernel.org/patch/6782891/
+>
+> Few questions/issues:
+> 1. For the proper patch the commit message needs to be fixed a little.
+> The dmesg above is meaningless but instead you can put short dmesg (2
+> or 4 lines) with failed booting of CPUs.
+
+They will be gone when I make a official patch.
+
+> 2. Why only MCPM? Isn't this also needed without MCPM?
+
+Current exynos platsmp is not aware multi clusters. MCPM covered
+secondary cpu booting of exynos big.Little cores. Without MCPM, same
+approach and codes will be required on platsmp thus I think it's
+redundant.
+
+>
+>>
+>> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+>> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: Heesub Shin <heesub.shin@samsung.com>
+>> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+>> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>> Signed-off-by: Chanho Park <parkch98@gmail.com>
+>
+> I think both Chanho Parks are the same person :) so you may leave only
+> one (the one matching "From").
+>
+>> ---
+>>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
+>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>>  2 files changed, 18 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
+>> index 9bdf547..a076dde 100644
+>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu, unsigned int cluster)
+>>                 cluster >= EXYNOS5420_NR_CLUSTERS)
+>>                 return -EINVAL;
+>>
+>> -       exynos_cpu_power_up(cpunr);
+>> +       if (!exynos_cpu_power_state(cpunr)) {
+>> +               exynos_cpu_power_up(cpunr);
+>
+> This second exynos_cpu_power_up() is needed? Do you know why?
+
+It's redirected to exynos's platsmp and it turned on CPU through pmu registers.
+ -> exynos_cpu_powerup: mcpm-exynos.c
+ -> exynos_cpu_power_up: platsmp.c
+
+Current mcpm exynos tried to run exynos_cpu_power_up twice during
+secondary cpu is up. The first is from cpu_power_up of mcpm and the
+second is from cpu_is_up. I want to avoid second power up the cpu if
+it already turned on.
+
+static void exynos_cpu_is_up(unsigned int cpu, unsigned int cluster)
+{
+        /* especially when resuming: make sure power control is set */
+
+        exynos_cpu_powerup(cpu, cluster);
+}
 
 
-I see you have all necessary acks so this can go through samsung-soc. I
-started applying everything. Patch 4/4 does not apply cleanly but this
-was easy to solve (I think it is better to rebase on Linus tree not on
-next in such case; subsystems cannot apply easily something depending on
-next).
+>
+>> +
+>> +               if (soc_is_exynos5800() && cluster) {
+>
+> If of_machine_is_compatible() can be used then please use it. Javier
+> also mentioned it and he pointed that this is not necessary on
+> Chromebooks.
 
-Unfortunately this patch (2/4) has build errors:
+Okay. I'll use of_machine_is_compatible() instead of soc_is_exynos5800
+to avoid running it from exynos5800.
 
-  DTC     arch/arm/boot/dts/exynos5250-arndale.dtb
-Error: ../arch/arm/boot/dts/exynos5250.dtsi:65.21-22 syntax error
-FATAL ERROR: Unable to parse input tree
-make[2]: *** [arch/arm/boot/dts/exynos5250-arndale.dtb] Error 1
-make[1]: *** [dtbs] Error 2
-make[1]: *** Waiting for unfinished jobs....
-make[1]: Leaving directory `/home/kozik/dev/linux/krzk/out'
-make: *** [sub-make] Error 2
-Fail: Make error
+>
+>> +                       while (!pmu_raw_readl(S5P_PMU_SPARE2))
+>> +                               udelay(10);
+>> +
+>> +                       pmu_raw_writel(EXYNOS5420_KFC_CORE_RESET(cpu),
+>> +                                       EXYNOS_SWRESET);
+>
+> This is quite similar to existing exynos_core_restart(). Can you
+> extend it for this purpose? Or at least put it as separate function
+> near exynos_core_restart() so this would be grouped close to each
+> other?
 
-I tried to apply this patch on my dt-for-next branch:
-https://github.com/krzk/linux/commits/dt-for-next
+As I said above, the platsmp is not aware multi clusters. I feel like
+it would be dirty if I try to merge them.
 
-I hold back other patches until this is clarified.
+>
+> Documenting this behaviour would be really nice (you can combine some
+> of my findings on SPARE2 from previous discussion, if they are useful
+> of course).
 
-Best regards,
-Krzysztof
+No one knows exactly why we should wait until SPARE2 is up. I'll
+specify known issue of it with your findings.
+
+-- 
+Best Regards,
+Chanho Park
