@@ -1,38 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 16 Jul 2015 15:00:26 +0100
-Subject: [PATCH] mm: Fix up new locking syscalls
-Message-ID: <1437055226-18351-1-git-send-email-broonie@kernel.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jul 2015 16:03:18 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+In-Reply-To: <2120032.PN20RpmoKe@wuerfel>
+References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+ <CACRpkdYQFrwJqZjW-A9txA=uaZqgXchSADVhPyxd7Z+5zOmF3g@mail.gmail.com>
+ <CACRpkdZ+_AJZhN7OmP=KXC+G0YrKuqOiWs9irjT1YFVYbab2Gw@mail.gmail.com>
+ <2120032.PN20RpmoKe@wuerfel>
+Message-ID: <CACRpkdaL6DHChx7mSWiGk65LZNxkMGtw=aef2zyHaE7dDhXz8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the arm64 compat syscall table for the new syscalls to fix build
-errors introduced by "mm: mlock: add new mlock, munlock, and munlockall
-system calls":
+On Tue, Jul 14, 2015 at 10:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 13 July 2015 10:21:51 Linus Walleij wrote:
+>>
+>> Since the original code just defined all three serial ports
+>> for all boards by them including ste-dbx500.dtsi I first made
+>> the patch to that file, and then as you said it had to be done
+>> on a per-toplevel file, I did it in the individual DTS files instead.
+>
+> I'm not following here. If you have boards that want port 1 to be
+> disabled, shouldn't you remove that alias?
 
- ../arch/arm64/include/asm/unistd32.h:801:1: error: array index in initializer exceeds array bounds
- ../arch/arm64/include/asm/unistd32.h:801:1: error: (near initialization for 'compat_sys_call_table')
- ../arch/arm64/include/asm/unistd32.h:803:1: error: array index in initializer exceeds array bounds
- ../arch/arm64/include/asm/unistd32.h:803:1: error: (near initialization for 'compat_sys_call_table')
- ../arch/arm64/include/asm/unistd32.h:805:1: error: array index in initializer exceeds array bounds
- ../arch/arm64/include/asm/unistd32.h:805:1: error: (near initialization for 'compat_sys_call_table')
+No, that is done by not changing status = "disabled"; to
+status = "okay"; on a per-board basis.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- arch/arm64/include/asm/unistd.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This is what the second patch is doing.
 
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 3bc498c..aa537a4 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -44,7 +44,7 @@
- #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
- #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
- 
--#define __NR_compat_syscalls		388
-+#define __NR_compat_syscalls		391
- #endif
- 
- #define __ARCH_WANT_SYS_CLONE
--- 
-2.1.4
+The aliases are set also to disabled ports to ensure enumeration
+for the cases where a board file enabled a previously disabled
+UART.
+
+Yours,
+Linus Walleij
