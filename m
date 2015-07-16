@@ -1,40 +1,39 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 16 Jul 2015 14:41:23 +0200
-Subject: Where to define platform-specific ndelay
-Message-ID: <55A7A673.50906@free.fr>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 16 Jul 2015 15:55:17 +0300
+Subject: [PATCH 0/2] omap3isp: Remove legacy platform data support
+Message-ID: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-arch/arm64 defines ndelay, but arch/arm does not.
+Now that all users of the OMAP3 ISP have switched to DT, this patch series
+removes support for legacy platform data support in the omap3isp driver. It
+also drops the OMAP3 ISP device instantiation board code that is now unused.
 
-With my current setup, ndelay resolves to the generic implementation
-from include/linux/delay.h
+Patch 2/2 depends on 1/2. From a conflict resolution point of view it would be
+easier to merge the whole series through the linux-media tree. Tony, would
+that be fine with you ? If so could you please ack patch 1/2 ?
 
-#ifndef ndelay
-static inline void ndelay(unsigned long x)
-{
-	udelay(DIV_ROUND_UP(x, 1000));
-}
-#define ndelay(x) ndelay(x)
-#endif
+Laurent Pinchart (2):
+  ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
+  v4l: omap3isp: Drop platform data support
 
+ arch/arm/mach-omap2/devices.c               |  53 ----------
+ arch/arm/mach-omap2/devices.h               |  19 ----
+ drivers/media/platform/Kconfig              |   2 +-
+ drivers/media/platform/omap3isp/isp.c       | 133 ++++-------------------
+ drivers/media/platform/omap3isp/isp.h       |   7 +-
+ drivers/media/platform/omap3isp/ispcsiphy.h |   2 +-
+ drivers/media/platform/omap3isp/ispvideo.c  |   9 +-
+ drivers/media/platform/omap3isp/omap3isp.h  | 132 +++++++++++++++++++++++
+ include/media/omap3isp.h                    | 158 ----------------------------
+ 9 files changed, 158 insertions(+), 357 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/devices.h
+ create mode 100644 drivers/media/platform/omap3isp/omap3isp.h
+ delete mode 100644 include/media/omap3isp.h
 
-I want to provide a different implementation for my platform.
+-- 
+Regards,
 
-Something along the lines of
-
-#define NDELAY_MULT	((2199 * HZ) >> 11)
-#define ndelay(n)	__const_udelay((n) * NDELAY_MULT)
-
-Where should I put these definitions?
-
-(I don't want to pollute the generic namespace, so it should
-probably go inside platform-specific files, such as perhaps
-mach-foo/include/mach/timex.h ??)
-
-Although, I'm not sure how it would be supposed to work
-with CONFIG_ARCH_MULTIPLATFORM (which is the default, IIUC?)
-
-Regards.
+Laurent Pinchart
