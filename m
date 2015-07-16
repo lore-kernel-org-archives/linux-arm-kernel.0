@@ -1,27 +1,82 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Thu, 16 Jul 2015 09:41:10 +0200
-Subject: [PATCH v2] serial: mxs-auart: keep the AUART unit in reset state
- when not in use
-In-Reply-To: <55A68502.1090609@i2se.com>
-References: <1436945777-4332-1-git-send-email-jbe@pengutronix.de>
- <55A68502.1090609@i2se.com>
-Message-ID: <201507160941.11261.jbe@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Jul 2015 08:38:51 +0100
+Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
+ the irqdomain of the GIC.
+In-Reply-To: <55A6AD1F.902@caviumnetworks.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
+ <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
+Message-ID: <55A75F8B.3080009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On 15/07/15 19:57, David Daney wrote:
+> On 07/15/2015 10:12 AM, Marc Zyngier wrote:
+>> On 15/07/15 17:54, David Daney wrote:
+>>> From: David Daney <david.daney@cavium.com>
+>>>
+>>> Needed to map SPI interrupt sources.
+>>>
+>>> Signed-off-by: David Daney <david.daney@cavium.com>
+>>> ---
+>>>   drivers/irqchip/irq-gic-v3.c       | 5 +++++
+>>>   include/linux/irqchip/arm-gic-v3.h | 1 +
+>>>   2 files changed, 6 insertions(+)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index c52f7ba..0019fed 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -58,6 +58,11 @@ static struct gic_chip_data gic_data __read_mostly;
+>>>   /* Our default, arbitrary priority value. Linux only uses one anyway. */
+>>>   #define DEFAULT_PMR_VALUE	0xf0
+>>>
+>>> +struct irq_domain *gic_get_irq_domain(void)
+>>> +{
+>>> +	return gic_data.domain;
+>>> +}
+>>> +
+>>>   static inline unsigned int gic_irq(struct irq_data *d)
+>>>   {
+>>>   	return d->hwirq;
+>>> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+>>> index 18e3757..5992224 100644
+>>> --- a/include/linux/irqchip/arm-gic-v3.h
+>>> +++ b/include/linux/irqchip/arm-gic-v3.h
+>>> @@ -391,6 +391,7 @@ int its_init(struct device_node *node, struct rdists *rdists,
+>>>
+>>>   typedef u32 (*its_pci_requester_id_t)(struct pci_dev *, u16);
+>>>   void set_its_pci_requester_id(its_pci_requester_id_t fn);
+>>> +struct irq_domain *gic_get_irq_domain(void);
+>>>   #endif
+>>>
+>>>   #endif
+>>>
+>>
+>> Hmmmffff... You need the domain for SPIs??
+>>
+>> What is wrong with putting these interrupts in your device tree?
+>>
+> 
+> There is no device tree node for ECAM based "PCIe" devices, they are 
+> discovered in the PCI bus scan, yet they still need to use SPI interrupts.
 
-On Wednesday 15 July 2015 18:06:26 Stefan Wahren wrote:
-> [...]
-> > ---
->
-> changelog for v2?
+What is different between these and the normal legacy interrupts that
+are normally expressed in the RC node using an interrupt map? Sorry if
+I'm only showing my ignorance here, but I'd like to understand the exact
+nature of the problem.
 
-:) follows. Will send v3 which also contains the missing newline fix.
+> We need a way to be able to map these.
+
+However you're going to map them, it will not be by just blindly
+exporting random irqdomains from an unsuspecting interrupt controller.
+
+Patch 5 has established that you're using "virtual wire" SPIs, so we
+need to work on exposing that with the normal kernel abstraction, and
+not by messing with the internals of the GIC.
 
 Thanks,
-Juergen
 
+	M.
 -- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions ? ? ? ? ? ? ? ? ? ?| http://www.pengutronix.de/ ?|
+Jazz is not dead. It just smells funny...
