@@ -1,108 +1,79 @@
-From: ahs3@redhat.com (Al Stone)
-Date: Thu, 16 Jul 2015 15:02:16 -0600
-Subject: [PATCH] ARM64: kernel: implement ACPI parking protocol
-In-Reply-To: <1437071026.21160.1.camel@redhat.com>
-References: <1436959990-32054-1-git-send-email-lorenzo.pieralisi@arm.com>	
- <1437063431.3583.2.camel@redhat.com> <20150716171221.GB18582@red-moon>	
- <55A7F24D.2000100@redhat.com> <1437071026.21160.1.camel@redhat.com>
-Message-ID: <55A81BD8.5080307@redhat.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Fri, 17 Jul 2015 04:03:16 +0800
+Subject: [PATCH 1/1] ARM: dts: imx6ul: add usb host and function support
+Message-ID: <1437076996-1194-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 12:23 PM, Mark Salter wrote:
-> On Thu, 2015-07-16 at 12:05 -0600, Al Stone wrote:
-> 
->> On 07/16/2015 11:12 AM, Lorenzo Pieralisi wrote:
-> 
->>> On Thu, Jul 16, 2015 at 05:17:11PM +0100, Mark Salter wrote:
-> 
->>>> On Wed, 2015-07-15 at 12:33 +0100, Lorenzo Pieralisi wrote:
->>>>
-> 
->>>>> The SBBR and ACPI specifications allow ACPI based systems that do not
->>>>> implement PSCI (eg systems with no EL3) to boot through the ACPI parking
->>>>> protocol specification[1].
->>>>>
->>>>> This patch implements the ACPI parking protocol CPU operations, and adds
->>>>> code that eases parsing the parking protocol data structures to the
->>>>> ARM64 SMP initializion carried out at the same time as cpus enumeration.
->>>>>
->>>>> To wake-up the CPUs from the parked state, this patch implements a
->>>>> wakeup IPI for ARM64 (ie arch_send_wakeup_ipi_mask()) that mirrors the
->>>>> ARM one, so that a specific IPI is sent for wake-up purpose in order
->>>>> to distinguish it from other IPI sources.
->>>>>
->>>>> Given the current ACPI MADT parsing API, the patch implements a glue
->>>>> layer that helps passing MADT GICC data structure from SMP initialization
->>>>
->>>> Somewhat off topic, but this reminds once again, that it might be
->>>> better to generalize the ACPI_MADT_TYPE_GENERIC_INTERRUPT so that it
->>>> could be done in one pass. Currently, the SMP code and the GIC code
->>>> need boot-time info from ACPI_MADT_TYPE_GENERIC_INTERRUPT tables. This
->>>> patch adds parking protocol, and this patch:
->>>>
->>>>  https://lkml.org/lkml/2015/5/1/203
->>>>
->>>> need to get the PMU irq from the same table. I've been thinking of
->>>> something like a single loop through the table in setup.c with
->>>> callouts to registered users of the various bits of data.
->>>
->>> It is not off topic at all, it is bang on topic. I hate the code
->>> as it stands forcing parsing the MADT in multiple places at different
->>> times, that's why I added hooks to set the parking protocol entries
->>> from smp.c and I know that's ugly, I posted it like this on purpose
->>> to get feedback.
->>>
-> 
->>>> Those users could register a handler function with something like an
->>>> ACPI_MADT_GIC_DECLARE() macro which would add a handler to a
->>>> special linker section.
->>>>
->>>> I could work up a separate patch if others think it a worthwhile
->>>> thing to do.
->>>
->>> Something simpler ? Like stashing the GICC entries (I know we need
->>> permanent table mappings for that to work unless we create data
->>> structures out of the MADT entries with the fields we are interested in)
->>> for possible CPUS ?
->>
->> Right -- it seems like it would be pretty straightforward to traverse
->> the MADT once, and capture all the GICC subtables in a list of pointers,
->> or even make a copy of the contents of all of them.  Each user of the
->> content would still have to traverse the list, though, unless data is
->> reduced to only those things that are needed and the rest tossed.  Even
->> if only keep the info needed, I've still got a list of entries, one for
->> each CPU, I think, that I would still have to traverse.
->>
->> If I have to register a handler to gather a specific bit of data needed,
->> I'm not understanding how that's any less complicated than what I need
->> to do today -- call acpi_parse_table_madt() with my GICC handler.  Wouldn't
->> both GICC subtable handlers be just about the same code?
->>
->> I'm probably missing something obvious, but I'm not understanding what problem
->> is being solved....
->>
-> 
-> The difference is that GIC code and SMP code each loop
-> through the tables getting the info they need. If they
-> registered a handler, there is only one loop through
-> the tables regardless of how many handlers get registered.
-> Having each loop through as currently done isn't really
-> a performance issue (its boot-time only right now), but
-> there is duplicated code wrt validating the table entry
-> and calling the acpi API to do it. All of that could be
-> done in one place instead of duplicating it in different
-> places.
+From: Frank Li <Frank.Li@freescale.com>
 
-Ah, okay.  Thanks, Mark.  I was being a bit myopic and wasn't
-thinking through the complete path in the kernel.
+Enable usb host and function driver
 
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 11 +++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi          | 27 +++++++++++++++++++++++++++
+ 2 files changed, 38 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 61b41ee..3d676ef 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -57,6 +57,17 @@
+ 	status = "okay";
+ };
+ 
++&usbotg1 {
++	dr_mode = "peripheral";
++	status = "okay";
++};
++
++&usbotg2 {
++	dr_mode = "host";
++	disable-over-current;
++	status = "okay";
++};
++
+ &usdhc1 {
+ 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
+ 	pinctrl-0 = <&pinctrl_usdhc1>;
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index f0cfc64..61507ef 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -511,6 +511,33 @@
+ 			reg = <0x02100000 0x100000>;
+ 			ranges;
+ 
++			usbotg1: usb at 02184000 {
++				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
++				reg = <0x02184000 0x200>;
++				interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_USBOH3>;
++				fsl,usbphy = <&usbphy1>;
++				fsl,usbmisc = <&usbmisc 0>;
++				fsl,anatop = <&anatop>;
++				status = "disabled";
++			};
++
++			usbotg2: usb at 02184200 {
++				compatible = "fsl,imx6ul-usb", "fsl,imx27-usb";
++				reg = <0x02184200 0x200>;
++				interrupts = <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_USBOH3>;
++				fsl,usbphy = <&usbphy2>;
++				fsl,usbmisc = <&usbmisc 1>;
++				status = "disabled";
++			};
++
++			usbmisc: usbmisc at 02184800 {
++				#index-cells = <1>;
++				compatible = "fsl,imx6ul-usbmisc", "fsl,imx6q-usbmisc";
++				reg = <0x02184800 0x200>;
++			};
++
+ 			usdhc1: usdhc at 02190000 {
+ 				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
+ 				reg = <0x02190000 0x4000>;
 -- 
-ciao,
-al
------------------------------------
-Al Stone
-Software Engineer
-Red Hat, Inc.
-ahs3 at redhat.com
------------------------------------
+1.9.1
