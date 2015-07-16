@@ -1,31 +1,41 @@
-From: ast@plumgrid.com (Alexei Starovoitov)
-Date: Thu, 16 Jul 2015 10:35:34 -0700
-Subject: [PATCH 0/6] BPF JIT fixes and features for ARM
-In-Reply-To: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-References: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <55A7EB66.7030700@plumgrid.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Thu, 16 Jul 2015 10:37:27 -0700
+Subject: [PATCH] input: ambakmi: Fix system PM by converting to modern
+ callbacks
+In-Reply-To: <CAPDyKFqu-BJLyP0aDDmZHjAUub=AZyA0YtTRhkZi=roHMaHcXA@mail.gmail.com>
+References: <1429008108-29295-1-git-send-email-ulf.hansson@linaro.org>
+ <CAPDyKFrhC1MCmOfoweztNtzk-Spwhj1uj7-sz3UtJhT_bHDQ+g@mail.gmail.com>
+ <20150522164909.GA40101@dtor-ws>
+ <CAPDyKFqu-BJLyP0aDDmZHjAUub=AZyA0YtTRhkZi=roHMaHcXA@mail.gmail.com>
+Message-ID: <20150716173727.GA32571@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/16/15 9:46 AM, Nicolas Schichan wrote:
-> This serie fixes issues with the ARM BPF JIT and adds support for more
-> instructions to the ARM BPF JIT.
->
-> The first three patches are fixing bugs in the ARM JIT and should
-> probably find their way to a stable kernel.
->
-> The last three patches add support to the ARM JIT for more BPF
-> instructions, namely skb netdevice type retrieval, skb payload offset
-> retrieval, and skb packet type retrieval.
->
-> With the first three patches, all 60 test_bpf tests in Linux 4.1 release
-> are now passing OK (was 54 out of 60 before).
->
-> The last three patches allow 35 tests to use the JIT instead of 29
-> before.
+On Thu, Jul 16, 2015 at 10:48:06AM +0200, Ulf Hansson wrote:
+> On 22 May 2015 at 18:49, Dmitry Torokhov <dmitry.torokhov@gmail.com> wrote:
+> > On Fri, May 22, 2015 at 04:37:12PM +0200, Ulf Hansson wrote:
+> >> On 14 April 2015 at 12:41, Ulf Hansson <ulf.hansson@linaro.org> wrote:
+> >> > The legacy system PM support has long time ago been dropped from the
+> >> > AMBA bus. Align to that by converting to the modern system PM
+> >> > callbacks.
+> >> >
+> >> > Fixes: 26825cfd90f9 (ARM: 7914/1: amba: Drop legacy PM support ...)
+> >> > Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> >>
+> >> What happened with this one? Can we queue it for 4.2?
+> >
+> > I was hoping that Russel could give it a spin since he has the
+> > relevant hardware.
+> >
+> 
+> Hmm, as there are still no progress could we give it a try and queue
+> it to get some test in linux-next? I think the patch is trivial and it
+> would be nice to get it queued as a fix.
 
-looks good to me.
-For the series:
-Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+Yep. I removed #ifdef CONFIG_PM_SLEEP guard in favor of __maybe_unused
+and applied.
 
-you might want to try the latest 4.2-rc, since it has 238 tests :)
+Thanks.
+
+-- 
+Dmitry
