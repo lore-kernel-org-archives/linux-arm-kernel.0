@@ -1,52 +1,63 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 16 Jul 2015 17:01:56 +0100
-Subject: [PATCH 2/5] arm64: kernel: Add cpufeature 'enable' callback.
+Date: Thu, 16 Jul 2015 17:01:57 +0100
+Subject: [PATCH 3/5] arm64: kernel: Add min/max values in feature-detection
+ register values.
 In-Reply-To: <1437062519-18883-1-git-send-email-james.morse@arm.com>
 References: <1437062519-18883-1-git-send-email-james.morse@arm.com>
-Message-ID: <1437062519-18883-3-git-send-email-james.morse@arm.com>
+Message-ID: <1437062519-18883-4-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an 'enable()' callback to cpu capability/feature
-detection, allowing features that require some setup or configuration
-to get this opportunity once the feature has been detected.
+When a new cpu feature is available, the cpu feature bits will be 0001,
+when features are updated, this value will be incremented. This patch
+changes 'register_value' to be '{min,max}_register_value', and checks
+the value falls in this range.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 1 +
- arch/arm64/kernel/cpufeature.c      | 6 ++++++
- 2 files changed, 7 insertions(+)
+ arch/arm64/include/asm/cpufeature.h | 3 ++-
+ arch/arm64/kernel/cpufeature.c      | 6 ++++--
+ 2 files changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index c1044218a63a..a8a201ab6cd1 100644
+index a8a201ab6cd1..680a6a1f087e 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -34,6 +34,7 @@ struct arm64_cpu_capabilities {
- 	const char *desc;
- 	u16 capability;
- 	bool (*matches)(const struct arm64_cpu_capabilities *);
-+	void (*enable)(void);
- 	union {
- 		struct {	/* To be used for erratum handling only */
- 			u32 midr_model;
+@@ -43,7 +43,8 @@ struct arm64_cpu_capabilities {
+ 
+ 		struct {	/* Feature register checking */
+ 			u64 register_mask;
+-			u64 register_value;
++			u64 min_register_value;
++			u64 max_register_value;
+ 		};
+ 	};
+ };
 diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 5ad86ceac010..650ffc28bedc 100644
+index 650ffc28bedc..f260affb825c 100644
 --- a/arch/arm64/kernel/cpufeature.c
 +++ b/arch/arm64/kernel/cpufeature.c
-@@ -55,6 +55,12 @@ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			pr_info("%s %s\n", info, caps[i].desc);
- 		cpus_set_cap(caps[i].capability);
- 	}
-+
-+	/* second pass allows enable() to consider interacting capabilities */
-+	for (i = 0; caps[i].desc; i++) {
-+		if (cpus_have_cap(caps[i].capability) && caps[i].enable)
-+			caps[i].enable();
-+	}
+@@ -28,7 +28,8 @@ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+ 	u64 val;
+ 
+ 	val = read_cpuid(id_aa64pfr0_el1);
+-	return (val & entry->register_mask) == entry->register_value;
++	return ((val & entry->register_mask) >= entry->min_register_value &&
++		(val & entry->register_mask) <= entry->max_register_value);
  }
  
- void check_local_cpu_features(void)
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+@@ -37,7 +38,8 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+ 		.matches = has_id_aa64pfr0_feature,
+ 		.register_mask = (0xf << 24),
+-		.register_value = (1 << 24),
++		.min_register_value = (1 << 24),
++		.max_register_value = (1 << 24),
+ 	},
+ 	{},
+ };
 -- 
 2.1.4
