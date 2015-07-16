@@ -1,167 +1,61 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jul 2015 10:38:51 +0900
-Subject: [PATCH v3 2/4] ARM: dts: Exynos5250: add CPU OPP and regulator
- supply property
-In-Reply-To: <55A70A3E.5020600@samsung.com>
-References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
- <1435756238-845-3-git-send-email-b.zolnierkie@samsung.com>
- <55A70A3E.5020600@samsung.com>
-Message-ID: <55A70B2B.1060100@samsung.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 16 Jul 2015 03:44:56 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <20150716011935.GB9033@localhost>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507151915.50677.marex@denx.de> <20150716011935.GB9033@localhost>
+Message-ID: <201507160344.56393.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16.07.2015 10:34, Krzysztof Kozlowski wrote:
-> On 01.07.2015 22:10, Bartlomiej Zolnierkiewicz wrote:
->> From: Thomas Abraham <thomas.ab@samsung.com>
->>
->> For Exynos5250 platforms, add CPU operating points and CPU
->> regulator supply properties for migrating from Exynos specific
->> cpufreq driver to using generic cpufreq driver.
->>
->> Changes by Bartlomiej:
->> - split Exynos5250 support from the original patch
->> - added CPU regulator supply property for Google Spring board
->> - put the new cpu nodes in alphabetical order
->>
->> Cc: Kukjin Kim <kgene.kim@samsung.com>
->> Cc: Doug Anderson <dianders@chromium.org>
->> Cc: Javier Martinez Canillas <javier@dowhile0.org>
->> Cc: Andreas Faerber <afaerber@suse.de>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos5250-arndale.dts  |  4 ++++
->>  arch/arm/boot/dts/exynos5250-smdk5250.dts |  4 ++++
->>  arch/arm/boot/dts/exynos5250-snow.dts     |  4 ++++
->>  arch/arm/boot/dts/exynos5250-spring.dts   |  4 ++++
->>  arch/arm/boot/dts/exynos5250.dtsi         | 22 ++++++++++++++++++++++
->>  5 files changed, 38 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
->> index 7e728a1..db3f65f 100644
->> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
->> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
->> @@ -117,6 +117,10 @@
->>  	};
->>  };
->>  
->> +&cpu0 {
->> +	cpu0-supply = <&buck2_reg>;
->> +};
->> +
->>  &dp {
->>  	status = "okay";
->>  	samsung,color-space = <0>;
->> diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> index 4fe186d..15aea76 100644
->> --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
->> @@ -74,6 +74,10 @@
->>  	};
->>  };
->>  
->> +&cpu0 {
->> +	cpu0-supply = <&buck2_reg>;
->> +};
->> +
->>  &dp {
->>  	samsung,color-space = <0>;
->>  	samsung,dynamic-range = <0>;
->> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
->> index b7f4122..a4133df 100644
->> --- a/arch/arm/boot/dts/exynos5250-snow.dts
->> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
->> @@ -235,6 +235,10 @@
->>  	};
->>  };
->>  
->> +&cpu0 {
->> +	cpu0-supply = <&buck2_reg>;
->> +};
->> +
->>  &dp {
->>  	status = "okay";
->>  	pinctrl-names = "default";
->> diff --git a/arch/arm/boot/dts/exynos5250-spring.dts b/arch/arm/boot/dts/exynos5250-spring.dts
->> index d03f9b8..c1edd6d 100644
->> --- a/arch/arm/boot/dts/exynos5250-spring.dts
->> +++ b/arch/arm/boot/dts/exynos5250-spring.dts
->> @@ -65,6 +65,10 @@
->>  	};
->>  };
->>  
->> +&cpu0 {
->> +	cpu0-supply = <&buck2_reg>;
->> +};
->> +
->>  &dp {
->>  	status = "okay";
->>  	pinctrl-names = "default";
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
->> index bf9bee6..0c7ef12 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -63,6 +63,28 @@
->>  			compatible = "arm,cortex-a15";
->>  			reg = <0>;
->>  			clock-frequency = <1700000000>;
->> +			clocks = <&clock CLK_ARM_CLK>;
->> +			clock-names = "cpu";
->> +			clock-latency = <140000>;
->> +
->> +			operating-points = <
->> +				1700000 1300000
->> +				1600000 1250000
->> +				1500000 1225000
->> +				1400000 1200000
->> +				1300000 1150000
->> +				1200000 1125000
->> +				1100000 1100000
->> +				1000000 1075000
->> +				 900000 1050000
->> +				 800000 1025000
->> +				 700000 1012500
->> +				 600000 1000000
->> +				 500000  975000
->> +				 400000  950000
->> +				 300000  937500
->> +				 200000  925000
->> +			>;
->>  			cooling-min-level = <15>;
->>  			cooling-max-level = <9>;
->>  			#cooling-cells = <2>; /* min followed by max */
->>
+On Thursday, July 16, 2015 at 03:19:35 AM, Brian Norris wrote:
+> On Wed, Jul 15, 2015 at 07:15:50PM +0200, Marek Vasut wrote:
+> > On Wednesday, July 15, 2015 at 05:59:46 PM, Brian Norris wrote:
+> > > 1. Fix up the SPI driver so that it knows how to break large SPI
+> > > transfers up into smaller segments that its constituent hardware (DMA
+> > > controllers, fast clocks, etc.) can handle.
 > 
+> BTW, Mark Brown already commented on this approach:
 > 
-> I see you have all necessary acks so this can go through samsung-soc. I
-> started applying everything. Patch 4/4 does not apply cleanly but this
-> was easy to solve (I think it is better to rebase on Linus tree not on
-> next in such case; subsystems cannot apply easily something depending on
-> next).
+> http://lists.infradead.org/pipermail/linux-mtd/2015-May/059364.html
 > 
-> Unfortunately this patch (2/4) has build errors:
+> I quote:
+> | With modern drivers using transfer_one() where we have control of the
+> | chip select we do also have the ability to add support to the core for
+> | chopping large transfers up into smaller ones that the hardware can
+> | handle transparently.  That won't for everything though since it depends
+> | on us being able to manually control the chip select which not all
+> | hardware can do.
+> | 
+> > I think this might actually be easier -- just do a transfer where you
+> > don't toggle CS and just stops the clock at the last bit, then do another
+> > (multiple) transfers which don't toggle CS at all, then finally do a
+> > transfer which toggles a CS at the end.
 > 
->   DTC     arch/arm/boot/dts/exynos5250-arndale.dtb
-> Error: ../arch/arm/boot/dts/exynos5250.dtsi:65.21-22 syntax error
-> FATAL ERROR: Unable to parse input tree
-> make[2]: *** [arch/arm/boot/dts/exynos5250-arndale.dtb] Error 1
-> make[1]: *** [dtbs] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> make[1]: Leaving directory `/home/kozik/dev/linux/krzk/out'
-> make: *** [sub-make] Error 2
-> Fail: Make error
-> 
-> I tried to apply this patch on my dt-for-next branch:
-> https://github.com/krzk/linux/commits/dt-for-next
-> 
-> I hold back other patches until this is clarified.
+> Sounds OK to me. And as Mark noted, this could probably be done in the
+> core. I suppose Mark could suggest whether the most expedient path is to
+> hack the buggy driver to do this, or whether reworking the SPI core to
+> have the appropriate spi_master field(s) (and caveats) to support this.
 
-Stupid me, it should not be split into separate branches as it depends
-on clock id from headers.
+Yep, agreed.
 
-Everything is fine, I applied patchset with respective tags (Javier's
-reviewed/tested, Sylwester's and Viresh's acks). I'll send later to
-Kukjin for v4.3 unless he picks it also.
+> > This should be pretty trivial
+> > to do and I think for example spi-mxs.c does this.
+> 
+> I don't think spi-mxs.c really does this; it chooses between PIO and DMA
+> based on length, but with either option, it runs through each SPI
+> transfer in one go. You might be confused by the fact that this driver
+> implements ->transfer_one_message instead of ->transfer_one, so it has
+> to loop through all transfers in the message.
+
+It does chop up the DMA transfers between multiple runs of the DMA engine
+IIRC. But it does so within the driver, which apparently is not the way
+to go :)
+
+> (IIUC, spi-mxs.c could easily be rewritten to use ->transfer, and some
+> of that not-too-complicated boilerplate could be killed off.)
+
+Most likely, yes.
 
 Best regards,
-Krzysztof
+Marek Vasut
