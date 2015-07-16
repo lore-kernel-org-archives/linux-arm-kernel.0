@@ -1,36 +1,86 @@
-From: danindrey@mail.ru (Andrey Danin)
-Date: Thu, 16 Jul 2015 12:03:43 +0300
-Subject: How to encode being an I2C slave in DT?
-In-Reply-To: <20150519061619.GA4448@schokonusskuchen.bad>
-References: <1427745615-5428-1-git-send-email-danindrey@mail.ru>
- <20150403194635.GC2016@katana> <1549160.njMIY2NVTi@fb07-iapwap2>
- <20150505105513.GA1841@katana> <554922EF.3050906@wwwdotorg.org>
- <20150506161712.GA4003@katana>
- <CAL_Jsq+iyeK-bV3ggcJv8Cw3EU71fkBo1wqYZnhCoh2-b_tO-Q@mail.gmail.com>
- <20150519061619.GA4448@schokonusskuchen.bad>
-Message-ID: <55A7736F.5090802@mail.ru>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 16 Jul 2015 10:04:26 +0100
+Subject: [PATCH 3/5] arm64, pci: Allow RC drivers to supply
+ pcibios_add_device() implementation.
+In-Reply-To: <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <20150716090426.GA17097@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+Hi David,
 
-On 19.05.2015 9:16, Wolfram Sang wrote:
->
->>> I give in to the flag idea. I also noticed that we'd need another flag
->>> anyhow to mark 10 bit addresses. I am still thinking between using two
->>> address-cells in that case (clean seperation between address and flags)
->>> or to encode the flags as MSB in the current address (all busses will
->>> have same address-cells and child description, less code paths and no
->>> overhead in dtbs).
->>
->> Reading thru the thread, this seems good to me. I would go with adding
->> flags in the MSB of the reg cell rather than adding a cell.
->
-> Thanks. I was leaning to the MSB idea, too, and am currently checking
-> how the code would look like. Feels much better to do knowing that it is
-> basically upstream compatible ;)
->
-Did you have enough time to check this ?
-(sorry for the noise, if I missed patch(es) in the ml)
+On Wed, Jul 15, 2015 at 05:54:43PM +0100, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> The default is to continue doing the what we have done before, but add
+> a hook so that this can be overridden.
 
-Thanks.
+This commit log is inappropriate. On top of that, it is already
+complicated enough to keep ARM and ARM64 in sync, I can't even
+imagine what would happen if we added a hook to pcibios_add_device
+so that RCs can implement their quirks beyond ARM64 core control.
+
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>  arch/arm64/include/asm/pci.h |  3 +++
+>  arch/arm64/kernel/pci.c      | 10 ++++++++++
+>  2 files changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> index b008a72..ad3fb18 100644
+> --- a/arch/arm64/include/asm/pci.h
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -37,6 +37,9 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+>  {
+>  	return 1;
+>  }
+> +
+> +void set_pcibios_add_device(int (*arg)(struct pci_dev *));
+> +
+>  #endif  /* CONFIG_PCI */
+>  
+>  #endif  /* __KERNEL__ */
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 4095379..3356023 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  	return res->start;
+>  }
+>  
+> +static int (*pcibios_add_device_impl)(struct pci_dev *);
+> +
+> +void set_pcibios_add_device(int (*arg)(struct pci_dev *))
+> +{
+> +	pcibios_add_device_impl = arg;
+> +}
+> +
+>  /*
+>   * Try to assign the IRQ number from DT when adding a new device
+>   */
+>  int pcibios_add_device(struct pci_dev *dev)
+>  {
+> +	if (pcibios_add_device_impl)
+> +		return pcibios_add_device_impl(dev);
+
+I am totally against this (and to be honest by reading the other
+patches I failed to understand why you even need it), see above.
+
+Thanks,
+Lorenzo
+
+> +
+>  	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>  
+>  	return 0;
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
