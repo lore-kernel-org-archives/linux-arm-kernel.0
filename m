@@ -1,45 +1,46 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 16 Jul 2015 19:14:26 +0300
-Subject: [PATCH 0/2] omap3isp: Remove legacy platform data support
-In-Reply-To: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
-References: <1437051319-9904-1-git-send-email-laurent.pinchart@ideasonboard.com>
-Message-ID: <55A7D862.3070700@iki.fi>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 16 Jul 2015 17:15:41 +0100
+Subject: [Xen-devel] [PATCH v2 09/20] xen/biomerge: Don't allow biovec
+ to be merge when Linux is not using 4KB page
+In-Reply-To: <alpine.DEB.2.02.1507161627010.17378@kaball.uk.xensource.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
+ <20150710191245.GA31063@l.oracle.com>
+ <alpine.DEB.2.02.1507161627010.17378@kaball.uk.xensource.com>
+Message-ID: <55A7D8AD.1090102@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Laurent Pinchart wrote:
-> Hello,
-> 
-> Now that all users of the OMAP3 ISP have switched to DT, this patch series
-> removes support for legacy platform data support in the omap3isp driver. It
-> also drops the OMAP3 ISP device instantiation board code that is now unused.
-> 
-> Patch 2/2 depends on 1/2. From a conflict resolution point of view it would be
-> easier to merge the whole series through the linux-media tree. Tony, would
-> that be fine with you ? If so could you please ack patch 1/2 ?
-> 
-> Laurent Pinchart (2):
->   ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
->   v4l: omap3isp: Drop platform data support
-> 
->  arch/arm/mach-omap2/devices.c               |  53 ----------
->  arch/arm/mach-omap2/devices.h               |  19 ----
->  drivers/media/platform/Kconfig              |   2 +-
->  drivers/media/platform/omap3isp/isp.c       | 133 ++++-------------------
->  drivers/media/platform/omap3isp/isp.h       |   7 +-
->  drivers/media/platform/omap3isp/ispcsiphy.h |   2 +-
->  drivers/media/platform/omap3isp/ispvideo.c  |   9 +-
->  drivers/media/platform/omap3isp/omap3isp.h  | 132 +++++++++++++++++++++++
->  include/media/omap3isp.h                    | 158 ----------------------------
->  9 files changed, 158 insertions(+), 357 deletions(-)
->  delete mode 100644 arch/arm/mach-omap2/devices.h
->  create mode 100644 drivers/media/platform/omap3isp/omap3isp.h
->  delete mode 100644 include/media/omap3isp.h
+Hi Stefano,
 
-For the set:
+On 16/07/2015 16:33, Stefano Stabellini wrote:
+> On Fri, 10 Jul 2015, Konrad Rzeszutek Wilk wrote:
+>> On Thu, Jul 09, 2015 at 09:42:21PM +0100, Julien Grall wrote:
+>>> When Linux is using 64K page granularity, every page will be slipt in
+>>> multiple non-contiguous 4K MFN (page granularity of Xen).
+>>
+>> But you don't care about that on the Linux layer I think?
+>>
+>> As in, is there an SWIOTLB that does PFN to MFN and vice-versa
+>> translation?
+>>
+>> I thought that ARM guests are not exposed to the MFN<->PFN logic
+>> and trying to figure that out to not screw up the DMA engine
+>> on a PCIe device slurping up contingous MFNs which don't map
+>> to contingous PFNs?
+>
+> Dom0 is mapped 1:1, so pfn == mfn normally, however grant maps
+> unavoidably screw up the 1:1, so the swiotlb jumps in to save the day
+> when a foreign granted page is involved in a dma operation.
+>
+> Regarding xen_biovec_phys_mergeable, we could check that all the pfn ==
+> mfn and return true in that case.
 
-Acked-by: Sakari Ailus <sakari.ailus@iki.fi>
+I mentioned it in the commit message. Although, we would have to loop on 
+every pfn which is slow on 64KB (16 times for every page). Given the 
+biovec is called often, I don't think we can do a such things.
+
+Regards,
 
 -- 
-Sakari Ailus
-sakari.ailus at iki.fi
+Julien Grall
