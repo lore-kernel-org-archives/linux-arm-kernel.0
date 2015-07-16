@@ -1,65 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 16 Jul 2015 09:59:40 +0200
-Subject: [PATCH v2] ARM: l2c: Add support for the "arm,
- shared-override" property
-In-Reply-To: <CAMuHMdV8MhkOP+cfZx1HHaOctccrGmKp9RQBLuqy-NS1SQCh8Q@mail.gmail.com>
-References: <1430990831-23825-1-git-send-email-geert+renesas@glider.be>
- <20150507160257.GA11067@e104818-lin.cambridge.arm.com>
- <20150515101028.GH2067@n2100.arm.linux.org.uk>
- <20150515135513.GH19345@e104818-lin.cambridge.arm.com>
- <556D593C.1090002@monstr.eu> <558C7068.7070105@hauke-m.de>
- <CAMuHMdV8MhkOP+cfZx1HHaOctccrGmKp9RQBLuqy-NS1SQCh8Q@mail.gmail.com>
-Message-ID: <CAMuHMdX2ko3f8s7dnvwk2w-L3CPt_O-vaJ4Bbj+EHUvin7uVRg@mail.gmail.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Thu, 16 Jul 2015 08:01:38 +0000
+Subject: [PATCH] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <2042080.Y9rzRSQLpW@wuerfel>
+References: <1436952778-28000-1-git-send-email-yao.yuan@freescale.com>
+ <3074236.7KNCYXgBBY@wuerfel>
+ <BL2PR03MB338DF493E475876FF6C6038839A0@BL2PR03MB338.namprd03.prod.outlook.com>
+ <2042080.Y9rzRSQLpW@wuerfel>
+Message-ID: <BL2PR03MB3380E34F751336BA0C0C5F283990@BL2PR03MB338.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 9:15 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Thu, Jun 25, 2015 at 11:19 PM, Hauke Mehrtens <hauke@hauke-m.de> wrote:
->> On 06/02/2015 09:20 AM, Michal Simek wrote:
->>> On 05/15/2015 03:55 PM, Catalin Marinas wrote:
->>>> On Fri, May 15, 2015 at 11:10:28AM +0100, Russell King - ARM
->>>> Linux wrote:
->>>>> On Thu, May 07, 2015 at 05:02:57PM +0100, Catalin Marinas
->>>>> wrote:
->>>>>> On Thu, May 07, 2015 at 11:27:11AM +0200, Geert Uytterhoeven
->>>>>> wrote:
->>>>>>> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt
->>>>>>> b/Documentation/devicetree/bindings/arm/l2cc.txt index
->>>>>>> 0dbabe9a6b0abb91..2484aed78c86546d 100644 ---
->>>>>>> a/Documentation/devicetree/bindings/arm/l2cc.txt +++
->>>>>>> b/Documentation/devicetree/bindings/arm/l2cc.txt @@ -67,6
->>>>>>> +67,12 @@ Optional properties: disable if zero. -
->>>>>>> arm,prefetch-offset : Override prefetch offset value. Valid
->>>>>>> values are 0-7, 15, 23, and 31. +- arm,shared-override :
->>>>>>> The default behavior of the pl310 cache controller with +
->>>>>>> respect to the shareable attribute is to transform "normal
->>>>>>> memory +  non-cacheable transactions" into "cacheable no
->>>>>>> allocate" (for reads) or +  "write through no write
->>>>>>> allocate" (for writes). +  On systems where this may cause
->>>>>>> DMA buffer corruption, this property must be +  specified
->>>>>>> to indicate that such transforms are precluded.
->
->>>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->
->> I do not see this in linux-next, and would like to use this.
->>
->> Geert have you submitted this through this patch submission page?
->> http://www.arm.linux.org.uk/developer/patches/
->
-> Thanks for reminding me!
->
-> Submitted with Catalin's Acked-by.
+Hi Arnd,
+Ok, I will remove the #ifdef in the next version.
+Thanks.
 
-Now included in today's arm/for-next. Thanks!
+Hi All,
+Is there any others comments?
 
-Gr{oetje,eeting}s,
+Thanks for your review.
 
-                        Geert
+Best Regards,
+Yuan Yao
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+On Wednesday, July 15, 2015 10:55 PM Arnd wrote:
+> On Wednesday 15 July 2015 10:29:55 Yao Yuan wrote:
+> > Hi Arnd,
+> >
+> > Thanks for your review.
+> > And can you give me more information?
+> > In my opinion, The fsl_edma_pm_state will just be used when CONFIG_PM
+> > support. So why not use the #ifdefs to remove the unnecessary code? Since
+> the PM will not be selected in many use cases.
+> 
+> I would consider code readability more important than saving a few instructions,
+> and the #ifdef interrupts the reading flow.
+> Another aspect is that the compiler does not produce warnings for incorrect
+> code in an #ifdef, so we try to use e.g. 'if (IS_ENABLED(CONFIG_FOO))'
+> instead of '#ifdef CONFIG_FOO' wherever possible.
+> 
+> 	Arnd
