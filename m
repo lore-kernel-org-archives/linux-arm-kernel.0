@@ -1,74 +1,45 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 16 Jul 2015 17:27:47 +0200
-Subject: [PATCH 0/7] add driver for Atmel QSPI controller
-Message-ID: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+Date: Thu, 16 Jul 2015 17:27:48 +0200
+Subject: [PATCH 1/7] Documentation: mtd: add a DT property to set the number
+ of dummy cycles
+In-Reply-To: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+Message-ID: <0eacf9dac878768b4cf915f926c628d9e65499df.1437059658.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Depending on the SPI clock frequency, the Fast Read op code and the
+Single/Dual Data Rate mode, the number of dummy cycles can be tuned to
+improve transfer speed.
+The actual number of dummy cycles is specific for each memory model and is
+provided by the manufacturer thanks to the memory datasheet.
 
-in order to be able to use Micron Quad SPI memories with the new Atmel QSPI
-controller I added a new set_protocol() callback into struct spi_nor.
-Indeed, once the quad I/O mode has been enabled on a Micron QSPI flash by
-clearing bit 7 in its Enhanced Volatile Configuration Register, this memory
-expects all the following commands to use the QSPI 4-4-4 protocol. So the
-QSPI controller needs to be notified about this protocol change before
-reading the Status register, 0x05 command sent by the
-spi_nor_wail_till_ready() function, in micron_quad_enable().
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Reading spi-nor.h, I saw an interesting struct spi_nor_xfer_cfg and its
-associated callbacks write_xfer() and read_xfer(). However these callbacks
-don't seem to be used at all for now. They look to have been designed to
-add QSPI support to the generic spi-nor framework. So before extending the
-framework with my own callback, I'd like to know whether I should have
-tried to used the read_xfer()/write_xfer() callbacks to join an already
-existing effort to add QSPI support.
-If so, I think either the read/write_reg() prototypes should be updated or
-new callbacks should be added for register reads/writes. As explained
-above, even for reading the Status register the QSPI 4-4-4 protocol must be
-used with Micron memories in quad I/O mode. So the framework has to find a
-way to tell the QSPI controller which protocol it should use.
-
-So I'm interested in your comments! :)
-
-Best Regards,
-
-Cyrille
-
-ChangeLog
-
-v1:
-
-This series of patches add support for the new Atmel QSPI controller
-embedded inside sama5d2x SoCs.
-
-These patches were first developped for linux-3.18-at91 and tested on a
-sama5d27 Xplained ultra board, which embeds a Micron n25q128a13 QSPI NOR
-flash memory. Then the series was adapted for mainline.
-
-Cyrille Pitchen (7):
-  Documentation: mtd: add a DT property to set the number of dummy
-    cycles
-  mtd: spi-nor: notify (Q)SPI controller about protocol change
-  mtd: spi-nor: allow to tune the number of dummy cycles
-  Documentation: mtd: add a DT property to set the latency code of
-    Spansion memory
-  mtd: spi-nor: allow the set the latency code on Spansion memories
-  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
-  mtd: atmel-quadspi: add driver for Atmel QSPI controller
-
- .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
- .../devicetree/bindings/mtd/jedec,spi-nor.txt      |   6 +
- .../devicetree/bindings/mtd/spansion-nor.txt       |  22 +
- drivers/mtd/spi-nor/Kconfig                        |   7 +
- drivers/mtd/spi-nor/Makefile                       |   1 +
- drivers/mtd/spi-nor/atmel-quadspi.c                | 901 +++++++++++++++++++++
- drivers/mtd/spi-nor/spi-nor.c                      | 160 +++-
- include/linux/mtd/spi-nor.h                        |  15 +
- 8 files changed, 1122 insertions(+), 19 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
- create mode 100644 Documentation/devicetree/bindings/mtd/spansion-nor.txt
- create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
-
+diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+index 2bee68103b01..4387567d8024 100644
+--- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
++++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
+@@ -19,6 +19,11 @@ Optional properties:
+                    all chips and support for it can not be detected at runtime.
+                    Refer to your chips' datasheet to check if this is supported
+                    by your chip.
++- m25p,num-dummy-cycles : Set the number of dummy cycles for Fast Read commands.
++                          Depending on the manufacturer additional dedicated
++                          commands are sent to the flash memory so the
++                          controller and the memory can agree on the number of
++                          dummy cycles to use.
+ 
+ Example:
+ 
+@@ -29,4 +34,5 @@ Example:
+ 		reg = <0>;
+ 		spi-max-frequency = <40000000>;
+ 		m25p,fast-read;
++		m25p,num-dummy-cycles = <8>;
+ 	};
 -- 
 1.8.2.2
