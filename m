@@ -1,78 +1,53 @@
 From: majun258@huawei.com (majun (F))
-Date: Thu, 16 Jul 2015 16:35:33 +0800
+Date: Thu, 16 Jul 2015 16:35:28 +0800
 Subject: [PATCH v3 1/3] IRQ/Gic-V3: Add mbigen driver to support mbigen
  interrupt controller
-In-Reply-To: <559D422D.1000307@arm.com>
+In-Reply-To: <alpine.DEB.2.11.1507081154090.3916@nanos>
 References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
  <1436166548-34920-2-git-send-email-majun258@huawei.com>
- <559D422D.1000307@arm.com>
-Message-ID: <55A76CD5.1050301@huawei.com>
+ <alpine.DEB.2.11.1507061248090.3916@nanos> <559CA530.2090508@huawei.com>
+ <alpine.DEB.2.11.1507081154090.3916@nanos>
+Message-ID: <55A76CD0.1050000@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-? 2015/7/8 23:30, Marc Zyngier ??:
-> Hi,
+? 2015/7/8 18:44, Thomas Gleixner ??:
+> On Wed, 8 Jul 2015, majun (F) wrote:
+>> ? 2015/7/6 20:33, Thomas Gleixner ??:
+>>> Care to explain what this does? It seems for some nodes you cannot
+>>> write the msi message. So how is that supposed to work? How is that
+>>> interrupt controlled (mask/unmask ...) ?
+>>>
+>> This function is used to write irq event id into vector register.Depends on
+>> hardware design, write operation is permitted in some mbigen node(nid=0,5,and >7),
+>> For other mbigen node, this register is read only.
+>>
+>> But only vector register has this problem. Other registers are ok for read/write.
 > 
-> Aside from all the comments Thomas had, the following aspect is worrying
-> me a bit:
+> You still fail to explain how that works if the register is not
+> writeable. And the code wants a proper comment explaining it.
 > 
-> On 06/07/15 08:09, Ma Jun wrote:
->> This patch contains the mbigen interrupt controller driver.
-> 
-> [...]
-> 
->> +static int mbigen_set_type(struct irq_data *d, unsigned int type)
->> +{
->> +       struct mbigen_chip *chip = d->domain->host_data;
->> +       u32 ofst, mask;
->> +       u32 val, nid, hwirq;
->> +       void __iomem *addr;
->> +
->> +       if (type != IRQ_TYPE_LEVEL_HIGH && type != IRQ_TYPE_EDGE_RISING)
->> +               return -EINVAL;
-> 
-> You seem to be supporting both edge and level triggered interrupts.
-> 
-> Given that the ITS is edge triggered only, I must assume you have some
-> code to regenerate an edge if the wired interrupt is level triggered,
-> and that the line level is still high when you perform the EOI...
-> 
-For each interrupt, there is state machine in mbigen chip.
-inactive-->pending--> active(pending & active)
 
-The level triggered interrupt process flow list as below:
-device---->mbigen---->ITS---->GIC--->CPU
+Actually, the interrupt trigger type, device id and event id already encoded in
+mbigen chip.
 
-[1]: device triggered interrupt A and line level changes to high
-[2]: Mbigen receive interrupt A and changes the status of A to pending in mbigen(mbigen.state = pending)
-[3]: Mbigen send interrupt A to ITS , the A status in mbigen will be changed to pending
-	& active (mbigen.state = pending & active)
-[4]: ITS receive the interrupt A and send A to gic (A status in gic is pending. gic.state=pending)
-[5]: CPU ack the interrupt A ( gic.state = active)
-[6]: Enter interrupt handler. The interrupt line level is cleared in device irq handler.
-[7]: When detects the low level on interrupt A line, mbigen change the interrupt A status
-	from pending & active to inactive (mbigen.state = inactive).
-[8]: Send EOI . a): write register to clear the status in mbigen .
-	b):clear the status in gic. (gic.state = inactive)
+Depends on hardweare design, the device id and event id value in some mbigen nodes
+can't be modified, but some nodes can.
+
+For the mbigen node which event id can't be modified, we can use the default event id
+value (encoded in mbigen register).
+If the event id can be programmed, we can use this function to modify the event id value.
 
 [....]
->> +static void mbigen_irq_eoi(struct irq_data *d)
->> +{
->> +       irq_chip_eoi_parent(d);
 > 
-> ... but this function doesn't have any code dealing with injecting an
-> edge on detecting a level high.
-> 
-
-Yes, before irq_chip_eoi_parent is called, some code should be added to
-clear the interrupt status in mbigen.
-
-> So how does it work? Either you're missing some logic here, or you don't
-> really support level interrupts.
+> Aside of that, please look at the per-device MSI series Marc posted
+> (you were cc'ed). This is going to be where we are heading and your
+> driver should be based on that.
+Ok, i will  change mbigen code based on Marc's patch.
 > 
 > Thanks,
 > 
-> 	M.
+> 	tglx
 > 
