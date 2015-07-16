@@ -1,34 +1,45 @@
 From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Thu, 16 Jul 2015 10:16:46 +0200
+Date: Thu, 16 Jul 2015 10:18:38 +0200
 Subject: [PATCH 1/2] gpio: dwapb: Use human understandable gpio numbering.
-In-Reply-To: <CACRpkdavWungUrU02dxObW1BUK5uELFHgDQMXmQwqdzzem2zuA@mail.gmail.com>
+In-Reply-To: <CACRpkdb_3B8749X-p_XEPGvZPEQ56-gMdLBcPrgjXkqWCiz1PQ@mail.gmail.com>
 References: <cover.1435777856.git.rcochran@linutronix.de>
  <d6b5ce85a17164970d454583560e07f7aed7b8ca.1435777856.git.rcochran@linutronix.de>
  <267A46E7-C5C5-4696-90CC-D44F4130B3EF@smart-africa.com>
- <CACRpkdavWungUrU02dxObW1BUK5uELFHgDQMXmQwqdzzem2zuA@mail.gmail.com>
-Message-ID: <60651945-976B-42B3-AD64-769AB10990C2@smart-africa.com>
+ <20150702142058.GA9349@localhost.localdomain>
+ <CACRpkdb_3B8749X-p_XEPGvZPEQ56-gMdLBcPrgjXkqWCiz1PQ@mail.gmail.com>
+Message-ID: <C83A636F-4C5C-4C11-A3CA-B4C4624B5375@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> On 16 Jul 2015, at 9:52 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On 16 Jul 2015, at 9:57 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
 > 
-> On Thu, Jul 2, 2015 at 9:05 AM, Michael van der Westhuizen
-> <michael@smart-africa.com> wrote:
+> On Thu, Jul 2, 2015 at 4:20 PM, Richard Cochran
+> <richardcochran@gmail.com> wrote:
+>> On Thu, Jul 02, 2015 at 08:05:26AM +0100, Michael van der Westhuizen wrote:
 > 
->> In my case, I have quite a lot of vendor-supplied code that needs the numbers to
->> be stable and backward compatible.  This quickly devolves into a discussion of
->> GPIOs in sysfs as an ABI, which is not a discussion I want to have :)
+>> Anyhow, the whole point is, when the data sheet says that the SoC has
+>> GPIO0 to GPION, then those numbers should be exposed to user space.
 > 
-> That is impossible to avoid.
+> The gpio_chip has this:
 > 
-> What you're saying is you just want to drill a hole in the boat and not
-> have a discussion whether the boat is going to float after this or
-> not.
+> struct gpio_chip {
+>        const char              *label;
+>        struct device           *dev;
+> (...)
+>        const char              *const *names;
+> (...)
+> 
+> If you want to help the users, provide string names for all the GPIO lines
+> and suggest them to do code in userspace that use these names instead
+> of GPIO numbers.
+> 
+> Also the string names "gpio0", "gpio1" etc are much better than just using
+> the Linux-specific numbers.
+> 
+> So what about making a patch to drivers/gpio/gpio-dwapb.c that adds the
+> .names property to its GPIO chip?
 
-Not at all.  I was just noting that this patch will touch on this topic, and it?s not a
-topic that I would weigh in on as my opinions are irrelevant in this discussion.
-
-No incendiary topic intended :-)
+That would meet my needs.  I?ll start putting something together.
 
 Michael
