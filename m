@@ -1,32 +1,115 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 16 Jul 2015 14:22:41 +0200
-Subject: [PATCH 0/4] ARM: dts: rockchip: add initial support for rk3288
- Chrome-devices
-In-Reply-To: <1436574562-16308-1-git-send-email-heiko@sntech.de>
-References: <1436574562-16308-1-git-send-email-heiko@sntech.de>
-Message-ID: <2237472.zxKkR4oPTR@diego>
+From: a0131933@ti.com (Lokesh Vutla)
+Date: Thu, 16 Jul 2015 17:56:39 +0530
+Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+In-Reply-To: <55A79DA6.4070206@ti.com>
+References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
+ <55A4DFEF.6040005@ti.com> <55A52208.5060302@ti.com>
+ <alpine.DEB.2.02.1507160014371.32764@utopia.booyaka.com>
+ <55A758A3.2070108@ti.com>
+ <alpine.DEB.2.02.1507161012090.32764@utopia.booyaka.com>
+ <55A79DA6.4070206@ti.com>
+Message-ID: <55A7A2FF.2010307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 11. Juli 2015, 02:29:18 schrieb Heiko Stuebner:
-> This adds the basic support for two RK3288 Chrome-devices.
-> Of course the internal display does not yet work, because we're
-> missing the edp driver in mainline currently.
-> But we're nevertheless able to boot to a rootfs on the devices.
-> 
-> 
-> Alexandru M Stan (2):
->   ARM: dts: rockchip: add shared rk3288-veyron files
->   ARM: dts: rockchip: add veyron-jerry board
-> 
-> Chris Zhong (1):
->   ARM: dts: Add sbs-battery dts fragment used by chromebooks
-> 
-> Heiko Stuebner (1):
->   ARM: dts: rockchip: add Pinky board
+Hi Tero,
+On Thursday 16 July 2015 05:33 PM, Tero Kristo wrote:
+> On 07/16/2015 01:13 PM, Paul Walmsley wrote:
+>> On Thu, 16 Jul 2015, Tero Kristo wrote:
+>>
+>>> On 07/16/2015 03:15 AM, Paul Walmsley wrote:
+>>>> On Tue, 14 Jul 2015, Tero Kristo wrote:
+>>>>
+>>>>> On 07/14/2015 01:09 PM, Lokesh Vutla wrote:
+>>>>>> Hi,
+>>>>>> On Wednesday 10 June 2015 02:56 PM, Lokesh Vutla wrote:
+>>>>>>> Some IP blocks like RTC, needs an additional unlocking mechanism for
+>>>>>>> writing to its registers. This patch adds optional lock and unlock
+>>>>>>> function pointers to the IP block's hwmod data which gets executed
+>>>>>>> before and after writing into IP sysconfig register.
+>>>>>>> And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod
+>>>>>>> data,
+>>>>>>> so that sysconfig registers are updated properly.
+>>>>>> ping on this series.
+>>>>>>
+>>>>>> Thanks and regards,
+>>>>>> Lokesh
+>>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>> It is also racy, as there is no locking in place to avoid concurrent
+>>>>> access to
+>>>>> the lock/unlock registers across hwmod+driver.
+>>>>
+>>>> I don't see the race.  Where is it?
+>>>
+>>> See drivers/rtc/rtc-omap.c, am3352_rtc_unlock and am3352_rtc_lock.
+>>>
+>>> That code is accessing the exact same registers.
+>>
+>> I guess my question is, when is it possible that code could race with the
+>> hwmod code for the same device?
+>
+> Hmm yea I think you are right, this only gets potentially called within
+> pm_runtime_get/put_sync for RTC.
+Yes, sysc is written from hwmod_init code and pm_runtime_get/put_sysnc.
+And we write into rtc registers only after pm_runtime_get_sync and 
+rtc_unlock.
+There cannot be a race condition here.
+>
+> The current sequence is highly inefficient though, as we are doing
+> multiple lock/unlock operations to the RTC from multiple sources. See
+> following rtcwake trace on am43xx-gp-evm as an example.
+Initially I had a patch which leaves rtc unlocked at hwmod_init instead 
+of doing
+unlock and lock for each set of register writes in the driver.
+But it was rejected stating that deviates the purpose of locking mechanism.
+So I updated the driver for adapting this locking and unlocking mechanism.
 
-applied these 4 with Dougs Acks/Reviews after addressing Dougs comments by
-- removing /bits/ 8 from gpio-restart
-- removing the bt_dev_wake pin for now
-- removing dvs-pins from the rk808 node
-- fixing missing newline in the pinky patch
+Thanks and regards,
+Lokesh
+
+>
+>
+> / # rtcwake -s 4 -m mem
+> [    7.425322] am3352_rtc_unlock
+> [    7.428330] am3352_rtc_lock
+> [    7.431139] am3352_rtc_unlock
+> [    7.434116] am3352_rtc_lock
+> wakeup from "mem" at Sat Jan  1 00:00:11 2000
+> [    7.448549] PM: Syncing filesystems ... done.
+> [    7.455425] Freezing user space processes ... (elapsed 0.001 seconds)
+> done.
+> [    7.463738] Freezing remaining freezable tasks ... (elapsed 0.001
+> seconds) do
+> ne.
+> [    7.472532] Suspending console(s) (use no_console_suspend to debug)
+> [    7.481878] am3352_rtc_unlock
+> [    7.481889] am3352_rtc_lock
+> [    7.482307] PM: suspend of devices complete after 2.713 msecs
+> [    7.483479] PM: late suspend of devices complete after 1.153 msecs
+> [    7.484727] omap_hwmod_rtc_unlock
+> [    7.484733] omap_hwmod_rtc_lock
+> [    7.485182] PM: noirq suspend of devices complete after 1.685 msecs
+> [    7.485190] Disabling non-boot CPUs ...
+> [    7.485199] PM: Successfully put all powerdomains to target state
+> [    7.485199] PM: Wakeup source RTC Alarm
+> [    7.499853] PM: noirq resume of devices complete after 14.558 msecs
+> [    7.500047] am3352_rtc_unlock
+> [    7.500052] am3352_rtc_lock
+> [    7.500123] am3352_rtc_unlock
+> [    7.500128] am3352_rtc_lock
+> [    7.501019] PM: early resume of devices complete after 0.809 msecs
+> [    7.501464] am3352_rtc_unlock
+> [    7.501472] am3352_rtc_lock
+> [    7.558046] PM: resume of devices complete after 57.007 msecs
+> [    7.638807] Restarting tasks ... done.
+> [    7.643173] am3352_rtc_unlock
+> [    7.646162] am3352_rtc_lock
+>
+> But, I guess this is for some interested party to optimize if needed,
+> and it is mostly an issue with the RTC driver itself.
+>
+> -Tero
+>
