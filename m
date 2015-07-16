@@ -1,38 +1,37 @@
-From: standby24x7@gmail.com (Masanari Iida)
-Date: Thu, 16 Jul 2015 19:57:46 +0900
-Subject: [PATCH] Doc: trace: Fix typo in coresight.txt
-Message-ID: <1437044266-17500-1-git-send-email-standby24x7@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Jul 2015 12:00:32 +0100
+Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
+In-Reply-To: <1437033944.27428.11.camel@tiscali.nl>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+ <1437033944.27428.11.camel@tiscali.nl>
+Message-ID: <20150716110032.GU11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fix spelling typos found in coresight.txt
+On Thu, Jul 16, 2015 at 10:05:44AM +0200, Paul Bolle wrote:
 
-Signed-off-by: Masanari Iida <standby24x7@gmail.com>
----
- Documentation/trace/coresight.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> > +static struct platform_driver snd_rk_mc_driver = {
+> > +	.probe = snd_rk_mc_probe,
+> > +	.remove = snd_rk_mc_remove,
+> > +	.driver = {
+> > +		.name = DRV_NAME,
 
-diff --git a/Documentation/trace/coresight.txt b/Documentation/trace/coresight.txt
-index 77d14d5..0a5c329 100644
---- a/Documentation/trace/coresight.txt
-+++ b/Documentation/trace/coresight.txt
-@@ -15,7 +15,7 @@ HW assisted tracing is becoming increasingly useful when dealing with systems
- that have many SoCs and other components like GPU and DMA engines.  ARM has
- developed a HW assisted tracing solution by means of different components, each
- being added to a design at synthesis time to cater to specific tracing needs.
--Compoments are generally categorised as source, link and sinks and are
-+Components are generally categorised as source, link and sinks and are
- (usually) discovered using the AMBA bus.
- 
- "Sources" generate a compressed stream representing the processor instruction
-@@ -138,7 +138,7 @@ void coresight_unregister(struct coresight_device *csdev);
- 
- The registering function is taking a "struct coresight_device *csdev" and
- register the device with the core framework.  The unregister function takes
--a reference to a "strut coresight_device", obtained at registration time.
-+a reference to a "struct coresight_device", obtained at registration time.
- 
- If everything goes well during the registration process the new devices will
- show up under /sys/bus/coresight/devices, as showns here for a TC2 platform:
--- 
-2.5.0.rc2.13.g961abca
+> > +MODULE_ALIAS("platform:" DRV_NAME);
+
+> This seems only useful if there's a corresponding struct
+> platform_device. Ie, a platform_device with a "rockchip-snd-max98090"
+> .name, which will trigger a "MODALIAS=platform:rockchip-snd-max98090"
+> uevent when it's created. But I couldn't find where such a
+> platform_device is created.
+
+> Did I miss something? Or is there another way this alias is useful here?
+
+You've got platform_device and platform_driver confused I think.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/740b2a88/attachment.sig>
