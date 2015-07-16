@@ -1,41 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Thu, 16 Jul 2015 10:09:23 +0300
-Subject: [PATCH 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
-In-Reply-To: <alpine.DEB.2.02.1507160014371.32764@utopia.booyaka.com>
-References: <1433928386-24891-1-git-send-email-lokeshvutla@ti.com>
- <55A4DFEF.6040005@ti.com> <55A52208.5060302@ti.com>
- <alpine.DEB.2.02.1507160014371.32764@utopia.booyaka.com>
-Message-ID: <55A758A3.2070108@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Jul 2015 00:16:40 -0700
+Subject: [PATCH] ARM: OMAP2+: Remove module references from IOMMU machine
+ layer
+In-Reply-To: <1436560985-5947-1-git-send-email-s-anna@ti.com>
+References: <1436560985-5947-1-git-send-email-s-anna@ti.com>
+Message-ID: <20150716071640.GI17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 03:15 AM, Paul Walmsley wrote:
-> On Tue, 14 Jul 2015, Tero Kristo wrote:
->
->> On 07/14/2015 01:09 PM, Lokesh Vutla wrote:
->>> Hi,
->>> On Wednesday 10 June 2015 02:56 PM, Lokesh Vutla wrote:
->>>> Some IP blocks like RTC, needs an additional unlocking mechanism for
->>>> writing to its registers. This patch adds optional lock and unlock
->>>> function pointers to the IP block's hwmod data which gets executed
->>>> before and after writing into IP sysconfig register.
->>>> And also hook lock and unlock functions to AMx3xx, DRA7 RTC hwmod data,
->>>> so that sysconfig registers are updated properly.
->>> ping on this series.
->>>
->>> Thanks and regards,
->>> Lokesh
->>
->
-> [...]
->
->> It is also racy, as there is no locking in place to avoid concurrent access to
->> the lock/unlock registers across hwmod+driver.
->
-> I don't see the race.  Where is it?
+* Suman Anna <s-anna@ti.com> [150710 13:45]:
+> The OMAP IOMMU driver has been adapted to the IOMMU framework
+> for a while now, and it no longer supports being built as a
+> module. Cleanup all the module related references both from
+> the code and in the build.
+> 
+> While at it, also relocate a comment around the initcall to
+> avoid a checkpatch strict warning about using a blank line
+> after function/struct/union/enum declarations.
 
-See drivers/rtc/rtc-omap.c, am3352_rtc_unlock and am3352_rtc_lock.
+OK applying into omap-for-v4.3/soc.
 
-That code is accessing the exact same registers.
+You may want to check few things after this:
 
--Tero
+- Does it still need to be omap_subsys_initcall or can it
+  happen later? Anything we can initialize later on is worth
+  doing as then we have proper debug console available.
+
+- For multi_v7_defconfig it would be nice to be able to
+  make the driver/iommu components into standard Linux
+  loadable modules.
+
+- Actually you can probably get rid of mach-omap2/omap-iommu.c
+  completely by implementing PM runtime and and possibly
+  reset controller.
+
+Regrds,
+
+Tony
