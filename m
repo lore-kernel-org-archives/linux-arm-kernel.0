@@ -1,105 +1,84 @@
 From: yong.wu@mediatek.com (Yong Wu)
-Date: Thu, 16 Jul 2015 17:04:29 +0800
-Subject: [PATCH v3 0/6] MT8173 IOMMU SUPPORT
-Message-ID: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+Date: Thu, 16 Jul 2015 17:04:31 +0800
+Subject: [PATCH v3 2/6] dt-bindings: mediatek: Add smi dts binding
+In-Reply-To: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1437037475-9065-3-git-send-email-yong.wu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for m4u(Multimedia Memory Management Unit),
-Currently it only support the m4u with 2 levels of pagetable on mt8173.
+This patch add smi binding document.
 
-  It is based on Robin Murphy's arm64 DMA v3: IOMMU-backed DMA mapping[1]. 
- 
-  Please check the hardware block diagram of Mediatek IOMMU.
- 
-              EMI (External Memory Interface)
-               |
-              m4u (Multimedia Memory Management Unit)
-               |
-              smi (Smart Multimedia Interface)
-               |
-        +---------------+-------
-        |               |
-        |               |
-    vdec larb       disp larb      ... SoCs have different local arbiter(larb).
-        |               |
-        |               |
-   +----+----+    +-----+-----+
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-   |    |    |    |     |     |    ...
-  MC   PP   VLD  OVL0 RDMA0 WDMA0  ... There are different ports in each larb.
-  
-  Normally we specify a local arbiter(larb) for each multimedia hardware like
-display, video decode, video encode and camera. And there are different ports in
-each larb. Take a example, there are some ports like MC, PP, UFO, VLD, AVC_MV,
-PRED_RD in video larb, all the ports are according to the video hardware.
- 
-  From the diagram, all the multimedia module connect with m4u via smi.
-SMI is responsible to enable/disable iommu and control the clocks for each local
-arbiter. If we should enable the iommu of video decode, it should config the
-video's ports. And if the video hardware work whether enable/disable iommu, 
-it should enable the clock of its larb's clock. And smi also help bandwidth
-control for each local arbiter. So we add a special driver for smi and locate
-it drivers/memory.
- 
-[1] http://lists.linuxfoundation.org/pipermail/iommu/2015-July/013597.html
-
-v3:
--rebased onto v4.2-rc1
--improve iommu flow based on the Robin's DMA v3.
--change mtk iommu-cells from 1 to 2.
--about Short-Descriptor: add split function; add self-test; add some other bits like nG,
- XN according to the spec; add SUPERSECTION and MTK quirk; move io_pgtable_ops_to_pgtable
- out from LPAE to the header file.
--about SMI: move from driver/soc/mediatek to driver/memory; change the clocks from
- clk[2] to clk_apb and clk_smi; add pm.
--add iommu suspend/resume to backup/restore register.
-
-v2: http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013028.html
--add arm short descriptor support.
--seperate smi common from smi and change the clock-names according
- to smi HW.
--delete the hardcode of the port-names in mt8173.
- replace this with larb-portes-nr in dtsi.
--fix some coding style issues.
-
-v1: http://lists.infradead.org/pipermail/linux-mediatek/2015-March/000058.html
--initial version.
-
-Yong Wu (6):
-  dt-bindings: iommu: Add binding for mediatek IOMMU
-  dt-bindings: mediatek: Add smi dts binding
-  iommu: add ARM short descriptor page table allocator.
-  memory: mediatek: Add SMI driver
-  iommu/mediatek: Add mt8173 IOMMU driver
-  dts: mt8173: Add iommu/smi nodes for mt8173
-
- .../devicetree/bindings/iommu/mediatek,iommu.txt   |   61 ++
- .../memory-controllers/mediatek,smi-larb.txt       |   25 +
- .../bindings/memory-controllers/mediatek,smi.txt   |   24 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   81 +++
- drivers/iommu/Kconfig                              |   31 +
- drivers/iommu/Makefile                             |    2 +
- drivers/iommu/io-pgtable-arm-short.c               |  742 ++++++++++++++++++++
- drivers/iommu/io-pgtable-arm.c                     |    3 -
- drivers/iommu/io-pgtable.c                         |    4 +
- drivers/iommu/io-pgtable.h                         |   13 +
- drivers/iommu/mtk_iommu.c                          |  725 +++++++++++++++++++
- drivers/memory/Kconfig                             |    8 +
- drivers/memory/Makefile                            |    1 +
- drivers/memory/mtk-smi.c                           |  285 ++++++++
- include/dt-bindings/memory/mt8173-larb-port.h      |  105 +++
- include/soc/mediatek/smi.h                         |   60 ++
- 16 files changed, 2167 insertions(+), 3 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/iommu/mediatek,iommu.txt
+Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+---
+ .../memory-controllers/mediatek,smi-larb.txt       |   25 ++++++++++++++++++++
+ .../bindings/memory-controllers/mediatek,smi.txt   |   24 +++++++++++++++++++
+ 2 files changed, 49 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
  create mode 100644 Documentation/devicetree/bindings/memory-controllers/mediatek,smi.txt
- create mode 100644 drivers/iommu/io-pgtable-arm-short.c
- create mode 100644 drivers/iommu/mtk_iommu.c
- create mode 100644 drivers/memory/mtk-smi.c
- create mode 100644 include/dt-bindings/memory/mt8173-larb-port.h
- create mode 100644 include/soc/mediatek/smi.h
 
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+new file mode 100644
+index 0000000..ae11dcf
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi-larb.txt
+@@ -0,0 +1,25 @@
++SMI (Smart Multimedia Interface) Local Arbiter
++
++The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
++
++Required properties:
++- compatible : must be "mediatek,mt8173-smi-larb"
++- reg : the register and size of this local arbiter.
++- mediatek,smi : a phandle to the smi_common node.
++- power-domains : a phandle to the power domain of this local arbiter.
++- clocks : Must contain an entry for each entry in clock-names.
++- clock-names: must contain 2 entries, as follows:
++  - "apb" : Advanced Peripheral Bus clock, It's the clock for setting
++	    the register.
++  - "smi" : It's the clock for transfer data and command.
++
++Example:
++	larb1: larb at 16010000 {
++		compatible = "mediatek,mt8173-smi-larb";
++		reg = <0 0x16010000 0 0x1000>;
++		mediatek,smi = <&smi_common>;
++		power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
++		clocks = <&vdecsys CLK_VDEC_CKEN>,
++			 <&vdecsys CLK_VDEC_LARB_CKEN>;
++		clock-names = "apb", "smi";
++	};
+\ No newline at end of file
+diff --git a/Documentation/devicetree/bindings/memory-controllers/mediatek,smi.txt b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi.txt
+new file mode 100644
+index 0000000..f34b3ef
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/mediatek,smi.txt
+@@ -0,0 +1,24 @@
++SMI (Smart Multimedia Interface)
++
++The hardware block diagram please check bindings/iommu/mediatek,iommu.txt
++
++Required properties:
++- compatible : must be "mediatek,mt8173-smi"
++- reg : the register and size of the SMI block.
++- power-domains : a phandle to the power domain of this local arbiter.
++- clocks : Must contain an entry for each entry in clock-names.
++- clock-names : must contain 2 entries, as follows:
++  - "apb" : Advanced Peripheral Bus clock, It's the clock for setting
++	    the register.
++  - "smi" : It's the clock for transfer data and command.
++  They may be the same if both source clock are the same.
++
++Example:
++	smi_common: smi at 14022000 {
++		compatible = "mediatek,mt8173-smi";
++		reg = <0 0x14022000 0 0x1000>;
++		power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
++		clocks = <&mmsys CLK_MM_SMI_COMMON>,
++			 <&mmsys CLK_MM_SMI_COMMON>;
++		clock-names = "apb", "smi";
++	};
+\ No newline at end of file
 -- 
 1.7.9.5
