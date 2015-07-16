@@ -1,112 +1,71 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Thu, 16 Jul 2015 09:40:58 +0200
-Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset state when
- not in use
-Message-ID: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jul 2015 09:42:54 +0200
+Subject: [PATCH v3] gpio: UniPhier: add driver for UniPhier GPIO controller
+In-Reply-To: <CAK7LNASd9z99RBmUgLVEM1WuLNSzGFM8qzrHwDf58tgGDy2SAw@mail.gmail.com>
+References: <1436841787-7734-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYaAMw5U3pctf96j0QpY2Qf+e=LX740F0okCmVU6pXkhA@mail.gmail.com>
+ <CAK7LNAQ+_ynWT944fPZsHCzMBLtfNu5AnppzaOxNgPSBTvj_tw@mail.gmail.com>
+ <CACRpkdZK41P-1JQsL6RiywqFEUj6=g5xJMKy86wDdp6BxLJNzQ@mail.gmail.com>
+ <CAK7LNASd9z99RBmUgLVEM1WuLNSzGFM8qzrHwDf58tgGDy2SAw@mail.gmail.com>
+Message-ID: <CACRpkdbBfidn_otxzSV-8HMv2AuD-htUbcRHZ8n9CHAUO=TB9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the UART device driver gets closed from userland, the driver
-disables the UART unit and then stops its clock to save power.
+On Thu, Jul 16, 2015 at 9:35 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2015-07-16 16:07 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
 
-The bit which disabled the UART unit is described as:
+>>> ngpio == 248 for some SoCs,
+>>> and ngpio == 136 for some, etc.
+>>
+>> That is the wrong way to handle different SoC. That should be handled
+>> by different compatible strings, and then you select the number of GPIOs
+>> for the version corresponding to that compatibe string.
+>>
+>>>>> +static const struct of_device_id uniphier_gpio_match[] = {
+>>>>> +       { .compatible = "socionext,uniphier-gpio" },
+>>>>> +       { /* sentinel */ }
+>>>>> +};
+>>
+>> i.e. you should use the .data field of of_device_id to carry variant-specific
+>> information.
+>
+>
+> Currently, I want to use this driver on 7 SoCs
+>
+> PH1-sLD3:    ngpio == 136
+> PH1-LD4 :    ngpio == 136
+> PH1-Pro4:    ngpio == 248
+> PH1-sLD8:    ngpio == 136
+> PH1-Pro5:    ngpio == 248
+> ProXstream2: ngpio == 232
+> PH1-LD6b:    ngpio == 232
+>
+> So, should I describe the OF match table like this?
+>
+> static const struct of_device_id uniphier_gpio_match[] = {
+>        { .compatible = "socionext,ph1-sld3-gpio"       .data = (void *)136 },
+>        { .compatible = "socionext,ph1-ld4-gpio"        .data = (void *)136 },
+>        { .compatible = "socionext,ph1-pro4-gpio"       .data = (void *)248 },
+>        { .compatible = "socionext,ph1-sld8-gpio"       .data = (void *)136 },
+>        { .compatible = "socionext,ph1-pro5-gpio"       .data = (void *)248 },
+>        { .compatible = "socionext,proxstream2-gpio",   .data = (void *)232 },
+>        { .compatible = "socionext,ph1-ld6b-gpio",      .data = (void *)232 },
+>        { /* sentinel */ }
+> };
 
-  "UART Enable. If this bit is set to 1, the UART is enabled. Data
-  transmission and reception occurs for the UART signals. When the
-  UART is disabled in the middle of transmission or reception, it
-  completes the current character before stopping."
+Yes.
 
-The important part is the "it completes the current character". Whenever
-a reception is ongoing when the UART gets disabled (including the clock
-off) the statemachine freezes and "remembers" this state on the next
-open() and re-enabling of the unit's clock.
+> One disadvantage for this way is that
+> I need to touch the driver file every time I add a new SoC support.
 
-In this case we end up receiving an additional bogus character
-immediately.
+That is appropriate since it is a new hardware. This is the same as
+the fact that we touch the kernel to add new USB IDs and PCI IDs
+every time a new hardware comes out for x86, we should know
+what hardware we are toying with.
 
-The solution in this change is to move the AUART unit into its reset
-state on close() and only release it from its reset state on the next
-open().
+Since you seem to have a pin controller in parallel anyways I see
+it as natural to do this at the same time as you do that anyways.
 
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
----
-
-Notes:
-    v3:
-     - missing newline added to an error message
-    
-    v2:
-     - rename mxs_auart_do_reset() to mxs_auart_keep_reset() to better reflect
-       what it really does
-     - adapt the delay in mxs_auart_keep_reset() to wait for the reset of the
-       AURAT unit to what is used in mxs_auart_reset()
-     - typo fixed
-
- drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
- 1 file changed, 30 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
-index 13cf773..135ee6c 100644
---- a/drivers/tty/serial/mxs-auart.c
-+++ b/drivers/tty/serial/mxs-auart.c
-@@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
- 	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
- }
- 
-+static void mxs_auart_keep_reset(struct uart_port *u)
-+{
-+	int i;
-+	u32 reg;
-+
-+	reg = readl(u->membase + AUART_CTRL0);
-+	/* if already in reset state, keep it untouched */
-+	if (reg & AUART_CTRL0_SFTRST)
-+		return;
-+
-+	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
-+
-+	for (i = 0; i < 10000; i++) {
-+		reg = readl(u->membase + AUART_CTRL0);
-+		/* reset is finished when the clock is gated */
-+		if (reg & AUART_CTRL0_CLKGATE)
-+			return;
-+		udelay(3);
-+	}
-+
-+	dev_err(u->dev, "Failed to reset the unit.\n");
-+}
-+
- static int mxs_auart_startup(struct uart_port *u)
- {
- 	int ret;
-@@ -867,7 +891,10 @@ static int mxs_auart_startup(struct uart_port *u)
- 	if (ret)
- 		return ret;
- 
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
-+	/* reset the unit if not aleady done */
-+	mxs_auart_keep_reset(u);
-+	/* bring it out of reset now */
-+	mxs_auart_reset(u);
- 
- 	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_SET);
- 
-@@ -899,13 +926,8 @@ static void mxs_auart_shutdown(struct uart_port *u)
- 	if (auart_dma_enabled(s))
- 		mxs_auart_dma_exit(s);
- 
--	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
--
--	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
--			u->membase + AUART_INTR_CLR);
--
--	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
--
-+	/* reset the unit and keep it in reset state */
-+	mxs_auart_keep_reset(u);
- 	clk_disable_unprepare(s->clk);
- }
- 
--- 
-2.1.4
+Yours,
+Linus Walleij
