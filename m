@@ -1,85 +1,60 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 16 Jul 2015 16:35:56 +0100
-Subject: [PATCH v2 10/20] xen/xenbus: Use Xen page definition
-In-Reply-To: <1436474552-31789-11-git-send-email-julien.grall@citrix.com>
+Date: Thu, 16 Jul 2015 16:36:53 +0100
+Subject: [PATCH v2 11/20] tty/hvc: xen: Use xen page definition
+In-Reply-To: <1436474552-31789-12-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-11-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.02.1507161635460.17378@kaball.uk.xensource.com>
+ <1436474552-31789-12-git-send-email-julien.grall@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507161636470.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 9 Jul 2015, Julien Grall wrote:
-> All the ring (xenstore, and PV rings) are always based on the page
-> granularity of Xen.
+> The console ring is always based on the page granularity of Xen.
 > 
 > Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.cz>
 > Cc: David Vrabel <david.vrabel@citrix.com>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: linuxppc-dev at lists.ozlabs.org
 
 Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-
->     Changes in v2:
->         - Also update the ring mapping function
-> ---
->  drivers/xen/xenbus/xenbus_client.c | 6 +++---
->  drivers/xen/xenbus/xenbus_probe.c  | 4 ++--
->  2 files changed, 5 insertions(+), 5 deletions(-)
+>  drivers/tty/hvc/hvc_xen.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/xen/xenbus/xenbus_client.c b/drivers/xen/xenbus/xenbus_client.c
-> index 9ad3272..80272f6 100644
-> --- a/drivers/xen/xenbus/xenbus_client.c
-> +++ b/drivers/xen/xenbus/xenbus_client.c
-> @@ -388,7 +388,7 @@ int xenbus_grant_ring(struct xenbus_device *dev, void *vaddr,
->  		}
->  		grefs[i] = err;
+> diff --git a/drivers/tty/hvc/hvc_xen.c b/drivers/tty/hvc/hvc_xen.c
+> index a9d837f..2135944 100644
+> --- a/drivers/tty/hvc/hvc_xen.c
+> +++ b/drivers/tty/hvc/hvc_xen.c
+> @@ -230,7 +230,7 @@ static int xen_hvm_console_init(void)
+>  	if (r < 0 || v == 0)
+>  		goto err;
+>  	mfn = v;
+> -	info->intf = xen_remap(mfn << PAGE_SHIFT, PAGE_SIZE);
+> +	info->intf = xen_remap(mfn << XEN_PAGE_SHIFT, XEN_PAGE_SIZE);
+>  	if (info->intf == NULL)
+>  		goto err;
+>  	info->vtermno = HVC_COOKIE;
+> @@ -392,7 +392,7 @@ static int xencons_connect_backend(struct xenbus_device *dev,
+>  	if (xen_pv_domain())
+>  		mfn = virt_to_mfn(info->intf);
+>  	else
+> -		mfn = __pa(info->intf) >> PAGE_SHIFT;
+> +		mfn = __pa(info->intf) >> XEN_PAGE_SHIFT;
+>  	ret = gnttab_alloc_grant_references(1, &gref_head);
+>  	if (ret < 0)
+>  		return ret;
+> @@ -476,7 +476,7 @@ static int xencons_resume(struct xenbus_device *dev)
+>  	struct xencons_info *info = dev_get_drvdata(&dev->dev);
 >  
-> -		vaddr = vaddr + PAGE_SIZE;
-> +		vaddr = vaddr + XEN_PAGE_SIZE;
->  	}
+>  	xencons_disconnect_backend(info);
+> -	memset(info->intf, 0, PAGE_SIZE);
+> +	memset(info->intf, 0, XEN_PAGE_SIZE);
+>  	return xencons_connect_backend(dev, info);
+>  }
 >  
->  	return 0;
-> @@ -555,7 +555,7 @@ static int xenbus_map_ring_valloc_pv(struct xenbus_device *dev,
->  	if (!node)
->  		return -ENOMEM;
->  
-> -	area = alloc_vm_area(PAGE_SIZE * nr_grefs, ptes);
-> +	area = alloc_vm_area(XEN_PAGE_SIZE * nr_grefs, ptes);
->  	if (!area) {
->  		kfree(node);
->  		return -ENOMEM;
-> @@ -750,7 +750,7 @@ static int xenbus_unmap_ring_vfree_pv(struct xenbus_device *dev, void *vaddr)
->  		unsigned long addr;
->  
->  		memset(&unmap[i], 0, sizeof(unmap[i]));
-> -		addr = (unsigned long)vaddr + (PAGE_SIZE * i);
-> +		addr = (unsigned long)vaddr + (XEN_PAGE_SIZE * i);
->  		unmap[i].host_addr = arbitrary_virt_to_machine(
->  			lookup_address(addr, &level)).maddr;
->  		unmap[i].dev_bus_addr = 0;
-> diff --git a/drivers/xen/xenbus/xenbus_probe.c b/drivers/xen/xenbus/xenbus_probe.c
-> index 4308fb3..c67e5ba 100644
-> --- a/drivers/xen/xenbus/xenbus_probe.c
-> +++ b/drivers/xen/xenbus/xenbus_probe.c
-> @@ -713,7 +713,7 @@ static int __init xenstored_local_init(void)
->  
->  	xen_store_mfn = xen_start_info->store_mfn =
->  		pfn_to_mfn(virt_to_phys((void *)page) >>
-> -			   PAGE_SHIFT);
-> +			   XEN_PAGE_SHIFT);
->  
->  	/* Next allocate a local port which xenstored can bind to */
->  	alloc_unbound.dom        = DOMID_SELF;
-> @@ -804,7 +804,7 @@ static int __init xenbus_init(void)
->  			goto out_error;
->  		xen_store_mfn = (unsigned long)v;
->  		xen_store_interface =
-> -			xen_remap(xen_store_mfn << PAGE_SHIFT, PAGE_SIZE);
-> +			xen_remap(xen_store_mfn << XEN_PAGE_SHIFT, XEN_PAGE_SIZE);
->  		break;
->  	default:
->  		pr_warn("Xenstore state unknown\n");
 > -- 
 > 2.1.4
 > 
