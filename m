@@ -1,61 +1,150 @@
-From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Thu, 16 Jul 2015 20:43:22 +0530
-Subject: [PATCH v2 4/4] input: Add DT binding documentation for Colibri VF50
- touchscreen
-In-Reply-To: <cover.1437058481.git.maitysanchayan@gmail.com>
-References: <cover.1437058481.git.maitysanchayan@gmail.com>
-Message-ID: <24246fb8671b84d067879c1e1c274b0d68bd3b8c.1437058481.git.maitysanchayan@gmail.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Thu, 16 Jul 2015 23:16:59 +0800
+Subject: [PATCH] arm64: dts: mediatek: Add MT8173 MMC dts
+In-Reply-To: <1437046580-10809-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1437046580-10809-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <CAGS+omBxP5LBMZuayRUDYW3bBrRe17up2E559YJFL6Sq4tx5Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds device tree binding documentation for the Colibri VF50
-touchscreen driver.
+Hi Chaotian,
 
-Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
----
- .../bindings/input/touchscreen/colibri-vf50-ts.txt | 34 ++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+On Thu, Jul 16, 2015 at 7:36 PM, Chaotian Jing
+<chaotian.jing@mediatek.com> wrote:
+> From: Eddie Huang <eddie.huang@mediatek.com>
+>
+> Add node mmc0 ~ mmc3 for mt8173.dtsi
+> Add node mmc0, mmc1 for mt8173-evb.dts
+>
+> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+> Remove clk_null
+> Base on 4.2-rc1, and  https://github.com/mbgg/linux-mediatek/tree/v4.2-next/arm64 commit 16ea61fc  arm64: dts: mt8173-evb: Add PMIC support
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126 ++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi    |  44 ++++++++++
+>  2 files changed, 170 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> index 986f25f..f76c99b 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> @@ -64,6 +64,132 @@
+>         };
+>  };
+>
+> +&mmc0 {
+> +       status = "okay";
+> +       pinctrl-names = "default", "state_uhs";
+> +       pinctrl-0 = <&mmc0_pins_default>;
+> +       pinctrl-1 = <&mmc0_pins_uhs>;
+> +       bus-width = <8>;
+> +       max-frequency = <50000000>;
+> +       cap-mmc-highspeed;
+> +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> +       vqmmc-supply = <&mt6397_vio18_reg>;
+> +       non-removable;
+> +};
+> +
+> +&mmc1 {
+> +       status = "okay";
+> +       pinctrl-names = "default", "state_uhs";
+> +       pinctrl-0 = <&mmc1_pins_default>;
+> +       pinctrl-1 = <&mmc1_pins_uhs>;
+> +       bus-width = <4>;
+> +       max-frequency = <50000000>;
+> +       cap-sd-highspeed;
+> +       sd-uhs-sdr25;
+> +       cd-gpios = <&pio 132 0>;
+> +       vmmc-supply = <&mt6397_vmch_reg>;
+> +       vqmmc-supply = <&mt6397_vmc_reg>;
+> +};
+> +
+> +&pio {
+> +       mmc0_pins_default: mmc0default {
+> +               pins_cmd_dat {
+> +                       pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
+> +                                <MT8173_PIN_58_MSDC0_DAT1__FUNC_MSDC0_DAT1>,
+> +                                <MT8173_PIN_59_MSDC0_DAT2__FUNC_MSDC0_DAT2>,
+> +                                <MT8173_PIN_60_MSDC0_DAT3__FUNC_MSDC0_DAT3>,
+> +                                <MT8173_PIN_61_MSDC0_DAT4__FUNC_MSDC0_DAT4>,
+> +                                <MT8173_PIN_62_MSDC0_DAT5__FUNC_MSDC0_DAT5>,
+> +                                <MT8173_PIN_63_MSDC0_DAT6__FUNC_MSDC0_DAT6>,
+> +                                <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
+> +                                <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>;
+> +                       input-enable;
+> +                       bias-pull-up;
+> +               };
+> +
+> +               pins_clk {
+> +                       pinmux = <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
+> +                       bias-pull-down;
+> +               };
+> +
+> +               pins_rst {
+> +                       pinmux = <MT8173_PIN_68_MSDC0_RST___FUNC_MSDC0_RSTB>;
+> +                       bias-pull-up;
+> +               };
+> +       };
+> +
+> +       mmc1_pins_default: mmc1default {
+> +               pins_cmd_dat {
+> +                       pinmux = <MT8173_PIN_73_MSDC1_DAT0__FUNC_MSDC1_DAT0>,
+> +                                <MT8173_PIN_74_MSDC1_DAT1__FUNC_MSDC1_DAT1>,
+> +                                <MT8173_PIN_75_MSDC1_DAT2__FUNC_MSDC1_DAT2>,
+> +                                <MT8173_PIN_76_MSDC1_DAT3__FUNC_MSDC1_DAT3>,
+> +                                <MT8173_PIN_78_MSDC1_CMD__FUNC_MSDC1_CMD>;
+> +                       input-enable;
+> +                       drive-strength = <MTK_DRIVE_4mA>;
+> +                       bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> +               };
+> +
+> +               pins_clk {
+> +                       pinmux = <MT8173_PIN_77_MSDC1_CLK__FUNC_MSDC1_CLK>;
+> +                       bias-pull-down;
+> +                       drive-strength = <MTK_DRIVE_4mA>;
+> +               };
+> +
+> +               pins_insert {
+> +                       pinmux = <MT8173_PIN_132_I2S0_DATA1__FUNC_GPIO132>;
+> +                       bias-pull-up;
+> +               };
+> +       };
+> +
+> +       mmc0_pins_uhs: mmc0 at 0{
 
-diff --git a/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-new file mode 100644
-index 0000000..caad52a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
-@@ -0,0 +1,34 @@
-+* Toradex Colibri VF50 Touchscreen driver
-+
-+Required Properties:
-+- compatible must be toradex,vf50-touchctrl
-+- io-channels: adc channels being used by the Colibri VF50 module
-+- xp-gpios: FET gate driver for input of X+
-+- xm-gpios: FET gate driver for input of X-
-+- yp-gpios: FET gate driver for input of Y+
-+- ym-gpios: FET gate driver for input of Y-
-+- pen-detect-gpios: GPIO for pen detect irq
-+- pen-pullup-gpios: GPIO for pen pullup
-+- pinctrl-names: "idle", "default", "gpios"
-+- pinctrl-0: pinctrl node for idle state gpio pinmux
-+- pinctrl-1: pinctrl node for touch detection state pinmux
-+- pinctrl-2: pinctrl node for gpios functioning as FET gate drivers
-+
-+Example:
-+
-+	touchctrl: vf50_touchctrl {
-+		compatible = "toradex,vf50-touchctrl";
-+		io-channels = <&adc1 0>,<&adc0 0>,
-+				<&adc0 1>,<&adc1 2>;
-+		xp-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-+		xm-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-+		yp-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-+		ym-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-+		pen-detect-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
-+		pen-pullup-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "idle","default","gpios";
-+		pinctrl-0 = <&pinctrl_touchctrl_idle>;
-+		pinctrl-1 = <&pinctrl_touchctrl_default>;
-+		pinctrl-2 = <&pinctrl_touchctrl_gpios>;
-+		status = "disabled";
-+	};
--- 
-2.4.6
+(1) I don't think these "@0" are needed (here and for mmc1_pins_uhs)
+(2) A space before the '{' would be nice.
+
+Other than these tiny nits, this one is:
+
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+> +               pins_cmd_dat {
+> +                       pinmux = <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>,
+> +                                <MT8173_PIN_58_MSDC0_DAT1__FUNC_MSDC0_DAT1>,
+> +                                <MT8173_PIN_59_MSDC0_DAT2__FUNC_MSDC0_DAT2>,
+> +                                <MT8173_PIN_60_MSDC0_DAT3__FUNC_MSDC0_DAT3>,
+> +                                <MT8173_PIN_61_MSDC0_DAT4__FUNC_MSDC0_DAT4>,
+> +                                <MT8173_PIN_62_MSDC0_DAT5__FUNC_MSDC0_DAT5>,
+> +                                <MT8173_PIN_63_MSDC0_DAT6__FUNC_MSDC0_DAT6>,
+> +                                <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
+> +                                <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>;
+> +                       input-enable;
+> +                       drive-strength = <MTK_DRIVE_2mA>;
+> +                       bias-pull-up = <MTK_PUPD_SET_R1R0_01>;
+> +               };
+> +
+> +               pins_clk {
+> +                       pinmux = <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
+> +                       drive-strength = <MTK_DRIVE_2mA>;
+> +                       bias-pull-down = <MTK_PUPD_SET_R1R0_01>;
+> +               };
+> +
+> +               pins_rst {
+> +                       pinmux = <MT8173_PIN_68_MSDC0_RST___FUNC_MSDC0_RSTB>;
+> +                       bias-pull-up;
+> +               };
+> +       };
+> +
+> +       mmc1_pins_uhs: mmc1 at 0 {
