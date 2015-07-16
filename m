@@ -1,78 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jul 2015 18:48:23 +0100
-Subject: [PATCH 10/13] arm64: Add support for running Linux in EL2 mode
-In-Reply-To: <1436372356-30410-11-git-send-email-marc.zyngier@arm.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <1436372356-30410-11-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150716174823.GP26390@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 16 Jul 2015 23:25:47 +0530
+Subject: [PATCH-v3 0/2] mfd: 88pm800: Add 88pm860 device support
+Message-ID: <1437069349-15015-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:19:13PM +0100, Marc Zyngier wrote:
-> With the ARMv8.1 VHE, the architecture is able to (almost) transparently
-> run the kernel at EL2, despite being written for EL1.
-> 
-> This patch takes care of the "almost" part, mostly preventing the kernel
-> from dropping from EL2 to EL1, and setting up the HYP configuration.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/head.S | 23 ++++++++++++++++++++++-
->  1 file changed, 22 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index c0ff3ce..a179747 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -29,6 +29,7 @@
->  #include <asm/asm-offsets.h>
->  #include <asm/cache.h>
->  #include <asm/cputype.h>
-> +#include <asm/kvm_mmu.h>
->  #include <asm/memory.h>
->  #include <asm/thread_info.h>
->  #include <asm/pgtable-hwdef.h>
-> @@ -481,8 +482,16 @@ CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
->  	isb
->  	ret
->  
-> +	/* Check for VHE being present */
-> +2:	mrs	x2, id_aa64mmfr1_el1
-> +	ubfx	x2, x2, #8, #4
-> +
->  	/* Hyp configuration. */
-> -2:	mov	x0, #(1 << 31)			// 64-bit EL1
-> +	mov	x0, #HCR_RW			// 64-bit EL1
-> +	cbz	x2, set_hcr
-> +	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
-> +	orr	x0, x0, #HCR_E2H
-> +set_hcr:
->  	msr	hcr_el2, x0
->  
->  	/* Generic timers. */
-> @@ -522,6 +531,9 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  
->  	/* Coprocessor traps. */
->  	mov	x0, #0x33ff
+88PM860 falls under 88pm800 family of devices, with some feature
+additions, for example, support for dual phase on BUCK1.
 
-These bits are RES0 with VHE enabled, afaict.
+This patch series, enabled chip ID support for 88pm860 in the driver
+and adds Init time configuration support based on chip ID
 
-> +	cbz	x2, set_cptr
-> +	orr	x0, x0, #(3 << 20)		// Don't trap FP
-> +set_cptr:
->  	msr	cptr_el2, x0			// Disable copro. traps to EL2
->  
->  #ifdef CONFIG_COMPAT
-> @@ -531,6 +543,15 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	/* Stage-2 translation */
->  	msr	vttbr_el2, xzr
->  
-> +	cbz	x2, install_el2_stub
-> +
-> +	setup_vtcr x4, x5
-> +
-> +	mov	w20, #BOOT_CPU_MODE_EL2		// This CPU booted in EL2
+V2 => V3
+=======
+Link to V2: https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg931170.html
 
-You do this in install_el2_stub as well -- can you move it above the cbz?
+  - Mistakenly introduced warning in V2, unused variable 'val'
+    Fixed it.
+    Note that no other code change compared to V2.
 
-Will
+V1 => V2
+========
+ - Dropped PATCH [03/06 to 06/06]
+    PATCH [03 & 04]: New clock provider driver is under development for
+    32KHz clock output enable/disable
+
+    PATCH [05 & 06]: Moved to regulator driver and will be part of regulator
+    changes patch-series, as dual-phase configuration belongs to regulator.
+
+  - Added Acked-by of "Krzysztof Kozlowski"
+
+  - Added comment into the code for missing init configuration for
+    88pm800 & 88pm805 device.
+
+TODO:
+  - Some of init time configurations are common to both 88pm800 and 88pm860
+    devices, but since I can not validate it, decided to move it to
+    88pm860 block only.
+    But if someone is willing to help me in validation, we can move it to
+    common code later. No issues there.
+  - Sleep/low-power-mode related configuration is also part of init time,
+    but since we are too far from sleep mode support and without testing
+    I do not want add anything, decided to take it later when we actually
+    start looking at sleep support.
+  - Init time configuration also includes pinmux setting for the device.
+    I am working on using pinctrl-single driver to have standard and generic
+    interface, hopefully it will get handled through pinctrl subsystem.
+      Link to RFC - https://patches.linaro.org/50604/
+
+Vaibhav Hiremath (2):
+  mfd: 88pm80x: Add 88pm860 chip type support
+  mfd: 88pm800: Add init time initial configuration support
+
+ drivers/mfd/88pm800.c       | 70 +++++++++++++++++++++++++++++++++++++++++++++
+ drivers/mfd/88pm80x.c       |  2 ++
+ include/linux/mfd/88pm80x.h | 14 +++++++++
+ 3 files changed, 86 insertions(+)
+
+-- 
+1.9.1
