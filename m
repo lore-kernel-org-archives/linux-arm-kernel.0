@@ -1,27 +1,39 @@
 From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 17 Jul 2015 00:32:44 +0200
-Subject: [PATCH and GIT PULL 0/5] ARM: initial Rockchip stuff for 4.3
-Message-ID: <2820374.NgluYWXZkW@diego>
+Date: Fri, 17 Jul 2015 00:33:51 +0200
+Subject: [PATCH 1/3] arm64: add Rockchip architecture entry
+In-Reply-To: <2820374.NgluYWXZkW@diego>
+References: <2820374.NgluYWXZkW@diego>
+Message-ID: <2658910.AevvbvQ8ln@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Kevin, Arnd,
+The rk3368 is Rockchip's first ARM64 soc, build around 8 Cortex-A53 cores.
 
-The 3 patches add support for the rk3368 ARM64 soc from Rockchip.
-Patch 3/3 needs a dependency, namely
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/Kconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-rk3368
-
-which Stephen Boyd declared stable.
-
-The patches for rk3368 have been on the lists for 3 weeks now.
-
-The two pull requests then add stuff for the 32bit Rockchip socs
-explained in the signed tags in them.
-
-
-So if nothing stands out, please apply and pull.
-
-
-Thanks
-Heiko
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0f6edb1..6ad9971 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -202,6 +202,16 @@ config ARCH_QCOM
+ 	help
+ 	  This enables support for the ARMv8 based Qualcomm chipsets.
+ 
++config ARCH_ROCKCHIP
++	bool "Rockchip Platforms"
++	select ARCH_HAS_RESET_CONTROLLER
++	select ARCH_REQUIRE_GPIOLIB
++	select PINCTRL
++	select PINCTRL_ROCKCHIP
++	help
++	  This enables support for the ARMv8 based Rockchip chipsets,
++	  like the RK3368.
++
+ config ARCH_SEATTLE
+ 	bool "AMD Seattle SoC Family"
+ 	help
+-- 
+2.1.4
