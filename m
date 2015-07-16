@@ -1,37 +1,32 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 16 Jul 2015 11:42:06 +0200
-Subject: [PATCH 1/7] ARM: shmobile: r8a73a4 dtsi: Add missing
- "gpio-ranges" to gpio node
-In-Reply-To: <CAMuHMdX4=C6DsbsaphndXQuPm8WFqv08kwq+cdQRJJQtDph1cg@mail.gmail.com>
-References: <1435650327-2542-1-git-send-email-geert+renesas@glider.be>
- <1435650327-2542-2-git-send-email-geert+renesas@glider.be>
- <32630741.rNENluEsDE@avalon>
- <CAMuHMdX4=C6DsbsaphndXQuPm8WFqv08kwq+cdQRJJQtDph1cg@mail.gmail.com>
-Message-ID: <CACRpkdbB6mLZAxpvPq8X5cWVLYD05ruF2XbwZSYn16Kj8tXvdQ@mail.gmail.com>
+Date: Thu, 16 Jul 2015 11:44:35 +0200
+Subject: [PATCH 2/2] irqchip: gic: remove reduntant gic_set_irqchip_flags
+In-Reply-To: <1436971109-20189-2-git-send-email-sudeep.holla@arm.com>
+References: <1436971109-20189-1-git-send-email-sudeep.holla@arm.com>
+ <1436971109-20189-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CACRpkdYBHQtFrC0AVk7Y3w40T9f2McBSgRn9LXSR8cwDLzkuTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 2:05 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Tue, Jun 30, 2015 at 11:49 AM, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
+On Wed, Jul 15, 2015 at 4:38 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
->>> To fix this, add a "gpio-ranges" property to the gpio device node, so
->>> the ranges are added by of_gpiochip_add_pin_range(), which is called by
->>> of_gpiochip_add() before the call to of_gpiochip_scan_hogs().
->>>
->>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->>
->> This looks sane to me, even though referencing the same DT node seems a bit
->> dodgy. I'll let Linus comment on that, but for the implementation itself,
->>
->> Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Now that the GIC chip implementation enables IRQCHIP_SKIP_SET_WAKE and
+> IRQCHIP_MASK_ON_SUSPEND by default, the platforms requiring them need
+> not override the irqchip flags as before.
 >
-> Thank you!
+> This patch removes all the users of gic_set_irqchip_flags and the
+> function itself.
 >
-> Any wise words from Linus?
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Magnus Damm <magnus.damm@gmail.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-I don't know if I'm wise but I'm OK with this:
+Works for me.
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
