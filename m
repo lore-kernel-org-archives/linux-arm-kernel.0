@@ -1,154 +1,154 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 16 Jul 2015 15:55:41 +0900
-Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
- blocking calls in the cpu hotplug notifier
-In-Reply-To: <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
-References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
- <1437008972-9140-174-git-send-email-kamal@canonical.com>
- <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
-Message-ID: <CAJKOXPf3ik5XahaK-fv0EOFhPHpO1aQ7PGxbAMrGiSrK4j1EYA@mail.gmail.com>
+From: sunnyliangjy@gmail.com (Wendy Liang)
+Date: Thu, 16 Jul 2015 17:04:33 +1000
+Subject: [RFC PATCH 2/2] Documentation: DTS: bindings: add ZynqMP RPU
+ remoteproc
+In-Reply-To: <20150715125029.GE10239@leverpostej>
+References: <1436962975-13918-1-git-send-email-jliang@xilinx.com>
+ <1436962975-13918-3-git-send-email-jliang@xilinx.com>
+ <20150715125029.GE10239@leverpostej>
+Message-ID: <CAA07jV9oc-AQQGN1sKHEgE09gVrG+Ng9Dx6f1TbcRrAbK6g8Sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-16 15:37 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
-> From: Kamal Mostafa <kamal@canonical.com> Sent: Thursday, July 16, 2015 9:08 AM
->> To: linux-kernel at vger.kernel.org; stable at vger.kernel.org; kernel-
->> team at lists.ubuntu.com
->> Cc: Kamal Mostafa; daniel.lezcano at linaro.org; kyungmin.park at samsung.com;
->> Damian Eppel; kgene at kernel.org; Thomas Gleixner; linux-arm-
->> kernel at lists.infradead.org; m.szyprowski at samsung.com
->> Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
->> blocking calls in the cpu hotplug notifier
->>
->> 3.19.8-ckt4 -stable review patch.  If anyone has any objections, please
->> let me know.
->>
->> ------------------
->>
->> From: Damian Eppel <d.eppel@samsung.com>
->>
->> commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
->>
->> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
->> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
->> request_irq() and free_irq() in the context of hotplug notification
->> (which is in this case atomic context).
->>
->> [   40.785859] CPU1: Software reset
->> [   40.786660] BUG: sleeping function called from invalid context at
->> mm/slub.c:1241
->> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name:
->> swapper/1
->> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
->> [   40.786681]
->> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-
->> 00024-g7dca860 #36
->> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>]
->> (show_stack+0x10/0x14)
->> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>]
->> (dump_stack+0x70/0xbc)
->> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>]
->> (kmem_cache_alloc+0xd8/0x170)
->> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>]
->> (request_threaded_irq+0x64/0x128)
->> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>]
->> (exynos4_local_timer_setup+0xc0/0x13c)
->> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>]
->> (exynos4_mct_cpu_notify+0x30/0xa8)
->> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>]
->> (notifier_call_chain+0x44/0x84)
->> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>]
->> (__cpu_notify+0x28/0x44)
->> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>]
->> (secondary_start_kernel+0xec/0x150)
->> [   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>]
->> (0x40008764)
->>
->> Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
->> notifications which run on the hotplugged cpu with interrupts and
->> preemption disabled.
->>
->> To avoid the issue, request the interrupts for all possible cpus in the
->> boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
->> request_irq/disable_irq() sequence. The flag prevents the
->> request_irq() code from enabling the interrupt immediately.
->>
->> The interrupt is then enabled in the CPU_STARTING notifier of the
->> hotplugged cpu and again disabled with disable_irq_nosync() in the
->> CPU_DYING notifier.
->>
->> [ tglx: Massaged changelog to match the patch ]
->>
->> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq
->> calls for local timer registration")
->> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
->> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
->> Cc: m.szyprowski at samsung.com
->> Cc: kyungmin.park at samsung.com
->> Cc: daniel.lezcano at linaro.org
->> Cc: kgene at kernel.org
->> Cc: linux-arm-kernel at lists.infradead.org
->> Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-
->> d.eppel at samsung.com
->> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
->> Signed-off-by: Kamal Mostafa <kamal@canonical.com>
->> ---
->>  drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------
->> ------
->>  1 file changed, 30 insertions(+), 13 deletions(-)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c
->> b/drivers/clocksource/exynos_mct.c
->> index 83564c9..c844616 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct
->> clock_event_device *evt)
->>       exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
->>
->>       if (mct_int_type == MCT_INT_SPI) {
->> -             evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
->> -             if (request_irq(evt->irq, exynos4_mct_tick_isr,
->> -                             IRQF_TIMER | IRQF_NOBALANCING,
->> -                             evt->name, mevt)) {
->> -                     pr_err("exynos-mct: cannot register IRQ %d\n",
->> -                             evt->irq);
->> +
->> +             if (evt->irq == -1)
->>                       return -EIO;
->> -             }
->> -             irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
->> cpumask_of(cpu));
->> +
->> +             irq_force_affinity(evt->irq, cpumask_of(cpu));
->> +             enable_irq(evt->irq);
->>       } else {
->>               enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->
-> In here, why not use enable_percpu_irq(evt->irq) ?
->
->>       }
->> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct
->> clock_event_device *evt)  static void exynos4_local_timer_stop(struct
->> clock_event_device *evt)  {
->>       evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->> -     if (mct_int_type == MCT_INT_SPI)
->> -             free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
->> -     else
->> +     if (mct_int_type == MCT_INT_SPI) {
->> +             if (evt->irq != -1)
->> +                     disable_irq_nosync(evt->irq);
->> +     } else {
->>               disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
->
-> In here, why not use disable_percpu_irq(evt->irq) ?
+Hi Mark,
 
-You know this is just a semi-automatic stable backport and this was
-already merged to mainline?
+On Wed, Jul 15, 2015 at 10:50 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>
+> On Wed, Jul 15, 2015 at 01:22:55PM +0100, Wendy Liang wrote:
+> > Add documentation about the ZynqMP RPU remoteproc driver
+> > DTS bindings.
+> >
+> > Signed-off-by: Jason Wu <j.wu@xilinx.com>
+> > Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> > ---
+> >  .../bindings/remoteproc/zynqmp_r5_remoteproc.txt   | 49 ++++++++++++++++++++++
+> >  1 file changed, 49 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/remoteproc/zynqmp_r5_remoteproc.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/remoteproc/zynqmp_r5_remoteproc.txt b/Documentation/devicetree/bindings/remoteproc/zynqmp_r5_remoteproc.txt
+> > new file mode 100644
+> > index 0000000..94c1d00
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/remoteproc/zynqmp_r5_remoteproc.txt
+> > @@ -0,0 +1,49 @@
+> > +Xilinx ARM Cortex A53-R5 remoteproc driver
+> > +==========================================
+> > +
+> > +ZynqMP family of devices use two Cortex R5 processors to help with various
+> > +low power / real time tasks.
+> > +
+> > +This driver requires specific ZynqMP hardware design.
+> > +
+> > +ZynqMP R5 RemoteProc Device Node:
+> > +=================================
+> > +A zynqmp_r5_remoteproc device node is used to represent a R5 IP instance
+> > +within ZynqMP SoC.
+> > +
+> > +Required properties:
+> > +--------------------
+> > + - compatible : Should be "xlnx,zynqmp-r5-remoteproc-1.0"
+> > + - reg : Address and length of the register set for the device. It
+> > +        contains in the same order as described reg-names
+> > + - reg-names: Contain the register set names. For direct control method,
+> > +              ipi, rpu_base and apb_base must be provided
+> > + - interrupts : Interrupt mapping for remoteproc IPI
+> > + - interrupt-parent : Phandle for the interrupt controller
+> > +
+> > +Optional properties:
+> > +--------------------
+> > + - firmware : Default firmware image name "rproc-rpu-fw" which can be
+> > +              loaded by remoteproc framework. This value can be override
+> > +              by "firmware" module parameter.
+>
+> The binding shouldn't mention Linux specifics, to the stuff about
+> modules should go.
+>
+> Why do you think you need the firmware name in the DT? It breaks
+> layering (the DT has to know about the user's filesystem), so I'm not
+> sure that makes much sense.
 
-Best regards,
-Krzysztof
+
+ Ok, We will remove it from the DTS.
+ We use it in the DTS is because we want to have different remoteproc instance,
+ and each of it can use a different firmware.
+ We previously think it the simplest to put it to DTS.
+
+>
+>
+> > + - bootmem : R5 boot device (valid string, ocm or tcm), default is ocm.
+> > + - core_conf : R5 core configuration (valid string - split0 or split1 or
+> > +               lock-step), default is lock-step.
+>
+> What do these mean, when would I choose each?
+
+ bootmem: where the RPU boots, if bootmem is "ocm", it means it will
+be configured
+ as "HIVEC" and boots from 0xffff0000 which is in OCM in our ZynqMP SoC.
+ If it is "tcm", it will be configured as "LOVEC", and boots form 0
+which is TCM.
+ Since it is confusing, I will rename it, and will use "hivec" and
+"lovec" for the values.
+
+ core_conf: it actually means the operation mode. We have R5-0 and R5-1,
+ "split0" means RPU is running in split mode and the remoteproc is for R5-0,
+ "lock-step" means RPU is running in lockstep mode.
+>
+>
+> s/_/-/ in property names.
+
+ Will change it
+>
+>
+> > + - method : RPU and IPI control method - direct, smc, hvc, default is smc.
+>
+> Likewise.
+>
+> > + - ipi_dest_mask : IPI channel destination mask. This is used to clear
+> > +         ipi SR and let the rpu know the kernel has completed the work.
+> > +         default mask is "0x100"
+>
+> We shouldn't encode masks like this in DT.
+>
+> Could you elaborate on how this is used?
+
+
+ We have IPI in our SoC, we don't have hardcoded IPI channel binding, though
+ we have default channel binding settings.
+ this property here is because in case user don't want to use default bindings
+ and they have their own configuration settings.
+
+ We will give number to each channel, and will change to do the
+mapping in the driver,
+ instead of using the mask directly in the DTS.
+
+ Thanks & Regards,
+ Wendy
+
+>
+>
+> Thanks,
+> Mark.
+>
+> > +
+> > +Example:
+> > +--------
+> > +     zynqmp-r5-remoteproc at 0 {
+> > +             compatible = "xlnx,zynqmp-r5-remoteproc";
+> > +             reg = <0x0 0x3ed00000 0x800000>, <0x0 0xff300000 0x100>, <0x0 0xff9a0000 0x400>, <0x0 0xff5e0000 0x400>;
+> > +             reg-names = "shared", "ipi", "rpu_base", "apb_base";
+> > +             core_conf = "split0";
+> > +             method = "direct";
+> > +             bootmem = "ocm";
+> > +             firmware = "r5_image";
+> > +             interrupt-parent = <&gic>;
+> > +             interrupts = <0 49 4>;
+> > +     } ;
+> > --
+> > 2.1.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
