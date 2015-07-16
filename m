@@ -1,50 +1,32 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 16 Jul 2015 12:50:24 -0400
-Subject: arm: dts: update for 4.2-rcx
-In-Reply-To: <55A7DE91.7050003@oracle.com>
-References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
-Message-ID: <55A7E0D0.9070104@ti.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 16 Jul 2015 09:52:55 -0700
+Subject: [PATCH 5/5] PCI: Add host drivers for Cavium ThunderX processors.
+In-Reply-To: <1437035476.27428.24.camel@tiscali.nl>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-6-git-send-email-ddaney.cavm@gmail.com>
+ <1437035476.27428.24.camel@tiscali.nl>
+Message-ID: <55A7E167.6040000@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 12:40 PM, santosh shilimkar wrote:
-> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
->> Santosh,
->>
->> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
->> This one should be applied to v4.2-rc kernel with priority.
->> Please review and do the needful.
->>
-> Yes I have it for next merge window. It won't be qualified as a
-> fix rather more of enhancement. Do you have also patches for
-> board DTS files which enables PCIE. I can queue them together
-> for next merge window.
-No this is a fix for v4.2-rc. PCIe driver is not complete without having 
-a SerDes driver. Currently the version we send is not accepted since the 
-config blobs are used. On K2E EVM, this causes problem since the EVM has 
-Marvell SATA controller present and with default values in the SerDes 
-register, it seems to pass the PCIe link check, but causes issues since 
-the configuration is not correct. The manifestation is that when EVM is 
-booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM 
-since to work, SerDes driver has to be present as well. So by default, 
-the PCIe DT binding should be disabled in SoC specific DTS. It can be 
-enabled in the board specific DTS when the SerDes device driver is also 
-present. We plan to upstream a common SerDes driver soon. But at this 
-point this has to be disabled by default.
-
-I can provide more details if needed in the patch commit description, 
-but I though it is not correct to keep the PCIe DT bindings to be 
-enabled in the SoC specific DTS to begin with. So this is a fix for v4.2-rc.
-
-Murali
-
+On 07/16/2015 01:31 AM, Paul Bolle wrote:
+> On wo, 2015-07-15 at 09:54 -0700, David Daney wrote:
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
 >
-> Regards,
-> Santosh
+>> +config PCI_THUNDER_PEM
+>> +	bool
 >
+> Do you expect other symbols to select this symbol in the future?
+
+No, ...
+
+> Because
+> at this moment PCI_THUNDER_PEM is merely an alias for PCI_THUNDER.
 >
 
+... the next version of the patch will uncouple them.  They are separate 
+drivers and should be selectable independently.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Thanks,
+David Daney
