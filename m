@@ -1,70 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jul 2015 19:19:29 +0100
-Subject: [PATCH] arm64: alternative: Provide if/else/endif assembler macros
-In-Reply-To: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
-References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150716181929.GU26390@arm.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Thu, 16 Jul 2015 23:46:54 +0530
+Subject: [PATCH 1/5] regulator: 88pm800: Fix indentation of assignments of
+ data structures
+In-Reply-To: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1437070618-21330-2-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This patch makes code more clean from readability point of view,
+make all assignments of LDO, BUCk and regulator_ops structure
+at the same indentation.
 
-On Fri, Jul 10, 2015 at 02:48:50PM +0100, Daniel Thompson wrote:
-> The existing alternative_insn macro has some limitations that make it
-> hard to work with. In partiuclar the fact it takes instructions from it
-> own macro arguments means it doesn't play very nicely with C pre-processor
-> macros because the macro arguments look like a string to the C
-> pre-processor. Workarounds are (probably) possible but things start to
-> look ugly.
-> 
-> Introduce an alternative set of macros that allows instructions to be
-> presented to the assembler as normal and switch everything over to the
-> new macros.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
-> 
-> Notes:
->     To be honest these if not/else/endif macros are simply more readable
->     than the original macro and that might be enough to justify them on
->     their own. However below is an example that is needlessly hard to
->     write without them because ICC_PMR_EL1 is a C pre-processor macro.
->     
->      	.macro	disable_irq, tmp
->      	mov	\tmp, #ICC_PMR_EL1_MASKED
->     alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
->     	msr	daifset, #2
->     alternative_else
->      	msr_s	ICC_PMR_EL1, \tmp
->     alternative_endif
->     	.endm
->     
->     The new macros have received a fair degree of testing because I have
->     based my (not published since March) pseudo-NMI patch set on them.
-> 
->  arch/arm64/include/asm/alternative.h | 18 ++++++++++++------
->  arch/arm64/kernel/entry.S            | 29 +++++++++++++----------------
->  arch/arm64/kvm/hyp.S                 | 12 ++++++++++--
->  arch/arm64/mm/cache.S                |  7 ++++++-
->  4 files changed, 41 insertions(+), 25 deletions(-)
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+ drivers/regulator/88pm800.c | 68 ++++++++++++++++++++++-----------------------
+ 1 file changed, 34 insertions(+), 34 deletions(-)
 
-After some consideration, I think I prefer your suggestion over what we
-currently have in mainline. However, there are a bunch of patches that
-are candidates for 4.3 which will conflict horribly with this.
-
-Would you be able to:
-
-  (1) Split this up so that you have a patch introducing the new macro,
-      then a patch converting entry.S and cache.S then a separate one
-      for kvm/hyp.S?
-
-  (2) Keep alternative_insn around for the moment
-
-  (3) Once the dust has settled for 4.3, we can see how easy the old
-      macro is to remove
-
-Sound ok to you?
-
-Cheers,
-
-Will
+diff --git a/drivers/regulator/88pm800.c b/drivers/regulator/88pm800.c
+index 832932b..11f7ab2 100644
+--- a/drivers/regulator/88pm800.c
++++ b/drivers/regulator/88pm800.c
+@@ -95,11 +95,11 @@ struct pm800_regulators {
+ #define PM800_BUCK(vreg, ereg, ebit, amax, volt_ranges, n_volt)		\
+ {									\
+ 	.desc	= {							\
+-		.name	= #vreg,					\
+-		.ops	= &pm800_volt_range_ops,			\
+-		.type	= REGULATOR_VOLTAGE,				\
+-		.id	= PM800_ID_##vreg,				\
+-		.owner	= THIS_MODULE,					\
++		.name			= #vreg,			\
++		.ops			= &pm800_volt_range_ops,	\
++		.type			= REGULATOR_VOLTAGE,		\
++		.id			= PM800_ID_##vreg,		\
++		.owner			= THIS_MODULE,			\
+ 		.n_voltages		= n_volt,			\
+ 		.linear_ranges		= volt_ranges,			\
+ 		.n_linear_ranges	= ARRAY_SIZE(volt_ranges),	\
+@@ -108,7 +108,7 @@ struct pm800_regulators {
+ 		.enable_reg		= PM800_##ereg,			\
+ 		.enable_mask		= 1 << (ebit),			\
+ 	},								\
+-	.max_ua		= (amax),					\
++	.max_ua	= (amax),						\
+ }
+ 
+ /*
+@@ -123,19 +123,19 @@ struct pm800_regulators {
+ #define PM800_LDO(vreg, ereg, ebit, amax, ldo_volt_table)		\
+ {									\
+ 	.desc	= {							\
+-		.name	= #vreg,					\
+-		.ops	= &pm800_volt_table_ops,			\
+-		.type	= REGULATOR_VOLTAGE,				\
+-		.id	= PM800_ID_##vreg,				\
+-		.owner	= THIS_MODULE,					\
+-		.n_voltages = ARRAY_SIZE(ldo_volt_table),		\
+-		.vsel_reg	= PM800_##vreg##_VOUT,			\
+-		.vsel_mask	= 0x1f,					\
+-		.enable_reg	= PM800_##ereg,				\
+-		.enable_mask	= 1 << (ebit),				\
+-		.volt_table	= ldo_volt_table,			\
++		.name			= #vreg,			\
++		.ops			= &pm800_volt_table_ops,	\
++		.type			= REGULATOR_VOLTAGE,		\
++		.id			= PM800_ID_##vreg,		\
++		.owner			= THIS_MODULE,			\
++		.n_voltages		= ARRAY_SIZE(ldo_volt_table),	\
++		.vsel_reg		= PM800_##vreg##_VOUT,		\
++		.vsel_mask		= 0x1f,				\
++		.enable_reg		= PM800_##ereg,			\
++		.enable_mask		= 1 << (ebit),			\
++		.volt_table		= ldo_volt_table,		\
+ 	},								\
+-	.max_ua		= (amax),					\
++	.max_ua	= (amax),						\
+ }
+ 
+ /* Ranges are sorted in ascending order. */
+@@ -178,25 +178,25 @@ static int pm800_get_current_limit(struct regulator_dev *rdev)
+ }
+ 
+ static struct regulator_ops pm800_volt_range_ops = {
+-	.list_voltage = regulator_list_voltage_linear_range,
+-	.map_voltage = regulator_map_voltage_linear_range,
+-	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+-	.get_voltage_sel = regulator_get_voltage_sel_regmap,
+-	.enable = regulator_enable_regmap,
+-	.disable = regulator_disable_regmap,
+-	.is_enabled = regulator_is_enabled_regmap,
+-	.get_current_limit = pm800_get_current_limit,
++	.list_voltage		= regulator_list_voltage_linear_range,
++	.map_voltage		= regulator_map_voltage_linear_range,
++	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
++	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
++	.enable			= regulator_enable_regmap,
++	.disable		= regulator_disable_regmap,
++	.is_enabled		= regulator_is_enabled_regmap,
++	.get_current_limit	= pm800_get_current_limit,
+ };
+ 
+ static struct regulator_ops pm800_volt_table_ops = {
+-	.list_voltage = regulator_list_voltage_table,
+-	.map_voltage = regulator_map_voltage_iterate,
+-	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+-	.get_voltage_sel = regulator_get_voltage_sel_regmap,
+-	.enable = regulator_enable_regmap,
+-	.disable = regulator_disable_regmap,
+-	.is_enabled = regulator_is_enabled_regmap,
+-	.get_current_limit = pm800_get_current_limit,
++	.list_voltage		= regulator_list_voltage_table,
++	.map_voltage		= regulator_map_voltage_iterate,
++	.set_voltage_sel	= regulator_set_voltage_sel_regmap,
++	.get_voltage_sel	= regulator_get_voltage_sel_regmap,
++	.enable			= regulator_enable_regmap,
++	.disable		= regulator_disable_regmap,
++	.is_enabled		= regulator_is_enabled_regmap,
++	.get_current_limit	= pm800_get_current_limit,
+ };
+ 
+ /* The array is indexed by id(PM800_ID_XXX) */
+-- 
+1.9.1
