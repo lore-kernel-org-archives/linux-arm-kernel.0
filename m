@@ -1,57 +1,257 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 15 Jul 2015 21:39:22 -0700
-Subject: [PATCH v3 3/4] arm64: Add Broadcom iProc family support
+Date: Wed, 15 Jul 2015 21:39:23 -0700
+Subject: [PATCH v3 4/4] arm64: dts: Add Broadcom North Star 2 support
 In-Reply-To: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
 References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1437021563-29139-4-git-send-email-rjui@broadcom.com>
+Message-ID: <1437021563-29139-5-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to Broadcom's iProc family of arm64 based SoCs
-in the arm64 Kconfig and defconfig files
+Add Broadcom NS2 device tree binding document. Also add initial device
+tree dtsi for Broadcom North Star 2 (NS2) SoC and board support for NS2
+SVK board
 
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
 Signed-off-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- arch/arm64/Kconfig           |    5 +++++
- arch/arm64/configs/defconfig |    2 ++
- 2 files changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
+ arch/arm64/boot/dts/Makefile                      |    1 +
+ arch/arm64/boot/dts/broadcom/Makefile             |    5 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   59 +++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi             |  118 +++++++++++++++++++++
+ 5 files changed, 192 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 318175f..969ef4a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -162,6 +162,11 @@ source "kernel/Kconfig.freezer"
- 
- menu "Platform selection"
- 
-+config ARCH_BCM_IPROC
-+	bool "Broadcom iProc SoC Family"
-+	help
-+	  This enables support for Broadcom iProc based SoCs
+diff --git a/Documentation/devicetree/bindings/arm/bcm/ns2.txt b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
+new file mode 100644
+index 0000000..35f056f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
+@@ -0,0 +1,9 @@
++Broadcom North Star 2 (NS2) device tree bindings
++------------------------------------------------
 +
- config ARCH_EXYNOS
- 	bool
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4e17e7e..c83d51f 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
-@@ -102,6 +103,7 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
++Boards with NS2 shall have the following properties:
++
++Required root node property:
++
++NS2 SVK board
++compatible = "brcm,ns2-svk", "brcm,ns2";
+diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
+index 38913be..9f95941 100644
+--- a/arch/arm64/boot/dts/Makefile
++++ b/arch/arm64/boot/dts/Makefile
+@@ -1,6 +1,7 @@
+ dts-dirs += amd
+ dts-dirs += apm
+ dts-dirs += arm
++dts-dirs += broadcom
+ dts-dirs += cavium
+ dts-dirs += exynos
+ dts-dirs += freescale
+diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
+new file mode 100644
+index 0000000..e21fe66
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/Makefile
+@@ -0,0 +1,5 @@
++dtb-$(CONFIG_ARCH_BCM_IPROC) += ns2-svk.dtb
++
++always		:= $(dtb-y)
++subdir-y	:= $(dts-dirs)
++clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+new file mode 100644
+index 0000000..244baf8
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -0,0 +1,59 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/dts-v1/;
++
++#include "ns2.dtsi"
++
++/ {
++	model = "Broadcom NS2 SVK";
++	compatible = "brcm,ns2-svk", "brcm,ns2";
++
++	aliases {
++		serial0 = &uart3;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x000000000 0x80000000 0x00000000 0x40000000>;
++	};
++
++	soc: soc {
++		uart3: serial at 66130000 {
++			status = "ok";
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+new file mode 100644
+index 0000000..3c92d92
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -0,0 +1,118 @@
++/*
++ *  BSD LICENSE
++ *
++ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
++ *
++ *  Redistribution and use in source and binary forms, with or without
++ *  modification, are permitted provided that the following conditions
++ *  are met:
++ *
++ *    * Redistributions of source code must retain the above copyright
++ *      notice, this list of conditions and the following disclaimer.
++ *    * Redistributions in binary form must reproduce the above copyright
++ *      notice, this list of conditions and the following disclaimer in
++ *      the documentation and/or other materials provided with the
++ *      distribution.
++ *    * Neither the name of Broadcom Corporation nor the names of its
++ *      contributors may be used to endorse or promote products derived
++ *      from this software without specific prior written permission.
++ *
++ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/memreserve/ 0x84b00000 0x00000008;
++
++/ {
++	compatible = "brcm,ns2";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0 0>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0x84b00000>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0 1>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0x84b00000>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0 2>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0x84b00000>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0 3>;
++			enable-method = "spin-table";
++			cpu-release-addr = <0 0x84b00000>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
++			      IRQ_TYPE_EDGE_RISING)>;
++	};
++
++	soc: soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0 0 0xffffffff>;
++
++		gic: interrupt-controller at 65210000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			interrupt-controller;
++			reg = <0x65210000 0x1000>,
++			      <0x65220000 0x1000>,
++			      <0x65240000 0x2000>,
++			      <0x65260000 0x1000>;
++		};
++
++		uart3: serial at 66130000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x66130000 0x100>;
++			interrupts = <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clock-frequency = <23961600>;
++			status = "disabled";
++		};
++	};
++};
 -- 
 1.7.9.5
