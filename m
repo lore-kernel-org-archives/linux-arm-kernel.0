@@ -1,88 +1,147 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Thu, 16 Jul 2015 02:25:30 +0200
-Subject: [PATCH] net: mvneta: fix refilling for Rx DMA buffers
-In-Reply-To: <20150715.155256.1854323748613951804.davem@davemloft.net>
-References: <1436738697-21652-1-git-send-email-simon.guinot@sequanux.org>
- <20150715.155256.1854323748613951804.davem@davemloft.net>
-Message-ID: <20150716002530.GD10671@kw.sim.vm.gnt>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 16 Jul 2015 09:27:46 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150715121337.3b31aa84@gandalf.local.home>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>	<1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>	<20150714225105.6c1e4f15@gandalf.local.home>	<55A646EE.6030402@linaro.org>	<20150715105536.42949ea9@gandalf.local.home>
+ <20150715121337.3b31aa84@gandalf.local.home>
+Message-ID: <55A6FA82.9000901@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 03:52:56PM -0700, David Miller wrote:
-> From: Simon Guinot <simon.guinot@sequanux.org>
-> Date: Mon, 13 Jul 2015 00:04:57 +0200
-> 
-> > On some Armada 370-based NAS, I have experimented kernel bugs and
-> > crashes when the mvneta Ethernet driver fails to refill Rx DMA buffers
-> > due to memory shortage.
-> > 
-> > With the actual code, if the memory allocation fails while refilling a
-> > Rx DMA buffer, then the corresponding descriptor is let with the address
-> > of an unmapped DMA buffer already passed to the network stack. Since the
-> > driver still increments the non-occupied counter for Rx descriptor (if a
-> > next packet is handled successfully), then the Ethernet controller is
-> > allowed to reuse the unfilled Rx descriptor...
-> > 
-> > As a fix, this patch first refills a Rx descriptor before handling the
-> > stored data and unmapping the associated Rx DMA buffer. Additionally the
-> > occupied and non-occupied counters for the Rx descriptors queues are now
-> > both updated with the rx_done value: the number of descriptors ready to
-> > be returned to the networking controller. Moreover note that there is no
-> > point in using different values for this counters because both the
-> > mvneta driver and the Ethernet controller are unable to handle holes in
-> > the Rx descriptors queues.
-> > 
-> > Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> > Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-> > Cc: <stable@vger.kernel.org> # v3.8+
-> > Tested-by: Yoann Sculo <yoann@sculo.fr>
+On 07/16/2015 01:13 AM, Steven Rostedt wrote:
+> On Wed, 15 Jul 2015 10:55:36 -0400
+> Steven Rostedt <rostedt@goodmis.org> wrote:
+>
+>
+>> I'll take a look at it and try to clean up the code.
+>
+> Does the  following patch make sense for you?
 
-Hi David,
+Looks nice. The patch greatly simplifies changes on arm64 side.
 
-> 
-> Failed memory allocations, are normal and if necessary kernel log
-> messages will be triggered by the core memory allocator.  So there is
-> zero reason to do anything other than bump the drop counter in your
-> driver.
+- Takahiro AKASHI
 
-Sure.
-
-> 
-> If I understand the rest of your logic, if the allocator fails, we
-> will reuse the original SKB and place it back into the RX ring?
-> Right?
-
-Yes that's what does the patch.
-
-Without this patch, in case of memory allocation error, the original
-buffer is both passed to the networking stack in a SKB _and_ let in
-the Rx ring. This leads to various kernel oops and crashes.
-
-Here are the problems with the original code:
-
-- Rx descriptor refilling is tried after passing the SKB to the
-  networking stack.
-- In case of refilling error, the buffer (passed in the SKB) is also
-  let in the Rx ring (as an unmapped DMA buffer).
-- And (always in case of refilling error), the non-occupied counter of
-  the Rx queue (hardware register) is not incremented. The idea was
-  maybe to prevent the networking controller to reuse the non-refilled
-  descriptor. But since this counter is incremented as soon as a next
-  descriptor is handled successfully, it is not correct.
-
-The patch:
-
-- Moves Rx descriptor refilling ahead of passing the SKB to the
-  networking stack.
-- places the buffer back into the Rx ring in case of refilling error.
-- And updates correctly the non-occupied descriptors counter of the Rx
-  queue.
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/96102ace/attachment.sig>
+> -- Steve
+>
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index 3f34496244e9..9384647d07c3 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -18,12 +18,6 @@
+>
+>   #define STACK_TRACE_ENTRIES 500
+>
+> -#ifdef CC_USING_FENTRY
+> -# define fentry		1
+> -#else
+> -# define fentry		0
+> -#endif
+> -
+>   static unsigned long stack_dump_trace[STACK_TRACE_ENTRIES+1] =
+>   	 { [0 ... (STACK_TRACE_ENTRIES)] = ULONG_MAX };
+>   static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
+> @@ -35,7 +29,7 @@ static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
+>    */
+>   static struct stack_trace max_stack_trace = {
+>   	.max_entries		= STACK_TRACE_ENTRIES - 1,
+> -	.entries		= &stack_dump_trace[1],
+> +	.entries		= &stack_dump_trace[0],
+>   };
+>
+>   static unsigned long max_stack_size;
+> @@ -77,7 +71,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   	unsigned long this_size, flags; unsigned long *p, *top, *start;
+>   	static int tracer_frame;
+>   	int frame_size = ACCESS_ONCE(tracer_frame);
+> -	int i;
+> +	int i, x;
+>
+>   	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
+>   	this_size = THREAD_SIZE - this_size;
+> @@ -105,26 +99,20 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   	max_stack_size = this_size;
+>
+>   	max_stack_trace.nr_entries = 0;
+> -
+> -	if (using_ftrace_ops_list_func())
+> -		max_stack_trace.skip = 4;
+> -	else
+> -		max_stack_trace.skip = 3;
+> +	max_stack_trace.skip = 0;
+>
+>   	save_stack_trace(&max_stack_trace);
+>
+> -	/*
+> -	 * Add the passed in ip from the function tracer.
+> -	 * Searching for this on the stack will skip over
+> -	 * most of the overhead from the stack tracer itself.
+> -	 */
+> -	stack_dump_trace[0] = ip;
+> -	max_stack_trace.nr_entries++;
+> +	/* Skip over the overhead of the stack tracer itself */
+> +	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+> +		if (stack_dump_trace[i] == ip)
+> +			break;
+> +	}
+>
+>   	/*
+>   	 * Now find where in the stack these are.
+>   	 */
+> -	i = 0;
+> +	x = 0;
+>   	start = stack;
+>   	top = (unsigned long *)
+>   		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
+> @@ -139,12 +127,13 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   	while (i < max_stack_trace.nr_entries) {
+>   		int found = 0;
+>
+> -		stack_dump_index[i] = this_size;
+> +		stack_dump_index[x] = this_size;
+>   		p = start;
+>
+>   		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+>   			if (*p == stack_dump_trace[i]) {
+> -				this_size = stack_dump_index[i++] =
+> +				stack_dump_trace[x] = stack_dump_trace[i++];
+> +				this_size = stack_dump_index[x++] =
+>   					(top - p) * sizeof(unsigned long);
+>   				found = 1;
+>   				/* Start the search from here */
+> @@ -168,6 +157,9 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   			i++;
+>   	}
+>
+> +	for (; x < max_stack_trace.nr_entries; x++)
+> +		stack_dump_trace[x] = ULONG_MAX;
+> +
+>   	if (task_stack_end_corrupted(current)) {
+>   		print_max_stack();
+>   		BUG();
+> @@ -192,24 +184,7 @@ stack_trace_call(unsigned long ip, unsigned long parent_ip,
+>   	if (per_cpu(trace_active, cpu)++ != 0)
+>   		goto out;
+>
+> -	/*
+> -	 * When fentry is used, the traced function does not get
+> -	 * its stack frame set up, and we lose the parent.
+> -	 * The ip is pretty useless because the function tracer
+> -	 * was called before that function set up its stack frame.
+> -	 * In this case, we use the parent ip.
+> -	 *
+> -	 * By adding the return address of either the parent ip
+> -	 * or the current ip we can disregard most of the stack usage
+> -	 * caused by the stack tracer itself.
+> -	 *
+> -	 * The function tracer always reports the address of where the
+> -	 * mcount call was, but the stack will hold the return address.
+> -	 */
+> -	if (fentry)
+> -		ip = parent_ip;
+> -	else
+> -		ip += MCOUNT_INSN_SIZE;
+> +	ip += MCOUNT_INSN_SIZE;
+>
+>   	check_stack(ip, &stack);
+>
+>
