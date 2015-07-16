@@ -1,38 +1,30 @@
-From: laurent.navet@gmail.com (Laurent Navet)
-Date: Thu, 16 Jul 2015 22:36:16 +0200
-Subject: [PATCH] i2c: s3c2410: remove unused variable
-Message-ID: <1437078976-29145-1-git-send-email-laurent.navet@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 16 Jul 2015 21:32:32 +0100
+Subject: [PATCH 5/5] regulator: 88pm800: Add support for configuration of
+ dual phase on BUCK1
+In-Reply-To: <1437070618-21330-6-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-6-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150716203232.GA1602@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ret is assigned zero and just used to return. remove it.
-Found by using coccinelle.
+On Thu, Jul 16, 2015 at 11:46:58PM +0530, Vaibhav Hiremath wrote:
 
-Signed-off-by: Laurent Navet <laurent.navet@gmail.com>
----
- drivers/i2c/busses/i2c-s3c2410.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+>  	.disable		= regulator_disable_regmap,
+>  	.is_enabled		= regulator_is_enabled_regmap,
+>  	.get_current_limit	= pm800_get_current_limit,
+> +	.set_current_limit	= pm800_set_current_limit,
 
-diff --git a/drivers/i2c/busses/i2c-s3c2410.c b/drivers/i2c/busses/i2c-s3c2410.c
-index 50bfd8c..cf3c6c0 100644
---- a/drivers/i2c/busses/i2c-s3c2410.c
-+++ b/drivers/i2c/busses/i2c-s3c2410.c
-@@ -409,7 +409,6 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
- {
- 	unsigned long tmp;
- 	unsigned char byte;
--	int ret = 0;
- 
- 	switch (i2c->state) {
- 
-@@ -565,7 +564,7 @@ static int i2c_s3c_irq_nextbyte(struct s3c24xx_i2c *i2c, unsigned long iicstat)
- 	tmp &= ~S3C2410_IICCON_IRQPEND;
- 	writel(tmp, i2c->regs + S3C2410_IICCON);
-  out:
--	return ret;
-+	return 0;
- }
- 
- /* s3c24xx_i2c_irq
--- 
-2.1.4
+set_current_limit() isn't the right interface to use for this, this is
+something that depends on the physical design of the system rather than
+something that limits the current.  It should be a DT property of its
+own.  There are some other PMICs with similar functions but it's not
+clear yet how generic the configuration mechanism is.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150716/b5a98a6e/attachment.sig>
