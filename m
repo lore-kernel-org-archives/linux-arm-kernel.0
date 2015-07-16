@@ -1,149 +1,42 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Thu, 16 Jul 2015 14:14:53 -0500
-Subject: [PATCHv2] ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
-Message-ID: <1437074093-12894-1-git-send-email-dinguyen@opensource.altera.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Thu, 16 Jul 2015 12:22:12 -0700
+Subject: [PATCH v4 0/2] arm/arm64: KVM: Optimize arm64 fp/simd,
+ saves 30-50% on exits for non-VHE
+In-Reply-To: <20150716190529.GA14369@cbox>
+References: <1436577547-5646-1-git-send-email-m.smarduch@samsung.com>
+ <20150716155253.GU7845@cbox> <55A7F68C.6020903@samsung.com>
+ <20150716190529.GA14369@cbox>
+Message-ID: <55A80464.7000701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dalon Westergreen <dwesterg@gmail.com>
+On 07/16/2015 12:05 PM, Christoffer Dall wrote:
+> On Thu, Jul 16, 2015 at 11:23:08AM -0700, Mario Smarduch wrote:
+>> On 07/16/2015 08:52 AM, Christoffer Dall wrote:
+>>> On Fri, Jul 10, 2015 at 06:19:05PM -0700, Mario Smarduch wrote:
+>>>> This is a followp to previous iteration but implemented on top of VHE patches. 
+>>>> Only non-VHE path is addressied by this patch. In second patch 32-bit handler 
+>>>> is updated to keep exit handling consistent with 64-bit code, and nothing
+>>>> has changed.
+>>>>
+>>> Why not simply preserve this the way it was in v3 and have it merged
+>>> first - after all we have reviewed it and I thought it was more or less
+>>> ready to be merged - I suspect the VHE patches may have a way to go
+>>> still ?
+>>
+>> Definitely, that's a better path. After looking at VHE patches,
+>> I would probably leave V3 the way it is (keeping deactivate_xxxx:
+>> symmetric). Marc has Reviewed V3 and you commented either way was
+>> fine with you, so V3 should be ok.
+> 
+> Yes, but there was a comment in the assembly file to fix up IIRC.
 
-The Terasic DE0 Atlas board is also known as the DE0-Nano board.
-This patch adds the DTS board file for the DE0-Nano Sockit board, and not
-the DE0 Nano "Development Board".
+That's right 1/2 and 0/2 header need little bit of editing.
 
-Signed-off-by: Dalon Westergreen <dwesterg@gmail.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
-v2: use stdpath-out for console and remove comment regarding u-boot ethaddr
----
- arch/arm/boot/dts/Makefile                        |   1 +
- arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 106 ++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
- create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 246473a..29e33aa 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -522,6 +522,7 @@ dtb-$(CONFIG_ARCH_SOCFPGA) += \
- 	socfpga_arria5_socdk.dtb \
- 	socfpga_arria10_socdk_sdmmc.dtb \
- 	socfpga_cyclone5_socdk.dtb \
-+	socfpga_cyclone5_de0_sockit.dtb \
- 	socfpga_cyclone5_sockit.dtb \
- 	socfpga_cyclone5_socrates.dtb \
- 	socfpga_vt.dtb
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-new file mode 100644
-index 0000000..ceb4058
---- /dev/null
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright Altera Corporation (C) 2015. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "socfpga_cyclone5.dtsi"
-+
-+/ {
-+	model = "Terasic DE-0(Atlas)";
-+	compatible = "altr,socfpga-cyclone5", "altr,socfpga";
-+
-+	chosen {
-+		bootargs = "earlyprintk";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		name = "memory";
-+		device_type = "memory";
-+		reg = <0x0 0x40000000>; /* 1GB */
-+	};
-+
-+	aliases {
-+		ethernet0 = &gmac1;
-+	};
-+
-+	regulator_3_3v: 3-3-v-regulator {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		hps0 {
-+			label = "hps_led0";
-+			gpios = <&portb 24 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
-+
-+&gmac1 {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+
-+	rxd0-skew-ps = <0>;
-+	rxd1-skew-ps = <0>;
-+	rxd2-skew-ps = <0>;
-+	rxd3-skew-ps = <0>;
-+	txen-skew-ps = <0>;
-+	txc-skew-ps = <2600>;
-+	rxdv-skew-ps = <0>;
-+	rxc-skew-ps = <2000>;
-+	max-frame-size = <3800>;
-+};
-+
-+&gpio0 {
-+	status = "okay";
-+};
-+
-+&gpio1 {
-+	status = "okay";
-+};
-+
-+&gpio2 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	speed-mode = <0>;
-+
-+	adxl345: adxl345 at 0 {
-+		compatible = "adi,adxl345";
-+		reg = <0x53>;
-+
-+		interrupt-parent = <&portc>;
-+		interrupts = <3 2>;
-+	};
-+};
-+
-+&mmc0 {
-+	vmmc-supply = <&regulator_3_3v>;
-+	vqmmc-supply = <&regulator_3_3v>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-2.4.5
+> 
+> Can you do a quick respin with that commentary changed and then Marc
+> can queue that if he agrees?
+> 
+> Thanks,
+> -Christoffer
+> 
