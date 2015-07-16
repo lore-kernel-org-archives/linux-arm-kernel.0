@@ -1,153 +1,54 @@
-From: kamal@canonical.com (Kamal Mostafa)
-Date: Wed, 15 Jul 2015 18:08:14 -0700
-Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid blocking
- calls in the cpu hotplug notifier
-In-Reply-To: <1437008972-9140-1-git-send-email-kamal@canonical.com>
-References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
-Message-ID: <1437008972-9140-174-git-send-email-kamal@canonical.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 15 Jul 2015 18:19:35 -0700
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <201507151915.50677.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507151352.27689.marex@denx.de>
+ <20150715155946.GB21362@localhost>
+ <201507151915.50677.marex@denx.de>
+Message-ID: <20150716011935.GB9033@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.19.8-ckt4 -stable review patch.  If anyone has any objections, please let me know.
+On Wed, Jul 15, 2015 at 07:15:50PM +0200, Marek Vasut wrote:
+> On Wednesday, July 15, 2015 at 05:59:46 PM, Brian Norris wrote:
+> > 1. Fix up the SPI driver so that it knows how to break large SPI
+> > transfers up into smaller segments that its constituent hardware (DMA
+> > controllers, fast clocks, etc.) can handle.
 
-------------------
+BTW, Mark Brown already commented on this approach:
 
-From: Damian Eppel <d.eppel@samsung.com>
+http://lists.infradead.org/pipermail/linux-mtd/2015-May/059364.html
 
-commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
+I quote:
 
-Whilst testing cpu hotplug events on kernel configured with
-DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
-caused by calling request_irq() and free_irq() in the context of
-hotplug notification (which is in this case atomic context).
+| With modern drivers using transfer_one() where we have control of the
+| chip select we do also have the ability to add support to the core for
+| chopping large transfers up into smaller ones that the hardware can
+| handle transparently.  That won't for everything though since it depends
+| on us being able to manually control the chip select which not all
+| hardware can do.
 
-[   40.785859] CPU1: Software reset
-[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
-[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
-[   40.786678] Preemption disabled at:[<  (null)>]   (null)
-[   40.786681]
-[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
-[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
-[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
-[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
-[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
-[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
-[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
-[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
-[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
-[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
-[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+> I think this might actually be easier -- just do a transfer where you
+> don't toggle CS and just stops the clock at the last bit, then do another
+> (multiple) transfers which don't toggle CS at all, then finally do a
+> transfer which toggles a CS at the end.
 
-Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
-notifications which run on the hotplugged cpu with interrupts and
-preemption disabled.
+Sounds OK to me. And as Mark noted, this could probably be done in the
+core. I suppose Mark could suggest whether the most expedient path is to
+hack the buggy driver to do this, or whether reworking the SPI core to
+have the appropriate spi_master field(s) (and caveats) to support this.
 
-To avoid the issue, request the interrupts for all possible cpus in
-the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
-request_irq/disable_irq() sequence. The flag prevents the
-request_irq() code from enabling the interrupt immediately.
+> This should be pretty trivial
+> to do and I think for example spi-mxs.c does this.
 
-The interrupt is then enabled in the CPU_STARTING notifier of the
-hotplugged cpu and again disabled with disable_irq_nosync() in the
-CPU_DYING notifier.
+I don't think spi-mxs.c really does this; it chooses between PIO and DMA
+based on length, but with either option, it runs through each SPI
+transfer in one go. You might be confused by the fact that this driver
+implements ->transfer_one_message instead of ->transfer_one, so it has
+to loop through all transfers in the message.
 
-[ tglx: Massaged changelog to match the patch ]
+(IIUC, spi-mxs.c could easily be rewritten to use ->transfer, and some
+of that not-too-complicated boilerplate could be killed off.)
 
-Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
-Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-Cc: m.szyprowski at samsung.com
-Cc: kyungmin.park at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: kgene at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Kamal Mostafa <kamal@canonical.com>
----
- drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
- 1 file changed, 30 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index 83564c9..c844616 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
- 
- 	if (mct_int_type == MCT_INT_SPI) {
--		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
--		if (request_irq(evt->irq, exynos4_mct_tick_isr,
--				IRQF_TIMER | IRQF_NOBALANCING,
--				evt->name, mevt)) {
--			pr_err("exynos-mct: cannot register IRQ %d\n",
--				evt->irq);
-+
-+		if (evt->irq == -1)
- 			return -EIO;
--		}
--		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
-+
-+		irq_force_affinity(evt->irq, cpumask_of(cpu));
-+		enable_irq(evt->irq);
- 	} else {
- 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
- 	}
-@@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
- static void exynos4_local_timer_stop(struct clock_event_device *evt)
- {
- 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
--	if (mct_int_type == MCT_INT_SPI)
--		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
--	else
-+	if (mct_int_type == MCT_INT_SPI) {
-+		if (evt->irq != -1)
-+			disable_irq_nosync(evt->irq);
-+	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-+	}
- }
- 
- static int exynos4_mct_cpu_notify(struct notifier_block *self,
-@@ -522,7 +521,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
- 
- static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
- {
--	int err;
-+	int err, cpu;
- 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
- 	struct clk *mct_clk, *tick_clk;
- 
-@@ -549,7 +548,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
- 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
- 		     mct_irqs[MCT_L0_IRQ], err);
- 	} else {
--		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
-+		for_each_possible_cpu(cpu) {
-+			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
-+			struct mct_clock_event_device *pcpu_mevt =
-+				per_cpu_ptr(&percpu_mct_tick, cpu);
-+
-+			pcpu_mevt->evt.irq = -1;
-+
-+			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
-+			if (request_irq(mct_irq,
-+					exynos4_mct_tick_isr,
-+					IRQF_TIMER | IRQF_NOBALANCING,
-+					pcpu_mevt->name, pcpu_mevt)) {
-+				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
-+									cpu);
-+
-+				continue;
-+			}
-+			pcpu_mevt->evt.irq = mct_irq;
-+		}
- 	}
- 
- 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
--- 
-1.9.1
+Brian
