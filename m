@@ -1,403 +1,154 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Thu, 16 Jul 2015 14:54:40 +0800
-Subject: [PATCH v5 2/3] pwm: add MediaTek display PWM driver support
-In-Reply-To: <1437025108.18175.13.camel@mtksdaap41>
-References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
- <1436778294-47635-3-git-send-email-yh.huang@mediatek.com>
- <CAGS+omCx4mDAN+F315x+8FeCABcKDoMn1gm_nHzF6VXnF_xm8Q@mail.gmail.com>
- <1436975995.15774.27.camel@mtksdaap41> <1437025108.18175.13.camel@mtksdaap41>
-Message-ID: <CAGS+omB1FCX12-KvU7ODywseFKgsAbzNtqNyYZ+PqvO5ZeEn-A@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 16 Jul 2015 15:55:41 +0900
+Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+ blocking calls in the cpu hotplug notifier
+In-Reply-To: <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
+References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
+ <1437008972-9140-174-git-send-email-kamal@canonical.com>
+ <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
+Message-ID: <CAJKOXPf3ik5XahaK-fv0EOFhPHpO1aQ7PGxbAMrGiSrK4j1EYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 1:38 PM, YH Huang <yh.huang@mediatek.com> wrote:
-> On Wed, 2015-07-15 at 23:59 +0800, YH Huang wrote:
->> On Mon, 2015-07-13 at 18:19 +0800, Daniel Kurtz wrote:
->> > On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
->> > > Add display PWM driver support to modify backlight for MT8173 and MT6595.
->> > > The PWM has one channel to control the brightness of the display.
->> > > When the (high_width / period) is closer to 1, the screen is brighter;
->> > > otherwise, it is darker.
->> > >
->> > > Signed-off-by: YH Huang <yh.huang@mediatek.com>
->> > > ---
->> > >  drivers/pwm/Kconfig        |  10 ++
->> > >  drivers/pwm/Makefile       |   1 +
->> > >  drivers/pwm/pwm-mtk-disp.c | 256 +++++++++++++++++++++++++++++++++++++++++++++
->> > >  3 files changed, 267 insertions(+)
->> > >  create mode 100644 drivers/pwm/pwm-mtk-disp.c
->> > >
->> > > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
->> > > index b1541f4..f5b03a4 100644
->> > > --- a/drivers/pwm/Kconfig
->> > > +++ b/drivers/pwm/Kconfig
->> > > @@ -211,6 +211,16 @@ config PWM_LPSS_PLATFORM
->> > >           To compile this driver as a module, choose M here: the module
->> > >           will be called pwm-lpss-platform.
->> > >
->> > > +config PWM_MTK_DISP
->> > > +       tristate "MediaTek display PWM driver"
->> > > +       depends on ARCH_MEDIATEK || COMPILE_TEST
->> > > +       help
->> > > +         Generic PWM framework driver for MediaTek disp-pwm device.
->> > > +         The PWM is used to control the backlight brightness for display.
->> > > +
->> > > +         To compile this driver as a module, choose M here: the module
->> > > +         will be called pwm-mtk-disp.
->> > > +
->> > >  config PWM_MXS
->> > >         tristate "Freescale MXS PWM support"
->> > >         depends on ARCH_MXS && OF
->> > > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
->> > > index ec50eb5..99c9e75 100644
->> > > --- a/drivers/pwm/Makefile
->> > > +++ b/drivers/pwm/Makefile
->> > > @@ -18,6 +18,7 @@ obj-$(CONFIG_PWM_LPC32XX)     += pwm-lpc32xx.o
->> > >  obj-$(CONFIG_PWM_LPSS)         += pwm-lpss.o
->> > >  obj-$(CONFIG_PWM_LPSS_PCI)     += pwm-lpss-pci.o
->> > >  obj-$(CONFIG_PWM_LPSS_PLATFORM)        += pwm-lpss-platform.o
->> > > +obj-$(CONFIG_PWM_MTK_DISP)     += pwm-mtk-disp.o
->> > >  obj-$(CONFIG_PWM_MXS)          += pwm-mxs.o
->> > >  obj-$(CONFIG_PWM_PCA9685)      += pwm-pca9685.o
->> > >  obj-$(CONFIG_PWM_PUV3)         += pwm-puv3.o
->> > > diff --git a/drivers/pwm/pwm-mtk-disp.c b/drivers/pwm/pwm-mtk-disp.c
->> > > new file mode 100644
->> > > index 0000000..1f17cee
->> > > --- /dev/null
->> > > +++ b/drivers/pwm/pwm-mtk-disp.c
->> > > @@ -0,0 +1,256 @@
->> > > +/*
->> > > + * MediaTek display pulse-width-modulation controller driver.
->> > > + * Copyright (c) 2015 MediaTek Inc.
->> > > + * Author: YH Huang <yh.huang@mediatek.com>
->> > > + *
->> > > + * This program is free software; you can redistribute it and/or modify
->> > > + * it under the terms of the GNU General Public License version 2 as
->> > > + * published by the Free Software Foundation.
->> > > + *
->> > > + * This program is distributed in the hope that it will be useful,
->> > > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > > + * GNU General Public License for more details.
->> > > + */
->> > > +
->> > > +#include <linux/clk.h>
->> > > +#include <linux/err.h>
->> > > +#include <linux/io.h>
->> > > +#include <linux/module.h>
->> > > +#include <linux/of.h>
->> > > +#include <linux/pwm.h>
->> > > +#include <linux/platform_device.h>
->> > > +#include <linux/slab.h>
->> > > +
->> > > +#define DISP_PWM_EN            0
->> >
->> > The "DISP_PWM_*" are register offsets, so use a hex value, like this:
->> >
->> > #define DISP_PWM_EN                      0x00
->> >
->> > Use BIT() for register *fields*, that is, the individual bits of a register.
->> >
+2015-07-16 15:37 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
+> From: Kamal Mostafa <kamal@canonical.com> Sent: Thursday, July 16, 2015 9:08 AM
+>> To: linux-kernel at vger.kernel.org; stable at vger.kernel.org; kernel-
+>> team at lists.ubuntu.com
+>> Cc: Kamal Mostafa; daniel.lezcano at linaro.org; kyungmin.park at samsung.com;
+>> Damian Eppel; kgene at kernel.org; Thomas Gleixner; linux-arm-
+>> kernel at lists.infradead.org; m.szyprowski at samsung.com
+>> Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+>> blocking calls in the cpu hotplug notifier
 >>
->> Got it!
+>> 3.19.8-ckt4 -stable review patch.  If anyone has any objections, please
+>> let me know.
 >>
->> > > +#define PWM_ENABLE_MASK                BIT(0)
->> > > +
->> > > +#define DISP_PWM_COMMIT                BIT(3)
->> >
->> > #define DISP_PWM_COMMIT            0x08
->> >
->> > > +#define PWM_COMMIT_MASK                BIT(0)
->> > > +
->> > > +#define DISP_PWM_CON_0         BIT(4)
->> >
->> > #define DISP_PWM_COMMIT            0x10
->> >
->> > > +#define PWM_CLKDIV_SHIFT       16
->> > > +#define PWM_CLKDIV_MAX         0x3ff
->> > > +#define PWM_CLKDIV_MASK                (PWM_CLKDIV_MAX << PWM_CLKDIV_SHIFT)
->> > > +
->> > > +#define DISP_PWM_CON_1         0x14
->> > > +#define PWM_PERIOD_MASK                0xfff
->> > > +/* Shift log2(PWM_PERIOD_MASK + 1) as divisor */
->> > > +#define PWM_PERIOD_BIT_SHIFT   12
->> > > +
->> > > +#define PWM_HIGH_WIDTH_SHIFT   16
->> > > +#define PWM_HIGH_WIDTH_MASK    (0x1fff << PWM_HIGH_WIDTH_SHIFT)
->> > > +
->> > > +struct mtk_disp_pwm {
->> > > +       struct pwm_chip chip;
->> > > +       struct device *dev;
->> >
->> > I don't think "dev" is actually used.  And, if needed, it can be
->> > extracted from "chip".
->> >
+>> ------------------
 >>
->> I will drop it.
+>> From: Damian Eppel <d.eppel@samsung.com>
 >>
->> > > +       struct clk *clk_main;
->> > > +       struct clk *clk_mm;
->> > > +       void __iomem *base;
->> > > +};
->> > > +
->> > > +static inline struct mtk_disp_pwm *to_mtk_disp_pwm(struct pwm_chip *chip)
->> > > +{
->> > > +       return container_of(chip, struct mtk_disp_pwm, chip);
->> > > +}
->> > > +
->> > > +static void mtk_disp_pwm_update_bits(void __iomem *address, u32 mask, u32 value)
->> >
->> > Take "struct mtk_disp_pwm *mdp" as a param and extract mdp->base,
->> > rather than pass the raw iomem address.
->> >
+>> commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
 >>
->> I will revise it like this.
+>> Whilst testing cpu hotplug events on kernel configured with DEBUG_PREEMPT
+>> and DEBUG_ATOMIC_SLEEP we get following BUG message, caused by calling
+>> request_irq() and free_irq() in the context of hotplug notification
+>> (which is in this case atomic context).
 >>
->> static void mtk_disp_pwm_update_bits(struct mtk_disp_pwm *mdp,
->>                              u32 reg, u32 mask, u32 value)
->> {
->>       void __iomem *address;
->>       u32 val;
+>> [   40.785859] CPU1: Software reset
+>> [   40.786660] BUG: sleeping function called from invalid context at
+>> mm/slub.c:1241
+>> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name:
+>> swapper/1
+>> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
+>> [   40.786681]
+>> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-
+>> 00024-g7dca860 #36
+>> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+>> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>]
+>> (show_stack+0x10/0x14)
+>> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>]
+>> (dump_stack+0x70/0xbc)
+>> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>]
+>> (kmem_cache_alloc+0xd8/0x170)
+>> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>]
+>> (request_threaded_irq+0x64/0x128)
+>> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>]
+>> (exynos4_local_timer_setup+0xc0/0x13c)
+>> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>]
+>> (exynos4_mct_cpu_notify+0x30/0xa8)
+>> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>]
+>> (notifier_call_chain+0x44/0x84)
+>> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>]
+>> (__cpu_notify+0x28/0x44)
+>> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>]
+>> (secondary_start_kernel+0xec/0x150)
+>> [   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>]
+>> (0x40008764)
 >>
->>       address = mdp->base + reg;
->>       val = readl(address);
->>       val &= ~mask;
->>       val |= value;
->>       writel(val, address);
->> }
+>> Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+>> notifications which run on the hotplugged cpu with interrupts and
+>> preemption disabled.
 >>
->> > > +{
->> > > +       u32 val;
->> > > +
->> > > +       val = readl(address);
->> > > +       val &= ~mask;
->> > > +       val |= value;
->> > > +       writel(val, address);
->> > > +}
->> > > +
->> > > +static int mtk_disp_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->> > > +                              int duty_ns, int period_ns)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = to_mtk_disp_pwm(chip);
->> > > +       u64 div, rate;
->> > > +       u32 clk_div, period, high_width, value;
->> > > +
->> > > +       /*
->> > > +        * Find period, high_width and clk_div to suit duty_ns and period_ns.
->> > > +        * Calculate proper div value to keep period value in the bound.
->> > > +        *
->> > > +        * period_ns = 10^9 * (clk_div + 1) * (period + 1) / PWM_CLK_RATE
->> > > +        * duty_ns = 10^9 * (clk_div + 1) * high_width / PWM_CLK_RATE
->> > > +        *
->> > > +        * period = (PWM_CLK_RATE * period_ns) / (10^9 * (clk_div + 1)) - 1
->> > > +        * high_width = (PWM_CLK_RATE * duty_ns) / (10^9 * (clk_div + 1))
->> > > +        */
->> > > +       rate = clk_get_rate(mdp->clk_main);
->> > > +       clk_div = div_u64(rate * period_ns, NSEC_PER_SEC) >>
->> > > +                         PWM_PERIOD_BIT_SHIFT;
->> > > +       if (clk_div > PWM_CLKDIV_MAX)
->> > > +               return -EINVAL;
->> > > +
->> > > +       div = NSEC_PER_SEC * (clk_div + 1);
->> > > +       period = div64_u64(rate * period_ns, div);
->> > > +       if (period > 0)
->> > > +               period--;
->> > > +
->> > > +       high_width = div64_u64(rate * duty_ns, div);
->> > > +
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_CON_0,
->> > > +                                PWM_CLKDIV_MASK, clk_div << PWM_CLKDIV_SHIFT);
->> > > +
->> > > +       value = period | (high_width << PWM_HIGH_WIDTH_SHIFT);
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_CON_1,
->> > > +                                PWM_PERIOD_MASK | PWM_HIGH_WIDTH_MASK, value);
->> > > +
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_COMMIT,
->> > > +                                PWM_COMMIT_MASK, 1);
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_COMMIT,
->> > > +                                PWM_COMMIT_MASK, 0);
->> > > +
->> > > +       return 0;
->> > > +}
->> > > +
->> > > +static int mtk_disp_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = to_mtk_disp_pwm(chip);
->> > > +
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_EN,
->> > > +                                PWM_ENABLE_MASK, 1);
->> > > +
->> > > +       return 0;
->> > > +}
->> > > +
->> > > +static void mtk_disp_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = to_mtk_disp_pwm(chip);
->> > > +
->> > > +       mtk_disp_pwm_update_bits(mdp->base + DISP_PWM_EN,
->> > > +                                PWM_ENABLE_MASK, 0);
->> > > +}
->> > > +
->> > > +static const struct pwm_ops mtk_disp_pwm_ops = {
->> > > +       .config = mtk_disp_pwm_config,
->> > > +       .enable = mtk_disp_pwm_enable,
->> > > +       .disable = mtk_disp_pwm_disable,
->> > > +       .owner = THIS_MODULE,
->> > > +};
->> > > +
->> > > +static int mtk_disp_pwm_probe(struct platform_device *pdev)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp;
->> > > +       struct resource *r;
->> > > +       int ret;
->> > > +
->> > > +       mdp = devm_kzalloc(&pdev->dev, sizeof(*mdp), GFP_KERNEL);
->> > > +       if (!mdp)
->> > > +               return -ENOMEM;
->> > > +
->> > > +       mdp->dev = &pdev->dev;
->> > > +
->> > > +       r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> > > +       mdp->base = devm_ioremap_resource(&pdev->dev, r);
->> > > +       if (IS_ERR(mdp->base))
->> > > +               return PTR_ERR(mdp->base);
->> > > +
->> > > +       mdp->clk_main = devm_clk_get(&pdev->dev, "main");
->> > > +       if (IS_ERR(mdp->clk_main))
->> > > +               return PTR_ERR(mdp->clk_main);
->> > > +
->> > > +       mdp->clk_mm = devm_clk_get(&pdev->dev, "mm");
->> > > +       if (IS_ERR(mdp->clk_mm))
->> > > +               return PTR_ERR(mdp->clk_mm);
->> > > +
->> > > +       ret = clk_prepare_enable(mdp->clk_main);
->> >
->> > Delay turning on the PWM clock until it is actually needed (pwm_enable)...
->> > Just be careful to ensure that the "main" clock is enabled when
->> > writing registers during mtk_disp_pwm_config.
+>> To avoid the issue, request the interrupts for all possible cpus in the
+>> boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+>> request_irq/disable_irq() sequence. The flag prevents the
+>> request_irq() code from enabling the interrupt immediately.
+>>
+>> The interrupt is then enabled in the CPU_STARTING notifier of the
+>> hotplugged cpu and again disabled with disable_irq_nosync() in the
+>> CPU_DYING notifier.
+>>
+>> [ tglx: Massaged changelog to match the patch ]
+>>
+>> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq
+>> calls for local timer registration")
+>> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+>> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+>> Cc: m.szyprowski at samsung.com
+>> Cc: kyungmin.park at samsung.com
+>> Cc: daniel.lezcano at linaro.org
+>> Cc: kgene at kernel.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-
+>> d.eppel at samsung.com
+>> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+>> Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+>> ---
+>>  drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------
+>> ------
+>>  1 file changed, 30 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/exynos_mct.c
+>> b/drivers/clocksource/exynos_mct.c
+>> index 83564c9..c844616 100644
+>> --- a/drivers/clocksource/exynos_mct.c
+>> +++ b/drivers/clocksource/exynos_mct.c
+>> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct
+>> clock_event_device *evt)
+>>       exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+>>
+>>       if (mct_int_type == MCT_INT_SPI) {
+>> -             evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+>> -             if (request_irq(evt->irq, exynos4_mct_tick_isr,
+>> -                             IRQF_TIMER | IRQF_NOBALANCING,
+>> -                             evt->name, mevt)) {
+>> -                     pr_err("exynos-mct: cannot register IRQ %d\n",
+>> -                             evt->irq);
+>> +
+>> +             if (evt->irq == -1)
+>>                       return -EIO;
+>> -             }
+>> -             irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
+>> cpumask_of(cpu));
+>> +
+>> +             irq_force_affinity(evt->irq, cpumask_of(cpu));
+>> +             enable_irq(evt->irq);
+>>       } else {
+>>               enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
 >
-> Since pwm-backlight driver configures PWM before enable PWM, I enable
-> clocks at the probe function.
-> Turning on the PWM clock in pwm_enable will lose the first configuration
-> of PWM. It won't affect a lot since the system configures PWM many times
-> at boot time.
-> So should I delay or keep the original way?
+> In here, why not use enable_percpu_irq(evt->irq) ?
+>
+>>       }
+>> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct
+>> clock_event_device *evt)  static void exynos4_local_timer_stop(struct
+>> clock_event_device *evt)  {
+>>       evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+>> -     if (mct_int_type == MCT_INT_SPI)
+>> -             free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+>> -     else
+>> +     if (mct_int_type == MCT_INT_SPI) {
+>> +             if (evt->irq != -1)
+>> +                     disable_irq_nosync(evt->irq);
+>> +     } else {
+>>               disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+>
+> In here, why not use disable_percpu_irq(evt->irq) ?
 
-Why does turning on the PWM clock in pwm_enable lose the first configuration?
-Would this be solved by turning enabling/disabling clocks during
-mtk_disp_pwm_config()?
+You know this is just a semi-automatic stable backport and this was
+already merged to mainline?
 
->
->> > By the way, is the pwm in a power domain that must also be enabled
->> > when enabling the pwm?
->>
->> It is in the display power domain which must also be enabled.
->>
->> >
->> > > +       if (ret < 0)
->> > > +               return ret;
->> > > +
->> > > +       ret = clk_prepare_enable(mdp->clk_mm);
->> > > +       if (ret < 0)
->> > > +               goto disable_clk_main;
->> > > +
->> > > +       platform_set_drvdata(pdev, mdp);
->> >
->> > Set this only after pwmchip_add() succeeds.
->>
->> OK.
->>
->> >
->> > > +
->> > > +       mdp->chip.dev = &pdev->dev;
->> > > +       mdp->chip.ops = &mtk_disp_pwm_ops;
->> > > +       mdp->chip.base = -1;
->> > > +       mdp->chip.npwm = 1;
->> > > +
->> > > +       ret = pwmchip_add(&mdp->chip);
->> > > +       if (ret < 0) {
->> > > +               dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
->> > > +               goto disable_clk_mm;
->> > > +       }
->> > > +
->> > > +       return 0;
->> > > +
->> > > +disable_clk_mm:
->> > > +       clk_disable_unprepare(mdp->clk_mm);
->> > > +disable_clk_main:
->> > > +       clk_disable_unprepare(mdp->clk_main);
->> > > +       return ret;
->> > > +}
->> > > +
->> > > +static int mtk_disp_pwm_remove(struct platform_device *pdev)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = platform_get_drvdata(pdev);
->> > > +       int ret = pwmchip_remove(&mdp->chip);
->> > > +
->> > > +       clk_disable_unprepare(mdp->clk_main);
->> > > +       clk_disable_unprepare(mdp->clk_mm);
->> >
->> > Nit: it is more traditional to disable clocks in the opposite order to
->> > which they are enabled, so:
->> >
->> >        clk_disable_unprepare(mdp->clk_mm);
->> >        clk_disable_unprepare(mdp->clk_main);
->> >
->>
->> OK.
->>
->> > > +
->> > > +       return ret;
->> > > +}
->> > > +
->> > > +static const struct of_device_id mtk_disp_pwm_of_match[] = {
->> > > +       { .compatible = "mediatek,mt8173-disp-pwm" },
->> > > +       { .compatible = "mediatek,mt6595-disp-pwm" },
->> > > +       { }
->> > > +};
->> > > +MODULE_DEVICE_TABLE(of, mtk_disp_pwm_of_match);
->> > > +
->> > > +#ifdef CONFIG_PM_SLEEP
->> > > +static int mtk_disp_pwm_suspend(struct device *dev)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
->> > > +
->> > > +       clk_disable_unprepare(mdp->clk_main);
->> > > +       clk_disable_unprepare(mdp->clk_mm);
->> > > +
->> > > +       return 0;
->> > > +}
->> > > +
->> > > +static int mtk_disp_pwm_resume(struct device *dev)
->> > > +{
->> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
->> > > +       int ret;
->> > > +
->> > > +       ret = clk_prepare_enable(mdp->clk_main);
->> > > +       if (ret < 0)
->> > > +               return ret;
->> > > +
->> > > +       ret = clk_prepare_enable(mdp->clk_mm);
->> > > +       if (ret < 0) {
->> > > +               clk_disable_unprepare(mdp->clk_main);
->> > > +               return ret;
->> > > +       }
->> > > +
->> >
->> > Don't you also have to restore the PWM rate and frequency?
->> >
->> > Is it possible to save power at runtime by leaving mdp->clk_mm enabled
->> > (to generate the PWM signal), but disable mdp->clk_main (clock
->> > required to access PWM registers)?
->>
->> The pwm-backlight driver will restore the data.
->>
->> After I try to disable anyone of the two clocks at runtime, the
->> backlight doesn't work well(no immediate update or losing backlight).
->> So we need to keep both clock enabled.
->>
->> Regards,
->> YH Huang
->>
->
->
+Best regards,
+Krzysztof
