@@ -1,141 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Jul 2015 19:03:08 +0100
-Subject: [PATCH 11/13] arm64: Panic when VHE and non VHE CPUs coexist
-In-Reply-To: <1436372356-30410-12-git-send-email-marc.zyngier@arm.com>
-References: <1436372356-30410-1-git-send-email-marc.zyngier@arm.com>
- <1436372356-30410-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150716180308.GQ26390@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 16 Jul 2015 11:04:12 -0700
+Subject: [PATCH] arm64: enable more compressed Image formats
+Message-ID: <1437069852-8393-1-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 05:19:14PM +0100, Marc Zyngier wrote:
-> Having both VHE and non-VHE capable CPUs in the same system
-> is likely to be a recipe for disaster.
-> 
-> If the boot CPU has VHE, but a secondary is not, we won't be
-> able to downgrade and run the kernel at EL1. Add CPU hotplug
-> to the mix, and this produces a terrifying mess.
-> 
-> Let's solve the problem once and for all. If you mix VHE and
-> non-VHE CPUs in the same system, you deserve to loose, and this
-> patch makes sure you don't get a chance.
-> 
-> This is implemented by storing the kernel execution level in
-> a global variable. Secondaries will park themselves in a
-> WFI loop if they observe a mismatch. Also, the primary CPU
-> will detect that the secondary CPU has died on a mismatched
-> execution level. Panic will follow.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/virt.h | 15 +++++++++++++++
->  arch/arm64/kernel/head.S      | 15 +++++++++++++++
->  arch/arm64/kernel/smp.c       |  4 ++++
->  3 files changed, 34 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-> index 9f22dd6..8e246f7 100644
-> --- a/arch/arm64/include/asm/virt.h
-> +++ b/arch/arm64/include/asm/virt.h
-> @@ -36,6 +36,11 @@
->   */
->  extern u32 __boot_cpu_mode[2];
->  
-> +/*
-> + * __run_cpu_mode records the mode the boot CPU uses for the kernel.
-> + */
-> +extern u32 __run_cpu_mode;
-> +
->  void __hyp_set_vectors(phys_addr_t phys_vector_base);
->  phys_addr_t __hyp_get_vectors(void);
->  
-> @@ -60,6 +65,16 @@ static inline bool is_kernel_in_hyp_mode(void)
->  	return el == CurrentEL_EL2;
->  }
->  
-> +static inline bool is_kernel_mode_mismatched(void)
-> +{
-> +	u64 el;
-> +	u32 mode;
-> +
-> +	asm("mrs %0, CurrentEL" : "=r" (el));
-> +	mode = ACCESS_ONCE(__run_cpu_mode);
-> +	return el != mode;
+Plumb up Makefile arguments for the already supported formats in the kbuild
+system: lz4, bzip2, lzma, and lzo.
 
-Why the temporary 'mode' variable?
+Note that just as with Image.gz, these images are not self-decompressing and
+the booting firmware still needs to handle decompression before launching the
+kernel image.
 
-> +}
-> +
->  /* The section containing the hypervisor text */
->  extern char __hyp_text_start[];
->  extern char __hyp_text_end[];
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index a179747..318e69f 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -578,7 +578,20 @@ ENTRY(set_cpu_boot_mode_flag)
->  1:	str	w20, [x1]			// This CPU has booted in EL1
->  	dmb	sy
->  	dc	ivac, x1			// Invalidate potentially stale cache line
-> +	adr_l	x1, __run_cpu_mode
-> +	ldr	w0, [x1]
-> +	mrs	x20, CurrentEL
+Signed-off-by: Olof Johansson <olof@lixom.net>
+---
+ arch/arm64/Makefile      |  2 +-
+ arch/arm64/boot/Makefile | 12 ++++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-Why x20?
-
-> +	str	w20, [x1]
-> +	dmb	sy
-> +	dc	ivac, x1			// Invalidate potentially stale cache line
-
-Can we stick __run_cpu_mode and __boot_cpu_mode into a struct in the same
-cacheline and avoid the extra maintenance?
-
-> +	cbz	x0, skip_el_check
-
-w0?
-
-> +	cmp	x0, x20
-
-w0, w20?
-
-> +	bne	mismatched_el
-> +skip_el_check:
->  	ret
-> +mismatched_el:
-> +	wfi
-> +	b	mismatched_el
->  ENDPROC(set_cpu_boot_mode_flag)
->  
->  /*
-> @@ -593,6 +606,8 @@ ENDPROC(set_cpu_boot_mode_flag)
->  ENTRY(__boot_cpu_mode)
->  	.long	BOOT_CPU_MODE_EL2
->  	.long	BOOT_CPU_MODE_EL1
-> +ENTRY(__run_cpu_mode)
-> +	.long	0
->  	.popsection
->  
->  #ifdef CONFIG_SMP
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 695801a..b467f51 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -52,6 +52,7 @@
->  #include <asm/sections.h>
->  #include <asm/tlbflush.h>
->  #include <asm/ptrace.h>
-> +#include <asm/virt.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/ipi.h>
-> @@ -112,6 +113,9 @@ int __cpu_up(unsigned int cpu, struct task_struct *idle)
->  			pr_crit("CPU%u: failed to come online\n", cpu);
->  			ret = -EIO;
->  		}
-> +
-> +		if (is_kernel_mode_mismatched())
-> +			panic("CPU%u: incompatible execution level", cpu);
-
-Might be useful to print the incompatible values, if possible.
-
-Will
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 4d2a925998f9..435618941c24 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -58,7 +58,7 @@ all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
+ 
+ boot := arch/arm64/boot
+ 
+-Image Image.gz: vmlinux
++Image Image.%: vmlinux
+ 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
+ 
+ zinstall install: vmlinux
+diff --git a/arch/arm64/boot/Makefile b/arch/arm64/boot/Makefile
+index 5a0e3ab854a5..abcbba2f01ba 100644
+--- a/arch/arm64/boot/Makefile
++++ b/arch/arm64/boot/Makefile
+@@ -19,9 +19,21 @@ targets := Image Image.gz
+ $(obj)/Image: vmlinux FORCE
+ 	$(call if_changed,objcopy)
+ 
++$(obj)/Image.bz2: $(obj)/Image FORCE
++	$(call if_changed,bzip2)
++
+ $(obj)/Image.gz: $(obj)/Image FORCE
+ 	$(call if_changed,gzip)
+ 
++$(obj)/Image.lz4: $(obj)/Image FORCE
++	$(call if_changed,lz4)
++
++$(obj)/Image.lzma: $(obj)/Image FORCE
++	$(call if_changed,lzma)
++
++$(obj)/Image.lzo: $(obj)/Image FORCE
++	$(call if_changed,lzo)
++
+ install: $(obj)/Image
+ 	$(CONFIG_SHELL) $(srctree)/$(src)/install.sh $(KERNELRELEASE) \
+ 	$(obj)/Image System.map "$(INSTALL_PATH)"
+-- 
+2.0.1.473.gc4d58ca
