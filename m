@@ -1,56 +1,47 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 16 Jul 2015 17:14:48 +0200
-Subject: Linux on Armada 370
-In-Reply-To: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
-References: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
-Message-ID: <20150716171448.59eb45e5@free-electrons.com>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Thu, 16 Jul 2015 20:43:18 +0530
+Subject: [PATCH v2 0/4]  Add support for touchscreen on Colibri VF50
+Message-ID: <cover.1437058481.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-On Thu, 16 Jul 2015 01:24:59 +0300, Constantine Shulyupin wrote:
+The patchset adds support for 4 wire touchscreen on Toradex Colibri
+VF50 modules. Patches are based on top of shawn's branch.
 
-> I want to run the mainstream Linux on Armada 370 and then contribute to it.
-> 
-> I use custom board derived from DB-88F6710-BP
-> Now I successfully run Marvell's linux-3.2.54-2014_T1.1 with u-boot
-> "Marvell version: v2011.12 2013_Q1.0p2"
-> U-boot and Linux are patched by our OEM according HW changes.
-> 
-> I unsuccessfully tried to to run linux-4.2 with armada-370-db.dts.
-> 
-> Can you please tell me, were can I find the latest Linux, which runs
-> on Armada 370?
-> What is proper configuration etc?
+Changes since v1:
+1. Fix/drop comments
+2. Use an inline function for multiple gpiod_get calls in probe
+3. Remove the pull up in the pinmux specified in DT for touchctrl_gpios
+4. Add the io-channel-cells property before status property.
+5. Add GPIOLIB as dependency in the Kconfig file
 
-Most likely you're hitting the internal register issue. Can you
-make sure you have either an A0 or B0 stepping or the 370 (it's shown
-in the U-Boot messages at boot), and then check whether your internal
-registers are at 0xd0000000 or 0xf1000000. To achieve this, please run:
+Version 1 of the patchset can be found here
+https://lkml.org/lkml/2015/6/30/103
 
-	md 0xd0020080
-	md 0xf1020080
+Thank you for the feedback Stefan.
 
-One of the two may crash the system. If the first command returns
-0xd0000000, then your internal registers are at that location. If the
-second command returns 0xf1000000, then your internal registers are at
-that location.
+Thanks & Regards,
+Sanchayan.
 
-I suspect that you might be using an old U-Boot that still maps
-registers at 0xd0000000. You have two choices:
 
- 1/ Update your U-Boot. This is the best option obviously. An updated
-    U-Boot is available for the Armada 370 DB.
+Sanchayan Maity (4):
+  ARM: dts: vfxxx: Add io-channel-cells property for ADC node
+  ARM: dts: vf500-colibri: Add device tree node for touchscreen support
+  touchscreen: colibri-vf50-ts: Add touchscreen support for Colibri VF50
+  input: Add DT binding documentation for Colibri VF50 touchscreen
 
- 2/ Change the kernel armada-370-db.dts to use the internal registers
-    at 0xd0000000. Basically, you can revert commit
-    4f054d445139d63868f931328f897ac5ef87242e.
+ .../bindings/input/touchscreen/colibri-vf50-ts.txt |  34 ++
+ arch/arm/boot/dts/vf500-colibri-eval-v3.dts        |   4 +
+ arch/arm/boot/dts/vf500-colibri.dtsi               |  46 +++
+ arch/arm/boot/dts/vfxxx.dtsi                       |   2 +
+ drivers/input/touchscreen/Kconfig                  |  12 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/colibri-vf50-ts.c        | 451 +++++++++++++++++++++
+ 7 files changed, 550 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/colibri-vf50-ts.txt
+ create mode 100644 drivers/input/touchscreen/colibri-vf50-ts.c
 
-Best regards,
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+2.4.6
