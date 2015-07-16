@@ -1,56 +1,73 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 16 Jul 2015 10:11:24 +0100
-Subject: [PATCH 1/3] nmi: create generic NMI backtrace implementation
-In-Reply-To: <E1ZFTSm-0006uz-3s@rmk-PC.arm.linux.org.uk>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
- <E1ZFTSm-0006uz-3s@rmk-PC.arm.linux.org.uk>
-Message-ID: <55A7753C.9020708@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 16 Jul 2015 02:11:09 -0700
+Subject: [PATCH 02/12] ARM: OMAP2+: Fix scrm compatible for dm814x
+In-Reply-To: <20150603193806.GW30984@atomide.com>
+References: <1433348601-8966-1-git-send-email-tony@atomide.com>
+ <1433348601-8966-3-git-send-email-tony@atomide.com>
+ <556F50B8.6000903@cogentembedded.com>
+ <20150603193806.GW30984@atomide.com>
+Message-ID: <20150716091109.GK17550@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/07/15 21:39, Russell King wrote:
-> +void nmi_trigger_all_cpu_backtrace(bool include_self,
-> +				   void (*raise)(cpumask_t *mask))
-> +{
-> +	struct nmi_seq_buf *s;
-> +	int i, cpu, this_cpu = get_cpu();
-> +
-> +	if (test_and_set_bit(0, &backtrace_flag)) {
-> +		/*
-> +		 * If there is already a trigger_all_cpu_backtrace() in progress
-> +		 * (backtrace_flag == 1), don't output double cpu dump infos.
-> +		 */
-> +		put_cpu();
-> +		return;
-> +	}
-> +
-> +	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-> +	if (!include_self)
-> +		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
-> +
-> +	cpumask_copy(&printtrace_mask, to_cpumask(backtrace_mask));
-> +
-> +	/*
-> +	 * Set up per_cpu seq_buf buffers that the NMIs running on the other
-> +	 * CPUs will write to.
-> +	 */
-> +	for_each_cpu(cpu, to_cpumask(backtrace_mask)) {
-> +		s = &per_cpu(nmi_print_seq, cpu);
-> +		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
-> +	}
-> +
-> +	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-> +		pr_info("Sending NMI to %s CPUs:\n",
-> +			(include_self ? "all" : "other"));
-> +		raise(to_cpumask(backtrace_mask));
+* Tony Lindgren <tony@atomide.com> [150603 12:39]:
+> * Sergei Shtylyov <sergei.shtylyov@cogentembedded.com> [150603 12:10]:
+> > Hello.
+> > 
+> > On 06/03/2015 07:23 PM, Tony Lindgren wrote:
+> > 
+> > >Fix scrm compatible for dm814x.
+> > 
+> >    So, scrm...
+> > 
+> > >Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+> > >Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > >---
+> > >  arch/arm/mach-omap2/control.c | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > >
+> > >diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+> > >index af95a62..364925c 100644
+> > >--- a/arch/arm/mach-omap2/control.c
+> > >+++ b/arch/arm/mach-omap2/control.c
+> > >@@ -649,6 +649,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
+> > >  	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
+> > >  	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
+> > >  	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
+> > >+	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
+> > 
+> >    ... or scm? :-)
+> > 
+> > >  	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
+> > >  	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
+> > >  	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
+> 
+> Thanks, yeah we should standardize on scm.
 
-On ARM, this code could be running with IRQs locked and with raise() 
-implemented using IRQs. In such as case the IPI will not be raised until 
-the function exists (and perhaps never). Thanks to the timeout we will 
-exit but we end up needlessly failing to print a backtrace for the 
-calling CPU.
+Below is this one updated to use scm instead of scrm in the
+description.
 
-The solution I used for this was to special case the current CPU and 
-call nmi_cpu_backtrace() directly. Originally I made this logic arm only 
-but I can't really see any reason for this to be arch specific so the 
-logic to do that should probably be included here.
+Regards,
+
+Tony
+
+8< -------------------
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 16 Jul 2015 01:55:57 -0700
+Subject: [PATCH] ARM: OMAP2+: Fix scm compatible for dm814x
+
+Fix scm compatible for dm814x.
+
+Cc: Matthijs van Duin <matthijsvanduin@gmail.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -652,6 +652,7 @@ static const struct of_device_id omap_scrm_dt_match_table[] = {
+ 	{ .compatible = "ti,am4-scm", .data = &ctrl_data },
+ 	{ .compatible = "ti,omap2-scm", .data = &omap2_ctrl_data },
+ 	{ .compatible = "ti,omap3-scm", .data = &omap2_ctrl_data },
++	{ .compatible = "ti,dm814-scm", .data = &ctrl_data },
+ 	{ .compatible = "ti,dm816-scrm", .data = &ctrl_data },
+ 	{ .compatible = "ti,omap4-scm-core", .data = &ctrl_data },
+ 	{ .compatible = "ti,omap5-scm-core", .data = &ctrl_data },
