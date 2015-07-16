@@ -1,7 +1,9 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 16 Jul 2015 16:13:46 -0700
-Subject: [GIT PULL] Broadcom Device Tree changes for 4.3 (part 1)
-Message-ID: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+Date: Thu, 16 Jul 2015 16:13:47 -0700
+Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 1)
+In-Reply-To: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+References: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1437088427-31176-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,31 +13,31 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
 are available in the git repository at:
 
-  http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/dts
+  http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc
 
-for you to fetch changes up to 0dfc7f687917a93175d469a2dc1254fd2f77fb63:
+for you to fetch changes up to ffb910d7b84f21ef6caeed041032a0af8d2e00ed:
 
-  ARM: BCM5301X: Enable UART0 on tested devices (2015-07-07 18:08:57 -0700)
-
-----------------------------------------------------------------
-This pull request contains two changes:
-
-- Ray adds the relevant clocks device tree nodes for Cygnus SoCs
-
-- Rafal enables UART0 on BCM5301X routers where it has been verified to work
-  correctly
+  ARM: BCM63xx: Remove custom secondary_startup function (2015-07-11 18:33:51 -0700)
 
 ----------------------------------------------------------------
-Rafa? Mi?ecki (1):
-      ARM: BCM5301X: Enable UART0 on tested devices
+This pull request contains two fixes for the Broadcom BCM63xx SMP code:
 
-Ray Jui (1):
-      ARM: dts: enable clock support for Broadcom Cygnus
+- Sudeep removes an invalid use of cpu_logical_map() which turned to be a no-op
+  since we always boot from physical CPU 0 = logical CPU 0
 
- arch/arm/boot/dts/bcm-cygnus-clock.dtsi            | 89 +++++++++++++++-------
- arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  |  4 +
- arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       |  4 +
- arch/arm/boot/dts/bcm4708-netgear-r6250.dts        | 14 +---
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |  4 +
- arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts |  4 +
- 6 files changed, 81 insertions(+), 38 deletions(-)
+- Florian removes the custom secondary_startup function and replaces it with
+  the generic one
+
+----------------------------------------------------------------
+Florian Fainelli (1):
+      ARM: BCM63xx: Remove custom secondary_startup function
+
+Sudeep Holla (1):
+      ARM: BCM63xx: fix parameter to of_get_cpu_node in bcm63138_smp_boot_secondary
+
+ arch/arm/mach-bcm/Makefile          |  4 +---
+ arch/arm/mach-bcm/bcm63xx_headsmp.S | 23 -----------------------
+ arch/arm/mach-bcm/bcm63xx_smp.c     |  4 ++--
+ arch/arm/mach-bcm/bcm63xx_smp.h     |  1 -
+ 4 files changed, 3 insertions(+), 29 deletions(-)
+ delete mode 100644 arch/arm/mach-bcm/bcm63xx_headsmp.S
