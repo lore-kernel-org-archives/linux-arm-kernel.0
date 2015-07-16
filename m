@@ -1,59 +1,83 @@
-From: sonnyrao@chromium.org (Sonny Rao)
-Date: Thu, 16 Jul 2015 11:24:11 -0700
-Subject: [PATCH] ARM: dts: rockchip: add rk3288 arm-pmu irq affinity
-In-Reply-To: <3814250.tDdID2FGKL@diego>
-References: <3814250.tDdID2FGKL@diego>
-Message-ID: <CAPz6YkWqFSGKAhRZ7qz2+XJ=8+0Q8H_mV3+r9MJUKxsBqLDfFQ@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 16 Jul 2015 14:24:54 -0400
+Subject: arm: dts: update for 4.2-rcx
+In-Reply-To: <55A7E1F2.7000100@oracle.com>
+References: <55A7C561.9020406@ti.com> <55A7DE91.7050003@oracle.com>
+ <55A7E0D0.9070104@ti.com> <55A7E1F2.7000100@oracle.com>
+Message-ID: <55A7F6F6.40202@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 2:22 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> The rk3288 uses spi irqs for the arm-pmu on individual cpu cores, so needs
-> the affinity to them defined.
+On 07/16/2015 12:55 PM, santosh shilimkar wrote:
+> On 7/16/2015 9:50 AM, Murali Karicheri wrote:
+>> On 07/16/2015 12:40 PM, santosh shilimkar wrote:
+>>> On 7/16/2015 7:53 AM, Murali Karicheri wrote:
+>>>> Santosh,
+>>>>
+>>>> Do you have my patch for https://lkml.org/lkml/2015/7/15/879 ?
+>>>> This one should be applied to v4.2-rc kernel with priority.
+>>>> Please review and do the needful.
+>>>>
+>>> Yes I have it for next merge window. It won't be qualified as a
+>>> fix rather more of enhancement. Do you have also patches for
+>>> board DTS files which enables PCIE. I can queue them together
+>>> for next merge window.
+>> No this is a fix for v4.2-rc. PCIe driver is not complete without having
+>> a SerDes driver. Currently the version we send is not accepted since the
+>> config blobs are used. On K2E EVM, this causes problem since the EVM has
+>> Marvell SATA controller present and with default values in the SerDes
+>> register, it seems to pass the PCIe link check, but causes issues since
+>> the configuration is not correct. The manifestation is that when EVM is
+>> booted with NFS rootfs, the boot hangs. We can't enable PCIe on this EVM
+>> since to work, SerDes driver has to be present as well. So by default,
+>> the PCIe DT binding should be disabled in SoC specific DTS. It can be
+>> enabled in the board specific DTS when the SerDes device driver is also
+>> present. We plan to upstream a common SerDes driver soon. But at this
+>> point this has to be disabled by default.
+>>
+> Please add this information and respin the patch. Thanks for explaining
+> it.
 >
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/rk3288.dtsi | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
+>> I can provide more details if needed in the patch commit description,
+>> but I though it is not correct to keep the PCIe DT bindings to be
+>> enabled in the SoC specific DTS to begin with. So this is a fix for
+>> v4.2-rc.
+>>
+> Please do. It wasn't clear from the patch description. With above added
+> description its a legitimate fix which I can queue it up for rc's.
 >
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 22e9221..2db91c9 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -78,6 +78,7 @@
->                              <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>,
->                              <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
->         };
->
->         cpus {
-> @@ -110,19 +111,19 @@
->                         clock-latency = <40000>;
->                         clocks = <&cru ARMCLK>;
->                 };
-> -               cpu at 501 {
-> +               cpu1: cpu at 501 {
->                         device_type = "cpu";
->                         compatible = "arm,cortex-a12";
->                         reg = <0x501>;
->                         resets = <&cru SRST_CORE1>;
->                 };
-> -               cpu at 502 {
-> +               cpu2: cpu at 502 {
->                         device_type = "cpu";
->                         compatible = "arm,cortex-a12";
->                         reg = <0x502>;
->                         resets = <&cru SRST_CORE2>;
->                 };
-> -               cpu at 503 {
-> +               cpu3: cpu at 503 {
->                         device_type = "cpu";
->                         compatible = "arm,cortex-a12";
->                         reg = <0x503>;
-> --
-> 2.1.4
+Ok. Will do. Need an additional patch to rename the PCI nodes such that 
+status can be overridden in a board specific DTS.
+
++
++&pcie1 {
++       status = "okay";
++};
+diff --git a/arch/arm/boot/dts/k2e.dtsi b/arch/arm/boot/dts/k2e.dtsi
+index 71e2b1c..0055477 100644
+--- a/arch/arm/boot/dts/k2e.dtsi
++++ b/arch/arm/boot/dts/k2e.dtsi
+@@ -94,7 +94,7 @@
+                         status = "disabled";
+                 };
+
+-               pcie at 21020000 {
++               pcie1: pcie at 21020000 {
+                         compatible = "ti,keystone-pcie","snps,dw-pcie";
+                         clocks = <&clkpcie1>;
+                         clock-names = "pcie";
+
+
+Same for pcie0 in keystone.dtsi. Do you prefer to put both in the same 
+patch or a separate one for this?
+
+Murali
+> Regards,
+> Santosh
 >
 >
 
-Reviewed-by: Sonny Rao <sonnyrao@chromium.org>
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
