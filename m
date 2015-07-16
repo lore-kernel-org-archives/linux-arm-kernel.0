@@ -1,59 +1,29 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 16 Jul 2015 10:14:11 -0700
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
- the irqdomain of the GIC.
-In-Reply-To: <55A7E52D.9080201@arm.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
- <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
- <55A75F8B.3080009@arm.com> <55A7E0C2.8020704@caviumnetworks.com>
- <55A7E52D.9080201@arm.com>
-Message-ID: <55A7E663.9030000@caviumnetworks.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 16 Jul 2015 18:16:32 +0100
+Subject: [PATCH v2 19/20] xen/privcmd: Add support for Linux 64KB page
+ granularity
+In-Reply-To: <alpine.DEB.2.02.1507161707300.17378@kaball.uk.xensource.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-20-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1507161707300.17378@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1507161815350.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 10:09 AM, Marc Zyngier wrote:
-> On 16/07/15 17:50, David Daney wrote:
-[...]
->>> Patch 5 has established that you're using "virtual wire" SPIs, so we
->>> need to work on exposing that with the normal kernel abstraction, and
->>> not by messing with the internals of the GIC.
->>>
->>
->> Agreed.
->>
->> The MSI system has pci_enable_msix()/pci_disable_msix().
->>
->> I would propose something like:
->>
->> struct gic_spi_entry {
->> 	int spi   /* SPI number */
->> 	int irq;  /* kernel irq number mapped to the spi*/
->> 	u32 msg;  /* message to be written */
->> 	u64 assert_addr;
->> 	u64 deassert_addr;
->> };
->>
->> /* Fill in the SPI processing information */
->> int gic_map_spi(int spi, struct gic_spi_entry *data);
->
-> Neither.
->
-> The way to do it is to make this a *separate* IRQ domain stacked onto
-> the SPI domain. No funky hook on the side. If it doesn't go through the
-> normal kernel API, it doesn't reach the GIC.
+On Thu, 16 Jul 2015, Stefano Stabellini wrote:
+> > +	/* setup_hparams guarantees ret == 0 */
+> > +	BUG_ON(xen_apply_to_page(page, setup_hparams, info));
+> > +
+> > +	set_xen_guest_handle(xatp.idxs, info->h_idxs);
+> > +	set_xen_guest_handle(xatp.gpfns, info->h_gpfns);
+> > +	set_xen_guest_handle(xatp.errs, info->h_errs);
+> > +	xatp.size = info->h_iter;
+> > +
+> > +	rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
+> 
+> I would have thought that XENMEM_add_to_physmap_range operates at 4K
+> granularity, regardless of how the guest decides to layout its
+> pagetables. If so, the call to XENMEM_add_to_physmap_range needs to be
+> moved within the function passed to xen_apply_to_page.
 
-Yes, the irqdomain does handle mapping SPI -> irq, and the message can 
-be derived from the SPI.  However, the irqdomain infrastructure cannot 
-supply values for either assert_addr or deassert_addr.
-
-Those are needed in order to use SPI.  How would you suggest that they 
-be obtained?
-
-
-David Daney
-
-
->
-> 	M.
->
+Sorry, this comment is wrong, please ignore it. The others are OK.
