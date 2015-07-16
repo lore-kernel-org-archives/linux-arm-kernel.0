@@ -1,107 +1,35 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 16 Jul 2015 21:55:34 +0200
-Subject: [PATCH 04/18] KVM: ARM64: Add reset and access handlers for
- PMCR_EL0 register
-In-Reply-To: <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20150716195534.GD14024@cbox>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 16 Jul 2015 21:57:35 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+In-Reply-To: <2694937.qjRpGCMvqj@wuerfel>
+References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+ <2120032.PN20RpmoKe@wuerfel>
+ <CACRpkdaL6DHChx7mSWiGk65LZNxkMGtw=aef2zyHaE7dDhXz8A@mail.gmail.com>
+ <2694937.qjRpGCMvqj@wuerfel>
+Message-ID: <CACRpkdb3k+s65tOR13iKNLqJ+CWvxSH6d3Z2Ra4OJ9rw+t2Q3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:17:34AM +0800, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Add reset handler which gets host value of PMCR_EL0 and make writable
-> bits architecturally UNKNOWN. Add access handler which emulates
-> writing and reading PMCR_EL0 register.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 40 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index c370b40..152ee17 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -33,6 +33,7 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_host.h>
->  #include <asm/kvm_mmu.h>
-> +#include <asm/pmu.h>
->  
->  #include <trace/events/kvm.h>
->  
-> @@ -236,6 +237,44 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
->  }
->  
-> +static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> +{
-> +	u32 pmcr;
-> +
-> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
-> +	vcpu_sys_reg(vcpu, PMCR_EL0) = (pmcr & ~ARMV8_PMCR_MASK)
-> +				       | (ARMV8_PMCR_MASK & 0xdecafbad);
+On Thu, Jul 16, 2015 at 4:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 16 July 2015 16:03:18 Linus Walleij wrote:
 
-You could add a comment that this resets to UNKNOWN as to not make
-people confused about the pseudo-random hex value.
+>> The aliases are set also to disabled ports to ensure enumeration
+>> for the cases where a board file enabled a previously disabled
+>> UART.
+>>
+>
+> Well, both really. The status property tells the kernel to not
+> ever touch a device, while the alias is what traditionally gets
+> used to assign an OS visible device name to a device in the tree.
+> This is more true for MacOS and AIX than Linux, which sometimes
+> does its own naming, but we really should not have an alias pointing
+> at a disabled device node.
 
-Have we thought about whether we want to tell the guest that it has the
-same PMU as available on the real hardware, or does the virtualization
-layer suggest to us that we should adjust this somehow?
+OK ... I will make a patch that remove the aliases for the disabled
+nodes.
 
+But this makes me think of whether the DT compiler should allow
+it or at least warn about it?
 
-> +}
-> +
-> +/* PMCR_EL0 accessor. Only called as long as MDCR_EL2.TPMCR is set. */
-> +static bool access_pmcr(struct kvm_vcpu *vcpu,
-> +			const struct sys_reg_params *p,
-> +			const struct sys_reg_desc *r)
-> +{
-> +	unsigned long val;
-> +
-> +	if (p->is_write) {
-> +		/* Only update writeable bits of PMCR */
-> +		if (!p->is_aarch32)
-> +			val = vcpu_sys_reg(vcpu, r->reg);
-> +		else
-> +			val = vcpu_cp15(vcpu, r->reg);
-
-don't you need to add this function as the handler in the cp15_regs
-array as well?
-
-> +		val &= ~ARMV8_PMCR_MASK;
-> +		val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
-> +		if (!p->is_aarch32)
-> +			vcpu_sys_reg(vcpu, r->reg) = val;
-> +		else
-> +			vcpu_cp15(vcpu, r->reg) = val;
-> +	} else {
-> +		if (!p->is_aarch32)
-> +			*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
-> +		else
-> +			*vcpu_reg(vcpu, p->Rt) = vcpu_cp15(vcpu, r->reg);
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -427,7 +466,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  
->  	/* PMCR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
-> -	  trap_raz_wi },
-> +	  access_pmcr, reset_pmcr_el0, PMCR_EL0, },
->  	/* PMCNTENSET_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
->  	  trap_raz_wi },
-> -- 
-> 2.1.0
-> 
-Thanks,
--Christoffer
+Yours,
+Linus Walleij
