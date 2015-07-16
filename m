@@ -1,63 +1,98 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu, 16 Jul 2015 17:01:57 +0100
-Subject: [PATCH 3/5] arm64: kernel: Add min/max values in feature-detection
- register values.
+Date: Thu, 16 Jul 2015 17:01:58 +0100
+Subject: [PATCH 4/5] arm64: kernel: Add optional CONFIG_ parameter to
+ ALTERNATIVE().
 In-Reply-To: <1437062519-18883-1-git-send-email-james.morse@arm.com>
 References: <1437062519-18883-1-git-send-email-james.morse@arm.com>
-Message-ID: <1437062519-18883-4-git-send-email-james.morse@arm.com>
+Message-ID: <1437062519-18883-5-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a new cpu feature is available, the cpu feature bits will be 0001,
-when features are updated, this value will be incremented. This patch
-changes 'register_value' to be '{min,max}_register_value', and checks
-the value falls in this range.
+Some uses of ALTERNATIVE() may depend on a feature that is disabled at
+compile time by a Kconfig option. In this case the unused alternative
+instructions waste space, and if the original instruction is a nop, it
+wastes time and space.
+
+This patch adds an optional 'config' option to ALTERNATIVE() and
+alternative_insn that allows the compiler to remove both the original
+and alternative instructions if the config option is not defined.
 
 Signed-off-by: James Morse <james.morse@arm.com>
+Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 3 ++-
- arch/arm64/kernel/cpufeature.c      | 6 ++++--
- 2 files changed, 6 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/alternative.h | 28 +++++++++++++++++++++++++---
+ 1 file changed, 25 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index a8a201ab6cd1..680a6a1f087e 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -43,7 +43,8 @@ struct arm64_cpu_capabilities {
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index c385a0c4057f..5598182dea28 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -3,6 +3,7 @@
  
- 		struct {	/* Feature register checking */
- 			u64 register_mask;
--			u64 register_value;
-+			u64 min_register_value;
-+			u64 max_register_value;
- 		};
- 	};
- };
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 650ffc28bedc..f260affb825c 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -28,7 +28,8 @@ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
- 	u64 val;
+ #ifndef __ASSEMBLY__
  
- 	val = read_cpuid(id_aa64pfr0_el1);
--	return (val & entry->register_mask) == entry->register_value;
-+	return ((val & entry->register_mask) >= entry->min_register_value &&
-+		(val & entry->register_mask) <= entry->max_register_value);
- }
++#include <linux/kconfig.h>
+ #include <linux/types.h>
+ #include <linux/stddef.h>
+ #include <linux/stringify.h>
+@@ -40,7 +41,8 @@ void free_alternatives_memory(void);
+  * be fixed in a binutils release posterior to 2.25.51.0.2 (anything
+  * containing commit 4e4d08cf7399b606 or c1baaddf8861).
+  */
+-#define ALTERNATIVE(oldinstr, newinstr, feature)			\
++#define __ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg_enabled)	\
++	".if "__stringify(cfg_enabled)" == 1\n"				\
+ 	"661:\n\t"							\
+ 	oldinstr "\n"							\
+ 	"662:\n"							\
+@@ -53,7 +55,11 @@ void free_alternatives_memory(void);
+ 	"664:\n\t"							\
+ 	".popsection\n\t"						\
+ 	".org	. - (664b-663b) + (662b-661b)\n\t"			\
+-	".org	. - (662b-661b) + (664b-663b)\n"
++	".org	. - (662b-661b) + (664b-663b)\n"			\
++	".endif\n"
++
++#define _ALTERNATIVE_CFG(oldinstr, newinstr, feature, cfg, ...)	\
++	__ALTERNATIVE_CFG(oldinstr, newinstr, feature, IS_ENABLED(cfg))
  
- static const struct arm64_cpu_capabilities arm64_features[] = {
-@@ -37,7 +38,8 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
- 		.matches = has_id_aa64pfr0_feature,
- 		.register_mask = (0xf << 24),
--		.register_value = (1 << 24),
-+		.min_register_value = (1 << 24),
-+		.max_register_value = (1 << 24),
- 	},
- 	{},
- };
+ #else
+ 
+@@ -65,7 +71,8 @@ void free_alternatives_memory(void);
+ 	.byte \alt_len
+ .endm
+ 
+-.macro alternative_insn insn1 insn2 cap
++.macro alternative_insn insn1, insn2, cap, enable = 1
++	.if \enable
+ 661:	\insn1
+ 662:	.pushsection .altinstructions, "a"
+ 	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+@@ -75,8 +82,23 @@ void free_alternatives_memory(void);
+ 664:	.popsection
+ 	.org	. - (664b-663b) + (662b-661b)
+ 	.org	. - (662b-661b) + (664b-663b)
++	.endif
+ .endm
+ 
++#define _ALTERNATIVE_CFG(insn1, insn2, cap, cfg, ...)	\
++	alternative_insn insn1, insn2, cap, IS_ENABLED(cfg)
++
++
+ #endif  /*  __ASSEMBLY__  */
+ 
++/*
++ * Usage: asm(ALTERNATIVE(oldinstr, newinstr, feature));
++ *
++ * Usage: asm(ALTERNATIVE(oldinstr, newinstr, feature, CONFIG_FOO));
++ * N.B. If CONFIG_FOO is specified, but not selected, the whole block
++ *      will be omitted, including oldinstr.
++ */
++#define ALTERNATIVE(oldinstr, newinstr, ...)   \
++	_ALTERNATIVE_CFG(oldinstr, newinstr, __VA_ARGS__, 1)
++
+ #endif /* __ASM_ALTERNATIVE_H */
 -- 
 2.1.4
