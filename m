@@ -1,51 +1,28 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Thu, 16 Jul 2015 17:40:44 +0000
-Subject: [PATCH] arm64: KVM: Enable minimalistic support for Thunder
-In-Reply-To: <55917C31.4060107@arm.com>
-References: <1435348284-32132-1-git-send-email-tchalamarla@caviumnetworks.com>
- <55910794.6000107@arm.com>
- <AED13EAB-D578-451F-AC35-A45A21816076@caviumnetworks.com>
- <55917C31.4060107@arm.com>
-Message-ID: <A6A516DF-5394-4249-AC07-71BAF2384B6B@caviumnetworks.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 16 Jul 2015 19:44:20 +0200
+Subject: [PATCH 4/7] Documentation: mtd: add a DT property to set the
+ latency code of Spansion memory
+In-Reply-To: <398ca9f17bda638e05e97f258fb4e6d27ac828db.1437059658.git.cyrille.pitchen@atmel.com>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+ <398ca9f17bda638e05e97f258fb4e6d27ac828db.1437059658.git.cyrille.pitchen@atmel.com>
+Message-ID: <201507161944.20523.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the discussion on the generic cpu seems to be stuck, is there a possibility to take this patch. so that Thunder has a chance to run some KVM.
+On Thursday, July 16, 2015 at 05:27:51 PM, Cyrille Pitchen wrote:
 
-Thanks,
-Tirumalesh.  
-> On Jun 29, 2015, at 10:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> 
-> On 29/06/15 18:06, Chalamarla, Tirumalesh wrote:
->> 
->>> On Jun 29, 2015, at 1:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> 
->>> On 26/06/15 20:51, Tirumalesh Chalamarla wrote:
->>>> In order to allow KVM to run on Thunder implementations, add the
->>>> minimal support required.
->>>> 
->>>> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@caviumnetworks.com>
->>> 
->>> CCing the KVM/ARM maintainers should be the first course of action.
->>> 
->> thanks. 
->> 
->>> Also, you may want to try Suzuki's patch instead:
->>> 
->>> http://www.spinics.net/lists/kvm/msg117703.html
->>> 
->> will try with this.
->> 
->>> Constantly adding new CPUs without providing any insight as to how they
->>> should be emulated only brings churn, and not much benefit.
->>> 
->> we are not planning(at this point) to emulate Thunder with QEMU/others.   
-> 
-> Fair enough. If cross-cpu VM migration is none of your concern, then
-> Suzuki's patch should be enough.
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+Hi!
+
+> Both the SPI controller and the NOR flash memory need to agree on the
+> number of dummy cycles to use for Fast Read commands. For Spansion
+> memories, this number of dummy cycles is not given directly but through a
+> so called "latency code".
+> The latency code can be found into the memory datasheet and depends on the
+> SPI clock frequency, the Fast Read op code and the Single/Dual Data Rate
+> mode.
+
+Shouldn't you be able to derive the latency code from the above information,
+which you already know then ?
+
+Best regards,
+Marek Vasut
