@@ -1,64 +1,53 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jul 2015 10:37:44 +0100
-Subject: [PATCH 1/3] nmi: create generic NMI backtrace implementation
-In-Reply-To: <55A7753C.9020708@linaro.org>
+Date: Thu, 16 Jul 2015 10:39:02 +0100
+Subject: [PATCH 3/3] ARM: add basic support for on-demand backtrace of
+ other CPUs
+In-Reply-To: <55A775B6.8080505@linaro.org>
 References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
- <E1ZFTSm-0006uz-3s@rmk-PC.arm.linux.org.uk>
- <55A7753C.9020708@linaro.org>
-Message-ID: <20150716093744.GI7557@n2100.arm.linux.org.uk>
+ <E1ZFTSw-0006vI-C2@rmk-PC.arm.linux.org.uk>
+ <55A775B6.8080505@linaro.org>
+Message-ID: <20150716093901.GJ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 10:11:24AM +0100, Daniel Thompson wrote:
+On Thu, Jul 16, 2015 at 10:13:26AM +0100, Daniel Thompson wrote:
 > On 15/07/15 21:39, Russell King wrote:
-> >+void nmi_trigger_all_cpu_backtrace(bool include_self,
-> >+				   void (*raise)(cpumask_t *mask))
-> >+{
-> >+	struct nmi_seq_buf *s;
-> >+	int i, cpu, this_cpu = get_cpu();
-> >+
-> >+	if (test_and_set_bit(0, &backtrace_flag)) {
-> >+		/*
-> >+		 * If there is already a trigger_all_cpu_backtrace() in progress
-> >+		 * (backtrace_flag == 1), don't output double cpu dump infos.
-> >+		 */
-> >+		put_cpu();
-> >+		return;
-> >+	}
-> >+
-> >+	cpumask_copy(to_cpumask(backtrace_mask), cpu_online_mask);
-> >+	if (!include_self)
-> >+		cpumask_clear_cpu(this_cpu, to_cpumask(backtrace_mask));
-> >+
-> >+	cpumask_copy(&printtrace_mask, to_cpumask(backtrace_mask));
-> >+
-> >+	/*
-> >+	 * Set up per_cpu seq_buf buffers that the NMIs running on the other
-> >+	 * CPUs will write to.
-> >+	 */
-> >+	for_each_cpu(cpu, to_cpumask(backtrace_mask)) {
-> >+		s = &per_cpu(nmi_print_seq, cpu);
-> >+		seq_buf_init(&s->seq, s->buffer, NMI_BUF_SIZE);
-> >+	}
-> >+
-> >+	if (!cpumask_empty(to_cpumask(backtrace_mask))) {
-> >+		pr_info("Sending NMI to %s CPUs:\n",
-> >+			(include_self ? "all" : "other"));
-> >+		raise(to_cpumask(backtrace_mask));
+> >As we now have generic infrastructure to support backtracing of other
+> >CPUs in the system on lockups, we can start to implement this for ARM.
+> >Initially, we add an IPI based implementation, as the GIC code needs
+> >modification to support the generation of FIQ IPIs, and not all ARM
+> >platforms have the ability to raise a FIQ in the non-secure world.
+> >
+> >This provides us with a "best efforts" implementation in the absence
+> >of FIQs.
+> >
+> >Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> >---
+> >diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> >index 90dfbedfbfb8..3a20c386fd33 100644
+> >--- a/arch/arm/kernel/smp.c
+> >+++ b/arch/arm/kernel/smp.c
+> >@@ -21,6 +21,7 @@
+> >  #include <linux/cpu.h>
+> >  #include <linux/seq_file.h>
+> >  #include <linux/irq.h>
+> >+#include <linux/nmi.h>
+> >  #include <linux/percpu.h>
+> >  #include <linux/clockchips.h>
+> >  #include <linux/completion.h>
+> >@@ -72,6 +73,7 @@ enum ipi_msg_type {
+> >  	IPI_CPU_STOP,
+> >  	IPI_IRQ_WORK,
+> >  	IPI_COMPLETION,
+> >+	IPI_CPU_BACKTRACE = 15,
 > 
-> On ARM, this code could be running with IRQs locked and with raise()
-> implemented using IRQs. In such as case the IPI will not be raised until the
-> function exists (and perhaps never). Thanks to the timeout we will exit but
-> we end up needlessly failing to print a backtrace for the calling CPU.
-> 
-> The solution I used for this was to special case the current CPU and call
-> nmi_cpu_backtrace() directly. Originally I made this logic arm only but I
-> can't really see any reason for this to be arch specific so the logic to do
-> that should probably be included here.
+> Even with the potential for (eventually) being signalled by FIQ, is this IPI
+> really so special it needs to be placed outside the scope of NR_IPI and the
+> accounting and tracing support it brings with it?
 
-That can be implemented in the arch raise() method if needed - most
-architectures shouldn't need it as if they are properly raising a NMI
-which is, by definition, deliverable with normal IRQs disabled.
+That's exactly why it's placed outside that range.  We don't want the
+accounting and tracing stuff at all in that path - that's more code which
+needs to be run which could be the cause of the lockup.  More fragility.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
