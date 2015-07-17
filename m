@@ -1,42 +1,77 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 17 Jul 2015 13:07:35 +0200
-Subject: [PATCH] drm/i2c: tda998x: Fix bad checksum of the HDMI AVI infoframe
-Message-ID: <mailman.5.1437133216.1755.linux-arm-kernel@lists.infradead.org>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Fri, 17 Jul 2015 19:40:25 +0800
+Subject: [PATCH 03/18] KVM: ARM64: Add offset defines for PMU registers
+In-Reply-To: <20150717101738.GM14024@cbox>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-4-git-send-email-shannon.zhao@linaro.org>
+ <20150716184509.GC14024@cbox> <55A8BBE2.7010900@linaro.org>
+ <20150717101738.GM14024@cbox>
+Message-ID: <55A8E9A9.9080506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 8c7a075da9f7980cc95ffcd7e6621d4a87f20f40
- "use drm_hdmi_avi_infoframe_from_display_mode()"
-also uses hdmi_avi_infoframe_pack() to create the AVI infoframe.
-This function sets the checksum of the frame and this breks
-the second calculation of the checksum done in tda998x_write_if().
 
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index fe1599d..424228b 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -606,8 +606,6 @@ static void
- tda998x_write_if(struct tda998x_priv *priv, uint8_t bit, uint16_t addr,
- 		 uint8_t *buf, size_t size)
- {
--	buf[PB(0)] = tda998x_cksum(buf, size);
--
- 	reg_clear(priv, REG_DIP_IF_FLAGS, bit);
- 	reg_write_range(priv, addr, buf, size);
- 	reg_set(priv, REG_DIP_IF_FLAGS, bit);
-@@ -627,6 +625,8 @@ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
- 	buf[PB(4)] = p->audio_frame[4];
- 	buf[PB(5)] = p->audio_frame[5] & 0xf8; /* DM_INH + LSV */
- 
-+	buf[PB(0)] = tda998x_cksum(buf, sizeof(buf));
-+
- 	tda998x_write_if(priv, DIP_IF_FLAGS_IF4, REG_IF4_HB0, buf,
- 			 sizeof(buf));
- }
+On 2015/7/17 18:17, Christoffer Dall wrote:
+> On Fri, Jul 17, 2015 at 04:25:06PM +0800, Shannon Zhao wrote:
+>>
+>>
+>> On 2015/7/17 2:45, Christoffer Dall wrote:
+>>> On Mon, Jul 06, 2015 at 10:17:33AM +0800, shannon.zhao at linaro.org wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>
+>>>> We are about to trap and emulate acccesses to each PMU register
+>>>> individually. This adds the context offsets for the AArch64 PMU
+>>>> registers and their AArch32 counterparts.
+>>>>
+>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> ---
+>>>>   arch/arm64/include/asm/kvm_asm.h | 59 +++++++++++++++++++++++++++++++++++-----
+>>>>   1 file changed, 52 insertions(+), 7 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>>> index 3c5fe68..21b5d3b 100644
+>>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>>> @@ -56,14 +56,36 @@
+>>>>   #define DBGWVR15_EL1	86
+>>>>   #define MDCCINT_EL1	87	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+>>>>
+>>>> +/* Performance Monitors Registers */
+>>>> +#define PMCR_EL0	88	/* Control Register */
+>>>> +#define PMOVSSET_EL0	89	/* Overflow Flag Status Set Register */
+>>>> +#define PMOVSCLR_EL0	90	/* Overflow Flag Status Clear Register */
+>>>> +#define PMCCNTR_EL0	91	/* Cycle Counter Register */
+>>>> +#define PMSELR_EL0	92	/* Event Counter Selection Register */
+>>>> +#define PMCEID0_EL0	93	/* Common Event Identification Register 0 */
+>>>> +#define PMCEID1_EL0	94	/* Common Event Identification Register 1 */
+>>>> +#define PMEVCNTR0_EL0	95	/* Event Counter Register (0-30) */
+>>>
+>>> why do we need these when we trap-and-emulate and we have the kvm_pmc
+>>> structs?
+>> This just makes the guest work when accessing these registers.
+>>
+>>> Is that because the kvm_pmc structs are only used when we
+>>> actually have an active counter running and registered with perf?
+>>>
+>>
+>> Right, the kvm_pmc structs are used to store the status of perf evnets,
+>> like the event type, count number of this perf event.
+>>
+>> On the other hand, the kernel perf codes will not directly access to the
+>> PMEVCNTRx_EL0 and PMEVTYPERx_EL0 registers. It will firstly write the
+>> index of select counter to PMSELR_EL0 and access to PMXEVCNTR_EL0 or
+>> PMXEVTYPER_EL0. Then this is architecturally mapped to PMEVCNTRx_EL0 and
+>> PMEVTYPERx_EL0.
+>>
+>
+> I'm just wondering if it makes sense to keep virtual state around for
+> all these registers, since we don't emulate the counter values, so why
+> do we need to preserve any virtual cpu state for all of them?
+>
+
+Good point. Will remove this :)
+
+Thanks,
 -- 
-2.1.4
+Shannon
