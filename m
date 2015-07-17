@@ -1,206 +1,304 @@
-From: fugang.duan@freescale.com (Duan Andy)
-Date: Fri, 17 Jul 2015 01:29:39 +0000
-Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
- blocking calls in the cpu hotplug notifier
-In-Reply-To: <CAJKOXPciVVa9ErvUWGeWM0sVEDefaohBGY6Ms3zSX1FzZiROvA@mail.gmail.com>
-References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
- <1437008972-9140-174-git-send-email-kamal@canonical.com>
- <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAJKOXPf3ik5XahaK-fv0EOFhPHpO1aQ7PGxbAMrGiSrK4j1EYA@mail.gmail.com>
- <BLUPR03MB373D7ABAC272AD28D656A40F5990@BLUPR03MB373.namprd03.prod.outlook.com>
- <CAJKOXPciVVa9ErvUWGeWM0sVEDefaohBGY6Ms3zSX1FzZiROvA@mail.gmail.com>
-Message-ID: <BY2PR03MB377BDFE34CCBDDDEDE7329CF5980@BY2PR03MB377.namprd03.prod.outlook.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 17 Jul 2015 11:04:48 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>	<1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>	<20150714225105.6c1e4f15@gandalf.local.home>	<55A646EE.6030402@linaro.org>	<20150715105536.42949ea9@gandalf.local.home>
+ <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
+ <55A703F3.8050203@linaro.org>
+ <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
+Message-ID: <55A862C0.4040101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Krzysztof Kozlowski <k.kozlowski@samsung.com> Sent: Thursday, July 16, 2015 5:52 PM
-> To: Duan Fugang-B38611
-> Cc: Krzysztof Kozlowski; Kamal Mostafa; daniel.lezcano at linaro.org; linux-
-> kernel at vger.kernel.org; stable at vger.kernel.org; Damian Eppel;
-> kgene at kernel.org; kyungmin.park at samsung.com; Thomas Gleixner;
-> m.szyprowski at samsung.com; linux-arm-kernel at lists.infradead.org; kernel-
-> team at lists.ubuntu.com
-> Subject: Re: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
-> blocking calls in the cpu hotplug notifier
-> 
-> 2015-07-16 17:14 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
-> > From: Krzysztof Kozlowski <k.kozlowski@samsung.com> Sent: Thursday,
-> > July 16, 2015 2:56 PM
-> >> To: Duan Fugang-B38611
-> >> Cc: Kamal Mostafa; linux-kernel at vger.kernel.org;
-> >> stable at vger.kernel.org; kernel-team at lists.ubuntu.com;
-> >> daniel.lezcano at linaro.org; Damian Eppel; kyungmin.park at samsung.com;
-> >> kgene at kernel.org; Thomas Gleixner; linux-arm-
-> >> kernel at lists.infradead.org; m.szyprowski at samsung.com
-> >> Subject: Re: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct:
-> >> Avoid blocking calls in the cpu hotplug notifier
-> >>
-> >> 2015-07-16 15:37 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
-> >> > From: Kamal Mostafa <kamal@canonical.com> Sent: Thursday, July 16,
-> >> > 2015 9:08 AM
-> >> >> To: linux-kernel at vger.kernel.org; stable at vger.kernel.org; kernel-
-> >> >> team at lists.ubuntu.com
-> >> >> Cc: Kamal Mostafa; daniel.lezcano at linaro.org;
-> >> >> kyungmin.park at samsung.com; Damian Eppel; kgene at kernel.org; Thomas
-> >> >> Gleixner; linux-arm- kernel at lists.infradead.org;
-> >> >> m.szyprowski at samsung.com
-> >> >> Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
-> >> >> blocking calls in the cpu hotplug notifier
-> >> >>
-> >> >> 3.19.8-ckt4 -stable review patch.  If anyone has any objections,
-> >> >> please let me know.
-> >> >>
-> >> >> ------------------
-> >> >>
-> >> >> From: Damian Eppel <d.eppel@samsung.com>
-> >> >>
-> >> >> commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
-> >> >>
-> >> >> Whilst testing cpu hotplug events on kernel configured with
-> >> >> DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
-> >> >> caused by calling
-> >> >> request_irq() and free_irq() in the context of hotplug
-> >> >> notification (which is in this case atomic context).
-> >> >>
-> >> >> [   40.785859] CPU1: Software reset
-> >> >> [   40.786660] BUG: sleeping function called from invalid context
-> at
-> >> >> mm/slub.c:1241
-> >> >> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name:
-> >> >> swapper/1
-> >> >> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
-> >> >> [   40.786681]
-> >> >> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-
-> rc4-
-> >> >> 00024-g7dca860 #36
-> >> >> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> >> >> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>]
-> >> >> (show_stack+0x10/0x14)
-> >> >> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>]
-> >> >> (dump_stack+0x70/0xbc)
-> >> >> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>]
-> >> >> (kmem_cache_alloc+0xd8/0x170)
-> >> >> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>]
-> >> >> (request_threaded_irq+0x64/0x128)
-> >> >> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>]
-> >> >> (exynos4_local_timer_setup+0xc0/0x13c)
-> >> >> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from
-> >> [<c0350ca8>]
-> >> >> (exynos4_mct_cpu_notify+0x30/0xa8)
-> >> >> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from
-> [<c003b330>]
-> >> >> (notifier_call_chain+0x44/0x84)
-> >> >> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>]
-> >> >> (__cpu_notify+0x28/0x44)
-> >> >> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>]
-> >> >> (secondary_start_kernel+0xec/0x150)
-> >> >> [   40.786886] [<c0013714>] (secondary_start_kernel) from
-> [<40008764>]
-> >> >> (0x40008764)
-> >> >>
-> >> >> Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
-> >> >> notifications which run on the hotplugged cpu with interrupts and
-> >> >> preemption disabled.
-> >> >>
-> >> >> To avoid the issue, request the interrupts for all possible cpus
-> >> >> in the boot code. The interrupts are marked NO_AUTOENABLE to avoid
-> >> >> a racy
-> >> >> request_irq/disable_irq() sequence. The flag prevents the
-> >> >> request_irq() code from enabling the interrupt immediately.
-> >> >>
-> >> >> The interrupt is then enabled in the CPU_STARTING notifier of the
-> >> >> hotplugged cpu and again disabled with disable_irq_nosync() in the
-> >> >> CPU_DYING notifier.
-> >> >>
-> >> >> [ tglx: Massaged changelog to match the patch ]
-> >> >>
-> >> >> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use
-> >> >> (request/free)_irq calls for local timer registration")
-> >> >> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> >> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> >> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> >> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
-> >> >> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
-> >> >> Cc: m.szyprowski at samsung.com
-> >> >> Cc: kyungmin.park at samsung.com
-> >> >> Cc: daniel.lezcano at linaro.org
-> >> >> Cc: kgene at kernel.org
-> >> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> >> Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-
-> >> >> d.eppel at samsung.com
-> >> >> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> >> >> Signed-off-by: Kamal Mostafa <kamal@canonical.com>
-> >> >> ---
-> >> >>  drivers/clocksource/exynos_mct.c | 43
-> >> >> ++++++++++++++++++++++++++++------
-> >> >> ------
-> >> >>  1 file changed, 30 insertions(+), 13 deletions(-)
-> >> >>
-> >> >> diff --git a/drivers/clocksource/exynos_mct.c
-> >> >> b/drivers/clocksource/exynos_mct.c
-> >> >> index 83564c9..c844616 100644
-> >> >> --- a/drivers/clocksource/exynos_mct.c
-> >> >> +++ b/drivers/clocksource/exynos_mct.c
-> >> >> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct
-> >> >> clock_event_device *evt)
-> >> >>       exynos4_mct_write(TICK_BASE_CNT, mevt->base +
-> >> >> MCT_L_TCNTB_OFFSET);
-> >> >>
-> >> >>       if (mct_int_type == MCT_INT_SPI) {
-> >> >> -             evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
-> >> >> -             if (request_irq(evt->irq, exynos4_mct_tick_isr,
-> >> >> -                             IRQF_TIMER | IRQF_NOBALANCING,
-> >> >> -                             evt->name, mevt)) {
-> >> >> -                     pr_err("exynos-mct: cannot register IRQ %d\n",
-> >> >> -                             evt->irq);
-> >> >> +
-> >> >> +             if (evt->irq == -1)
-> >> >>                       return -EIO;
-> >> >> -             }
-> >> >> -             irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
-> >> >> cpumask_of(cpu));
-> >> >> +
-> >> >> +             irq_force_affinity(evt->irq, cpumask_of(cpu));
-> >> >> +             enable_irq(evt->irq);
-> >> >>       } else {
-> >> >>               enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
-> >> >
-> >> > In here, why not use enable_percpu_irq(evt->irq) ?
-> >> >
-> >> >>       }
-> >> >> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct
-> >> >> clock_event_device *evt)  static void
-> >> >> exynos4_local_timer_stop(struct clock_event_device *evt)  {
-> >> >>       evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-> >> >> -     if (mct_int_type == MCT_INT_SPI)
-> >> >> -             free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
-> >> >> -     else
-> >> >> +     if (mct_int_type == MCT_INT_SPI) {
-> >> >> +             if (evt->irq != -1)
-> >> >> +                     disable_irq_nosync(evt->irq);
-> >> >> +     } else {
-> >> >>               disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
-> >> >
-> >> > In here, why not use disable_percpu_irq(evt->irq) ?
-> >>
-> >> You know this is just a semi-automatic stable backport and this was
-> >> already merged to mainline?
-> >>
-> >> Best regards,
-> >> Krzysztof
-> >
-> > Yes, I know. Do you know the reason why not enable other cpus irq ?
-> > I want to confirm whether it is right after below change ?
-> > enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0); ->
-> > enable_percpu_irq(evt->irq, 0);
-> > disable_percpu_irq(mct_irqs[MCT_L0_IRQ]) ->
-> > disable_percpu_irq(evt->irq)
-> 
-> This is a backport so are there any objections about this patch? Do you
-> think the patch is invalid so it should not be backported to stable?
-> 
-No, I just have some questions about the original code design.
-Your patch has no problem.
+Jungseok,
 
-Regards,
-Andy
+Thank you for your testing and reviews.
+
+On 07/16/2015 10:29 PM, Jungseok Lee wrote:
+> On Jul 16, 2015, at 10:08 AM, AKASHI Takahiro wrote:
+>
+> Hi, AKASHI
+>
+>> On 07/16/2015 09:27 AM, AKASHI Takahiro wrote:
+>>> On 07/16/2015 01:13 AM, Steven Rostedt wrote:
+>>>> On Wed, 15 Jul 2015 10:55:36 -0400
+>>>> Steven Rostedt <rostedt@goodmis.org> wrote:
+>>>>
+>>>>
+>>>>> I'll take a look at it and try to clean up the code.
+>>>>
+>>>> Does the  following patch make sense for you?
+>>>
+>>> Looks nice. The patch greatly simplifies changes on arm64 side.
+>>
+>> As follows:
+>>
+>> - Takahiro AKASHI
+>>
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> index c5534fa..868d6f1 100644
+>> --- a/arch/arm64/include/asm/ftrace.h
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -15,6 +15,7 @@
+>>
+>> #define MCOUNT_ADDR		((unsigned long)_mcount)
+>> #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+>> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
+
+Well,
+   #define FTRACE_STACK_FRAME_OFFSET AARCH64_INSN_SIZE
+might be better.
+
+> How about binding it to -4 in unwind_frame function?
+
+Do you mean like this?
+In unwind_frame(),
+   frame->pc = *(unsigned long*)(fp + 8) - AARCH64_INSN_SIZE;
+
+> IMHO, it would help other developers trying to change stack trace code
+> be aware of this stack tracer feature.
+>
+>> #ifndef __ASSEMBLY__
+>> #include <linux/compat.h>
+>> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+>> index 1da6029..2c1bf7d 100644
+>> --- a/include/linux/ftrace.h
+>> +++ b/include/linux/ftrace.h
+>> @@ -260,6 +260,13 @@ static inline void ftrace_kill(void) { }
+>> #endif /* CONFIG_FUNCTION_TRACER */
+>>
+>> #ifdef CONFIG_STACK_TRACER
+>> +/*
+>> + * the offset value to add to return address from save_stack_trace()
+>> + */
+>> +#ifndef FTRACE_STACK_FRAME_OFFSET
+>> +#define FTRACE_STACK_FRAME_OFFSET 0
+>> +#endif
+>> +
+>> extern int stack_tracer_enabled;
+>> int
+>> stack_trace_sysctl(struct ctl_table *table, int write,
+>> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+>> index 9384647..c5b9748 100644
+>> --- a/kernel/trace/trace_stack.c
+>> +++ b/kernel/trace/trace_stack.c
+>> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+>>
+>> 	/* Skip over the overhead of the stack tracer itself */
+>> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+>> -		if (stack_dump_trace[i] == ip)
+>> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+>> 			break;
+>> 	}
+>>
+>> @@ -131,7 +131,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+>> 		p = start;
+>>
+>> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+>> -			if (*p == stack_dump_trace[i]) {
+>> +			if (*p == (stack_dump_trace[i]
+>> +					+ FTRACE_STACK_FRAME_OFFSET)) {
+>> 				stack_dump_trace[x] = stack_dump_trace[i++];
+>> 				this_size = stack_dump_index[x++] =
+>> 					(top - p) * sizeof(unsigned long);
+>> --
+>
+> I've prepared a kernel with the following patches and reviewed them.
+>
+> 1) Steve's clean up patch
+> 2) This patch
+> 3) [RFC 2/3]
+>
+> AFAIU, [RFC 3/3] is not needed any more thanks to Steve's patch.
+
+We don't need [2/3].
+
+> First of all, let's look at the following data.
+>
+> 1) stack_trace data
+>          Depth    Size   Location    (55 entries)
+>          -----    ----   --------
+>    0)     4808      16   notifier_call_chain+0x2c/0x94
+>    1)     4792      64   raw_notifier_call_chain+0x34/0x44
+>    2)     4728      48   timekeeping_update.constprop.9+0xb8/0x114
+>    3)     4680      48   update_wall_time+0x408/0x6dc
+>    4)     4632     128   tick_do_update_jiffies64+0xd8/0x154
+>    5)     4504      80   tick_sched_do_timer+0x50/0x60
+>    6)     4424      32   tick_sched_timer+0x34/0x90
+>    7)     4392      48   __run_hrtimer+0x60/0x258
+>    8)     4344      64   hrtimer_interrupt+0xe8/0x260
+>    9)     4280     128   arch_timer_handler_virt+0x38/0x48
+>   10)     4152      32   handle_percpu_devid_irq+0x84/0x188
+>   11)     4120      64   generic_handle_irq+0x38/0x54
+>   12)     4056      32   __handle_domain_irq+0x68/0xbc
+>   13)     4024      64   gic_handle_irq+0x38/0x88
+>   14)     3960     336   el1_irq+0x64/0xd8
+>   15)     3624      16   netif_rx_internal+0x14/0x198
+>   16)     3608      64   netif_rx+0x20/0xa4
+>   17)     3544      32   loopback_xmit+0x64/0xf4
+>   18)     3512      48   dev_hard_start_xmit+0x25c/0x3f8
+>   19)     3464     160   __dev_queue_xmit+0x440/0x4dc
+>   20)     3304      96   dev_queue_xmit_sk+0x20/0x30
+>   21)     3208      32   ip_finish_output+0x1e0/0xabc
+>   22)     3176      96   ip_output+0xf0/0x120
+>   23)     3080      64   ip_local_out_sk+0x44/0x54
+>   24)     3016      32   ip_send_skb+0x24/0xbc
+>   25)     2984      48   ip_push_pending_frames+0x40/0x60
+>   26)     2936      64   icmp_push_reply+0x104/0x144
+>   27)     2872      96   icmp_send+0x3c0/0x3c8
+>   28)     2776     192   __udp4_lib_rcv+0x5b8/0x684
+>   29)     2584      96   udp_rcv+0x2c/0x3c
+>   30)     2488      32   ip_local_deliver+0xa0/0x224
+>   31)     2456      48   ip_rcv+0x360/0x57c
+>   32)     2408      64   __netif_receive_skb_core+0x4d0/0x80c
+>   33)     2344     128   __netif_receive_skb+0x24/0x84
+>   34)     2216      32   process_backlog+0x9c/0x15c
+>   35)     2184      80   net_rx_action+0x1ec/0x32c
+>   36)     2104     160   __do_softirq+0x114/0x2f0
+>   37)     1944     128   do_softirq+0x60/0x68
+>   38)     1816      32   __local_bh_enable_ip+0xb0/0xd4
+>   39)     1784      32   ip_finish_output+0x1f4/0xabc
+>   40)     1752      96   ip_output+0xf0/0x120
+>   41)     1656      64   ip_local_out_sk+0x44/0x54
+>   42)     1592      32   ip_send_skb+0x24/0xbc
+>   43)     1560      48   udp_send_skb+0x1b4/0x2f4
+>   44)     1512      80   udp_sendmsg+0x2a8/0x7a0
+>   45)     1432     272   inet_sendmsg+0xa0/0xd0
+>   46)     1160      48   sock_sendmsg+0x30/0x78
+>   47)     1112      32   ___sys_sendmsg+0x15c/0x26c
+>   48)     1080     400   __sys_sendmmsg+0x94/0x180
+>   49)      680     320   SyS_sendmmsg+0x38/0x54
+>   50)      360     360   el0_svc_naked+0x20/0x28
+>
+> 2) stack_max_size data
+> 4888
+>
+> The data looks odd in two points.
+> 1) the number of entry
+> There is a mismatch between start token and real data
+>
+> 2) 80-byte gap
+> stack_max_size is not aligned with "Depth" field of the first entry of stack_trace.
+>
+> IMHO, two items are not considered in this series as digging them out.
+>
+> 1) skipped entries
+> As x variable is introduced in Steve's patch, it is needed to track down
+> how many entries are recorded in both stack_dump_trace and stack_dump_index.
+>
+> 2) max_stack_trace.skip value
+> max_stack_trace.skip is 0 as applying Steve's patch. The above gap could be
+> observed unless the value is not considered in arch code. In the above example,
+> 80-byte gap is save_stack_trace function in arch/arm64/kernel/stacktrace.c.
+>
+> As applying the following fix, stack_trace and stack_max_size are okay.
+> However, I'm not sure which code, arch or generic ftrace, should handle trace->skip.
+> The latter one is responsible for it under current implementation, not Steve's change.
+>
+> Please correct me if I am wrong.
+
+I will address these issues in my later replies.
+
+Thanks,
+-Takahiro AKASHI
+
+> Best Regards
+> Jungseok Lee
+>
+> ----8<----
+>
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 978c923..5f6f4df 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -137,7 +137,9 @@ void save_stack_trace(struct stack_trace *trace)
+>
+>   	frame.fp = (unsigned long)__builtin_frame_address(0);
+>   	frame.sp = current_stack_pointer;
+> -	frame.pc = (unsigned long)save_stack_trace_tsk;
+> +	frame.pc = (unsigned long)save_stack_trace;
+> +
+> +	trace->skip += 4;
+>
+>   	__save_stack_trace(&frame, trace, 0);
+>   }
+> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+> index c5b9748..5635683 100644
+> --- a/kernel/trace/trace_stack.c
+> +++ b/kernel/trace/trace_stack.c
+> @@ -158,6 +158,9 @@ check_stack(unsigned long ip, unsigned long *stack)
+>   			i++;
+>   	}
+>
+> +	/* We do not want to include skipped entries */
+> +	max_stack_trace.nr_entries -= (i - x);
+> +
+>   	for (; x < max_stack_trace.nr_entries; x++)
+>   		stack_dump_trace[x] = ULONG_MAX;
+>
+> @@ -330,7 +333,7 @@ static int t_show(struct seq_file *m, void *v)
+>   		seq_printf(m, "        Depth    Size   Location"
+>   			   "    (%d entries)\n"
+>   			   "        -----    ----   --------\n",
+> -			   max_stack_trace.nr_entries - 1);
+> +			   max_stack_trace.nr_entries);
+>
+>   		if (!stack_tracer_enabled && !max_stack_size)
+>   			print_disabled(m);
+>
+> ----8<----
+>
+> 1) stack_trace data
+>          Depth    Size   Location    (47 entries)
+>          -----    ----   --------
+>    0)     4648      16   notifier_call_chain+0x2c/0x94
+>    1)     4632      64   raw_notifier_call_chain+0x34/0x44
+>    2)     4568      48   timekeeping_update.constprop.9+0xb8/0x114
+>    3)     4520      48   update_wall_time+0x408/0x6dc
+>    4)     4472     128   tick_do_update_jiffies64+0xd8/0x154
+>    5)     4344      80   tick_sched_do_timer+0x50/0x60
+>    6)     4264      32   tick_sched_timer+0x34/0x90
+>    7)     4232      48   __run_hrtimer+0x60/0x258
+>    8)     4184      64   hrtimer_interrupt+0xe8/0x260
+>    9)     4120     128   arch_timer_handler_virt+0x38/0x48
+>   10)     3992      32   handle_percpu_devid_irq+0x84/0x188
+>   11)     3960      64   generic_handle_irq+0x38/0x54
+>   12)     3896      32   __handle_domain_irq+0x68/0xbc
+>   13)     3864      64   gic_handle_irq+0x38/0x88
+>   14)     3800     336   el1_irq+0x64/0xd8
+>   15)     3464      48   __kmalloc_track_caller+0x40/0x2f8
+>   16)     3416      16   __kmalloc_reserve.isra.46+0x44/0x9c
+>   17)     3400     144   __alloc_skb+0x70/0x180
+>   18)     3256      96   alloc_skb_with_frags+0x74/0x234
+>   19)     3160     112   sock_alloc_send_pskb+0x1d0/0x294
+>   20)     3048     160   sock_alloc_send_skb+0x44/0x54
+>   21)     2888      64   __ip_append_data.isra.40+0x78c/0xb48
+>   22)     2824     224   ip_append_data.part.42+0x98/0xe8
+>   23)     2600     112   ip_append_data+0x68/0x7c
+>   24)     2488      96   icmp_push_reply+0x7c/0x144
+>   25)     2392      96   icmp_send+0x3c0/0x3c8
+>   26)     2296     192   __udp4_lib_rcv+0x5b8/0x684
+>   27)     2104      96   udp_rcv+0x2c/0x3c
+>   28)     2008      32   ip_local_deliver+0xa0/0x224
+>   29)     1976      48   ip_rcv+0x360/0x57c
+>   30)     1928      64   __netif_receive_skb_core+0x4d0/0x80c
+>   31)     1864     128   __netif_receive_skb+0x24/0x84
+>   32)     1736      32   process_backlog+0x9c/0x15c
+>   33)     1704      80   net_rx_action+0x1ec/0x32c
+>   34)     1624     160   __do_softirq+0x114/0x2f0
+>   35)     1464     128   do_softirq+0x60/0x68
+>   36)     1336      32   __local_bh_enable_ip+0xb0/0xd4
+>   37)     1304      32   ip_finish_output+0x1f4/0xabc
+>   38)     1272      96   ip_output+0xf0/0x120
+>   39)     1176      64   ip_local_out_sk+0x44/0x54
+>   40)     1112      32   ip_send_skb+0x24/0xbc
+>   41)     1080      48   udp_send_skb+0x1b4/0x2f4
+>   42)     1032      80   udp_sendmsg+0x2a8/0x7a0
+>   43)      952     272   inet_sendmsg+0xa0/0xd0
+>   44)      680      48   sock_sendmsg+0x30/0x78
+>   45)      632      32   SyS_sendto+0xc4/0x108
+>   46)      600     600   el0_svc_naked+0x20/0x28
+>
+> 2) stack_max_size data
+> 4648
+>
