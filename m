@@ -1,47 +1,79 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 17 Jul 2015 09:01:50 -0400
-Subject: [PATCH v1 1/2] ARM: keystone: dts: fix dt bindings for PCIe
-In-Reply-To: <55A83388.5040306@oracle.com>
-References: <1437083492-28208-1-git-send-email-m-karicheri2@ti.com>
- <55A83388.5040306@oracle.com>
-Message-ID: <55A8FCBE.3090703@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 17 Jul 2015 14:06:41 +0100
+Subject: [Xen-devel] [PATCH v2 13/20] xen/events: fifo: Make it running
+ on 64KB granularity
+In-Reply-To: <55A7D955.5090203@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1507161642130.17378@kaball.uk.xensource.com>
+ <55A7D955.5090203@citrix.com>
+Message-ID: <alpine.DEB.2.02.1507171405210.17378@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 06:43 PM, santosh.shilimkar at oracle.com wrote:
-> On 7/16/15 2:51 PM, Murali Karicheri wrote:
->> Currently PCIe DT bindings are broken. PCIe driver can't function
->> without having a SerDes driver that provide the phy configuration.
->> On K2E EVM, this causes problem since the EVM has Marvell SATA
->> controller present and with default values in the SerDes register,
->> it seems to pass the PCIe link check, but causes issues since
->> the configuration is not correct. The manifestation is that when
->> EVM is booted with NFS rootfs, the boot hangs. We shouldn't enable
->> PCIe on this EVM since to work, SerDes driver has to be present as
->> well. So by default, the PCIe DT binding should be disabled in SoC
->> specific DTS. It can be enabled in the board specific DTS when the
->> SerDes device driver is also present.
->>
->> So fix the status of PCIe DT bindings in the SoC specific DTS to
->> "disabled". To enable PCIe, the status should be set to "ok" in
->> the EVM DTS file when SerDes driver support becomes available in
->> the upstream tree.
->>
->> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
->> ---
->>   - updated commit description to make it clear that it is fix
->>     to be applied to v4.2-rc.
->
-> Just sent pull request with both of these patches from the series.
->
-> Regards,
-> Santosh
->
->
-Thanks Santosh.
+On Thu, 16 Jul 2015, Julien Grall wrote:
+> Hi Stefano,
+> 
+> On 16/07/2015 16:43, Stefano Stabellini wrote:
+> > On Thu, 9 Jul 2015, Julien Grall wrote:
+> > > Only use the first 4KB of the page to store the events channel info. It
+> > > means that we will wast 60KB every time we allocate page for:
+> >                        ^ waste
+> > 
+> > >       * control block: a page is allocating per CPU
+> > >       * event array: a page is allocating everytime we need to expand it
+> > > 
+> > > I think we can reduce the memory waste for the 2 areas by:
+> > > 
+> > >      * control block: sharing between multiple vCPUs. Although it will
+> > >      require some bookkeeping in order to not free the page when the CPU
+> > >      goes offline and the other CPUs sharing the page still there
+> > > 
+> > >      * event array: always extend the array event by 64K (i.e 16 4K
+> > >      chunk). That would require more care when we fail to expand the
+> > >      event channel.
+> > 
+> > But this is not implemented in this series, right?
+> 
+> Yes, it's some ideas to improve the code.
+> 
+> > 
+> > 
+> > > Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> > > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> > > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> > > Cc: David Vrabel <david.vrabel@citrix.com>
+> > > ---
+> > >   drivers/xen/events/events_base.c | 2 +-
+> > >   drivers/xen/events/events_fifo.c | 2 +-
+> > >   2 files changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/drivers/xen/events/events_base.c
+> > > b/drivers/xen/events/events_base.c
+> > > index 96093ae..858d2f6 100644
+> > > --- a/drivers/xen/events/events_base.c
+> > > +++ b/drivers/xen/events/events_base.c
+> > > @@ -40,11 +40,11 @@
+> > >   #include <asm/idle.h>
+> > >   #include <asm/io_apic.h>
+> > >   #include <asm/xen/pci.h>
+> > > -#include <xen/page.h>
+> > >   #endif
+> > >   #include <asm/sync_bitops.h>
+> > >   #include <asm/xen/hypercall.h>
+> > >   #include <asm/xen/hypervisor.h>
+> > > +#include <xen/page.h>
+> > > 
+> > >   #include <xen/xen.h>
+> > >   #include <xen/hvm.h>
+> > 
+> > Spurious change?
+> 
+> No, xen/page.h was only included for x86 before. Now, it's included for every
+> architecture.
+> 
+> This is required in order to get XEN_PAGE_SIZE.
 
-regards,
+Ah, right.
 
--- 
-Murali Karicheri
-Linux Kernel, Keystone
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
