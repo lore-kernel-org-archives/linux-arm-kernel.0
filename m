@@ -1,49 +1,48 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 17 Jul 2015 11:09:26 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150716103445.3e94f0ee@gandalf.local.home>
-References: <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>	<20150714225105.6c1e4f15@gandalf.local.home>	<55A646EE.6030402@linaro.org>	<20150715105536.42949ea9@gandalf.local.home>	<20150715121337.3b31aa84@gandalf.local.home>	<55A6FA82.9000901@linaro.org>	<55A703F3.8050203@linaro.org>	<20150716142834.GD28631@leverpostej>
- <20150716103445.3e94f0ee@gandalf.local.home>
-Message-ID: <55A863D6.7010408@linaro.org>
+From: zhengxing@rock-chips.com (zhengxing)
+Date: Fri, 17 Jul 2015 10:17:25 +0800
+Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
+In-Reply-To: <1437056116.28351.19.camel@tiscali.nl>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
+ <1437033944.27428.11.camel@tiscali.nl> <20150716110032.GU11162@sirena.org.uk>
+ <1437047261.28351.6.camel@tiscali.nl> <20150716125529.GG4039@sirena.org.uk>
+ <1437056116.28351.19.camel@tiscali.nl>
+Message-ID: <55A865B5.7020609@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/16/2015 11:34 PM, Steven Rostedt wrote:
-> On Thu, 16 Jul 2015 15:28:34 +0100
-> Mark Rutland <mark.rutland@arm.com> wrote:
+Hi Paul,
+On 2015?07?16? 22:15, Paul Bolle wrote:
+>
+> That's exactly how I understood MODULE_ALIAS() to work.
+>
+> And it works, in short, because a platform device fires a
+> "MODALIAS=platform:[...]" uevent when it's created. And userspace uses
+> that uevent to load the module carrying that alias.
+>
+> Let's put it this was. If one does
+>      sudo find /sys -perm -o=r -name uevent -exec grep -H MODALIAS=platform: {} \;
+>
+> or
+>      sudo find /sys -perm -o=r -name modalias -exec grep -H platform: {} \;
+>
+> (both lists should be similar)
+>
+> on the systems this patch is targeting, will
+>     platform:rockchip-snd-max98090
+>
+> then show up?
+>
+> Thanks,
 >
 >
->>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->>> index c5534fa..868d6f1 100644
->>> --- a/arch/arm64/include/asm/ftrace.h
->>> +++ b/arch/arm64/include/asm/ftrace.h
->>> @@ -15,6 +15,7 @@
->>>
->>>    #define MCOUNT_ADDR		((unsigned long)_mcount)
->>>    #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
->>> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
->>
->> Is there any reason we couldn't have the arch code dump the stack depth
->> for each function when it walks the stack to generate the stack trace?
->>
->> That means we can provide a more precise result (because we know the
->> layour of our own stackframes), and we only need walk the stack once to
->> do so.
->>
->> The downside is that we need a new function per-arch to do so.
+> Paul Bolle
 >
-> Or we make check_patch() a weak function, and let archs override it. I
-> can possibly break up the code a bit to have helper functions where
-> things are the same.
+Thank you for your patience and detailed explanation.
+I tested your two ways and didn't find the 
+"platform:rockchip-snd-max98090" in my device(kernel v3.14), and the 
+driver path is:
+localhost rockchip-snd-max98090 # pwd
+/sys/bus/platform/drivers/rockchip-snd-max98090
 
-Yeah, that is exactly what I meant in my cover letter[0/3] if the series
-of patches are not acceptable.
-
--Takahiro AKASHI
-
-> I want x86 to be able to track irq stacks as well, but there's no way
-> to do that generically yet, so having arch specific functions has been
-> on my todo list.
->
-> -- Steve
->
+Thanks.
