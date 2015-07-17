@@ -1,8 +1,8 @@
 From: Haikun.Wang@freescale.com (Wang Haikun)
-Date: Fri, 17 Jul 2015 09:00:43 +0000
+Date: Fri, 17 Jul 2015 09:03:28 +0000
 Subject: [PATCH v2] arm: configs: Add Freescale LS1021A defconfig
 References: <1435321164-48981-1-git-send-email-haikun.wang@freescale.com>
-Message-ID: <DM2PR0301MB06239861D12EF29194B99F76F8980@DM2PR0301MB0623.namprd03.prod.outlook.com>
+Message-ID: <DM2PR0301MB06239AFF227230BB15A4634EF8980@DM2PR0301MB0623.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,7 +18,7 @@ On 6/26/2015 8:23 PM, Haikun Wang wrote:
 > Above IPs also been verified successfully.
 >
 > Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
-+ yao yuan
++ yao yuan, re-correct the email address
 
 Best regards,
 Wang Haikun
