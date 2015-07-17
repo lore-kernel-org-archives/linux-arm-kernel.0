@@ -1,57 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jul 2015 15:49:38 +0900
-Subject: [PATCH v2 4/4] mfd: max77686: Split out regulator part from the
- DT binding
-In-Reply-To: <55A8A4BE.1030904@osg.samsung.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-5-git-send-email-javier@osg.samsung.com>
- <CAJKOXPe8rDLCt+Za+Qzkkd4JnFoyKtsFTmMbJL6+3Ark8qFYiQ@mail.gmail.com>
- <55A8A4BE.1030904@osg.samsung.com>
-Message-ID: <CAJKOXPdih+qqGnEZub-hqeVF6POSuSGN-OWnLCgN9cW_5sYb+A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 17 Jul 2015 08:50:30 +0200
+Subject: [PATCH] arm64: remove dead code
+In-Reply-To: <CAKv+Gu_TWN6wGxe4VuuoEzSELbOcqGPtWL_SM4-dFkjai8eLtQ@mail.gmail.com>
+References: <1437069533-22103-1-git-send-email-msalter@redhat.com>
+ <CAKv+Gu_TWN6wGxe4VuuoEzSELbOcqGPtWL_SM4-dFkjai8eLtQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8f7eEYx183qp5RBHns6sNwYEVCZsw=fKFovTe8FSeBVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-17 15:46 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
-> Hello Krzysztof,
+(use Geoff's correct email address)
+
+On 17 July 2015 at 08:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> (adding Geoff and Takahiro)
 >
-> On 07/17/2015 08:42 AM, Krzysztof Kozlowski wrote:
->> 2015-07-17 15:29 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->>> The Maxim MAX77686 PMIC is a multi-function device with regulators,
->>> clocks and a RTC. The DT bindings for the clocks are in a separate
->>> file but the bindings for the regulators are inside the mfd part.
->>>
->>> To make it consistent with the clocks portion of the binding and
->>> because is more natural to look for regulator bindings under the
->>> bindings/regulator sub-directory, split the regulator portion of
->>> the DT binding and add it as a separate file.
->>>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>
->>> ---
->>>
->>> Changes in v2:
->>> - Use a generic name for the max77686 node in the regulator example.
->>>
->>>  Documentation/devicetree/bindings/mfd/max77686.txt | 58 +-----------------
->>>  .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
->>>  2 files changed, 74 insertions(+), 55 deletions(-)
->>>  create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
->>
->> Putting regulator bindings under regulator directory seems logical so
->> I am fine with it.
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> On 16 July 2015 at 19:58, Mark Salter <msalter@redhat.com> wrote:
+>> Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed
+>> soft_reset() from the kernel. This was the only caller of
+>> setup_mm_for_reboot(), so remove that also.
 >>
 >
-> Thanks a lot for your review. For completeness, I talked with Lee Jones
-> over IRC yesterday asking him his opinion on whether MFD DT binding doc
-> should contain all the info or if it should be split across different
-> subsystems and he prefers the later. That's why I re-spun this series.
-
-Okay, this sounds good.
-
-One more thing - can you update the maintainers file? The bindings
-documentation is mentioned there for max77686.
-
-Best regards,
-Krzysztof
+> I am wondering if setup_mm_for_reboot() is being used in the kexec
+> patches. Perhaps we should check that before removing it.
+>
+> Geoff?
+>
+>
+>> Signed-off-by: Mark Salter <msalter@redhat.com>
+>> ---
+>>  arch/arm64/include/asm/mmu.h |  1 -
+>>  arch/arm64/mm/mmu.c          | 11 -----------
+>>  2 files changed, 12 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+>> index 79fcfb0..0302087 100644
+>> --- a/arch/arm64/include/asm/mmu.h
+>> +++ b/arch/arm64/include/asm/mmu.h
+>> @@ -28,7 +28,6 @@ typedef struct {
+>>  #define ASID(mm)       ((mm)->context.id & 0xffff)
+>>
+>>  extern void paging_init(void);
+>> -extern void setup_mm_for_reboot(void);
+>>  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>>  extern void init_mem_pgprot(void);
+>>  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+>> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+>> index a4ede4e..63012fe 100644
+>> --- a/arch/arm64/mm/mmu.c
+>> +++ b/arch/arm64/mm/mmu.c
+>> @@ -461,17 +461,6 @@ void __init paging_init(void)
+>>  }
+>>
+>>  /*
+>> - * Enable the identity mapping to allow the MMU disabling.
+>> - */
+>> -void setup_mm_for_reboot(void)
+>> -{
+>> -       cpu_set_reserved_ttbr0();
+>> -       flush_tlb_all();
+>> -       cpu_set_idmap_tcr_t0sz();
+>> -       cpu_switch_mm(idmap_pg_dir, &init_mm);
+>> -}
+>> -
+>> -/*
+>>   * Check whether a kernel address is valid (derived from arch/x86/).
+>>   */
+>>  int kern_addr_valid(unsigned long addr)
+>> --
+>> 2.4.3
+>>
