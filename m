@@ -1,39 +1,42 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 17 Jul 2015 16:08:02 -0500
-Subject: [PATCH 2/4] ARM: dts: AM4372: Add ti,
- mbox-send-noirq to wkup_m3 mailbox
+Date: Fri, 17 Jul 2015 16:08:04 -0500
+Subject: [PATCH 4/4] ARM: dts: AM4372: Add the wkup_m3_ipc node
 In-Reply-To: <1437167284-25659-1-git-send-email-d-gerlach@ti.com>
 References: <1437167284-25659-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1437167284-25659-3-git-send-email-d-gerlach@ti.com>
+Message-ID: <1437167284-25659-5-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keerthy <j-keerthy@ti.com>
+From: Suman Anna <s-anna@ti.com>
 
-Add ti,mbox-send-noirq to wkup_m3 mailbox so that messages using
-wkup_m3 mailbox are sent without triggering any further interrupts.
-This is required to be able to send multiple messages to the WkupM3
-after the mailbox usage logic adjustment in the wkup_m3_ipc driver.
+Add the Wakeup M3 IPC device node for the wkup_m3_ipc driver on
+AM4372 SoC. This node uses the IPC registers, part of the Control
+Module, and is therefore added as a child of the scm node.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Acked-by: Dave Gerlach <d-gerlach@ti.com>
-[s-anna at ti.com: revise commit description]
 Signed-off-by: Suman Anna <s-anna@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/am4372.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/am4372.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 6f6f393..5bccc48 100644
+index 5bccc48..45bcd1b 100644
 --- a/arch/arm/boot/dts/am4372.dtsi
 +++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -214,6 +214,7 @@
- 			ti,mbox-num-users = <4>;
- 			ti,mbox-num-fifos = <8>;
- 			mbox_wkupm3: wkup_m3 {
-+				ti,mbox-send-noirq;
- 				ti,mbox-tx = <0 0 0>;
- 				ti,mbox-rx = <0 0 3>;
+@@ -136,6 +136,14 @@
+ 					};
+ 				};
+ 
++				wkup_m3_ipc: wkup_m3_ipc at 1324 {
++					compatible = "ti,am4372-wkup-m3-ipc";
++					reg = <0x1324 0x44>;
++					interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++					ti,rproc = <&wkup_m3>;
++					mboxes = <&mailbox &mbox_wkupm3>;
++				};
++
+ 				scm_clockdomains: clockdomains {
+ 				};
  			};
 -- 
 2.4.5
