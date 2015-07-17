@@ -1,27 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 17 Jul 2015 11:34:29 +0800
-Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
- lpsr
-In-Reply-To: <BN3PR03MB15095AD84AD5738B142F6F8CA8990@BN3PR03MB1509.namprd03.prod.outlook.com>
-References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
- <20150715072307.GM4119@tiger>
- <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
- <20150716155034.GN4119@tiger>
- <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
- <BN3PR03MB15095AD84AD5738B142F6F8CA8990@BN3PR03MB1509.namprd03.prod.outlook.com>
-Message-ID: <20150717033429.GC12927@tiger>
+Date: Fri, 17 Jul 2015 11:46:25 +0800
+Subject: [PATCH] input: snvs_pwrkey: add linux prefix for wakeup property
+In-Reply-To: <20150716183408.GD32571@dtor-ws>
+References: <1436930409-6536-1-git-send-email-shawnguo@kernel.org>
+ <CAHrpEqS2o6_B6dNrnWJ06ASWaB0SGxur1o3VuN2A-QywWhbWVA@mail.gmail.com>
+ <20150716183408.GD32571@dtor-ws>
+Message-ID: <20150717034625.GD12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 08:39:33PM +0000, Alonso Adrian wrote:
-> Hi All,
-> 
-> I will sent a new patch series including documentation for pad group id encoding in
-> Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-> 
-> Thanks for your comments :)
+On Thu, Jul 16, 2015 at 11:34:08AM -0700, Dmitry Torokhov wrote:
+> I should have said to use "wakeup-source", not simply "wakeup" so that
+> we'd match with I2C annotation.
 
-Do not get me wrong.  The problem with the patch is not merely missing
-the document update.
+Yeah, consistency is the real motivation of this patch.  I do not
+like that different properties are invented for the same purpose.  As it
+seems that subsystems are all moving to "wakeup-source", I would be
+happy to get it consistent with that.  V2 will be coming soon.
 
 Shawn
