@@ -1,41 +1,29 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 17 Jul 2015 08:22:20 +0200
-Subject: [PATCH 0/2] dmaengine: Add scatter-gathered memset support
-In-Reply-To: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150717062220.GH14886@odux.rfo.atmel.com>
+From: poggi.raph@gmail.com (=?UTF-8?Q?Rapha=C3=ABl_Poggi?=)
+Date: Fri, 17 Jul 2015 08:27:32 +0200
+Subject: [PATCH] ARM: VDSO: fix regression with toolchains lacking ld.bfd
+ executable
+In-Reply-To: <55A82D79.3000106@mentor.com>
+References: <1436934852-27547-1-git-send-email-nathan_lynch@mentor.com>
+ <CACqcpZBnU+17Ob85hYhikQUdNxtNiUs47PGQXfZDQyXYrTgnyg@mail.gmail.com>
+ <55A82D79.3000106@mentor.com>
+Message-ID: <CACqcpZCyfYKbqQK0i3+TwuQfQr=3R2SrstZdvg2Cw5vv3=LJ8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 12:19:22PM +0200, Maxime Ripard wrote:
-> Hi Vinod,
-> 
-> Here is a patch serie that adds a new dmaengine operation for
-> scatter-gathered memset.
-> 
-> Indeed, doing a memset over a discontiguous buffer is quite
-> inefficient at the moment, since you have to create and submit each
-> chunk separately, which might result in a huge list of transfers,
-> while some controllers can handle that just fine.
-> 
-> Let me know what you think,
-> Maxime
-> 
-> Maxime Ripard (2):
->   dmaengine: Add scatter-gathered memset
->   dmaengine: xdmac: Add scatter gathered memset support
-> 
+Yes, I use the CodeBench Lite 2014.05 with gcc 4.8.3
 
-I have forgotten to add it but of course:
-
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-Thanks
-
->  drivers/dma/at_xdmac.c    | 166 +++++++++++++++++++++++++++++++++++++++++++++-
->  include/linux/dmaengine.h |   5 ++
->  2 files changed, 170 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 2.4.5
-> 
+2015-07-17 0:17 GMT+02:00 Nathan Lynch <Nathan_Lynch@mentor.com>:
+> On 07/16/2015 03:34 PM, Rapha?l Poggi wrote:
+>> Hi Nathan,
+>>
+>> I just tested it right now and it works, you can add my:
+>>
+>> Tested-by: Rapha?l Poggi <poggi.raph@gmail.com>
+>
+> Thanks.  Are you also using a CodeBench toolchain, or something else?
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
