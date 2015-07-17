@@ -1,76 +1,94 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 17 Jul 2015 09:56:23 +0200
-Subject: [PATCH] Subject: pinctrl: imx1-core: Fix debug output in
- .pin_config_set callback
-In-Reply-To: <1437118723-19217-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <55A85B59.5060906@gtsys.com.hk>
- <1437118723-19217-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20150717075623.GL26287@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 17 Jul 2015 08:58:03 +0100
+Subject: [RESEND PATCH v3] ARM: tegra124: pmu support
+In-Reply-To: <20150715093511.GA10239@leverpostej>
+References: <1436808945-14524-1-git-send-email-khuey@kylehuey.com>
+ <20150715093511.GA10239@leverpostej>
+Message-ID: <55A8B58B.3040104@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 09:38:43AM +0200, Uwe Kleine-K?nig wrote:
-> imx1_pinconf_set assumes that the array of pins in struct
-> imx1_pinctrl_soc_info can be indexed by pin id to get the
-> pinctrl_pin_desc for a pin. This used to be correct up to commit
-> 607af165c047 which removed some entries from the array and so made it
-> wrong to access the array by pin id.
-> 
-> The result of this bug is a wrong pin name in the output for small pin
-> ids and an oops for the bigger ones.
-> 
-> This patch is the result of a discussion that includes patches by Markus
-> Pargmann and Chris Ruehl.
-> 
-> Fixes: 607af165c047 ("pinctrl: i.MX27: Remove nonexistent pad definitions")
-> Cc: stable at vger.kernel.org
-> Reported-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Reviewed-by: Markus Pargmann <mpa@pengutronix.de>
 
-> ---
->  drivers/pinctrl/freescale/pinctrl-imx1-core.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
+On 15/07/15 10:35, Mark Rutland wrote:
+> On Mon, Jul 13, 2015 at 06:35:45PM +0100, Kyle Huey wrote:
+>> This patch modifies the device tree for tegra124 based devices to enable
+>> the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM
+>> DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
+>>
+>> Updated for proper ordering and to add interrupt-affinity values.
+>>
+>> Signed-off-by: Kyle Huey <khuey@kylehuey.com>
 > 
-> diff --git a/drivers/pinctrl/freescale/pinctrl-imx1-core.c b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> index 5fd4437cee15..88a7fac11bd4 100644
-> --- a/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> +++ b/drivers/pinctrl/freescale/pinctrl-imx1-core.c
-> @@ -403,14 +403,13 @@ static int imx1_pinconf_set(struct pinctrl_dev *pctldev,
->  			     unsigned num_configs)
->  {
->  	struct imx1_pinctrl *ipctl = pinctrl_dev_get_drvdata(pctldev);
-> -	const struct imx1_pinctrl_soc_info *info = ipctl->info;
->  	int i;
->  
->  	for (i = 0; i != num_configs; ++i) {
->  		imx1_write_bit(ipctl, pin_id, configs[i] & 0x01, MX1_PUEN);
->  
->  		dev_dbg(ipctl->dev, "pinconf set pullup pin %s\n",
-> -			info->pins[pin_id].name);
-> +			pin_desc_get(pctldev, pin_id)->name);
->  	}
->  
->  	return 0;
-> -- 
-> 2.1.4
+> This looks sane to me, and as you've tested it the values seem to be
+> valid:
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/ecd666ac/attachment.sig>
+FWIW ...
+
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+
+Stephen, Thierry, Alex,
+
+Can we pick this up now?
+
+Jon
+
+>> ---
+>>  arch/arm/boot/dts/tegra124.dtsi | 17 +++++++++++++----
+>>  1 file changed, 13 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+>> index 13cc7ca..de07d7e 100644
+>> --- a/arch/arm/boot/dts/tegra124.dtsi
+>> +++ b/arch/arm/boot/dts/tegra124.dtsi
+>> @@ -918,31 +918,40 @@
+>>  		#address-cells = <1>;
+>>  		#size-cells = <0>;
+>>  
+>> -		cpu at 0 {
+>> +		A15_0: cpu at 0 {
+>>  			device_type = "cpu";
+>>  			compatible = "arm,cortex-a15";
+>>  			reg = <0>;
+>>  		};
+>>  
+>> -		cpu at 1 {
+>> +		A15_1: cpu at 1 {
+>>  			device_type = "cpu";
+>>  			compatible = "arm,cortex-a15";
+>>  			reg = <1>;
+>>  		};
+>>  
+>> -		cpu at 2 {
+>> +		A15_2: cpu at 2 {
+>>  			device_type = "cpu";
+>>  			compatible = "arm,cortex-a15";
+>>  			reg = <2>;
+>>  		};
+>>  
+>> -		cpu at 3 {
+>> +		A15_3: cpu at 3 {
+>>  			device_type = "cpu";
+>>  			compatible = "arm,cortex-a15";
+>>  			reg = <3>;
+>>  		};
+>>  	};
+>>  
+>> +	pmu {
+>> +		compatible = "arm,cortex-a15-pmu";
+>> +		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+>> +			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+>> +		interrupt-affinity = <&A15_0>, <&A15_1>, <&A15_2>, <&A15_3>;
+>> +	};
+>> +
+>>  	thermal-zones {
+>>  		cpu {
+>>  			polling-delay-passive = <1000>;
+>> -- 
+>> 1.9.1
+>>
