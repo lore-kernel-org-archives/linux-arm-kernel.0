@@ -1,99 +1,58 @@
 From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Jul 2015 18:30:17 +0100
-Subject: [PATCH v2 2/6] arm64: kernel: preparatory: Move config_sctlr_el1
-In-Reply-To: <1437154221-5736-1-git-send-email-james.morse@arm.com>
-References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
-Message-ID: <1437154221-5736-3-git-send-email-james.morse@arm.com>
+Date: Fri, 17 Jul 2015 18:30:15 +0100
+Subject: [PATCH v2 0/6] arm64: kernel: Add support for Privileged Access Never
+Message-ID: <1437154221-5736-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Later patches need config_sctlr_el1 to set/clear bits in the sctlr_el1
-register.
+This series adds support for Privileged Access Never (PAN; part of the ARMv8.1
+Extensions). When enabled, this feature causes a permission fault if the kernel
+attempts to access memory that is also accessible by userspace - instead the
+PAN bit must be cleared when accessing userspace memory. (or use the
+ldt*/stt* instructions).
 
-This patch moves this function into header a file.
+This series detects and enables this feature, and uses alternatives to change
+{get,put}_user() et al to clear the PAN bit while they do their work.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
+Changes since v1:
+* Copied cpuid_feature_extract_field() from arch/arm as a new patch, suggested
+  by Russell King [1].
+* Changed feature-detection patch to use cpuid_feature_extract_field() for sign
+  extension, and '>='.
+* Moved SCTLR_EL1_* from asm/cputype.h to asm/sysreg.h
+* Added PSR_PAN_BIT in uapi/asm/ptrace.h
+* Removed the setting of PSTATE_PAN in kernel/process.c
+
+[1] http://www.spinics.net/lists/arm-kernel/msg432518.html
+
+
+James Morse (6):
+  arm64: kernel: Add cpuid_feature_extract_field() for 4bit sign
+    extension
+  arm64: kernel: preparatory: Move config_sctlr_el1
+  arm64: kernel: Add cpufeature 'enable' callback
+  arm64: kernel: Add min_register_value and use '>=' for feature
+    detection
+  arm64: kernel: Add optional CONFIG_ parameter to ALTERNATIVE()
+  arm64: kernel: Add support for Privileged Access Never
+
+ arch/arm64/Kconfig                   | 14 +++++++++++++
+ arch/arm64/include/asm/alternative.h | 28 ++++++++++++++++++++++---
+ arch/arm64/include/asm/cpufeature.h  | 21 ++++++++++++++++---
  arch/arm64/include/asm/cputype.h     |  3 ---
- arch/arm64/include/asm/sysreg.h      | 12 ++++++++++++
- arch/arm64/kernel/armv8_deprecated.c | 11 +----------
- 3 files changed, 13 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/futex.h       |  8 ++++++++
+ arch/arm64/include/asm/processor.h   |  2 ++
+ arch/arm64/include/asm/sysreg.h      | 21 +++++++++++++++++++
+ arch/arm64/include/asm/uaccess.h     | 11 ++++++++++
+ arch/arm64/include/uapi/asm/ptrace.h |  1 +
+ arch/arm64/kernel/armv8_deprecated.c | 11 +---------
+ arch/arm64/kernel/cpufeature.c       | 40 +++++++++++++++++++++++++++++++++---
+ arch/arm64/lib/clear_user.S          |  8 ++++++++
+ arch/arm64/lib/copy_from_user.S      |  8 ++++++++
+ arch/arm64/lib/copy_in_user.S        |  8 ++++++++
+ arch/arm64/lib/copy_to_user.S        |  8 ++++++++
+ arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++
+ 16 files changed, 193 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
-index a84ec605bed8..ee6403df9fe4 100644
---- a/arch/arm64/include/asm/cputype.h
-+++ b/arch/arm64/include/asm/cputype.h
-@@ -81,9 +81,6 @@
- #define ID_AA64MMFR0_BIGEND(mmfr0)	\
- 	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
- 
--#define SCTLR_EL1_CP15BEN	(0x1 << 5)
--#define SCTLR_EL1_SED		(0x1 << 8)
--
- #ifndef __ASSEMBLY__
- 
- /*
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 5c89df0acbcb..56391fbae1e1 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -20,6 +20,9 @@
- #ifndef __ASM_SYSREG_H
- #define __ASM_SYSREG_H
- 
-+#define SCTLR_EL1_CP15BEN	(0x1 << 5)
-+#define SCTLR_EL1_SED		(0x1 << 8)
-+
- #define sys_reg(op0, op1, crn, crm, op2) \
- 	((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
- 
-@@ -55,6 +58,15 @@ asm(
- "	.endm\n"
- );
- 
-+static inline void config_sctlr_el1(u32 clear, u32 set)
-+{
-+	u32 val;
-+
-+	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
-+	val &= ~clear;
-+	val |= set;
-+	asm volatile("msr sctlr_el1, %0" : : "r" (val));
-+}
- #endif
- 
- #endif	/* __ASM_SYSREG_H */
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 7922c2e710ca..78d56bff91fd 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -16,6 +16,7 @@
- 
- #include <asm/insn.h>
- #include <asm/opcodes.h>
-+#include <asm/sysreg.h>
- #include <asm/system_misc.h>
- #include <asm/traps.h>
- #include <asm/uaccess.h>
-@@ -504,16 +505,6 @@ ret:
- 	return 0;
- }
- 
--static inline void config_sctlr_el1(u32 clear, u32 set)
--{
--	u32 val;
--
--	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
--	val &= ~clear;
--	val |= set;
--	asm volatile("msr sctlr_el1, %0" : : "r" (val));
--}
--
- static int cp15_barrier_set_hw_mode(bool enable)
- {
- 	if (enable)
 -- 
 2.1.4
