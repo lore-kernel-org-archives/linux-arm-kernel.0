@@ -1,24 +1,31 @@
-From: Haikun.Wang@freescale.com (Wang Haikun)
-Date: Fri, 17 Jul 2015 09:03:28 +0000
-Subject: [PATCH v2] arm: configs: Add Freescale LS1021A defconfig
-References: <1435321164-48981-1-git-send-email-haikun.wang@freescale.com>
-Message-ID: <DM2PR0301MB06239AFF227230BB15A4634EF8980@DM2PR0301MB0623.namprd03.prod.outlook.com>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Fri, 17 Jul 2015 11:04:28 +0200
+Subject: [PATCH 7/7] mtd: atmel-quadspi: add driver for Atmel QSPI
+ controller
+In-Reply-To: <cf2522fc858b72af78d057ac76c4f029e80edf4a.1437059658.git.cyrille.pitchen@atmel.com>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+ <cf2522fc858b72af78d057ac76c4f029e80edf4a.1437059658.git.cyrille.pitchen@atmel.com>
+Message-ID: <1437123868.24981.7.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/26/2015 8:23 PM, Haikun Wang wrote:
-> Add Freescale LS1021A initial defconfig file.
-> The LS1021A SoC is a dual-core Cortex-A7 based processor.
->
-> LS1021A has some special configure options against common V7 SOCs,
-> such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
->
-> Enable I2C, LPUART, eDMA, WDT default.
-> LS1021AQDS and LS1021ATWR boot successfully with patch.
-> Above IPs also been verified successfully.
->
-> Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
-+ yao yuan, re-correct the email address
+On do, 2015-07-16 at 17:27 +0200, Cyrille Pitchen wrote:
+> --- /dev/null
+> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
 
-Best regards,
-Wang Haikun
+> +static struct platform_driver atmel_qspi_driver = {
+> +	.driver		= {
+> +		[...]
+> +		.bus	= &platform_bus_type,
+> +		[...]
+> +};
+> +module_platform_driver(atmel_qspi_driver);
+
+Nit: on module init this will basically do
+    __platform_driver_register(&atmel_qspi_driver, THIS_MODULE);
+
+which will again set bus to &platform_bus_type. So you might as well
+drop that line.
+
+
+Paul Bolle
