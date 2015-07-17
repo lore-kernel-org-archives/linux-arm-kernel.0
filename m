@@ -1,106 +1,99 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 17 Jul 2015 10:40:56 +0530
-Subject: [PATCH 02/18] ARM/cns3xxx/timer: Migrate to new 'set-state' interface
+Date: Fri, 17 Jul 2015 10:40:57 +0530
+Subject: [PATCH 03/18] ARM/davinci/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
 References: <cover.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <9bdc2e0c9a45b2b5f4de9927562305475ecb9b55.1437101996.git.viresh.kumar@linaro.org>
+Message-ID: <bc660a454f7899f21f2106be1a16e8d006dd2dba.1437101996.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate cns3xxx driver to the new 'set-state' interface provided by
+Migrate davinci driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-NOTE: We don't read TIMER1_2_CONTROL_OFFSET register on shutdown
-anymore.
+We weren't doing anything in set_mode(RESUME) and so .tick_resume()
+isn't implemented.
 
-Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Cc: Sekhar Nori <nsekhar@ti.com>
+Cc: Kevin Hilman <khilman@deeprootsystems.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-cns3xxx/core.c | 55 +++++++++++++++++++++++++-------------------
- 1 file changed, 31 insertions(+), 24 deletions(-)
+ arch/arm/mach-davinci/time.c | 54 ++++++++++++++++++++++++--------------------
+ 1 file changed, 30 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
-index 4e9837ded96d..11f9644f8f41 100644
---- a/arch/arm/mach-cns3xxx/core.c
-+++ b/arch/arm/mach-cns3xxx/core.c
-@@ -113,30 +113,33 @@ void cns3xxx_power_off(void)
-  */
- static void __iomem *cns3xxx_tmr1;
+diff --git a/arch/arm/mach-davinci/time.c b/arch/arm/mach-davinci/time.c
+index 160c9602f490..6c18445a4639 100644
+--- a/arch/arm/mach-davinci/time.c
++++ b/arch/arm/mach-davinci/time.c
+@@ -303,36 +303,42 @@ static int davinci_set_next_event(unsigned long cycles,
+ 	return 0;
+ }
  
--static void cns3xxx_timer_set_mode(enum clock_event_mode mode,
--				   struct clock_event_device *clk)
-+static int cns3xxx_shutdown(struct clock_event_device *clk)
-+{
-+	writel(0, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	return 0;
-+}
-+
-+static int cns3xxx_set_oneshot(struct clock_event_device *clk)
-+{
-+	unsigned long ctrl = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+
-+	/* period set, and timer enabled in 'next_event' hook */
-+	ctrl |= (1 << 2) | (1 << 9);
-+	writel(ctrl, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
-+	return 0;
-+}
-+
-+static int cns3xxx_set_periodic(struct clock_event_device *clk)
+-static void davinci_set_mode(enum clock_event_mode mode,
+-			     struct clock_event_device *evt)
++static int davinci_shutdown(struct clock_event_device *evt)
  {
- 	unsigned long ctrl = readl(cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
- 	int pclk = cns3xxx_cpu_clock() / 8;
- 	int reload;
+ 	struct timer_s *t = &timers[TID_CLOCKEVENT];
  
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		reload = pclk * 20 / (3 * HZ) * 0x25000;
--		writel(reload, cns3xxx_tmr1 + TIMER1_AUTO_RELOAD_OFFSET);
--		ctrl |= (1 << 0) | (1 << 2) | (1 << 9);
+-		t->period = davinci_clock_tick_rate / (HZ);
+-		t->opts &= ~TIMER_OPTS_STATE_MASK;
+-		t->opts |= TIMER_OPTS_PERIODIC;
+-		timer32_config(t);
 -		break;
 -	case CLOCK_EVT_MODE_ONESHOT:
--		/* period set, and timer enabled in 'next_event' hook */
--		ctrl |= (1 << 2) | (1 << 9);
+-		t->opts &= ~TIMER_OPTS_STATE_MASK;
+-		t->opts |= TIMER_OPTS_ONESHOT;
 -		break;
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
--	default:
--		ctrl = 0;
+-		t->opts &= ~TIMER_OPTS_STATE_MASK;
+-		t->opts |= TIMER_OPTS_DISABLED;
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
+-		break;
 -	}
--
-+	reload = pclk * 20 / (3 * HZ) * 0x25000;
-+	writel(reload, cns3xxx_tmr1 + TIMER1_AUTO_RELOAD_OFFSET);
-+	ctrl |= (1 << 0) | (1 << 2) | (1 << 9);
- 	writel(ctrl, cns3xxx_tmr1 + TIMER1_2_CONTROL_OFFSET);
++	t->opts &= ~TIMER_OPTS_STATE_MASK;
++	t->opts |= TIMER_OPTS_DISABLED;
++	return 0;
++}
++
++static int davinci_set_oneshot(struct clock_event_device *evt)
++{
++	struct timer_s *t = &timers[TID_CLOCKEVENT];
++
++	t->opts &= ~TIMER_OPTS_STATE_MASK;
++	t->opts |= TIMER_OPTS_ONESHOT;
++	return 0;
++}
++
++static int davinci_set_periodic(struct clock_event_device *evt)
++{
++	struct timer_s *t = &timers[TID_CLOCKEVENT];
++
++	t->period = davinci_clock_tick_rate / (HZ);
++	t->opts &= ~TIMER_OPTS_STATE_MASK;
++	t->opts |= TIMER_OPTS_PERIODIC;
++	timer32_config(t);
 +	return 0;
  }
  
- static int cns3xxx_timer_set_next_event(unsigned long evt,
-@@ -151,12 +154,16 @@ static int cns3xxx_timer_set_next_event(unsigned long evt,
- }
- 
- static struct clock_event_device cns3xxx_tmr1_clockevent = {
--	.name		= "cns3xxx timer1",
+ static struct clock_event_device clockevent_davinci = {
 -	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= cns3xxx_timer_set_mode,
--	.set_next_event	= cns3xxx_timer_set_next_event,
--	.rating		= 350,
--	.cpumask	= cpu_all_mask,
-+	.name			= "cns3xxx timer1",
+-	.set_next_event	= davinci_set_next_event,
+-	.set_mode	= davinci_set_mode,
 +	.features		= CLOCK_EVT_FEAT_PERIODIC |
 +				  CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= cns3xxx_shutdown,
-+	.set_state_periodic	= cns3xxx_set_periodic,
-+	.set_state_oneshot	= cns3xxx_set_oneshot,
-+	.tick_resume		= cns3xxx_shutdown,
-+	.set_next_event		= cns3xxx_timer_set_next_event,
-+	.rating			= 350,
-+	.cpumask		= cpu_all_mask,
++	.set_next_event		= davinci_set_next_event,
++	.set_state_shutdown	= davinci_shutdown,
++	.set_state_periodic	= davinci_set_periodic,
++	.set_state_oneshot	= davinci_set_oneshot,
  };
  
- static void __init cns3xxx_clockevents_init(unsigned int timer_irq)
+ 
 -- 
 2.4.0
