@@ -1,96 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 17 Jul 2015 17:32:20 +0100
-Subject: [PATCH 05/18] arm64: introduce CONFIG_ARM64_LSE_ATOMICS as
- fallback to ll/sc atomics
-In-Reply-To: <1436779519-2232-6-git-send-email-will.deacon@arm.com>
-References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
- <1436779519-2232-6-git-send-email-will.deacon@arm.com>
-Message-ID: <20150717163219.GA4208@e104818-lin.cambridge.arm.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 17 Jul 2015 09:38:45 -0700
+Subject: [PATCH 3/5] arm64,
+ pci: Allow RC drivers to supply pcibios_add_device() implementation.
+In-Reply-To: <20150717110016.GB19067@red-moon>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150716090426.GA17097@red-moon> <55A7E334.3030101@caviumnetworks.com>
+ <20150717110016.GB19067@red-moon>
+Message-ID: <55A92F95.307@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 10:25:06AM +0100, Will Deacon wrote:
-> In order to patch in the new atomic instructions at runtime, we need to
-> generate wrappers around the out-of-line exclusive load/store atomics.
-> 
-> This patch adds a new Kconfig option, CONFIG_ARM64_LSE_ATOMICS. which
-> causes our atomic functions to branch to the out-of-line ll/sc
-> implementations. To avoid the register spill overhead of the PCS, the
-> out-of-line functions are compiled with specific compiler flags to
-> force out-of-line save/restore of any registers that are usually
-> caller-saved.
+On 07/17/2015 04:00 AM, Lorenzo Pieralisi wrote:
+> Hi David,
+>
+> On Thu, Jul 16, 2015 at 06:00:36PM +0100, David Daney wrote:
+>> On 07/16/2015 02:04 AM, Lorenzo Pieralisi wrote:
+>>> Hi David,
+>>>
+>>> On Wed, Jul 15, 2015 at 05:54:43PM +0100, David Daney wrote:
+>>>> From: David Daney <david.daney@cavium.com>
+>>>>
+>> [...]
+>>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+>>>> index 4095379..3356023 100644
+>>>> --- a/arch/arm64/kernel/pci.c
+>>>> +++ b/arch/arm64/kernel/pci.c
+>>>> @@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>>>>    	return res->start;
+>>>>    }
+>>>>
+>>>> +static int (*pcibios_add_device_impl)(struct pci_dev *);
+>>>> +
+>>>> +void set_pcibios_add_device(int (*arg)(struct pci_dev *))
+>>>> +{
+>>>> +	pcibios_add_device_impl = arg;
+>>>> +}
+>>>> +
+>>>>    /*
+>>>>     * Try to assign the IRQ number from DT when adding a new device
+>>>>     */
+>>>>    int pcibios_add_device(struct pci_dev *dev)
+>>>>    {
+>>>> +	if (pcibios_add_device_impl)
+>>>> +		return pcibios_add_device_impl(dev);
+>>>
+>>> I am totally against this (and to be honest by reading the other
+>>> patches I failed to understand why you even need it), see above.
+>>>
+>>
+>> It is because ...
+>>
+>>
+>>> Thanks,
+>>> Lorenzo
+>>>
+>>>> +
+>>>>    	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>>
+>>
+>>    ... this is total crap.  But I didn't want to break existing systems.
+>
+> That's a good aim, but you are still failing to explain the issue properly
+> I am afraid.
+>
+>> The PCI RC drivers need a way to configure the legacy virtual-wire
+>> interrupts, because the existing code doesn't do it.
+>
+> Can I ask you please to explain the issue a bit more clearly (and why
+> the OF API does not work for you ?)
 
-I'm still trying to get my head around those -ffixed -fcall-used
-options.
+Several problems:
 
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/atomic_lse.h
-> @@ -0,0 +1,181 @@
-> +/*
-> + * Based on arch/arm/include/asm/atomic.h
-> + *
-> + * Copyright (C) 1996 Russell King.
-> + * Copyright (C) 2002 Deep Blue Solutions Ltd.
-> + * Copyright (C) 2012 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#ifndef __ASM_ATOMIC_LSE_H
-> +#define __ASM_ATOMIC_LSE_H
-> +
-> +#ifndef __ARM64_IN_ATOMIC_IMPL
-> +#error "please don't include this file directly"
-> +#endif
-> +
-> +/* Move the ll/sc atomics out-of-line */
-> +#define __LL_SC_INLINE
-> +#define __LL_SC_PREFIX(x)	__ll_sc_##x
-> +#define __LL_SC_EXPORT(x)	EXPORT_SYMBOL(__LL_SC_PREFIX(x))
-> +
-> +/* Macros for constructing calls to out-of-line ll/sc atomics */
-> +#define __LL_SC_SAVE_LR(r)	"mov\t" #r ", x30\n"
-> +#define __LL_SC_RESTORE_LR(r)	"mov\tx30, " #r "\n"
-> +#define __LL_SC_CALL(op)						\
-> +	"bl\t" __stringify(__LL_SC_PREFIX(atomic_##op)) "\n"
-> +#define __LL_SC_CALL64(op)						\
-> +	"bl\t" __stringify(__LL_SC_PREFIX(atomic64_##op)) "\n"
-> +
-> +#define ATOMIC_OP(op, asm_op)						\
-> +static inline void atomic_##op(int i, atomic_t *v)			\
-> +{									\
-> +	unsigned long lr;						\
-> +	register int w0 asm ("w0") = i;					\
-> +	register atomic_t *x1 asm ("x1") = v;				\
-> +									\
-> +	asm volatile(							\
-> +	__LL_SC_SAVE_LR(%0)						\
-> +	__LL_SC_CALL(op)						\
-> +	__LL_SC_RESTORE_LR(%0)						\
-> +	: "=&r" (lr), "+r" (w0), "+Q" (v->counter)			\
-> +	: "r" (x1));							\
-> +}									\
+1) It prints many times to the boot log this string:
+     pci 0000:01:0e.2: of_irq_parse_pci() failed with rc=-19
 
-Since that's an inline function, in most cases we wouldn't need to
-save/restore LR for a BL call, it may already be on the stack of the
-including functions. Can we just not tell gcc that LR is clobbered by
-this asm and it makes its own decision about saving/restoring?
+2) For a RC with no device_node it does nothing (in addition to printing 
+the annoying message).
 
-As for v->counter, could we allocate it in callee-saved registers
-already and avoid the -ffixed etc. options.
 
-But note that I'm still trying to understand all these tricks, so I may
-be wrong.
-
--- 
-Catalin
+>
+> Thank you !
+> Lorenzo
+>
