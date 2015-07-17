@@ -1,54 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Jul 2015 14:14:03 +0200
-Subject: [GIT PULL] EP93xx defconfig changes
-Message-ID: <CACRpkdaXEMt6qyuZP4cH2OLqK7PhwCcVSk=Xgf5Lfsd1bPSzag@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jul 2015 14:23:19 +0200
+Subject: [PATCH 1/2] ARM: ux500: define serial port aliases
+In-Reply-To: <CACRpkdb3k+s65tOR13iKNLqJ+CWvxSH6d3Z2Ra4OJ9rw+t2Q3w@mail.gmail.com>
+References: <1436520735-23692-1-git-send-email-linus.walleij@linaro.org>
+ <2694937.qjRpGCMvqj@wuerfel>
+ <CACRpkdb3k+s65tOR13iKNLqJ+CWvxSH6d3Z2Ra4OJ9rw+t2Q3w@mail.gmail.com>
+Message-ID: <3466799.BCvMeL6TVk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC people,
+On Thursday 16 July 2015 21:57:35 Linus Walleij wrote:
+> On Thu, Jul 16, 2015 at 4:09 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 16 July 2015 16:03:18 Linus Walleij wrote:
+> 
+> >> The aliases are set also to disabled ports to ensure enumeration
+> >> for the cases where a board file enabled a previously disabled
+> >> UART.
+> >>
+> >
+> > Well, both really. The status property tells the kernel to not
+> > ever touch a device, while the alias is what traditionally gets
+> > used to assign an OS visible device name to a device in the tree.
+> > This is more true for MacOS and AIX than Linux, which sometimes
+> > does its own naming, but we really should not have an alias pointing
+> > at a disabled device node.
+> 
+> OK ... I will make a patch that remove the aliases for the disabled
+> nodes.
+> 
+> But this makes me think of whether the DT compiler should allow
+> it or at least warn about it?
 
-here is a separate pull request updating the EP93xx
-defconfig, partly relying on the changes in the previous
-pull request to be meaningful (like NO_HZ) but still
-harmless if applied in isolation.
+We don't get a lot of warnings from dtc at the moment, but
+we could start adding them for stuff like this. It probably
+requires looking at the whole dtb a bit deeper than dtc
+does at the moment.
 
-All patches (as well as in the previous pull request) are
-ACKed by Hartley.
-
-Pleas pull this in too!
-
-Yours,
-Linus Walleij
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-tags/ep93xx-defconfig
-
-for you to fetch changes up to b471e7f2ec5a8673e1b5385307357f3dba62f451:
-
-  ARM: ep93xx: add framebuffer to the defconfig (2015-07-17 11:52:38 +0200)
-
-----------------------------------------------------------------
-This updates the EP93xx defconfig to use NO_HZ and high
-resolution timers, and to by default enable and compile
-all board variants now that we can have a single kernel,
-and enable all EP93xx-specific drivers that sit in various
-sites across the kernel.
-
-----------------------------------------------------------------
-Linus Walleij (7):
-      ARM: ep93xx: activate NO_HZ and high-res timers
-      ARM: ep93xx: enable all boards in the EP93xx defconfig
-      ARM: ep93xx: enable SIM.ONE MMC/SD hardware
-      ARM: ep93xx: add LEDs and triggers to defconfig
-      ARM: ep93xx: add GPIO I2C to defconfig
-      ARM: ep93xx: add DMA engine to the defconfig
-      ARM: ep93xx: add framebuffer to the defconfig
-
- arch/arm/configs/ep93xx_defconfig | 29 +++++++++++++++++++++++++++--
- 1 file changed, 27 insertions(+), 2 deletions(-)
+	Arnd
