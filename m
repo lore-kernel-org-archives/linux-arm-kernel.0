@@ -1,105 +1,67 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 17 Jul 2015 15:32:46 +0100
-Subject: [PATCH v2 12/20] xen/balloon: Don't rely on the page granularity
- is the same for Xen and Linux
-In-Reply-To: <alpine.DEB.2.02.1507161819200.17378@kaball.uk.xensource.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-13-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507161819200.17378@kaball.uk.xensource.com>
-Message-ID: <55A9120E.4020302@citrix.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 17 Jul 2015 16:35:28 +0200
+Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset
+ state when not in use
+In-Reply-To: <55A8FEAE.9010502@hurleysoftware.com>
+References: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+ <55A8FEAE.9010502@hurleysoftware.com>
+Message-ID: <1437143728.3254.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
-
-On 17/07/15 15:03, Stefano Stabellini wrote:
->> ---
->>  drivers/xen/balloon.c | 147 +++++++++++++++++++++++++++++++++++---------------
->>  1 file changed, 105 insertions(+), 42 deletions(-)
->>
->> diff --git a/drivers/xen/balloon.c b/drivers/xen/balloon.c
->> index fd93369..19a72b1 100644
->> --- a/drivers/xen/balloon.c
->> +++ b/drivers/xen/balloon.c
->> @@ -230,6 +230,7 @@ static enum bp_state reserve_additional_memory(long credit)
->>  	nid = memory_add_physaddr_to_nid(hotplug_start_paddr);
->>  
->>  #ifdef CONFIG_XEN_HAVE_PVMMU
->> +	/* TODO */
+Am Freitag, den 17.07.2015, 09:10 -0400 schrieb Peter Hurley:
+> Hi Juergen,
 > 
-> I think you need to be more verbose than that: TODO what?
-
-It was for me to remember fixing reserve_additional_memory. I did it and
-forgot to remove the TODO when I clean up.
-
-I will drop it in the next version.
-
+> On 07/16/2015 03:40 AM, Juergen Borleis wrote:
+> > Whenever the UART device driver gets closed from userland, the driver
+> > disables the UART unit and then stops its clock to save power.
+> > 
+> > The bit which disabled the UART unit is described as:
+> > 
+> >   "UART Enable. If this bit is set to 1, the UART is enabled. Data
+> >   transmission and reception occurs for the UART signals. When the
+> >   UART is disabled in the middle of transmission or reception, it
+> >   completes the current character before stopping."
+> > 
+> > The important part is the "it completes the current character". Whenever
+> > a reception is ongoing when the UART gets disabled (including the clock
+> > off) the statemachine freezes and "remembers" this state on the next
+> > open() and re-enabling of the unit's clock.
+> > 
+> > In this case we end up receiving an additional bogus character
+> > immediately.
+> > 
+> > The solution in this change is to move the AUART unit into its reset
+> > state on close() and only release it from its reset state on the next
+> > open().
+> > 
+> > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> > ---
+> > 
+> > Notes:
+> >     v3:
+> >      - missing newline added to an error message
+> >     
+> >     v2:
+> >      - rename mxs_auart_do_reset() to mxs_auart_keep_reset() to better reflect
+> >        what it really does
+> >      - adapt the delay in mxs_auart_keep_reset() to wait for the reset of the
+> >        AURAT unit to what is used in mxs_auart_reset()
+> 
+> The function names and semantics are not clear. See below.
 [...]
-
->>  static enum bp_state increase_reservation(unsigned long nr_pages)
->>  {
->>  	int rc;
->> -	unsigned long  pfn, i;
->> +	unsigned long i, frame_idx;
->>  	struct page   *page;
->>  	struct xen_memory_reservation reservation = {
->>  		.address_bits = 0,
->> @@ -343,44 +406,43 @@ static enum bp_state increase_reservation(unsigned long nr_pages)
->>  	}
->>  #endif
->>  
->> -	if (nr_pages > ARRAY_SIZE(frame_list))
->> -		nr_pages = ARRAY_SIZE(frame_list);
->> +	if (nr_pages > (ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE))
->> +		nr_pages = ARRAY_SIZE(frame_list) / XEN_PFN_PER_PAGE;
->>  
->> +	frame_idx = 0;
->>  	page = list_first_entry_or_null(&ballooned_pages, struct page, lru);
->>  	for (i = 0; i < nr_pages; i++) {
->>  		if (!page) {
->>  			nr_pages = i;
->>  			break;
->>  		}
->> -		frame_list[i] = page_to_pfn(page);
->> +
->> +		rc = xen_apply_to_page(page, set_frame, &frame_idx);
->> +
->>  		page = balloon_next_page(page);
->>  	}
->>  
->>  	set_xen_guest_handle(reservation.extent_start, frame_list);
->> -	reservation.nr_extents = nr_pages;
->> +	reservation.nr_extents = nr_pages * XEN_PFN_PER_PAGE;
->>  	rc = HYPERVISOR_memory_op(XENMEM_populate_physmap, &reservation);
->>  	if (rc <= 0)
->>  		return BP_EAGAIN;
->>  
->> -	for (i = 0; i < rc; i++) {
->> +	/* rc is equal to the number of Xen page populated */
->> +	nr_pages = rc / XEN_PFN_PER_PAGE;
+> > +	/* bring it out of reset now */
+> > +	mxs_auart_reset(u);
 > 
-> Here we are purposedly ignoring any spares (rc % XEN_PFN_PER_PAGE).
-> Instead of leaking them, maybe we should givem them back to Xen since we
-> cannot use them?
-
-I will give a look to do it.
-
->> +	for (i = 0; i < nr_pages; i++) {
->>  		page = balloon_retrieve(false);
->>  		BUG_ON(page == NULL);
->>  
->> -		pfn = page_to_pfn(page);
->> -
->>  #ifdef CONFIG_XEN_HAVE_PVMMU
->> +		frame_idx = 0;
+> mxs_auart_reset() is really not resetting but simply performing a block enable.
+> Isn't there a generic block enable for the iMX.2x SoCs? (Maybe there should be)
 > 
-> Shouldn't this be before the beginning of the loop above?
+> The names of these functions don't match expected operations of startup().
+> Start up should be enabling the device, not keeping it in reset.
+> 
+> And "keep reset" immediately followed by "reset" makes no sense.
 
-Hmmmm... Yes. Note that I only compiled tested on x86, it would be good
-if someone test on real hardware at some point (I don't have any x86 Xen
-setup).
+I'd call the pair mxs_auart_reset_assert and mxs_auart_reset_deassert.
 
-Regards,
-
--- 
-Julien Grall
+regards
+Philipp
