@@ -1,230 +1,206 @@
-From: punnaia@xilinx.com (punnaiah choudary kalluri)
-Date: Fri, 17 Jul 2015 06:22:42 +0530
-Subject: [PATCH v3 2/2] dma: Add Xilinx zynqmp dma engine driver support
-In-Reply-To: <20150716123548.GO5086@localhost>
-References: <1434422083-8653-1-git-send-email-punnaia@xilinx.com>
- <1434422083-8653-2-git-send-email-punnaia@xilinx.com>
- <20150716123548.GO5086@localhost>
-Message-ID: <CAGnW=BbUBOzm5V_LP_YcCfJ9X+Yw8qGp6PE2xSM13E=qUXxUsw@mail.gmail.com>
+From: fugang.duan@freescale.com (Duan Andy)
+Date: Fri, 17 Jul 2015 01:29:39 +0000
+Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+ blocking calls in the cpu hotplug notifier
+In-Reply-To: <CAJKOXPciVVa9ErvUWGeWM0sVEDefaohBGY6Ms3zSX1FzZiROvA@mail.gmail.com>
+References: <1437008972-9140-1-git-send-email-kamal@canonical.com>
+ <1437008972-9140-174-git-send-email-kamal@canonical.com>
+ <BLUPR03MB373DFDE70DADB28EC1666A0F5990@BLUPR03MB373.namprd03.prod.outlook.com>
+ <CAJKOXPf3ik5XahaK-fv0EOFhPHpO1aQ7PGxbAMrGiSrK4j1EYA@mail.gmail.com>
+ <BLUPR03MB373D7ABAC272AD28D656A40F5990@BLUPR03MB373.namprd03.prod.outlook.com>
+ <CAJKOXPciVVa9ErvUWGeWM0sVEDefaohBGY6Ms3zSX1FzZiROvA@mail.gmail.com>
+Message-ID: <BY2PR03MB377BDFE34CCBDDDEDE7329CF5980@BY2PR03MB377.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 6:05 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> On Tue, Jun 16, 2015 at 08:04:43AM +0530, Punnaiah Choudary Kalluri wrote:
->> +/* Register Offsets */
->> +#define ISR                          0x100
->> +#define IMR                          0x104
->> +#define IER                          0x108
->> +#define IDS                          0x10C
->> +#define CTRL0                                0x110
->> +#define CTRL1                                0x114
->> +#define STATUS                               0x11C
->> +#define DATA_ATTR                    0x120
->> +#define DSCR_ATTR                    0x124
->> +#define SRC_DSCR_WRD0                        0x128
->> +#define SRC_DSCR_WRD1                        0x12C
->> +#define SRC_DSCR_WRD2                        0x130
->> +#define SRC_DSCR_WRD3                        0x134
->> +#define DST_DSCR_WRD0                        0x138
->> +#define DST_DSCR_WRD1                        0x13C
->> +#define DST_DSCR_WRD2                        0x140
->> +#define DST_DSCR_WRD3                        0x144
->> +#define SRC_START_LSB                        0x158
->> +#define SRC_START_MSB                        0x15C
->> +#define DST_START_LSB                        0x160
->> +#define DST_START_MSB                        0x164
->> +#define TOTAL_BYTE                   0x188
->> +#define RATE_CTRL                    0x18C
->> +#define IRQ_SRC_ACCT                 0x190
->> +#define IRQ_DST_ACCT                 0x194
->> +#define CTRL2                                0x200
-> Can you namespace these and other defines
-
-Ok. just to be clear, you want to me to prefix ZYNQMP_DMA?
-or you want me to add comments ?
-I have defined the exact register names as per the zynqmp dma
-spec,
-
-
->
->> +struct zynqmp_dma_chan {
->> +     struct zynqmp_dma_device *xdev;
-> xdev seems an odd name, i suspect copy paste error!
-
-I will change the name.
-
->
->> +     void __iomem *regs;
->> +     spinlock_t lock;
->> +     struct list_head pending_list;
->> +     struct list_head free_list;
->> +     struct list_head active_list;
->> +     struct zynqmp_dma_desc_sw *sw_desc_pool;
->> +     struct list_head done_list;
->> +     struct dma_chan common;
->> +     void *desc_pool_v;
->> +     dma_addr_t desc_pool_p;
-> why two pools and one void *?
->
->> +/**
->> + * zynqmp_dma_alloc_chan_resources - Allocate channel resources
->> + * @dchan: DMA channel
->> + *
->> + * Return: '0' on success and failure value on error
-> wrong, its number of descriptors which maybe 0
-
-Correct. I Will modify this.
-
->
->> + */
->> +static int zynqmp_dma_alloc_chan_resources(struct dma_chan *dchan)
->> +{
->> +     struct zynqmp_dma_chan *chan = to_chan(dchan);
->> +     struct zynqmp_dma_desc_sw *desc;
->> +     int i;
->> +
->> +     chan->sw_desc_pool = kzalloc(sizeof(*desc) * ZYNQMP_DMA_NUM_DESCS,
->> +                                  GFP_KERNEL);
-> and you are allocating the number so pls return that
-
-Ok.
-
->
-> Btw is ZYNQMP_DMA_NUM_DESCS sw or HW limit
-
-Sw limit.
-
->
->> +static void zynqmp_dma_start_transfer(struct zynqmp_dma_chan *chan)
->> +{
->> +     struct zynqmp_dma_desc_sw *desc;
->> +
->> +     if (!zynqmp_dma_chan_is_idle(chan))
->> +             return;
->> +
->> +     desc = list_first_entry_or_null(&chan->pending_list,
->> +                                     struct zynqmp_dma_desc_sw, node);
->> +     if (!desc)
->> +             return;
->> +
->> +     if (chan->has_sg)
->> +             list_splice_tail_init(&chan->pending_list, &chan->active_list);
->> +     else
->> +             list_move_tail(&desc->node, &chan->active_list);
->> +
->> +     if (chan->has_sg)
->> +             zynqmp_dma_update_desc_to_ctrlr(chan, desc);
->> +     else
->> +             zynqmp_dma_config_simple_desc(chan, desc->src, desc->dst,
->> +                                           desc->len);
->> +     zynqmp_dma_start(chan);
->> +}
-> Lots of the list management will get simplified if you use the vchan to do
-> so
-
-I have explored using the virt-dma to reduce the common list processing, But
-in this driver descriptor processing and cleaning is happening inside
-the tasklet
-context and virt-dma assumes it is happening in interrupt context and using the
-spin locks accordingly. So, added code for the list management in side
-the driver.
-
->
->> +
->> +
->> +/**
->> + * zynqmp_dma_chan_desc_cleanup - Cleanup the completed descriptors
->> + * @chan: ZynqMP DMA channel
->> + */
->> +static void zynqmp_dma_chan_desc_cleanup(struct zynqmp_dma_chan *chan)
->> +{
->> +     struct zynqmp_dma_desc_sw *desc, *next;
->> +
->> +     list_for_each_entry_safe(desc, next, &chan->done_list, node) {
->> +             dma_async_tx_callback callback;
->> +             void *callback_param;
->> +
->> +             list_del(&desc->node);
->> +
->> +             callback = desc->async_tx.callback;
->> +             callback_param = desc->async_tx.callback_param;
->> +             if (callback)
->> +                     callback(callback_param);
->> +
-> and you are calling the callback with lock held and user can do further
-> submissions so this is wrong!
-
-is it that driver should have separate temp list and fill this list
-with the descriptors in
-done_list and process them with out lock held ?
-
-please suggest.
-
->
->> +static enum dma_status zynqmp_dma_tx_status(struct dma_chan *dchan,
->> +                                   dma_cookie_t cookie,
->> +                                   struct dma_tx_state *txstate)
->> +{
->> +     return dma_cookie_status(dchan, cookie, txstate);
->
-> no residue calculation?
-
-Controller has total byte count register that Indicates total number of bytes
-transferred since last clear. But since we implemented the Hw queuing it
-is difficult to get residue calculation by relying on the above register value.
-
-So, at least for this version of the driver no residue calculation.
-
->
->> +static struct dma_async_tx_descriptor *zynqmp_dma_prep_memcpy(
->> +                             struct dma_chan *dchan, dma_addr_t dma_dst,
->> +                             dma_addr_t dma_src, size_t len, ulong flags)
->> +{
->> +     struct zynqmp_dma_chan *chan;
->> +     struct zynqmp_dma_desc_sw *new, *first = NULL;
->> +     void *desc = NULL, *prev = NULL;
->> +     size_t copy;
->> +     u32 desc_cnt;
->> +
->> +     chan = to_chan(dchan);
->> +
->> +     if ((len > ZYNQMP_DMA_MAX_TRANS_LEN) && !chan->has_sg)
-> why sg?
-
-Controller supports two types of modes.
-
-Simple dma mode:
-   In this mode, DMA transfer parameters are specified in APB registers
-   So, queuing the new request in hw is not possible when the channel
-is busy with
-   previous transfer and also it doesn't have SG support.
-   Max transfer size per transfer is 1GB.
-
-Scatter gather dma mode:
-   Transfer parameters are specified in the buffer descriptors (BD).
-   Max transfer size per BD is 1GB and Dma transaction can have multiple BDs
-
-The above condition is to ensure that when the controller is
-configured for Simple
-Dma mode, allow the transfers that are with in 1GB size if not it return error.
-
->
->> +static int zynqmp_dma_remove(struct platform_device *pdev)
->> +{
->> +     struct zynqmp_dma_device *xdev = platform_get_drvdata(pdev);
->> +
->> +     of_dma_controller_free(pdev->dev.of_node);
->> +     dma_async_device_unregister(&xdev->common);
->> +
->> +     zynqmp_dma_chan_remove(xdev->chan);
-> Please free up irq here explictly and also ensure tasklet is not running
-
-irq free is not required as cleaning will be taken care by the devm framework.
-tasklet cleaning is happening inside the zynqmp_chan_remove function.
+From: Krzysztof Kozlowski <k.kozlowski@samsung.com> Sent: Thursday, July 16, 2015 5:52 PM
+> To: Duan Fugang-B38611
+> Cc: Krzysztof Kozlowski; Kamal Mostafa; daniel.lezcano at linaro.org; linux-
+> kernel at vger.kernel.org; stable at vger.kernel.org; Damian Eppel;
+> kgene at kernel.org; kyungmin.park at samsung.com; Thomas Gleixner;
+> m.szyprowski at samsung.com; linux-arm-kernel at lists.infradead.org; kernel-
+> team at lists.ubuntu.com
+> Subject: Re: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+> blocking calls in the cpu hotplug notifier
+> 
+> 2015-07-16 17:14 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
+> > From: Krzysztof Kozlowski <k.kozlowski@samsung.com> Sent: Thursday,
+> > July 16, 2015 2:56 PM
+> >> To: Duan Fugang-B38611
+> >> Cc: Kamal Mostafa; linux-kernel at vger.kernel.org;
+> >> stable at vger.kernel.org; kernel-team at lists.ubuntu.com;
+> >> daniel.lezcano at linaro.org; Damian Eppel; kyungmin.park at samsung.com;
+> >> kgene at kernel.org; Thomas Gleixner; linux-arm-
+> >> kernel at lists.infradead.org; m.szyprowski at samsung.com
+> >> Subject: Re: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct:
+> >> Avoid blocking calls in the cpu hotplug notifier
+> >>
+> >> 2015-07-16 15:37 GMT+09:00 Duan Andy <fugang.duan@freescale.com>:
+> >> > From: Kamal Mostafa <kamal@canonical.com> Sent: Thursday, July 16,
+> >> > 2015 9:08 AM
+> >> >> To: linux-kernel at vger.kernel.org; stable at vger.kernel.org; kernel-
+> >> >> team at lists.ubuntu.com
+> >> >> Cc: Kamal Mostafa; daniel.lezcano at linaro.org;
+> >> >> kyungmin.park at samsung.com; Damian Eppel; kgene at kernel.org; Thomas
+> >> >> Gleixner; linux-arm- kernel at lists.infradead.org;
+> >> >> m.szyprowski at samsung.com
+> >> >> Subject: [PATCH 3.19.y-ckt 173/251] clocksource: exynos_mct: Avoid
+> >> >> blocking calls in the cpu hotplug notifier
+> >> >>
+> >> >> 3.19.8-ckt4 -stable review patch.  If anyone has any objections,
+> >> >> please let me know.
+> >> >>
+> >> >> ------------------
+> >> >>
+> >> >> From: Damian Eppel <d.eppel@samsung.com>
+> >> >>
+> >> >> commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
+> >> >>
+> >> >> Whilst testing cpu hotplug events on kernel configured with
+> >> >> DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+> >> >> caused by calling
+> >> >> request_irq() and free_irq() in the context of hotplug
+> >> >> notification (which is in this case atomic context).
+> >> >>
+> >> >> [   40.785859] CPU1: Software reset
+> >> >> [   40.786660] BUG: sleeping function called from invalid context
+> at
+> >> >> mm/slub.c:1241
+> >> >> [   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name:
+> >> >> swapper/1
+> >> >> [   40.786678] Preemption disabled at:[<  (null)>]   (null)
+> >> >> [   40.786681]
+> >> >> [   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-
+> rc4-
+> >> >> 00024-g7dca860 #36
+> >> >> [   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+> >> >> [   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>]
+> >> >> (show_stack+0x10/0x14)
+> >> >> [   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>]
+> >> >> (dump_stack+0x70/0xbc)
+> >> >> [   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>]
+> >> >> (kmem_cache_alloc+0xd8/0x170)
+> >> >> [   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>]
+> >> >> (request_threaded_irq+0x64/0x128)
+> >> >> [   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>]
+> >> >> (exynos4_local_timer_setup+0xc0/0x13c)
+> >> >> [   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from
+> >> [<c0350ca8>]
+> >> >> (exynos4_mct_cpu_notify+0x30/0xa8)
+> >> >> [   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from
+> [<c003b330>]
+> >> >> (notifier_call_chain+0x44/0x84)
+> >> >> [   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>]
+> >> >> (__cpu_notify+0x28/0x44)
+> >> >> [   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>]
+> >> >> (secondary_start_kernel+0xec/0x150)
+> >> >> [   40.786886] [<c0013714>] (secondary_start_kernel) from
+> [<40008764>]
+> >> >> (0x40008764)
+> >> >>
+> >> >> Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+> >> >> notifications which run on the hotplugged cpu with interrupts and
+> >> >> preemption disabled.
+> >> >>
+> >> >> To avoid the issue, request the interrupts for all possible cpus
+> >> >> in the boot code. The interrupts are marked NO_AUTOENABLE to avoid
+> >> >> a racy
+> >> >> request_irq/disable_irq() sequence. The flag prevents the
+> >> >> request_irq() code from enabling the interrupt immediately.
+> >> >>
+> >> >> The interrupt is then enabled in the CPU_STARTING notifier of the
+> >> >> hotplugged cpu and again disabled with disable_irq_nosync() in the
+> >> >> CPU_DYING notifier.
+> >> >>
+> >> >> [ tglx: Massaged changelog to match the patch ]
+> >> >>
+> >> >> Fixes: 7114cd749a12 ("clocksource: exynos_mct: use
+> >> >> (request/free)_irq calls for local timer registration")
+> >> >> Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> >> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> >> Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> >> Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+> >> >> Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+> >> >> Cc: m.szyprowski at samsung.com
+> >> >> Cc: kyungmin.park at samsung.com
+> >> >> Cc: daniel.lezcano at linaro.org
+> >> >> Cc: kgene at kernel.org
+> >> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> >> Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-
+> >> >> d.eppel at samsung.com
+> >> >> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> >> >> Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+> >> >> ---
+> >> >>  drivers/clocksource/exynos_mct.c | 43
+> >> >> ++++++++++++++++++++++++++++------
+> >> >> ------
+> >> >>  1 file changed, 30 insertions(+), 13 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/clocksource/exynos_mct.c
+> >> >> b/drivers/clocksource/exynos_mct.c
+> >> >> index 83564c9..c844616 100644
+> >> >> --- a/drivers/clocksource/exynos_mct.c
+> >> >> +++ b/drivers/clocksource/exynos_mct.c
+> >> >> @@ -466,15 +466,12 @@ static int exynos4_local_timer_setup(struct
+> >> >> clock_event_device *evt)
+> >> >>       exynos4_mct_write(TICK_BASE_CNT, mevt->base +
+> >> >> MCT_L_TCNTB_OFFSET);
+> >> >>
+> >> >>       if (mct_int_type == MCT_INT_SPI) {
+> >> >> -             evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+> >> >> -             if (request_irq(evt->irq, exynos4_mct_tick_isr,
+> >> >> -                             IRQF_TIMER | IRQF_NOBALANCING,
+> >> >> -                             evt->name, mevt)) {
+> >> >> -                     pr_err("exynos-mct: cannot register IRQ %d\n",
+> >> >> -                             evt->irq);
+> >> >> +
+> >> >> +             if (evt->irq == -1)
+> >> >>                       return -EIO;
+> >> >> -             }
+> >> >> -             irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu],
+> >> >> cpumask_of(cpu));
+> >> >> +
+> >> >> +             irq_force_affinity(evt->irq, cpumask_of(cpu));
+> >> >> +             enable_irq(evt->irq);
+> >> >>       } else {
+> >> >>               enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+> >> >
+> >> > In here, why not use enable_percpu_irq(evt->irq) ?
+> >> >
+> >> >>       }
+> >> >> @@ -487,10 +484,12 @@ static int exynos4_local_timer_setup(struct
+> >> >> clock_event_device *evt)  static void
+> >> >> exynos4_local_timer_stop(struct clock_event_device *evt)  {
+> >> >>       evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> >> >> -     if (mct_int_type == MCT_INT_SPI)
+> >> >> -             free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+> >> >> -     else
+> >> >> +     if (mct_int_type == MCT_INT_SPI) {
+> >> >> +             if (evt->irq != -1)
+> >> >> +                     disable_irq_nosync(evt->irq);
+> >> >> +     } else {
+> >> >>               disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+> >> >
+> >> > In here, why not use disable_percpu_irq(evt->irq) ?
+> >>
+> >> You know this is just a semi-automatic stable backport and this was
+> >> already merged to mainline?
+> >>
+> >> Best regards,
+> >> Krzysztof
+> >
+> > Yes, I know. Do you know the reason why not enable other cpus irq ?
+> > I want to confirm whether it is right after below change ?
+> > enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0); ->
+> > enable_percpu_irq(evt->irq, 0);
+> > disable_percpu_irq(mct_irqs[MCT_L0_IRQ]) ->
+> > disable_percpu_irq(evt->irq)
+> 
+> This is a backport so are there any objections about this patch? Do you
+> think the patch is invalid so it should not be backported to stable?
+> 
+No, I just have some questions about the original code design.
+Your patch has no problem.
 
 Regards,
-Punnaiah
->
-> --
-> ~Vinod
->
+Andy
