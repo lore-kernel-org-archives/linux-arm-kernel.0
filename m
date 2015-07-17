@@ -1,51 +1,69 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 17 Jul 2015 08:29:23 +0200
-Subject: [PATCH v2 0/4] mfd: Improve DT binding docs for max77686 and max77802
-Message-ID: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+Date: Fri, 17 Jul 2015 08:29:24 +0200
+Subject: [PATCH v2 1/4] mfd: max77686: Don't suggest in binding to use a
+ deprecated property
+In-Reply-To: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1437114567-17629-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+The regulator-compatible property from the regulator DT binding was
+deprecated. But the max77686 DT binding doc still suggest to use it
+instead of the regulator node name's which is the correct approach.
 
-This series contains some improvements for the Device Tree bindings of
-the Maxim MAX77686 and MAX77802 multi-function devices.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-This is the second version of the series that addresses issues pointed
-out by Krzysztof Kozlowski and Sergei Shtylyov.
-
-Patch #1 changes the max77686 binding to not suggest using a deprecated
-property of the regulator DT binding.
-
-Patch #2 changes the max77686 example to use a generic node name instead
-of the chip's name.
-
-Patch #3 adds a DT binding for the mfd portion of the max77802 that was
-missing.
-
-Patch #4 moves the regulator portion of the max77686 to the regulator's
-DT binding sub-directory since it is a better fit for this information.
-This fourth patch needs an ack from the regulator sub-system maintainer.
+---
 
 Changes in v2:
 - Add Krzysztof Kozlowski Reviewed-by tag in patch #1.
-- Use the correct "maxim,max77802" compatible string.
-  Suggested by Krzysztof Kozlowski
-- Use a pmic generic node name for the max77802 node example.
-  Suggested by Sergei Shtylyov.
-- Use a generic name for the max77686 node in the regulator example.
 
-Javier Martinez Canillas (4):
-  mfd: max77686: Don't suggest in binding to use a deprecated property
-  mfd: max77686: Use a generic name for the PMIC node in the example
-  mfd: Add DT binding for Maxim MAX77802 IC
-  mfd: max77686: Split out regulator part from the DT binding
+ Documentation/devicetree/bindings/mfd/max77686.txt | 11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
- Documentation/devicetree/bindings/mfd/max77686.txt | 63 ++-----------------
- Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++
- .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
- 3 files changed, 101 insertions(+), 59 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
- create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
-
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index 163bd81a4607..8221102d3fc2 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -26,7 +26,7 @@ Optional node:
+ 	};
+ 	refer Documentation/devicetree/bindings/regulator/regulator.txt
+ 
+-  The regulator-compatible property of regulator should initialized with string
++  The regulator node's name should be initialized with a string
+ to get matched with their hardware counterparts as follow:
+ 
+ 	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
+@@ -55,16 +55,14 @@ Example:
+ 		reg = <0x09>;
+ 
+ 		voltage-regulators {
+-			ldo11_reg {
+-				regulator-compatible = "LDO11";
++			ldo11_reg: LDO11 {
+ 				regulator-name = "vdd_ldo11";
+ 				regulator-min-microvolt = <1900000>;
+ 				regulator-max-microvolt = <1900000>;
+ 				regulator-always-on;
+ 			};
+ 
+-			buck1_reg {
+-				regulator-compatible = "BUCK1";
++			buck1_reg: BUCK1 {
+ 				regulator-name = "vdd_mif";
+ 				regulator-min-microvolt = <950000>;
+ 				regulator-max-microvolt = <1300000>;
+@@ -72,8 +70,7 @@ Example:
+ 				regulator-boot-on;
+ 			};
+ 
+-			buck9_reg {
+-				regulator-compatible = "BUCK9";
++			buck9_reg: BUCK9 {
+ 				regulator-name = "CAM_ISP_CORE_1.2V";
+ 				regulator-min-microvolt = <1000000>;
+ 				regulator-max-microvolt = <1200000>;
 -- 
 2.4.3
