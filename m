@@ -1,68 +1,64 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 17 Jul 2015 13:04:04 +0100
-Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
+Date: Fri, 17 Jul 2015 13:04:06 +0100
+Subject: [PATCH 5/6] mailbox: Add generic mechanism for testing Mailbox
+ Controllers
 In-Reply-To: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
 References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1437134647-28298-6-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ST's platforms currently support a maximum of 5 Mailboxes, one for
-each of the supported co-processors situated on the platform.  Each
-Mailbox is divided up into 4 instances which consist of 32 channels.
-Messages are passed between the application and co-processors using
-shared memory areas.  It is the Client's responsibility to manage
-these areas.
+This particular Client implementation uses shared memory in order
+to pass messages between Mailbox users; however, it can be easily
+hacked to support any type of Controller.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/mailbox/Kconfig       |   7 +
- drivers/mailbox/Makefile      |   2 +
- drivers/mailbox/mailbox-sti.c | 562 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 571 insertions(+)
- create mode 100644 drivers/mailbox/mailbox-sti.c
+ drivers/mailbox/Kconfig        |   7 ++
+ drivers/mailbox/Makefile       |   2 +
+ drivers/mailbox/mailbox-test.c | 210 +++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 219 insertions(+)
+ create mode 100644 drivers/mailbox/mailbox-test.c
 
 diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index e269f08..2cc4c39 100644
+index 2cc4c39..7720bde 100644
 --- a/drivers/mailbox/Kconfig
 +++ b/drivers/mailbox/Kconfig
-@@ -70,4 +70,11 @@ config BCM2835_MBOX
- 	  the services of the Videocore. Say Y here if you want to use the
- 	  BCM2835 Mailbox.
+@@ -77,4 +77,11 @@ config STI_MBOX
+ 	  Mailbox implementation for STMicroelectonics family chips with
+ 	  hardware for interprocessor communication.
  
-+config STI_MBOX
-+	tristate "STI Mailbox framework support"
-+	depends on ARCH_STI && OF
++config MAILBOX_TEST
++	tristate "Mailbox Test Client"
++	depends on OF
 +	help
-+	  Mailbox implementation for STMicroelectonics family chips with
-+	  hardware for interprocessor communication.
++	  Test client to help with testing new Controller driver
++	  implementations.
 +
  endif
 diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 8e6d822..7cb4766 100644
+index 7cb4766..92435ef 100644
 --- a/drivers/mailbox/Makefile
 +++ b/drivers/mailbox/Makefile
-@@ -13,3 +13,5 @@ obj-$(CONFIG_PCC)		+= pcc.o
- obj-$(CONFIG_ALTERA_MBOX)	+= mailbox-altera.o
+@@ -2,6 +2,8 @@
  
- obj-$(CONFIG_BCM2835_MBOX)	+= bcm2835-mailbox.o
+ obj-$(CONFIG_MAILBOX)		+= mailbox.o
+ 
++obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
 +
-+obj-$(CONFIG_STI_MBOX)		+= mailbox-sti.o
-diff --git a/drivers/mailbox/mailbox-sti.c b/drivers/mailbox/mailbox-sti.c
+ obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
+ 
+ obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
+diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
 new file mode 100644
-index 0000000..0c82f7b
+index 0000000..10bfe3a
 --- /dev/null
-+++ b/drivers/mailbox/mailbox-sti.c
-@@ -0,0 +1,562 @@
++++ b/drivers/mailbox/mailbox-test.c
+@@ -0,0 +1,210 @@
 +/*
-+ * STi Mailbox
-+ *
 + * Copyright (C) 2015 ST Microelectronics
 + *
-+ * Author: Lee Jones <lee.jones@linaro.org> for ST Microelectronics
-+ *
-+ * Based on the original driver written by;
-+ *   Alexandre Torgue, Olivier Lebreton and Loic Pallardy
++ * Author: Lee Jones <lee.jones@linaro.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
@@ -70,551 +66,204 @@ index 0000000..0c82f7b
 + * (at your option) any later version.
 + */
 +
++#include <linux/debugfs.h>
 +#include <linux/err.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
 +#include <linux/kernel.h>
-+#include <linux/mailbox_controller.h>
++#include <linux/mailbox_client.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
-+#include <linux/of_device.h>
 +#include <linux/platform_device.h>
 +#include <linux/slab.h>
-+#include <dt-bindings/mailbox/mailbox.h>
++#include <linux/uaccess.h>
 +
-+#include "mailbox.h"
++#define MBOX_MAX_MSG_LEN 128
 +
-+#define STI_MBOX_INST_MAX	4      /* RAM saving: Max supported instances */
-+#define STI_MBOX_CHAN_MAX	20     /* RAM saving: Max supported channels  */
++static struct dentry *root_debugfs_dir;
 +
-+static DEFINE_SPINLOCK(sti_mbox_chan_lock);
-+
-+/**
-+ * STi Mailbox device data
-+ *
-+ * An IP Mailbox is currently composed of 4 instances
-+ * Each instance is currently composed of 32 channels
-+ * This means that we have 128 channels per Mailbox
-+ * A channel an be used for TX or RX
-+ *
-+ * @dev:	Device to which it is attached
-+ * @mbox:	Representation of a communication channel controller
-+ * @base:	Base address of the register mapping region
-+ * @name:	Name of the mailbox
-+ * @enabled:	Local copy of enabled channels
-+ */
-+struct sti_mbox_device {
++struct mbox_test_device {
 +	struct device		*dev;
-+	struct mbox_controller	*mbox;
-+	void __iomem		*base;
-+	const char		*name;
-+	u32			enabled[STI_MBOX_INST_MAX];
++	struct mbox_chan	*tx_channel;
++	struct mbox_chan	*rx_channel;
++	void __iomem		*mmio;
++
 +};
 +
-+/**
-+ * STi Mailbox platform specfic configuration
-+ *
-+ * @num_inst:	Maximum number of instances in one HW Mailbox
-+ * @num_chan:	Maximum number of channel per instance
-+ * @irq_val:	Register offset to read interrupt status
-+ * @irq_set:	Register offset to generate a Tx channel interrupt
-+ * @irq_clr:	Register offset to clear pending Rx interrupts
-+ * @ena_val:	Register offset to read enable status
-+ * @ena_set:	Register offset to enable a channel
-+ * @ena_clr:	Register offset to disable a channel
-+ */
-+struct sti_mbox_pdata {
-+	unsigned int		num_inst;
-+	unsigned int		num_chan;
-+	unsigned int		irq_val;
-+	unsigned int		irq_set;
-+	unsigned int		irq_clr;
-+	unsigned int		ena_val;
-+	unsigned int		ena_set;
-+	unsigned int		ena_clr;
-+};
-+
-+/**
-+ * STi Mailbox allocated channel information
-+ *
-+ * @mdev:	Pointer to parent Mailbox device
-+ * @instance:	Instance number channel resides in
-+ * @channel:	Channel number pertaining to this container
-+ * @direction:	Direction which data will travel in through the channel (Tx/Rx)
-+ */
-+struct sti_channel {
-+	struct sti_mbox_device	*mdev;
-+	unsigned int		instance;
-+	unsigned int		channel;
-+	unsigned int		direction;
-+};
-+
-+static inline bool sti_mbox_channel_is_enabled(struct mbox_chan *chan)
++static ssize_t mbox_test_write(struct file *filp,
++			       const char __user *userbuf,
++			       size_t count, loff_t *ppos)
 +{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+
-+	return mdev->enabled[instance] & BIT(channel);
-+}
-+
-+static inline
-+struct mbox_chan *sti_mbox_to_channel(struct mbox_controller *mbox,
-+				      unsigned int instance,
-+				      unsigned int channel)
-+{
-+	struct sti_channel *chan_info;
-+	int i;
-+
-+	for (i = 0; i < mbox->num_chans; i++) {
-+		chan_info = mbox->chans[i].con_priv;
-+		if (chan_info &&
-+		    chan_info->instance == instance &&
-+		    chan_info->channel == channel)
-+			return &mbox->chans[i];
-+	}
-+
-+	dev_err(mbox->dev,
-+		"Channel not registered: instance: %d channel: %d\n",
-+		instance, channel);
-+
-+	return NULL;
-+}
-+
-+static void sti_mbox_enable_channel(struct mbox_chan *chan)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+	unsigned long flags;
-+	void __iomem *base;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	spin_lock_irqsave(&sti_mbox_chan_lock, flags);
-+	mdev->enabled[instance] |= BIT(channel);
-+	writel_relaxed(BIT(channel), base + pdata->ena_set);
-+	spin_unlock_irqrestore(&sti_mbox_chan_lock, flags);
-+}
-+
-+static void sti_mbox_disable_channel(struct mbox_chan *chan)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+	unsigned long flags;
-+	void __iomem *base;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	spin_lock_irqsave(&sti_mbox_chan_lock, flags);
-+	mdev->enabled[instance] &= ~BIT(channel);
-+	writel_relaxed(BIT(channel), base + pdata->ena_clr);
-+	spin_unlock_irqrestore(&sti_mbox_chan_lock, flags);
-+}
-+
-+static void sti_mbox_clear_irq(struct mbox_chan *chan)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+	void __iomem *base;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	writel_relaxed(BIT(channel), base + pdata->irq_clr);
-+}
-+
-+static struct mbox_chan *sti_mbox_irq_to_channel(struct sti_mbox_device *mdev,
-+						 unsigned int instance)
-+{
-+	struct mbox_controller *mbox = mdev->mbox;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	struct mbox_chan *chan = NULL;
-+	unsigned int channel;
-+	unsigned long bits;
-+	void __iomem *base;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	bits = readl_relaxed(base + pdata->irq_val);
-+	if (!bits)
-+		/* No IRQs fired in specified instance */
-+		return NULL;
-+
-+	/* An IRQ has fired, find the associated channel */
-+	for (channel = 0; bits; channel++) {
-+		if (!test_and_clear_bit(channel, &bits))
-+			continue;
-+
-+		chan = sti_mbox_to_channel(mbox, instance, channel);
-+		if (chan) {
-+			dev_dbg(mbox->dev,
-+				"IRQ fired on instance: %d channel: %d\n",
-+				instance, channel);
-+			break;
-+		}
-+	}
-+
-+	return chan;
-+}
-+
-+static irqreturn_t sti_mbox_thread_handler(int irq, void *data)
-+{
-+	struct sti_mbox_device *mdev = data;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	struct mbox_chan *chan;
-+	unsigned int instance;
-+
-+	for (instance = 0; instance < pdata->num_inst; instance++) {
-+keep_looking:
-+		chan = sti_mbox_irq_to_channel(mdev, instance);
-+		if (!chan)
-+			continue;
-+
-+		mbox_chan_received_data(chan, NULL);
-+		sti_mbox_clear_irq(chan);
-+		sti_mbox_enable_channel(chan);
-+		goto keep_looking;
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static irqreturn_t sti_mbox_irq_handler(int irq, void *data)
-+{
-+	struct sti_mbox_device *mdev = data;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	struct sti_channel *chan_info;
-+	struct mbox_chan *chan;
-+	unsigned int instance;
-+	int ret = IRQ_NONE;
-+
-+	for (instance = 0; instance < pdata->num_inst; instance++) {
-+		chan = sti_mbox_irq_to_channel(mdev, instance);
-+		if (!chan)
-+			continue;
-+		chan_info = chan->con_priv;
-+
-+		if (!sti_mbox_channel_is_enabled(chan)) {
-+			dev_warn(mdev->dev,
-+				 "Unexpected IRQ: %s\n"
-+				 "  instance: %d: channel: %d [enabled: %x]\n",
-+				 mdev->name, chan_info->instance,
-+				 chan_info->channel, mdev->enabled[instance]);
-+			ret = IRQ_HANDLED;
-+			continue;
-+		}
-+
-+		sti_mbox_disable_channel(chan);
-+		ret = IRQ_WAKE_THREAD;
-+	}
-+
-+	if (ret == IRQ_NONE)
-+		dev_err(mdev->dev, "Spurious IRQ - was a channel requested?\n");
-+
-+	return ret;
-+}
-+
-+static bool sti_mbox_tx_is_ready(struct mbox_chan *chan)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+	void __iomem *base;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	if (!(chan_info->direction & MBOX_TX))
-+		return false;
-+
-+	if (!(readl_relaxed(base + pdata->ena_val) & BIT(channel))) {
-+		dev_dbg(mdev->dev, "Mbox: %s: inst: %d, chan: %d disabled\n",
-+			mdev->name, instance, channel);
-+		return false;
-+	}
-+
-+	if (readl_relaxed(base + pdata->irq_val) & BIT(channel)) {
-+		dev_dbg(mdev->dev, "Mbox: %s: inst: %d, chan: %d not ready\n",
-+			mdev->name, instance, channel);
-+		return false;
-+	}
-+
-+	return true;
-+}
-+
-+static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct sti_mbox_device *mdev = chan_info->mdev;
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	unsigned int instance = chan_info->instance;
-+	unsigned int channel = chan_info->channel;
-+	void __iomem *base;
-+
-+	if (!sti_mbox_tx_is_ready(chan))
-+		return -EBUSY;
-+
-+	base = mdev->base + (instance * sizeof(u32));
-+
-+	/* Send event to co-processor */
-+	writel_relaxed(BIT(channel), base + pdata->irq_set);
-+
-+	dev_dbg(mdev->dev,
-+		"Sent via Mailbox %s: instance: %d channel: %d\n",
-+		mdev->name, instance, channel);
-+
-+	return 0;
-+}
-+
-+static int sti_mbox_startup_chan(struct mbox_chan *chan)
-+{
-+	sti_mbox_clear_irq(chan);
-+	sti_mbox_enable_channel(chan);
-+
-+	return 0;
-+}
-+
-+static void sti_mbox_shutdown_chan(struct mbox_chan *chan)
-+{
-+	struct sti_channel *chan_info = chan->con_priv;
-+	struct mbox_controller *mbox = chan_info->mdev->mbox;
-+	int i;
-+
-+	for (i = 0; i < mbox->num_chans; i++)
-+		if (chan == &mbox->chans[i])
-+			break;
-+
-+	if (mbox->num_chans == i) {
-+		dev_warn(mbox->dev, "Request to free non-existent channel\n");
-+		return;
-+	}
-+
-+	sti_mbox_disable_channel(chan);
-+	sti_mbox_clear_irq(chan);
-+
-+	/* Reset channel */
-+	memset(chan, 0, sizeof(*chan));
-+	chan->mbox = mbox;
-+	chan->txdone_method = TXDONE_BY_POLL;
-+	spin_lock_init(&chan->lock);
-+}
-+
-+static struct mbox_chan *sti_mbox_xlate(struct mbox_controller *mbox,
-+					const struct of_phandle_args *spec)
-+{
-+	struct sti_mbox_device *mdev = dev_get_drvdata(mbox->dev);
-+	struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-+	struct sti_channel *chan_info;
-+	struct mbox_chan *chan = NULL;
-+	unsigned int instance  = spec->args[0];
-+	unsigned int channel   = spec->args[1];
-+	unsigned int direction = spec->args[2];
-+	int i;
-+
-+	/* Bounds checking */
-+	if (instance >= pdata->num_inst || channel  >= pdata->num_chan) {
-+		dev_err(mbox->dev,
-+			"Invalid channel requested instance: %d channel: %d\n",
-+			instance, channel);
-+		return NULL;
-+	}
-+
-+	for (i = 0; i < mbox->num_chans; i++) {
-+		chan_info = mbox->chans[i].con_priv;
-+
-+		/* Is requested channel free? */
-+		if (direction != MBOX_LOOPBACK &&
-+		    chan_info &&
-+		    mbox->dev == chan_info->mdev->dev &&
-+		    instance == chan_info->instance &&
-+		    channel == chan_info->channel) {
-+			dev_err(mbox->dev, "Channel in use\n");
-+			return NULL;
-+		}
-+
-+		/* Find the first free slot */
-+		if (!chan && !chan_info)
-+			chan = &mbox->chans[i];
-+	}
-+
-+	if (!chan) {
-+		dev_err(mbox->dev, "No free channels left\n");
-+		return NULL;
-+	}
-+
-+	chan_info = devm_kzalloc(mbox->dev, sizeof(*chan_info), GFP_KERNEL);
-+	if (!chan_info)
-+		return NULL;
-+
-+	chan_info->mdev		= mdev;
-+	chan_info->instance	= instance;
-+	chan_info->channel	= channel;
-+	chan_info->direction	= direction;
-+
-+	chan->con_priv = chan_info;
-+
-+	dev_info(mbox->dev,
-+		 "Mbox: %s: Created channel:\n"
-+		 "  instance: %d channel: %d direction: %s\n",
-+		 mdev->name, instance, channel,
-+		direction == MBOX_LOOPBACK ? "Loopback" :
-+		direction == MBOX_TX ? "Tx" : "Rx");
-+
-+	return chan;
-+}
-+
-+static struct mbox_chan_ops sti_mbox_ops = {
-+	.startup	= sti_mbox_startup_chan,
-+	.shutdown	= sti_mbox_shutdown_chan,
-+	.send_data	= sti_mbox_send_data,
-+	.last_tx_done	= sti_mbox_tx_is_ready,
-+};
-+
-+static const struct sti_mbox_pdata mbox_stih407_pdata = {
-+	.num_inst	= 4,
-+	.num_chan	= 32,
-+	.irq_val	= 0x04,
-+	.irq_set	= 0x24,
-+	.irq_clr	= 0x44,
-+	.ena_val	= 0x64,
-+	.ena_set	= 0x84,
-+	.ena_clr	= 0xa4,
-+};
-+
-+static const struct of_device_id sti_mailbox_match[] = {
-+	{
-+		.compatible = "st,stih407-mailbox",
-+		.data = (void *)&mbox_stih407_pdata
-+	},
-+	{ }
-+};
-+
-+static int sti_mbox_probe(struct platform_device *pdev)
-+{
-+	const struct of_device_id *match;
-+	struct mbox_controller *mbox;
-+	struct sti_mbox_device *mdev;
-+	struct device_node *np = pdev->dev.of_node;
-+	struct mbox_chan *chans;
-+	struct resource *res;
-+	int irq;
++	struct mbox_test_device *tdev = filp->private_data;
++	char *message;
 +	int ret;
 +
-+	match = of_match_device(sti_mailbox_match, &pdev->dev);
-+	if (!match) {
-+		dev_err(&pdev->dev, "No configuration found\n");
-+		return -ENODEV;
-+	}
-+	pdev->dev.platform_data = (struct sti_mbox_pdata *) match->data;
-+
-+	mdev = devm_kzalloc(&pdev->dev, sizeof(*mdev), GFP_KERNEL);
-+	if (!mdev)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, mdev);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	mdev->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (!mdev->base)
-+		return -ENOMEM;
-+
-+	ret = of_property_read_string(np, "mbox-name", &mdev->name);
-+	if (ret)
-+		mdev->name = np->full_name;
-+
-+	mbox = devm_kzalloc(&pdev->dev, sizeof(*mbox), GFP_KERNEL);
-+	if (!mbox)
-+		return -ENOMEM;
-+
-+	chans = devm_kzalloc(&pdev->dev,
-+			     sizeof(*chans) * STI_MBOX_CHAN_MAX, GFP_KERNEL);
-+	if (!chans)
-+		return -ENOMEM;
-+
-+	mdev->dev		= &pdev->dev;
-+	mdev->mbox		= mbox;
-+
-+	/* STi Mailbox does not have a Tx-Done or Tx-Ready IRQ */
-+	mbox->txdone_irq	= false;
-+	mbox->txdone_poll	= true;
-+	mbox->txpoll_period	= 100;
-+	mbox->ops		= &sti_mbox_ops;
-+	mbox->dev		= mdev->dev;
-+	mbox->of_xlate		= sti_mbox_xlate;
-+	mbox->chans		= chans;
-+	mbox->num_chans		= STI_MBOX_CHAN_MAX;
-+
-+	ret = mbox_controller_register(mbox);
-+	if (ret)
-+		return ret;
-+
-+	/* It's okay for Tx Mailboxes to not supply IRQs */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0) {
-+		dev_info(&pdev->dev,
-+			 "%s: Registered Tx only Mailbox\n", mdev->name);
-+		return 0;
-+	}
-+
-+	ret = devm_request_threaded_irq(&pdev->dev, irq,
-+					sti_mbox_irq_handler,
-+					sti_mbox_thread_handler,
-+					IRQF_ONESHOT, mdev->name, mdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Can't claim IRQ %d\n", irq);
-+		mbox_controller_unregister(mbox);
++	if (count > MBOX_MAX_MSG_LEN) {
++		dev_err(tdev->dev,
++			"Message length %d greater than max allowed %d\n",
++			count, MBOX_MAX_MSG_LEN);
 +		return -EINVAL;
 +	}
 +
-+	dev_info(&pdev->dev, "%s: Registered Tx/Rx Mailbox\n", mdev->name);
++	message = kzalloc(count, GFP_KERNEL);
++	if (!message)
++		return -ENOMEM;
 +
-+	return 0;
++	ret = copy_from_user(message, userbuf, count);
++	if (ret)
++		return -EFAULT;
++
++	print_hex_dump(KERN_ERR, "Client: Sending: ", DUMP_PREFIX_ADDRESS,
++		       16, 1, message, 16, true);
++
++	ret = mbox_send_message(tdev->tx_channel, message);
++	if (ret < 0)
++		dev_err(tdev->dev, "Failed to send message via mailbox\n");
++
++	kfree(message);
++
++	return ret < 0 ? ret : count;
 +}
 +
-+static int sti_mbox_remove(struct platform_device *pdev)
-+{
-+	struct sti_mbox_device *mdev = platform_get_drvdata(pdev);
-+
-+	mbox_controller_unregister(mdev->mbox);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver sti_mbox_driver = {
-+	.probe = sti_mbox_probe,
-+	.remove = sti_mbox_remove,
-+	.driver = {
-+		.name = "sti-mailbox",
-+		.of_match_table = sti_mailbox_match,
-+	},
++static const struct file_operations mbox_test_ops = {
++	.write	= mbox_test_write,
++	.open	= simple_open,
++	.llseek	= generic_file_llseek,
 +};
 +
-+static int __init sti_mbox_init(void)
++static int mbox_test_add_debugfs(struct platform_device *pdev,
++				 struct mbox_test_device *tdev)
 +{
-+	return platform_driver_register(&sti_mbox_driver);
++	if (!debugfs_initialized())
++		return 0;
++
++	root_debugfs_dir = debugfs_create_dir("mailbox", NULL);
++	if (!root_debugfs_dir) {
++		dev_err(&pdev->dev, "Failed to create Mailbox debugfs\n");
++		return -EINVAL;
++	}
++
++	debugfs_create_file("send-message", 0200, root_debugfs_dir,
++			    tdev, &mbox_test_ops);
++
++	return 0;
 +}
 +
-+static void __exit sti_mbox_exit(void)
++static void mbox_test_receive_message(struct mbox_client *client, void *message)
 +{
-+	platform_driver_unregister(&sti_mbox_driver);
++	struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
++
++	if (!tdev->mmio) {
++		dev_info(tdev->dev, "Client: Recived something [read mmio]\n");
++		return;
++	}
++
++	print_hex_dump(KERN_ERR, "Client: from co-proc: ", DUMP_PREFIX_ADDRESS,
++		       16, 1, tdev->mmio, MBOX_MAX_MSG_LEN, true);
 +}
 +
-+postcore_initcall(sti_mbox_init);
-+module_exit(sti_mbox_exit);
++static void mbox_test_prepare_message(struct mbox_client *client, void *message)
++{
++	struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
 +
-+MODULE_LICENSE("GPL");
-+MODULE_DESCRIPTION("STMicroelectronics Mailbox Controller");
++	if (tdev->mmio)
++		memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
++}
++
++static void mbox_test_message_sent(struct mbox_client *client,
++				   void *message, int r)
++{
++	if (r)
++		dev_warn(client->dev,
++			 "Client: Message could not be sent: %d\n", r);
++	else
++		dev_info(client->dev,
++			 "Client: Message sent\n");
++}
++
++static struct mbox_chan *
++mbox_test_request_channel(struct platform_device *pdev, const char *name)
++{
++	struct mbox_client *client;
++
++	client = devm_kzalloc(&pdev->dev, sizeof(*client), GFP_KERNEL);
++	if (!client)
++		return ERR_PTR(-ENOMEM);
++
++	client->dev		= &pdev->dev;
++	client->rx_callback	= mbox_test_receive_message;
++	client->tx_prepare	= mbox_test_prepare_message;
++	client->tx_done		= mbox_test_message_sent;
++	client->tx_block	= true;
++	client->knows_txdone	= false;
++	client->tx_tout		= 500;
++
++	return mbox_request_channel_byname(client, name);
++}
++
++static int mbox_test_probe(struct platform_device *pdev)
++{
++	struct mbox_test_device *tdev;
++	struct resource *res;
++	int ret;
++
++	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
++	if (!tdev)
++		return -ENOMEM;
++
++	/* It's okay for MMIO to be NULL */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	tdev->mmio = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(tdev->mmio))
++		tdev->mmio = NULL;
++
++	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
++	if (IS_ERR(tdev->tx_channel))
++		return PTR_ERR(tdev->tx_channel);
++
++	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
++	if (IS_ERR(tdev->rx_channel))
++		return PTR_ERR(tdev->rx_channel);
++
++	tdev->dev = &pdev->dev;
++	platform_set_drvdata(pdev, tdev);
++
++	ret = mbox_test_add_debugfs(pdev, tdev);
++	if (ret)
++		return ret;
++
++	dev_info(&pdev->dev, "Successfully registered\n");
++
++	return 0;
++}
++
++static int mbox_test_remove(struct platform_device *pdev)
++{
++	struct mbox_test_device *tdev = platform_get_drvdata(pdev);
++
++	debugfs_remove_recursive(root_debugfs_dir);
++
++	mbox_free_channel(tdev->tx_channel);
++	mbox_free_channel(tdev->rx_channel);
++
++	return 0;
++}
++
++static const struct of_device_id mbox_test_match[] = {
++	{ .compatible = "mailbox_test" },
++	{},
++};
++
++static struct platform_driver mbox_test_driver = {
++	.driver = {
++		.name = "mailbox_sti_test",
++		.of_match_table = mbox_test_match,
++	},
++	.probe  = mbox_test_probe,
++	.remove = mbox_test_remove,
++};
++module_platform_driver(mbox_test_driver);
++
++MODULE_DESCRIPTION("Generic Mailbox Testing Facility");
 +MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org");
-+MODULE_ALIAS("platform:mailbox-sti");
++MODULE_LICENSE("GPL v2");
 -- 
 1.9.1
