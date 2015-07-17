@@ -1,29 +1,41 @@
-From: poggi.raph@gmail.com (=?UTF-8?Q?Rapha=C3=ABl_Poggi?=)
-Date: Fri, 17 Jul 2015 08:27:32 +0200
-Subject: [PATCH] ARM: VDSO: fix regression with toolchains lacking ld.bfd
- executable
-In-Reply-To: <55A82D79.3000106@mentor.com>
-References: <1436934852-27547-1-git-send-email-nathan_lynch@mentor.com>
- <CACqcpZBnU+17Ob85hYhikQUdNxtNiUs47PGQXfZDQyXYrTgnyg@mail.gmail.com>
- <55A82D79.3000106@mentor.com>
-Message-ID: <CACqcpZCyfYKbqQK0i3+TwuQfQr=3R2SrstZdvg2Cw5vv3=LJ8Q@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 17 Jul 2015 08:29:25 +0200
+Subject: [PATCH v2 2/4] mfd: max77686: Use a generic name for the PMIC node in
+ the example
+In-Reply-To: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1437114567-17629-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yes, I use the CodeBench Lite 2014.05 with gcc 4.8.3
+The ePAR standard says that: "the name of a node should be somewhat
+generic, reflecting the function of the device and not its precise
+programming model."
 
-2015-07-17 0:17 GMT+02:00 Nathan Lynch <Nathan_Lynch@mentor.com>:
-> On 07/16/2015 03:34 PM, Rapha?l Poggi wrote:
->> Hi Nathan,
->>
->> I just tested it right now and it works, you can add my:
->>
->> Tested-by: Rapha?l Poggi <poggi.raph@gmail.com>
->
-> Thanks.  Are you also using a CodeBench toolchain, or something else?
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+So, change the max77686 binding document example to use a generic
+node name instead of using the chip's name.
+
+Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+
+Changes in v2: None
+
+ Documentation/devicetree/bindings/mfd/max77686.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
+index 8221102d3fc2..d2ed3c20a5c3 100644
+--- a/Documentation/devicetree/bindings/mfd/max77686.txt
++++ b/Documentation/devicetree/bindings/mfd/max77686.txt
+@@ -48,7 +48,7 @@ to get matched with their hardware counterparts as follow:
+ 
+ Example:
+ 
+-	max77686 at 09 {
++	max77686: pmic at 09 {
+ 		compatible = "maxim,max77686";
+ 		interrupt-parent = <&wakeup_eint>;
+ 		interrupts = <26 0>;
+-- 
+2.4.3
