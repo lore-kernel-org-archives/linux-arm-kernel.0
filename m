@@ -1,43 +1,22 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 17 Jul 2015 11:19:26 +0200
-Subject: [PATCH v2 2/4] mfd: max77686: Use a generic name for the PMIC
- node in the example
-In-Reply-To: <55A8C6B2.5020109@cogentembedded.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-3-git-send-email-javier@osg.samsung.com>
- <55A8C6B2.5020109@cogentembedded.com>
-Message-ID: <55A8C89E.8010606@osg.samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 17 Jul 2015 11:20:48 +0200 (CEST)
+Subject: [PATCH V4 1/1] irqchip: imx-gpcv2: IMX GPCv2 drivers for wakeup
+ source and suspend
+In-Reply-To: <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
+References: <1436371523-18083-1-git-send-email-shenwei.wang@freescale.com>
+ <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
+Message-ID: <alpine.DEB.2.11.1507171119250.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sergei,
+On Thu, 16 Jul 2015, Shenwei Wang wrote:
 
-On 07/17/2015 11:11 AM, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 7/17/2015 9:29 AM, Javier Martinez Canillas wrote:
-> 
->> The ePAR standard says that: "the name of a node should be somewhat
-> 
->    ePAPR.
->
+> Kindly PING.
 
-Thanks for pointing it out. I guess that Lee can fix the typo when applying?
+If you folks would kindly CC the proper mailing list for irq chip
+patches, then they would end up in the proper mail folder and not in
+my random crap mbox.
 
->> generic, reflecting the function of the device and not its precise
->> programming model."
-> 
->> So, change the max77686 binding document example to use a generic
->> node name instead of using the chip's name.
-> 
->> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> MBR, Sergei
-> 
+Thanks,
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+	tglx
