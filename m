@@ -1,64 +1,52 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 17 Jul 2015 16:58:22 +0100
-Subject: [PATCH 2/2] arm64: dma-mapping: consolidate __swiotlb_mmap()
-In-Reply-To: <65a75c2ea16d0fff8e8ec18a8f42e204c33249ed.1437148528.git.robin.murphy@arm.com>
-References: <65a75c2ea16d0fff8e8ec18a8f42e204c33249ed.1437148528.git.robin.murphy@arm.com>
-Message-ID: <114c1dcf89f3af794f69f85547127a33691b433f.1437148528.git.robin.murphy@arm.com>
+Date: Fri, 17 Jul 2015 16:58:21 +0100
+Subject: [PATCH 1/2] arm64: dma-mapping: implement dma_get_sgtable()
+Message-ID: <65a75c2ea16d0fff8e8ec18a8f42e204c33249ed.1437148528.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 9d3bfbb4df58 ("arm64: Combine coherent and non-coherent
-swiotlb dma_ops"), __dma_common_mmap() is no longer shared between two
-callers, so roll it into the remaining one.
+The default dma_common_get_sgtable() implementation relies on the CPU
+address of the buffer being a regular lowmem address. This is not always
+the case on arm64, since allocations from the various DMA pools may have
+remapped vmalloc addresses, rendering the use of virt_to_page() invalid.
 
+Fix this by providing our own implementation based on the fact that we
+can safely derive a physical address from the DMA address in both cases.
+
+CC: Jon Medhurst <tixy@linaro.org>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/mm/dma-mapping.c | 19 ++++++-------------
- 1 file changed, 6 insertions(+), 13 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 4b9b600..07c6976 100644
+index d16a1ce..4b9b600 100644
 --- a/arch/arm64/mm/dma-mapping.c
 +++ b/arch/arm64/mm/dma-mapping.c
-@@ -303,9 +303,9 @@ static void __swiotlb_sync_sg_for_device(struct device *dev,
- 				       sg->length, dir);
+@@ -337,10 +337,24 @@ static int __swiotlb_mmap(struct device *dev,
+ 	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
  }
  
--/* vma->vm_page_prot must be set appropriately before calling this function */
--static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
--			     void *cpu_addr, dma_addr_t dma_addr, size_t size)
-+static int __swiotlb_mmap(struct device *dev, struct vm_area_struct *vma,
-+			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
++int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
++			  void *cpu_addr, dma_addr_t handle, size_t size,
 +			  struct dma_attrs *attrs)
- {
- 	int ret = -ENXIO;
- 	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >>
-@@ -314,6 +314,9 @@ static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
- 	unsigned long pfn = dma_to_phys(dev, dma_addr) >> PAGE_SHIFT;
- 	unsigned long off = vma->vm_pgoff;
- 
-+	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
-+					     is_device_dma_coherent(dev));
++{
++	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
 +
- 	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
- 		return ret;
- 
-@@ -327,16 +330,6 @@ static int __dma_common_mmap(struct device *dev, struct vm_area_struct *vma,
- 	return ret;
- }
- 
--static int __swiotlb_mmap(struct device *dev,
--			  struct vm_area_struct *vma,
--			  void *cpu_addr, dma_addr_t dma_addr, size_t size,
--			  struct dma_attrs *attrs)
--{
--	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot,
--					     is_device_dma_coherent(dev));
--	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
--}
--
- int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
- 			  void *cpu_addr, dma_addr_t handle, size_t size,
- 			  struct dma_attrs *attrs)
++	if (!ret)
++		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
++			    PAGE_ALIGN(size), 0);
++
++	return ret;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+ 	.mmap = __swiotlb_mmap,
++	.get_sgtable = __swiotlb_get_sgtable,
+ 	.map_page = __swiotlb_map_page,
+ 	.unmap_page = __swiotlb_unmap_page,
+ 	.map_sg = __swiotlb_map_sg_attrs,
 -- 
 1.9.1
