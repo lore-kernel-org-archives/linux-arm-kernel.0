@@ -1,70 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Jul 2015 12:04:43 +0100
-Subject: [PATCH] arm64: Better native ptrace support for compat tasks
-In-Reply-To: <20150717104953.GA13712@e104818-lin.cambridge.arm.com>
-References: <1436887217-13158-1-git-send-email-catalin.marinas@arm.com>
- <20150717102629.GI18994@arm.com>
- <20150717104953.GA13712@e104818-lin.cambridge.arm.com>
-Message-ID: <20150717110443.GM18994@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Jul 2015 12:05:06 +0100
+Subject: [PATCH 3/5] arm64: kernel: Add min/max values in
+ feature-detection register values.
+In-Reply-To: <20150717105110.GL18994@arm.com>
+References: <1437062519-18883-1-git-send-email-james.morse@arm.com>
+ <1437062519-18883-4-git-send-email-james.morse@arm.com>
+ <20150717105110.GL18994@arm.com>
+Message-ID: <20150717110505.GB13712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 11:49:54AM +0100, Catalin Marinas wrote:
-> On Fri, Jul 17, 2015 at 11:26:29AM +0100, Will Deacon wrote:
-> > On Tue, Jul 14, 2015 at 04:20:17PM +0100, Catalin Marinas wrote:
-> > > The compat ptrace interface allows access to the TLS register, hardware
-> > > breakpoints and watchpoints, syscall number. However, a native task
-> > > using the native ptrace interface to debug compat tasks (e.g. multi-arch
-> > > gdb) only has access to the general and VFP register sets. The compat
-> > > ptrace interface cannot be accessed from a native task.
-> > > 
-> > > This patch adds a new user_aarch32_ptrace_view which contains the TLS,
-> > > hardware breakpoint/watchpoint and syscall number regsets in addition to
-> > > the existing GPR and VFP regsets. This view is backwards compatible with
-> > > the previous kernels. Core dumping of 32-bit tasks and compat ptrace are
-> > > not affected since the original user_aarch32_view is preserved.
-> > 
-> > [...]
-> > 
-> > > +static const struct user_regset aarch32_ptrace_regsets[] = {
-> > > +	[REGSET_GPR] = {
-> > > +		.core_note_type = NT_PRSTATUS,
-> > > +		.n = COMPAT_ELF_NGREG,
-> > > +		.size = sizeof(compat_elf_greg_t),
-> > > +		.align = sizeof(compat_elf_greg_t),
-> > > +		.get = compat_gpr_get,
-> > > +		.set = compat_gpr_set
-> > > +	},
-> > > +	[REGSET_FPR] = {
-> > > +		.core_note_type = NT_ARM_VFP,
-> > > +		.n = VFP_STATE_SIZE / sizeof(compat_ulong_t),
-> > > +		.size = sizeof(compat_ulong_t),
-> > > +		.align = sizeof(compat_ulong_t),
-> > > +		.get = compat_vfp_get,
-> > > +		.set = compat_vfp_set
-> > 
-> > 
-> > I don't see how this is "backwards compatible with the previous kernels".
+On Fri, Jul 17, 2015 at 11:51:11AM +0100, Will Deacon wrote:
+> On Thu, Jul 16, 2015 at 05:01:57PM +0100, James Morse wrote:
+> > When a new cpu feature is available, the cpu feature bits will be 0001,
+> > when features are updated, this value will be incremented. This patch
+> > changes 'register_value' to be '{min,max}_register_value', and checks
+> > the value falls in this range.
 > 
-> The first two entries of aarch32_ptrace_regsets are the same as the two
-> aarch32_regsets entries currently in use before this patch (I just
-> dropped "COMPAT" from REGSET_* for consistency with the rest of the
-> array).
+> I'm not sure this is completely true. For example, the new atomics are
+> advertised with feature bits of 0002, whilst 0001 is RESERVED and 0000
+> means they're not present.
 > 
-> > If there is some userspace out there that expects a native view onto the
-> > registers of a compat task, then that's no longer the case, right? For
-> > example, NT_PRFPREG requests will no longer work afaict.
-> 
-> But this never worked since task_user_regset_view() always returned
-> user_aarch32_view (with the aarch32_regsets) if the ptrace'd task was
-> compat. So a native gdb debugging compat task is expected to use
-> NT_ARM_VFP before and after this patch.
+> Also, the problem with specifying an upper bound is that we have to keep
+> updating it. Elsewhere in the kernel, we've treated these as 4-bit signed
+> fields and if X > Y, we assume that the feature set of X is a superset of
+> Y. Unfortunately, the ARM ARM doesn't provide this insight but it is
+> something that we teased out of the architects.
 
-Aha, sorry, I got confused because you've wired up the native hw-breakpoint
-interfaces later on in the regset (which is fine, because I don't think
-the parent could've got into the compat hw-breakpoint ptrace requests
-since they're not regset-based).
+I got another verbal confirmation yesterday from the architects that
+this is the principle the ID bits are based on (so higher number
+preserves the existing functionality).
 
-So I think this looks fine, thanks!
+We currently have a mix of exact match in cpufeature.c or greater-than
+in some .S files. So we have two ways to address this:
 
-Will
+1. Always use >= but with signed 4-bit field
+2. Use min/max in cpufeature.c with max being 7
+
+I think we should just go for 1 unless anyone sees a problem with the
+current CPU implementations (and we need to keep an eye on the
+architects for future additions to these registers).
+
+-- 
+Catalin
