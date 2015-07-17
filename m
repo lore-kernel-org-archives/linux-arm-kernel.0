@@ -1,70 +1,51 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 17 Jul 2015 08:50:30 +0200
-Subject: [PATCH] arm64: remove dead code
-In-Reply-To: <CAKv+Gu_TWN6wGxe4VuuoEzSELbOcqGPtWL_SM4-dFkjai8eLtQ@mail.gmail.com>
-References: <1437069533-22103-1-git-send-email-msalter@redhat.com>
- <CAKv+Gu_TWN6wGxe4VuuoEzSELbOcqGPtWL_SM4-dFkjai8eLtQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8f7eEYx183qp5RBHns6sNwYEVCZsw=fKFovTe8FSeBVg@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 17 Jul 2015 15:51:17 +0900
+Subject: [GIT PULL] ARM: defconfig: Improvements for 4.3
+Message-ID: <1437115877-22010-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(use Geoff's correct email address)
+Dear Kukjin,
 
-On 17 July 2015 at 08:49, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> (adding Geoff and Takahiro)
->
-> On 16 July 2015 at 19:58, Mark Salter <msalter@redhat.com> wrote:
->> Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed
->> soft_reset() from the kernel. This was the only caller of
->> setup_mm_for_reboot(), so remove that also.
->>
->
-> I am wondering if setup_mm_for_reboot() is being used in the kexec
-> patches. Perhaps we should check that before removing it.
->
-> Geoff?
->
->
->> Signed-off-by: Mark Salter <msalter@redhat.com>
->> ---
->>  arch/arm64/include/asm/mmu.h |  1 -
->>  arch/arm64/mm/mmu.c          | 11 -----------
->>  2 files changed, 12 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
->> index 79fcfb0..0302087 100644
->> --- a/arch/arm64/include/asm/mmu.h
->> +++ b/arch/arm64/include/asm/mmu.h
->> @@ -28,7 +28,6 @@ typedef struct {
->>  #define ASID(mm)       ((mm)->context.id & 0xffff)
->>
->>  extern void paging_init(void);
->> -extern void setup_mm_for_reboot(void);
->>  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
->>  extern void init_mem_pgprot(void);
->>  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
->> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
->> index a4ede4e..63012fe 100644
->> --- a/arch/arm64/mm/mmu.c
->> +++ b/arch/arm64/mm/mmu.c
->> @@ -461,17 +461,6 @@ void __init paging_init(void)
->>  }
->>
->>  /*
->> - * Enable the identity mapping to allow the MMU disabling.
->> - */
->> -void setup_mm_for_reboot(void)
->> -{
->> -       cpu_set_reserved_ttbr0();
->> -       flush_tlb_all();
->> -       cpu_set_idmap_tcr_t0sz();
->> -       cpu_switch_mm(idmap_pg_dir, &init_mm);
->> -}
->> -
->> -/*
->>   * Check whether a kernel address is valid (derived from arch/x86/).
->>   */
->>  int kern_addr_valid(unsigned long addr)
->> --
->> 2.4.3
->>
+Few defconfig related changes.
+
+Description along with a tag.
+You can find them also on the lists with my reviewed-by.
+
+Best regards,
+Krzysztof
+
+
+The following changes since commit 1c4c7159ed2468f3ac4ce5a7f08d79663d381a93:
+
+  Merge tag 'ext4_for_linus_stable' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2015-07-05 16:24:54 -0700)
+
+are available in the git repository at:
+
+
+  https://github.com/krzk/linux.git tags/samsung-defconfig-4.3
+
+for you to fetch changes up to 5efedc7617df7add295702f21f11dd7e7a67b76e:
+
+  ARM: multi_v7_defconfig: Enable max77802 regulator (2015-07-16 15:57:31 +0900)
+
+----------------------------------------------------------------
+Defconfig changes around Exynos based boards:
+1. Enable sound on Odroid XU3 on exynos defconfig.
+2. Enable NTC thermistors for Chromebooks on exynos and multi_v7.
+3. Enable main PMIC regulator for Chromebooks on multi_v7.
+4. Clean up in multi_v7 - remove old (non-existing) configs.
+
+----------------------------------------------------------------
+Anand Moon (1):
+      ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
+
+Javier Martinez Canillas (4):
+      ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
+      ARM: multi_v7_defconfig: Enable NTC Thermistors support
+      ARM: exynos_defconfig: Enable NTC Thermistors support
+      ARM: multi_v7_defconfig: Enable max77802 regulator
+
+ arch/arm/configs/exynos_defconfig   | 3 +++
+ arch/arm/configs/multi_v7_defconfig | 5 +++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
