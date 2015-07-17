@@ -1,333 +1,119 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Jul 2015 10:46:42 +0100
-Subject: [PATCH] irqchip: gicv3-its: Fix mapping of LPIs to collections
-Message-ID: <1437126402-11677-1-git-send-email-marc.zyngier@arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 17 Jul 2015 18:54:32 +0900
+Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
+In-Reply-To: <1437120340.5797.46.camel@collabora.co.uk>
+References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
+ <1437120340.5797.46.camel@collabora.co.uk>
+Message-ID: <CAJKOXPfgiAdrM1v02YTOFZXVyM-RFssX4j=X61Thgy2eEidFrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GICv3 ITS architecture allows a given [DevID, EventID] pair to be
-translated to a [LPI, Collection] pair, where DevID is the device writing
-the MSI, EventID is the payload being written, LPI is the actual
-interrupt number, and Collection is roughly equivalent to a target CPU.
+2015-07-17 17:05 GMT+09:00 Sjoerd Simons <sjoerd.simons@collabora.co.uk>:
+> On Wed, 2015-07-15 at 10:36 +0900, Chanho Park wrote:
+>> The cpu booting of exynos5422 has been still broken since we
+>> discussed
+>> it in last year[1]. I found this resetting codes from odroid-xu3
+>> kernel of
+>> hardkernel, it could help to boot 8 cores well. This patch need to
+>> have
+>> more test like STR and other SoC especially exynos5800 which is
+>> variant
+>> of exynos5422. If this patch is broken on exynos5800, I'll find
+>> another
+>> way to check exynos5422.
+>>
+>> This patch is top of my previous exynos5422 cpu ordering patch[2] and
+>> need to enable CONFIG_EXYNOS5420_MCPM=y
+>>
+>> [    0.047509] CPU0: update cpu_capacity 448
+>> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
+>> [    0.047874] Setting up static identity map for 0x400082c0 -
+>> 0x40008318
+>> [    0.048340] ARM CCI driver probed
+>> [    0.048597] Exynos MCPM support installed
+>> [    0.065676] CPU1: update cpu_capacity 448
+>> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
+>> [    0.070672] CPU2: update cpu_capacity 448
+>> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
+>> [    0.075644] CPU3: update cpu_capacity 448
+>> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
+>> [    0.080590] CPU4: update cpu_capacity 1535
+>> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
+>> [    0.085591] CPU5: update cpu_capacity 1535
+>> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
+>> [    0.090590] CPU6: update cpu_capacity 1535
+>> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
+>> [    0.095585] CPU7: update cpu_capacity 1535
+>> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
+>> [    0.095720] Brought up 8 CPUs
+>>
+>> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015
+>> -June/350632.html
+>> [2]:https://patchwork.kernel.org/patch/6782891/
+>>
+>> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+>> Cc: Chanwoo Choi <cw00.choi@samsung.com>
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: Heesub Shin <heesub.shin@samsung.com>
+>> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
+>> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
+>> Signed-off-by: Chanho Park <parkch98@gmail.com>
+>> ---
+>>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
+>>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
+>>  2 files changed, 18 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach
+>> -exynos/mcpm-exynos.c
+>> index 9bdf547..a076dde 100644
+>> --- a/arch/arm/mach-exynos/mcpm-exynos.c
+>> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
+>> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu,
+>> unsigned int cluster)
+>>               cluster >= EXYNOS5420_NR_CLUSTERS)
+>>               return -EINVAL;
+>>
+>> -     exynos_cpu_power_up(cpunr);
+>> +     if (!exynos_cpu_power_state(cpunr)) {
+>> +             exynos_cpu_power_up(cpunr);
+>> +
+>> +             if (soc_is_exynos5800() && cluster) {
+>
+> This seems a tad subtle. You're assuming here cluster 1 is the little
+> cluster. Would be good to make this more specific/obvious.
+>
+> From looking at other mcpm-exynos code the assumption seems valid
+> (otherwise more code would be broken), so it may make sense to simply
+> define LITTLE_CLUSTER and BIG_CLUSTER and check explicitely for that.
+>
+> Krzysztof on IRC mention that the cluster layout is read from MPIDR so
+> in principle this assumption could be invalidated on some Exynos
+> versions, but then again, given the amount of fallout from that i don't
+> see it as a practical issue at the moment :)
 
-Each LPI can be mapped to a separate collection, but the ITS driver
-insists on maintaining the collection on a device basis, instead of doing
-it on a per interrupt basis.
+For these SoCs this cluster ID should be fixed. However you are right
+that it is a little fuzzy so it would be better to find a more
+reliable way.
 
-This is obviously flawed, and this patch fixes it by adding a per interrupt
-index that indicates which collection number is in use.
+>
+>> +                     while (!pmu_raw_readl(S5P_PMU_SPARE2))
+>> +                             udelay(10);
+>
+> Would love to see some documentation for this magical pmu register, but
+> i guess you can't have them all :)
 
-Cc: stable at vger.kernel.org	# 4.1, 4.0
-Reported-by: Ian Campbell <ian.campbell@citrix.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 111 ++++++++++++++++++++++++++-------------
- 1 file changed, 75 insertions(+), 36 deletions(-)
+I started documenting more of such registers here:
+Documentation/arm/Samsung/Bootloader-interface.txt
+The SPARE2 register is 0x908. I would be good to extend the
+documentation but unfortunately all I knowledge I got came from
+observation or vendor's source code, not from bootloader source code.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 1b7e155..c00e2db 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -75,6 +75,13 @@ struct its_node {
- 
- #define ITS_ITT_ALIGN		SZ_256
- 
-+struct event_lpi_map {
-+	unsigned long		*lpi_map;
-+	u16			*col_map;
-+	irq_hw_number_t		lpi_base;
-+	int			nr_lpis;
-+};
-+
- /*
-  * The ITS view of a device - belongs to an ITS, a collection, owns an
-  * interrupt translation table, and a list of interrupts.
-@@ -82,11 +89,8 @@ struct its_node {
- struct its_device {
- 	struct list_head	entry;
- 	struct its_node		*its;
--	struct its_collection	*collection;
-+	struct event_lpi_map	event_map;
- 	void			*itt;
--	unsigned long		*lpi_map;
--	irq_hw_number_t		lpi_base;
--	int			nr_lpis;
- 	u32			nr_ites;
- 	u32			device_id;
- };
-@@ -99,6 +103,14 @@ static struct rdists *gic_rdists;
- #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- 
-+static struct its_collection *dev_event_to_col(struct its_device *its_dev,
-+					       u32 event)
-+{
-+	struct its_node *its = its_dev->its;
-+
-+	return its->collections + its_dev->event_map.col_map[event];
-+}
-+
- /*
-  * ITS command descriptors - parameters to be encoded in a command
-  * block.
-@@ -134,7 +146,7 @@ struct its_cmd_desc {
- 		struct {
- 			struct its_device *dev;
- 			struct its_collection *col;
--			u32 id;
-+			u32 event_id;
- 		} its_movi_cmd;
- 
- 		struct {
-@@ -241,7 +253,7 @@ static struct its_collection *its_build_mapd_cmd(struct its_cmd_block *cmd,
- 
- 	its_fixup_cmd(cmd);
- 
--	return desc->its_mapd_cmd.dev->collection;
-+	return NULL;
- }
- 
- static struct its_collection *its_build_mapc_cmd(struct its_cmd_block *cmd,
-@@ -260,52 +272,72 @@ static struct its_collection *its_build_mapc_cmd(struct its_cmd_block *cmd,
- static struct its_collection *its_build_mapvi_cmd(struct its_cmd_block *cmd,
- 						  struct its_cmd_desc *desc)
- {
-+	struct its_collection *col;
-+
-+	col = dev_event_to_col(desc->its_mapvi_cmd.dev,
-+			       desc->its_mapvi_cmd.event_id);
-+
- 	its_encode_cmd(cmd, GITS_CMD_MAPVI);
- 	its_encode_devid(cmd, desc->its_mapvi_cmd.dev->device_id);
- 	its_encode_event_id(cmd, desc->its_mapvi_cmd.event_id);
- 	its_encode_phys_id(cmd, desc->its_mapvi_cmd.phys_id);
--	its_encode_collection(cmd, desc->its_mapvi_cmd.dev->collection->col_id);
-+	its_encode_collection(cmd, col->col_id);
- 
- 	its_fixup_cmd(cmd);
- 
--	return desc->its_mapvi_cmd.dev->collection;
-+	return col;
- }
- 
- static struct its_collection *its_build_movi_cmd(struct its_cmd_block *cmd,
- 						 struct its_cmd_desc *desc)
- {
-+	struct its_collection *col;
-+
-+	col = dev_event_to_col(desc->its_movi_cmd.dev,
-+			       desc->its_movi_cmd.event_id);
-+
- 	its_encode_cmd(cmd, GITS_CMD_MOVI);
- 	its_encode_devid(cmd, desc->its_movi_cmd.dev->device_id);
--	its_encode_event_id(cmd, desc->its_movi_cmd.id);
-+	its_encode_event_id(cmd, desc->its_movi_cmd.event_id);
- 	its_encode_collection(cmd, desc->its_movi_cmd.col->col_id);
- 
- 	its_fixup_cmd(cmd);
- 
--	return desc->its_movi_cmd.dev->collection;
-+	return col;
- }
- 
- static struct its_collection *its_build_discard_cmd(struct its_cmd_block *cmd,
- 						    struct its_cmd_desc *desc)
- {
-+	struct its_collection *col;
-+
-+	col = dev_event_to_col(desc->its_discard_cmd.dev,
-+			       desc->its_discard_cmd.event_id);
-+
- 	its_encode_cmd(cmd, GITS_CMD_DISCARD);
- 	its_encode_devid(cmd, desc->its_discard_cmd.dev->device_id);
- 	its_encode_event_id(cmd, desc->its_discard_cmd.event_id);
- 
- 	its_fixup_cmd(cmd);
- 
--	return desc->its_discard_cmd.dev->collection;
-+	return col;
- }
- 
- static struct its_collection *its_build_inv_cmd(struct its_cmd_block *cmd,
- 						struct its_cmd_desc *desc)
- {
-+	struct its_collection *col;
-+
-+	col = dev_event_to_col(desc->its_inv_cmd.dev,
-+			       desc->its_inv_cmd.event_id);
-+
- 	its_encode_cmd(cmd, GITS_CMD_INV);
- 	its_encode_devid(cmd, desc->its_inv_cmd.dev->device_id);
- 	its_encode_event_id(cmd, desc->its_inv_cmd.event_id);
- 
- 	its_fixup_cmd(cmd);
- 
--	return desc->its_inv_cmd.dev->collection;
-+	return col;
- }
- 
- static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
-@@ -497,7 +529,7 @@ static void its_send_movi(struct its_device *dev,
- 
- 	desc.its_movi_cmd.dev = dev;
- 	desc.its_movi_cmd.col = col;
--	desc.its_movi_cmd.id = id;
-+	desc.its_movi_cmd.event_id = id;
- 
- 	its_send_single_command(dev->its, its_build_movi_cmd, &desc);
- }
-@@ -528,7 +560,7 @@ static void its_send_invall(struct its_node *its, struct its_collection *col)
- static inline u32 its_get_event_id(struct irq_data *d)
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
--	return d->hwirq - its_dev->lpi_base;
-+	return d->hwirq - its_dev->event_map.lpi_base;
- }
- 
- static void lpi_set_config(struct irq_data *d, bool enable)
-@@ -583,7 +615,7 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 
- 	target_col = &its_dev->its->collections[cpu];
- 	its_send_movi(its_dev, target_col, id);
--	its_dev->collection = target_col;
-+	its_dev->event_map.col_map[id] = cpu;
- 
- 	return IRQ_SET_MASK_OK_DONE;
- }
-@@ -713,8 +745,10 @@ out:
- 	return bitmap;
- }
- 
--static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
-+static void its_lpi_free(struct event_lpi_map *map)
- {
-+	int base = map->lpi_base;
-+	int nr_ids = map->nr_lpis;
- 	int lpi;
- 
- 	spin_lock(&lpi_lock);
-@@ -731,7 +765,8 @@ static void its_lpi_free(unsigned long *bitmap, int base, int nr_ids)
- 
- 	spin_unlock(&lpi_lock);
- 
--	kfree(bitmap);
-+	kfree(map->lpi_map);
-+	kfree(map->col_map);
- }
- 
- /*
-@@ -1099,11 +1134,11 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	struct its_device *dev;
- 	unsigned long *lpi_map;
- 	unsigned long flags;
-+	u16 *col_map = NULL;
- 	void *itt;
- 	int lpi_base;
- 	int nr_lpis;
- 	int nr_ites;
--	int cpu;
- 	int sz;
- 
- 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-@@ -1117,20 +1152,24 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	sz = max(sz, ITS_ITT_ALIGN) + ITS_ITT_ALIGN - 1;
- 	itt = kzalloc(sz, GFP_KERNEL);
- 	lpi_map = its_lpi_alloc_chunks(nvecs, &lpi_base, &nr_lpis);
-+	if (lpi_map)
-+		col_map = kzalloc(sizeof(*col_map) * nr_lpis, GFP_KERNEL);
- 
--	if (!dev || !itt || !lpi_map) {
-+	if (!dev || !itt || !lpi_map || !col_map) {
- 		kfree(dev);
- 		kfree(itt);
- 		kfree(lpi_map);
-+		kfree(col_map);
- 		return NULL;
- 	}
- 
- 	dev->its = its;
- 	dev->itt = itt;
- 	dev->nr_ites = nr_ites;
--	dev->lpi_map = lpi_map;
--	dev->lpi_base = lpi_base;
--	dev->nr_lpis = nr_lpis;
-+	dev->event_map.lpi_map = lpi_map;
-+	dev->event_map.col_map = col_map;
-+	dev->event_map.lpi_base = lpi_base;
-+	dev->event_map.nr_lpis = nr_lpis;
- 	dev->device_id = dev_id;
- 	INIT_LIST_HEAD(&dev->entry);
- 
-@@ -1138,10 +1177,6 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
- 	list_add(&dev->entry, &its->its_device_list);
- 	raw_spin_unlock_irqrestore(&its->lock, flags);
- 
--	/* Bind the device to the first possible CPU */
--	cpu = cpumask_first(cpu_online_mask);
--	dev->collection = &its->collections[cpu];
--
- 	/* Map device to its ITT */
- 	its_send_mapd(dev, 1);
- 
-@@ -1163,12 +1198,13 @@ static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
- {
- 	int idx;
- 
--	idx = find_first_zero_bit(dev->lpi_map, dev->nr_lpis);
--	if (idx == dev->nr_lpis)
-+	idx = find_first_zero_bit(dev->event_map.lpi_map,
-+				  dev->event_map.nr_lpis);
-+	if (idx == dev->event_map.nr_lpis)
- 		return -ENOSPC;
- 
--	*hwirq = dev->lpi_base + idx;
--	set_bit(idx, dev->lpi_map);
-+	*hwirq = dev->event_map.lpi_base + idx;
-+	set_bit(idx, dev->event_map.lpi_map);
- 
- 	return 0;
- }
-@@ -1288,7 +1324,8 @@ static int its_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
- 		irq_domain_set_hwirq_and_chip(domain, virq + i,
- 					      hwirq, &its_irq_chip, its_dev);
- 		dev_dbg(info->scratchpad[1].ptr, "ID:%d pID:%d vID:%d\n",
--			(int)(hwirq - its_dev->lpi_base), (int)hwirq, virq + i);
-+			(int)(hwirq - its_dev->event_map.lpi_base),
-+			(int)hwirq, virq + i);
- 	}
- 
- 	return 0;
-@@ -1300,6 +1337,9 @@ static void its_irq_domain_activate(struct irq_domain *domain,
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	u32 event = its_get_event_id(d);
- 
-+	/* Bind the LPI to the first possible CPU */
-+	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-+
- 	/* Map the GIC IRQ and event to the device */
- 	its_send_mapvi(its_dev, d->hwirq, event);
- }
-@@ -1327,17 +1367,16 @@ static void its_irq_domain_free(struct irq_domain *domain, unsigned int virq,
- 		u32 event = its_get_event_id(data);
- 
- 		/* Mark interrupt index as unused */
--		clear_bit(event, its_dev->lpi_map);
-+		clear_bit(event, its_dev->event_map.lpi_map);
- 
- 		/* Nuke the entry in the domain */
- 		irq_domain_reset_irq_data(data);
- 	}
- 
- 	/* If all interrupts have been freed, start mopping the floor */
--	if (bitmap_empty(its_dev->lpi_map, its_dev->nr_lpis)) {
--		its_lpi_free(its_dev->lpi_map,
--			     its_dev->lpi_base,
--			     its_dev->nr_lpis);
-+	if (bitmap_empty(its_dev->event_map.lpi_map,
-+			 its_dev->event_map.nr_lpis)) {
-+		its_lpi_free(&its_dev->event_map);
- 
- 		/* Unmap device/itt */
- 		its_send_mapd(its_dev, 0);
--- 
-2.1.4
+I know that Przemyslaw Marczak is also looking at the issue so maybe
+he could share some details?
+
+Best regards,
+Krzysztof
