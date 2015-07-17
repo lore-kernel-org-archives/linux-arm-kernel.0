@@ -1,26 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:11:13 -0700
-Subject: [PATCH 0/2] ARM: Couple of dts fixes for v4.2-rcx
-In-Reply-To: <1437086473-21437-1-git-send-email-ssantosh@kernel.org>
-References: <1437086473-21437-1-git-send-email-ssantosh@kernel.org>
-Message-ID: <20150717171113.GG21691@localhost>
+Date: Fri, 17 Jul 2015 10:17:00 -0700
+Subject: [GIT PULL] Broadcom Device Tree changes for 4.3 (part 1)
+In-Reply-To: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+References: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150717171700.GH21691@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 06:41:13PM -0400, Santosh Shilimkar wrote:
-> The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
+On Thu, Jul 16, 2015 at 04:13:46PM -0700, Florian Fainelli wrote:
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
->   Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-fixes
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/dts
 > 
-> for you to fetch changes up to 8b4769cc535adf9dd4ae5d82725ca1de254f007c:
+> for you to fetch changes up to 0dfc7f687917a93175d469a2dc1254fd2f77fb63:
 > 
->   ARM: keystone: dts: rename pcie nodes to help override status (2015-07-16 18:13:03 -0400)
+>   ARM: BCM5301X: Enable UART0 on tested devices (2015-07-07 18:08:57 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains two changes:
+> 
+> - Ray adds the relevant clocks device tree nodes for Cygnus SoCs
+> 
+> - Rafal enables UART0 on BCM5301X routers where it has been verified to work
+>   correctly
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
