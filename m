@@ -1,48 +1,39 @@
-From: zhengxing@rock-chips.com (zhengxing)
-Date: Fri, 17 Jul 2015 10:17:25 +0800
-Subject: [PATCH 1/2] ASoC: rockchip: Add machine driver for max98090 codec
-In-Reply-To: <1437056116.28351.19.camel@tiscali.nl>
-References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
- <1436930143-31361-2-git-send-email-zhengxing@rock-chips.com>
- <1437033944.27428.11.camel@tiscali.nl> <20150716110032.GU11162@sirena.org.uk>
- <1437047261.28351.6.camel@tiscali.nl> <20150716125529.GG4039@sirena.org.uk>
- <1437056116.28351.19.camel@tiscali.nl>
-Message-ID: <55A865B5.7020609@rock-chips.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 17 Jul 2015 08:06:02 +0530
+Subject: [PATCH 00/10] OPP: Add code to support operating-points-v2
+ bindings
+In-Reply-To: <CAKohpokaiCq8kq5xALyW-q1QXvUJo2uv2ZbbFYfVFMT0XAqdzA@mail.gmail.com>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <CAKohpokaiCq8kq5xALyW-q1QXvUJo2uv2ZbbFYfVFMT0XAqdzA@mail.gmail.com>
+Message-ID: <20150717023602.GD5828@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-On 2015?07?16? 22:15, Paul Bolle wrote:
->
-> That's exactly how I understood MODULE_ALIAS() to work.
->
-> And it works, in short, because a platform device fires a
-> "MODALIAS=platform:[...]" uevent when it's created. And userspace uses
-> that uevent to load the module carrying that alias.
->
-> Let's put it this was. If one does
->      sudo find /sys -perm -o=r -name uevent -exec grep -H MODALIAS=platform: {} \;
->
-> or
->      sudo find /sys -perm -o=r -name modalias -exec grep -H platform: {} \;
->
-> (both lists should be similar)
->
-> on the systems this patch is targeting, will
->     platform:rockchip-snd-max98090
->
-> then show up?
->
-> Thanks,
->
->
-> Paul Bolle
->
-Thank you for your patience and detailed explanation.
-I tested your two ways and didn't find the 
-"platform:rockchip-snd-max98090" in my device(kernel v3.14), and the 
-driver path is:
-localhost rockchip-snd-max98090 # pwd
-/sys/bus/platform/drivers/rockchip-snd-max98090
+On 30-06-15, 22:14, Viresh Kumar wrote:
+> On 15 June 2015 at 17:27, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > Hi Guys,
+> >
+> > This adds code to support operating-points-v2 bindings. Not everything
+> > is supported yet, but most of the basic stuff is.
+> >
+> > Tested with: Exynos 5250, dual cortex A15 board. With both old and new
+> > bindings.
+> >
+> > Bindings are already frozen:
+> > http://marc.info/?i=cover.1433434659.git.viresh.kumar%40linaro.org
+> >
+> > Pushed here as well for reference:
+> > ssh://git at git.linaro.org/people/viresh.kumar/linux.git opp/v2
+> 
+> I am really hoping to get all basic stuff pushed in for 4.3, can we have
+> some review of the code please?
 
-Thanks.
+@Stephen: Can you please review rest of the stuff?
+
+@Nishanth: Can you please review the series, now that you are back :)
+
+@Rafael: Can you please apply the patches Acked by Stephen for 4.3, so
+that I don't have to resend them again ?
+
+-- 
+viresh
