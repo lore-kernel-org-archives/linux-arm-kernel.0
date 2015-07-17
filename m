@@ -1,190 +1,160 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 17 Jul 2015 08:29:27 +0200
-Subject: [PATCH v2 4/4] mfd: max77686: Split out regulator part from the DT
- binding
-In-Reply-To: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1437114567-17629-5-git-send-email-javier@osg.samsung.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 17 Jul 2015 14:35:55 +0800
+Subject: [PATCH v5 2/3] pwm: add MediaTek display PWM driver support
+In-Reply-To: <CAGS+omAj0=AWsUA+B8mDOBK5kjwhjwqfmxq4bFeGViOWUU0pCg@mail.gmail.com>
+References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
+ <1436778294-47635-3-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omCx4mDAN+F315x+8FeCABcKDoMn1gm_nHzF6VXnF_xm8Q@mail.gmail.com>
+ <1436975995.15774.27.camel@mtksdaap41>
+ <1437025108.18175.13.camel@mtksdaap41>
+ <CAGS+omB1FCX12-KvU7ODywseFKgsAbzNtqNyYZ+PqvO5ZeEn-A@mail.gmail.com>
+ <1437031079.8107.13.camel@mtksdaap41>
+ <CAGS+omAzPqDFzsJCiBV3=Zite2FS2no-P1F8EOSHu7w9LrN3cg@mail.gmail.com>
+ <1437065050.11063.26.camel@mtksdaap41>
+ <CAGS+omAj0=AWsUA+B8mDOBK5kjwhjwqfmxq4bFeGViOWUU0pCg@mail.gmail.com>
+Message-ID: <1437114955.21534.15.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Maxim MAX77686 PMIC is a multi-function device with regulators,
-clocks and a RTC. The DT bindings for the clocks are in a separate
-file but the bindings for the regulators are inside the mfd part.
+On Fri, 2015-07-17 at 01:18 +0800, Daniel Kurtz wrote:
+> On Fri, Jul 17, 2015 at 12:44 AM, YH Huang <yh.huang@mediatek.com> wrote:
+> > On Thu, 2015-07-16 at 23:21 +0800, Daniel Kurtz wrote:
+> >> On Thu, Jul 16, 2015 at 3:17 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> >> > On Thu, 2015-07-16 at 14:54 +0800, Daniel Kurtz wrote:
+> >> >> On Thu, Jul 16, 2015 at 1:38 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> >> >> > On Wed, 2015-07-15 at 23:59 +0800, YH Huang wrote:
+> >> >> >> On Mon, 2015-07-13 at 18:19 +0800, Daniel Kurtz wrote:
+> >> >> >> > On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> >> >> >> > > +#ifdef CONFIG_PM_SLEEP
+> >> >> >> > > +static int mtk_disp_pwm_suspend(struct device *dev)
+> >> >> >> > > +{
+> >> >> >> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
+> >> >> >> > > +
+> >> >> >> > > +       clk_disable_unprepare(mdp->clk_main);
+> >> >> >> > > +       clk_disable_unprepare(mdp->clk_mm);
+> >> >> >> > > +
+> >> >> >> > > +       return 0;
+> >> >> >> > > +}
+> >> >> >> > > +
+> >> >> >> > > +static int mtk_disp_pwm_resume(struct device *dev)
+> >> >> >> > > +{
+> >> >> >> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
+> >> >> >> > > +       int ret;
+> >> >> >> > > +
+> >> >> >> > > +       ret = clk_prepare_enable(mdp->clk_main);
+> >> >> >> > > +       if (ret < 0)
+> >> >> >> > > +               return ret;
+> >> >> >> > > +
+> >> >> >> > > +       ret = clk_prepare_enable(mdp->clk_mm);
+> >> >> >> > > +       if (ret < 0) {
+> >> >> >> > > +               clk_disable_unprepare(mdp->clk_main);
+> >> >> >> > > +               return ret;
+> >> >> >> > > +       }
+> >> >> >> > > +
+> >> >> >> >
+> >> >> >> > Don't you also have to restore the PWM rate and frequency?
+> >> >> >> >
+> >> >> >> > Is it possible to save power at runtime by leaving mdp->clk_mm enabled
+> >> >> >> > (to generate the PWM signal), but disable mdp->clk_main (clock
+> >> >> >> > required to access PWM registers)?
+> >> >> >>
+> >> >> >> The pwm-backlight driver will restore the data.
+> >> >> >>
+> >> >> >> After I try to disable anyone of the two clocks at runtime, the
+> >> >> >> backlight doesn't work well(no immediate update or losing backlight).
+> >> >> >> So we need to keep both clock enabled.
+> >>
+> >> Do you mean you see backlight glitch because the clocks / backlight
+> >> were *already on* during the first config (Perhaps left on by the
+> >> bootloader)?
+> >> I don't know how to solve that problem.
+> >> Maybe Thierry does.
+> >>
+> >> In any case, this is a minor issue; we really shouldn't hold up
+> >> landing the driver to optimize when the clocks are enabled/disabled
+> >> :-). I'm happy enough with what you have in this patch.
+> >
+> > Sorry for my terrible expression. Let me try again.
+> > 1. We want to disable unnecessary clock at runtime.
+> > But, I get backlight glitch when I disable clk_main or clk_mm in
+> > mtk_disp_pwm_config(). So both clocks are necessary and we don't disable
+> > them at runtime.
+> >
+> > 2. Because pwm-backlight driver calls mtk_disp_pwm_config() before
+> > mtk_disp_pwm_enable(), we will lose the first config if clocks are
+> > enabled in mtk_disp_pwm_enable(). I prefer to enable clocks in probe
+> > function. Samsung did the same way in their pwm driver.
+> 
+> I don't understand why you will "lose the first config if clocks are
+> enabled in mtk_disp_pwm_enable().  I don't believe registers will lose
+> their values just because you turn enable/disable clocks.
+> 
+> Perhaps I wasn't clear with what I was proposing which is something like this:
+> 
+> mtk_disp_pwm_config()
+> {
+>   clk_enable();
+>   /* write registers */
+>   clk_disable();
+> }
+> 
+> mtk_disp_enable()
+> {
+>   clk_enable();
+>   /* write enable bit */
+> }
+> 
+> mtk_disp_disable()
+> {
+>   /* clear enable bit */
+>   clk_disable();
+> }
+> 
+> 
+> In this way, if mtk_disp_pwm_config() is called when the pwm is
+> disabled, we will temporarily enable the clocks long enough to update
+> the register values.  These values should take effect the next time
+> the PWM is enabled.  We then disable the clocks and wait for the PWM
+> to be enabled.
+> 
+> If mtk_disp_pwm_config() is called when the pwm is already enabled, we
+> will increment the enable count on the clocks, but then we decrement
+> it again immediately.
 
-To make it consistent with the clocks portion of the binding and
-because is more natural to look for regulator bindings under the
-bindings/regulator sub-directory, split the regulator portion of
-the DT binding and add it as a separate file.
+I think there is something wrong about mdp->clk_mm(generate the PWM
+signal) and mdp->clk_main(access PWM registers).
+If we want to write the register, we should enable both clocks before.
+I try it in this way.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+mtk_disp_pwm_config()
+{
+   clk_enable(mdp->clk_main);
+   clk_enable(mdp->clk_mm);
+   /* write registers */
+   clk_disable(mdp->clk_mm);
+   clk_disable(mdp->clk_main);
+}
+with
+A:
+mtk_disp_enable()
+{
+   clk_enable(mdp->clk_main);
+   clk_enable(mdp->clk_mm);
+   /* write enable bit */
+   clk_disable(mdp->clk_mm);
+}
+or
+B:
+mtk_disp_enable()
+{
+   clk_enable(mdp->clk_main);
+   clk_enable(mdp->clk_mm);
+   /* write enable bit */
+   clk_disable(mdp->clk_main);
+}
 
----
+I both get backlight glitch with "A" or "B".
+So I think we should keep clocks enabled.
 
-Changes in v2:
-- Use a generic name for the max77686 node in the regulator example.
-
- Documentation/devicetree/bindings/mfd/max77686.txt | 58 +-----------------
- .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
- 2 files changed, 74 insertions(+), 55 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/max77686.txt b/Documentation/devicetree/bindings/mfd/max77686.txt
-index d2ed3c20a5c3..c5aeca609b1f 100644
---- a/Documentation/devicetree/bindings/mfd/max77686.txt
-+++ b/Documentation/devicetree/bindings/mfd/max77686.txt
-@@ -8,7 +8,8 @@ client while probing.This document describes the binding for mfd device and
- PMIC submodule.
- 
- Binding for the built-in 32k clock generator block is defined separately
--in bindings/clk/maxim,max77686.txt file.
-+in the bindings/clk/maxim,max77686.txt file and binding for the regulators
-+is defined in the bindings/regulator/max77686.txt file.
- 
- Required properties:
- - compatible : Must be "maxim,max77686";
-@@ -16,36 +17,6 @@ Required properties:
- - interrupts : This i2c device has an IRQ line connected to the main SoC.
- - interrupt-parent : The parent interrupt controller.
- 
--Optional node:
--- voltage-regulators : The regulators of max77686 have to be instantiated
--  under subnode named "voltage-regulators" using the following format.
--
--	regulator_name {
--		regulator-compatible = LDOn/BUCKn
--		standard regulator constraints....
--	};
--	refer Documentation/devicetree/bindings/regulator/regulator.txt
--
--  The regulator node's name should be initialized with a string
--to get matched with their hardware counterparts as follow:
--
--	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
--		 	example: LDO1, LDO2, LDO26.
--	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 9.
--			example: BUCK1, BUCK5, BUCK9.
--
--  Regulators which can be turned off during system suspend:
--	-LDOn	:	2, 6-8, 10-12, 14-16,
--	-BUCKn	:	1-4.
--  Use standard regulator bindings for it ('regulator-off-in-suspend').
--
--  LDO20, LDO21, LDO22, BUCK8 and BUCK9 can be configured to GPIO enable
--  control. To turn this feature on this property must be added to the regulator
--  sub-node:
--	- maxim,ena-gpios :	one GPIO specifier enable control (the gpio
--				flags are actually ignored and always
--				ACTIVE_HIGH is used)
--
- Example:
- 
- 	max77686: pmic at 09 {
-@@ -53,27 +24,4 @@ Example:
- 		interrupt-parent = <&wakeup_eint>;
- 		interrupts = <26 0>;
- 		reg = <0x09>;
--
--		voltage-regulators {
--			ldo11_reg: LDO11 {
--				regulator-name = "vdd_ldo11";
--				regulator-min-microvolt = <1900000>;
--				regulator-max-microvolt = <1900000>;
--				regulator-always-on;
--			};
--
--			buck1_reg: BUCK1 {
--				regulator-name = "vdd_mif";
--				regulator-min-microvolt = <950000>;
--				regulator-max-microvolt = <1300000>;
--				regulator-always-on;
--				regulator-boot-on;
--			};
--
--			buck9_reg: BUCK9 {
--				regulator-name = "CAM_ISP_CORE_1.2V";
--				regulator-min-microvolt = <1000000>;
--				regulator-max-microvolt = <1200000>;
--				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
--			};
--	}
-+	};
-diff --git a/Documentation/devicetree/bindings/regulator/max77686.txt b/Documentation/devicetree/bindings/regulator/max77686.txt
-new file mode 100644
-index 000000000000..831cbd3cd965
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/max77686.txt
-@@ -0,0 +1,71 @@
-+Binding for Maxim MAX77686 regulators
-+
-+This is a part of the device tree bindings of MAX77686 multi-function device.
-+More information can be found in bindings/mfd/max77686.txt file.
-+
-+The MAX77686 PMIC has 9 high-efficiency Buck and 26 Low-dropout (LDO)
-+regulators that can be controlled over I2C.
-+
-+Following properties should be present in main device node of the MFD chip.
-+
-+Optional node:
-+- voltage-regulators : The regulators of max77686 have to be instantiated
-+  under subnode named "voltage-regulators" using the following format.
-+
-+	regulator_name {
-+		regulator-compatible = LDOn/BUCKn
-+		standard regulator constraints....
-+	};
-+	refer Documentation/devicetree/bindings/regulator/regulator.txt
-+
-+  The regulator node's name should be initialized with a string
-+to get matched with their hardware counterparts as follow:
-+
-+	-LDOn 	:	for LDOs, where n can lie in range 1 to 26.
-+			example: LDO1, LDO2, LDO26.
-+	-BUCKn 	:	for BUCKs, where n can lie in range 1 to 9.
-+			example: BUCK1, BUCK5, BUCK9.
-+
-+  Regulators which can be turned off during system suspend:
-+	-LDOn	:	2, 6-8, 10-12, 14-16,
-+	-BUCKn	:	1-4.
-+  Use standard regulator bindings for it ('regulator-off-in-suspend').
-+
-+  LDO20, LDO21, LDO22, BUCK8 and BUCK9 can be configured to GPIO enable
-+  control. To turn this feature on this property must be added to the regulator
-+  sub-node:
-+	- maxim,ena-gpios :	one GPIO specifier enable control (the gpio
-+				flags are actually ignored and always
-+				ACTIVE_HIGH is used)
-+
-+Example:
-+
-+	max77686: pmic at 09 {
-+		compatible = "maxim,max77686";
-+		interrupt-parent = <&wakeup_eint>;
-+		interrupts = <26 0>;
-+		reg = <0x09>;
-+
-+		voltage-regulators {
-+			ldo11_reg: LDO11 {
-+				regulator-name = "vdd_ldo11";
-+				regulator-min-microvolt = <1900000>;
-+				regulator-max-microvolt = <1900000>;
-+				regulator-always-on;
-+			};
-+
-+			buck1_reg: BUCK1 {
-+				regulator-name = "vdd_mif";
-+				regulator-min-microvolt = <950000>;
-+				regulator-max-microvolt = <1300000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			buck9_reg: BUCK9 {
-+				regulator-name = "CAM_ISP_CORE_1.2V";
-+				regulator-min-microvolt = <1000000>;
-+				regulator-max-microvolt = <1200000>;
-+				maxim,ena-gpios = <&gpm0 3 GPIO_ACTIVE_HIGH>;
-+			};
-+	};
--- 
-2.4.3
+Regards,
+YH Huang
