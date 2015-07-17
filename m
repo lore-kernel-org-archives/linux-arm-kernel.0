@@ -1,30 +1,34 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 17 Jul 2015 13:40:54 +0100
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150716121658.7982fdf5@gandalf.local.home>
-References: <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home>
- <55A6FA82.9000901@linaro.org> <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
-Message-ID: <20150717124054.GE26091@leverpostej>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jul 2015 14:41:21 +0200
+Subject: [PATCH] [v2] pinctrl: add support for Qualcomm Technologies
+ QDF2xxx ARM64 SoCs
+In-Reply-To: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
+References: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkda-bhOUUTN314Z_T02Mwsr6DmpeAnNspcc1eFvZ6BBn8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 15, 2015 at 6:47 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-> @@ -354,7 +330,7 @@ static int t_show(struct seq_file *m, vo
->  		seq_printf(m, "        Depth    Size   Location"
->  			   "    (%d entries)\n"
->  			   "        -----    ----   --------\n",
-> -			   max_stack_trace.nr_entries - 1);
-> +			   max_stack_trace.nr_entries);
+> Add the pinctrl driver for the Qualcomm Technologies QDF2xxx ARM64 SoCs,
+> which uses the Qualcomm Technologies TLMM pinctrl/gpio device.  This
+> driver is probed via ACPI and uses the pinctrl-msm.c backend driver.
+>
+> This driver is intended to be used only an ACPI-enabled system.  As such,
+> UEFI will handle all pin control configuration, so this driver does not
+> provide pin control functions.  It is effectively a GPIO-only driver.
 
-I believe you'll want the same fix in print_max_stack, given it's a
-carbon copy.
+In my experience, you will come back and add pin control to it if
+it ever sees any practical power-aware use cases.
 
-Mark
+For the same reason that Intel is doing it to their pin controllers,
+that also run on systems that are ACPI-enabled.
+
+>
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+
+This version applied with Bj?rn's review tag.
+
+
+Yours,
+Linus Walleij
