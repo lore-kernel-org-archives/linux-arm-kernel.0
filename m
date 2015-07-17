@@ -1,64 +1,52 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 17 Jul 2015 12:41:55 +0200
-Subject: [PATCH V3 10/19] drm/tegra: dc: Prepare for generic PM domains
-In-Reply-To: <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20150717104154.GM3057@ulmo>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Fri, 17 Jul 2015 11:42:26 +0100
+Subject: [PATCH] arm64: alternative: Provide if/else/endif assembler macros
+In-Reply-To: <20150716181929.GU26390@arm.com>
+References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
+ <20150716181929.GU26390@arm.com>
+Message-ID: <55A8DC12.2060904@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 01:39:48PM +0100, Jon Hunter wrote:
-> Add support to the tegra dc driver for generic PM domains. However,
-> to ensure backward compatibility with older device tree blobs ensure
-> that the driver can work with or without generic PM domains. In order
-> to migrate to generic PM domain infrastructure the necessary changes
-> are:
-> 
-> 1. If the "power-domains" property is present in the DT device node then
->    generic PM domains is supported and pm_runtime_enable() should be
->    called for the device. Furthermore, the enabling and disabling of the
->    power-domain is handled via calling pm_runtime_get/put, respectively.
+On 16/07/15 19:19, Will Deacon wrote:
+>> Notes:
+>>      To be honest these if not/else/endif macros are simply more readable
+>>      than the original macro and that might be enough to justify them on
+>>      their own. However below is an example that is needlessly hard to
+>>      write without them because ICC_PMR_EL1 is a C pre-processor macro.
+>>
+>>       	.macro	disable_irq, tmp
+>>       	mov	\tmp, #ICC_PMR_EL1_MASKED
+>>      alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+>>      	msr	daifset, #2
+>>      alternative_else
+>>       	msr_s	ICC_PMR_EL1, \tmp
+>>      alternative_endif
+>>      	.endm
+>>
+>>      The new macros have received a fair degree of testing because I have
+>>      based my (not published since March) pseudo-NMI patch set on them.
+>
+> After some consideration, I think I prefer your suggestion over what we
+> currently have in mainline. However, there are a bunch of patches that
+> are candidates for 4.3 which will conflict horribly with this.
+>
+> Would you be able to:
+>
+>    (1) Split this up so that you have a patch introducing the new macro,
+>        then a patch converting entry.S and cache.S then a separate one
+>        for kvm/hyp.S?
+>
+>    (2) Keep alternative_insn around for the moment
+>
+>    (3) Once the dust has settled for 4.3, we can see how easy the old
+>        macro is to remove
+>
+> Sound ok to you?
 
-The device could be PM runtime enabled even if no power-domains property
-is set. Couldn't we check something more direct, like for example if the
-dev->pm_domain is non-NULL?
+Absolutely fine.
 
-Perhaps it'd be worth converting the driver to use runtime PM first, and
-move all the powergate and clock handling into suspend/resume functions,
-and then we can conditionalize whether or not we call the legacy API iff
-dev->pm_domain == NULL?
+I will get the split out patches posted soon.
 
-> 2. To ensure that clocks are managed consistently when generic PM domains
->    are used and are not used, drivers should be migrated to use the
->    tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
->    functions instead of the current tegra_powergate_sequence_power_up()
->    and tegra_powergate_power_off(). The purpose of the
->    tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
->    APIs is to mimick the behaviour of the tegra generic power-domain code,
->    such that if generic power domains are not supported the functionality
->    is the same.
-> 
-> 3. The main difference between the tegra_powergate_sequence_power_up() API
->    and the tegra_powergate_power_on_legacy() is that the clock used to
->    enable the powergate is not kept enabled when using the
->    tegra_powergate_power_on_legacy() API. Therefore, drivers must enable
->    the clocks they need after calling tegra_powergate_power_on_legacy()
->    and disable these clocks before calling
->    tegra_powergate_power_off_legacy().
 
-This seems like it should go into the previous patch. I'm not sure I
-understand why this is necessary. Wouldn't it be easier to update the
-drivers to properly cope with this? We'll need to move them to runtime
-PM at some point anyway, so if we do that first, we should be able to
-hide all these details within the driver's suspend/resume functions
-but without the need for the API churn here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/0275a247/attachment.sig>
+Daniel.
