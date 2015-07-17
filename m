@@ -1,39 +1,39 @@
-From: nathan_lynch@mentor.com (Nathan Lynch)
-Date: Fri, 17 Jul 2015 16:01:02 -0500
-Subject: [PATCH] ARM: zynq: reserve space for jump target in secondary
- trampoline
-Message-ID: <1437166862-29782-1-git-send-email-nathan_lynch@mentor.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Fri, 17 Jul 2015 16:08:02 -0500
+Subject: [PATCH 2/4] ARM: dts: AM4372: Add ti,
+ mbox-send-noirq to wkup_m3 mailbox
+In-Reply-To: <1437167284-25659-1-git-send-email-d-gerlach@ti.com>
+References: <1437167284-25659-1-git-send-email-d-gerlach@ti.com>
+Message-ID: <1437167284-25659-3-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a zero argument to the .word directive in
-zynq_secondary_trampoline.  Without an expression the assembler emits
-nothing for the .word directive.
+From: Keerthy <j-keerthy@ti.com>
 
-This makes it so that the intended range is communicated to ioremap
-and outer_flush_range in zynq_cpun_start; e.g. for LE
-trampoline_code_size evaluates to 12 now instead of 8.
+Add ti,mbox-send-noirq to wkup_m3 mailbox so that messages using
+wkup_m3 mailbox are sent without triggering any further interrupts.
+This is required to be able to send multiple messages to the WkupM3
+after the mailbox usage logic adjustment in the wkup_m3_ipc driver.
 
-Found by inspection.  I'm not aware of any real problem this fixes.
-Tested by doing on online/offline loop on ZC702.
-
-Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+Acked-by: Dave Gerlach <d-gerlach@ti.com>
+[s-anna at ti.com: revise commit description]
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-zynq/headsmp.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/am4372.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-index 045c72720a4d..f6d5de073e34 100644
---- a/arch/arm/mach-zynq/headsmp.S
-+++ b/arch/arm/mach-zynq/headsmp.S
-@@ -18,7 +18,7 @@ ARM_BE8(rev	r0, r0)
- .globl zynq_secondary_trampoline_jump
- zynq_secondary_trampoline_jump:
- 	/* Space for jumping address */
--	.word	/* cpu 1 */
-+	.word	0	/* cpu 1 */
- .globl zynq_secondary_trampoline_end
- zynq_secondary_trampoline_end:
- ENDPROC(zynq_secondary_trampoline)
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 6f6f393..5bccc48 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -214,6 +214,7 @@
+ 			ti,mbox-num-users = <4>;
+ 			ti,mbox-num-fifos = <8>;
+ 			mbox_wkupm3: wkup_m3 {
++				ti,mbox-send-noirq;
+ 				ti,mbox-tx = <0 0 0>;
+ 				ti,mbox-rx = <0 0 3>;
+ 			};
 -- 
-2.1.0
+2.4.5
