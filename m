@@ -1,34 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 17 Jul 2015 14:41:21 +0200
-Subject: [PATCH] [v2] pinctrl: add support for Qualcomm Technologies
- QDF2xxx ARM64 SoCs
-In-Reply-To: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
-References: <1436978834-7271-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkda-bhOUUTN314Z_T02Mwsr6DmpeAnNspcc1eFvZ6BBn8Q@mail.gmail.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 17 Jul 2015 18:13:05 +0530
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <20150717111733.GL11162@sirena.org.uk>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
+ <20150717111733.GL11162@sirena.org.uk>
+Message-ID: <55A8F859.2090204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 6:47 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-> Add the pinctrl driver for the Qualcomm Technologies QDF2xxx ARM64 SoCs,
-> which uses the Qualcomm Technologies TLMM pinctrl/gpio device.  This
-> driver is probed via ACPI and uses the pinctrl-msm.c backend driver.
+
+On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
+> On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
 >
-> This driver is intended to be used only an ACPI-enabled system.  As such,
-> UEFI will handle all pin control configuration, so this driver does not
-> provide pin control functions.  It is effectively a GPIO-only driver.
-
-In my experience, you will come back and add pin control to it if
-it ever sees any practical power-aware use cases.
-
-For the same reason that Intel is doing it to their pin controllers,
-that also run on systems that are ACPI-enabled.
-
+>> Can you merge this into regulator tree?
 >
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+>> Link to MFD - https://lkml.org/lkml/2015/7/16/704
+>
+> I need a tag I can pull from Lee.
+>
+Great.
 
-This version applied with Bj?rn's review tag.
+Lee,
+It would be helpful, if you could ack below patch,
 
+https://lkml.org/lkml/2015/7/16/704
 
-Yours,
-Linus Walleij
+Thanks,
+Vaibhav
