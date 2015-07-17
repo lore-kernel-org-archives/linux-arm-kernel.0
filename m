@@ -1,138 +1,93 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 17 Jul 2015 10:41:00 +0530
-Subject: [PATCH 06/18] ARM/imx/epit: Migrate to new 'set-state' interface
+Date: Fri, 17 Jul 2015 10:41:02 +0530
+Subject: [PATCH 08/18] ARM/ks8695/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
 References: <cover.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <3200579fafb0400cd098e939ec664638d38e2bc9.1437101996.git.viresh.kumar@linaro.org>
+Message-ID: <7cfa3c69ca97acfd7cac19652d82aa610015bab8.1437101996.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate imx driver to the new 'set-state' interface provided by
+Migrate ks8695 driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Also drop 'clockevent_mode': It was caching the last state of the
-clockevent device. The same behavior can be achieved by using
-clockevents state helpers. These helpers are only required for oneshot
-mode as shutdown/resume wouldn't be done twice by the core.
+There is nothing to be done for oneshot or shutdown states and so are
+not implemented.
 
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Sascha Hauer <kernel@pengutronix.de>
+Acked-by: Greg Ungerer <gerg@uclinux.org>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-imx/epit.c | 67 +++++++++++++++++++++++++-----------------------
- 1 file changed, 35 insertions(+), 32 deletions(-)
+ arch/arm/mach-ks8695/time.c | 43 +++++++++++++++++++++----------------------
+ 1 file changed, 21 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-imx/epit.c b/arch/arm/mach-imx/epit.c
-index 074b1a81ba76..08ce20771bb3 100644
---- a/arch/arm/mach-imx/epit.c
-+++ b/arch/arm/mach-imx/epit.c
-@@ -57,7 +57,6 @@
- #include "hardware.h"
+diff --git a/arch/arm/mach-ks8695/time.c b/arch/arm/mach-ks8695/time.c
+index a197874bf382..18eb0fbd8d82 100644
+--- a/arch/arm/mach-ks8695/time.c
++++ b/arch/arm/mach-ks8695/time.c
+@@ -54,28 +54,25 @@
+ /* Timer0 Timeout Counter Register */
+ #define T0TC_WATCHDOG		(0xff)		/* Enable watchdog mode */
  
- static struct clock_event_device clockevent_epit;
--static enum clock_event_mode clockevent_mode = CLOCK_EVT_MODE_UNUSED;
- 
- static void __iomem *timer_base;
- 
-@@ -106,8 +105,8 @@ static int epit_set_next_event(unsigned long evt,
- 	return 0;
- }
- 
--static void epit_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
-+/* Left event sources disabled, no more interrupts appear */
-+static int epit_shutdown(struct clock_event_device *evt)
+-static void ks8695_set_mode(enum clock_event_mode mode,
+-			    struct clock_event_device *evt)
++static int ks8695_set_periodic(struct clock_event_device *evt)
  {
- 	unsigned long flags;
++	u32 rate = DIV_ROUND_CLOSEST(KS8695_CLOCK_RATE, HZ);
++	u32 half = DIV_ROUND_CLOSEST(rate, 2);
+ 	u32 tmcon;
  
-@@ -120,39 +119,41 @@ static void epit_set_mode(enum clock_event_mode mode,
- 	/* Disable interrupt in GPT module */
- 	epit_irq_disable();
- 
--	if (mode != clockevent_mode) {
--		/* Set event time into far-far future */
+-	if (mode == CLOCK_EVT_FEAT_PERIODIC) {
+-		u32 rate = DIV_ROUND_CLOSEST(KS8695_CLOCK_RATE, HZ);
+-		u32 half = DIV_ROUND_CLOSEST(rate, 2);
 -
--		/* Clear pending interrupt */
--		epit_irq_acknowledge();
--	}
-+	/* Clear pending interrupt */
-+	epit_irq_acknowledge();
+-		/* Disable timer 1 */
+-		tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
+-		tmcon &= ~TMCON_T1EN;
+-		writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
++	/* Disable timer 1 */
++	tmcon = readl_relaxed(KS8695_TMR_VA + KS8695_TMCON);
++	tmcon &= ~TMCON_T1EN;
++	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
  
--	/* Remember timer mode */
--	clockevent_mode = mode;
- 	local_irq_restore(flags);
+-		/* Both registers need to count down */
+-		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
+-		writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
++	/* Both registers need to count down */
++	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1TC);
++	writel_relaxed(half, KS8695_TMR_VA + KS8695_T1PD);
  
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		printk(KERN_ERR "epit_set_mode: Periodic mode is not "
--				"supported for i.MX EPIT\n");
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
-+	return 0;
-+}
-+
-+static int epit_set_oneshot(struct clock_event_device *evt)
-+{
-+	unsigned long flags;
-+
-+	/*
-+	 * The timer interrupt generation is disabled at least
-+	 * for enough time to call epit_set_next_event()
-+	 */
-+	local_irq_save(flags);
-+
-+	/* Disable interrupt in GPT module */
-+	epit_irq_disable();
-+
-+	/* Clear pending interrupt, only while switching mode */
-+	if (!clockevent_state_oneshot(evt))
-+		epit_irq_acknowledge();
-+
- 	/*
- 	 * Do not put overhead of interrupt enable/disable into
- 	 * epit_set_next_event(), the core has about 4 minutes
- 	 * to call epit_set_next_event() or shutdown clock after
- 	 * mode switching
- 	 */
--		local_irq_save(flags);
--		epit_irq_enable();
--		local_irq_restore(flags);
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_RESUME:
--		/* Left event sources disabled, no more interrupts appear */
--		break;
+-		/* Re-enable timer1 */
+-		tmcon |= TMCON_T1EN;
+-		writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
 -	}
-+	epit_irq_enable();
-+	local_irq_restore(flags);
-+
++	/* Re-enable timer1 */
++	tmcon |= TMCON_T1EN;
++	writel_relaxed(tmcon, KS8695_TMR_VA + KS8695_TMCON);
 +	return 0;
  }
+ 
+ static int ks8695_set_next_event(unsigned long cycles,
+@@ -102,11 +99,13 @@ static int ks8695_set_next_event(unsigned long cycles,
+ }
+ 
+ static struct clock_event_device clockevent_ks8695 = {
+-	.name		= "ks8695_t1tc",
+-	.rating		= 300, /* Reasonably fast and accurate clock event */
+-	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
+-	.set_next_event	= ks8695_set_next_event,
+-	.set_mode	= ks8695_set_mode,
++	.name			= "ks8695_t1tc",
++	/* Reasonably fast and accurate clock event */
++	.rating			= 300,
++	.features		= CLOCK_EVT_FEAT_ONESHOT |
++				  CLOCK_EVT_FEAT_PERIODIC,
++	.set_next_event		= ks8695_set_next_event,
++	.set_state_periodic	= ks8695_set_periodic,
+ };
  
  /*
-@@ -176,11 +177,13 @@ static struct irqaction epit_timer_irq = {
- };
- 
- static struct clock_event_device clockevent_epit = {
--	.name		= "epit",
--	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode	= epit_set_mode,
--	.set_next_event	= epit_set_next_event,
--	.rating		= 200,
-+	.name			= "epit",
-+	.features		= CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown	= epit_shutdown,
-+	.tick_resume		= epit_shutdown,
-+	.set_state_oneshot	= epit_set_oneshot,
-+	.set_next_event		= epit_set_next_event,
-+	.rating			= 200,
- };
- 
- static int __init epit_clockevent_init(struct clk *timer_clk)
 -- 
 2.4.0
