@@ -1,83 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Jul 2015 07:45:49 +0100
-Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
- the irqdomain of the GIC.
-In-Reply-To: <55A7EAAC.8000800@arm.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
- <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
- <55A75F8B.3080009@arm.com> <55A7E0C2.8020704@caviumnetworks.com>
- <55A7E52D.9080201@arm.com> <55A7E663.9030000@caviumnetworks.com>
- <55A7EAAC.8000800@arm.com>
-Message-ID: <20150717074549.7a502e09@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 17 Jul 2015 08:49:25 +0200
+Subject: [PATCH] arm64: remove dead code
+In-Reply-To: <1437069533-22103-1-git-send-email-msalter@redhat.com>
+References: <1437069533-22103-1-git-send-email-msalter@redhat.com>
+Message-ID: <CAKv+Gu_TWN6wGxe4VuuoEzSELbOcqGPtWL_SM4-dFkjai8eLtQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jul 2015 18:32:28 +0100
-Marc Zyngier <marc.zyngier@arm.com> wrote:
+(adding Geoff and Takahiro)
 
-> On 16/07/15 18:14, David Daney wrote:
-> > On 07/16/2015 10:09 AM, Marc Zyngier wrote:
-> >> On 16/07/15 17:50, David Daney wrote:
-> > [...]
-> >>>> Patch 5 has established that you're using "virtual wire" SPIs, so we
-> >>>> need to work on exposing that with the normal kernel abstraction, and
-> >>>> not by messing with the internals of the GIC.
-> >>>>
-> >>>
-> >>> Agreed.
-> >>>
-> >>> The MSI system has pci_enable_msix()/pci_disable_msix().
-> >>>
-> >>> I would propose something like:
-> >>>
-> >>> struct gic_spi_entry {
-> >>> 	int spi   /* SPI number */
-> >>> 	int irq;  /* kernel irq number mapped to the spi*/
-> >>> 	u32 msg;  /* message to be written */
-> >>> 	u64 assert_addr;
-> >>> 	u64 deassert_addr;
-> >>> };
-> >>>
-> >>> /* Fill in the SPI processing information */
-> >>> int gic_map_spi(int spi, struct gic_spi_entry *data);
-> >>
-> >> Neither.
-> >>
-> >> The way to do it is to make this a *separate* IRQ domain stacked onto
-> >> the SPI domain. No funky hook on the side. If it doesn't go through the
-> >> normal kernel API, it doesn't reach the GIC.
-> > 
-> > Yes, the irqdomain does handle mapping SPI -> irq, and the message can 
-> > be derived from the SPI.  However, the irqdomain infrastructure cannot 
-> > supply values for either assert_addr or deassert_addr.
-> 
-> This is why I suggested earlier (in my reply to patch 5) that you have a
-> look at the series I posted a couple of days ago to implement non-PCI
-> MSI support. This would allow you to compose the domains as such:
-> 
-> platform-MSI -> message-SPI -> GIC
-> 
-> You'd end up with a msi_msg containing the GICD_SETSPI_NSR doorbell, and
-> the SPI as a payload.
-> 
-> > Those are needed in order to use SPI.  How would you suggest that they 
-> > be obtained?
-> 
-> Two possibilities: either you derive GICD_CLRSPI_NSR by adding 8 to the
-> doorbell you got from the msi_msg structure (ugly, but limited to your
-> own code), or you extend msi_msg to cater for this case.
+On 16 July 2015 at 19:58, Mark Salter <msalter@redhat.com> wrote:
+> Commit 68234df4ea79 ("arm64: kill flush_cache_all()") removed
+> soft_reset() from the kernel. This was the only caller of
+> setup_mm_for_reboot(), so remove that also.
+>
 
-A simpler alternative to the above would be to move all this to
-firmware, and only expose a *wired* SPI to the kernel. This would have
-the advantage to use the existing infrastructure for both DT and ACPI.
+I am wondering if setup_mm_for_reboot() is being used in the kexec
+patches. Perhaps we should check that before removing it.
 
-As a side note, that was the intended use of these registers - to
-provide a "virtual wire" interface that remains mostly invisible to
-software.
+Geoff?
 
-Thanks,
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+> Signed-off-by: Mark Salter <msalter@redhat.com>
+> ---
+>  arch/arm64/include/asm/mmu.h |  1 -
+>  arch/arm64/mm/mmu.c          | 11 -----------
+>  2 files changed, 12 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> index 79fcfb0..0302087 100644
+> --- a/arch/arm64/include/asm/mmu.h
+> +++ b/arch/arm64/include/asm/mmu.h
+> @@ -28,7 +28,6 @@ typedef struct {
+>  #define ASID(mm)       ((mm)->context.id & 0xffff)
+>
+>  extern void paging_init(void);
+> -extern void setup_mm_for_reboot(void);
+>  extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+>  extern void init_mem_pgprot(void);
+>  extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index a4ede4e..63012fe 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -461,17 +461,6 @@ void __init paging_init(void)
+>  }
+>
+>  /*
+> - * Enable the identity mapping to allow the MMU disabling.
+> - */
+> -void setup_mm_for_reboot(void)
+> -{
+> -       cpu_set_reserved_ttbr0();
+> -       flush_tlb_all();
+> -       cpu_set_idmap_tcr_t0sz();
+> -       cpu_switch_mm(idmap_pg_dir, &init_mm);
+> -}
+> -
+> -/*
+>   * Check whether a kernel address is valid (derived from arch/x86/).
+>   */
+>  int kern_addr_valid(unsigned long addr)
+> --
+> 2.4.3
+>
