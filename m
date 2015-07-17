@@ -1,67 +1,129 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Jul 2015 16:35:28 +0200
-Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset
- state when not in use
-In-Reply-To: <55A8FEAE.9010502@hurleysoftware.com>
-References: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
- <55A8FEAE.9010502@hurleysoftware.com>
-Message-ID: <1437143728.3254.10.camel@pengutronix.de>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Fri, 17 Jul 2015 23:38:28 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <55A862C0.4040101@linaro.org>
+References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>	<1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>	<20150714225105.6c1e4f15@gandalf.local.home>	<55A646EE.6030402@linaro.org>	<20150715105536.42949ea9@gandalf.local.home>
+ <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
+ <55A703F3.8050203@linaro.org>
+ <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
+ <55A862C0.4040101@linaro.org>
+Message-ID: <10104998-CA54-4150-9228-2ED8C327911D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 17.07.2015, 09:10 -0400 schrieb Peter Hurley:
-> Hi Juergen,
+On Jul 17, 2015, at 11:04 AM, AKASHI Takahiro wrote:
+> Jungseok,
 > 
-> On 07/16/2015 03:40 AM, Juergen Borleis wrote:
-> > Whenever the UART device driver gets closed from userland, the driver
-> > disables the UART unit and then stops its clock to save power.
-> > 
-> > The bit which disabled the UART unit is described as:
-> > 
-> >   "UART Enable. If this bit is set to 1, the UART is enabled. Data
-> >   transmission and reception occurs for the UART signals. When the
-> >   UART is disabled in the middle of transmission or reception, it
-> >   completes the current character before stopping."
-> > 
-> > The important part is the "it completes the current character". Whenever
-> > a reception is ongoing when the UART gets disabled (including the clock
-> > off) the statemachine freezes and "remembers" this state on the next
-> > open() and re-enabling of the unit's clock.
-> > 
-> > In this case we end up receiving an additional bogus character
-> > immediately.
-> > 
-> > The solution in this change is to move the AUART unit into its reset
-> > state on close() and only release it from its reset state on the next
-> > open().
-> > 
-> > Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-> > ---
-> > 
-> > Notes:
-> >     v3:
-> >      - missing newline added to an error message
-> >     
-> >     v2:
-> >      - rename mxs_auart_do_reset() to mxs_auart_keep_reset() to better reflect
-> >        what it really does
-> >      - adapt the delay in mxs_auart_keep_reset() to wait for the reset of the
-> >        AURAT unit to what is used in mxs_auart_reset()
-> 
-> The function names and semantics are not clear. See below.
-[...]
-> > +	/* bring it out of reset now */
-> > +	mxs_auart_reset(u);
-> 
-> mxs_auart_reset() is really not resetting but simply performing a block enable.
-> Isn't there a generic block enable for the iMX.2x SoCs? (Maybe there should be)
-> 
-> The names of these functions don't match expected operations of startup().
-> Start up should be enabling the device, not keeping it in reset.
-> 
-> And "keep reset" immediately followed by "reset" makes no sense.
+> Thank you for your testing and reviews.
 
-I'd call the pair mxs_auart_reset_assert and mxs_auart_reset_deassert.
+You're welcome.
 
-regards
-Philipp
+> On 07/16/2015 10:29 PM, Jungseok Lee wrote:
+>> On Jul 16, 2015, at 10:08 AM, AKASHI Takahiro wrote:
+>> 
+>> Hi, AKASHI
+>> 
+>>> On 07/16/2015 09:27 AM, AKASHI Takahiro wrote:
+>>>> On 07/16/2015 01:13 AM, Steven Rostedt wrote:
+>>>>> On Wed, 15 Jul 2015 10:55:36 -0400
+>>>>> Steven Rostedt <rostedt@goodmis.org> wrote:
+>>>>> 
+>>>>> 
+>>>>>> I'll take a look at it and try to clean up the code.
+>>>>> 
+>>>>> Does the  following patch make sense for you?
+>>>> 
+>>>> Looks nice. The patch greatly simplifies changes on arm64 side.
+>>> 
+>>> As follows:
+>>> 
+>>> - Takahiro AKASHI
+>>> 
+>>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>>> index c5534fa..868d6f1 100644
+>>> --- a/arch/arm64/include/asm/ftrace.h
+>>> +++ b/arch/arm64/include/asm/ftrace.h
+>>> @@ -15,6 +15,7 @@
+>>> 
+>>> #define MCOUNT_ADDR		((unsigned long)_mcount)
+>>> #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+>>> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
+> 
+> Well,
+>  #define FTRACE_STACK_FRAME_OFFSET AARCH64_INSN_SIZE
+> might be better.
+
+Agree.
+
+> 
+>> How about binding it to -4 in unwind_frame function?
+> 
+> Do you mean like this?
+> In unwind_frame(),
+>  frame->pc = *(unsigned long*)(fp + 8) - AARCH64_INSN_SIZE;
+
+Exactly.
+
+> 
+>> IMHO, it would help other developers trying to change stack trace code
+>> be aware of this stack tracer feature.
+>> 
+>>> #ifndef __ASSEMBLY__
+>>> #include <linux/compat.h>
+>>> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+>>> index 1da6029..2c1bf7d 100644
+>>> --- a/include/linux/ftrace.h
+>>> +++ b/include/linux/ftrace.h
+>>> @@ -260,6 +260,13 @@ static inline void ftrace_kill(void) { }
+>>> #endif /* CONFIG_FUNCTION_TRACER */
+>>> 
+>>> #ifdef CONFIG_STACK_TRACER
+>>> +/*
+>>> + * the offset value to add to return address from save_stack_trace()
+>>> + */
+>>> +#ifndef FTRACE_STACK_FRAME_OFFSET
+>>> +#define FTRACE_STACK_FRAME_OFFSET 0
+>>> +#endif
+>>> +
+>>> extern int stack_tracer_enabled;
+>>> int
+>>> stack_trace_sysctl(struct ctl_table *table, int write,
+>>> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+>>> index 9384647..c5b9748 100644
+>>> --- a/kernel/trace/trace_stack.c
+>>> +++ b/kernel/trace/trace_stack.c
+>>> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+>>> 
+>>> 	/* Skip over the overhead of the stack tracer itself */
+>>> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+>>> -		if (stack_dump_trace[i] == ip)
+>>> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+>>> 			break;
+>>> 	}
+>>> 
+>>> @@ -131,7 +131,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+>>> 		p = start;
+>>> 
+>>> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+>>> -			if (*p == stack_dump_trace[i]) {
+>>> +			if (*p == (stack_dump_trace[i]
+>>> +					+ FTRACE_STACK_FRAME_OFFSET)) {
+>>> 				stack_dump_trace[x] = stack_dump_trace[i++];
+>>> 				this_size = stack_dump_index[x++] =
+>>> 					(top - p) * sizeof(unsigned long);
+>>> --
+>> 
+>> I've prepared a kernel with the following patches and reviewed them.
+>> 
+>> 1) Steve's clean up patch
+>> 2) This patch
+>> 3) [RFC 2/3]
+>> 
+>> AFAIU, [RFC 3/3] is not needed any more thanks to Steve's patch.
+> 
+> We don't need [2/3].
+
+Okay. So, I've played a kernel including Steve's latest patch and only [1/3].
+
+Best Regards
+Jungseok Lee
