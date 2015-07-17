@@ -1,46 +1,35 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Fri, 17 Jul 2015 16:39:40 +0200
-Subject: [PATCH v11 3/5] ARM: sun4i: dt: Add DT bindings documentation for
- SUN4I Security System
-In-Reply-To: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1437143983-4479-4-git-send-email-clabbe.montjoie@gmail.com>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Fri, 17 Jul 2015 11:36:32 -0300
+Subject: [PATCH v2 0/4] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <20150717134159.GC10608@kwain>
+References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20150717134159.GC10608@kwain>
+Message-ID: <55A912F0.7080605@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the
-Security System cryptographic accelerator driver.
+Hi Antoine,
 
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
----
- Documentation/devicetree/bindings/crypto/sun4i-ss.txt | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/crypto/sun4i-ss.txt
+On 07/17/2015 10:41 AM, Antoine Tenart wrote:
+> Hi guys,
+>
+> On Tue, Jul 07, 2015 at 05:08:23PM +0200, Antoine Tenart wrote:
+>>
+>> This series was part of a bigger one[1], which was split into smaller
+>> ones as asked by Ezequiel[2]. When we take this into account, this is
+>> v7. In addition, there was absolutely no comment for more than 1 month
+>> (since June 2nd). Given this, I really expect the series to be merge
+>> soon as other series are based on this.
+>
+> Any news on this series?
+>
 
-diff --git a/Documentation/devicetree/bindings/crypto/sun4i-ss.txt b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-new file mode 100644
-index 0000000..1e02d17
---- /dev/null
-+++ b/Documentation/devicetree/bindings/crypto/sun4i-ss.txt
-@@ -0,0 +1,19 @@
-+* Allwinner Security System found on A20 SoC
-+
-+Required properties:
-+- compatible : Should be "allwinner,sun4i-a10-crypto".
-+- reg: Should contain the Security System register location and length.
-+- interrupts: Should contain the IRQ line for the Security System.
-+- clocks : List of clock specifiers, corresponding to ahb and ss.
-+- clock-names : Name of the functional clock, should be
-+	* "ahb" : AHB gating clock
-+	* "mod" : SS controller clock
-+
-+Example:
-+	crypto: crypto-engine at 01c15000 {
-+		compatible = "allwinner,sun4i-a10-crypto";
-+		reg = <0x01c15000 0x1000>;
-+		interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&ahb_gates 5>, <&ss_clk>;
-+		clock-names = "ahb", "mod";
-+	};
+I'll try to take a look and do some testing over the weekend.
+
+Robert: think you can test this on a pxa board? I have one here,
+but it's non trivial for me to set it up.
+
+Thanks,
 -- 
-2.3.6
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
