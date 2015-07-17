@@ -1,101 +1,88 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 17 Jul 2015 11:13:51 -0700
-Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
- Control Processor)
-In-Reply-To: <55A8E434.2010709@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
- <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
- <559ADC94.4080505@codeaurora.org> <559BF858.1020301@arm.com>
- <20150708014606.GH30412@codeaurora.org> <55A7D79B.3080305@arm.com>
- <20150716193114.GA17952@codeaurora.org> <55A8E434.2010709@arm.com>
-Message-ID: <55A945DF.3@codeaurora.org>
+From: const@makelinux.com (Constantine Shulyupin)
+Date: Fri, 17 Jul 2015 22:10:00 +0300
+Subject: Linux on Armada 370
+In-Reply-To: <2423243.x5Zj3FZyBc@wuerfel>
+References: <CAE7jHC_u0kTcaRUypSMdL=GqKrizcE8cjbJnp3RJrt9oL8m7ug@mail.gmail.com>
+ <20150716171448.59eb45e5@free-electrons.com>
+ <2423243.x5Zj3FZyBc@wuerfel>
+Message-ID: <CAE7jHC8ogMggTnz=ujVptXLKvA7MMr6hfeROv+gRcGqfJ-VM2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2015 04:17 AM, Sudeep Holla wrote:
->
->
-> On 16/07/15 20:31, Stephen Boyd wrote:
->> On 07/16, Sudeep Holla wrote:
->>> On 08/07/15 02:46, Stephen Boyd wrote:
->>>>
->>>> Yes struct clk would have min/max, and struct clk_core would have
->>>> min/max. Then some sort of provider API (or possibly even
->>>> clk_init_data) would take the min/max fields and copy them over
->>>> to struct clk_core. Then during set_rate operations we would
->>>> aggregate the constraints from struct clk like we already do and
->>>> add in the constrains in struct clk_core.
->>>>
->>>> One downside to adding new fields to clk_init_data is that there
->>>> are drivers out there that aren't initializing that structure to
->>>> 0, and they're putting it on the stack, so stack junk can come
->>>> through. Furthermore, min/max would mean that every driver needs
->>>> to specify some large number for max or we have to special case
->>>> min == max == 0 and ignore it. Somehow it needs to be opt-in. If
->>>> we want to go down the clk_init_data route then perhaps we need
->>>> some sort of rate_constraint struct pointer in there that drivers
->>>> can optionally setup.
->>>>
->>>>     struct clk_rate_constraint {
->>>>         unsigned long min;
->>>>         unsigned long max;
->>>>     };
->>>>
->>>>     struct clk_init_data {
->>>>         ...
->>>>         struct clk_rate_constraint *rate_constraint;
->>>>     };
->>>>
->>>> I haven't thought it through completely, but I can probably write
->>>> up some patch tomorrow after I sleep on it.
->>>>
->>>
->>> I am hoping to get this series for v4.3. In order to avoid using
->>> consumer API, I can revert back to the min,max check I had in the
->>> round_rate earlier if that's fine with you ? Let me know so that I can
->>> post the next version based on that. All the other comments are already
->>> addressed.
+On Fri, Jul 17, 2015 at 3:30 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 16 July 2015 17:14:48 Thomas Petazzoni wrote:
 >>
->> Ok. I'm fine with the consumer API being used, but it would be
->> nice if we didn't have to do so. Try out the patch below,
->> hopefully it's good enough for your purposes. It may need to be
->> more robust, and we may still want to use the init_data structure
->> to avoid races with providers and consumers, but we can leave
->> that for later after sweeping all the structure users.
+>> On Thu, 16 Jul 2015 01:24:59 +0300, Constantine Shulyupin wrote:
 >>
->
-> Agreed, I would avoid using clk consumer API or use it with TODO so that
-> I remember to remove it soon. Anyways, thanks for the patch, I tested it
-> and works fine to me. You can add Tested-by if you decide to push it.
-
-Thanks. I pushed it to -next last night but it probably hasn't shown up yet.
-
->
->>>
->>> Also since this series depends on SCPI, I was thinking to get it merged
->>> via ARM-SoC, but that might conflict with the round_rate prototype
->>> change. Do do plan to share a stable base with arm-soc guys or you
->>> expect all the changes to be contained in clk tree ?
->>>
+>> > I want to run the mainstream Linux on Armada 370 and then contribute to it.
+>> >
+>> > I use custom board derived from DB-88F6710-BP
+>> > Now I successfully run Marvell's linux-3.2.54-2014_T1.1 with u-boot
+>> > "Marvell version: v2011.12 2013_Q1.0p2"
+>> > U-boot and Linux are patched by our OEM according HW changes.
+>> >
+>> > I unsuccessfully tried to to run linux-4.2 with armada-370-db.dts.
+>> >
+>> > Can you please tell me, were can I find the latest Linux, which runs
+>> > on Armada 370?
+>> > What is proper configuration etc?
 >>
->> We can share a stable branch for the determine_rate change with
->> arm-soc. We already have it on a separate branch but haven't
->> published it so far because nobody has asked.
+>> Most likely you're hitting the internal register issue. Can you
+>> make sure you have either an A0 or B0 stepping or the 370 (it's shown
+>> in the U-Boot messages at boot), and then check whether your internal
+>> registers are at 0xd0000000 or 0xf1000000. To achieve this, please run:
 >>
+>>         md 0xd0020080
+>>         md 0xf1020080
+>>
+>> One of the two may crash the system. If the first command returns
+>> 0xd0000000, then your internal registers are at that location. If the
+>> second command returns 0xf1000000, then your internal registers are at
+>> that location.
+>>
+>> I suspect that you might be using an old U-Boot that still maps
+>> registers at 0xd0000000. You have two choices:
+>>
+>>  1/ Update your U-Boot. This is the best option obviously. An updated
+>>     U-Boot is available for the Armada 370 DB.
 >
-> determine_rate change shouldn't affect SCPI clock driver but I remember
-> seeing round_rate change too on the list which returns value using the
-> argument from Boris. Is that planned for v4.3 ? I would need the stable
-> branch from this clk_hw_set_rate_range if you decide to push. Let me
-> know your preferences. I will post the updated version of the patch
-> accordingly.
+> That is only really an option if the machine hasn't been deployed
+> in the field yet. If it has, then the setting needs to stay
+> unmodified, or there is no proper upgrade path because the new
+> boot loader breaks the existing 3.2 kernel.
 >
+>>  2/ Change the kernel armada-370-db.dts to use the internal registers
+>>     at 0xd0000000. Basically, you can revert commit
+>>     4f054d445139d63868f931328f897ac5ef87242e.
+>
+> Right, and if that works, we can add a new dts file for that machine
+> with the correct setting. I would assume that there are a few other
+> changes compared to DB-88F6710-BP, so the new file should enable
+> exactly those devices that are in fact wired up on Constantine's board.
+>
+>         Arnd
 
-We're not going to change round_rate() so it sounds like you don't need 
-a stable branch. But you would need this new consumer API. So you still 
-need a branch right?
+Thank you.
+I changed internal register to 0xd0000000 and it boots till network
+configuration and powers off by it self.
+The last log I see is:
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+NET: Registered protocol family 17
+Key type dns_resolver registered
+ThumbEE CPU extension supported.
+Registering SWP/SWPB emulation handler
+hctosys: unable to open rtc device (rtc0)
+mvneta d0070000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+IP-Config: Guessing netmask 255.255.0.0
+IP-Config: Complete:
+     device=eth0, hwaddr=36:17:d5:87:ee:6e, ipaddr=169.254.0.2,
+mask=255.255.0.0, gw=255.255.255.255
+     host=169.254.0.2, domain=, nis-domain=(none)
+     bootserver=255.255.255.255, rootserver=169.254.0.1, rootpath=
+
+
+Tested on 4.2.0-rc1-00088-gb9243b5 and 4.0.0-rc1-00002-g4f054d4
+
+What can you suggest?
+
+Thanks constantine
