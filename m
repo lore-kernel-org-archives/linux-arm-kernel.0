@@ -1,289 +1,315 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri, 17 Jul 2015 23:28:13 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150717090009.720f6bd0@gandalf.local.home>
-References: <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
- <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
-Message-ID: <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 17 Jul 2015 16:30:43 +0200
+Subject: [PATCH 07/18] KVM: ARM64: PMU: Add perf event map and introduce
+ perf event creating function
+In-Reply-To: <1436149068-3784-8-git-send-email-shannon.zhao@linaro.org>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-8-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <20150717143043.GR14024@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 17, 2015, at 10:00 PM, Steven Rostedt wrote:
+On Mon, Jul 06, 2015 at 10:17:37AM +0800, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> When we use tools like perf on host, perf passes the event type and the
+> id in this type category to kernel, then kernel will map them to event
+> number and write this number to PMU PMEVTYPER<n>_EL0 register. While
+> we're trapping and emulating guest accesses to PMU registers, we get the
+> event number and map it to the event type and the id reversely.
 
-Hi Steve,
+There's something with the nomenclature that makes this really hard to
+read.
 
-> Here's my latest version of the patch. I also added a fix that made
-> entries off from the real number of entries. That was to stop the loop
-> on ULONG_MAX in stack_dump_trace[i], otherwise if for some reason
-> nr_entries is one off and points to ULONG_MAX, and there is a -1 in the
-> stack, the trace will include it in the count. The output of the stack
-> tests against both nr_entries and ULONG_MAX and will stop with either
-> case, making the dump and the count different.
+you mention here: "event type", "the id", and "event number".  The
+former two I think are perf identifiers, and the latter is the hardware
+event number, is this right?
+
 > 
-> -- Steve
+> Check whether the event type is same with the one to be set.
+
+when?
+
+> If not,
+> stop counter to monitor current event and find the event type map id.
+> According to the bits of data to configure this perf_event attr and
+> set exclude_host to 1 for guest. Then call perf_event API to create the
+> corresponding event and save the event pointer.
 > 
-> From 1c3697c3c4ce1f237466f76e40c91f66e2030bac Mon Sep 17 00:00:00 2001
-> From: "Steven Rostedt (Red Hat)" <rostedt@goodmis.org>
-> Date: Thu, 16 Jul 2015 13:24:54 -0400
-> Subject: [PATCH] tracing: Clean up stack tracing and fix fentry updates
-> 
-> Akashi Takahiro was porting the stack tracer to arm64 and found some
-> issues with it. One was that it repeats the top function, due to the
-> stack frame added by the mcount caller and added by itself. This
-> was added when fentry came in, and before fentry created its own stack
-> frame. But x86's fentry now creates its own stack frame, and there's
-> no need to insert the function again.
-> 
-> This also cleans up the code a bit, where it doesn't need to do something
-> special for fentry, and doesn't include insertion of a duplicate
-> entry for the called function being traced.
-> 
-> Link: http://lkml.kernel.org/r/55A646EE.6030402 at linaro.org
-> 
-> Some-suggestions-by: Jungseok Lee <jungseoklee85@gmail.com>
-> Some-suggestions-by: Mark Rutland <mark.rutland@arm.com>
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
-> kernel/trace/trace_stack.c | 68 ++++++++++++++++------------------------------
-> 1 file changed, 23 insertions(+), 45 deletions(-)
+>  include/kvm/arm_pmu.h |   4 ++
+>  virt/kvm/arm/pmu.c    | 173 ++++++++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 177 insertions(+)
 > 
-> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-> index 3f34496244e9..b746399ab59c 100644
-> --- a/kernel/trace/trace_stack.c
-> +++ b/kernel/trace/trace_stack.c
-> @@ -18,12 +18,6 @@
-> 
-> #define STACK_TRACE_ENTRIES 500
-> 
-> -#ifdef CC_USING_FENTRY
-> -# define fentry		1
-> -#else
-> -# define fentry		0
-> -#endif
-> -
-> static unsigned long stack_dump_trace[STACK_TRACE_ENTRIES+1] =
-> 	 { [0 ... (STACK_TRACE_ENTRIES)] = ULONG_MAX };
-> static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
-> @@ -35,7 +29,7 @@ static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
->  */
-> static struct stack_trace max_stack_trace = {
-> 	.max_entries		= STACK_TRACE_ENTRIES - 1,
-> -	.entries		= &stack_dump_trace[1],
-> +	.entries		= &stack_dump_trace[0],
-> };
-> 
-> static unsigned long max_stack_size;
-> @@ -55,7 +49,7 @@ static inline void print_max_stack(void)
-> 
-> 	pr_emerg("        Depth    Size   Location    (%d entries)\n"
-> 			   "        -----    ----   --------\n",
-> -			   max_stack_trace.nr_entries - 1);
-> +			   max_stack_trace.nr_entries);
-> 
-> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-> 		if (stack_dump_trace[i] == ULONG_MAX)
-> @@ -77,7 +71,7 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 	unsigned long this_size, flags; unsigned long *p, *top, *start;
-> 	static int tracer_frame;
-> 	int frame_size = ACCESS_ONCE(tracer_frame);
-> -	int i;
-> +	int i, x;
-> 
-> 	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
-> 	this_size = THREAD_SIZE - this_size;
-> @@ -105,26 +99,20 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 	max_stack_size = this_size;
-> 
-> 	max_stack_trace.nr_entries = 0;
-> -
-> -	if (using_ftrace_ops_list_func())
-> -		max_stack_trace.skip = 4;
-> -	else
-> -		max_stack_trace.skip = 3;
-> +	max_stack_trace.skip = 3;
-> 
-> 	save_stack_trace(&max_stack_trace);
-> 
-> -	/*
-> -	 * Add the passed in ip from the function tracer.
-> -	 * Searching for this on the stack will skip over
-> -	 * most of the overhead from the stack tracer itself.
-> -	 */
-> -	stack_dump_trace[0] = ip;
-> -	max_stack_trace.nr_entries++;
-> +	/* Skip over the overhead of the stack tracer itself */
-> +	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-> +		if (stack_dump_trace[i] == ip)
-> +			break;
-> +	}
-> 
-> 	/*
-> 	 * Now find where in the stack these are.
-> 	 */
-> -	i = 0;
-> +	x = 0;
-> 	start = stack;
-> 	top = (unsigned long *)
-> 		(((unsigned long)start & ~(THREAD_SIZE-1)) + THREAD_SIZE);
-> @@ -139,12 +127,15 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 	while (i < max_stack_trace.nr_entries) {
-> 		int found = 0;
-> 
-> -		stack_dump_index[i] = this_size;
-> +		stack_dump_index[x] = this_size;
-> 		p = start;
-> 
-> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-> +			if (stack_dump_trace[i] == ULONG_MAX)
-> +				break;
-> 			if (*p == stack_dump_trace[i]) {
-> -				this_size = stack_dump_index[i++] =
-> +				stack_dump_trace[x] = stack_dump_trace[i++];
-> +				this_size = stack_dump_index[x++] =
-> 					(top - p) * sizeof(unsigned long);
-> 				found = 1;
-> 				/* Start the search from here */
-> @@ -156,7 +147,7 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 				 * out what that is, then figure it out
-> 				 * now.
-> 				 */
-> -				if (unlikely(!tracer_frame) && i == 1) {
-> +				if (unlikely(!tracer_frame)) {
-> 					tracer_frame = (p - stack) *
-> 						sizeof(unsigned long);
-> 					max_stack_size -= tracer_frame;
-> @@ -168,6 +159,10 @@ check_stack(unsigned long ip, unsigned long *stack)
-> 			i++;
-> 	}
-> 
-> +	max_stack_trace.nr_entries = x;
-> +	for (; x < i; x++)
-> +		stack_dump_trace[x] = ULONG_MAX;
+> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+> index 27d14ca..1050b24 100644
+> --- a/include/kvm/arm_pmu.h
+> +++ b/include/kvm/arm_pmu.h
+> @@ -45,9 +45,13 @@ struct kvm_pmu {
+>  
+>  #ifdef CONFIG_KVM_ARM_PMU
+>  void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu);
+> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
+> +				    unsigned long select_idx);
+>  void kvm_pmu_init(struct kvm_vcpu *vcpu);
+>  #else
+>  static inline void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu) {}
+> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
+> +				    unsigned long select_idx) {}
+>  static inline void kvm_pmu_init(struct kvm_vcpu *vcpu) {}
+>  #endif
+>  
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index dc252d0..50a3c82 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -18,8 +18,68 @@
+>  #include <linux/cpu.h>
+>  #include <linux/kvm.h>
+>  #include <linux/kvm_host.h>
+> +#include <linux/perf_event.h>
+>  #include <kvm/arm_pmu.h>
+>  
+> +/* PMU HW events mapping. */
+> +static struct kvm_pmu_hw_event_map {
+> +	unsigned eventsel;
+> +	unsigned event_type;
+> +} kvm_pmu_hw_events[] = {
+> +	[0] = { 0x11, PERF_COUNT_HW_CPU_CYCLES },
+> +	[1] = { 0x08, PERF_COUNT_HW_INSTRUCTIONS },
+> +	[2] = { 0x04, PERF_COUNT_HW_CACHE_REFERENCES },
+> +	[3] = { 0x03, PERF_COUNT_HW_CACHE_MISSES },
+> +	[4] = { 0x10, PERF_COUNT_HW_BRANCH_MISSES },
+> +};
 > +
-> 	if (task_stack_end_corrupted(current)) {
-> 		print_max_stack();
-> 		BUG();
-> @@ -192,24 +187,7 @@ stack_trace_call(unsigned long ip, unsigned long parent_ip,
-> 	if (per_cpu(trace_active, cpu)++ != 0)
-> 		goto out;
-> 
-> -	/*
-> -	 * When fentry is used, the traced function does not get
-> -	 * its stack frame set up, and we lose the parent.
-> -	 * The ip is pretty useless because the function tracer
-> -	 * was called before that function set up its stack frame.
-> -	 * In this case, we use the parent ip.
-> -	 *
-> -	 * By adding the return address of either the parent ip
-> -	 * or the current ip we can disregard most of the stack usage
-> -	 * caused by the stack tracer itself.
-> -	 *
-> -	 * The function tracer always reports the address of where the
-> -	 * mcount call was, but the stack will hold the return address.
-> -	 */
-> -	if (fentry)
-> -		ip = parent_ip;
-> -	else
-> -		ip += MCOUNT_INSN_SIZE;
-> +	ip += MCOUNT_INSN_SIZE;
-> 
-> 	check_stack(ip, &stack);
-> 
-> @@ -284,7 +262,7 @@ __next(struct seq_file *m, loff_t *pos)
-> {
-> 	long n = *pos - 1;
-> 
-> -	if (n >= max_stack_trace.nr_entries || stack_dump_trace[n] == ULONG_MAX)
-> +	if (n > max_stack_trace.nr_entries || stack_dump_trace[n] == ULONG_MAX)
-> 		return NULL;
-> 
-> 	m->private = (void *)n;
-> @@ -354,7 +332,7 @@ static int t_show(struct seq_file *m, void *v)
-> 		seq_printf(m, "        Depth    Size   Location"
-> 			   "    (%d entries)\n"
-> 			   "        -----    ----   --------\n",
-> -			   max_stack_trace.nr_entries - 1);
-> +			   max_stack_trace.nr_entries);
-> 
-> 		if (!stack_tracer_enabled && !max_stack_size)
-> 			print_disabled(m);
+> +/* PMU HW cache events mapping. */
+> +static struct kvm_pmu_hw_cache_event_map {
+> +	unsigned eventsel;
+> +	unsigned cache_type;
+> +	unsigned cache_op;
+> +	unsigned cache_result;
+> +} kvm_pmu_hw_cache_events[] = {
+> +	[0] = { 0x04, PERF_COUNT_HW_CACHE_L1D, PERF_COUNT_HW_CACHE_OP_READ,
+> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
+> +	[1] = { 0x03, PERF_COUNT_HW_CACHE_L1D, PERF_COUNT_HW_CACHE_OP_READ,
+> +		      PERF_COUNT_HW_CACHE_RESULT_MISS },
+> +	[2] = { 0x04, PERF_COUNT_HW_CACHE_L1D, PERF_COUNT_HW_CACHE_OP_WRITE,
+> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
+> +	[3] = { 0x03, PERF_COUNT_HW_CACHE_L1D, PERF_COUNT_HW_CACHE_OP_WRITE,
+> +		      PERF_COUNT_HW_CACHE_RESULT_MISS },
+
+seems to me that the four entries above will never be used, because
+you'll always match them in kvm_pmu_hw_events above?
+
+Is this because perf map multiple generic perf events to the same
+hardware event?  Does it matter if we register this with perf as one or
+the other then?
+
+> +	[4] = { 0x12, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_READ,
+> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
+> +	[5] = { 0x10, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_READ,
+> +		      PERF_COUNT_HW_CACHE_RESULT_MISS },
+> +	[6] = { 0x12, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_WRITE,
+> +		      PERF_COUNT_HW_CACHE_RESULT_ACCESS },
+> +	[7] = { 0x10, PERF_COUNT_HW_CACHE_BPU, PERF_COUNT_HW_CACHE_OP_WRITE,
+> +		      PERF_COUNT_HW_CACHE_RESULT_MISS },
+> +};
+> +
+> +/**
+> + * kvm_pmu_stop_counter - stop PMU counter for the selected counter
+> + * @vcpu: The vcpu pointer
+> + * @select_idx: The counter index
+> + *
+> + * If this counter has been configured to monitor some event, disable and
+> + * release it.
+> + */
+> +static void kvm_pmu_stop_counter(struct kvm_vcpu *vcpu,
+> +				 unsigned long select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +
+> +	if (pmc->perf_event) {
+> +		perf_event_disable(pmc->perf_event);
+> +		perf_event_release_kernel(pmc->perf_event);
+> +	}
+> +	pmc->perf_event = NULL;
+> +	pmc->eventsel = 0xff;
+
+why is 0xff 'unused' or reserved?  If we're choosing this arbitrarily,
+why is it not 0x3ff?  Should we create a define for this?
+
+> +}
+> +
+>  /**
+>   * kvm_pmu_vcpu_reset - reset pmu state for cpu
+>   * @vcpu: The vcpu pointer
+> @@ -27,12 +87,125 @@
+>   */
+>  void kvm_pmu_vcpu_reset(struct kvm_vcpu *vcpu)
+>  {
+> +	int i;
+>  	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>  
+> +	for (i = 0; i < ARMV8_MAX_COUNTERS; i++)
+> +		kvm_pmu_stop_counter(vcpu, i);
+> +	pmu->overflow_status = 0;
+>  	pmu->irq_pending = false;
+>  }
+>  
+>  /**
+> + * kvm_pmu_find_hw_event - find hardware event
+> + * @pmu: The pmu pointer
+> + * @event_select: The number of selected event type
+> + *
+> + * Based on the number of selected event type, find out whether it belongs to
+> + * PERF_TYPE_HARDWARE. If so, return the corresponding event id.
+> + */
+> +static unsigned kvm_pmu_find_hw_event(struct kvm_pmu *pmu,
+> +				      unsigned long event_select)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(kvm_pmu_hw_events); i++)
+> +		if (kvm_pmu_hw_events[i].eventsel == event_select)
+> +			break;
+> +
+> +	if (i == ARRAY_SIZE(kvm_pmu_hw_events))
+> +		return PERF_COUNT_HW_MAX;
+> +
+> +	return kvm_pmu_hw_events[i].event_type;
+
+you can just return this directly in the loop if you have a match and
+unconditionally return PERF_COUNT_HW_MAX outside the loop without having
+to check the loop condition.
+
+> +}
+> +
+> +/**
+> + * kvm_pmu_find_hw_cache_event - find hardware cache event
+> + * @pmu: The pmu pointer
+> + * @event_select: The number of selected event type
+> + *
+> + * Based on the number of selected event type, find out whether it belongs to
+> + * PERF_TYPE_HW_CACHE. If so, return the corresponding event id.
+> + */
+> +static unsigned kvm_pmu_find_hw_cache_event(struct kvm_pmu *pmu,
+> +					    unsigned long event_select)
+> +{
+> +	int i;
+> +	unsigned config;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(kvm_pmu_hw_cache_events); i++)
+> +		if (kvm_pmu_hw_cache_events[i].eventsel == event_select)
+> +			break;
+> +
+> +	if (i == ARRAY_SIZE(kvm_pmu_hw_cache_events))
+> +		return PERF_COUNT_HW_CACHE_MAX;
+
+I feel like I just read this code, can we reuse it with a pointer to the
+array?
+
+> +
+> +	config = (kvm_pmu_hw_cache_events[i].cache_type & 0xff)
+> +		 | ((kvm_pmu_hw_cache_events[i].cache_op & 0xff) << 8)
+> +		 | ((kvm_pmu_hw_cache_events[i].cache_result & 0xff) << 16);
+> +
+> +	return config;
+> +}
+> +
+> +/**
+> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+> + * @vcpu: The vcpu pointer
+> + * @data: The data guest writes to PMXEVTYPER_EL0
+> + * @select_idx: The number of selected counter
+> + *
+> + * Firstly check whether the event type is same with the one to be set.
+> + * If not, stop counter to monitor current event and find the event type map id.
+> + * According to the bits of data to configure this perf_event attr and set
+> + * exclude_host to 1 for guest. Then call perf_event API to create the
+> + * corresponding event and save the event pointer.
+
+This text seems to be describing more how the function does something,
+as opposed to what it does and why.  I found it a little hard to read.
+
+> + */
+> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
+> +				    unsigned long select_idx)
+> +{
+> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+> +	struct perf_event *event;
+> +	struct perf_event_attr attr;
+> +	unsigned config, type = PERF_TYPE_RAW;
+> +
+> +	if ((data & ARMV8_EVTYPE_EVENT) == pmc->eventsel)
+> +		return;
+> +
+> +	kvm_pmu_stop_counter(vcpu, select_idx);
+> +	pmc->eventsel = data & ARMV8_EVTYPE_EVENT;
+> +
+> +	config = kvm_pmu_find_hw_event(pmu, pmc->eventsel);
+> +	if (config != PERF_COUNT_HW_MAX) {
+> +		type = PERF_TYPE_HARDWARE;
+> +	} else {
+> +		config = kvm_pmu_find_hw_cache_event(pmu, pmc->eventsel);
+> +		if (config != PERF_COUNT_HW_CACHE_MAX)
+> +			type = PERF_TYPE_HW_CACHE;
+> +	}
+> +
+> +	if (type == PERF_TYPE_RAW)
+> +		config = pmc->eventsel;
+
+don't you need to memset attr to 0 first?
+
+otherwise, how do you ensure that for example exclude_guest is always
+clear?
+
+> +
+> +	attr.type = type;
+> +	attr.size = sizeof(attr);
+> +	attr.pinned = true;
+> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
+> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
+> +	attr.exclude_hv = data & ARMV8_INCLUDE_EL2 ? 0 : 1;
+
+should the guest be able to see something counted in the hypervisor ever
+or should that only be the host being able to see that?
+
+my gut feeling is that the hypervisor should be hidden from the guest
+and that exclude_hv = 0, is the right choice.  But this is a question
+about the semantics of perf, I suppose.
+
+> +	attr.exclude_host = 1;
+> +	attr.config = config;
+> +	attr.sample_period = (-pmc->counter) & (((u64)1 << 32) - 1);
+
+whoa, what is this scary calculation?
+
+definitely needs an explanation?
+
+> +
+> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+> +	if (IS_ERR(event)) {
+> +		kvm_err("kvm: pmu event creation failed %ld\n",
+> +			  PTR_ERR(event));
+
+doesn't this mean we'll spam the kernel log if the guest supplies
+bogus/unsupported event numbers?
+
+In that case it shoudl be kvm_debug and the guest should be able to see
+this somehow (e.g. events don't count).
+
+> +		return;
+> +	}
+> +	pmc->perf_event = event;
+> +}
+> +
+> +/**
+>   * kvm_pmu_init - Initialize global PMU state for per vcpu
+>   * @vcpu: The vcpu pointer
+>   *
 > -- 
-
-
-I have reviewed and tested the kernel including this patch and only [RFC 1/3].
-
-Now, the number of entries and max_stack_size are always okay, but unexpected functions,
-such as ftrace_ops_no_ops and ftrace_call, are *sometimes* listed as follows.
-
-$ cat /sys/kernel/debug/tracing/stack_trace 
-
-        Depth    Size   Location    (49 entries)
-        -----    ----   --------
-  0)     4456      16   arch_counter_read+0xc/0x24
-  1)     4440      16   ktime_get+0x44/0xb4
-  2)     4424      48   get_drm_timestamp+0x30/0x40
-  3)     4376      16   drm_get_last_vbltimestamp+0x94/0xb4
-  4)     4360      80   drm_handle_vblank+0x84/0x3c0
-  5)     4280     144   mdp5_irq+0x118/0x130
-  6)     4136      80   msm_irq+0x2c/0x68
-  7)     4056      32   handle_irq_event_percpu+0x60/0x210
-  8)     4024      96   handle_irq_event+0x50/0x80
-  9)     3928      64   handle_fasteoi_irq+0xb0/0x178
- 10)     3864      48   generic_handle_irq+0x38/0x54
- 11)     3816      32   __handle_domain_irq+0x68/0xbc
- 12)     3784      64   gic_handle_irq+0x38/0x88
- 13)     3720     280   el1_irq+0x64/0xd8
- 14)     3440     168   ftrace_ops_no_ops+0xb4/0x16c
- 15)     3272      64   ftrace_call+0x0/0x4
- 16)     3208      16   _raw_spin_lock_irqsave+0x14/0x70
- 17)     3192      32   msm_gpio_set+0x44/0xb4
- 18)     3160      48   _gpiod_set_raw_value+0x68/0x148
- 19)     3112      64   gpiod_set_value+0x40/0x70
- 20)     3048      32   gpio_led_set+0x3c/0x94
- 21)     3016      48   led_set_brightness+0x50/0xa4
- 22)     2968      32   led_trigger_event+0x4c/0x78
- 23)     2936      48   mmc_request_done+0x38/0x84
- 24)     2888      32   sdhci_tasklet_finish+0xcc/0x12c
- 25)     2856      48   tasklet_action+0x64/0x120
- 26)     2808      48   __do_softirq+0x114/0x2f0
- 27)     2760     128   irq_exit+0x98/0xd8
- 28)     2632      32   __handle_domain_irq+0x6c/0xbc
- 29)     2600      64   gic_handle_irq+0x38/0x88
- 30)     2536     280   el1_irq+0x64/0xd8
- 31)     2256     168   ftrace_ops_no_ops+0xb4/0x16c
- 32)     2088      64   ftrace_call+0x0/0x4
- 33)     2024      16   __schedule+0x1c/0x748
- 34)     2008      80   schedule+0x38/0x94
- 35)     1928      32   schedule_timeout+0x1a8/0x200
- 36)     1896     128   wait_for_common+0xa8/0x150
- 37)     1768     128   wait_for_completion+0x24/0x34
- 38)     1640      32   mmc_wait_for_req_done+0x3c/0x104
- 39)     1608      64   mmc_wait_for_cmd+0x68/0x94
- 40)     1544     128   get_card_status.isra.25+0x6c/0x88
- 41)     1416     112   card_busy_detect.isra.31+0x7c/0x154
- 42)     1304     128   mmc_blk_err_check+0xd0/0x4f8
- 43)     1176     192   mmc_start_req+0xe4/0x3a8
- 44)      984     160   mmc_blk_issue_rw_rq+0xc4/0x9c0
- 45)      824     176   mmc_blk_issue_rq+0x19c/0x450
- 46)      648     112   mmc_queue_thread+0x134/0x17c
- 47)      536      80   kthread+0xe0/0xf8
- 48)      456     456   ret_from_fork+0xc/0x50
-
-$ cat /sys/kernel/debug/tracing/stack_max_size
-4456
-
-This issue might be related to arch code, not this change.
-IMHO, this patch look settled now.
-
-Best Regards
-Jungseok Lee
+> 2.1.0
+> 
