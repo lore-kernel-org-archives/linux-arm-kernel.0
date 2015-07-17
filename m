@@ -1,73 +1,70 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 17 Jul 2015 12:00:16 +0100
-Subject: [PATCH 3/5] arm64, pci: Allow RC drivers to supply
- pcibios_add_device() implementation.
-In-Reply-To: <55A7E334.3030101@caviumnetworks.com>
-References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
- <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
- <20150716090426.GA17097@red-moon>
- <55A7E334.3030101@caviumnetworks.com>
-Message-ID: <20150717110016.GB19067@red-moon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Jul 2015 12:04:43 +0100
+Subject: [PATCH] arm64: Better native ptrace support for compat tasks
+In-Reply-To: <20150717104953.GA13712@e104818-lin.cambridge.arm.com>
+References: <1436887217-13158-1-git-send-email-catalin.marinas@arm.com>
+ <20150717102629.GI18994@arm.com>
+ <20150717104953.GA13712@e104818-lin.cambridge.arm.com>
+Message-ID: <20150717110443.GM18994@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
-
-On Thu, Jul 16, 2015 at 06:00:36PM +0100, David Daney wrote:
-> On 07/16/2015 02:04 AM, Lorenzo Pieralisi wrote:
-> > Hi David,
-> >
-> > On Wed, Jul 15, 2015 at 05:54:43PM +0100, David Daney wrote:
-> >> From: David Daney <david.daney@cavium.com>
-> >>
-> [...]
-> >> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> >> index 4095379..3356023 100644
-> >> --- a/arch/arm64/kernel/pci.c
-> >> +++ b/arch/arm64/kernel/pci.c
-> >> @@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> >>   	return res->start;
-> >>   }
-> >>
-> >> +static int (*pcibios_add_device_impl)(struct pci_dev *);
-> >> +
-> >> +void set_pcibios_add_device(int (*arg)(struct pci_dev *))
-> >> +{
-> >> +	pcibios_add_device_impl = arg;
-> >> +}
-> >> +
-> >>   /*
-> >>    * Try to assign the IRQ number from DT when adding a new device
-> >>    */
-> >>   int pcibios_add_device(struct pci_dev *dev)
-> >>   {
-> >> +	if (pcibios_add_device_impl)
-> >> +		return pcibios_add_device_impl(dev);
-> >
-> > I am totally against this (and to be honest by reading the other
-> > patches I failed to understand why you even need it), see above.
-> >
+On Fri, Jul 17, 2015 at 11:49:54AM +0100, Catalin Marinas wrote:
+> On Fri, Jul 17, 2015 at 11:26:29AM +0100, Will Deacon wrote:
+> > On Tue, Jul 14, 2015 at 04:20:17PM +0100, Catalin Marinas wrote:
+> > > The compat ptrace interface allows access to the TLS register, hardware
+> > > breakpoints and watchpoints, syscall number. However, a native task
+> > > using the native ptrace interface to debug compat tasks (e.g. multi-arch
+> > > gdb) only has access to the general and VFP register sets. The compat
+> > > ptrace interface cannot be accessed from a native task.
+> > > 
+> > > This patch adds a new user_aarch32_ptrace_view which contains the TLS,
+> > > hardware breakpoint/watchpoint and syscall number regsets in addition to
+> > > the existing GPR and VFP regsets. This view is backwards compatible with
+> > > the previous kernels. Core dumping of 32-bit tasks and compat ptrace are
+> > > not affected since the original user_aarch32_view is preserved.
+> > 
+> > [...]
+> > 
+> > > +static const struct user_regset aarch32_ptrace_regsets[] = {
+> > > +	[REGSET_GPR] = {
+> > > +		.core_note_type = NT_PRSTATUS,
+> > > +		.n = COMPAT_ELF_NGREG,
+> > > +		.size = sizeof(compat_elf_greg_t),
+> > > +		.align = sizeof(compat_elf_greg_t),
+> > > +		.get = compat_gpr_get,
+> > > +		.set = compat_gpr_set
+> > > +	},
+> > > +	[REGSET_FPR] = {
+> > > +		.core_note_type = NT_ARM_VFP,
+> > > +		.n = VFP_STATE_SIZE / sizeof(compat_ulong_t),
+> > > +		.size = sizeof(compat_ulong_t),
+> > > +		.align = sizeof(compat_ulong_t),
+> > > +		.get = compat_vfp_get,
+> > > +		.set = compat_vfp_set
+> > 
+> > 
+> > I don't see how this is "backwards compatible with the previous kernels".
 > 
-> It is because ...
+> The first two entries of aarch32_ptrace_regsets are the same as the two
+> aarch32_regsets entries currently in use before this patch (I just
+> dropped "COMPAT" from REGSET_* for consistency with the rest of the
+> array).
 > 
+> > If there is some userspace out there that expects a native view onto the
+> > registers of a compat task, then that's no longer the case, right? For
+> > example, NT_PRFPREG requests will no longer work afaict.
 > 
-> > Thanks,
-> > Lorenzo
-> >
-> >> +
-> >>   	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> 
-> 
->   ... this is total crap.  But I didn't want to break existing systems.
+> But this never worked since task_user_regset_view() always returned
+> user_aarch32_view (with the aarch32_regsets) if the ptrace'd task was
+> compat. So a native gdb debugging compat task is expected to use
+> NT_ARM_VFP before and after this patch.
 
-That's a good aim, but you are still failing to explain the issue properly
-I am afraid.
+Aha, sorry, I got confused because you've wired up the native hw-breakpoint
+interfaces later on in the regset (which is fine, because I don't think
+the parent could've got into the compat hw-breakpoint ptrace requests
+since they're not regset-based).
 
-> The PCI RC drivers need a way to configure the legacy virtual-wire 
-> interrupts, because the existing code doesn't do it.
+So I think this looks fine, thanks!
 
-Can I ask you please to explain the issue a bit more clearly (and why
-the OF API does not work for you ?)
-
-Thank you !
-Lorenzo
+Will
