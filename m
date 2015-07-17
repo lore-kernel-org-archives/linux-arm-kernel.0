@@ -1,57 +1,83 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 17 Jul 2015 08:46:22 +0200
-Subject: [PATCH v2 4/4] mfd: max77686: Split out regulator part from the
- DT binding
-In-Reply-To: <CAJKOXPe8rDLCt+Za+Qzkkd4JnFoyKtsFTmMbJL6+3Ark8qFYiQ@mail.gmail.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-5-git-send-email-javier@osg.samsung.com>
- <CAJKOXPe8rDLCt+Za+Qzkkd4JnFoyKtsFTmMbJL6+3Ark8qFYiQ@mail.gmail.com>
-Message-ID: <55A8A4BE.1030904@osg.samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Jul 2015 07:45:49 +0100
+Subject: [PATCH 4/5] irqchip: gic-v3: Add gic_get_irq_domain() to get
+ the irqdomain of the GIC.
+In-Reply-To: <55A7EAAC.8000800@arm.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-5-git-send-email-ddaney.cavm@gmail.com>
+ <55A6947F.8070903@arm.com> <55A6AD1F.902@caviumnetworks.com>
+ <55A75F8B.3080009@arm.com> <55A7E0C2.8020704@caviumnetworks.com>
+ <55A7E52D.9080201@arm.com> <55A7E663.9030000@caviumnetworks.com>
+ <55A7EAAC.8000800@arm.com>
+Message-ID: <20150717074549.7a502e09@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Thu, 16 Jul 2015 18:32:28 +0100
+Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-On 07/17/2015 08:42 AM, Krzysztof Kozlowski wrote:
-> 2015-07-17 15:29 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->> The Maxim MAX77686 PMIC is a multi-function device with regulators,
->> clocks and a RTC. The DT bindings for the clocks are in a separate
->> file but the bindings for the regulators are inside the mfd part.
->>
->> To make it consistent with the clocks portion of the binding and
->> because is more natural to look for regulator bindings under the
->> bindings/regulator sub-directory, split the regulator portion of
->> the DT binding and add it as a separate file.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->> Changes in v2:
->> - Use a generic name for the max77686 node in the regulator example.
->>
->>  Documentation/devicetree/bindings/mfd/max77686.txt | 58 +-----------------
->>  .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
->>  2 files changed, 74 insertions(+), 55 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
+> On 16/07/15 18:14, David Daney wrote:
+> > On 07/16/2015 10:09 AM, Marc Zyngier wrote:
+> >> On 16/07/15 17:50, David Daney wrote:
+> > [...]
+> >>>> Patch 5 has established that you're using "virtual wire" SPIs, so we
+> >>>> need to work on exposing that with the normal kernel abstraction, and
+> >>>> not by messing with the internals of the GIC.
+> >>>>
+> >>>
+> >>> Agreed.
+> >>>
+> >>> The MSI system has pci_enable_msix()/pci_disable_msix().
+> >>>
+> >>> I would propose something like:
+> >>>
+> >>> struct gic_spi_entry {
+> >>> 	int spi   /* SPI number */
+> >>> 	int irq;  /* kernel irq number mapped to the spi*/
+> >>> 	u32 msg;  /* message to be written */
+> >>> 	u64 assert_addr;
+> >>> 	u64 deassert_addr;
+> >>> };
+> >>>
+> >>> /* Fill in the SPI processing information */
+> >>> int gic_map_spi(int spi, struct gic_spi_entry *data);
+> >>
+> >> Neither.
+> >>
+> >> The way to do it is to make this a *separate* IRQ domain stacked onto
+> >> the SPI domain. No funky hook on the side. If it doesn't go through the
+> >> normal kernel API, it doesn't reach the GIC.
+> > 
+> > Yes, the irqdomain does handle mapping SPI -> irq, and the message can 
+> > be derived from the SPI.  However, the irqdomain infrastructure cannot 
+> > supply values for either assert_addr or deassert_addr.
 > 
-> Putting regulator bindings under regulator directory seems logical so
-> I am fine with it.
+> This is why I suggested earlier (in my reply to patch 5) that you have a
+> look at the series I posted a couple of days ago to implement non-PCI
+> MSI support. This would allow you to compose the domains as such:
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->
+> platform-MSI -> message-SPI -> GIC
+> 
+> You'd end up with a msi_msg containing the GICD_SETSPI_NSR doorbell, and
+> the SPI as a payload.
+> 
+> > Those are needed in order to use SPI.  How would you suggest that they 
+> > be obtained?
+> 
+> Two possibilities: either you derive GICD_CLRSPI_NSR by adding 8 to the
+> doorbell you got from the msi_msg structure (ugly, but limited to your
+> own code), or you extend msi_msg to cater for this case.
 
-Thanks a lot for your review. For completeness, I talked with Lee Jones
-over IRC yesterday asking him his opinion on whether MFD DT binding doc
-should contain all the info or if it should be split across different
-subsystems and he prefers the later. That's why I re-spun this series.
- 
-> Best regards,
-> Krzysztof
-> --
+A simpler alternative to the above would be to move all this to
+firmware, and only expose a *wired* SPI to the kernel. This would have
+the advantage to use the existing infrastructure for both DT and ACPI.
 
-Best regards,
+As a side note, that was the intended use of these registers - to
+provide a "virtual wire" interface that remains mostly invisible to
+software.
+
+Thanks,
+
+	M.
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Jazz is not dead. It just smells funny.
