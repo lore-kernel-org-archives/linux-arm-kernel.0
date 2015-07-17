@@ -1,67 +1,30 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 17 Jul 2015 16:42:27 +0200
-Subject: [PATCH 10/18] KVM: ARM64: Add reset and access handlers for
- PMCCNTR_EL0 register
-In-Reply-To: <1436149068-3784-11-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-11-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20150717144227.GT14024@cbox>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 17 Jul 2015 15:44:37 +0100
+Subject: [Xen-devel] [PATCH v2 09/20] xen/biomerge: Don't allow biovec
+ to be merge when Linux is not using 4KB page
+In-Reply-To: <alpine.DEB.2.02.1507171418260.17378@kaball.uk.xensource.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-10-git-send-email-julien.grall@citrix.com>
+ <20150710191245.GA31063@l.oracle.com>
+ <alpine.DEB.2.02.1507161627010.17378@kaball.uk.xensource.com>
+ <55A7D8AD.1090102@citrix.com>
+ <alpine.DEB.2.02.1507171418260.17378@kaball.uk.xensource.com>
+Message-ID: <55A914D5.7080900@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:17:40AM +0800, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Since the reset value of PMCCNTR_EL0 is UNKNOWN, use reset_unknown for
-> its reset handler. Add access handler which emulates writing and reading
-> PMCCNTR_EL0 register.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 19 ++++++++++++++++++-
->  1 file changed, 18 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 2bcf1a0..29883df 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -375,6 +375,23 @@ static bool access_pmxevcntr(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +static bool access_pmccntr(struct kvm_vcpu *vcpu,
-> +			   const struct sys_reg_params *p,
-> +			   const struct sys_reg_desc *r)
-> +{
-> +	unsigned long val;
-> +
-> +	if (p->is_write) {
-> +		val = *vcpu_reg(vcpu, p->Rt);
-> +		kvm_pmu_set_counter_value(vcpu, 31, val);
+On 17/07/15 14:20, Stefano Stabellini wrote:
+> We would have to run some benchmarks, but I think it would still be a
+> win. We should write an ad-hoc __pfn_to_mfn translation function that
+> operates on a range of pfns and simply checks whether an entry is
+> present in that range. It should be just as fast as __pfn_to_mfn. I
+> would definitely recommend it.
 
-magic number?  do we have some existing define we can use or can we add
-one?
+I'd like to see a basic support of 64KB support on Xen pushed in Linux
+upstream before looking to possible improvement in the code. Can we
+defer this as the follow-up of this series?
 
-> +	} else {
-> +		val = kvm_pmu_get_counter_value(vcpu, 31);
-> +		*vcpu_reg(vcpu, p->Rt) = val;
-> +	}
-> +
-> +	return true;
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -590,7 +607,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmceid, reset_pmceid, PMCEID1_EL0, },
->  	/* PMCCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
-> -	  trap_raz_wi },
-> +	  access_pmccntr, reset_unknown, PMCCNTR_EL0 },
->  	/* PMXEVTYPER_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
->  	  access_pmxevtyper, reset_unknown, PMXEVTYPER_EL0 },
-> -- 
-> 2.1.0
-> 
+Regards,
+
+-- 
+Julien Grall
