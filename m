@@ -1,50 +1,119 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Fri, 17 Jul 2015 13:20:49 +0300
-Subject: [PATCH V3 02/19] memory: tegra: Add MC flush support
-In-Reply-To: <20150717095754.GG3057@ulmo>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-3-git-send-email-jonathanh@nvidia.com>
- <20150717095754.GG3057@ulmo>
-Message-ID: <20150717102049.GQ6287@tbergstrom-lnx.Nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 17 Jul 2015 12:21:33 +0200
+Subject: [PATCH 04/18] KVM: ARM64: Add reset and access handlers for
+ PMCR_EL0 register
+In-Reply-To: <55A8C0B8.1000101@linaro.org>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
+ <20150716195534.GD14024@cbox> <55A8C0B8.1000101@linaro.org>
+Message-ID: <20150717102133.GN14024@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 11:57:55AM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On Fri, Jul 17, 2015 at 04:45:44PM +0800, Shannon Zhao wrote:
 > 
-> On Mon, Jul 13, 2015 at 01:39:40PM +0100, Jon Hunter wrote:
-> > The Tegra memory controller implements a flush feature to flush pending
-> > accesses and prevent further accesses from occurring. This feature is
-> > used when powering down IP blocks to ensure the IP block is in a good
-> > state. The flushes are organised by software groups and IP blocks are
-> > assigned in hardware to the different software groups. Add helper
-> > functions for requesting a handle to an MC flush for a given
-> > software group and enabling/disabling the MC flush itself.
+> 
+> On 2015/7/17 3:55, Christoffer Dall wrote:
+> > On Mon, Jul 06, 2015 at 10:17:34AM +0800, shannon.zhao at linaro.org wrote:
+> >> From: Shannon Zhao <shannon.zhao@linaro.org>
+> >>
+> >> Add reset handler which gets host value of PMCR_EL0 and make writable
+> >> bits architecturally UNKNOWN. Add access handler which emulates
+> >> writing and reading PMCR_EL0 register.
+> >>
+> >> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> >> ---
+> >>  arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+> >>  1 file changed, 40 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> >> index c370b40..152ee17 100644
+> >> --- a/arch/arm64/kvm/sys_regs.c
+> >> +++ b/arch/arm64/kvm/sys_regs.c
+> >> @@ -33,6 +33,7 @@
+> >>  #include <asm/kvm_emulate.h>
+> >>  #include <asm/kvm_host.h>
+> >>  #include <asm/kvm_mmu.h>
+> >> +#include <asm/pmu.h>
+> >>  
+> >>  #include <trace/events/kvm.h>
+> >>  
+> >> @@ -236,6 +237,44 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> >>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+> >>  }
+> >>  
+> >> +static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+> >> +{
+> >> +	u32 pmcr;
+> >> +
+> >> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+> >> +	vcpu_sys_reg(vcpu, PMCR_EL0) = (pmcr & ~ARMV8_PMCR_MASK)
+> >> +				       | (ARMV8_PMCR_MASK & 0xdecafbad);
 > > 
-> > This is based upon a change by Vince Hsu <vinceh@nvidia.com>.
+> > You could add a comment that this resets to UNKNOWN as to not make
+> > people confused about the pseudo-random hex value.
 > > 
-> > Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> > ---
-> >  drivers/memory/tegra/mc.c | 110 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/memory/tegra/mc.h |   2 +
-> >  include/soc/tegra/mc.h    |  34 ++++++++++++++
-> >  3 files changed, 146 insertions(+)
+> Ok.
 > 
-> Do we know if this is actually necessary? I remember having a discussion
-> with Arnd Bergmann a while ago, and the Linux driver model kind of
-> assumes that by the time a device is disabled all outstanding accesses
-> will have stopped.
+> > Have we thought about whether we want to tell the guest that it has the
+> > same PMU as available on the real hardware, or does the virtualization
+> > layer suggest to us that we should adjust this somehow?
+> > 
+> I guess here the number of PMU counters is what we can adjust, right?
+> Are we worried about that the host will run out of counters when guest
+> and host register lots of events?
+
+that's what I wonder; if perf itself reserves a counter for example,
+then we'll at best be able to measure with N-1 counters for the guest (N
+being the number of counters on the physical CPU), so why tell the guest
+we have N counters?
+
+Of course, we can never even be guaranteed to have N-1 counters
+avaialable either, so maybe the sane choice is just to tell the guest
+what kind of hardware we have, and then fiddle the best we can with the
+remaining counters?  After all, correct functionality of the guest
+doesn't depend on this, it's a best-effort kind of thing...
+
+Thoughts?
+
+> The PMU of cortex-a57 has 6 counters. IIUC, if one of the guest vcpu
+> process registers 6 events and some host process register 6 events too,
+> these events will be monitored in real hardware PMU counter when the
+> related process runs on the cpu. And when other processes are scheduled
+> to run, it will switch the contexts of PMU counters.
+
+That depends on the way the counters are used by perf I think.  What if
+you have system wide events?  What if the KVM (vcpu) process itself is
+being monitored for some events?
+
 > 
-> Do we have a way to determine that this even makes a difference? Can we
-> trigger a case where not doing this would cause breakage and see that
-> adding this fixes that particular issue?
+> > 
+> >> +}
+> >> +
+> >> +/* PMCR_EL0 accessor. Only called as long as MDCR_EL2.TPMCR is set. */
+> >> +static bool access_pmcr(struct kvm_vcpu *vcpu,
+> >> +			const struct sys_reg_params *p,
+> >> +			const struct sys_reg_desc *r)
+> >> +{
+> >> +	unsigned long val;
+> >> +
+> >> +	if (p->is_write) {
+> >> +		/* Only update writeable bits of PMCR */
+> >> +		if (!p->is_aarch32)
+> >> +			val = vcpu_sys_reg(vcpu, r->reg);
+> >> +		else
+> >> +			val = vcpu_cp15(vcpu, r->reg);
+> > 
+> > don't you need to add this function as the handler in the cp15_regs
+> > array as well?
+> > 
+> Sorry, I'm not very clear about this. Will look at the codes and
+> understand the use of cp15_regs.
 > 
 
-Most likely it is. The memory controller can still be processing requests
-when the peripheral domain is powergated. This would mean the response cannot
-be delivered in that case. So we need to be sure there are no outstanding
-requests before shutting down the domain.
+I think the point is that you cannot use the same value of r->reg to
+index into both arrays, so the cp15 index must be passed from the
+cp15_regs array first.
 
-Cheers,
-
-Peter.
+Thanks,
+-Christoffer
