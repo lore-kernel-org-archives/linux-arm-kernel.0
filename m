@@ -1,75 +1,145 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 17 Jul 2015 10:41:06 +0530
-Subject: [PATCH 12/18] ARM/omap1/time: Migrate to new 'set-state' interface
+Date: Fri, 17 Jul 2015 10:41:09 +0530
+Subject: [PATCH 15/18] ARM/SPEAr/time: Migrate to new 'set-state' interface
 In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
 References: <cover.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <29105e102085a9c1a1eea4f634db2890aca884b8.1437101996.git.viresh.kumar@linaro.org>
+Message-ID: <7639c0b8b3d5e061253936ed5279ff674be238cb.1437101996.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate omap driver to the new 'set-state' interface provided by
+Migrate SPEAr driver to the new 'set-state' interface provided by
 clockevents core, the earlier 'set-mode' interface is marked obsolete
 now.
 
 This also enables us to implement callbacks for new states of clockevent
 devices, for example: ONESHOT_STOPPED.
 
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
-Acked-by: Tony Lindgren <tony@atomide.com>
+Also kill the unnecessary forward declaration of set-mode routine by
+moving 'struct clock_event_device clkevt' towards the bottom of the file.
+
+Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- arch/arm/mach-omap1/time.c | 35 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 19 deletions(-)
+ arch/arm/mach-spear/time.c | 89 ++++++++++++++++++++++++++--------------------
+ 1 file changed, 50 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index a7588cfd0286..524977a31a49 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -124,29 +124,26 @@ static int omap_mpu_set_next_event(unsigned long cycles,
- 	return 0;
+diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+index 26fda4ed4d51..94342a0966e3 100644
+--- a/arch/arm/mach-spear/time.c
++++ b/arch/arm/mach-spear/time.c
+@@ -66,8 +66,6 @@
+ static __iomem void *gpt_base;
+ static struct clk *gpt_clk;
+ 
+-static void clockevent_set_mode(enum clock_event_mode mode,
+-				struct clock_event_device *clk_event_dev);
+ static int clockevent_next_event(unsigned long evt,
+ 				 struct clock_event_device *clk_event_dev);
+ 
+@@ -95,54 +93,67 @@ static void __init spear_clocksource_init(void)
+ 		200, 16, clocksource_mmio_readw_up);
  }
  
--static void omap_mpu_set_mode(enum clock_event_mode mode,
--			      struct clock_event_device *evt)
-+static int omap_mpu_set_oneshot(struct clock_event_device *evt)
+-static struct clock_event_device clkevt = {
+-	.name = "tmr0",
+-	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_mode = clockevent_set_mode,
+-	.set_next_event = clockevent_next_event,
+-	.shift = 0,	/* to be computed */
+-};
++static inline void timer_shutdown(struct clock_event_device *evt)
++{
++	u16 val = readw(gpt_base + CR(CLKEVT));
++
++	/* stop the timer */
++	val &= ~CTRL_ENABLE;
++	writew(val, gpt_base + CR(CLKEVT));
++}
++
++static int spear_shutdown(struct clock_event_device *evt)
++{
++	timer_shutdown(evt);
++
++	return 0;
++}
++
++static int spear_set_oneshot(struct clock_event_device *evt)
++{
++	u16 val;
+ 
+-static void clockevent_set_mode(enum clock_event_mode mode,
+-				struct clock_event_device *clk_event_dev)
++	/* stop the timer */
++	timer_shutdown(evt);
++
++	val = readw(gpt_base + CR(CLKEVT));
++	val |= CTRL_ONE_SHOT;
++	writew(val, gpt_base + CR(CLKEVT));
++
++	return 0;
++}
++
++static int spear_set_periodic(struct clock_event_device *evt)
  {
+ 	u32 period;
+ 	u16 val;
+ 
+ 	/* stop the timer */
++	timer_shutdown(evt);
++
++	period = clk_get_rate(gpt_clk) / HZ;
++	period >>= CTRL_PRESCALER16;
++	writew(period, gpt_base + LOAD(CLKEVT));
++
+ 	val = readw(gpt_base + CR(CLKEVT));
+-	val &= ~CTRL_ENABLE;
++	val &= ~CTRL_ONE_SHOT;
++	val |= CTRL_ENABLE | CTRL_INT_ENABLE;
+ 	writew(val, gpt_base + CR(CLKEVT));
+ 
 -	switch (mode) {
 -	case CLOCK_EVT_MODE_PERIODIC:
--		omap_mpu_set_autoreset(0);
+-		period = clk_get_rate(gpt_clk) / HZ;
+-		period >>= CTRL_PRESCALER16;
+-		writew(period, gpt_base + LOAD(CLKEVT));
+-
+-		val = readw(gpt_base + CR(CLKEVT));
+-		val &= ~CTRL_ONE_SHOT;
+-		val |= CTRL_ENABLE | CTRL_INT_ENABLE;
+-		writew(val, gpt_base + CR(CLKEVT));
+-
 -		break;
 -	case CLOCK_EVT_MODE_ONESHOT:
--		omap_mpu_timer_stop(0);
--		omap_mpu_remove_autoreset(0);
+-		val = readw(gpt_base + CR(CLKEVT));
+-		val |= CTRL_ONE_SHOT;
+-		writew(val, gpt_base + CR(CLKEVT));
+-
 -		break;
 -	case CLOCK_EVT_MODE_UNUSED:
 -	case CLOCK_EVT_MODE_SHUTDOWN:
 -	case CLOCK_EVT_MODE_RESUME:
+-
+-		break;
+-	default:
+-		pr_err("Invalid mode requested\n");
 -		break;
 -	}
-+	omap_mpu_timer_stop(0);
-+	omap_mpu_remove_autoreset(0);
-+	return 0;
-+}
-+
-+static int omap_mpu_set_periodic(struct clock_event_device *evt)
-+{
-+	omap_mpu_set_autoreset(0);
 +	return 0;
  }
  
- static struct clock_event_device clockevent_mpu_timer1 = {
--	.name		= "mpu_timer1",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_next_event	= omap_mpu_set_next_event,
--	.set_mode	= omap_mpu_set_mode,
-+	.name			= "mpu_timer1",
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
-+	.set_next_event		= omap_mpu_set_next_event,
-+	.set_state_periodic	= omap_mpu_set_periodic,
-+	.set_state_oneshot	= omap_mpu_set_oneshot,
- };
- 
- static irqreturn_t omap_mpu_timer1_interrupt(int irq, void *dev_id)
++static struct clock_event_device clkevt = {
++	.name = "tmr0",
++	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_state_shutdown = spear_shutdown,
++	.set_state_periodic = spear_set_periodic,
++	.set_state_oneshot = spear_set_oneshot,
++	.tick_resume = spear_shutdown,
++	.set_next_event = clockevent_next_event,
++	.shift = 0,	/* to be computed */
++};
++
+ static int clockevent_next_event(unsigned long cycles,
+ 				 struct clock_event_device *clk_event_dev)
+ {
 -- 
 2.4.0
