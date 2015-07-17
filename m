@@ -1,42 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:23:35 -0700
-Subject: [GIT PULL] EP93xx defconfig changes
-In-Reply-To: <CACRpkdaXEMt6qyuZP4cH2OLqK7PhwCcVSk=Xgf5Lfsd1bPSzag@mail.gmail.com>
-References: <CACRpkdaXEMt6qyuZP4cH2OLqK7PhwCcVSk=Xgf5Lfsd1bPSzag@mail.gmail.com>
-Message-ID: <20150717172335.GK21691@localhost>
+Date: Fri, 17 Jul 2015 10:22:54 -0700
+Subject: [GIT PULL] EP93xx cleanups for v4.3
+In-Reply-To: <CACRpkdbEnK2Z2SW-QafisHv9hXv-bSdYx0dS7wtGh3oMDDcg=A@mail.gmail.com>
+References: <CACRpkdbEnK2Z2SW-QafisHv9hXv-bSdYx0dS7wtGh3oMDDcg=A@mail.gmail.com>
+Message-ID: <20150717172254.GJ21691@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 02:14:03PM +0200, Linus Walleij wrote:
+On Fri, Jul 17, 2015 at 02:11:15PM +0200, Linus Walleij wrote:
 > Hi ARM SoC people,
 > 
-> here is a separate pull request updating the EP93xx
-> defconfig, partly relying on the changes in the previous
-> pull request to be meaningful (like NO_HZ) but still
-> harmless if applied in isolation.
+> this is a long due pull request finally doing some EP93xx
+> cleanups, most prominently:
 > 
-> All patches (as well as in the previous pull request) are
-> ACKed by Hartley.
+> - Switch to GENERIC TIME
 > 
-> Pleas pull this in too!
+> - Remove memory config options and rely on PATCH_PHYS_VIRT
 > 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/ep93xx-defconfig
-> 
-> for you to fetch changes up to b471e7f2ec5a8673e1b5385307357f3dba62f451:
-> 
->   ARM: ep93xx: add framebuffer to the defconfig (2015-07-17 11:52:38 +0200)
+> I forgot the latter in the tag text, feel free to copy it
+> back in when pulling.
 
-Merged, thanks.
+Done.
+
+> 
+> There is a series of defconfig changes adjacent to this that
+> I would consider merging into the same branch on top
+> of this, but I don't know how you want to handle it so they
+> will be served separately.
+
+Will either set be usable on its own, or do they need to go in together?
+
+If it's the latter then they should be on top of each other. Anyway, I've
+merged both of them now so at least for-next will have it all.
+
+> Please pull this in for v4.3!
+
+Merged, thanks!
 
 
 -Olof
