@@ -1,64 +1,103 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 17 Jul 2015 22:27:02 +0200
-Subject: [PATCH 3/9] gpio: Allow hogged gpios to be requested
-In-Reply-To: <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150717202702.GK7013@pengutronix.de>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Fri, 17 Jul 2015 15:30:18 -0500
+Subject: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to ram/disk
+Message-ID: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+When system goes into low power states like SUSPEND_MEM and
+HIBERNATION, the hardware IP block may be powered off to reduce
+the power consumption. This power down may cause problems on
+some imx platforms, because the hardware settings are reset to
+its power on default values which may differ from the ones when
+it power off. This patch added the dev_pm_ops and implemented
+two callbacks: suspend_noirq and resume_noirq, which will save
+the necessory hardware parameters right before power down and
+recover them before system uses the hardware.
 
-On Fri, Jul 17, 2015 at 11:32:44AM +0200, Markus Pargmann wrote:
-> It can be useful to claim hogged gpios later, for example from
-> userspace. This allows to set defaults for GPIOs using the hogging
-> mechanism and override the setup later from userspace or a kernel driver.
-> 
-> This patch adds a check for hogged gpios to allow requesting them. If
-> the gpio is not hogged but marked as requested, it still fails with
-> -EBUSY.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/gpio/gpiolib.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index bf4bd1d120c3..9f402b159cbe 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -798,7 +798,8 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
->  	 * before IRQs are enabled, for non-sleeping (SOC) GPIOs.
->  	 */
->  
-> -	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0) {
-> +	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0 ||
-> +	    test_and_clear_bit(FLAG_IS_HOGGED, &desc->flags) == 1) {
->  		desc_set_label(desc, label ? : "?");
->  		status = 0;
-I don't like this patch. IMHO hogging is a "use" of a GPIO that should
-prevent it being requested.
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+ drivers/tty/serial/imx.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-While I think it's useful to be able to export some hogged pins I don't
-think this should be possible for all hogged pins unconditionally. And
-for gpios being used by drivers I'd expect they don't need to be hogged
-at all.
-
-I don't have a good idea how to solve that. Adding another property to a
-gpio that should be allowd to be exported can hardly count as hardware
-description and so doesn't belong in a device tree?!
-
-Please don't consider this objection as a reason for a NACK, only as
-starting point for a discussion.
-
-Apart from that: Does this result in hogged gpios being able to be
-requested by two additional drivers in parallel? Maybe the IS_HOGGED
-flag should be dropped when the gpio is requested?
-
-Best regards
-Uwe
-
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index c8cfa06..acaaa68 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -216,6 +216,7 @@ struct imx_port {
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+ 	wait_queue_head_t	dma_wait;
++	unsigned int            saved_reg[10];
+ };
+ 
+ struct imx_port_ucrs {
+@@ -1986,6 +1987,58 @@ static int serial_imx_remove(struct platform_device *pdev)
+ 	return uart_remove_one_port(&imx_reg, &sport->port);
+ }
+ 
++static int imx_serial_port_suspend_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	/* Save necessary regs */
++	clk_enable(sport->clk_ipg);
++	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
++	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
++	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
++	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
++	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
++	sport->saved_reg[5] = readl(sport->port.membase + UESC);
++	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
++	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
++	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
++	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
++	clk_disable(sport->clk_ipg);
++
++	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static int imx_serial_port_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	clk_enable(sport->clk_ipg);
++	writel(sport->saved_reg[4], sport->port.membase + UFCR);
++	writel(sport->saved_reg[5], sport->port.membase + UESC);
++	writel(sport->saved_reg[6], sport->port.membase + UTIM);
++	writel(sport->saved_reg[7], sport->port.membase + UBIR);
++	writel(sport->saved_reg[8], sport->port.membase + UBMR);
++	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
++	writel(sport->saved_reg[0], sport->port.membase + UCR1);
++	writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
++	writel(sport->saved_reg[2], sport->port.membase + UCR3);
++	writel(sport->saved_reg[3], sport->port.membase + UCR4);
++	clk_disable(sport->clk_ipg);
++
++	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static const struct dev_pm_ops imx_serial_port_pm_ops = {
++	.suspend_noirq = imx_serial_port_suspend_noirq,
++	.resume_noirq = imx_serial_port_resume_noirq,
++};
++
+ static struct platform_driver serial_imx_driver = {
+ 	.probe		= serial_imx_probe,
+ 	.remove		= serial_imx_remove,
+@@ -1996,6 +2049,7 @@ static struct platform_driver serial_imx_driver = {
+ 	.driver		= {
+ 		.name	= "imx-uart",
+ 		.of_match_table = imx_uart_dt_ids,
++		.pm	= &imx_serial_port_pm_ops,
+ 	},
+ };
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.5.0.rc2
