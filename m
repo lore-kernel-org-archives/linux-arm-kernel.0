@@ -1,39 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 16 Jul 2015 22:48:42 -0700
-Subject: [PATCH 4/4] ARM: omap2: restore OMAP4 barrier behaviour
-In-Reply-To: <20150716135413.GD7576@n2100.arm.linux.org.uk>
-References: <20150715174647.GA7557@n2100.arm.linux.org.uk>
- <E1ZFQmM-0006GN-5Y@rmk-PC.arm.linux.org.uk>
- <20150716064854.GG17550@atomide.com>
- <20150716135413.GD7576@n2100.arm.linux.org.uk>
-Message-ID: <20150717054842.GS17550@atomide.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 17 Jul 2015 08:22:20 +0200
+Subject: [PATCH 0/2] dmaengine: Add scatter-gathered memset support
+In-Reply-To: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150717062220.GH14886@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [150716 06:56]:
-> On Wed, Jul 15, 2015 at 11:48:54PM -0700, Tony Lindgren wrote:
-> > Hi,
-> > 
-> > * Russell King <rmk+kernel@arm.linux.org.uk> [150715 10:50]:
-> > > Restore the OMAP4 barrier behaviour using the new implementation which
-> > > allows multiplatform systems to hook into the mb() and wmb() ARM
-> > > implementations to perform any necessary additional barrier maintanence.
-> > 
-> > I'm getthing this with omap2plus_defconfig with the last patch
-> > applied:
-> > 
-> > arch/arm/mach-omap2/omap4-common.c: In function ?omap4_sram_init?:
-> > arch/arm/mach-omap2/omap4-common.c:138:14: error: implicit declaration of function ?of_get_named_gen_pool? [-Werror=implicit-function-declaration]
-> >   sram_pool = of_get_named_gen_pool(np, "sram", 0);
-> >               ^
-> > arch/arm/mach-omap2/omap4-common.c:138:12: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-> >   sram_pool = of_get_named_gen_pool(np, "sram", 0);
-> >             ^
+On Mon, Jul 06, 2015 at 12:19:22PM +0200, Maxime Ripard wrote:
+> Hi Vinod,
 > 
-> I'd forgotten to merge in the merge window fixes for this... which have now
-> been lost.  This needs to become of_gen_pool_get() in 4.2-rc1 and later.
+> Here is a patch serie that adds a new dmaengine operation for
+> scatter-gathered memset.
+> 
+> Indeed, doing a memset over a discontiguous buffer is quite
+> inefficient at the moment, since you have to create and submit each
+> chunk separately, which might result in a huge list of transfers,
+> while some controllers can handle that just fine.
+> 
+> Let me know what you think,
+> Maxime
+> 
+> Maxime Ripard (2):
+>   dmaengine: Add scatter-gathered memset
+>   dmaengine: xdmac: Add scatter gathered memset support
+> 
 
-OK with that change looks good to me, so please feel free to
-add for the whole series:
+I have forgotten to add it but of course:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+Thanks
+
+>  drivers/dma/at_xdmac.c    | 166 +++++++++++++++++++++++++++++++++++++++++++++-
+>  include/linux/dmaengine.h |   5 ++
+>  2 files changed, 170 insertions(+), 1 deletion(-)
+> 
+> -- 
+> 2.4.5
+> 
