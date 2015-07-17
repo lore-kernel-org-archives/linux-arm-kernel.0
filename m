@@ -1,49 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 17 Jul 2015 14:21:05 -0700
-Subject: [PATCH v5] ARM: smp: Only expose /sys/.../cpuX/online if
- hotpluggable
-In-Reply-To: <5578C427.1070100@codeaurora.org>
-References: <1428705191-15670-1-git-send-email-sboyd@codeaurora.org>
- <20150413134246.GS12732@n2100.arm.linux.org.uk>
- <557739AC.8000903@codeaurora.org>
- <20150610225744.GT7557@n2100.arm.linux.org.uk>
- <5578C427.1070100@codeaurora.org>
-Message-ID: <55A971C1.8090308@codeaurora.org>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 17 Jul 2015 14:32:08 -0700
+Subject: [PATCH v2] input: snvs_pwrkey: use "wakeup-source" as deivce
+ tree property name
+In-Reply-To: <1437105737-16899-1-git-send-email-shawnguo@kernel.org>
+References: <1437105737-16899-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <20150717213208.GB39282@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2015 04:11 PM, Stephen Boyd wrote:
-> On 06/10/2015 03:57 PM, Russell King - ARM Linux wrote:
->> diff --git a/arch/arm/mach-shmobile/common.h b/arch/arm/mach-shmobile/common.h
->> index 476092b86c6e..f2c4bf437ea7 100644
->> --- a/arch/arm/mach-shmobile/common.h
->> +++ b/arch/arm/mach-shmobile/common.h
->> @@ -13,7 +13,8 @@ extern void shmobile_smp_boot(void);
->>   extern void shmobile_smp_sleep(void);
->>   extern void shmobile_smp_hook(unsigned int cpu, unsigned long fn,
->>   			      unsigned long arg);
->> -extern int shmobile_smp_cpu_disable(unsigned int cpu);
->> +extern bool shmobile_smp_cpu_can_disable(unsigned int cpu);
->> +extern void shmobile_invalidate_start(void);
->>
->> which your original patch did not include.  The tree I'm applying to
->> (-rc1) contains:
->>
->> extern int shmobile_smp_cpu_disable(unsigned int cpu);
->> extern void shmobile_invalidate_start(void);
->>
->> there.  Hence git quite rightfully declines to apply the patch.
->>
-> Thanks. Fixed.
->
+On Fri, Jul 17, 2015 at 12:02:17PM +0800, Shawn Guo wrote:
+> Instead of inventing a new property name, let's use "wakeup-source" to
+> be consistent with other driver and subsystem bindings.
+> 
+> Signed-off-by: Shawn Guo <shawnguo@kernel.org>
+> ---
+> Changes since v1:
+>  - Use "wakeup-source" rather than "linux,wakeup"
+> 
+> This is a fixup for Frank's patch which is queued on i.MX tree, so I
+> will apply it to the same branch.
 
-Sorry I just noticed that you applied 8392/1 instead of 8392/2 from the 
-patch tracker. So shmobile_invalidate_start() came back.
+So we do not need to care about keeping compatibility yet. Good.
 
-I thought it would automatically supersede the previous patch but it 
-looks like it just sticks around? I've never had to replace a patch 
-before so I'll keep this in mind next time.
+Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+> 
+> Shawn
+> 
+>  Documentation/devicetree/bindings/crypto/fsl-sec4.txt | 2 +-
+>  drivers/input/keyboard/snvs_pwrkey.c                  | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> index 71a39c5bd486..f16bbd6644b8 100644
+> --- a/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> +++ b/Documentation/devicetree/bindings/crypto/fsl-sec4.txt
+> @@ -408,7 +408,7 @@ System ON/OFF key driver
+>        Value type: <int>
+>        Definition: Keycode to emit, KEY_POWER by default.
+>  
+> -  - wakeup:
+> +  - wakeup-source:
+>        Usage: option
+>        Value type: <boo>
+>        Definition: Button can wake-up the system.
+> diff --git a/drivers/input/keyboard/snvs_pwrkey.c b/drivers/input/keyboard/snvs_pwrkey.c
+> index 512a1fc2a864..78fd24ca3813 100644
+> --- a/drivers/input/keyboard/snvs_pwrkey.c
+> +++ b/drivers/input/keyboard/snvs_pwrkey.c
+> @@ -122,7 +122,7 @@ static int imx_snvs_pwrkey_probe(struct platform_device *pdev)
+>  		dev_warn(&pdev->dev, "KEY_POWER without setting in dts\n");
+>  	}
+>  
+> -	pdata->wakeup = of_property_read_bool(np, "wakeup");
+> +	pdata->wakeup = of_property_read_bool(np, "wakeup-source");
+>  
+>  	pdata->irq = platform_get_irq(pdev, 0);
+>  	if (pdata->irq < 0) {
+> -- 
+> 1.9.1
+> 
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Dmitry
