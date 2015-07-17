@@ -1,29 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 17 Jul 2015 12:11:14 +0300
-Subject: [PATCH v2 2/4] mfd: max77686: Use a generic name for the PMIC
- node in the example
-In-Reply-To: <1437114567-17629-3-git-send-email-javier@osg.samsung.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <55A8C6B2.5020109@cogentembedded.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 17 Jul 2015 17:13:36 +0800
+Subject: [PATCH 3/6] clk: sunxi: Add A33 clock for compilation
+In-Reply-To: <20150717090958.GM28632@lukather>
+References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1431240383-12763-4-git-send-email-vishnupatekar0510@gmail.com>
+ <20150510101750.GC11057@lukather>
+ <CAEzqOZv5pDPJgBfvNKk7vZuTr5H9hLdEOweyxStRFtarNxtFhQ@mail.gmail.com>
+ <CAGb2v67NjfNjS_FQoYmEs2=OhKYRszgzuqiNPyww3UtiWCq--Q@mail.gmail.com>
+ <20150717090958.GM28632@lukather>
+Message-ID: <CAGb2v659_zRJ70Ee573s-V1-nAfuaiEY2VcYBKH6gUijqGhuPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, Jul 17, 2015 at 5:09 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Fri, Jul 17, 2015 at 04:57:11PM +0800, Chen-Yu Tsai wrote:
+>> Hi Vishnu,
+>>
+>> This patch did not make v4.2-rc1.
+>>
+>> A33 support requires this patch. Otherwise the clock tree
+>> is absent and nothing works.
+>
+> It got delayed and is in v4.2-rc2.
 
-On 7/17/2015 9:29 AM, Javier Martinez Canillas wrote:
+Ah, it's in the A33 machine support patch.
+Not where I was expecting it.
 
-> The ePAR standard says that: "the name of a node should be somewhat
+Thanks.
 
-    ePAPR.
-
-> generic, reflecting the function of the device and not its precise
-> programming model."
-
-> So, change the max77686 binding document example to use a generic
-> node name instead of using the chip's name.
-
-> Suggested-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-MBR, Sergei
+ChenYu
