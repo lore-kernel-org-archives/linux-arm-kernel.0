@@ -1,30 +1,30 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 17 Jul 2015 22:42:51 +0200
-Subject: Mediatek MT8135 dts updates
-In-Reply-To: <1436273113-25472-1-git-send-email-s.hauer@pengutronix.de>
-References: <1436273113-25472-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1710258.caKtOyyVJz@ubix>
+Date: Fri, 17 Jul 2015 22:53:26 +0200
+Subject: [PATCH] ARM: mediatek: Add regmap to mediatek Kconfig
+Message-ID: <1437166406-14233-1-git-send-email-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, July 07, 2015 02:45:09 PM Sascha Hauer wrote:
-> This series contains dts updates for the Mediatek MT8135 to enable
-> recently added Kernel features. Last time I sent this the dt-include
-> files were missing. This time this should be ready to get merged.
-> 
-> Sascha
-> 
-> ----------------------------------------------------------------
-> James Liao (1):
->       ARM: dts: mediatek: Enable clock support for Mediatek MT8135.
-> 
-> Sascha Hauer (3):
->       ARM: dts: mt8135: Add pmic wrapper nodes
->       ARM: dts: mt8135-evbp1: Add PMIC support
->       ARM: dts: mediatek mt8135: Use real UART clocks
->
+Mediatek SoC needs the regmap/syscon infrastructure.
+The infrastructure is used by the clock and pinctrl driver.
+This patch adds MD_SYSCON to Kconfig for all Mediatek devices.
 
-Whole series applied to v4.2-next/dts
+Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+---
+ arch/arm/mach-mediatek/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks!
+diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+index 9f59e58..aeece17 100644
+--- a/arch/arm/mach-mediatek/Kconfig
++++ b/arch/arm/mach-mediatek/Kconfig
+@@ -3,6 +3,7 @@ menuconfig ARCH_MEDIATEK
+ 	select ARM_GIC
+ 	select PINCTRL
+ 	select MTK_TIMER
++	select MFD_SYSCON
+ 	help
+ 	  Support for Mediatek MT65xx & MT81xx SoCs
  
+-- 
+1.9.1
