@@ -1,261 +1,84 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 17 Jul 2015 14:48:42 +0200
-Subject: [PATCH 02/18] KVM: ARM64: Add initial support for PMU
-In-Reply-To: <55A8E862.6000408@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-3-git-send-email-shannon.zhao@linaro.org>
- <20150716182553.GB14024@cbox> <55A8B92F.9070706@linaro.org>
- <20150717095807.GK14024@cbox> <55A8E862.6000408@linaro.org>
-Message-ID: <20150717124842.GO14024@cbox>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Jul 2015 13:57:03 +0100
+Subject: [PATCH 5/5] arm64: kernel: Add support for Privileged Access Never
+In-Reply-To: <1437062519-18883-6-git-send-email-james.morse@arm.com>
+References: <1437062519-18883-1-git-send-email-james.morse@arm.com>
+ <1437062519-18883-6-git-send-email-james.morse@arm.com>
+Message-ID: <20150717125702.GF13712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 07:34:58PM +0800, Shannon Zhao wrote:
-> 
-> 
-> On 2015/7/17 17:58, Christoffer Dall wrote:
-> >On Fri, Jul 17, 2015 at 04:13:35PM +0800, Shannon Zhao wrote:
-> >>
-> >>
-> >>On 2015/7/17 2:25, Christoffer Dall wrote:
-> >>>On Mon, Jul 06, 2015 at 10:17:32AM +0800, shannon.zhao at linaro.org wrote:
-> >>>>From: Shannon Zhao <shannon.zhao@linaro.org>
-> >>>>
-> >>>>Here we plan to support virtual PMU for guest by full software
-> >>>>emulation, so define some basic structs and functions preparing for
-> >>>>futher steps. Define struct kvm_pmc for performance monitor counter and
-> >>>>struct kvm_pmu for performance monitor unit for each vcpu. According to
-> >>>>ARMv8 spec, the PMU contains at most 32(ARMV8_MAX_COUNTERS) counters.
-> >>>>Initialize PMU for each vcpu when kvm initialize vcpus, while reset PMU
-> >>>>when kvm reset vcpus.
-> >>>>Since this only supports ARM64 (or PMUv3), add a separate config symbol
-> >>>>for it.
-> >>>>
-> >>>>Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> >>>>---
-> >>>>  arch/arm/kvm/arm.c                |  4 +++
-> >>>>  arch/arm64/include/asm/kvm_host.h |  2 ++
-> >>>>  arch/arm64/include/asm/pmu.h      |  2 ++
-> >>>>  arch/arm64/kvm/Kconfig            |  7 +++++
-> >>>>  arch/arm64/kvm/Makefile           |  1 +
-> >>>>  arch/arm64/kvm/reset.c            |  3 +++
-> >>>>  include/kvm/arm_pmu.h             | 54 ++++++++++++++++++++++++++++++++++++++
-> >>>>  virt/kvm/arm/pmu.c                | 55 +++++++++++++++++++++++++++++++++++++++
-> >>>>  8 files changed, 128 insertions(+)
-> >>>>  create mode 100644 include/kvm/arm_pmu.h
-> >>>>  create mode 100644 virt/kvm/arm/pmu.c
-> >>>>
-> >>>>diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> >>>>index bc738d2..4e82625 100644
-> >>>>--- a/arch/arm/kvm/arm.c
-> >>>>+++ b/arch/arm/kvm/arm.c
-> >>>>@@ -28,6 +28,7 @@
-> >>>>  #include <linux/sched.h>
-> >>>>  #include <linux/kvm.h>
-> >>>>  #include <trace/events/kvm.h>
-> >>>>+#include <kvm/arm_pmu.h>
-> >>>>
-> >>>>  #define CREATE_TRACE_POINTS
-> >>>>  #include "trace.h"
-> >>>>@@ -278,6 +279,9 @@ int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
-> >>>>  	/* Set up the timer */
-> >>>>  	kvm_timer_vcpu_init(vcpu);
-> >>>>
-> >>>>+	/* Set up the PMU */
-> >>>>+	kvm_pmu_init(vcpu);
-> >>>>+
-> >>>>  	return 0;
-> >>>>  }
-> >>>>
-> >>>>diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>>index 2709db2..3c88873 100644
-> >>>>--- a/arch/arm64/include/asm/kvm_host.h
-> >>>>+++ b/arch/arm64/include/asm/kvm_host.h
-> >>>>@@ -42,6 +42,7 @@
-> >>>>
-> >>>>  #include <kvm/arm_vgic.h>
-> >>>>  #include <kvm/arm_arch_timer.h>
-> >>>>+#include <kvm/arm_pmu.h>
-> >>>>
-> >>>>  #define KVM_VCPU_MAX_FEATURES 3
-> >>>>
-> >>>>@@ -116,6 +117,7 @@ struct kvm_vcpu_arch {
-> >>>>  	/* VGIC state */
-> >>>>  	struct vgic_cpu vgic_cpu;
-> >>>>  	struct arch_timer_cpu timer_cpu;
-> >>>>+	struct kvm_pmu pmu;
-> >>>>
-> >>>>  	/*
-> >>>>  	 * Anything that is not used directly from assembly code goes
-> >>>>diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> >>>>index b9f394a..95681e6 100644
-> >>>>--- a/arch/arm64/include/asm/pmu.h
-> >>>>+++ b/arch/arm64/include/asm/pmu.h
-> >>>>@@ -19,6 +19,8 @@
-> >>>>  #ifndef __ASM_PMU_H
-> >>>>  #define __ASM_PMU_H
-> >>>>
-> >>>>+#include <linux/perf_event.h>
-> >>>>+
-> >>>>  #define ARMV8_MAX_COUNTERS      32
-> >>>>  #define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
-> >>>>
-> >>>>diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-> >>>>index bfffe8f..eae3a1b 100644
-> >>>>--- a/arch/arm64/kvm/Kconfig
-> >>>>+++ b/arch/arm64/kvm/Kconfig
-> >>>>@@ -31,6 +31,7 @@ config KVM
-> >>>>  	select KVM_VFIO
-> >>>>  	select HAVE_KVM_EVENTFD
-> >>>>  	select HAVE_KVM_IRQFD
-> >>>>+	select KVM_ARM_PMU
-> >>>>  	---help---
-> >>>>  	  Support hosting virtualized guest machines.
-> >>>>
-> >>>>@@ -52,4 +53,10 @@ config KVM_ARM_MAX_VCPUS
-> >>>>  	  large, so only choose a reasonable number that you expect to
-> >>>>  	  actually use.
-> >>>>
-> >>>>+config KVM_ARM_PMU
-> >>>>+	bool
-> >>>>+	depends on KVM_ARM_HOST
-> >>>>+	---help---
-> >>>>+	  Adds support for the Performance Monitoring in virtual machines.
-> >>>
-> >>>Adds support for a virtual Performance Monitoring Unit (PMU) in virtual
-> >>>machines.
-> >>>
-> >>>>+
-> >>>>  endif # VIRTUALIZATION
-> >>>>diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> >>>>index f90f4aa..78db4ee 100644
-> >>>>--- a/arch/arm64/kvm/Makefile
-> >>>>+++ b/arch/arm64/kvm/Makefile
-> >>>>@@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
-> >>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-> >>>>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
-> >>>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> >>>>+kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> >>>>diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-> >>>>index 0b43265..ee2c2e9 100644
-> >>>>--- a/arch/arm64/kvm/reset.c
-> >>>>+++ b/arch/arm64/kvm/reset.c
-> >>>>@@ -107,5 +107,8 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
-> >>>>  	/* Reset timer */
-> >>>>  	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-> >>>>
-> >>>>+	/* Reset PMU */
-> >>>>+	kvm_pmu_vcpu_reset(vcpu);
-> >>>>+
-> >>>>  	return 0;
-> >>>>  }
-> >>>>diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> >>>>new file mode 100644
-> >>>>index 0000000..27d14ca
-> >>>>--- /dev/null
-> >>>>+++ b/include/kvm/arm_pmu.h
-> >>>>@@ -0,0 +1,54 @@
-> >>>>+/*
-> >>>>+ * Copyright (C) 2015 Linaro Ltd.
-> >>>>+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> >>>>+ *
-> >>>>+ * This program is free software; you can redistribute it and/or modify
-> >>>>+ * it under the terms of the GNU General Public License version 2 as
-> >>>>+ * published by the Free Software Foundation.
-> >>>>+ *
-> >>>>+ * This program is distributed in the hope that it will be useful,
-> >>>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >>>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >>>>+ * GNU General Public License for more details.
-> >>>>+ *
-> >>>>+ * You should have received a copy of the GNU General Public License
-> >>>>+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> >>>>+ */
-> >>>>+
-> >>>>+#ifndef __ASM_ARM_KVM_PMU_H
-> >>>>+#define __ASM_ARM_KVM_PMU_H
-> >>>>+
-> >>>>+#include <asm/pmu.h>
-> >>>>+#include <linux/irq_work.h>
-> >>>>+
-> >>>>+struct kvm_pmc {
-> >>>>+	u8 idx;
-> >>>
-> >>>which index is this?  Does it map to something architecturally or is it
-> >>>just the array index number?
-> >>>
-> >>
-> >>It's the index of the PMU counter.
-> >>
-> >
-> >sorry, I don't feel this answers my question? ;)
-> >
-> 
-> This index is only used for kvm_pmu_perf_overflow to locate the
-> index of this PMU counter and kvm_pmu_perf_overflow will set the
-> corresponding bit of overflow_status to show whether this counter
-> overflows.
-> 
-> See patch 17/18:
-> 
-> +static void kvm_pmu_perf_overflow(struct perf_event *perf_event,
-> +				  struct perf_sample_data *data,
-> +				  struct pt_regs *regs)
-> +{
-> +	struct kvm_pmc *pmc = perf_event->overflow_handler_context;
-> +	struct kvm_vcpu *vcpu = pmc->vcpu;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+On Thu, Jul 16, 2015 at 05:01:59PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 7e419fabe75a..68aa1e399575 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -20,9 +20,18 @@
+>  #ifndef __ASM_SYSREG_H
+>  #define __ASM_SYSREG_H
+>  
+> +#include <asm/opcodes.h>
 > +
-> +	if (pmc->interrupt == true) {
-> +		__set_bit(pmc->idx, (unsigned long *)&pmu->overflow_status);
-> 
-> >>>>+	u64 counter;
-> >>>>+	u64 eventsel;
-> >>>
-> >>>does this map to PMEVTYPER<n>_EL0.evtCount?
-> >>>
-> >>No, it just stores the event type.
-> >>
-> >
-> >can you specify more clearly what this maps to/how I derive its meaning?
-> >
-> >Is this a perf (Linux) event type number, or an architecturally defined
-> >thing?
-> >
-> 
-> Yes, it stores a perf event type number. This is used for
-> kvm_pmu_set_counter_event_type to check whether event type of this
-> time is same with the previous one. If they are same, it will return
-> and doesn't create a new perf event for it and just reuses the
-> previous one.
-> 
-> See PATCH 07/18:
-> 
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned
-> long data,
-> +				    unsigned long select_idx)
+>  #define sys_reg(op0, op1, crn, crm, op2) \
+>  	((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+>  
+> +#define REG_PSTATE_PAN_IMM                     sys_reg(2, 0, 4, 0, 4)
+> +#define PSTATE_PAN                             (1 << 22)
+
+I missed this before, can we have a PSR_PAN_BIT in uapi/asm/ptrace.h for
+consistency with the other PSTATE bits? It's not user accessible but we
+did the same with the I and F bits already.
+
+> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+> index f260affb825c..0464eaef6667 100644
+> --- a/arch/arm64/kernel/cpufeature.c
+> +++ b/arch/arm64/kernel/cpufeature.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/types.h>
+>  #include <asm/cpu.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/processor.h>
+>  
+>  static bool
+>  has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+> @@ -32,6 +33,16 @@ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+>  		(val & entry->register_mask) <= entry->max_register_value);
+>  }
+>  
+> +static bool __maybe_unused
+> +has_id_aa64mmfr1_feature(const struct arm64_cpu_capabilities *entry)
 > +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +	struct perf_event *event;
-> +	struct perf_event_attr attr;
-> +	unsigned config, type = PERF_TYPE_RAW;
+> +	u64 val;
 > +
-> +	if ((data & ARMV8_EVTYPE_EVENT) == pmc->eventsel)
-> +		return;
-> 
+> +	val = read_cpuid(id_aa64mmfr1_el1);
+> +	return ((val & entry->register_mask) >= entry->min_register_value &&
+> +		(val & entry->register_mask) <= entry->max_register_value);
+> +}
 
-ok, thanks for the explanation of both:
+That's fine until we clarify what we actually want here in the other
+patch.
 
-I think it would be helpful, especially for the review, to have a
-one-line comment on the struct definition, along the lines of:
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 223b093c9440..cea69aae4997 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -277,6 +277,9 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>  	} else {
+>  		memset(childregs, 0, sizeof(struct pt_regs));
+>  		childregs->pstate = PSR_MODE_EL1h;
+> +		if (IS_ENABLED(CONFIG_ARM64_PAN) &&
+> +		    cpus_have_cap(ARM64_HAS_PAN))
+> +			childregs->pstate |= PSTATE_PAN;
+>  		p->thread.cpu_context.x19 = stack_start;
+>  		p->thread.cpu_context.x20 = stk_sz;
 
+I wonder if this is actually needed. When we run in kernel mode, PAN is
+always set (automatically on exception entry) and only explicitly
+cleared for get_user/put_user etc. Switching to a kernel thread is done
+via switch_to which preserves PAN, so the regs->pstate here is not
+relevant (IOW, we only ever ERET to a kernel thread after an
+exception/interrupt but in that case pstate.pan is already set by the
+handler).
 
-struct kvm_pmc {
-	u8 idx;		/* index into the pmu->pmc array */
-	u64 eventsel;	/* perf event number, see ARMV8_EVTYPE_EVENT */
-	...
-};
-
-Thanks,
--Christoffer
+-- 
+Catalin
