@@ -1,64 +1,239 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Fri, 17 Jul 2015 08:39:26 +0530
-Subject: [PATCH 2/2] dmaengine: xdmac: Add scatter gathered memset support
-In-Reply-To: <20150716141105.GJ28632@lukather>
-References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
- <1436177964-19380-3-git-send-email-maxime.ripard@free-electrons.com>
- <20150716120154.GN5086@localhost> <20150716141105.GJ28632@lukather>
-Message-ID: <20150717030926.GC5086@localhost>
+From: Jianwei.Wang@freescale.com (Wang J.W.)
+Date: Fri, 17 Jul 2015 03:17:21 +0000
+Subject: [PATCH v9 1/4] drm/layerscape: Add Freescale DCU DRM driver
+In-Reply-To: <20150716113106.GB4635@ulmo>
+References: <1436784692-40560-1-git-send-email-jianwei.wang@freescale.com>
+ <20150714104913.GI12465@ulmo.nvidia.com>
+ <DM2PR0301MB12297B66D33EE9E26F011D9E9F990@DM2PR0301MB1229.namprd03.prod.outlook.com>
+ <20150716113106.GB4635@ulmo>
+Message-ID: <DM2PR0301MB1229816732FEF8BD31343F1C9F980@DM2PR0301MB1229.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 04:11:05PM +0200, Maxime Ripard wrote:
-> Hi Vinod,
+
+
+> -----Original Message-----
+> From: Thierry Reding [mailto:thierry.reding at gmail.com]
+> Sent: Thursday, July 16, 2015 7:31 PM
+> To: Wang Jianwei-B52261
+> Cc: dri-devel at lists.freedesktop.org; linux-kernel at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; devicetree at vger.kernel.org;
+> airlied at linux.ie; daniel.vetter at ffwll.ch; mark.yao at rock-chips.com; Wood
+> Scott-B07421; Wang Huan-B18965; Xiubo Li
+> Subject: Re: [PATCH v9 1/4] drm/layerscape: Add Freescale DCU DRM driver
 > 
-> > > +		/*
-> > > +		 * The scatterlist API gives us only the address and
-> > > +		 * length of each elements.
-> > > +		 *
-> > > +		 * Unfortunately, we don't have the stride, which we
-> > > +		 * will need to compute.
-> > > +		 *
-> > > +		 * That make us end up in a situation like this one:
-> > > +		 *    len    stride    len    stride    len
-> > > +		 * +-------+        +-------+        +-------+
-> > > +		 * |  N-2  |        |  N-1  |        |   N   |
-> > > +		 * +-------+        +-------+        +-------+
-> > > +		 *
-> > > +		 * We need all these three elements (N-2, N-1 and N)
-> > > +		 * to actually take the decision on whether we need to
-> > > +		 * queue N-1 or reuse N-2.
-> > > +		 *
-> > > +		 * We will only consider N if it is the last element.
-> > > +		 */
+> On Thu, Jul 16, 2015 at 11:10:29AM +0000, Wang J.W. wrote:
+> [...]
+> > > -----Original Message-----
+> > > From: Thierry Reding [mailto:thierry.reding at gmail.com]
+> [...]
+> > > On Mon, Jul 13, 2015 at 06:51:29PM +0800, Jianwei Wang wrote:
+> [...]
+> > > >  DRM DRIVERS FOR NVIDIA TEGRA
+> > > >  M:	Thierry Reding <thierry.reding@gmail.com>
+> > > >  M:	Terje Bergstr?m <tbergstrom@nvidia.com>
+> > > > diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
+> > > > index c46ca31..9cfd14e 100644
+> > > > --- a/drivers/gpu/drm/Kconfig
+> > > > +++ b/drivers/gpu/drm/Kconfig
+> > > > @@ -231,6 +231,8 @@ source "drivers/gpu/drm/virtio/Kconfig"
+> > > >
+> > > >  source "drivers/gpu/drm/msm/Kconfig"
+> > > >
+> > > > +source "drivers/gpu/drm/fsl-dcu/Kconfig"
+> > > > +
+> > >
+> > > As mentioned in a different email, I'm somewhat annoyed by the
+> > > random placement of these source statements. But we can probably
+> > > clean that up in one go and insist on proper ordering when there is
+> one.
+> > >
 > >
-> > Why do you need stride?
-> > 
-> > This is scatterlist so the computation of stride sounds odd here. Ideally
-> > you should take the scatterlist and program the lli for controller.
+> > Ok, I plan to move it to the last line. Is it ok?
 > 
-> Because it is sub-optimal if the length and stride are equals from one
-> descriptors to another. The XDMAC is able to repeat any given
-> descriptor a given number of time (which is one by default), which
-> means that if the parameters of the transfer don't change, we simply
-> have to increment the number of time the descriptor has to be used,
-> instead of creating a new one that the controller will have to fetch.
+> It doesn't really matter, it will be inconsistent no matter what because
+> the current ordering isn't consistent. Keep it where it is for now. I'll
+> prepare a set of patches to get some consistency into this file.
 > 
-> In the non-optimal case (ie the length and/or stride change from one
-> scatterlist element to another), we simply fallback to a one LLI per
-> scatter list element.
-Sound fine to me. The optimization is a good one then...
+> > > > +int fsl_dcu_drm_connector_create(struct fsl_dcu_drm_device *fsl_dev,
+> > > > +				 struct drm_encoder *encoder) {
+> > > > +	struct drm_connector *connector = &fsl_dev-
+> >connector.connector;
+> > > > +	struct device_node *panel_node;
+> > > > +	int ret;
+> > > > +
+> > > > +	fsl_dev->connector.encoder = encoder;
+> > >
+> > > Why do you need this? The DRM core should set this for you when
+> > > setting the initial configuration.
+> > >
+> >
+> > This connector is a private structure fsl_dcu_drm_connector. I set it
+> > for select best encoder.
+> 
+> That doesn't sound right. Technically the DRM core or userspace is going
+> to select the encoder for your connector, so it'd be better to derive the
+> pointer to your driver-private structure from struct drm_encoder *,
+> otherwise you'll end up getting you private copy of the assignment out of
+> sync with what the DRM core and/or userspace set up.
+> 
 
-Another question though, do you expect stride to be linear for your cases,
-if so have you actually though about using interleaved API, for these cases
+Maybe this is a misunderstanding.
 
--- 
-~Vinod
+fsl_dev->connector.encoder = encoder;
+In this sentence fsl_dev and connector are all driver-private structures
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/42815724/attachment.sig>
+Fsl_dev define:
+177 struct fsl_dcu_drm_device {
+178         struct device *dev;
+179         struct device_node *np;
+180         struct regmap *regmap;
+181         int irq;
+182         struct clk *clk;
+183         /*protects hardware register*/
+184         spinlock_t irq_lock;
+185         struct drm_device *drm;
+186         struct drm_fbdev_cma *fbdev;
+187         struct drm_crtc crtc;
+188         struct drm_encoder encoder;
+189         struct fsl_dcu_drm_connector connector;  connector is here
+190 };
+
+fsl_dcu_drm_connector define:
+15 struct fsl_dcu_drm_connector {
+16         struct drm_connector base;
+17         struct drm_encoder *encoder;
+18         struct drm_panel *panel;
+19 };
+ 
+And this will be used in .best_encoder hooker
+
+91 static struct drm_encoder *
+92 fsl_dcu_drm_connector_best_encoder(struct drm_connector *connector)
+93 {
+94         struct fsl_dcu_drm_connector *fsl_con = to_fsl_dcu_connector(connector);
+95
+96         return fsl_con->encoder;
+97 }
+
+I see some other also do it like this. Is it ok?
+
+
+
+> Note that you might not run into problems now because you only have a
+> single encoder. But if you ever add support for another you're going to
+> run into problems with this kind of static assignment.
+> 
+> > > > +	dev->irq_enabled = true;
+> > > > +	dev->vblank_disable_allowed = true;
+> > > > +
+> > > > +	ret = regmap_write(fsl_dev->regmap, DCU_INT_STATUS, 0);
+> > > > +	if (ret)
+> > > > +		dev_err(&pdev->dev, "set DCU_INT_STATUS failed\n");
+> > > > +	ret = regmap_read(fsl_dev->regmap, DCU_INT_MASK, &int_mask);
+> > > > +	if (ret)
+> > > > +		dev_err(&pdev->dev, "read DCU_INT_MASK failed\n");
+> > > > +	ret = regmap_write(fsl_dev->regmap, DCU_INT_MASK, int_mask &
+> > > > +			   ~DCU_INT_MASK_VBLANK);
+> > > > +	if (ret)
+> > > > +		dev_err(&pdev->dev, "set DCU_INT_MASK failed\n");
+> > > > +	ret = regmap_write(fsl_dev->regmap, DCU_UPDATE_MODE,
+> > > > +			   DCU_UPDATE_MODE_READREG);
+> > >
+> > > What's this DCU_UPDATE_MODE_READREG bit?
+> > >
+> >
+> > In fact, Only when setting DCU_UPDATE_MODE_READREG bit, it begin to
+> > transfer register values. So setting DCU_UPDATE_MODE_READREG bit is a
+> > must after registers updating.
+> 
+> Okay, I see. That's going to be convenient for atomic updates.
+> 
+> > > > diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
+> > > > b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
+> > > [...]
+> > > > +#define DCU_DISP_SIZE			0x0018
+> > > > +#define DCU_DISP_SIZE_DELTA_Y(x)	((x) << 16)
+> > > > +/*Regisiter value 1/16 of horizontal resolution*/
+> > > > +#define DCU_DISP_SIZE_DELTA_X(x)	((x) >> 4)
+> > >
+> > > Does this mean the display controller only supports horizontal
+> > > resolutions that are a multiple of 16?
+> > >
+> >
+> > Yes.
+> 
+> You may want to check for this explicitly in the driver and filter out
+> modes that you don't support.
+ 
+
+Ok, I'll add mode check in connector_helper_funcs.mode_valid
+
+
+> 
+> > > > +#ifdef CONFIG_SOC_VF610
+> > > > +#define DCU_TOTAL_LAYER_NUM             64
+> > > > +#define DCU_LAYER_NUM_MAX               6
+> > > > +#else
+> > > > +#define DCU_TOTAL_LAYER_NUM             16
+> > > > +#define DCU_LAYER_NUM_MAX               4
+> > > > +#endif
+> > >
+> > > Should this not be a runtime decision so that the same driver can
+> > > run on
+> > > VF610 and LS1021A platforms?
+> > >
+> >
+> > Yes, Both VF610 and LS1021A use DCU as video IP module.
+> > And there are a bit of differences on each SoCs.
+> 
+> Yes, I understand. This should be covered by SoC-specific parameters (via
+> the of_device_id table) so that you can run the same kernel on both
+> VF610 and LS1021A SoCs.
+> 
+> As it is, if you build this on a configuration where both VF610 and
+> LS1021A are enabled you're going to pick up the values for VF610 and cause
+> LS1021A to not work.
+ 
+
+Very good idea, I'll do it
+
+
+
+> 
+> > > > +void fsl_dcu_drm_plane_destroy(struct drm_plane *plane) {
+> > > > +	fsl_dcu_drm_plane_disable(plane);
+> > >
+> > > Hmm? This function doesn't do anything, so why not just drop it?
+> > >
+> >
+> >
+> > I'll implement fsl_dcu_drm_plane_disable(plane)
+> >
+> >
+> >
+> > > > +	drm_plane_cleanup(plane);
+> > > > +}
+> > >
+> > > Also this function and ->atomic_update() should be static. Perhaps
+> > > make it a habit of running your build tests with C=1 occasionally to
+> > > get notified of this kind of error.
+> > >
+> > > Thierry
+> >
+> >
+> >
+> > One question: How can I set C=1?
+> 
+> Just add it to the make command-line along with any other parameters, like
+> this for example:
+> 
+> 	$ make ARCH=arm CROSS_COMPILE=armv7l-unknown-linux-gnueabihf- \
+> 		O=build/vf610 C=1
+> 
+> Thierry
+ 
+
+Thanks
+
+Jianwei
