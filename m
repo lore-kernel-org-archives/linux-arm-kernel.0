@@ -1,33 +1,26 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 17 Jul 2015 18:15:00 -0500
-Subject: [PATCH v3 2/8] ACPI / irqchip: Add self-probe infrastructure to
- initialize IRQ controller
-In-Reply-To: <1436525114-14425-3-git-send-email-hanjun.guo@linaro.org>
-References: <1436525114-14425-1-git-send-email-hanjun.guo@linaro.org>
- <1436525114-14425-3-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <CAOZdJXWB71tzc=OMm_UH23jc+_wsA5=pC5W9arrEM-URm_sywg@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 18 Jul 2015 01:26:14 +0200
+Subject: [GIT PULL] pxa for v4.3
+In-Reply-To: <87egk6h22b.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Sat, 18 Jul 2015 00:06:04 +0200")
+References: <87egk6h22b.fsf@belgarion.home>
+Message-ID: <87si8mfjs9.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 10, 2015 at 5:45 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-> +void __init acpi_irqchip_init(void)
-> +{
-> +       struct acpi_table_id *id;
-> +
-> +       if (acpi_disabled)
-> +               return;
-> +
-> +       if (acpi_gic_version_init())
-> +               return;
-> +
-> +       /* scan the irqchip table to match the GIC version and its driver */
-> +       for (id = __irqchip_acpi_table; id->id[0]; id++) {
-> +               if (gic_version == (u8)id->driver_data)
-> +                       acpi_table_parse(id->id,
-> +                                        (acpi_tbl_table_handler)id->handler);
-> +       }
+> Hi Arnd, Kevin, and Olof,
+>
+> This is the pxa pull request for 4.3 development cycle. It is a quite small one,
+> the main work happening on the drivers side, mostly dmaengine centric work.
 
-Should we display an error message if we don't find a matching table?
-That can happen if the ACPI tables shows a GIC version number that is
-not listed in __irqchip_acpi_table[]?
+Actually, could you hold this pull request, there is a warning I've not seen so
+far which was caught by 0-day ...
+
+I'll request again in a couple of days.
+
+Cheers.
+
+--
+Robert
