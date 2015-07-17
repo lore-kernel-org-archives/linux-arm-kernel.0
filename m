@@ -1,129 +1,91 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Fri, 17 Jul 2015 12:14:36 +0100
-Subject: [PATCH] thermal: consistently use int for temperatures
-In-Reply-To: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
- (Sascha Hauer's message of "Mon, 6 Jul 2015 09:19:49 +0200")
-References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <9hhd1zrc9yb.fsf@e105922-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 17 Jul 2015 12:17:08 +0100
+Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
+ Control Processor)
+In-Reply-To: <20150716193114.GA17952@codeaurora.org>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
+ <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
+ <559ADC94.4080505@codeaurora.org> <559BF858.1020301@arm.com>
+ <20150708014606.GH30412@codeaurora.org> <55A7D79B.3080305@arm.com>
+ <20150716193114.GA17952@codeaurora.org>
+Message-ID: <55A8E434.2010709@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
 
-> The thermal code uses int, long and unsigned long for temperatures
-> in different places.
+On 16/07/15 20:31, Stephen Boyd wrote:
+> On 07/16, Sudeep Holla wrote:
+>> On 08/07/15 02:46, Stephen Boyd wrote:
+>>>
+>>> Yes struct clk would have min/max, and struct clk_core would have
+>>> min/max. Then some sort of provider API (or possibly even
+>>> clk_init_data) would take the min/max fields and copy them over
+>>> to struct clk_core. Then during set_rate operations we would
+>>> aggregate the constraints from struct clk like we already do and
+>>> add in the constrains in struct clk_core.
+>>>
+>>> One downside to adding new fields to clk_init_data is that there
+>>> are drivers out there that aren't initializing that structure to
+>>> 0, and they're putting it on the stack, so stack junk can come
+>>> through. Furthermore, min/max would mean that every driver needs
+>>> to specify some large number for max or we have to special case
+>>> min == max == 0 and ignore it. Somehow it needs to be opt-in. If
+>>> we want to go down the clk_init_data route then perhaps we need
+>>> some sort of rate_constraint struct pointer in there that drivers
+>>> can optionally setup.
+>>>
+>>> 	struct clk_rate_constraint {
+>>> 		unsigned long min;
+>>> 		unsigned long max;
+>>> 	};
+>>>
+>>> 	struct clk_init_data {
+>>> 		...
+>>> 		struct clk_rate_constraint *rate_constraint;
+>>> 	};
+>>>
+>>> I haven't thought it through completely, but I can probably write
+>>> up some patch tomorrow after I sleep on it.
+>>>
+>>
+>> I am hoping to get this series for v4.3. In order to avoid using
+>> consumer API, I can revert back to the min,max check I had in the
+>> round_rate earlier if that's fine with you ? Let me know so that I can
+>> post the next version based on that. All the other comments are already
+>> addressed.
 >
-> Using an unsigned type limits the thermal framework to positive
-> temperatures without need. Also several drivers currently will report
-> temperatures near UINT_MAX for temperatures below 0?C. This will probably
-> immediately shut the machine down due to overtemperature if started below
-> 0?C.
+> Ok. I'm fine with the consumer API being used, but it would be
+> nice if we didn't have to do so. Try out the patch below,
+> hopefully it's good enough for your purposes. It may need to be
+> more robust, and we may still want to use the init_data structure
+> to avoid races with providers and consumers, but we can leave
+> that for later after sweeping all the structure users.
 >
-> 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
-> is above the melting point of all known materials.
+
+Agreed, I would avoid using clk consumer API or use it with TODO so that
+I remember to remove it soon. Anyways, thanks for the patch, I tested it
+and works fine to me. You can add Tested-by if you decide to push it.
+
+>>
+>> Also since this series depends on SCPI, I was thinking to get it merged
+>> via ARM-SoC, but that might conflict with the round_rate prototype
+>> change. Do do plan to share a stable base with arm-soc guys or you
+>> expect all the changes to be contained in clk tree ?
+>>
 >
-> Consistently use a plain 'int' for temperatures throughout the thermal code and
-> the drivers. This only changes the places in the drivers where the temperature
-> is passed around as pointer, when drivers internally use another type this is
-> not changed.
+> We can share a stable branch for the determine_rate change with
+> arm-soc. We already have it on a separate branch but haven't
+> published it so far because nobody has asked.
 >
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Thanks for moving over the thermal sub-system in Linux to consistently
-use a single type.
+determine_rate change shouldn't affect SCPI clock driver but I remember
+seeing round_rate change too on the list which returns value using the
+argument from Boris. Is that planned for v4.3 ? I would need the stable
+branch from this clk_hw_set_rate_range if you decide to push. Let me
+know your preferences. I will post the updated version of the patch
+accordingly.
 
-In your patch, you missed migrating over power_allocator governor and
-it's associated trace events. It got merged for v4.2.
-
-Could you incorporate something like below in your next version?
-
-Thanks,
-Punit
-
-[...]
-
---------------->8-----------------------
-Subject: [PATCH] Use int for temperature in power_allocator governor
-
----
- drivers/thermal/power_allocator.c              | 10 ++++------
- include/trace/events/thermal_power_allocator.h |  6 +++---
- 2 files changed, 7 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/thermal/power_allocator.c b/drivers/thermal/power_allocator.c
-index 4672250..1bb7d7f 100644
---- a/drivers/thermal/power_allocator.c
-+++ b/drivers/thermal/power_allocator.c
-@@ -92,8 +92,7 @@ struct power_allocator_params {
-  * Return: The power budget for the next period.
-  */
- static u32 pid_controller(struct thermal_zone_device *tz,
--			  unsigned long current_temp,
--			  unsigned long control_temp,
-+			  int current_temp, int control_temp,
- 			  u32 max_allocatable_power)
- {
- 	s64 p, i, d, power_range;
-@@ -223,8 +222,7 @@ static void divvy_up_power(u32 *req_power, u32 *max_power, int num_actors,
- }
- 
- static int allocate_power(struct thermal_zone_device *tz,
--			  unsigned long current_temp,
--			  unsigned long control_temp)
-+			  int current_temp, int control_temp)
- {
- 	struct thermal_instance *instance;
- 	struct power_allocator_params *params = tz->governor_data;
-@@ -411,7 +409,7 @@ static int power_allocator_bind(struct thermal_zone_device *tz)
- {
- 	int ret;
- 	struct power_allocator_params *params;
--	unsigned long switch_on_temp, control_temp;
-+	int switch_on_temp, control_temp;
- 	u32 temperature_threshold;
- 
- 	if (!tz->tzp || !tz->tzp->sustainable_power) {
-@@ -476,7 +474,7 @@ static void power_allocator_unbind(struct thermal_zone_device *tz)
- static int power_allocator_throttle(struct thermal_zone_device *tz, int trip)
- {
- 	int ret;
--	unsigned long switch_on_temp, control_temp, current_temp;
-+	int switch_on_temp, control_temp, current_temp;
- 	struct power_allocator_params *params = tz->governor_data;
- 
- 	/*
-diff --git a/include/trace/events/thermal_power_allocator.h b/include/trace/events/thermal_power_allocator.h
-index 12e1321..5afae8f 100644
---- a/include/trace/events/thermal_power_allocator.h
-+++ b/include/trace/events/thermal_power_allocator.h
-@@ -11,7 +11,7 @@ TRACE_EVENT(thermal_power_allocator,
- 		 u32 total_req_power, u32 *granted_power,
- 		 u32 total_granted_power, size_t num_actors,
- 		 u32 power_range, u32 max_allocatable_power,
--		 unsigned long current_temp, s32 delta_temp),
-+		 int current_temp, s32 delta_temp),
- 	TP_ARGS(tz, req_power, total_req_power, granted_power,
- 		total_granted_power, num_actors, power_range,
- 		max_allocatable_power, current_temp, delta_temp),
-@@ -24,7 +24,7 @@ TRACE_EVENT(thermal_power_allocator,
- 		__field(size_t,        num_actors               )
- 		__field(u32,           power_range              )
- 		__field(u32,           max_allocatable_power    )
--		__field(unsigned long, current_temp             )
-+		__field(int,           current_temp             )
- 		__field(s32,           delta_temp               )
- 	),
- 	TP_fast_assign(
-@@ -42,7 +42,7 @@ TRACE_EVENT(thermal_power_allocator,
- 		__entry->delta_temp = delta_temp;
- 	),
- 
--	TP_printk("thermal_zone_id=%d req_power={%s} total_req_power=%u granted_power={%s} total_granted_power=%u power_range=%u max_allocatable_power=%u current_temperature=%lu delta_temperature=%d",
-+	TP_printk("thermal_zone_id=%d req_power={%s} total_req_power=%u granted_power={%s} total_granted_power=%u power_range=%u max_allocatable_power=%u current_temperature=%d delta_temperature=%d",
- 		__entry->tz_id,
- 		__print_array(__get_dynamic_array(req_power),
-                               __entry->num_actors, 4),
--- 
-2.1.2
+Regards,
+Sudeep
