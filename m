@@ -1,52 +1,116 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 17 Jul 2015 07:28:19 +0200 (CEST)
-Subject: [PATCH 14/41] clocksource: mxs: Migrate to new 'set-state'
- interface
-In-Reply-To: <5505013f2020eef13aa55f7d748f79e344ce6c69.1434622147.git.viresh.kumar@linaro.org>
-References: <cover.1434622147.git.viresh.kumar@linaro.org>
- <5505013f2020eef13aa55f7d748f79e344ce6c69.1434622147.git.viresh.kumar@linaro.org>
-Message-ID: <1002917180.81547.1437110899188.JavaMail.open-xchange@oxbsltgw05.schlund.de>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 17 Jul 2015 10:41:01 +0530
+Subject: [PATCH 07/18] ARM/ixp4xx/timer: Migrate to new 'set-state' interface
+In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
+References: <cover.1437101996.git.viresh.kumar@linaro.org>
+Message-ID: <cea50eeef15c8498181c4a1ff804a7cdef29aebb.1437101996.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
+Migrate ixp4xx driver to the new 'set-state' interface provided by
+clockevents core, the earlier 'set-mode' interface is marked obsolete
+now.
 
-[add Fabio, Marek and Pengutronix to CC]
+This also enables us to implement callbacks for new states of clockevent
+devices, for example: ONESHOT_STOPPED.
 
-> Viresh Kumar <viresh.kumar@linaro.org> hat am 18. Juni 2015 um 12:54
-> geschrieben:
->
->
-> Migrate mxs driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
->
-> Also drop:
-> - 'mxs_clockevent_mode': as we have helpers available from core for the
-> same.
-> same state twice and so perhaps the check wasn't required.
-> - 'clock_event_mode_label': CLOCK_EVT_MODE_* shouldn't be used anymore
-> by drivers and it was used just to print old-state:new-state. The
-> debug prints are called from mxs_irq_clear() now based on the
-> state-name passed to it. The printed name will be same for shutdown
-> and resume states as they use the same callback pointer.
->
-> Cc: Shawn Guo <shawn.guo@linaro.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
->
-> ---
-> @Shawn: Please let me know if you want to print "resume" for resume
-> state, as that will require a separate callback for resume state, just
-> to print the name correctly. I thought it might not be worth enough :)
-> ---
+NOTE: ixp4xx_set_{oneshot|periodic} don't perform read operation on
+'IXP4XX_OSRT1' register anymore.
 
-sorry for the late feedback. I've tested the patch with an i.MX23 and an i.MX28
-board without any problems.
+Cc: Imre Kaloz <kaloz@openwrt.org>
+Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-ixp4xx/common.c | 68 +++++++++++++++++++++++++------------------
+ 1 file changed, 40 insertions(+), 28 deletions(-)
 
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-
-Regards
-Stefan
+diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
+index 8537d4c41e34..70773b948e7e 100644
+--- a/arch/arm/mach-ixp4xx/common.c
++++ b/arch/arm/mach-ixp4xx/common.c
+@@ -521,43 +521,55 @@ static int ixp4xx_set_next_event(unsigned long evt,
+ 	return 0;
+ }
+ 
+-static void ixp4xx_set_mode(enum clock_event_mode mode,
+-			    struct clock_event_device *evt)
++static int ixp4xx_shutdown(struct clock_event_device *evt)
+ {
+ 	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
+ 	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
+ 
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
+- 		opts = IXP4XX_OST_ENABLE;
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* period set by 'set next_event' */
+-		osrt = 0;
+-		opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
+-		break;
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-		opts &= ~IXP4XX_OST_ENABLE;
+-		break;
+-	case CLOCK_EVT_MODE_RESUME:
+-		opts |= IXP4XX_OST_ENABLE;
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-	default:
+-		osrt = opts = 0;
+-		break;
+-	}
++	opts &= ~IXP4XX_OST_ENABLE;
++	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
++}
+ 
++static int ixp4xx_set_oneshot(struct clock_event_device *evt)
++{
++	unsigned long opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
++	unsigned long osrt = 0;
++
++	/* period set by 'set next_event' */
+ 	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
++}
++
++static int ixp4xx_set_periodic(struct clock_event_device *evt)
++{
++	unsigned long opts = IXP4XX_OST_ENABLE;
++	unsigned long osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
++
++	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
++}
++
++static int ixp4xx_resume(struct clock_event_device *evt)
++{
++	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
++	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
++
++	opts |= IXP4XX_OST_ENABLE;
++	*IXP4XX_OSRT1 = osrt | opts;
++	return 0;
+ }
+ 
+ static struct clock_event_device clockevent_ixp4xx = {
+-	.name		= "ixp4xx timer1",
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.rating         = 200,
+-	.set_mode	= ixp4xx_set_mode,
+-	.set_next_event	= ixp4xx_set_next_event,
++	.name			= "ixp4xx timer1",
++	.features		= CLOCK_EVT_FEAT_PERIODIC |
++				  CLOCK_EVT_FEAT_ONESHOT,
++	.rating			= 200,
++	.set_state_shutdown	= ixp4xx_shutdown,
++	.set_state_periodic	= ixp4xx_set_periodic,
++	.set_state_oneshot	= ixp4xx_set_oneshot,
++	.tick_resume		= ixp4xx_resume,
++	.set_next_event		= ixp4xx_set_next_event,
+ };
+ 
+ static void __init ixp4xx_clockevent_init(void)
+-- 
+2.4.0
