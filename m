@@ -1,42 +1,73 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 17 Jul 2015 11:32:44 +0200 (CEST)
-Subject: [PATCH V4 1/1] irqchip: imx-gpcv2: IMX GPCv2 drivers for wakeup
- source and suspend
-In-Reply-To: <alpine.DEB.2.11.1507171119250.18576@nanos>
-References: <1436371523-18083-1-git-send-email-shenwei.wang@freescale.com>
- <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1507171119250.18576@nanos>
-Message-ID: <alpine.DEB.2.11.1507171130590.18576@nanos>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 17 Jul 2015 11:33:34 +0200
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <55965F81.5050609@arm.com>
+References: <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+ <559185D4.7060308@arm.com>
+ <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
+ <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
+ <559642EE.1050605@arm.com>
+ <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
+ <559647A7.7010309@arm.com>
+ <CAFEAcA-XyGRLSdQSye5OP6vRQKLZtMY4Erg7jfcpr-oo-HqJ7A@mail.gmail.com>
+ <55965F81.5050609@arm.com>
+Message-ID: <20150717093334.GA24504@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jul 2015, Thomas Gleixner wrote:
-
-> On Thu, 16 Jul 2015, Shenwei Wang wrote:
+On Fri, Jul 03, 2015 at 11:10:09AM +0100, Marc Zyngier wrote:
+> On 03/07/15 10:34, Peter Maydell wrote:
+> > On 3 July 2015 at 09:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> On 03/07/15 09:12, Peter Maydell wrote:
+> >>> I would still like to see the proponents of this patch say
+> >>> what their model is for userspace support of cross-host migration,
+> >>> if we're abandoning the model the current API envisages.
+> >>
+> >> I thought we had discussed this above, and don't really see this as a
+> >> departure from the current model:
+> >>
+> >> - "-cpu host" results in "GENERIC" being used: VM can only be migrated
+> >> to the exact same HW (no cross-host migration). MIDR should probably
+> >> become RO.
+> >> - "-cpu host" results in "A57" (for example): VM can be migrated to a
+> >> variety of A57 platforms, and allow for some fuzzing on the revision (or
+> >> accept any revision).
+> >> - "-cpu a57" forces an A57 model to be emulated, always. It is always
+> >> possible to migrate such a VM on any host.
+> >>
+> >> I think only the first point is new, but the last two are what we have
+> >> (or what we should have).
+> > 
+> > Right, but the implicit idea of this GENERIC patch seems to
+> > be that new host CPU types don't get their own KVM_ARM_TARGET_*
+> > constant, and are thus forever unable to do cross-host migration.
+> > It's not clear to me why we'd want to have new CPUs be second
+> > class citizens like that.
 > 
-> > Kindly PING.
+> I certainly don't want to see *any* CPU be a second class citizen. But
+> let's face it, we're adding more and more targets that don't implement
+> anything new, and just satisfy themselves with the generic implementation.
 > 
-> If you folks would kindly CC the proper mailing list for irq chip
-> patches, then they would end up in the proper mail folder and not in
-> my random crap mbox.
+> I see it as an incentive to provide something useful (tables of all the
+> registers with default values?) so that cross-host migration becomes a
+> reality instead of the figment of our imagination (as it is now). If it
+> wasn't already ABI, I'd have removed the existing targets until we have
+> something meaningful to put there.
 
-And before you resend, please do what I asked you before:
+What we're doing now certainly seems silly, because we're adding kernel
+patches without bringing anything to the table...
 
-This wants to be split in separate patches:
-     - suspend code
-     - irqchip code
-
-Your V4 is still a combo patch:
-
->  arch/arm/mach-imx/Kconfig        |   1 +
->  arch/arm/mach-imx/Makefile       |   2 +
->  arch/arm/mach-imx/pm-imx7.c      | 735 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/suspend-imx7.S | 494 ++++++++++++++++++++++++++
->  drivers/irqchip/Kconfig          |   7 +
->  drivers/irqchip/Makefile         |   1 +
->  drivers/irqchip/irq-imx-gpcv2.c  | 311 +++++++++++++++++
->  include/soc/imx/gpcv2.h          | 137 ++++++++
+> 
+> Now, I also have my own doubts about cross-host migration (timers
+> anyone?). But I don't see the above as a change in policy. More as a way
+> to outline the fact that we currently don't have the right level of
+> information/infrastructure to support it at all.
+> 
+The one thing that I've lost track of here (sorry) is whether we're
+enforcing the inability to do cross-host migration with the generic
+target when this patch is merged or do we leave this up to the graces of
+userspace?
 
 Thanks,
-
-	tglx
+-Christoffer
