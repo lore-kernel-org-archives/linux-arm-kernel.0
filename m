@@ -1,15 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:27:45 -0700
+Date: Fri, 17 Jul 2015 10:29:29 -0700
 Subject: [PATCH] arm64: Split out platform options to separate Kconfig
-In-Reply-To: <20150715132014.GE20186@e104818-lin.cambridge.arm.com>
+In-Reply-To: <20150715130152.GG1005@arm.com>
 References: <1436958621-23524-1-git-send-email-olof@lixom.net>
- <20150715132014.GE20186@e104818-lin.cambridge.arm.com>
-Message-ID: <20150717172745.GA28326@localhost>
+ <20150715130152.GG1005@arm.com>
+Message-ID: <20150717172929.GB28326@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 02:20:14PM +0100, Catalin Marinas wrote:
-> On Wed, Jul 15, 2015 at 07:10:21AM -0400, Olof Johansson wrote:
+On Wed, Jul 15, 2015 at 02:01:52PM +0100, Will Deacon wrote:
+> Hi Olof,
+> 
+> On Wed, Jul 15, 2015 at 12:10:21PM +0100, Olof Johansson wrote:
 > > Let's move out the platform Kconfig entries to a separate file, since these
 > > changes usually get moved through arm-soc instead of the arm64 arch tree, and
 > > this will lead to fewer conflicts
@@ -19,49 +21,21 @@ On Wed, Jul 15, 2015 at 02:20:14PM +0100, Catalin Marinas wrote:
 > > 
 > > Will, Catalin, I'll merge this through arm-soc if I get your acks. Thanks!
 > 
-> That's fine by me.
+> Fine by me:
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Cool, applying here then!
-
-> > +config ARCH_TEGRA
-> > +	bool "NVIDIA Tegra SoC Family"
-> > +	select ARCH_HAS_RESET_CONTROLLER
-> > +	select ARCH_REQUIRE_GPIOLIB
-> > +	select CLKDEV_LOOKUP
-> > +	select CLKSRC_MMIO
-> > +	select CLKSRC_OF
-> > +	select GENERIC_CLOCKEVENTS
-> > +	select HAVE_CLK
-> > +	select PINCTRL
-> > +	select RESET_CONTROLLER
-> > +	help
-> > +	  This enables support for the NVIDIA Tegra SoC family.
-> > +
-> > +config ARCH_TEGRA_132_SOC
-> > +	bool "NVIDIA Tegra132 SoC"
-> > +	depends on ARCH_TEGRA
-> > +	select PINCTRL_TEGRA124
-> > +	select USB_ULPI if USB_PHY
-> > +	select USB_ULPI_VIEWPORT if USB_PHY
-> > +	help
-> > +	  Enable support for NVIDIA Tegra132 SoC, based on the Denver
-> > +	  ARMv8 CPU.  The Tegra132 SoC is similar to the Tegra124 SoC,
-> > +	  but contains an NVIDIA Denver CPU complex in place of
-> > +	  Tegra124's "4+1" Cortex-A15 CPU complex.
+>   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Also, please make sure we won't get any more Kconfig entries for SoC
-> variations on arm64 (still waiting for the Tegra folk to remove
-> ARCH_TEGRA_132_SOC; this seems to be one of the very few SoCs that use
-> Makefile obj-y tricks to build clock, memory controller drivers instead
-> of dedicated driver Kconfig entries and they aren't even consistent:
-> PINCTRL_TEGRA124).
+> The only problem I can think of is how we resolve defconfig conflicts
+> between you adding a new platform and us adding a new feature, since
+> resolving those usually happens by regenerating the defconfig anyway.
+> 
+> Maybe we just wait until -rc1 before adding new platforms to defconfig?
 
-Yep. I'd imagine at some point some platforms will want to segment out
-major families (and in particular server vs mobile, etc) for dependency
-reasons, but right now there should be little need for it.
-
+We've been able to avoid most of these conflicts so far, haven't
+we? Hopefully it'll be fairly limited. We don't want to hold off touching
+defconfig until -rc1 since it means no build/test coverage until after
+the merge window closes.  So hopefully we can just deal with it as it
+comes up.
 
 
 -Olof
