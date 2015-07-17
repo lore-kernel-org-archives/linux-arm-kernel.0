@@ -1,307 +1,94 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 17 Jul 2015 23:49:43 +0200 (CEST)
-Subject: [PATCH V5 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <1437150300-8134-2-git-send-email-shenwei.wang@freescale.com>
-References: <1437150300-8134-1-git-send-email-shenwei.wang@freescale.com>
- <1437150300-8134-2-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <alpine.DEB.2.11.1507172253520.18576@nanos>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 17 Jul 2015 14:51:22 -0700
+Subject: [PATCH 1/2] input: touchscreen: pixcir_i2c_ts: Add support for
+ optional wakeup interrupt
+In-Reply-To: <1437115241-17859-2-git-send-email-vigneshr@ti.com>
+References: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+ <1437115241-17859-2-git-send-email-vigneshr@ti.com>
+Message-ID: <20150717215122.GC39282@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jul 2015, Shenwei Wang wrote:
-> +++ b/drivers/irqchip/irq-imx-gpcv2.c
-> @@ -0,0 +1,311 @@
-> +
-> +/*
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/of_address.h>
+Hi Vignesh,
+
+On Fri, Jul 17, 2015 at 12:10:40PM +0530, Vignesh R wrote:
+> On am437x-gp-evm, pixcir touchscreen can wake the system from low power
+> state by generating wake-up interrupt via pinctrl and IO daisy chain.
+> Add support for optional wakeup interrupt source by regsitering to
+> automated wake IRQ framework introduced by commit 4990d4fe327b ("PM /
+> Wakeirq: Add automated device wake IRQ handling").
+> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+> support for optional wake-up")
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  drivers/input/touchscreen/pixcir_i2c_ts.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> index 8f3e243a62bf..f7c602027fbd 100644
+> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> @@ -29,6 +29,8 @@
+>  #include <linux/of.h>
+>  #include <linux/of_gpio.h>
+>  #include <linux/of_device.h>
 > +#include <linux/of_irq.h>
-> +#include <linux/slab.h>
-> +#include <linux/syscore_ops.h>
-> +#include "irqchip.h"
+> +#include <linux/pm_wakeirq.h>
+>  
+>  #define PIXCIR_MAX_SLOTS       5 /* Max fingers supported by driver */
+>  
+> @@ -38,6 +40,7 @@ struct pixcir_i2c_ts_data {
+>  	const struct pixcir_ts_platform_data *pdata;
+>  	bool running;
+>  	int max_fingers;	/* Max fingers supported in this instance */
+> +	int wakeirq;
+>  };
+>  
+>  struct pixcir_touch {
+> @@ -564,11 +567,22 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>  	i2c_set_clientdata(client, tsdata);
+>  	device_init_wakeup(&client->dev, 1);
+>  
+> +	/* Register wakeirq, if available */
+> +	tsdata->wakeirq = of_irq_get(dev->of_node, 1);
 
-This file is deprecated. Use linux/irqchip.h instead.
+Can we put this in platform data and parse in pixcir_parse_dt() please?
+Also, why not of_irq_get_byname()?
 
-> +static struct imx_irq_gpcv2 *gpcv2_get_chip_data(void)
-> +{
-> +	struct irq_data *data;
-> +	int virq;
-> +
-> +	/* Since GPCv2 is the default IRQ domain, its private data can
-> +	 * be gotten from any irq descriptor. Here we use interrupt #19
-> +	 * which is for snvs-rtc.
-> +	 */
-
-Yuck. What kind of logic is that?
-
-Use some random hardcoded number to find something which has been set
-by this driver?
-
-> +	virq = irq_find_mapping(0, 19);
-> +
-> +	for (data = irq_get_irq_data(virq); data;
-> +	     data = data->parent_data) {
-> +		if (!data->domain)
-> +			continue;
-> +
-> +		if (!strcmp(data->domain->name, "GPCv2"))
-
-So you are relying on internal knowledge of the irq domain code which
-sets the domain name to the chip name if the domain name is not
-initialized by other means.
-
-Brilliant, NOT!
-
-In other words you are interested in the irq chip associated with that
-domain and not with the domain itself.
-
-Care to explain what you are trying to do and why you think there are
-no better ways to figure that out?
-
-> +			return data->chip_data;
+> +	if (tsdata->wakeirq) {
+> +		error = dev_pm_set_dedicated_wake_irq(dev,
+> +						      tsdata->wakeirq);
+> +		if (error)
+> +			dev_dbg(dev, "unable to get wakeirq %d\n",
+> +				error);
 > +	}
-> +
-> +	return 0;
 
-This wants to be 'return NULL;' if at all.
+Shouldn't his actually be:
 
-> +}
-> +
-> +static int gpcv2_wakeup_source_save(void)
-> +{
-> +	struct imx_irq_gpcv2 *cd;
-> +	void __iomem *reg;
-> +	int i;
-> +
-> +	cd = gpcv2_get_chip_data();
-> +	if (!cd)
-> +		return 0;
-> +
-> +	for (i = 0; i < IMR_NUM; i++) {
+	error = tsdata->wakeirq ?
+		dev_pm_set_dedicated_wake_irq(dev, tsdata->wakeirq) :
+		dev_pm_set_wake_irq(dev, client->irq);
+	if (error) {
+		...
+	}
 
-Why is IMR_NUM a hard coded constant and not provided by DT?
-
-> +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
-> +		cd->enabled_irqs[i] = readl_relaxed(reg);
-> +		writel_relaxed(cd->wakeup_sources[i], reg);
-> +	}
-> +
-> +	pr_devel("%s ----\r\n", __func__);
-> +	pr_devel("Enabled IRQ:\t %08X %08X %08X %08X\r\n",
-> +			cd->enabled_irqs[0],
-> +			cd->enabled_irqs[1],
-> +			cd->enabled_irqs[2],
-> +			cd->enabled_irqs[3]);
-> +	pr_devel("Wakeup Sources:\t %08X %08X %08X %08X\r\n",
-> +			cd->wakeup_sources[0],
-> +			cd->wakeup_sources[1],
-> +			cd->wakeup_sources[2],
-> +			cd->wakeup_sources[3]);
-
-Do we really need this debug stuff in mainline?
-
-> +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
-> +{
-> +	unsigned int idx = d->hwirq / 32;
-> +	struct imx_irq_gpcv2 *cd = d->chip_data;
-> +	u32 mask, val;
-> +	unsigned long flags;
-> +	void __iomem *reg;
-
-Can you come up with an even less readable way to arrange those
-declarations?
-
-> +	spin_lock_irqsave(&cd->lock, flags);
-
-That wants to be a raw spinlock.
-
-> +	reg = cd->gpc_base + cd->cpu2wakeup + idx * 4;
-
-This lacks a comment explaining the magic math
-
-> +static void imx_gpcv2_irq_unmask(struct irq_data *d)
-> +{
-> +	void __iomem *reg;
-> +	struct imx_irq_gpcv2 *cd = d->chip_data;
-> +	u32 val;
-> +	unsigned long flags;
-
-Another random variant of arranging declarations.
-
-> +	spin_lock_irqsave(&cd->lock, flags);
-
-This callback is always called with interrupts disabled, so this wants
-to be raw_spin_lock()
-
-> +	reg = cd->gpc_base + cd->cpu2wakeup + d->hwirq / 32 * 4;
-> +	val = readl_relaxed(reg);
-> +	val &= ~(1 << d->hwirq % 32);
-> +	writel_relaxed(val, reg);
-> +	irq_chip_unmask_parent(d);
-
-Why needs this to be called under cd->lock?
-
-If there is a requirement to do so, then it needs a comment.
-
-> +	spin_unlock_irqrestore(&cd->lock, flags);
-
-> +static int imx_gpcv2_domain_xlate(struct irq_domain *domain,
-> +				struct device_node *controller,
-> +				const u32 *intspec,
-> +				unsigned int intsize,
-> +				unsigned long *out_hwirq,
-> +				unsigned int *out_type)
-> +{
-> +	if (domain->of_node != controller)
-> +		return -EINVAL;	/* Shouldn't happen, really... */
-
-Tail comments are horrible to read. Either your comment has a value
-then put it above the if construct or just get rid of it.
-
-> +static int __init imx_gpcv2_irqchip_init(struct device_node *node,
-> +			       struct device_node *parent)
-> +{
-> +	struct irq_domain *parent_domain, *domain;
-> +	int i, val;
-> +	struct imx_irq_gpcv2 *cd;
-> +
-> +	if (!parent) {
-> +		pr_err("%s: no parent, giving up\n", node->full_name);
-> +		return -ENODEV;
-> +	}
-> +
-> +	parent_domain = irq_find_host(parent);
-> +	if (!parent_domain) {
-> +		pr_err("%s: unable to obtain parent domain\n", node->full_name);
-> +		return -ENXIO;
-> +	}
-> +
-> +	cd = kzalloc(sizeof(struct imx_irq_gpcv2), GFP_KERNEL);
-> +	BUG_ON(!cd);
-
-This BUG_ON does not make any sense as you just return an error code
-if something else goes wrong after that.
-
-> +	cd->gpc_base = of_iomap(node, 0);
-> +	if (!cd->gpc_base) {
-> +		pr_err("fsl-gpcv2: unable to map gpc registers\n");
-> +		kzfree(cd);
-
-Surely this needs kzfree because cd contains security relevant data,
-right?
-
-> +	/*
-> +	 * Due to hardware design requirement, need to make sure GPR
-
-s/requirement/failure/ right?
-
-> +	 * interrupt(#32) is unmasked during RUN mode to avoid entering
-> +	 * DSM by mistake.
-> +	 */
-> +	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
-
-Magic constant '~0x1' ?
+and then we can get rid of enable_irq_wake()/disable_irq_wake() in
+pixcir_i2c_ts_suspend() and pixcir_i2c_ts_resume().
 
 > +
-> +	/* Mask the wakeup sources in M/F power domain */
-> +	cd->mfmix_mask[0] = 0x54010000;
-> +	cd->mfmix_mask[1] = 0xc00;
-> +	cd->mfmix_mask[2] = 0x0;
-> +	cd->mfmix_mask[3] = 0x400010;
+>  	return 0;
+>  }
+>  
+>  static int pixcir_i2c_ts_remove(struct i2c_client *client)
+>  {
+> +	dev_pm_clear_wake_irq(&client->dev);
+>  	device_init_wakeup(&client->dev, 0);
 
-Again, really intuitive and self explaining magic constants.
+I wonder if driver core should be responsible for clearing wake irq and
+also for clearing wakeup flag.
 
-> +
-> +IRQCHIP_DECLARE(imx_gpcv2, "fsl,imx7d-gpc", imx_gpcv2_irqchip_init);
+Thanks.
 
-I'm not a DT expert, but AFAIK there is a requirement to document the
-bindings somewhere. -ENODOCUMENT!
-
-> +
-> +enum gpcv2_mode {
-> +	WAIT_CLOCKED,		/* wfi only */
-
-Again, tail comments are horrible to read. Use proper KernelDoc if you
-want to document stuff. Though I doubt that any of these comments have
-any value at all.
-
-Aside of that these names are pretty generic and prone to create a
-namespace clash sooner or later.
-
-> +	WAIT_UNCLOCKED,		/* WAIT */
-> +	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
-> +	STOP_POWER_ON,		/* just STOP */
-> +	STOP_POWER_OFF,		/* STOP + SRPG */
-> +};
-> +
-> +enum gpcv2_slot {
-
-What is this enum for?
-
-> +	CORE0_A7,
-> +	CORE1_A7,
-> +	SCU_A7,
-> +	FAST_MEGA_MIX,
-> +	MIPI_PHY,
-> +	PCIE_PHY,
-> +	USB_OTG1_PHY,
-> +	USB_OTG2_PHY,
-> +	USB_HSIC_PHY,
-> +	CORE0_M4,
-
-Namespace?
-
-> +};
-
-> +struct imx_irq_gpcv2 {
-> +	spinlock_t lock;
-
-  raw_spinlock_t
-
-> +	void __iomem *gpc_base;
-> +	struct regmap *anatop;
-> +	struct regmap *imx_src;
-> +	u32 wakeup_sources[IMR_NUM];
-> +	u32 enabled_irqs[IMR_NUM];
-> +	u32 mfmix_mask[IMR_NUM];
-> +	u32 wakeupmix_mask[IMR_NUM];
-> +	u32 lpsrmix_mask[IMR_NUM];
-> +	u32 cpu2wakeup;
-> +	void (*lpm_env_setup)(struct imx_irq_gpcv2 *);
-> +	void (*lpm_env_clean)(struct imx_irq_gpcv2 *);
-> +	void (*lpm_cpu_power_gate)(struct imx_irq_gpcv2 *, u32, bool);
-> +	void (*lpm_plat_power_gate)(struct imx_irq_gpcv2 *, bool);
-> +	void (*set_mode)(struct imx_irq_gpcv2 *, enum gpcv2_mode mode);
-> +	void (*standby)(struct imx_irq_gpcv2 *);
-> +	void (*suspend)(struct imx_irq_gpcv2 *);
-> +	void (*set_slot)(struct imx_irq_gpcv2 *cd, u32 index,
-> +			enum gpcv2_slot m_core, bool mode, bool ack);
-> +	void (*clear_slots)(struct imx_irq_gpcv2 *);
-> +	void (*lpm_enable_core)(struct imx_irq_gpcv2 *,
-> +			bool enable, u32 offset);
-> +
-> +
-> +	void (*suspend_fn_in_ocram)(void __iomem *ocram_vbase);
-> +	void __iomem *ocram_vbase;
-
-How many of these struct members are actually relevant to this driver
-and what is the purpose of those? A proper KernelDoc comment would
-shed some light on it.
-
-> +};
-> +
-> +void ca7_cpu_resume(void);
-> +void imx7_suspend(void __iomem *ocram_vbase);
-
-How is that related to the irqchip driver?
-
-Thanks,
-
-	tglx
+-- 
+Dmitry
