@@ -1,119 +1,84 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 17 Jul 2015 18:54:32 +0900
-Subject: [RFC] ARM: EXYNOS: reset KFC cores when cpu is up
-In-Reply-To: <1437120340.5797.46.camel@collabora.co.uk>
-References: <1436924213-29732-1-git-send-email-parkch98@gmail.com>
- <1437120340.5797.46.camel@collabora.co.uk>
-Message-ID: <CAJKOXPfgiAdrM1v02YTOFZXVyM-RFssX4j=X61Thgy2eEidFrA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Jul 2015 10:56:39 +0100
+Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
+In-Reply-To: <20150717093334.GA24504@cbox>
+References: <559180CA.3050905@arm.com>
+ <CAFEAcA-E+KdiL4suQ0DoEvB-zGpNZ7-dq46FegC_iXYRPvo9jA@mail.gmail.com>
+ <559185D4.7060308@arm.com>
+ <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
+ <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
+ <559642EE.1050605@arm.com>
+ <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
+ <559647A7.7010309@arm.com>
+ <CAFEAcA-XyGRLSdQSye5OP6vRQKLZtMY4Erg7jfcpr-oo-HqJ7A@mail.gmail.com>
+ <55965F81.5050609@arm.com> <20150717093334.GA24504@cbox>
+Message-ID: <55A8D157.9010601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-17 17:05 GMT+09:00 Sjoerd Simons <sjoerd.simons@collabora.co.uk>:
-> On Wed, 2015-07-15 at 10:36 +0900, Chanho Park wrote:
->> The cpu booting of exynos5422 has been still broken since we
->> discussed
->> it in last year[1]. I found this resetting codes from odroid-xu3
->> kernel of
->> hardkernel, it could help to boot 8 cores well. This patch need to
->> have
->> more test like STR and other SoC especially exynos5800 which is
->> variant
->> of exynos5422. If this patch is broken on exynos5800, I'll find
->> another
->> way to check exynos5422.
+On 17/07/15 10:33, Christoffer Dall wrote:
+> On Fri, Jul 03, 2015 at 11:10:09AM +0100, Marc Zyngier wrote:
+>> On 03/07/15 10:34, Peter Maydell wrote:
+>>> On 3 July 2015 at 09:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> On 03/07/15 09:12, Peter Maydell wrote:
+>>>>> I would still like to see the proponents of this patch say
+>>>>> what their model is for userspace support of cross-host migration,
+>>>>> if we're abandoning the model the current API envisages.
+>>>>
+>>>> I thought we had discussed this above, and don't really see this as a
+>>>> departure from the current model:
+>>>>
+>>>> - "-cpu host" results in "GENERIC" being used: VM can only be migrated
+>>>> to the exact same HW (no cross-host migration). MIDR should probably
+>>>> become RO.
+>>>> - "-cpu host" results in "A57" (for example): VM can be migrated to a
+>>>> variety of A57 platforms, and allow for some fuzzing on the revision (or
+>>>> accept any revision).
+>>>> - "-cpu a57" forces an A57 model to be emulated, always. It is always
+>>>> possible to migrate such a VM on any host.
+>>>>
+>>>> I think only the first point is new, but the last two are what we have
+>>>> (or what we should have).
+>>>
+>>> Right, but the implicit idea of this GENERIC patch seems to
+>>> be that new host CPU types don't get their own KVM_ARM_TARGET_*
+>>> constant, and are thus forever unable to do cross-host migration.
+>>> It's not clear to me why we'd want to have new CPUs be second
+>>> class citizens like that.
 >>
->> This patch is top of my previous exynos5422 cpu ordering patch[2] and
->> need to enable CONFIG_EXYNOS5420_MCPM=y
+>> I certainly don't want to see *any* CPU be a second class citizen. But
+>> let's face it, we're adding more and more targets that don't implement
+>> anything new, and just satisfy themselves with the generic implementation.
 >>
->> [    0.047509] CPU0: update cpu_capacity 448
->> [    0.047534] CPU0: thread -1, cpu 0, socket 1, mpidr 80000100
->> [    0.047874] Setting up static identity map for 0x400082c0 -
->> 0x40008318
->> [    0.048340] ARM CCI driver probed
->> [    0.048597] Exynos MCPM support installed
->> [    0.065676] CPU1: update cpu_capacity 448
->> [    0.065685] CPU1: thread -1, cpu 1, socket 1, mpidr 80000101
->> [    0.070672] CPU2: update cpu_capacity 448
->> [    0.070680] CPU2: thread -1, cpu 2, socket 1, mpidr 80000102
->> [    0.075644] CPU3: update cpu_capacity 448
->> [    0.075653] CPU3: thread -1, cpu 3, socket 1, mpidr 80000103
->> [    0.080590] CPU4: update cpu_capacity 1535
->> [    0.080600] CPU4: thread -1, cpu 0, socket 0, mpidr 80000000
->> [    0.085591] CPU5: update cpu_capacity 1535
->> [    0.085599] CPU5: thread -1, cpu 1, socket 0, mpidr 80000001
->> [    0.090590] CPU6: update cpu_capacity 1535
->> [    0.090598] CPU6: thread -1, cpu 2, socket 0, mpidr 80000002
->> [    0.095585] CPU7: update cpu_capacity 1535
->> [    0.095593] CPU7: thread -1, cpu 3, socket 0, mpidr 80000003
->> [    0.095720] Brought up 8 CPUs
+>> I see it as an incentive to provide something useful (tables of all the
+>> registers with default values?) so that cross-host migration becomes a
+>> reality instead of the figment of our imagination (as it is now). If it
+>> wasn't already ABI, I'd have removed the existing targets until we have
+>> something meaningful to put there.
+> 
+> What we're doing now certainly seems silly, because we're adding kernel
+> patches without bringing anything to the table...
+> 
 >>
->> [1]:http://lists.infradead.org/pipermail/linux-arm-kernel/2015
->> -June/350632.html
->> [2]:https://patchwork.kernel.org/patch/6782891/
+>> Now, I also have my own doubts about cross-host migration (timers
+>> anyone?). But I don't see the above as a change in policy. More as a way
+>> to outline the fact that we currently don't have the right level of
+>> information/infrastructure to support it at all.
 >>
->> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
->> Cc: Chanwoo Choi <cw00.choi@samsung.com>
->> Cc: Kevin Hilman <khilman@kernel.org>
->> Cc: Heesub Shin <heesub.shin@samsung.com>
->> Cc: Mauro Ribeiro <mauro.ribeiro@hardkernel.com>
->> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
->> Cc: Przemyslaw Marczak <p.marczak@samsung.com>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Signed-off-by: Chanho Park <chanho61.park@samsung.com>
->> Signed-off-by: Chanho Park <parkch98@gmail.com>
->> ---
->>  arch/arm/mach-exynos/mcpm-exynos.c | 13 ++++++++++++-
->>  arch/arm/mach-exynos/regs-pmu.h    |  6 ++++++
->>  2 files changed, 18 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach
->> -exynos/mcpm-exynos.c
->> index 9bdf547..a076dde 100644
->> --- a/arch/arm/mach-exynos/mcpm-exynos.c
->> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
->> @@ -70,7 +70,18 @@ static int exynos_cpu_powerup(unsigned int cpu,
->> unsigned int cluster)
->>               cluster >= EXYNOS5420_NR_CLUSTERS)
->>               return -EINVAL;
->>
->> -     exynos_cpu_power_up(cpunr);
->> +     if (!exynos_cpu_power_state(cpunr)) {
->> +             exynos_cpu_power_up(cpunr);
->> +
->> +             if (soc_is_exynos5800() && cluster) {
->
-> This seems a tad subtle. You're assuming here cluster 1 is the little
-> cluster. Would be good to make this more specific/obvious.
->
-> From looking at other mcpm-exynos code the assumption seems valid
-> (otherwise more code would be broken), so it may make sense to simply
-> define LITTLE_CLUSTER and BIG_CLUSTER and check explicitely for that.
->
-> Krzysztof on IRC mention that the cluster layout is read from MPIDR so
-> in principle this assumption could be invalidated on some Exynos
-> versions, but then again, given the amount of fallout from that i don't
-> see it as a practical issue at the moment :)
+> The one thing that I've lost track of here (sorry) is whether we're
+> enforcing the inability to do cross-host migration with the generic
+> target when this patch is merged or do we leave this up to the graces of
+> userspace?
 
-For these SoCs this cluster ID should be fixed. However you are right
-that it is a little fuzzy so it would be better to find a more
-reliable way.
+The jury is still out on that one.
 
->
->> +                     while (!pmu_raw_readl(S5P_PMU_SPARE2))
->> +                             udelay(10);
->
-> Would love to see some documentation for this magical pmu register, but
-> i guess you can't have them all :)
+I was initially not going to enforce anything (after all, this isn't
+that different from the whole CNTVOFF story where we allow userspace to
+shoot itself in the foot), but I'm equally happy to make MIDR_EL1
+read-only if we're creating a generic guest...
 
-I started documenting more of such registers here:
-Documentation/arm/Samsung/Bootloader-interface.txt
-The SPARE2 register is 0x908. I would be good to extend the
-documentation but unfortunately all I knowledge I got came from
-observation or vendor's source code, not from bootloader source code.
+Thanks,
 
-I know that Przemyslaw Marczak is also looking at the issue so maybe
-he could share some details?
-
-Best regards,
-Krzysztof
+	M.
+-- 
+Jazz is not dead. It just smells funny...
