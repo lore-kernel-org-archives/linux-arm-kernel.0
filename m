@@ -1,116 +1,57 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 17 Jul 2015 10:41:01 +0530
-Subject: [PATCH 07/18] ARM/ixp4xx/timer: Migrate to new 'set-state' interface
-In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
-References: <cover.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <cea50eeef15c8498181c4a1ff804a7cdef29aebb.1437101996.git.viresh.kumar@linaro.org>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 17 Jul 2015 11:08:04 +0530
+Subject: [PATCH 5/5] regulator: 88pm800: Add support for configuration
+ of dual phase on BUCK1
+In-Reply-To: <20150716203232.GA1602@sirena.org.uk>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-6-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716203232.GA1602@sirena.org.uk>
+Message-ID: <55A894BC.8070401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate ixp4xx driver to the new 'set-state' interface provided by
-clockevents core, the earlier 'set-mode' interface is marked obsolete
-now.
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
 
-NOTE: ixp4xx_set_{oneshot|periodic} don't perform read operation on
-'IXP4XX_OSRT1' register anymore.
+On Friday 17 July 2015 02:02 AM, Mark Brown wrote:
+> On Thu, Jul 16, 2015 at 11:46:58PM +0530, Vaibhav Hiremath wrote:
+>
+>>   	.disable		= regulator_disable_regmap,
+>>   	.is_enabled		= regulator_is_enabled_regmap,
+>>   	.get_current_limit	= pm800_get_current_limit,
+>> +	.set_current_limit	= pm800_set_current_limit,
+>
+> set_current_limit() isn't the right interface to use for this, this is
+> something that depends on the physical design of the system rather than
+> something that limits the current.  It should be a DT property of its
+> own.  There are some other PMICs with similar functions but it's not
+> clear yet how generic the configuration mechanism is.
+>
 
-Cc: Imre Kaloz <kaloz@openwrt.org>
-Acked-by: Krzysztof Ha?asa <khalasa@piap.pl>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-ixp4xx/common.c | 68 +++++++++++++++++++++++++------------------
- 1 file changed, 40 insertions(+), 28 deletions(-)
+Hmmm,
+Yeah, right. This is depends on physical design. And not the regulator
+current limit.
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 8537d4c41e34..70773b948e7e 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -521,43 +521,55 @@ static int ixp4xx_set_next_event(unsigned long evt,
- 	return 0;
- }
- 
--static void ixp4xx_set_mode(enum clock_event_mode mode,
--			    struct clock_event_device *evt)
-+static int ixp4xx_shutdown(struct clock_event_device *evt)
- {
- 	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
- 	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
- 
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
-- 		opts = IXP4XX_OST_ENABLE;
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		/* period set by 'set next_event' */
--		osrt = 0;
--		opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
--		break;
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		opts &= ~IXP4XX_OST_ENABLE;
--		break;
--	case CLOCK_EVT_MODE_RESUME:
--		opts |= IXP4XX_OST_ENABLE;
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	default:
--		osrt = opts = 0;
--		break;
--	}
-+	opts &= ~IXP4XX_OST_ENABLE;
-+	*IXP4XX_OSRT1 = osrt | opts;
-+	return 0;
-+}
- 
-+static int ixp4xx_set_oneshot(struct clock_event_device *evt)
-+{
-+	unsigned long opts = IXP4XX_OST_ENABLE | IXP4XX_OST_ONE_SHOT;
-+	unsigned long osrt = 0;
-+
-+	/* period set by 'set next_event' */
- 	*IXP4XX_OSRT1 = osrt | opts;
-+	return 0;
-+}
-+
-+static int ixp4xx_set_periodic(struct clock_event_device *evt)
-+{
-+	unsigned long opts = IXP4XX_OST_ENABLE;
-+	unsigned long osrt = IXP4XX_LATCH & ~IXP4XX_OST_RELOAD_MASK;
-+
-+	*IXP4XX_OSRT1 = osrt | opts;
-+	return 0;
-+}
-+
-+static int ixp4xx_resume(struct clock_event_device *evt)
-+{
-+	unsigned long opts = *IXP4XX_OSRT1 & IXP4XX_OST_RELOAD_MASK;
-+	unsigned long osrt = *IXP4XX_OSRT1 & ~IXP4XX_OST_RELOAD_MASK;
-+
-+	opts |= IXP4XX_OST_ENABLE;
-+	*IXP4XX_OSRT1 = osrt | opts;
-+	return 0;
- }
- 
- static struct clock_event_device clockevent_ixp4xx = {
--	.name		= "ixp4xx timer1",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.rating         = 200,
--	.set_mode	= ixp4xx_set_mode,
--	.set_next_event	= ixp4xx_set_next_event,
-+	.name			= "ixp4xx timer1",
-+	.features		= CLOCK_EVT_FEAT_PERIODIC |
-+				  CLOCK_EVT_FEAT_ONESHOT,
-+	.rating			= 200,
-+	.set_state_shutdown	= ixp4xx_shutdown,
-+	.set_state_periodic	= ixp4xx_set_periodic,
-+	.set_state_oneshot	= ixp4xx_set_oneshot,
-+	.tick_resume		= ixp4xx_resume,
-+	.set_next_event		= ixp4xx_set_next_event,
- };
- 
- static void __init ixp4xx_clockevent_init(void)
--- 
-2.4.0
+Earlier, I had submitted DT based approach, but was MFD DT property.
+Which is not correct, do you think regulator DT property is the right
+approach?
+
+Below is going to be my approach -
+
+pmic1: 88pm860 at 30 {
+	compatible = "marvell,88pm800";
+	...
+	regulators {
+		compatible = "marvell,88pm80x-regulator";
+
+		marvell,88pm860-buck1-dualphase-en;
+
+		buck1: buck1 {
+			...
+		};
+		...
+	};
+};
+
+
+Thanks,
+Vaibhav
