@@ -1,79 +1,139 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 17 Jul 2015 14:06:41 +0100
-Subject: [Xen-devel] [PATCH v2 13/20] xen/events: fifo: Make it running
- on 64KB granularity
-In-Reply-To: <55A7D955.5090203@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-14-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507161642130.17378@kaball.uk.xensource.com>
- <55A7D955.5090203@citrix.com>
-Message-ID: <alpine.DEB.2.02.1507171405210.17378@kaball.uk.xensource.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 17 Jul 2015 09:10:06 -0400
+Subject: [PATCH v3] serial: mxs-auart: keep the AUART unit in reset state
+ when not in use
+In-Reply-To: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+References: <1437032458-8577-1-git-send-email-jbe@pengutronix.de>
+Message-ID: <55A8FEAE.9010502@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jul 2015, Julien Grall wrote:
-> Hi Stefano,
-> 
-> On 16/07/2015 16:43, Stefano Stabellini wrote:
-> > On Thu, 9 Jul 2015, Julien Grall wrote:
-> > > Only use the first 4KB of the page to store the events channel info. It
-> > > means that we will wast 60KB every time we allocate page for:
-> >                        ^ waste
-> > 
-> > >       * control block: a page is allocating per CPU
-> > >       * event array: a page is allocating everytime we need to expand it
-> > > 
-> > > I think we can reduce the memory waste for the 2 areas by:
-> > > 
-> > >      * control block: sharing between multiple vCPUs. Although it will
-> > >      require some bookkeeping in order to not free the page when the CPU
-> > >      goes offline and the other CPUs sharing the page still there
-> > > 
-> > >      * event array: always extend the array event by 64K (i.e 16 4K
-> > >      chunk). That would require more care when we fail to expand the
-> > >      event channel.
-> > 
-> > But this is not implemented in this series, right?
-> 
-> Yes, it's some ideas to improve the code.
-> 
-> > 
-> > 
-> > > Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> > > Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > > Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> > > Cc: David Vrabel <david.vrabel@citrix.com>
-> > > ---
-> > >   drivers/xen/events/events_base.c | 2 +-
-> > >   drivers/xen/events/events_fifo.c | 2 +-
-> > >   2 files changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/drivers/xen/events/events_base.c
-> > > b/drivers/xen/events/events_base.c
-> > > index 96093ae..858d2f6 100644
-> > > --- a/drivers/xen/events/events_base.c
-> > > +++ b/drivers/xen/events/events_base.c
-> > > @@ -40,11 +40,11 @@
-> > >   #include <asm/idle.h>
-> > >   #include <asm/io_apic.h>
-> > >   #include <asm/xen/pci.h>
-> > > -#include <xen/page.h>
-> > >   #endif
-> > >   #include <asm/sync_bitops.h>
-> > >   #include <asm/xen/hypercall.h>
-> > >   #include <asm/xen/hypervisor.h>
-> > > +#include <xen/page.h>
-> > > 
-> > >   #include <xen/xen.h>
-> > >   #include <xen/hvm.h>
-> > 
-> > Spurious change?
-> 
-> No, xen/page.h was only included for x86 before. Now, it's included for every
-> architecture.
-> 
-> This is required in order to get XEN_PAGE_SIZE.
+Hi Juergen,
 
-Ah, right.
+On 07/16/2015 03:40 AM, Juergen Borleis wrote:
+> Whenever the UART device driver gets closed from userland, the driver
+> disables the UART unit and then stops its clock to save power.
+> 
+> The bit which disabled the UART unit is described as:
+> 
+>   "UART Enable. If this bit is set to 1, the UART is enabled. Data
+>   transmission and reception occurs for the UART signals. When the
+>   UART is disabled in the middle of transmission or reception, it
+>   completes the current character before stopping."
+> 
+> The important part is the "it completes the current character". Whenever
+> a reception is ongoing when the UART gets disabled (including the clock
+> off) the statemachine freezes and "remembers" this state on the next
+> open() and re-enabling of the unit's clock.
+> 
+> In this case we end up receiving an additional bogus character
+> immediately.
+> 
+> The solution in this change is to move the AUART unit into its reset
+> state on close() and only release it from its reset state on the next
+> open().
+> 
+> Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
+> ---
+> 
+> Notes:
+>     v3:
+>      - missing newline added to an error message
+>     
+>     v2:
+>      - rename mxs_auart_do_reset() to mxs_auart_keep_reset() to better reflect
+>        what it really does
+>      - adapt the delay in mxs_auart_keep_reset() to wait for the reset of the
+>        AURAT unit to what is used in mxs_auart_reset()
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+The function names and semantics are not clear. See below.
+
+>      - typo fixed
+> 
+>  drivers/tty/serial/mxs-auart.c | 38 ++++++++++++++++++++++++++++++--------
+>  1 file changed, 30 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/mxs-auart.c b/drivers/tty/serial/mxs-auart.c
+> index 13cf773..135ee6c 100644
+> --- a/drivers/tty/serial/mxs-auart.c
+> +++ b/drivers/tty/serial/mxs-auart.c
+> @@ -858,6 +858,30 @@ static void mxs_auart_reset(struct uart_port *u)
+>  	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+>  }
+>  
+> +static void mxs_auart_keep_reset(struct uart_port *u)
+> +{
+> +	int i;
+> +	u32 reg;
+> +
+> +	reg = readl(u->membase + AUART_CTRL0);
+> +	/* if already in reset state, keep it untouched */
+> +	if (reg & AUART_CTRL0_SFTRST)
+> +		return;
+> +
+> +	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> +	writel(AUART_CTRL0_SFTRST, u->membase + AUART_CTRL0_SET);
+> +
+> +	for (i = 0; i < 10000; i++) {
+> +		reg = readl(u->membase + AUART_CTRL0);
+> +		/* reset is finished when the clock is gated */
+> +		if (reg & AUART_CTRL0_CLKGATE)
+> +			return;
+> +		udelay(3);
+> +	}
+> +
+> +	dev_err(u->dev, "Failed to reset the unit.\n");
+> +}
+> +
+>  static int mxs_auart_startup(struct uart_port *u)
+>  {
+>  	int ret;
+> @@ -867,7 +891,10 @@ static int mxs_auart_startup(struct uart_port *u)
+>  	if (ret)
+>  		return ret;
+>  
+> -	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_CLR);
+> +	/* reset the unit if not aleady done */
+> +	mxs_auart_keep_reset(u);
+
+Why is this performing a soft-reset on open now? Didn't mxs_auart_shutdown()
+already leave it in this state?
+
+Because if you're performing a soft-reset deliberately as part of the
+initial condition, you make no mention of that in the changelog.
+
+
+> +	/* bring it out of reset now */
+> +	mxs_auart_reset(u);
+
+mxs_auart_reset() is really not resetting but simply performing a block enable.
+Isn't there a generic block enable for the iMX.2x SoCs? (Maybe there should be)
+
+The names of these functions don't match expected operations of startup().
+Start up should be enabling the device, not keeping it in reset.
+
+And "keep reset" immediately followed by "reset" makes no sense.
+
+Regards,
+Peter Hurley
+
+
+>  	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_SET);
+>  
+> @@ -899,13 +926,8 @@ static void mxs_auart_shutdown(struct uart_port *u)
+>  	if (auart_dma_enabled(s))
+>  		mxs_auart_dma_exit(s);
+>  
+> -	writel(AUART_CTRL2_UARTEN, u->membase + AUART_CTRL2_CLR);
+> -
+> -	writel(AUART_INTR_RXIEN | AUART_INTR_RTIEN | AUART_INTR_CTSMIEN,
+> -			u->membase + AUART_INTR_CLR);
+> -
+> -	writel(AUART_CTRL0_CLKGATE, u->membase + AUART_CTRL0_SET);
+> -
+> +	/* reset the unit and keep it in reset state */
+> +	mxs_auart_keep_reset(u);
+>  	clk_disable_unprepare(s->clk);
+>  }
+>  
+> 
