@@ -1,49 +1,37 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 17 Jul 2015 11:32:50 +0200
-Subject: [PATCH 9/9] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
+Date: Fri, 17 Jul 2015 11:32:42 +0200
+Subject: [PATCH 1/9] gpiolib: Fix possible use of wrong name
 In-Reply-To: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
 References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <1437125570-28623-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add some information about gpio names to the debugfs gpio file. name and
-label of a GPIO are then displayed next to each other. This way it is
-easy to see what the real name of GPIO is and what the driver requested
-it for.
+The name is set optionally from DT. Therefore we need to reset the name
+variable for every loop iteration. Otherwise we could use a wrong or
+uninitialized name.
 
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/gpio/gpiolib.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ drivers/gpio/gpiolib-of.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index dcac3bcf21dd..0f1d1f5faf5d 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 	int			is_irq;
+diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+index 9a0ec48a4737..60aebe4d7c26 100644
+--- a/drivers/gpio/gpiolib-of.c
++++ b/drivers/gpio/gpiolib-of.c
+@@ -209,11 +209,11 @@ static void of_gpiochip_scan_hogs(struct gpio_chip *chip)
+ {
+ 	struct gpio_desc *desc = NULL;
+ 	struct device_node *np;
+-	const char *name;
+ 	enum gpio_lookup_flags lflags;
+ 	enum gpiod_flags dflags;
  
- 	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
--		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
-+		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
-+			if (gdesc->name) {
-+				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
-+					   gpio, gdesc->name);
-+			}
+ 	for_each_child_of_node(chip->of_node, np) {
++		const char *name = NULL;
+ 		if (!of_property_read_bool(np, "gpio-hog"))
  			continue;
-+		}
  
- 		gpiod_get_direction(gdesc);
- 		is_out = test_bit(FLAG_IS_OUT, &gdesc->flags);
- 		is_irq = test_bit(FLAG_USED_AS_IRQ, &gdesc->flags);
--		seq_printf(s, " gpio-%-3d (%-20.20s) %s %s %s",
--			gpio, gdesc->label,
-+		seq_printf(s, " gpio-%-3d (%-20.20s|%-20.20s) %s %s %s",
-+			gpio, gdesc->name ? gdesc->name : "", gdesc->label,
- 			is_out ? "out" : "in ",
- 			chip->get
- 				? (chip->get(chip, i) ? "hi" : "lo")
 -- 
 2.1.4
