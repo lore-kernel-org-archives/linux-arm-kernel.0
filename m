@@ -1,129 +1,73 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 17 Jul 2015 14:08:58 +0200
-Subject: [PATCH V3 01/19] reset: add of_reset_control_get_by_index()
-In-Reply-To: <1436791197-32358-2-git-send-email-jonathanh@nvidia.com>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-2-git-send-email-jonathanh@nvidia.com>
-Message-ID: <1437134938.3254.3.camel@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jul 2015 14:11:15 +0200
+Subject: [GIT PULL] EP93xx cleanups for v4.3
+Message-ID: <CACRpkdbEnK2Z2SW-QafisHv9hXv-bSdYx0dS7wtGh3oMDDcg=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 13.07.2015, 13:39 +0100 schrieb Jon Hunter:
-> From: Vince Hsu <vinceh@nvidia.com>
-> 
-> Add of_reset_control_get_by_index() to allow the drivers to get reset
-> device without knowing its name.
-> 
-> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-> [jonathanh at nvidia.com: Updated stub function to return -ENOTSUPP instead
->  of -ENOSYS which should only be used for system calls.]
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+Hi ARM SoC people,
 
-Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+this is a long due pull request finally doing some EP93xx
+cleanups, most prominently:
 
-regards
-Philipp
+- Switch to GENERIC TIME
 
-> ---
-> v3: addressed comments from Philipp
-> v2: minor changes according to Alex's comments
-> ---
->  drivers/reset/core.c  | 40 +++++++++++++++++++++++++++++-----------
->  include/linux/reset.h |  9 +++++++++
->  2 files changed, 38 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/reset/core.c b/drivers/reset/core.c
-> index 7955e00d04d4..81ae17d15480 100644
-> --- a/drivers/reset/core.c
-> +++ b/drivers/reset/core.c
-> @@ -141,27 +141,24 @@ int reset_control_status(struct reset_control *rstc)
->  EXPORT_SYMBOL_GPL(reset_control_status);
->  
->  /**
-> - * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-> + * of_reset_control_get_by_index - Lookup and obtain a reference to a reset
-> + * controller by index.
->   * @node: device to be reset by the controller
-> - * @id: reset line name
-> - *
-> - * Returns a struct reset_control or IS_ERR() condition containing errno.
-> + * @index: index of the reset controller
->   *
-> - * Use of id names is optional.
-> + * This is to be used to perform a list of resets for a device or power domain
-> + * in whatever order. Returns a struct reset_control or IS_ERR() condition
-> + * containing errno.
->   */
-> -struct reset_control *of_reset_control_get(struct device_node *node,
-> -					   const char *id)
-> +struct reset_control *of_reset_control_get_by_index(struct device_node *node,
-> +					   int index)
->  {
->  	struct reset_control *rstc = ERR_PTR(-EPROBE_DEFER);
->  	struct reset_controller_dev *r, *rcdev;
->  	struct of_phandle_args args;
-> -	int index = 0;
->  	int rstc_id;
->  	int ret;
->  
-> -	if (id)
-> -		index = of_property_match_string(node,
-> -						 "reset-names", id);
->  	ret = of_parse_phandle_with_args(node, "resets", "#reset-cells",
->  					 index, &args);
->  	if (ret)
-> @@ -202,6 +199,27 @@ struct reset_control *of_reset_control_get(struct device_node *node,
->  
->  	return rstc;
->  }
-> +EXPORT_SYMBOL_GPL(of_reset_control_get_by_index);
-> +
-> +/**
-> + * of_reset_control_get - Lookup and obtain a reference to a reset controller.
-> + * @node: device to be reset by the controller
-> + * @id: reset line name
-> + *
-> + * Returns a struct reset_control or IS_ERR() condition containing errno.
-> + *
-> + * Use of id names is optional.
-> + */
-> +struct reset_control *of_reset_control_get(struct device_node *node,
-> +					   const char *id)
-> +{
-> +	int index = 0;
-> +
-> +	if (id)
-> +		index = of_property_match_string(node,
-> +						 "reset-names", id);
-> +	return of_reset_control_get_by_index(node, index);
-> +}
->  EXPORT_SYMBOL_GPL(of_reset_control_get);
->  
->  /**
-> diff --git a/include/linux/reset.h b/include/linux/reset.h
-> index da5602bd77d7..26f1b53386d8 100644
-> --- a/include/linux/reset.h
-> +++ b/include/linux/reset.h
-> @@ -38,6 +38,9 @@ static inline struct reset_control *devm_reset_control_get_optional(
->  struct reset_control *of_reset_control_get(struct device_node *node,
->  					   const char *id);
->  
-> +struct reset_control *of_reset_control_get_by_index(
-> +					struct device_node *node, int index);
-> +
->  #else
->  
->  static inline int reset_control_reset(struct reset_control *rstc)
-> @@ -92,6 +95,12 @@ static inline struct reset_control *of_reset_control_get(
->  	return ERR_PTR(-ENOSYS);
->  }
->  
-> +static inline struct reset_control *of_reset_control_get_by_index(
-> +				struct device_node *node, int index)
-> +{
-> +	return ERR_PTR(-ENOTSUPP);
-> +}
-> +
->  #endif /* CONFIG_RESET_CONTROLLER */
->  
->  #endif
+- Remove memory config options and rely on PATCH_PHYS_VIRT
+
+I forgot the latter in the tag text, feel free to copy it
+back in when pulling.
+
+There is a series of defconfig changes adjacent to this that
+I would consider merging into the same branch on top
+of this, but I don't know how you want to handle it so they
+will be served separately.
+
+Please pull this in for v4.3!
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/ep93xx-cleanup
+
+for you to fetch changes up to 109965a32b67cf45951f4fcb92c8d606c0474619:
+
+  ARM: ep93xx: simone: enable DMA on the SPI host (2015-07-17 11:50:23 +0200)
+
+----------------------------------------------------------------
+EP93xx cleanup and completing developments. This switches
+EP93xx to generic time and brings in a few out-of-tree small
+patches that were stalled for ages.
+
+----------------------------------------------------------------
+H Hartley Sweeten (3):
+      ARM: ep93xx: remove memory configuration options
+      ARM: ep93xx: vision_ep9307: enable DMA for SPI
+      ARM: ep93xx: vision_ep9307: add audio support
+
+Linus Walleij (7):
+      ARM: ep93xx: move timer to its own file
+      ARM: ep93xx: switch to GENERIC_CLOCKEVENTS
+      ARM: ep93xx: use non-raw accessors for timer
+      ARM: ep93xx: switch clockevent to timer 3
+      ARM: ep93xx: update comment on timer usage
+      ARM: ep93xx: toss the device ID into the entropy pool
+      ARM: ep93xx: simone: enable DMA on the SPI host
+
+ arch/arm/Kconfig                     |  11 ++-
+ arch/arm/mach-ep93xx/Kconfig         |  54 --------------
+ arch/arm/mach-ep93xx/Makefile        |   2 +-
+ arch/arm/mach-ep93xx/Makefile.boot   |  15 +---
+ arch/arm/mach-ep93xx/core.c          | 116 ++---------------------------
+ arch/arm/mach-ep93xx/simone.c        |   1 +
+ arch/arm/mach-ep93xx/timer-ep93xx.c  | 140 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ep93xx/vision_ep9307.c |  61 ++++++++++++++-
+ 8 files changed, 213 insertions(+), 187 deletions(-)
+ create mode 100644 arch/arm/mach-ep93xx/timer-ep93xx.c
