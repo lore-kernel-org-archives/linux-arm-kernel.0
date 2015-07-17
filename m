@@ -1,135 +1,98 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 17 Jul 2015 22:23:25 +0530
-Subject: [RFC PATCH 4/4] iommu/arm-smmu: Add support for specifying regulators
-In-Reply-To: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
-References: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1437152005-25092-5-git-send-email-sricharan@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 17 Jul 2015 18:15:22 +0100
+Subject: [PATCH 3/5] arm64, pci: Allow RC drivers to supply
+ pcibios_add_device() implementation.
+In-Reply-To: <55A92F95.307@caviumnetworks.com>
+References: <1436979285-8177-1-git-send-email-ddaney.cavm@gmail.com>
+ <1436979285-8177-4-git-send-email-ddaney.cavm@gmail.com>
+ <20150716090426.GA17097@red-moon>
+ <55A7E334.3030101@caviumnetworks.com>
+ <20150717110016.GB19067@red-moon> <55A92F95.307@caviumnetworks.com>
+Message-ID: <20150717171522.GI26091@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mitchel Humpherys <mitchelh@codeaurora.org>
+On Fri, Jul 17, 2015 at 05:38:45PM +0100, David Daney wrote:
+> On 07/17/2015 04:00 AM, Lorenzo Pieralisi wrote:
+> > Hi David,
+> >
+> > On Thu, Jul 16, 2015 at 06:00:36PM +0100, David Daney wrote:
+> >> On 07/16/2015 02:04 AM, Lorenzo Pieralisi wrote:
+> >>> Hi David,
+> >>>
+> >>> On Wed, Jul 15, 2015 at 05:54:43PM +0100, David Daney wrote:
+> >>>> From: David Daney <david.daney@cavium.com>
+> >>>>
+> >> [...]
+> >>>> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> >>>> index 4095379..3356023 100644
+> >>>> --- a/arch/arm64/kernel/pci.c
+> >>>> +++ b/arch/arm64/kernel/pci.c
+> >>>> @@ -38,11 +38,21 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+> >>>>    	return res->start;
+> >>>>    }
+> >>>>
+> >>>> +static int (*pcibios_add_device_impl)(struct pci_dev *);
+> >>>> +
+> >>>> +void set_pcibios_add_device(int (*arg)(struct pci_dev *))
+> >>>> +{
+> >>>> +	pcibios_add_device_impl = arg;
+> >>>> +}
+> >>>> +
+> >>>>    /*
+> >>>>     * Try to assign the IRQ number from DT when adding a new device
+> >>>>     */
+> >>>>    int pcibios_add_device(struct pci_dev *dev)
+> >>>>    {
+> >>>> +	if (pcibios_add_device_impl)
+> >>>> +		return pcibios_add_device_impl(dev);
+> >>>
+> >>> I am totally against this (and to be honest by reading the other
+> >>> patches I failed to understand why you even need it), see above.
+> >>>
+> >>
+> >> It is because ...
+> >>
+> >>
+> >>> Thanks,
+> >>> Lorenzo
+> >>>
+> >>>> +
+> >>>>    	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> >>
+> >>
+> >>    ... this is total crap.  But I didn't want to break existing systems.
+> >
+> > That's a good aim, but you are still failing to explain the issue properly
+> > I am afraid.
+> >
+> >> The PCI RC drivers need a way to configure the legacy virtual-wire
+> >> interrupts, because the existing code doesn't do it.
+> >
+> > Can I ask you please to explain the issue a bit more clearly (and why
+> > the OF API does not work for you ?)
+> 
+> Several problems:
+> 
+> 1) It prints many times to the boot log this string:
+>      pci 0000:01:0e.2: of_irq_parse_pci() failed with rc=-19
 
-This adds the support to turn on the regulators required
-for SMMUs. It is turned on during the SMMU probe and remains
-'on' till the device exists.
+which happens because...?
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- .../devicetree/bindings/iommu/arm,smmu.txt         |  3 ++
- drivers/iommu/arm-smmu.c                           | 48 +++++++++++++++++++++-
- 2 files changed, 50 insertions(+), 1 deletion(-)
+That's -ENODEV. As far as I can tell, that only gets printed if the
+device doesn't have a wired interrupt (the interrupt pin field in config
+space read as zero).
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index c2cf4fe..433d778 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -60,6 +60,9 @@ conditions.
- 		  Documentation/devicetree/bindings/clock/clock-bindings.txt
- 		  for more info.
- 
-+- vdd-supply    : Phandle of the regulator that should be powered on during
-+                  SMMU register access.
-+
- Example:
- 
-         smmu {
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 80d56f0a..c92de50 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -326,6 +326,8 @@ struct arm_smmu_device {
- 
- 	int				num_clocks;
- 	struct clk			**clocks;
-+
-+	struct regulator		*regulator;
- };
- 
- struct arm_smmu_cfg {
-@@ -559,6 +561,22 @@ static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
- 	clear_bit(idx, map);
- }
- 
-+static int arm_smmu_enable_regulators(struct arm_smmu_device *smmu)
-+{
-+	if (!smmu->regulator)
-+		return 0;
-+
-+	return regulator_enable(smmu->regulator);
-+}
-+
-+static int arm_smmu_disable_regulators(struct arm_smmu_device *smmu)
-+{
-+	if (!smmu->regulator)
-+		return 0;
-+
-+	return regulator_disable(smmu->regulator);
-+}
-+
- /* Wait for any pending TLB invalidations to complete */
- static void __arm_smmu_tlb_sync(struct arm_smmu_device *smmu)
- {
-@@ -1583,6 +1601,20 @@ static int arm_smmu_id_size_to_bits(int size)
- 	}
- }
- 
-+static int arm_smmu_init_regulators(struct arm_smmu_device *smmu)
-+{
-+	struct device *dev = smmu->dev;
-+
-+	if (!of_get_property(dev->of_node, "vdd-supply", NULL))
-+		return 0;
-+
-+	smmu->regulator = devm_regulator_get(dev, "vdd");
-+	if (IS_ERR(smmu->regulator))
-+		return PTR_ERR(smmu->regulator);
-+
-+	return 0;
-+}
-+
- static int arm_smmu_init_clocks(struct arm_smmu_device *smmu)
- {
- 	const char *cname;
-@@ -1841,11 +1873,21 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 		smmu->irqs[i] = irq;
- 	}
- 
-+	err = arm_smmu_init_regulators(smmu);
-+	if (err)
-+		goto out_put_masters;
-+
- 	err = arm_smmu_init_clocks(smmu);
- 	if (err)
- 		goto out_put_masters;
- 
--	arm_smmu_enable_clocks(smmu);
-+	err = arm_smmu_enable_regulators(smmu);
-+	if (err)
-+		goto out_put_masters;
-+
-+	err = arm_smmu_enable_clocks(smmu);
-+	if (err)
-+		goto out_disable_regulators;
- 
- 	err = arm_smmu_device_cfg_probe(smmu);
- 	if (err)
-@@ -1908,6 +1950,9 @@ out_free_irqs:
- out_disable_clocks:
- 	arm_smmu_disable_clocks(smmu);
- 
-+out_disable_regulators:
-+	arm_smmu_disable_regulators(smmu);
-+
- out_put_masters:
- 	for (node = rb_first(&smmu->masters); node; node = rb_next(node)) {
- 		struct arm_smmu_master *master
-@@ -1953,6 +1998,7 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	/* Turn the thing off */
- 	writel(sCR0_CLIENTPD, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
- 	arm_smmu_disable_clocks(smmu);
-+	arm_smmu_disable_regulators(smmu);
- 
- 	return 0;
- }
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+So that's beningn, but annoying?
+
+Surely we can clean that up.
+
+> 2) For a RC with no device_node it does nothing (in addition to printing 
+> the annoying message).
+
+Your root complex has a device_node if it is described in DT.
+
+Is the problem that this doesn't work with ACPI?
+
+Thanks,
+Mark.
