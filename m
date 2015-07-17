@@ -1,52 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 17 Jul 2015 11:28:42 +0200
-Subject: [PATCH V3 18/19] ARM: tegra: add GPU power supply to Jetson TK1 DT
-In-Reply-To: <1436791197-32358-19-git-send-email-jonathanh@nvidia.com>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-19-git-send-email-jonathanh@nvidia.com>
-Message-ID: <20150717092841.GE3057@ulmo>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 17 Jul 2015 11:32:44 +0200 (CEST)
+Subject: [PATCH V4 1/1] irqchip: imx-gpcv2: IMX GPCv2 drivers for wakeup
+ source and suspend
+In-Reply-To: <alpine.DEB.2.11.1507171119250.18576@nanos>
+References: <1436371523-18083-1-git-send-email-shenwei.wang@freescale.com>
+ <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
+ <alpine.DEB.2.11.1507171119250.18576@nanos>
+Message-ID: <alpine.DEB.2.11.1507171130590.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 13, 2015 at 01:39:56PM +0100, Jon Hunter wrote:
-> From: Vince Hsu <vinceh@nvidia.com>
-> 
-> Add power supply information which is board dependent for GK20A.
-> 
-> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
-> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> ---
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 6 +++++-
->  1 file changed, 5 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> index ce5961cd0b77..2b355957635c 100644
-> --- a/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> +++ b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
-> @@ -1514,7 +1514,7 @@
->  					regulator-always-on;
->  				};
->  
-> -				sd6 {
-> +				vdd_gpu: sd6 {
->  					regulator-name = "+VDD_GPU_AP";
->  					regulator-min-microvolt = <650000>;
->  					regulator-max-microvolt = <1200000>;
-> @@ -1635,6 +1635,10 @@
->  		};
->  	};
->  
-> +	gpu-power-domain {
-> +		vdd-supply = <&vdd_gpu>;
-> +	};
+On Fri, 17 Jul 2015, Thomas Gleixner wrote:
 
-This doesn't seem to match the path to the original node.
+> On Thu, 16 Jul 2015, Shenwei Wang wrote:
+> 
+> > Kindly PING.
+> 
+> If you folks would kindly CC the proper mailing list for irq chip
+> patches, then they would end up in the proper mail folder and not in
+> my random crap mbox.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/6e42b0a0/attachment.sig>
+And before you resend, please do what I asked you before:
+
+This wants to be split in separate patches:
+     - suspend code
+     - irqchip code
+
+Your V4 is still a combo patch:
+
+>  arch/arm/mach-imx/Kconfig        |   1 +
+>  arch/arm/mach-imx/Makefile       |   2 +
+>  arch/arm/mach-imx/pm-imx7.c      | 735 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/suspend-imx7.S | 494 ++++++++++++++++++++++++++
+>  drivers/irqchip/Kconfig          |   7 +
+>  drivers/irqchip/Makefile         |   1 +
+>  drivers/irqchip/irq-imx-gpcv2.c  | 311 +++++++++++++++++
+>  include/soc/imx/gpcv2.h          | 137 ++++++++
+
+Thanks,
+
+	tglx
