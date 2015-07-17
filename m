@@ -1,29 +1,36 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 17 Jul 2015 12:10:39 +0530
-Subject: [PATCH 0/2] pixcir_i2c_ts: Add optional wakeup irq support
-Message-ID: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+Date: Fri, 17 Jul 2015 12:10:41 +0530
+Subject: [PATCH 2/2] ARM: dts: am437x-gp-evm: Add wakeup interrupt source for
+ pixcir_i2c_tsc
+In-Reply-To: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+References: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+Message-ID: <1437115241-17859-3-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Pixcir_i2c_tsc driver can now wakeup the system from lower power state
+via pinctrl and IO daisy chain using generic wakeirq framwework. Add
+optional wakeup irq entry to allow pixcir_i2c_tsc to wake system from
+low power state.
 
-On am437x-gp-evm, pixcir_i2c_tsc can wake-up system from low power
-state via pinctrl and IO daisy chain mechanism. This patch series add
-support for such optional wake up interrupt to be handled via recently
-introduced generic wake irq handling framework.
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/am437x-gp-evm.dts | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Tested on am437x-gp-evm, with some out of tree patches to support
-suspend/resume on am437x.
-
-
-Vignesh R (2):
-  input: touchscreen: pixcir_i2c_ts: Add support for optional wakeup
-    interrupt
-  ARM: dts: AM437x-gp-evm: Add wakeup interrupt source for
-    pixcir_i2c_tsc
-
- arch/arm/boot/dts/am437x-gp-evm.dts       |  3 +++
- drivers/input/touchscreen/pixcir_i2c_ts.c | 14 ++++++++++++++
- 2 files changed, 17 insertions(+)
-
+diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
+index 84aa30c3235a..04f7667c604e 100644
+--- a/arch/arm/boot/dts/am437x-gp-evm.dts
++++ b/arch/arm/boot/dts/am437x-gp-evm.dts
+@@ -503,6 +503,9 @@
+ 
+ 		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+ 
++		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
++				      <&am43xx_pinmux 0x264>;
++
+ 		touchscreen-size-x = <1024>;
+ 		touchscreen-size-y = <600>;
+ 	};
 -- 
 2.4.5
