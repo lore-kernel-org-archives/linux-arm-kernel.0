@@ -1,129 +1,110 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Fri, 17 Jul 2015 23:38:28 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <55A862C0.4040101@linaro.org>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>	<1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>	<DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>	<20150714093154.4d73e551@gandalf.local.home>	<55A5A75A.1060401@linaro.org>	<20150714225105.6c1e4f15@gandalf.local.home>	<55A646EE.6030402@linaro.org>	<20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
- <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <55A862C0.4040101@linaro.org>
-Message-ID: <10104998-CA54-4150-9228-2ED8C327911D@gmail.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Fri, 17 Jul 2015 16:39:37 +0200
+Subject: [PATCH v11] crypto: Add Allwinner Security System crypto accelerator
+Message-ID: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Jul 17, 2015, at 11:04 AM, AKASHI Takahiro wrote:
-> Jungseok,
-> 
-> Thank you for your testing and reviews.
+Hello
 
-You're welcome.
+This is the driver for the Security System included in Allwinner SoC A20.
+The Security System (SS for short) is a hardware cryptographic accelerator that
+support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+It could be found on others Allwinner SoC: 
+- A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
+- A23 speak about a security system but without precisions
+- A80 and A83T datasheet speak about a security system with more functions
+  (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver.
 
-> On 07/16/2015 10:29 PM, Jungseok Lee wrote:
->> On Jul 16, 2015, at 10:08 AM, AKASHI Takahiro wrote:
->> 
->> Hi, AKASHI
->> 
->>> On 07/16/2015 09:27 AM, AKASHI Takahiro wrote:
->>>> On 07/16/2015 01:13 AM, Steven Rostedt wrote:
->>>>> On Wed, 15 Jul 2015 10:55:36 -0400
->>>>> Steven Rostedt <rostedt@goodmis.org> wrote:
->>>>> 
->>>>> 
->>>>>> I'll take a look at it and try to clean up the code.
->>>>> 
->>>>> Does the  following patch make sense for you?
->>>> 
->>>> Looks nice. The patch greatly simplifies changes on arm64 side.
->>> 
->>> As follows:
->>> 
->>> - Takahiro AKASHI
->>> 
->>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->>> index c5534fa..868d6f1 100644
->>> --- a/arch/arm64/include/asm/ftrace.h
->>> +++ b/arch/arm64/include/asm/ftrace.h
->>> @@ -15,6 +15,7 @@
->>> 
->>> #define MCOUNT_ADDR		((unsigned long)_mcount)
->>> #define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
->>> +#define FTRACE_STACK_FRAME_OFFSET 4 /* sync it up with stacktrace.c */
-> 
-> Well,
->  #define FTRACE_STACK_FRAME_OFFSET AARCH64_INSN_SIZE
-> might be better.
+This driver currently supports:
+- MD5 and SHA1 hash algorithms
+- AES block cipher in CBC/ECB mode with 128/196/256bits keys.
+- DES and 3DES block cipher in CBC/ECB mode
+The driver exposes all those algorithms through the kernel cryptographic API.
 
-Agree.
+The driver support only CPU driven (aka poll mode) transfer mode,
+since the DMA engine of the A20 does not have a mainline driver yet.
 
-> 
->> How about binding it to -4 in unwind_frame function?
-> 
-> Do you mean like this?
-> In unwind_frame(),
->  frame->pc = *(unsigned long*)(fp + 8) - AARCH64_INSN_SIZE;
+For the moment the driver is fully synchronous.
+A patch exists for making the driver asynchronous at the costs of badly decreasing performance.
+It will be re-introduced later when DMA will be supported.
 
-Exactly.
+Changes since v10
+- fix checkpatch --strict issues (except for BIT where it is volontary)
+- lots of spelling fix
+- add mode to algt
+- import/export now initialize correctly op
+- replace some dev_err with dev_err_ratelimited
 
-> 
->> IMHO, it would help other developers trying to change stack trace code
->> be aware of this stack tracer feature.
->> 
->>> #ifndef __ASSEMBLY__
->>> #include <linux/compat.h>
->>> diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
->>> index 1da6029..2c1bf7d 100644
->>> --- a/include/linux/ftrace.h
->>> +++ b/include/linux/ftrace.h
->>> @@ -260,6 +260,13 @@ static inline void ftrace_kill(void) { }
->>> #endif /* CONFIG_FUNCTION_TRACER */
->>> 
->>> #ifdef CONFIG_STACK_TRACER
->>> +/*
->>> + * the offset value to add to return address from save_stack_trace()
->>> + */
->>> +#ifndef FTRACE_STACK_FRAME_OFFSET
->>> +#define FTRACE_STACK_FRAME_OFFSET 0
->>> +#endif
->>> +
->>> extern int stack_tracer_enabled;
->>> int
->>> stack_trace_sysctl(struct ctl_table *table, int write,
->>> diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
->>> index 9384647..c5b9748 100644
->>> --- a/kernel/trace/trace_stack.c
->>> +++ b/kernel/trace/trace_stack.c
->>> @@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
->>> 
->>> 	/* Skip over the overhead of the stack tracer itself */
->>> 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
->>> -		if (stack_dump_trace[i] == ip)
->>> +		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
->>> 			break;
->>> 	}
->>> 
->>> @@ -131,7 +131,8 @@ check_stack(unsigned long ip, unsigned long *stack)
->>> 		p = start;
->>> 
->>> 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
->>> -			if (*p == stack_dump_trace[i]) {
->>> +			if (*p == (stack_dump_trace[i]
->>> +					+ FTRACE_STACK_FRAME_OFFSET)) {
->>> 				stack_dump_trace[x] = stack_dump_trace[i++];
->>> 				this_size = stack_dump_index[x++] =
->>> 					(top - p) * sizeof(unsigned long);
->>> --
->> 
->> I've prepared a kernel with the following patches and reviewed them.
->> 
->> 1) Steve's clean up patch
->> 2) This patch
->> 3) [RFC 2/3]
->> 
->> AFAIU, [RFC 3/3] is not needed any more thanks to Steve's patch.
-> 
-> We don't need [2/3].
+Changes since v9
+- use spin_lock_bh instead of spin_lock_irqx
+- use sg_miter always with SG_MITER_ATOMIC flag
+- rework the hash update functions
+- the DES/3DES/AES now uses two functions one for all case and one for SG with
+ size not multiple of 4 and so remove the fallback for DES/3DES
+- add A10 support, tested by Matthieu CERDA
+- fix export/import functions
+- do not use any _relaxed read/write
+- write IV at end of cipher functions
 
-Okay. So, I've played a kernel including Steve's latest patch and only [1/3].
+Changes since v8
+- use sg_miter in cipher functions, this clean all kmap stuff (thanks to bbrezillon)
+- use GIC in dt interupts
+- rename all references (files/dtcompatible) from sunxi to sun4i in prevision of futur A80/A83 driver
 
-Best Regards
-Jungseok Lee
+Changes since v7
+- Add ECB block mode
+- split the sunxi_ss_cipher_init in two
+- remove sunxi_ss_cipher_encrypt/sunxi_ss_cipher_decrypt
+- use now sunxi_ss_block_method_encrypt and sunxi_ss_block_method_decrypt
+- Add weak DES key test needed by ECB tests
+
+Changes since v6:
+- Use alphabetic ordering for new sections in MAINTAINERS
+- Clean remaining PRNG driver header
+
+Changes since v5:
+- Hash functions now keep partial hash states in sunxi_ss structures
+- Use of spinlock instead of mutex
+- Remove the static sunxi_ss structures by using container of
+- Add export/import functions
+- replace lots of writel by writesl
+- replace lots of readl by readsl
+
+Changes since v4:
+- Rework all mutex path
+- Use ahash_request_ctx() in hash functions
+- Major rework of hash functions for solving mutex problems
+- Split sunxi_req_ctx in two since ciphers now use struct sunxi_tfm_ctx
+- Hash functions now test FIFO space register
+
+Changes since v3:
+- Remove all algorithms options from Kconfig, so now only one module is used
+- Add the sunxi_ss_cipher function to unify mode calculation
+- Remove the sunxi_cipher_exit empty function
+- Add some missing mutex_unlock()
+- Drop PRNG support, I wait for more comment on its results before re-enabling it.
+
+Changes since v2:
+- Fix Makefile and Kconfig for static kernel.
+
+Changes since v1:
+- annotate ss->base as __iomem
+- regroup all mutex in the ss_ctx structure
+- splited driver in 7 modules (core md5 sha1 aes des 3des prng) in sunxi-ss directory
+- use dev_exit_p() for .remove
+- added missing CRYPTO_BLKCIPHER dep in Kconfig
+- use ahash instead of shash
+- use ablkcipher instead of blkcipher
+- use crypto_rng_ctx instead of crypto_tfm_ctx
+- set seed as an u32
+- drop useless comment decoration
+- drop useless debug
+- ss_ctx is now a static pointer and whole structure being allocated
+- fix the platform_get_resource/devm_ioremap_resource pattern
+- invert getting die id and configuring clock
+- set clock value as a const unsigned long
+- add MODULE_ALIAS
+- use define names more consistency (SS_xxx)
+- fix PRNG errors
+- respell SS to Security System in DT documentation
