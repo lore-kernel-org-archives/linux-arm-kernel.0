@@ -1,40 +1,34 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Fri, 17 Jul 2015 05:41:55 +0000
-Subject: [PATCH] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <20150716132411.GX5086@localhost>
-References: <1436952778-28000-1-git-send-email-yao.yuan@freescale.com>
- <1436952778-28000-2-git-send-email-yao.yuan@freescale.com>
- <20150716132411.GX5086@localhost>
-Message-ID: <BL2PR03MB338CBF3F98AFF7E93AA78C183980@BL2PR03MB338.namprd03.prod.outlook.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Fri, 17 Jul 2015 11:12:04 +0530
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <20150716213429.GE1602@sirena.org.uk>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk>
+Message-ID: <55A895AC.8070101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
 
-eDMA sullpies the data transmission service for other IPs, so it should be suspended later and resumed earlier.
-For example:
-Synchronous Audio Interface (SAI), SAI use DMA to transfer the data.
-When suspend:
-1, SAI using suspend handlers to stop the DMA transmission.
-2, DMA using suspend_late  handlers to check whether DMA chan is idle.
-When resume:
-1, DMA using resume_early   to enable. And then can servicing for others.
-2, SAI using resume and then can use DMA to data transmission.
 
-We must sure the order is right, so I think DMA should using early/late handlers.
+On Friday 17 July 2015 03:04 AM, Mark Brown wrote:
+> On Thu, Jul 16, 2015 at 11:46:57PM +0530, Vaibhav Hiremath wrote:
+>> 88PM860 falls under 88pm800 family of devices, with
+>> additional feature enhancements, like,
+>>    - 88pm860 had additional BUCK regulator (BUCK6 and BUCK1B)
+>>    - Additional LDO (LDO20)
+>>    - different voltage and current capability
+>
+> ...and reverted since this doesn't build as the kbuild test robot
+> reported.  :(
+>
 
-Thanks.
+How do you suggest to handle dependency between MFD patch and this
+patch?
 
-Best Regards,
-Yuan Yao
+Can you merge this into regulator tree?
 
-On Thursday, July 16, 2015 9:24 PM, Vinod wrote:
-> On Wed, Jul 15, 2015 at 05:32:58PM +0800, Yuan Yao wrote:
-> > +
-> > +static const struct dev_pm_ops fsl_edma_pm_ops = {
-> > +	.suspend_late   = fsl_edma_suspend_late,
-> > +	.resume_early   = fsl_edma_resume_early,
-> any reason why you are using early/late handlers?
-> 
-> --
-> ~Vinod
+Link to MFD - https://lkml.org/lkml/2015/7/16/704
+
+Thanks,
+Vaibhav
