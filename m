@@ -1,73 +1,182 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 17 Jul 2015 08:59:46 +0200
-Subject: [PATCH v2 4/4] mfd: max77686: Split out regulator part from the
- DT binding
-In-Reply-To: <CAJKOXPdih+qqGnEZub-hqeVF6POSuSGN-OWnLCgN9cW_5sYb+A@mail.gmail.com>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-5-git-send-email-javier@osg.samsung.com>
- <CAJKOXPe8rDLCt+Za+Qzkkd4JnFoyKtsFTmMbJL6+3Ark8qFYiQ@mail.gmail.com>
- <55A8A4BE.1030904@osg.samsung.com>
- <CAJKOXPdih+qqGnEZub-hqeVF6POSuSGN-OWnLCgN9cW_5sYb+A@mail.gmail.com>
-Message-ID: <55A8A7E2.7020201@osg.samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 17 Jul 2015 14:59:56 +0800
+Subject: [PATCH v5 2/3] pwm: add MediaTek display PWM driver support
+In-Reply-To: <1437114955.21534.15.camel@mtksdaap41>
+References: <1436778294-47635-1-git-send-email-yh.huang@mediatek.com>
+ <1436778294-47635-3-git-send-email-yh.huang@mediatek.com>
+ <CAGS+omCx4mDAN+F315x+8FeCABcKDoMn1gm_nHzF6VXnF_xm8Q@mail.gmail.com>
+ <1436975995.15774.27.camel@mtksdaap41> <1437025108.18175.13.camel@mtksdaap41>
+ <CAGS+omB1FCX12-KvU7ODywseFKgsAbzNtqNyYZ+PqvO5ZeEn-A@mail.gmail.com>
+ <1437031079.8107.13.camel@mtksdaap41>
+ <CAGS+omAzPqDFzsJCiBV3=Zite2FS2no-P1F8EOSHu7w9LrN3cg@mail.gmail.com>
+ <1437065050.11063.26.camel@mtksdaap41>
+ <CAGS+omAj0=AWsUA+B8mDOBK5kjwhjwqfmxq4bFeGViOWUU0pCg@mail.gmail.com>
+ <1437114955.21534.15.camel@mtksdaap41>
+Message-ID: <CAGS+omC5KMQJiE3xwkjk5Vu+di+=GbZodM8inMRoGR5SyjpUVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 07/17/2015 08:49 AM, Krzysztof Kozlowski wrote:
-> 2015-07-17 15:46 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->> Hello Krzysztof,
->>
->> On 07/17/2015 08:42 AM, Krzysztof Kozlowski wrote:
->>> 2015-07-17 15:29 GMT+09:00 Javier Martinez Canillas <javier@osg.samsung.com>:
->>>> The Maxim MAX77686 PMIC is a multi-function device with regulators,
->>>> clocks and a RTC. The DT bindings for the clocks are in a separate
->>>> file but the bindings for the regulators are inside the mfd part.
->>>>
->>>> To make it consistent with the clocks portion of the binding and
->>>> because is more natural to look for regulator bindings under the
->>>> bindings/regulator sub-directory, split the regulator portion of
->>>> the DT binding and add it as a separate file.
->>>>
->>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>
->>>> ---
->>>>
->>>> Changes in v2:
->>>> - Use a generic name for the max77686 node in the regulator example.
->>>>
->>>>  Documentation/devicetree/bindings/mfd/max77686.txt | 58 +-----------------
->>>>  .../devicetree/bindings/regulator/max77686.txt     | 71 ++++++++++++++++++++++
->>>>  2 files changed, 74 insertions(+), 55 deletions(-)
->>>>  create mode 100644 Documentation/devicetree/bindings/regulator/max77686.txt
->>>
->>> Putting regulator bindings under regulator directory seems logical so
->>> I am fine with it.
->>>
->>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>
->> Thanks a lot for your review. For completeness, I talked with Lee Jones
->> over IRC yesterday asking him his opinion on whether MFD DT binding doc
->> should contain all the info or if it should be split across different
->> subsystems and he prefers the later. That's why I re-spun this series.
-> 
-> Okay, this sounds good.
-> 
-> One more thing - can you update the maintainers file? The bindings
-> documentation is mentioned there for max77686.
+On Fri, Jul 17, 2015 at 2:35 PM, YH Huang <yh.huang@mediatek.com> wrote:
 >
-
-Sure, I see that also the max77802 files are missing in that section.
-I'll included that as well. But I'll wait to see if Lee pick this
-series before posting the patch for MAINTAINERS.
- 
-> Best regards,
-> Krzysztof
+> On Fri, 2015-07-17 at 01:18 +0800, Daniel Kurtz wrote:
+> > On Fri, Jul 17, 2015 at 12:44 AM, YH Huang <yh.huang@mediatek.com> wrote:
+> > > On Thu, 2015-07-16 at 23:21 +0800, Daniel Kurtz wrote:
+> > >> On Thu, Jul 16, 2015 at 3:17 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > >> > On Thu, 2015-07-16 at 14:54 +0800, Daniel Kurtz wrote:
+> > >> >> On Thu, Jul 16, 2015 at 1:38 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > >> >> > On Wed, 2015-07-15 at 23:59 +0800, YH Huang wrote:
+> > >> >> >> On Mon, 2015-07-13 at 18:19 +0800, Daniel Kurtz wrote:
+> > >> >> >> > On Mon, Jul 13, 2015 at 5:04 PM, YH Huang <yh.huang@mediatek.com> wrote:
+> > >> >> >> > > +#ifdef CONFIG_PM_SLEEP
+> > >> >> >> > > +static int mtk_disp_pwm_suspend(struct device *dev)
+> > >> >> >> > > +{
+> > >> >> >> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
+> > >> >> >> > > +
+> > >> >> >> > > +       clk_disable_unprepare(mdp->clk_main);
+> > >> >> >> > > +       clk_disable_unprepare(mdp->clk_mm);
+> > >> >> >> > > +
+> > >> >> >> > > +       return 0;
+> > >> >> >> > > +}
+> > >> >> >> > > +
+> > >> >> >> > > +static int mtk_disp_pwm_resume(struct device *dev)
+> > >> >> >> > > +{
+> > >> >> >> > > +       struct mtk_disp_pwm *mdp = dev_get_drvdata(dev);
+> > >> >> >> > > +       int ret;
+> > >> >> >> > > +
+> > >> >> >> > > +       ret = clk_prepare_enable(mdp->clk_main);
+> > >> >> >> > > +       if (ret < 0)
+> > >> >> >> > > +               return ret;
+> > >> >> >> > > +
+> > >> >> >> > > +       ret = clk_prepare_enable(mdp->clk_mm);
+> > >> >> >> > > +       if (ret < 0) {
+> > >> >> >> > > +               clk_disable_unprepare(mdp->clk_main);
+> > >> >> >> > > +               return ret;
+> > >> >> >> > > +       }
+> > >> >> >> > > +
+> > >> >> >> >
+> > >> >> >> > Don't you also have to restore the PWM rate and frequency?
+> > >> >> >> >
+> > >> >> >> > Is it possible to save power at runtime by leaving mdp->clk_mm enabled
+> > >> >> >> > (to generate the PWM signal), but disable mdp->clk_main (clock
+> > >> >> >> > required to access PWM registers)?
+> > >> >> >>
+> > >> >> >> The pwm-backlight driver will restore the data.
+> > >> >> >>
+> > >> >> >> After I try to disable anyone of the two clocks at runtime, the
+> > >> >> >> backlight doesn't work well(no immediate update or losing backlight).
+> > >> >> >> So we need to keep both clock enabled.
+> > >>
+> > >> Do you mean you see backlight glitch because the clocks / backlight
+> > >> were *already on* during the first config (Perhaps left on by the
+> > >> bootloader)?
+> > >> I don't know how to solve that problem.
+> > >> Maybe Thierry does.
+> > >>
+> > >> In any case, this is a minor issue; we really shouldn't hold up
+> > >> landing the driver to optimize when the clocks are enabled/disabled
+> > >> :-). I'm happy enough with what you have in this patch.
+> > >
+> > > Sorry for my terrible expression. Let me try again.
+> > > 1. We want to disable unnecessary clock at runtime.
+> > > But, I get backlight glitch when I disable clk_main or clk_mm in
+> > > mtk_disp_pwm_config(). So both clocks are necessary and we don't disable
+> > > them at runtime.
+> > >
+> > > 2. Because pwm-backlight driver calls mtk_disp_pwm_config() before
+> > > mtk_disp_pwm_enable(), we will lose the first config if clocks are
+> > > enabled in mtk_disp_pwm_enable(). I prefer to enable clocks in probe
+> > > function. Samsung did the same way in their pwm driver.
+> >
+> > I don't understand why you will "lose the first config if clocks are
+> > enabled in mtk_disp_pwm_enable().  I don't believe registers will lose
+> > their values just because you turn enable/disable clocks.
+> >
+> > Perhaps I wasn't clear with what I was proposing which is something like this:
+> >
+> > mtk_disp_pwm_config()
+> > {
+> >   clk_enable();
+> >   /* write registers */
+> >   clk_disable();
+> > }
+> >
+> > mtk_disp_enable()
+> > {
+> >   clk_enable();
+> >   /* write enable bit */
+> > }
+> >
+> > mtk_disp_disable()
+> > {
+> >   /* clear enable bit */
+> >   clk_disable();
+> > }
+> >
+> >
+> > In this way, if mtk_disp_pwm_config() is called when the pwm is
+> > disabled, we will temporarily enable the clocks long enough to update
+> > the register values.  These values should take effect the next time
+> > the PWM is enabled.  We then disable the clocks and wait for the PWM
+> > to be enabled.
+> >
+> > If mtk_disp_pwm_config() is called when the pwm is already enabled, we
+> > will increment the enable count on the clocks, but then we decrement
+> > it again immediately.
 >
+> I think there is something wrong about mdp->clk_mm(generate the PWM
+> signal) and mdp->clk_main(access PWM registers).
+> If we want to write the register, we should enable both clocks before.
+> I try it in this way.
+>
+> mtk_disp_pwm_config()
+> {
+>    clk_enable(mdp->clk_main);
+>    clk_enable(mdp->clk_mm);
+>    /* write registers */
+>    clk_disable(mdp->clk_mm);
+>    clk_disable(mdp->clk_main);
+> }
+> with
+> A:
+> mtk_disp_enable()
+> {
+>    clk_enable(mdp->clk_main);
+>    clk_enable(mdp->clk_mm);
+>    /* write enable bit */
+>    clk_disable(mdp->clk_mm);
+> }
+> or
+> B:
+> mtk_disp_enable()
+> {
+>    clk_enable(mdp->clk_main);
+>    clk_enable(mdp->clk_mm);
+>    /* write enable bit */
+>    clk_disable(mdp->clk_main);
+> }
+>
+> I both get backlight glitch with "A" or "B".
+> So I think we should keep clocks enabled.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+
+Ok, but what about this:
+
+mtk_disp_pwm_config()
+{
+   clk_enable(mdp->clk_main);
+   /* write registers */
+   clk_disable(mdp->clk_main);
+}
+
+mtk_disp_enable()
+{
+   clk_enable(mdp->clk_main);
+   clk_enable(mdp->clk_mm);
+   /* write enable bit */
+}
+
+>
+>
+> Regards,
+> YH Huang
+>
