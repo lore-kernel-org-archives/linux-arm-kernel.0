@@ -1,27 +1,67 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:19:27 -0700
-Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 1)
-In-Reply-To: <1437088427-31176-2-git-send-email-f.fainelli@gmail.com>
-References: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
- <1437088427-31176-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20150717171927.GI21691@localhost>
+Date: Fri, 17 Jul 2015 10:27:45 -0700
+Subject: [PATCH] arm64: Split out platform options to separate Kconfig
+In-Reply-To: <20150715132014.GE20186@e104818-lin.cambridge.arm.com>
+References: <1436958621-23524-1-git-send-email-olof@lixom.net>
+ <20150715132014.GE20186@e104818-lin.cambridge.arm.com>
+Message-ID: <20150717172745.GA28326@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 04:13:47PM -0700, Florian Fainelli wrote:
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+On Wed, Jul 15, 2015 at 02:20:14PM +0100, Catalin Marinas wrote:
+> On Wed, Jul 15, 2015 at 07:10:21AM -0400, Olof Johansson wrote:
+> > Let's move out the platform Kconfig entries to a separate file, since these
+> > changes usually get moved through arm-soc instead of the arm64 arch tree, and
+> > this will lead to fewer conflicts
+> > 
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > ---
+> > 
+> > Will, Catalin, I'll merge this through arm-soc if I get your acks. Thanks!
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> That's fine by me.
 > 
-> are available in the git repository at:
-> 
->   http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc
-> 
-> for you to fetch changes up to ffb910d7b84f21ef6caeed041032a0af8d2e00ed:
-> 
->   ARM: BCM63xx: Remove custom secondary_startup function (2015-07-11 18:33:51 -0700)
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Thanks, merged into next/cleanup.
+Cool, applying here then!
+
+> > +config ARCH_TEGRA
+> > +	bool "NVIDIA Tegra SoC Family"
+> > +	select ARCH_HAS_RESET_CONTROLLER
+> > +	select ARCH_REQUIRE_GPIOLIB
+> > +	select CLKDEV_LOOKUP
+> > +	select CLKSRC_MMIO
+> > +	select CLKSRC_OF
+> > +	select GENERIC_CLOCKEVENTS
+> > +	select HAVE_CLK
+> > +	select PINCTRL
+> > +	select RESET_CONTROLLER
+> > +	help
+> > +	  This enables support for the NVIDIA Tegra SoC family.
+> > +
+> > +config ARCH_TEGRA_132_SOC
+> > +	bool "NVIDIA Tegra132 SoC"
+> > +	depends on ARCH_TEGRA
+> > +	select PINCTRL_TEGRA124
+> > +	select USB_ULPI if USB_PHY
+> > +	select USB_ULPI_VIEWPORT if USB_PHY
+> > +	help
+> > +	  Enable support for NVIDIA Tegra132 SoC, based on the Denver
+> > +	  ARMv8 CPU.  The Tegra132 SoC is similar to the Tegra124 SoC,
+> > +	  but contains an NVIDIA Denver CPU complex in place of
+> > +	  Tegra124's "4+1" Cortex-A15 CPU complex.
+> 
+> Also, please make sure we won't get any more Kconfig entries for SoC
+> variations on arm64 (still waiting for the Tegra folk to remove
+> ARCH_TEGRA_132_SOC; this seems to be one of the very few SoCs that use
+> Makefile obj-y tricks to build clock, memory controller drivers instead
+> of dedicated driver Kconfig entries and they aren't even consistent:
+> PINCTRL_TEGRA124).
+
+Yep. I'd imagine at some point some platforms will want to segment out
+major families (and in particular server vs mobile, etc) for dependency
+reasons, but right now there should be little need for it.
+
 
 
 -Olof
