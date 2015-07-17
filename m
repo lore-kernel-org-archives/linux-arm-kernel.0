@@ -1,94 +1,60 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 17 Jul 2015 15:51:07 +0200
-Subject: [PATCH 06/18] KVM: ARM64: Add reset and access handlers for
- PMCEID0_EL0 and PMCEID1_EL0 register
-In-Reply-To: <1436149068-3784-7-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-7-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20150717135107.GQ14024@cbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Jul 2015 14:57:30 +0100
+Subject: [PATCH 03/18] arm64: elf: advertise 8.1 atomic instructions as
+ new hwcap
+In-Reply-To: <20150717134845.GA15035@localhost>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+ <1436779519-2232-4-git-send-email-will.deacon@arm.com>
+ <20150717134845.GA15035@localhost>
+Message-ID: <20150717135730.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:17:36AM +0800, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, Jul 17, 2015 at 02:48:46PM +0100, Catalin Marinas wrote:
+> On Mon, Jul 13, 2015 at 10:25:04AM +0100, Will Deacon wrote:
+> >  #endif /* _UAPI__ASM_HWCAP_H */
+> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> > index f3067d4d4e35..c7fd2c946374 100644
+> > --- a/arch/arm64/kernel/setup.c
+> > +++ b/arch/arm64/kernel/setup.c
+> > @@ -280,6 +280,19 @@ static void __init setup_processor(void)
+> >  	if (block && !(block & 0x8))
+> >  		elf_hwcap |= HWCAP_CRC32;
+> >  
+> > +	block = (features >> 20) & 0xf;
+> > +	if (!(block & 0x8)) {
+> > +		switch (block) {
+> > +		default:
+> > +		case 2:
+> > +			elf_hwcap |= HWCAP_ATOMICS;
+> > +		case 1:
+> > +			/* RESERVED */
+> > +		case 0:
+> > +			break;
+> > +		}
+> > +	}
 > 
-> Add reset handler which gets host value of PMCEID0_EL0 or PMCEID1_EL0.
-> Add access handler which emulates writing and reading PMCEID0_EL0 or
-> PMCEID1_EL0 register.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 36 ++++++++++++++++++++++++++++++++++--
->  1 file changed, 34 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index 69c8c48..1df9ef3 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -246,6 +246,19 @@ static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
->  				       | (ARMV8_PMCR_MASK & 0xdecafbad);
->  }
->  
-> +static void reset_pmceid(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-> +{
-> +	u32 pmceid;
-> +
-> +	if (r->reg == PMCEID0_EL0) {
-> +		asm volatile("mrs %0, pmceid0_el0\n" : "=r" (pmceid));
-> +		vcpu_sys_reg(vcpu, r->reg) = pmceid;
-> +	} else {
+> At some point, we should move the elf_hwcap setting to the cpu features
+> infrastructure. The PAN patch series introduces an "enable" method for
+> detected CPU features (can be cleaned up for 4.4).
 
-add /* PMCEID1_EL1 */
-> +		asm volatile("mrs %0, pmceid1_el0\n" : "=r" (pmceid));
-> +		vcpu_sys_reg(vcpu, r->reg) = pmceid;
-> +	}
-> +}
-> +
->  /* PMCR_EL0 accessor. Only called as long as MDCR_EL2.TPMCR is set. */
->  static bool access_pmcr(struct kvm_vcpu *vcpu,
->  			const struct sys_reg_params *p,
-> @@ -299,6 +312,25 @@ static bool access_pmselr(struct kvm_vcpu *vcpu,
->  	return true;
->  }
->  
-> +/* PMCEID0_EL0 and PMCEID1_EL0 accessor. */
-> +static bool access_pmceid(struct kvm_vcpu *vcpu,
-> +			  const struct sys_reg_params *p,
-> +			  const struct sys_reg_desc *r)
-> +{
-> +	unsigned long val;
-> +
-> +	if (p->is_write) {
-> +		return ignore_write(vcpu, p);
-> +	} else {
-> +		if (!p->is_aarch32)
-> +			val = vcpu_sys_reg(vcpu, r->reg);
-> +		else
-> +			val = vcpu_cp15(vcpu, r->reg);
-> +		*vcpu_reg(vcpu, p->Rt) = val;
-> +		return true;
-> +	}
-> +}
-> +
->  /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
->  #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
->  	/* DBGBVRn_EL1 */						\
-> @@ -508,10 +540,10 @@ static const struct sys_reg_desc sys_reg_descs[] = {
->  	  access_pmselr, reset_unknown, PMSELR_EL0 },
->  	/* PMCEID0_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
-> -	  trap_raz_wi },
-> +	  access_pmceid, reset_pmceid, PMCEID0_EL0, },
->  	/* PMCEID1_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
-> -	  trap_raz_wi },
-> +	  access_pmceid, reset_pmceid, PMCEID1_EL0, },
->  	/* PMCCNTR_EL0 */
->  	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
->  	  trap_raz_wi },
-> -- 
-> 2.1.0
-> 
-same comment wrt. 32-bit table.
+On 32-bit ARM, we have this accessor:
 
--Christoffer
+	cpuid_feature_extract_field()
+
+which is there to properly deal with sign extending the 4-bit values, and
+avoids all the if (!(block & 8)) { crap.
+
+The above could then become the much simpler:
+
+	block = cpuid_feature_extract_field(...);
+	if (block > 0)
+		elf_hwcap |= HWCAP_CRC32;
+
+	block = cpuid_feature_extract_field(isarN, 20);
+	if (block > 1)
+		elf_hwcap |= HWCAP_ATOMICS;
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
