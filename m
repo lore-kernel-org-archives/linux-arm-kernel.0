@@ -1,41 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:22:54 -0700
-Subject: [GIT PULL] EP93xx cleanups for v4.3
-In-Reply-To: <CACRpkdbEnK2Z2SW-QafisHv9hXv-bSdYx0dS7wtGh3oMDDcg=A@mail.gmail.com>
-References: <CACRpkdbEnK2Z2SW-QafisHv9hXv-bSdYx0dS7wtGh3oMDDcg=A@mail.gmail.com>
-Message-ID: <20150717172254.GJ21691@localhost>
+Date: Fri, 17 Jul 2015 10:19:27 -0700
+Subject: [GIT PULL] Broadcom SoC changes for 4.3 (part 1)
+In-Reply-To: <1437088427-31176-2-git-send-email-f.fainelli@gmail.com>
+References: <1437088427-31176-1-git-send-email-f.fainelli@gmail.com>
+ <1437088427-31176-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20150717171927.GI21691@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 02:11:15PM +0200, Linus Walleij wrote:
-> Hi ARM SoC people,
+On Thu, Jul 16, 2015 at 04:13:47PM -0700, Florian Fainelli wrote:
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
-> this is a long due pull request finally doing some EP93xx
-> cleanups, most prominently:
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 > 
-> - Switch to GENERIC TIME
+> are available in the git repository at:
 > 
-> - Remove memory config options and rely on PATCH_PHYS_VIRT
+>   http://github.com/broadcom/stblinux tags/arm-soc/for-4.3/soc
 > 
-> I forgot the latter in the tag text, feel free to copy it
-> back in when pulling.
-
-Done.
-
+> for you to fetch changes up to ffb910d7b84f21ef6caeed041032a0af8d2e00ed:
 > 
-> There is a series of defconfig changes adjacent to this that
-> I would consider merging into the same branch on top
-> of this, but I don't know how you want to handle it so they
-> will be served separately.
+>   ARM: BCM63xx: Remove custom secondary_startup function (2015-07-11 18:33:51 -0700)
 
-Will either set be usable on its own, or do they need to go in together?
-
-If it's the latter then they should be on top of each other. Anyway, I've
-merged both of them now so at least for-next will have it all.
-
-> Please pull this in for v4.3!
-
-Merged, thanks!
+Thanks, merged into next/cleanup.
 
 
 -Olof
