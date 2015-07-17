@@ -1,85 +1,201 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 17 Jul 2015 12:15:33 +0200
-Subject: [PATCH] arm64/kvm: Add generic v8 KVM target
-In-Reply-To: <55A8D157.9010601@arm.com>
-References: <559185D4.7060308@arm.com>
- <85D36B67-643B-407F-944F-D18D54FF9909@caviumnetworks.com>
- <D805D093-CCFE-4835-853A-B2654DAA10A1@caviumnetworks.com>
- <559642EE.1050605@arm.com>
- <CAFEAcA8nt7yr0K4QesJjWqEwBgziWOt2DViY70E=z2wjt=X7XA@mail.gmail.com>
- <559647A7.7010309@arm.com>
- <CAFEAcA-XyGRLSdQSye5OP6vRQKLZtMY4Erg7jfcpr-oo-HqJ7A@mail.gmail.com>
- <55965F81.5050609@arm.com> <20150717093334.GA24504@cbox>
- <55A8D157.9010601@arm.com>
-Message-ID: <20150717101533.GL14024@cbox>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 17 Jul 2015 12:17:00 +0200
+Subject: [PATCH V3 07/19] soc: tegra: pmc: Wait for powergate state to
+ change
+In-Reply-To: <1436791197-32358-8-git-send-email-jonathanh@nvidia.com>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-8-git-send-email-jonathanh@nvidia.com>
+Message-ID: <20150717101658.GK3057@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 10:56:39AM +0100, Marc Zyngier wrote:
-> On 17/07/15 10:33, Christoffer Dall wrote:
-> > On Fri, Jul 03, 2015 at 11:10:09AM +0100, Marc Zyngier wrote:
-> >> On 03/07/15 10:34, Peter Maydell wrote:
-> >>> On 3 July 2015 at 09:28, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >>>> On 03/07/15 09:12, Peter Maydell wrote:
-> >>>>> I would still like to see the proponents of this patch say
-> >>>>> what their model is for userspace support of cross-host migration,
-> >>>>> if we're abandoning the model the current API envisages.
-> >>>>
-> >>>> I thought we had discussed this above, and don't really see this as a
-> >>>> departure from the current model:
-> >>>>
-> >>>> - "-cpu host" results in "GENERIC" being used: VM can only be migrated
-> >>>> to the exact same HW (no cross-host migration). MIDR should probably
-> >>>> become RO.
-> >>>> - "-cpu host" results in "A57" (for example): VM can be migrated to a
-> >>>> variety of A57 platforms, and allow for some fuzzing on the revision (or
-> >>>> accept any revision).
-> >>>> - "-cpu a57" forces an A57 model to be emulated, always. It is always
-> >>>> possible to migrate such a VM on any host.
-> >>>>
-> >>>> I think only the first point is new, but the last two are what we have
-> >>>> (or what we should have).
-> >>>
-> >>> Right, but the implicit idea of this GENERIC patch seems to
-> >>> be that new host CPU types don't get their own KVM_ARM_TARGET_*
-> >>> constant, and are thus forever unable to do cross-host migration.
-> >>> It's not clear to me why we'd want to have new CPUs be second
-> >>> class citizens like that.
-> >>
-> >> I certainly don't want to see *any* CPU be a second class citizen. But
-> >> let's face it, we're adding more and more targets that don't implement
-> >> anything new, and just satisfy themselves with the generic implementation.
-> >>
-> >> I see it as an incentive to provide something useful (tables of all the
-> >> registers with default values?) so that cross-host migration becomes a
-> >> reality instead of the figment of our imagination (as it is now). If it
-> >> wasn't already ABI, I'd have removed the existing targets until we have
-> >> something meaningful to put there.
-> > 
-> > What we're doing now certainly seems silly, because we're adding kernel
-> > patches without bringing anything to the table...
-> > 
-> >>
-> >> Now, I also have my own doubts about cross-host migration (timers
-> >> anyone?). But I don't see the above as a change in policy. More as a way
-> >> to outline the fact that we currently don't have the right level of
-> >> information/infrastructure to support it at all.
-> >>
-> > The one thing that I've lost track of here (sorry) is whether we're
-> > enforcing the inability to do cross-host migration with the generic
-> > target when this patch is merged or do we leave this up to the graces of
-> > userspace?
+On Mon, Jul 13, 2015 at 01:39:45PM +0100, Jon Hunter wrote:
+> Currently, the function tegra_powergate_set() simply sets the desired
+> powergate state but does not wait for the state to change. In some
+> circumstances this can be desirable. However, in most cases we should
+> wait for the state to change before proceeding. Therefore, add a
+> parameter to tegra_powergate_set() to indicate whether we should wait
+> for the state to change.
 > 
-> The jury is still out on that one.
+> By adding this feature, we can also eliminate the polling loop from
+> tegra30_boot_secondary().
 > 
-> I was initially not going to enforce anything (after all, this isn't
-> that different from the whole CNTVOFF story where we allow userspace to
-> shoot itself in the foot), but I'm equally happy to make MIDR_EL1
-> read-only if we're creating a generic guest...
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> ---
+>  arch/arm/mach-tegra/platsmp.c | 18 ++++--------------
+>  drivers/soc/tegra/pmc.c       | 29 +++++++++++++++++++++++------
+>  include/soc/tegra/pmc.h       |  2 +-
+>  3 files changed, 28 insertions(+), 21 deletions(-)
 > 
-Looking at the code, midr_el1 is already an invariant register, so isn't
-this automagically enforced already?
+> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+> index b45086666648..13982b5936c0 100644
+> --- a/arch/arm/mach-tegra/platsmp.c
+> +++ b/arch/arm/mach-tegra/platsmp.c
+> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  	 * be un-gated by un-toggling the power gate register
+>  	 * manually.
+>  	 */
+> -	if (!tegra_pmc_cpu_is_powered(cpu)) {
+> -		ret = tegra_pmc_cpu_power_on(cpu);
+> -		if (ret)
+> -			return ret;
+> -
+> -		/* Wait for the power to come up. */
+> -		timeout = jiffies + msecs_to_jiffies(100);
+> -		while (!tegra_pmc_cpu_is_powered(cpu)) {
+> -			if (time_after(jiffies, timeout))
+> -				return -ETIMEDOUT;
+> -			udelay(10);
+> -		}
+> -	}
+> +	ret = tegra_pmc_cpu_power_on(cpu, true);
+> +	if (ret)
+> +		return ret;
+>  
+>  remove_clamps:
+>  	/* CPU partition is powered. Enable the CPU clock. */
+> @@ -162,7 +152,7 @@ static int tegra114_boot_secondary(unsigned int cpu, struct task_struct *idle)
+>  		 * also initial power state in flow controller. After that,
+>  		 * the CPU's power state is maintained by flow controller.
+>  		 */
+> -		ret = tegra_pmc_cpu_power_on(cpu);
+> +		ret = tegra_pmc_cpu_power_on(cpu, false);
+>  	}
+>  
+>  	return ret;
+> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
+> index 300f11e0c3bb..c0635bdd4ee3 100644
+> --- a/drivers/soc/tegra/pmc.c
+> +++ b/drivers/soc/tegra/pmc.c
+> @@ -175,9 +175,11 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
+>   * @id: partition ID
+>   * @new_state: new state of the partition
 
-In that case, I'm fine with merging this patch.
+The comment here isn't updated.
 
--Christoffer
+>   */
+> -static int tegra_powergate_set(int id, bool new_state)
+> +static int tegra_powergate_set(int id, bool new_state, bool wait)
+
+Can we please not chain boolean parameters, it makes the call sites
+impossible to parse for humans. Instead, can we simply leave
+tegra_powergate_set() as it is and add another function, such as
+tegra_powergate_set_sync() or tegra_powergate_set_and_wait(), to achieve
+the same? You may have to split out a tegra_powergate_set_unlocked() or
+similar to make sure you get to keep the lock across both operations:
+
+	static int tegra_powergate_set_unlocked(int id, bool new_state)
+	{
+		...
+	}
+
+	static int tegra_powergate_set(int id, bool new_state)
+	{
+		int err;
+
+		mutex_lock(&pmc->powergates_lock);
+		err = tegra_powergate_set_unlocked(id, new_state);
+		mutex_unlock(&pmc->powergates_lock);
+
+		return err;
+	}
+
+	/*
+	 * Must be called with pmc->powergates_lock mutex held.
+	 */
+	static int tegra_powergate_wait(int id, bool new_state)
+	{
+		...
+	}
+
+	static int tegra_powergate_set_and_wait(int id, bool new_state)
+	{
+		int err;
+
+		mutex_lock(&pmc->powergates_lock);
+
+		err = tegra_powergate_set_unlocked(id, new_state);
+		if (err < 0)
+			goto unlock;
+
+		err = tegra_powergate_wait(id, new_state);
+		if (err < 0)
+			goto unlock;
+
+	unlock:
+		mutex_unlock(&pmc->powergates_lock);
+		return err;
+	}
+
+>  {
+> +	unsigned long timeout;
+>  	bool status;
+> +	int ret = 0;
+>  
+>  	mutex_lock(&pmc->powergates_lock);
+>  
+> @@ -190,9 +192,23 @@ static int tegra_powergate_set(int id, bool new_state)
+>  
+>  	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
+>  
+> +	if (wait) {
+> +		timeout = jiffies + msecs_to_jiffies(100);
+> +		ret = -ETIMEDOUT;
+> +
+> +		while (time_before(jiffies, timeout)) {
+> +			status = !!(tegra_pmc_readl(PWRGATE_STATUS) & BIT(id));
+> +			if (status == new_state) {
+> +				ret = 0;
+> +				break;
+> +			}
+> +			udelay(10);
+> +		}
+> +	}
+> +
+>  	mutex_unlock(&pmc->powergates_lock);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  /**
+> @@ -204,7 +220,7 @@ int tegra_powergate_power_on(int id)
+>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>  		return -EINVAL;
+>  
+> -	return tegra_powergate_set(id, true);
+> +	return tegra_powergate_set(id, true, true);
+>  }
+>  
+>  /**
+> @@ -216,7 +232,7 @@ int tegra_powergate_power_off(int id)
+>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>  		return -EINVAL;
+>  
+> -	return tegra_powergate_set(id, false);
+> +	return tegra_powergate_set(id, false, true);
+>  }
+>  EXPORT_SYMBOL(tegra_powergate_power_off);
+>  
+> @@ -351,8 +367,9 @@ bool tegra_pmc_cpu_is_powered(int cpuid)
+>  /**
+>   * tegra_pmc_cpu_power_on() - power on CPU partition
+>   * @cpuid: CPU partition ID
+> + * @wait:  Wait for CPU state to transition
+>   */
+> -int tegra_pmc_cpu_power_on(int cpuid)
+> +int tegra_pmc_cpu_power_on(int cpuid, bool wait)
+
+This one is probably fine since it's the only boolean parameter so far.
+That said, I see that we call this exactly twice, so I wonder if there'd
+be any harm in having the second occurrence wait as well and hence get
+rid of the parameter.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/90379f1b/attachment.sig>
