@@ -1,587 +1,176 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Fri, 17 Jul 2015 15:56:32 -0500
-Subject: [PATCH v2 3/3] soc: ti: Add wkup_m3_ipc driver
+Date: Fri, 17 Jul 2015 15:56:30 -0500
+Subject: [PATCH v2 1/3] mailbox/omap: Add ti,
+ mbox-send-noirq quirk to fix AM33xx CPU Idle
 In-Reply-To: <1437166592-25378-1-git-send-email-d-gerlach@ti.com>
 References: <1437166592-25378-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <1437166592-25378-4-git-send-email-d-gerlach@ti.com>
+Message-ID: <1437166592-25378-2-git-send-email-d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a wkup_m3_ipc driver to handle communication between the MPU
-and Cortex M3 wkup_m3 present on am335x.
+The mailbox framework controls the transmission queue and requires
+either its controller implementations or clients to run the state
+machine for the Tx queue. The OMAP mailbox controller uses a Tx-ready
+interrupt as the equivalent of a Tx-done interrupt to run this Tx
+queue state-machine.
 
-This driver is responsible for actually booting the wkup_m3_rproc and
-also handling all IPC which is done using the IPC registers in the control
-module, a mailbox, and a separate interrupt back from the wkup_m3. A small
-API is exposed for executing specific power commands, which include
-configuring for low power mode, request a transition to a low power mode,
-and status info on a previous transition.
+The WkupM3 processor on AM33xx and AM43xx SoCs is used to offload
+certain PM tasks, like doing the necessary operations for Device
+PM suspend/resume or for entering lower c-states during cpuidle.
+
+The CPUIdle on AM33xx requires the messages to be sent without
+having to trigger the Tx-ready interrupts, as the interrupt
+would immediately terminate the CPUIdle operation. Support for
+this has been added by introducing a DT quirk, "ti,mbox-send-noirq"
+and using it to modify the normal OMAP mailbox controller behavior
+on the sub-mailboxes used to communicate with the WkupM3 remote
+processor. This also requires the wkup_m3_ipc driver to adjust
+its mailbox usage logic to run the Tx state machine.
+
+NOTE:
+- AM43xx does not communicate with WkupM3 for CPU Idle, so is
+  not affected by this behavior. But, it uses the same IPC driver
+  for PM suspend/resume functionality, so requires the quirk as
+  well, because of changes to the common wkup_m3_ipc driver.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+[s-anna at ti.com: revise logic and update comments/patch description]
+Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- drivers/soc/ti/Kconfig       |  10 +
- drivers/soc/ti/Makefile      |   1 +
- drivers/soc/ti/wkup_m3_ipc.c | 486 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/wkup_m3_ipc.h  |  30 +++
- 4 files changed, 527 insertions(+)
- create mode 100644 drivers/soc/ti/wkup_m3_ipc.c
- create mode 100644 include/linux/wkup_m3_ipc.h
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   |  8 ++++
+ drivers/mailbox/omap-mailbox.c                     | 49 ++++++++++++++++++++--
+ 2 files changed, 53 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/soc/ti/Kconfig b/drivers/soc/ti/Kconfig
-index 7266b21..3557c5e 100644
---- a/drivers/soc/ti/Kconfig
-+++ b/drivers/soc/ti/Kconfig
-@@ -28,4 +28,14 @@ config KEYSTONE_NAVIGATOR_DMA
+diff --git a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+index d1a0433..9b40c49 100644
+--- a/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
++++ b/Documentation/devicetree/bindings/mailbox/omap-mailbox.txt
+@@ -75,6 +75,14 @@ data that represent the following:
+     Cell #3 (usr_id)  - mailbox user id for identifying the interrupt line
+                         associated with generating a tx/rx fifo interrupt.
  
- 	  If unsure, say N.
++Optional Properties:
++--------------------
++- ti,mbox-send-noirq:   Quirk flag to allow the client user of this sub-mailbox
++                        to send messages without triggering a Tx ready interrupt,
++                        and to control the Tx ticker. Should be used only on
++                        sub-mailboxes used to communicate with WkupM3 remote
++                        processor on AM33xx/AM43xx SoCs.
++
+ Mailbox Users:
+ ==============
+ A device needing to communicate with a target processor device should specify
+diff --git a/drivers/mailbox/omap-mailbox.c b/drivers/mailbox/omap-mailbox.c
+index a3dbfd9..b7f636f 100644
+--- a/drivers/mailbox/omap-mailbox.c
++++ b/drivers/mailbox/omap-mailbox.c
+@@ -38,6 +38,8 @@
+ #include <linux/mailbox_controller.h>
+ #include <linux/mailbox_client.h>
  
-+config WKUP_M3_IPC
-+	tristate "TI AMx3 Wkup-M3 IPC Driver"
-+	depends on WKUP_M3_RPROC
-+	depends on OMAP2PLUS_MBOX
-+	help
-+	  TI AM33XX and AM43XX have a Cortex M3, the Wakeup M3, to handle
-+	  low power transitions. This IPC driver provides the necessary API
-+	  to communicate and use the Wakeup M3 for PM features like suspend
-+	  resume and boots it using wkup_m3_rproc driver.
++#include "mailbox.h"
 +
- endif # SOC_TI
-diff --git a/drivers/soc/ti/Makefile b/drivers/soc/ti/Makefile
-index 135bdad..48ff3a7 100644
---- a/drivers/soc/ti/Makefile
-+++ b/drivers/soc/ti/Makefile
-@@ -4,3 +4,4 @@
- obj-$(CONFIG_KEYSTONE_NAVIGATOR_QMSS)	+= knav_qmss.o
- knav_qmss-y := knav_qmss_queue.o knav_qmss_acc.o
- obj-$(CONFIG_KEYSTONE_NAVIGATOR_DMA)	+= knav_dma.o
-+obj-$(CONFIG_WKUP_M3_IPC)		+= wkup_m3_ipc.o
-diff --git a/drivers/soc/ti/wkup_m3_ipc.c b/drivers/soc/ti/wkup_m3_ipc.c
-new file mode 100644
-index 0000000..7eb05aa
---- /dev/null
-+++ b/drivers/soc/ti/wkup_m3_ipc.c
-@@ -0,0 +1,486 @@
-+/*
-+ * AMx3 Wkup M3 IPC driver
-+ *
-+ * Copyright (C) 2015 Texas Instruments, Inc.
-+ *
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+ #define MAILBOX_REVISION		0x000
+ #define MAILBOX_MESSAGE(m)		(0x040 + 4 * (m))
+ #define MAILBOX_FIFOSTATUS(m)		(0x080 + 4 * (m))
+@@ -106,6 +108,7 @@ struct omap_mbox_fifo_info {
+ 	int rx_irq;
+ 
+ 	const char *name;
++	bool send_no_irq;
+ };
+ 
+ struct omap_mbox {
+@@ -119,6 +122,7 @@ struct omap_mbox {
+ 	u32			ctx[OMAP4_MBOX_NR_REGS];
+ 	u32			intr_type;
+ 	struct mbox_chan	*chan;
++	bool			send_no_irq;
+ };
+ 
+ /* global variables for the mailbox devices */
+@@ -418,6 +422,9 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+ 		goto fail_request_irq;
+ 	}
+ 
++	if (mbox->send_no_irq)
++		mbox->chan->txdone_method = TXDONE_BY_ACK;
 +
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/kthread.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/omap-mailbox.h>
-+#include <linux/platform_device.h>
-+#include <linux/remoteproc.h>
-+#include <linux/suspend.h>
-+#include <linux/wkup_m3_ipc.h>
+ 	_omap_mbox_enable_irq(mbox, IRQ_RX);
+ 
+ 	return 0;
+@@ -586,13 +593,27 @@ static void omap_mbox_chan_shutdown(struct mbox_chan *chan)
+ 	mutex_unlock(&mdev->cfg_lock);
+ }
+ 
+-static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
++static int omap_mbox_chan_send_noirq(struct omap_mbox *mbox, void *data)
+ {
+-	struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
+ 	int ret = -EBUSY;
+ 
+-	if (!mbox)
+-		return -EINVAL;
++	if (!mbox_fifo_full(mbox)) {
++		_omap_mbox_enable_irq(mbox, IRQ_RX);
++		mbox_fifo_write(mbox, (mbox_msg_t)data);
++		ret = 0;
++		_omap_mbox_disable_irq(mbox, IRQ_RX);
 +
-+#define AM33XX_CTRL_IPC_REG_COUNT	0x8
-+#define AM33XX_CTRL_IPC_REG_OFFSET(m)	(0x4 + 4 * (m))
-+
-+/* AM33XX M3_TXEV_EOI register */
-+#define AM33XX_CONTROL_M3_TXEV_EOI	0x00
-+
-+#define AM33XX_M3_TXEV_ACK		(0x1 << 0)
-+#define AM33XX_M3_TXEV_ENABLE		(0x0 << 0)
-+
-+#define IPC_CMD_DS0			0x4
-+#define IPC_CMD_STANDBY			0xc
-+#define IPC_CMD_IDLE			0x10
-+#define IPC_CMD_RESET			0xe
-+#define DS_IPC_DEFAULT			0xffffffff
-+#define M3_VERSION_UNKNOWN		0x0000ffff
-+#define M3_BASELINE_VERSION		0x191
-+#define M3_STATUS_RESP_MASK		(0xffff << 16)
-+#define M3_FW_VERSION_MASK		0xffff
-+
-+#define M3_STATE_UNKNOWN		0
-+#define M3_STATE_RESET			1
-+#define M3_STATE_INITED			2
-+#define M3_STATE_MSG_FOR_LP		3
-+#define M3_STATE_MSG_FOR_RESET		4
-+
-+struct wkup_m3_ipc {
-+	struct rproc *rproc;
-+
-+	void __iomem *ipc_mem_base;
-+	struct device *dev;
-+
-+	int mem_type;
-+	unsigned long resume_addr;
-+	int state;
-+
-+	struct completion sync_complete;
-+	struct mbox_client mbox_client;
-+	struct mbox_chan *mbox;
-+};
-+
-+static struct wkup_m3_ipc m3_ipc_state;
-+
-+static void am33xx_txev_eoi(struct wkup_m3_ipc *m3_ipc)
-+{
-+	writel(AM33XX_M3_TXEV_ACK,
-+	       m3_ipc->ipc_mem_base + AM33XX_CONTROL_M3_TXEV_EOI);
-+}
-+
-+static void am33xx_txev_enable(struct wkup_m3_ipc *m3_ipc)
-+{
-+	writel(AM33XX_M3_TXEV_ENABLE,
-+	       m3_ipc->ipc_mem_base + AM33XX_CONTROL_M3_TXEV_EOI);
-+}
-+
-+static void wkup_m3_ctrl_ipc_write(struct wkup_m3_ipc *m3_ipc,
-+				   u32 val, int ipc_reg_num)
-+{
-+	if (WARN(ipc_reg_num < 0 || ipc_reg_num > AM33XX_CTRL_IPC_REG_COUNT,
-+		 "ipc register operation out of range"))
-+		return;
-+
-+	writel(val, m3_ipc->ipc_mem_base +
-+	       AM33XX_CTRL_IPC_REG_OFFSET(ipc_reg_num));
-+}
-+
-+static unsigned int wkup_m3_ctrl_ipc_read(struct wkup_m3_ipc *m3_ipc,
-+					  int ipc_reg_num)
-+{
-+	if (WARN(ipc_reg_num < 0 || ipc_reg_num > AM33XX_CTRL_IPC_REG_COUNT,
-+		 "ipc register operation out of range"))
-+		return 0;
-+
-+	return readl(m3_ipc->ipc_mem_base +
-+		     AM33XX_CTRL_IPC_REG_OFFSET(ipc_reg_num));
-+}
-+
-+static int wkup_m3_fw_version_read(struct wkup_m3_ipc *m3_ipc)
-+{
-+	int val;
-+
-+	val = wkup_m3_ctrl_ipc_read(m3_ipc, 2);
-+
-+	return val & M3_FW_VERSION_MASK;
-+}
-+
-+static irqreturn_t wkup_m3_txev_handler(int irq, void *ipc_data)
-+{
-+	struct wkup_m3_ipc *m3_ipc = ipc_data;
-+	struct device *dev = m3_ipc->dev;
-+	int ver = 0;
-+
-+	am33xx_txev_eoi(m3_ipc);
-+
-+	switch (m3_ipc->state) {
-+	case M3_STATE_RESET:
-+		ver = wkup_m3_fw_version_read(m3_ipc);
-+
-+		if (ver == M3_VERSION_UNKNOWN ||
-+		    ver < M3_BASELINE_VERSION) {
-+			dev_warn(dev, "CM3 Firmware Version %x not supported\n",
-+				 ver);
-+		} else {
-+			dev_info(dev, "CM3 Firmware Version = 0x%x\n", ver);
-+		}
-+
-+		m3_ipc->state = M3_STATE_INITED;
-+		complete(&m3_ipc->sync_complete);
-+		break;
-+	case M3_STATE_MSG_FOR_RESET:
-+		m3_ipc->state = M3_STATE_INITED;
-+		complete(&m3_ipc->sync_complete);
-+		break;
-+	case M3_STATE_MSG_FOR_LP:
-+		complete(&m3_ipc->sync_complete);
-+		break;
-+	case M3_STATE_UNKNOWN:
-+		dev_warn(dev, "Unknown CM3 State\n");
++		/* we must read and ack the interrupt directly from here */
++		mbox_fifo_read(mbox);
++		ack_mbox_irq(mbox, IRQ_RX);
 +	}
 +
-+	am33xx_txev_enable(m3_ipc);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static int wkup_m3_ping(struct wkup_m3_ipc *m3_ipc)
-+{
-+	struct device *dev = m3_ipc->dev;
-+	mbox_msg_t dummy_msg = 0;
-+	int ret;
-+
-+	if (!m3_ipc->mbox) {
-+		dev_err(dev,
-+			"No IPC channel to communicate with wkup_m3!\n");
-+		return -EIO;
-+	}
-+
-+	/*
-+	 * Write a dummy message to the mailbox in order to trigger the RX
-+	 * interrupt to alert the M3 that data is available in the IPC
-+	 * registers. We must enable the IRQ here and disable it after in
-+	 * the RX callback to avoid multiple interrupts being received
-+	 * by the CM3.
-+	 */
-+	ret = mbox_send_message(m3_ipc->mbox, &dummy_msg);
-+	if (ret < 0) {
-+		dev_err(dev, "%s: mbox_send_message() failed: %d\n",
-+			__func__, ret);
-+		return ret;
-+	}
-+
-+	ret = wait_for_completion_timeout(&m3_ipc->sync_complete,
-+					  msecs_to_jiffies(500));
-+	if (!ret) {
-+		dev_err(dev, "MPU<->CM3 sync failure\n");
-+		m3_ipc->state = M3_STATE_UNKNOWN;
-+		return -EIO;
-+	}
-+
-+	mbox_client_txdone(m3_ipc->mbox, 0);
-+	return 0;
-+}
-+
-+static int wkup_m3_ping_noirq(struct wkup_m3_ipc *m3_ipc)
-+{
-+	struct device *dev = m3_ipc->dev;
-+	mbox_msg_t dummy_msg = 0;
-+	int ret;
-+
-+	if (!m3_ipc->mbox) {
-+		dev_err(dev,
-+			"No IPC channel to communicate with wkup_m3!\n");
-+		return -EIO;
-+	}
-+
-+	ret = mbox_send_message(m3_ipc->mbox, &dummy_msg);
-+	if (ret < 0) {
-+		dev_err(dev, "%s: mbox_send_message() failed: %d\n",
-+			__func__, ret);
-+		return ret;
-+	}
-+
-+	mbox_client_txdone(m3_ipc->mbox, 0);
-+	return 0;
-+}
-+
-+static int wkup_m3_is_available(struct wkup_m3_ipc *m3_ipc)
-+{
-+	return ((m3_ipc->state != M3_STATE_RESET) &&
-+		(m3_ipc->state != M3_STATE_UNKNOWN));
-+}
-+
-+/* Public functions */
-+/**
-+ * wkup_m3_set_mem_type - Pass wkup_m3 which type of memory is in use
-+ * @mem_type: memory type value read directly from emif
-+ *
-+ * wkup_m3 must know what memory type is in use to properly suspend
-+ * and resume.
-+ */
-+void wkup_m3_set_mem_type(int mem_type)
-+{
-+	m3_ipc_state.mem_type = mem_type;
-+}
-+EXPORT_SYMBOL_GPL(wkup_m3_set_mem_type);
-+
-+/**
-+ * wkup_m3_set_resume_address - Pass wkup_m3 resume address
-+ * @addr: Physical address from which resume code should execute
-+ */
-+void wkup_m3_set_resume_address(void *addr)
-+{
-+	m3_ipc_state.resume_addr = (unsigned long)addr;
-+}
-+EXPORT_SYMBOL_GPL(wkup_m3_set_resume_address);
-+
-+/**
-+ * wkup_m3_request_pm_status - Retrieve wkup_m3 status code after suspend
-+ *
-+ * Returns code representing the status of a low power mode transition.
-+ *	0 - Successful transition
-+ *	1 - Failure to transition to low power state
-+ */
-+int wkup_m3_request_pm_status(void)
-+{
-+	struct wkup_m3_ipc *m3_ipc = &m3_ipc_state;
-+	unsigned int i;
-+	int val;
-+
-+	val = wkup_m3_ctrl_ipc_read(m3_ipc, 1);
-+
-+	i = M3_STATUS_RESP_MASK & val;
-+	i >>= __ffs(M3_STATUS_RESP_MASK);
-+
-+	return i;
-+}
-+EXPORT_SYMBOL_GPL(wkup_m3_request_pm_status);
-+
-+/**
-+ * wkup_m3_prepare_low_power - Request preparation for transition to
-+ *			       low power state
-+ * @state: A kernel suspend state to enter, either MEM or STANDBY
-+ *
-+ * Returns 0 if preparation was successful, otherwise returns error code
-+ */
-+int wkup_m3_prepare_low_power(int state)
-+{
-+	struct wkup_m3_ipc *m3_ipc = &m3_ipc_state;
-+	struct device *dev = m3_ipc_state.dev;
-+	int m3_power_state;
-+	int ret = 0;
-+
-+	if (!wkup_m3_is_available(m3_ipc))
-+		return -ENODEV;
-+
-+	switch (state) {
-+	case WKUP_M3_DEEPSLEEP:
-+		m3_power_state = IPC_CMD_DS0;
-+		break;
-+	case WKUP_M3_STANDBY:
-+		m3_power_state = IPC_CMD_STANDBY;
-+		break;
-+	case WKUP_M3_IDLE:
-+		m3_power_state = IPC_CMD_IDLE;
-+		break;
-+	default:
-+		return 1;
-+	}
-+
-+	/* Program each required IPC register then write defaults to others */
-+	wkup_m3_ctrl_ipc_write(m3_ipc, m3_ipc_state.resume_addr, 0);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, m3_power_state, 1);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, m3_ipc_state.mem_type, 4);
-+
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 2);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 3);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 5);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 6);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 7);
-+
-+	m3_ipc->state = M3_STATE_MSG_FOR_LP;
-+
-+	if (state == WKUP_M3_IDLE)
-+		ret = wkup_m3_ping_noirq(m3_ipc);
-+	else
-+		ret = wkup_m3_ping(m3_ipc);
-+
-+	if (ret) {
-+		dev_err(dev, "Unable to ping CM3\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(wkup_m3_prepare_low_power);
-+
-+/**
-+ * wkup_m3_finish_low_power - Return m3 to reset state
-+ *
-+ * Returns 0 if reset was successful, otherwise returns error code
-+ */
-+int wkup_m3_finish_low_power(void)
-+{
-+	struct wkup_m3_ipc *m3_ipc = &m3_ipc_state;
-+	struct device *dev = m3_ipc_state.dev;
-+	int ret = 0;
-+
-+	if (!wkup_m3_is_available(m3_ipc))
-+		return -ENODEV;
-+
-+	wkup_m3_ctrl_ipc_write(m3_ipc, IPC_CMD_RESET, 1);
-+	wkup_m3_ctrl_ipc_write(m3_ipc, DS_IPC_DEFAULT, 2);
-+
-+	m3_ipc->state = M3_STATE_MSG_FOR_RESET;
-+
-+	ret = wkup_m3_ping(m3_ipc);
-+	if (ret) {
-+		dev_err(dev, "Unable to ping CM3\n");
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(wkup_m3_finish_low_power);
-+
-+static void wkup_m3_rproc_boot_thread(struct rproc *rproc)
-+{
-+	struct device *dev = &rproc->dev;
-+	int ret;
-+
-+	wait_for_completion(&rproc->firmware_loading_complete);
-+
-+	init_completion(&m3_ipc_state.sync_complete);
-+
-+	ret = rproc_boot(rproc);
-+	if (ret)
-+		dev_err(dev, "rproc_boot failed\n");
-+
-+	do_exit(0);
-+}
-+
-+static int wkup_m3_ipc_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	int irq, ret;
-+	phandle rproc_phandle;
-+	struct rproc *m3_rproc;
-+	struct resource *res;
-+	struct task_struct *task;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	m3_ipc_state.ipc_mem_base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(m3_ipc_state.ipc_mem_base)) {
-+		dev_err(dev, "could not ioremap ipc_mem\n");
-+		ret = PTR_ERR(m3_ipc_state.ipc_mem_base);
-+		return ret;
-+	}
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (!irq) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		ret = -ENXIO;
-+		return ret;
-+	}
-+
-+	ret = devm_request_irq(dev, irq, wkup_m3_txev_handler,
-+			       0, "wkup_m3_txev", &m3_ipc_state);
-+	if (ret) {
-+		dev_err(dev, "request_irq failed\n");
-+		return ret;
-+	}
-+
-+	m3_ipc_state.mbox_client.dev = dev;
-+	m3_ipc_state.mbox_client.tx_done = NULL;
-+	m3_ipc_state.mbox_client.rx_callback = NULL;
-+	m3_ipc_state.mbox_client.tx_block = false;
-+	m3_ipc_state.mbox_client.knows_txdone = false;
-+
-+	m3_ipc_state.mbox = mbox_request_channel(&m3_ipc_state.mbox_client, 0);
-+	if (IS_ERR(m3_ipc_state.mbox)) {
-+		dev_err(dev, "IPC Request for A8->M3 Channel failed! %ld\n",
-+			PTR_ERR(m3_ipc_state.mbox));
-+		ret = PTR_ERR(m3_ipc_state.mbox);
-+		m3_ipc_state.mbox = NULL;
-+		return ret;
-+	}
-+
-+	if (of_property_read_u32(dev->of_node, "ti,rproc", &rproc_phandle)) {
-+		dev_err(&pdev->dev, "could not get rproc phandle\n");
-+		ret = -ENODEV;
-+		goto err;
-+	}
-+
-+	m3_rproc = rproc_get_by_phandle(rproc_phandle);
-+	if (!m3_rproc) {
-+		dev_err(&pdev->dev, "could not get rproc handle\n");
-+		ret = -EPROBE_DEFER;
-+		goto err;
-+	}
-+
-+	m3_ipc_state.rproc = m3_rproc;
-+	m3_ipc_state.dev = dev;
-+	m3_ipc_state.state = M3_STATE_RESET;
-+
-+	/*
-+	 * Wait for firmware loading completion in a thread so we
-+	 * can boot the wkup_m3 as soon as it's ready without holding
-+	 * up kernel boot
-+	 */
-+	task = kthread_run((void *)wkup_m3_rproc_boot_thread, m3_rproc,
-+			   "wkup_m3_rproc_loader");
-+
-+	if (IS_ERR(task)) {
-+		dev_err(dev, "can't create rproc_boot thread\n");
-+		goto err_put_rproc;
-+	}
-+
-+	return 0;
-+
-+err_put_rproc:
-+	rproc_put(m3_rproc);
-+err:
-+	mbox_free_channel(m3_ipc_state.mbox);
 +	return ret;
 +}
 +
-+static int wkup_m3_ipc_remove(struct platform_device *pdev)
++static int omap_mbox_chan_send(struct omap_mbox *mbox, void *data)
 +{
-+	mbox_free_channel(m3_ipc_state.mbox);
++	int ret = -EBUSY;
+ 
+ 	if (!mbox_fifo_full(mbox)) {
+ 		mbox_fifo_write(mbox, (mbox_msg_t)data);
+@@ -604,6 +625,22 @@ static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
+ 	return ret;
+ }
+ 
++static int omap_mbox_chan_send_data(struct mbox_chan *chan, void *data)
++{
++	struct omap_mbox *mbox = mbox_chan_to_omap_mbox(chan);
++	int ret;
 +
-+	rproc_shutdown(m3_ipc_state.rproc);
-+	rproc_put(m3_ipc_state.rproc);
++	if (!mbox)
++		return -EINVAL;
 +
-+	return 0;
++	if (mbox->send_no_irq)
++		ret = omap_mbox_chan_send_noirq(mbox, data);
++	else
++		ret = omap_mbox_chan_send(mbox, data);
++
++	return ret;
 +}
 +
-+static const struct of_device_id wkup_m3_ipc_of_match[] = {
-+	{ .compatible = "ti,am3352-wkup-m3-ipc", },
-+	{ .compatible = "ti,am4372-wkup-m3-ipc", },
-+	{},
-+};
+ static const struct mbox_chan_ops omap_mbox_chan_ops = {
+ 	.startup        = omap_mbox_chan_startup,
+ 	.send_data      = omap_mbox_chan_send_data,
+@@ -732,6 +769,9 @@ static int omap_mbox_probe(struct platform_device *pdev)
+ 			finfo->rx_usr = tmp[2];
+ 
+ 			finfo->name = child->name;
 +
-+static struct platform_driver wkup_m3_ipc_driver = {
-+	.probe = wkup_m3_ipc_probe,
-+	.remove = wkup_m3_ipc_remove,
-+	.driver = {
-+		.name = "wkup_m3_ipc",
-+		.of_match_table = wkup_m3_ipc_of_match,
-+	},
-+};
-+
-+module_platform_driver(wkup_m3_ipc_driver);
-+
-+MODULE_LICENSE("GPL v2");
-+MODULE_DESCRIPTION("wkup m3 remote processor ipc driver");
-+MODULE_AUTHOR("Dave Gerlach <d-gerlach@ti.com>");
-diff --git a/include/linux/wkup_m3_ipc.h b/include/linux/wkup_m3_ipc.h
-new file mode 100644
-index 0000000..4eda969
---- /dev/null
-+++ b/include/linux/wkup_m3_ipc.h
-@@ -0,0 +1,30 @@
-+/*
-+ * TI Wakeup M3 for AMx3 SoCs Power Management Routines
-+ *
-+ * Copyright (C) 2015 Texas Instruments Incorporated - http://www.ti.com/
-+ * Dave Gerlach <d-gerlach@ti.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _LINUX_WKUP_M3_IPC_H
-+#define _LINUX_WKUP_M3_IPC_H
-+
-+#define WKUP_M3_DEEPSLEEP	1
-+#define WKUP_M3_STANDBY		2
-+#define WKUP_M3_IDLE		3
-+
-+void wkup_m3_set_mem_type(int mem_type);
-+void wkup_m3_set_resume_address(void *addr);
-+int wkup_m3_prepare_low_power(int state);
-+int wkup_m3_finish_low_power(void);
-+int wkup_m3_request_pm_status(void);
-+
-+#endif /* _LINUX_WKUP_M3_IPC_H */
++			if (of_find_property(child, "ti,mbox-send-noirq", NULL))
++				finfo->send_no_irq = true;
+ 		} else {
+ 			finfo->tx_id = info->tx_id;
+ 			finfo->rx_id = info->rx_id;
+@@ -791,6 +831,7 @@ static int omap_mbox_probe(struct platform_device *pdev)
+ 		fifo->irqstatus = MAILBOX_IRQSTATUS(intr_type, finfo->rx_usr);
+ 		fifo->irqdisable = MAILBOX_IRQDISABLE(intr_type, finfo->rx_usr);
+ 
++		mbox->send_no_irq = finfo->send_no_irq;
+ 		mbox->intr_type = intr_type;
+ 
+ 		mbox->parent = mdev;
 -- 
 2.4.5
