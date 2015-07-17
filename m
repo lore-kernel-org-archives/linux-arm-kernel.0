@@ -1,22 +1,23 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 17 Jul 2015 11:20:48 +0200 (CEST)
-Subject: [PATCH V4 1/1] irqchip: imx-gpcv2: IMX GPCv2 drivers for wakeup
- source and suspend
-In-Reply-To: <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1436371523-18083-1-git-send-email-shenwei.wang@freescale.com>
- <BL2PR03MB370D2B063B9102C323A042283990@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1507171119250.18576@nanos>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 17 Jul 2015 11:28:23 +0200
+Subject: [PATCH v4 0/2] arm/arm64: KVM: Optimize arm64 fp/simd, saves
+ 30-50% on exits
+In-Reply-To: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
+References: <1437082178-11039-1-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20150717092823.GG14024@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jul 2015, Shenwei Wang wrote:
+On Thu, Jul 16, 2015 at 02:29:36PM -0700, Mario Smarduch wrote:
+> Currently we save/restore fp/simd on each exit. The first patch optimizes arm64
+> save/restore, we only do so on Guest access. hackbench and several lmbench
+> tests show anywhere from 30% to 50% of exits don't context switch the vfp/simd
+> registers.
+> 
+> For second patch 32-bit handler is updated to keep exit handling consistent
+> with 64-bit code.
+> 
 
-> Kindly PING.
+For the series:
 
-If you folks would kindly CC the proper mailing list for irq chip
-patches, then they would end up in the proper mail folder and not in
-my random crap mbox.
-
-Thanks,
-
-	tglx
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
