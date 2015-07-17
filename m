@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 17 Jul 2015 10:08:53 -0700
-Subject: [GIT PULL] ARM: mvebu: dt changes for v4.3
-In-Reply-To: <55A82BA3.1090001@free-electrons.com>
-References: <55A82BA3.1090001@free-electrons.com>
-Message-ID: <20150717170853.GE21691@localhost>
+Date: Fri, 17 Jul 2015 10:09:39 -0700
+Subject: [GIT PULL] ARM: mvebu: config changes for v4.3
+In-Reply-To: <55A82BAD.5040507@free-electrons.com>
+References: <55A82BAD.5040507@free-electrons.com>
+Message-ID: <20150717170939.GF21691@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 12:09:39AM +0200, Gregory CLEMENT wrote:
+On Fri, Jul 17, 2015 at 12:09:49AM +0200, Gregory CLEMENT wrote:
 > Hi,
 > 
-> Here is the first pull request for dt for mvebu for v4.3
+> Here is the first pull request for config for mvebu for v4.3
 > 
 > Gregory
 > 
@@ -20,11 +20,11 @@ On Fri, Jul 17, 2015 at 12:09:39AM +0200, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.3-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-config-4.3-1
 > 
-> for you to fetch changes up to 7e5308be4c0747e328d03f3daa46aaa5eaf7714f:
+> for you to fetch changes up to adfe5f267dd005d0bbe8d71820a7fa38945d08bd:
 > 
->   ARM: mvebu: update EEPROM description of Armada 388 GP (2015-07-09 15:28:08 +0200)
+>   ARM: mvebu: update mvebu_v7_defconfig with features needed for Armada 388 GP (2015-07-09 15:32:55 +0200)
 
 Merged, thanks!
 
