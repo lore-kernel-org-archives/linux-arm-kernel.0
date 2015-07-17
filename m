@@ -1,36 +1,27 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 17 Jul 2015 13:51:27 +0200
-Subject: [PATCH 2/2] drm: sti: adapt DT to fix probe/bind issues in DRM
- driver
-In-Reply-To: <1437133510-13615-2-git-send-email-benjamin.gaignard@linaro.org>
-References: <1437133510-13615-1-git-send-email-benjamin.gaignard@linaro.org>
- <1437133510-13615-2-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <55A8EC3F.6050903@st.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Fri, 17 Jul 2015 17:20:30 +0530
+Subject: [PATCH v2 0/3] ARM: OMAP2+: hwmod: RTC: Add lock and unlock hooks
+Message-ID: <1437133833-32355-1-git-send-email-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear ARM SoC Maintainers,
+This series implements lock and unlock functions for RTC and hooks
+the same to DRA7 and AMx3xx hwmod.
+This is dependent on the patch https://patchwork.kernel.org/patch/6578281/,
+which is queued recently by Paul.
 
-On 07/17/2015 01:45 PM, Benjamin Gaignard wrote:
-> STI drm drivers probe and bind using component framework was incorrect.
-> In addition to drivers fix DT update is needed to make all sub-components
-> become childs of sti-display-subsystem.
->
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-> ---
->   arch/arm/boot/dts/stih407.dtsi | 82 +++++++++++++++++++++---------------------
->   arch/arm/boot/dts/stih410.dtsi | 82 +++++++++++++++++++++---------------------
->   2 files changed, 80 insertions(+), 84 deletions(-)
->
->
+Tested on DRA72-evm: http://pastebin.ubuntu.com/11892356/
 
-This patch solves an issue preventing DRM driver probing, but it breaks 
-the DT ABI.
-For now, this driver and its DT node are only used by a few identified 
-people.
+Lokesh Vutla (3):
+  ARM: hwmod: RTC: Add lock and unlock functions
+  ARM: DRA7: RTC: Add lock and unlock functions
+  ARM: AMx3xx: RTC: Add lock and unlock functions
 
-Since these people only use aligned version of Kernel and DT, do you 
-accept we break the ABI for this time?
+ arch/arm/mach-omap2/omap_hwmod.h                   |  2 +
+ .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c |  2 +
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +
+ arch/arm/mach-omap2/omap_hwmod_reset.c             | 56 ++++++++++++++++++++++
+ 4 files changed, 62 insertions(+)
 
-Thanks in advance,
-Maxime
+-- 
+2.1.4
