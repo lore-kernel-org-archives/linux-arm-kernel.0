@@ -1,40 +1,24 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 17 Jul 2015 12:05:07 +0100
-Subject: [PATCH 3/5] arm64: kernel: Add min/max values in feature-detection
- register values.
-In-Reply-To: <20150717105110.GL18994@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 17 Jul 2015 12:06:24 +0100
+Subject: [PATCH 1/5] arm64: kernel: preparatory: Move config_sctlr_el1
+In-Reply-To: <1437062519-18883-2-git-send-email-james.morse@arm.com>
 References: <1437062519-18883-1-git-send-email-james.morse@arm.com>
- <1437062519-18883-4-git-send-email-james.morse@arm.com>
- <20150717105110.GL18994@arm.com>
-Message-ID: <55A8E163.5010607@arm.com>
+ <1437062519-18883-2-git-send-email-james.morse@arm.com>
+Message-ID: <20150717110624.GC13712@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/15 11:51, Will Deacon wrote:
-> On Thu, Jul 16, 2015 at 05:01:57PM +0100, James Morse wrote:
->> When a new cpu feature is available, the cpu feature bits will be 0001,
->> when features are updated, this value will be incremented. This patch
->> changes 'register_value' to be '{min,max}_register_value', and checks
->> the value falls in this range.
+On Thu, Jul 16, 2015 at 05:01:55PM +0100, James Morse wrote:
+> Later patches need config_sctlr_el1 to set/clear bits in the sctlr_el1
+> register.
 > 
-> I'm not sure this is completely true. For example, the new atomics are
-> advertised with feature bits of 0002, whilst 0001 is RESERVED and 0000
-> means they're not present.
+> This patch moves this function into header a file.
 > 
-> Also, the problem with specifying an upper bound is that we have to keep
-> updating it. Elsewhere in the kernel, we've treated these as 4-bit signed
-> fields and if X > Y, we assume that the feature set of X is a superset of
-> Y. Unfortunately, the ARM ARM doesn't provide this insight but it is
-> something that we teased out of the architects.
-> 
-> Does PAN break our assumptions here?
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-No, it just needs to match 1 and 2.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Would you prefer a 'min_register_value' and some careful 4-bit
-sign-extension logic to use the 'if X > Y' logic?
-
-
-Thanks,
-
-James
+-- 
+Catalin
