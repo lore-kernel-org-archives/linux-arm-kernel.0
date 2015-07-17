@@ -1,33 +1,35 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Fri, 17 Jul 2015 16:38:20 +0800
-Subject: [PATCH v1 0/4] ARM: imx6ul: add fec1 and fec2 support for i.MX6ul
- 14x14 evk board
-Message-ID: <1437122304-20598-1-git-send-email-b38611@freescale.com>
+Date: Fri, 17 Jul 2015 16:38:21 +0800
+Subject: [PATCH v1 1/4] ARM: imx6ul: add fec bits to GPR syscon definition
+In-Reply-To: <1437122304-20598-1-git-send-email-b38611@freescale.com>
+References: <1437122304-20598-1-git-send-email-b38611@freescale.com>
+Message-ID: <1437122304-20598-2-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, upstream kernel support i.MX6ul 14x14 evk board, but don't support ethernet that
-bringup some inconvenient for other modules debug and support.
+FEC requires additional bits to select refrence clock.
 
-The patch series just add fec1 and fec2 two MACs support for the board.
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Patch#1 and #2:
-	FEC MAC refrence clock needs extra GPR bit set to select clock source.
-	The board install KSZ8081 that also needs extra phyfix.
-Patch#3 and #4:
-	Add fec support for SOC and evk board in dts file.
-
-Fugang Duan (4):
-  ARM: imx6ul: add fec bits to GPR syscon definition
-  ARM: imx6ul: add fec MAC refrence clock and phy fixup init
-  ARM: dts: imx: add fec1 and fec2 nodes for SOC i.MX6UL
-  ARM: dts: imx6ul-14x14-evk: add fec1 and fec2 support
-
- arch/arm/boot/dts/imx6ul-14x14-evk.dts      | 29 +++++++++++++++++++
- arch/arm/boot/dts/imx6ul.dtsi               | 37 +++++++++++++++++++++++++
- arch/arm/mach-imx/mach-imx6ul.c             | 43 +++++++++++++++++++++++++++++
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  8 ++++++
- 4 files changed, 117 insertions(+)
-
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index d16f4c8..558a485 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -435,4 +435,12 @@
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
+ 
++/* For imx6ul iomux gpr register field define */
++#define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
++#define IMX6UL_GPR1_ENET2_CLK_DIR		(0x1 << 18)
++#define IMX6UL_GPR1_ENET1_CLK_OUTPUT		(0x1 << 17)
++#define IMX6UL_GPR1_ENET2_CLK_OUTPUT		(0x1 << 18)
++#define IMX6UL_GPR1_ENET_CLK_DIR		(0x3 << 17)
++#define IMX6UL_GPR1_ENET_CLK_OUTPUT		(0x3 << 17)
++
+ #endif /* __LINUX_IMX6Q_IOMUXC_GPR_H */
 -- 
 1.9.1
