@@ -1,141 +1,133 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 17 Jul 2015 17:32:13 +0200
-Subject: [PATCH 18/18] KVM: ARM64: Add KVM_CAP_ARM_PMU and
- KVM_ARM_PMU_SET_IRQ
-In-Reply-To: <1436149068-3784-19-git-send-email-shannon.zhao@linaro.org>
-References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
- <1436149068-3784-19-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <20150717153213.GC14024@cbox>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Sat, 18 Jul 2015 00:34:21 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+References: <55A646EE.6030402@linaro.org>
+ <20150715105536.42949ea9@gandalf.local.home>
+ <20150715121337.3b31aa84@gandalf.local.home> <55A6FA82.9000901@linaro.org>
+ <55A703F3.8050203@linaro.org>
+ <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
+ <20150716102405.2cc8c406@gandalf.local.home>
+ <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+ <20150716113115.45a17f17@gandalf.local.home>
+ <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+Message-ID: <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 06, 2015 at 10:17:48AM +0800, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
+> On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
+>> On Fri, 17 Jul 2015 23:28:13 +0900
+>> Jungseok Lee <jungseoklee85@gmail.com> wrote:
+>> 
+>> 
+>>> 
+>>> I have reviewed and tested the kernel including this patch and only [RFC 1/3].
+>> 
+>> Thanks! Can you repost patch 1 with the changes I recommended, so that
+>> I can get an Acked-by from the arm64 maintainers and pull all the
+>> changes in together. This is fine for a 4.3 release, right? That is, it
+>> doesn't need to go into 4.2-rcs.
+>> 
 > 
-> Add KVM_CAP_ARM_PMU for userspace to check whether KVM supports PMU. Add
-> KVM_ARM_PMU_SET_IRQ for userspace to set PMU IRQ number.
+> Welcome!
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm/kvm/arm.c       | 8 ++++++++
->  include/kvm/arm_pmu.h    | 5 +++++
->  include/uapi/linux/kvm.h | 4 ++++
->  virt/kvm/arm/pmu.c       | 9 +++++++++
->  4 files changed, 26 insertions(+)
+> It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
+> Also, it might be needed to consider Mark's comment on arch part.
 > 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 41eb063..350866e 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -182,6 +182,7 @@ int kvm_vm_ioctl_check_extension(struct kvm *kvm, long ext)
->  	case KVM_CAP_ARM_PSCI_0_2:
->  	case KVM_CAP_READONLY_MEM:
->  	case KVM_CAP_MP_STATE:
-> +	case KVM_CAP_ARM_PMU:
->  		r = 1;
->  		break;
->  	case KVM_CAP_COALESCED_MMIO:
-> @@ -816,6 +817,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
->  			return -E2BIG;
->  		return kvm_arm_copy_reg_indices(vcpu, user_list->reg);
->  	}
-> +	case KVM_ARM_PMU_SET_IRQ: {
-> +		uint32_t irq;
-> +
-> +		if (copy_from_user(&irq, argp, sizeof(irq)))
-> +			return -EFAULT;
-> +		return kvm_pmu_set_irq_num(vcpu, irq);
-> +	}
->  	default:
->  		return -EINVAL;
->  	}
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 5bcf27b..1a93f53 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -58,6 +58,7 @@ void kvm_pmu_enable_interrupt(struct kvm_vcpu *vcpu, unsigned long val);
->  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, unsigned long val);
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
->  				    unsigned long select_idx);
-> +int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq);
->  void kvm_pmu_init(struct kvm_vcpu *vcpu);
->  #else
->  void kvm_pmu_sync_hwstate(struct kvm_vcpu *vcpu) {}
-> @@ -76,6 +77,10 @@ void kvm_pmu_enable_interrupt(struct kvm_vcpu *vcpu, unsigned long val) {}
->  void kvm_pmu_software_increment(struct kvm_vcpu *vcpu, unsigned long val) {}
->  void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
->  				    unsigned long select_idx) {}
-> +int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq)
-> +{
-> +	return -ENXIO;
-> +}
->  static inline void kvm_pmu_init(struct kvm_vcpu *vcpu) {}
->  #endif
->  
-> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
-> index 716ad4a..90f5e73 100644
-> --- a/include/uapi/linux/kvm.h
-> +++ b/include/uapi/linux/kvm.h
-> @@ -817,6 +817,7 @@ struct kvm_ppc_smmu_info {
->  #define KVM_CAP_DISABLE_QUIRKS 116
->  #define KVM_CAP_X86_SMM 117
->  #define KVM_CAP_MULTI_ADDRESS_SPACE 118
-> +#define KVM_CAP_ARM_PMU 119
->  
->  #ifdef KVM_CAP_IRQ_ROUTING
->  
-> @@ -1205,6 +1206,9 @@ struct kvm_s390_ucas_mapping {
->  /* Available with KVM_CAP_X86_SMM */
->  #define KVM_SMI                   _IO(KVMIO,   0xb7)
->  
-> +/* Available with KVM_CAP_ARM_PMU */
-> +#define KVM_ARM_PMU_SET_IRQ	  _IOW(KVMIO, 0xb8, __u32)
-> +
+> If they are okay, I will proceed.
 
-does this really warrant a completely new ioctl?  Perhaps a new kvm
-device that you create with a PMU would be better, in that way you could
-choose whether you want the PMU for the guest or not.
+Akashi and Mark,
 
-Alternatively, we have some room to spare in the features array of
-KVM_ARM_VCPU_INIT.
+The [RFC 1/3] patch used in my environment is shaped as follows.
+I leave the hunk for *only* clear synchronization. This is why I choose this format
+instead of reposting a patch. I hope it would help to track down this thread.
 
-Alternatively to the alternative, does the IRQ number appear in any
-register somewhere?  If so, we could use the ONE_REG interface to set
-the irq number.
+Steve,
 
-In any case, the new ABI should be documented in
-Documentation/virtual/kvm/api.txt.
+I think this is my best at this point.
 
+Best Regards
+Jungseok Lee
 
->  #define KVM_DEV_ASSIGN_ENABLE_IOMMU	(1 << 0)
->  #define KVM_DEV_ASSIGN_PCI_2_3		(1 << 1)
->  #define KVM_DEV_ASSIGN_MASK_INTX	(1 << 2)
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index f957b85..57585e1 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -381,6 +381,15 @@ void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, unsigned long data,
->  	pmc->perf_event = event;
->  }
->  
-> +int kvm_pmu_set_irq_num(struct kvm_vcpu *vcpu, u32 irq)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +
-> +	kvm_info("kvm_arm_set_pmu_irq: irq: %u\n", irq);
-
-kvm_debug instead?
-
-> +	pmu->irq_num = irq;
-> +	return 0;
-> +}
-> +
->  /**
->   * kvm_pmu_init - Initialize global PMU state for per vcpu
->   * @vcpu: The vcpu pointer
-> -- 
-> 2.1.0
-> 
-
-Thanks,
--Christoffer
+----8<----
+diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+index c5534fa..2b43e20 100644
+--- a/arch/arm64/include/asm/ftrace.h
++++ b/arch/arm64/include/asm/ftrace.h
+@@ -13,8 +13,9 @@
+ 
+ #include <asm/insn.h>
+ 
+-#define MCOUNT_ADDR		((unsigned long)_mcount)
+-#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
++#define MCOUNT_ADDR			((unsigned long)_mcount)
++#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
++#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/compat.h>
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 407991b..9ab67af 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -20,6 +20,7 @@
+ #include <linux/sched.h>
+ #include <linux/stacktrace.h>
+ 
++#include <asm/insn.h>
+ #include <asm/stacktrace.h>
+ 
+ /*
+@@ -52,7 +53,7 @@ int notrace unwind_frame(struct stackframe *frame)
+ 	 * -4 here because we care about the PC at time of bl,
+ 	 * not where the return will go.
+ 	 */
+-	frame->pc = *(unsigned long *)(fp + 8) - 4;
++	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 1da6029..6566201 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -260,6 +260,9 @@ static inline void ftrace_kill(void) { }
+ #endif /* CONFIG_FUNCTION_TRACER */
+ 
+ #ifdef CONFIG_STACK_TRACER
++#ifndef FTRACE_STACK_FRAME_OFFSET
++#define FTRACE_STACK_FRAME_OFFSET 0
++#endif
+ extern int stack_tracer_enabled;
+ int
+ stack_trace_sysctl(struct ctl_table *table, int write,
+diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+index b746399..30521ea 100644
+--- a/kernel/trace/trace_stack.c
++++ b/kernel/trace/trace_stack.c
+@@ -105,7 +105,7 @@ check_stack(unsigned long ip, unsigned long *stack)
+ 
+ 	/* Skip over the overhead of the stack tracer itself */
+ 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+-		if (stack_dump_trace[i] == ip)
++		if ((stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET) == ip)
+ 			break;
+ 	}
+ 
+@@ -133,7 +133,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+ 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+ 			if (stack_dump_trace[i] == ULONG_MAX)
+ 				break;
+-			if (*p == stack_dump_trace[i]) {
++			if (*p == (stack_dump_trace[i]
++					+ FTRACE_STACK_FRAME_OFFSET)) {
+ 				stack_dump_trace[x] = stack_dump_trace[i++];
+ 				this_size = stack_dump_index[x++] =
+ 					(top - p) * sizeof(unsigned long);
+----8<----
