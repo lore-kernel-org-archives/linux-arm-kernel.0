@@ -1,19 +1,142 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 18 Jul 2015 00:15:52 +0200
-Subject: [PATCH v2 09/10] KVM: arm/arm64: timer: Allow the timer to
- control the active state
-In-Reply-To: <1436378202-20224-10-git-send-email-marc.zyngier@arm.com>
-References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
- <1436378202-20224-10-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150717221552.GM14024@cbox>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Sat, 18 Jul 2015 00:16:26 +0200
+Subject: [PATCH] arm64: dts: mediatek: Add MT8173 MMC dts
+In-Reply-To: <CAGS+omBxP5LBMZuayRUDYW3bBrRe17up2E559YJFL6Sq4tx5Jg@mail.gmail.com>
+References: <1437046580-10809-1-git-send-email-chaotian.jing@mediatek.com>
+ <CAGS+omBxP5LBMZuayRUDYW3bBrRe17up2E559YJFL6Sq4tx5Jg@mail.gmail.com>
+Message-ID: <2095363.Eo4NFi8jHO@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 06:56:41PM +0100, Marc Zyngier wrote:
-> In order to remove the crude hack where we sneak the masked bit
-> into the timer's control register, make use of the phys_irq_map
-> API control the active state of the interrupt.
+On Thursday, July 16, 2015 11:16:59 PM Daniel Kurtz wrote:
+> Hi Chaotian,
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> On Thu, Jul 16, 2015 at 7:36 PM, Chaotian Jing
+> 
+> <chaotian.jing@mediatek.com> wrote:
+> > From: Eddie Huang <eddie.huang@mediatek.com>
+> > 
+> > Add node mmc0 ~ mmc3 for mt8173.dtsi
+> > Add node mmc0, mmc1 for mt8173-evb.dts
+> > 
+> > Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> > ---
+> > Remove clk_null
+> > Base on 4.2-rc1, and 
+> > https://github.com/mbgg/linux-mediatek/tree/v4.2-next/arm64 commit
+> > 16ea61fc  arm64: dts: mt8173-evb: Add PMIC support> 
+> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 126
+> >  ++++++++++++++++++++++++++++ arch/arm64/boot/dts/mediatek/mt8173.dtsi   
+> >  |  44 ++++++++++
+> >  2 files changed, 170 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts index 986f25f..f76c99b
+> > 100644
+> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+> > @@ -64,6 +64,132 @@
+> > 
+> >         };
+> >  
+> >  };
+> > 
+> > +&mmc0 {
+> > +       status = "okay";
+> > +       pinctrl-names = "default", "state_uhs";
+> > +       pinctrl-0 = <&mmc0_pins_default>;
+> > +       pinctrl-1 = <&mmc0_pins_uhs>;
+> > +       bus-width = <8>;
+> > +       max-frequency = <50000000>;
+> > +       cap-mmc-highspeed;
+> > +       vmmc-supply = <&mt6397_vemc_3v3_reg>;
+> > +       vqmmc-supply = <&mt6397_vio18_reg>;
+> > +       non-removable;
+> > +};
+> > +
+> > +&mmc1 {
+> > +       status = "okay";
+> > +       pinctrl-names = "default", "state_uhs";
+> > +       pinctrl-0 = <&mmc1_pins_default>;
+> > +       pinctrl-1 = <&mmc1_pins_uhs>;
+> > +       bus-width = <4>;
+> > +       max-frequency = <50000000>;
+> > +       cap-sd-highspeed;
+> > +       sd-uhs-sdr25;
+> > +       cd-gpios = <&pio 132 0>;
+> > +       vmmc-supply = <&mt6397_vmch_reg>;
+> > +       vqmmc-supply = <&mt6397_vmc_reg>;
+> > +};
+> > +
+> > +&pio {
+> > +       mmc0_pins_default: mmc0default {
+> > +               pins_cmd_dat {
+> > +                       pinmux =
+> > <MT8173_PIN_57_MSDC0_DAT0__FUNC_MSDC0_DAT0>, +                           
+> >     <MT8173_PIN_58_MSDC0_DAT1__FUNC_MSDC0_DAT1>, +                       
+> >         <MT8173_PIN_59_MSDC0_DAT2__FUNC_MSDC0_DAT2>, +                   
+> >             <MT8173_PIN_60_MSDC0_DAT3__FUNC_MSDC0_DAT3>, +               
+> >                 <MT8173_PIN_61_MSDC0_DAT4__FUNC_MSDC0_DAT4>, +           
+> >                     <MT8173_PIN_62_MSDC0_DAT5__FUNC_MSDC0_DAT5>, +       
+> >                         <MT8173_PIN_63_MSDC0_DAT6__FUNC_MSDC0_DAT6>, +   
+> >                             <MT8173_PIN_64_MSDC0_DAT7__FUNC_MSDC0_DAT7>,
+> > +                               
+> > <MT8173_PIN_66_MSDC0_CMD__FUNC_MSDC0_CMD>; +                      
+> > input-enable;
+> > +                       bias-pull-up;
+> > +               };
+> > +
+> > +               pins_clk {
+> > +                       pinmux =
+> > <MT8173_PIN_65_MSDC0_CLK__FUNC_MSDC0_CLK>;
+> > +                       bias-pull-down;
+> > +               };
+> > +
+> > +               pins_rst {
+> > +                       pinmux =
+> > <MT8173_PIN_68_MSDC0_RST___FUNC_MSDC0_RSTB>; +                      
+> > bias-pull-up;
+> > +               };
+> > +       };
+> > +
+> > +       mmc1_pins_default: mmc1default {
+> > +               pins_cmd_dat {
+> > +                       pinmux =
+> > <MT8173_PIN_73_MSDC1_DAT0__FUNC_MSDC1_DAT0>, +                           
+> >     <MT8173_PIN_74_MSDC1_DAT1__FUNC_MSDC1_DAT1>, +                       
+> >         <MT8173_PIN_75_MSDC1_DAT2__FUNC_MSDC1_DAT2>, +                   
+> >             <MT8173_PIN_76_MSDC1_DAT3__FUNC_MSDC1_DAT3>, +               
+> >                 <MT8173_PIN_78_MSDC1_CMD__FUNC_MSDC1_CMD>; +             
+> >          input-enable;
+> > +                       drive-strength = <MTK_DRIVE_4mA>;
+> > +                       bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
+> > +               };
+> > +
+> > +               pins_clk {
+> > +                       pinmux =
+> > <MT8173_PIN_77_MSDC1_CLK__FUNC_MSDC1_CLK>;
+> > +                       bias-pull-down;
+> > +                       drive-strength = <MTK_DRIVE_4mA>;
+> > +               };
+> > +
+> > +               pins_insert {
+> > +                       pinmux =
+> > <MT8173_PIN_132_I2S0_DATA1__FUNC_GPIO132>;
+> > +                       bias-pull-up;
+> > +               };
+> > +       };
+> > +
+> > +       mmc0_pins_uhs: mmc0 at 0{
+> 
+> (1) I don't think these "@0" are needed (here and for mmc1_pins_uhs)
+> (2) A space before the '{' would be nice.
+> 
+> Other than these tiny nits, this one is:
+> 
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+I fixed the nits mentioned by Dan and applied the patch to v4.2-next/arm64
+
+Thanks
