@@ -1,145 +1,52 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 17 Jul 2015 10:41:09 +0530
-Subject: [PATCH 15/18] ARM/SPEAr/time: Migrate to new 'set-state' interface
-In-Reply-To: <cover.1437101996.git.viresh.kumar@linaro.org>
-References: <cover.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <7639c0b8b3d5e061253936ed5279ff674be238cb.1437101996.git.viresh.kumar@linaro.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 17 Jul 2015 07:28:19 +0200 (CEST)
+Subject: [PATCH 14/41] clocksource: mxs: Migrate to new 'set-state'
+ interface
+In-Reply-To: <5505013f2020eef13aa55f7d748f79e344ce6c69.1434622147.git.viresh.kumar@linaro.org>
+References: <cover.1434622147.git.viresh.kumar@linaro.org>
+ <5505013f2020eef13aa55f7d748f79e344ce6c69.1434622147.git.viresh.kumar@linaro.org>
+Message-ID: <1002917180.81547.1437110899188.JavaMail.open-xchange@oxbsltgw05.schlund.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Migrate SPEAr driver to the new 'set-state' interface provided by
-clockevents core, the earlier 'set-mode' interface is marked obsolete
-now.
+Hi Viresh,
 
-This also enables us to implement callbacks for new states of clockevent
-devices, for example: ONESHOT_STOPPED.
+[add Fabio, Marek and Pengutronix to CC]
 
-Also kill the unnecessary forward declaration of set-mode routine by
-moving 'struct clock_event_device clkevt' towards the bottom of the file.
+> Viresh Kumar <viresh.kumar@linaro.org> hat am 18. Juni 2015 um 12:54
+> geschrieben:
+>
+>
+> Migrate mxs driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Also drop:
+> - 'mxs_clockevent_mode': as we have helpers available from core for the
+> same.
+> same state twice and so perhaps the check wasn't required.
+> - 'clock_event_mode_label': CLOCK_EVT_MODE_* shouldn't be used anymore
+> by drivers and it was used just to print old-state:new-state. The
+> debug prints are called from mxs_irq_clear() now based on the
+> state-name passed to it. The printed name will be same for shutdown
+> and resume states as they use the same callback pointer.
+>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+>
+> ---
+> @Shawn: Please let me know if you want to print "resume" for resume
+> state, as that will require a separate callback for resume state, just
+> to print the name correctly. I thought it might not be worth enough :)
+> ---
 
-Cc: Shiraz Hashim <shiraz.linux.kernel@gmail.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-spear/time.c | 89 ++++++++++++++++++++++++++--------------------
- 1 file changed, 50 insertions(+), 39 deletions(-)
+sorry for the late feedback. I've tested the patch with an i.MX23 and an i.MX28
+board without any problems.
 
-diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
-index 26fda4ed4d51..94342a0966e3 100644
---- a/arch/arm/mach-spear/time.c
-+++ b/arch/arm/mach-spear/time.c
-@@ -66,8 +66,6 @@
- static __iomem void *gpt_base;
- static struct clk *gpt_clk;
- 
--static void clockevent_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *clk_event_dev);
- static int clockevent_next_event(unsigned long evt,
- 				 struct clock_event_device *clk_event_dev);
- 
-@@ -95,54 +93,67 @@ static void __init spear_clocksource_init(void)
- 		200, 16, clocksource_mmio_readw_up);
- }
- 
--static struct clock_event_device clkevt = {
--	.name = "tmr0",
--	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = clockevent_set_mode,
--	.set_next_event = clockevent_next_event,
--	.shift = 0,	/* to be computed */
--};
-+static inline void timer_shutdown(struct clock_event_device *evt)
-+{
-+	u16 val = readw(gpt_base + CR(CLKEVT));
-+
-+	/* stop the timer */
-+	val &= ~CTRL_ENABLE;
-+	writew(val, gpt_base + CR(CLKEVT));
-+}
-+
-+static int spear_shutdown(struct clock_event_device *evt)
-+{
-+	timer_shutdown(evt);
-+
-+	return 0;
-+}
-+
-+static int spear_set_oneshot(struct clock_event_device *evt)
-+{
-+	u16 val;
- 
--static void clockevent_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *clk_event_dev)
-+	/* stop the timer */
-+	timer_shutdown(evt);
-+
-+	val = readw(gpt_base + CR(CLKEVT));
-+	val |= CTRL_ONE_SHOT;
-+	writew(val, gpt_base + CR(CLKEVT));
-+
-+	return 0;
-+}
-+
-+static int spear_set_periodic(struct clock_event_device *evt)
- {
- 	u32 period;
- 	u16 val;
- 
- 	/* stop the timer */
-+	timer_shutdown(evt);
-+
-+	period = clk_get_rate(gpt_clk) / HZ;
-+	period >>= CTRL_PRESCALER16;
-+	writew(period, gpt_base + LOAD(CLKEVT));
-+
- 	val = readw(gpt_base + CR(CLKEVT));
--	val &= ~CTRL_ENABLE;
-+	val &= ~CTRL_ONE_SHOT;
-+	val |= CTRL_ENABLE | CTRL_INT_ENABLE;
- 	writew(val, gpt_base + CR(CLKEVT));
- 
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		period = clk_get_rate(gpt_clk) / HZ;
--		period >>= CTRL_PRESCALER16;
--		writew(period, gpt_base + LOAD(CLKEVT));
--
--		val = readw(gpt_base + CR(CLKEVT));
--		val &= ~CTRL_ONE_SHOT;
--		val |= CTRL_ENABLE | CTRL_INT_ENABLE;
--		writew(val, gpt_base + CR(CLKEVT));
--
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		val = readw(gpt_base + CR(CLKEVT));
--		val |= CTRL_ONE_SHOT;
--		writew(val, gpt_base + CR(CLKEVT));
--
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_RESUME:
--
--		break;
--	default:
--		pr_err("Invalid mode requested\n");
--		break;
--	}
-+	return 0;
- }
- 
-+static struct clock_event_device clkevt = {
-+	.name = "tmr0",
-+	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-+	.set_state_shutdown = spear_shutdown,
-+	.set_state_periodic = spear_set_periodic,
-+	.set_state_oneshot = spear_set_oneshot,
-+	.tick_resume = spear_shutdown,
-+	.set_next_event = clockevent_next_event,
-+	.shift = 0,	/* to be computed */
-+};
-+
- static int clockevent_next_event(unsigned long cycles,
- 				 struct clock_event_device *clk_event_dev)
- {
--- 
-2.4.0
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+
+Regards
+Stefan
