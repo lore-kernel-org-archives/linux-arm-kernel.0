@@ -1,14 +1,14 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 18 Jul 2015 00:06:04 +0200
-Subject: [GIT PULL] pxa for v4.3
-Message-ID: <87egk6h22b.fsf@belgarion.home>
+Date: Sat, 18 Jul 2015 00:10:42 +0200
+Subject: [GIT PULL] pxa-dt for v4.3
+Message-ID: <87wpxyfna5.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Kevin, and Olof,
 
-This is the pxa pull request for 4.3 development cycle. It is a quite small one,
-the main work happening on the drivers side, mostly dmaengine centric work.
+This is the pxa pull request for 4.3 device-tree. It is mostly dma centric, with
+one fix and 2 new IPs support, camera host and usb host.
 
 The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
@@ -16,37 +16,33 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
 are available in the git repository at:
 
-  https://github.com/rjarzmik/linux.git tags/tags/pxa-for-4.3
+  https://github.com/rjarzmik/linux.git tags/tags/pxa-dt-4.3
 
-for you to fetch changes up to 13f62201c9745403188c3cf9c78e643b35e0d160:
+for you to fetch changes up to fb18539b3c8f03e550b8afb21cf53db2a2235dbe:
 
-  ARM: pxa: Use setup_timer (2015-07-14 23:33:14 +0200)
-
-----------------------------------------------------------------
-This is the pxa changes for v4.3 cycle.
-
-There is mostly one evolution on the dma side, to enable cooperation
-of the legacy pxa DMA API, and the new dmaengine API.
-Once all drivers using DMA are converted, the legacy DMA API should
-be removed.
+  ARM: dts: pxa: fix power i2c definition (2015-07-10 22:29:22 +0200)
 
 ----------------------------------------------------------------
-Robert Jarzmik (1):
-      ARM: pxa: transition to dmaengine phase 1
+This device-tree pxa update brings :
+ - dma nodes after dmaengine pxa_dma driver merge
+ - camera driver
+ - usb host controller
 
-Vaishali Thakkar (2):
-      ARM: pxa: Use module_platform_driver
-      ARM: pxa: Use setup_timer
+----------------------------------------------------------------
+Robert Jarzmik (6):
+      ARM: dts: pxa: add dma controller
+      ARM: dts: pxa: add dma engine node to pxa3xx-nand
+      ARM: dts: pxa: add dma pxamci nodes to pxa3xx
+      ARM: dts: pxa: add embedded pxa camera capture interface
+      ARM: dts: pxa: add the usb host controller
+      ARM: dts: pxa: fix power i2c definition
 
- arch/arm/mach-pxa/devices.c          | 37 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-pxa/pxa25x.c           |  1 +
- arch/arm/mach-pxa/pxa27x.c           |  1 +
- arch/arm/mach-pxa/pxa3xx.c           |  1 +
- arch/arm/mach-pxa/sharpsl_pm.c       |  6 ++----
- arch/arm/mach-pxa/tosa-bt.c          | 15 +--------------
- arch/arm/plat-pxa/dma.c              | 22 ++++++++++-----------
- arch/arm/plat-pxa/include/plat/dma.h | 15 +++++++++++++++
- 8 files changed, 69 insertions(+), 29 deletions(-)
+ arch/arm/boot/dts/pxa27x.dtsi | 36 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/pxa2xx.dtsi |  4 ++++
+ arch/arm/boot/dts/pxa3xx.dtsi | 52 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
+
+Cheers.
 
 -- 
 Robert
