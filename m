@@ -1,44 +1,35 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 17 Jul 2015 10:03:14 +0200
-Subject: [PATCH 0/4] ARM: tegra: enable Nouveau for Jetson TK1 and Venice 2
-In-Reply-To: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
-References: <1435742028-8237-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20150717080313.GA3057@ulmo>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jul 2015 09:58:01 +0200
+Subject: [PATCH] Subject: pinctrl: imx1-core: Fix debug output in
+ .pin_config_set callback
+In-Reply-To: <1437118723-19217-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <55A85B59.5060906@gtsys.com.hk>
+ <1437118723-19217-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <CACRpkdbzZDLVLgRnj9n3zKNCzYT+pdNDGEfYPN0p5ZA7bO0uUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 06:13:44PM +0900, Alexandre Courbot wrote:
-> With all essential kernel driver and user-space patches merged, GK20A can now
-> be enabled safely on Tegra124 devices. This series makes small device tree
-> and configuration adjustments to allow this.
-> 
-> It leaves the GK20A nodes ready to be used, but still disabled. Enabling the
-> nodes is the work of the bootloader, after it has configured VPR properly.
-> 
-> U-boot patches that do this are in the work. In the meantime, it is safe to
-> merge this kernel support.
-> 
-> Alexandre Courbot (3):
->   ARM: tegra: Add IOMMU node to GK20A
->   ARM: tegra: jetson-tk1: Add GK20A GPU DT node
->   ARM: tegra: Enable Nouveau in defconfig
-> 
-> Thierry Reding (1):
->   ARM: tegra: venice2: Add GK20A GPU DT node
-> 
->  arch/arm/boot/dts/tegra124-jetson-tk1.dts | 10 +++++++++-
->  arch/arm/boot/dts/tegra124-venice2.dts    | 10 +++++++++-
->  arch/arm/boot/dts/tegra124.dtsi           |  3 +++
->  arch/arm/configs/tegra_defconfig          |  3 +++
->  4 files changed, 24 insertions(+), 2 deletions(-)
+On Fri, Jul 17, 2015 at 9:38 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-Applied, thanks.
+> imx1_pinconf_set assumes that the array of pins in struct
+> imx1_pinctrl_soc_info can be indexed by pin id to get the
+> pinctrl_pin_desc for a pin. This used to be correct up to commit
+> 607af165c047 which removed some entries from the array and so made it
+> wrong to access the array by pin id.
+>
+> The result of this bug is a wrong pin name in the output for small pin
+> ids and an oops for the bigger ones.
+>
+> This patch is the result of a discussion that includes patches by Markus
+> Pargmann and Chris Ruehl.
+>
+> Fixes: 607af165c047 ("pinctrl: i.MX27: Remove nonexistent pad definitions")
+> Cc: stable at vger.kernel.org
+> Reported-by: Chris Ruehl <chris.ruehl@gtsys.com.hk>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/7c27f992/attachment-0001.sig>
+Patch applied for fixes with Markus' review tag.
+
+Yours,
+Linus Walleij
