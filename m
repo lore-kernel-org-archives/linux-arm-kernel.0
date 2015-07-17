@@ -1,75 +1,110 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 16 Jul 2015 23:21:28 -0400
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <55A86D50.9060407@linaro.org>
-References: <1436765375-7119-1-git-send-email-takahiro.akashi@linaro.org>
- <1436765375-7119-3-git-send-email-takahiro.akashi@linaro.org>
- <DAAB1BC4-B36E-436D-8EAD-548641E58490@gmail.com>
- <20150714093154.4d73e551@gandalf.local.home>
- <55A5A75A.1060401@linaro.org>
- <20150714225105.6c1e4f15@gandalf.local.home>
- <55A646EE.6030402@linaro.org>
- <20150715105536.42949ea9@gandalf.local.home>
- <20150715121337.3b31aa84@gandalf.local.home>
- <55A6FA82.9000901@linaro.org> <55A703F3.8050203@linaro.org>
- <A601CC3C-4B09-4D8B-8564-558349D45815@gmail.com>
- <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <5176E676-1AAA-4F2B-827B-BEF3A2620D86@gmail.com>
- <20150716162255.0beedc76@gandalf.local.home>
- <55A86D50.9060407@linaro.org>
-Message-ID: <20150716232128.1a887a9f@grimm.local.home>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 17 Jul 2015 11:31:09 +0800
+Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+ lpsr
+In-Reply-To: <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
+References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
+ <20150715072307.GM4119@tiger>
+ <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
+ <20150716155034.GN4119@tiger>
+ <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
+Message-ID: <20150717033109.GB12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jul 2015 11:49:52 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> > -
-> > -	if (using_ftrace_ops_list_func())
-> > -		max_stack_trace.skip = 4;
-> > -	else
-> > -		max_stack_trace.skip = 3;
-> > +	max_stack_trace.skip = 3;
+On Thu, Jul 16, 2015 at 11:22:27AM -0500, Zhi Li wrote:
+> On Thu, Jul 16, 2015 at 10:50 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> Although cross IOMUX and IOMUXC-LPSR is rare,  it will be headache if there are
+> one boards.
 > 
-> I don't think this last line is necessary because we will skip all
-> the functions anyway below:
-
-I put this back more as an optimization as it is already known that it
-takes at least three calls to get to this point. Unless of course gcc
-decides to inline them. But currently I don't see that.
-
+> Some SD card, ENET have reset\wp\cd pin.
 > 
-> >   	save_stack_trace(&max_stack_trace);
-> >
-> > -	/*
-> > -	 * Add the passed in ip from the function tracer.
-> > -	 * Searching for this on the stack will skip over
-> > -	 * most of the overhead from the stack tracer itself.
-> > -	 */
-> > -	stack_dump_trace[0] = ip;
-> > -	max_stack_trace.nr_entries++;
-> > +	/* Skip over the overhead of the stack tracer itself */
-> > +	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-> > +		if (stack_dump_trace[i] == ip)
-> > +			break;
-> > +	}
+> pinctrl_usdhc1: usdhc1grp {
+>                         fsl,pins = <
+>                                 MX7D_PAD_SD1_CMD__SD1_CMD               0x59
+>                                 MX7D_PAD_SD1_CLK__SD1_CLK               0x19
+>                                 MX7D_PAD_SD1_DATA0__SD1_DATA0           0x59
+>                                 MX7D_PAD_SD1_DATA1__SD1_DATA1           0x59
+>                                 MX7D_PAD_SD1_DATA2__SD1_DATA2           0x59
+>                                 MX7D_PAD_SD1_DATA3__SD1_DATA3           0x59
+>                                 MX7D_PAD_SD1_CD_B__GPIO5_IO0
+>  0x59 /* CD */
+>                                 MX7D_PAD_SD1_WP__GPIO5_IO1
+>  0x59 /* WP */
+>                                 MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+>  0x59 /* vmmc */
+>                         >;
 > 
-> here. Now "i" indicates the start point, excepting tracer functions,
-> and "x" will eventually represent the exact number of functions
-> that we are interested in after searching the stack.
+> Customer may choose below pin to IOMUX-lPSR.
 > 
-> To calc "stack_max_size" correctly, we should change the line:
->      if (unlikely(tracer_frame) && i == 1) {
-> to
->      if (unlikely(tracer_frame)) {
+> MX7D_PAD_SD1_CD_B__GPIO5_IO0
+> MX7D_PAD_SD1_WP__GPIO5_IO1
+> MX7D_PAD_SD1_RESET_B__GPIO5_IO2
+> 
+> FEC have Phy Reset GPIO, which possibly choose IOMUX-lPSR.
 
-Good catch, I'll fix that!
+I do not understand why it would be a headache.  The following is what I
+have in my head, and I think it's nicer and easier to implement.  Most
+importantly, this maps how hardware is laid out exactly, save us all
+those magics and hacks.
 
--- Steve
+iomuxc: iomuxc at 30330000 {
+	compatible = "fsl,imx7d-iomuxc";
+	reg = <0x30330000 0x10000>;
+};
 
-> 
-> With these two changes applied, the issues Jungseok mentioned will be
-> fixed.
-> 
+iomuxc_lpsr: iomuxc-lpsr at 302c0000 {
+	compatible = "fsl,imx7d-iomuxc-lpsr";
+	reg = <0x302c0000 0x10000>;
+	fsl,select-input-controller = <&iomuxc>;
+};
+
+&iomuxc {
+	pinctrl_usdhc1: usdhc1grp {
+		fsl,pins = <
+			MX7D_PAD_SD1_CMD__SD1_CMD	0x59
+			MX7D_PAD_SD1_CLK__SD1_CLK	0x19
+			MX7D_PAD_SD1_DATA0__SD1_DATA0	0x59
+			MX7D_PAD_SD1_DATA1__SD1_DATA1	0x59
+			MX7D_PAD_SD1_DATA2__SD1_DATA2	0x59
+			MX7D_PAD_SD1_DATA3__SD1_DATA3	0x59
+		>;
+	};
+};
+
+&iomuxc_lpsr {
+	pinctrl_usdhc1_lpsr: usdhc1lpsrgrp {
+		fsl,pins = <
+			MX7D_PAD_LPSR_GPIO1_IO0__GPIO1_IO0  0x59 /* CD */
+			MX7D_PAD_LPSR_GPIO1_IO1__GPIO1_IO1  0x59 /* WP */
+			MX7D_PAD_LPSR_GPIO1_IO2__GPIO1_IO2  0x59 /* vmmc */
+		>;
+	};
+};
+
+&usdhc1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_usdhc1_lpsr>;
+};
+
+> It is very easy to make mistake.
+> According to pin NAME macro, it is not easy to distinguish between
+> IOMUX and IOMUX-LPSR.
+
+That's easy to resolve.  As I demonstrated above, having LPSR in the
+macro names and putting all those LPSR pad macros in a separate header
+like imx7d-lpsr-pinfunc.h would make it easy to remember.
+
+> Internal kernel tree use two pinctrl instance.
+
+I think this is the right approach.  You should post that solution
+for upstream instead.
+
+> It will be simple if we think IOMUX and IOMUX-LPSR together, and one
+> module have two group registers.
+
+No, they are two instances of IOMUX controller from perspective of
+hardware design.  And Linux pinctrl subsystem is well-designed to fit
+there.
+
+Shawn
