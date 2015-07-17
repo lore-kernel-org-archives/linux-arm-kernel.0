@@ -1,56 +1,88 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 17 Jul 2015 16:57:11 +0800
-Subject: [PATCH 3/6] clk: sunxi: Add A33 clock for compilation
-In-Reply-To: <CAEzqOZv5pDPJgBfvNKk7vZuTr5H9hLdEOweyxStRFtarNxtFhQ@mail.gmail.com>
-References: <1431240383-12763-1-git-send-email-vishnupatekar0510@gmail.com>
- <1431240383-12763-4-git-send-email-vishnupatekar0510@gmail.com>
- <20150510101750.GC11057@lukather>
- <CAEzqOZv5pDPJgBfvNKk7vZuTr5H9hLdEOweyxStRFtarNxtFhQ@mail.gmail.com>
-Message-ID: <CAGb2v67NjfNjS_FQoYmEs2=OhKYRszgzuqiNPyww3UtiWCq--Q@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 17 Jul 2015 10:59:47 +0200
+Subject: [RESEND PATCH v3] ARM: tegra124: pmu support
+In-Reply-To: <1436808945-14524-1-git-send-email-khuey@kylehuey.com>
+References: <1436808945-14524-1-git-send-email-khuey@kylehuey.com>
+Message-ID: <20150717085946.GB3057@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vishnu,
+On Mon, Jul 13, 2015 at 10:35:45AM -0700, Kyle Huey wrote:
+> This patch modifies the device tree for tegra124 based devices to enable
+> the Cortex A15 PMU.  The interrupt numbers are taken from NVIDIA TRM
+> DP-06905-001_v03p.  This patch was tested on a Jetson TK1.
+> 
+> Updated for proper ordering and to add interrupt-affinity values.
+> 
+> Signed-off-by: Kyle Huey <khuey@kylehuey.com>
+> ---
+>  arch/arm/boot/dts/tegra124.dtsi | 17 +++++++++++++----
+>  1 file changed, 13 insertions(+), 4 deletions(-)
 
-This patch did not make v4.2-rc1.
+Is there any way to test this? What are the effects of adding this? Does
+it enable using perf for profiling?
 
-A33 support requires this patch. Otherwise the clock tree
-is absent and nothing works.
+> diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
+> index 13cc7ca..de07d7e 100644
+> --- a/arch/arm/boot/dts/tegra124.dtsi
+> +++ b/arch/arm/boot/dts/tegra124.dtsi
+> @@ -918,31 +918,40 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -		cpu at 0 {
+> +		A15_0: cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <0>;
+>  		};
+>  
+> -		cpu at 1 {
+> +		A15_1: cpu at 1 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <1>;
+>  		};
+>  
+> -		cpu at 2 {
+> +		A15_2: cpu at 2 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <2>;
+>  		};
+>  
+> -		cpu at 3 {
+> +		A15_3: cpu at 3 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a15";
+>  			reg = <3>;
+>  		};
+>  	};
+>  
+> +	pmu {
+> +		compatible = "arm,cortex-a15-pmu";
+> +		interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-affinity = <&A15_0>, <&A15_1>, <&A15_2>, <&A15_3>;
 
+These labels look somewhat artificial to me, perhaps we could do
+something like the following instead?
 
+	interrupt-affinity = <&{/cpus/cpu@0}>, ...;
 
-On Mon, May 11, 2015 at 4:53 PM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> Hi,
->
-> On Sun, May 10, 2015 at 3:47 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Hi,
->>
->> On Sun, May 10, 2015 at 12:16:20PM +0530, Vishnu Patekar wrote:
->>> A33 clock control unit is similar to A23.
->>>
->>> A33 specific clocks are not yet implemented, added CLK_OF_DECLARE
->>> to get it compiled for A33.
->>
->> That commit log doesn't make any sense.
->>
->> What you're doing isn't about whether or not that will be compiled,
->> but whether you're registering the clocks and which clocks you
->> protect.
-> Actually, It's just registering the a33 clocks and reusing a23 code.
-> nothing to do with compile. I'll correct it in next patch version.
->>
->>> Signed-off-by: VishnuPatekar <vishnupatekar0510@gmail.com>
->>
->> Isn't it supposed to have a space in the middle of your name, just
->> like you have in your mail address?
-> Yes, There should be space.
->>
->> Thanks,
->> Maxime
->>
->> --
->> Maxime Ripard, Free Electrons
->> Embedded Linux, Kernel and Android engineering
->> http://free-electrons.com
+That's slightly more obvious and avoids the need to "invent" labels for
+the CPUs.
+
+No need to respin, I can fix that up when applying if nobody objects to
+using the alternative notation.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/ac176d0d/attachment.sig>
