@@ -1,66 +1,45 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Sat, 18 Jul 2015 00:04:18 +0200
-Subject: [RESEND PATCH 1/6] Document: bindings: DT: Add SMP enable method
- for MT6580 SoC platform
-In-Reply-To: <1436611086.17661.3.camel@mtksdaap41>
-References: <1436611086.17661.3.camel@mtksdaap41>
-Message-ID: <7449891.najJl8C2om@ubix>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 17 Jul 2015 10:44:10 -0700
+Subject: [PATCH v2 0/2] Add support for PL172 memory-controller
+In-Reply-To: <1436822412-20171-1-git-send-email-manabian@gmail.com>
+References: <1436822412-20171-1-git-send-email-manabian@gmail.com>
+Message-ID: <20150717174410.GO21691@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, July 11, 2015 06:38:06 PM Yingjoe Chen wrote:
-> On Mon, 2015-06-29 at 11:03 +0800, Yingjoe Chen wrote:
-> > On Fri, 2015-06-19 at 02:01 +0800, Scott Shu wrote:
-> > > For MT6580 SoC platform, the secondary cores are in powered off state
-> > > as default, so compared with MT65xx series SoC, one new enable method
-> > > is needed. This method using the SPM (System Power Manager) inside
-> > > the SCYSYS to control the CPU power.
-> > > ---
-> > > 
-> > >  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/arm/cpus.txt
-> > > b/Documentation/devicetree/bindings/arm/cpus.txt index ac2903d..fb80b2e
-> > > 100644
-> > > --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> > > +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> > > @@ -194,6 +194,7 @@ nodes to be present and contain the properties
-> > > described below.> > 
-> > >  			    "marvell,armada-380-smp"
-> > >  			    "marvell,armada-390-smp"
-> > >  			    "marvell,armada-xp-smp"
-> > > 
-> > > +			    "mediatek,mt6580-smp"
-> > > 
-> > >  			    "mediatek,mt65xx-smp"
-> > >  			    "mediatek,mt81xx-tz-smp"
-> > >  			    "qcom,gcc-msm8660"
-> > 
-> > Hi
-> > 
-> > It seems we have 3 different kinds of cpu enable method now, and
-> > mt65xx-smp doesn't cover all mt65xx series. So maybe it make sense to
-> > change naming before it got merged.
-> > 
-> > Short summary for these methods:
-> > 
-> > mt65xx-smp:    	For mt65xx socs which wakeup all cores at boot.
-> > 
-> > 		Tested on mt6589 by Matthias.
-> > 
-> > mt6580-smp:     Only first core is alive at boot, so need to wakeup
-> > 
-> > 		other cores using SPM. AFAIK only for mt6580 now.
-> > 
-> > mt81xx-tz-smp:  For soc which wakeup all cores at boot, and have
-> > 
-> > 		trustzone firmware. Suitable for mt8127, mt8135.
+On Mon, Jul 13, 2015 at 11:20:10PM +0200, Joachim Eastwood wrote:
+> This patch set adds a memory driver and documentation for the ARM
+> PL172. This driver  makes it possible to configure the static
+> memory chip selects on the ARM PL172 MultiPort Memory Controller
+> from a set of properties in DT. Configuration of dynamic memory
+> (SDRAM) is not supported and is left to the boot loader. The
+> intended usage is to setup timing and configuration for static
+> memory devices like NAND and NOR Flash before they are probed by
+> a driver. Pretty much what like all the other memory drivers do.
 > 
-> Hi Matthias, Arnd,
+> As drivers/memory doesn't seem to have a maintainer of it's own
+> I hope this patch set can go through the armsoc-drivers branch.
 > 
-> Any suggestion on the naming? Is it ok if I just rename mt65xx-smp to
-> mt6589-smp since that's the only one we tested?
+> The previous version of the patch set didn't recive recivce much
+> feedback and the cover letter can be found here:
+> http://marc.info/?l=devicetree&m=143024189625522&w=2
 > 
+> DT bindings for PL172 is based on the bindings for the TI AEMIF
+> memory controller. PL172 can be found on a number of NXP devices
+> like the LPC18xx family.
+> 
+> Tested on Embedded Artists' LPC4357 Developer's Kit with NOR Flash
+> (SST39VF320) and 74LCV16374 (gpio-74x164) on MPMC.
+> 
+> Changes since v1:
+>  - Add proper commit messages
+>  - Misc clean ups
+> 
+> Joachim Eastwood (2):
+>   memory: add ARM PL172 MultiPort Memory Controller driver
+>   doc: dt: add documentation for pl172 memory bindings
 
-Yes, that's fine for me.
+Thanks, I've applied both patches to next/drivers.
+
+
+-Olof
