@@ -1,212 +1,74 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Jul 2015 11:36:09 +0100
-Subject: Master-aware devices and sideband ID data
-In-Reply-To: <20150716133441.GC28631@leverpostej>
-References: <26BE36EF-2C5B-4DA6-8950-8FEBB031ED1B@caviumnetworks.com>
- <20150527173953.GC23176@leverpostej>
- <E342D737-5DD5-48C7-BB01-B83C29CB6E31@caviumnetworks.com>
- <20150601102208.GD22406@leverpostej>
- <158EFC9F-FCAF-44D3-AD40-804EDFE0CE25@caviumnetworks.com>
- <20150605090534.GC1198@arm.com>
- <20150609101515.GA28474@leverpostej>
- <20150708133049.GD7025@leverpostej> <20150708160227.GJ9283@arm.com>
- <20150716133441.GC28631@leverpostej>
-Message-ID: <20150717103609.GJ18994@arm.com>
+From: russell.joyce@york.ac.uk (Russell Joyce)
+Date: Fri, 17 Jul 2015 11:41:43 +0100
+Subject: [PATCH] PCI: xilinx: Add check for MSI interrupt flag before
+ handling as INTx
+In-Reply-To: <20150714222440.GO24416@google.com>
+References: <1436288059-22925-1-git-send-email-russell.joyce@york.ac.uk>
+ <20150714222440.GO24416@google.com>
+Message-ID: <E5601A3C-EB97-4DF9-8888-138C5C7C2E49@york.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 02:34:41PM +0100, Mark Rutland wrote:
-> Hi Will,
+Of the PCIe cards I have tried, only one (an Intel SSD 750 Series) causes the problem, where both INTx and MSI interrupt flags are set shortly after the device is enabled during boot.
+For reference, I am using the latest 2015.2 Xilinx tools with version 2.6 (rev. 1) of the AXI PCIe Bridge core in root port mode on a ZedBoard Mini-ITX.
 
-Hi Mark,
+The documentation for the core does not say that the interrupt type flags are mutually exclusive, and the interrupt message type (XILINX_PCIE_RPIFR1_MSI_INTR) is already checked before handling MSI interrupts, so it makes sense that it should also be checked before handling INTx interrupts.
 
-[adding David, since he's working on PCI/ITS stuff atm]
 
-> The below is an attempt at an MSI binding, derived from my original
-> example. It extends msi-parent inoto a phandle+(optional args) style
-> property.
+> On 14 Jul 2015, at 23:24, Bjorn Helgaas <bhelgaas@google.com> wrote:
 > 
-> I haven't yet managed to come up with a sane way of describing
-> the Bus-ID/BDF -> {iommu,msi}-cells translation, but this should
-> hopefully cover the platform device case.
+> On Tue, Jul 07, 2015 at 05:54:19PM +0100, Russell Joyce wrote:
+>> Occasionally both MSI and INTx bits in the interrupt decode register are
+>> set at once by the Xilinx AXI PCIe Bridge, so the MSI flag in the
+>> interrupt message should be checked to ensure that the correct handler is
+>> used.
+>> 
+>> If this check is not in place and the interrupt message type is MSI, the
+>> INTx handler will be used erroneously when both type bits are set.
+>> This will also be followed by a second read of the message FIFO, which can
+>> result in the function returning early and the interrupt decode register
+>> not being cleared if the FIFO is now empty.
+>> 
+>> Signed-off-by: Russell Joyce <russell.joyce@york.ac.uk>
+>> ---
+>> drivers/pci/host/pcie-xilinx.c | 19 +++++++++++--------
+>> 1 file changed, 11 insertions(+), 8 deletions(-)
+>> 
+>> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+>> index f1a06a0..dcb9b57 100644
+>> --- a/drivers/pci/host/pcie-xilinx.c
+>> +++ b/drivers/pci/host/pcie-xilinx.c
+>> @@ -449,14 +449,17 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
+>> 			return IRQ_HANDLED;
+>> 		}
+>> 
+>> -		/* Clear interrupt FIFO register 1 */
+>> -		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+>> -			   XILINX_PCIE_REG_RPIFR1);
+>> -
+>> -		/* Handle INTx Interrupt */
+>> -		val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+>> -			XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
+>> -		generic_handle_irq(irq_find_mapping(port->irq_domain, val));
+>> +		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
+>> +			/* Clear interrupt FIFO register 1 */
+>> +			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
+>> +				   XILINX_PCIE_REG_RPIFR1);
+>> +
+>> +			/* Handle INTx Interrupt */
+>> +			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
+>> +				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
+>> +			generic_handle_irq(irq_find_mapping(port->irq_domain,
+>> +							    val));
 > 
-> For the Bus-ID translation case I'm not sure it's sane to attempt to use
-> msi-parent, given that the transformation description will necessarily
-> have to describe the parents anyway.
-
-We probably want a separate property on the RC node describing the
-transformation (i.e. offsetting) in a similar way to ranges or
-interrupt-map (potentially replacing msi-parent altogether). Maybe you
-could propose something so that David could have a crack at describing
-his RequesterID -> DeviceID mapping, which seems to map nicely onto a
-per-RC offset IIUC.
-
-David -- does that sound ok to you?
-
-Will
-
-> ---->8----
-> From 429dca4bba98732c492e95bdf395aa2ccc634e69 Mon Sep 17 00:00:00 2001
-> From: Mark Rutland <mark.rutland@arm.com>
-> Date: Thu, 9 Jul 2015 17:53:00 +0100
-> Subject: [PATCH] Documentation: dt: add generic MSI bindings
+> Xilinx folks, any comments?
 > 
-> Currently msi-parent is in use in a couple of drviers despite being
-> fairly underspecified. This patch adds a generic binding for MSIs
-> (including the existing msi-parent property) enabling the description of
-> platform devices capable of using MSIs.
+> Russell, is there a good way to reproduce this so others can verify the
+> problem and the fix?
 > 
-> This binding does not yet cover the general case. Currently the binding
-> does not cover the relationship between bus IDs (e.g. PCIe BDF) and
-> sideband data.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
->  1 file changed, 135 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> new file mode 100644
-> index 0000000..c60c034
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
-> @@ -0,0 +1,135 @@
-> +This document describes the generic device tree binding for MSI controllers and
-> +their master(s).
-> +
-> +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
-> +write to an MMIO address.
-> +
-> +MSIs were originally specified by PCI (and are used with PCIe), but may also be
-> +used with other busses, and hence a mechanism is required to relate devices on
-> +those busses to the MSI controllers which they are capable of using,
-> +potentially including additional information.
-> +
-> +MSIs are distinguished by some combination of:
-> +
-> +- The doorbell (the MMIO address written to).
-> +  
-> +  Devices may be configured by software to write to arbitrary doorbells which
-> +  they can address. An MSI controller may feature a number of doorbells.
-> +
-> +- The payload (the value written to the doorbell).
-> +  
-> +  Devices may be configured to write an arbitrary payload chosen by software.
-> +  MSI controllers may have restrictions on permitted payloads.
-> +
-> +- Sideband information accompanying the write.
-> +  
-> +  Typically this is neither configurable nor probeable, and depends on the path
-> +  taken through the memory system (i.e. it is a property of the combination of
-> +  MSI controller and device rather than a property of either in isolation).
-> +
-> +
-> +MSI controllers:
-> +================
-> +
-> +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
-> +address by some master. An MSI controller may feature a number of doorbells.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- msi-controller: Identifies the node as an MSI controller.
-> +
-> +Optional properties:
-> +--------------------
-> +
-> +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
-> +
-> +  Typically this will encode information related to sideband data, and will
-> +  not encode doorbells or payloads as these can be configured dynamically.
-> +
-> +  The meaning of the msi-specifier is defined by the device tree binding of
-> +  the specific MSI controller. 
-> +
-> +
-> +MSI clients
-> +===========
-> +
-> +MSI clients are devices which generate MSIs. For each MSI they wish to
-> +generate, the doorbell and payload may be configured, though sideband
-> +information may not be configurable.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
-> +  controller which the device is capable of using.
-> +
-> +  This property is unordered, and MSIs may be allocated from any combination of
-> +  MSI controllers listed in the msi-parent property.
-> +
-> +  If a device has restrictions on the allocation of MSIs, these restrictions
-> +  must be described with additional properties.
-> +
-> +  When #msi-cells is non-zero, busses with an msi-parent will require
-> +  additional properties to describe the relationship between devices on the bus
-> +  and the set of MSIs they can potentially generate.
-> +
-> +
-> +Example
-> +=======
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi_a: msi-controller at a {
-> +		reg = <0xa 0xf00>;
-> +		compatible = "vendor-a,some-controller";
-> +		msi-controller;
-> +		/* No sideband data, so #msi-cells omitted */
-> +	};
-> +
-> +	msi_b: msi-controller at b {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	msi_c: msi-controller at c {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	dev at 0 {
-> +		reg = <0x0 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/* Can only generate MSIs to msi_a */
-> +		msi-parent = <&msi_a>;
-> +	};
-> +
-> +	dev at 1 {
-> +		reg = <0x1 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/* 
-> +		 * Can generate MSIs to either A or B.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>;
-> +	};
-> +
-> +	dev at 2 {
-> +		reg = <0x2 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +		/*
-> +		 * Has different IDs at each MSI controller.
-> +		 * Can generate MSIs to all of the MSI controllers.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
-> +	};
-> +};
-> -- 
-> 1.9.1
-> 
+>> +		}
+>> 	}
+>> 
+>> 	if (status & XILINX_PCIE_INTR_MSI) {
+>> -- 
+>> 2.1.4
