@@ -1,29 +1,33 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 17 Jul 2015 10:26:46 +0200
-Subject: [PATCH 0/2] Drop two more omap3 legacy board files for v4.3
- merge window
-In-Reply-To: <1437047951-22300-1-git-send-email-tony@atomide.com>
-References: <1437047951-22300-1-git-send-email-tony@atomide.com>
-Message-ID: <20150717082645.GB9331@earth>
+From: b38611@freescale.com (Fugang Duan)
+Date: Fri, 17 Jul 2015 16:38:20 +0800
+Subject: [PATCH v1 0/4] ARM: imx6ul: add fec1 and fec2 support for i.MX6ul
+ 14x14 evk board
+Message-ID: <1437122304-20598-1-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Currently, upstream kernel support i.MX6ul 14x14 evk board, but don't support ethernet that
+bringup some inconvenient for other modules debug and support.
 
-On Thu, Jul 16, 2015 at 04:59:09AM -0700, Tony Lindgren wrote:
-> I think we can drop these now. This just leaves n900 and ldp with
-> n900 pending patches for legacy proc support.
+The patch series just add fec1 and fec2 two MACs support for the board.
 
-So I guess n900 board file removal depends on the atag procfs
-support in DT. What's the problem with ldp? Its DT file seem
-to cover everything in the board file. I guess both of them
-will finally be removed in 4.4?
+Patch#1 and #2:
+	FEC MAC refrence clock needs extra GPR bit set to select clock source.
+	The board install KSZ8081 that also needs extra phyfix.
+Patch#3 and #4:
+	Add fec support for SOC and evk board in dts file.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150717/afc5f085/attachment.sig>
+Fugang Duan (4):
+  ARM: imx6ul: add fec bits to GPR syscon definition
+  ARM: imx6ul: add fec MAC refrence clock and phy fixup init
+  ARM: dts: imx: add fec1 and fec2 nodes for SOC i.MX6UL
+  ARM: dts: imx6ul-14x14-evk: add fec1 and fec2 support
+
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts      | 29 +++++++++++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi               | 37 +++++++++++++++++++++++++
+ arch/arm/mach-imx/mach-imx6ul.c             | 43 +++++++++++++++++++++++++++++
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h |  8 ++++++
+ 4 files changed, 117 insertions(+)
+
+-- 
+1.9.1
