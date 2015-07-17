@@ -1,61 +1,43 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Fri, 17 Jul 2015 11:32:41 +0200
-Subject: [PATCH 0/9] gpiolib: Add GPIO name support
-Message-ID: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 17 Jul 2015 11:36:20 +0200
+Subject: [PATCH 04/13] pinctrl: tegra: Only set the gpio range if needed
+In-Reply-To: <CAAObsKAH4kXdetXoj7fEZP4t09g39E4Y6QZPO4_SBu=BqstqbA@mail.gmail.com>
+References: <1434548543-22949-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1434548543-22949-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CACRpkdY1PPTvuF1ntiybGYoN8nHD7dojtuuJkKpUPXNjBpK1nw@mail.gmail.com>
+ <CAAObsKBUoMmHOXBmEO4+8H1VVAkEHn_aFvLBOrXS5syLu5p1iA@mail.gmail.com>
+ <CACRpkdahW+oXpcmyCSEYbUrsz3DPgT+HJ6h=8_J=nYOpghaXAQ@mail.gmail.com>
+ <CAAObsKAH4kXdetXoj7fEZP4t09g39E4Y6QZPO4_SBu=BqstqbA@mail.gmail.com>
+Message-ID: <CACRpkda+8Tt0rbFo=xYemy89ShxYanixFc=Bc2aQ7fC9ykN9FA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 17, 2015 at 10:19 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 17 July 2015 at 10:04, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-This is a proposal to add GPIO names to the kernel based on devicetree
-descriptions.
+>> I don't see Stephen's ACK on them, where is it? It's not in the
+>> patch and I don't see it as response to the patches.
+>
+> I see it in:
+>
+> https://lkml.kernel.org/g/1436862596-27730-4-git-send-email-tomeu.vizoso at collabora.com
+>
+> Which was given in:
+>
+> https://lkml.kernel.org/g/559D8E36.50209 at wwwdotorg.org
 
-This series adds GPIO name support. Until now it is only possible to use names
-for already requested GPIOs (for example what they are used for). It is not
-possible to identify GPIOs by a name although most of them have a name for
-example in the schematics of the board. This makes it difficult to identify
-a specific GPIO from userspace.
+Hm strange I only see v1, that's why I'm confused....
 
-As the GPIO name information is a hardware description this series uses the
-devicetree bindings introduced by the GPIO hogging mechanism, specifically
-'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
-names as fallback. The gpio numbers still have a higher priority to ensure
-backwards compatibility.
+> But we still need an ack for patch 1/3 before both 2/3 and 3/3 can be
+> merged, because if we don't defer the probe when the pinctrl isn't
+> found and just skip adding the gpio-range, there won't be no
+> gpio-range set at all if the pinctrl device probes after the gpiochip
+> device. Merging 2/3 now would be fine as long as we don't merge 3/3
+> before 1/3.
 
-Exported GPIOs are still using their number as directory name (gpio<ID>). But the
-directories now contain a 'name' file which is '(null)' for non-existent names
-and the name otherwise.
+I'll hold it back for now, bug me when you think I can merge
+1/3 and 2/3.
 
-This series can be used to have an easy name mapping for udev with a quite
-simple rule similar to this:
-	SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
-	PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
-With this rule udev adds a link for each exported GPIO with a name into
-/dev/gpios/. This way it is not necessary to know the number of a GPIO to use
-it.
-
-Best Regards,
-
-Markus
-
-
-Markus Pargmann (9):
-  gpiolib: Fix possible use of wrong name
-  gpiolib-of: Rename gpio_hog functions to be generic
-  gpio: Allow hogged gpios to be requested
-  gpio: Add 'name' to the gpio descriptor struct
-  gpiolib: Implement gpio_name_to_desc()
-  gpiolib-of: Reuse 'line-name' from DT as gpio descriptor name
-  gpiolib-sysfs: Add gpio name parsing for sysfs export
-  gpiolib-sysfs: Show gpio-name in /sys/class/gpio/gpio*/name
-  gpiolib: Add gpio name information to /sys/kernel/debug/gpio
-
- drivers/gpio/gpiolib-of.c     | 45 +++++++++++++++++++------------
- drivers/gpio/gpiolib-sysfs.c  | 61 ++++++++++++++++++++++++++++++++++---------
- drivers/gpio/gpiolib.c        | 46 +++++++++++++++++++++++++++++---
- drivers/gpio/gpiolib.h        |  3 +++
- include/linux/gpio/consumer.h |  7 +++++
- 5 files changed, 128 insertions(+), 34 deletions(-)
-
--- 
-2.1.4
+Yours,
+Linus Walleij
