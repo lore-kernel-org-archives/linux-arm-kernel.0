@@ -1,32 +1,105 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Fri, 17 Jul 2015 17:20:32 +0530
-Subject: [PATCH v2 2/3] ARM: DRA7: RTC: Add lock and unlock functions
-In-Reply-To: <1437133833-32355-1-git-send-email-lokeshvutla@ti.com>
-References: <1437133833-32355-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <1437133833-32355-3-git-send-email-lokeshvutla@ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 17 Jul 2015 13:56:20 +0200
+Subject: [PATCH v3] mfd: atmel-hlcdc: implement config synchronization
+In-Reply-To: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <55A8ED64.9030109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook omap_hwmod_rtc_unlock/lock functions into RTC hwmod,
-so that SYSCONFIG register is updated properly
+Le 07/07/2015 19:16, Boris Brezillon a ?crit :
+> Some HLCDC registers cannot be written until the hardware has finished
+> applying the previous configuration request. If they are written while
+> an action is still in progress, the new configuration might be silently
+> ignored, resulting in unpredictable behavior.
+> 
+> Hide the config synchronization stuff in a regmap implementation and use
+> this implementation instead of the generic mmio one.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 2 ++
- 1 file changed, 2 insertions(+)
+Yes, that implements the needed behavior for these registers...
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index 2606c66..95d9bc5c 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1572,6 +1572,8 @@ static struct omap_hwmod_class_sysconfig dra7xx_rtcss_sysc = {
- static struct omap_hwmod_class dra7xx_rtcss_hwmod_class = {
- 	.name	= "rtcss",
- 	.sysc	= &dra7xx_rtcss_sysc,
-+	.unlock	= &omap_hwmod_rtc_unlock,
-+	.lock	= &omap_hwmod_rtc_lock,
- };
- 
- /* rtcss */
+Thanks. Bye,
+
+> ---
+> Changes since v2:
+>  - reword the commit message
+> 
+> Changes since v1:
+>  - add a 100 usec timeout
+> ---
+>  drivers/mfd/atmel-hlcdc.c | 35 +++++++++++++++++++++++++++++++++--
+>  1 file changed, 33 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+> index cfd58f4..04e01cc 100644
+> --- a/drivers/mfd/atmel-hlcdc.c
+> +++ b/drivers/mfd/atmel-hlcdc.c
+> @@ -18,6 +18,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/iopoll.h>
+>  #include <linux/mfd/atmel-hlcdc.h>
+>  #include <linux/mfd/core.h>
+>  #include <linux/module.h>
+> @@ -37,11 +38,41 @@ static const struct mfd_cell atmel_hlcdc_cells[] = {
+>  	},
+>  };
+>  
+> +static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
+> +					unsigned int val)
+> +{
+> +	void __iomem *regs = context;
+> +
+> +	if (reg <= ATMEL_HLCDC_DIS) {
+> +		u32 status;
+> +
+> +		readl_poll_timeout(regs + ATMEL_HLCDC_SR, status,
+> +				   !(status & ATMEL_HLCDC_SIP), 1, 100);
+> +	}
+> +
+> +	writel(val, regs + reg);
+> +
+> +	return 0;
+> +}
+> +
+> +static int regmap_atmel_hlcdc_reg_read(void *context, unsigned int reg,
+> +				       unsigned int *val)
+> +{
+> +	void __iomem *regs = context;
+> +
+> +	*val = readl(regs + reg);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct regmap_config atmel_hlcdc_regmap_config = {
+>  	.reg_bits = 32,
+>  	.val_bits = 32,
+>  	.reg_stride = 4,
+>  	.max_register = ATMEL_HLCDC_REG_MAX,
+> +	.reg_write = regmap_atmel_hlcdc_reg_write,
+> +	.reg_read = regmap_atmel_hlcdc_reg_read,
+> +	.fast_io = true,
+>  };
+>  
+>  static int atmel_hlcdc_probe(struct platform_device *pdev)
+> @@ -82,8 +113,8 @@ static int atmel_hlcdc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(hlcdc->slow_clk);
+>  	}
+>  
+> -	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
+> -					      &atmel_hlcdc_regmap_config);
+> +	hlcdc->regmap = devm_regmap_init(dev, NULL, regs,
+> +					 &atmel_hlcdc_regmap_config);
+>  	if (IS_ERR(hlcdc->regmap))
+>  		return PTR_ERR(hlcdc->regmap);
+>  
+> 
+
+
 -- 
-2.1.4
+Nicolas Ferre
