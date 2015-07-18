@@ -1,67 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sat, 18 Jul 2015 20:52:38 +0200
-Subject: [PATCH v2] ARM: dts: Convert Linkstation Mini to Device Tree
-In-Reply-To: <1436885641.7145.9.camel@dolka.fr>
-References: <1436885641.7145.9.camel@dolka.fr>
-Message-ID: <20150718185238.GH17961@lunn.ch>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 19 Jul 2015 00:18:37 +0200
+Subject: [PATCH 3/3] clocksource: atmel-pit: Remove irq handler when
+ clock event is unused
+In-Reply-To: <alpine.DEB.2.11.1507181013050.18576@nanos>
+References: <1437161608-26782-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1437161608-26782-4-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1507181013050.18576@nanos>
+Message-ID: <20150718221837.GK3487@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 04:54:01PM +0200, Benjamin Cama wrote:
-> The name of the file better reflects the manufacturer's device name
-> (LS-WSGL) than the original (lsmini), which exists in a kirkwood version
-> too.
+On 18/07/2015 at 10:20:53 +0200, Thomas Gleixner wrote :
+> On Fri, 17 Jul 2015, Alexandre Belloni wrote:
+> >  /*
+> > + * IRQ handler for the timer.
+> > + */
+> > +static irqreturn_t at91sam926x_pit_interrupt(int irq, void *dev_id)
+> > +{
+> > +	struct pit_data *data = dev_id;
+> > +
+> > +	/*
+> > +	 * irqs should be disabled here, but as the irq is shared they are only
+> > +	 * guaranteed to be off if the timer irq is registered first.
 > 
-> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
-> ---
-> Alexey, Thomas,
+> That's wrong. We run all handlers with interrupts disabled for about 5
+> years now.
 > 
-> I need your approval to change the license, as Jason and Andrew
-> suggested using dual licensing. Do you agree with it?
+> > +	 */
+> > +	WARN_ON_ONCE(!irqs_disabled());
 > 
-> The changes since the first version are:
-> * the license change;
-> * the more precise attribution to Alexey;
-> * gpio keys are now named, even if I find them not to be the good ones;
->   at least they fit with the old numbers and the recently submitted
->   LS-WSXL scheme;
-> * added "earlyprintk" to the command-line
-> 
-> I did not rename the leds to be like LS-WSXL, as they are a bit
-> different. I also did not take time to look at the NOR flash layout to
-> separate uboot from the config (that must be all there is in these
-> 256KB).
-> 
-> Hope the patch is OK like that. Sorry for the long delay, I spent quite
-> some time on the IRQ0 fix, and did not have so much of it lately???
-> 
->  arch/arm/boot/dts/Makefile           |   3 +-
->  arch/arm/boot/dts/orion5x-lswsgl.dts | 276 ++++++++++++++++++++++++++++++++++
->  arch/arm/mach-orion5x/Kconfig        |   6 +-
->  arch/arm/mach-orion5x/lsmini-setup.c | 280 -----------------------------------
->  4 files changed, 281 insertions(+), 284 deletions(-)
->  create mode 100644 arch/arm/boot/dts/orion5x-lswsgl.dts
->  delete mode 100644 arch/arm/mach-orion5x/lsmini-setup.c
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 992736b..bd5ad2f 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -441,7 +441,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
->  	orion5x-lacie-d2-network.dtb \
->  	orion5x-lacie-ethernet-disk-mini-v2.dtb \
->  	orion5x-maxtor-shared-storage-2.dtb \
-> -	orion5x-rd88f5182-nas.dtb
-> +	orion5x-rd88f5182-nas.dtb \
-> +	orion5x-lswsgl.dtb
 
-Hi Benjamin
+Yeah, I was skeptical when I read that...
 
-Please keep these in alphabetical order.
+> 
+> > +	/* The PIT interrupt may be disabled, and is shared */
+> > +	if (clockevent_state_periodic(&data->clkevt) &&
+> > +	    (pit_read(data->base, AT91_PIT_SR) & AT91_PIT_PITS)) {
+> > +		unsigned nr_ticks;
+> > +
+> > +		/* Get number of ticks performed before irq, and ack it */
+> > +		nr_ticks = PIT_PICNT(pit_read(data->base, AT91_PIT_PIVR));
+> > +		do {
+> > +			data->cnt += data->cycle;
+> > +			data->clkevt.event_handler(&data->clkevt);
+> > +			nr_ticks--;
+> > +		} while (nr_ticks);
+> 
+> I don't think you need this loop. You have a proper clocksource
+> registered so the timekeeping code will handle the lost ticks nicely.
+> 
 
-Other than that:
+... for both comments, this is just code I'm moving from one place to
+another. I'll have a look a clean that up in a preliminary patch.
+Thanks!
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks
-	Andrew
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
