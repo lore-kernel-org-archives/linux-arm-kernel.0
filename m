@@ -1,59 +1,67 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Sat, 18 Jul 2015 14:54:07 -0400
-Subject: [PATCH] mm: Fix up new locking syscalls
-In-Reply-To: <1437055226-18351-1-git-send-email-broonie@kernel.org>
-References: <1437055226-18351-1-git-send-email-broonie@kernel.org>
-Message-ID: <CAP=VYLoN3fLJS5cPFJytdhMjqD21jado+unf0eZD6SYXM5rpyA@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 18 Jul 2015 20:52:38 +0200
+Subject: [PATCH v2] ARM: dts: Convert Linkstation Mini to Device Tree
+In-Reply-To: <1436885641.7145.9.camel@dolka.fr>
+References: <1436885641.7145.9.camel@dolka.fr>
+Message-ID: <20150718185238.GH17961@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 10:00 AM, Mark Brown <broonie@kernel.org> wrote:
-> Extend the arm64 compat syscall table for the new syscalls to fix build
-> errors introduced by "mm: mlock: add new mlock, munlock, and munlockall
-> system calls":
-
-The ia64 builds also are failing with:
-
-arch/ia64/kernel/entry.S:1775: Error: attempt to move .org backwards
-
-and a mindless bisect leads to the same commit listed above, presumably
-for the same NR_syscall issue Mark fixes here.
-
-http://kisskb.ellerman.id.au/kisskb/buildresult/12465244/
-
-Paul.
---
-
->
->  ../arch/arm64/include/asm/unistd32.h:801:1: error: array index in initializer exceeds array bounds
->  ../arch/arm64/include/asm/unistd32.h:801:1: error: (near initialization for 'compat_sys_call_table')
->  ../arch/arm64/include/asm/unistd32.h:803:1: error: array index in initializer exceeds array bounds
->  ../arch/arm64/include/asm/unistd32.h:803:1: error: (near initialization for 'compat_sys_call_table')
->  ../arch/arm64/include/asm/unistd32.h:805:1: error: array index in initializer exceeds array bounds
->  ../arch/arm64/include/asm/unistd32.h:805:1: error: (near initialization for 'compat_sys_call_table')
->
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+On Tue, Jul 14, 2015 at 04:54:01PM +0200, Benjamin Cama wrote:
+> The name of the file better reflects the manufacturer's device name
+> (LS-WSGL) than the original (lsmini), which exists in a kirkwood version
+> too.
+> 
+> Signed-off-by: Benjamin Cama <benoar@dolka.fr>
 > ---
->  arch/arm64/include/asm/unistd.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-> index 3bc498c..aa537a4 100644
-> --- a/arch/arm64/include/asm/unistd.h
-> +++ b/arch/arm64/include/asm/unistd.h
-> @@ -44,7 +44,7 @@
->  #define __ARM_NR_compat_cacheflush     (__ARM_NR_COMPAT_BASE+2)
->  #define __ARM_NR_compat_set_tls                (__ARM_NR_COMPAT_BASE+5)
->
-> -#define __NR_compat_syscalls           388
-> +#define __NR_compat_syscalls           391
->  #endif
->
->  #define __ARCH_WANT_SYS_CLONE
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-next" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Alexey, Thomas,
+> 
+> I need your approval to change the license, as Jason and Andrew
+> suggested using dual licensing. Do you agree with it?
+> 
+> The changes since the first version are:
+> * the license change;
+> * the more precise attribution to Alexey;
+> * gpio keys are now named, even if I find them not to be the good ones;
+>   at least they fit with the old numbers and the recently submitted
+>   LS-WSXL scheme;
+> * added "earlyprintk" to the command-line
+> 
+> I did not rename the leds to be like LS-WSXL, as they are a bit
+> different. I also did not take time to look at the NOR flash layout to
+> separate uboot from the config (that must be all there is in these
+> 256KB).
+> 
+> Hope the patch is OK like that. Sorry for the long delay, I spent quite
+> some time on the IRQ0 fix, and did not have so much of it lately???
+> 
+>  arch/arm/boot/dts/Makefile           |   3 +-
+>  arch/arm/boot/dts/orion5x-lswsgl.dts | 276 ++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-orion5x/Kconfig        |   6 +-
+>  arch/arm/mach-orion5x/lsmini-setup.c | 280 -----------------------------------
+>  4 files changed, 281 insertions(+), 284 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/orion5x-lswsgl.dts
+>  delete mode 100644 arch/arm/mach-orion5x/lsmini-setup.c
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 992736b..bd5ad2f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -441,7 +441,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+>  	orion5x-lacie-d2-network.dtb \
+>  	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+>  	orion5x-maxtor-shared-storage-2.dtb \
+> -	orion5x-rd88f5182-nas.dtb
+> +	orion5x-rd88f5182-nas.dtb \
+> +	orion5x-lswsgl.dtb
+
+Hi Benjamin
+
+Please keep these in alphabetical order.
+
+Other than that:
+
+Acked-by: Andrew Lunn <andrew@lunn.ch>
+
+Thanks
+	Andrew
