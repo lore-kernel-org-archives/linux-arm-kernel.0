@@ -1,42 +1,22 @@
-From: vitalya@ti.com (Vitaly Andrianov)
-Date: Fri, 17 Jul 2015 20:29:35 -0400
-Subject: [PATCH] ARM: mm: do not use virt_to_idmap() for NOMMU systems
-Message-ID: <1437179375-23855-1-git-send-email-vitalya@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Jul 2015 17:47:53 -0700
+Subject: [PATCH v3 2/3] clk: mediatek: Fix calculation of PLL rate settings
+In-Reply-To: <1436517574-17895-3-git-send-email-jamesjj.liao@mediatek.com>
+References: <1436517574-17895-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1436517574-17895-3-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <20150718004753.GW30412@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The "ARM: mm: Introduce virt_to_idmap() with an arch hook" defines
-arch_virt_to_idmap hook in arch/arm/mm/idmap.c. That breaks systems w/o
-MMU because that file is not built for them.
+On 07/10, James Liao wrote:
+> Avoid u32 overflow when calculate post divider setting, and
+> increase the max post divider setting from 3 (/8) to 4 (/16).
+> 
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
 
-This patch fixes this bug.
+Applied to clk-next
 
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
----
- arch/arm/include/asm/memory.h | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 6f225ac..114abe3 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -279,6 +279,7 @@ static inline void *phys_to_virt(phys_addr_t x)
- 
- extern phys_addr_t (*arch_virt_to_idmap)(unsigned long x);
- 
-+#ifdef CONFIG_MMU
- /*
-  * These are for systems that have a hardware interconnect supported alias of
-  * physical memory for idmap purposes.  Most cases should leave these
-@@ -293,6 +294,9 @@ static inline phys_addr_t __virt_to_idmap(unsigned long x)
- }
- 
- #define virt_to_idmap(x)	__virt_to_idmap((unsigned long)(x))
-+#else
-+#define virt_to_idmap(x)	__virt_to_phys((unsigned long)(x))
-+#endif
- 
- /*
-  * Virtual <-> DMA view memory address translations
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
