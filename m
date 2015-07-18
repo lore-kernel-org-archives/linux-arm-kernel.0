@@ -1,30 +1,22 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Fri, 17 Jul 2015 19:51:20 -0700
-Subject: [PATCH 0/2] ARM: Couple of dts fixes for v4.2-rcx
-In-Reply-To: <20150717171113.GG21691@localhost>
-References: <1437086473-21437-1-git-send-email-ssantosh@kernel.org>
- <20150717171113.GG21691@localhost>
-Message-ID: <55A9BF28.5020405@oracle.com>
+From: zhengxing@rock-chips.com (zhengxing)
+Date: Sat, 18 Jul 2015 11:52:10 +0800
+Subject: [PATCH 2/2] ASoC: rockchip: Add machine driver for rt5645/rt5650
+ codec
+In-Reply-To: <20150717181122.GT11162@sirena.org.uk>
+References: <1436930143-31361-1-git-send-email-zhengxing@rock-chips.com>
+ <1436930143-31361-3-git-send-email-zhengxing@rock-chips.com>
+ <20150717181122.GT11162@sirena.org.uk>
+Message-ID: <55A9CD6A.806@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/17/15 10:11 AM, Olof Johansson wrote:
-> On Thu, Jul 16, 2015 at 06:41:13PM -0400, Santosh Shilimkar wrote:
->> The following changes since commit 5ebe6afaf0057ac3eaeb98defd5456894b446d22:
->>
->>    Linux 4.1-rc2 (2015-05-03 19:22:23 -0700)
->>
->> are available in the git repository at:
->>
->>    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-dts-fixes
->>
->> for you to fetch changes up to 8b4769cc535adf9dd4ae5d82725ca1de254f007c:
->>
->>    ARM: keystone: dts: rename pcie nodes to help override status (2015-07-16 18:13:03 -0400)
->
-> Merged, thanks!
->
-Thanks Olof !!
+Hi Mark,
 
-Regards,
-Santosh
+On 2015?07?18? 02:11, Mark Brown wrote:
+> On Wed, Jul 15, 2015 at 11:15:43AM +0800, Xing Zheng wrote:
+>> From: zhengxing<zhengxing@rock-chips.com>
+>>
+>> The driver is used for rockchip board using a rt5645/rt5650.
+> Same comments here, mostly good but some minor issues.  The other thing
+> with both of these is that you need to have a binding document for them.
+OK. Thank you.
