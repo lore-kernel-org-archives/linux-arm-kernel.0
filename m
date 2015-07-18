@@ -1,58 +1,35 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 19 Jul 2015 00:23:08 +0200
-Subject: [PATCH 1/3] clocksource: atmel-st: Remove irq handler when clock
- event is unused
-In-Reply-To: <alpine.DEB.2.11.1507180942360.18576@nanos>
-References: <1437161608-26782-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1437161608-26782-2-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1507180942360.18576@nanos>
-Message-ID: <20150718222308.GA30489@piout.net>
+From: linux@roeck-us.net (Guenter)
+Date: Sat, 18 Jul 2015 16:34:55 -0700
+Subject: Build error due to "x86/fpu, sched: Dynamically allocate 'struct
+ fpu'"
+In-Reply-To: <20150718232717.GA3235@groeck-UX31A>
+References: <20150718232717.GA3235@groeck-UX31A>
+Message-ID: <20150718233455.GA3273@groeck-UX31A>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/07/2015 at 10:12:03 +0200, Thomas Gleixner wrote :
-> On Fri, 17 Jul 2015, Alexandre Belloni wrote:
-> > +static int atmel_st_request_irq(struct clock_event_device *dev)
-> > +{
-> > +	int ret;
-> > +
-> > +	if (clockevent_state_periodic(dev) || clockevent_state_oneshot(dev))
-> > +		return 0;
-> > +
-> > +	ret = request_irq(irq, at91rm9200_timer_interrupt,
-> > +			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-> > +			  "at91_tick", regmap_st);
-> > +	if (ret) {
-> > +		pr_alert("Unable to setup IRQ\n");
-> > +		return ret;
-> > +	}
-> > +
-> >  	return 0;
-> >  }
-> >  
-> >  static int clkevt32k_set_oneshot(struct clock_event_device *dev)
-> >  {
-> > +	int ret;
-> > +
-> >  	clkdev32k_disable_and_flush_irq();
-> >  
-> >  	/*
-> >  	 * ALM for oneshot irqs, set by next_event()
-> >  	 * before 32 seconds have passed.
-> >  	 */
-> > +	ret = atmel_st_request_irq(dev);
+On Sat, Jul 18, 2015 at 04:27:17PM -0700, Guenter wrote:
+> Hi,
 > 
-> You cannot call request_irq() from interrupt disabled context. It
-> works during early boot because might_sleep() is not active then, but
-> if that happens during normal runtime it wont work.
+> Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+> causes s390 builds in mainline to fail as follows.
+> 
+> arch/s390/kernel/traps.c: Assembler messages:
+> arch/s390/kernel/traps.c:262: Error: operand out of range
+> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
+> arch/s390/kernel/traps.c:300: Error: operand out of range
+> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
 > 
 
-Indeed, clockevents_switch_state() has to be called with interrupts
-disabled. So I'm not sure anymore how we should go about this change
-(obviously, the same applies to the pit change). Do you have an idea?
+Also:
 
+arm64:allmodconfig:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+arch/arm64/kernel/entry.S: Assembler messages:
+arch/arm64/kernel/entry.S:588: Error: immediate out of range
+arch/arm64/kernel/entry.S:597: Error: immediate out of range
+make[1]: *** [arch/arm64/kernel/entry.o] Error 1
+
+I didn't bisect that one, but it looks like the cause is the same.
+
+Guenter
