@@ -1,47 +1,52 @@
-From: lorenx4@gmail.com (Lorenzo Nava)
-Date: Sat, 18 Jul 2015 13:54:42 +0200
-Subject: [PATCH v5] arm DMA: Fix allocation from CMA for coherent DMA
-In-Reply-To: <20150703090305.GR7557@n2100.arm.linux.org.uk>
-References: <1435699746-21395-1-git-send-email-lorenx4@gmail.com>
- <20150701111251.GA21981@e104818-lin.cambridge.arm.com>
- <20150703090305.GR7557@n2100.arm.linux.org.uk>
-Message-ID: <CAE=W-e3Bweki8BBapPKOgFOGha8tM6wgq=AOhXQ2WUAPcqJkiw@mail.gmail.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Sat, 18 Jul 2015 17:58:45 +0530
+Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <CAH=tA9H56jP_GZBA7A3HER8w3WNtWbfkF5rWk3P0ERkQ9DpPpQ@mail.gmail.com>
+References: <cover.1437058481.git.maitysanchayan@gmail.com>
+ <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
+ <CAH=tA9H56jP_GZBA7A3HER8w3WNtWbfkF5rWk3P0ERkQ9DpPpQ@mail.gmail.com>
+Message-ID: <20150718122845.GA1833@Sanchayan-Arch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 3, 2015 at 11:03 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jul 01, 2015 at 12:12:51PM +0100, Catalin Marinas wrote:
->> On Tue, Jun 30, 2015 at 11:29:06PM +0200, Lorenzo Nava wrote:
->> > This patch allows the use of CMA for DMA coherent memory allocation.
->> > At the moment if the input parameter "is_coherent" is set to true
->> > the allocation is not made using the CMA, which I think is not the
->> > desired behaviour.
->> >
->> > Signed-off-by: Lorenzo Nava <lorenx4@gmail.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> If Russell doesn't have any objections, you can send the patch to
->> his patch system. See here for more information:
->
-> I'm left wondering whether this patch is really want Lorenzo wants.
-> From my reading of it, while this has the effect of allocating from
-> CMA for coherent devices, it's no different from the non-coherent
-> case, because by calling __alloc_from_contiguous(), we end up
-> remapping the allocated memory, removing the cacheability status
-> from the allocated pages.
->
-> This brings up an interesting point: presumably, it's been tested, and
-> people are happy with the performance it's giving, inspite of it not
-> returning cacheable memory... or maybe it hasn't been tested that much?
->
-Hello Russell,
+On 15-07-18 14:03:25, Nicolae Rosia wrote:
+> Hi,
+> 
+> On Thu, Jul 16, 2015 at 6:13 PM, Sanchayan Maity
+> <maitysanchayan@gmail.com> wrote:
+> > The Colibri Vybrid VF50 module supports 4-wire touchscreens using
+> > FETs and ADC inputs. This driver uses the IIO consumer interface
+> > and relies on the vf610_adc driver based on the IIO framework.
+> >
+> > Signed-off-by: Sanch
+> > +static const struct of_device_id vf50_touch_of_match[] = {
+> > +       { .compatible = "toradex,vf50-touchctrl", },
+> > +       { }
+> > +};
+> > +MODULE_DEVICE_TABLE(of, vf50_touch_of_match);
+> > +
+> > +static struct platform_driver __refdata vf50_touch_driver = {
+> > +       .driver = {
+> > +               .name = "toradex,vf50_touchctrl",
+> > +               .of_match_table = vf50_touch_of_match,
+> > +       },
+> > +       .probe = vf50_ts_probe,
+> > +       .remove = vf50_ts_remove,
+> > +       .prevent_deferred_probe = false,
+> > +};
+> Why Toradex ? Isn't this a Freescale IP ?
 
-I was wondering if you have any other observations about this patch or
-if you need any further investigation about some aspects.
-It's not clear to me if the last comments from me and Catalin answer
-your questions or if you see any other problem that we didn't
-consider.
+The 4 wire touchscreen support is provided by using on module circuitry
+mainly comprising of FET's and leveraging the GPIOs and on chip ADC of
+the Vybrid SoC.
 
-Thank you.
-Lorenzo
+This is specific to our Colibri Vybrid VF50 module and not the Freescale
+IP. While I guess one could certainly use the driver for their own needs
+if one were to replicate a similar circuitry and change the DT properties
+concerning GPIO and ADC's as per their own board, as of now this is only
+use on our Toradex VF50 modules and was done by us specifically to provide
+touchscreen support for VF50.
+
+Regards,
+Sanchayan.
