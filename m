@@ -1,213 +1,242 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 19 Jul 2015 13:48:23 +0100
-Subject: [PATCH v3 1/2] iio: adc: vf610: Determine sampling frequencies
- by using minimum sample time
-In-Reply-To: <baf52bf42eff6c986fa2ba5e030a295489068d00.1436880513.git.maitysanchayan@gmail.com>
-References: <cover.1436880513.git.maitysanchayan@gmail.com>
- <baf52bf42eff6c986fa2ba5e030a295489068d00.1436880513.git.maitysanchayan@gmail.com>
-Message-ID: <55AB9C97.8080103@kernel.org>
+From: atx@atx.name (Josef Gajdusek)
+Date: Sun, 19 Jul 2015 15:45:03 +0200
+Subject: [PATCH] ARM: dts: sun4i: Add Iteaduino Plus A10
+Message-ID: <20150719134501.GA19235@maud>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/07/15 14:53, Sanchayan Maity wrote:
-> The driver currently does not take into account the minimum sample time
-> as per the Figure 6-8 Chapter 9.1.1 12-bit ADC electrical characteristics.
-> We set a static amount of cycles instead of considering the sample time
-> as a given value, which depends on hardware characteristics.
-> 
-> Determine sampling frequencies by first reading the device tree property
-> node and then calculating the required Long Sample Time Adder (LSTAdder)
-> value, based on the ADC clock frequency and sample time value obtained
-> from the device tree. This LSTAdder value is then used for calculating
-> the sampling frequencies possible.
-> 
-> In case the sample time property is not specified through the device
-> tree, a safe default value of 1000ns is assumed.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-Applied with the Acks from Stefan and Fugang as the patch has changed very little
-from the previous version.
+Iteaduino Plus A10 is a breakout board + Itead Core A10. It features 1GB RAM,
+has most of the A10 pins on a .1" header, 2 USB ports, 1 OTG USB port,
+Ethernet, HDMI, SATA, Speaker/Microphone 3.5mm jacks and an SD card slot.
 
-Applied to the togreg branch of iio.git - initially pushed out as testing for
-the autobuilders to play with it.
+Link to manufacturer wiki: http://wiki.iteadstudio.com/Iteaduino_Plus_A10/A20
 
-Thanks,
+Signed-off-by: Josef Gajdusek <atx@atx.name>
+---
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts | 202 +++++++++++++++++++++++++
+ 2 files changed, 203 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
 
-Jonathan
-> ---
->  .../devicetree/bindings/iio/adc/vf610-adc.txt      |  5 ++
->  drivers/iio/adc/vf610_adc.c                        | 79 ++++++++++++++++++++--
->  2 files changed, 80 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> index 3eb40e2..1aad051 100644
-> --- a/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> +++ b/Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-> @@ -17,6 +17,11 @@ Recommended properties:
->    - Frequency in normal mode (ADLPC=0, ADHSC=0)
->    - Frequency in high-speed mode (ADLPC=0, ADHSC=1)
->    - Frequency in low-power mode (ADLPC=1, ADHSC=0)
-> +- min-sample-time: Minimum sampling time in nanoseconds. This value has
-> +  to be chosen according to the conversion mode and the connected analog
-> +  source resistance (R_as) and capacitance (C_as). Refer the datasheet's
-> +  operating requirements. A safe default across a wide range of R_as and
-> +  C_as as well as conversion modes is 1000ns.
->  
->  Example:
->  adc0: adc at 4003b000 {
-> diff --git a/drivers/iio/adc/vf610_adc.c b/drivers/iio/adc/vf610_adc.c
-> index 480f335..23b8fb9 100644
-> --- a/drivers/iio/adc/vf610_adc.c
-> +++ b/drivers/iio/adc/vf610_adc.c
-> @@ -68,6 +68,9 @@
->  #define VF610_ADC_CLK_DIV8		0x60
->  #define VF610_ADC_CLK_MASK		0x60
->  #define VF610_ADC_ADLSMP_LONG		0x10
-> +#define VF610_ADC_ADSTS_SHORT   0x100
-> +#define VF610_ADC_ADSTS_NORMAL  0x200
-> +#define VF610_ADC_ADSTS_LONG    0x300
->  #define VF610_ADC_ADSTS_MASK		0x300
->  #define VF610_ADC_ADLPC_EN		0x80
->  #define VF610_ADC_ADHSC_EN		0x400
-> @@ -98,6 +101,8 @@
->  #define VF610_ADC_CALF			0x2
->  #define VF610_ADC_TIMEOUT		msecs_to_jiffies(100)
->  
-> +#define DEFAULT_SAMPLE_TIME		1000
-> +
->  enum clk_sel {
->  	VF610_ADCIOC_BUSCLK_SET,
->  	VF610_ADCIOC_ALTCLK_SET,
-> @@ -124,6 +129,17 @@ enum conversion_mode_sel {
->  	VF610_ADC_CONV_LOW_POWER,
->  };
->  
-> +enum lst_adder_sel {
-> +	VF610_ADCK_CYCLES_3,
-> +	VF610_ADCK_CYCLES_5,
-> +	VF610_ADCK_CYCLES_7,
-> +	VF610_ADCK_CYCLES_9,
-> +	VF610_ADCK_CYCLES_13,
-> +	VF610_ADCK_CYCLES_17,
-> +	VF610_ADCK_CYCLES_21,
-> +	VF610_ADCK_CYCLES_25,
-> +};
-> +
->  struct vf610_adc_feature {
->  	enum clk_sel	clk_sel;
->  	enum vol_ref	vol_ref;
-> @@ -132,6 +148,8 @@ struct vf610_adc_feature {
->  	int	clk_div;
->  	int     sample_rate;
->  	int	res_mode;
-> +	u32 lst_adder_index;
-> +	u32 default_sample_time;
->  
->  	bool	calibration;
->  	bool	ovwren;
-> @@ -155,11 +173,13 @@ struct vf610_adc {
->  };
->  
->  static const u32 vf610_hw_avgs[] = { 1, 4, 8, 16, 32 };
-> +static const u32 vf610_lst_adder[] = { 3, 5, 7, 9, 13, 17, 21, 25 };
->  
->  static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  {
->  	struct vf610_adc_feature *adc_feature = &info->adc_feature;
->  	unsigned long adck_rate, ipg_rate = clk_get_rate(info->clk);
-> +	u32 adck_period, lst_addr_min;
->  	int divisor, i;
->  
->  	adck_rate = info->max_adck_rate[adc_feature->conv_mode];
-> @@ -174,6 +194,19 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  	}
->  
->  	/*
-> +	 * Determine the long sample time adder value to be used based
-> +	 * on the default minimum sample time provided.
-> +	 */
-> +	adck_period = NSEC_PER_SEC / adck_rate;
-> +	lst_addr_min = adc_feature->default_sample_time / adck_period;
-> +	for (i = 0; i < ARRAY_SIZE(vf610_lst_adder); i++) {
-> +		if (vf610_lst_adder[i] > lst_addr_min) {
-> +			adc_feature->lst_adder_index = i;
-> +			break;
-> +		}
-> +	}
-> +
-> +	/*
->  	 * Calculate ADC sample frequencies
->  	 * Sample time unit is ADCK cycles. ADCK clk source is ipg clock,
->  	 * which is the same as bus clock.
-> @@ -182,12 +215,13 @@ static inline void vf610_adc_calculate_rates(struct vf610_adc *info)
->  	 * SFCAdder: fixed to 6 ADCK cycles
->  	 * AverageNum: 1, 4, 8, 16, 32 samples for hardware average.
->  	 * BCT (Base Conversion Time): fixed to 25 ADCK cycles for 12 bit mode
-> -	 * LSTAdder(Long Sample Time): fixed to 3 ADCK cycles
-> +	 * LSTAdder(Long Sample Time): 3, 5, 7, 9, 13, 17, 21, 25 ADCK cycles
->  	 */
->  	adck_rate = ipg_rate / info->adc_feature.clk_div;
->  	for (i = 0; i < ARRAY_SIZE(vf610_hw_avgs); i++)
->  		info->sample_freq_avail[i] =
-> -			adck_rate / (6 + vf610_hw_avgs[i] * (25 + 3));
-> +			adck_rate / (6 + vf610_hw_avgs[i] *
-> +			 (25 + vf610_lst_adder[adc_feature->lst_adder_index]));
->  }
->  
->  static inline void vf610_adc_cfg_init(struct vf610_adc *info)
-> @@ -347,8 +381,40 @@ static void vf610_adc_sample_set(struct vf610_adc *info)
->  		break;
->  	}
->  
-> -	/* Use the short sample mode */
-> -	cfg_data &= ~(VF610_ADC_ADLSMP_LONG | VF610_ADC_ADSTS_MASK);
-> +	/*
-> +	 * Set ADLSMP and ADSTS based on the Long Sample Time Adder value
-> +	 * determined.
-> +	 */
-> +	switch (adc_feature->lst_adder_index) {
-> +	case VF610_ADCK_CYCLES_3:
-> +		break;
-> +	case VF610_ADCK_CYCLES_5:
-> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
-> +		break;
-> +	case VF610_ADCK_CYCLES_7:
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	case VF610_ADCK_CYCLES_9:
-> +		cfg_data |= VF610_ADC_ADSTS_LONG;
-> +		break;
-> +	case VF610_ADCK_CYCLES_13:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		break;
-> +	case VF610_ADCK_CYCLES_17:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_SHORT;
-> +		break;
-> +	case VF610_ADCK_CYCLES_21:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	case VF610_ADCK_CYCLES_25:
-> +		cfg_data |= VF610_ADC_ADLSMP_LONG;
-> +		cfg_data |= VF610_ADC_ADSTS_NORMAL;
-> +		break;
-> +	default:
-> +		dev_err(info->dev, "error in sample time select\n");
-> +	}
->  
->  	/* update hardware average selection */
->  	cfg_data &= ~VF610_ADC_AVGS_MASK;
-> @@ -713,6 +779,11 @@ static int vf610_adc_probe(struct platform_device *pdev)
->  	of_property_read_u32_array(pdev->dev.of_node, "fsl,adck-max-frequency",
->  			info->max_adck_rate, 3);
->  
-> +	ret = of_property_read_u32(pdev->dev.of_node, "min-sample-time",
-> +			&info->adc_feature.default_sample_time);
-> +	if (ret)
-> +		info->adc_feature.default_sample_time = DEFAULT_SAMPLE_TIME;
-> +
->  	platform_set_drvdata(pdev, indio_dev);
->  
->  	init_completion(&info->completion);
-> 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index adb1826..6104ed1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -529,6 +529,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+ 	sun4i-a10-hackberry.dtb \
+ 	sun4i-a10-hyundai-a7hd.dtb \
+ 	sun4i-a10-inet97fv2.dtb \
++	sun4i-a10-iteaduino-plus.dts \
+ 	sun4i-a10-jesurun-q5.dtb \
+ 	sun4i-a10-marsboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+diff --git a/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
+new file mode 100644
+index 0000000..985e155
+--- /dev/null
++++ b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
+@@ -0,0 +1,202 @@
++/*
++ * Copyright 2015 Josef Gajdusek <atx@atx.name>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun4i-a10.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Iteaduino Plus A10";
++	compatible = "itead,iteaduino-plus-a10", "allwinner,sun4i-a10";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ahci {
++	target-supply = <&reg_ahci_5v>;
++	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_pins_a>;
++	phy = <&phy1>;
++	status = "okay";
++};
++
++&emac_sram {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++
++	axp209: pmic at 34 {
++		reg = <0x34>;
++		interrupts = <0>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c2_pins_a>;
++	status = "okay";
++};
++
++&ir0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir0_rx_pins_a>;
++	status = "okay";
++};
++
++&mdio {
++	status = "okay";
++
++	phy1: ethernet-phy at 1 {
++		reg = <1>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&reg_ahci_5v {
++	status = "okay";
++};
++
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
++&reg_usb1_vbus {
++	status = "okay";
++};
++
++&reg_usb2_vbus {
++	status = "okay";
++};
++
++&spi0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_pins_a>,
++		    <&spi0_cs0_pins_a>;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	usb1_vbus-supply = <&reg_usb1_vbus>;
++	usb2_vbus-supply = <&reg_usb2_vbus>;
++	status = "okay";
++};
+-- 
+2.3.6
