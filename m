@@ -1,35 +1,139 @@
-From: linux@roeck-us.net (Guenter)
-Date: Sat, 18 Jul 2015 16:34:55 -0700
-Subject: Build error due to "x86/fpu, sched: Dynamically allocate 'struct
- fpu'"
-In-Reply-To: <20150718232717.GA3235@groeck-UX31A>
-References: <20150718232717.GA3235@groeck-UX31A>
-Message-ID: <20150718233455.GA3273@groeck-UX31A>
+From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
+Date: Sat, 18 Jul 2015 21:53:00 -0300
+Subject: [PATCH v2 2/4] mtd: pxa3xx_nand: add helpers to setup the timings
+In-Reply-To: <1436281707-20106-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1436281707-20106-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1436281707-20106-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <55AAF4EC.6000700@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 18, 2015 at 04:27:17PM -0700, Guenter wrote:
-> Hi,
-> 
-> Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-> causes s390 builds in mainline to fail as follows.
-> 
-> arch/s390/kernel/traps.c: Assembler messages:
-> arch/s390/kernel/traps.c:262: Error: operand out of range
-> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
-> arch/s390/kernel/traps.c:300: Error: operand out of range
-> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
-> 
+On 07/07/2015 12:08 PM, Antoine Tenart wrote:
+> Add helpers to setup the timings in the pxa3xx driver. These helpers
+> allow to either make use of the nand framework nand_sdr_timings or the
+> pxa3xx specific pxa3xx_nand_host, for compatibility reasons.
+>
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+> ---
+>   drivers/mtd/nand/pxa3xx_nand.c | 91 ++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 91 insertions(+)
+>
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index 5465fa439c9e..9a95c24ab2ce 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
+> @@ -385,6 +385,97 @@ static void pxa3xx_nand_set_timing(struct pxa3xx_nand_host *host,
+>   	nand_writel(info, NDTR1CS0, ndtr1);
+>   }
+>
+> +static void pxa3xx_nand_set_sdr_timing(struct pxa3xx_nand_host *host,
+> +				       const struct nand_sdr_timings *t)
+> +{
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	struct nand_chip *chip = &host->chip;
+> +	unsigned long nand_clk = clk_get_rate(info->clk);
+> +	uint32_t ndtr0, ndtr1;
+> +
+> +	u32 tCH_min = DIV_ROUND_UP(t->tCH_min, 1000);
+> +	u32 tCS_min = DIV_ROUND_UP(t->tCS_min, 1000);
+> +	u32 tWH_min = DIV_ROUND_UP(t->tWH_min, 1000);
+> +	u32 tWP_min = DIV_ROUND_UP(t->tWC_min - tWH_min, 1000);
 
-Also:
+Is the substraction above correct? You seem to be substracting
+picoseconds to nanoseconds.
 
-arm64:allmodconfig:
+> +	u32 tREH_min = DIV_ROUND_UP(t->tREH_min, 1000);
+> +	u32 tRP_min = DIV_ROUND_UP(t->tRC_min - tREH_min, 1000);
 
-arch/arm64/kernel/entry.S: Assembler messages:
-arch/arm64/kernel/entry.S:588: Error: immediate out of range
-arch/arm64/kernel/entry.S:597: Error: immediate out of range
-make[1]: *** [arch/arm64/kernel/entry.o] Error 1
+Ditto.
 
-I didn't bisect that one, but it looks like the cause is the same.
+> +	u32 tR = chip->chip_delay * 1000;
+> +	u32 tWHR_min = DIV_ROUND_UP(t->tWHR_min, 1000);
+> +	u32 tAR_min = DIV_ROUND_UP(t->tAR_min, 1000);
+> +
+> +	/* fallback to a default value if tR = 0 */
+> +	if (!tR)
+> +		tR = 20000;
+> +
+> +	ndtr0 = NDTR0_tCH(ns2cycle(tCH_min, nand_clk)) |
+> +		NDTR0_tCS(ns2cycle(tCS_min, nand_clk)) |
+> +		NDTR0_tWH(ns2cycle(tWH_min, nand_clk)) |
+> +		NDTR0_tWP(ns2cycle(tWP_min, nand_clk)) |
+> +		NDTR0_tRH(ns2cycle(tREH_min, nand_clk)) |
+> +		NDTR0_tRP(ns2cycle(tRP_min, nand_clk));
+> +
+> +	ndtr1 = NDTR1_tR(ns2cycle(tR, nand_clk)) |
+> +		NDTR1_tWHR(ns2cycle(tWHR_min, nand_clk)) |
+> +		NDTR1_tAR(ns2cycle(tAR_min, nand_clk));
+> +
+> +	info->ndtr0cs0 = ndtr0;
+> +	info->ndtr1cs0 = ndtr1;
+> +	nand_writel(info, NDTR0CS0, ndtr0);
+> +	nand_writel(info, NDTR1CS0, ndtr1);
+> +}
+> +
+> +static int pxa3xx_nand_init_timings(struct pxa3xx_nand_host *host)
+> +{
+> +	const struct nand_sdr_timings *timings;
+> +	struct nand_chip *chip = &host->chip;
+> +	struct pxa3xx_nand_info *info = host->info_data;
+> +	const struct pxa3xx_nand_flash *f = NULL;
+> +	int mode, id, ntypes, i;
+> +
+> +	mode = onfi_get_async_timing_mode(chip);
+> +	if (mode == ONFI_TIMING_MODE_UNKNOWN) {
+> +		ntypes = ARRAY_SIZE(builtin_flash_types);
+> +
+> +		chip->cmdfunc(host->mtd, NAND_CMD_READID, 0x00, -1);
+> +
+> +		id = chip->read_byte(host->mtd);
+> +		id |= chip->read_byte(host->mtd) << 0x8;
+> +
+> +		for (i = 0; i < ntypes; i++) {
+> +			f = &builtin_flash_types[i];
+> +
+> +			if (f->chip_id == id)
+> +				break;
+> +		}
+> +
+> +		if (i == ntypes) {
+> +			dev_err(&info->pdev->dev, "Error: timings not found\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		pxa3xx_nand_set_timing(host, f->timing);
+> +
+> +		if (f->flash_width == 16) {
+> +			info->reg_ndcr |= NDCR_DWIDTH_M;
+> +			chip->options |= NAND_BUSWIDTH_16;
+> +		}
+> +
+> +		info->reg_ndcr |= (f->dfc_width == 16) ? NDCR_DWIDTH_C : 0;
 
-Guenter
+Nitpick: the 16-bit flash configuration doesn't belong in a function
+called "xxx_init_timings".
+
+> +	} else {
+> +		mode = fls(mode) - 1;
+> +		if (mode < 0)
+> +			mode = 0;
+> +
+> +		timings = onfi_async_timing_mode_to_sdr_timings(mode);
+> +		if (IS_ERR(timings))
+> +			return PTR_ERR(timings);
+> +
+> +		pxa3xx_nand_set_sdr_timing(host, timings);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>   /*
+>    * Set the data and OOB size, depending on the selected
+>    * spare and ECC configuration.
+>
+
+Thanks,
+-- 
+Ezequiel Garcia, VanguardiaSur
+www.vanguardiasur.com.ar
