@@ -1,79 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 19 Jul 2015 13:19:43 +0900
-Subject: [PATCH v2 1/7] pinctrl: UniPhier: add UniPhier pinctrl core
- support
-In-Reply-To: <CACRpkdZFfypZfDAmULcC1_q_bYD-nsh2H0rMAqo+ncWsBx6m=A@mail.gmail.com>
-References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdZFfypZfDAmULcC1_q_bYD-nsh2H0rMAqo+ncWsBx6m=A@mail.gmail.com>
-Message-ID: <CAK7LNARjFdM6du3tM7RfdXEHktM=4z6XrYag9DM-z+Y0o79jNA@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 19 Jul 2015 12:58:52 +0200
+Subject: [PATCH v6 1/4] phy-sun4i-usb: Add missing EXPORT_SYMBOL for
+ sun4i_usb_phy_set_squelch_detect
+In-Reply-To: <55A653AF.608@ti.com>
+References: <1436366500-12555-1-git-send-email-hdegoede@redhat.com>
+ <1436366500-12555-2-git-send-email-hdegoede@redhat.com> <55A653AF.608@ti.com>
+Message-ID: <55AB82EC.7050309@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi,
 
-
-
-2015-07-16 16:20 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Jul 14, 2015 at 4:40 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
+On 15-07-15 14:35, Kishon Vijay Abraham I wrote:
+> Hi,
 >
->> The core support for the pinctrl drivers for all the UniPhier SoCs.
+> On Wednesday 08 July 2015 08:11 PM, Hans de Goede wrote:
+>> sun4i_usb_phy_set_squelch_detect is used by other code, which may be built
+>> as a module, so it should be exported.
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 >> ---
+>> Changes in v6:
+>> -New patch in v6 of the sunxi musb support series
+>> ---
+>>   drivers/phy/phy-sun4i-usb.c | 1 +
+>>   1 file changed, 1 insertion(+)
 >>
->> Changes in v2:
->>   - drop vogus THIS_MODULE because this file is always built-in
->>   - drop vogus "include <linux/module.h> because this file is
->>     always built-in
+>> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+>> index e17c539..b82aa26 100644
+>> --- a/drivers/phy/phy-sun4i-usb.c
+>> +++ b/drivers/phy/phy-sun4i-usb.c
+>> @@ -212,6 +212,7 @@ void sun4i_usb_phy_set_squelch_detect(struct phy *_phy, bool enabled)
+>>
+>>   	sun4i_usb_phy_write(phy, PHY_SQUELCH_DETECT, enabled ? 0 : 2, 2);
+>>   }
+>> +EXPORT_SYMBOL(sun4i_usb_phy_set_squelch_detect);
 >
-> This looks nice and uses all generic facilities we have.
->
-> Patch applied.
->
-> Yours,
-> Linus Walleij
->
+> EXPORT_SYMBOL_GPL?
 
+Both work for me, feel free to fix this up if you prefer _GPL.
 
+Regards,
 
-I saw the applied patch and noticed "Changes in v2"
-was moved to git-description.
-
-
-commit 6e908892025885b07e804dc6c05aab6ce1e06832
-Author: Masahiro Yamada <yamada.masahiro@socionext.com>
-Date:   Tue Jul 14 11:40:01 2015 +0900
-
-    pinctrl: UniPhier: add UniPhier pinctrl core support
-
-    The core support for the pinctrl drivers for all the UniPhier SoCs.
-
-    Changes in v2:
-      - drop vogus THIS_MODULE because this file is always built-in
-      - drop vogus "include <linux/module.h> because this file is
-        always built-in
-
-    Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-    Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-
-
-
-Do we need to record such stuff in the git history?
-
-In my opinion, the difference between patch versions
-should be mentioned to help reviewers, but not included in the git repository.
-
-Early versions are often so immature that they must be improved
-in the review process.
-No point to record what was updated from those versions, I think.
-
-This is why I put "changed in v2" below the "---".
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Hans
