@@ -1,91 +1,45 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 19 Jul 2015 16:01:42 +0200
-Subject: [PATCH 3/9] gpio: Allow hogged gpios to be requested
-In-Reply-To: <20150717202702.GK7013@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
- <20150717202702.GK7013@pengutronix.de>
-Message-ID: <20150719140142.GV26287@pengutronix.de>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Sun, 19 Jul 2015 18:28:17 +0200 (CEST)
+Subject: [1/2] RTC: Add core rtc support for Gemini Soc devices
+In-Reply-To: <89dc8e097d12d9400217a237b7a6ca6e@advem.lv>
+References: <1292339307-14336-2-git-send-email-ulli.kroll@googlemail.com>
+ <2131951.l0j0CIttAZ@wuerfel> <f22e65faa7d86074cda27973f83d7a52@advem.lv>
+ <1781580.JRD7b0UrJA@wuerfel> <89dc8e097d12d9400217a237b7a6ca6e@advem.lv>
+Message-ID: <alpine.LNX.2.00.1507191821310.12665@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
+Hi
 
-On Fri, Jul 17, 2015 at 10:27:02PM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Fri, Jul 17, 2015 at 11:32:44AM +0200, Markus Pargmann wrote:
-> > It can be useful to claim hogged gpios later, for example from
-> > userspace. This allows to set defaults for GPIOs using the hogging
-> > mechanism and override the setup later from userspace or a kernel driver.
+On Thu, 9 Jul 2015, Roman Yeryomin wrote:
+
+> On 2015-07-09 11:04, Arnd Bergmann wrote:
+> > On Thursday 09 July 2015 01:29:39 Roman Yeryomin wrote:
+> > > 
+> > > OK, here are the minimal changes required (see attachment). Tested on
+> > > 4.1.1
+> > > Let me know if you want me to submit it in some other way.
+> > > 
 > > 
-> > This patch adds a check for hogged gpios to allow requesting them. If
-> > the gpio is not hogged but marked as requested, it still fails with
-> > -EBUSY.
+> > The changes look ok to me. Please submit them as two separate
+> > patches (1. set up and use timer3, 2. register sched_clock) according
+> > to the Documentation/SubmittingPatches description.
 > > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/gpio/gpiolib.c | 3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > index bf4bd1d120c3..9f402b159cbe 100644
-> > --- a/drivers/gpio/gpiolib.c
-> > +++ b/drivers/gpio/gpiolib.c
-> > @@ -798,7 +798,8 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
-> >  	 * before IRQs are enabled, for non-sleeping (SOC) GPIOs.
-> >  	 */
-> >  
-> > -	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0) {
-> > +	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0 ||
-> > +	    test_and_clear_bit(FLAG_IS_HOGGED, &desc->flags) == 1) {
-> >  		desc_set_label(desc, label ? : "?");
-> >  		status = 0;
-> I don't like this patch. IMHO hogging is a "use" of a GPIO that should
-> prevent it being requested.
-
-I disagree with you here. The original patch stated in its description
-that it was designed to initialize GPIOs. In my understanding this does
-not necessarily mean that a hogged GPIO has to be blocked forever.
-
-It may be a use case for example to initialize multiplexers to known
-safe values to work with the system right from the beginning. Later it
-may be necessary to change them.
-
 > 
-> While I think it's useful to be able to export some hogged pins I don't
-> think this should be possible for all hogged pins unconditionally. And
-> for gpios being used by drivers I'd expect they don't need to be hogged
-> at all.
+> So what do we do?
+> Do you still want me to split this as you said and submit or you want Hans's
+> patches rebased/resubmitted?
 > 
-> I don't have a good idea how to solve that. Adding another property to a
-> gpio that should be allowd to be exported can hardly count as hardware
-> description and so doesn't belong in a device tree?!
+> Regards,
+> Roman
 > 
-> Please don't consider this objection as a reason for a NACK, only as
-> starting point for a discussion.
-> 
-> Apart from that: Does this result in hogged gpios being able to be
-> requested by two additional drivers in parallel? Maybe the IS_HOGGED
-> flag should be dropped when the gpio is requested?
 
-The IS_HOGGED flag is cleared at the same time it is tested so only one
-consumer can request one hogged GPIO. The GPIO is not considered to be
-hogged after it is normally requested.
+can you rebase your patches againt my branch at
 
-Best regards,
+git://github.com/ulli-kroll/linux.git gemini/clockevents/4.3
 
-Markus
+I've added here the clockevents changes for 4.3 and patch fory
+arch/arm/mach-gemini 
+This changes will then go arm at kernel.org.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150719/b22ebe66/attachment.sig>
+Hans Ulli
