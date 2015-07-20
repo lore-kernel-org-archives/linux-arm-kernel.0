@@ -1,71 +1,122 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 20 Jul 2015 20:01:18 +0800
-Subject: [PATCH part3 v12 10/10] IA64/PCI: Fix build warning found by kbuild
- test
+Date: Mon, 20 Jul 2015 20:01:17 +0800
+Subject: [PATCH part3 v12 09/10] PCI: Remove pci_bus_assign_domain_nr()
 In-Reply-To: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
 References: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1437393678-4077-11-git-send-email-wangyijing@huawei.com>
+Message-ID: <1437393678-4077-10-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kbuild test robot found we passed a pci_dev * to
-pci_domain_nr(). In old IA64 specific pci_domain_nr()
-It was macro defines:
-
-#define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
-#define pci_domain_nr(busdev)    (PCI_CONTROLLER(busdev)->segment)
-
-Both pci_dev * and pci_bus * have opaque sysdata, so IA64 specific
-pci_domain_nr() could get the pci_controller and return the exact
-domain number, but now we use common pci_domain_nr() functions, so we
-should fix this warning.
+Now we save the domain number in pci_host_bridge,
+we could remove pci_bus_assign_domain_nr() and
+clean the domain member in pci_bus.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- arch/ia64/sn/kernel/io_acpi_init.c |    6 +++---
- arch/ia64/sn/kernel/io_init.c      |    2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/pci/pci.c   |    5 -----
+ drivers/pci/pci.h   |    9 ---------
+ drivers/pci/probe.c |   11 +++--------
+ include/linux/pci.h |    3 ---
+ 4 files changed, 3 insertions(+), 25 deletions(-)
 
-diff --git a/arch/ia64/sn/kernel/io_acpi_init.c b/arch/ia64/sn/kernel/io_acpi_init.c
-index 0640739..2fd7414 100644
---- a/arch/ia64/sn/kernel/io_acpi_init.c
-+++ b/arch/ia64/sn/kernel/io_acpi_init.c
-@@ -364,12 +364,12 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
-         status = acpi_evaluate_integer(rootbus_handle, METHOD_NAME__SEG, NULL,
-                                        &segment);
-         if (ACPI_SUCCESS(status)) {
--		if (segment != pci_domain_nr(dev)) {
-+		if (segment != pci_domain_nr(dev->bus)) {
- 			acpi_get_name(rootbus_handle, ACPI_FULL_PATHNAME,
- 				&name_buffer);
- 			printk(KERN_ERR
- 			       "%s: Segment number mismatch, 0x%llx vs 0x%x for: %s\n",
--			       __func__, segment, pci_domain_nr(dev),
-+			       __func__, segment, pci_domain_nr(dev->bus),
- 			       (char *)name_buffer.pointer);
- 			kfree(name_buffer.pointer);
- 			return 1;
-@@ -407,7 +407,7 @@ sn_acpi_get_pcidev_info(struct pci_dev *dev, struct pcidev_info **pcidev_info,
- 	/* Build up the pcidev_info.pdi_slot_host_handle */
- 	host_devfn = get_host_devfn(pcidev_match.handle, rootbus_handle);
- 	(*pcidev_info)->pdi_slot_host_handle =
--			((unsigned long) pci_domain_nr(dev) << 40) |
-+			((unsigned long) pci_domain_nr(dev->bus) << 40) |
- 					/* bus == 0 */
- 					host_devfn;
- 	return 0;
-diff --git a/arch/ia64/sn/kernel/io_init.c b/arch/ia64/sn/kernel/io_init.c
-index d528814..0bdab82 100644
---- a/arch/ia64/sn/kernel/io_init.c
-+++ b/arch/ia64/sn/kernel/io_init.c
-@@ -164,7 +164,7 @@ sn_io_slot_fixup(struct pci_dev *dev)
- 		panic("%s: Unable to alloc memory for sn_irq_info", __func__);
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index 0074420..cac136a 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4536,11 +4536,6 @@ static int pci_assign_domain_nr(struct device *dev)
  
- 	/* Call to retrieve pci device information needed by kernel. */
--	status = sal_get_pcidev_info((u64) pci_domain_nr(dev),
-+	status = sal_get_pcidev_info((u64) pci_domain_nr(dev->bus),
- 		(u64) dev->bus->number,
- 		dev->devfn,
- 		(u64) __pa(pcidev_info),
+ 	return domain;
+ }
+-
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+-{
+-	bus->domain_nr = pci_assign_domain_nr(parent);
+-}
+ #endif
+ #endif
+ 
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index 4a815c9..5c4b0dd 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -335,14 +335,5 @@ static inline int pci_dev_specific_reset(struct pci_dev *dev, int probe)
+ 
+ struct pci_host_bridge *pci_find_host_bridge(struct pci_bus *bus);
+ 
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+-#else
+-static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+-					struct device *parent)
+-{
+-}
+-#endif
+-
+ void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain);
+ #endif /* DRIVERS_PCI_H */
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index cb525aa..5f2388b 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -481,7 +481,7 @@ void pci_read_bridge_bases(struct pci_bus *child)
+ 	}
+ }
+ 
+-static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
++static struct pci_bus *pci_alloc_bus(void)
+ {
+ 	struct pci_bus *b;
+ 
+@@ -496,10 +496,6 @@ static struct pci_bus *pci_alloc_bus(struct pci_bus *parent)
+ 	INIT_LIST_HEAD(&b->resources);
+ 	b->max_bus_speed = PCI_SPEED_UNKNOWN;
+ 	b->cur_bus_speed = PCI_SPEED_UNKNOWN;
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-	if (parent)
+-		b->domain_nr = parent->domain_nr;
+-#endif
+ 	return b;
+ }
+ 
+@@ -670,7 +666,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	/*
+ 	 * Allocate a new bus, and inherit stuff from the parent..
+ 	 */
+-	child = pci_alloc_bus(parent);
++	child = pci_alloc_bus();
+ 	if (!child)
+ 		return NULL;
+ 
+@@ -1974,7 +1970,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 		return NULL;
+ 	}
+ 
+-	b = pci_alloc_bus(NULL);
++	b = pci_alloc_bus();
+ 	if (!b)
+ 		goto unregister_host;
+ 
+@@ -1982,7 +1978,6 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
+-	pci_bus_assign_domain_nr(b, parent);
+ 
+ 	b->bridge = get_device(&bridge->dev);
+ 	device_enable_async_suspend(b->bridge);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 6b4789c..8293f61 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -461,9 +461,6 @@ struct pci_bus {
+ 	unsigned char	primary;	/* number of primary bridge */
+ 	unsigned char	max_bus_speed;	/* enum pci_bus_speed */
+ 	unsigned char	cur_bus_speed;	/* enum pci_bus_speed */
+-#ifdef CONFIG_PCI_DOMAINS_GENERIC
+-	int		domain_nr;
+-#endif
+ 
+ 	char		name[48];
+ 
 -- 
 1.7.1
