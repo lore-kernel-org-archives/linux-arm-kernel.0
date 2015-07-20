@@ -1,77 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Jul 2015 18:45:42 +0100
-Subject: [PATCH v3 4/8] irqchip / gic: Add stacked irqdomain support for
- ACPI based GICv2 init
-In-Reply-To: <1436525114-14425-5-git-send-email-hanjun.guo@linaro.org>
-References: <1436525114-14425-1-git-send-email-hanjun.guo@linaro.org>
- <1436525114-14425-5-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <55AD33C6.3000809@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 20 Jul 2015 10:46:18 -0700
+Subject: [PATCH v5 1/2] mtd: nand: sunxi: Replace failsafe timing cfg
+ with calculated value
+In-Reply-To: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
+References: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
+Message-ID: <20150720174618.GF24125@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/15 11:45, Hanjun Guo wrote:
-> For now, ACPI based GICv2 is using the irq_default_domain as the
-> ACPI core domain which is not scalable, also we don't support
-> stacked irq domains in ACPI, this patch is trying to implement that.
+On Fri, Jun 26, 2015 at 11:00:10AM +0200, Roy Spliet wrote:
+> The TIMING_CFG register was previously statically set to a magic value
+> (extracted from Allwinner's BSP) when initializing the NAND controller.
+> Now that we have more details about the TIMING_CFG register layout
+> (extracted from the A83 user manual) we can dynamically calculate the
+> appropriate value for each NAND chip and set it when selecting the
+> chip.
 > 
-> Firstly, we need to find the irqdomain with GSI, because we use
-> different model of mapping interrupt with device in ACPI than DT,
-> in DT, we using the interrupt parent property to get the device
-> node of irqchip for devices, that's why we need the matching function
-> that match the device node with the one associated with the irqdomain.
-> But for ACPI, we only can get the GSI which the device is using, no
-> interrupt parent will be specified, then we need a mechanism to find
-> GSI's (also the device's) irqdomain to make the code scalable.
+> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > 
-> Thanks to the usage of GSI, it is a flat hwirq number which is unique
-> in the system, then we can get its associated irq domain by matching
-> the GSI supported by this irqchip (see drawings below), then we can
-> live without the token pointer matching the interrupt controller as
-> DT did.
+> ---
+> V2:
+> - Fix crippled comments
 > 
->                   ------------      ---> gsi_base0
->                  |            |
->                  |            |
->   irqdomain <----| irqchip 0  |
->                  |            |
->                  |            |
->                  |____________|     ---> gsi_end0
+> V3:
+> - Warn for invalid timings
+> - Style
 > 
->                   ------------      ---> gsi_base1 (probably gsi_end0+1)
->                  |            |
->                  |            |
->   irqdomain <----| irqchip 1  |
->                  |            |
->                  |            |
->                  |____________|     ---> gsi_end1
+> V4:
+> - Make better use of return types
+> - Style and comments
+> - Remove superfluous initialisation
 > 
->                   .....
-> 
-> if a device is using GSI n, then we can find GSI's irqdomain by matching
-> gsi_base <= n <= gsi_end.
-> 
-> For GIC, we only have one GICD, but the above model still valid. GICD
-> structure in ACPI MADT defines System Vector Base in the GICD entry,
-> which means the global system interrupt number where this GIC
-> Distributor?s interrupt inputs start, then we can get the hwirq numbers
-> supported by reading the register, so we can explictly get the GSI's
-> associated irqdomain if the GSI is within the range of hwirq supported
-> by this GICD.
-> 
-> Secondly, pass the GSI as the arg for domain's ops alloc() function
-> when register the GSI, then we can take advantage of stacked irqdomains.
+> V5:
+> - Tidy up macros
 
-I'm sorry, but this doesn't make much sense to me.
+Pushed both to l2-mtd.git. Thanks!
 
-This patch doesn't only convert GICv2 ACPI support to stacked domains,
-it adds a whole new concept of "banks of wired interrupts".
-
-Why do we need this? How relevant is that to making the ACPI code
-stacked-domain aware? As far as I understand, only SPIs provided by the
-GIC can be expressed as a GSI. And you can only have one GIC.
-
-I'm more and more puzzled by this series.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Brian
