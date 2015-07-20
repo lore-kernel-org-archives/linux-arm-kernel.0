@@ -1,60 +1,49 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 20 Jul 2015 11:04:30 +0200 (CEST)
-Subject: [PATCH 1/3] clocksource: atmel-st: Remove irq handler when clock
- event is unused
-In-Reply-To: <20150718222308.GA30489@piout.net>
-References: <1437161608-26782-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1437161608-26782-2-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1507180942360.18576@nanos>
- <20150718222308.GA30489@piout.net>
-Message-ID: <alpine.DEB.2.11.1507201103550.18576@nanos>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 20 Jul 2015 17:06:08 +0800
+Subject: [Linaro-acpi] [PATCH v3 0/8] Add self-probe infrastructure and
+ stacked irqdomain support for ACPI based GICv2/3 init
+In-Reply-To: <CAOZdJXXxJxxc9KAQK1VY9iTTVdj-FbpFpoWcexGMrqOS0TgDEQ@mail.gmail.com>
+References: <1436525114-14425-1-git-send-email-hanjun.guo@linaro.org>
+ <CAOZdJXXxJxxc9KAQK1VY9iTTVdj-FbpFpoWcexGMrqOS0TgDEQ@mail.gmail.com>
+Message-ID: <55ACBA00.4080101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 19 Jul 2015, Alexandre Belloni wrote:
-> On 18/07/2015 at 10:12:03 +0200, Thomas Gleixner wrote :
-> > On Fri, 17 Jul 2015, Alexandre Belloni wrote:
-> > > +static int atmel_st_request_irq(struct clock_event_device *dev)
-> > > +{
-> > > +	int ret;
-> > > +
-> > > +	if (clockevent_state_periodic(dev) || clockevent_state_oneshot(dev))
-> > > +		return 0;
-> > > +
-> > > +	ret = request_irq(irq, at91rm9200_timer_interrupt,
-> > > +			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
-> > > +			  "at91_tick", regmap_st);
-> > > +	if (ret) {
-> > > +		pr_alert("Unable to setup IRQ\n");
-> > > +		return ret;
-> > > +	}
-> > > +
-> > >  	return 0;
-> > >  }
-> > >  
-> > >  static int clkevt32k_set_oneshot(struct clock_event_device *dev)
-> > >  {
-> > > +	int ret;
-> > > +
-> > >  	clkdev32k_disable_and_flush_irq();
-> > >  
-> > >  	/*
-> > >  	 * ALM for oneshot irqs, set by next_event()
-> > >  	 * before 32 seconds have passed.
-> > >  	 */
-> > > +	ret = atmel_st_request_irq(dev);
-> > 
-> > You cannot call request_irq() from interrupt disabled context. It
-> > works during early boot because might_sleep() is not active then, but
-> > if that happens during normal runtime it wont work.
-> > 
-> 
-> Indeed, clockevents_switch_state() has to be called with interrupts
-> disabled. So I'm not sure anymore how we should go about this change
-> (obviously, the same applies to the pit change). Do you have an idea?
+Hi Timur,
 
-That's why I used setup/remove_irq() in the stale RT changes.
+On 07/18/2015 07:09 AM, Timur Tabi wrote:
+> On Fri, Jul 10, 2015 at 5:45 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> This patch set introduce self-probe infrastructure to init IRQ
+>> controllers and stacked irqdomain support for ACPI based GICv2/3
+>> init.
+>>
+>> This patch set add its support for GIC verion which is introduced
+>> in ACPI 6.0, based on that, we introduce the self-probe infrastructure,
+>> the self-probe infrastructure for ACPI GIC init is similar as
+>> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
+>> MADT table. we match the GIC version and GIC driver and load
+>> it.
+>>
+>> After the self-probe infrastructure is ready, I cleanuped the GICv2
+>> code to use the framework.
+>>
+>> Patch 4 implement the stacked irqdomain support for GICv2 based on
+>> the model of mapping interrupt and device in ACPI.
+>>
+>> Patch 5~8 are ACPI based GICv3 init.
+>
+> All eight patches:
+>
+> Tested-by: Timur Tabi <timur@codeaurora.org>
 
-Thanks,
+Wonderful, Thanks a lot!
 
-	tglx
+I got a question, do you test GICv3 in this patch set too?
+if yes, that will be really great!
+
+Just let you know, I'm still working on this patch set to try
+to address Marc's comments (unify DT and ACPI to match the domain),
+I'm not sure if any obstacles ahead, I will let you know the progress.
+
+Regards
+Hanjun
