@@ -1,68 +1,92 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 20 Jul 2015 10:56:00 +0100
-Subject: [PATCH v2 2/4] drm/tegra: Add VIC support
-In-Reply-To: <55ACB6A2.9030906@nvidia.com>
-References: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
- <1437378869-10451-3-git-send-email-mperttunen@nvidia.com>
- <55ACB134.8010401@nvidia.com> <55ACB6A2.9030906@nvidia.com>
-Message-ID: <55ACC5B0.20703@nvidia.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Jul 2015 11:57:04 +0200
+Subject: [RFC PATCH 08/15] backlight: pwm_bl: remove useless call to
+ pwm_set_period
+In-Reply-To: <20150720091003.GN29614@ulmo>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-9-git-send-email-boris.brezillon@free-electrons.com>
+ <20150720081559.GI29614@ulmo> <20150720102143.05949ca2@bbrezillon>
+ <20150720083648.GK29614@ulmo> <20150720105003.29b5813a@bbrezillon>
+ <20150720091003.GN29614@ulmo>
+Message-ID: <20150720115704.0c64d070@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 20 Jul 2015 11:10:04 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-On 20/07/15 09:51, Mikko Perttunen wrote:
-> On 07/20/2015 11:28 AM, Jon Hunter wrote:
->> Hi Mikko,
+> On Mon, Jul 20, 2015 at 10:50:03AM +0200, Boris Brezillon wrote:
+> > On Mon, 20 Jul 2015 10:36:50 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > 
+> > > On Mon, Jul 20, 2015 at 10:21:43AM +0200, Boris Brezillon wrote:
+> > > > On Mon, 20 Jul 2015 10:16:00 +0200
+> > > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > > 
+> > > > > On Wed, Jul 01, 2015 at 10:21:54AM +0200, Boris Brezillon wrote:
+> > > > > > The PWM period will be set when calling pwm_config. Remove this useless
+> > > > > > call to pwm_set_period, which might mess up with the initial PWM state
+> > > > > > once we have added proper support for PWM init state retrieval.
+> > > > > > 
+> > > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > > ---
+> > > > > >  drivers/video/backlight/pwm_bl.c | 4 +---
+> > > > > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > > > > > 
+> > > > > > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> > > > > > index ae498c1..fe5597c 100644
+> > > > > > --- a/drivers/video/backlight/pwm_bl.c
+> > > > > > +++ b/drivers/video/backlight/pwm_bl.c
+> > > > > > @@ -295,10 +295,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> > > > > >  	 * via the PWM lookup table.
+> > > > > >  	 */
+> > > > > >  	pb->period = pwm_get_default_period(pb->pwm);
+> > > > > > -	if (!pb->period && (data->pwm_period_ns > 0)) {
+> > > > > > +	if (!pb->period && (data->pwm_period_ns > 0))
+> > > > > >  		pb->period = data->pwm_period_ns;
+> > > > > > -		pwm_set_period(pb->pwm, data->pwm_period_ns);
+> > > > > > -	}
+> > > > > >  
+> > > > > >  	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+> > > > > 
+> > > > > As far as I remember this line is there in order to pass in a period if
+> > > > > the backlight driver is initialized from board setup files. In such a
+> > > > > case there won't be an period associated with the PWM channel in the
+> > > > > first place.
+> > > > > 
+> > > > > I think even with the introduction of a default period, we'd be missing
+> > > > > out on the board setup case because there is no standard place where it
+> > > > > is being set, so it must come from the platform data.
+> > > > 
+> > > > AFAICT, we don't need to explicitly set the period when probing the
+> > > > backlight device, because it will be set next time we call
+> > > > pwm_config(), and since we're passing pb->period when calling
+> > > > pwm_config() everything should be fine.
+> > > 
+> > > Calling pwm_set_period() is still good for consistency. Consider for
+> > > example what happens if after the driver were to call pwm_get_period().
+> > > It would return some more or less random value (likely 0 or whatever it
+> > > had been set to by an earlier user).
+> > 
+> > Yes, that's true in general, but in this specific driver
+> > pwm_get_period() is never called, and the driver only relies on the
+> > pb->period value.
 > 
-> Hi!
-> 
->> ...
->>> +static int vic_runtime_resume(struct device *dev)
->>> +{
->>> +	struct vic *vic = dev_get_drvdata(dev);
->>> +	int err;
->>> +
->>> +	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
->>> +						vic->clk, vic->rst);
->>
->> I would like to deprecate use of the above function [1]. I have been
->> trying to migrate driver to use a new API instead of the above.
-> 
-> Yes, we will need to coordinate the API change here. I kept the old way
-> here to not depend on your series for now.
-> 
->>
->>> +	if (err < 0)
->>> +		dev_err(dev, "failed to power up device\n");
->>> +
->>> +	return err;
->>> +}
->>> +
->>> ...
->>> +
->>> +	pm_runtime_enable(&pdev->dev);
->>> +	if (!pm_runtime_enabled(&pdev->dev)) {
->>> +		err = vic_runtime_resume(&pdev->dev);
->>> +		if (err < 0)
->>> +			goto unregister_client;
->>> +	}
->>
->> I don't see why pm_runtime_enable() should ever fail to enable
->> pm_runtime here. Hence, the if-statement appears to be redundant. If you
->> are trying to determine whether rpm is supported for the power-domains
->> then you should simply check to see if the DT node for the device has
->> the "power-domains" property. See my series [1].
-> 
-> The intention is that if runtime PM is not enabled, the power domain is
-> still brought up. On a cursory look, it seems like with your patch, this
-> should indeed work fine without this check if CONFIG_PM is enabled. Now,
-> that might always be enabled? If so, then everything would be fine; if
-> this lands after your series, we could even just make the power-domains
-> prop mandatory and not implement the legacy mode at all. If not, then
-> AFAIU we must still keep this path.
+> Perhaps that's something that should change. If the PWM core has all
+> this infrastructure there should be no need for the backlight driver to
+> keep it's own copy of that variable.
 
-Ok, I see you just wish to test it is enabled in the kernel config. Then
-yes that would make sense and the above is fine.
+Yes, probably. In any case, I don't think we want PWM users to be able
+to mess up with the current or default PWM state, that's why I was
+planning on making the pwm_set_default_xxx helpers private to PWM
+drivers and core infrastructure.
 
-Cheers
-Jon
+Also note that if we keep this assignment it should at least be changed
+to a pwm_set_default_period() so that it does not override the current
+PWM state.
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
