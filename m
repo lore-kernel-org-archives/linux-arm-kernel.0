@@ -1,53 +1,93 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Jul 2015 17:31:57 +0200
-Subject: [PATCH v2 00/10] pwm: add support for atomic update
-Message-ID: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 20 Jul 2015 17:32:00 +0200
+Subject: [PATCH v2 03/10] pwm: move the enabled/disabled info to pwm_state
+ struct
+In-Reply-To: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1437406327-6207-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry,
+Prepare the transition to PWM atomic update by moving the enabled/disabled
+state into the pwm_state struct. This way we can easily update the whole
+PWM state by copying the new state in the ->state field.
 
-This series adds support for atomic PWM update, or IOW, the capability
-to update all the parameters of a PWM device (enabled/disabled, period,
-duty and polarity) in one go.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/pwm/core.c  | 15 ++++++++++++---
+ include/linux/pwm.h |  7 ++++---
+ 2 files changed, 16 insertions(+), 6 deletions(-)
 
-Best Regards,
-
-Boris
-
-Changes since v1:
-- dropped applied patches
-- squashed Heiko's fixes into the rockchip driver changes
-- made a few cosmetic changes
-- added kerneldoc comments
-- added Heiko's patch to display more information in debugfs
-- dropped pwm-regulator patches (should be submitted separately)
-
-Boris Brezillon (9):
-  pwm: introduce default period and polarity concepts
-  pwm: define a new pwm_state struct
-  pwm: move the enabled/disabled info to pwm_state struct
-  backlight: pwm_bl: remove useless call to pwm_set_period
-  pwm: declare a default PWM state
-  pwm: add the PWM initial state retrieval infra
-  pwm: add the core infrastructure to allow atomic update
-  pwm: rockchip: add initial state retrieval
-  pwm: rockchip: add support for atomic update
-
-Heiko St?bner (1):
-  pwm: add information about polarity, duty cycle and period to debugfs
-
- drivers/leds/leds-pwm.c              |   2 +-
- drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
- drivers/pwm/pwm-pxa.c                |   2 +-
- drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
- drivers/pwm/pwm-sun4i.c              |   3 +-
- drivers/regulator/pwm-regulator.c    |   2 +-
- drivers/video/backlight/lm3630a_bl.c |   4 +-
- drivers/video/backlight/pwm_bl.c     |  10 ++-
- drivers/video/fbdev/ssd1307fb.c      |   2 +-
- include/linux/pwm.h                  |  86 +++++++++++++++---
- 10 files changed, 336 insertions(+), 63 deletions(-)
-
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index a6bc8e6..3e830ce 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -474,8 +474,15 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
+  */
+ int pwm_enable(struct pwm_device *pwm)
+ {
+-	if (pwm && !test_and_set_bit(PWMF_ENABLED, &pwm->flags))
+-		return pwm->chip->ops->enable(pwm->chip, pwm);
++	if (pwm && !pwm_is_enabled(pwm)) {
++		int err;
++
++		err = pwm->chip->ops->enable(pwm->chip, pwm);
++		if (!err)
++			pwm->state.enabled = true;
++
++		return err;
++	}
+ 
+ 	return pwm ? 0 : -EINVAL;
+ }
+@@ -487,8 +494,10 @@ EXPORT_SYMBOL_GPL(pwm_enable);
+  */
+ void pwm_disable(struct pwm_device *pwm)
+ {
+-	if (pwm && test_and_clear_bit(PWMF_ENABLED, &pwm->flags))
++	if (pwm && pwm_is_enabled(pwm)) {
+ 		pwm->chip->ops->disable(pwm->chip, pwm);
++		pwm->state.enabled = false;
++	}
+ }
+ EXPORT_SYMBOL_GPL(pwm_disable);
+ 
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index fafed26..f4bc034 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -75,8 +75,7 @@ enum pwm_polarity {
+ 
+ enum {
+ 	PWMF_REQUESTED = 1 << 0,
+-	PWMF_ENABLED = 1 << 1,
+-	PWMF_EXPORTED = 1 << 2,
++	PWMF_EXPORTED = 1 << 1,
+ };
+ 
+ /**
+@@ -84,11 +83,13 @@ enum {
+  * @period: PWM period (in nanoseconds)
+  * @duty_cycle: PWM duty cycle (in nanoseconds)
+  * @polarity: PWM polarity
++ * @enabled: PWM enabled status
+  */
+ struct pwm_state {
+ 	unsigned int period;
+ 	unsigned int duty_cycle;
+ 	enum pwm_polarity polarity;
++	bool enabled;
+ };
+ 
+ struct pwm_device {
+@@ -104,7 +105,7 @@ struct pwm_device {
+ 
+ static inline bool pwm_is_enabled(const struct pwm_device *pwm)
+ {
+-	return test_bit(PWMF_ENABLED, &pwm->flags);
++	return pwm->state.enabled;
+ }
+ 
+ static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
 -- 
 1.9.1
