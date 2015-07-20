@@ -1,107 +1,30 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 20 Jul 2015 10:18:33 +0530
-Subject: [PATCH 1/2] input: touchscreen: pixcir_i2c_ts: Add support for
- optional wakeup interrupt
-In-Reply-To: <20150717215122.GC39282@dtor-ws>
-References: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
- <1437115241-17859-2-git-send-email-vigneshr@ti.com>
- <20150717215122.GC39282@dtor-ws>
-Message-ID: <55AC7DA1.9050002@ti.com>
+Date: Mon, 20 Jul 2015 10:20:12 +0530
+Subject: [PATCH v2 0/2] pixcir_i2c_ts: Add optional wakeup irq support
+Message-ID: <1437367814-27785-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
 
-On 7/18/2015 3:21 AM, Dmitry Torokhov wrote:
-> Hi Vignesh,
-> 
-> On Fri, Jul 17, 2015 at 12:10:40PM +0530, Vignesh R wrote:
->> On am437x-gp-evm, pixcir touchscreen can wake the system from low power
->> state by generating wake-up interrupt via pinctrl and IO daisy chain.
->> Add support for optional wakeup interrupt source by regsitering to
->> automated wake IRQ framework introduced by commit 4990d4fe327b ("PM /
->> Wakeirq: Add automated device wake IRQ handling").
->> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
->> support for optional wake-up")
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>  drivers/input/touchscreen/pixcir_i2c_ts.c | 14 ++++++++++++++
->>  1 file changed, 14 insertions(+)
->>
->> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
->> index 8f3e243a62bf..f7c602027fbd 100644
->> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
->> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
->> @@ -29,6 +29,8 @@
->>  #include <linux/of.h>
->>  #include <linux/of_gpio.h>
->>  #include <linux/of_device.h>
->> +#include <linux/of_irq.h>
->> +#include <linux/pm_wakeirq.h>
->>  
->>  #define PIXCIR_MAX_SLOTS       5 /* Max fingers supported by driver */
->>  
->> @@ -38,6 +40,7 @@ struct pixcir_i2c_ts_data {
->>  	const struct pixcir_ts_platform_data *pdata;
->>  	bool running;
->>  	int max_fingers;	/* Max fingers supported in this instance */
->> +	int wakeirq;
->>  };
->>  
->>  struct pixcir_touch {
->> @@ -564,11 +567,22 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->>  	i2c_set_clientdata(client, tsdata);
->>  	device_init_wakeup(&client->dev, 1);
->>  
->> +	/* Register wakeirq, if available */
->> +	tsdata->wakeirq = of_irq_get(dev->of_node, 1);
-> 
-> Can we put this in platform data and parse in pixcir_parse_dt() please?
-> Also, why not of_irq_get_byname()?
->
+On am437x-gp-evm, pixcir_i2c_tsc can wake-up system from low power
+state via pinctrl and IO daisy chain mechanism. This patch series add
+support for such optional wake up interrupt to be handled via recently
+introduced generic wake irq handling framework.
 
-Ok.
+Tested on am437x-gp-evm, with some out of tree patches to support
+suspend/resume on am437x.
 
->> +	if (tsdata->wakeirq) {
->> +		error = dev_pm_set_dedicated_wake_irq(dev,
->> +						      tsdata->wakeirq);
->> +		if (error)
->> +			dev_dbg(dev, "unable to get wakeirq %d\n",
->> +				error);
->> +	}
-> 
-> Shouldn't his actually be:
-> 
-> 	error = tsdata->wakeirq ?
-> 		dev_pm_set_dedicated_wake_irq(dev, tsdata->wakeirq) :
-> 		dev_pm_set_wake_irq(dev, client->irq);
-> 	if (error) {
-> 		...
-> 	}
-> 
-> and then we can get rid of enable_irq_wake()/disable_irq_wake() in
-> pixcir_i2c_ts_suspend() and pixcir_i2c_ts_resume().
-> 
 
-Yes, I will do this in v2.
+Vignesh R (2):
+  input: touchscreen: pixcir_i2c_ts: Add support for optional wakeup
+    interrupt
+  ARM: dts: AM437x-gp-evm: Add wakeup interrupt source for
+    pixcir_i2c_tsc
 
->> +
->>  	return 0;
->>  }
->>  
->>  static int pixcir_i2c_ts_remove(struct i2c_client *client)
->>  {
->> +	dev_pm_clear_wake_irq(&client->dev);
->>  	device_init_wakeup(&client->dev, 0);
-> 
-> I wonder if driver core should be responsible for clearing wake irq and
-> also for clearing wakeup flag.
-> 
+ arch/arm/boot/dts/am437x-gp-evm.dts       |  4 ++++
+ drivers/input/touchscreen/pixcir_i2c_ts.c | 17 +++++++++++++----
+ include/linux/input/pixcir_ts.h           |  1 +
+ 3 files changed, 18 insertions(+), 4 deletions(-)
 
-AFAICU, wakeup flag is deleted when struct device is deleted, hence,
-device_init_wakeup() call may not be required in .remove(). But,
-dev_pm_clear_wake_irq() can be moved to driver core.
-
-Regards
-Vignesh
+-- 
+2.4.5
