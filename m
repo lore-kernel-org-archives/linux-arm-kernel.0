@@ -1,31 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 Jul 2015 16:02:54 +0100
-Subject: [PATCH] regmap: Add function check before called format_val
-In-Reply-To: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
-References: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20150720150254.GC11162@sirena.org.uk>
+From: k.opasiak@samsung.com (Krzysztof Opasiak)
+Date: Mon, 20 Jul 2015 17:08:13 +0200
+Subject: [PATCH v3 26/46] usb: gadget: pch_ud: add ep capabilities support
+In-Reply-To: <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
+References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
+ <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
+Message-ID: <55AD0EDD.70201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 08:41:50PM +0800, Henry Chen wrote:
-> The regmap_format will not be initialize since regmap_bus is not assgined 
-> on regmap_init(). It should has a function check before using 
-> format_val() to avoid null function called on regmap_bulk_read().
 
-> -			map->format.format_val(val + (i * val_bytes), ival, 0);
-> +			if (map->format.format_val)
-> +				map->format.format_val(val + (i * val_bytes), ival, 0);
-> +			else
-> +				memcpy(val + (i * val_bytes), &ival, val_bytes);
 
-Your changelog doesn't explan why we are in this code path in the first
-place without a format_val() and why a memcpy() is an appropriate
-replacement.  It should, it's not clear to me that this is a good fix
-but I don't feel I fully understand the problem.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/bd264eb8/attachment-0001.sig>
+On 07/15/2015 08:32 AM, Robert Baldyga wrote:
+> Convert endpoint configuration to new capabilities model.
+>
+> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+> ---
+>   drivers/usb/gadget/udc/pch_udc.c | 14 ++++++++++++--
+>   1 file changed, 12 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/gadget/udc/pch_udc.c b/drivers/usb/gadget/udc/pch_udc.c
+> index 613547f..cc8fb3c 100644
+> --- a/drivers/usb/gadget/udc/pch_udc.c
+> +++ b/drivers/usb/gadget/udc/pch_udc.c
+> @@ -2895,11 +2895,21 @@ static void pch_udc_pcd_reinit(struct pch_udc_dev *dev)
+>   		ep->in = ~i & 1;
+>   		ep->ep.name = ep_string[i];
+>   		ep->ep.ops = &pch_udc_ep_ops;
+> -		if (ep->in)
+> +		if (ep->in) {
+>   			ep->offset_addr = ep->num * UDC_EP_REG_SHIFT;
+> -		else
+> +			ep->ep.caps.dir_in = true;
+> +		} else {
+>   			ep->offset_addr = (UDC_EPINT_OUT_SHIFT + ep->num) *
+>   					  UDC_EP_REG_SHIFT;
+> +			ep->ep.caps.dir_out = true;
+> +		}
+> +		if (i == UDC_EP0IN_IDX || i == UDC_EP0OUT_IDX) {
+> +			ep->ep.caps.type_control = true;
+
+In all previous patches you set both dir_in and dir_out to true for ep0 
+but in this patch you don't do this. Is there some reason for this or 
+it's just a mistake?
+
+> +		} else {
+> +			ep->ep.caps.type_iso = true;
+> +			ep->ep.caps.type_bulk = true;
+> +			ep->ep.caps.type_int = true;
+> +		}
+>   		/* need to set ep->ep.maxpacket and set Default Configuration?*/
+>   		usb_ep_set_maxpacket_limit(&ep->ep, UDC_BULK_MAX_PKT_SIZE);
+>   		list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
+>
+
+Best Regards,
+
+-- 
+Krzysztof Opasiak
+Samsung R&D Institute Poland
+Samsung Electronics
