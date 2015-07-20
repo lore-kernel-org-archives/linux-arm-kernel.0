@@ -1,50 +1,38 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 20 Jul 2015 16:10:03 +0100
-Subject: [PATCH v2 4/5] arm64: kvm: Adopt new alternative assembler macros
-In-Reply-To: <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
-References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
- <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437405004-1296-5-git-send-email-daniel.thompson@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 20 Jul 2015 17:23:36 +0200
+Subject: [linux-sunxi] Re: [PATCH v2] mmc: sunxi: Don't start commands
+ while the card is busy
+In-Reply-To: <20150720080007.GR28632@lukather>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+ <20150720080007.GR28632@lukather>
+Message-ID: <55AD1278.3060308@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the dynamic patching for ARM64_HAS_SYSREG_GIC_CPUIF over to
-the newly added alternative assembler macros.
+Hi,
 
-Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
----
- arch/arm64/kvm/hyp.S | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+On 20-07-15 10:00, Maxime Ripard wrote:
+> Hi,
+>
+> On Fri, Jul 10, 2015 at 05:14:44PM +0200, Hans de Goede wrote:
+>> Some sdio wifi modules have not been working reliable with the sunxi-mmc
+>> host code. This turns out to be caused by it starting new commands while
+>> the card signals that it is still busy processing a previous command.
+>>
+>> This commit fixes this, thereby fixing the wifi reliability issues on
+>> the Cubietruck and other sunxi boards using sdio wifi.
+>>
+>> Reported-by: Eugene K <sigintmailru@gmail.com>
+>> Suggested-by: Eugene K <sigintmailru@gmail.com>
+>> Cc: Eugene K <sigintmailru@gmail.com>
+>
+> You should use the "real" name here, and not some shortening.
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 17a8fb14f428..10915aaf0b01 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -810,7 +810,11 @@
-  * Call into the vgic backend for state saving
-  */
- .macro save_vgic_state
--	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+	bl	__save_vgic_v2_state
-+alternative_else
-+	bl	__save_vgic_v3_state
-+alternative_endif
- 	mrs	x24, hcr_el2
- 	mov	x25, #HCR_INT_OVERRIDE
- 	neg	x25, x25
-@@ -827,7 +831,11 @@
- 	orr	x24, x24, #HCR_INT_OVERRIDE
- 	orr	x24, x24, x25
- 	msr	hcr_el2, x24
--	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+	bl	__restore_vgic_v2_state
-+alternative_else
-+	bl	__restore_vgic_v3_state
-+alternative_endif
- .endm
- 
- .macro save_timer_state
--- 
-2.4.3
+I don't know the real name, and AFAIK this is really only important
+for S-o-b lines.
+
+Eugene, care to share your full name with us?
+
+Regards,
+
+Hans
