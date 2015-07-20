@@ -1,57 +1,44 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Jul 2015 11:01:24 +0200
-Subject: [RFC PATCH 10/15] pwm: add the PWM initial state retrieval infra
-In-Reply-To: <1435738921-25027-11-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-11-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150720090123.GM29614@ulmo>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 20 Jul 2015 11:03:25 +0200
+Subject: [PATCH v2 1/2] dmaengine: Add an enum for the dmaengine
+ alignment constraints
+In-Reply-To: <1437381693-18948-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1437381693-18948-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20150720110325.502af335@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 10:21:56AM +0200, Boris Brezillon wrote:
-> Add a ->init_state() function to the pwm_ops struct to let PWM drivers
-> initialize the PWM state attached to a PWM device.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/pwm/core.c  | 3 +++
->  include/linux/pwm.h | 2 ++
->  2 files changed, 5 insertions(+)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index 3e830ce..30631f5 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -264,6 +264,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
->  		pwm->hwpwm = i;
->  		pwm_set_default_polarity(pwm, polarity);
->  
-> +		if (chip->ops->init_state)
-> +			chip->ops->init_state(chip, pwm);
-> +
->  		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
->  	}
->  
-> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> index 0f36a06..b47244a 100644
-> --- a/include/linux/pwm.h
-> +++ b/include/linux/pwm.h
-> @@ -177,6 +177,8 @@ struct pwm_ops {
->  					  struct pwm_device *pwm);
->  	void			(*disable)(struct pwm_chip *chip,
->  					   struct pwm_device *pwm);
-> +	void			(*init_state)(struct pwm_chip *chip,
-> +					      struct pwm_device *pwm);
+Maxime,
 
-I think I'd call this reset_state. init has this connotation of setting
-a set of default values. For reset it's clearer in my opinion that it's
-resetting to the hardware state.
+On Mon, 20 Jul 2015 10:41:32 +0200, Maxime Ripard wrote:
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/13fd205a/attachment.sig>
+>  /**
+> + * enum dmaengine_alignment - defines alignment of the DMA async tx
+> + * buffers
+> + */
+> +enum dmaengine_alignment {
+> +	DMAENGINE_ALIGN_1_BYTE = 0,
+> +	DMAENGINE_ALIGN_2_BYTES = 1,
+> +	DMAENGINE_ALIGN_4_BYTES = 2,
+> +	DMAENGINE_ALIGN_8_BYTES = 3,
+> +	DMAENGINE_ALIGN_16_BYTES = 4,
+> +	DMAENGINE_ALIGN_32_BYTES = 5,
+> +	DMAENGINE_ALIGN_64_BYTES = 6,
+> +};
+
+Sorry I didn't think about this during the first iteration, but this
+define is just the log2 of the values, no? So maybe you could simply do
+something like:
+
+static inline unsigned int dmaengine_alignment(size_t bytes)
+{
+	return ilog2(bytes);
+}
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
