@@ -1,44 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 20 Jul 2015 11:03:25 +0200
-Subject: [PATCH v2 1/2] dmaengine: Add an enum for the dmaengine
- alignment constraints
-In-Reply-To: <1437381693-18948-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1437381693-18948-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150720110325.502af335@free-electrons.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 20 Jul 2015 11:04:30 +0200 (CEST)
+Subject: [PATCH 1/3] clocksource: atmel-st: Remove irq handler when clock
+ event is unused
+In-Reply-To: <20150718222308.GA30489@piout.net>
+References: <1437161608-26782-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1437161608-26782-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1507180942360.18576@nanos>
+ <20150718222308.GA30489@piout.net>
+Message-ID: <alpine.DEB.2.11.1507201103550.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Maxime,
+On Sun, 19 Jul 2015, Alexandre Belloni wrote:
+> On 18/07/2015 at 10:12:03 +0200, Thomas Gleixner wrote :
+> > On Fri, 17 Jul 2015, Alexandre Belloni wrote:
+> > > +static int atmel_st_request_irq(struct clock_event_device *dev)
+> > > +{
+> > > +	int ret;
+> > > +
+> > > +	if (clockevent_state_periodic(dev) || clockevent_state_oneshot(dev))
+> > > +		return 0;
+> > > +
+> > > +	ret = request_irq(irq, at91rm9200_timer_interrupt,
+> > > +			  IRQF_SHARED | IRQF_TIMER | IRQF_IRQPOLL,
+> > > +			  "at91_tick", regmap_st);
+> > > +	if (ret) {
+> > > +		pr_alert("Unable to setup IRQ\n");
+> > > +		return ret;
+> > > +	}
+> > > +
+> > >  	return 0;
+> > >  }
+> > >  
+> > >  static int clkevt32k_set_oneshot(struct clock_event_device *dev)
+> > >  {
+> > > +	int ret;
+> > > +
+> > >  	clkdev32k_disable_and_flush_irq();
+> > >  
+> > >  	/*
+> > >  	 * ALM for oneshot irqs, set by next_event()
+> > >  	 * before 32 seconds have passed.
+> > >  	 */
+> > > +	ret = atmel_st_request_irq(dev);
+> > 
+> > You cannot call request_irq() from interrupt disabled context. It
+> > works during early boot because might_sleep() is not active then, but
+> > if that happens during normal runtime it wont work.
+> > 
+> 
+> Indeed, clockevents_switch_state() has to be called with interrupts
+> disabled. So I'm not sure anymore how we should go about this change
+> (obviously, the same applies to the pit change). Do you have an idea?
 
-On Mon, 20 Jul 2015 10:41:32 +0200, Maxime Ripard wrote:
+That's why I used setup/remove_irq() in the stale RT changes.
 
->  /**
-> + * enum dmaengine_alignment - defines alignment of the DMA async tx
-> + * buffers
-> + */
-> +enum dmaengine_alignment {
-> +	DMAENGINE_ALIGN_1_BYTE = 0,
-> +	DMAENGINE_ALIGN_2_BYTES = 1,
-> +	DMAENGINE_ALIGN_4_BYTES = 2,
-> +	DMAENGINE_ALIGN_8_BYTES = 3,
-> +	DMAENGINE_ALIGN_16_BYTES = 4,
-> +	DMAENGINE_ALIGN_32_BYTES = 5,
-> +	DMAENGINE_ALIGN_64_BYTES = 6,
-> +};
+Thanks,
 
-Sorry I didn't think about this during the first iteration, but this
-define is just the log2 of the values, no? So maybe you could simply do
-something like:
-
-static inline unsigned int dmaengine_alignment(size_t bytes)
-{
-	return ilog2(bytes);
-}
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	tglx
