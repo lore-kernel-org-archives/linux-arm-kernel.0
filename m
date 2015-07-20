@@ -1,54 +1,108 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 20 Jul 2015 11:23:39 +0200
-Subject: [PATCH 4/7] Documentation: mtd: add a DT property to set the
- latency code of Spansion memory
-In-Reply-To: <201507161944.20523.marex@denx.de>
-References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
- <398ca9f17bda638e05e97f258fb4e6d27ac828db.1437059658.git.cyrille.pitchen@atmel.com>
- <201507161944.20523.marex@denx.de>
-Message-ID: <55ACBE1B.6050507@atmel.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 20 Jul 2015 17:32:05 +0800
+Subject: [PATCH v2 1/2] power: reset: at91: add sama5d3 reset function
+Message-ID: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This patch introduces a new compatible string: "atmel,sama5d3-rstc" and
+new reset function for sama5d3 and later chips.
 
-Le 16/07/2015 19:44, Marek Vasut a ?crit :
-> On Thursday, July 16, 2015 at 05:27:51 PM, Cyrille Pitchen wrote:
-> 
-> Hi!
-> 
->> Both the SPI controller and the NOR flash memory need to agree on the
->> number of dummy cycles to use for Fast Read commands. For Spansion
->> memories, this number of dummy cycles is not given directly but through a
->> so called "latency code".
->> The latency code can be found into the memory datasheet and depends on the
->> SPI clock frequency, the Fast Read op code and the Single/Dual Data Rate
->> mode.
-> 
-> Shouldn't you be able to derive the latency code from the above information,
-> which you already know then ?
-Yes I agree with you; this could have been done adding static tables inside the
-driver instead of creating a new DT property dedicated to Spansion memories.
+As in sama5d3 or later chips, we don't have to shutdown the DDR
+controller before reset. Shutdown the DDR controller before reset is a
+workaround to avoid DDR signal driving the bus, but since sama5d3 and
+later chips there is no such a conflict.
 
-When I wrote this patch, I had a close look at the s25fl512s datasheet but only
-overviewed few datasheets for other Spansion QSPI flash memories. So I don't
-know whether a single latency code table could be shared among all Spansion
-memories or many tables should be added to support different memory models.
+So in this patch:
+   1. the sama5d3 reset function only need to write the rstc register
+and return.
+   2. we can remove the code related with sama5d3 DDR controller as
+we don't use it at all.
 
-That's why I've chosen to add a dedicated DT property to support Spansion
-memories as it avoids to add tables to guess the proper latency code to be
-used. I thought it would be more flexible.
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
 
-Maybe I will remove the support of Spansion QSPI memories from this series for
-now. Their support can still be implemented later.
+Changes in v2:
+- aligned the function parameters to be consist with the coding style
+- refined the commit log
+- add binding document changes
+- use of_device_is_compitable() instead
 
-Anyway, thanks for your review :)
+ .../devicetree/bindings/arm/atmel-at91.txt         |  2 +-
+ drivers/power/reset/at91-reset.c                   | 26 ++++++++++++++++------
+ 2 files changed, 20 insertions(+), 8 deletions(-)
 
-> 
-> Best regards,
-> Marek Vasut
-> 
-
-Best Regards,
-
-Cyrille
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 424ac8c..dd998b9 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -87,7 +87,7 @@ One interrupt per TC channel in a TC block:
+ 
+ RSTC Reset Controller required properties:
+ - compatible: Should be "atmel,<chip>-rstc".
+-  <chip> can be "at91sam9260" or "at91sam9g45"
++  <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
+ - reg: Should contain registers location and length
+ 
+ Example:
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index 36dc52f..c378d4e 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -123,6 +123,15 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
+ 	return NOTIFY_DONE;
+ }
+ 
++static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
++			   void *cmd)
++{
++	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
++	       at91_rstc_base);
++
++	return NOTIFY_DONE;
++}
++
+ static void __init at91_reset_status(struct platform_device *pdev)
+ {
+ 	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
+@@ -155,13 +164,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
+ static const struct of_device_id at91_ramc_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-sdramc", },
+ 	{ .compatible = "atmel,at91sam9g45-ddramc", },
+-	{ .compatible = "atmel,sama5d3-ddramc", },
+ 	{ /* sentinel */ }
+ };
+ 
+ static const struct of_device_id at91_reset_of_match[] = {
+ 	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
+ 	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
++	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
+ 	{ /* sentinel */ }
+ };
+ 
+@@ -181,13 +190,16 @@ static int at91_reset_of_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	for_each_matching_node(np, at91_ramc_of_match) {
+-		at91_ramc_base[idx] = of_iomap(np, 0);
+-		if (!at91_ramc_base[idx]) {
+-			dev_err(&pdev->dev, "Could not map ram controller address\n");
+-			return -ENODEV;
++	if (!of_device_is_compatible(pdev->dev.of_node, "atmel,sama5d3-rstc")) {
++		/* we need to shutdown the ddr controller, so get ramc base */
++		for_each_matching_node(np, at91_ramc_of_match) {
++			at91_ramc_base[idx] = of_iomap(np, 0);
++			if (!at91_ramc_base[idx]) {
++				dev_err(&pdev->dev, "Could not map ram controller address\n");
++				return -ENODEV;
++			}
++			idx++;
+ 		}
+-		idx++;
+ 	}
+ 
+ 	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+-- 
+1.9.1
