@@ -1,84 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Jul 2015 14:02:08 +0100
-Subject: [PATCH 06/14] TEMPORARY: arm: update public headers for GICv3 ITS
- emulation
+Date: Mon, 20 Jul 2015 14:02:11 +0100
+Subject: [PATCH 09/14] add kvm__check_vm_capability
 In-Reply-To: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
 References: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1437397336-21385-7-git-send-email-andre.przywara@arm.com>
+Message-ID: <1437397336-21385-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is preliminary and updates the headers from a kernel with
-ITS emulation support. It should be replaced by a proper header
-update once ITS support is upstream.
-Contains a "hack" to support compiling on ARM, too.
+KVM capabilities can be per-VM, in this case the ioctl should be
+issued on the VM file descriptor, not on the system fd.
+Since this feature is guarded by a (system) capability itself, wrap
+the call into a function of its own.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/aarch64/include/asm/kvm.h | 3 +++
- arm/gic.c                     | 4 ++++
- include/linux/kvm.h           | 6 +++++-
- 3 files changed, 12 insertions(+), 1 deletion(-)
+ include/kvm/kvm.h |  1 +
+ kvm.c             | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 29 insertions(+)
 
-diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
-index d268320..e42435c 100644
---- a/arm/aarch64/include/asm/kvm.h
-+++ b/arm/aarch64/include/asm/kvm.h
-@@ -82,8 +82,11 @@ struct kvm_regs {
- #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
- #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
+diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
+index 754e029..325e3b7 100644
+--- a/include/kvm/kvm.h
++++ b/include/kvm/kvm.h
+@@ -125,6 +125,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
+ }
  
-+#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
+ 
+ static inline void kvm__set_thread_name(const char *name)
+ {
+diff --git a/kvm.c b/kvm.c
+index 78dd7c0..04327b9 100644
+--- a/kvm.c
++++ b/kvm.c
+@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
+ 	return kvm_dir;
+ }
+ 
++bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
++{
++	static int supports_vm_ext_check = 0;
++	int ret;
 +
- #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
- #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
-+#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
- 
- #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
- #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
-diff --git a/arm/gic.c b/arm/gic.c
-index 2c1a547..93a8a1d 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -18,6 +18,10 @@
- #define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
- #endif
- 
-+#ifndef KVM_VGIC_V3_ADDR_TYPE_ITS
-+#define KVM_VGIC_V3_ADDR_TYPE_ITS 4
-+#endif
++	switch (supports_vm_ext_check) {
++	case 0:
++		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
++			    KVM_CAP_CHECK_EXTENSION_VM);
++		if (ret <= 0) {
++			supports_vm_ext_check = -1;
++			return false;
++		}
++		supports_vm_ext_check = 1;
++		/* fall through */
++	case 1:
++		break;
++	case -1:
++		return false;
++	}
 +
- static int gic_fd = -1;
- static u64 gic_redists_base;
- static u64 gic_redists_size;
-diff --git a/include/linux/kvm.h b/include/linux/kvm.h
-index 4b60056..39428d1 100644
---- a/include/linux/kvm.h
-+++ b/include/linux/kvm.h
-@@ -815,6 +815,8 @@ struct kvm_ppc_smmu_info {
- #define KVM_CAP_S390_IRQ_STATE 114
- #define KVM_CAP_PPC_HWRNG 115
- 
-+#define KVM_CAP_MSI_DEVID 119
++	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
++	if (ret < 0)
++		return false;
 +
- #ifdef KVM_CAP_IRQ_ROUTING
- 
- struct kvm_irq_routing_irqchip {
-@@ -965,12 +967,14 @@ struct kvm_one_reg {
- 	__u64 addr;
- };
- 
-+#define KVM_MSI_VALID_DEVID	(1U << 0)
- struct kvm_msi {
- 	__u32 address_lo;
- 	__u32 address_hi;
- 	__u32 data;
- 	__u32 flags;
--	__u8  pad[16];
-+	__u32 devid;
-+	__u8  pad[12];
- };
- 
- struct kvm_arm_device_addr {
++	return ret;
++}
++
+ bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
+ {
+ 	int ret;
 -- 
 2.3.5
