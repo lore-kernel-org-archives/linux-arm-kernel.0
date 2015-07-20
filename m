@@ -1,94 +1,67 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Jul 2015 10:32:46 +0200
-Subject: [RFC PATCH 05/15] pwm: introduce default period and polarity
- concepts
-In-Reply-To: <20150720082241.GJ29614@ulmo>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-6-git-send-email-boris.brezillon@free-electrons.com>
- <20150702064445.GC11824@pengutronix.de>
- <20150702094955.4b1c9254@bbrezillon> <20150720080313.GF29614@ulmo>
- <20150720101443.180ebddb@bbrezillon> <20150720082241.GJ29614@ulmo>
-Message-ID: <20150720103246.316c159d@bbrezillon>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 20 Jul 2015 16:35:21 +0800
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <20150720075231.GQ28632@lukather>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+ <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
+ <559FEED3.5080505@atmel.com> <55A32EC8.4080309@atmel.com>
+ <20150720075231.GQ28632@lukather>
+Message-ID: <55ACB2C9.5070701@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jul 2015 10:22:42 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
+Hi, Maxime
 
-> On Mon, Jul 20, 2015 at 10:14:43AM +0200, Boris Brezillon wrote:
-> > Hi Thierry,
-> > 
-> > On Mon, 20 Jul 2015 10:03:14 +0200
-> > Thierry Reding <thierry.reding@gmail.com> wrote:
-> > 
-> > > On Thu, Jul 02, 2015 at 09:49:55AM +0200, Boris Brezillon wrote:
-> > > > On Thu, 2 Jul 2015 08:44:45 +0200
-> > > > Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de> wrote:
-> > > > 
-> > > > > On Wed, Jul 01, 2015 at 10:21:51AM +0200, Boris Brezillon wrote:
-> > > > > > When requested by a user, the PWM is assigned a default period and polarity
-> > > > > > extracted from the DT, the platform data or statically set by the driver.
-> > > > > > Those default values are currently stored in the period and polarity
-> > > > > > fields of the pwm_device struct, but they will be stored somewhere else
-> > > > > > once we have introduced the architecture allowing for hardware state
-> > > > > > retrieval.
-> > > > > > 
-> > > > > > The pwm_set_default_polarity and pwm_set_default_period should only be
-> > > > > > used by PWM drivers or the PWM core infrastructure to specify the
-> > > > > > default period and polarity values.
-> > > > > Would it make sense to put the prototypes of
-> > > > > pwm_set_default_p{olarity,eriod} into (say) drivers/pwm/pwm-private.h
-> > > > > then?
-> > > > > 
-> > > > 
-> > > > Yes, definitely. I was thinking about moving those functions/prototypes
-> > > > into include/linux/pwm-provider.h, but I'm fine with
-> > > > drivers/pwm/pwm-private.h too.
-> > > > 
-> > > > Thierry, any opinion ?
-> > > 
-> > > I'm not sure I see the need for this. If they are the default values and
-> > > drivers have no need to change them, then storing them in the regular
-> > > period and polarity fields seems just fine (they'll be propagated into
-> > > new state objects as they get created).
-> > > 
-> > > And if the driver has a need to change them, then why would it ever care
-> > > about the default values?
-> > 
-> > Because the period is often directly extracted from the DT, and this
-> > extracted period may not match the one configured by the bootloader.
-> > 
-> > If the driver wants to display the current status without changing the
-> > PWM state, then the driver will use the current state. ITOH, if it
-> > has to apply a new config, the driver will use the default period
-> > value (extracted from the DT) and change the duty-cycle depending on its
-> > needs.
-> > This is the case we have with the pwm-regulator driver: we want to
-> > display the initial voltage value without changing the PWM config, and
-> > when someone decides to change the voltage, we want to use the default
-> > period instead of keeping the one configured by the bootloader.
-> 
-> Wouldn't it make more sense to postpone this until the introduction of
-> the default state, then? That way we'd be getting a more consistent way
-> of dealing with default vs. initial by looking only at state objects.
+On 7/20/2015 3:52 PM, Maxime Ripard wrote:
+> Hi Josh,
+>
+> On Mon, Jul 13, 2015 at 11:21:44AM +0800, Josh Wu wrote:
+>> On 7/11/2015 12:12 AM, Nicolas Ferre wrote:
+>>> Le 10/07/2015 14:31, Maxime Ripard a ?crit :
+>>>> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+>>>>>> I would agree with Maxime. Currently all latest chip reset function is
+>>>>>> compatible with the atmel,sama5d3-rstc.
+>>>>>> So check compatible string is enough for now.
+>>>>>> But of cause if we have other incompatible reset in future with new chip,
+>>>>>> the structure like you said is needed.
+>>>>> We managed to avoid using of_machine_is_compatible() in all the at91
+>>>>> drivers. I'd like to keep it that way. It was painful enough to remove
+>>>>> all those cpu_is_at91xxx calls.
+>>>> That's your call...
+>>>>
+>>>>> Also, using it is trying to match strings and will result in longer boot
+>>>>> times.
+>>>> Have you looked at the implementation of of_match_device? If that's
+>>>> really a concern to you, you should actually avoid it.
+>>> I agree: let's keep it simple and use of_match_device().
+>> Ok. I will keep it as it is now:  use the (match->data != sama5d3_restart)
+>> for the condition.
+> I'm not just that's been an option in our discussion so far.
+>
+> Nicolas said that he was agreeing with me, but at the same time said
+> the complete opposite of what I was arguing for, so I'm not really
+> sure what's really on his mind, but the two options that were
+> discussed were to remove that test, and either:
+>
+>    - Use of_device_is_compatible to prevent the loop execution
 
-Hm, I was trying to keep the series bisectable. If we do that
-after introducing the default state concept, then some drivers will
-retrieve invalid values until the patches introducing the default
-helpers and changing the different drivers to call the default helpers
-where appropriate are introduced.
+Thank you for explaining, it is clear to me.
 
-> 
-> Ideally initial state should be the same as the default state. Except
-> maybe for the duty-cycle, which won't be encoded in the default state
-> anyway.
+I'll take this above option. As the of_device_is_compatible() almost 
+same as of_match_node()/of_match_device(). Except that 
+of_device_is_compatible() is more efficient (in this case It calls 
+__of_device_is_compatible() directly) than of_match_node/of_match_device.
 
-Yes, but we don't live in an ideal world ;-), and the value set in an
-old bootloaders might be considered wrong at some point, and new dts
-versions might decide to change a bit the period value.
+>
+>    - define a structure with a flag to say whether you need the ram
+>      controller quirk or not, and test that flag.
+>
+> Maxime
+>
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best Regards,
+Josh Wu
