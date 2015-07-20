@@ -1,55 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jul 2015 14:20:54 -0700
-Subject: [PATCH v8 6/9] nvmem: qfprom: Add Qualcomm QFPROM support.
-In-Reply-To: <1437403445-4348-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403445-4348-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55AD6636.4050302@codeaurora.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 20 Jul 2015 23:28:17 +0200 (CEST)
+Subject: [RFCv2 PATCH 1/8] irqdomain: Introduce
+ irq_domain_ops.init_alloc_info
+In-Reply-To: <1436778864-17645-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1436778864-17645-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1436778864-17645-2-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <alpine.DEB.2.11.1507202326450.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2015 07:44 AM, Srinivas Kandagatla wrote:
-> This patch adds QFPROM support driver which is used by other drivers
-> like thermal sensor and cpufreq.
->
-> On MSM parts there are some efuses (called qfprom) these fuses store
-> things like calibration data, speed bins.. etc. Drivers like cpufreq,
-> thermal sensors would read out this data for configuring the driver.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+On Mon, 13 Jul 2015, Suravee Suthikulpanit wrote:
 
-One comment below, otherwise
+> Currently, when calling irq_domain_alloc_irqs() on ARM64, it uses
+> struct of_phandle_args to pass irq information. However, this is not
+> appropriate for ACPI since of_phandle_args is specific to DT.
+> 
+> Therefore, this patch introduces a new function pointer,
+> irq_domain_ops.init_alloc_info, which can be used by irqchips to provide
+> a way to initialize irqchip-specific data-structure for allocating IRQ.
+> 
+> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> ---
+> NOTE:
+> Similarly, x86 is currently using struct irq_alloc_info
+> (see arch/x86/include/asm/hw_irq.h) and each irq_domain has different
+> way of initializing this structure.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+And why don't you use the same mechanism on ARM and have a private
+irq_alloc_info implementation which can carry either DT or ACPI
+information?
+ 
+Thanks,
 
-> diff --git a/drivers/nvmem/qfprom.c b/drivers/nvmem/qfprom.c
-> new file mode 100644
-> index 0000000..ba5e2b4
-> --- /dev/null
-> +++ b/drivers/nvmem/qfprom.c
-> @@ -0,0 +1,86 @@
-> +/*
-> + * Copyright (C) 2015 Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-
-This include is used?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+	tglx
