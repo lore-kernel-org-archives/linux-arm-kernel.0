@@ -1,112 +1,52 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Sun, 19 Jul 2015 23:25:34 -0700
-Subject: [PATCH v2 1/2] input: touchscreen: pixcir_i2c_ts: Add support
- for optional wakeup interrupt
-In-Reply-To: <1437367814-27785-2-git-send-email-vigneshr@ti.com>
-References: <1437367814-27785-1-git-send-email-vigneshr@ti.com>
- <1437367814-27785-2-git-send-email-vigneshr@ti.com>
-Message-ID: <20150720062534.GB13092@dtor-ws>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 20 Jul 2015 08:32:49 +0200
+Subject: [PATCH 3/9] gpio: Allow hogged gpios to be requested
+In-Reply-To: <20150719140142.GV26287@pengutronix.de>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
+ <20150717202702.GK7013@pengutronix.de>
+ <20150719140142.GV26287@pengutronix.de>
+Message-ID: <20150720063249.GM7013@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 10:20:13AM +0530, Vignesh R wrote:
-> On am437x-gp-evm, pixcir touchscreen can wake the system from low power
-> state by generating wake-up interrupt via pinctrl and IO daisy chain.
-> Add support for optional wakeup interrupt source by regsitering to
-> automated wake IRQ framework introduced by commit 4990d4fe327b ("PM /
-> Wakeirq: Add automated device wake IRQ handling").
-> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
-> support for optional wake-up")
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
-> v2:
->  * use of_irq_get_byname()
->  * remove enable/disable_wake_irq()
-> 
->  drivers/input/touchscreen/pixcir_i2c_ts.c | 17 +++++++++++++----
->  include/linux/input/pixcir_ts.h           |  1 +
->  2 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> index 8f3e243a62bf..b9cebf274678 100644
-> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-> @@ -29,6 +29,8 @@
->  #include <linux/of.h>
->  #include <linux/of_gpio.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/pm_wakeirq.h>
->  
->  #define PIXCIR_MAX_SLOTS       5 /* Max fingers supported by driver */
->  
-> @@ -364,8 +366,6 @@ static int __maybe_unused pixcir_i2c_ts_suspend(struct device *dev)
->  				goto unlock;
->  			}
->  		}
-> -
-> -		enable_irq_wake(client->irq);
->  	} else if (input->users) {
->  		ret = pixcir_stop(ts);
->  	}
-> @@ -386,8 +386,6 @@ static int __maybe_unused pixcir_i2c_ts_resume(struct device *dev)
->  	mutex_lock(&input->mutex);
->  
->  	if (device_may_wakeup(&client->dev)) {
-> -		disable_irq_wake(client->irq);
-> -
->  		if (!input->users) {
->  			ret = pixcir_stop(ts);
->  			if (ret) {
-> @@ -445,6 +443,8 @@ static struct pixcir_ts_platform_data *pixcir_parse_dt(struct device *dev)
->  	dev_dbg(dev, "%s: x %d, y %d, gpio %d\n", __func__,
->  		pdata->x_max + 1, pdata->y_max + 1, pdata->gpio_attb);
->  
-> +	pdata->wakeirq = of_irq_get_byname(dev->of_node, "wakeupirq");
-> +
->  	return pdata;
->  }
->  #else
-> @@ -564,11 +564,20 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
->  	i2c_set_clientdata(client, tsdata);
->  	device_init_wakeup(&client->dev, 1);
->  
-> +	/* Register wakeirq */
-> +	error = pdata->wakeirq ?
+Hello Markus,
 
-Hmm, I guess the condition should be pdata->wakeirq > 0.
-
-> +		dev_pm_set_dedicated_wake_irq(dev, pdata->wakeirq) :
-> +		dev_pm_set_wake_irq(dev, client->irq);
-> +	if (error)
-> +		dev_info(dev, "unable to get wakeirq %d\n",
-> +			 error);
-> +
->  	return 0;
->  }
->  
->  static int pixcir_i2c_ts_remove(struct i2c_client *client)
->  {
-> +	dev_pm_clear_wake_irq(&client->dev);
->  	device_init_wakeup(&client->dev, 0);
->  
->  	return 0;
-> diff --git a/include/linux/input/pixcir_ts.h b/include/linux/input/pixcir_ts.h
-> index 7bae83b7c396..da573de5a5ee 100644
-> --- a/include/linux/input/pixcir_ts.h
-> +++ b/include/linux/input/pixcir_ts.h
-> @@ -58,6 +58,7 @@ struct pixcir_ts_platform_data {
->  	int x_max;
->  	int y_max;
->  	int gpio_attb;		/* GPIO connected to ATTB line */
-> +	int wakeirq;
->  	struct pixcir_i2c_chip_data chip;
->  };
->  
-> -- 
-> 2.4.5
+On Sun, Jul 19, 2015 at 04:01:42PM +0200, Markus Pargmann wrote:
+> On Fri, Jul 17, 2015 at 10:27:02PM +0200, Uwe Kleine-K?nig wrote:
+> > On Fri, Jul 17, 2015 at 11:32:44AM +0200, Markus Pargmann wrote:
+> > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> > > index bf4bd1d120c3..9f402b159cbe 100644
+> > > --- a/drivers/gpio/gpiolib.c
+> > > +++ b/drivers/gpio/gpiolib.c
+> > > @@ -798,7 +798,8 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
+> > >  	 * before IRQs are enabled, for non-sleeping (SOC) GPIOs.
+> > >  	 */
+> > >  
+> > > -	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0) {
+> > > +	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0 ||
+> > > +	    test_and_clear_bit(FLAG_IS_HOGGED, &desc->flags) == 1) {
+> > >  		desc_set_label(desc, label ? : "?");
+> > >  		status = 0;
+> > I don't like this patch. IMHO hogging is a "use" of a GPIO that should
+> > prevent it being requested.
 > 
+> I disagree with you here. The original patch stated in its description
+> that it was designed to initialize GPIOs. In my understanding this does
+> not necessarily mean that a hogged GPIO has to be blocked forever.
+Assume for a moment I can agree with "not necessarily". But now, what
+about the cases where a hogged GPIO should be blocked?
+IMHO, if you want to drive the GPIO from userspace anyhow, you don't
+need to add a hog for it.
+
+> The IS_HOGGED flag is cleared at the same time it is tested so only one
+> consumer can request one hogged GPIO. The GPIO is not considered to be
+> hogged after it is normally requested.
+You're right here, I missed the and_clear_bit part on the test.
+
+Best regards
+Uwe
 
 -- 
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
