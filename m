@@ -1,140 +1,72 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Jul 2015 14:02:04 +0100
-Subject: [PATCH 02/14] MSI-X: update GSI routing after changed MSI-X
- configuration
+Date: Mon, 20 Jul 2015 14:02:05 +0100
+Subject: [PATCH 03/14] virtio: fix endianness check for vhost support
 In-Reply-To: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
 References: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1437397336-21385-3-git-send-email-andre.przywara@arm.com>
+Message-ID: <1437397336-21385-4-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we set up GSI routing to map MSIs to KVM's GSI numbers, we
-write the current device's MSI setup into the kernel routing table.
-However the device driver in the guest can use PCI configuration space
-accesses to change the MSI configuration (address and/or payload data).
-Whenever this happens after we have setup the routing table already,
-we must amend the previously sent data.
-So when MSI-X PCI config space accesses write address or payload,
-find the associated GSI number and the matching routing table entry
-and update the kernel routing table (only if the data has changed).
-
-This fixes vhost-net, where the queue's IRQFD was setup before the
-MSI vectors.
+Currently we deny any VHOST_* functionality if the architecture
+supports guests with different endianness than the host. Most of the
+time even on those architectures the endianness of guest and host are
+the same, though, so we are denying the glory of VHOST needlessly.
+Switch from compile time determination to a run time scheme, which
+takes the actual endianness of the guest into account.
+For this we change the semantics of VIRTIO_ENDIAN_HOST to return the
+actual endianness of the host (the endianness of kvmtool at compile
+time, really). The actual check in vhost_net now compares this against
+the guest endianness.
+This enables vhost support on ARM and ARM64.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/irq.h |  1 +
- irq.c             | 31 +++++++++++++++++++++++++++++++
- virtio/pci.c      | 36 +++++++++++++++++++++++++++++++++---
- 3 files changed, 65 insertions(+), 3 deletions(-)
+ include/kvm/virtio.h | 9 +++++++--
+ virtio/net.c         | 2 +-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/include/kvm/irq.h b/include/kvm/irq.h
-index bb71521..f35eb7e 100644
---- a/include/kvm/irq.h
-+++ b/include/kvm/irq.h
-@@ -21,5 +21,6 @@ int irq__exit(struct kvm *kvm);
+diff --git a/include/kvm/virtio.h b/include/kvm/virtio.h
+index 768ee96..66530fd 100644
+--- a/include/kvm/virtio.h
++++ b/include/kvm/virtio.h
+@@ -17,10 +17,15 @@
+ #define VIRTIO_PCI_O_CONFIG	0
+ #define VIRTIO_PCI_O_MSIX	1
  
- int irq__allocate_routing_entry(void);
- int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg);
-+void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg);
+-#define VIRTIO_ENDIAN_HOST	0
+ #define VIRTIO_ENDIAN_LE	(1 << 0)
+ #define VIRTIO_ENDIAN_BE	(1 << 1)
  
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_LE
++#else
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_BE
++#endif
++
+ struct virt_queue {
+ 	struct vring	vring;
+ 	u32		pfn;
+@@ -40,7 +45,7 @@ struct virt_queue {
+ #define VIRTIO_RING_ENDIAN VIRTIO_ENDIAN_HOST
  #endif
-diff --git a/irq.c b/irq.c
-index 1aee478..25ac8d7 100644
---- a/irq.c
-+++ b/irq.c
-@@ -89,6 +89,37 @@ int irq__add_msix_route(struct kvm *kvm, struct msi_msg *msg)
- 	return next_gsi++;
- }
  
-+static bool update_data(u32 *ptr, u32 newdata)
-+{
-+	if (*ptr == newdata)
-+		return false;
-+
-+	*ptr = newdata;
-+	return true;
-+}
-+
-+void irq__update_msix_route(struct kvm *kvm, u32 gsi, struct msi_msg *msg)
-+{
-+	struct kvm_irq_routing_msi *entry;
-+	unsigned int i;
-+	bool changed;
-+
-+	for (i = 0; i < irq_routing->nr; i++)
-+		if (gsi == irq_routing->entries[i].gsi)
-+			break;
-+	if (i == irq_routing->nr)
-+		return;
-+
-+	entry = &irq_routing->entries[i].u.msi;
-+
-+	changed  = update_data(&entry->address_hi, msg->address_hi);
-+	changed |= update_data(&entry->address_lo, msg->address_lo);
-+	changed |= update_data(&entry->data, msg->data);
-+
-+	if (changed)
-+		ioctl(kvm->vm_fd, KVM_SET_GSI_ROUTING, irq_routing);
-+}
-+
- int __attribute__((weak)) irq__exit(struct kvm *kvm)
- {
- 	free(irq_routing);
-diff --git a/virtio/pci.c b/virtio/pci.c
-index 70c93ce..625fec0 100644
---- a/virtio/pci.c
-+++ b/virtio/pci.c
-@@ -152,6 +152,30 @@ static bool virtio_pci__io_in(struct ioport *ioport, struct kvm_cpu *vcpu, u16 p
- 	return ret;
- }
+-#if (VIRTIO_RING_ENDIAN & (VIRTIO_ENDIAN_LE | VIRTIO_ENDIAN_BE))
++#if VIRTIO_RING_ENDIAN != VIRTIO_ENDIAN_HOST
  
-+static void update_msix_map(struct virtio_pci *vpci,
-+			    struct msix_table *msix_entry, u32 vecnum)
-+{
-+	u32 gsi, i;
-+
-+	/* Find the GSI number used for that vector */
-+	if (vecnum == vpci->config_vector) {
-+		gsi = vpci->config_gsi;
-+	} else {
-+		for (i = 0; i < VIRTIO_PCI_MAX_VQ; i++)
-+			if (vpci->vq_vector[i] == vecnum)
-+				break;
-+		if (i == VIRTIO_PCI_MAX_VQ)
-+			return;
-+		gsi = vpci->gsis[i];
-+	}
-+
-+	if (gsi == 0)
-+		return;
-+
-+	msix_entry = &msix_entry[vecnum];
-+	irq__update_msix_route(vpci->kvm, gsi, &msix_entry->msg);
-+}
-+
- static bool virtio_pci__specific_io_out(struct kvm *kvm, struct virtio_device *vdev, u16 port,
- 					void *data, int size, int offset)
+ static inline __u16 __virtio_g2h_u16(u16 endian, __u16 val)
  {
-@@ -269,10 +293,16 @@ static void virtio_pci__msix_mmio_callback(struct kvm_cpu *vcpu,
- 		offset	= vpci->msix_io_block;
+diff --git a/virtio/net.c b/virtio/net.c
+index 9784520..aa61103 100644
+--- a/virtio/net.c
++++ b/virtio/net.c
+@@ -521,7 +521,7 @@ static int init_vq(struct kvm *kvm, void *dev, u32 vq, u32 page_size, u32 align,
  	}
  
--	if (is_write)
--		memcpy(table + addr - offset, data, len);
--	else
-+	if (!is_write) {
- 		memcpy(data, table + addr - offset, len);
-+		return;
-+	}
-+
-+	memcpy(table + addr - offset, data, len);
-+
-+	/* Did we just update the address or payload? */
-+	if (addr % 0x10 < 0xc)
-+		update_msix_map(vpci, table, (addr - offset) / 16);
- }
+ 	if (queue->endian != VIRTIO_ENDIAN_HOST)
+-		die_perror("VHOST requires VIRTIO_ENDIAN_HOST");
++		die_perror("VHOST requires the same endianness in guest and host");
  
- static void virtio_pci__signal_msi(struct kvm *kvm, struct virtio_pci *vpci, int vec)
+ 	state.num = queue->vring.num;
+ 	r = ioctl(ndev->vhost_fd, VHOST_SET_VRING_NUM, &state);
 -- 
 2.3.5
