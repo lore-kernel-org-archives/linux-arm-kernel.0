@@ -1,890 +1,172 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Mon, 20 Jul 2015 23:41:19 +0800
-Subject: [PATCH v2 3/5] usb: phy: add usb3.0 phy driver for mt65xx SoCs
-In-Reply-To: <20150710064209.GV18700@pengutronix.de>
-References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
- <1436348468-4126-4-git-send-email-chunfeng.yun@mediatek.com>
- <20150710064209.GV18700@pengutronix.de>
-Message-ID: <1437406879.11518.26.camel@mhfsdcap03>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Jul 2015 16:56:04 +0100
+Subject: [PATCH 09/10] arch: introduce memremap()
+In-Reply-To: <CAPcyv4h+02J-GpJ+PC8f1M3O_yXXE0=W5=jg3P33nPesc+YPiQ@mail.gmail.com>
+References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150720001822.30857.65670.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150720120040.GC19239@leverpostej>
+ <CAPcyv4h+02J-GpJ+PC8f1M3O_yXXE0=W5=jg3P33nPesc+YPiQ@mail.gmail.com>
+Message-ID: <20150720155604.GD19239@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-10 at 08:42 +0200, Sascha Hauer wrote:
-> On Wed, Jul 08, 2015 at 05:41:05PM +0800, Chunfeng Yun wrote:
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  drivers/usb/phy/Kconfig           |  10 +
-> >  drivers/usb/phy/Makefile          |   1 +
-> >  drivers/usb/phy/phy-mt65xx-usb3.c | 856 ++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 867 insertions(+)
-> >  create mode 100644 drivers/usb/phy/phy-mt65xx-usb3.c
-> > 
-> > diff --git a/drivers/usb/phy/Kconfig b/drivers/usb/phy/Kconfig
-> > index 869c0cfcad..66ded00 100644
-> > --- a/drivers/usb/phy/Kconfig
-> > +++ b/drivers/usb/phy/Kconfig
-> > @@ -152,6 +152,16 @@ config USB_MSM_OTG
-> >  	  This driver is not supported on boards like trout which
-> >  	  has an external PHY.
-> >  
-> > +config USB_MT65XX_USB3_PHY
-> > +	tristate "Mediatek USB3.0 PHY controller Driver"
-> > +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> > +	select USB_PHY
-> > +	help
-> > +	  Say 'Y' here to add support for Mediatek USB3.0 PHY driver
-> > +	  for mt65xx SoCs. it supports two usb2.0 ports and
-> > +	  one usb3.0 port.
-> > +	  To compile this driver as a module, choose M here
-> > +
-> >  config USB_MV_OTG
-> >  	tristate "Marvell USB OTG support"
-> >  	depends on USB_EHCI_MV && USB_MV_UDC && PM
-> > diff --git a/drivers/usb/phy/Makefile b/drivers/usb/phy/Makefile
-> > index e36ab1d..414ef57 100644
-> > --- a/drivers/usb/phy/Makefile
-> > +++ b/drivers/usb/phy/Makefile
-> > @@ -20,6 +20,7 @@ obj-$(CONFIG_USB_EHCI_TEGRA)		+= phy-tegra-usb.o
-> >  obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
-> >  obj-$(CONFIG_USB_ISP1301)		+= phy-isp1301.o
-> >  obj-$(CONFIG_USB_MSM_OTG)		+= phy-msm-usb.o
-> > +obj-$(CONFIG_USB_MT65XX_USB3_PHY)	+= phy-mt65xx-usb3.o
-> >  obj-$(CONFIG_USB_MV_OTG)		+= phy-mv-usb.o
-> >  obj-$(CONFIG_USB_MXS_PHY)		+= phy-mxs-usb.o
-> >  obj-$(CONFIG_USB_RCAR_PHY)		+= phy-rcar-usb.o
-> > diff --git a/drivers/usb/phy/phy-mt65xx-usb3.c b/drivers/usb/phy/phy-mt65xx-usb3.c
-> > new file mode 100644
-> > index 0000000..38ee6f3
-> > --- /dev/null
-> > +++ b/drivers/usb/phy/phy-mt65xx-usb3.c
-> > @@ -0,0 +1,856 @@
-> > +/*
-> > + * Copyright (c) 2015 MediaTek Inc.
-> > + * Author: Chunfeng.Yun <chunfeng.yun@mediatek.com>
-> > + *
-> > + * This software is licensed under the terms of the GNU General Public
-> > + * License version 2, as published by the Free Software Foundation, and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + */
-> > +
-> > +#include <linux/clk.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/err.h>
-> > +#include <linux/export.h>
-> > +#include <linux/gpio.h>
-> > +#include <linux/io.h>
-> > +#include <linux/iopoll.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/module.h>
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_device.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/of.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/pm_runtime.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/regulator/consumer.h>
-> > +#include <linux/resource.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/usb/of.h>
-> > +#include <linux/usb/otg.h>
-> > +#include <linux/usb/phy.h>
-> > +
-> > +/*
-> > + * relative to MAC base address
-> > + */
-> > +#define SSUSB_USB3_MAC_CSR_BASE	(0x1400)
-> > +#define SSUSB_USB3_SYS_CSR_BASE	(0x1400)
-> > +#define SSUSB_USB2_CSR_BASE	(0x2400)
-> 
-> Please drop the unnecessary braces.
-> 
-ok
-> > +
-> > +/*
-> > + * for sifslv1 register
-> > + * relative to USB3_SIF_BASE base address
-> > + */
-> > +#define SSUSB_SIFSLV_IPPC_BASE	(0x700)
-> > +
-> > +/*
-> > + * for sifslv2 register
-> > + * relative to USB3_SIF_BASE base address
-> > + */
-> > +#define SSUSB_SIFSLV_U2PHY_COM_BASE	(0x10800)
-> > +#define SSUSB_SIFSLV_U3PHYD_BASE	(0x10900)
-> > +#define SSUSB_SIFSLV_U2FREQ_BASE	(0x10f00)
-> > +#define SSUSB_USB30_PHYA_SIV_B_BASE	(0x10b00)
-> > +#define SSUSB_SIFSLV_U3PHYA_DA_BASE	(0x10c00)
-> > +#define SSUSB_SIFSLV_SPLLC	(0x10000)
-> > +
-> > +/*port1 refs. +0x800(refer to port0)*/
-> > +#define U3P_PORT_OFFSET (0x800)	/*based on port0 */
-> > +#define U3P_PHY_BASE(index) ((U3P_PORT_OFFSET) * (index))
-> 
-> According to my datasheet port(idx) base is at:
-> 
-> sif_base + 0x800 + 0x100 * idx
-> 
-> Am I missing something here?
-Maybe, ssusb_sifslv_u2_phy_com_T28_Xp etc(X = 1,2,3,4)
-and their interval is 0x800
- 
-> > +
-> > +#define U3P_IP_PW_CTRL0	(SSUSB_SIFSLV_IPPC_BASE + 0x0000)
-> > +#define CTRL0_IP_SW_RST	(0x1 << 0)
-> > +
-> > +#define U3P_IP_PW_CTRL1	(SSUSB_SIFSLV_IPPC_BASE + 0x0004)
-> > +#define CTRL1_IP_HOST_PDN	(0x1 << 0)
-> > +
-> > +#define U3P_IP_PW_CTRL2	(SSUSB_SIFSLV_IPPC_BASE + 0x0008)
-> > +#define CTRL2_IP_DEV_PDN	(0x1 << 0)
-> > +
-> > +#define U3P_IP_PW_STS1	(SSUSB_SIFSLV_IPPC_BASE + 0x0010)
-> > +#define STS1_IP_SLEEP_STS	(0x1 << 30)
-> > +#define STS1_U3_MAC_RST		(0x1 << 16)
-> > +#define STS1_SYS125_RST		(0x1 << 10)
-> > +#define STS1_REF_RST		(0x1 << 8)
-> > +#define STS1_SYSPLL_STABLE	(0x1 << 0)
-> > +
-> > +#define U3P_IP_PW_STS2	(SSUSB_SIFSLV_IPPC_BASE + 0x0014)
-> > +#define STS2_U2_MAC_RST	(0x1 << 0)
-> > +
-> > +#define U3P_IP_XHCI_CAP	(SSUSB_SIFSLV_IPPC_BASE + 0x0024)
-> > +#define CAP_U3_PORT_NUM(p)	((p) & 0xff)
-> > +#define CAP_U2_PORT_NUM(p)	(((p) >> 8) & 0xff)
-> > +
-> > +#define U3P_U3_CTRL_0P	(SSUSB_SIFSLV_IPPC_BASE + 0x0030)
-> > +#define CTRL_U3_PORT_HOST_SEL	(0x1 << 2)
-> > +#define CTRL_U3_PORT_PDN	(0x1 << 1)
-> > +#define CTRL_U3_PORT_DIS	(0x1 << 0)
-> > +
-> > +#define U3P_U2_CTRL_0P	(SSUSB_SIFSLV_IPPC_BASE + 0x0050)
-> > +#define CTRL_U2_PORT_HOST_SEL	(0x1 << 2)
-> > +#define CTRL_U2_PORT_PDN	(0x1 << 1)
-> > +#define CTRL_U2_PORT_DIS	(0x1 << 0)
-> > +
-> > +#define U3P_U3_CTRL(p)	(U3P_U3_CTRL_0P + ((p) * 0x08))
-> > +#define U3P_U2_CTRL(p)	(U3P_U2_CTRL_0P + ((p) * 0x08))
-> > +
-> > +#define U3P_USBPHYACR0	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0000)
-> > +#define PA0_RG_U2PLL_FORCE_ON	(0x1 << 15)
-> > +
-> > +#define U3P_USBPHYACR2	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0008)
-> > +#define PA2_RG_SIF_U2PLL_FORCE_EN	(0x1 << 18)
-> > +
-> > +#define U3P_USBPHYACR5	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0014)
-> > +#define PA5_RG_U2_HSTX_SRCTRL		(0x7 << 12)
-> > +#define PA5_RG_U2_HSTX_SRCTRL_VAL(x)	((0x7 & (x)) << 12)
-> > +#define PA5_RG_U2_HS_100U_U3_EN		(0x1 << 11)
-> > +
-> > +#define U3P_USBPHYACR6	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0018)
-> > +#define PA6_RG_U2_ISO_EN		(0x1 << 31)
-> > +#define PA6_RG_U2_BC11_SW_EN	(0x1 << 23)
-> > +#define PA6_RG_U2_OTG_VBUSCMP_EN	(0x1 << 20)
-> > +
-> > +#define U3P_U2PHYACR4	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0020)
-> > +#define P2C_RG_USB20_GPIO_CTL	(0x1 << 9)
-> > +#define P2C_USB20_GPIO_MODE	(0x1 << 8)
-> > +#define P2C_U2_GPIO_CTR_MSK	(P2C_RG_USB20_GPIO_CTL | P2C_USB20_GPIO_MODE)
-> > +
-> > +#define U3D_U2PHYDCR0	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0060)
-> > +#define P2C_RG_SIF_U2PLL_FORCE_ON	(0x1 << 24)
-> > +
-> > +#define U3P_U2PHYDTM0	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0068)
-> > +#define P2C_FORCE_UART_EN	(0x1 << 26)
-> > +#define P2C_FORCE_DATAIN	(0x1 << 23)
-> > +#define P2C_FORCE_DM_PULLDOWN	(0x1 << 21)
-> > +#define P2C_FORCE_DP_PULLDOWN	(0x1 << 20)
-> > +#define P2C_FORCE_XCVRSEL	(0x1 << 19)
-> > +#define P2C_FORCE_SUSPENDM	(0x1 << 18)
-> > +#define P2C_FORCE_TERMSEL	(0x1 << 17)
-> > +#define P2C_RG_DATAIN		(0xf << 10)
-> > +#define P2C_RG_DATAIN_VAL(x)	((0xf & (x)) << 10)
-> > +#define P2C_RG_DMPULLDOWN	(0x1 << 7)
-> > +#define P2C_RG_DPPULLDOWN	(0x1 << 6)
-> > +#define P2C_RG_XCVRSEL		(0x3 << 4)
-> > +#define P2C_RG_XCVRSEL_VAL(x)	((0x3 & (x)) << 4)
-> > +#define P2C_RG_SUSPENDM		(0x1 << 3)
-> > +#define P2C_RG_TERMSEL		(0x1 << 2)
-> > +#define P2C_DTM0_PART_MASK \
-> > +		(P2C_FORCE_DATAIN | P2C_FORCE_DM_PULLDOWN | \
-> > +		P2C_FORCE_DP_PULLDOWN | P2C_FORCE_XCVRSEL | \
-> > +		P2C_FORCE_TERMSEL | P2C_RG_DMPULLDOWN | \
-> > +		P2C_RG_DPPULLDOWN | P2C_RG_TERMSEL)
-> > +
-> > +#define U3P_U2PHYDTM1	(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x006C)
-> > +#define P2C_RG_UART_EN		(0x1 << 16)
-> > +#define P2C_RG_VBUSVALID	(0x1 << 5)
-> > +#define P2C_RG_SESSEND		(0x1 << 4)
-> > +#define P2C_RG_AVALID		(0x1 << 2)
-> > +
-> > +#define U3P_U3_PHYA_REG0	(SSUSB_USB30_PHYA_SIV_B_BASE + 0x0000)
-> > +#define P3A_RG_U3_VUSB10_ON	(1 << 5)
-> > +
-> > +#define U3P_U3_PHYA_REG6	(SSUSB_USB30_PHYA_SIV_B_BASE + 0x0018)
-> > +#define P3A_RG_TX_EIDLE_CM	(0xf << 28)
-> > +#define P3A_RG_TX_EIDLE_CM_VAL(x)	((0xf & (x)) << 28)
-> > +
-> > +#define U3P_U3_PHYA_REG9	(SSUSB_USB30_PHYA_SIV_B_BASE + 0x0024)
-> > +#define P3A_RG_RX_DAC_MUX	(0x1f << 1)
-> > +#define P3A_RG_RX_DAC_MUX_VAL(x)	((0x1f & (x)) << 1)
-> > +
-> > +#define U3P_U3PHYA_DA_REG0	(SSUSB_SIFSLV_U3PHYA_DA_BASE + 0x0)
-> > +#define P3A_RG_XTAL_EXT_EN_U3	(0x3 << 10)
-> > +#define P3A_RG_XTAL_EXT_EN_U3_VAL(x)	((0x3 & (x)) << 10)
-> > +
-> > +#define U3P_PHYD_CDR1	(SSUSB_SIFSLV_U3PHYD_BASE + 0x5c)
-> > +#define P3D_RG_CDR_BIR_LTD1		(0x1f << 24)
-> > +#define P3D_RG_CDR_BIR_LTD1_VAL(x)	((0x1f & (x)) << 24)
-> > +#define P3D_RG_CDR_BIR_LTD0		(0x1f << 8)
-> > +#define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
-> > +
-> > +#define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x18)
-> > +#define XC3_RG_U3_XTAL_RX_PWD		(0x1 << 9)
-> > +#define XC3_RG_U3_FRC_XTAL_RX_PWD	(0x1 << 8)
-> > +
-> > +#define U3P_UX_EXIT_LFPS_PARAM	(SSUSB_USB3_MAC_CSR_BASE + 0x00A0)
-> > +#define RX_UX_EXIT_REF		(0xff << 8)
-> > +#define RX_UX_EXIT_REF_VAL	(0x3 << 8)
-> > +
-> > +#define U3P_REF_CLK_PARAM	(SSUSB_USB3_MAC_CSR_BASE + 0x00B0)
-> > +#define REF_CLK_1000NS		(0xff << 0)
-> > +#define REF_CLK_VAL_DEF		(0xa << 0)
-> > +
-> > +#define U3P_LINK_PM_TIMER	(SSUSB_USB3_SYS_CSR_BASE + 0x0208)
-> > +#define PM_LC_TIMEOUT		(0xf << 0)
-> > +#define PM_LC_TIMEOUT_VAL	(0x3 << 0)
-> > +
-> > +#define U3P_TIMING_PULSE_CTRL	(SSUSB_USB3_SYS_CSR_BASE + 0x02B4)
-> > +#define U3T_CNT_1US			(0xff << 0)
-> > +#define U3T_CNT_1US_VAL		(0x3f << 0)	/* 62.5MHz: 63 */
-> > +
-> > +#define U3P_U2_TIMING_PARAM	(SSUSB_USB2_CSR_BASE + 0x0040)
-> > +#define U2T_VAL_1US		(0xff << 0)
-> > +#define U2T_VAL_1US_VAL	(0x3f << 0)	/* 62.5MHz: 63 */
-> > +
-> > +
-> > +#define PERI_WK_CTRL0		0x400
-> > +#define UWK_CTL1_1P_LS_E	(0x1 << 0)
-> > +#define UWK_CTL1_1P_LS_C(x)	(((x) & 0xf) << 1)
-> > +#define UWK_CTR0_0P_LS_NE	(0x1 << 7)  /* negedge for 0p linestate*/
-> > +#define UWK_CTR0_0P_LS_PE	(0x1 << 8)  /* posedge */
-> > +
-> > +#define PERI_WK_CTRL1		0x404
-> > +#define UWK_CTL1_IS_P		(0x1 << 6)  /* polarity for ip sleep */
-> > +#define UWK_CTL1_0P_LS_P	(0x1 << 7)
-> > +#define UWK_CTL1_IDDIG_P	(0x1 << 9)  /* polarity */
-> > +#define UWK_CTL1_IDDIG_E	(0x1 << 10) /* enable debounce */
-> > +#define UWK_CTL1_IDDIG_C(x)	(((x) & 0xf) << 11)  /* cycle debounce */
-> > +#define UWK_CTL1_0P_LS_E	(0x1 << 20)
-> > +#define UWK_CTL1_0P_LS_C(x)	(((x) & 0xf) << 21)
-> > +#define UWK_CTL1_IS_E		(0x1 << 25)
-> > +#define UWK_CTL1_IS_C(x)	(((x) & 0xf) << 26)
-> > +
-> > +enum ssusb_wakeup_src {
-> > +	SSUSB_WK_IP_SLEEP = 1,
-> > +	SSUSB_WK_LINE_STATE = 2,
-> > +};
-> > +
-> > +struct mt65xx_u3phy {
-> > +	struct usb_phy phy;
-> > +	struct device *dev;
-> > +	void __iomem *mac_base;	/* only device-mac regs, exclude xhci's */
-> > +	void __iomem *sif_base;	/* include sif & sif2 */
-> > +	struct regmap *pericfg;
-> > +	struct clk *wk_deb_p0;	/* port0's wakeup debounce clock */
-> > +	struct clk *wk_deb_p1;
-> > +	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
-> > +	int wakeup_src;
-> > +	int u2port_num;
-> > +};
-> > +
-> > +
-> > +static void u3p_writel(void __iomem *base, u32 offset, u32 data)
-> > +{
-> > +	writel(data, base + offset);
-> > +}
-> 
-> Never ever name a function 'writel' that has the arguments reversed to
-> the original writel function.
-> 
-Remove it later
+On Mon, Jul 20, 2015 at 03:39:44PM +0100, Dan Williams wrote:
+> On Mon, Jul 20, 2015 at 5:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > Hi,
+> >
+> > On Mon, Jul 20, 2015 at 01:18:23AM +0100, Dan Williams wrote:
+> >> Existing users of ioremap_cache() are mapping memory that is known in
+> >> advance to not have i/o side effects.  These users are forced to cast
+> >> away the __iomem annotation, or otherwise neglect to fix the sparse
+> >> errors thrown when dereferencing pointers to this memory.  Provide
+> >> memremap() as a non __iomem annotated ioremap_*() in the case when
+> >> ioremap is otherwise a pointer to memory.
+> >>
+> >> The ARCH_HAS_MEMREMAP kconfig symbol is introduced for archs to assert
+> >> that it is safe to recast / reuse the return value from ioremap as a
+> >> normal pointer to memory.  In other words, archs that mandate specific
+> >> accessors for __iomem are not memremap() capable and drivers that care,
+> >> like pmem, can add a dependency to disable themselves on these archs.
+> >>
+> >> Note, that memremap is a break from the ioremap implementation pattern
+> >> of adding a new memremap_<type>() for each mapping type.  Instead,
+> >> the implementation defines flags that are passed to the central
+> >> memremap() implementation.
+> >>
+> >> Outside of ioremap() and ioremap_nocache(), the expectation is that most
+> >> calls to ioremap_<type>() are seeking memory-like semantics (e.g.
+> >> speculative reads, and prefetching permitted).  These callsites can be
+> >> moved to memremap() over time.
+> >>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Acked-by: Andy Shevchenko <andy.shevchenko@gmail.com>
+> >> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 
-> > +
-> > +static u32 u3p_readl(void __iomem *base, u32 offset)
-> > +{
-> > +	return readl(base + offset);
-> > +}
-> > +
-> > +static void u3p_setmsk(void __iomem *base, u32 offset, u32 msk)
-> > +{
-> > +	void __iomem *addr = base + offset;
-> > +
-> > +	writel((readl(addr) | msk), addr);
-> > +}
-> > +
-> > +static void u3p_clrmsk(void __iomem *base, u32 offset, u32 msk)
-> > +{
-> > +	void __iomem *addr = base + offset;
-> > +
-> > +	writel((readl(addr) & ~msk), addr);
-> > +}
-> > +
-> > +static void u3p_setval(void __iomem *base, u32 offset,
-> > +	u32 mask, u32 value)
-> > +{
-> > +	void __iomem *addr = base + offset;
-> > +	unsigned int new_value;
-> > +
-> > +	new_value = (readl(addr) & ~mask) | value;
-> > +	writel(new_value, addr);
-> > +}
-> > +
-> > +static void phy_index_power_on(struct mt65xx_u3phy *u3phy, int index)
-> > +{
-> > +	void __iomem *sif_base = u3phy->sif_base + U3P_PHY_BASE(index);
-> > +
-> > +	if (!index) {
-> > +		/* Set RG_SSUSB_VUSB10_ON as 1 after VUSB10 ready */
-> > +		u3p_setmsk(sif_base, U3P_U3_PHYA_REG0, P3A_RG_U3_VUSB10_ON);
-> > +		/* power domain iso disable */
-> > +		u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_ISO_EN);
-> > +	}
-> > +
-> > +	/* switch to USB function. (system register, force ip into usb mode) */
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_UART_EN);
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_UART_EN);
-> > +	if (!index)
-> > +		u3p_clrmsk(sif_base, U3P_U2PHYACR4, P2C_U2_GPIO_CTR_MSK);
-> > +
-> > +	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_SUSPENDM);
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM0,
-> > +			P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
-> > +
-> > +	/* DP/DM BC1.1 path Disable */
-> > +	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_BC11_SW_EN);
-> > +	/* OTG Enable */
-> > +	u3p_setmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_OTG_VBUSCMP_EN);
-> > +	u3p_setval(sif_base, U3P_U3PHYA_DA_REG0, P3A_RG_XTAL_EXT_EN_U3,
-> > +			P3A_RG_XTAL_EXT_EN_U3_VAL(2));
-> > +	u3p_setval(sif_base, U3P_U3_PHYA_REG9, P3A_RG_RX_DAC_MUX,
-> > +			P3A_RG_RX_DAC_MUX_VAL(4));
-> > +
-> > +	if (!index) {
-> > +		u3p_setmsk(sif_base, U3P_XTALCTL3, XC3_RG_U3_XTAL_RX_PWD);
-> > +		u3p_setmsk(sif_base, U3P_XTALCTL3, XC3_RG_U3_FRC_XTAL_RX_PWD);
-> > +		/* [mt8173]disable Change 100uA current from SSUSB */
-> > +		u3p_clrmsk(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HS_100U_U3_EN);
-> > +	}
-> > +	u3p_setval(sif_base, U3P_U3_PHYA_REG6, P3A_RG_TX_EIDLE_CM,
-> > +			P3A_RG_TX_EIDLE_CM_VAL(0xe));
-> > +	u3p_setval(sif_base, U3P_PHYD_CDR1, P3D_RG_CDR_BIR_LTD0,
-> > +			P3D_RG_CDR_BIR_LTD0_VAL(0xc));
-> > +	u3p_setval(sif_base, U3P_PHYD_CDR1, P3D_RG_CDR_BIR_LTD1,
-> > +			P3D_RG_CDR_BIR_LTD1_VAL(0x3));
-> > +
-> > +	udelay(800);
-> > +	u3p_setmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_VBUSVALID | P2C_RG_AVALID);
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_SESSEND);
-> > +
-> > +	/* USB 2.0 slew rate calibration */
-> > +	u3p_setval(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HSTX_SRCTRL,
-> > +			PA5_RG_U2_HSTX_SRCTRL_VAL(4));
-> > +
-> > +	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
-> > +}
-> > +
-> > +static void phy_index_power_off(struct mt65xx_u3phy *u3phy, int index)
-> > +{
-> > +	void __iomem *sif_base = u3phy->sif_base + U3P_PHY_BASE(index);
-> > +
-> > +	/* switch to USB function. (system register, force ip into usb mode) */
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_UART_EN);
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_UART_EN);
-> 
-> That's the same register sequence as above in power_on. Do you really
-> need to do this twice or is this more something that should be done
-> during initialization once?
-> 
-I will put them into init function
+[...]
 
-> > +	if (!index)
-> > +		u3p_clrmsk(sif_base, U3P_U2PHYACR4, P2C_U2_GPIO_CTR_MSK);
-> > +
-> > +	u3p_setmsk(sif_base, U3P_U2PHYDTM0, P2C_FORCE_SUSPENDM);
-> > +	u3p_setval(sif_base, U3P_U2PHYDTM0,
-> > +			P2C_RG_XCVRSEL, P2C_RG_XCVRSEL_VAL(1));
-> > +	u3p_setval(sif_base, U3P_U2PHYDTM0,
-> > +			P2C_RG_DATAIN, P2C_RG_DATAIN_VAL(0));
-> > +	u3p_setmsk(sif_base, U3P_U2PHYDTM0, P2C_DTM0_PART_MASK);
+> > Unfortunately, even with that fixed this patch breaks boot due to the
+> > memremap_valid check. It's extremely likely that (portions of) the
+> > tables are already in the linear mapping, and so page_is_ram will be
+> > true.
 > 
-> That's four read/write accesses in a row which is really hard to read.
-> This should really be something like:
-> 
-> 	val = readl(sif_base + U3P_U2PHYDTM0);
-> 	val &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN)
-> 	val |= P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL_VAL(1);
-> 	writel(val, sif_base + U3P_U2PHYDTM0);
-> 
-> Those read/modify/write access functions often have the tendency to lead
-> to inefficient code.
-> 
-Sometimes the bits should be set by sequence, check it later.
+> Really, "portions of", not the entire table?
 
-> Generally review your register accesses. There are several bits that are
-> cleared multiple times but never set, like:
-> 
-> U3P_U2PHYDTM0, P2C_FORCE_UART_EN -> cleared multiple times, never set
-> U3P_USBPHYACR6, PA6_RG_U2_BC11_SW_EN -> cleared mutliple times, never set
-> U3P_U2PHYDTM1, P2C_RG_UART_EN -> cleared mutliple times, never set
-> 
-> This probably belongs to some init code executed once.
-> 
-OK,
+Yes, if a table straddles a page boundary (the spec doesn't seem to
+disallow this). We might not map all of the required pages, e.g.
 
-> > +	/* DP/DM BC1.1 path Disable */
-> > +	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_BC11_SW_EN);
-> > +	/* OTG Disable */
-> > +	u3p_clrmsk(sif_base, U3P_USBPHYACR6, PA6_RG_U2_OTG_VBUSCMP_EN);
-> > +	if (!index) {
-> > +		/* Change 100uA current switch to USB2.0 */
-> > +		u3p_clrmsk(sif_base, U3P_USBPHYACR5, PA5_RG_U2_HS_100U_U3_EN);
-> > +	}
-> > +	udelay(800);
-> > +
-> > +	/* let suspendm=0, set utmi into analog power down */
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM0, P2C_RG_SUSPENDM);
-> > +	udelay(1);
-> > +
-> > +	u3p_clrmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_VBUSVALID | P2C_RG_AVALID);
-> > +	u3p_setmsk(sif_base, U3P_U2PHYDTM1, P2C_RG_SESSEND);
-> > +	if (!index) {
-> > +		/* Set RG_SSUSB_VUSB10_ON as 1 after VUSB10 ready */
-> > +		u3p_clrmsk(sif_base, U3P_U3_PHYA_REG0, P3A_RG_U3_VUSB10_ON);
-> > +	}
-> > +	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
-> > +}
-> > +
-> > +static void u3phy_power_on(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	phy_index_power_on(u3phy, 0);
-> > +	if (u3phy->u2port_num > 1)
-> > +		phy_index_power_on(u3phy, 1);
-> > +}
-> > +
-> > +static void u3phy_power_off(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	phy_index_power_off(u3phy, 0);
-> > +	if (u3phy->u2port_num > 1)
-> > +		phy_index_power_off(u3phy, 1);
-> > +}
-> > +
-> > +static int check_ip_clk_status(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	int ret;
-> > +	int u3_port_num;
-> > +	int u2_port_num;
-> > +	u32 xhci_cap;
-> > +	u32 val;
-> > +	void __iomem *sif_base = u3phy->sif_base;
-> > +
-> > +	xhci_cap = u3p_readl(sif_base, U3P_IP_XHCI_CAP);
-> > +	u3_port_num = CAP_U3_PORT_NUM(xhci_cap);
-> > +	u2_port_num = CAP_U2_PORT_NUM(xhci_cap);
-> > +
-> > +	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-> > +			  (val & STS1_SYSPLL_STABLE), 100, 10000);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "sypll is not stable!!!\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = eadl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-> > +			  (val & STS1_REF_RST), 100, 10000);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "ref_clk is still active!!!\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-> > +			   (val & STS1_SYS125_RST), 100, 10000);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "sys125_ck is still active!!!\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	if (u3_port_num) {
-> > +		ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, val,
-> > +				   (val & STS1_U3_MAC_RST), 100, 10000);
-> > +		if (ret) {
-> > +			dev_err(u3phy->dev, "mac3_mac_ck is still active!!!\n");
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	if (u2_port_num) {
-> > +		ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS2, val,
-> > +				   (val & STS2_U2_MAC_RST), 100, 10000);
-> > +		if (ret) {
-> > +			dev_err(u3phy->dev, "mac2_sys_ck is still active!!!\n");
-> > +			return ret;
-> > +		}
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int u3phy_ports_enable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	int i;
-> > +	u32 temp;
-> > +	int u3_port_num;
-> > +	int u2_port_num;
-> > +	void __iomem *sif_base = u3phy->sif_base;
-> > +
-> > +	temp = u3p_readl(sif_base, U3P_IP_XHCI_CAP);
-> > +	u3_port_num = CAP_U3_PORT_NUM(temp);
-> > +	u2_port_num = CAP_U2_PORT_NUM(temp);
-> > +	dev_dbg(u3phy->dev, "%s u2p:%d, u3p:%d\n",
-> > +		__func__, u2_port_num, u3_port_num);
-> > +
-> > +	/* power on host ip */
-> > +	u3p_clrmsk(sif_base, U3P_IP_PW_CTRL1, CTRL1_IP_HOST_PDN);
-> > +
-> > +	/* power on and enable all u3 ports */
-> > +	for (i = 0; i < u3_port_num; i++) {
-> > +		temp = u3p_readl(sif_base, U3P_U3_CTRL(i));
-> > +		temp &= ~(CTRL_U3_PORT_PDN | CTRL_U3_PORT_DIS);
-> > +		temp |= CTRL_U3_PORT_HOST_SEL;
-> > +		u3p_writel(sif_base, U3P_U3_CTRL(i), temp);
-> > +	}
-> > +
-> > +	/* power on and enable all u2 ports */
-> > +	for (i = 0; i < u2_port_num; i++) {
-> > +		temp = u3p_readl(sif_base, U3P_U2_CTRL(i));
-> > +		temp &= ~(CTRL_U2_PORT_PDN | CTRL_U2_PORT_DIS);
-> > +		temp |= CTRL_U2_PORT_HOST_SEL;
-> > +		u3p_writel(sif_base, U3P_U2_CTRL(i), temp);
-> > +	}
-> > +	return check_ip_clk_status(u3phy);
-> > +}
-> > +
-> > +static int u3phy_ports_disable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	int i;
-> > +	u32 temp;
-> > +	int ret;
-> > +	int u3_port_num;
-> > +	int u2_port_num;
-> > +	void __iomem *sif_base = u3phy->sif_base;
-> > +
-> > +	temp = u3p_readl(sif_base, U3P_IP_XHCI_CAP);
-> > +	u3_port_num = CAP_U3_PORT_NUM(temp);
-> > +	u2_port_num = CAP_U2_PORT_NUM(temp);
-> > +	dev_dbg(u3phy->dev, "%s u2p:%d, u3p:%d\n",
-> > +		__func__, u2_port_num, u3_port_num);
-> > +
-> > +	/* power on and enable all u3 ports */
-> 
-> This comment seems wrong.
-> 
-Yes, It is my mistake 
+* If the kernel was loaded more than TEXT_OFFSET bytes above the table
+  (the arm64 linear/direct mapping is currently tied to our text
+  mapping, and we can't currently address anything below that).
 
-> > +	for (i = 0; i < u3_port_num; i++) {
-> > +		temp = u3p_readl(sif_base, U3P_U3_CTRL(i));
-> > +		temp |= CTRL_U3_PORT_PDN;
-> > +		u3p_writel(sif_base, U3P_U3_CTRL(i), temp);
-> > +	}
-> > +
-> > +	/* power on and enable all u2 ports */
-> 
-> ditto
-> 
-> > +	for (i = 0; i < u2_port_num; i++) {
-> > +		temp = u3p_readl(sif_base, U3P_U2_CTRL(i));
-> > +		temp |= CTRL_U2_PORT_PDN;
-> > +		u3p_writel(sif_base, U3P_U2_CTRL(i), temp);
-> > +	}
-> > +
-> > +	/* power off host ip */
-> > +	u3p_setmsk(sif_base, U3P_IP_PW_CTRL1, CTRL1_IP_HOST_PDN);
-> > +	u3p_setmsk(sif_base, U3P_IP_PW_CTRL2, CTRL2_IP_DEV_PDN);
-> > +
-> > +	ret = readl_poll_timeout(sif_base + U3P_IP_PW_STS1, temp,
-> > +			  (temp & STS1_IP_SLEEP_STS), 100, 100000);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "ip sleep failed!!!\n");
-> > +		return ret;
-> > +	}
-> > +	return 0;
-> > +}
-> > +
-> > +static void u3phy_timing_init(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	void __iomem *mbase = u3phy->mac_base;
-> > +	int u3_port_num;
-> > +	u32 temp;
-> > +
-> > +	temp = u3p_readl(u3phy->sif_base, U3P_IP_XHCI_CAP);
-> > +	u3_port_num = CAP_U3_PORT_NUM(temp);
-> > +
-> > +	if (u3_port_num) {
-> > +		/* set MAC reference clock speed */
-> > +		u3p_setval(mbase, U3P_UX_EXIT_LFPS_PARAM,
-> > +				RX_UX_EXIT_REF, RX_UX_EXIT_REF_VAL);
-> > +		/* set REF_CLK */
-> > +		u3p_setval(mbase, U3P_REF_CLK_PARAM,
-> > +				REF_CLK_1000NS, REF_CLK_VAL_DEF);
-> > +		/* set SYS_CLK */
-> > +		u3p_setval(mbase, U3P_TIMING_PULSE_CTRL,
-> > +				U3T_CNT_1US, U3T_CNT_1US_VAL);
-> > +		/* set LINK_PM_TIMER=3 */
-> > +		u3p_setval(mbase, U3P_LINK_PM_TIMER,
-> > +				PM_LC_TIMEOUT, PM_LC_TIMEOUT_VAL);
-> 
-> This fiddles in the register space of the xhci controller. Should be
-> done in the xhci driver, not here in the phy driver.
-> 
-done
+  In this case the start isn't in the direct mapping, and we'll try to
+  create a new mapping. That should work.
 
-> > +	}
-> > +	u3p_setval(mbase, U3P_U2_TIMING_PARAM, U2T_VAL_1US, U2T_VAL_1US_VAL);
-> > +}
-> > +
-> > +static int u3phy_clks_enable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = clk_prepare_enable(u3phy->u3phya_ref);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
-> > +		goto u3phya_ref_err;
-> > +	}
-> > +	ret = clk_prepare_enable(u3phy->wk_deb_p0);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "failed to enable wk_deb_p0\n");
-> > +		goto usb_p0_err;
-> > +	}
-> > +	if (u3phy->u2port_num > 1) {
-> > +		ret = clk_prepare_enable(u3phy->wk_deb_p1);
-> > +		if (ret) {
-> > +			dev_err(u3phy->dev, "failed to enable wk_deb_p1\n");
-> > +			goto usb_p1_err;
-> > +		}
-> > +	}
-> > +	udelay(50);
-> > +
-> > +	return 0;
-> > +
-> > +usb_p1_err:
-> > +	clk_disable_unprepare(u3phy->wk_deb_p0);
-> > +usb_p0_err:
-> > +	clk_disable_unprepare(u3phy->u3phya_ref);
-> > +u3phya_ref_err:
-> > +	return -EINVAL;
-> > +}
-> > +
-> > +static void u3phy_clks_disable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	if (u3phy->u2port_num > 1)
-> > +		clk_disable_unprepare(u3phy->wk_deb_p1);
-> > +	clk_disable_unprepare(u3phy->wk_deb_p0);
-> > +	clk_disable_unprepare(u3phy->u3phya_ref);
-> > +}
-> > +
-> > +/* only clocks can be turn off for ip-sleep wakeup mode */
-> > +static void usb_wakeup_ip_sleep_en(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	u32 tmp;
-> > +	struct regmap *pericfg = u3phy->pericfg;
-> > +
-> > +	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-> > +	tmp &= ~UWK_CTL1_IS_P;
-> > +	tmp &= ~(UWK_CTL1_IS_C(0xf));
-> > +	tmp |= UWK_CTL1_IS_C(0x8);
-> > +	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
-> > +	regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_IS_E);
-> > +
-> > +	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-> > +	dev_dbg(u3phy->dev, "%s(): WK_CTRL1[P6,E25,C26:29]=%#x\n", __func__,
-> > +		tmp);
-> > +}
-> > +
-> > +static void usb_wakeup_ip_sleep_dis(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	u32 tmp;
-> > +
-> > +	regmap_read(u3phy->pericfg, PERI_WK_CTRL1, &tmp);
-> > +	tmp &= ~UWK_CTL1_IS_E;
-> > +	regmap_write(u3phy->pericfg, PERI_WK_CTRL1, tmp);
-> > +}
-> > +
-> > +/*
-> > +* for line-state wakeup mode, phy's power should not power-down
-> > +* and only support cable plug in/out
-> > +*/
-> > +static void usb_wakeup_line_state_en(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	u32 tmp;
-> > +	struct regmap *pericfg = u3phy->pericfg;
-> > +
-> > +	/* line-state of u2-port0 */
-> > +	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-> > +	tmp &= ~UWK_CTL1_0P_LS_P;
-> > +	tmp &= ~(UWK_CTL1_0P_LS_C(0xf));
-> > +	tmp |= UWK_CTL1_0P_LS_C(0x8);
-> > +	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
-> > +	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-> > +	regmap_write(pericfg, PERI_WK_CTRL1, tmp | UWK_CTL1_0P_LS_E);
-> > +
-> > +	/* line-state of u2-port1 if support */
-> > +	if (u3phy->u2port_num > 1) {
-> > +		regmap_read(pericfg, PERI_WK_CTRL0, &tmp);
-> > +		tmp &= ~(UWK_CTL1_1P_LS_C(0xf));
-> > +		tmp |= UWK_CTL1_1P_LS_C(0x8);
-> > +		regmap_write(pericfg, PERI_WK_CTRL0, tmp);
-> > +		regmap_write(pericfg, PERI_WK_CTRL0, tmp | UWK_CTL1_1P_LS_E);
-> > +	}
-> > +}
-> > +
-> > +static void usb_wakeup_line_state_dis(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	u32 tmp;
-> > +	struct regmap *pericfg = u3phy->pericfg;
-> > +
-> > +	regmap_read(pericfg, PERI_WK_CTRL1, &tmp);
-> > +	tmp &= ~UWK_CTL1_0P_LS_E;
-> > +	regmap_write(pericfg, PERI_WK_CTRL1, tmp);
-> > +
-> > +	if (u3phy->u2port_num > 1) {
-> > +		regmap_read(pericfg, PERI_WK_CTRL0, &tmp);
-> > +		tmp &= ~UWK_CTL1_1P_LS_E;
-> > +		regmap_write(pericfg, PERI_WK_CTRL0, tmp);
-> > +	}
-> > +}
-> > +
-> > +static void usb_wakeup_enable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	if (u3phy->wakeup_src == SSUSB_WK_IP_SLEEP)
-> > +		usb_wakeup_ip_sleep_en(u3phy);
-> > +	else if (u3phy->wakeup_src == SSUSB_WK_LINE_STATE)
-> > +		usb_wakeup_line_state_en(u3phy);
-> > +}
-> > +
-> > +static void usb_wakeup_disable(struct mt65xx_u3phy *u3phy)
-> > +{
-> > +	if (u3phy->wakeup_src == SSUSB_WK_IP_SLEEP)
-> > +		usb_wakeup_ip_sleep_dis(u3phy);
-> > +	else if (u3phy->wakeup_src == SSUSB_WK_LINE_STATE)
-> > +		usb_wakeup_line_state_dis(u3phy);
-> > +}
-> > +
-> > +static int mt65xx_u3phy_init(struct usb_phy *phy)
-> > +{
-> > +	struct mt65xx_u3phy *u3phy;
-> > +	int ret;
-> > +
-> > +	u3phy = container_of(phy, struct mt65xx_u3phy, phy);
-> > +	dev_dbg(u3phy->dev, "%s+\n", __func__);
-> > +
-> > +	ret = pm_runtime_get_sync(u3phy->dev);
-> > +	if (ret < 0)
-> > +		goto pm_err;
-> > +
-> > +	ret = u3phy_clks_enable(u3phy);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "failed to enable clks\n");
-> > +		goto clks_err;
-> > +	}
-> > +
-> > +	/* reset whole ip */
-> > +	u3p_setmsk(u3phy->sif_base, U3P_IP_PW_CTRL0, CTRL0_IP_SW_RST);
-> > +	u3p_clrmsk(u3phy->sif_base, U3P_IP_PW_CTRL0, CTRL0_IP_SW_RST);
-> > +
-> > +	ret = u3phy_ports_enable(u3phy);
-> > +	if (ret) {
-> > +		dev_err(u3phy->dev, "failed to enable ports\n");
-> > +		goto port_err;
-> > +	}
-> > +	u3phy_timing_init(u3phy);
-> > +	u3phy_power_on(u3phy);
-> > +	msleep(40);
-> > +
-> > +	return 0;
-> > +
-> > +port_err:
-> > +	u3phy_clks_disable(u3phy);
-> > +clks_err:
-> > +	pm_runtime_put_sync(u3phy->dev);
-> > +pm_err:
-> > +	return ret;
-> > +}
-> > +
-> > +
-> > +static void mt65xx_u3phy_shutdown(struct usb_phy *phy)
-> > +{
-> > +	struct mt65xx_u3phy *u3phy;
-> > +
-> > +	u3phy = container_of(phy, struct mt65xx_u3phy, phy);
-> > +	u3phy_power_off(u3phy);
-> > +	u3phy_clks_disable(u3phy);
-> > +	pm_runtime_put_sync(u3phy->dev);
-> > +}
-> > +
-> > +
-> > +static int mt65xx_u3phy_suspend(struct usb_phy *x, int suspend)
-> > +{
-> > +	struct mt65xx_u3phy *u3phy = container_of(x, struct mt65xx_u3phy, phy);
-> > +
-> > +	if (suspend) {
-> > +		u3phy_ports_disable(u3phy);
-> > +		u3phy_power_off(u3phy);
-> > +		u3phy_clks_disable(u3phy);
-> > +		usb_wakeup_enable(u3phy);
-> > +	} else {
-> > +		usb_wakeup_disable(u3phy);
-> > +		u3phy_clks_enable(u3phy);
-> > +		u3phy_power_on(u3phy);
-> > +		u3phy_ports_enable(u3phy);
-> > +	}
-> > +	return 0;
-> > +}
-> > +
-> > +
-> > +static const struct of_device_id mt65xx_u3phy_id_table[] = {
-> > +	{ .compatible = "mediatek,mt8173-u3phy",},
-> > +	{ },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mt65xx_u3phy_id_table);
-> > +
-> > +
-> > +static int mt65xx_u3phy_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct device_node *np = dev->of_node;
-> > +	struct resource *mac_res;
-> > +	struct resource *sif_res;
-> > +	struct mt65xx_u3phy *u3phy;
-> > +	int retval = -ENOMEM;
-> > +
-> > +	u3phy = devm_kzalloc(&pdev->dev, sizeof(*u3phy), GFP_KERNEL);
-> > +	if (!u3phy)
-> > +		goto err;
-> 
-> No need for goto if all you do there is to return. return here.
+* If the kernel is built with a small VA range, and we have just the
+  right amount of memory before the table begins (this is absurdly
+  unlikely).
 
-Ok, I will revise it 
+  In this case if the start is in the direct mapping, but the end isn't,
+  we'll explode when accessing it.
 
-Thank you very much.
+* If the 'mem=' parameter is used, the direct mapping can be truncated.
+
+  In this case if the start is in the direct mapping, but the end isn't,
+  we'll explode when accessing it.
+
+In the arm64 ioremap_cache we only check
+pfn_valid(__phys_to_pfn(phys_addr)), and assume that if the start was
+mapped, then the whole region is. In the cases above that's clearly not
+true, so we should probably see about handling that.
+
+> Is it too early to use the direct mapping like
+> pfn_to_page(memmap.phys_map >> PAGE_SHIFT)?
+
+I believe it's too early, as we haven't initialised the memmap yet. For
+the cases above we will never have a page for the portion of the region
+not in the direct mapping anyway.
+
+> In any event this splat mandates splitting this memremap() enabling
+> patch into per-instance conversions of ioremap_cache().
 > 
-> Sascha
+> > At boot time I get the following:
+> >
+> > Remapping and enabling EFI services.
+> > ------------[ cut here ]------------
+> > WARNING: CPU: 0 PID: 1 at kernel/resource.c:541 memremap+0xb0/0xbc()
+> > memremap attempted on ram 0x00000009f9e4a018 size: 1200
+> > Modules linked in:
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.2.0-rc3+ #201
+> > Hardware name: ARM Juno development board (r0) (DT)
+> > Call trace:
+> > [<ffffffc000089954>] dump_backtrace+0x0/0x124
+> > [<ffffffc000089a88>] show_stack+0x10/0x1c
+> > [<ffffffc0005d15c8>] dump_stack+0x84/0xc8
+> > [<ffffffc0000b3f44>] warn_slowpath_common+0x98/0xd0
+> > [<ffffffc0000b3fc8>] warn_slowpath_fmt+0x4c/0x58
+> > [<ffffffc0000b9470>] memremap+0xac/0xbc
+> > [<ffffffc000814fe8>] arm64_enable_runtime_services+0x90/0x208
+> > [<ffffffc000082864>] do_one_initcall+0x88/0x1a0
+> > [<ffffffc000811a20>] kernel_init_freeable+0x8c/0x1f8
+> > [<ffffffc0005ce370>] kernel_init+0xc/0xd8
+> > ---[ end trace cb88537fdc8fa200 ]---
+> > Failed to remap EFI memory map
+> >
+> >>         if (!memmap.map) {
+> >>                 pr_err("Failed to remap EFI memory map\n");
+> >>                 return -1;
+> >> @@ -299,8 +298,8 @@ static int __init arm64_enable_runtime_services(void)
+> >>         memmap.map_end = memmap.map + mapsize;
+> >>         efi.memmap = &memmap;
+> >>
+> >> -       efi.systab = (__force void *)ioremap_cache(efi_system_table,
+> >> -                                                  sizeof(efi_system_table_t));
+> >> +       efi.systab = memremap(efi_system_table, sizeof(efi_system_table_t),
+> >> +                       MEMREMAP_CACHE);
+> >>         if (!efi.systab) {
+> >>                 pr_err("Failed to remap EFI System Table\n");
+> >>                 return -1;
+> >> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
+> >> index aef3605a8c47..b9caf6cd44e6 100644
+> >> --- a/arch/arm64/kernel/smp_spin_table.c
+> >> +++ b/arch/arm64/kernel/smp_spin_table.c
+> >> @@ -73,19 +73,19 @@ static int smp_spin_table_cpu_init(unsigned int cpu)
+> >>
+> >>  static int smp_spin_table_cpu_prepare(unsigned int cpu)
+> >>  {
+> >> -       __le64 __iomem *release_addr;
+> >> +       __le64 *release_addr;
+> >>
+> >>         if (!cpu_release_addr[cpu])
+> >>                 return -ENODEV;
+> >>
+> >>         /*
+> >>          * The cpu-release-addr may or may not be inside the linear mapping.
+> >> -        * As ioremap_cache will either give us a new mapping or reuse the
+> >> -        * existing linear mapping, we can use it to cover both cases. In
+> >> -        * either case the memory will be MT_NORMAL.
+> >> +        * As memremap will either give us a new mapping or reuse the existing
+> >> +        * linear mapping, we can use it to cover both cases. In either case
+> >> +        * the memory will be MT_NORMAL.
+> >>          */
+> >> -       release_addr = ioremap_cache(cpu_release_addr[cpu],
+> >> -                                    sizeof(*release_addr));
+> >> +       release_addr = memremap(cpu_release_addr[cpu], sizeof(*release_addr),
+> >> +                       MEMREMAP_CACHE);
+> >
+> > Likewise, the comment here is contradicted by the code in memremap_valid
+> > (below). We'll fail to bring up secondaries if the release address fell
+> > in the linear mapping.
 > 
-> 
+> Ah, so ARM's ioremap_cache() silently handles calls to remap RAM with
+> a pointer to the direct mapping.  It think that's a useful property to
+> carry in the generic implementation.  Especially if the direct mapping
+> has established greater than PAGE_SIZE mappings.
+
+That sounds good to me.
+
+As mentioned above, I think we should test that the entire region we're
+trying to map falls within the direct mapping before assuming we can use
+it, though I'm not sure what the best way of doing that is.
+
+Thanks,
+Mark.
