@@ -1,29 +1,53 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 Jul 2015 18:28:28 +0100
-Subject: [PATCH 1/2] dt-bindings: Add document for MT6311 regulator
-In-Reply-To: <1437377793-31558-2-git-send-email-henryc.chen@mediatek.com>
+Date: Mon, 20 Jul 2015 18:31:53 +0100
+Subject: [PATCH 2/2] regulator: MT6311: Add support for MT6311 regulator
+In-Reply-To: <1437377793-31558-3-git-send-email-henryc.chen@mediatek.com>
 References: <1437377793-31558-1-git-send-email-henryc.chen@mediatek.com>
- <1437377793-31558-2-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20150720172828.GG11162@sirena.org.uk>
+ <1437377793-31558-3-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20150720173153.GH11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 03:36:32PM +0800, Henry Chen wrote:
+On Mon, Jul 20, 2015 at 03:36:33PM +0800, Henry Chen wrote:
 
-> +Required properties:
-> +- compatible: "mediatek,mt6311-regulator"
-> +- mt6311regulator: List of regulators provided by this controller. It is named
-> +  to VDVFS and VBIASN.
+> @@ -460,6 +460,15 @@ config REGULATOR_MT6397
+>  	  This driver supports the control of different power rails of device
+>  	  through regulator interface.
+>  
+> +config REGULATOR_MT6311
+> +	tristate "MediaTek MT6311 PMIC"
 
-Why this weird property name?  It looks like it might just be a typo and
-should just be "regulator"?
+Please keep these files sorted, MT6311 should be before MT6397.
 
-Please use subject lines reflecting the style for the subsystem, it
-helps people find patches that are relevant to them.
+> +static struct mt6311_pdata *mt6311_parse_regulators_dt(
+> +		struct device *dev)
+> +{
+> +	struct mt6311_pdata *pdata;
+> +	struct device_node *node;
+> +	int i, num, n;
+> +
+> +	node = of_get_child_by_name(dev->of_node, "regulators");
+> +	if (!node) {
+> +		dev_err(dev, "regulators node not found\n");
+> +		return ERR_PTR(-ENODEV);
+> +	}
+> +
+> +	num = of_regulator_match(dev, node, mt6311_matches,
+> +				 ARRAY_SIZE(mt6311_matches));
+
+Please convert this to use the modern method of specifying the regulator
+DT bindings by providing of_match and regulators_node in the
+regulator_desc so the core does the mapping for yand regulators_node in
+the regulator_desc so the core does the mapping for yand regulators_node
+in the regulator_desc so the core does the mapping for yand
+regulators_node in the regulator_desc so the core does the mapping for
+you and you can delete the DT handling code.
+
+Otherwise this driver looks good.
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 473 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/d39e4523/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/2dd86787/attachment.sig>
