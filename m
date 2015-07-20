@@ -1,49 +1,101 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 20 Jul 2015 17:06:08 +0800
-Subject: [Linaro-acpi] [PATCH v3 0/8] Add self-probe infrastructure and
- stacked irqdomain support for ACPI based GICv2/3 init
-In-Reply-To: <CAOZdJXXxJxxc9KAQK1VY9iTTVdj-FbpFpoWcexGMrqOS0TgDEQ@mail.gmail.com>
-References: <1436525114-14425-1-git-send-email-hanjun.guo@linaro.org>
- <CAOZdJXXxJxxc9KAQK1VY9iTTVdj-FbpFpoWcexGMrqOS0TgDEQ@mail.gmail.com>
-Message-ID: <55ACBA00.4080101@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Jul 2015 11:10:04 +0200
+Subject: [RFC PATCH 08/15] backlight: pwm_bl: remove useless call to
+ pwm_set_period
+In-Reply-To: <20150720105003.29b5813a@bbrezillon>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-9-git-send-email-boris.brezillon@free-electrons.com>
+ <20150720081559.GI29614@ulmo> <20150720102143.05949ca2@bbrezillon>
+ <20150720083648.GK29614@ulmo> <20150720105003.29b5813a@bbrezillon>
+Message-ID: <20150720091003.GN29614@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur,
+On Mon, Jul 20, 2015 at 10:50:03AM +0200, Boris Brezillon wrote:
+> On Mon, 20 Jul 2015 10:36:50 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Mon, Jul 20, 2015 at 10:21:43AM +0200, Boris Brezillon wrote:
+> > > On Mon, 20 Jul 2015 10:16:00 +0200
+> > > Thierry Reding <thierry.reding@gmail.com> wrote:
+> > > 
+> > > > On Wed, Jul 01, 2015 at 10:21:54AM +0200, Boris Brezillon wrote:
+> > > > > The PWM period will be set when calling pwm_config. Remove this useless
+> > > > > call to pwm_set_period, which might mess up with the initial PWM state
+> > > > > once we have added proper support for PWM init state retrieval.
+> > > > > 
+> > > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > > ---
+> > > > >  drivers/video/backlight/pwm_bl.c | 4 +---
+> > > > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> > > > > index ae498c1..fe5597c 100644
+> > > > > --- a/drivers/video/backlight/pwm_bl.c
+> > > > > +++ b/drivers/video/backlight/pwm_bl.c
+> > > > > @@ -295,10 +295,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> > > > >  	 * via the PWM lookup table.
+> > > > >  	 */
+> > > > >  	pb->period = pwm_get_default_period(pb->pwm);
+> > > > > -	if (!pb->period && (data->pwm_period_ns > 0)) {
+> > > > > +	if (!pb->period && (data->pwm_period_ns > 0))
+> > > > >  		pb->period = data->pwm_period_ns;
+> > > > > -		pwm_set_period(pb->pwm, data->pwm_period_ns);
+> > > > > -	}
+> > > > >  
+> > > > >  	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+> > > > 
+> > > > As far as I remember this line is there in order to pass in a period if
+> > > > the backlight driver is initialized from board setup files. In such a
+> > > > case there won't be an period associated with the PWM channel in the
+> > > > first place.
+> > > > 
+> > > > I think even with the introduction of a default period, we'd be missing
+> > > > out on the board setup case because there is no standard place where it
+> > > > is being set, so it must come from the platform data.
+> > > 
+> > > AFAICT, we don't need to explicitly set the period when probing the
+> > > backlight device, because it will be set next time we call
+> > > pwm_config(), and since we're passing pb->period when calling
+> > > pwm_config() everything should be fine.
+> > 
+> > Calling pwm_set_period() is still good for consistency. Consider for
+> > example what happens if after the driver were to call pwm_get_period().
+> > It would return some more or less random value (likely 0 or whatever it
+> > had been set to by an earlier user).
+> 
+> Yes, that's true in general, but in this specific driver
+> pwm_get_period() is never called, and the driver only relies on the
+> pb->period value.
 
-On 07/18/2015 07:09 AM, Timur Tabi wrote:
-> On Fri, Jul 10, 2015 at 5:45 AM, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> This patch set introduce self-probe infrastructure to init IRQ
->> controllers and stacked irqdomain support for ACPI based GICv2/3
->> init.
->>
->> This patch set add its support for GIC verion which is introduced
->> in ACPI 6.0, based on that, we introduce the self-probe infrastructure,
->> the self-probe infrastructure for ACPI GIC init is similar as
->> IRQCHIP_DECLARE() and based on the GIC version support in ACPI
->> MADT table. we match the GIC version and GIC driver and load
->> it.
->>
->> After the self-probe infrastructure is ready, I cleanuped the GICv2
->> code to use the framework.
->>
->> Patch 4 implement the stacked irqdomain support for GICv2 based on
->> the model of mapping interrupt and device in ACPI.
->>
->> Patch 5~8 are ACPI based GICv3 init.
->
-> All eight patches:
->
-> Tested-by: Timur Tabi <timur@codeaurora.org>
+Perhaps that's something that should change. If the PWM core has all
+this infrastructure there should be no need for the backlight driver to
+keep it's own copy of that variable.
 
-Wonderful, Thanks a lot!
+> > Technically I think the most proper equivalent here would be to set the
+> > default state's period to data->pwm_period_ns, but I don't think that's
+> > proper to do. Perhaps since this is only relevant to boards where the
+> > backlight device is created from board setup code we don't have to care
+> > so much about messing up the initial state because either the board
+> > setup code has been carefully written to match what the bootloader set
+> > up, or because they don't match at all, in which case we don't have to
+> > worry anyway.
+> 
+> IMHO, if we had to support default period values for non DT boards, the
+> proper way would be to pass something in the PWM platform data and let
+> the PWM driver (or PWM core) initialize the default PWM state.
+> This way the PWM user could rely on the pwm_get_default_period() helper
+> to extract the default period value.
 
-I got a question, do you test GICv3 in this patch set too?
-if yes, that will be really great!
+Yes, that's what PWM lookup tables are meant to address. I tried to
+convert existing users a number of times, but never got any replies and
+since it's board code I couldn't merge this through the PWM tree...
 
-Just let you know, I'm still working on this patch set to try
-to address Marc's comments (unify DT and ACPI to match the domain),
-I'm not sure if any obstacles ahead, I will let you know the progress.
-
-Regards
-Hanjun
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/3accacfa/attachment.sig>
