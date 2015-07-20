@@ -1,130 +1,121 @@
-From: xander.huff@ni.com (Xander Huff)
-Date: Mon, 20 Jul 2015 18:14:10 -0500
-Subject: [PATCH v3] iio: adc: xilinx-xadc: Push interrupts into threaded
- context
-In-Reply-To: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>
-References: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>
-Message-ID: <1437434050-32907-1-git-send-email-xander.huff@ni.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 21 Jul 2015 08:53:34 +0900
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <20150720162004.GL9908@arm.com>
+References: <20150716102405.2cc8c406@gandalf.local.home>
+ <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+ <20150716113115.45a17f17@gandalf.local.home>
+ <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+ <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+ <20150720162004.GL9908@arm.com>
+Message-ID: <55AD89FE.1010706@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver currently registers a pair of irq handlers using
-request_threaded_irq(), however the synchronization mechanism between the
-hardirq and the threadedirq handler is a regular spinlock.
+Hi
 
-Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
-and is thus not able to be acquired from a hardirq handler. This patch gets
-rid of the hardirq handler and pushes all interrupt handling into the
-threaded context.
+So i don't have to repost my patch here. Please use the original
+commit log message[1/3] as is.
+But please keep in mind that there is still an issue that I mentioned
+in the cover letter; 'Size' field is inaccurate.
+  <reported size> = <its own dynamic local variables>
+                         + <child's local variables>
+and
+  <real size> = <reported size> + <its local variables>
+                                - <child's local variables>
+where "dynamic" means, for example, a variable allocated like the below:
+   int foo(int num) {
+     int array[num];
+     ...
+   }
+(See more details in my ascii art.)
 
-To validate that this change has no impact on RT performance, here are
-cyclictest values with no processes running:
+Such usage is seldom seen in the kernel, and <reported size> is
+likely equal to <child's local variables>. In other words, we will
+see one-line *displacement* in most cases.
 
-$ sudo cyclictest -S -m -p 98
-# /dev/cpu_dma_latency set to 0us
-policy: fifo: loadavg: 0.05 0.04 0.05 1/237 828
-T: 0 ( 1861) P:98 I:1000 C:56925046 Min: 9 Act: 12 Avg: 12 Max: 71
-T: 1 ( 1862) P:98 I:1500 C:37950030 Min: 9 Act: 12 Avg: 13 Max: 74
+(We'd better mention it explicitly in the commmit?)
 
-Then, all xadc raw handles were accessed in a continuous loop via
-/sys/bus/iio/devices/iio:device0:
+Thanks,
+-Takahiro AKASHI
 
-$ sudo cyclictest -S -m -p 98
-# /dev/cpu_dma_latency set to 0us
-policy: fifo: loadavg: 7.81 7.64 7.541 2/247 5751
-T: 0 ( 1568) P:98 I:1000 C:23845515 Min: 11 Act: 22 Avg: 21 Max: 71
-T: 1 ( 1569) P:98 I:1500 C:15897239 Min: 11 Act: 21 Avg: 22 Max: 68
 
-Signed-off-by: Xander Huff <xander.huff@ni.com>
----
- drivers/iio/adc/xilinx-xadc-core.c | 37 ++++++++-----------------------------
- 1 file changed, 8 insertions(+), 29 deletions(-)
-
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index ce93bd8..e16afdb 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -267,40 +267,15 @@ static void xadc_zynq_unmask_worker(struct work_struct *work)
- 	xadc_zynq_update_intmsk(xadc, 0, 0);
- 
- 	spin_unlock_irq(&xadc->lock);
--
--	/* if still pending some alarm re-trigger the timer */
--	if (xadc->zynq_masked_alarm) {
--		schedule_delayed_work(&xadc->zynq_unmask_work,
--				msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
--	}
- }
- 
- static irqreturn_t xadc_zynq_threaded_interrupt_handler(int irq, void *devid)
- {
- 	struct iio_dev *indio_dev = devid;
- 	struct xadc *xadc = iio_priv(indio_dev);
--	unsigned int alarm;
--
--	spin_lock_irq(&xadc->lock);
--	alarm = xadc->zynq_alarm;
--	xadc->zynq_alarm = 0;
--	spin_unlock_irq(&xadc->lock);
--
--	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
--
--	/* unmask the required interrupts in timer. */
--	schedule_delayed_work(&xadc->zynq_unmask_work,
--			msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
--
--	return IRQ_HANDLED;
--}
--
--static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
--{
--	struct iio_dev *indio_dev = devid;
--	struct xadc *xadc = iio_priv(indio_dev);
- 	irqreturn_t ret = IRQ_HANDLED;
- 	uint32_t status;
-+	unsigned int alarm;
- 
- 	xadc_read_reg(xadc, XADC_ZYNQ_REG_INTSTS, &status);
- 
-@@ -312,7 +287,6 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
- 	spin_lock(&xadc->lock);
- 
- 	xadc_write_reg(xadc, XADC_ZYNQ_REG_INTSTS, status);
--
- 	if (status & XADC_ZYNQ_INT_DFIFO_GTH) {
- 		xadc_zynq_update_intmsk(xadc, XADC_ZYNQ_INT_DFIFO_GTH,
- 			XADC_ZYNQ_INT_DFIFO_GTH);
-@@ -330,8 +304,14 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
- 		xadc_zynq_update_intmsk(xadc, 0, 0);
- 		ret = IRQ_WAKE_THREAD;
- 	}
-+
-+	alarm = xadc->zynq_alarm;
-+	xadc->zynq_alarm = 0;
-+
- 	spin_unlock(&xadc->lock);
- 
-+	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
-+
- 	return ret;
- }
- 
-@@ -436,7 +416,6 @@ static const struct xadc_ops xadc_zynq_ops = {
- 	.write = xadc_zynq_write_adc_reg,
- 	.setup = xadc_zynq_setup,
- 	.get_dclk_rate = xadc_zynq_get_dclk_rate,
--	.interrupt_handler = xadc_zynq_interrupt_handler,
- 	.threaded_interrupt_handler = xadc_zynq_threaded_interrupt_handler,
- 	.update_alarm = xadc_zynq_update_alarm,
- };
-@@ -1225,7 +1204,7 @@ static int xadc_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto err_free_samplerate_trigger;
- 
--	ret = request_threaded_irq(irq, xadc->ops->interrupt_handler,
-+	ret = request_threaded_irq(irq, NULL,
- 				xadc->ops->threaded_interrupt_handler,
- 				0, dev_name(&pdev->dev), indio_dev);
- 	if (ret)
--- 
-1.9.1
+On 07/21/2015 01:20 AM, Will Deacon wrote:
+> Hi all,
+>
+> On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
+>> On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
+>>> On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
+>>>> Thanks! Can you repost patch 1 with the changes I recommended, so that
+>>>> I can get an Acked-by from the arm64 maintainers and pull all the
+>>>> changes in together. This is fine for a 4.3 release, right? That is, it
+>>>> doesn't need to go into 4.2-rcs.
+>>>>
+>>>
+>>> It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
+>>> Also, it might be needed to consider Mark's comment on arch part.
+>>>
+>>> If they are okay, I will proceed.
+>>
+>> The [RFC 1/3] patch used in my environment is shaped as follows.
+>> I leave the hunk for *only* clear synchronization. This is why I choose this format
+>> instead of reposting a patch. I hope it would help to track down this thread.
+>>
+>> I think this is my best at this point.
+>>
+>> ----8<----
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> index c5534fa..2b43e20 100644
+>> --- a/arch/arm64/include/asm/ftrace.h
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -13,8 +13,9 @@
+>>
+>>   #include <asm/insn.h>
+>>
+>> -#define MCOUNT_ADDR		((unsigned long)_mcount)
+>> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+>> +#define MCOUNT_ADDR			((unsigned long)_mcount)
+>> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
+>> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
+>>
+>>   #ifndef __ASSEMBLY__
+>>   #include <linux/compat.h>
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index 407991b..9ab67af 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -20,6 +20,7 @@
+>>   #include <linux/sched.h>
+>>   #include <linux/stacktrace.h>
+>>
+>> +#include <asm/insn.h>
+>>   #include <asm/stacktrace.h>
+>>
+>>   /*
+>> @@ -52,7 +53,7 @@ int notrace unwind_frame(struct stackframe *frame)
+>>   	 * -4 here because we care about the PC at time of bl,
+>>   	 * not where the return will go.
+>>   	 */
+>> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
+>> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+>>
+>>   	return 0;
+>>   }
+>
+> The arm64 bits look fine to me:
+>
+>    Acked-by: Will Deacon <will.deacon@arm.com>
+>
+> Steve: feel free to take this along with the other ftrace changes. I don't
+> anticipate any conflicts, but if anything crops up in -next we can sort
+> it out then.
+>
+> Thanks!
+>
+> Will
+>
