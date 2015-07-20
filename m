@@ -1,35 +1,27 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 20 Jul 2015 23:28:17 +0200 (CEST)
-Subject: [RFCv2 PATCH 1/8] irqdomain: Introduce
- irq_domain_ops.init_alloc_info
-In-Reply-To: <1436778864-17645-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1436778864-17645-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1436778864-17645-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <alpine.DEB.2.11.1507202326450.18576@nanos>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 20 Jul 2015 16:18:11 -0600
+Subject: [PATCH v3 2/4] staging/nvec: reimplement on top of tegra i2c
+ driver
+In-Reply-To: <1437424546-30405-3-git-send-email-danindrey@mail.ru>
+References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
+ <1437424546-30405-3-git-send-email-danindrey@mail.ru>
+Message-ID: <55AD73A3.6000706@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jul 2015, Suravee Suthikulpanit wrote:
+On 07/20/2015 02:35 PM, Andrey Danin wrote:
+> Remove i2c controller related code and use tegra i2c driver in slave mode.
+> Update nvec documentation.
 
-> Currently, when calling irq_domain_alloc_irqs() on ARM64, it uses
-> struct of_phandle_args to pass irq information. However, this is not
-> appropriate for ACPI since of_phandle_args is specific to DT.
-> 
-> Therefore, this patch introduces a new function pointer,
-> irq_domain_ops.init_alloc_info, which can be used by irqchips to provide
-> a way to initialize irqchip-specific data-structure for allocating IRQ.
-> 
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> ---
-> NOTE:
-> Similarly, x86 is currently using struct irq_alloc_info
-> (see arch/x86/include/asm/hw_irq.h) and each irq_domain has different
-> way of initializing this structure.
+> diff --git a/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt b/Documentation/devicetree/bindings/nvec/nvidia,nvec.txt
 
-And why don't you use the same mechanism on ARM and have a private
-irq_alloc_info implementation which can carry either DT or ACPI
-information?
- 
-Thanks,
+I would expect this patch to add a new binding file 
+nvidia,nvec-slave.txt so that the filename continues to match the 
+compatible value it documents. This patch introduces a new binding for 
+the NVEC slave as opposed to modifying the existing binding.
 
-	tglx
+> +- compatible : should be "nvidia,nvec-slave".
+> +- reg: the i2c address of the slave controller
+
+I think "the I2C address to respond to" would be clearer? You might also 
+mention that this needs to include flags from <dt-bindings/i2c/ic2.h>.
