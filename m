@@ -1,63 +1,52 @@
-From: iivanov@mm-sol.com (Ivan T. Ivanov)
-Date: Mon, 20 Jul 2015 14:22:54 +0300
-Subject: [PATCH V4 4/7] i2c: qup: Transfer each i2c_msg in i2c_msgs
- without a stop bit
-In-Reply-To: <1436412350-19519-5-git-send-email-sricharan@codeaurora.org>
-References: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>
- <1436412350-19519-5-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1437391374.6267.7.camel@mm-sol.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Jul 2015 12:32:37 +0100
+Subject: [PATCH v2 1/6] arm64: kernel: Add cpuid_feature_extract_field()
+ for 4bit sign extension
+In-Reply-To: <1437154221-5736-2-git-send-email-james.morse@arm.com>
+References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
+ <1437154221-5736-2-git-send-email-james.morse@arm.com>
+Message-ID: <20150720113236.GH20385@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi, 
-
-On Thu, 2015-07-09 at 08:55 +0530, Sricharan R wrote:
-
-<snip>
-
->  #define ONE_BYTE                       0x1
-> +#define QUP_I2C_MX_CONFIG_DURING_RUN   BIT(31)
+On Fri, Jul 17, 2015 at 06:30:16PM +0100, James Morse wrote:
+> Copied from arch/arm/include/asm/cputype.h, this function does the
+> shifting and sign extension necessary when accessing cpu feature fields.
 > 
->  struct qup_i2c_block {
->         int     count;
-> @@ -121,6 +122,7 @@ struct qup_i2c_block {
->         int     rx_tag_len;
->         int     data_len;
->         u8      tags[6];
-> +       int     config_run;
-
-This is not directly related to "block" control logic, right?
-Could it made part of qup_i2c_dev structure?
-
->  };
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Suggested-by: Russell King <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
->  struct qup_i2c_dev {
-> @@ -152,6 +154,10 @@ struct qup_i2c_dev {
-> 
->         int (*qup_i2c_write_one)(struct qup_i2c_dev *qup,
->                                         struct i2c_msg *msg);
-> +       /* Current i2c_msg in i2c_msgs */
-> +       int     cmsg;
-> +       /* total num of i2c_msgs */
-> +       int     num;
-
-I think it will be simpler with just "bool is_last" evaluated in main xfer loop.
-
-<snip>
-
-> 
-> @@ -374,6 +383,9 @@ static void qup_i2c_get_blk_data(struct qup_i2c_dev *qup,
->         /* There are 2 tag bytes that are read in to fifo for every block */
->         if (msg->flags & I2C_M_RD)
->                 qup->blk.rx_tag_len = qup->blk.count * 2;
-> +
-> +       if (qup->cmsg)
-> +               qup->blk.config_run = QUP_I2C_MX_CONFIG_DURING_RUN;
-
-This could be moved to qup_i2c_xfer_v2() to avoid repeatedly setting it. 
-
+> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+> index c1044218a63a..56c843918504 100644
+> --- a/arch/arm64/include/asm/cpufeature.h
+> +++ b/arch/arm64/include/asm/cpufeature.h
+> @@ -70,6 +70,19 @@ static inline void cpus_set_cap(unsigned int num)
+>  		__set_bit(num, cpu_hwcaps);
 >  }
+>  
+> +static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
+> +								  int field)
+> +{
+> +	int feature = (features >> field) & 15;
+> +
+> +	/* feature registers are signed values */
+> +	if (feature > 8)
+> +		feature -= 16;
+> +
+> +	return feature;
+> +}
 
-Regards,
-Ivan
+It may generate better code like, especially when field is a constant:
+
+	return (s64)(feature << (64 - 4 - field)) >> (64 - 4);
+
+(in asm I think we could do it with a single instruction but the above
+shouldn't be that bad either).
+
+-- 
+Catalin
