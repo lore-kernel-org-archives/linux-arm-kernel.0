@@ -1,74 +1,22 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Jul 2015 18:12:42 +0100
-Subject: [PATCH v2 1/5] arm64: alternative: Provide if/else/endif
- assembler macros
-In-Reply-To: <1437405004-1296-2-git-send-email-daniel.thompson@linaro.org>
-References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
- <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
- <1437405004-1296-2-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150720171242.GP9908@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Jul 2015 18:19:50 +0100
+Subject: [PATCH v2 00/10] pwm: add support for atomic update
+In-Reply-To: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150720171950.GE11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+On Mon, Jul 20, 2015 at 05:31:57PM +0200, Boris Brezillon wrote:
 
-Couple of really small comments.
+> - dropped pwm-regulator patches (should be submitted separately)
 
-On Mon, Jul 20, 2015 at 04:10:00PM +0100, Daniel Thompson wrote:
-> The existing alternative_insn macro has some limitations that make it
-> hard to work with. In particular the fact it takes instructions from it
-> own macro arguments means it doesn't play very nicely with C pre-processor
-> macros because the macro arguments look like a string to the C
-> pre-processor. Workarounds are (probably) possible but things start to
-> look ugly.
-> 
-> Introduce an alternative set of macros that allows instructions to be
-> presented to the assembler as normal and switch everything over to the
-> new macros.
-> 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> ---
->  arch/arm64/include/asm/alternative.h | 40 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 40 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-> index c385a0c4057f..31b19ad18f7e 100644
-> --- a/arch/arm64/include/asm/alternative.h
-> +++ b/arch/arm64/include/asm/alternative.h
-> @@ -77,6 +77,46 @@ void free_alternatives_memory(void);
->  	.org	. - (662b-661b) + (664b-663b)
->  .endm
->  
-> +/*
-> + * Begin an alternative code sequence.
-> + *
-> + * The code that follows this marco will be assembled and linked as
-> + * normal. There are no restrictions on this code.
-
-s/marco/macro/
-
-> + */
-> +.macro alternative_if_not cap
-> +	.pushsection .altinstructions, "a"
-> +	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
-> +	.popsection
-> +661:
-> +.endm
-> +
-> +/*
-> + * Provide the alternative code sequence.
-> + *
-> + * The code that follows this macro is assembled into a special
-> + * section to be used for dynamic patching. Code that follows this
-> + * macro must:
-> + *
-> + * 1. Be exactly the same length (in bytes) as the default code
-> + *    sequence.
-> + *
-> + * 2. Not jump to local labels defined outside of the alternative
-> + *    sequence.
-
-Actually, we fix up the branch target during patching. What you can't do
-is jump into *another* alternative sequence.
-
-Will
+I think the second patch needs to go in with this series doesn't it?  It
+was just the enable one that was good to go immediately IIRC.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/c2218e7b/attachment-0001.sig>
