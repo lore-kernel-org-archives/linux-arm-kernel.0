@@ -1,125 +1,84 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Jul 2015 14:02:06 +0100
-Subject: [PATCH 04/14] FDT: introduce global phandle allocation
+Date: Mon, 20 Jul 2015 14:02:08 +0100
+Subject: [PATCH 06/14] TEMPORARY: arm: update public headers for GICv3 ITS
+ emulation
 In-Reply-To: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
 References: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1437397336-21385-5-git-send-email-andre.przywara@arm.com>
+Message-ID: <1437397336-21385-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allocating an FDT phandle (a unique identifier) using a static
-variable in a static inline function defined in a header file works
-only if all users are in the same source file. So trying to allocate
-a handle from two different compilation units fails.
-Introduce global phandle allocation and reference code to properly
-allocate unique phandles.
+This patch is preliminary and updates the headers from a kernel with
+ITS emulation support. It should be replaced by a proper header
+update once ITS support is upstream.
+Contains a "hack" to support compiling on ARM, too.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- Makefile          |  1 +
- arm/fdt.c         |  2 +-
- arm/gic.c         |  2 +-
- include/kvm/fdt.h | 10 +++++-----
- kvm-fdt.c         | 26 ++++++++++++++++++++++++++
- 5 files changed, 34 insertions(+), 7 deletions(-)
- create mode 100644 kvm-fdt.c
+ arm/aarch64/include/asm/kvm.h | 3 +++
+ arm/gic.c                     | 4 ++++
+ include/linux/kvm.h           | 6 +++++-
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/Makefile b/Makefile
-index a9c13d7..363129d 100644
---- a/Makefile
-+++ b/Makefile
-@@ -100,6 +100,7 @@ OBJS	+= kvm-ipc.o
- OBJS	+= builtin-sandbox.o
- OBJS	+= virtio/mmio.o
- OBJS	+= hw/i8042.o
-+OBJS	+= kvm-fdt.o
+diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
+index d268320..e42435c 100644
+--- a/arm/aarch64/include/asm/kvm.h
++++ b/arm/aarch64/include/asm/kvm.h
+@@ -82,8 +82,11 @@ struct kvm_regs {
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
  
- # Translate uname -m into ARCH string
- ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc.*/powerpc/ \
-diff --git a/arm/fdt.c b/arm/fdt.c
-index 3657108..4b68a97 100644
---- a/arm/fdt.c
-+++ b/arm/fdt.c
-@@ -117,7 +117,7 @@ static int setup_fdt(struct kvm *kvm)
- {
- 	struct device_header *dev_hdr;
- 	u8 staging_fdt[FDT_MAX_SIZE];
--	u32 gic_phandle		= fdt__alloc_phandle();
-+	u32 gic_phandle		= fdt__get_phandle(PHANDLE_GIC);
- 	u64 mem_reg_prop[]	= {
- 		cpu_to_fdt64(kvm->arch.memory_guest_start),
- 		cpu_to_fdt64(kvm->ram_size),
++#define KVM_VGIC_V3_ADDR_TYPE_ITS	4
++
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		SZ_64K
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
 diff --git a/arm/gic.c b/arm/gic.c
-index d6d6dd0..b60437e 100644
+index 2c1a547..93a8a1d 100644
 --- a/arm/gic.c
 +++ b/arm/gic.c
-@@ -222,7 +222,7 @@ void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type)
- 	_FDT(fdt_property_cell(fdt, "#interrupt-cells", GIC_FDT_IRQ_NUM_CELLS));
- 	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
- 	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
--	_FDT(fdt_property_cell(fdt, "phandle", phandle));
-+	_FDT(fdt_property_cell(fdt, "phandle", fdt__get_phandle(PHANDLE_GIC)));
- 	_FDT(fdt_end_node(fdt));
- }
+@@ -18,6 +18,10 @@
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST 3
+ #endif
  
-diff --git a/include/kvm/fdt.h b/include/kvm/fdt.h
-index 53d85a4..cd2bb72 100644
---- a/include/kvm/fdt.h
-+++ b/include/kvm/fdt.h
-@@ -8,6 +8,10 @@
- #include <linux/types.h>
++#ifndef KVM_VGIC_V3_ADDR_TYPE_ITS
++#define KVM_VGIC_V3_ADDR_TYPE_ITS 4
++#endif
++
+ static int gic_fd = -1;
+ static u64 gic_redists_base;
+ static u64 gic_redists_size;
+diff --git a/include/linux/kvm.h b/include/linux/kvm.h
+index 4b60056..39428d1 100644
+--- a/include/linux/kvm.h
++++ b/include/linux/kvm.h
+@@ -815,6 +815,8 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_S390_IRQ_STATE 114
+ #define KVM_CAP_PPC_HWRNG 115
  
- #define FDT_MAX_SIZE	0x10000
-+#define FDT_INVALID_PHANDLE 0
-+#define FDT_IS_VALID_PHANDLE(phandle) ((phandle) != FDT_INVALID_PHANDLE)
++#define KVM_CAP_MSI_DEVID 119
 +
-+enum phandles {PHANDLE_GIC, PHANDLES_MAX};
+ #ifdef KVM_CAP_IRQ_ROUTING
  
- /* Those definitions are generic FDT values for specifying IRQ
-  * types and are used in the Linux kernel internally as well as in
-@@ -33,10 +37,6 @@ enum irq_type {
- 		}							\
- 	} while (0)
+ struct kvm_irq_routing_irqchip {
+@@ -965,12 +967,14 @@ struct kvm_one_reg {
+ 	__u64 addr;
+ };
  
--static inline u32 fdt__alloc_phandle(void)
--{
--	static u32 phandle = 0;
--	return ++phandle;
--}
-+u32 fdt__get_phandle(enum phandles phandle);
++#define KVM_MSI_VALID_DEVID	(1U << 0)
+ struct kvm_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
+ };
  
- #endif /* KVM__FDT_H */
-diff --git a/kvm-fdt.c b/kvm-fdt.c
-new file mode 100644
-index 0000000..d05f3fe
---- /dev/null
-+++ b/kvm-fdt.c
-@@ -0,0 +1,26 @@
-+/*
-+ * Commonly used FDT functions.
-+ */
-+
-+#include <stdio.h>
-+#include "kvm/fdt.h"
-+#include "kvm/util.h"
-+
-+u32 phandles[PHANDLES_MAX] = {};
-+u32 next_phandle = 1;
-+
-+u32 fdt__get_phandle(enum phandles phandle)
-+{
-+	u32 ret;
-+
-+	if (phandle >= PHANDLES_MAX)
-+		return FDT_INVALID_PHANDLE;
-+
-+	ret = phandles[phandle];
-+	if (ret == FDT_INVALID_PHANDLE) {
-+		ret = next_phandle++;
-+		phandles[phandle] = ret;
-+	}
-+
-+	return ret;
-+}
+ struct kvm_arm_device_addr {
 -- 
 2.3.5
