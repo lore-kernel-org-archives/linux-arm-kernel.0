@@ -1,89 +1,74 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 20 Jul 2015 07:20:43 -0700
-Subject: [PATCH] arm64: Minor refactoring of cpu_switch_to() to fix build
- breakage
-In-Reply-To: <20150720105345.GC9908@arm.com>
-References: <1437359377-39932-1-git-send-email-olof@lixom.net>
- <20150720073647.GA10504@gmail.com> <20150720105345.GC9908@arm.com>
-Message-ID: <20150720142042.GA10685@roeck-us.net>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Mon, 20 Jul 2015 22:24:00 +0800
+Subject: [PATCH v2 2/5] dt-bindings: Add a binding for Mediatek xHCI
+ host controller
+In-Reply-To: <559F82C7.5010202@ti.com>
+References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1436348468-4126-3-git-send-email-chunfeng.yun@mediatek.com>
+ <559F82C7.5010202@ti.com>
+Message-ID: <1437402240.11518.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 11:53:45AM +0100, Will Deacon wrote:
-> On Mon, Jul 20, 2015 at 08:36:47AM +0100, Ingo Molnar wrote:
-> > * Olof Johansson <olof@lixom.net> wrote:
+On Fri, 2015-07-10 at 11:31 +0300, Roger Quadros wrote:
+> Hi,
+> 
+> On 08/07/15 12:41, Chunfeng Yun wrote:
+> > add a DT binding documentation of xHCI host controller for the
+> > MT8173 SoC from Mediatek.
 > > 
-> > > Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-> > > moved the thread_struct to the bottom of task_struct. As a result, the
-> > > offset is now too large to be used in an immediate add on arm64 with
-> > > some kernel configs:
-> > > 
-> > > arch/arm64/kernel/entry.S: Assembler messages:
-> > > arch/arm64/kernel/entry.S:588: Error: immediate out of range
-> > > arch/arm64/kernel/entry.S:597: Error: immediate out of range
-> > > 
-> > > There's really no reason for cpu_switch_to to take a task_struct pointer
-> > > in the first place, since all it does is access the thread.cpu_context
-> > > member. So, just pass that in directly.
-> > > 
-> > > Fixes: 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-> > > Cc: Dave Hansen <dave.hansen@linux.intel.com>
-> > > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > > ---
-> > >  arch/arm64/include/asm/processor.h |    4 ++--
-> > >  arch/arm64/kernel/asm-offsets.c    |    2 --
-> > >  arch/arm64/kernel/entry.S          |   34 ++++++++++++++++------------------
-> > >  arch/arm64/kernel/process.c        |    3 ++-
-> > >  4 files changed, 20 insertions(+), 23 deletions(-)
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/usb/mt8173-xhci.txt        | 27 ++++++++++++++++++++++
+> >  1 file changed, 27 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 > > 
-> > So why not pass in 'thread_struct' as the patch below does - it looks much
-> > simpler to me. This way the assembly doesn't have to be changed at all.
+> > diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> > new file mode 100644
+> > index 0000000..94cec94
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+> > @@ -0,0 +1,27 @@
+> > +MT65XX xhci
+> > +
+> > +The device node for Mediatek SOC usb3.0 host controller
+> > +
+> > +Required properties:
+> > + - compatible : supports "mediatek,mt8173-xhci"
+> > + - reg        : Offset and length of registers
+> > + - interrupts : Interrupt mode, number and trigger mode
+> > + - reg-vusb33-supply:  regulator of usb avdd3.3v
+> > + - reg-vbus-supply : regulator of vbus;
 > 
-> Unfortunately, neither of these approaches really work:
+> General trend is to use <supply-name>-supply.
+> We already know it is a regulator so no need to add "reg-"
 > 
->   - We need to return last from __switch_to, which means not corrupting
->     x0 in cpu_switch_to and then having an ugly container_of to get back
->     at the task_struct
+> So those two can be
 > 
->   - ret_from_fork needs to pass the task_struct of prev to schedule_tail,
->     so we have the same issue there
+> vusb33-supply:
+> vbus-supply:
 > 
-Confirmed; both Ingo's patch (after fixing it up) and Olof's patch
-fail my qemu tests (qemu hangs with both patches and does not produce
-any console output).
+Ok, thanks
 
-> Patch below fixes things, but it's a shame we have to use an extra register
-> like this.
 > 
-Yes, your patch works, at least with my qemu tests, and the allmodconfig build
-no longer fails.
-
-Tested-by: Guenter Roeck <linux@roeck-us.net>
-
-> Will
+> > + - usb-phy : the phy that xhci will bind
+> > + - usb3-lpm-capable: supports USB3 LPM
+> > + - clocks     : must support all clocks that xhci needs
+> > + - clock-names: should be "sys_mac" for sys and mac clocks
+> > +
+> > +Example:
+> > +usb: usb30 at 11270000 {
+> > +	compatible = "mediatek,mt8173-xhci";
+> > +	reg = <0 0x11270000 0 0x1000>;
+> > +	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+> > +	reg-vusb33-supply = <&mt6397_vusb_reg>;
+> > +	reg-vbus-supply = <&usb_p1_vbus>;
+> > +	usb-phy = <&u3phy>;
+> > +	usb3-lpm-capable;
+> > +	clocks = <&topckgen CLK_TOP_USB30_SEL>;
+> > +	clock-names = "sys_mac";
+> > +};
+> > 
 > 
-> --->8
-> 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index f860bfda454a..e16351819fed 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -585,7 +585,8 @@ ENDPROC(el0_irq)
->   *
->   */
->  ENTRY(cpu_switch_to)
-> -	add	x8, x0, #THREAD_CPU_CONTEXT
-> +	mov	x10, #THREAD_CPU_CONTEXT
-> +	add	x8, x0, x10
->  	mov	x9, sp
->  	stp	x19, x20, [x8], #16		// store callee-saved registers
->  	stp	x21, x22, [x8], #16
-> @@ -594,7 +595,7 @@ ENTRY(cpu_switch_to)
->  	stp	x27, x28, [x8], #16
->  	stp	x29, x9, [x8], #16
->  	str	lr, [x8]
-> -	add	x8, x1, #THREAD_CPU_CONTEXT
-> +	add	x8, x1, x10
->  	ldp	x19, x20, [x8], #16		// restore callee-saved registers
->  	ldp	x21, x22, [x8], #16
->  	ldp	x23, x24, [x8], #16
+> cheers,
+> -roger
