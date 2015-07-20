@@ -1,73 +1,97 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Mon, 20 Jul 2015 11:30:53 -0500
-Subject: [PATCH] ARM: socfpga: add reset for the Arria 10 platform
-Message-ID: <1437409853-29070-1-git-send-email-dinguyen@opensource.altera.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Jul 2015 17:38:25 +0100
+Subject: [PATCH v3 3/3] dt-binding:Documents the mbigen bindings
+In-Reply-To: <55A76CDB.1020905@huawei.com>
+References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
+ <1436166548-34920-4-git-send-email-majun258@huawei.com>
+ <20150708134019.GE7025@leverpostej> <55A76CDB.1020905@huawei.com>
+Message-ID: <20150720163825.GF19239@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+> >> +The mbigen and devices connect to mbigen have the following properties:
+> >> +
+> >> +
+> >> +Mbigen required properties:
+> >> +-------------------------------------------
+> >> +-compatible: Should be "hisilicon,mbigen-v2"
+> >> +-msi-parent: should specified the ITS mbigen connected
+> >> +-interrupt controller: Identifies the node as an interrupt controller
+> >> +- #interrupt-cells : Specifies the number of cells needed to encode an
+> >> +  interrupt source. The value is 5 now.
+> >> +
+> >> +  The 1st cell is the device id.
+> > 
+> > Does a given mbigen block generate interrupts with different ITS device
+> > IDs? Or does a given mbigen block have a single device ID shared by all
+> > interrupts it generates?
+> > 
+> The mbigen chip structrue likes below:
+> 
+> 			mbigen_chip(domain)
+> 	|------------|------------------|
+> mbigen_node0	mbigen_node1		mbigen_node2
+> |	|	|	|		|	|
+> dev1	dev2	dev3	dev4		dev5	dev6
+> 
+> For each mbigen chip, it contains several mbigen nodes.
+> For each mbigen node, it can collect interrupts from different devices.
+> 
+> For example, dev1 and dev2 both connect to mbigen node0.Because dev1 and dev2 are
+> differnt device, they have different device id.
+> 
+> The device id is encoded in mbigen chip and can not be changed.
 
-Since the Arria10's reset register offset is different from the Cyclone/Arria 5,
-it's best to add a new DT_MACHINE_START() for the Arria10.
+Thanks for the diagram, that clears up some of my confusion regarding
+nodes.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/mach-socfpga/core.h    |  1 +
- arch/arm/mach-socfpga/socfpga.c | 26 ++++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+Ok, so each device has it's own device ID. That's good. If a device has
+multiple interrupt lines to the mbigen, do these always share the same
+device ID?
 
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 7259c37..5bc6ea8 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -25,6 +25,7 @@
- #define SOCFPGA_RSTMGR_MODPERRST	0x14
- #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
- 
-+#define SOCFPGA_A10_RSTMGR_CTRL		0xC
- #define SOCFPGA_A10_RSTMGR_MODMPURST	0x20
- 
- /* System Manager bits */
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 19643a7..48c82af 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -74,6 +74,19 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- 	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
- }
- 
-+static void socfpga_arria10_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	u32 temp;
-+
-+	temp = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
-+
-+	if (mode == REBOOT_HARD)
-+		temp |= RSTMGR_CTRL_SWCOLDRSTREQ;
-+	else
-+		temp |= RSTMGR_CTRL_SWWARMRSTREQ;
-+	writel(temp, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
-+}
-+
- static const char *altera_dt_match[] = {
- 	"altr,socfpga",
- 	NULL
-@@ -86,3 +99,16 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
- 	.restart	= socfpga_cyclone5_restart,
- 	.dt_compat	= altera_dt_match,
- MACHINE_END
-+
-+static const char *altera_a10_dt_match[] = {
-+	"altr,socfpga-arria10",
-+	NULL
-+};
-+
-+DT_MACHINE_START(SOCFPGA_A10, "Altera SOCFPGA Arria10")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+	.init_irq	= socfpga_init_irq,
-+	.restart	= socfpga_arria10_restart,
-+	.dt_compat	= altera_dt_match,
-+MACHINE_END
--- 
-2.4.5
+> >> +  The 2nd cell is the totall interrupt number of this device?
+> > 
+> > I don't follow. What is a "total interrupt number"?
+> > 
+> It's the wired interrupt number connected to a device.
+> For the devices connected to mbigen node, the interrupt number  varied from
+> 1 to 100+ .So I have to specifies this value in dts.
+>
+> >> +  The 3rd cell is the hardware pin number of the interrupt.
+> >> +  This value depends on the Soc design.
+> > 
+> > This property seems sane.
+> > 
+> >> +  The 4th cell is the mbigen node number. This value should refer to the
+> >> +  vendor soc specification.
+> > 
+> > What is this, and why do you think you need it?
+> > 
+> > Surely the address of the mbigen node is a sufficient unique identifier?
+> > 
+> 		mbigen_chip(domain)
+> 	|------------|------------------|
+> mbigen_node0	mbigen_node1		mbigen_node2
+> |	|	|	|		|	|
+> dev1	dev2	dev3	dev4		dev5	dev6
+> 
+> To avoid the duplicat hardware irq number problem, the Mbigen node number is defined here.
+> For example:
+> dev1 has 3 interrupts with pin number from 0 to 2
+> dev3 has 5 interrupts with pin number from 0 to 4
+> For dev3 the interrupt from 0 to 2 would be has same hardware irq number
+> as dev1 if we only use pin number.
+>
+> Because these two devices located in same irq domain(mbigen chip),using same
+> hwirq number is a mistake.
+> 
+> In mbigen driver, I will use this value and  the 3rd cell(pin number) to compose
+> a new hardware irq( (nid<<8) | pin number) for mbigen using.
+
+Ok. I now see why you need node and pin.
+
+However, I don't see why you also need the 'total' interrupt number. Why
+isn't node and pin sufficient to uniquely identify an interrupt?
+
+Thanks,
+Mark.
