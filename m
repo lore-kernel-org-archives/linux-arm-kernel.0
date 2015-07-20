@@ -1,30 +1,29 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Mon, 20 Jul 2015 18:26:06 +0100
-Subject: [Xen-devel] [PATCH v2 17/20] net/xen-netfront: Make it running
- on 64KB page granularity
-In-Reply-To: <1436474552-31789-18-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-18-git-send-email-julien.grall@citrix.com>
-Message-ID: <55AD2F2E.9090204@citrix.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Jul 2015 18:28:28 +0100
+Subject: [PATCH 1/2] dt-bindings: Add document for MT6311 regulator
+In-Reply-To: <1437377793-31558-2-git-send-email-henryc.chen@mediatek.com>
+References: <1437377793-31558-1-git-send-email-henryc.chen@mediatek.com>
+ <1437377793-31558-2-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20150720172828.GG11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 20, 2015 at 03:36:32PM +0800, Henry Chen wrote:
 
-On 09/07/15 21:42, Julien Grall wrote:
-> +static void xennet_make_one_txreq(unsigned long mfn, unsigned int offset,
-> +				  unsigned int *len, void *data)
-> +{
-> +	struct xennet_gnttab_make_txreq *info = data;
-> +
-> +	info->tx->flags |= XEN_NETTXF_more_data;
-> +	skb_get(info->skb);
-> +	xennet_make_one_txreq(mfn, offset, len, data);
+> +Required properties:
+> +- compatible: "mediatek,mt6311-regulator"
+> +- mt6311regulator: List of regulators provided by this controller. It is named
+> +  to VDVFS and VBIASN.
 
-This should be xennet_tx_setup_grant rather than calling itself. I did
-the mistake while cleaning up the code sorry.
+Why this weird property name?  It looks like it might just be a typo and
+should just be "regulator"?
 
-Regards,
-
--- 
-Julien Grall
+Please use subject lines reflecting the style for the subsystem, it
+helps people find patches that are relevant to them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/d39e4523/attachment.sig>
