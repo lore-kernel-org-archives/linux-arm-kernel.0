@@ -1,79 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Jul 2015 11:53:45 +0100
-Subject: [PATCH] arm64: Minor refactoring of cpu_switch_to() to fix build
- breakage
-In-Reply-To: <20150720073647.GA10504@gmail.com>
-References: <1437359377-39932-1-git-send-email-olof@lixom.net>
- <20150720073647.GA10504@gmail.com>
-Message-ID: <20150720105345.GC9908@arm.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 20 Jul 2015 12:02:06 +0100
+Subject: [PATCH v2 0/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <1437154221-5736-1-git-send-email-james.morse@arm.com>
+References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
+Message-ID: <55ACD52E.1090701@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 08:36:47AM +0100, Ingo Molnar wrote:
-> * Olof Johansson <olof@lixom.net> wrote:
+On 17/07/15 18:30, James Morse wrote:
+> This series adds support for Privileged Access Never (PAN; part of the ARMv8.1
+> Extensions). When enabled, this feature causes a permission fault if the kernel
+> attempts to access memory that is also accessible by userspace - instead the
+> PAN bit must be cleared when accessing userspace memory. (or use the
+> ldt*/stt* instructions).
 > 
-> > Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-> > moved the thread_struct to the bottom of task_struct. As a result, the
-> > offset is now too large to be used in an immediate add on arm64 with
-> > some kernel configs:
-> > 
-> > arch/arm64/kernel/entry.S: Assembler messages:
-> > arch/arm64/kernel/entry.S:588: Error: immediate out of range
-> > arch/arm64/kernel/entry.S:597: Error: immediate out of range
-> > 
-> > There's really no reason for cpu_switch_to to take a task_struct pointer
-> > in the first place, since all it does is access the thread.cpu_context
-> > member. So, just pass that in directly.
-> > 
-> > Fixes: 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-> > Cc: Dave Hansen <dave.hansen@linux.intel.com>
-> > Signed-off-by: Olof Johansson <olof@lixom.net>
-> > ---
-> >  arch/arm64/include/asm/processor.h |    4 ++--
-> >  arch/arm64/kernel/asm-offsets.c    |    2 --
-> >  arch/arm64/kernel/entry.S          |   34 ++++++++++++++++------------------
-> >  arch/arm64/kernel/process.c        |    3 ++-
-> >  4 files changed, 20 insertions(+), 23 deletions(-)
+> This series detects and enables this feature, and uses alternatives to change
+> {get,put}_user() et al to clear the PAN bit while they do their work.
 > 
-> So why not pass in 'thread_struct' as the patch below does - it looks much
-> simpler to me. This way the assembly doesn't have to be changed at all.
+> Changes since v1:
+> * Copied cpuid_feature_extract_field() from arch/arm as a new patch, suggested
+>   by Russell King [1].
+> * Changed feature-detection patch to use cpuid_feature_extract_field() for sign
+>   extension, and '>='.
+> * Moved SCTLR_EL1_* from asm/cputype.h to asm/sysreg.h
+> * Added PSR_PAN_BIT in uapi/asm/ptrace.h
+> * Removed the setting of PSTATE_PAN in kernel/process.c
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg432518.html
+> 
 
-Unfortunately, neither of these approaches really work:
+Hi James,
 
-  - We need to return last from __switch_to, which means not corrupting
-    x0 in cpu_switch_to and then having an ugly container_of to get back
-    at the task_struct
+Looks like it doesn't play nicely with CONFIG_SWP_EMULATION=y. I get
+segfault while executing swp and PAN is enabled, though I've been
+playing with one of the older version.
 
-  - ret_from_fork needs to pass the task_struct of prev to schedule_tail,
-    so we have the same issue there
+Vladimir
 
-Patch below fixes things, but it's a shame we have to use an extra register
-like this.
-
-Will
-
---->8
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f860bfda454a..e16351819fed 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -585,7 +585,8 @@ ENDPROC(el0_irq)
-  *
-  */
- ENTRY(cpu_switch_to)
--	add	x8, x0, #THREAD_CPU_CONTEXT
-+	mov	x10, #THREAD_CPU_CONTEXT
-+	add	x8, x0, x10
- 	mov	x9, sp
- 	stp	x19, x20, [x8], #16		// store callee-saved registers
- 	stp	x21, x22, [x8], #16
-@@ -594,7 +595,7 @@ ENTRY(cpu_switch_to)
- 	stp	x27, x28, [x8], #16
- 	stp	x29, x9, [x8], #16
- 	str	lr, [x8]
--	add	x8, x1, #THREAD_CPU_CONTEXT
-+	add	x8, x1, x10
- 	ldp	x19, x20, [x8], #16		// restore callee-saved registers
- 	ldp	x21, x22, [x8], #16
- 	ldp	x23, x24, [x8], #16
+> 
+> James Morse (6):
+>   arm64: kernel: Add cpuid_feature_extract_field() for 4bit sign
+>     extension
+>   arm64: kernel: preparatory: Move config_sctlr_el1
+>   arm64: kernel: Add cpufeature 'enable' callback
+>   arm64: kernel: Add min_register_value and use '>=' for feature
+>     detection
+>   arm64: kernel: Add optional CONFIG_ parameter to ALTERNATIVE()
+>   arm64: kernel: Add support for Privileged Access Never
+> 
+>  arch/arm64/Kconfig                   | 14 +++++++++++++
+>  arch/arm64/include/asm/alternative.h | 28 ++++++++++++++++++++++---
+>  arch/arm64/include/asm/cpufeature.h  | 21 ++++++++++++++++---
+>  arch/arm64/include/asm/cputype.h     |  3 ---
+>  arch/arm64/include/asm/futex.h       |  8 ++++++++
+>  arch/arm64/include/asm/processor.h   |  2 ++
+>  arch/arm64/include/asm/sysreg.h      | 21 +++++++++++++++++++
+>  arch/arm64/include/asm/uaccess.h     | 11 ++++++++++
+>  arch/arm64/include/uapi/asm/ptrace.h |  1 +
+>  arch/arm64/kernel/armv8_deprecated.c | 11 +---------
+>  arch/arm64/kernel/cpufeature.c       | 40 +++++++++++++++++++++++++++++++++---
+>  arch/arm64/lib/clear_user.S          |  8 ++++++++
+>  arch/arm64/lib/copy_from_user.S      |  8 ++++++++
+>  arch/arm64/lib/copy_in_user.S        |  8 ++++++++
+>  arch/arm64/lib/copy_to_user.S        |  8 ++++++++
+>  arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++
+>  16 files changed, 193 insertions(+), 22 deletions(-)
+> 
