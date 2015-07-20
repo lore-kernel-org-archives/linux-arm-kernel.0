@@ -1,40 +1,126 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Mon, 20 Jul 2015 22:50:00 +0900
-Subject: [PATCH 0/2] ARM: DTS support for Linkstation LS-WTGL (orion5x)
-In-Reply-To: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
-References: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <CAEQ9gE=GAE7RbzkNWBvPxbH0OSsc7QP3+Kvsig+krQ2cA8=7bg@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 20 Jul 2015 06:52:28 -0700
+Subject: [PATCH] sched, arm64: Fix the fallout of increasing the offset
+ of 'thread_struct' within 'task_struct'
+In-Reply-To: <20150720072043.GA7696@gmail.com>
+References: <20150718232717.GA3235@groeck-UX31A>
+ <20150718233455.GA3273@groeck-UX31A> <20150720072043.GA7696@gmail.com>
+Message-ID: <55ACFD1C.8090907@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew, Jason,
+On 07/20/2015 12:20 AM, Ingo Molnar wrote:
+>
+> * Guenter <linux@roeck-us.net> wrote:
+>
+>> On Sat, Jul 18, 2015 at 04:27:17PM -0700, Guenter wrote:
+>>> Hi,
+>>>
+>>> Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+>>> causes s390 builds in mainline to fail as follows.
+>>>
+>>> arch/s390/kernel/traps.c: Assembler messages:
+>>> arch/s390/kernel/traps.c:262: Error: operand out of range
+>>> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
+>>> arch/s390/kernel/traps.c:300: Error: operand out of range
+>>> 	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
+>>>
+>>
+>> Also:
+>>
+>> arm64:allmodconfig:
+>>
+>> arch/arm64/kernel/entry.S: Assembler messages:
+>> arch/arm64/kernel/entry.S:588: Error: immediate out of range
+>> arch/arm64/kernel/entry.S:597: Error: immediate out of range
+>> make[1]: *** [arch/arm64/kernel/entry.o] Error 1
+>>
+>> I didn't bisect that one, but it looks like the cause is the same.
+>
+> Hm, it looks like the new, increased offset of 'thread_struct' within
+> 'task_struct' goes over a limit that these instructions are able to support on
+> arm64:
+>
+>   arch/arm64/kernel/asm-offsets.c:  DEFINE(THREAD_CPU_CONTEXT,    offsetof(struct task_struct, thread.cpu_context));
+>   arch/arm64/kernel/entry.S:      add     x8, x0, #THREAD_CPU_CONTEXT
+>   arch/arm64/kernel/entry.S:      add     x8, x1, #THREAD_CPU_CONTEXT
+>
+> If there's no instruction that can support such offset sizes then I suspect the
+> straightforward fix would be to pass in thread_struct instead - like the patch
+> below. That's a tiny bit cleaner for type encapsulation anyway.
+>
 
-Could you help to review my patchset on Linkstation LS-WTGL (orion5x), please?
-Thank you and look forward to your feedback!
+Olof submitted a different patch to solve the problem:
+	http://www.spinics.net/lists/kernel/msg2036825.html
 
-Cheers,
-Roger
+His patch is passing cpu_context instead of thread_context.
 
-On Tue, Jul 14, 2015 at 10:00 PM, Roger Shimizu <rogershimizu@gmail.com> wrote:
-> Dear Orion5x Maintainer,
+> Warning: it's not even build tested, but in case it works:
 >
-> I'd like to add DTS support for a bit older linkstation orion5x device, LS-WTGL.
-> I have tested againt latest kernel next/dt branch on my box and it works fine.
-> Please consider to merge. Thank you!
+>    Signed-off-by: Ingo Molnar <mingo@kernel.org>
 >
-> Cheers,
-> Roger
+> Thanks,
 >
-> Roger Shimizu (2):
->   ARM: dts: add buffalo linkstation ls-wtgl
->   ARM: defconfig: add DT support for orion5x_defconfig
+> 	Ingo
 >
->  arch/arm/boot/dts/Makefile                       |   1 +
->  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 242 +++++++++++++++++++++++
->  arch/arm/configs/orion5x_defconfig               |   4 +
->  3 files changed, 247 insertions(+)
->  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+> ================
 >
-> --
-> 1.9.1
+>   arch/arm64/include/asm/processor.h | 4 ++--
+>   arch/arm64/kernel/asm-offsets.c    | 2 +-
+>   arch/arm64/kernel/process.c        | 2 +-
+>   3 files changed, 4 insertions(+), 4 deletions(-)
 >
+> diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
+> index e4c893e54f01..890f84bb3b8c 100644
+> --- a/arch/arm64/include/asm/processor.h
+> +++ b/arch/arm64/include/asm/processor.h
+> @@ -152,8 +152,8 @@ static inline void cpu_relax(void)
+>   #define cpu_relax_lowlatency()                cpu_relax()
+>
+>   /* Thread switching */
+> -extern struct task_struct *cpu_switch_to(struct task_struct *prev,
+> -					 struct task_struct *next);
+> +extern struct task_struct *cpu_switch_to(struct thread_struct *prev,
+> +					 struct thread_struct *next);
+>
+>   #define task_pt_regs(p) \
+>   	((struct pt_regs *)(THREAD_START_SP + task_stack_page(p)) - 1)
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index c99701a34d7b..3785373c2369 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -39,7 +39,7 @@ int main(void)
+>     DEFINE(TI_TASK,		offsetof(struct thread_info, task));
+>     DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
+>     BLANK();
+> -  DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
+> +  DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct thread_struct, cpu_context));
+>     BLANK();
+>     DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
+>     DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index 223b093c9440..436e95bda1b2 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -325,7 +325,7 @@ struct task_struct *__switch_to(struct task_struct *prev,
+>   	dsb(ish);
+>
+>   	/* the actual thread switch */
+> -	last = cpu_switch_to(prev, next);
+> +	last = cpu_switch_to(&prev.thread, &next.thread);
+
+Doesn't compile.
+
+arch/arm64/kernel/process.c: In function ?__switch_to?:
+arch/arm64/kernel/process.c:328:28: error: request for member ?thread? in something not a structure or union
+   last = cpu_switch_to(&prev.thread, &next.thread);
+                             ^
+arch/arm64/kernel/process.c:328:42: error: request for member ?thread? in something not a structure or union
+   last = cpu_switch_to(&prev.thread, &next.thread);
+
+It would have to be
+	last = cpu_switch_to(&prev->thread, &next->thread);
+
+which does compile, but fails to run in qemu.
+
+Guenter
