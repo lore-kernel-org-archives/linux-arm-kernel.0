@@ -1,82 +1,63 @@
 From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 20 Jul 2015 20:01:12 +0800
-Subject: [PATCH part3 v12 04/10] PCI: Introduce pci_host_assign_domain_nr() to
- assign domain
+Date: Mon, 20 Jul 2015 20:01:14 +0800
+Subject: [PATCH part3 v12 06/10] PCI: Make pci_host_bridge hold sysdata in
+ drvdata
 In-Reply-To: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
 References: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
-Message-ID: <1437393678-4077-5-git-send-email-wangyijing@huawei.com>
+Message-ID: <1437393678-4077-7-git-send-email-wangyijing@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce pci_host_assign_domain_nr() to assign domain number
-for pci_host_bridge.
+Now platform specific sysdata is saved in pci_bus,
+and pcibios_root_bridge_prepare() need to know
+the sysdata. Later, we would move pcibios_root_bridge_prepare()
+prior to root bus creation, so we need to make
+pci_host_bridge hold sysdata.
 
 Signed-off-by: Yijing Wang <wangyijing@huawei.com>
 ---
- drivers/pci/pci.c |   24 +++++++++++++++++++-----
- drivers/pci/pci.h |    1 +
- 2 files changed, 20 insertions(+), 5 deletions(-)
+ arch/ia64/pci/pci.c |    2 +-
+ arch/x86/pci/acpi.c |    2 +-
+ drivers/pci/probe.c |    1 +
+ 3 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 59032e2..79d01e4 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4484,10 +4484,10 @@ static int pci_get_new_domain_nr(void)
- 	return atomic_inc_return(&__domain_nr);
- }
- 
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+static int pci_assign_domain_nr(struct device *dev)
- {
- 	static int use_dt_domains = -1;
--	int domain = of_get_pci_domain_nr(parent->of_node);
-+	int domain = of_get_pci_domain_nr(dev->of_node);
- 
- 	/*
- 	 * Check DT domain and use_dt_domains values.
-@@ -4521,16 +4521,30 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 		use_dt_domains = 0;
- 		domain = pci_get_new_domain_nr();
- 	} else {
--		dev_err(parent, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
--			parent->of_node->full_name);
-+		dev_err(dev, "Node %s has inconsistent \"linux,pci-domain\" property in DT\n",
-+			dev->of_node->full_name);
- 		domain = -1;
+diff --git a/arch/ia64/pci/pci.c b/arch/ia64/pci/pci.c
+index 67ffe1f..8f79852 100644
+--- a/arch/ia64/pci/pci.c
++++ b/arch/ia64/pci/pci.c
+@@ -485,7 +485,7 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	 * that case.
+ 	 */
+ 	if (!bridge->dev.parent) {
+-		struct pci_controller *controller = bridge->bus->sysdata;
++		struct pci_controller *controller = dev_get_drvdata(&bridge->dev);
+ 		ACPI_COMPANION_SET(&bridge->dev, controller->companion);
  	}
- 
--	bus->domain_nr = domain;
-+	return domain;
-+}
-+
-+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+{
-+	bus->domain_nr = pci_assign_domain_nr(parent);
- }
- #endif
- #endif
- 
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain)
-+{
-+#ifdef CONFIG_PCI_DOMAINS_GENERIC
-+	host->domain = pci_assign_domain_nr(host->dev.parent);
-+#else
-+	host->domain = domain;
-+#endif
-+}
-+
- /**
-  * pci_ext_cfg_avail - can we access extended PCI config space?
-  *
-diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
-index 02192aa..4a815c9 100644
---- a/drivers/pci/pci.h
-+++ b/drivers/pci/pci.h
-@@ -344,4 +344,5 @@ static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
- }
- #endif
- 
-+void pci_host_assign_domain_nr(struct pci_host_bridge *host, int domain);
- #endif /* DRIVERS_PCI_H */
+ 	return 0;
+diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
+index 629fc3b..38ce348 100644
+--- a/arch/x86/pci/acpi.c
++++ b/arch/x86/pci/acpi.c
+@@ -502,7 +502,7 @@ int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+ 	 * that case.
+ 	 */
+ 	if (!bridge->dev.parent) {
+-		struct pci_sysdata *sd = bridge->bus->sysdata;
++		struct pci_sysdata *sd = dev_get_drvdata(&bridge->dev);
+ 		ACPI_COMPANION_SET(&bridge->dev, sd->companion);
+ 	}
+ 	return 0;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 0eba126..0ae8bf2 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1967,6 +1967,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int domain,
+ 	bridge->domain = domain;
+ 	bridge->dev.parent = parent;
+ 	bridge->dev.release = pci_release_host_bridge_dev;
++	dev_set_drvdata(&bridge->dev, sysdata);
+ 	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+ 	error = pcibios_root_bridge_prepare(bridge);
+ 	if (error) {
 -- 
 1.7.1
