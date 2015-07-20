@@ -1,46 +1,99 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 20 Jul 2015 10:43:28 +0200
-Subject: [PATCH] ARM: zynq: reserve space for jump target in secondary
- trampoline
-In-Reply-To: <1437166862-29782-1-git-send-email-nathan_lynch@mentor.com>
-References: <1437166862-29782-1-git-send-email-nathan_lynch@mentor.com>
-Message-ID: <55ACB4B0.3040906@xilinx.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Mon, 20 Jul 2015 16:44:54 +0800
+Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <55ACB2C9.5070701@atmel.com>
+References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
+ <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
+ <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
+ <559FEED3.5080505@atmel.com> <55A32EC8.4080309@atmel.com>
+ <20150720075231.GQ28632@lukather> <55ACB2C9.5070701@atmel.com>
+Message-ID: <55ACB506.9080505@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2015 11:01 PM, Nathan Lynch wrote:
-> Add a zero argument to the .word directive in
-> zynq_secondary_trampoline.  Without an expression the assembler emits
-> nothing for the .word directive.
-> 
-> This makes it so that the intended range is communicated to ioremap
-> and outer_flush_range in zynq_cpun_start; e.g. for LE
-> trampoline_code_size evaluates to 12 now instead of 8.
-> 
-> Found by inspection.  I'm not aware of any real problem this fixes.
-> Tested by doing on online/offline loop on ZC702.
-> 
-> Signed-off-by: Nathan Lynch <nathan_lynch@mentor.com>
-> ---
->  arch/arm/mach-zynq/headsmp.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-zynq/headsmp.S b/arch/arm/mach-zynq/headsmp.S
-> index 045c72720a4d..f6d5de073e34 100644
-> --- a/arch/arm/mach-zynq/headsmp.S
-> +++ b/arch/arm/mach-zynq/headsmp.S
-> @@ -18,7 +18,7 @@ ARM_BE8(rev	r0, r0)
->  .globl zynq_secondary_trampoline_jump
->  zynq_secondary_trampoline_jump:
->  	/* Space for jumping address */
-> -	.word	/* cpu 1 */
-> +	.word	0	/* cpu 1 */
->  .globl zynq_secondary_trampoline_end
->  zynq_secondary_trampoline_end:
->  ENDPROC(zynq_secondary_trampoline)
-> 
+On 7/20/2015 4:35 PM, Josh Wu wrote:
+> Hi, Maxime
+>
+> On 7/20/2015 3:52 PM, Maxime Ripard wrote:
+>> Hi Josh,
+>>
+>> On Mon, Jul 13, 2015 at 11:21:44AM +0800, Josh Wu wrote:
+>>> On 7/11/2015 12:12 AM, Nicolas Ferre wrote:
+>>>> Le 10/07/2015 14:31, Maxime Ripard a ?crit :
+>>>>> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
+>>>>>>> I would agree with Maxime. Currently all latest chip reset 
+>>>>>>> function is
+>>>>>>> compatible with the atmel,sama5d3-rstc.
+>>>>>>> So check compatible string is enough for now.
+>>>>>>> But of cause if we have other incompatible reset in future with 
+>>>>>>> new chip,
+>>>>>>> the structure like you said is needed.
+>>>>>> We managed to avoid using of_machine_is_compatible() in all the at91
+>>>>>> drivers. I'd like to keep it that way. It was painful enough to 
+>>>>>> remove
+>>>>>> all those cpu_is_at91xxx calls.
+>>>>> That's your call...
+>>>>>
+>>>>>> Also, using it is trying to match strings and will result in 
+>>>>>> longer boot
+>>>>>> times.
+>>>>> Have you looked at the implementation of of_match_device? If that's
+>>>>> really a concern to you, you should actually avoid it.
+>>>> I agree: let's keep it simple and use of_match_device().
+>>> Ok. I will keep it as it is now:  use the (match->data != 
+>>> sama5d3_restart)
+>>> for the condition.
+>> I'm not just that's been an option in our discussion so far.
+>>
+>> Nicolas said that he was agreeing with me, but at the same time said
+>> the complete opposite of what I was arguing for, so I'm not really
+>> sure what's really on his mind, but the two options that were
+>> discussed were to remove that test, and either:
+>>
+>>    - Use of_device_is_compatible to prevent the loop execution
+>
+> Thank you for explaining, it is clear to me.
+>
+> I'll take this above option. As the of_device_is_compatible() almost 
+> same as of_match_node()/of_match_device(). Except that 
+> of_device_is_compatible() is more efficient (in this case It calls 
+> __of_device_is_compatible() directly) than of_match_node/of_match_device.
 
-Tested and applied to zynq/cleanup.
+Sorry, after checking the code a little, I'd say use the of_match_node 
+instead of of_device_is_compatible() is better. Since After check the 
+of_device_is_compatible() we also need to call of_match_node() again.
 
-Thanks,
-Michal
+So the simplest way is just get the match data by of_match_node() first, 
+then check the match->data. like following:
+
+     match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
+     if (match->data != sama5d3_restart) {
+         /* we need to shutdown the ddr controller, so get ramc base */
+         for_each_matching_node(np, at91_ramc_of_match) {
+             at91_ramc_base[idx] = of_iomap(np, 0);
+             if (!at91_ramc_base[idx]) {
+                 dev_err(&pdev->dev, "Could not map ram controller 
+address\n");
+                 return -ENODEV;
+             }
+             idx++;
+         }
+     }
+
+     at91_restart_nb.notifier_call = match->data;
+
+Best Regards,
+Josh Wu
+>
+>>
+>>    - define a structure with a flag to say whether you need the ram
+>>      controller quirk or not, and test that flag.
+>>
+>> Maxime
+>>
+>
+> Best Regards,
+> Josh Wu
