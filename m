@@ -1,70 +1,69 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 20 Jul 2015 11:51:46 +0300
-Subject: [PATCH v2 2/4] drm/tegra: Add VIC support
-In-Reply-To: <55ACB134.8010401@nvidia.com>
-References: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
- <1437378869-10451-3-git-send-email-mperttunen@nvidia.com>
- <55ACB134.8010401@nvidia.com>
-Message-ID: <55ACB6A2.9030906@nvidia.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 20 Jul 2015 10:54:05 +0200
+Subject: [PATCH 6/7] Documentation: atmel-quadspi: add binding file for
+ Atmel QSPI driver
+In-Reply-To: <55A8EAAE.6010506@cogentembedded.com>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+ <f4bb1c68fcc19b3642110ab0ef9850d6eeca3112.1437059658.git.cyrille.pitchen@atmel.com>
+ <55A8EAAE.6010506@cogentembedded.com>
+Message-ID: <55ACB72D.60506@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2015 11:28 AM, Jon Hunter wrote:
-> Hi Mikko,
+Hi Sergei,
 
-Hi!
+thanks for the review. For the next series I've removed all references to
+"qspi" in the node example but the one from the compatible string.
+I've also removed the leading 0 in the size of the second memory region.
 
-> ...
->> +static int vic_runtime_resume(struct device *dev)
->> +{
->> +	struct vic *vic = dev_get_drvdata(dev);
->> +	int err;
+Best Regards,
+
+Cyrille
+
+Le 17/07/2015 13:44, Sergei Shtylyov a ?crit :
+> Hello.
+> 
+> On 7/16/2015 6:27 PM, Cyrille Pitchen wrote:
+> 
+>> This patch documents the DT bindings for the driver of the Atmel QSPI
+>> controller embedded inside sama5d2x SoCs.
+> 
+>> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+>> ---
+>>   .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
+>>   1 file changed, 29 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+> 
+>> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+>> new file mode 100644
+>> index 000000000000..a0d60ac7ae10
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+>> @@ -0,0 +1,29 @@
+>> +* Atmel Quad Serial Peripheral Interface (QSPI)
 >> +
->> +	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
->> +						vic->clk, vic->rst);
-> 
-> I would like to deprecate use of the above function [1]. I have been
-> trying to migrate driver to use a new API instead of the above.
-
-Yes, we will need to coordinate the API change here. I kept the old way
-here to not depend on your series for now.
-
-> 
->> +	if (err < 0)
->> +		dev_err(dev, "failed to power up device\n");
+>> +Required properties:
+>> +  - compatible : Should be "atmel,sama5d2-qspi"
+>> +  - reg : the first contains the register location and length,
+>> +          the second contains the memory mapping address and length
+>> +  - interrupts : Should contain the interrupt for the device
+>> +  - clocks : The clock needed by the QSPI controller
+>> +  - #address-cells : should be 1
+>> +  - #size-cells : should be 0
 >> +
->> +	return err;
->> +}
+>> +Example:
 >> +
->> ...
->> +
->> +	pm_runtime_enable(&pdev->dev);
->> +	if (!pm_runtime_enabled(&pdev->dev)) {
->> +		err = vic_runtime_resume(&pdev->dev);
->> +		if (err < 0)
->> +			goto unregister_client;
->> +	}
+>> +qspi0: qspi at f0020000 {
 > 
-> I don't see why pm_runtime_enable() should ever fail to enable
-> pm_runtime here. Hence, the if-statement appears to be redundant. If you
-> are trying to determine whether rpm is supported for the power-domains
-> then you should simply check to see if the DT node for the device has
-> the "power-domains" property. See my series [1].
-
-The intention is that if runtime PM is not enabled, the power domain is
-still brought up. On a cursory look, it seems like with your patch, this
-should indeed work fine without this check if CONFIG_PM is enabled. Now,
-that might always be enabled? If so, then everything would be fine; if
-this lands after your series, we could even just make the power-domains
-prop mandatory and not implement the legacy mode at all. If not, then
-AFAIU we must still keep this path.
-
+>     Once again, the ePAPR standard tells up to call the node just "spi", not "qspi".
 > 
-> Cheers
-> Jon
+>> +    compatible = "atmel,sama5d2-qspi";
+>> +    reg = <0xf0020000 0x100>,
+>> +          <0xd0000000 0x08000000>;
 > 
-> [1] http://www.spinics.net/lists/arm-kernel/msg431051.html
+>    Either you use the leading zeroes or you don't. :-)
 > 
-
-Cheers,
-Mikko.
+> [...]
+> 
+> MBR, Sergei
+> 
