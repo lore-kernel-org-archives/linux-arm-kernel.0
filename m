@@ -1,42 +1,30 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 20 Jul 2015 18:23:35 +0100
-Subject: [PATCH v4 0/4] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <20150720152637.GD10969@8bytes.org>
-References: <cover.1437070995.git.robin.murphy@arm.com>
- <20150720152637.GD10969@8bytes.org>
-Message-ID: <55AD2E97.1040901@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 20 Jul 2015 18:26:06 +0100
+Subject: [Xen-devel] [PATCH v2 17/20] net/xen-netfront: Make it running
+ on 64KB page granularity
+In-Reply-To: <1436474552-31789-18-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-18-git-send-email-julien.grall@citrix.com>
+Message-ID: <55AD2F2E.9090204@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+Hi,
 
-On 20/07/15 16:26, Joerg Roedel wrote:
-> On Thu, Jul 16, 2015 at 07:40:11PM +0100, Robin Murphy wrote:
->>   arch/arm64/Kconfig                   |   1 +
->>   arch/arm64/include/asm/dma-mapping.h |  15 +-
->>   arch/arm64/mm/dma-mapping.c          | 452 +++++++++++++++++++++++++++++
->
-> What happened to the plan to merge this with the existing iommu-based
-> dma-api implementation for 32 bit ARM?
+On 09/07/15 21:42, Julien Grall wrote:
+> +static void xennet_make_one_txreq(unsigned long mfn, unsigned int offset,
+> +				  unsigned int *len, void *data)
+> +{
+> +	struct xennet_gnttab_make_txreq *info = data;
+> +
+> +	info->tx->flags |= XEN_NETTXF_more_data;
+> +	skb_get(info->skb);
+> +	xennet_make_one_txreq(mfn, offset, len, data);
 
-The issue currently is that there are a bunch of drivers using the 
-exported arm_iommu_* functions directly. From what I can tell, they seem 
-like they could probably all be converted to using default domains 
-and/or the new domain type abstractions via the core IOMMU API, which 
-would then allow killing off dma_iommu_mapping and rewriting the 
-arch/arm implementation to use the new shared code. I don't currently 
-have any 32-bit platform to test with, so I'm a little dubious of taking 
-that all on myself right now.
+This should be xennet_tx_setup_grant rather than calling itself. I did
+the mistake while cleaning up the code sorry.
 
-In the meantime on arm64, DMA mapping ops are needed for SMMUv3 platform 
-device support, the Mediatek M4U patches and my own SMMUv2 work, so it 
-would be very useful to get the arm64 and common code in as a first 
-step, then look at cleaning up arch/arm for 4.4 without dangling 
-dependencies.
+Regards,
 
-Robin.
-
->
->
-> 	Joerg
->
+-- 
+Julien Grall
