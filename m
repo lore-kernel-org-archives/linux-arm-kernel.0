@@ -1,97 +1,39 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Jul 2015 17:38:25 +0100
-Subject: [PATCH v3 3/3] dt-binding:Documents the mbigen bindings
-In-Reply-To: <55A76CDB.1020905@huawei.com>
-References: <1436166548-34920-1-git-send-email-majun258@huawei.com>
- <1436166548-34920-4-git-send-email-majun258@huawei.com>
- <20150708134019.GE7025@leverpostej> <55A76CDB.1020905@huawei.com>
-Message-ID: <20150720163825.GF19239@leverpostej>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 20 Jul 2015 18:42:42 +0200
+Subject: [PATCH v2 1/2] power: reset: at91: add sama5d3 reset function
+In-Reply-To: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
+References: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20150720164241.GA5930@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +The mbigen and devices connect to mbigen have the following properties:
-> >> +
-> >> +
-> >> +Mbigen required properties:
-> >> +-------------------------------------------
-> >> +-compatible: Should be "hisilicon,mbigen-v2"
-> >> +-msi-parent: should specified the ITS mbigen connected
-> >> +-interrupt controller: Identifies the node as an interrupt controller
-> >> +- #interrupt-cells : Specifies the number of cells needed to encode an
-> >> +  interrupt source. The value is 5 now.
-> >> +
-> >> +  The 1st cell is the device id.
-> > 
-> > Does a given mbigen block generate interrupts with different ITS device
-> > IDs? Or does a given mbigen block have a single device ID shared by all
-> > interrupts it generates?
-> > 
-> The mbigen chip structrue likes below:
-> 
-> 			mbigen_chip(domain)
-> 	|------------|------------------|
-> mbigen_node0	mbigen_node1		mbigen_node2
-> |	|	|	|		|	|
-> dev1	dev2	dev3	dev4		dev5	dev6
-> 
-> For each mbigen chip, it contains several mbigen nodes.
-> For each mbigen node, it can collect interrupts from different devices.
-> 
-> For example, dev1 and dev2 both connect to mbigen node0.Because dev1 and dev2 are
-> differnt device, they have different device id.
-> 
-> The device id is encoded in mbigen chip and can not be changed.
+Hi,
 
-Thanks for the diagram, that clears up some of my confusion regarding
-nodes.
-
-Ok, so each device has it's own device ID. That's good. If a device has
-multiple interrupt lines to the mbigen, do these always share the same
-device ID?
-
-> >> +  The 2nd cell is the totall interrupt number of this device?
-> > 
-> > I don't follow. What is a "total interrupt number"?
-> > 
-> It's the wired interrupt number connected to a device.
-> For the devices connected to mbigen node, the interrupt number  varied from
-> 1 to 100+ .So I have to specifies this value in dts.
->
-> >> +  The 3rd cell is the hardware pin number of the interrupt.
-> >> +  This value depends on the Soc design.
-> > 
-> > This property seems sane.
-> > 
-> >> +  The 4th cell is the mbigen node number. This value should refer to the
-> >> +  vendor soc specification.
-> > 
-> > What is this, and why do you think you need it?
-> > 
-> > Surely the address of the mbigen node is a sufficient unique identifier?
-> > 
-> 		mbigen_chip(domain)
-> 	|------------|------------------|
-> mbigen_node0	mbigen_node1		mbigen_node2
-> |	|	|	|		|	|
-> dev1	dev2	dev3	dev4		dev5	dev6
+On Mon, Jul 20, 2015 at 05:32:05PM +0800, Josh Wu wrote:
+> This patch introduces a new compatible string: "atmel,sama5d3-rstc" and
+> new reset function for sama5d3 and later chips.
 > 
-> To avoid the duplicat hardware irq number problem, the Mbigen node number is defined here.
-> For example:
-> dev1 has 3 interrupts with pin number from 0 to 2
-> dev3 has 5 interrupts with pin number from 0 to 4
-> For dev3 the interrupt from 0 to 2 would be has same hardware irq number
-> as dev1 if we only use pin number.
->
-> Because these two devices located in same irq domain(mbigen chip),using same
-> hwirq number is a mistake.
+> As in sama5d3 or later chips, we don't have to shutdown the DDR
+> controller before reset. Shutdown the DDR controller before reset is a
+> workaround to avoid DDR signal driving the bus, but since sama5d3 and
+> later chips there is no such a conflict.
 > 
-> In mbigen driver, I will use this value and  the 3rd cell(pin number) to compose
-> a new hardware irq( (nid<<8) | pin number) for mbigen using.
+> So in this patch:
+>    1. the sama5d3 reset function only need to write the rstc register
+> and return.
+>    2. we can remove the code related with sama5d3 DDR controller as
+> we don't use it at all.
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Ok. I now see why you need node and pin.
+queued.
 
-However, I don't see why you also need the 'total' interrupt number. Why
-isn't node and pin sufficient to uniquely identify an interrupt?
-
-Thanks,
-Mark.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/f587183e/attachment.sig>
