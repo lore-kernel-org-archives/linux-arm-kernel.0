@@ -1,48 +1,60 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Jul 2015 15:01:01 +0100
-Subject: [PATCH v2 6/6] arm64: kernel: Add support for Privileged Access
- Never
-In-Reply-To: <1437154221-5736-7-git-send-email-james.morse@arm.com>
-References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
- <1437154221-5736-7-git-send-email-james.morse@arm.com>
-Message-ID: <20150720140100.GL20385@e104818-lin.cambridge.arm.com>
+Date: Mon, 20 Jul 2015 15:03:55 +0100
+Subject: [PATCH] sched, arm64: Fix the fallout of increasing the offset
+ of 'thread_struct' within 'task_struct'
+In-Reply-To: <55ACFD1C.8090907@roeck-us.net>
+References: <20150718232717.GA3235@groeck-UX31A>
+ <20150718233455.GA3273@groeck-UX31A>
+ <20150720072043.GA7696@gmail.com> <55ACFD1C.8090907@roeck-us.net>
+Message-ID: <20150720140355.GM20385@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 06:30:21PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 56391fbae1e1..f243bb1adaa5 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -20,12 +20,21 @@
->  #ifndef __ASM_SYSREG_H
->  #define __ASM_SYSREG_H
->  
-> +#include <asm/opcodes.h>
-> +
->  #define SCTLR_EL1_CP15BEN	(0x1 << 5)
->  #define SCTLR_EL1_SED		(0x1 << 8)
->  
->  #define sys_reg(op0, op1, crn, crm, op2) \
->  	((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
->  
-> +#define REG_PSTATE_PAN_IMM                     sys_reg(2, 0, 4, 0, 4)
-> +#define PSTATE_PAN                             (1 << 22)
+On Mon, Jul 20, 2015 at 06:52:28AM -0700, Guenter Roeck wrote:
+> On 07/20/2015 12:20 AM, Ingo Molnar wrote:
+> >* Guenter <linux@roeck-us.net> wrote:
+> >>On Sat, Jul 18, 2015 at 04:27:17PM -0700, Guenter wrote:
+> >>>Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+> >>>causes s390 builds in mainline to fail as follows.
+> >>>
+> >>>arch/s390/kernel/traps.c: Assembler messages:
+> >>>arch/s390/kernel/traps.c:262: Error: operand out of range
+> >>>	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
+> >>>arch/s390/kernel/traps.c:300: Error: operand out of range
+> >>>	(0x00000000000023e8 is not between 0x0000000000000000 and 0x0000000000000fff)
+> >>>
+> >>
+> >>Also:
+> >>
+> >>arm64:allmodconfig:
+> >>
+> >>arch/arm64/kernel/entry.S: Assembler messages:
+> >>arch/arm64/kernel/entry.S:588: Error: immediate out of range
+> >>arch/arm64/kernel/entry.S:597: Error: immediate out of range
+> >>make[1]: *** [arch/arm64/kernel/entry.o] Error 1
+> >>
+> >>I didn't bisect that one, but it looks like the cause is the same.
+> >
+> >Hm, it looks like the new, increased offset of 'thread_struct' within
+> >'task_struct' goes over a limit that these instructions are able to support on
+> >arm64:
+> >
+> >  arch/arm64/kernel/asm-offsets.c:  DEFINE(THREAD_CPU_CONTEXT,    offsetof(struct task_struct, thread.cpu_context));
+> >  arch/arm64/kernel/entry.S:      add     x8, x0, #THREAD_CPU_CONTEXT
+> >  arch/arm64/kernel/entry.S:      add     x8, x1, #THREAD_CPU_CONTEXT
+> >
+> >If there's no instruction that can support such offset sizes then I suspect the
+> >straightforward fix would be to pass in thread_struct instead - like the patch
+> >below. That's a tiny bit cleaner for type encapsulation anyway.
+> 
+> Olof submitted a different patch to solve the problem:
+> 	http://www.spinics.net/lists/kernel/msg2036825.html
+> 
+> His patch is passing cpu_context instead of thread_context.
 
-[...]
+It's likely that we'll use this patch instead:
 
-> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-> index 6913643bbe54..208db3df135a 100644
-> --- a/arch/arm64/include/uapi/asm/ptrace.h
-> +++ b/arch/arm64/include/uapi/asm/ptrace.h
-> @@ -44,6 +44,7 @@
->  #define PSR_I_BIT	0x00000080
->  #define PSR_A_BIT	0x00000100
->  #define PSR_D_BIT	0x00000200
-> +#define PSR_PAN_BIT	0x00400000
-
-What I meant is to use PSR_PAN_BIT instead of PSTATE_PAN, not just to
-define it (i.e. remove the latter).
+http://lkml.kernel.org/g/20150720105345.GC9908 at arm.com
 
 -- 
 Catalin
