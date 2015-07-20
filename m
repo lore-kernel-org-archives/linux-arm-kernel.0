@@ -1,47 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Jul 2015 09:29:23 +0200
-Subject: [PATCH 1/7] ARM: at91: Remove clk-provider.h include
-In-Reply-To: <1436568347-24554-2-git-send-email-sboyd@codeaurora.org>
-References: <1436568347-24554-1-git-send-email-sboyd@codeaurora.org>
- <1436568347-24554-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150720072923.GD15539@piout.net>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 20 Jul 2015 08:30:11 +0100
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <55A8F859.2090204@linaro.org>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
+ <20150717111733.GL11162@sirena.org.uk>
+ <55A8F859.2090204@linaro.org>
+Message-ID: <20150720073011.GA3061@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2015 at 15:45:41 -0700, Stephen Boyd wrote :
-> This file doesn't use the clk provider APIs. Remove the include.
-> 
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Fri, 17 Jul 2015, Vaibhav Hiremath wrote:
 
-> ---
 > 
-> Please ack if you want this to go through clk-tree.
 > 
->  arch/arm/mach-at91/at91rm9200.c | 1 -
->  1 file changed, 1 deletion(-)
+> On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
+> >On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
+> >
+> >>Can you merge this into regulator tree?
+> >
+> >>Link to MFD - https://lkml.org/lkml/2015/7/16/704
+> >
+> >I need a tag I can pull from Lee.
+> >
+> Great.
 > 
-> diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-> index eaf58f88ef5d..685826c4a710 100644
-> --- a/arch/arm/mach-at91/at91rm9200.c
-> +++ b/arch/arm/mach-at91/at91rm9200.c
-> @@ -8,7 +8,6 @@
->   * Licensed under GPLv2 or later.
->   */
->  
-> -#include <linux/clk-provider.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
->  
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> Lee,
+> It would be helpful, if you could ack below patch,
 > 
+> https://lkml.org/lkml/2015/7/16/704
+
+These patches are yet to be reviewed.  I will unmark those patches as
+important (meaning they will not be reviewed during this iteration).
+Please resubmit a single patch-set containing all of the
+dependencies and Mark and I will work it out between us.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
