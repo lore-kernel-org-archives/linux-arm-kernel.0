@@ -1,135 +1,146 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jul 2015 14:41:13 +0200
-Subject: [PATCH 3/4] pinctrl: sunxi: Add custom irq_domain_ops
+Date: Mon, 20 Jul 2015 14:41:14 +0200
+Subject: [PATCH 4/4] ARM: sunxi: dt: Convert users to the PIO interrupts
+ binding
 In-Reply-To: <1437396074-15791-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1437396074-15791-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1437396074-15791-4-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1437396074-15791-5-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current interrupt parsing code was working by accident, because the
-default was actually parsing the first node of interrupts.
+The current DTs were setting the cell size to 2, but used the default xlate
+function that was assuming an interrupt cell size of 1, leading to the
+second part of the cell (the flags) being ignored, while we were having an
+inconsistent binding between the interrupts and gpio (that could also be
+used as interrupts).
 
-While that was mostly working (and the flags were actually ignored), this
-binding has never been documented, and doesn't work with SoCs that have
-multiple interrupt banks anyway.
+That "binding" doesn't work either with newer SoCs that have multiple irq
+banks.
 
-Add a proper interrupt xlate function, that uses the same description than
-the GPIOs (<bank> <pin> <flags>), that will make things less confusing.
-
-The EINT number will still be used as the hwirq number, but won't be
-exposed through the DT.
+Now that we fixed the pinctrl driver to handle this like it should always
+have been handled, convert the DT users, and while we're at it, remove the
+size-cells property of PIO that is completely useless.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   | 37 +++++++++++++++++++++-
- drivers/pinctrl/sunxi/pinctrl-sunxi.c              | 35 ++++++++++++++++++--
- 2 files changed, 69 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/sun4i-a10.dtsi           | 3 +--
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts   | 2 +-
+ arch/arm/boot/dts/sun5i.dtsi               | 3 +--
+ arch/arm/boot/dts/sun6i-a31.dtsi           | 3 +--
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts | 2 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts  | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi           | 3 +--
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi       | 3 +--
+ 8 files changed, 8 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index 9462ab7ddd1f..3c821cda1ad0 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -48,7 +48,7 @@ Optional subnode-properties:
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 61c03d1fe530..710a0531953e 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -713,8 +713,7 @@
+ 			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			#size-cells = <0>;
++			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
- Examples:
+ 			pwm0_pins_a: pwm0 at 0 {
+diff --git a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+index 514f159a14d4..9303fa035b0e 100644
+--- a/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
++++ b/arch/arm/boot/dts/sun5i-a13-utoo-p66.dts
+@@ -93,7 +93,7 @@
+ 		compatible = "chipone,icn8318";
+ 		reg = <0x40>;
+ 		interrupt-parent = <&pio>;
+-		interrupts = <9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
++		interrupts = <6 9 IRQ_TYPE_EDGE_FALLING>; /* EINT9 (PG9) */
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&ts_wake_pin_p66>;
+ 		wake-gpios = <&pio 1 3 GPIO_ACTIVE_HIGH>; /* PB3 */
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 54b097830434..c58d5a62605f 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -475,8 +475,7 @@
+ 			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			#size-cells = <0>;
++			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
--pinctrl at 01c20800 {
-+pio: pinctrl at 01c20800 {
- 	compatible = "allwinner,sun5i-a13-pinctrl";
- 	reg = <0x01c20800 0x400>;
- 	#address-cells = <1>;
-@@ -68,3 +68,38 @@ pinctrl at 01c20800 {
- 		allwinner,pull = <0>;
+ 			i2c0_pins_a: i2c0 at 0 {
+diff --git a/arch/arm/boot/dts/sun6i-a31.dtsi b/arch/arm/boot/dts/sun6i-a31.dtsi
+index 008047a018cf..2541412cabb0 100644
+--- a/arch/arm/boot/dts/sun6i-a31.dtsi
++++ b/arch/arm/boot/dts/sun6i-a31.dtsi
+@@ -599,8 +599,7 @@
+ 			clocks = <&apb1_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			#size-cells = <0>;
++			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
+ 
+ 			uart0_pins_a: uart0 at 0 {
+diff --git a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+index 4611e2f5a99e..70d0f85a636d 100644
+--- a/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
++++ b/arch/arm/boot/dts/sun7i-a20-cubietruck.dts
+@@ -181,7 +181,7 @@
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+-		interrupts = <10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
++		interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
+ 		interrupt-names = "host-wake";
  	};
  };
-+
-+
-+GPIO and interrupt controller
-+-----------------------------
-+
-+This hardware also acts as a GPIO controller and an interrupt
-+controller.
-+
-+Consumers that would want to refer to one or the other (or both)
-+should provide through the usual *-gpios and interrupts properties a
-+cell with 3 arguments, first the number of the bank, then the pin
-+inside that bank, and finally the flags for the GPIO/interrupts.
-+
-+Example:
-+
-+xio: gpio at 38 {
-+	compatible = "nxp,pcf8574a";
-+	reg = <0x38>;
-+
-+	gpio-controller;
-+	#gpio-cells = <2>;
-+
-+	interrupt-parent = <&pio>;
-+	interrupts = <6 0 IRQ_TYPE_EDGE_FALLING>;
-+	interrupt-controller;
-+	#interrupt-cells = <2>;
-+};
-+
-+reg_usb1_vbus: usb1-vbus {
-+	compatible = "regulator-fixed";
-+	regulator-name = "usb1-vbus";
-+	regulator-min-microvolt = <5000000>;
-+	regulator-max-microvolt = <5000000>;
-+	gpio = <&pio 7 6 GPIO_ACTIVE_HIGH>;
-+};
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 87c327993afa..9beb7314d478 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -711,6 +711,37 @@ static struct irq_chip sunxi_pinctrl_level_irq_chip = {
- 			  IRQCHIP_EOI_IF_HANDLED,
+diff --git a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+index f32f6f20d923..1e6bd360dac0 100644
+--- a/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
++++ b/arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts
+@@ -178,7 +178,7 @@
+ 		reg = <1>;
+ 		compatible = "brcm,bcm4329-fmac";
+ 		interrupt-parent = <&pio>;
+-		interrupts = <10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
++		interrupts = <7 10 IRQ_TYPE_LEVEL_LOW>; /* PH10 / EINT10 */
+ 		interrupt-names = "host-wake";
+ 	};
  };
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 6a63f30c9a69..d3497a51f0c4 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -794,8 +794,7 @@
+ 			clocks = <&apb0_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+-			#interrupt-cells = <2>;
+-			#size-cells = <0>;
++			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
-+static int sunxi_pinctrl_irq_of_xlate(struct irq_domain *d,
-+				      struct device_node *node,
-+				      const u32 *intspec,
-+				      unsigned int intsize,
-+				      unsigned long *out_hwirq,
-+				      unsigned int *out_type)
-+{
-+	struct sunxi_desc_function *desc;
-+	int pin, base;
-+
-+	if (intsize < 3)
-+		return -EINVAL;
-+
-+	base = PINS_PER_BANK * intspec[0];
-+	pin = base + intspec[1];
-+
-+	desc = sunxi_pinctrl_desc_find_function_by_pin(d->host_data,
-+						       pin, "irq");
-+	if (!desc)
-+		return -EINVAL;
-+
-+	*out_hwirq = desc->irqbank * PINS_PER_BANK + desc->irqnum;
-+	*out_type = intspec[2];
-+
-+	return 0;
-+}
-+
-+static struct irq_domain_ops sunxi_pinctrl_irq_domain_ops = {
-+	.xlate		= sunxi_pinctrl_irq_of_xlate,
-+};
-+
- static void sunxi_pinctrl_irq_handler(unsigned irq, struct irq_desc *desc)
- {
- 	struct irq_chip *chip = irq_get_chip(irq);
-@@ -985,8 +1016,8 @@ int sunxi_pinctrl_init(struct platform_device *pdev,
+ 			pwm0_pins_a: pwm0 at 0 {
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 7abd0ae3143d..f93105709680 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -339,8 +339,7 @@
+ 			clocks = <&apb1_gates 5>;
+ 			gpio-controller;
+ 			interrupt-controller;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
++			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
- 	pctl->domain = irq_domain_add_linear(node,
- 					     pctl->desc->irq_banks * IRQ_PER_BANK,
--					     &irq_domain_simple_ops,
--					     NULL);
-+					     &sunxi_pinctrl_irq_domain_ops,
-+					     pctl);
- 	if (!pctl->domain) {
- 		dev_err(&pdev->dev, "Couldn't register IRQ domain\n");
- 		ret = -ENOMEM;
+ 			uart0_pins_a: uart0 at 0 {
 -- 
 2.4.5
