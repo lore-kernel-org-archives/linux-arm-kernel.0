@@ -1,67 +1,83 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 20 Jul 2015 16:35:21 +0800
-Subject: [PATCH 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <20150720075231.GQ28632@lukather>
-References: <1436436947-11210-1-git-send-email-josh.wu@atmel.com>
- <20150710060350.GA3127@piout.net> <559F7AC4.6050008@atmel.com>
- <20150710120907.GC3127@piout.net> <20150710123148.GA28632@lukather>
- <559FEED3.5080505@atmel.com> <55A32EC8.4080309@atmel.com>
- <20150720075231.GQ28632@lukather>
-Message-ID: <55ACB2C9.5070701@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Jul 2015 10:36:50 +0200
+Subject: [RFC PATCH 08/15] backlight: pwm_bl: remove useless call to
+ pwm_set_period
+In-Reply-To: <20150720102143.05949ca2@bbrezillon>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-9-git-send-email-boris.brezillon@free-electrons.com>
+ <20150720081559.GI29614@ulmo> <20150720102143.05949ca2@bbrezillon>
+Message-ID: <20150720083648.GK29614@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Maxime
+On Mon, Jul 20, 2015 at 10:21:43AM +0200, Boris Brezillon wrote:
+> On Mon, 20 Jul 2015 10:16:00 +0200
+> Thierry Reding <thierry.reding@gmail.com> wrote:
+> 
+> > On Wed, Jul 01, 2015 at 10:21:54AM +0200, Boris Brezillon wrote:
+> > > The PWM period will be set when calling pwm_config. Remove this useless
+> > > call to pwm_set_period, which might mess up with the initial PWM state
+> > > once we have added proper support for PWM init state retrieval.
+> > > 
+> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > ---
+> > >  drivers/video/backlight/pwm_bl.c | 4 +---
+> > >  1 file changed, 1 insertion(+), 3 deletions(-)
+> > > 
+> > > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> > > index ae498c1..fe5597c 100644
+> > > --- a/drivers/video/backlight/pwm_bl.c
+> > > +++ b/drivers/video/backlight/pwm_bl.c
+> > > @@ -295,10 +295,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+> > >  	 * via the PWM lookup table.
+> > >  	 */
+> > >  	pb->period = pwm_get_default_period(pb->pwm);
+> > > -	if (!pb->period && (data->pwm_period_ns > 0)) {
+> > > +	if (!pb->period && (data->pwm_period_ns > 0))
+> > >  		pb->period = data->pwm_period_ns;
+> > > -		pwm_set_period(pb->pwm, data->pwm_period_ns);
+> > > -	}
+> > >  
+> > >  	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+> > 
+> > As far as I remember this line is there in order to pass in a period if
+> > the backlight driver is initialized from board setup files. In such a
+> > case there won't be an period associated with the PWM channel in the
+> > first place.
+> > 
+> > I think even with the introduction of a default period, we'd be missing
+> > out on the board setup case because there is no standard place where it
+> > is being set, so it must come from the platform data.
+> 
+> AFAICT, we don't need to explicitly set the period when probing the
+> backlight device, because it will be set next time we call
+> pwm_config(), and since we're passing pb->period when calling
+> pwm_config() everything should be fine.
 
-On 7/20/2015 3:52 PM, Maxime Ripard wrote:
-> Hi Josh,
->
-> On Mon, Jul 13, 2015 at 11:21:44AM +0800, Josh Wu wrote:
->> On 7/11/2015 12:12 AM, Nicolas Ferre wrote:
->>> Le 10/07/2015 14:31, Maxime Ripard a ?crit :
->>>> On Fri, Jul 10, 2015 at 02:09:07PM +0200, Alexandre Belloni wrote:
->>>>> Hi,
->>>>>
->>>>> On 10/07/2015 at 15:56:52 +0800, Josh Wu wrote :
->>>>>> I would agree with Maxime. Currently all latest chip reset function is
->>>>>> compatible with the atmel,sama5d3-rstc.
->>>>>> So check compatible string is enough for now.
->>>>>> But of cause if we have other incompatible reset in future with new chip,
->>>>>> the structure like you said is needed.
->>>>> We managed to avoid using of_machine_is_compatible() in all the at91
->>>>> drivers. I'd like to keep it that way. It was painful enough to remove
->>>>> all those cpu_is_at91xxx calls.
->>>> That's your call...
->>>>
->>>>> Also, using it is trying to match strings and will result in longer boot
->>>>> times.
->>>> Have you looked at the implementation of of_match_device? If that's
->>>> really a concern to you, you should actually avoid it.
->>> I agree: let's keep it simple and use of_match_device().
->> Ok. I will keep it as it is now:  use the (match->data != sama5d3_restart)
->> for the condition.
-> I'm not just that's been an option in our discussion so far.
->
-> Nicolas said that he was agreeing with me, but at the same time said
-> the complete opposite of what I was arguing for, so I'm not really
-> sure what's really on his mind, but the two options that were
-> discussed were to remove that test, and either:
->
->    - Use of_device_is_compatible to prevent the loop execution
+Calling pwm_set_period() is still good for consistency. Consider for
+example what happens if after the driver were to call pwm_get_period().
+It would return some more or less random value (likely 0 or whatever it
+had been set to by an earlier user).
 
-Thank you for explaining, it is clear to me.
+Technically I think the most proper equivalent here would be to set the
+default state's period to data->pwm_period_ns, but I don't think that's
+proper to do. Perhaps since this is only relevant to boards where the
+backlight device is created from board setup code we don't have to care
+so much about messing up the initial state because either the board
+setup code has been carefully written to match what the bootloader set
+up, or because they don't match at all, in which case we don't have to
+worry anyway.
 
-I'll take this above option. As the of_device_is_compatible() almost 
-same as of_match_node()/of_match_device(). Except that 
-of_device_is_compatible() is more efficient (in this case It calls 
-__of_device_is_compatible() directly) than of_match_node/of_match_device.
+Of course the right thing to do would be to replace all initialization
+of the data->pwm_period_ns by proper PWM lookup tables, but that's
+proven difficult in the past since very few people still have access to
+hardware where that code gets executed.
 
->
->    - define a structure with a flag to say whether you need the ram
->      controller quirk or not, and test that flag.
->
-> Maxime
->
-
-Best Regards,
-Josh Wu
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/fa5731d1/attachment.sig>
