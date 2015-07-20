@@ -1,90 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Jul 2015 17:20:04 +0100
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
-References: <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
-Message-ID: <20150720162004.GL9908@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 20 Jul 2015 09:33:22 -0700
+Subject: [PATCH] arm64: Minor refactoring of cpu_switch_to() to fix build
+ breakage
+In-Reply-To: <20150720142042.GA10685@roeck-us.net>
+References: <1437359377-39932-1-git-send-email-olof@lixom.net>
+ <20150720073647.GA10504@gmail.com> <20150720105345.GC9908@arm.com>
+ <20150720142042.GA10685@roeck-us.net>
+Message-ID: <CAOesGMgYsS_cdATZaHBcxpLQDrq1vEw-HwJ2GKWD9J7=a486ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jul 20, 2015 at 7:20 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+> On Mon, Jul 20, 2015 at 11:53:45AM +0100, Will Deacon wrote:
+>> On Mon, Jul 20, 2015 at 08:36:47AM +0100, Ingo Molnar wrote:
+>> > * Olof Johansson <olof@lixom.net> wrote:
+>> >
+>> > > Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+>> > > moved the thread_struct to the bottom of task_struct. As a result, the
+>> > > offset is now too large to be used in an immediate add on arm64 with
+>> > > some kernel configs:
+>> > >
+>> > > arch/arm64/kernel/entry.S: Assembler messages:
+>> > > arch/arm64/kernel/entry.S:588: Error: immediate out of range
+>> > > arch/arm64/kernel/entry.S:597: Error: immediate out of range
+>> > >
+>> > > There's really no reason for cpu_switch_to to take a task_struct pointer
+>> > > in the first place, since all it does is access the thread.cpu_context
+>> > > member. So, just pass that in directly.
+>> > >
+>> > > Fixes: 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+>> > > Cc: Dave Hansen <dave.hansen@linux.intel.com>
+>> > > Signed-off-by: Olof Johansson <olof@lixom.net>
+>> > > ---
+>> > >  arch/arm64/include/asm/processor.h |    4 ++--
+>> > >  arch/arm64/kernel/asm-offsets.c    |    2 --
+>> > >  arch/arm64/kernel/entry.S          |   34 ++++++++++++++++------------------
+>> > >  arch/arm64/kernel/process.c        |    3 ++-
+>> > >  4 files changed, 20 insertions(+), 23 deletions(-)
+>> >
+>> > So why not pass in 'thread_struct' as the patch below does - it looks much
+>> > simpler to me. This way the assembly doesn't have to be changed at all.
+>>
+>> Unfortunately, neither of these approaches really work:
+>>
+>>   - We need to return last from __switch_to, which means not corrupting
+>>     x0 in cpu_switch_to and then having an ugly container_of to get back
+>>     at the task_struct
+>>
+>>   - ret_from_fork needs to pass the task_struct of prev to schedule_tail,
+>>     so we have the same issue there
+>>
+> Confirmed; both Ingo's patch (after fixing it up) and Olof's patch
+> fail my qemu tests (qemu hangs with both patches and does not produce
+> any console output).
+>
+>> Patch below fixes things, but it's a shame we have to use an extra register
+>> like this.
+>>
+> Yes, your patch works, at least with my qemu tests, and the allmodconfig build
+> no longer fails.
+>
+> Tested-by: Guenter Roeck <linux@roeck-us.net>
 
-On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
-> On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
-> > On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
-> >> Thanks! Can you repost patch 1 with the changes I recommended, so that
-> >> I can get an Acked-by from the arm64 maintainers and pull all the
-> >> changes in together. This is fine for a 4.3 release, right? That is, it
-> >> doesn't need to go into 4.2-rcs.
-> >> 
-> > 
-> > It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
-> > Also, it might be needed to consider Mark's comment on arch part.
-> > 
-> > If they are okay, I will proceed.
-> 
-> The [RFC 1/3] patch used in my environment is shaped as follows.
-> I leave the hunk for *only* clear synchronization. This is why I choose this format
-> instead of reposting a patch. I hope it would help to track down this thread.
-> 
-> I think this is my best at this point.
-> 
-> ----8<----
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> index c5534fa..2b43e20 100644
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -13,8 +13,9 @@
->  
->  #include <asm/insn.h>
->  
-> -#define MCOUNT_ADDR		((unsigned long)_mcount)
-> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
-> +#define MCOUNT_ADDR			((unsigned long)_mcount)
-> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
-> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
->  
->  #ifndef __ASSEMBLY__
->  #include <linux/compat.h>
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index 407991b..9ab67af 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -20,6 +20,7 @@
->  #include <linux/sched.h>
->  #include <linux/stacktrace.h>
->  
-> +#include <asm/insn.h>
->  #include <asm/stacktrace.h>
->  
->  /*
-> @@ -52,7 +53,7 @@ int notrace unwind_frame(struct stackframe *frame)
->  	 * -4 here because we care about the PC at time of bl,
->  	 * not where the return will go.
->  	 */
-> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
-> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
->  
->  	return 0;
->  }
+Yep, my bad for not looking harder (and resurrecting my only arm64
+test system that's currently down).
 
-The arm64 bits look fine to me:
+Thanks all. :)
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Steve: feel free to take this along with the other ftrace changes. I don't
-anticipate any conflicts, but if anything crops up in -next we can sort
-it out then.
-
-Thanks!
-
-Will
+-Olof
