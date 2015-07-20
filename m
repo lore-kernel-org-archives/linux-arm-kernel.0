@@ -1,37 +1,40 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 20 Jul 2015 14:02:15 +0100
-Subject: [PATCH 13/14] TEMPORARY: update public headers for
- kvm_irq_routing_msi extension
-In-Reply-To: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
-References: <1437397336-21385-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1437397336-21385-14-git-send-email-andre.przywara@arm.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Mon, 20 Jul 2015 22:50:00 +0900
+Subject: [PATCH 0/2] ARM: DTS support for Linkstation LS-WTGL (orion5x)
+In-Reply-To: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
+References: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
+Message-ID: <CAEQ9gE=GAE7RbzkNWBvPxbH0OSsc7QP3+Kvsig+krQ2cA8=7bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is preliminary and updates the headers from a kernel with
-extended IRQ routing support (for ARM). It should be replaced by a
-proper header update once IRQ routing support is upstream.
+Dear Andrew, Jason,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- include/linux/kvm.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Could you help to review my patchset on Linkstation LS-WTGL (orion5x), please?
+Thank you and look forward to your feedback!
 
-diff --git a/include/linux/kvm.h b/include/linux/kvm.h
-index 39428d1..71ba749 100644
---- a/include/linux/kvm.h
-+++ b/include/linux/kvm.h
-@@ -828,7 +828,10 @@ struct kvm_irq_routing_msi {
- 	__u32 address_lo;
- 	__u32 address_hi;
- 	__u32 data;
--	__u32 pad;
-+	union {
-+		__u32 pad;
-+		__u32 devid;
-+	};
- };
- 
- struct kvm_irq_routing_s390_adapter {
--- 
-2.3.5
+Cheers,
+Roger
+
+On Tue, Jul 14, 2015 at 10:00 PM, Roger Shimizu <rogershimizu@gmail.com> wrote:
+> Dear Orion5x Maintainer,
+>
+> I'd like to add DTS support for a bit older linkstation orion5x device, LS-WTGL.
+> I have tested againt latest kernel next/dt branch on my box and it works fine.
+> Please consider to merge. Thank you!
+>
+> Cheers,
+> Roger
+>
+> Roger Shimizu (2):
+>   ARM: dts: add buffalo linkstation ls-wtgl
+>   ARM: defconfig: add DT support for orion5x_defconfig
+>
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 242 +++++++++++++++++++++++
+>  arch/arm/configs/orion5x_defconfig               |   4 +
+>  3 files changed, 247 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+>
+> --
+> 1.9.1
+>
