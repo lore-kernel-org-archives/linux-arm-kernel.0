@@ -1,86 +1,276 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Jul 2015 12:17:15 +0200
-Subject: [PATCH v2 2/4] drm/tegra: Add VIC support
-In-Reply-To: <55ACC5B0.20703@nvidia.com>
-References: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
- <1437378869-10451-3-git-send-email-mperttunen@nvidia.com>
- <55ACB134.8010401@nvidia.com> <55ACB6A2.9030906@nvidia.com>
- <55ACC5B0.20703@nvidia.com>
-Message-ID: <20150720101714.GY29614@ulmo>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Jul 2015 12:15:27 +0200
+Subject: [PATCH] ARM: dts: sun4i: Add Iteaduino Plus A10
+In-Reply-To: <20150719134501.GA19235@maud>
+References: <20150719134501.GA19235@maud>
+Message-ID: <20150720101527.GV28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 10:56:00AM +0100, Jon Hunter wrote:
+Hi,
+
+Thanks for your patch.
+
+On Sun, Jul 19, 2015 at 03:45:03PM +0200, Josef Gajdusek wrote:
+> Iteaduino Plus A10 is a breakout board + Itead Core A10.
+
+Is there multiple breakout boards available for that module?
+
+> It features 1GB RAM, has most of the A10 pins on a .1" header, 2 USB
+> ports, 1 OTG USB port, Ethernet, HDMI, SATA, Speaker/Microphone
+> 3.5mm jacks and an SD card slot.
 > 
-> On 20/07/15 09:51, Mikko Perttunen wrote:
-> > On 07/20/2015 11:28 AM, Jon Hunter wrote:
-> >> Hi Mikko,
-> > 
-> > Hi!
-> > 
-> >> ...
-> >>> +static int vic_runtime_resume(struct device *dev)
-> >>> +{
-> >>> +	struct vic *vic = dev_get_drvdata(dev);
-> >>> +	int err;
-> >>> +
-> >>> +	err = tegra_powergate_sequence_power_up(TEGRA_POWERGATE_VIC,
-> >>> +						vic->clk, vic->rst);
-> >>
-> >> I would like to deprecate use of the above function [1]. I have been
-> >> trying to migrate driver to use a new API instead of the above.
-> > 
-> > Yes, we will need to coordinate the API change here. I kept the old way
-> > here to not depend on your series for now.
-> > 
-> >>
-> >>> +	if (err < 0)
-> >>> +		dev_err(dev, "failed to power up device\n");
-> >>> +
-> >>> +	return err;
-> >>> +}
-> >>> +
-> >>> ...
-> >>> +
-> >>> +	pm_runtime_enable(&pdev->dev);
-> >>> +	if (!pm_runtime_enabled(&pdev->dev)) {
-> >>> +		err = vic_runtime_resume(&pdev->dev);
-> >>> +		if (err < 0)
-> >>> +			goto unregister_client;
-> >>> +	}
-> >>
-> >> I don't see why pm_runtime_enable() should ever fail to enable
-> >> pm_runtime here. Hence, the if-statement appears to be redundant. If you
-> >> are trying to determine whether rpm is supported for the power-domains
-> >> then you should simply check to see if the DT node for the device has
-> >> the "power-domains" property. See my series [1].
-> > 
-> > The intention is that if runtime PM is not enabled, the power domain is
-> > still brought up. On a cursory look, it seems like with your patch, this
-> > should indeed work fine without this check if CONFIG_PM is enabled. Now,
-> > that might always be enabled? If so, then everything would be fine; if
-> > this lands after your series, we could even just make the power-domains
-> > prop mandatory and not implement the legacy mode at all. If not, then
-> > AFAIU we must still keep this path.
+> Link to manufacturer wiki: http://wiki.iteadstudio.com/Iteaduino_Plus_A10/A20
+
+Please don't put such links in the commit description. Valid URLs come
+and go, the git history doesn't.
+
+> Signed-off-by: Josef Gajdusek <atx@atx.name>
+> ---
+>  arch/arm/boot/dts/Makefile                     |   1 +
+>  arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts | 202 +++++++++++++++++++++++++
+>  2 files changed, 203 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
 > 
-> Ok, I see you just wish to test it is enabled in the kernel config. Then
-> yes that would make sense and the above is fine.
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index adb1826..6104ed1 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -529,6 +529,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
+>  	sun4i-a10-hackberry.dtb \
+>  	sun4i-a10-hyundai-a7hd.dtb \
+>  	sun4i-a10-inet97fv2.dtb \
+> +	sun4i-a10-iteaduino-plus.dts \
+>  	sun4i-a10-jesurun-q5.dtb \
+>  	sun4i-a10-marsboard.dtb \
+>  	sun4i-a10-mini-xplus.dtb \
+> diff --git a/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
+> new file mode 100644
+> index 0000000..985e155
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
 
-Do we really need to bother about this? If runtime PM isn't enabled we
-don't care very much about power management anyway. So in my opinion if
-a driver supports runtime PM it should support it all the way and not
-pretend to. Having this mix of runtime PM vs. no runtime PM is beside
-the point of using something like runtime PM in the first place.
+we try to have a DT name that is
+<family>-<soc>-<manufacturer>-<device>.dts
 
-So if this is about supporting legacy vs. runtime PM, then I think it
-should be based on some more explicit check, like if (!dev->pm_domain),
-but otherwise we should assume that pm_runtime_enable() succeeds.
+Which in this case would be sun4i-a10-itead-iteaduino-plus.dts
 
-Thierry
+> @@ -0,0 +1,202 @@
+> +/*
+> + * Copyright 2015 Josef Gajdusek <atx@atx.name>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +#include "sun4i-a10.dtsi"
+> +#include "sunxi-common-regulators.dtsi"
+> +
+> +#include <dt-bindings/gpio/gpio.h>
+> +#include <dt-bindings/pinctrl/sun4i-a10.h>
+> +
+> +/ {
+> +	model = "Iteaduino Plus A10";
+> +	compatible = "itead,iteaduino-plus-a10", "allwinner,sun4i-a10";
+> +
+> +	aliases {
+> +		serial0 = &uart0;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +};
+> +
+> +&ahci {
+> +	target-supply = <&reg_ahci_5v>;
+> +	status = "okay";
+> +};
+> +
+> +&cpu0 {
+> +	cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+> +&ehci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ehci1 {
+> +	status = "okay";
+> +};
+> +
+> +&emac {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&emac_pins_a>;
+> +	phy = <&phy1>;
+> +	status = "okay";
+> +};
+> +
+> +&emac_sram {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c0_pins_a>;
+> +	status = "okay";
+> +
+> +	axp209: pmic at 34 {
+> +		reg = <0x34>;
+> +		interrupts = <0>;
+> +	};
+> +};
+> +
+> +&i2c1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c1_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&i2c2_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&ir0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&ir0_rx_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&mdio {
+> +	status = "okay";
+> +
+> +	phy1: ethernet-phy at 1 {
+> +		reg = <1>;
+> +	};
+> +};
+> +
+> +&mmc0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
+> +	vmmc-supply = <&reg_vcc3v3>;
+> +	bus-width = <4>;
+> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
+> +	cd-inverted;
+> +	status = "okay";
+> +};
+> +
+> +&ohci0 {
+> +	status = "okay";
+> +};
+> +
+> +&ohci1 {
+> +	status = "okay";
+> +};
+> +
+> +&reg_ahci_5v {
+> +	status = "okay";
+> +};
+> +
+> +#include "axp209.dtsi"
+> +
+> +&reg_dcdc2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1450000>;
+> +	regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc3 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <1000000>;
+> +	regulator-max-microvolt = <1400000>;
+> +	regulator-name = "vdd-int-dll";
+> +};
+> +
+> +&reg_ldo1 {
+> +	regulator-name = "vdd-rtc";
+> +};
+> +
+> +&reg_ldo2 {
+> +	regulator-always-on;
+> +	regulator-min-microvolt = <3000000>;
+> +	regulator-max-microvolt = <3000000>;
+> +	regulator-name = "avcc";
+> +};
+> +
+> +&reg_usb1_vbus {
+> +	status = "okay";
+> +};
+> +
+> +&reg_usb2_vbus {
+> +	status = "okay";
+> +};
+> +
+> +&spi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi0_pins_a>,
+> +		    <&spi0_cs0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&uart0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&uart0_pins_a>;
+> +	status = "okay";
+> +};
+> +
+> +&usbphy {
+> +	usb1_vbus-supply = <&reg_usb1_vbus>;
+> +	usb2_vbus-supply = <&reg_usb2_vbus>;
+> +	status = "okay";
+> +};
+
+Looks good otherwise, thanks!
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/314568c1/attachment.sig>
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/ce3306a3/attachment-0001.sig>
