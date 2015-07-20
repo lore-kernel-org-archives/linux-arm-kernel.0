@@ -1,145 +1,97 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Sun, 19 Jul 2015 20:17:32 -0400
-Subject: [PATCH 00/10] unify ioremap definitions and introduce memremap
-Message-ID: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+Date: Sun, 19 Jul 2015 20:17:43 -0400
+Subject: [PATCH 02/10] mm, x86: Remove region_is_ram() call from ioremap
+In-Reply-To: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150720001743.30857.48346.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While developing the pmem driver it became clear that not all
-architectures implement all the various ioremap types, and when they do
-implement an ioremap instance the declaration is inconsistent.
+From: Toshi Kani <toshi.kani@hp.com>
 
-In addition to ioremap prototype confusion, it was also noticed that
-several usages of ioremap_cache() were ignoring the __iomem annotation
-on returned pointers.  The common theme of these call sites is treating
-the return value from ioremap() as an unannotated pointer to normal
-memory.  Introduce memremap() as a method to treat a given resource as
-memory (safe to speculatively read, pre-fetch, write-combine, etc).
+__ioremap_caller() calls region_is_ram() to walk through the
+iomem_resource table to check if a target range is in RAM, which
+was added to improve the lookup performance over page_is_ram()
+(commit 906e36c5c717 "x86: use optimized ioresource lookup in
+ioremap function").  page_is_ram() was no longer used when this
+change was added, though.
 
-Note that Christoph proposed, in the longer term, changing the calling
-convention of ioremap() to take a mapping and prot flags.  It seems that
-outside of the _nocache usages of ioremap_*() most instances should be
-converted to some form of memremap().  For this reason memremap() takes
-a mapping type 'flags' argument and breaks from the pattern of
-"ioremap_<type>()".
+__ioremap_caller() then calls walk_system_ram_range(), which had
+replaced page_is_ram() to improve the lookup performance (commit
+c81c8a1eeede "x86, ioremap: Speed up check for RAM pages").
 
-This series also folds in, with a few fixups, Toshi's fixes for
-region_is_ram().  The memremap() implementation needs a functional
-region_is_ram() to block attempts to remap system memory.
+Since both checks walk through the same iomem_resource table for
+the same purpose, there is no need to call the two functions.
+Furthermore, region_is_ram() always returns with -1, which makes
+walk_system_ram_range() as the only check being used at this point.
 
-The series applies against latest 4.2-rc and is targeted for -tip, but
-I'm open to carrying a branch, or, if proposed, a better alternative to
-handle this cross-tree thrash.  This content has passed a cycle through
-the 0day-kbuild infrastructure.
+Therefore, this patch changes __ioremap_caller() to call
+walk_system_ram_range() only.
 
+Note, removing the call to region_is_ram() is also necessary to
+fix bugs in region_is_ram().  walk_system_ram_range() requires
+RAM ranges be page-aligned in the iomem_resource table to work
+properly.  This restriction has allowed multiple ioremaps to RAM
+(setup_data) which are page-unaligned.  Using fixed region_is_ram()
+will cause these callers to start failing.  After all ioremap
+callers to setup_data are converted, __ioremap_caller() may call
+region_is_ram() instead to remove this restriction.
+
+Signed-off-by: Toshi Kani <toshi.kani@hp.com>
+Cc: Roland Dreier <roland@purestorage.com>
+Cc: Mike Travis <travis@sgi.com>
+Cc: Luis R. Rodriguez <mcgrof@suse.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Borislav Petkov <bp@alien8.de>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
+ arch/x86/mm/ioremap.c |   24 ++++++------------------
+ 1 file changed, 6 insertions(+), 18 deletions(-)
 
-Dan Williams (7):
-      arch, drivers: don't include <asm/io.h> directly, use <linux/io.h> instead
-      arch: unify ioremap prototypes and macro aliases
-      cleanup IORESOURCE_CACHEABLE vs ioremap()
-      devm: fix ioremap_cache() usage
-      arch: introduce strict_ioremap
-      arch: introduce memremap()
-      pmem: convert to generic memremap
-
-Toshi Kani (3):
-      mm, x86: Fix warning in ioremap RAM check
-      mm, x86: Remove region_is_ram() call from ioremap
-      mm: Fix bugs in region_is_ram()
-
-
- arch/alpha/include/asm/io.h                 |    7 ++
- arch/arc/include/asm/io.h                   |    6 --
- arch/arm/Kconfig                            |    1 
- arch/arm/include/asm/io.h                   |    8 +--
- arch/arm/mach-clps711x/board-cdb89712.c     |    2 -
- arch/arm/mach-shmobile/pm-rcar.c            |    2 -
- arch/arm/mm/ioremap.c                       |    6 +-
- arch/arm/mm/nommu.c                         |    6 +-
- arch/arm64/Kconfig                          |    1 
- arch/arm64/include/asm/io.h                 |   23 ++++++--
- arch/arm64/kernel/efi.c                     |    7 +-
- arch/arm64/kernel/smp_spin_table.c          |   17 +++---
- arch/avr32/include/asm/io.h                 |   22 ++++---
- arch/avr32/mm/ioremap.c                     |    2 -
- arch/cris/include/asm/io.h                  |    8 +--
- arch/cris/mm/ioremap.c                      |    2 -
- arch/frv/Kconfig                            |    1 
- arch/frv/include/asm/io.h                   |   23 +++-----
- arch/hexagon/include/asm/io.h               |    5 +-
- arch/ia64/include/asm/io.h                  |   10 +--
- arch/ia64/kernel/cyclone.c                  |    2 -
- arch/ia64/mm/ioremap.c                      |    4 +
- arch/m32r/include/asm/io.h                  |    9 +--
- arch/m68k/Kconfig                           |    1 
- arch/m68k/include/asm/io_mm.h               |   21 ++++---
- arch/m68k/include/asm/io_no.h               |   34 +++++++----
- arch/m68k/include/asm/raw_io.h              |    3 +
- arch/m68k/mm/kmap.c                         |    2 -
- arch/metag/Kconfig                          |    1 
- arch/metag/include/asm/io.h                 |   35 +++++++-----
- arch/microblaze/include/asm/io.h            |    6 --
- arch/microblaze/mm/pgtable.c                |    2 -
- arch/mips/Kconfig                           |    1 
- arch/mips/include/asm/io.h                  |   42 +++++---------
- arch/mn10300/include/asm/io.h               |   10 ++-
- arch/nios2/include/asm/io.h                 |   15 +----
- arch/openrisc/include/asm/io.h              |    3 +
- arch/openrisc/mm/ioremap.c                  |    2 -
- arch/parisc/include/asm/io.h                |    6 +-
- arch/parisc/mm/ioremap.c                    |    2 -
- arch/powerpc/Kconfig                        |    1 
- arch/powerpc/include/asm/io.h               |    7 +-
- arch/powerpc/kernel/pci_of_scan.c           |    2 -
- arch/s390/include/asm/io.h                  |    8 +--
- arch/sh/include/asm/io.h                    |    9 ++-
- arch/sparc/include/asm/io_32.h              |    7 +-
- arch/sparc/include/asm/io_64.h              |    8 +--
- arch/sparc/kernel/ioport.c                  |    2 -
- arch/sparc/kernel/pci.c                     |    3 -
- arch/tile/include/asm/io.h                  |   17 ++++--
- arch/unicore32/include/asm/io.h             |   25 +++++++-
- arch/x86/Kconfig                            |    1 
- arch/x86/include/asm/io.h                   |   17 +++---
- arch/x86/kernel/crash_dump_64.c             |    6 +-
- arch/x86/kernel/kdebugfs.c                  |    8 +--
- arch/x86/kernel/ksysfs.c                    |   28 +++++----
- arch/x86/mm/ioremap.c                       |   53 ++++++++---------
- arch/xtensa/Kconfig                         |    1 
- arch/xtensa/include/asm/io.h                |   13 ++--
- drivers/acpi/apei/einj.c                    |    9 ++-
- drivers/acpi/apei/erst.c                    |    6 +-
- drivers/firmware/google/memconsole.c        |    5 +-
- drivers/isdn/icn/icn.h                      |    2 -
- drivers/mtd/devices/slram.c                 |    2 -
- drivers/mtd/nand/diskonchip.c               |    2 -
- drivers/mtd/onenand/generic.c               |    2 -
- drivers/net/ethernet/sfc/io.h               |    2 -
- drivers/nvdimm/pmem.c                       |    2 -
- drivers/pci/probe.c                         |    3 -
- drivers/pnp/manager.c                       |    2 -
- drivers/scsi/aic94xx/aic94xx_init.c         |    7 --
- drivers/scsi/arcmsr/arcmsr_hba.c            |    5 --
- drivers/scsi/mvsas/mv_init.c                |   15 +----
- drivers/scsi/sun3x_esp.c                    |    2 -
- drivers/staging/comedi/drivers/ii_pci20kc.c |    1 
- drivers/tty/serial/8250/8250_core.c         |    2 -
- drivers/video/fbdev/ocfb.c                  |    1 
- drivers/video/fbdev/s1d13xxxfb.c            |    3 -
- drivers/video/fbdev/stifb.c                 |    1 
- include/asm-generic/io.h                    |   15 +++--
- include/asm-generic/iomap.h                 |    8 ---
- include/linux/device.h                      |    5 ++
- include/linux/io-mapping.h                  |    2 -
- include/linux/io.h                          |   82 +++++++++++++++++++++++++++
- include/linux/mtd/map.h                     |    2 -
- include/linux/pmem.h                        |   29 +++++-----
- include/video/vga.h                         |    2 -
- kernel/resource.c                           |   57 +++++++++++++++++--
- lib/Kconfig                                 |    5 +-
- lib/devres.c                                |   68 ++++++++++++++--------
- lib/pci_iomap.c                             |    7 +-
- tools/testing/nvdimm/Kbuild                 |    4 +
- tools/testing/nvdimm/test/iomap.c           |   34 ++++++++---
- 93 files changed, 565 insertions(+), 405 deletions(-)
+diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
+index 63da79114fe9..ccf5c867b2eb 100644
+--- a/arch/x86/mm/ioremap.c
++++ b/arch/x86/mm/ioremap.c
+@@ -92,7 +92,6 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
+ 	pgprot_t prot;
+ 	int retval;
+ 	void __iomem *ret_addr;
+-	int ram_region;
+ 
+ 	/* Don't allow wraparound or zero size */
+ 	last_addr = phys_addr + size - 1;
+@@ -115,26 +114,15 @@ static void __iomem *__ioremap_caller(resource_size_t phys_addr,
+ 	/*
+ 	 * Don't allow anybody to remap normal RAM that we're using..
+ 	 */
+-	/* First check if whole region can be identified as RAM or not */
+-	ram_region = region_is_ram(phys_addr, size);
+-	if (ram_region > 0) {
+-		WARN_ONCE(1, "ioremap on RAM at 0x%lx - 0x%lx\n",
+-				(unsigned long int)phys_addr,
+-				(unsigned long int)last_addr);
+-		return NULL;
+-	}
+-
+-	/* If could not be identified(-1), check page by page */
+-	if (ram_region < 0) {
+-		pfn      = phys_addr >> PAGE_SHIFT;
+-		last_pfn = last_addr >> PAGE_SHIFT;
+-		if (walk_system_ram_range(pfn, last_pfn - pfn + 1, NULL,
++	pfn      = phys_addr >> PAGE_SHIFT;
++	last_pfn = last_addr >> PAGE_SHIFT;
++	if (walk_system_ram_range(pfn, last_pfn - pfn + 1, NULL,
+ 					  __ioremap_check_ram) == 1) {
+-			WARN_ONCE(1, "ioremap on RAM at %pa - %pa\n",
++		WARN_ONCE(1, "ioremap on RAM at %pa - %pa\n",
+ 					&phys_addr, &last_addr);
+-			return NULL;
+-		}
++		return NULL;
+ 	}
++
+ 	/*
+ 	 * Mappings have to be page-aligned
+ 	 */
