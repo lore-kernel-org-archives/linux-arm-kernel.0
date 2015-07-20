@@ -1,61 +1,70 @@
-From: k.opasiak@samsung.com (Krzysztof Opasiak)
-Date: Mon, 20 Jul 2015 17:08:13 +0200
-Subject: [PATCH v3 26/46] usb: gadget: pch_ud: add ep capabilities support
-In-Reply-To: <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
-References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
- <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
-Message-ID: <55AD0EDD.70201@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Mon, 20 Jul 2015 16:09:59 +0100
+Subject: [PATCH v2 0/5] arm64: alternative: Provide if/else/endif assembler
+ macros
+In-Reply-To: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
+References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Will: This is a split out version of previous patch, as requested. I have
+      retained a patch at the send of the series to nix alternative_insn
+      but there's no need to take this one for 4.3. Likewise I've fully
+      split out all the switch-over patches so you can just drop them
+      if they bring any merge trouble.
 
+The existing alternative_insn macro has some limitations that make it
+hard to work with. In particular the fact it takes instructions from it
+own macro arguments means it doesn't play very nicely with C pre-processor
+macros because the macro arguments look like a string to the C
+pre-processor. Workarounds are (probably) possible but things start to
+look ugly.
 
-On 07/15/2015 08:32 AM, Robert Baldyga wrote:
-> Convert endpoint configuration to new capabilities model.
->
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->   drivers/usb/gadget/udc/pch_udc.c | 14 ++++++++++++--
->   1 file changed, 12 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/usb/gadget/udc/pch_udc.c b/drivers/usb/gadget/udc/pch_udc.c
-> index 613547f..cc8fb3c 100644
-> --- a/drivers/usb/gadget/udc/pch_udc.c
-> +++ b/drivers/usb/gadget/udc/pch_udc.c
-> @@ -2895,11 +2895,21 @@ static void pch_udc_pcd_reinit(struct pch_udc_dev *dev)
->   		ep->in = ~i & 1;
->   		ep->ep.name = ep_string[i];
->   		ep->ep.ops = &pch_udc_ep_ops;
-> -		if (ep->in)
-> +		if (ep->in) {
->   			ep->offset_addr = ep->num * UDC_EP_REG_SHIFT;
-> -		else
-> +			ep->ep.caps.dir_in = true;
-> +		} else {
->   			ep->offset_addr = (UDC_EPINT_OUT_SHIFT + ep->num) *
->   					  UDC_EP_REG_SHIFT;
-> +			ep->ep.caps.dir_out = true;
-> +		}
-> +		if (i == UDC_EP0IN_IDX || i == UDC_EP0OUT_IDX) {
-> +			ep->ep.caps.type_control = true;
+This patchset introduces new macros that allow instructions to be
+presented to the assembler as normal and overcomes these limitations,
+together with patches to switch all existing users to the new macros.
 
-In all previous patches you set both dir_in and dir_out to true for ep0 
-but in this patch you don't do this. Is there some reason for this or 
-it's just a mistake?
+My view is that these if_not/else/endif macros are more readable
+than the original macro and that alone might be enough to justify them.
+However below is an concrete example of an alterntive sequence that is
+needlessly hard to write without them because ICC_PMR_EL1 is a C
+pre-processor macro.
 
-> +		} else {
-> +			ep->ep.caps.type_iso = true;
-> +			ep->ep.caps.type_bulk = true;
-> +			ep->ep.caps.type_int = true;
-> +		}
->   		/* need to set ep->ep.maxpacket and set Default Configuration?*/
->   		usb_ep_set_maxpacket_limit(&ep->ep, UDC_BULK_MAX_PKT_SIZE);
->   		list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
->
+ 	.macro	disable_irq, tmp
+ 	mov	\tmp, #ICC_PMR_EL1_MASKED
+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+	msr	daifset, #2
+alternative_else
+ 	msr_s	ICC_PMR_EL1, \tmp
+alternative_endif
+	.endm
 
-Best Regards,
+The new macros have received a fair degree of testing because I have
+based my (not published since March) pseudo-NMI patch set on them.
 
--- 
-Krzysztof Opasiak
-Samsung R&D Institute Poland
-Samsung Electronics
+v2:
+
+ * Split big patch out into atomized components (Will Deacon).
+   To show where I would like to go I have retained a patch to remove
+   assembler_insn() from the code base although, based on Will's email
+   I don't anticipate this patch being taken for 4.3.
+
+ * Add some comments to make clear the constraints imposed on alternative
+   sequences.
+
+Daniel Thompson (5):
+  arm64: alternative: Provide if/else/endif assembler macros
+  arm64: mm: Adopt new alternative assembler macros
+  arm64: kernel: Adopt new alternative assembler macros
+  arm64: kvm: Adopt new alternative assembler macros
+  arm64: alternative: Remove alternative_insn macro
+
+ arch/arm64/include/asm/alternative.h | 40 ++++++++++++++++++++++++++++++------
+ arch/arm64/kernel/entry.S            | 29 ++++++++++++--------------
+ arch/arm64/kvm/hyp.S                 | 12 +++++++++--
+ arch/arm64/mm/cache.S                |  7 ++++++-
+ 4 files changed, 63 insertions(+), 25 deletions(-)
+
+--
+2.4.3
