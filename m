@@ -1,66 +1,45 @@
 From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 20 Jul 2015 10:54:25 +0300
-Subject: [PATCH v2 0/4] Add VIC support for Tegra124
-Message-ID: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
+Date: Mon, 20 Jul 2015 10:54:28 +0300
+Subject: [PATCH v2 3/4] of: Add NVIDIA Tegra VIC binding
+In-Reply-To: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
+References: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
+Message-ID: <1437378869-10451-4-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From Arto's original cover letter:
+This adds device tree binding documentation for the Video Image
+Compositor (VIC) present on Tegra124 and newer SoC's.
 
-This series adds Video-Image-Compositor (VIC) support for Tegra124. The unit
-replaced gr2d engine on T124 and it is effectively used for similar
-operations: making simple surface copy and fill operations.
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+---
+ .../devicetree/bindings/gpu/nvidia,tegra20-host1x.txt     | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-[..]
-
-The series has been tested on Jetson TK1 by first disabling IOMMU (*),
-enabling CMA and running a VIC clear test case that is posted to dri-devel
-and linux-tegra mailing lists. The firmware image for VIC is publicly
-available as part of Linux For Tegra driver package [0].
-
-[0] https://developer.nvidia.com/linux-tegra
-
-(*) Currently Tegra DRM does not support mapping the host1x command buffers
-into kernel address space in case IOMMU is enabled.
-
-End of original cover letter.
-
-The aforementioned VIC clear test can be found at
-https://patchwork.kernel.org/patch/6454821/.
-
-This series is now composed of a commit that adds a general Falcon helper
-library to be used by drivers whose hardware contains a Falcon, which
-includes many Host1x clients; and then separately of the VIC driver that
-uses that Falcon library. The fixes to host1x this series used to include
-are in the 'Host1x/TegraDRM fixes/improvements' series I posted earlier;
-that series is a dependency for this series.
-
-Thanks,
-Mikko.
-
-Arto Merilainen (3):
-  drm/tegra: Add falcon helper library
-  drm/tegra: Add VIC support
-  ARM: tegra: Add VIC for Tegra124
-
-Mikko Perttunen (1):
-  of: Add NVIDIA Tegra VIC binding
-
- .../bindings/gpu/nvidia,tegra20-host1x.txt         |  15 +
- arch/arm/boot/dts/tegra124.dtsi                    |  12 +
- drivers/gpu/drm/tegra/Makefile                     |   4 +-
- drivers/gpu/drm/tegra/drm.c                        |   7 +
- drivers/gpu/drm/tegra/drm.h                        |   1 +
- drivers/gpu/drm/tegra/falcon.c                     | 256 ++++++++++++
- drivers/gpu/drm/tegra/falcon.h                     | 130 ++++++
- drivers/gpu/drm/tegra/vic.c                        | 456 +++++++++++++++++++++
- drivers/gpu/drm/tegra/vic.h                        |  35 ++
- include/linux/host1x.h                             |   1 +
- 10 files changed, 916 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/tegra/falcon.c
- create mode 100644 drivers/gpu/drm/tegra/falcon.h
- create mode 100644 drivers/gpu/drm/tegra/vic.c
- create mode 100644 drivers/gpu/drm/tegra/vic.h
-
+diff --git a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
+index 009f4bf..1328f3f 100644
+--- a/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
++++ b/Documentation/devicetree/bindings/gpu/nvidia,tegra20-host1x.txt
+@@ -240,6 +240,21 @@ of the following host1x client modules:
+     - dpaux
+   - vdd-supply: phandle of a supply that powers the DisplayPort link
+ 
++- vic: Video Image Compositor
++  - compatible: For Tegra124, must contain "nvidia,tegra124-vic".  Otherwise,
++    must contain '"nvidia,<chip>-vic", "nvidia,tegra124-vic"', where
++    <chip> is tegra132.
++  - reg: Physical base address and length of the controller's registers.
++  - interrupts: The interrupt outputs from the controller.
++  - clocks: Must contain an entry for each entry in clock-names.
++    See ../clocks/clock-bindings.txt for details.
++  - clock-names: Must include the following entries:
++    - vic: clock input for the VIC hardware
++  - resets: Must contain an entry for each entry in reset-names.
++    See ../reset/reset.txt for details.
++  - reset-names: Must include the following entries:
++    - vic
++
+ Example:
+ 
+ / {
 -- 
 2.1.4
