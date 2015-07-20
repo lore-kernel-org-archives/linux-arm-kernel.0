@@ -1,69 +1,45 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 20 Jul 2015 10:54:05 +0200
-Subject: [PATCH 6/7] Documentation: atmel-quadspi: add binding file for
- Atmel QSPI driver
-In-Reply-To: <55A8EAAE.6010506@cogentembedded.com>
-References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
- <f4bb1c68fcc19b3642110ab0ef9850d6eeca3112.1437059658.git.cyrille.pitchen@atmel.com>
- <55A8EAAE.6010506@cogentembedded.com>
-Message-ID: <55ACB72D.60506@atmel.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Jul 2015 09:54:11 +0100
+Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
+ Control Processor)
+In-Reply-To: <55A945DF.3@codeaurora.org>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
+ <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
+ <559ADC94.4080505@codeaurora.org> <559BF858.1020301@arm.com>
+ <20150708014606.GH30412@codeaurora.org> <55A7D79B.3080305@arm.com>
+ <20150716193114.GA17952@codeaurora.org> <55A8E434.2010709@arm.com>
+ <55A945DF.3@codeaurora.org>
+Message-ID: <55ACB733.2080609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
 
-thanks for the review. For the next series I've removed all references to
-"qspi" in the node example but the one from the compatible string.
-I've also removed the leading 0 in the size of the second memory region.
 
-Best Regards,
+On 17/07/15 19:13, Stephen Boyd wrote:
+> On 07/17/2015 04:17 AM, Sudeep Holla wrote:
 
-Cyrille
+[...]
 
-Le 17/07/2015 13:44, Sergei Shtylyov a ?crit :
-> Hello.
-> 
-> On 7/16/2015 6:27 PM, Cyrille Pitchen wrote:
-> 
->> This patch documents the DT bindings for the driver of the Atmel QSPI
->> controller embedded inside sama5d2x SoCs.
-> 
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> ---
->>   .../devicetree/bindings/mtd/atmel-quadspi.txt      | 29 ++++++++++++++++++++++
->>   1 file changed, 29 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
-> 
->> diff --git a/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
->> new file mode 100644
->> index 000000000000..a0d60ac7ae10
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
->> @@ -0,0 +1,29 @@
->> +* Atmel Quad Serial Peripheral Interface (QSPI)
->> +
->> +Required properties:
->> +  - compatible : Should be "atmel,sama5d2-qspi"
->> +  - reg : the first contains the register location and length,
->> +          the second contains the memory mapping address and length
->> +  - interrupts : Should contain the interrupt for the device
->> +  - clocks : The clock needed by the QSPI controller
->> +  - #address-cells : should be 1
->> +  - #size-cells : should be 0
->> +
->> +Example:
->> +
->> +qspi0: qspi at f0020000 {
-> 
->     Once again, the ePAPR standard tells up to call the node just "spi", not "qspi".
-> 
->> +    compatible = "atmel,sama5d2-qspi";
->> +    reg = <0xf0020000 0x100>,
->> +          <0xd0000000 0x08000000>;
-> 
->    Either you use the leading zeroes or you don't. :-)
-> 
-> [...]
-> 
-> MBR, Sergei
-> 
+>>
+>> determine_rate change shouldn't affect SCPI clock driver but I remember
+>> seeing round_rate change too on the list which returns value using the
+>> argument from Boris. Is that planned for v4.3 ? I would need the stable
+>> branch from this clk_hw_set_rate_range if you decide to push. Let me
+>> know your preferences. I will post the updated version of the patch
+>> accordingly.
+>>
+>
+> We're not going to change round_rate() so it sounds like you don't need
+> a stable branch. But you would need this new consumer API. So you still
+> need a branch right?
+>
+
+I am fine either way. If no one else need the stable branch to be shared
+with arm-soc, I prefer to use clock consumer API for now to avoid all
+the troubles to you guys and switch to provider API later. I will post
+it once the both this driver and that provider API is merged, if that's
+fine with you ?
+
+Regards,
+Sudeep
