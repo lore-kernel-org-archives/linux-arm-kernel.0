@@ -1,30 +1,69 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Jul 2015 09:52:09 +0200
-Subject: [RFC PATCH 03/15] pwm: add pwm_get_polarity helper function
-In-Reply-To: <1435738921-25027-4-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-4-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150720075209.GD29614@ulmo>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 20 Jul 2015 08:54:30 +0100
+Subject: [PATCH v4 09/19] drivers: base: Add MSI domain support for non-PCI
+ devices
+In-Reply-To: <55AC5DF3.8090502@huawei.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-10-git-send-email-marc.zyngier@arm.com>
+ <55AC5DF3.8090502@huawei.com>
+Message-ID: <55ACA936.3060800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 10:21:49AM +0200, Boris Brezillon wrote:
-> Some drivers are directly accessing the ->polarity field in pwm_device.
-> Add an helper to retrieve the current polarity so that we can easily move
-> this field elsewhere (required to support atomic update).
+On 20/07/15 03:33, majun (F) wrote:
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  include/linux/pwm.h | 5 +++++
->  1 file changed, 5 insertions(+)
+> 
+> ? 2015/7/15 20:16, Marc Zyngier ??:
+>> With the msi_list and the msi_domain properties now being at the
+>> generic device level, it is starting to be relatively easy to offer
+>> a generic way of providing non-PCI MSIs.
+>>
+> [...]
+>> diff --git a/include/linux/msi.h b/include/linux/msi.h
+>> index c10ec56..b55cf63 100644
+>> --- a/include/linux/msi.h
+>> +++ b/include/linux/msi.h
+>> @@ -18,6 +18,11 @@ struct pci_dev;
+>>  void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+>>  void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
+>>  
+>> +typedef void (*irq_write_msi_msg_t)(struct msi_desc *desc,
+>> +				    struct msi_msg *msg);
+>> +
+>> +struct platform_msi_priv_data;
+>> +
+>>  struct msi_desc {
+>>  	struct list_head		list;
+>>  	unsigned int			irq;
+>> @@ -42,6 +47,10 @@ struct msi_desc {
+>>  				void __iomem *mask_base;
+>>  			};
+>>  		};
+>> +		struct {
+>> +			struct platform_msi_priv_data *platform_msi_priv_data;
+>> +			u16 msi_index;
+>> +		};
+>>  	};
+>>  };
+>>  
+> When I add this patch in linux 4.2.rc2, this part is rejected. So I added this part
+> myself. But there is compiling errors.
 
-Applied thanks.
+[...]
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/934ee3a4/attachment-0001.sig>
+Did you read this crucial part of the cover letter:
+
+<quote>
+[...]
+Patches are on top of 4.2-rc2 and Jiang Liu's series, and available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+irq/npci-msi-v2
+</quote>
+
+Without Jiang Liu's series as a prerequisite, it is not surprising
+nothing applies, let alone compile...
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
