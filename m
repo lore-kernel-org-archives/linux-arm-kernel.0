@@ -1,71 +1,36 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 20 Jul 2015 14:37:47 +0200
-Subject: [PATCH v2 2/2] ARM: at91: sama5/dt: update rstc to correct
- compatible string
-In-Reply-To: <1437384726-24927-2-git-send-email-josh.wu@atmel.com>
-References: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
- <1437384726-24927-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <55ACEB9B.70901@atmel.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Mon, 20 Jul 2015 20:41:50 +0800
+Subject: [PATCH] regmap: Add function check before called format_val
+Message-ID: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 20/07/2015 11:32, Josh Wu a ?crit :
-> They'll use "atmel,sama5d3-rstc" for reset function.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+The regmap_format will not be initialize since regmap_bus is not assgined 
+on regmap_init(). It should has a function check before using 
+format_val() to avoid null function called on regmap_bulk_read().
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+Based on v4.2rc1
+---
+ drivers/base/regmap/regmap.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-And we'll have to synchronize with the other patches. The best way to
-deal with that can be to take both of them with us through arm-soc.
-
-Sebastian,
-
-1/ as you weren't in the CC list of the original patch, do you want me
-to re-send the whole series?
-
-2/ can we take these driver's changes with use through the arm-soc git
-tree so that we can manage the synchronization better?
-
-Thanks, bye,
-
-> ---
-> 
-> Changes in v2: None
-> 
->  arch/arm/boot/dts/sama5d3.dtsi | 2 +-
->  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-> index 9e2444b..280255b 100644
-> --- a/arch/arm/boot/dts/sama5d3.dtsi
-> +++ b/arch/arm/boot/dts/sama5d3.dtsi
-> @@ -1259,7 +1259,7 @@
->  			};
->  
->  			rstc at fffffe00 {
-> -				compatible = "atmel,at91sam9g45-rstc";
-> +				compatible = "atmel,sama5d3-rstc";
->  				reg = <0xfffffe00 0x10>;
->  			};
->  
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 3ee22ee..481196c 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -1277,7 +1277,7 @@
->  			};
->  
->  			rstc at fc068600 {
-> -				compatible = "atmel,at91sam9g45-rstc";
-> +				compatible = "atmel,sama5d3-rstc";
->  				reg = <0xfc068600 0x10>;
->  			};
->  
-> 
-
-
+diff --git a/drivers/base/regmap/regmap.c b/drivers/base/regmap/regmap.c
+index 7111d04..c1e8c32 100644
+--- a/drivers/base/regmap/regmap.c
++++ b/drivers/base/regmap/regmap.c
+@@ -2317,7 +2317,10 @@ int regmap_bulk_read(struct regmap *map, unsigned int reg, void *val,
+ 					  &ival);
+ 			if (ret != 0)
+ 				return ret;
+-			map->format.format_val(val + (i * val_bytes), ival, 0);
++			if (map->format.format_val)
++				map->format.format_val(val + (i * val_bytes), ival, 0);
++			else
++				memcpy(val + (i * val_bytes), &ival, val_bytes);
+ 		}
+ 	}
+ 
 -- 
-Nicolas Ferre
+1.8.1.1.dirty
