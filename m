@@ -1,52 +1,36 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 20 Jul 2015 08:32:49 +0200
-Subject: [PATCH 3/9] gpio: Allow hogged gpios to be requested
-In-Reply-To: <20150719140142.GV26287@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-4-git-send-email-mpa@pengutronix.de>
- <20150717202702.GK7013@pengutronix.de>
- <20150719140142.GV26287@pengutronix.de>
-Message-ID: <20150720063249.GM7013@pengutronix.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 19 Jul 2015 23:33:23 -0700
+Subject: [PATCH 1/2] input: touchscreen: pixcir_i2c_ts: Add support for
+ optional wakeup interrupt
+In-Reply-To: <20150720060506.GV17550@atomide.com>
+References: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+ <1437115241-17859-2-git-send-email-vigneshr@ti.com>
+ <20150717215122.GC39282@dtor-ws> <55AC7DA1.9050002@ti.com>
+ <20150720060506.GV17550@atomide.com>
+Message-ID: <20150720063323.GC13092@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Markus,
-
-On Sun, Jul 19, 2015 at 04:01:42PM +0200, Markus Pargmann wrote:
-> On Fri, Jul 17, 2015 at 10:27:02PM +0200, Uwe Kleine-K?nig wrote:
-> > On Fri, Jul 17, 2015 at 11:32:44AM +0200, Markus Pargmann wrote:
-> > > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > > index bf4bd1d120c3..9f402b159cbe 100644
-> > > --- a/drivers/gpio/gpiolib.c
-> > > +++ b/drivers/gpio/gpiolib.c
-> > > @@ -798,7 +798,8 @@ static int __gpiod_request(struct gpio_desc *desc, const char *label)
-> > >  	 * before IRQs are enabled, for non-sleeping (SOC) GPIOs.
-> > >  	 */
-> > >  
-> > > -	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0) {
-> > > +	if (test_and_set_bit(FLAG_REQUESTED, &desc->flags) == 0 ||
-> > > +	    test_and_clear_bit(FLAG_IS_HOGGED, &desc->flags) == 1) {
-> > >  		desc_set_label(desc, label ? : "?");
-> > >  		status = 0;
-> > I don't like this patch. IMHO hogging is a "use" of a GPIO that should
-> > prevent it being requested.
+On Sun, Jul 19, 2015 at 11:05:07PM -0700, Tony Lindgren wrote:
+> * Vignesh R <vigneshr@ti.com> [150719 21:51]:
+> > On 7/18/2015 3:21 AM, Dmitry Torokhov wrote:
+> > > 
+> > > I wonder if driver core should be responsible for clearing wake irq and
+> > > also for clearing wakeup flag.
+> > > 
+> > 
+> > AFAICU, wakeup flag is deleted when struct device is deleted, hence,
+> > device_init_wakeup() call may not be required in .remove(). But,
+> > dev_pm_clear_wake_irq() can be moved to driver core.
 > 
-> I disagree with you here. The original patch stated in its description
-> that it was designed to initialize GPIOs. In my understanding this does
-> not necessarily mean that a hogged GPIO has to be blocked forever.
-Assume for a moment I can agree with "not necessarily". But now, what
-about the cases where a hogged GPIO should be blocked?
-IMHO, if you want to drive the GPIO from userspace anyhow, you don't
-need to add a hog for it.
+> Currently the lifecycle of struct wakeup_source is not necessarily
+> the same as the lifecycle struct device. I believe net and usb drivers
+> at least allocate it dynamically.
 
-> The IS_HOGGED flag is cleared at the same time it is tested so only one
-> consumer can request one hogged GPIO. The GPIO is not considered to be
-> hogged after it is normally requested.
-You're right here, I missed the and_clear_bit part on the test.
-
-Best regards
-Uwe
+I am not sure if I follow. I was wondering if we should clear the wakeup
+IRQ setting on the driver unbinding. It does not mean that we'd be
+deleting wakeup_source, just that we'll clear wakeup irq setting from
+it.
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Dmitry
