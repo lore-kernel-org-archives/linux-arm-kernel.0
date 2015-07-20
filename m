@@ -1,76 +1,103 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 20 Jul 2015 15:22:53 -0300
-Subject: [PATCH v5 07/12] mtd: nand: add Samsung K9GBG08U0A-M to nand_ids
- table
-In-Reply-To: <20150720180847.GH24125@google.com>
-References: <1431356341-31640-1-git-send-email-antoine.tenart@free-electrons.com>
- <1431356341-31640-8-git-send-email-antoine.tenart@free-electrons.com>
- <555792FC.8030407@vanguardiasur.com.ar>
- <20150520140631.GN22054@kwain>
- <555C9584.1030609@vanguardiasur.com.ar>
- <20150520142409.GP22054@kwain> <20150520144341.GQ22054@kwain>
- <55621B83.4040909@vanguardiasur.com.ar>
- <20150720180847.GH24125@google.com>
-Message-ID: <CAAEAJfDuDu_M7D41h5qtvVrAiAB2KW8scAauckP2z5gZjC6=1w@mail.gmail.com>
+From: adam.yh.lee@gmail.com (Adam Lee)
+Date: Mon, 20 Jul 2015 11:23:46 -0700
+Subject: [PATCH] [TWL4030 MADC] Fix ADC[3:6] readings
+In-Reply-To: <55AD35D1.7000607@kernel.org>
+References: <1437085227-28845-1-git-send-email-adam.yh.lee@gmail.com>
+ <1437085227-28845-2-git-send-email-adam.yh.lee@gmail.com>
+ <20150717090039.GC9331@earth>
+ <alpine.DEB.2.02.1507171136180.14972@pmeerw.net>
+ <CAFeBWL6ARBReHq8jom3kGu3iOaPib41nOJ3-gx358nYwsGKLfw@mail.gmail.com>
+ <55AD35D1.7000607@kernel.org>
+Message-ID: <CAFeBWL4dEZ09UdNH6moDzDy8S+2w7XpM6vWcK6yVW++H7qZTjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 July 2015 at 15:08, Brian Norris <computersforpeace@gmail.com> wrote:
-> Hi Ezequiel,
+Hello Jonathan, I sent the same patch with linux-iio cc'd.
+I expanded the cover letter with the quotes from TI's documents, but
+the text has been removed in the email somehow.
+The discussion in this thread should be enough (I think) for linux-iio
+maintainers, so we will see!
+
+Thanks,
+
+Adam
+
+On Mon, Jul 20, 2015 at 10:54 AM, Jonathan Cameron <jic23@kernel.org> wrote:
+> On 20/07/15 18:47, Adam Lee wrote:
+>> Hello, here is some more context from the TPS65950's TRM [1].
+>>
+>> Quoting from section 15.3.1.2.1 VUSB3V1 section:
+>>
+>>     "VUSB3V1 is also used to bias analog multiplexers on the four MCPC
+>> pins between the carkit and the MADC (supplied by VINTANA2)."
+>>
+>>
+>> And from section 15.4.11. MADC Monitoring Using MCPC:
+>>
+>>     "Four MCPC pins can be selected as analog conversion input pins by
+>> setting the CARKIT_ANA_CTRL[3] SEL_MADC_MCPC bit."
+>>
+>> My patch addresses both (set the register, and enable 3v1). And yes it
+>> has been tested on Gumstix Overo COMs (OMAP3 + TPS65950).
+>>
+>> Hope to hear from IIO maintainers!
+> I dug the patch out of the archives.
 >
-> On Sun, May 24, 2015 at 03:42:11PM -0300, Ezequiel Garcia wrote:
->> On 05/20/2015 11:43 AM, Antoine Tenart wrote:
->> [..]
->> >>
->> >> I just had a look on the datasheet, and I you're right, the nand should
->> >> support JDEC. However I get a "No NAND device found" error when
->> >> reverting this patch.
->> >>
->> >> It seems nand_flash_detect_jedec() is not reading "JDEC" and is returning
->> >> directly. I'm having a look at this.
->> >
->> > So, I can read 'J', 'E', 'D' and 'E' but then I got 0xff's. So I tried
->> > to only check of JEDE in nand_flash_detect_jedec() but the JEDEC
->> > parameter page was then not valid.
->> >
->>
->> This uncovers two different bugs in the driver.
->>
->> 1. read_id_bytes is either '2' or '4', but JEDEC detections needs at
->> least 5 bytes.
->>
->> 2. The initial buffer (to read the ID and the parameter page) has
->> 256 bytes, but the JEDEC parameter page is 512-bytes.
->>
->> And while at it, the driver doesn't seem to support reading the
->> redundant parameter pages (recently reported on barebox ML [1]). So this
->> is a third bug.
->>
->> Would you try setting read_id_bytes to '5' and also increasing the READ_PARAM
->> transfer length? Something like this:
+> Looks clear enough to me.  Could you resend the patch with linux-iio cc'd?
+> I will want an Ack from Sebastian.
 >
-> I'm trying to parse through the latest pxa3xx_nand patches, and I'm a
-> bit lost. Did this piece get dropped on the floor?
+> Thanks,
 >
-
-As far as I can see, yes. Regarding this particular patch, the flash device
-supports JEDEC detection but the driver needs a fix.
-
-Hopefully, Antoine will submit a fix in the future.
-
-> At any rate, it looks like there are a few more things to fix in
-> Antoine's latest work, so I can't quite take them. Correct me if I'm
-> misunderstanding.
+> Jonathan
 >
-
-The current patchset under discussion is "v2 mtd: pxa3xx_nand: rework
-the timing setup":
-
-http://lists.infradead.org/pipermail/linux-mtd/2015-July/060033.html
-
-We are trying to get that sorted out, so we can move to the Berlin SoC support.
-
-Cheers,
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+>>
+>> [1] http://www.droid-developers.org/images/2/21/Tps65950_TRM.pdf
+>>
+>> On Fri, Jul 17, 2015 at 2:42 AM, Peter Meerwald <pmeerw@pmeerw.net> wrote:
+>>> Hello,
+>>>
+>>> adding linux-iio...
+>>>
+>>>> To get a chance of this patch being considered for inclusion, you
+>>>> should send this to the maintainers of the phy and iio framework.
+>>>> There is a high chance, that none of them will see your mail.
+>>>>
+>>>> On Thu, Jul 16, 2015 at 03:20:27PM -0700, Adam YH Lee wrote:
+>>>>> MADC[3:6] reads incorrect values without these two following changes:
+>>>>
+>>>> uhm MADC[3:6] are externally available analog inputs. Your
+>>>> change will result in them being tied to the USB module.
+>>>
+>>> change regarding TWL4030_USB_SEL_MADC_MCPC is necessary at
+>>> least for some hardware revisions to get proper ADC values
+>>>
+>>>>> - enable the 3v1 bias regulator for ADC[3:6]
+>>>>
+>>>> The regulator is not required for correct MADC functionality, but
+>>>> for correct USB measureing. The regulator should not be requested
+>>>> by the madc module, but by the usb module, which is connected to
+>>>> the madc.
+>>>
+>>> in my experience, the MADC exhibits several strange things, I wouldn't be
+>>> surprised that this bias is somehow necessary for operation even if it is
+>>> not what the spec says -- has this been tested?
+>>>
+>>>>> - configure ADC[3:6] lines as input, not as USB
+>>>>
+>>>> I don't think that should be done for all boards.
+>>>>
+>>>>> [...]
+>>>>
+>>>> -- Sebastian
+>>>>
+>>>
+>>> --
+>>>
+>>> Peter Meerwald
+>>> +43-664-2444418 (mobile)
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>>
+>
