@@ -1,43 +1,255 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Mon, 20 Jul 2015 10:55:54 +0200
-Subject: [PATCH 7/7] mtd: atmel-quadspi: add driver for Atmel QSPI
- controller
-In-Reply-To: <1437123868.24981.7.camel@tiscali.nl>
-References: <cover.1437059658.git.cyrille.pitchen@atmel.com>	
- <cf2522fc858b72af78d057ac76c4f029e80edf4a.1437059658.git.cyrille.pitchen@atmel.com>
- <1437123868.24981.7.camel@tiscali.nl>
-Message-ID: <55ACB79A.3010101@atmel.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Jul 2015 10:59:40 +0200
+Subject: [RFC PATCH 11/15] pwm: add the core infrastructure to allow
+ atomic update
+In-Reply-To: <1435738921-25027-12-git-send-email-boris.brezillon@free-electrons.com>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150720085939.GL29614@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On Wed, Jul 01, 2015 at 10:21:57AM +0200, Boris Brezillon wrote:
+> Add an ->apply() method to the pwm_ops struct to allow PWM drivers to
+> implement atomic update.
+> This method will be prefered over the ->enable(), ->disable() and
+> ->config() methods if available.
+> 
+> Add the pwm_get_state(), pwm_get_default_state() and pwm_apply_state()
+> functions for PWM users to be able to use the atomic update feature.
+> 
+> Note that the pwm_apply_state() does not guarantee the atomicity of the
+> update operation, it all depends on the availability and implementation
+> of the ->apply() method.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/pwm/core.c  | 110 ++++++++++++++++++++++++++++++++++++++++++++++------
+>  include/linux/pwm.h |  26 +++++++++++++
+>  2 files changed, 124 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index 30631f5..6dafd8e 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -238,8 +238,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+>  	unsigned int i;
+>  	int ret;
+>  
+> -	if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
+> -	    !chip->ops->enable || !chip->ops->disable || !chip->npwm)
+> +	if (!chip || !chip->dev || !chip->ops || (!chip->ops->apply &&
+> +	    (!chip->ops->config || !chip->ops->enable ||
+> +	     !chip->ops->disable)) || !chip->npwm)
+>  		return -EINVAL;
 
-I've removed the ".bus = &plaform_bus_type" for the next series.
-Thank you for the explanation and the review :)
+This is becoming really unreadable, perhaps split it into two checks, or
+even split out the sanity check on the ops into a separate function to
+make the negations easier to read:
 
-Best Regards,
+	static bool pwm_ops_check(const struct pwm_ops *ops)
+	{
+		/* driver supports legacy, non-atomic operation */
+		if (ops->config && ops->enable && ops->disable)
+			return true;
 
-Cyrille
+		/* driver supports atomic operation */
+		if (ops->apply)
+			return true;
 
-Le 17/07/2015 11:04, Paul Bolle a ?crit :
-> On do, 2015-07-16 at 17:27 +0200, Cyrille Pitchen wrote:
->> --- /dev/null
->> +++ b/drivers/mtd/spi-nor/atmel-quadspi.c
-> 
->> +static struct platform_driver atmel_qspi_driver = {
->> +	.driver		= {
->> +		[...]
->> +		.bus	= &platform_bus_type,
->> +		[...]
->> +};
->> +module_platform_driver(atmel_qspi_driver);
-> 
-> Nit: on module init this will basically do
->     __platform_driver_register(&atmel_qspi_driver, THIS_MODULE);
-> 
-> which will again set bus to &platform_bus_type. So you might as well
-> drop that line.
-> 
-> 
-> Paul Bolle
-> 
+		return false;
+	}
+
+and then use this:
+
+	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
+		return -EINVAL;
+
+	if (!pwm_ops_check(chip->ops))
+		return -EINVAL;
+
+>  	mutex_lock(&pwm_lock);
+> @@ -430,7 +431,17 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+>  	if (!pwm || duty_ns < 0 || period_ns <= 0 || duty_ns > period_ns)
+>  		return -EINVAL;
+>  
+> -	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
+> +	if (pwm->chip->ops->apply) {
+> +		struct pwm_state state = pwm->state;
+
+Shouldn't this use pwm_get_state()?
+
+> +
+> +		state.period = period_ns;
+> +		state.duty_cycle = duty_ns;
+> +
+> +		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
+> +	} else {
+> +		err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
+> +	}
+> +
+>  	if (err)
+>  		return err;
+>  
+> @@ -455,6 +466,17 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
+>  	if (!pwm || !pwm->chip->ops)
+>  		return -EINVAL;
+>  
+> +	if (pwm->chip->ops->apply) {
+> +		struct pwm_state state = pwm->state;
+
+Same here.
+
+> +
+> +		state.polarity = polarity;
+> +		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
+> +		if (!err)
+> +			pwm->state.polarity = polarity;
+> +
+> +		return err;
+> +	}
+> +
+>  	if (!pwm->chip->ops->set_polarity)
+>  		return -ENOSYS;
+>  
+> @@ -477,17 +499,27 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
+>   */
+>  int pwm_enable(struct pwm_device *pwm)
+>  {
+> -	if (pwm && !pwm_is_enabled(pwm)) {
+> -		int err;
+> +	int err;
+>  
+> -		err = pwm->chip->ops->enable(pwm->chip, pwm);
+> -		if (!err)
+> -			pwm->state.enabled = true;
+> +	if (!pwm)
+> +		return -EINVAL;
+>  
+> -		return err;
+> +	if (pwm_is_enabled(pwm))
+> +		return 0;
+> +
+> +	if (pwm->chip->ops->apply) {
+> +		struct pwm_state state = pwm->state;
+
+And here.
+
+> +
+> +		state.enabled = true;
+> +		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
+
+There should be a space between the above two lines.
+
+> +	} else {
+> +		err = pwm->chip->ops->enable(pwm->chip, pwm);
+>  	}
+>  
+> -	return pwm ? 0 : -EINVAL;
+> +	if (!err)
+> +		pwm->state.enabled = true;
+> +
+> +	return err;
+>  }
+>  EXPORT_SYMBOL_GPL(pwm_enable);
+>  
+> @@ -497,13 +529,67 @@ EXPORT_SYMBOL_GPL(pwm_enable);
+>   */
+>  void pwm_disable(struct pwm_device *pwm)
+>  {
+> -	if (pwm && pwm_is_enabled(pwm)) {
+> +	if (!pwm || !pwm_is_enabled(pwm))
+> +		return;
+> +
+> +	if (pwm->chip->ops->apply) {
+> +		struct pwm_state state = pwm->state;
+> +
+> +		state.enabled = false;
+> +		pwm->chip->ops->apply(pwm->chip, pwm, &state);
+> +	} else {
+>  		pwm->chip->ops->disable(pwm->chip, pwm);
+> -		pwm->state.enabled = false;
+>  	}
+> +
+> +	pwm->state.enabled = false;
+>  }
+>  EXPORT_SYMBOL_GPL(pwm_disable);
+
+Same comments as for pwm_enable().
+
+>  
+> +int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
+> +{
+> +	int err = 0;
+> +
+> +	if (!pwm)
+> +		return -EINVAL;
+> +
+> +	if (!memcmp(state, &pwm->state, sizeof(*state)))
+> +		return 0;
+> +
+> +	if (pwm->chip->ops->apply) {
+> +		err = pwm->chip->ops->apply(pwm->chip, pwm, state);
+> +		if (!err)
+> +			pwm->state = *state;
+
+Maybe we want pwm_set_state() for this?
+
+> +	} else {
+> +		/*
+> +		 * FIXME: restore the initial state in case of error.
+> +		 */
+> +		if (state->polarity != pwm->state.polarity) {
+> +			pwm_disable(pwm);
+> +			err = pwm_set_polarity(pwm, state->polarity);
+> +			if (err)
+> +				goto out;
+> +		}
+> +
+> +		if (state->period != pwm->state.period ||
+> +		    state->duty_cycle != pwm->state.duty_cycle) {
+> +			err = pwm_config(pwm, state->period, state->duty_cycle);
+> +			if (err)
+> +				goto out;
+> +		}
+> +
+> +		if (state->enabled != pwm->state.enabled) {
+> +			if (state->enabled)
+> +				err = pwm_enable(pwm);
+> +			else
+> +				pwm_disable(pwm);
+> +		}
+> +	}
+> +
+> +out:
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(pwm_apply_state);
+> +
+>  static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
+>  {
+>  	struct pwm_chip *chip;
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index b47244a..7e99679 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -151,6 +151,29 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+>  	return pwm ? pwm->state.polarity : PWM_POLARITY_NORMAL;
+>  }
+>  
+> +/*
+> + * pwm_apply_state - apply a new state to the PWM device
+> + */
+> +int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state);
+
+If you add kerneldoc, please add it properly. It should start with /**
+and you need to list at least the parameters and return value.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/40a5e6a4/attachment.sig>
