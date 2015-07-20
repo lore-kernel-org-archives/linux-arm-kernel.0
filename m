@@ -1,59 +1,27 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 20 Jul 2015 10:11:04 +0200
-Subject: [RFC PATCH 07/15] pwm: move the enabled/disabled info to
- pwm_state struct
-In-Reply-To: <1435738921-25027-8-git-send-email-boris.brezillon@free-electrons.com>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-8-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150720081103.GH29614@ulmo>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Mon, 20 Jul 2015 16:10:50 +0800
+Subject: [PATCH v11] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20150720081050.GB12908@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 01, 2015 at 10:21:53AM +0200, Boris Brezillon wrote:
-> Prepare the transition to PWM atomic update by moving the enabled/disabled
-> state into the pwm_state struct. This way we can easily update the whole
-> PWM state by copying the new state in the ->state field.
+On Fri, Jul 17, 2015 at 04:39:37PM +0200, LABBE Corentin wrote:
+> Hello
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/pwm/core.c  | 15 ++++++++++++---
->  include/linux/pwm.h |  6 +++---
->  2 files changed, 15 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index a6bc8e6..3e830ce 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -474,8 +474,15 @@ EXPORT_SYMBOL_GPL(pwm_set_polarity);
->   */
->  int pwm_enable(struct pwm_device *pwm)
->  {
-> -	if (pwm && !test_and_set_bit(PWMF_ENABLED, &pwm->flags))
-> -		return pwm->chip->ops->enable(pwm->chip, pwm);
-> +	if (pwm && !pwm_is_enabled(pwm)) {
-> +		int err;
-> +
-> +		err = pwm->chip->ops->enable(pwm->chip, pwm);
-> +		if (!err)
-> +			pwm->state.enabled = true;
-> +
-> +		return err;
-> +	}
+> This is the driver for the Security System included in Allwinner SoC A20.
+> The Security System (SS for short) is a hardware cryptographic accelerator that
+> support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+> It could be found on others Allwinner SoC: 
+> - A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
+> - A23 speak about a security system but without precisions
+> - A80 and A83T datasheet speak about a security system with more functions
+>   (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver.
 
-Technically there's now a race between the pwm_is_enabled() and
-pwm->state.enabled = true; statements, but as discussed in the cover
-letter I think that's fine because of the assumptions about concurrent
-usage of PWMs.
-
-The most important check (PWMF_REQUESTED) is still atomic, so it is
-still up to drivers to properly lock concurrent access to a PWM device
-and the core will make sure that a device can only be requested once.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/4840dad3/attachment.sig>
+All applied.  Thanks a lot!
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
