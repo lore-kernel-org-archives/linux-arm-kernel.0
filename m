@@ -1,50 +1,54 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 20 Jul 2015 10:16:05 +0200
-Subject: [PATCH V4 RFC 0/3] nvmem: add ocotp support for i.MX23 and i.MX28
-In-Reply-To: <55AC970D.6090707@i2se.com>
-References: <1437343499-16422-1-git-send-email-stefan.wahren@i2se.com>
- <201507200007.30100.marex@denx.de> <55AC970D.6090707@i2se.com>
-Message-ID: <201507201016.05699.marex@denx.de>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 20 Jul 2015 10:16:00 +0200
+Subject: [RFC PATCH 08/15] backlight: pwm_bl: remove useless call to
+ pwm_set_period
+In-Reply-To: <1435738921-25027-9-git-send-email-boris.brezillon@free-electrons.com>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150720081559.GI29614@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 20, 2015 at 08:37:01 AM, Stefan Wahren wrote:
-> Hi Marek,
-
-Hi!
-
-> Am 20.07.2015 um 00:07 schrieb Marek Vasut:
-> > On Monday, July 20, 2015 at 12:04:56 AM, Stefan Wahren wrote:
-> >> This patch series brings read-only support for the On-Chip OTP cells
-> >> in the i.MX23 and i.MX28 processor.
-> >> 
-> >> It has been a long time since V3 of this series [1]. The last version
-> >> has been rejected because there was no standard interface to the OTP
-> >> data. So this version bases on V7 of the new NVMEM framework [2] which
-> >> required a nearly complete rewrite of the driver.
-> >> 
-> >> [1] -
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-October/29522
-> >> 8. html [2] -
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355652.h
-> >> tm l
-> > 
-> > Are you sure you even want this support in kernel ?
+On Wed, Jul 01, 2015 at 10:21:54AM +0200, Boris Brezillon wrote:
+> The PWM period will be set when calling pwm_config. Remove this useless
+> call to pwm_set_period, which might mess up with the initial PWM state
+> once we have added proper support for PWM init state retrieval.
 > 
-> definitely. But only read-only support make sense. Please believe me, i
-> didn't wait since last year for the NVMEM framework just for fun.
-
-:)
-
-> > Isn't it enough to have
-> > this in some manufacturing-time mutated bootloader to program the OTP
-> > once and never touch it again ?
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/video/backlight/pwm_bl.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
-> No, our products uses a previous version of this patch series to set the
-> MAC address of a network interface from OTP data. I also get some
-> feedback from other users that they are happy about this driver.
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index ae498c1..fe5597c 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -295,10 +295,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  	 * via the PWM lookup table.
+>  	 */
+>  	pb->period = pwm_get_default_period(pb->pwm);
+> -	if (!pb->period && (data->pwm_period_ns > 0)) {
+> +	if (!pb->period && (data->pwm_period_ns > 0))
+>  		pb->period = data->pwm_period_ns;
+> -		pwm_set_period(pb->pwm, data->pwm_period_ns);
+> -	}
+>  
+>  	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
 
-OK, now I understand. This makes perfect sense indeed.
+As far as I remember this line is there in order to pass in a period if
+the backlight driver is initialized from board setup files. In such a
+case there won't be an period associated with the PWM channel in the
+first place.
 
-Best regards,
-Marek Vasut
+I think even with the introduction of a default period, we'd be missing
+out on the board setup case because there is no standard place where it
+is being set, so it must come from the platform data.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/ba0f22ea/attachment.sig>
