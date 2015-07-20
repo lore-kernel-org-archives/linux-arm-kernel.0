@@ -1,40 +1,59 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 20 Jul 2015 10:46:18 -0700
-Subject: [PATCH v5 1/2] mtd: nand: sunxi: Replace failsafe timing cfg
- with calculated value
-In-Reply-To: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
-References: <1435309211-15236-1-git-send-email-r.spliet@ultimaker.com>
-Message-ID: <20150720174618.GF24125@google.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 20 Jul 2015 10:46:27 -0700
+Subject: [PATCH 07/10] opp: Add OPP sharing information to OPP library
+In-Reply-To: <20150718063304.GD11802@linux>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <2e1c7fcc1fb62f73c82bd57d196d054ba2607a55.1434369079.git.viresh.kumar@linaro.org>
+ <55A986DD.3010104@codeaurora.org> <20150718063304.GD11802@linux>
+Message-ID: <55AD33F3.4000302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 11:00:10AM +0200, Roy Spliet wrote:
-> The TIMING_CFG register was previously statically set to a magic value
-> (extracted from Allwinner's BSP) when initializing the NAND controller.
-> Now that we have more details about the TIMING_CFG register layout
-> (extracted from the A83 user manual) we can dynamically calculate the
-> appropriate value for each NAND chip and set it when selecting the
-> chip.
-> 
-> Signed-off-by: Roy Spliet <r.spliet@ultimaker.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> ---
-> V2:
-> - Fix crippled comments
-> 
-> V3:
-> - Warn for invalid timings
-> - Style
-> 
-> V4:
-> - Make better use of return types
-> - Style and comments
-> - Remove superfluous initialisation
-> 
-> V5:
-> - Tidy up macros
+On 07/17/2015 11:33 PM, Viresh Kumar wrote:
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Wed, 11 Feb 2015 16:16:28 +0800
+> Subject: [PATCH] opp: Add OPP sharing information to OPP library
+>
+> An opp can be shared by multiple devices, for example its very common
+> for CPUs to share the OPPs, i.e. when they share clock/voltage rails.
+>
+> This patch adds support of shared OPPs to the OPP library.
+>
+> Instead of a single device, dev_opp will not contain a list of devices
+> that use it. It also senses if the device (we are trying to initialize
+> OPPs for) shares OPPs with a device added earlier and in that case we
+> update the list of devices managed by OPPs instead of duplicating OPPs
+> again.
+>
+> The same infrastructure will be used for the old OPP bindings, with
+> later patches.
+>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Pushed both to l2-mtd.git. Thanks!
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Brian
+> +static struct device_opp *_managed_opp(const struct device_node *np)
+> +{
+> +	struct device_opp *dev_opp;
+> +
+> +	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node)
+> +		if (dev_opp->np == np) {
+> +			/*
+> +			 * Multiple devices can point to the same OPP table and
+> +			 * so will have same node-pointer, np.
+> +			 *
+> +			 * But the OPPs will be considered as shared only if the
+> +			 * OPP table contains a "opp-shared" property.
+> +			 */
+> +			if (dev_opp->shared_opp)
+> +				return dev_opp;
+> +			else
+> +				return NULL;
+> +		
+
+The janitors will probably find this and say that it could be simplified 
+to an if () and a return without the else.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
