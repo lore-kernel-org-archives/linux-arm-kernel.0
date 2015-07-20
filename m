@@ -1,65 +1,74 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 20 Jul 2015 18:00:57 +0100
-Subject: [PATCH 1/2] arm64: dma-mapping: implement dma_get_sgtable()
-In-Reply-To: <20150720163645.GM9908@arm.com>
-References: <65a75c2ea16d0fff8e8ec18a8f42e204c33249ed.1437148528.git.robin.murphy@arm.com>
- <20150720163645.GM9908@arm.com>
-Message-ID: <55AD2949.2040401@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Jul 2015 18:12:42 +0100
+Subject: [PATCH v2 1/5] arm64: alternative: Provide if/else/endif
+ assembler macros
+In-Reply-To: <1437405004-1296-2-git-send-email-daniel.thompson@linaro.org>
+References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
+ <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
+ <1437405004-1296-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20150720171242.GP9908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi Daniel,
 
-On 20/07/15 17:36, Will Deacon wrote:
-> On Fri, Jul 17, 2015 at 04:58:21PM +0100, Robin Murphy wrote:
->> The default dma_common_get_sgtable() implementation relies on the CPU
->> address of the buffer being a regular lowmem address. This is not always
->> the case on arm64, since allocations from the various DMA pools may have
->> remapped vmalloc addresses, rendering the use of virt_to_page() invalid.
->>
->> Fix this by providing our own implementation based on the fact that we
->> can safely derive a physical address from the DMA address in both cases.
->>
->> CC: Jon Medhurst <tixy@linaro.org>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>   arch/arm64/mm/dma-mapping.c | 14 ++++++++++++++
->>   1 file changed, 14 insertions(+)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index d16a1ce..4b9b600 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -337,10 +337,24 @@ static int __swiotlb_mmap(struct device *dev,
->>   	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
->>   }
->>
->> +int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
->> +			  void *cpu_addr, dma_addr_t handle, size_t size,
->> +			  struct dma_attrs *attrs)
->> +{
->> +	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
->> +
->> +	if (!ret)
->> +		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
->> +			    PAGE_ALIGN(size), 0);
->> +
->> +	return ret;
->> +}
->
-> Any reason not to do this in dma_common_get_sgtable?
+Couple of really small comments.
 
-Summarising the discussion over at [1], most architectures seem to 
-depend on dma_common_get_sgtable, but only a handful implement 
-dma_to_phys (plus this approach seems to match the original intent). 
-There doesn't seem to be a nice solution for doing this in common code 
-without a big cross-architecture patch, and it's somewhat questionable 
-how widely this is actually needed.
+On Mon, Jul 20, 2015 at 04:10:00PM +0100, Daniel Thompson wrote:
+> The existing alternative_insn macro has some limitations that make it
+> hard to work with. In particular the fact it takes instructions from it
+> own macro arguments means it doesn't play very nicely with C pre-processor
+> macros because the macro arguments look like a string to the C
+> pre-processor. Workarounds are (probably) possible but things start to
+> look ugly.
+> 
+> Introduce an alternative set of macros that allows instructions to be
+> presented to the assembler as normal and switch everything over to the
+> new macros.
+> 
+> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+> ---
+>  arch/arm64/include/asm/alternative.h | 40 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+> index c385a0c4057f..31b19ad18f7e 100644
+> --- a/arch/arm64/include/asm/alternative.h
+> +++ b/arch/arm64/include/asm/alternative.h
+> @@ -77,6 +77,46 @@ void free_alternatives_memory(void);
+>  	.org	. - (662b-661b) + (664b-663b)
+>  .endm
+>  
+> +/*
+> + * Begin an alternative code sequence.
+> + *
+> + * The code that follows this marco will be assembled and linked as
+> + * normal. There are no restrictions on this code.
 
-Robin.
+s/marco/macro/
 
-[1]:http://thread.gmane.org/gmane.linux.kernel/1998795
+> + */
+> +.macro alternative_if_not cap
+> +	.pushsection .altinstructions, "a"
+> +	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
+> +	.popsection
+> +661:
+> +.endm
+> +
+> +/*
+> + * Provide the alternative code sequence.
+> + *
+> + * The code that follows this macro is assembled into a special
+> + * section to be used for dynamic patching. Code that follows this
+> + * macro must:
+> + *
+> + * 1. Be exactly the same length (in bytes) as the default code
+> + *    sequence.
+> + *
+> + * 2. Not jump to local labels defined outside of the alternative
+> + *    sequence.
 
->
-> Will
->
+Actually, we fix up the branch target during patching. What you can't do
+is jump into *another* alternative sequence.
+
+Will
