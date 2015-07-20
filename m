@@ -1,59 +1,74 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 20 Jul 2015 10:46:27 -0700
-Subject: [PATCH 07/10] opp: Add OPP sharing information to OPP library
-In-Reply-To: <20150718063304.GD11802@linux>
-References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <2e1c7fcc1fb62f73c82bd57d196d054ba2607a55.1434369079.git.viresh.kumar@linaro.org>
- <55A986DD.3010104@codeaurora.org> <20150718063304.GD11802@linux>
-Message-ID: <55AD33F3.4000302@codeaurora.org>
+From: adam.yh.lee@gmail.com (Adam Lee)
+Date: Mon, 20 Jul 2015 10:47:28 -0700
+Subject: [PATCH] [TWL4030 MADC] Fix ADC[3:6] readings
+In-Reply-To: <alpine.DEB.2.02.1507171136180.14972@pmeerw.net>
+References: <1437085227-28845-1-git-send-email-adam.yh.lee@gmail.com>
+ <1437085227-28845-2-git-send-email-adam.yh.lee@gmail.com>
+ <20150717090039.GC9331@earth>
+ <alpine.DEB.2.02.1507171136180.14972@pmeerw.net>
+Message-ID: <CAFeBWL6ARBReHq8jom3kGu3iOaPib41nOJ3-gx358nYwsGKLfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/17/2015 11:33 PM, Viresh Kumar wrote:
-> From: Viresh Kumar <viresh.kumar@linaro.org>
-> Date: Wed, 11 Feb 2015 16:16:28 +0800
-> Subject: [PATCH] opp: Add OPP sharing information to OPP library
->
-> An opp can be shared by multiple devices, for example its very common
-> for CPUs to share the OPPs, i.e. when they share clock/voltage rails.
->
-> This patch adds support of shared OPPs to the OPP library.
->
-> Instead of a single device, dev_opp will not contain a list of devices
-> that use it. It also senses if the device (we are trying to initialize
-> OPPs for) shares OPPs with a device added earlier and in that case we
-> update the list of devices managed by OPPs instead of duplicating OPPs
-> again.
->
-> The same infrastructure will be used for the old OPP bindings, with
-> later patches.
->
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Hello, here is some more context from the TPS65950's TRM [1].
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Quoting from section 15.3.1.2.1 VUSB3V1 section:
 
-> +static struct device_opp *_managed_opp(const struct device_node *np)
-> +{
-> +	struct device_opp *dev_opp;
-> +
-> +	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node)
-> +		if (dev_opp->np == np) {
-> +			/*
-> +			 * Multiple devices can point to the same OPP table and
-> +			 * so will have same node-pointer, np.
-> +			 *
-> +			 * But the OPPs will be considered as shared only if the
-> +			 * OPP table contains a "opp-shared" property.
-> +			 */
-> +			if (dev_opp->shared_opp)
-> +				return dev_opp;
-> +			else
-> +				return NULL;
-> +		
+    "VUSB3V1 is also used to bias analog multiplexers on the four MCPC
+pins between the carkit and the MADC (supplied by VINTANA2)."
 
-The janitors will probably find this and say that it could be simplified 
-to an if () and a return without the else.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+And from section 15.4.11. MADC Monitoring Using MCPC:
+
+    "Four MCPC pins can be selected as analog conversion input pins by
+setting the CARKIT_ANA_CTRL[3] SEL_MADC_MCPC bit."
+
+My patch addresses both (set the register, and enable 3v1). And yes it
+has been tested on Gumstix Overo COMs (OMAP3 + TPS65950).
+
+Hope to hear from IIO maintainers!
+
+[1] http://www.droid-developers.org/images/2/21/Tps65950_TRM.pdf
+
+On Fri, Jul 17, 2015 at 2:42 AM, Peter Meerwald <pmeerw@pmeerw.net> wrote:
+> Hello,
+>
+> adding linux-iio...
+>
+>> To get a chance of this patch being considered for inclusion, you
+>> should send this to the maintainers of the phy and iio framework.
+>> There is a high chance, that none of them will see your mail.
+>>
+>> On Thu, Jul 16, 2015 at 03:20:27PM -0700, Adam YH Lee wrote:
+>> > MADC[3:6] reads incorrect values without these two following changes:
+>>
+>> uhm MADC[3:6] are externally available analog inputs. Your
+>> change will result in them being tied to the USB module.
+>
+> change regarding TWL4030_USB_SEL_MADC_MCPC is necessary at
+> least for some hardware revisions to get proper ADC values
+>
+>> > - enable the 3v1 bias regulator for ADC[3:6]
+>>
+>> The regulator is not required for correct MADC functionality, but
+>> for correct USB measureing. The regulator should not be requested
+>> by the madc module, but by the usb module, which is connected to
+>> the madc.
+>
+> in my experience, the MADC exhibits several strange things, I wouldn't be
+> surprised that this bias is somehow necessary for operation even if it is
+> not what the spec says -- has this been tested?
+>
+>> > - configure ADC[3:6] lines as input, not as USB
+>>
+>> I don't think that should be done for all boards.
+>>
+>> > [...]
+>>
+>> -- Sebastian
+>>
+>
+> --
+>
+> Peter Meerwald
+> +43-664-2444418 (mobile)
