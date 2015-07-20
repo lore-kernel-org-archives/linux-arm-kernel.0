@@ -1,31 +1,36 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 20 Jul 2015 12:33:07 -0700
-Subject: [PATCH v4 8/8] ARM: bcm2835: Use the firmware on rpi to get the EMMC
- clock.
+Date: Mon, 20 Jul 2015 12:33:04 -0700
+Subject: [PATCH v4 5/8] clk: bcm2835: Drop the fixed sys_pclk.
 In-Reply-To: <1437420787-32137-1-git-send-email-eric@anholt.net>
 References: <1437420787-32137-1-git-send-email-eric@anholt.net>
-Message-ID: <1437420787-32137-9-git-send-email-eric@anholt.net>
+Message-ID: <1437420787-32137-6-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This updates the MMC frequency from 100Mhz to 250Mhz.
+Nothing uses it, and I can't find any evidence that anything ever has.
+Its role is now filled by the core clock in the firmware driver.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/clk/clk-bcm2835.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 0a32123..5d370cb 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -62,6 +62,7 @@
- &sdhci {
- 	status = "okay";
- 	bus-width = <4>;
-+	clocks = <&firmware_clocks RPI_CLOCK_EMMC>;
- };
+diff --git a/drivers/clk/clk-bcm2835.c b/drivers/clk/clk-bcm2835.c
+index 6b950ca..dd295e4 100644
+--- a/drivers/clk/clk-bcm2835.c
++++ b/drivers/clk/clk-bcm2835.c
+@@ -32,11 +32,6 @@ void __init bcm2835_init_clocks(void)
+ 	struct clk *clk;
+ 	int ret;
  
- &uart0 {
+-	clk = clk_register_fixed_rate(NULL, "sys_pclk", NULL, CLK_IS_ROOT,
+-					250000000);
+-	if (IS_ERR(clk))
+-		pr_err("sys_pclk not registered\n");
+-
+ 	clk = clk_register_fixed_rate(NULL, "apb_pclk", NULL, CLK_IS_ROOT,
+ 					126000000);
+ 	if (IS_ERR(clk))
 -- 
 2.1.4
