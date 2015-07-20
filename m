@@ -1,64 +1,50 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 20 Jul 2015 16:10:02 +0100
-Subject: [PATCH v2 3/5] arm64: kernel: Adopt new alternative assembler macros
+Date: Mon, 20 Jul 2015 16:10:03 +0100
+Subject: [PATCH v2 4/5] arm64: kvm: Adopt new alternative assembler macros
 In-Reply-To: <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
  <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437405004-1296-4-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437405004-1296-5-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the dynamic patching for ARM64_WORKAROUND_845719 over to
+Convert the dynamic patching for ARM64_HAS_SYSREG_GIC_CPUIF over to
 the newly added alternative assembler macros.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm64/kernel/entry.S | 29 +++++++++++++----------------
- 1 file changed, 13 insertions(+), 16 deletions(-)
+ arch/arm64/kvm/hyp.S | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index a7691a378668..be8a70d4028c 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -122,26 +122,23 @@
- 	ct_user_enter
- 	ldr	x23, [sp, #S_SP]		// load return stack pointer
- 	msr	sp_el0, x23
--
- #ifdef CONFIG_ARM64_ERRATUM_845719
--
--#undef SEQUENCE_ORG
--#undef SEQUENCE_ALT
--
-+alternative_if_not ARM64_WORKAROUND_845719
-+	nop
-+	nop
- #ifdef CONFIG_PID_IN_CONTEXTIDR
--
--#define SEQUENCE_ORG	"nop ; nop ; nop"
--#define SEQUENCE_ALT	"tbz x22, #4, 1f ; mrs x29, contextidr_el1; msr contextidr_el1, x29; 1:"
--
-+	nop
-+#endif
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 17a8fb14f428..10915aaf0b01 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -810,7 +810,11 @@
+  * Call into the vgic backend for state saving
+  */
+ .macro save_vgic_state
+-	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
++alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
++	bl	__save_vgic_v2_state
 +alternative_else
-+	tbz	x22, #4, 1f
-+#ifdef CONFIG_PID_IN_CONTEXTIDR
-+	mrs	x29, contextidr_el1
-+	msr	contextidr_el1, x29
- #else
--
--#define SEQUENCE_ORG	"nop ; nop"
--#define SEQUENCE_ALT	"tbz x22, #4, 1f ; msr contextidr_el1, xzr; 1:"
--
-+	msr contextidr_el1, xzr
- #endif
--
--	alternative_insn SEQUENCE_ORG, SEQUENCE_ALT, ARM64_WORKAROUND_845719
--
-+1:
++	bl	__save_vgic_v3_state
 +alternative_endif
- #endif
- 	.endif
- 	msr	elr_el1, x21			// set up the return data
+ 	mrs	x24, hcr_el2
+ 	mov	x25, #HCR_INT_OVERRIDE
+ 	neg	x25, x25
+@@ -827,7 +831,11 @@
+ 	orr	x24, x24, #HCR_INT_OVERRIDE
+ 	orr	x24, x24, x25
+ 	msr	hcr_el2, x24
+-	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
++alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
++	bl	__restore_vgic_v2_state
++alternative_else
++	bl	__restore_vgic_v3_state
++alternative_endif
+ .endm
+ 
+ .macro save_timer_state
 -- 
 2.4.3
