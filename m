@@ -1,72 +1,89 @@
 From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Tue, 21 Jul 2015 03:02:20 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6ul: fix low case define in imx6ul-pinfunc.h
-Message-ID: <1437418941-19051-1-git-send-email-Frank.Li@freescale.com>
+Date: Tue, 21 Jul 2015 03:02:21 +0800
+Subject: [PATCH 2/2] ARM: dts: imx6ul: add qspi support
+In-Reply-To: <1437418941-19051-1-git-send-email-Frank.Li@freescale.com>
+References: <1437418941-19051-1-git-send-email-Frank.Li@freescale.com>
+Message-ID: <1437418941-19051-2-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Frank Li <Frank.Li@freescale.com>
 
-some pin name should be capital "_B" instead of "_b"
+enable qspi support
 
 Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- arch/arm/boot/dts/imx6ul-pinfunc.h | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 26 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6ul.dtsi          | 13 +++++++++++++
+ 2 files changed, 39 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
-index 83d6ccb..20c7da1 100644
---- a/arch/arm/boot/dts/imx6ul-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
-@@ -666,7 +666,7 @@
- #define MX6UL_PAD_NAND_RE_B__ECSPI3_SS2                          	0x0178 0x0404 0x0000 8 0
- #define MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B                        	0x017c 0x0408 0x0000 0 0
- #define MX6UL_PAD_NAND_WE_B__USDHC2_CMD                          	0x017c 0x0408 0x0678 1 2
--#define MX6UL_PAD_NAND_WE_B__QSPI_B_SS0_b                        	0x017c 0x0408 0x0000 2 0
-+#define MX6UL_PAD_NAND_WE_B__QSPI_B_SS0_B                        	0x017c 0x0408 0x0000 2 0
- #define MX6UL_PAD_NAND_WE_B__KPP_COL00                           	0x017c 0x0408 0x0000 3 0
- #define MX6UL_PAD_NAND_WE_B__EIM_EB_B01                          	0x017c 0x0408 0x0000 4 0
- #define MX6UL_PAD_NAND_WE_B__GPIO4_IO01                          	0x017c 0x0408 0x0000 5 0
-@@ -753,14 +753,14 @@
- #define MX6UL_PAD_NAND_READY_B__GPIO4_IO12                       	0x01a8 0x0434 0x0000 5 0
- #define MX6UL_PAD_NAND_READY_B__UART3_DCE_TX                         	0x01a8 0x0434 0x0000 8 0
- #define MX6UL_PAD_NAND_READY_B__UART3_DTE_RX                         	0x01a8 0x0434 0x0634 8 2
--#define MX6UL_PAD_NAND_CE0_b__RAWNAND_CE0_b                      	0x01ac 0x0438 0x0000 0 0
--#define MX6UL_PAD_NAND_CE0_b__USDHC1_DATA5                       	0x01ac 0x0438 0x0000 1 0
--#define MX6UL_PAD_NAND_CE0_b__QSPI_A_DATA01                      	0x01ac 0x0438 0x0000 2 0
--#define MX6UL_PAD_NAND_CE0_b__ECSPI3_SCLK                        	0x01ac 0x0438 0x0554 3 1
--#define MX6UL_PAD_NAND_CE0_b__EIM_DTACK_B                        	0x01ac 0x0438 0x0000 4 0
--#define MX6UL_PAD_NAND_CE0_b__GPIO4_IO13                         	0x01ac 0x0438 0x0000 5 0
--#define MX6UL_PAD_NAND_CE0_b__UART3_DCE_RX                           	0x01ac 0x0438 0x0634 8 3
--#define MX6UL_PAD_NAND_CE0_b__UART3_DTE_TX                           	0x01ac 0x0438 0x0000 8 0
-+#define MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B                      	0x01ac 0x0438 0x0000 0 0
-+#define MX6UL_PAD_NAND_CE0_B__USDHC1_DATA5                       	0x01ac 0x0438 0x0000 1 0
-+#define MX6UL_PAD_NAND_CE0_B__QSPI_A_DATA01                      	0x01ac 0x0438 0x0000 2 0
-+#define MX6UL_PAD_NAND_CE0_B__ECSPI3_SCLK                        	0x01ac 0x0438 0x0554 3 1
-+#define MX6UL_PAD_NAND_CE0_B__EIM_DTACK_B                        	0x01ac 0x0438 0x0000 4 0
-+#define MX6UL_PAD_NAND_CE0_B__GPIO4_IO13                         	0x01ac 0x0438 0x0000 5 0
-+#define MX6UL_PAD_NAND_CE0_B__UART3_DCE_RX                           	0x01ac 0x0438 0x0634 8 3
-+#define MX6UL_PAD_NAND_CE0_B__UART3_DTE_TX                           	0x01ac 0x0438 0x0000 8 0
- #define MX6UL_PAD_NAND_CE1_B__RAWNAND_CE1_B                      	0x01b0 0x043c 0x0000 0 0
- #define MX6UL_PAD_NAND_CE1_B__USDHC1_DATA6                       	0x01b0 0x043c 0x0000 1 0
- #define MX6UL_PAD_NAND_CE1_B__QSPI_A_DATA02                      	0x01b0 0x043c 0x0000 2 0
-@@ -779,7 +779,7 @@
- #define MX6UL_PAD_NAND_CLE__UART3_DTE_CTS                        	0x01b4 0x0440 0x0000 8 0
- #define MX6UL_PAD_NAND_DQS__RAWNAND_DQS                          	0x01b8 0x0444 0x0000 0 0
- #define MX6UL_PAD_NAND_DQS__CSI_FIELD                            	0x01b8 0x0444 0x0530 1 1
--#define MX6UL_PAD_NAND_DQS__QSPI_A_SS0_b                         	0x01b8 0x0444 0x0000 2 0
-+#define MX6UL_PAD_NAND_DQS__QSPI_A_SS0_B                         	0x01b8 0x0444 0x0000 2 0
- #define MX6UL_PAD_NAND_DQS__PWM5_OUT                             	0x01b8 0x0444 0x0000 3 0
- #define MX6UL_PAD_NAND_DQS__EIM_WAIT                             	0x01b8 0x0444 0x0000 4 0
- #define MX6UL_PAD_NAND_DQS__GPIO4_IO16                           	0x01b8 0x0444 0x0000 5 0
-@@ -834,7 +834,7 @@
- #define MX6UL_PAD_CSI_MCLK__USDHC2_CD_B                          	0x01d4 0x0460 0x0674 1 0
- #define MX6UL_PAD_CSI_MCLK__RAWNAND_CE2_B                        	0x01d4 0x0460 0x0000 2 0
- #define MX6UL_PAD_CSI_MCLK__I2C1_SDA                             	0x01d4 0x0460 0x05a8 3 0
--#define MX6UL_PAD_CSI_MCLK__EIM_CS0_b                            	0x01d4 0x0460 0x0000 4 0
-+#define MX6UL_PAD_CSI_MCLK__EIM_CS0_B                            	0x01d4 0x0460 0x0000 4 0
- #define MX6UL_PAD_CSI_MCLK__GPIO4_IO17                           	0x01d4 0x0460 0x0000 5 0
- #define MX6UL_PAD_CSI_MCLK__SNVS_HP_VIO_5_CTL                    	0x01d4 0x0460 0x0000 6 0
- #define MX6UL_PAD_CSI_MCLK__UART6_DCE_TX                             	0x01d4 0x0460 0x0000 8 0
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 3d676ef..b314024 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -44,6 +44,21 @@
+ 	soc-supply = <&reg_soc>;
+ };
+ 
++&qspi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_qspi>;
++	status = "okay";
++
++	flash0: n25q256a at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "micron,n25q256a";
++		spi-max-frequency = <29000000>;
++		spi-nor,ddr-quad-read-dummy = <6>;
++		reg = <0>;
++	};
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -206,6 +221,17 @@
+ 		>;
+ 	};
+ 
++	pinctrl_qspi: qspigrp {
++		fsl,pins = <
++			MX6UL_PAD_NAND_WP_B__QSPI_A_SCLK	0x70a1
++			MX6UL_PAD_NAND_READY_B__QSPI_A_DATA00	0x70a1
++			MX6UL_PAD_NAND_CE0_B__QSPI_A_DATA01	0x70a1
++			MX6UL_PAD_NAND_CE1_B__QSPI_A_DATA02	0x70a1
++			MX6UL_PAD_NAND_CLE__QSPI_A_DATA03	0x70a1
++			MX6UL_PAD_NAND_DQS__QSPI_A_SS0_B	0x70a1
++		>;
++	};
++
+ 	pinctrl_pwm1: pwm1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_GPIO1_IO08__PWM1_OUT   0x110b0
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index 61507ef..3e36f97 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -592,6 +592,19 @@
+ 				status = "disabled";
+ 			};
+ 
++			qspi: qspi@021e0000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "fsl,imx6ul-qspi", "fsl, imx6sx-qspi";
++				reg = <0x021e0000 0x4000>, <0x60000000 0x10000000>;
++				reg-names = "QuadSPI", "QuadSPI-memory";
++				interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_QSPI>,
++					 <&clks IMX6UL_CLK_QSPI>;
++				clock-names = "qspi_en", "qspi";
++				status = "disabled";
++			};
++
+ 			uart2: serial at 021e8000 {
+ 				compatible = "fsl,imx6ul-uart",
+ 					     "fsl,imx6q-uart";
 -- 
 1.9.1
