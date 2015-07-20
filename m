@@ -1,114 +1,55 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Jul 2015 11:33:43 +0200
-Subject: [PATCH v2 1/2] power: reset: at91: add sama5d3 reset function
-In-Reply-To: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
+Date: Mon, 20 Jul 2015 11:34:00 +0200
+Subject: [PATCH v2 2/2] ARM: at91: sama5/dt: update rstc to correct
+ compatible string
+In-Reply-To: <1437384726-24927-2-git-send-email-josh.wu@atmel.com>
 References: <1437384726-24927-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20150720093343.GF15539@piout.net>
+ <1437384726-24927-2-git-send-email-josh.wu@atmel.com>
+Message-ID: <20150720093400.GG15539@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/2015 at 17:32:05 +0800, Josh Wu wrote :
-> This patch introduces a new compatible string: "atmel,sama5d3-rstc" and
-> new reset function for sama5d3 and later chips.
+On 20/07/2015 at 17:32:06 +0800, Josh Wu wrote :
+> They'll use "atmel,sama5d3-rstc" for reset function.
 > 
-> As in sama5d3 or later chips, we don't have to shutdown the DDR
-> controller before reset. Shutdown the DDR controller before reset is a
-> workaround to avoid DDR signal driving the bus, but since sama5d3 and
-> later chips there is no such a conflict.
-> 
-> So in this patch:
->    1. the sama5d3 reset function only need to write the rstc register
-> and return.
->    2. we can remove the code related with sama5d3 DDR controller as
-> we don't use it at all.
-> 
+> Cc: devicetree at vger.kernel.org
 > Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
 > ---
 > 
-> Changes in v2:
-> - aligned the function parameters to be consist with the coding style
-> - refined the commit log
-> - add binding document changes
-> - use of_device_is_compitable() instead
+> Changes in v2: None
 > 
->  .../devicetree/bindings/arm/atmel-at91.txt         |  2 +-
->  drivers/power/reset/at91-reset.c                   | 26 ++++++++++++++++------
->  2 files changed, 20 insertions(+), 8 deletions(-)
+>  arch/arm/boot/dts/sama5d3.dtsi | 2 +-
+>  arch/arm/boot/dts/sama5d4.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> index 424ac8c..dd998b9 100644
-> --- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> +++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
-> @@ -87,7 +87,7 @@ One interrupt per TC channel in a TC block:
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index 9e2444b..280255b 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -1259,7 +1259,7 @@
+>  			};
 >  
->  RSTC Reset Controller required properties:
->  - compatible: Should be "atmel,<chip>-rstc".
-> -  <chip> can be "at91sam9260" or "at91sam9g45"
-> +  <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
->  - reg: Should contain registers location and length
+>  			rstc at fffffe00 {
+> -				compatible = "atmel,at91sam9g45-rstc";
+> +				compatible = "atmel,sama5d3-rstc";
+>  				reg = <0xfffffe00 0x10>;
+>  			};
 >  
->  Example:
-> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> index 36dc52f..c378d4e 100644
-> --- a/drivers/power/reset/at91-reset.c
-> +++ b/drivers/power/reset/at91-reset.c
-> @@ -123,6 +123,15 @@ static int at91sam9g45_restart(struct notifier_block *this, unsigned long mode,
->  	return NOTIFY_DONE;
->  }
+> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+> index 3ee22ee..481196c 100644
+> --- a/arch/arm/boot/dts/sama5d4.dtsi
+> +++ b/arch/arm/boot/dts/sama5d4.dtsi
+> @@ -1277,7 +1277,7 @@
+>  			};
 >  
-> +static int sama5d3_restart(struct notifier_block *this, unsigned long mode,
-> +			   void *cmd)
-> +{
-> +	writel(cpu_to_le32(AT91_RSTC_KEY | AT91_RSTC_PERRST | AT91_RSTC_PROCRST),
-> +	       at91_rstc_base);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
->  static void __init at91_reset_status(struct platform_device *pdev)
->  {
->  	u32 reg = readl(at91_rstc_base + AT91_RSTC_SR);
-> @@ -155,13 +164,13 @@ static void __init at91_reset_status(struct platform_device *pdev)
->  static const struct of_device_id at91_ramc_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-sdramc", },
->  	{ .compatible = "atmel,at91sam9g45-ddramc", },
-> -	{ .compatible = "atmel,sama5d3-ddramc", },
->  	{ /* sentinel */ }
->  };
+>  			rstc at fc068600 {
+> -				compatible = "atmel,at91sam9g45-rstc";
+> +				compatible = "atmel,sama5d3-rstc";
+>  				reg = <0xfc068600 0x10>;
+>  			};
 >  
->  static const struct of_device_id at91_reset_of_match[] = {
->  	{ .compatible = "atmel,at91sam9260-rstc", .data = at91sam9260_restart },
->  	{ .compatible = "atmel,at91sam9g45-rstc", .data = at91sam9g45_restart },
-> +	{ .compatible = "atmel,sama5d3-rstc", .data = sama5d3_restart },
->  	{ /* sentinel */ }
->  };
->  
-> @@ -181,13 +190,16 @@ static int at91_reset_of_probe(struct platform_device *pdev)
->  		return -ENODEV;
->  	}
->  
-> -	for_each_matching_node(np, at91_ramc_of_match) {
-> -		at91_ramc_base[idx] = of_iomap(np, 0);
-> -		if (!at91_ramc_base[idx]) {
-> -			dev_err(&pdev->dev, "Could not map ram controller address\n");
-> -			return -ENODEV;
-> +	if (!of_device_is_compatible(pdev->dev.of_node, "atmel,sama5d3-rstc")) {
-> +		/* we need to shutdown the ddr controller, so get ramc base */
-> +		for_each_matching_node(np, at91_ramc_of_match) {
-> +			at91_ramc_base[idx] = of_iomap(np, 0);
-> +			if (!at91_ramc_base[idx]) {
-> +				dev_err(&pdev->dev, "Could not map ram controller address\n");
-> +				return -ENODEV;
-> +			}
-> +			idx++;
->  		}
-> -		idx++;
->  	}
->  
->  	match = of_match_node(at91_reset_of_match, pdev->dev.of_node);
 > -- 
 > 1.9.1
 > 
