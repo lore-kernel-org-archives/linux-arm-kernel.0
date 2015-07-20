@@ -1,150 +1,233 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Mon, 20 Jul 2015 22:39:39 +0800
-Subject: [PATCH v2 5/5] arm64: dts: mediatek: add xHCI & usb phy for mt8173
-In-Reply-To: <CAGS+omDfUv0KW8K45rLoN8qUV2Q_vgWFK_X4Ojb6K55G9tiehA@mail.gmail.com>
-References: <1436348468-4126-1-git-send-email-chunfeng.yun@mediatek.com>
- <1436348468-4126-6-git-send-email-chunfeng.yun@mediatek.com>
- <CAGS+omDfUv0KW8K45rLoN8qUV2Q_vgWFK_X4Ojb6K55G9tiehA@mail.gmail.com>
-Message-ID: <1437403179.11518.10.camel@mhfsdcap03>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 20 Jul 2015 15:42:32 +0100
+Subject: [PATCH v8 0/9] Add simple NVMEM Framework via regmap.
+Message-ID: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Greg,
 
-On Tue, 2015-07-14 at 18:12 +0800, Daniel Kurtz wrote:
-> Hi Chunfeng,
-> 
-> On Wed, Jul 8, 2015 at 5:41 PM, Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 15 +++++++++++++++
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 27 +++++++++++++++++++++++++++
-> >  2 files changed, 42 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > index f433c21..cb63dc3 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> > @@ -13,6 +13,7 @@
-> >   */
-> >
-> >  /dts-v1/;
-> > +#include <dt-bindings/gpio/gpio.h>
-> >  #include "mt8173.dtsi"
-> >
-> >  / {
-> > @@ -32,6 +33,15 @@
-> >         };
-> >
-> >         chosen { };
-> > +
-> > +       usb_p1_vbus: fixedregulator at 0 {
-> 
-> Why @0 ?
-It is the first fixed regulator, so set it to 0 as a index.
-I will remove it later
-> 
-> > +               compatible = "regulator-fixed";
-> > +               regulator-name = "usb_vbus";
-> > +               regulator-min-microvolt = <5000000>;
-> > +               regulator-max-microvolt = <5000000>;
-> > +               gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
-> > +               enable-active-high;
-> > +       };
-> >  };
-> >
-> >  &pwrap {
-> > @@ -211,3 +221,8 @@
-> >  &uart0 {
-> >         status = "okay";
-> >  };
-> > +
-> > +&usb {
-> > +       reg-vusb33-supply = <&mt6397_vusb_reg>;
-> > +       reg-vbus-supply = <&usb_p1_vbus>;
-> > +};
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 0696f8f..452bd0a 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -15,6 +15,7 @@
-> >  #include <dt-bindings/interrupt-controller/irq.h>
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >  #include <dt-bindings/reset-controller/mt8173-resets.h>
-> > +#include <dt-bindings/power/mt8173-power.h>
-> 
-> Sort alphabetically, so:
-> power before reset
-> 
-Ok
-> >  #include "mt8173-pinfunc.h"
-> >
-> >  / {
-> > @@ -393,6 +394,32 @@
-> >                         #size-cells = <0>;
-> >                         status = "disabled";
-> >                 };
-> > +
-> > +               usb: usb30 at 11270000 {
-> > +                       compatible = "mediatek,mt8173-xhci";
-> > +                       reg = <0 0x11270000 0 0x1000>;
-> > +                       interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-> > +                       usb-phy = <&u3phy>;
-> > +                       usb3-lpm-capable;
-> > +                       clocks = <&topckgen CLK_TOP_USB30_SEL>;
-> > +                       clock-names = "sys_mac";
-> > +               };
-> > +
-> > +               u3phy: usb-phy at 11271000 {
-> > +                       compatible = "mediatek,mt8173-u3phy";
-> > +                       reg = <0 0x11271000 0 0x3000>,
-> > +                             <0 0x11280000 0 0x20000>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-> > +                       usb-wakeup-ctrl = <&pericfg>;
-> > +                       wakeup-src = <1>;
-> > +                       u2port-num = <2>;
-> 
-> Mediatek specific properties should be prefixed with "mediatek,".
-> I also find it nicer if you put the standard properties first:
->   (compatible, reg, clocks, clock-names, power-domains)
-> then device specific properties:
->   (usb-wakeup-ctrl, wakeup-src, u2port-num)
-> and then the final:
->   status="disabled";
-> 
-> This last is currently missing, so please add it, too.
-> 
-I will revise it. Thanks a lot.
+ This patchset adds a new simple NVMEM framework to kernel, and it is tested
+with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
+"begal bone cape manager" and few more on the way.
 
-> Also, is there some pinctrl settings that must be set for USB?
-> 
-There is no special pinctrl setting for USB on EVB board on which driver
-is tested.
+Thankyou all for providing inputs and comments on previous versions of this
+patchset. Here is the v8 of the patchset addressing all the issues raised as
+part of previous versions review.
 
-> Lastly, I could not quite figure out which patch this set was based on.
-> Patch [0] mentions v4.2-rc1, however, the .dts changes in this patch
-> did not apply cleanly.
-> Perhaps it was based on a particular patch of Matthias tree?
-> 
-Yes, it is.
-> Thanks!
-> -Dan
-> 
-> > +                       clocks = <&pericfg CLK_PERI_USB0>,
-> > +                                <&pericfg CLK_PERI_USB1>,
-> > +                                <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-> > +                       clock-names = "wakeup_deb_p0",
-> > +                                     "wakeup_deb_p1",
-> > +                                     "u3phya_ref";
-> > +               };
-> >         };
-> >  };
-> >
-> > --
-> > 1.8.1.1.dirty
-> >
-> >
-> > _______________________________________________
-> > Linux-mediatek mailing list
-> > Linux-mediatek at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Up until now, NVMEM drivers like eeprom were stored in drivers/misc, where they
+all had to duplicate pretty much the same code to register a sysfs file, allow
+in-kernel users to access the content of the devices they were driving, etc.
+This was also a problem as far as other in-kernel users were involved, since
+the solutions used were pretty much different from on driver to another, there
+was a rather big abstraction leak.
+    
+Introduction of this framework aims at solving this. It also introduces DT
+representation for consumer devices to go get the data they require (MAC
+Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs.
+    
+After learning few things about QCOM qfprom and other eeprom/efuses, which
+has packed fields at bit level. Which makes it important to add support to
+such memories. This version adds support to this type of non volatile
+memories by adding support to bit level nvmem-cells.
+
+Having regmap interface to this framework would give much better
+abstraction for nvmems on different buses.
+
+patch 1-4 Introduces the NVMEM framework.
+Patch 5-6 Adds Qualcomm specific qfprom driver.
+Patch 7 migrates an existing driver to nvmem framework.
+Patch 8 adds entry in MAINTAINERS.
+
+Its also possible to migrate other nvmem drivers to this framework, and I think
+some of them already posted patches based on this framework.
+
+Providers APIs:
+	nvmem_register/unregister();
+
+Consumers APIs:
+Cell based apis for both DT/Non-DT:
+	nvmem_cell_get()/nvmem_cell_put();
+	devm_nvmem_cell_get()/devm_nvmem_cell_put();
+	of_nvmem_cell_get()
+	nvmem_cell_read()/nvmem_cell_write();
+
+Raw byte access apis for both DT/non-DT.
+	nvmem_device_get()/nvmem_device_put()
+	devm_nvmem_device_get()/nvmem_device_put()
+	of_nvmem_device_get()
+
+	nvmem_device_read()/nvmem_device_write();
+	nvmem_device_cell_read()/nvmem_device_cell_write();
+
+Device Tree:
+
+	/* Provider */
+	qfprom: qfprom at 00700000 {
+		...
+
+		/* Data cells */
+		tsens_calibration: calib at 404 {
+			reg = <0x404 0x10>;
+		};
+
+		tsens_calibration_bckp: calib_bckp at 504 {
+			reg = <0x504 0x11>;
+			bits = <6 128>
+		};
+
+		pvs_version: pvs-version at 6 {
+			reg = <0x6 0x2>
+			bit-offset = 7;
+			bits = <7 2>
+		};
+
+		speed_bin: speed-bin at c{
+			reg = <0xc 0x1>;
+			bits = <2 3>;
+
+		};
+		...
+	};
+/* Consumer */
+	tsens {
+		...
+		nvmem-cells = <&tsens_calibration>;
+		nvmem-cell-names = "calibration";
+	};
+
+userspace interface: binary file in /sys/bus/nvmem/devices/*/nvmem
+
+ex:
+hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
+                                                                                                                                                                                                                  
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+*
+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
+0000000 0000 0000 0000 0000 0000 0000 0000 0000
+...
+*
+0001000
+
+Changes since v7 (https://lwn.net/Articles/650734/)
+ * Fixed various style and documentation reated comments
+ from Stephen Boyd, Stephen Wahren and Joe Perches.
+ * Fixed read-only flag as suggested by Philipp Zabel
+ * Changed bit level bindings as suggesed by Rob Herring.
+
+Changes since v6 (https://lkml.org/lkml/2015/6/24/325)
+ * Replaced class usage with bus, suggested by Stephen Boyd.
+ * various cosmetic and header cleanups suggested by Stefan Wahren
+ * changed nvmem-cell property to nvmem-cells spotted by Rajendra Nayak
+
+Changes since v5(https://lkml.org/lkml/2015/5/21/643)
+ * skipped regmap patches which are already merged by Mark.
+ * Fixed lot of style related comments by Stephen.
+ * Fixed sunxi driver.
+ * added devm_* variants requested by Stephen.
+ * added of_* variants requested by Pantelis Antoniou
+ * added read_only options for non-dt drivers.
+ * added basic how-to doc.
+
+Changes since v4(https://lkml.org/lkml/2015/3/30/725)
+ * rename eeprom to nvmem suggested by Matt Porter
+ * added bit level support to nvmem cells, if not framework is
+ 	not usable for qcom platforms.
+ * removed ternary operator shortcut suggested by Mark B.
+ * unified consumer/provider apis for both DT and non-DT.
+ * added name support for cell.
+ * added bit level bindings.
+ * added read-only support suggested by Matt Porter and others.
+ * added new nvmem_device based consumer apis.
+
+Changes since v3(https://lkml.org/lkml/2015/3/24/1066)
+ * simplified logic in bin_attr_eeprom_read/write spotted by Mark Brown.
+ * moved from using regmap_bulk_read/write to regmap_raw_read/write
+ spotted by Mark Brown
+ * Fixed return error codes for the dummy wrappers spotted by Sascha Hauer
+ * Fixed various error code checks in core spotted by Sascha Hauer.
+ * Simplified consumer bindings suggested by Sascha Hauer.
+ * Added eeprom-mmio helper functions.
+
+Changes since v2(https://lkml.org/lkml/2015/3/13/168)
+ * Fixed error handling in eeprom_register spotted by Mark Brown
+ * Added new regmap_get_max_register() and regmap_get_reg_stride().
+ * Fixed module build errors reported by kbuild robot.
+ * recycle the ids when eeprom provider is released.
+
+Changes since v1(https://lkml.org/lkml/2015/3/5/153)
+ * Fix various Licencing issues spotted by Paul Bolle and Mark Brown
+ * Allow eeprom core to build as module spotted by Paul Bolle.
+ * Fix various kconfig issues spotted by Paul Bolle.
+ * remove unessary atomic varible spotted by Mark Brown.
+ * Few cleanups and common up some of the code in core.
+ * Add qfprom bindings.
+
+Changes since RFC(https://lkml.org/lkml/2015/2/19/307)
+ * Fix documentation and error checks in read/write spotted by Andrew Lunn
+ * Kconfig fix suggested by Stephen Boyd.
+ * Add module owner suggested by Stephen Boyd and others.
+ * Fix unsafe handling of eeprom in unregister spotted by Russell and Mark Brown.
+ * seperate bindings patch as suggested by Rob.
+ * Add MAINTAINERS as suggested by Rob.
+ * Added support to allow reading eeprom for things like serial number which
+ * canbe scatters across.
+ * Added eeprom data using reg property suggested by Sascha and Stephen.
+ * Added non-DT support.
+ * Move kerneldoc to the src files spotted by Mark Brown.
+ * Remove local list and do eeprom lookup by using class_find_device()
+
+
+Thanks,
+srini
+
+Maxime Ripard (1):
+  nvmem: sunxi: Move the SID driver to the nvmem framework
+
+Srinivas Kandagatla (8):
+  nvmem: Add a simple NVMEM framework for nvmem providers
+  nvmem: Add a simple NVMEM framework for consumers
+  nvmem: Add nvmem_device based consumer apis.
+  nvmem: Add bindings for simple nvmem framework
+  Documentation: nvmem: add nvmem api level and how-to doc
+  nvmem: qfprom: Add Qualcomm QFPROM support.
+  nvmem: qfprom: Add bindings for qfprom
+  nvmem: Add to MAINTAINERS for nvmem framework
+
+ Documentation/ABI/testing/sysfs-driver-sunxi-sid   |   22 -
+ .../bindings/misc/allwinner,sunxi-sid.txt          |   17 -
+ .../bindings/nvmem/allwinner,sunxi-sid.txt         |   21 +
+ Documentation/devicetree/bindings/nvmem/nvmem.txt  |   80 ++
+ Documentation/devicetree/bindings/nvmem/qfprom.txt |   35 +
+ Documentation/nvmem/nvmem.txt                      |  152 +++
+ MAINTAINERS                                        |    9 +
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/misc/eeprom/Kconfig                        |   13 -
+ drivers/misc/eeprom/Makefile                       |    1 -
+ drivers/misc/eeprom/sunxi_sid.c                    |  156 ---
+ drivers/nvmem/Kconfig                              |   39 +
+ drivers/nvmem/Makefile                             |   12 +
+ drivers/nvmem/core.c                               | 1057 ++++++++++++++++++++
+ drivers/nvmem/qfprom.c                             |   86 ++
+ drivers/nvmem/sunxi_sid.c                          |  159 +++
+ include/linux/nvmem-consumer.h                     |  157 +++
+ include/linux/nvmem-provider.h                     |   47 +
+ 19 files changed, 1857 insertions(+), 209 deletions(-)
+ delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+ delete mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/nvmem.txt
+ create mode 100644 Documentation/devicetree/bindings/nvmem/qfprom.txt
+ create mode 100644 Documentation/nvmem/nvmem.txt
+ delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+ create mode 100644 drivers/nvmem/Kconfig
+ create mode 100644 drivers/nvmem/Makefile
+ create mode 100644 drivers/nvmem/core.c
+ create mode 100644 drivers/nvmem/qfprom.c
+ create mode 100644 drivers/nvmem/sunxi_sid.c
+ create mode 100644 include/linux/nvmem-consumer.h
+ create mode 100644 include/linux/nvmem-provider.h
+
+-- 
+1.9.1
