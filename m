@@ -1,26 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Jul 2015 11:18:45 +0200
-Subject: [PATCH v2 1/7] pinctrl: UniPhier: add UniPhier pinctrl core
- support
-In-Reply-To: <CAK7LNARjFdM6du3tM7RfdXEHktM=4z6XrYag9DM-z+Y0o79jNA@mail.gmail.com>
-References: <1436841607-7556-1-git-send-email-yamada.masahiro@socionext.com>
- <1436841607-7556-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdZFfypZfDAmULcC1_q_bYD-nsh2H0rMAqo+ncWsBx6m=A@mail.gmail.com>
- <CAK7LNARjFdM6du3tM7RfdXEHktM=4z6XrYag9DM-z+Y0o79jNA@mail.gmail.com>
-Message-ID: <CACRpkdZuuAzjcXupuHsi6BSkZzomaR6uVafWsVTS_BjiHG8u1g@mail.gmail.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 20 Jul 2015 11:23:39 +0200
+Subject: [PATCH 4/7] Documentation: mtd: add a DT property to set the
+ latency code of Spansion memory
+In-Reply-To: <201507161944.20523.marex@denx.de>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+ <398ca9f17bda638e05e97f258fb4e6d27ac828db.1437059658.git.cyrille.pitchen@atmel.com>
+ <201507161944.20523.marex@denx.de>
+Message-ID: <55ACBE1B.6050507@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 19, 2015 at 6:19 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+Hi Marek,
 
-> I saw the applied patch and noticed "Changes in v2"
-> was moved to git-description.
-(...)
-> Do we need to record such stuff in the git history?
+Le 16/07/2015 19:44, Marek Vasut a ?crit :
+> On Thursday, July 16, 2015 at 05:27:51 PM, Cyrille Pitchen wrote:
+> 
+> Hi!
+> 
+>> Both the SPI controller and the NOR flash memory need to agree on the
+>> number of dummy cycles to use for Fast Read commands. For Spansion
+>> memories, this number of dummy cycles is not given directly but through a
+>> so called "latency code".
+>> The latency code can be found into the memory datasheet and depends on the
+>> SPI clock frequency, the Fast Read op code and the Single/Dual Data Rate
+>> mode.
+> 
+> Shouldn't you be able to derive the latency code from the above information,
+> which you already know then ?
+Yes I agree with you; this could have been done adding static tables inside the
+driver instead of creating a new DT property dedicated to Spansion memories.
 
-There is no "we", it is up to the subsystem maintainer what
-s/he wants to record in the commit blurb.
+When I wrote this patch, I had a close look at the s25fl512s datasheet but only
+overviewed few datasheets for other Spansion QSPI flash memories. So I don't
+know whether a single latency code table could be shared among all Spansion
+memories or many tables should be added to support different memory models.
 
-Yours,
-Linus Walleij
+That's why I've chosen to add a dedicated DT property to support Spansion
+memories as it avoids to add tables to guess the proper latency code to be
+used. I thought it would be more flexible.
+
+Maybe I will remove the support of Spansion QSPI memories from this series for
+now. Their support can still be implemented later.
+
+Anyway, thanks for your review :)
+
+> 
+> Best regards,
+> Marek Vasut
+> 
+
+Best Regards,
+
+Cyrille
