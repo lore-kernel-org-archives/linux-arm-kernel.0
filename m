@@ -1,136 +1,115 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 20 Jul 2015 22:42:22 +0200
-Subject: [PATCH 1/2] ARM: dts: add buffalo linkstation ls-wtgl
-In-Reply-To: <1436878802-25712-2-git-send-email-rogershimizu@gmail.com>
-References: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
- <1436878802-25712-2-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20150720204222.GA21011@lunn.ch>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 20 Jul 2015 15:49:10 -0500
+Subject: [PATCH RESEND] irqchip: omap-intc: improve IRQ handler
+In-Reply-To: <alpine.DEB.2.11.1507202241550.18576@nanos>
+References: <1437410759-4945-1-git-send-email-balbi@ti.com>
+ <alpine.DEB.2.11.1507202241550.18576@nanos>
+Message-ID: <20150720204910.GH5394@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 10:00:01PM +0900, Roger Shimizu wrote:
-> Add dts file to support Buffalo Linkstation LS-WTGL,
-> which is marvell orion5x based 2-bay 3.5" HDD NAS.
-> Product info:
->  - (JPN) http://buffalo.jp/products/catalog/storage/ls-wtgl_r1/
->  - (ENG) http://www.buffalotech.com/support-and-downloads/download/LinkStation_Pro_Duo_Manual_web.pdf
+On Mon, Jul 20, 2015 at 10:44:08PM +0200, Thomas Gleixner wrote:
+> On Mon, 20 Jul 2015, Felipe Balbi wrote:
+> > +	irqnr = intc_readl(INTC_SIR);
+> > +	irqnr &= ACTIVEIRQ_MASK;
+> > +	WARN(!irqnr, "Spurious IRQ ?\n");
 > 
-> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
-> ---
->  arch/arm/boot/dts/Makefile                       |   1 +
->  arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 242 +++++++++++++++++++++++
->  2 files changed, 243 insertions(+)
->  create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index a8bf702..f3ddfa0 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -464,6 +464,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
->  dtb-$(CONFIG_ARCH_ORION5X) += \
->  	orion5x-lacie-d2-network.dtb \
->  	orion5x-lacie-ethernet-disk-mini-v2.dtb \
-> +	orion5x-linkstation-lswtgl.dtb \
->  	orion5x-maxtor-shared-storage-2.dtb \
->  	orion5x-rd88f5182-nas.dtb
->  dtb-$(CONFIG_ARCH_PRIMA2) += \
-> diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> new file mode 100644
-> index 0000000..6d021bd
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-> @@ -0,0 +1,242 @@
-> +/*
-> + * Device Tree file for Buffalo Linkstation LS-WTGL
-> + *
-> + * Copyright (C) 2015, Roger Shimizu <rogershimizu@gmail.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
+> Shouldn't that be WARN_ONCE?
 
-Hi Roger
+Sure, why not ?
 
-Could you licence this under both GPL and X11? See the recent posting
-by Benjamin Cama for the WSGL.
+8<--------------------------------------------------------------------
 
-> +
-> +/dts-v1/;
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/input/input.h>
-> +#include "orion5x-mv88f5182.dtsi"
-> +
-> +/ {
-> +	model = "Buffalo Linkstation LS-WTGL";
-> +	compatible = "buffalo,lswtgl", "marvell,orion5x-88f5182", "marvell,orion5x";
-> +
-> +	memory { /* 64 MB */
-> +		device_type = "memory";
-> +		reg = <0x00000000 0x4000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk";
-> +		linux,stdout-path = &uart0;
-> +	};
-> +
-> +	soc {
-> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
-> +		         <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
-> +			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
-> +
-> +		internal-regs {
-> +			pinctrl: pinctrl at 10000 {
-> +				pinctrl-0 = <&pmx_usb_power &pmx_power_hdd
-> +					&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-> +				pinctrl-names = "default";
-> +
-> +				pmx_led_power: pmx-leds {
-> +					marvell,pins = "mpp0";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_led_alarm: pmx-leds {
-> +					marvell,pins = "mpp2";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_led_info: pmx-leds {
-> +					marvell,pins = "mpp3";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_power_hdd: pmx-power-hdd {
-> +					marvell,pins = "mpp1";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_usb_power: pmx-usb-power {
-> +					marvell,pins = "mpp9";
-> +					marvell,function = "gpio";
-> +				};
-> +
-> +				pmx_sata0: pmx-sata0 {
-> +					marvell,pins = "mpp12";
-> +					//marvell,function = "gpio";
+>From a71590d725e54b888db278de6c278d2a106fc76d Mon Sep 17 00:00:00 2001
+From: Felipe Balbi <balbi@ti.com>
+Date: Fri, 2 Jan 2015 16:18:54 -0600
+Subject: [PATCH RESEND v2] irqchip: omap-intc: improve IRQ handler
 
-Please remove commented out lines.
+as it turns out the current IRQ number will
+*always* be available from SIR register which
+renders the reads of PENDING registers as plain
+unnecessary overhead.
 
-> +					marvell,function = "sata0";
-> +				};
-> +
-> +				pmx_sata1: pmx-sata1 {
-> +					marvell,pins = "mpp13";
-> +					//marvell,function = "gpio";
+In order to catch any situation where SIR reads
+as zero, we're adding a WARN() to turn it into
+a very verbose error and users actually report
+it.
 
-Same here.
+With this patch average running time of
+omap_intc_handle_irq() reduced from about 28.5us
+to 19.8us as measured by the kernel function
+profiler.
 
-> +					marvell,function = "sata1";
-> +				};
+Tested with BeagleBoneBlack Rev A5C.
 
-Otherwise this looks good.
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
-	  Andrew
+Changes from V1:
+
+ - replace WARN() with WARN_ONCE()
+
+ drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
+ 1 file changed, 5 insertions(+), 30 deletions(-)
+
+diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
+index a569c6dbd1d1..e15f10746310 100644
+--- a/drivers/irqchip/irq-omap-intc.c
++++ b/drivers/irqchip/irq-omap-intc.c
+@@ -331,37 +331,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
+ static asmlinkage void __exception_irq_entry
+ omap_intc_handle_irq(struct pt_regs *regs)
+ {
+-	u32 irqnr = 0;
+-	int handled_irq = 0;
+-	int i;
+-
+-	do {
+-		for (i = 0; i < omap_nr_pending; i++) {
+-			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
+-			if (irqnr)
+-				goto out;
+-		}
+-
+-out:
+-		if (!irqnr)
+-			break;
+-
+-		irqnr = intc_readl(INTC_SIR);
+-		irqnr &= ACTIVEIRQ_MASK;
++	u32 irqnr;
+ 
+-		if (irqnr) {
+-			handle_domain_irq(domain, irqnr, regs);
+-			handled_irq = 1;
+-		}
+-	} while (irqnr);
+-
+-	/*
+-	 * If an irq is masked or deasserted while active, we will
+-	 * keep ending up here with no irq handled. So remove it from
+-	 * the INTC with an ack.
+-	 */
+-	if (!handled_irq)
+-		omap_ack_irq(NULL);
++	irqnr = intc_readl(INTC_SIR);
++	irqnr &= ACTIVEIRQ_MASK;
++	WARN_ONCE(!irqnr, "Spurious IRQ ?\n");
++	handle_domain_irq(domain, irqnr, regs);
+ }
+ 
+ void __init omap3_init_irq(void)
+-- 
+2.4.4
+
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/6a9f0eb0/attachment.sig>
