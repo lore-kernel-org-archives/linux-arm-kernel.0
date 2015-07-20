@@ -1,63 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Mon, 20 Jul 2015 12:59:41 +0300
-Subject: [PATCH V3 02/19] memory: tegra: Add MC flush support
-In-Reply-To: <20150717113124.GP3057@ulmo>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-3-git-send-email-jonathanh@nvidia.com>
- <20150717095754.GG3057@ulmo>
- <20150717102049.GQ6287@tbergstrom-lnx.Nvidia.com>
- <20150717113124.GP3057@ulmo>
-Message-ID: <20150720095941.GZ6287@tbergstrom-lnx.Nvidia.com>
+From: jianwei.wang.chn@gmail.com (Jianwei Wang)
+Date: Mon, 20 Jul 2015 17:54:02 +0800
+Subject: [PATCH v11 5/5] arm/dts/ls1021a: Add a TFT LCD panel dts node
+In-Reply-To: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
+References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
+Message-ID: <1437386042-34825-5-git-send-email-jianwei.wang.chn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 01:31:24PM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Fri, Jul 17, 2015 at 01:20:49PM +0300, Peter De Schrijver wrote:
-> > On Fri, Jul 17, 2015 at 11:57:55AM +0200, Thierry Reding wrote:
-> > > > Old Signed by an unknown key
-> > > 
-> > > On Mon, Jul 13, 2015 at 01:39:40PM +0100, Jon Hunter wrote:
-> > > > The Tegra memory controller implements a flush feature to flush pending
-> > > > accesses and prevent further accesses from occurring. This feature is
-> > > > used when powering down IP blocks to ensure the IP block is in a good
-> > > > state. The flushes are organised by software groups and IP blocks are
-> > > > assigned in hardware to the different software groups. Add helper
-> > > > functions for requesting a handle to an MC flush for a given
-> > > > software group and enabling/disabling the MC flush itself.
-> > > > 
-> > > > This is based upon a change by Vince Hsu <vinceh@nvidia.com>.
-> > > > 
-> > > > Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
-> > > > ---
-> > > >  drivers/memory/tegra/mc.c | 110 ++++++++++++++++++++++++++++++++++++++++++++++
-> > > >  drivers/memory/tegra/mc.h |   2 +
-> > > >  include/soc/tegra/mc.h    |  34 ++++++++++++++
-> > > >  3 files changed, 146 insertions(+)
-> > > 
-> > > Do we know if this is actually necessary? I remember having a discussion
-> > > with Arnd Bergmann a while ago, and the Linux driver model kind of
-> > > assumes that by the time a device is disabled all outstanding accesses
-> > > will have stopped.
-> > > 
-> > > Do we have a way to determine that this even makes a difference? Can we
-> > > trigger a case where not doing this would cause breakage and see that
-> > > adding this fixes that particular issue?
-> > > 
-> > 
-> > Most likely it is. The memory controller can still be processing requests
-> > when the peripheral domain is powergated. This would mean the response cannot
-> > be delivered in that case. So we need to be sure there are no outstanding
-> > requests before shutting down the domain.
-> 
-> My point is that that's the driver's responsibility anyway, hence making
-> the explicit flush unnecessary.
-> 
+Add a TFT LCD panel. the TFT LCD panel is WQVGA "480x272",
+and the bpp is 24.
 
-The peripheral driver doesn't know how long a request is queued in the memory
-controller. So it can't be responsible for ensuring this.
+Signed-off-by: Alison Wang <b18965@freescale.com>
+Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+Reviewed-by: Alison Wang <alison.wang@freescale.com>
+---
+ arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Cheers,
-
-Peter.
+diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
+index a2c591e..2443329 100644
+--- a/arch/arm/boot/dts/ls1021a-twr.dts
++++ b/arch/arm/boot/dts/ls1021a-twr.dts
+@@ -56,6 +56,17 @@
+ 		enet0_sgmii_phy = &sgmii_phy2;
+ 		enet1_sgmii_phy = &sgmii_phy0;
+ 	};
++
++	panel: panel {
++		compatible = "nec,nl4827hc19_05b";
++	};
++
++};
++
++&dcu {
++	fsl,panel = <&panel>;
++	status = "okay";
++
+ };
+ 
+ &dspi1 {
+-- 
+2.1.0.27.g96db324
