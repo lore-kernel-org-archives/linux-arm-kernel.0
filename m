@@ -1,44 +1,38 @@
-From: mperttunen@nvidia.com (Mikko Perttunen)
-Date: Mon, 20 Jul 2015 10:54:29 +0300
-Subject: [PATCH v2 4/4] ARM: tegra: Add VIC for Tegra124
-In-Reply-To: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
-References: <1437378869-10451-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <1437378869-10451-5-git-send-email-mperttunen@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Jul 2015 10:00:07 +0200
+Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
+In-Reply-To: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20150720080007.GR28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arto Merilainen <amerilainen@nvidia.com>
+Hi,
 
-This patch adds VIC device tree node for Video Image Compositor.
+On Fri, Jul 10, 2015 at 05:14:44PM +0200, Hans de Goede wrote:
+> Some sdio wifi modules have not been working reliable with the sunxi-mmc
+> host code. This turns out to be caused by it starting new commands while
+> the card signals that it is still busy processing a previous command.
+> 
+> This commit fixes this, thereby fixing the wifi reliability issues on
+> the Cubietruck and other sunxi boards using sdio wifi.
+> 
+> Reported-by: Eugene K <sigintmailru@gmail.com>
+> Suggested-by: Eugene K <sigintmailru@gmail.com>
+> Cc: Eugene K <sigintmailru@gmail.com>
 
-Signed-off-by: Arto Merilainen <amerilainen@nvidia.com>
-Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
----
- arch/arm/boot/dts/tegra124.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+You should use the "real" name here, and not some shortening.
 
-diff --git a/arch/arm/boot/dts/tegra124.dtsi b/arch/arm/boot/dts/tegra124.dtsi
-index 87318a7..1233f4a 100644
---- a/arch/arm/boot/dts/tegra124.dtsi
-+++ b/arch/arm/boot/dts/tegra124.dtsi
-@@ -137,6 +137,18 @@
- 			status = "disabled";
- 		};
- 
-+		vic at 0,54340000 {
-+			compatible = "nvidia,tegra124-vic";
-+			reg = <0x0 0x54340000 0x0 0x00040000>;
-+			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&tegra_car TEGRA124_CLK_VIC03>;
-+			clock-names = "vic";
-+			resets = <&tegra_car TEGRA124_CLK_VIC03>;
-+			reset-names = "vic";
-+
-+			iommus = <&mc TEGRA_SWGROUP_VIC>;
-+		};
-+
- 		sor at 0,54540000 {
- 			compatible = "nvidia,tegra124-sor";
- 			reg = <0x0 0x54540000 0x0 0x00040000>;
+Maxime
+
 -- 
-2.1.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/af9c8cfa/attachment.sig>
