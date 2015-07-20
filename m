@@ -1,38 +1,43 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Mon, 20 Jul 2015 16:10:01 +0100
-Subject: [PATCH v2 2/5] arm64: mm: Adopt new alternative assembler macros
+Date: Mon, 20 Jul 2015 16:10:04 +0100
+Subject: [PATCH v2 5/5] arm64: alternative: Remove alternative_insn macro
 In-Reply-To: <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
  <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437405004-1296-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437405004-1296-6-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the dynamic patching for ARM64_WORKAROUND_CLEAN_CACHE over to
-the newly added alternative assembler macros.
+This macro has been superceded by the alterntive_if_not/else/endif
+macro family and is no longer used anywhere in the kerne. Remove it.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm64/mm/cache.S | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/alternative.h | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index bdeb5d38c2dd..eb48d5df4a0f 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -143,7 +143,12 @@ __dma_clean_range:
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x0, x0, x3
--1:	alternative_insn "dc cvac, x0", "dc civac, x0", ARM64_WORKAROUND_CLEAN_CACHE
-+1:
-+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-+	dc	cvac, x0
-+alternative_else
-+	dc	civac, x0
-+alternative_endif
- 	add	x0, x0, x2
- 	cmp	x0, x1
- 	b.lo	1b
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index 31b19ad18f7e..3267f0b9104a 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -65,18 +65,6 @@ void free_alternatives_memory(void);
+ 	.byte \alt_len
+ .endm
+ 
+-.macro alternative_insn insn1 insn2 cap
+-661:	\insn1
+-662:	.pushsection .altinstructions, "a"
+-	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+-	.popsection
+-	.pushsection .altinstr_replacement, "ax"
+-663:	\insn2
+-664:	.popsection
+-	.org	. - (664b-663b) + (662b-661b)
+-	.org	. - (662b-661b) + (664b-663b)
+-.endm
+-
+ /*
+  * Begin an alternative code sequence.
+  *
 -- 
 2.4.3
