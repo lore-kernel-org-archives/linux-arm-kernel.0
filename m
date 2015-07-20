@@ -1,89 +1,32 @@
-From: wangyijing@huawei.com (Yijing Wang)
-Date: Mon, 20 Jul 2015 20:01:08 +0800
-Subject: [PATCH part3 v12 00/10] Cleanup platform pci_domain_nr()
-Message-ID: <1437393678-4077-1-git-send-email-wangyijing@huawei.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 20 Jul 2015 07:12:06 -0500
+Subject: [PATCH v3 2/8] ACPI / irqchip: Add self-probe
+ infrastructure to initialize IRQ controller
+In-Reply-To: <55ACC022.1000800@linaro.org>
+References: <1436525114-14425-1-git-send-email-hanjun.guo@linaro.org>	<1436525114-14425-3-git-send-email-hanjun.guo@linaro.org>
+ <CAOZdJXWB71tzc=OMm_UH23jc+_wsA5=pC5W9arrEM-URm_sywg@mail.gmail.com>
+ <55ACC022.1000800@linaro.org>
+Message-ID: <55ACE596.10709@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is splitted out from previous patchset
-"Refine PCI scan interfaces and make generic pci host bridge".
-It try to clean up all platform pci_domain_nr(), save domain
-in pci_host_bridge, so we could get domain number from the
-common interface. 
+Hanjun Guo wrote:
+>> Should we display an error message if we don't find a matching table?
+>> That can happen if the ACPI tables shows a GIC version number that is
+>> not listed in __irqchip_acpi_table[]?
+>
+> Hmm, did you get the error message like: "Invalid GIC version 5 in
+> MADT"? or just use ACPI_MADT_GIC_VERSION_V1 as the gic_version? if
+> the later one, it will show everything is fine, but failed to probe
+> the GIC.
 
-v11->v12:
-  Introduce wrap function pci_create_root_bus_generic()
-  and pci_create_root_bus_generic() for arm/arm64 which
-  enable CONFIG_PCI_DOMAINS_GENERIC.
-  Rebased this series based 4.2-rc1
+We had a bug in our ACPI tables that listed the GIC version as 1, and it 
+failed to probe and then the kernel panicked.  It took me a while to 
+figure out what was wrong, so I think it should print an error message 
+that says that version X is unsupported.
 
-Yijing Wang (10):
-  PCI: Save domain in pci_host_bridge
-  PCI: Move pci_bus_assign_domain_nr() declaration into
-    drivers/pci/pci.h
-  PCI: Remove declaration for pci_get_new_domain_nr()
-  PCI: Introduce pci_host_assign_domain_nr() to assign domain
-  powerpc/PCI: Rename pcibios_root_bridge_prepare() to
-    pcibios_root_bus_prepare()
-  PCI: Make pci_host_bridge hold sysdata in drvdata
-  PCI: Create pci host bridge prior to root bus
-  PCI: Introduce common pci_domain_nr() and remove platform specific
-    code
-  PCI: Remove pci_bus_assign_domain_nr()
-  IA64/PCI: Fix build warning found by kbuild test
 
- arch/alpha/include/asm/pci.h             |    2 -
- arch/alpha/kernel/pci.c                  |    4 +-
- arch/alpha/kernel/sys_nautilus.c         |    2 +-
- arch/arm/kernel/bios32.c                 |    2 +-
- arch/arm/mach-dove/pcie.c                |    2 +-
- arch/arm/mach-iop13xx/pci.c              |    4 +-
- arch/arm/mach-mv78xx0/pcie.c             |    2 +-
- arch/arm/mach-orion5x/pci.c              |    4 +-
- arch/frv/mb93090-mb00/pci-vdk.c          |    3 +-
- arch/ia64/include/asm/pci.h              |    1 -
- arch/ia64/pci/pci.c                      |    6 +-
- arch/ia64/sn/kernel/io_acpi_init.c       |    6 +-
- arch/ia64/sn/kernel/io_init.c            |    6 +-
- arch/m68k/coldfire/pci.c                 |    2 +-
- arch/microblaze/include/asm/pci.h        |    2 -
- arch/microblaze/pci/pci-common.c         |   15 +----
- arch/mips/include/asm/pci.h              |    2 -
- arch/mips/pci/pci.c                      |    4 +-
- arch/mn10300/unit-asb2305/pci.c          |    3 +-
- arch/powerpc/include/asm/machdep.h       |    2 +-
- arch/powerpc/include/asm/pci.h           |    2 -
- arch/powerpc/kernel/pci-common.c         |   21 ++-----
- arch/powerpc/platforms/pseries/pci.c     |    2 +-
- arch/powerpc/platforms/pseries/pseries.h |    2 +-
- arch/powerpc/platforms/pseries/setup.c   |    2 +-
- arch/s390/include/asm/pci.h              |    1 -
- arch/s390/pci/pci.c                      |   10 +---
- arch/sh/drivers/pci/pci.c                |    4 +-
- arch/sh/include/asm/pci.h                |    2 -
- arch/sparc/include/asm/pci_64.h          |    1 -
- arch/sparc/kernel/leon_pci.c             |    2 +-
- arch/sparc/kernel/pci.c                  |   21 +------
- arch/sparc/kernel/pcic.c                 |    2 +-
- arch/tile/include/asm/pci.h              |    2 -
- arch/tile/kernel/pci.c                   |    4 +-
- arch/tile/kernel/pci_gx.c                |    4 +-
- arch/unicore32/kernel/pci.c              |    2 +-
- arch/x86/include/asm/pci.h               |    6 --
- arch/x86/pci/acpi.c                      |    6 +-
- arch/x86/pci/common.c                    |    2 +-
- arch/xtensa/kernel/pci.c                 |    2 +-
- drivers/parisc/dino.c                    |    2 +-
- drivers/parisc/lba_pci.c                 |    2 +-
- drivers/pci/host/pci-versatile.c         |    3 +-
- drivers/pci/host/pci-xgene.c             |    2 +-
- drivers/pci/host/pcie-designware.c       |    2 +-
- drivers/pci/host/pcie-iproc.c            |    2 +-
- drivers/pci/host/pcie-xilinx.c           |    2 +-
- drivers/pci/hotplug/ibmphp_core.c        |    2 +-
- drivers/pci/pci.c                        |   31 ++++++++--
- drivers/pci/pci.h                        |    1 +
- drivers/pci/probe.c                      |   92 +++++++++++++++++-------------
- drivers/pci/xen-pcifront.c               |    2 +-
- include/linux/pci.h                      |   39 ++++++-------
- 54 files changed, 161 insertions(+), 195 deletions(-)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
