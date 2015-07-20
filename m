@@ -1,63 +1,48 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Jul 2015 15:56:12 +0200
-Subject: [PATCH] tty/serial: atmel: use proper accessors
-Message-ID: <1437400572-16575-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 20 Jul 2015 15:01:01 +0100
+Subject: [PATCH v2 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <1437154221-5736-7-git-send-email-james.morse@arm.com>
+References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
+ <1437154221-5736-7-git-send-email-james.morse@arm.com>
+Message-ID: <20150720140100.GL20385@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM, it is necessary to use the _relaxed versions of read[bl] and
-write[bl] to ensure we do the correct endianness conversion when running in
-big endian.
-Keep using avr32 __raw version on avr32 to avoid breakage.
+On Fri, Jul 17, 2015 at 06:30:21PM +0100, James Morse wrote:
+> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> index 56391fbae1e1..f243bb1adaa5 100644
+> --- a/arch/arm64/include/asm/sysreg.h
+> +++ b/arch/arm64/include/asm/sysreg.h
+> @@ -20,12 +20,21 @@
+>  #ifndef __ASM_SYSREG_H
+>  #define __ASM_SYSREG_H
+>  
+> +#include <asm/opcodes.h>
+> +
+>  #define SCTLR_EL1_CP15BEN	(0x1 << 5)
+>  #define SCTLR_EL1_SED		(0x1 << 8)
+>  
+>  #define sys_reg(op0, op1, crn, crm, op2) \
+>  	((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+>  
+> +#define REG_PSTATE_PAN_IMM                     sys_reg(2, 0, 4, 0, 4)
+> +#define PSTATE_PAN                             (1 << 22)
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
+[...]
 
-This patch applies after [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353704.html
+> diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
+> index 6913643bbe54..208db3df135a 100644
+> --- a/arch/arm64/include/uapi/asm/ptrace.h
+> +++ b/arch/arm64/include/uapi/asm/ptrace.h
+> @@ -44,6 +44,7 @@
+>  #define PSR_I_BIT	0x00000080
+>  #define PSR_A_BIT	0x00000100
+>  #define PSR_D_BIT	0x00000200
+> +#define PSR_PAN_BIT	0x00400000
 
- drivers/tty/serial/atmel_serial.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+What I meant is to use PSR_PAN_BIT instead of PSTATE_PAN, not just to
+define it (i.e. remove the latter).
 
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index e91b3b2f0590..451acf054281 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -194,6 +194,7 @@ to_atmel_uart_port(struct uart_port *uart)
- 	return container_of(uart, struct atmel_uart_port, uart);
- }
- 
-+#ifdef CONFIG_AVR32
- static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
- {
- 	return __raw_readl(port->membase + reg);
-@@ -213,6 +214,27 @@ static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
- {
- 	__raw_writeb(value, port->membase + reg);
- }
-+#else
-+static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
-+{
-+	return readl_relaxed(port->membase + reg);
-+}
-+
-+static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
-+{
-+	writel_relaxed(value, port->membase + reg);
-+}
-+
-+static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
-+{
-+	return readb_relaxed(port->membase + reg);
-+}
-+
-+static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
-+{
-+	writeb_relaxed(value, port->membase + reg);
-+}
-+#endif
- 
- #ifdef CONFIG_SERIAL_ATMEL_PDC
- static bool atmel_use_pdc_rx(struct uart_port *port)
 -- 
-2.1.4
+Catalin
