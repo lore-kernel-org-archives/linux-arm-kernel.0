@@ -1,79 +1,65 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 20 Jul 2015 11:45:59 -0500
-Subject: [PATCH RESEND] irqchip: omap-intc: improve IRQ handler
-Message-ID: <1437410759-4945-1-git-send-email-balbi@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 20 Jul 2015 18:00:57 +0100
+Subject: [PATCH 1/2] arm64: dma-mapping: implement dma_get_sgtable()
+In-Reply-To: <20150720163645.GM9908@arm.com>
+References: <65a75c2ea16d0fff8e8ec18a8f42e204c33249ed.1437148528.git.robin.murphy@arm.com>
+ <20150720163645.GM9908@arm.com>
+Message-ID: <55AD2949.2040401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-as it turns out the current IRQ number will
-*always* be available from SIR register which
-renders the reads of PENDING registers as plain
-unnecessary overhead.
+Hi Will,
 
-In order to catch any situation where SIR reads
-as zero, we're adding a WARN() to turn it into
-a very verbose error and users actually report
-it.
+On 20/07/15 17:36, Will Deacon wrote:
+> On Fri, Jul 17, 2015 at 04:58:21PM +0100, Robin Murphy wrote:
+>> The default dma_common_get_sgtable() implementation relies on the CPU
+>> address of the buffer being a regular lowmem address. This is not always
+>> the case on arm64, since allocations from the various DMA pools may have
+>> remapped vmalloc addresses, rendering the use of virt_to_page() invalid.
+>>
+>> Fix this by providing our own implementation based on the fact that we
+>> can safely derive a physical address from the DMA address in both cases.
+>>
+>> CC: Jon Medhurst <tixy@linaro.org>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>   arch/arm64/mm/dma-mapping.c | 14 ++++++++++++++
+>>   1 file changed, 14 insertions(+)
+>>
+>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>> index d16a1ce..4b9b600 100644
+>> --- a/arch/arm64/mm/dma-mapping.c
+>> +++ b/arch/arm64/mm/dma-mapping.c
+>> @@ -337,10 +337,24 @@ static int __swiotlb_mmap(struct device *dev,
+>>   	return __dma_common_mmap(dev, vma, cpu_addr, dma_addr, size);
+>>   }
+>>
+>> +int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+>> +			  void *cpu_addr, dma_addr_t handle, size_t size,
+>> +			  struct dma_attrs *attrs)
+>> +{
+>> +	int ret = sg_alloc_table(sgt, 1, GFP_KERNEL);
+>> +
+>> +	if (!ret)
+>> +		sg_set_page(sgt->sgl, phys_to_page(dma_to_phys(dev, handle)),
+>> +			    PAGE_ALIGN(size), 0);
+>> +
+>> +	return ret;
+>> +}
+>
+> Any reason not to do this in dma_common_get_sgtable?
 
-With this patch average running time of
-omap_intc_handle_irq() reduced from about 28.5us
-to 19.8us as measured by the kernel function
-profiler.
+Summarising the discussion over at [1], most architectures seem to 
+depend on dma_common_get_sgtable, but only a handful implement 
+dma_to_phys (plus this approach seems to match the original intent). 
+There doesn't seem to be a nice solution for doing this in common code 
+without a big cross-architecture patch, and it's somewhat questionable 
+how widely this is actually needed.
 
-Tested with BeagleBoneBlack Rev A5C.
+Robin.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
- drivers/irqchip/irq-omap-intc.c | 35 +++++------------------------------
- 1 file changed, 5 insertions(+), 30 deletions(-)
+[1]:http://thread.gmane.org/gmane.linux.kernel/1998795
 
-diff --git a/drivers/irqchip/irq-omap-intc.c b/drivers/irqchip/irq-omap-intc.c
-index a569c6dbd1d1..0706db624213 100644
---- a/drivers/irqchip/irq-omap-intc.c
-+++ b/drivers/irqchip/irq-omap-intc.c
-@@ -331,37 +331,12 @@ static int __init omap_init_irq(u32 base, struct device_node *node)
- static asmlinkage void __exception_irq_entry
- omap_intc_handle_irq(struct pt_regs *regs)
- {
--	u32 irqnr = 0;
--	int handled_irq = 0;
--	int i;
--
--	do {
--		for (i = 0; i < omap_nr_pending; i++) {
--			irqnr = intc_readl(INTC_PENDING_IRQ0 + (0x20 * i));
--			if (irqnr)
--				goto out;
--		}
--
--out:
--		if (!irqnr)
--			break;
--
--		irqnr = intc_readl(INTC_SIR);
--		irqnr &= ACTIVEIRQ_MASK;
-+	u32 irqnr;
- 
--		if (irqnr) {
--			handle_domain_irq(domain, irqnr, regs);
--			handled_irq = 1;
--		}
--	} while (irqnr);
--
--	/*
--	 * If an irq is masked or deasserted while active, we will
--	 * keep ending up here with no irq handled. So remove it from
--	 * the INTC with an ack.
--	 */
--	if (!handled_irq)
--		omap_ack_irq(NULL);
-+	irqnr = intc_readl(INTC_SIR);
-+	irqnr &= ACTIVEIRQ_MASK;
-+	WARN(!irqnr, "Spurious IRQ ?\n");
-+	handle_domain_irq(domain, irqnr, regs);
- }
- 
- void __init omap3_init_irq(void)
--- 
-2.4.4
+>
+> Will
+>
