@@ -1,44 +1,54 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Mon, 20 Jul 2015 17:22:31 +0530
-Subject: [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
-Message-ID: <1437393151-5362-1-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Mon, 20 Jul 2015 17:31:00 +0530
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <20150720073011.GA3061@x1>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
+ <20150717111733.GL11162@sirena.org.uk> <55A8F859.2090204@linaro.org>
+ <20150720073011.GA3061@x1>
+Message-ID: <55ACE2FC.2090801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add chip identification support for 88PM860 device
-to the pm80x_chip_mapping table.
 
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/mfd/88pm80x.c       | 2 ++
- include/linux/mfd/88pm80x.h | 1 +
- 2 files changed, 3 insertions(+)
 
-diff --git a/drivers/mfd/88pm80x.c b/drivers/mfd/88pm80x.c
-index 5e72f65..63445ea 100644
---- a/drivers/mfd/88pm80x.c
-+++ b/drivers/mfd/88pm80x.c
-@@ -33,6 +33,8 @@ static struct pm80x_chip_mapping chip_mapping[] = {
- 	{0x3,	CHIP_PM800},
- 	/* 88PM805 chip id number */
- 	{0x0,	CHIP_PM805},
-+	/* 88PM860 chip id number */
-+	{0x4,	CHIP_PM860},
- };
- 
- /*
-diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-index 9c5773b..2e25fb1 100644
---- a/include/linux/mfd/88pm80x.h
-+++ b/include/linux/mfd/88pm80x.h
-@@ -21,6 +21,7 @@ enum {
- 	CHIP_INVALID = 0,
- 	CHIP_PM800,
- 	CHIP_PM805,
-+	CHIP_PM860,
- 	CHIP_MAX,
- };
- 
--- 
-1.9.1
+On Monday 20 July 2015 01:00 PM, Lee Jones wrote:
+> On Fri, 17 Jul 2015, Vaibhav Hiremath wrote:
+>
+>>
+>>
+>> On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
+>>> On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
+>>>
+>>>> Can you merge this into regulator tree?
+>>>
+>>>> Link to MFD - https://lkml.org/lkml/2015/7/16/704
+>>>
+>>> I need a tag I can pull from Lee.
+>>>
+>> Great.
+>>
+>> Lee,
+>> It would be helpful, if you could ack below patch,
+>>
+>> https://lkml.org/lkml/2015/7/16/704
+>
+> These patches are yet to be reviewed.  I will unmark those patches as
+> important (meaning they will not be reviewed during this iteration).
+> Please resubmit a single patch-set containing all of the
+> dependencies and Mark and I will work it out between us.
+>
+
+Ok,
+
+I have just sent single patch, which has dependency on regulator
+changes. Please review, ack and queue up.
+
+
+[PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
+https://patchwork.kernel.org/patch/6826531/
+
+
+Thanks,
+Vaibhav
