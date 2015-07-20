@@ -1,172 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Jul 2015 16:56:04 +0100
-Subject: [PATCH 09/10] arch: introduce memremap()
-In-Reply-To: <CAPcyv4h+02J-GpJ+PC8f1M3O_yXXE0=W5=jg3P33nPesc+YPiQ@mail.gmail.com>
-References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150720001822.30857.65670.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150720120040.GC19239@leverpostej>
- <CAPcyv4h+02J-GpJ+PC8f1M3O_yXXE0=W5=jg3P33nPesc+YPiQ@mail.gmail.com>
-Message-ID: <20150720155604.GD19239@leverpostej>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 20 Jul 2015 18:11:54 +0200
+Subject: [PATCH v4 2/2] mfd: flexcom: add a driver for Atmel Flexible
+ Serial Communication Unit
+In-Reply-To: <558BD3B8.10709@atmel.com>
+References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
+ <dddf7a6d750967785255733a7931780b3c465d5f.1434967670.git.cyrille.pitchen@atmel.com>
+ <20150624142456.GS15013@x1> <558BD3B8.10709@atmel.com>
+Message-ID: <55AD1DCA.9080308@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 03:39:44PM +0100, Dan Williams wrote:
-> On Mon, Jul 20, 2015 at 5:00 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> > On Mon, Jul 20, 2015 at 01:18:23AM +0100, Dan Williams wrote:
-> >> Existing users of ioremap_cache() are mapping memory that is known in
-> >> advance to not have i/o side effects.  These users are forced to cast
-> >> away the __iomem annotation, or otherwise neglect to fix the sparse
-> >> errors thrown when dereferencing pointers to this memory.  Provide
-> >> memremap() as a non __iomem annotated ioremap_*() in the case when
-> >> ioremap is otherwise a pointer to memory.
-> >>
-> >> The ARCH_HAS_MEMREMAP kconfig symbol is introduced for archs to assert
-> >> that it is safe to recast / reuse the return value from ioremap as a
-> >> normal pointer to memory.  In other words, archs that mandate specific
-> >> accessors for __iomem are not memremap() capable and drivers that care,
-> >> like pmem, can add a dependency to disable themselves on these archs.
-> >>
-> >> Note, that memremap is a break from the ioremap implementation pattern
-> >> of adding a new memremap_<type>() for each mapping type.  Instead,
-> >> the implementation defines flags that are passed to the central
-> >> memremap() implementation.
-> >>
-> >> Outside of ioremap() and ioremap_nocache(), the expectation is that most
-> >> calls to ioremap_<type>() are seeking memory-like semantics (e.g.
-> >> speculative reads, and prefetching permitted).  These callsites can be
-> >> moved to memremap() over time.
-> >>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Acked-by: Andy Shevchenko <andy.shevchenko@gmail.com>
-> >> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+Hi all,
 
-[...]
+based on my previous mail, do someone have any idea on how to add support to
+the Flexcom in the kernel ? We would like to manage the Flexcom separately so
+we avoid patching 3 existing drivers.
 
-> > Unfortunately, even with that fixed this patch breaks boot due to the
-> > memremap_valid check. It's extremely likely that (portions of) the
-> > tables are already in the linear mapping, and so page_is_ram will be
-> > true.
+Indeed, their associated devices have no need to know whether they're wrapped
+or not by a Flexcom: the Flexcom itself has no functional impact on the serial
+controllers it contains.
+
+Also, hiding the additional layer of the Flexcom from the USART, SPI and I2C
+drivers would ease their maintenance: it keeps the design of each IP
+independent from the others so it would be more easy to add support to future
+features.
+
+
+Best Regards,
+
+Cyrille
+
+
+Le 25/06/2015 12:11, Cyrille Pitchen a ?crit :
+> Hi lee,
 > 
-> Really, "portions of", not the entire table?
-
-Yes, if a table straddles a page boundary (the spec doesn't seem to
-disallow this). We might not map all of the required pages, e.g.
-
-* If the kernel was loaded more than TEXT_OFFSET bytes above the table
-  (the arm64 linear/direct mapping is currently tied to our text
-  mapping, and we can't currently address anything below that).
-
-  In this case the start isn't in the direct mapping, and we'll try to
-  create a new mapping. That should work.
-
-* If the kernel is built with a small VA range, and we have just the
-  right amount of memory before the table begins (this is absurdly
-  unlikely).
-
-  In this case if the start is in the direct mapping, but the end isn't,
-  we'll explode when accessing it.
-
-* If the 'mem=' parameter is used, the direct mapping can be truncated.
-
-  In this case if the start is in the direct mapping, but the end isn't,
-  we'll explode when accessing it.
-
-In the arm64 ioremap_cache we only check
-pfn_valid(__phys_to_pfn(phys_addr)), and assume that if the start was
-mapped, then the whole region is. In the cases above that's clearly not
-true, so we should probably see about handling that.
-
-> Is it too early to use the direct mapping like
-> pfn_to_page(memmap.phys_map >> PAGE_SHIFT)?
-
-I believe it's too early, as we haven't initialised the memmap yet. For
-the cases above we will never have a page for the portion of the region
-not in the direct mapping anyway.
-
-> In any event this splat mandates splitting this memremap() enabling
-> patch into per-instance conversions of ioremap_cache().
+> Le 24/06/2015 16:24, Lee Jones a ?crit :
+>> On Mon, 22 Jun 2015, Cyrille Pitchen wrote:
+>>
+>>> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
+>>> integrates one SPI controller, one I2C controller and one USART. Only one
+>>> function can be enabled at a time. This driver selects the function once
+>>> for all, when the Flexcom is probed, according to the value of the new
+>>> "atmel,flexcom-mode" device tree property.
+>>>
+>>> This driver has chosen to present the Flexcom to the system as a MFD so
+>>> the implementation is seamless for the existing Atmel SPI, I2C and USART
+>>> drivers.
+>>
+>> No need for this driver.
+>>
+>> Just create your 3 platform drivers and get them to read the mode at
+>> probe time.  If the mode isn't the one pertaining to itself return
+>> -ENODEV and the Device Driver API will attempt the probe the next
+>> device.  Ensure all of the devices have the same compatible string
+>> i.e. atmel,sama5d2-flexcom.
+>>
 > 
-> > At boot time I get the following:
-> >
-> > Remapping and enabling EFI services.
-> > ------------[ cut here ]------------
-> > WARNING: CPU: 0 PID: 1 at kernel/resource.c:541 memremap+0xb0/0xbc()
-> > memremap attempted on ram 0x00000009f9e4a018 size: 1200
-> > Modules linked in:
-> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.2.0-rc3+ #201
-> > Hardware name: ARM Juno development board (r0) (DT)
-> > Call trace:
-> > [<ffffffc000089954>] dump_backtrace+0x0/0x124
-> > [<ffffffc000089a88>] show_stack+0x10/0x1c
-> > [<ffffffc0005d15c8>] dump_stack+0x84/0xc8
-> > [<ffffffc0000b3f44>] warn_slowpath_common+0x98/0xd0
-> > [<ffffffc0000b3fc8>] warn_slowpath_fmt+0x4c/0x58
-> > [<ffffffc0000b9470>] memremap+0xac/0xbc
-> > [<ffffffc000814fe8>] arm64_enable_runtime_services+0x90/0x208
-> > [<ffffffc000082864>] do_one_initcall+0x88/0x1a0
-> > [<ffffffc000811a20>] kernel_init_freeable+0x8c/0x1f8
-> > [<ffffffc0005ce370>] kernel_init+0xc/0xd8
-> > ---[ end trace cb88537fdc8fa200 ]---
-> > Failed to remap EFI memory map
-> >
-> >>         if (!memmap.map) {
-> >>                 pr_err("Failed to remap EFI memory map\n");
-> >>                 return -1;
-> >> @@ -299,8 +298,8 @@ static int __init arm64_enable_runtime_services(void)
-> >>         memmap.map_end = memmap.map + mapsize;
-> >>         efi.memmap = &memmap;
-> >>
-> >> -       efi.systab = (__force void *)ioremap_cache(efi_system_table,
-> >> -                                                  sizeof(efi_system_table_t));
-> >> +       efi.systab = memremap(efi_system_table, sizeof(efi_system_table_t),
-> >> +                       MEMREMAP_CACHE);
-> >>         if (!efi.systab) {
-> >>                 pr_err("Failed to remap EFI System Table\n");
-> >>                 return -1;
-> >> diff --git a/arch/arm64/kernel/smp_spin_table.c b/arch/arm64/kernel/smp_spin_table.c
-> >> index aef3605a8c47..b9caf6cd44e6 100644
-> >> --- a/arch/arm64/kernel/smp_spin_table.c
-> >> +++ b/arch/arm64/kernel/smp_spin_table.c
-> >> @@ -73,19 +73,19 @@ static int smp_spin_table_cpu_init(unsigned int cpu)
-> >>
-> >>  static int smp_spin_table_cpu_prepare(unsigned int cpu)
-> >>  {
-> >> -       __le64 __iomem *release_addr;
-> >> +       __le64 *release_addr;
-> >>
-> >>         if (!cpu_release_addr[cpu])
-> >>                 return -ENODEV;
-> >>
-> >>         /*
-> >>          * The cpu-release-addr may or may not be inside the linear mapping.
-> >> -        * As ioremap_cache will either give us a new mapping or reuse the
-> >> -        * existing linear mapping, we can use it to cover both cases. In
-> >> -        * either case the memory will be MT_NORMAL.
-> >> +        * As memremap will either give us a new mapping or reuse the existing
-> >> +        * linear mapping, we can use it to cover both cases. In either case
-> >> +        * the memory will be MT_NORMAL.
-> >>          */
-> >> -       release_addr = ioremap_cache(cpu_release_addr[cpu],
-> >> -                                    sizeof(*release_addr));
-> >> +       release_addr = memremap(cpu_release_addr[cpu], sizeof(*release_addr),
-> >> +                       MEMREMAP_CACHE);
-> >
-> > Likewise, the comment here is contradicted by the code in memremap_valid
-> > (below). We'll fail to bring up secondaries if the release address fell
-> > in the linear mapping.
+> The main idea of this patch was to hide the Flexcom overlay from the 3 serial
+> drivers. The Flexcom is a kind of muxer which selects one of the 3 IPs: it 
+> doesn't change the internal of the IPs. For instance, on sama5d2x SoCs,
+> some SPI controlers are still standalone whereas others are wrapped by a
+> Flexcom but all these SPI controllers share the same IP version.
 > 
-> Ah, so ARM's ioremap_cache() silently handles calls to remap RAM with
-> a pointer to the direct mapping.  It think that's a useful property to
-> carry in the generic implementation.  Especially if the direct mapping
-> has established greater than PAGE_SIZE mappings.
-
-That sounds good to me.
-
-As mentioned above, I think we should test that the entire region we're
-trying to map falls within the direct mapping before assuming we can use
-it, though I'm not sure what the best way of doing that is.
-
-Thanks,
-Mark.
+> Also, the Flexcom has its own I/O range. Especially, the Flexcom Mode Register
+> which selects the active peripheral is outside the I/O ranges of the SPI, I2C
+> or USART IPs.
+> 
+> The active peripheral must be selected first then its driver can access its I/O
+> registers but registers of the other inactive peripherals are still unavailable
+> and would be read as zero since their peripherals are still disabled.
+> That's why the very first version of the driver presented the Flexcom as a
+> clock because most peripherals can't be used before enabling their clock.
+> However the Flexcom is not an actual clock so I was told that it would be
+> better to introduce the Flexcom as an MFD.
+> 
+> The idea is to separate the serial controller drivers and the Flexcom driver
+> the same way as a clock driver and a pin controller driver are separated from
+> the driver of a peripheral which uses them.
+> 
+> 
+> Best Regards,
+> 
+> Cyrille
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
