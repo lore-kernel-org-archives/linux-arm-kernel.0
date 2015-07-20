@@ -1,61 +1,90 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 20 Jul 2015 11:13:37 -0500
-Subject: [PATCH] ARM: OMAP2+: Remove module references from IOMMU machine
- layer
-In-Reply-To: <20150716071640.GI17550@atomide.com>
-References: <1436560985-5947-1-git-send-email-s-anna@ti.com>
- <20150716071640.GI17550@atomide.com>
-Message-ID: <55AD1E31.8020107@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Jul 2015 17:20:04 +0100
+Subject: [RFC 2/3] arm64: refactor save_stack_trace()
+In-Reply-To: <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+References: <20150716102405.2cc8c406@gandalf.local.home>
+ <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
+ <20150716113115.45a17f17@gandalf.local.home>
+ <20150716121658.7982fdf5@gandalf.local.home>
+ <20150717124054.GE26091@leverpostej>
+ <20150717090009.720f6bd0@gandalf.local.home>
+ <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
+ <20150717104144.6588b2f7@gandalf.local.home>
+ <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
+ <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
+Message-ID: <20150720162004.GL9908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi all,
 
-On 07/16/2015 02:16 AM, Tony Lindgren wrote:
-> * Suman Anna <s-anna@ti.com> [150710 13:45]:
->> The OMAP IOMMU driver has been adapted to the IOMMU framework
->> for a while now, and it no longer supports being built as a
->> module. Cleanup all the module related references both from
->> the code and in the build.
->>
->> While at it, also relocate a comment around the initcall to
->> avoid a checkpatch strict warning about using a blank line
->> after function/struct/union/enum declarations.
+On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
+> On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
+> > On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
+> >> Thanks! Can you repost patch 1 with the changes I recommended, so that
+> >> I can get an Acked-by from the arm64 maintainers and pull all the
+> >> changes in together. This is fine for a 4.3 release, right? That is, it
+> >> doesn't need to go into 4.2-rcs.
+> >> 
+> > 
+> > It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
+> > Also, it might be needed to consider Mark's comment on arch part.
+> > 
+> > If they are okay, I will proceed.
 > 
-> OK applying into omap-for-v4.3/soc.
-
-Thanks.
-
+> The [RFC 1/3] patch used in my environment is shaped as follows.
+> I leave the hunk for *only* clear synchronization. This is why I choose this format
+> instead of reposting a patch. I hope it would help to track down this thread.
 > 
-> You may want to check few things after this:
+> I think this is my best at this point.
 > 
-> - Does it still need to be omap_subsys_initcall or can it
->   happen later? Anything we can initialize later on is worth
->   doing as then we have proper debug console available.
+> ----8<----
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index c5534fa..2b43e20 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -13,8 +13,9 @@
+>  
+>  #include <asm/insn.h>
+>  
+> -#define MCOUNT_ADDR		((unsigned long)_mcount)
+> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
+> +#define MCOUNT_ADDR			((unsigned long)_mcount)
+> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
+> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
+>  
+>  #ifndef __ASSEMBLY__
+>  #include <linux/compat.h>
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 407991b..9ab67af 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -20,6 +20,7 @@
+>  #include <linux/sched.h>
+>  #include <linux/stacktrace.h>
+>  
+> +#include <asm/insn.h>
+>  #include <asm/stacktrace.h>
+>  
+>  /*
+> @@ -52,7 +53,7 @@ int notrace unwind_frame(struct stackframe *frame)
+>  	 * -4 here because we care about the PC at time of bl,
+>  	 * not where the return will go.
+>  	 */
+> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
+> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+>  
+>  	return 0;
+>  }
 
-This code will be cleaned up once the non-DT references/users for OMAP3
-IOMMUs go away. I will do this in the next merge window once Laurent's
-OMAP3ISP legacy device creation cleanup series gets into mainline [1].
+The arm64 bits look fine to me:
 
-> 
-> - For multi_v7_defconfig it would be nice to be able to
->   make the driver/iommu components into standard Linux
->   loadable modules.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-We used to be module before, and the built-in is coming from the IOMMU
-framework. The init function in the OMAP IOMMU driver already handles
-the multi_v7_defconfig scenario, so no issues there.
+Steve: feel free to take this along with the other ftrace changes. I don't
+anticipate any conflicts, but if anything crops up in -next we can sort
+it out then.
 
-> 
-> - Actually you can probably get rid of mach-omap2/omap-iommu.c
->   completely by implementing PM runtime and and possibly
->   reset controller.
+Thanks!
 
-Yeah, any need for this file after the non-DT device creation removal
-would arises from the PRCM/reset dependencies against API present in
-mach-omap2 layer only.
-
-regards
-Suman
-
-[1] http://marc.info/?l=linux-omap&m=143705130631733&w=2
+Will
