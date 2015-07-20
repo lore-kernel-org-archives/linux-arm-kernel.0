@@ -1,95 +1,63 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Mon, 20 Jul 2015 17:54:00 +0800
-Subject: [PATCH v11 3/5] drm/panel: simple: Add support for NEC NL4827HC19-05B
- 480x272 panel
-In-Reply-To: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1437386042-34825-3-git-send-email-jianwei.wang.chn@gmail.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Mon, 20 Jul 2015 12:59:41 +0300
+Subject: [PATCH V3 02/19] memory: tegra: Add MC flush support
+In-Reply-To: <20150717113124.GP3057@ulmo>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-3-git-send-email-jonathanh@nvidia.com>
+ <20150717095754.GG3057@ulmo>
+ <20150717102049.GQ6287@tbergstrom-lnx.Nvidia.com>
+ <20150717113124.GP3057@ulmo>
+Message-ID: <20150720095941.GZ6287@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the NEC NL4827HC19-05B 480x272 panel to the DRM
-simple panel driver.
+On Fri, Jul 17, 2015 at 01:31:24PM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Fri, Jul 17, 2015 at 01:20:49PM +0300, Peter De Schrijver wrote:
+> > On Fri, Jul 17, 2015 at 11:57:55AM +0200, Thierry Reding wrote:
+> > > > Old Signed by an unknown key
+> > > 
+> > > On Mon, Jul 13, 2015 at 01:39:40PM +0100, Jon Hunter wrote:
+> > > > The Tegra memory controller implements a flush feature to flush pending
+> > > > accesses and prevent further accesses from occurring. This feature is
+> > > > used when powering down IP blocks to ensure the IP block is in a good
+> > > > state. The flushes are organised by software groups and IP blocks are
+> > > > assigned in hardware to the different software groups. Add helper
+> > > > functions for requesting a handle to an MC flush for a given
+> > > > software group and enabling/disabling the MC flush itself.
+> > > > 
+> > > > This is based upon a change by Vince Hsu <vinceh@nvidia.com>.
+> > > > 
+> > > > Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+> > > > ---
+> > > >  drivers/memory/tegra/mc.c | 110 ++++++++++++++++++++++++++++++++++++++++++++++
+> > > >  drivers/memory/tegra/mc.h |   2 +
+> > > >  include/soc/tegra/mc.h    |  34 ++++++++++++++
+> > > >  3 files changed, 146 insertions(+)
+> > > 
+> > > Do we know if this is actually necessary? I remember having a discussion
+> > > with Arnd Bergmann a while ago, and the Linux driver model kind of
+> > > assumes that by the time a device is disabled all outstanding accesses
+> > > will have stopped.
+> > > 
+> > > Do we have a way to determine that this even makes a difference? Can we
+> > > trigger a case where not doing this would cause breakage and see that
+> > > adding this fixes that particular issue?
+> > > 
+> > 
+> > Most likely it is. The memory controller can still be processing requests
+> > when the peripheral domain is powergated. This would mean the response cannot
+> > be delivered in that case. So we need to be sure there are no outstanding
+> > requests before shutting down the domain.
+> 
+> My point is that that's the driver's responsibility anyway, hence making
+> the explicit flush unnecessary.
+> 
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
----
- .../bindings/panel/nec,nl4827hc19_05b.txt          |  7 ++++++
- MAINTAINERS                                        |  1 +
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 3 files changed, 34 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+The peripheral driver doesn't know how long a request is queued in the memory
+controller. So it can't be responsible for ensuring this.
 
-diff --git a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
-new file mode 100644
-index 0000000..20e9473
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
-@@ -0,0 +1,7 @@
-+NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "nec,nl4827hc19_05b"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index dc9d371..5a97a6a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3557,6 +3557,7 @@ L:	dri-devel at lists.freedesktop.org
- S:	Supported
- F:	drivers/gpu/drm/fsl-dcu/
- F:	Documentation/devicetree/bindings/video/fsl,dcu.txt
-+F:	Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
- 
- DRM DRIVERS FOR FREESCALE IMX
- M:	Philipp Zabel <p.zabel@pengutronix.de>
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f94201b..db61dd1 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -943,6 +943,29 @@ static const struct panel_desc lg_lp129qe = {
- 	},
- };
- 
-+static const struct drm_display_mode nec_nl4827hc19_05b_mode = {
-+	.clock = 10870,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 2,
-+	.hsync_end = 480 + 2 + 41,
-+	.htotal = 480 + 2 + 41 + 2,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 2,
-+	.vsync_end = 272 + 2 + 4,
-+	.vtotal = 272 + 2 + 4 + 2,
-+	.vrefresh = 74,
-+};
-+
-+static const struct panel_desc nec_nl4827hc19_05b = {
-+	.modes = &nec_nl4827hc19_05b_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 95,
-+		.height = 54,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24
-+};
-+
- static const struct drm_display_mode ortustech_com43h4m85ulc_mode  = {
- 	.clock = 25000,
- 	.hdisplay = 480,
-@@ -1113,6 +1136,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "lg,lp129qe",
- 		.data = &lg_lp129qe,
- 	}, {
-+		.compatible = "nec,nl4827hc19_05b",
-+		.data = &nec_nl4827hc19_05b,
-+	}, {
- 		.compatible = "ortustech,com43h4m85ulc",
- 		.data = &ortustech_com43h4m85ulc,
- 	}, {
--- 
-2.1.0.27.g96db324
+Cheers,
+
+Peter.
