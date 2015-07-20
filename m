@@ -1,19 +1,43 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 20 Jul 2015 17:26:37 +0200
-Subject: [PATCH v4 0/4] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <cover.1437070995.git.robin.murphy@arm.com>
-References: <cover.1437070995.git.robin.murphy@arm.com>
-Message-ID: <20150720152637.GD10969@8bytes.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Jul 2015 17:32:01 +0200
+Subject: [PATCH v2 04/10] backlight: pwm_bl: remove useless call to
+ pwm_set_period
+In-Reply-To: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1437406327-6207-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 07:40:11PM +0100, Robin Murphy wrote:
->  arch/arm64/Kconfig                   |   1 +
->  arch/arm64/include/asm/dma-mapping.h |  15 +-
->  arch/arm64/mm/dma-mapping.c          | 452 +++++++++++++++++++++++++++++
+The PWM period will be set when calling pwm_config. Remove this useless
+call to pwm_set_period, which might mess up with the initial PWM state
+once we have added proper support for PWM init state retrieval.
 
-What happened to the plan to merge this with the existing iommu-based
-dma-api implementation for 32 bit ARM?
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/video/backlight/pwm_bl.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-
-	Joerg
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index ae498c1..71944f8 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -293,12 +293,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	 * period, parsed from the DT, in the PWM device. For the non-DT case,
+ 	 * set the period from platform data if it has not already been set
+ 	 * via the PWM lookup table.
++	 * FIXME: This assignment should be dropped as soon as all the boards
++	 * have moved to the PWM lookup table approach. The same goes for the
++	 * pb->period field which should be replaced by
++	 * pwm_get_default_period() calls.
+ 	 */
+ 	pb->period = pwm_get_default_period(pb->pwm);
+-	if (!pb->period && (data->pwm_period_ns > 0)) {
++	if (!pb->period && (data->pwm_period_ns > 0))
+ 		pb->period = data->pwm_period_ns;
+-		pwm_set_period(pb->pwm, data->pwm_period_ns);
+-	}
+ 
+ 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
+ 
+-- 
+1.9.1
