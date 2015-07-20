@@ -1,29 +1,40 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 20 Jul 2015 22:46:37 +0200 (CEST)
-Subject: [PATCH 1/3] clocksource: atmel-st: Remove irq handler when clock
- event is unused
-In-Reply-To: <20150720193726.GJ15539@piout.net>
-References: <1437161608-26782-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1437161608-26782-2-git-send-email-alexandre.belloni@free-electrons.com>
- <alpine.DEB.2.11.1507180942360.18576@nanos>
- <20150718222308.GA30489@piout.net>
- <alpine.DEB.2.11.1507201103550.18576@nanos> <20150720193726.GJ15539@piout.net>
-Message-ID: <alpine.DEB.2.11.1507202245310.18576@nanos>
+From: aparnab@ti.com (Aparna Balasubramanian)
+Date: Mon, 20 Jul 2015 16:07:31 -0500
+Subject: [PATCH] ARM: dts: omap5-uevm: Add Palmas power button support
+In-Reply-To: <omap5uevm_palmas>
+References: <omap5uevm_palmas>
+Message-ID: <1437426451-27372-1-git-send-email-aparnab@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jul 2015, Alexandre Belloni wrote:
+Palmas on OMAP5uevm has support for power button, so enable it.
 
-> On 20/07/2015 at 11:04:30 +0200, Thomas Gleixner wrote :
-> > That's why I used setup/remove_irq() in the stale RT changes.
-> > 
-> 
-> Hum, actually, you hit the same thing with setup/remove_irq (and I'm not sure
-> to follow why):
+Signed-off-by: Aparna Balasubramanian <aparnab@ti.com>
+---
 
-It's the kmalloc of the proc interface. So back to the drawing
-board. I'll think about it tomorrow with brain awake.
+Based on kernel tag 4.2.0-rc1 and test result log is at
+http://pastebin.ubuntu.com/11910178/
 
-Thanks,
+ arch/arm/boot/dts/omap5-uevm.dts |    7 +++++++
+ 1 file changed, 7 insertions(+)
 
-	tglx
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 275618f..3cc8f35 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -510,6 +510,13 @@
+ 				};
+ 			};
+ 		};
++
++		palmas_power_button: palmas_power_button {
++			compatible = "ti,palmas-pwrbutton";
++			interrupt-parent = <&palmas>;
++			interrupts = <1 IRQ_TYPE_EDGE_FALLING>;
++			wakeup-source;
++		};
+ 	};
+ 
+ 	twl6040: twl at 4b {
+-- 
+1.7.9.5
