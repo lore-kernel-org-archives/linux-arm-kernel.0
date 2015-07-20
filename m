@@ -1,44 +1,41 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Mon, 20 Jul 2015 17:54:02 +0800
-Subject: [PATCH v11 5/5] arm/dts/ls1021a: Add a TFT LCD panel dts node
-In-Reply-To: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1437386042-34825-5-git-send-email-jianwei.wang.chn@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 20 Jul 2015 12:01:16 +0200
+Subject: [RFC PATCH 06/15] pwm: define a new pwm_state struct
+In-Reply-To: <20150720080458.GG29614@ulmo>
+References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1435738921-25027-7-git-send-email-boris.brezillon@free-electrons.com>
+ <20150720080458.GG29614@ulmo>
+Message-ID: <20150720120116.2358b829@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a TFT LCD panel. the TFT LCD panel is WQVGA "480x272",
-and the bpp is 24.
+On Mon, 20 Jul 2015 10:04:59 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
-Reviewed-by: Alison Wang <alison.wang@freescale.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> On Wed, Jul 01, 2015 at 10:21:52AM +0200, Boris Brezillon wrote:
+> [...]
+> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> [...]
+> > +struct pwm_state {
+> > +	unsigned int		period; 	/* in nanoseconds */
+> > +	unsigned int		duty_cycle;	/* in nanoseconds */
+> > +	enum pwm_polarity	polarity;
+> > +};
+> 
+> No need for the extra padding here.
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..2443329 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -56,6 +56,17 @@
- 		enet0_sgmii_phy = &sgmii_phy2;
- 		enet1_sgmii_phy = &sgmii_phy0;
- 	};
-+
-+	panel: panel {
-+		compatible = "nec,nl4827hc19_05b";
-+	};
-+
-+};
-+
-+&dcu {
-+	fsl,panel = <&panel>;
-+	status = "okay";
-+
- };
- 
- &dspi1 {
+What do you mean by "extra padding" ?
+I just reused the indentation used in the pwm_device struct.
+
+Would you prefer something like that ?
+
+struct pwm_state {
+	unsigned int period; 		/* in nanoseconds */
+	unsigned int duty_cycle;	/* in nanoseconds */
+	enum pwm_polarity polarity;
+};
+
 -- 
-2.1.0.27.g96db324
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
