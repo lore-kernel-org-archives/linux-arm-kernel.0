@@ -1,54 +1,33 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Mon, 20 Jul 2015 12:33:05 -0700
-Subject: [PATCH v4 6/8] ARM: bcm2835: Use the RPi firmware clocks for uart.
+Date: Mon, 20 Jul 2015 12:33:06 -0700
+Subject: [PATCH v4 7/8] ARM: bcm2835: Tie SPI clock to the core clock rate.
 In-Reply-To: <1437420787-32137-1-git-send-email-eric@anholt.net>
 References: <1437420787-32137-1-git-send-email-eric@anholt.net>
-Message-ID: <1437420787-32137-7-git-send-email-eric@anholt.net>
+Message-ID: <1437420787-32137-8-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This gets us a correct apb_pclk, which previously was accidentally
-using the "20201000.uart" clock from clk-bcm2835.c, due to the
-fallback clk_get_sys() path.
+We were previously using a fixed clock declared in the 2835 DT, but
+it's actually the core clock, and it might not be the same if you had
+adjusted it using the firmware's config.txt.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
 Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 +++++++
- arch/arm/boot/dts/bcm2835.dtsi     | 2 +-
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index 7cc47fb..9549eb8 100644
+index 9549eb8..0a32123 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
 +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -1,3 +1,4 @@
-+#include <dt-bindings/clk/raspberrypi.h>
- #include "bcm2835.dtsi"
- 
- / {
-@@ -62,3 +63,9 @@
- 	status = "okay";
- 	bus-width = <4>;
+@@ -69,3 +69,7 @@
+ 		 <&firmware_clocks RPI_CLOCK_CORE>;
+ 	clock-names = "uartclk", "apb_pclk";
  };
 +
-+&uart0 {
-+	clocks = <&firmware_clocks RPI_CLOCK_UART0>,
-+		 <&firmware_clocks RPI_CLOCK_CORE>;
-+	clock-names = "uartclk", "apb_pclk";
++&spi {
++	clocks = <&firmware_clocks RPI_CLOCK_CORE>;
 +};
-diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
-index 32f5830..5be2862 100644
---- a/arch/arm/boot/dts/bcm2835.dtsi
-+++ b/arch/arm/boot/dts/bcm2835.dtsi
-@@ -92,7 +92,7 @@
- 			#interrupt-cells = <2>;
- 		};
- 
--		uart at 7e201000 {
-+		uart0: uart at 7e201000 {
- 			compatible = "brcm,bcm2835-pl011", "arm,pl011", "arm,primecell";
- 			reg = <0x7e201000 0x1000>;
- 			interrupts = <2 25>;
 -- 
 2.1.4
