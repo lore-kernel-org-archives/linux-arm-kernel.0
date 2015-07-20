@@ -1,49 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 20 Jul 2015 21:08:19 +0100
-Subject: [PATCH v2 00/10] pwm: add support for atomic update
-In-Reply-To: <20150720214913.73c47fa6@bbrezillon>
-References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
- <20150720171950.GE11162@sirena.org.uk>
- <20150720214913.73c47fa6@bbrezillon>
-Message-ID: <20150720200819.GN11162@sirena.org.uk>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Tue, 21 Jul 2015 03:02:20 +0800
+Subject: [PATCH 1/2] ARM: dts: imx6ul: fix low case define in imx6ul-pinfunc.h
+Message-ID: <1437418941-19051-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 09:49:13PM +0200, Boris Brezillon wrote:
-> Mark Brown <broonie@kernel.org> wrote:
-> > On Mon, Jul 20, 2015 at 05:31:57PM +0200, Boris Brezillon wrote:
+From: Frank Li <Frank.Li@freescale.com>
 
-> > > - dropped pwm-regulator patches (should be submitted separately)
+some pin name should be capital "_B" instead of "_b"
 
-> > I think the second patch needs to go in with this series doesn't it?  It
-> > was just the enable one that was good to go immediately IIRC.
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
+---
+ arch/arm/boot/dts/imx6ul-pinfunc.h | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-> I was planning on submitting those two patches after the PWM changes
-> have been merged, but you're right, maybe we should think about a proper
-> way to smoothly get all of them in the same release.
-
-I see.  We should at least try to get the enable one in this time, I'd
-like to just apply it and then either do a cross tree merge for the one
-making use of the new functionality or (if the rest of the series gets
-held up for some reason) just letting it get merged via Linus' tree.
-
-> I have rebased my work on top your regulator/topic/pwm branch containing
-> Lee's work [1].
-
-> Note that patch 1 has changed a bit to take Lee's additions into
-> account.
-
-> Thierry, could you create a branch based on Mark's regulator/topic/pwm
-> branch ?
-> If everybody agrees on the solution I'll send a v3 rebasing my work on
-> top of this topic branch.
-
-I think that's fine for me, I can tag the PWM branch in my tree and
-Thierry can pull that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/450dfbae/attachment.sig>
+diff --git a/arch/arm/boot/dts/imx6ul-pinfunc.h b/arch/arm/boot/dts/imx6ul-pinfunc.h
+index 83d6ccb..20c7da1 100644
+--- a/arch/arm/boot/dts/imx6ul-pinfunc.h
++++ b/arch/arm/boot/dts/imx6ul-pinfunc.h
+@@ -666,7 +666,7 @@
+ #define MX6UL_PAD_NAND_RE_B__ECSPI3_SS2                          	0x0178 0x0404 0x0000 8 0
+ #define MX6UL_PAD_NAND_WE_B__RAWNAND_WE_B                        	0x017c 0x0408 0x0000 0 0
+ #define MX6UL_PAD_NAND_WE_B__USDHC2_CMD                          	0x017c 0x0408 0x0678 1 2
+-#define MX6UL_PAD_NAND_WE_B__QSPI_B_SS0_b                        	0x017c 0x0408 0x0000 2 0
++#define MX6UL_PAD_NAND_WE_B__QSPI_B_SS0_B                        	0x017c 0x0408 0x0000 2 0
+ #define MX6UL_PAD_NAND_WE_B__KPP_COL00                           	0x017c 0x0408 0x0000 3 0
+ #define MX6UL_PAD_NAND_WE_B__EIM_EB_B01                          	0x017c 0x0408 0x0000 4 0
+ #define MX6UL_PAD_NAND_WE_B__GPIO4_IO01                          	0x017c 0x0408 0x0000 5 0
+@@ -753,14 +753,14 @@
+ #define MX6UL_PAD_NAND_READY_B__GPIO4_IO12                       	0x01a8 0x0434 0x0000 5 0
+ #define MX6UL_PAD_NAND_READY_B__UART3_DCE_TX                         	0x01a8 0x0434 0x0000 8 0
+ #define MX6UL_PAD_NAND_READY_B__UART3_DTE_RX                         	0x01a8 0x0434 0x0634 8 2
+-#define MX6UL_PAD_NAND_CE0_b__RAWNAND_CE0_b                      	0x01ac 0x0438 0x0000 0 0
+-#define MX6UL_PAD_NAND_CE0_b__USDHC1_DATA5                       	0x01ac 0x0438 0x0000 1 0
+-#define MX6UL_PAD_NAND_CE0_b__QSPI_A_DATA01                      	0x01ac 0x0438 0x0000 2 0
+-#define MX6UL_PAD_NAND_CE0_b__ECSPI3_SCLK                        	0x01ac 0x0438 0x0554 3 1
+-#define MX6UL_PAD_NAND_CE0_b__EIM_DTACK_B                        	0x01ac 0x0438 0x0000 4 0
+-#define MX6UL_PAD_NAND_CE0_b__GPIO4_IO13                         	0x01ac 0x0438 0x0000 5 0
+-#define MX6UL_PAD_NAND_CE0_b__UART3_DCE_RX                           	0x01ac 0x0438 0x0634 8 3
+-#define MX6UL_PAD_NAND_CE0_b__UART3_DTE_TX                           	0x01ac 0x0438 0x0000 8 0
++#define MX6UL_PAD_NAND_CE0_B__RAWNAND_CE0_B                      	0x01ac 0x0438 0x0000 0 0
++#define MX6UL_PAD_NAND_CE0_B__USDHC1_DATA5                       	0x01ac 0x0438 0x0000 1 0
++#define MX6UL_PAD_NAND_CE0_B__QSPI_A_DATA01                      	0x01ac 0x0438 0x0000 2 0
++#define MX6UL_PAD_NAND_CE0_B__ECSPI3_SCLK                        	0x01ac 0x0438 0x0554 3 1
++#define MX6UL_PAD_NAND_CE0_B__EIM_DTACK_B                        	0x01ac 0x0438 0x0000 4 0
++#define MX6UL_PAD_NAND_CE0_B__GPIO4_IO13                         	0x01ac 0x0438 0x0000 5 0
++#define MX6UL_PAD_NAND_CE0_B__UART3_DCE_RX                           	0x01ac 0x0438 0x0634 8 3
++#define MX6UL_PAD_NAND_CE0_B__UART3_DTE_TX                           	0x01ac 0x0438 0x0000 8 0
+ #define MX6UL_PAD_NAND_CE1_B__RAWNAND_CE1_B                      	0x01b0 0x043c 0x0000 0 0
+ #define MX6UL_PAD_NAND_CE1_B__USDHC1_DATA6                       	0x01b0 0x043c 0x0000 1 0
+ #define MX6UL_PAD_NAND_CE1_B__QSPI_A_DATA02                      	0x01b0 0x043c 0x0000 2 0
+@@ -779,7 +779,7 @@
+ #define MX6UL_PAD_NAND_CLE__UART3_DTE_CTS                        	0x01b4 0x0440 0x0000 8 0
+ #define MX6UL_PAD_NAND_DQS__RAWNAND_DQS                          	0x01b8 0x0444 0x0000 0 0
+ #define MX6UL_PAD_NAND_DQS__CSI_FIELD                            	0x01b8 0x0444 0x0530 1 1
+-#define MX6UL_PAD_NAND_DQS__QSPI_A_SS0_b                         	0x01b8 0x0444 0x0000 2 0
++#define MX6UL_PAD_NAND_DQS__QSPI_A_SS0_B                         	0x01b8 0x0444 0x0000 2 0
+ #define MX6UL_PAD_NAND_DQS__PWM5_OUT                             	0x01b8 0x0444 0x0000 3 0
+ #define MX6UL_PAD_NAND_DQS__EIM_WAIT                             	0x01b8 0x0444 0x0000 4 0
+ #define MX6UL_PAD_NAND_DQS__GPIO4_IO16                           	0x01b8 0x0444 0x0000 5 0
+@@ -834,7 +834,7 @@
+ #define MX6UL_PAD_CSI_MCLK__USDHC2_CD_B                          	0x01d4 0x0460 0x0674 1 0
+ #define MX6UL_PAD_CSI_MCLK__RAWNAND_CE2_B                        	0x01d4 0x0460 0x0000 2 0
+ #define MX6UL_PAD_CSI_MCLK__I2C1_SDA                             	0x01d4 0x0460 0x05a8 3 0
+-#define MX6UL_PAD_CSI_MCLK__EIM_CS0_b                            	0x01d4 0x0460 0x0000 4 0
++#define MX6UL_PAD_CSI_MCLK__EIM_CS0_B                            	0x01d4 0x0460 0x0000 4 0
+ #define MX6UL_PAD_CSI_MCLK__GPIO4_IO17                           	0x01d4 0x0460 0x0000 5 0
+ #define MX6UL_PAD_CSI_MCLK__SNVS_HP_VIO_5_CTL                    	0x01d4 0x0460 0x0000 6 0
+ #define MX6UL_PAD_CSI_MCLK__UART6_DCE_TX                             	0x01d4 0x0460 0x0000 8 0
+-- 
+1.9.1
