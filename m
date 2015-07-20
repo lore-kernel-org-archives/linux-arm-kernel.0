@@ -1,56 +1,49 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 20 Jul 2015 22:02:49 +0200
-Subject: [PATCH] tty/serial: atmel: use proper accessors
-In-Reply-To: <55AD4683.3090708@hurleysoftware.com>
-References: <1437400572-16575-1-git-send-email-alexandre.belloni@free-electrons.com>
- <55AD4683.3090708@hurleysoftware.com>
-Message-ID: <20150720200249.GK15539@piout.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 20 Jul 2015 21:08:19 +0100
+Subject: [PATCH v2 00/10] pwm: add support for atomic update
+In-Reply-To: <20150720214913.73c47fa6@bbrezillon>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20150720171950.GE11162@sirena.org.uk>
+ <20150720214913.73c47fa6@bbrezillon>
+Message-ID: <20150720200819.GN11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jul 20, 2015 at 09:49:13PM +0200, Boris Brezillon wrote:
+> Mark Brown <broonie@kernel.org> wrote:
+> > On Mon, Jul 20, 2015 at 05:31:57PM +0200, Boris Brezillon wrote:
 
-(adding Hans in Cc)
+> > > - dropped pwm-regulator patches (should be submitted separately)
 
-On 20/07/2015 at 15:05:39 -0400, Peter Hurley wrote :
-> Hi Alexandre,
-> 
-> On 07/20/2015 09:56 AM, Alexandre Belloni wrote:
-> > On ARM, it is necessary to use the _relaxed versions of read[bl] and
-> > write[bl] to ensure we do the correct endianness conversion when running in
-> > big endian.
-> > Keep using avr32 __raw version on avr32 to avoid breakage.
-> > 
-> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > ---
-> > 
-> > This patch applies after [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353704.html
-> > 
-> >  drivers/tty/serial/atmel_serial.c | 22 ++++++++++++++++++++++
-> >  1 file changed, 22 insertions(+)
-> > 
-> > diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> > index e91b3b2f0590..451acf054281 100644
-> > --- a/drivers/tty/serial/atmel_serial.c
-> > +++ b/drivers/tty/serial/atmel_serial.c
-> > @@ -194,6 +194,7 @@ to_atmel_uart_port(struct uart_port *uart)
-> >  	return container_of(uart, struct atmel_uart_port, uart);
-> >  }
-> >  
-> > +#ifdef CONFIG_AVR32
-> 
-> The whole point of i/o accessors is to encapsulate arch-specific
-> differences, so one of these arches isn't doing it right, or the wrong
-> i/o accessors are being used.
-> 
+> > I think the second patch needs to go in with this series doesn't it?  It
+> > was just the enable one that was good to go immediately IIRC.
 
-I'm not an avr32 specialist but I think __raw accessors are doing big
-endian accesses but _relaxed accessors are doing litlle endian accesses.
+> I was planning on submitting those two patches after the PWM changes
+> have been merged, but you're right, maybe we should think about a proper
+> way to smoothly get all of them in the same release.
 
-Maybe Hans can clarify what's needed here.
+I see.  We should at least try to get the enable one in this time, I'd
+like to just apply it and then either do a cross tree merge for the one
+making use of the new functionality or (if the rest of the series gets
+held up for some reason) just letting it get merged via Linus' tree.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> I have rebased my work on top your regulator/topic/pwm branch containing
+> Lee's work [1].
+
+> Note that patch 1 has changed a bit to take Lee's additions into
+> account.
+
+> Thierry, could you create a branch based on Mark's regulator/topic/pwm
+> branch ?
+> If everybody agrees on the solution I'll send a v3 rebasing my work on
+> top of this topic branch.
+
+I think that's fine for me, I can tag the PWM branch in my tree and
+Thierry can pull that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/450dfbae/attachment.sig>
