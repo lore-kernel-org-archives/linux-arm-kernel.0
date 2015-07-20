@@ -1,38 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jul 2015 14:41:12 +0200
-Subject: [PATCH 2/4] pinctrl: sunxi: Add irq_chip name
-In-Reply-To: <1437396074-15791-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1437396074-15791-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1437396074-15791-3-git-send-email-maxime.ripard@free-electrons.com>
+Date: Mon, 20 Jul 2015 14:41:10 +0200
+Subject: [PATCH 0/4] pinctrl: sunxi: Implement proper irq DT parsing
+Message-ID: <1437396074-15791-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to ease the debugging, add a name to the irq_chips.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/pinctrl/sunxi/pinctrl-sunxi.c | 2 ++
- 1 file changed, 2 insertions(+)
+So far the GPIO and pinctrl driver had a limited support for
+interrupts, and no documentation about the DT bindings. A few DT ended
+up using these external interrupts, relying on the default DT parsing
+logic.
 
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-index 777669d0a955..87c327993afa 100644
---- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-+++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
-@@ -685,6 +685,7 @@ static void sunxi_pinctrl_irq_ack_unmask(struct irq_data *d)
- }
- 
- static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
-+	.name		= "sunxi_pio_edge",
- 	.irq_ack	= sunxi_pinctrl_irq_ack,
- 	.irq_mask	= sunxi_pinctrl_irq_mask,
- 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
-@@ -695,6 +696,7 @@ static struct irq_chip sunxi_pinctrl_edge_irq_chip = {
- };
- 
- static struct irq_chip sunxi_pinctrl_level_irq_chip = {
-+	.name		= "sunxi_pio_level",
- 	.irq_eoi	= sunxi_pinctrl_irq_ack,
- 	.irq_mask	= sunxi_pinctrl_irq_mask,
- 	.irq_unmask	= sunxi_pinctrl_irq_unmask,
+However, this doesn't really work, since there's still no
+documentation describing the expected behaviour, and we ended up with
+bindings different if you want to use a GPIO as interrupt (using the
+gpios property), or an interrupt over a GPIO (using the interrupts
+property) that doesn't really make sense and only brings confusion.
+
+Moreover, the "new" SoCs from Allwinner have multiple interrupt banks,
+while the previous generation had only one, which means that we cannot
+really express those interrupts with the default bindings anymore
+either.
+
+The point of this serie is to fix the current situation by introducing
+some custom DT parsing code to have a consistant binding with the GPIO
+one, which will also fix the multiple banks issues, and document it.
+
+Let me know what you think,
+Maxime
+
+Maxime Ripard (4):
+  pinctrl: sunxi: Use common functions to change irq_chip and handler
+  pinctrl: sunxi: Add irq_chip name
+  pinctrl: sunxi: Add custom irq_domain_ops
+  ARM: sunxi: dt: Convert users to the PIO interrupts binding
+
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   | 37 ++++++++++++++-
+ arch/arm/boot/dts/sun4i-a10.dtsi                   |  3 +-
+ arch/arm/boot/dts/sun5i-a13-utoo-p66.dts           |  2 +-
+ arch/arm/boot/dts/sun5i.dtsi                       |  3 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                   |  3 +-
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts         |  2 +-
+ arch/arm/boot/dts/sun7i-a20-i12-tvbox.dts          |  2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  3 +-
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi               |  3 +-
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c              | 55 +++++++++++++++++-----
+ 10 files changed, 88 insertions(+), 25 deletions(-)
+
 -- 
 2.4.5
