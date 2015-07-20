@@ -1,125 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 19 Jul 2015 19:29:37 -0700
-Subject: [PATCH] arm64: Minor refactoring of cpu_switch_to() to fix build
- breakage
-Message-ID: <1437359377-39932-1-git-send-email-olof@lixom.net>
+From: majun258@huawei.com (majun (F))
+Date: Mon, 20 Jul 2015 10:33:23 +0800
+Subject: [PATCH v4 09/19] drivers: base: Add MSI domain support for non-PCI
+ devices
+In-Reply-To: <1436962613-17359-10-git-send-email-marc.zyngier@arm.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55AC5DF3.8090502@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-moved the thread_struct to the bottom of task_struct. As a result, the
-offset is now too large to be used in an immediate add on arm64 with
-some kernel configs:
 
-arch/arm64/kernel/entry.S: Assembler messages:
-arch/arm64/kernel/entry.S:588: Error: immediate out of range
-arch/arm64/kernel/entry.S:597: Error: immediate out of range
 
-There's really no reason for cpu_switch_to to take a task_struct pointer
-in the first place, since all it does is access the thread.cpu_context
-member. So, just pass that in directly.
+? 2015/7/15 20:16, Marc Zyngier ??:
+> With the msi_list and the msi_domain properties now being at the
+> generic device level, it is starting to be relatively easy to offer
+> a generic way of providing non-PCI MSIs.
+> 
+[...]
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index c10ec56..b55cf63 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -18,6 +18,11 @@ struct pci_dev;
+>  void __get_cached_msi_msg(struct msi_desc *entry, struct msi_msg *msg);
+>  void get_cached_msi_msg(unsigned int irq, struct msi_msg *msg);
+>  
+> +typedef void (*irq_write_msi_msg_t)(struct msi_desc *desc,
+> +				    struct msi_msg *msg);
+> +
+> +struct platform_msi_priv_data;
+> +
+>  struct msi_desc {
+>  	struct list_head		list;
+>  	unsigned int			irq;
+> @@ -42,6 +47,10 @@ struct msi_desc {
+>  				void __iomem *mask_base;
+>  			};
+>  		};
+> +		struct {
+> +			struct platform_msi_priv_data *platform_msi_priv_data;
+> +			u16 msi_index;
+> +		};
+>  	};
+>  };
+>  
+When I add this patch in linux 4.2.rc2, this part is rejected. So I added this part
+myself. But there is compiling errors.
 
-Fixes: 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
-Cc: Dave Hansen <dave.hansen@linux.intel.com>
-Signed-off-by: Olof Johansson <olof@lixom.net>
----
- arch/arm64/include/asm/processor.h |    4 ++--
- arch/arm64/kernel/asm-offsets.c    |    2 --
- arch/arm64/kernel/entry.S          |   34 ++++++++++++++++------------------
- arch/arm64/kernel/process.c        |    3 ++-
- 4 files changed, 20 insertions(+), 23 deletions(-)
+drivers/base/platform-msi.c: In function 'platform_msi_free_descs':
+drivers/base/platform-msi.c:129:2: error: implicit declaration of function 'to_pci_dev' [-Werror=implicit-function-declaration]
+  list_for_each_entry_safe(desc, tmp, dev_to_msi_list(dev), list) {
+  ^
+In file included from include/linux/list.h:8:0,
+                 from include/linux/kobject.h:20,
+                 from include/linux/device.h:17,
+                 from drivers/base/platform-msi.c:20:
+include/linux/msi.h:57:50: error: invalid type argument of '->' (have 'int')
+ #define dev_to_msi_list(dev)  (&to_pci_dev((dev))->msi_list)
+                                                  ^
+include/linux/kernel.h:810:49: note: in definition of macro 'container_of'
+  const typeof( ((type *)0)->member ) *__mptr = (ptr); \
+                                                 ^
 
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index e4c893e..ba90764 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -152,8 +152,8 @@ static inline void cpu_relax(void)
- #define cpu_relax_lowlatency()                cpu_relax()
- 
- /* Thread switching */
--extern struct task_struct *cpu_switch_to(struct task_struct *prev,
--					 struct task_struct *next);
-+extern struct task_struct *cpu_switch_to(struct cpu_context *prev,
-+					 struct cpu_context *next);
- 
- #define task_pt_regs(p) \
- 	((struct pt_regs *)(THREAD_START_SP + task_stack_page(p)) - 1)
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index c99701a..c9e13f6 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -39,8 +39,6 @@ int main(void)
-   DEFINE(TI_TASK,		offsetof(struct thread_info, task));
-   DEFINE(TI_CPU,		offsetof(struct thread_info, cpu));
-   BLANK();
--  DEFINE(THREAD_CPU_CONTEXT,	offsetof(struct task_struct, thread.cpu_context));
--  BLANK();
-   DEFINE(S_X0,			offsetof(struct pt_regs, regs[0]));
-   DEFINE(S_X1,			offsetof(struct pt_regs, regs[1]));
-   DEFINE(S_X2,			offsetof(struct pt_regs, regs[2]));
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index f860bfd..2216326 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -579,29 +579,27 @@ ENDPROC(el0_irq)
- /*
-  * Register switch for AArch64. The callee-saved registers need to be saved
-  * and restored. On entry:
-- *   x0 = previous task_struct (must be preserved across the switch)
-- *   x1 = next task_struct
-+ *   x0 = previous cpu_context (must be preserved across the switch)
-+ *   x1 = next cpu_context
-  * Previous and next are guaranteed not to be the same.
-  *
-  */
- ENTRY(cpu_switch_to)
--	add	x8, x0, #THREAD_CPU_CONTEXT
- 	mov	x9, sp
--	stp	x19, x20, [x8], #16		// store callee-saved registers
--	stp	x21, x22, [x8], #16
--	stp	x23, x24, [x8], #16
--	stp	x25, x26, [x8], #16
--	stp	x27, x28, [x8], #16
--	stp	x29, x9, [x8], #16
--	str	lr, [x8]
--	add	x8, x1, #THREAD_CPU_CONTEXT
--	ldp	x19, x20, [x8], #16		// restore callee-saved registers
--	ldp	x21, x22, [x8], #16
--	ldp	x23, x24, [x8], #16
--	ldp	x25, x26, [x8], #16
--	ldp	x27, x28, [x8], #16
--	ldp	x29, x9, [x8], #16
--	ldr	lr, [x8]
-+	stp	x19, x20, [x0], #16		// store callee-saved registers
-+	stp	x21, x22, [x0], #16
-+	stp	x23, x24, [x0], #16
-+	stp	x25, x26, [x0], #16
-+	stp	x27, x28, [x0], #16
-+	stp	x29, x9, [x0], #16
-+	str	lr, [x0]
-+	ldp	x19, x20, [x1], #16		// restore callee-saved registers
-+	ldp	x21, x22, [x1], #16
-+	ldp	x23, x24, [x1], #16
-+	ldp	x25, x26, [x1], #16
-+	ldp	x27, x28, [x1], #16
-+	ldp	x29, x9, [x1], #16
-+	ldr	lr, [x1]
- 	mov	sp, x9
- 	ret
- ENDPROC(cpu_switch_to)
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 223b093..6b9a09c 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -325,7 +325,8 @@ struct task_struct *__switch_to(struct task_struct *prev,
- 	dsb(ish);
- 
- 	/* the actual thread switch */
--	last = cpu_switch_to(prev, next);
-+	last = cpu_switch_to(&prev->thread.cpu_context,
-+			     &next->thread.cpu_context);
- 
- 	return last;
- }
--- 
-1.7.10.4
+> @@ -228,6 +237,12 @@ int msi_domain_alloc_irqs(struct irq_domain *domain, struct device *dev,
+>  void msi_domain_free_irqs(struct irq_domain *domain, struct device *dev);
+>  struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain);
+>  
+> +struct irq_domain *platform_msi_create_irq_domain(struct device_node *np,
+> +						  struct msi_domain_info *info,
+> +						  struct irq_domain *parent);
+> +int platform_msi_domain_alloc_irqs(struct device *dev, unsigned int nvec,
+> +				   irq_write_msi_msg_t write_msi_msg);
+> +void platform_msi_domain_free_irqs(struct device *dev);
+>  #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
+>  
+>  #ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+> 
