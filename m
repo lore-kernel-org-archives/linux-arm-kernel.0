@@ -1,81 +1,98 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 20 Jul 2015 15:05:39 -0400
-Subject: [PATCH] tty/serial: atmel: use proper accessors
-In-Reply-To: <1437400572-16575-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1437400572-16575-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55AD4683.3090708@hurleysoftware.com>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Mon, 20 Jul 2015 12:12:14 -0700
+Subject: [V2] [TWL4030 MADC] Fix ADC[3:6] readings
+Message-ID: <1437419534-27209-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+MADC[3:6] reads incorrect values without these two following changes:
 
-On 07/20/2015 09:56 AM, Alexandre Belloni wrote:
-> On ARM, it is necessary to use the _relaxed versions of read[bl] and
-> write[bl] to ensure we do the correct endianness conversion when running in
-> big endian.
-> Keep using avr32 __raw version on avr32 to avoid breakage.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
-> 
-> This patch applies after [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353704.html
-> 
->  drivers/tty/serial/atmel_serial.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-> index e91b3b2f0590..451acf054281 100644
-> --- a/drivers/tty/serial/atmel_serial.c
-> +++ b/drivers/tty/serial/atmel_serial.c
-> @@ -194,6 +194,7 @@ to_atmel_uart_port(struct uart_port *uart)
->  	return container_of(uart, struct atmel_uart_port, uart);
->  }
->  
-> +#ifdef CONFIG_AVR32
+- enable the 3v1 bias regulator for ADC[3:6]
+- configure ADC[3:6] lines as input, not as USB
 
-The whole point of i/o accessors is to encapsulate arch-specific
-differences, so one of these arches isn't doing it right, or the wrong
-i/o accessors are being used.
+Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
+---
+ drivers/iio/adc/twl4030-madc.c | 14 ++++++++++++++
+ drivers/phy/phy-twl4030-usb.c  |  7 +++++++
+ 2 files changed, 21 insertions(+)
 
-In any event, serial drivers can't start taking on per-arch conditional
-compilation.
-
-Regards,
-Peter Hurley
-
-PS - The $subject doesn't really match the patch; this is basically adding
-big-endian support on little-endian arches.
-
->  static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
->  {
->  	return __raw_readl(port->membase + reg);
-> @@ -213,6 +214,27 @@ static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
->  {
->  	__raw_writeb(value, port->membase + reg);
->  }
-> +#else
-> +static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
-> +{
-> +	return readl_relaxed(port->membase + reg);
-> +}
-> +
-> +static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
-> +{
-> +	writel_relaxed(value, port->membase + reg);
-> +}
-> +
-> +static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
-> +{
-> +	return readb_relaxed(port->membase + reg);
-> +}
-> +
-> +static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
-> +{
-> +	writeb_relaxed(value, port->membase + reg);
-> +}
-> +#endif
->  
->  #ifdef CONFIG_SERIAL_ATMEL_PDC
->  static bool atmel_use_pdc_rx(struct uart_port *port)
-> 
+diff --git a/drivers/iio/adc/twl4030-madc.c b/drivers/iio/adc/twl4030-madc.c
+index 94c5f05..92f290e 100644
+--- a/drivers/iio/adc/twl4030-madc.c
++++ b/drivers/iio/adc/twl4030-madc.c
+@@ -45,6 +45,7 @@
+ #include <linux/types.h>
+ #include <linux/gfp.h>
+ #include <linux/err.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/iio/iio.h>
+ 
+@@ -52,6 +53,7 @@
+  * struct twl4030_madc_data - a container for madc info
+  * @dev:		Pointer to device structure for madc
+  * @lock:		Mutex protecting this data structure
++ * @regulator:		Pointer to bias regulator for madc
+  * @requests:		Array of request struct corresponding to SW1, SW2 and RT
+  * @use_second_irq:	IRQ selection (main or co-processor)
+  * @imr:		Interrupt mask register of MADC
+@@ -60,6 +62,7 @@
+ struct twl4030_madc_data {
+ 	struct device *dev;
+ 	struct mutex lock;	/* mutex protecting this data structure */
++	struct regulator *usb3v1;
+ 	struct twl4030_madc_request requests[TWL4030_MADC_NUM_METHODS];
+ 	bool use_second_irq;
+ 	u8 imr;
+@@ -848,6 +851,14 @@ static int twl4030_madc_probe(struct platform_device *pdev)
+ 		goto err_i2c;
+ 	}
+ 
++	madc->usb3v1 = devm_regulator_get(madc->dev, "vusb3v1");
++	if (IS_ERR(madc->usb3v1))
++		return -ENODEV;
++
++	ret = regulator_enable(madc->usb3v1);
++	if (ret)
++		dev_err(madc->dev, "could not enable 3v1 bias regulator\n");
++
+ 	return 0;
+ 
+ err_i2c:
+@@ -867,6 +878,9 @@ static int twl4030_madc_remove(struct platform_device *pdev)
+ 	twl4030_madc_set_current_generator(madc, 0, 0);
+ 	twl4030_madc_set_power(madc, 0);
+ 
++	regulator_disable(madc->usb3v1);
++	regulator_put(madc->usb3v1);
++
+ 	return 0;
+ }
+ 
+diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
+index 7b04bef..88fc7d7 100644
+--- a/drivers/phy/phy-twl4030-usb.c
++++ b/drivers/phy/phy-twl4030-usb.c
+@@ -144,6 +144,9 @@
+ #define PMBR1				0x0D
+ #define GPIO_USB_4PIN_ULPI_2430C	(3 << 0)
+ 
++#define TWL4030_USB_SEL_MADC_MCPC	(1<<3)
++#define TWL4030_USB_CARKIT_ANA_CTRL	0xBB
++
+ struct twl4030_usb {
+ 	struct usb_phy		phy;
+ 	struct device		*dev;
+@@ -459,6 +462,10 @@ static int twl4030_phy_power_on(struct phy *phy)
+ 		twl4030_i2c_access(twl, 0);
+ 	schedule_delayed_work(&twl->id_workaround_work, 0);
+ 
++	twl4030_usb_write(twl, TWL4030_USB_CARKIT_ANA_CTRL,
++		twl4030_usb_read(twl, TWL4030_USB_CARKIT_ANA_CTRL) |
++		TWL4030_USB_SEL_MADC_MCPC);
++
+ 	return 0;
+ }
+ 
+-- 
+2.1.4
