@@ -1,276 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 20 Jul 2015 12:15:27 +0200
-Subject: [PATCH] ARM: dts: sun4i: Add Iteaduino Plus A10
-In-Reply-To: <20150719134501.GA19235@maud>
-References: <20150719134501.GA19235@maud>
-Message-ID: <20150720101527.GV28632@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Jul 2015 11:53:45 +0100
+Subject: [PATCH] arm64: Minor refactoring of cpu_switch_to() to fix build
+ breakage
+In-Reply-To: <20150720073647.GA10504@gmail.com>
+References: <1437359377-39932-1-git-send-email-olof@lixom.net>
+ <20150720073647.GA10504@gmail.com>
+Message-ID: <20150720105345.GC9908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Thanks for your patch.
-
-On Sun, Jul 19, 2015 at 03:45:03PM +0200, Josef Gajdusek wrote:
-> Iteaduino Plus A10 is a breakout board + Itead Core A10.
-
-Is there multiple breakout boards available for that module?
-
-> It features 1GB RAM, has most of the A10 pins on a .1" header, 2 USB
-> ports, 1 OTG USB port, Ethernet, HDMI, SATA, Speaker/Microphone
-> 3.5mm jacks and an SD card slot.
+On Mon, Jul 20, 2015 at 08:36:47AM +0100, Ingo Molnar wrote:
+> * Olof Johansson <olof@lixom.net> wrote:
 > 
-> Link to manufacturer wiki: http://wiki.iteadstudio.com/Iteaduino_Plus_A10/A20
-
-Please don't put such links in the commit description. Valid URLs come
-and go, the git history doesn't.
-
-> Signed-off-by: Josef Gajdusek <atx@atx.name>
-> ---
->  arch/arm/boot/dts/Makefile                     |   1 +
->  arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts | 202 +++++++++++++++++++++++++
->  2 files changed, 203 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
+> > Commit 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+> > moved the thread_struct to the bottom of task_struct. As a result, the
+> > offset is now too large to be used in an immediate add on arm64 with
+> > some kernel configs:
+> > 
+> > arch/arm64/kernel/entry.S: Assembler messages:
+> > arch/arm64/kernel/entry.S:588: Error: immediate out of range
+> > arch/arm64/kernel/entry.S:597: Error: immediate out of range
+> > 
+> > There's really no reason for cpu_switch_to to take a task_struct pointer
+> > in the first place, since all it does is access the thread.cpu_context
+> > member. So, just pass that in directly.
+> > 
+> > Fixes: 0c8c0f03e3a2 ("x86/fpu, sched: Dynamically allocate 'struct fpu'")
+> > Cc: Dave Hansen <dave.hansen@linux.intel.com>
+> > Signed-off-by: Olof Johansson <olof@lixom.net>
+> > ---
+> >  arch/arm64/include/asm/processor.h |    4 ++--
+> >  arch/arm64/kernel/asm-offsets.c    |    2 --
+> >  arch/arm64/kernel/entry.S          |   34 ++++++++++++++++------------------
+> >  arch/arm64/kernel/process.c        |    3 ++-
+> >  4 files changed, 20 insertions(+), 23 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index adb1826..6104ed1 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -529,6 +529,7 @@ dtb-$(CONFIG_MACH_SUN4I) += \
->  	sun4i-a10-hackberry.dtb \
->  	sun4i-a10-hyundai-a7hd.dtb \
->  	sun4i-a10-inet97fv2.dtb \
-> +	sun4i-a10-iteaduino-plus.dts \
->  	sun4i-a10-jesurun-q5.dtb \
->  	sun4i-a10-marsboard.dtb \
->  	sun4i-a10-mini-xplus.dtb \
-> diff --git a/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
-> new file mode 100644
-> index 0000000..985e155
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun4i-a10-iteaduino-plus.dts
+> So why not pass in 'thread_struct' as the patch below does - it looks much
+> simpler to me. This way the assembly doesn't have to be changed at all.
 
-we try to have a DT name that is
-<family>-<soc>-<manufacturer>-<device>.dts
+Unfortunately, neither of these approaches really work:
 
-Which in this case would be sun4i-a10-itead-iteaduino-plus.dts
+  - We need to return last from __switch_to, which means not corrupting
+    x0 in cpu_switch_to and then having an ugly container_of to get back
+    at the task_struct
 
-> @@ -0,0 +1,202 @@
-> +/*
-> + * Copyright 2015 Josef Gajdusek <atx@atx.name>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "sun4i-a10.dtsi"
-> +#include "sunxi-common-regulators.dtsi"
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pinctrl/sun4i-a10.h>
-> +
-> +/ {
-> +	model = "Iteaduino Plus A10";
-> +	compatible = "itead,iteaduino-plus-a10", "allwinner,sun4i-a10";
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +};
-> +
-> +&ahci {
-> +	target-supply = <&reg_ahci_5v>;
-> +	status = "okay";
-> +};
-> +
-> +&cpu0 {
-> +	cpu-supply = <&reg_dcdc2>;
-> +};
-> +
-> +&ehci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ehci1 {
-> +	status = "okay";
-> +};
-> +
-> +&emac {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&emac_pins_a>;
-> +	phy = <&phy1>;
-> +	status = "okay";
-> +};
-> +
-> +&emac_sram {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_pins_a>;
-> +	status = "okay";
-> +
-> +	axp209: pmic at 34 {
-> +		reg = <0x34>;
-> +		interrupts = <0>;
-> +	};
-> +};
-> +
-> +&i2c1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c1_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c2_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&ir0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&ir0_rx_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&mdio {
-> +	status = "okay";
-> +
-> +	phy1: ethernet-phy at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> +
-> +&mmc0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_reference_design>;
-> +	vmmc-supply = <&reg_vcc3v3>;
-> +	bus-width = <4>;
-> +	cd-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
-> +	cd-inverted;
-> +	status = "okay";
-> +};
-> +
-> +&ohci0 {
-> +	status = "okay";
-> +};
-> +
-> +&ohci1 {
-> +	status = "okay";
-> +};
-> +
-> +&reg_ahci_5v {
-> +	status = "okay";
-> +};
-> +
-> +#include "axp209.dtsi"
-> +
-> +&reg_dcdc2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1450000>;
-> +	regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <1000000>;
-> +	regulator-max-microvolt = <1400000>;
-> +	regulator-name = "vdd-int-dll";
-> +};
-> +
-> +&reg_ldo1 {
-> +	regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +	regulator-always-on;
-> +	regulator-min-microvolt = <3000000>;
-> +	regulator-max-microvolt = <3000000>;
-> +	regulator-name = "avcc";
-> +};
-> +
-> +&reg_usb1_vbus {
-> +	status = "okay";
-> +};
-> +
-> +&reg_usb2_vbus {
-> +	status = "okay";
-> +};
-> +
-> +&spi0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi0_pins_a>,
-> +		    <&spi0_cs0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart0_pins_a>;
-> +	status = "okay";
-> +};
-> +
-> +&usbphy {
-> +	usb1_vbus-supply = <&reg_usb1_vbus>;
-> +	usb2_vbus-supply = <&reg_usb2_vbus>;
-> +	status = "okay";
-> +};
+  - ret_from_fork needs to pass the task_struct of prev to schedule_tail,
+    so we have the same issue there
 
-Looks good otherwise, thanks!
+Patch below fixes things, but it's a shame we have to use an extra register
+like this.
 
-Maxime
+Will
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/ce3306a3/attachment-0001.sig>
+--->8
+
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index f860bfda454a..e16351819fed 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -585,7 +585,8 @@ ENDPROC(el0_irq)
+  *
+  */
+ ENTRY(cpu_switch_to)
+-	add	x8, x0, #THREAD_CPU_CONTEXT
++	mov	x10, #THREAD_CPU_CONTEXT
++	add	x8, x0, x10
+ 	mov	x9, sp
+ 	stp	x19, x20, [x8], #16		// store callee-saved registers
+ 	stp	x21, x22, [x8], #16
+@@ -594,7 +595,7 @@ ENTRY(cpu_switch_to)
+ 	stp	x27, x28, [x8], #16
+ 	stp	x29, x9, [x8], #16
+ 	str	lr, [x8]
+-	add	x8, x1, #THREAD_CPU_CONTEXT
++	add	x8, x1, x10
+ 	ldp	x19, x20, [x8], #16		// restore callee-saved registers
+ 	ldp	x21, x22, [x8], #16
+ 	ldp	x23, x24, [x8], #16
