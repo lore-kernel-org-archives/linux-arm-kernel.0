@@ -1,69 +1,41 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Mon, 20 Jul 2015 16:17:15 +0800
-Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
-Message-ID: <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 20 Jul 2015 10:18:36 +0200
+Subject: [PATCH v11] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20150720081050.GB12908@gondor.apana.org.au>
+References: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20150720081050.GB12908@gondor.apana.org.au>
+Message-ID: <20150720081836.GT28632@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the device-tree binding of MediatTek display PWM.
-The PWM has one channel to control the backlight brightness for display.
-It supports MT8173 and MT6595.
+On Mon, Jul 20, 2015 at 04:10:50PM +0800, Herbert Xu wrote:
+> On Fri, Jul 17, 2015 at 04:39:37PM +0200, LABBE Corentin wrote:
+> > Hello
+> > 
+> > This is the driver for the Security System included in Allwinner SoC A20.
+> > The Security System (SS for short) is a hardware cryptographic accelerator that
+> > support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+> > It could be found on others Allwinner SoC: 
+> > - A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
+> > - A23 speak about a security system but without precisions
+> > - A80 and A83T datasheet speak about a security system with more functions
+> >   (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver.
+> 
+> All applied.  Thanks a lot!
 
-Signed-off-by: YH Huang <yh.huang@mediatek.com>
----
- .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42 ++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+All applied, DT bits included?
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-new file mode 100644
-index 0000000..f8f59ba
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-@@ -0,0 +1,42 @@
-+MediaTek display PWM controller
-+
-+Required properties:
-+ - compatible: should be "mediatek,<name>-disp-pwm":
-+   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-+   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
-+ - reg: physical base address and length of the controller's registers.
-+ - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
-+   the cell format.
-+ - clocks: phandle and clock specifier of the PWM reference clock.
-+ - clock-names: must contain the following:
-+   - "main": clock used to generate PWM signals.
-+   - "mm": sync signals from the modules of mmsys.
-+ - pinctrl-names: Must contain a "default" entry.
-+ - pinctrl-0: One property must exist for each entry in pinctrl-names.
-+   See pinctrl/pinctrl-bindings.txt for details of the property values.
-+
-+Example:
-+	pwm0: pwm at 1401e000 {
-+		compatible = "mediatek,mt8173-disp-pwm",
-+			     "mediatek,mt6595-disp-pwm";
-+		reg = <0 0x1401e000 0 0x1000>;
-+		#pwm-cells = <2>;
-+		clocks = <&mmsys CLK_MM_DISP_PWM026M>,
-+			 <&mmsys CLK_MM_DISP_PWM0MM>;
-+		clock-names = "main", "mm";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&disp_pwm0_pins>;
-+	};
-+
-+	backlight_lcd: backlight_lcd {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm0 0 1000000>;
-+		brightness-levels = <
-+			  0  16  32  48  64  80  96 112
-+			128 144 160 176 192 208 224 240
-+			255
-+		>;
-+		default-brightness-level = <9>;
-+		power-supply = <&mt6397_vio18_reg>;
-+		enable-gpios = <&pio 95 GPIO_ACTIVE_HIGH>;
-+	};
+Maxime
+
 -- 
-1.8.1.1.dirty
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150720/8d1f352f/attachment.sig>
