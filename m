@@ -1,132 +1,221 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Sun, 19 Jul 2015 20:18:11 -0400
-Subject: [PATCH 07/10] devm: fix ioremap_cache() usage
+Date: Sun, 19 Jul 2015 20:17:54 -0400
+Subject: [PATCH 04/10] arch, drivers: don't include <asm/io.h> directly,
+ use <linux/io.h> instead
 In-Reply-To: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
 References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150720001811.30857.92541.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150720001754.30857.39667.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide devm_ioremap_cache() and fix up devm_ioremap_resource() to
-actually provide cacheable mappings.  On archs that implement
-ioremap_cache() devm_ioremap_resource() is always silently falling back
-to uncached when IORESOURCE_CACHEABLE is specified.
+Preparation for uniform definition of ioremap, ioremap_wc, ioremap_wt,
+and ioremap_cache, tree-wide.
 
-Cc: Toshi Kani <toshi.kani@hp.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Christoph Hellwig <hch@lst.de>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- include/linux/io.h |    2 ++
- lib/devres.c       |   53 +++++++++++++++++++++++++---------------------------
- 2 files changed, 27 insertions(+), 28 deletions(-)
+ arch/arm/mach-shmobile/pm-rcar.c            |    2 +-
+ arch/ia64/kernel/cyclone.c                  |    2 +-
+ drivers/isdn/icn/icn.h                      |    2 +-
+ drivers/mtd/devices/slram.c                 |    2 +-
+ drivers/mtd/nand/diskonchip.c               |    2 +-
+ drivers/mtd/onenand/generic.c               |    2 +-
+ drivers/scsi/sun3x_esp.c                    |    2 +-
+ drivers/staging/comedi/drivers/ii_pci20kc.c |    1 +
+ drivers/tty/serial/8250/8250_core.c         |    2 +-
+ drivers/video/fbdev/s1d13xxxfb.c            |    3 +--
+ drivers/video/fbdev/stifb.c                 |    1 +
+ include/linux/io-mapping.h                  |    2 +-
+ include/linux/mtd/map.h                     |    2 +-
+ include/video/vga.h                         |    2 +-
+ 14 files changed, 14 insertions(+), 13 deletions(-)
 
-diff --git a/include/linux/io.h b/include/linux/io.h
-index a4b2c1b2aaee..58482241c95c 100644
---- a/include/linux/io.h
-+++ b/include/linux/io.h
-@@ -71,6 +71,8 @@ static inline void devm_ioport_unmap(struct device *dev, void __iomem *addr)
+diff --git a/arch/arm/mach-shmobile/pm-rcar.c b/arch/arm/mach-shmobile/pm-rcar.c
+index 00022ee56f80..9d3dde00c2fe 100644
+--- a/arch/arm/mach-shmobile/pm-rcar.c
++++ b/arch/arm/mach-shmobile/pm-rcar.c
+@@ -12,7 +12,7 @@
+ #include <linux/err.h>
+ #include <linux/mm.h>
+ #include <linux/spinlock.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ #include "pm-rcar.h"
  
- void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
- 			   resource_size_t size);
-+void __iomem *devm_ioremap_cache(struct device *dev, resource_size_t offset,
-+			   resource_size_t size);
- void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
- 				   resource_size_t size);
- void __iomem *devm_ioremap_wc(struct device *dev, resource_size_t offset,
-diff --git a/lib/devres.c b/lib/devres.c
-index dafbad21bfab..eefdebd9f903 100644
---- a/lib/devres.c
-+++ b/lib/devres.c
-@@ -34,6 +34,8 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
- 	return *(void **)res == match_data;
- }
+ /* SYSC */
+diff --git a/arch/ia64/kernel/cyclone.c b/arch/ia64/kernel/cyclone.c
+index 4826ff957a3d..5fa3848ba224 100644
+--- a/arch/ia64/kernel/cyclone.c
++++ b/arch/ia64/kernel/cyclone.c
+@@ -4,7 +4,7 @@
+ #include <linux/errno.h>
+ #include <linux/timex.h>
+ #include <linux/clocksource.h>
+-#include <asm/io.h>
++#include <linux/io.h>
  
-+typedef void __iomem *(*ioremap_fn)(resource_size_t offset, unsigned long size);
-+
- /**
-  * devm_ioremap - Managed ioremap()
-  * @dev: Generic device to remap IO address for
-@@ -42,8 +44,9 @@ static int devm_ioremap_match(struct device *dev, void *res, void *match_data)
-  *
-  * Managed ioremap().  Map is automatically unmapped on driver detach.
+ /* IBM Summit (EXA) Cyclone counter code*/
+ #define CYCLONE_CBAR_ADDR 0xFEB00CD0
+diff --git a/drivers/isdn/icn/icn.h b/drivers/isdn/icn/icn.h
+index b713466997a0..f8f2e76d34bf 100644
+--- a/drivers/isdn/icn/icn.h
++++ b/drivers/isdn/icn/icn.h
+@@ -38,7 +38,7 @@ typedef struct icn_cdef {
+ #include <linux/errno.h>
+ #include <linux/fs.h>
+ #include <linux/major.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/signal.h>
+ #include <linux/slab.h>
+diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
+index 2fc4957cbe7f..a70eb83e68f1 100644
+--- a/drivers/mtd/devices/slram.c
++++ b/drivers/mtd/devices/slram.c
+@@ -41,7 +41,7 @@
+ #include <linux/fs.h>
+ #include <linux/ioctl.h>
+ #include <linux/init.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ 
+ #include <linux/mtd/mtd.h>
+ 
+diff --git a/drivers/mtd/nand/diskonchip.c b/drivers/mtd/nand/diskonchip.c
+index 7da266a53979..0802158a3f75 100644
+--- a/drivers/mtd/nand/diskonchip.c
++++ b/drivers/mtd/nand/diskonchip.c
+@@ -24,7 +24,7 @@
+ #include <linux/rslib.h>
+ #include <linux/moduleparam.h>
+ #include <linux/slab.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ 
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/nand.h>
+diff --git a/drivers/mtd/onenand/generic.c b/drivers/mtd/onenand/generic.c
+index 32a216d31141..ab7bda0bb245 100644
+--- a/drivers/mtd/onenand/generic.c
++++ b/drivers/mtd/onenand/generic.c
+@@ -18,7 +18,7 @@
+ #include <linux/mtd/mtd.h>
+ #include <linux/mtd/onenand.h>
+ #include <linux/mtd/partitions.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ 
+ /*
+  * Note: Driver name and platform data format have been updated!
+diff --git a/drivers/scsi/sun3x_esp.c b/drivers/scsi/sun3x_esp.c
+index e26e81de7c45..d50c5ed8f428 100644
+--- a/drivers/scsi/sun3x_esp.c
++++ b/drivers/scsi/sun3x_esp.c
+@@ -12,9 +12,9 @@
+ #include <linux/platform_device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/interrupt.h>
++#include <linux/io.h>
+ 
+ #include <asm/sun3x.h>
+-#include <asm/io.h>
+ #include <asm/dma.h>
+ #include <asm/dvma.h>
+ 
+diff --git a/drivers/staging/comedi/drivers/ii_pci20kc.c b/drivers/staging/comedi/drivers/ii_pci20kc.c
+index 0768bc42a5db..14ef1f67dd42 100644
+--- a/drivers/staging/comedi/drivers/ii_pci20kc.c
++++ b/drivers/staging/comedi/drivers/ii_pci20kc.c
+@@ -28,6 +28,7 @@
   */
--void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
--			   resource_size_t size)
-+static void __iomem *devm_ioremap_type(struct device *dev,
-+		resource_size_t offset, resource_size_t size,
-+		ioremap_fn ioremap_type)
- {
- 	void __iomem **ptr, *addr;
  
-@@ -51,7 +54,7 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
- 	if (!ptr)
- 		return NULL;
+ #include <linux/module.h>
++#include <linux/io.h>
+ #include "../comedidev.h"
  
--	addr = ioremap(offset, size);
-+	addr = ioremap_type(offset, size);
- 	if (addr) {
- 		*ptr = addr;
- 		devres_add(dev, ptr);
-@@ -60,34 +63,25 @@ void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
+ /*
+diff --git a/drivers/tty/serial/8250/8250_core.c b/drivers/tty/serial/8250/8250_core.c
+index 37fff12dd4d0..fe902ff52e58 100644
+--- a/drivers/tty/serial/8250/8250_core.c
++++ b/drivers/tty/serial/8250/8250_core.c
+@@ -38,11 +38,11 @@
+ #include <linux/slab.h>
+ #include <linux/uaccess.h>
+ #include <linux/pm_runtime.h>
++#include <linux/io.h>
+ #ifdef CONFIG_SPARC
+ #include <linux/sunserialcore.h>
+ #endif
  
- 	return addr;
- }
-+
-+void __iomem *devm_ioremap(struct device *dev, resource_size_t offset,
-+			   resource_size_t size)
-+{
-+	return devm_ioremap_type(dev, offset, size, ioremap);
-+}
- EXPORT_SYMBOL(devm_ioremap);
+-#include <asm/io.h>
+ #include <asm/irq.h>
  
--/**
-- * devm_ioremap_nocache - Managed ioremap_nocache()
-- * @dev: Generic device to remap IO address for
-- * @offset: BUS offset to map
-- * @size: Size of map
-- *
-- * Managed ioremap_nocache().  Map is automatically unmapped on driver
-- * detach.
-- */
-+void __iomem *devm_ioremap_cache(struct device *dev, resource_size_t offset,
-+			   resource_size_t size)
-+{
-+	return devm_ioremap_type(dev, offset, size, ioremap_cache);
-+}
-+EXPORT_SYMBOL(devm_ioremap_cache);
-+
- void __iomem *devm_ioremap_nocache(struct device *dev, resource_size_t offset,
- 				   resource_size_t size)
- {
--	void __iomem **ptr, *addr;
+ #include "8250.h"
+diff --git a/drivers/video/fbdev/s1d13xxxfb.c b/drivers/video/fbdev/s1d13xxxfb.c
+index 83433cb0dfba..96aa46dc696c 100644
+--- a/drivers/video/fbdev/s1d13xxxfb.c
++++ b/drivers/video/fbdev/s1d13xxxfb.c
+@@ -32,8 +32,7 @@
+ #include <linux/spinlock_types.h>
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
 -
--	ptr = devres_alloc(devm_ioremap_release, sizeof(*ptr), GFP_KERNEL);
--	if (!ptr)
--		return NULL;
--
--	addr = ioremap_nocache(offset, size);
--	if (addr) {
--		*ptr = addr;
--		devres_add(dev, ptr);
--	} else
--		devres_free(ptr);
--
--	return addr;
-+	return devm_ioremap_type(dev, offset, size, ioremap_nocache);
- }
- EXPORT_SYMBOL(devm_ioremap_nocache);
+-#include <asm/io.h>
++#include <linux/io.h>
  
-@@ -173,8 +167,11 @@ void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res)
- 		return IOMEM_ERR_PTR(-EBUSY);
- 	}
+ #include <video/s1d13xxxfb.h>
  
--	/* FIXME: add devm_ioremap_cache support */
--	dest_ptr = devm_ioremap(dev, res->start, size);
-+	if (res->flags & IORESOURCE_CACHEABLE)
-+		dest_ptr = devm_ioremap_cache(dev, res->start, size);
-+	else
-+		dest_ptr = devm_ioremap_nocache(dev, res->start, size);
-+
- 	if (!dest_ptr) {
- 		dev_err(dev, "ioremap failed for resource %pR\n", res);
- 		devm_release_mem_region(dev, res->start, size);
+diff --git a/drivers/video/fbdev/stifb.c b/drivers/video/fbdev/stifb.c
+index 735355b0e023..7df4228e25f0 100644
+--- a/drivers/video/fbdev/stifb.c
++++ b/drivers/video/fbdev/stifb.c
+@@ -64,6 +64,7 @@
+ #include <linux/fb.h>
+ #include <linux/init.h>
+ #include <linux/ioport.h>
++#include <linux/io.h>
+ 
+ #include <asm/grfioctl.h>	/* for HP-UX compatibility */
+ #include <asm/uaccess.h>
+diff --git a/include/linux/io-mapping.h b/include/linux/io-mapping.h
+index c27dde7215b5..e399029b68c5 100644
+--- a/include/linux/io-mapping.h
++++ b/include/linux/io-mapping.h
+@@ -21,7 +21,7 @@
+ #include <linux/types.h>
+ #include <linux/slab.h>
+ #include <linux/bug.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ #include <asm/page.h>
+ 
+ /*
+diff --git a/include/linux/mtd/map.h b/include/linux/mtd/map.h
+index 29975c73a953..366cf77953b5 100644
+--- a/include/linux/mtd/map.h
++++ b/include/linux/mtd/map.h
+@@ -27,9 +27,9 @@
+ #include <linux/string.h>
+ #include <linux/bug.h>
+ #include <linux/kernel.h>
++#include <linux/io.h>
+ 
+ #include <asm/unaligned.h>
+-#include <asm/io.h>
+ #include <asm/barrier.h>
+ 
+ #ifdef CONFIG_MTD_MAP_BANK_WIDTH_1
+diff --git a/include/video/vga.h b/include/video/vga.h
+index cac567f22e62..d334e64c1c19 100644
+--- a/include/video/vga.h
++++ b/include/video/vga.h
+@@ -18,7 +18,7 @@
+ #define __linux_video_vga_h__
+ 
+ #include <linux/types.h>
+-#include <asm/io.h>
++#include <linux/io.h>
+ #include <asm/vga.h>
+ #include <asm/byteorder.h>
+ 
