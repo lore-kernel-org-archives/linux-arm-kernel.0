@@ -1,126 +1,59 @@
-From: adam.yh.lee@gmail.com (Adam Lee)
-Date: Mon, 20 Jul 2015 12:19:12 -0700
-Subject: [PATCH] [TWL4030 MADC] Fix ADC[3:6] readings
-In-Reply-To: <alpine.DEB.2.02.1507202051270.18050@pmeerw.net>
-References: <1437416058-24586-1-git-send-email-adam.yh.lee@gmail.com>
- <1437416058-24586-2-git-send-email-adam.yh.lee@gmail.com>
- <alpine.DEB.2.02.1507202051270.18050@pmeerw.net>
-Message-ID: <CAFeBWL7oyOYF1fuR85O-zFdyJozvKs5yyF5KLEjuHmD7LHphbw@mail.gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 20 Jul 2015 21:29:41 +0200
+Subject: [PATCH 4/7] Documentation: mtd: add a DT property to set the
+ latency code of Spansion memory
+In-Reply-To: <55ACBE1B.6050507@atmel.com>
+References: <cover.1437059658.git.cyrille.pitchen@atmel.com>
+ <201507161944.20523.marex@denx.de> <55ACBE1B.6050507@atmel.com>
+Message-ID: <201507202129.42105.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter, I sent a V2 with corrected wording. My bad!
+On Monday, July 20, 2015 at 11:23:39 AM, Cyrille Pitchen wrote:
+> Hi Marek,
 
-And yes I agree that register setting should be done in the ADC driver.
-Let me see what I can do, and will report back.
+Hi!
 
-Thanks,
+> Le 16/07/2015 19:44, Marek Vasut a ?crit :
+> > On Thursday, July 16, 2015 at 05:27:51 PM, Cyrille Pitchen wrote:
+> > 
+> > Hi!
+> > 
+> >> Both the SPI controller and the NOR flash memory need to agree on the
+> >> number of dummy cycles to use for Fast Read commands. For Spansion
+> >> memories, this number of dummy cycles is not given directly but through
+> >> a so called "latency code".
+> >> The latency code can be found into the memory datasheet and depends on
+> >> the SPI clock frequency, the Fast Read op code and the Single/Dual Data
+> >> Rate mode.
+> > 
+> > Shouldn't you be able to derive the latency code from the above
+> > information, which you already know then ?
+> 
+> Yes I agree with you; this could have been done adding static tables inside
+> the driver instead of creating a new DT property dedicated to Spansion
+> memories.
 
-Adam
+OK, I see now. The latency code can not be calculed from "SPI clock frequency, 
+the Fast Read op code and the Single/Dual Data Rate mode" easily, you need to
+index into some table to obtain some ad-hoc value. Got it. Sorry for the noise!
 
-On Mon, Jul 20, 2015 at 11:54 AM, Peter Meerwald <pmeerw@pmeerw.net> wrote:
-> On Mon, 20 Jul 2015, Adam YH Lee wrote:
->
->> MADC[3:6] reads incorrect values without these two following changes:
->>
->> - enable the 3v1 bias regulator for ADC[3:6]
->> - configure ADC[3:6] lines as input, not as USB
->
-> comments below
->
->> Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
->> ---
->>  drivers/iio/adc/twl4030-madc.c | 14 ++++++++++++++
->>  drivers/phy/phy-twl4030-usb.c  |  7 +++++++
->>  2 files changed, 21 insertions(+)
->>
->> diff --git a/drivers/iio/adc/twl4030-madc.c b/drivers/iio/adc/twl4030-madc.c
->> index 94c5f05..b5020ab 100644
->> --- a/drivers/iio/adc/twl4030-madc.c
->> +++ b/drivers/iio/adc/twl4030-madc.c
->> @@ -45,6 +45,7 @@
->>  #include <linux/types.h>
->>  #include <linux/gfp.h>
->>  #include <linux/err.h>
->> +#include <linux/regulator/consumer.h>
->>
->>  #include <linux/iio/iio.h>
->>
->> @@ -52,6 +53,7 @@
->>   * struct twl4030_madc_data - a container for madc info
->>   * @dev:             Pointer to device structure for madc
->>   * @lock:            Mutex protecting this data structure
->> + * @regulator:               Pointer to bias regulator for madc
->>   * @requests:                Array of request struct corresponding to SW1, SW2 and RT
->>   * @use_second_irq:  IRQ selection (main or co-processor)
->>   * @imr:             Interrupt mask register of MADC
->> @@ -60,6 +62,7 @@
->>  struct twl4030_madc_data {
->>       struct device *dev;
->>       struct mutex lock;      /* mutex protecting this data structure */
->> +     struct regulator *usb3v1;
->>       struct twl4030_madc_request requests[TWL4030_MADC_NUM_METHODS];
->>       bool use_second_irq;
->>       u8 imr;
->> @@ -848,6 +851,14 @@ static int twl4030_madc_probe(struct platform_device *pdev)
->>               goto err_i2c;
->>       }
->>
->> +     madc->usb3v1 = devm_regulator_get(madc->dev, "vusb3v1");
->> +     if (IS_ERR(madc->usb3v1))
->> +             return -ENODEV;
->> +
->> +     ret = regulator_enable(madc->usb3v1);
->> +     if (ret)
->> +             dev_err(madc->dev, "could not be enable 3v1 bias regulator\n");
->
-> please fix wording, "could not enable usb 3v1 bias regulator" probably
->
->> +
->>       return 0;
->>
->>  err_i2c:
->> @@ -867,6 +878,9 @@ static int twl4030_madc_remove(struct platform_device *pdev)
->>       twl4030_madc_set_current_generator(madc, 0, 0);
->>       twl4030_madc_set_power(madc, 0);
->>
->> +     regulator_disable(madc->usb3v1);
->> +     regulator_put(madc->usb3v1);
->> +
->>       return 0;
->>  }
->>
->> diff --git a/drivers/phy/phy-twl4030-usb.c b/drivers/phy/phy-twl4030-usb.c
->> index 7b04bef..88fc7d7 100644
->> --- a/drivers/phy/phy-twl4030-usb.c
->> +++ b/drivers/phy/phy-twl4030-usb.c
->> @@ -144,6 +144,9 @@
->>  #define PMBR1                                0x0D
->>  #define GPIO_USB_4PIN_ULPI_2430C     (3 << 0)
->>
->> +#define TWL4030_USB_SEL_MADC_MCPC    (1<<3)
->> +#define TWL4030_USB_CARKIT_ANA_CTRL  0xBB
->> +
->>  struct twl4030_usb {
->>       struct usb_phy          phy;
->>       struct device           *dev;
->> @@ -459,6 +462,10 @@ static int twl4030_phy_power_on(struct phy *phy)
->>               twl4030_i2c_access(twl, 0);
->>       schedule_delayed_work(&twl->id_workaround_work, 0);
->>
->> +     twl4030_usb_write(twl, TWL4030_USB_CARKIT_ANA_CTRL,
->> +             twl4030_usb_read(twl, TWL4030_USB_CARKIT_ANA_CTRL) |
->> +             TWL4030_USB_SEL_MADC_MCPC);
->> +
->
-> shouldn't this be done is the adc driver?
->
->>       return 0;
->>  }
->>
->>
->
-> --
->
-> Peter Meerwald
-> +43-664-2444418 (mobile)
+> When I wrote this patch, I had a close look at the s25fl512s datasheet but
+> only overviewed few datasheets for other Spansion QSPI flash memories. So
+> I don't know whether a single latency code table could be shared among all
+> Spansion memories or many tables should be added to support different
+> memory models.
+> 
+> That's why I've chosen to add a dedicated DT property to support Spansion
+> memories as it avoids to add tables to guess the proper latency code to be
+> used. I thought it would be more flexible.
+> 
+> Maybe I will remove the support of Spansion QSPI memories from this series
+> for now. Their support can still be implemented later.
+> 
+> Anyway, thanks for your review :)
+
+Let's wait for more comments :)
+
+Best regards,
+Marek Vasut
