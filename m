@@ -1,52 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Jul 2015 12:32:37 +0100
-Subject: [PATCH v2 1/6] arm64: kernel: Add cpuid_feature_extract_field()
- for 4bit sign extension
-In-Reply-To: <1437154221-5736-2-git-send-email-james.morse@arm.com>
-References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
- <1437154221-5736-2-git-send-email-james.morse@arm.com>
-Message-ID: <20150720113236.GH20385@e104818-lin.cambridge.arm.com>
+From: zhang.chunyan@linaro.org (Chunyan Zhang)
+Date: Mon, 20 Jul 2015 19:51:49 +0800
+Subject: [PATCH] coresight: Fix implicit inclusion of linux/sched.h
+In-Reply-To: <1437387289-14847-1-git-send-email-broonie@kernel.org>
+References: <1437387289-14847-1-git-send-email-broonie@kernel.org>
+Message-ID: <CAG2=9p-C20h4cGQ9Z2mr_JkrL8RaONRPnaCFZL1eVnQ2rLYRbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 06:30:16PM +0100, James Morse wrote:
-> Copied from arch/arm/include/asm/cputype.h, this function does the
-> shifting and sign extension necessary when accessing cpu feature fields.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Suggested-by: Russell King <linux@arm.linux.org.uk>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Thank you so much, Mark
+
+Chunyan
+
+On Mon, Jul 20, 2015 at 6:14 PM, Mark Brown <broonie@kernel.org> wrote:
+> The patch "Coresight: Add an interface for supporting ETM3/4 Context ID
+> tracing" adds uses of find_task_by_vpid() and task_pid_nr() from
+> linux/sched.h but does not include that header causing build errors in
+> at least an ARM allmodconfig where it is not implicitly included. Add an
+> explicit include to fix that.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 > ---
->  arch/arm64/include/asm/cpufeature.h | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index c1044218a63a..56c843918504 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -70,6 +70,19 @@ static inline void cpus_set_cap(unsigned int num)
->  		__set_bit(num, cpu_hwcaps);
->  }
->  
-> +static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
-> +								  int field)
-> +{
-> +	int feature = (features >> field) & 15;
-> +
-> +	/* feature registers are signed values */
-> +	if (feature > 8)
-> +		feature -= 16;
-> +
-> +	return feature;
-> +}
-
-It may generate better code like, especially when field is a constant:
-
-	return (s64)(feature << (64 - 4 - field)) >> (64 - 4);
-
-(in asm I think we could do it with a single instruction but the above
-shouldn't be that bad either).
-
--- 
-Catalin
+>  include/linux/coresight.h | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index 626da6948ca2..c69e1b932809 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -14,6 +14,7 @@
+>  #define _LINUX_CORESIGHT_H
+>
+>  #include <linux/device.h>
+> +#include <linux/sched.h>
+>
+>  /* Peripheral id registers (0xFD0-0xFEC) */
+>  #define CORESIGHT_PERIPHIDR4   0xfd0
+> --
+> 2.1.4
+>
