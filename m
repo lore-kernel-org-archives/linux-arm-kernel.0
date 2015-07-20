@@ -1,59 +1,134 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 20 Jul 2015 11:42:11 +0200
-Subject: [RFC PATCH 10/15] pwm: add the PWM initial state retrieval infra
-In-Reply-To: <20150720090123.GM29614@ulmo>
-References: <1435738921-25027-1-git-send-email-boris.brezillon@free-electrons.com>
- <1435738921-25027-11-git-send-email-boris.brezillon@free-electrons.com>
- <20150720090123.GM29614@ulmo>
-Message-ID: <20150720114211.155c3579@bbrezillon>
+From: iivanov@mm-sol.com (Ivan T. Ivanov)
+Date: Mon, 20 Jul 2015 12:44:03 +0300
+Subject: [PATCH V4 3/7] i2c: qup: Add V2 tags support
+In-Reply-To: <1436412350-19519-4-git-send-email-sricharan@codeaurora.org>
+References: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>
+ <1436412350-19519-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1437385443.6267.5.camel@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jul 2015 11:01:24 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
 
-> On Wed, Jul 01, 2015 at 10:21:56AM +0200, Boris Brezillon wrote:
-> > Add a ->init_state() function to the pwm_ops struct to let PWM drivers
-> > initialize the PWM state attached to a PWM device.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/pwm/core.c  | 3 +++
-> >  include/linux/pwm.h | 2 ++
-> >  2 files changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> > index 3e830ce..30631f5 100644
-> > --- a/drivers/pwm/core.c
-> > +++ b/drivers/pwm/core.c
-> > @@ -264,6 +264,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
-> >  		pwm->hwpwm = i;
-> >  		pwm_set_default_polarity(pwm, polarity);
-> >  
-> > +		if (chip->ops->init_state)
-> > +			chip->ops->init_state(chip, pwm);
-> > +
-> >  		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
-> >  	}
-> >  
-> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-> > index 0f36a06..b47244a 100644
-> > --- a/include/linux/pwm.h
-> > +++ b/include/linux/pwm.h
-> > @@ -177,6 +177,8 @@ struct pwm_ops {
-> >  					  struct pwm_device *pwm);
-> >  	void			(*disable)(struct pwm_chip *chip,
-> >  					   struct pwm_device *pwm);
-> > +	void			(*init_state)(struct pwm_chip *chip,
-> > +					      struct pwm_device *pwm);
+Hi Sricharan,
+
+On Thu, 2015-07-09 at 08:55 +0530, Sricharan R wrote:
+> QUP from version 2.1.1 onwards, supports a new format of
+> i2c command tags. Tag codes instructs the controller to
+> perform a operation like read/write. This new tagging version
+> supports bam dma and transfers of more than 256 bytes without 'stop'
+> in between. Adding the support for the same.
+
+IIRC, more than 256 bytes in message is supported only in BAM(DMA)
+mode, if this is true, please be more explicit in commit message.
+
+You haven't tried to read more than 256 bytes with this
+patch, right? See qup_i2c_quirks ;-) 
+
 > 
-> I think I'd call this reset_state. init has this connotation of setting
-> a set of default values. For reset it's clearer in my opinion that it's
-> resetting to the hardware state.
+> 
+>  struct qup_i2c_dev {
+>         struct device*dev;
+>         void __iomem*base;
+> @@ -117,6 +138,7 @@ struct qup_i2c_dev {
+>         int     in_blk_sz;
+> 
+>         unsigned longone_byte_t;
+> +       struct qup_i2c_blockblk;
+> 
+>         struct i2c_msg*msg;
+>         /* Current posion in user message buffer */
+> @@ -126,6 +148,14 @@ struct qup_i2c_dev {
+>         /* QUP core errors */
+>         u32     qup_err;
+> 
+> +       int     use_v2_tags;
+> +
+> +       int (*qup_i2c_write_one)(struct qup_i2c_dev *qup,
+> +                                       struct i2c_msg *msg);
+> +
+> +       int (*qup_i2c_read_one)(struct qup_i2c_dev *qup,
+> +                               struct i2c_msg *msg);
+> +
 
-I'm fine with the reset_state name, I'll change that in my v2.
+Do we really need additional level of indirection?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+We have separate struct i2c_algorithm, then we have common 
+qup_i2c_read/write methods and then we have different 
+read/write sub functions. I don't think 3-4 lines code reuse
+deserve increased complexity.
+
+<snip>
+
+> +static void qup_i2c_get_blk_data(struct qup_i2c_dev *qup,
+> +                                       struct i2c_msg *msg)
+> +{
+
+This is more like "set_blk_metadata". Second argument could fit line above.
+
+> +       memset(&qup->blk, 0, sizeof(qup->blk));
+> +
+> +       if (!qup->use_v2_tags) {
+> +               if (!(msg->flags & I2C_M_RD))
+> +                       qup->blk.tx_tag_len = 1;
+> +               return;
+> +       }
+> +
+> +       qup->blk.data_len = msg->len;
+> +       qup->blk.count = (msg->len + QUP_READ_LIMIT - 1) / QUP_READ_LIMIT;
+> +
+> +       /* 4 bytes for first block and 2 writes for rest */
+> +       qup->blk.tx_tag_len = 4 + (qup->blk.count - 1) * 2;
+> +
+> +       /* There are 2 tag bytes that are read in to fifo for every block */
+> +       if (msg->flags & I2C_M_RD)
+> +               qup->blk.rx_tag_len = qup->blk.count * 2;
+> +}
+> +
+
+<snip>
+
+> +static int qup_i2c_get_tags(u8 *tags, struct qup_i2c_dev *qup,
+> +                                                       struct i2c_msg *msg)
+> +{
+
+This is more like "set_tags".
+
+> +       u16 addr = (msg->addr << 1) | ((msg->flags & I2C_M_RD) == I2C_M_RD);
+> +       int len = 0;
+> +       int data_len;
+> +
+> +       if (qup->blk.pos == 0) {
+> +               tags[len++] = QUP_TAG_V2_START;
+> +               tags[len++] = addr & 0xff;
+> +
+> +               if (msg->flags & I2C_M_TEN)
+> +                       tags[len++] = addr >> 8;
+> +       }
+> +
+> +       /* Send _STOP commands for the last block */
+> +       if (qup->blk.pos == (qup->blk.count - 1)) {
+> +               if (msg->flags & I2C_M_RD)
+> +                       tags[len++] = QUP_TAG_V2_DATARD_STOP;
+> +               else
+> +                       tags[len++] = QUP_TAG_V2_DATAWR_STOP;
+> +       } else {
+> +               if (msg->flags & I2C_M_RD)
+> +                       tags[len++] = QUP_TAG_V2_DATARD;
+> +               else
+> +                       tags[len++] = QUP_TAG_V2_DATAWR;
+> +       }
+> +
+> +       data_len = qup_i2c_get_data_len(qup);
+> +
+> +       /* 0 implies 256 bytes */
+> +       if (data_len == QUP_READ_LIMIT)
+> +               tags[len++] = 0;
+> +       else
+> +               tags[len++] = data_len;
+> +
+> +       return len;
+> +}
+> +
+
+Regards,
+Ivan
