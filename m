@@ -1,38 +1,66 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 20 Jul 2015 15:44:33 +0100
-Subject: [PATCH v8 9/9] nvmem: Add to MAINTAINERS for nvmem framework
-In-Reply-To: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1437403473-4474-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 20 Jul 2015 22:46:36 +0800
+Subject: [PATCH] dmaengine: sirf: fix kernel panic under one race condition
+In-Reply-To: <20150716131736.GV5086@localhost>
+References: <1436833705-6550-1-git-send-email-21cnbao@gmail.com>
+ <20150716131736.GV5086@localhost>
+Message-ID: <CAGsJ_4wzcngAzbekphSunPKNJWynWPE23tfUcpCSRE-Ovsgawg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds MAINTAINERS to nvmem framework.
+2015-07-16 21:17 GMT+08:00 Vinod Koul <vinod.koul@intel.com>:
+> On Tue, Jul 14, 2015 at 12:28:25AM +0000, Barry Song wrote:
+>> From: Yanchang Li <yl22@csr.com>
+>
+> patch title should alos say what is changed. "panic under one race" is not
+> an apt description for this
+>
+> Can you fix that up, otherwise it looks okay
+>
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+yes. it seems it can be
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8133cef..90e0d94 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7263,6 +7263,15 @@ S:	Supported
- F:	drivers/block/nvme*
- F:	include/linux/nvme.h
- 
-+NVMEM FRAMEWORK
-+M:	Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+M:	Maxime Ripard <maxime.ripard@free-electrons.com>
-+S:	Maintained
-+F:	drivers/nvmem/
-+F:	Documentation/devicetree/bindings/nvmem/
-+F:	include/linux/nvmem-consumer.h
-+F:	include/linux/nvmem-provider.h
-+
- NXP-NCI NFC DRIVER
- M:	Cl??ment Perrochaud <clement.perrochaud@effinnov.com>
- R:	Charles Gorand <charles.gorand@effinnov.com>
--- 
-1.9.1
+dmaengine: sirf: clear any pending DMA interrupt when DMA terminates
+
+> --
+> ~Vinod
+>
+>>
+>> If DMA interrupt comes and is latched by IRQ controller during the
+>> execution of dma_terminate_all(), dma_irq routine will be executed
+>> after dma terminated, and it will cause kernel panic.
+>> We clear DMA interrupts in dma_terminate_all() to avoid this useless
+>> interrupt.
+>>
+>> Signed-off-by: Yanchang Li <yl22@csr.com>
+>> Signed-off-by: Barry Song <Baohua.Song@csr.com>
+>> ---
+>>  drivers/dma/sirf-dma.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
+>> index 8c5186c..7d5598d 100644
+>> --- a/drivers/dma/sirf-dma.c
+>> +++ b/drivers/dma/sirf-dma.c
+>> @@ -455,6 +455,7 @@ static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
+>>       switch (sdma->type) {
+>>       case SIRFSOC_DMA_VER_A7V1:
+>>               writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_INT_EN_CLR);
+>> +             writel_relaxed(1 << cid, sdma->base + SIRFSOC_DMA_CH_INT);
+>>               writel_relaxed((1 << cid) | 1 << (cid + 16),
+>>                              sdma->base +
+>>                              SIRFSOC_DMA_CH_LOOP_CTRL_CLR_ATLAS7);
+>> @@ -462,6 +463,8 @@ static int sirfsoc_dma_terminate_all(struct dma_chan *chan)
+>>               break;
+>>       case SIRFSOC_DMA_VER_A7V2:
+>>               writel_relaxed(0, sdma->base + SIRFSOC_DMA_INT_EN_ATLAS7);
+>> +             writel_relaxed(SIRFSOC_DMA_INT_ALL_ATLAS7,
+>> +                            sdma->base + SIRFSOC_DMA_INT_ATLAS7);
+>>               writel_relaxed(0, sdma->base + SIRFSOC_DMA_LOOP_CTRL_ATLAS7);
+>>               writel_relaxed(0, sdma->base + SIRFSOC_DMA_VALID_ATLAS7);
+>>               break;
+>> --
+>> 2.3.5
+>>
+>
+-barry
