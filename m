@@ -1,23 +1,24 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Jul 2015 11:10:50 -0700
-Subject: [PATCH] phy: rockchip-usb: power down phy when rockchip phy probe
-In-Reply-To: <1437118165-20713-1-git-send-email-hl@rock-chips.com>
-References: <1437118165-20713-1-git-send-email-hl@rock-chips.com>
-Message-ID: <CAD=FV=XsdDSGiFqUgWNs-V80mAqBFRjB_3zyWkq9WNLJ6cnK5g@mail.gmail.com>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Mon, 20 Jul 2015 11:14:17 -0700
+Subject: [PATCH] Fix incomplete initialization of ADC[3:6]$
+Message-ID: <1437416058-24586-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hl,
+Additionally the original discussion for this patch can be found here [5].
+$
+[1] http://comments.gmane.org/gmane.linux.ports.arm.omap/83698$
+[2] http://gumstix.8.x6.nabble.com/twl4030-madc-low-read-value-td4967139.html#none$
+[3] https://e2e.ti.com/support/power_management/pmu/f/43/t/732$
+[4] http://www.droid-developers.org/images/2/21/Tps65950_TRM.pdf$
+[5] http://www.spinics.net/lists/linux-omap/msg120300.html
 
-On Fri, Jul 17, 2015 at 12:29 AM, huang lin <hl@rock-chips.com> wrote:
-> rockchip phy are enable when soc reset, to save power consumption,
-> we disable it when probe, and enable each phy when it use
->
-> Signed-off-by: huang lin <hl@rock-chips.com>
-> ---
->  drivers/phy/phy-rockchip-usb.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+Adam YH Lee (1):
+  [TWL4030 MADC] Fix ADC[3:6] readings
 
-Looks right to me.
+ drivers/iio/adc/twl4030-madc.c | 14 ++++++++++++++
+ drivers/phy/phy-twl4030-usb.c  |  7 +++++++
+ 2 files changed, 21 insertions(+)
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+-- 
+2.1.4
