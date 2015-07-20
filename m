@@ -1,224 +1,130 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Mon, 20 Jul 2015 17:25:52 -0500
-Subject: [PATCH] firmware: qcom: scm: Convert to platform driver
-Message-ID: <1437431152-6730-1-git-send-email-agross@codeaurora.org>
+From: xander.huff@ni.com (Xander Huff)
+Date: Mon, 20 Jul 2015 18:14:10 -0500
+Subject: [PATCH v3] iio: adc: xilinx-xadc: Push interrupts into threaded
+ context
+In-Reply-To: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>
+References: <CAKfKVtGTO81wLWk50M303t2WjcBEMEt_LUnsJ3_WmvR_3izUjg@mail.gmail.com>
+Message-ID: <1437434050-32907-1-git-send-email-xander.huff@ni.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch creates a platform driver for the SCM so that we can adequately
-manage resources.  This removes clients having to carry the necessary
-clocks to use the SCM resources.
+The driver currently registers a pair of irq handlers using
+request_threaded_irq(), however the synchronization mechanism between the
+hardirq and the threadedirq handler is a regular spinlock.
 
-Signed-off-by: Andy Gross <agross@codeaurora.org>
+Unfortunately, this breaks PREEMPT_RT builds, where a spinlock can sleep,
+and is thus not able to be acquired from a hardirq handler. This patch gets
+rid of the hardirq handler and pushes all interrupt handling into the
+threaded context.
+
+To validate that this change has no impact on RT performance, here are
+cyclictest values with no processes running:
+
+$ sudo cyclictest -S -m -p 98
+# /dev/cpu_dma_latency set to 0us
+policy: fifo: loadavg: 0.05 0.04 0.05 1/237 828
+T: 0 ( 1861) P:98 I:1000 C:56925046 Min: 9 Act: 12 Avg: 12 Max: 71
+T: 1 ( 1862) P:98 I:1500 C:37950030 Min: 9 Act: 12 Avg: 13 Max: 74
+
+Then, all xadc raw handles were accessed in a continuous loop via
+/sys/bus/iio/devices/iio:device0:
+
+$ sudo cyclictest -S -m -p 98
+# /dev/cpu_dma_latency set to 0us
+policy: fifo: loadavg: 7.81 7.64 7.541 2/247 5751
+T: 0 ( 1568) P:98 I:1000 C:23845515 Min: 11 Act: 22 Avg: 21 Max: 71
+T: 1 ( 1569) P:98 I:1500 C:15897239 Min: 11 Act: 21 Avg: 22 Max: 68
+
+Signed-off-by: Xander Huff <xander.huff@ni.com>
 ---
- .../devicetree/bindings/firmware/qcom,scm.txt      |   25 ++++
- drivers/firmware/qcom_scm.c                        |  138 +++++++++++++++++++-
- 2 files changed, 159 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+ drivers/iio/adc/xilinx-xadc-core.c | 37 ++++++++-----------------------------
+ 1 file changed, 8 insertions(+), 29 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-new file mode 100644
-index 0000000..debcd32
---- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
-@@ -0,0 +1,25 @@
-+QCOM Secure Channel Manager (SCM)
-+
-+Qualcomm processors include an interface to communicate to the secure firmware.
-+This interface allows for clients to request different types of actions.  These
-+can include CPU power up/down, HDCP requests, loading of firmware, and other
-+assorted actions.
-+
-+Required properties:
-+- compatible: must contain "qcom,scm"
-+- clocks: Should contain the core, iface, and bus clocks.
-+- clock-names: Must contain "core" for the core clock, "iface" for the interface
-+  clock and "bus" for the bus clock.
-+
-+Example:
-+
-+	firmware {
-+		compatible = "simple-bus";
-+
-+		scm {
-+			compatible = "qcom,scm";
-+			clocks = <&gcc GCC_CE1_CLK> , <&gcc GCC_CE1_AXI_CLK>, <&gcc GCC_CE1_AHB_CLK>;
-+			clock-names = "core", "bus", "iface";
-+		};
-+	};
-+
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index 45c008d..5dd0514 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -15,14 +15,57 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-  * 02110-1301, USA.
-  */
+diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+index ce93bd8..e16afdb 100644
+--- a/drivers/iio/adc/xilinx-xadc-core.c
++++ b/drivers/iio/adc/xilinx-xadc-core.c
+@@ -267,40 +267,15 @@ static void xadc_zynq_unmask_worker(struct work_struct *work)
+ 	xadc_zynq_update_intmsk(xadc, 0, 0);
+ 
+ 	spin_unlock_irq(&xadc->lock);
 -
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
- #include <linux/cpumask.h>
- #include <linux/export.h>
- #include <linux/types.h>
- #include <linux/qcom_scm.h>
-+#include <linux/of.h>
-+#include <linux/clk.h>
- 
- #include "qcom_scm.h"
- 
-+struct qcom_scm {
-+	struct clk *core_clk;
-+	struct clk *iface_clk;
-+	struct clk *bus_clk;
-+};
-+
-+static struct qcom_scm *__scm;
-+
-+static int qcom_scm_clk_enable(void)
-+{
-+	int ret;
-+
-+	ret = clk_prepare_enable(__scm->core_clk);
-+	if (ret)
-+		goto bail;
-+	ret = clk_prepare_enable(__scm->iface_clk);
-+	if (ret)
-+		goto disable_core;
-+	ret = clk_prepare_enable(__scm->bus_clk);
-+	if (ret)
-+		goto disable_iface;
-+
-+	return 0;
-+
-+disable_iface:
-+	clk_disable_unprepare(__scm->iface_clk);
-+disable_core:
-+	clk_disable_unprepare(__scm->core_clk);
-+bail:
-+	return ret;
-+}
-+
-+static void qcom_scm_clk_disable(void)
-+{
-+	clk_disable_unprepare(__scm->core_clk);
-+	clk_disable_unprepare(__scm->iface_clk);
-+	clk_disable_unprepare(__scm->bus_clk);
-+}
-+
- /**
-  * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
-  * @entry: Entry point function for the cpus
-@@ -72,11 +115,17 @@ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
-  */
- bool qcom_scm_hdcp_available(void)
- {
--	int ret;
-+	int ret = qcom_scm_clk_enable();
-+
-+	if (ret)
-+		goto clk_err;
- 
- 	ret = __qcom_scm_is_call_available(QCOM_SCM_SVC_HDCP,
--		QCOM_SCM_CMD_HDCP);
-+						QCOM_SCM_CMD_HDCP);
-+
-+	qcom_scm_clk_disable();
- 
-+clk_err:
- 	return (ret > 0) ? true : false;
+-	/* if still pending some alarm re-trigger the timer */
+-	if (xadc->zynq_masked_alarm) {
+-		schedule_delayed_work(&xadc->zynq_unmask_work,
+-				msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
+-	}
  }
- EXPORT_SYMBOL(qcom_scm_hdcp_available);
-@@ -91,6 +140,87 @@ EXPORT_SYMBOL(qcom_scm_hdcp_available);
-  */
- int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+ 
+ static irqreturn_t xadc_zynq_threaded_interrupt_handler(int irq, void *devid)
  {
--	return __qcom_scm_hdcp_req(req, req_cnt, resp);
-+	int ret = qcom_scm_clk_enable();
+ 	struct iio_dev *indio_dev = devid;
+ 	struct xadc *xadc = iio_priv(indio_dev);
+-	unsigned int alarm;
+-
+-	spin_lock_irq(&xadc->lock);
+-	alarm = xadc->zynq_alarm;
+-	xadc->zynq_alarm = 0;
+-	spin_unlock_irq(&xadc->lock);
+-
+-	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
+-
+-	/* unmask the required interrupts in timer. */
+-	schedule_delayed_work(&xadc->zynq_unmask_work,
+-			msecs_to_jiffies(XADC_ZYNQ_UNMASK_TIMEOUT));
+-
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+-{
+-	struct iio_dev *indio_dev = devid;
+-	struct xadc *xadc = iio_priv(indio_dev);
+ 	irqreturn_t ret = IRQ_HANDLED;
+ 	uint32_t status;
++	unsigned int alarm;
+ 
+ 	xadc_read_reg(xadc, XADC_ZYNQ_REG_INTSTS, &status);
+ 
+@@ -312,7 +287,6 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+ 	spin_lock(&xadc->lock);
+ 
+ 	xadc_write_reg(xadc, XADC_ZYNQ_REG_INTSTS, status);
+-
+ 	if (status & XADC_ZYNQ_INT_DFIFO_GTH) {
+ 		xadc_zynq_update_intmsk(xadc, XADC_ZYNQ_INT_DFIFO_GTH,
+ 			XADC_ZYNQ_INT_DFIFO_GTH);
+@@ -330,8 +304,14 @@ static irqreturn_t xadc_zynq_interrupt_handler(int irq, void *devid)
+ 		xadc_zynq_update_intmsk(xadc, 0, 0);
+ 		ret = IRQ_WAKE_THREAD;
+ 	}
 +
-+	if (ret)
-+		return ret;
++	alarm = xadc->zynq_alarm;
++	xadc->zynq_alarm = 0;
 +
-+	ret = __qcom_scm_hdcp_req(req, req_cnt, resp);
-+	qcom_scm_clk_disable();
-+	return ret;
+ 	spin_unlock(&xadc->lock);
+ 
++	xadc_handle_events(indio_dev, xadc_zynq_transform_alarm(alarm));
++
+ 	return ret;
  }
- EXPORT_SYMBOL(qcom_scm_hdcp_req);
-+
-+/**
-+ * qcom_scm_is_available() - Checks if SCM is available
-+ */
-+bool qcom_scm_is_available(void)
-+{
-+	return !!__scm;
-+}
-+EXPORT_SYMBOL(qcom_scm_is_available);
-+
-+static int qcom_scm_remove(struct platform_device *pdev)
-+{
-+	__scm = NULL;
-+
-+	return 0;
-+}
-+
-+static int qcom_scm_probe(struct platform_device *pdev)
-+{
-+	struct qcom_scm *scm;
-+	int ret;
-+
-+	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
-+	if (!scm)
-+		return -ENOMEM;
-+
-+	scm->core_clk = devm_clk_get(&pdev->dev, "core");
-+	if (IS_ERR(scm->core_clk)) {
-+		if (PTR_ERR(scm->core_clk) != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "failed to acquire core clk\n");
-+		return PTR_ERR(scm->core_clk);
-+	}
-+
-+	scm->iface_clk = devm_clk_get(&pdev->dev, "iface");
-+	if (IS_ERR(scm->iface_clk)) {
-+		if (PTR_ERR(scm->iface_clk) != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "failed to acquire iface clk\n");
-+		return PTR_ERR(scm->iface_clk);
-+	}
-+
-+	scm->bus_clk = devm_clk_get(&pdev->dev, "bus");
-+	if (IS_ERR(scm->bus_clk)) {
-+		if (PTR_ERR(scm->bus_clk) != -EPROBE_DEFER)
-+			dev_err(&pdev->dev, "failed to acquire bus clk\n");
-+		return PTR_ERR(scm->bus_clk);
-+	}
-+
-+	/* vote for max clk rate for highest performance */
-+	ret = clk_set_rate(scm->core_clk, INT_MAX);
-+	if (ret)
-+		return ret;
-+
-+	__scm = scm;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id qcom_scm_dt_match[] = {
-+	{ .compatible = "qcom,scm",},
-+	{},
-+};
-+
-+MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
-+
-+static struct platform_driver qcom_scm_driver = {
-+	.driver = {
-+		.name	= "scm",
-+		.of_match_table = qcom_scm_dt_match,
-+	},
-+	.probe = qcom_scm_probe,
-+	.remove = qcom_scm_remove,
-+};
-+
-+module_platform_driver(qcom_scm_driver);
+ 
+@@ -436,7 +416,6 @@ static const struct xadc_ops xadc_zynq_ops = {
+ 	.write = xadc_zynq_write_adc_reg,
+ 	.setup = xadc_zynq_setup,
+ 	.get_dclk_rate = xadc_zynq_get_dclk_rate,
+-	.interrupt_handler = xadc_zynq_interrupt_handler,
+ 	.threaded_interrupt_handler = xadc_zynq_threaded_interrupt_handler,
+ 	.update_alarm = xadc_zynq_update_alarm,
+ };
+@@ -1225,7 +1204,7 @@ static int xadc_probe(struct platform_device *pdev)
+ 	if (ret)
+ 		goto err_free_samplerate_trigger;
+ 
+-	ret = request_threaded_irq(irq, xadc->ops->interrupt_handler,
++	ret = request_threaded_irq(irq, NULL,
+ 				xadc->ops->threaded_interrupt_handler,
+ 				0, dev_name(&pdev->dev), indio_dev);
+ 	if (ret)
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.9.1
