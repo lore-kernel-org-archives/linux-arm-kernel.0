@@ -1,70 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 20 Jul 2015 14:53:42 +0100
-Subject: [PATCH v2 4/6] arm64: kernel: Add min_register_value and use
- '>=' for feature detection
-In-Reply-To: <1437154221-5736-5-git-send-email-james.morse@arm.com>
-References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
- <1437154221-5736-5-git-send-email-james.morse@arm.com>
-Message-ID: <20150720135341.GK20385@e104818-lin.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 20 Jul 2015 15:56:12 +0200
+Subject: [PATCH] tty/serial: atmel: use proper accessors
+Message-ID: <1437400572-16575-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 06:30:19PM +0100, James Morse wrote:
-> When a new cpu feature is available, the cpu feature bits will have some
-> initial value, which is incremented when the feature is updated.
-> This patch changes 'register_value' to be 'min_register_value', and checks
-> the feature bits value (interpreted as a signed int) is greater than this
-> minimum.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/include/asm/cpufeature.h |  4 ++--
->  arch/arm64/kernel/cpufeature.c      | 14 +++++++++++---
->  2 files changed, 13 insertions(+), 5 deletions(-)
+On ARM, it is necessary to use the _relaxed versions of read[bl] and
+write[bl] to ensure we do the correct endianness conversion when running in
+big endian.
+Keep using avr32 __raw version on avr32 to avoid breakage.
 
-I think we could move patch 1 into this patch.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
 
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index 7456fc44bee1..ef38e21ed719 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -42,8 +42,8 @@ struct arm64_cpu_capabilities {
->  		};
->  
->  		struct {	/* Feature register checking */
-> -			u64 register_mask;
-> -			u64 register_value;
-> +			u8 register_shift;
-> +			u8 min_register_value;
+This patch applies after [PATCH v4 0/5] tty/serial: at91: add support to FIFOs
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353704.html
 
-Nitpick: since they are no longer register values/shifts, can we call
-them field_value and field_position (or just field_pos)?
+ drivers/tty/serial/atmel_serial.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
->  		};
->  	};
->  };
-> diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-> index 650ffc28bedc..cc26d6c6520b 100644
-> --- a/arch/arm64/kernel/cpufeature.c
-> +++ b/arch/arm64/kernel/cpufeature.c
-> @@ -23,12 +23,20 @@
->  #include <asm/cpufeature.h>
->  
->  static bool
-> +feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
-> +{
-> +	int val = cpuid_feature_extract_field(reg, entry->register_shift);
-> +
-> +	return (val >= entry->min_register_value);
-> +}
-
-We should rather use an int type for min_register_value (and
-register_shift) to avoid confusion with C comparison of signed vs
-unsigned.
-
-Nitpick: no brackets needed after return.
-
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index e91b3b2f0590..451acf054281 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -194,6 +194,7 @@ to_atmel_uart_port(struct uart_port *uart)
+ 	return container_of(uart, struct atmel_uart_port, uart);
+ }
+ 
++#ifdef CONFIG_AVR32
+ static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
+ {
+ 	return __raw_readl(port->membase + reg);
+@@ -213,6 +214,27 @@ static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
+ {
+ 	__raw_writeb(value, port->membase + reg);
+ }
++#else
++static inline u32 atmel_uart_readl(struct uart_port *port, u32 reg)
++{
++	return readl_relaxed(port->membase + reg);
++}
++
++static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
++{
++	writel_relaxed(value, port->membase + reg);
++}
++
++static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
++{
++	return readb_relaxed(port->membase + reg);
++}
++
++static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
++{
++	writeb_relaxed(value, port->membase + reg);
++}
++#endif
+ 
+ #ifdef CONFIG_SERIAL_ATMEL_PDC
+ static bool atmel_use_pdc_rx(struct uart_port *port)
 -- 
-Catalin
+2.1.4
