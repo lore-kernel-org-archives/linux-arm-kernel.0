@@ -1,32 +1,107 @@
-From: steev@gentoo.org (Steev Klimaszewski)
-Date: Sun, 19 Jul 2015 22:26:52 -0500
-Subject: [PATCH] ARM: tegra: Fix nyan-big panel binding
-In-Reply-To: <CAEUnVG6g-0iYexKPXjO167-O6Oay71QXnoVz1Hvs=U8tSOp5uw@mail.gmail.com>
-References: <1437336913-12886-1-git-send-email-steev@gentoo.org>
- <CAEUnVG6g-0iYexKPXjO167-O6Oay71QXnoVz1Hvs=U8tSOp5uw@mail.gmail.com>
-Message-ID: <1437362812.8225.13.camel@gentoo.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Mon, 20 Jul 2015 10:18:33 +0530
+Subject: [PATCH 1/2] input: touchscreen: pixcir_i2c_ts: Add support for
+ optional wakeup interrupt
+In-Reply-To: <20150717215122.GC39282@dtor-ws>
+References: <1437115241-17859-1-git-send-email-vigneshr@ti.com>
+ <1437115241-17859-2-git-send-email-vigneshr@ti.com>
+ <20150717215122.GC39282@dtor-ws>
+Message-ID: <55AC7DA1.9050002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2015-07-19 at 16:43 -0600, Dylan Reid wrote:
-> On Sun, Jul 19, 2015 at 2:15 PM, Steev Klimaszewski <
-> threeway at gmail.com> wrote:
-> > The nyan-big Chromebook uses a 1920x1080 panel, not a 1366x768 
-> > panel so correct
-> > the binding.
+Hi Dmitry,
+
+On 7/18/2015 3:21 AM, Dmitry Torokhov wrote:
+> Hi Vignesh,
 > 
-> This isn't incorrect, although it is not complete.  Nyan-big (Acer
-> CB5-311) has _both_ a 1920x1080 and 1366x768 variant available.  They
-> are referred to as the "Full HD" and "HD" models respectively.
+> On Fri, Jul 17, 2015 at 12:10:40PM +0530, Vignesh R wrote:
+>> On am437x-gp-evm, pixcir touchscreen can wake the system from low power
+>> state by generating wake-up interrupt via pinctrl and IO daisy chain.
+>> Add support for optional wakeup interrupt source by regsitering to
+>> automated wake IRQ framework introduced by commit 4990d4fe327b ("PM /
+>> Wakeirq: Add automated device wake IRQ handling").
+>> This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+>> support for optional wake-up")
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  drivers/input/touchscreen/pixcir_i2c_ts.c | 14 ++++++++++++++
+>>  1 file changed, 14 insertions(+)
+>>
+>> diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> index 8f3e243a62bf..f7c602027fbd 100644
+>> --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+>> @@ -29,6 +29,8 @@
+>>  #include <linux/of.h>
+>>  #include <linux/of_gpio.h>
+>>  #include <linux/of_device.h>
+>> +#include <linux/of_irq.h>
+>> +#include <linux/pm_wakeirq.h>
+>>  
+>>  #define PIXCIR_MAX_SLOTS       5 /* Max fingers supported by driver */
+>>  
+>> @@ -38,6 +40,7 @@ struct pixcir_i2c_ts_data {
+>>  	const struct pixcir_ts_platform_data *pdata;
+>>  	bool running;
+>>  	int max_fingers;	/* Max fingers supported in this instance */
+>> +	int wakeirq;
+>>  };
+>>  
+>>  struct pixcir_touch {
+>> @@ -564,11 +567,22 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+>>  	i2c_set_clientdata(client, tsdata);
+>>  	device_init_wakeup(&client->dev, 1);
+>>  
+>> +	/* Register wakeirq, if available */
+>> +	tsdata->wakeirq = of_irq_get(dev->of_node, 1);
+> 
+> Can we put this in platform data and parse in pixcir_parse_dt() please?
+> Also, why not of_irq_get_byname()?
+>
 
+Ok.
 
-Actually, as it turns out, that was a wrong turn. 
+>> +	if (tsdata->wakeirq) {
+>> +		error = dev_pm_set_dedicated_wake_irq(dev,
+>> +						      tsdata->wakeirq);
+>> +		if (error)
+>> +			dev_dbg(dev, "unable to get wakeirq %d\n",
+>> +				error);
+>> +	}
+> 
+> Shouldn't his actually be:
+> 
+> 	error = tsdata->wakeirq ?
+> 		dev_pm_set_dedicated_wake_irq(dev, tsdata->wakeirq) :
+> 		dev_pm_set_wake_irq(dev, client->irq);
+> 	if (error) {
+> 		...
+> 	}
+> 
+> and then we can get rid of enable_irq_wake()/disable_irq_wake() in
+> pixcir_i2c_ts_suspend() and pixcir_i2c_ts_resume().
+> 
 
-The real issue is that 1d002fa720738bcd0bddb9178e9ea0773288e1dd
-(drm/dp: Use large transactions for I2C over AUX) breaks reading of
-EDID data on the nyan_big "Full HD" - I'm not sure if it does on
-others, but by setting DP_AUX_MAX_PAYLOAD_BYTES to 1, it fixed reading
-the EDID data here and I have 1920x1080 at boot, with valid EDID data.
+Yes, I will do this in v2.
 
-Not really sure the best way to go about doing that though.  I've poked
-at some people in #dri-devel on irc, to see what they think.
+>> +
+>>  	return 0;
+>>  }
+>>  
+>>  static int pixcir_i2c_ts_remove(struct i2c_client *client)
+>>  {
+>> +	dev_pm_clear_wake_irq(&client->dev);
+>>  	device_init_wakeup(&client->dev, 0);
+> 
+> I wonder if driver core should be responsible for clearing wake irq and
+> also for clearing wakeup flag.
+> 
+
+AFAICU, wakeup flag is deleted when struct device is deleted, hence,
+device_init_wakeup() call may not be required in .remove(). But,
+dev_pm_clear_wake_irq() can be moved to driver core.
+
+Regards
+Vignesh
