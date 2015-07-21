@@ -1,164 +1,182 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 21 Jul 2015 10:20:44 -0700
-Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
- support for Colibri VF50
-In-Reply-To: <40d7c372e64c7f25b7df3e48930386de@agner.ch>
-References: <cover.1437058481.git.maitysanchayan@gmail.com>
- <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
- <20150717234242.GJ39282@dtor-ws>
- <40d7c372e64c7f25b7df3e48930386de@agner.ch>
-Message-ID: <20150721172044.GC39076@dtor-ws>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Jul 2015 18:21:02 +0100
+Subject: [PATCH v2 07/10] KVM: arm/arm64: vgic: Allow HW interrupts to
+ be queued to a guest
+In-Reply-To: <20150717215608.GG14024@cbox>
+References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
+ <1436378202-20224-8-git-send-email-marc.zyngier@arm.com>
+ <20150717215608.GG14024@cbox>
+Message-ID: <55AE7F7E.302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
+On 17/07/15 22:56, Christoffer Dall wrote:
+> On Wed, Jul 08, 2015 at 06:56:39PM +0100, Marc Zyngier wrote:
+>> To allow a HW interrupt to be injected into a guest, we lookup the
+>> guest virtual interrupt in the irq_phys_map rbtree, and if we have
+> 
+> s/rbtree/list/
+> 
+>> a match, encode both interrupts in the LR.
+>>
+>> We also mark the interrupt as "active" at the host distributor level.
+>>
+>> On guest EOI on the virtual interrupt, the host interrupt will be
+>> deactivated.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  virt/kvm/arm/vgic.c | 72 ++++++++++++++++++++++++++++++++++++++++++++++++++---
+>>  1 file changed, 69 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+>> index 3424329..f8582d7 100644
+>> --- a/virt/kvm/arm/vgic.c
+>> +++ b/virt/kvm/arm/vgic.c
+>> @@ -1118,6 +1118,26 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
+>>  	if (!vgic_irq_is_edge(vcpu, irq))
+>>  		vlr.state |= LR_EOI_INT;
+>>  
+>> +	if (vlr.irq >= VGIC_NR_SGIS) {
+>> +		struct irq_phys_map *map;
+>> +		map = vgic_irq_map_search(vcpu, irq);
+>> +
+>> +		if (map) {
+>> +			int ret;
+>> +
+>> +			BUG_ON(!map->active);
+>> +			vlr.hwirq = map->phys_irq;
+>> +			vlr.state |= LR_HW;
+>> +			vlr.state &= ~LR_EOI_INT;
+>> +
+>> +			ret = irq_set_irqchip_state(map->irq,
+>> +						    IRQCHIP_STATE_ACTIVE,
+>> +						    true);
+> 
+> So if we have a mapping, and the virtual interrupt is being injected,
+> then we must set the state to active in the physical world, because
+> otherwise the guest will just exit before processing the virtual
+> interrupt, yes?
 
-On Tue, Jul 21, 2015 at 04:43:36PM +0200, Stefan Agner wrote:
-> Hi Dmitry,
-> 
-> As the original author of the driver I have some remarks to your review
-> 
-> On 2015-07-18 01:42, Dmitry Torokhov wrote:
-> >> +		/*
-> >> +		 * If touch pressure is too low, stop measuring and reenable
-> >> +		 * touch detection
-> >> +		 */
-> >> +		if (val_p < min_pressure || val_p > 2000)
-> >> +			break;
-> 
-> This is where the modules touch pressure is used to stop the measurement
-> process and switch back to interrupt mode. See my remarks at the end.
-> 
-> >> +
-> >> +		/*
-> >> +		 * The pressure may not be enough for the first x and the
-> >> +		 * second y measurement, but, the pressure is ok when the
-> >> +		 * driver is doing the third and fourth measurement. To
-> >> +		 * take care of this, we drop the first measurement always.
-> >> +		 */
-> >> +		if (discard_val_on_start) {
-> >> +			discard_val_on_start = false;
-> >> +		} else {
-> >> +			/*
-> >> +			 * Report touch position and sleep for
-> >> +			 * next measurement
-> >> +			 */
-> >> +			input_report_abs(vf50_ts->ts_input,
-> >> +					ABS_X, VF_ADC_MAX - val_x);
-> >> +			input_report_abs(vf50_ts->ts_input,
-> >> +					ABS_Y, VF_ADC_MAX - val_y);
-> >> +			input_report_abs(vf50_ts->ts_input,
-> >> +					ABS_PRESSURE, val_p);
-> >> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
-> >> +			input_sync(vf50_ts->ts_input);
-> >> +		}
-> >> +
-> >> +		msleep(10);
-> >> +	}
-> >> +
-> >> +	/* Report no more touch, reenable touch detection */
-> >> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
-> >> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
-> >> +	input_sync(vf50_ts->ts_input);
-> >> +
-> >> +	vf50_ts_enable_touch_detection(vf50_ts);
-> >> +
-> >> +	/* Wait for the pull-up to be stable on high */
-> >> +	msleep(10);
-> >> +
-> >> +	/* Reenable IRQ to detect touch */
-> >> +	enable_irq(vf50_ts->pen_irq);
-> >> +
-> >> +	dev_dbg(dev, "Reenabled touch detection interrupt\n");
-> >> +}
-> >> +
-> >> +static irqreturn_t vf50_ts_touched(int irq, void *dev_id)
-> >> +{
-> >> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)dev_id;
-> >> +	struct device *dev = &vf50_ts->pdev->dev;
-> >> +
-> >> +	dev_dbg(dev, "Touch detected, start worker thread\n");
-> >> +
-> >> +	disable_irq_nosync(irq);
-> >> +
-> >> +	/* Disable the touch detection plates */
-> >> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
-> >> +
-> >> +	/* Let the platform mux to default state in order to mux as ADC */
-> >> +	pinctrl_pm_select_default_state(dev);
-> >> +
-> >> +	queue_work(vf50_ts->ts_workqueue, &vf50_ts->ts_work);
-> > 
-> > If you convert this to a threaded interrupt you won't need to
-> > disable/reenable interrupt or queue work. You should also be able to use
-> > gpiod_set_value_cansleep() extending the range of ways the controller
-> > could be connected to systems.
-> > 
-> 
-> I'm not sure if a threaded interrupt is the right thing here. While the
-> pen is on the touchscreen (which can be for several seconds)
-> measurements have to be made in a continuous loop. Is it ok for a
-> threaded interrupt to run that long?
+Exactly. This is what will prevent the interrupt from firing on the host
+(we going back to the state the GIC would be in if we were handling this
+interrupt on the host).
 
-Yes, why not? Threaded interrupt is simply a kernel thread that is woken
-when hard interrupt handler tells it to wake up. Very similar to
-interrupt + work queue, except that the kernel manages interactions
-properly for you. There are several drivers in kernel that do that, for
-example auo-pixcir-ts.c or tsc2007.c
+> I think this deserves a comment here.
 
-> 
-> I'm also not sure if it is really safe to _not_ disable the pen down
-> GPIO interrupt. If we get a interrupt while measuring, we should ignore
-> that interrupt.
+Sure.
 
-The interrupt management core (you'll have to annotate it as
-IRQF_ONESHOT) will make sure it stays masked properly until the threaded
-handler completes so you do not need to disable it explicitly.
+>> +			vgic_irq_set_queued(vcpu, irq);
+> 
+> And we set it queued only to avoid sampling it again and setting
+> PENDING+ACTIVE, because the hardware doesn't support setting that state
+> when the HW bit is set, yes?
 
-> 
-> On resistive touch screens the pen down works by relying on the high
-> resistance between the two plates while not being touched. The X-Plate
-> will be pulled high, the Y-Plate is strong GND. We measure on the
-> X-Plate (XM) which is high too. As soon as the plate is touched, XM will
-> be GND (since the resistance over the two plates is way lower then the
-> pull-up resistance). An interrupt on falling edge will trigger.
-> 
-> Now the measuring takes place, X, Y and pressure by using different
-> measuring methods.
-> 
-> While Y-Plate measurement the same GPIO interupt pin is used for ADC
-> measurement! The voltage on that pin will at that point depend on the
-> Y-Position of the pen position... Is it guaranteed that the GPIO
-> interrupt is not fired? I guess because we muxed to ADC at that point,
-> it won't lead to a second (spurious) interrupt... However this is a
-> thing which needs to be checked before removing interrupt enable/disable
-> calls.
-> 
-> >> +};
-> >> +
-> >> +module_platform_driver(vf50_touch_driver);
-> >> +
-> >> +module_param(min_pressure, int, 0600);
-> >> +MODULE_PARM_DESC(min_pressure, "Minimum pressure for touch detection");
-> > 
-> > I'd rather let userspace figure out what it recognizes as valid touch.
-> > 
-> 
-> This is value is used as the termination condition for the measurement
-> loop. It essentially defines at which pressure level we stop measuring
-> X/Y values. Depending on the size and resistance of the plates. However,
-> it is not safe to measure even at low/no pressure, since then we would
-> only get maximum X/Y values. Hence it is crucial that this value is
-> choosen properly, otherwise the driver will report "wrong" X/Y values.
-> 
-> Since we use the value for measurement termination, we need it in kernel
-> space. As far as I know we do not get such a value from user space.
+Indeed.
 
-If this value is device model-specific and not user preference then we
-probably should pass it via device tree data instead of module parameter
-then.
+> I think a comment here is warranted too.
 
-Thanks.
+Fair enough.
 
+>> +			WARN_ON(ret);
+>> +		}
+>> +	}
+>> +
+>>  	vgic_set_lr(vcpu, lr_nr, vlr);
+>>  	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
+>>  }
+>> @@ -1342,6 +1362,35 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
+>>  	return level_pending;
+>>  }
+>>  
+>> +/* Return 1 if HW interrupt went from active to inactive, and 0 otherwise */
+> 
+> ... also clear the active state on the physical distributor so that
+> shared devices can be used in a different context. (did I get this
+> right?)
+
+You're getting good at that! ;-)
+
+>> +static int vgic_sync_hwirq(struct kvm_vcpu *vcpu, struct vgic_lr vlr)
+>> +{
+>> +	struct irq_phys_map *map;
+>> +	int ret;
+>> +
+>> +	if (!(vlr.state & LR_HW))
+>> +		return 0;
+>> +
+>> +	map = vgic_irq_map_search(vcpu, vlr.irq);
+>> +	BUG_ON(!map || !map->active);
+>> +
+>> +	ret = irq_get_irqchip_state(map->irq,
+>> +				    IRQCHIP_STATE_ACTIVE,
+>> +				    &map->active);
+>> +
+>> +	WARN_ON(ret);
+>> +
+>> +	if (map->active) {
+>> +		ret = irq_set_irqchip_state(map->irq,
+>> +					    IRQCHIP_STATE_ACTIVE,
+>> +					    false);
+>> +		WARN_ON(ret);
+>> +		return 0;
+>> +	}
+>> +
+>> +	return 1;
+>> +}
+>> +
+>>  /* Sync back the VGIC state after a guest run */
+>>  static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>>  {
+>> @@ -1356,14 +1405,31 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+>>  	elrsr = vgic_get_elrsr(vcpu);
+>>  	elrsr_ptr = u64_to_bitmask(&elrsr);
+>>  
+>> -	/* Clear mappings for empty LRs */
+>> -	for_each_set_bit(lr, elrsr_ptr, vgic->nr_lr) {
+>> +	/* Deal with HW interrupts, and clear mappings for empty LRs */
+>> +	for (lr = 0; lr < vgic->nr_lr; lr++) {
+>>  		struct vgic_lr vlr;
+>>  
+>> -		if (!test_and_clear_bit(lr, vgic_cpu->lr_used))
+>> +		if (!test_bit(lr, vgic_cpu->lr_used))
+>>  			continue;
+>>  
+>>  		vlr = vgic_get_lr(vcpu, lr);
+>> +		if (vgic_sync_hwirq(vcpu, vlr)) {
+>> +			/*
+>> +			 * So this is a HW interrupt that the guest
+>> +			 * EOI-ed. Clean the LR state and allow the
+>> +			 * interrupt to be queued again.
+> 
+> s/queued/sampled/ ?
+
+Indeed.
+
+>> +			 */
+>> +			vlr.state = 0;
+>> +			vlr.hwirq = 0;
+>> +			vgic_set_lr(vcpu, lr, vlr);
+>> +			vgic_irq_clear_queued(vcpu, vlr.irq);
+>> +			set_bit(lr, elrsr_ptr);
+>> +		}
+>> +
+>> +		if (!test_bit(lr, elrsr_ptr))
+>> +			continue;
+>> +
+>> +		clear_bit(lr, vgic_cpu->lr_used);
+>>  
+>>  		BUG_ON(vlr.irq >= dist->nr_irqs);
+>>  		vgic_cpu->vgic_irq_lr_map[vlr.irq] = LR_EMPTY;
+>> -- 
+>> 2.1.4
+>>
+> Thanks,
+> -Christoffer
+> 
+
+Thanks,
+
+	M.
 -- 
-Dmitry
+Jazz is not dead. It just smells funny...
