@@ -1,24 +1,85 @@
-From: danindrey@mail.ru (Andrey Danin)
-Date: Tue, 21 Jul 2015 11:51:15 +0300
-Subject: [PATCH v3 4/4] dt: paz00: define nvec as child of i2c bus
-In-Reply-To: <4778199.vGjAP5lpOS@fb07-iapwap2>
-References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
- <55AD73F4.2050502@wwwdotorg.org> <55ADE829.4030108@mail.ru>
- <4778199.vGjAP5lpOS@fb07-iapwap2>
-Message-ID: <55AE0803.10603@mail.ru>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 21 Jul 2015 09:54:03 +0100
+Subject: [PATCH V3 03/19] memory: tegra: add flush operation for Tegra30
+ memory clients
+In-Reply-To: <20150717100337.GH3057@ulmo>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-4-git-send-email-jonathanh@nvidia.com>
+ <20150717100337.GH3057@ulmo>
+Message-ID: <55AE08AB.6060903@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.07.2015 11:25, Marc Dietrich wrote:
-> I think in this case it would be better to leave nvec and dt as it is for now,
-> and just add the slave function to tegra-i2c. Otherwise we will again have two
-> different "nvidia,nvec-slave" bindings (one for the intermediate hack and one
-> for the final representation). As an alternative, you could also add slave
-> function and port nvec in the same series.
->
-First patch only adds slave functionality to tegra-i2c driver. I sent v3 
-to fix only tegra-i2c as Wolfram suggested.
 
-Unfortunately I haven't fixed all defects and I will resend patch(es).
-I can resend only first patch (for tegra-i2c) if it is more obvious for 
-everyone.
+On 17/07/15 11:03, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Mon, Jul 13, 2015 at 01:39:41PM +0100, Jon Hunter wrote:
+>> From: Vince Hsu <vinceh@nvidia.com>
+>>
+>> This patch adds the hot reset register table and flush related callback
+>> functions for Tegra30.
+>>
+>> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
+>> [jonathanh at nvidia.com: Removed tegra_mc_ops and added
+>>  metastable_flush_reads.]
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>
+>> ---
+>> v3: removal of tegra_mc_ops
+>> ---
+>>  drivers/memory/tegra/tegra30.c | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/drivers/memory/tegra/tegra30.c b/drivers/memory/tegra/tegra30.c
+>> index 1abcd8f6f3ba..3b4987f39b52 100644
+>> --- a/drivers/memory/tegra/tegra30.c
+>> +++ b/drivers/memory/tegra/tegra30.c
+>> @@ -6,6 +6,7 @@
+>>   * published by the Free Software Foundation.
+>>   */
+>>  
+>> +#include <linux/device.h>
+> 
+> What do you need this for?
+
+Looks like I forgot to remove this, when removing the tegra_mc_ops.
+Thanks, will remove.
+
+>>  #include <linux/of.h>
+>>  #include <linux/mm.h>
+>>  
+>> @@ -936,6 +937,26 @@ static const struct tegra_smmu_swgroup tegra30_swgroups[] = {
+>>  	{ .name = "isp",  .swgroup = TEGRA_SWGROUP_ISP,  .reg = 0x258 },
+>>  };
+>>  
+>> +static struct tegra_mc_flush tegra30_mc_flush[] = {
+> 
+> const
+
+Yes, will fix.
+
+>> +	{TEGRA_SWGROUP_AFI,        0x200, 0x204,  0},
+>> +	{TEGRA_SWGROUP_AVPC,       0x200, 0x204,  1},
+>> +	{TEGRA_SWGROUP_DC,         0x200, 0x204,  2},
+>> +	{TEGRA_SWGROUP_DCB,        0x200, 0x204,  3},
+>> +	{TEGRA_SWGROUP_EPP,        0x200, 0x204,  4},
+>> +	{TEGRA_SWGROUP_G2,         0x200, 0x204,  5},
+>> +	{TEGRA_SWGROUP_HC,         0x200, 0x204,  6},
+>> +	{TEGRA_SWGROUP_HDA,        0x200, 0x204,  7},
+>> +	{TEGRA_SWGROUP_ISP,        0x200, 0x204,  8},
+>> +	{TEGRA_SWGROUP_MPCORE,     0x200, 0x204,  9},
+>> +	{TEGRA_SWGROUP_MPCORELP,   0x200, 0x204, 10},
+>> +	{TEGRA_SWGROUP_MPE,        0x200, 0x204, 11},
+>> +	{TEGRA_SWGROUP_NV,         0x200, 0x204, 12},
+>> +	{TEGRA_SWGROUP_NV2,        0x200, 0x204, 13},
+>> +	{TEGRA_SWGROUP_PPCS,       0x200, 0x204, 14},
+>> +	{TEGRA_SWGROUP_VDE,        0x200, 0x204, 16},
+>> +	{TEGRA_SWGROUP_VI,         0x200, 0x204, 17},
+> 
+> Spaces around { and }, please.
+
+Ok.
+
+Cheers
+Jon
