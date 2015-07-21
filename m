@@ -1,49 +1,76 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Jul 2015 11:05:54 -0700
-Subject: [PATCH v4 3/8] clk: add support for clocks provided by SCP(System
- Control Processor)
-In-Reply-To: <55ACB733.2080609@arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-4-git-send-email-sudeep.holla@arm.com>
- <20150702172310.GF4301@codeaurora.org> <5596A1B6.8020307@arm.com>
- <559ADC94.4080505@codeaurora.org> <559BF858.1020301@arm.com>
- <20150708014606.GH30412@codeaurora.org> <55A7D79B.3080305@arm.com>
- <20150716193114.GA17952@codeaurora.org> <55A8E434.2010709@arm.com>
- <55A945DF.3@codeaurora.org> <55ACB733.2080609@arm.com>
-Message-ID: <55AE8A02.9070801@codeaurora.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 21 Jul 2015 11:11:45 -0700
+Subject: [PATCH v3 0/2] pci: xgene: Add multiple memory ranges support
+In-Reply-To: <20150721161446.GC21967@google.com>
+References: <1481643.dA4ocqzitg@wuerfel> <cover.1436476099.git.dhdang@apm.com>
+ <20150721161446.GC21967@google.com>
+Message-ID: <CADaLND=abMVVZrv-GPb5un_7yEDs5QNpL8zR44=6N_CdYDCzMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/20/2015 01:54 AM, Sudeep Holla wrote:
->
->
-> On 17/07/15 19:13, Stephen Boyd wrote:
->> On 07/17/2015 04:17 AM, Sudeep Holla wrote:
->
-> [...]
->
->>>
->>> determine_rate change shouldn't affect SCPI clock driver but I remember
->>> seeing round_rate change too on the list which returns value using the
->>> argument from Boris. Is that planned for v4.3 ? I would need the stable
->>> branch from this clk_hw_set_rate_range if you decide to push. Let me
->>> know your preferences. I will post the updated version of the patch
->>> accordingly.
->>>
+On Tue, Jul 21, 2015 at 9:14 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Thu, Jul 09, 2015 at 02:20:10PM -0700, Duc Dang wrote:
+>> This patch set adds 1 large (up to 64GB) memory window for each PCIe
+>> controller nodes in X-Gene device tree and fix PCIe controller driver
+>> to handle multiple memory ranges correctly. These changes are required
+>> to support PCIe devices that have huge BAR.
 >>
->> We're not going to change round_rate() so it sounds like you don't need
->> a stable branch. But you would need this new consumer API. So you still
->> need a branch right?
+>> v3 changes:
+>>       1. Explicitly mention in change log that: Each PCIe node in dts
+>>       will have 1 32-bit non-prefetchable memory window and 1 64-bit
+>>       prefetchable memory window.
 >>
+>> v2 changes:
+>>         1. Separate device-tree changes and driver changes into different
+>>         patches
+>>         2. Explicitly define new large window as 64-bit prefetchable in dts.
+>>         3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
+>>         register to be used to configure the memory ranges.
+>>
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
+>>  drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
+>>  2 files changed, 24 insertions(+), 11 deletions(-)
 >
-> I am fine either way. If no one else need the stable branch to be shared
-> with arm-soc, I prefer to use clock consumer API for now to avoid all
-> the troubles to you guys and switch to provider API later. I will post
-> it once the both this driver and that provider API is merged, if that's
-> fine with you ?
+> Applied to pci/host-xgene for v4.3, with changelogs as follows, thanks!
 
-Ok. Sounds fine as long as we don't forget.
+Thanks a lot, Bjorn.
+
+>
+>
+> commit 80bb3eda7475eb38b688d2e915c191ce6ad20df1
+> Author: Duc Dang <dhdang@apm.com>
+> Date:   Thu Jul 9 14:20:11 2015 -0700
+>
+>     arm64: dts: Add APM X-Gene PCIe 64-bit prefetchable window
+>
+>     Add a large window (up to 64GB) for X-Gene PCIe nodes to support devices
+>     that require huge BARs.
+>
+>     Each X-Gene PCIe node will now have two memory windows: a 32-bit
+>     non-prefetchable window and a 64-bit prefetchable window.
+>
+>     [bhelgaas: changelog]
+>     Signed-off-by: Duc Dang <dhdang@apm.com>
+>     Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+>
+> commit 8ef54f27f6f425fa8deedc237d99b9daf41d68d2
+> Author: Duc Dang <dhdang@apm.com>
+> Date:   Thu Jul 9 14:20:12 2015 -0700
+>
+>     PCI: xgene: Add support for a 64-bit prefetchable memory window
+>
+>     X-Gene PCIe controller has registers to support multiple memory ranges.
+>
+>     Add support for a 64-bit prefetchable memory window.
+>
+>     [bhelgaas: changelog]
+>     Signed-off-by: Duc Dang <dhdang@apm.com>
+>     Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+>     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Regards,
+Duc Dang.
