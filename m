@@ -1,62 +1,27 @@
-From: roger.pau@citrix.com (=?UTF-8?B?Um9nZXIgUGF1IE1vbm7DqQ==?=)
-Date: Tue, 21 Jul 2015 11:54:52 +0200
-Subject: [PATCH v2 05/20] block/xen-blkfront: Split blkif_queue_request
- in 2
-In-Reply-To: <1436474552-31789-6-git-send-email-julien.grall@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-6-git-send-email-julien.grall@citrix.com>
-Message-ID: <55AE16EC.2020204@citrix.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 21 Jul 2015 11:54:57 +0200
+Subject: [PATCH 0/9] gpiolib: Add GPIO name support
+In-Reply-To: <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+ <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
+Message-ID: <20150721095457.GA9981@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El 09/07/15 a les 22.42, Julien Grall ha escrit:
-> Currently, blkif_queue_request has 2 distinct execution path:
->     - Send a discard request
->     - Send a read/write request
-> 
-> The function is also allocating grants to use for generating the
-> request. Although, this is only used for read/write request.
-> 
-> Rather than having a function with 2 distinct execution path, separate
-> the function in 2. This will also remove one level of tabulation.
-> 
-> Signed-off-by: Julien Grall <julien.grall@citrix.com>
-> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> Cc: Roger Pau Monn? <roger.pau@citrix.com>
-> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> Cc: David Vrabel <david.vrabel@citrix.com>
+Hello,
 
-Patch looks fine, although with so much indentation changes it's kind of
-hard to review.
+On Tue, Jul 21, 2015 at 06:00:37PM +0900, Alexandre Courbot wrote:
+> On Sat, Jul 18, 2015 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > I must say I like this series.
+I think apart from patch 3 which I'd like to have discussed a bit more,
+I like it, too. I didn't try, but the series should work fine without
+patch 3 such that this patch can be discussed separately and the
+remaining 8 patches can go in?
 
-Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Best regards
+Uwe
 
-Just one minor change below.
-
-[...]
-
-> @@ -595,6 +603,24 @@ static int blkif_queue_request(struct request *req)
->  	return 0;
->  }
->  
-> +/*
-> + * Generate a Xen blkfront IO request from a blk layer request.  Reads
-> + * and writes are handled as expected.
-> + *
-> + * @req: a request struct
-> + */
-> +static int blkif_queue_request(struct request *req)
-> +{
-> +	struct blkfront_info *info = req->rq_disk->private_data;
-> +
-> +	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
-> +		return 1;
-> +
-> +	if (unlikely(req->cmd_flags & (REQ_DISCARD | REQ_SECURE)))
-> +		return blkif_queue_discard_req(req);
-> +	else
-> +		return blkif_queue_rw_req(req);
-
-There's no need for the else clause.
-
-Roger.
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
