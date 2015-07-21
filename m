@@ -1,77 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Jul 2015 09:59:23 +0200
-Subject: [PATCH v2] Add Mediatek thermal support
-Message-ID: <1437465566-16299-1-git-send-email-s.hauer@pengutronix.de>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Tue, 21 Jul 2015 10:25:31 +0200
+Subject: [PATCH v3 4/4] dt: paz00: define nvec as child of i2c bus
+In-Reply-To: <55ADE829.4030108@mail.ru>
+References: <1437424546-30405-1-git-send-email-danindrey@mail.ru>
+ <55AD73F4.2050502@wwwdotorg.org> <55ADE829.4030108@mail.ru>
+Message-ID: <4778199.vGjAP5lpOS@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for the thermal sensors included in the
-MT8173 SoC. Currently only basic temperature reading is supported
-without any interrupt support.
+Am Dienstag, 21. Juli 2015, 09:35:21 schrieb Andrey Danin:
+> On 21.07.2015 1:19, Stephen Warren wrote:
+> > On 07/20/2015 02:35 PM, Andrey Danin wrote:
+> >> NVEC driver was reimplemented to use tegra i2c. Use common i2c bindings
+> >> for NVEC node.
+> >> 
+> >> diff --git a/arch/arm/boot/dts/tegra20-paz00.dts
+> >> b/arch/arm/boot/dts/tegra20-paz00.dts
+> >> 
+> >> +        nvec: nvec at 45 {
+> >> +            compatible = "nvidia,nvec-slave";
+> >> +            reg = <0x45>;
+> > 
+> > I think you need to or in I2C_OWN_SLAVE_ADDRESS from
+> > <dt-bindings/i2c/i2c.h> here?
+> 
+> Sorry, I mentioned it in letter 0 only.
+> I will rework nvec driver and device tree according to i2c core slave
+> implementation later. v3 of this patchset is for fixing tegra i2c driver
+> only.
 
-The cpufreq driver for MT8173 is currently under review, so there's no
-real cooling device available in mainline. Until this is available the
-thermal driver can be tested with the following dts snippet. It creates
-a fake gpio fan and a fake trip point which is so low that it can easily
-be reached with a "cat /dev/zero > /dev/null" on the command line.
+I think in this case it would be better to leave nvec and dt as it is for now, 
+and just add the slave function to tegra-i2c. Otherwise we will again have two 
+different "nvidia,nvec-slave" bindings (one for the intermediate hack and one 
+for the final representation). As an alternative, you could also add slave 
+function and port nvec in the same series.
 
-Please review and let me know what's missing to be included in mainline.
-
-Changes since v1:
-- Use "mediatek," prefix for custom properties
-- Drop "thermal: consistently use int for temperatures" dependency
-
-Sascha
-
-	fan: gpio_fan {
-		compatible = "gpio-fan";
-		gpios = <&pio 24 0>;
-		gpio-fan,speed-map = <0    0
-				      4500 1>;
-		#cooling-cells = <2>;
-	};
-
-	thermal-zones {
-		cpu_thermal: cpu_thermal {
-			polling-delay-passive = <1000>; /* milliseconds */
-			polling-delay = <1000>; /* milliseconds */
-
-			thermal-sensors = <&thermal 0>;
-
-			trips {
-				cpu_passive: cpu_passive {
-					temperature = <47000>; /* millicelsius */
-					hysteresis = <2000>; /* millicelsius */
-					type = "passive";
-				};
-
-				cpu_crit {
-					temperature = <90000>; /* millicelsius */
-					hysteresis = <2000>; /* millicelsius */
-					type = "critical";
-				};
-			};
-
-			cooling-maps {
-				map0 {
-					trip = <&cpu_passive>;
-					cooling-device = <&fan THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-				};
-			};
-		};
-	};
-
-----------------------------------------------------------------
-Sascha Hauer (3):
-      dt-bindings: thermal: Add binding document for Mediatek thermal controller
-      thermal: Add Mediatek thermal controller support
-      ARM64: dts: mt8173: Add thermal/auxadc device nodes
-
- .../bindings/thermal/mediatek-thermal.txt          |  38 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  18 +
- drivers/thermal/Kconfig                            |   8 +
- drivers/thermal/Makefile                           |   1 +
- drivers/thermal/mtk_thermal.c                      | 602 +++++++++++++++++++++
- 5 files changed, 667 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
- create mode 100644 drivers/thermal/mtk_thermal.c
+Marc
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/75633402/attachment.sig>
