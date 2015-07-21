@@ -1,78 +1,99 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Jul 2015 13:23:29 +0100
-Subject: [PATCH v3 4/6] arm64: kernel: Add min_field_value and use '>=' for
- feature detection
+Date: Tue, 21 Jul 2015 13:23:27 +0100
+Subject: [PATCH v3 2/6] arm64: kernel: preparatory: Move config_sctlr_el1
 In-Reply-To: <1437481411-1595-1-git-send-email-james.morse@arm.com>
 References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
-Message-ID: <1437481411-1595-5-git-send-email-james.morse@arm.com>
+Message-ID: <1437481411-1595-3-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a new cpu feature is available, the cpu feature bits will have some
-initial value, which is incremented when the feature is updated.
-This patch changes 'register_value' to be 'min_field_value', and checks
-the feature bits value (interpreted as a signed int) is greater than this
-minimum.
+Later patches need config_sctlr_el1 to set/clear bits in the sctlr_el1
+register.
+
+This patch moves this function into header a file.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h |  4 ++--
- arch/arm64/kernel/cpufeature.c      | 14 +++++++++++---
- 2 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm64/include/asm/cputype.h     |  3 ---
+ arch/arm64/include/asm/sysreg.h      | 12 ++++++++++++
+ arch/arm64/kernel/armv8_deprecated.c | 11 +----------
+ 3 files changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 484fa9425314..f595f7ddd43b 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -42,8 +42,8 @@ struct arm64_cpu_capabilities {
- 		};
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index a84ec605bed8..ee6403df9fe4 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -81,9 +81,6 @@
+ #define ID_AA64MMFR0_BIGEND(mmfr0)	\
+ 	(((mmfr0) & ID_AA64MMFR0_BIGEND_MASK) >> ID_AA64MMFR0_BIGEND_SHIFT)
  
- 		struct {	/* Feature register checking */
--			u64 register_mask;
--			u64 register_value;
-+			int field_pos;
-+			int min_field_value;
- 		};
- 	};
- };
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 650ffc28bedc..74fd0f74b065 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -23,12 +23,20 @@
- #include <asm/cpufeature.h>
+-#define SCTLR_EL1_CP15BEN	(0x1 << 5)
+-#define SCTLR_EL1_SED		(0x1 << 8)
+-
+ #ifndef __ASSEMBLY__
  
- static bool
-+feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
+ /*
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 5c89df0acbcb..56391fbae1e1 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,6 +20,9 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
++#define SCTLR_EL1_CP15BEN	(0x1 << 5)
++#define SCTLR_EL1_SED		(0x1 << 8)
++
+ #define sys_reg(op0, op1, crn, crm, op2) \
+ 	((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+ 
+@@ -55,6 +58,15 @@ asm(
+ "	.endm\n"
+ );
+ 
++static inline void config_sctlr_el1(u32 clear, u32 set)
 +{
-+	int val = cpuid_feature_extract_field(reg, entry->field_pos);
++	u32 val;
 +
-+	return val >= entry->min_field_value;
++	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
++	val &= ~clear;
++	val |= set;
++	asm volatile("msr sctlr_el1, %0" : : "r" (val));
 +}
-+
-+static bool
- has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
- {
- 	u64 val;
+ #endif
  
- 	val = read_cpuid(id_aa64pfr0_el1);
--	return (val & entry->register_mask) == entry->register_value;
-+	return feature_matches(val, entry);
+ #endif	/* __ASM_SYSREG_H */
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 7922c2e710ca..78d56bff91fd 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -16,6 +16,7 @@
+ 
+ #include <asm/insn.h>
+ #include <asm/opcodes.h>
++#include <asm/sysreg.h>
+ #include <asm/system_misc.h>
+ #include <asm/traps.h>
+ #include <asm/uaccess.h>
+@@ -504,16 +505,6 @@ ret:
+ 	return 0;
  }
  
- static const struct arm64_cpu_capabilities arm64_features[] = {
-@@ -36,8 +44,8 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.desc = "GIC system register CPU interface",
- 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
- 		.matches = has_id_aa64pfr0_feature,
--		.register_mask = (0xf << 24),
--		.register_value = (1 << 24),
-+		.field_pos = 24,
-+		.min_field_value = 1,
- 	},
- 	{},
- };
+-static inline void config_sctlr_el1(u32 clear, u32 set)
+-{
+-	u32 val;
+-
+-	asm volatile("mrs %0, sctlr_el1" : "=r" (val));
+-	val &= ~clear;
+-	val |= set;
+-	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+-}
+-
+ static int cp15_barrier_set_hw_mode(bool enable)
+ {
+ 	if (enable)
 -- 
 2.1.4
