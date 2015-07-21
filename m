@@ -1,45 +1,38 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 21 Jul 2015 12:10:37 +0200
-Subject: [PATCH 0/9] gpiolib: Add GPIO name support
-In-Reply-To: <20150721095457.GA9981@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
- <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
- <20150721095457.GA9981@pengutronix.de>
-Message-ID: <20150721101037.GB20023@pengutronix.de>
+From: roger.pau@citrix.com (=?UTF-8?B?Um9nZXIgUGF1IE1vbm7DqQ==?=)
+Date: Tue, 21 Jul 2015 12:16:07 +0200
+Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn
+ in the grant structure
+In-Reply-To: <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
+Message-ID: <55AE1BE7.5030102@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jul 21, 2015 at 11:54:57AM +0200, Uwe Kleine-K?nig wrote:
-> Hello,
+El 09/07/15 a les 22.42, Julien Grall ha escrit:
+> All the usage of the field pfn are done using the same idiom:
 > 
-> On Tue, Jul 21, 2015 at 06:00:37PM +0900, Alexandre Courbot wrote:
-> > On Sat, Jul 18, 2015 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > > I must say I like this series.
-> I think apart from patch 3 which I'd like to have discussed a bit more,
-> I like it, too. I didn't try, but the series should work fine without
-> patch 3 such that this patch can be discussed separately and the
-> remaining 8 patches can go in?
+> pfn_to_page(grant->pfn)
+> 
+> This will  return always the same page. Store directly the page in the
+> grant to clean up the code.
+> 
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Roger Pau Monn? <roger.pau@citrix.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
 
-This series should work without patch 3, yes. Just remove the hogging
-keyword from the gpios defined in the devicetree.
-However some test coverage for this series would be good.
+Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
 
-Best regards,
+With one style fix.
 
-Markus
+[...]
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/93f5e420/attachment.sig>
+>  static struct grant *get_grant(grant_ref_t *gref_head,
+> -                               unsigned long pfn,
+> +			       struct page *page,
+
+Indentation.
+
+Roger.
