@@ -1,42 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 21 Jul 2015 13:38:31 +0100
-Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
- Never
-In-Reply-To: <1437481411-1595-7-git-send-email-james.morse@arm.com>
-References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
- <1437481411-1595-7-git-send-email-james.morse@arm.com>
-Message-ID: <20150721123830.GD25887@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Jul 2015 14:38:47 +0200
+Subject: [PATCH v11] crypto: Add Allwinner Security System crypto
+ accelerator
+In-Reply-To: <20150720082057.GA13098@gondor.apana.org.au>
+References: <1437143983-4479-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20150720081050.GB12908@gondor.apana.org.au>
+ <20150720081836.GT28632@lukather>
+ <20150720082057.GA13098@gondor.apana.org.au>
+Message-ID: <20150721123847.GD2373@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 01:23:31PM +0100, James Morse wrote:
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 94d98cd1aad8..149a36ea9673 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -30,9 +30,11 @@
->  #include <linux/highmem.h>
->  #include <linux/perf_event.h>
->  
-> +#include <asm/cpufeature.h>
->  #include <asm/exception.h>
->  #include <asm/debug-monitors.h>
->  #include <asm/esr.h>
-> +#include <asm/sysreg.h>
->  #include <asm/system_misc.h>
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
-> @@ -147,6 +149,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
->  		__do_kernel_fault(mm, addr, esr, regs);
->  }
->  
-> +static bool pan_enabled(struct pt_regs *regs)
-> +{
-> +	if (IS_ENABLED(CONFIG_ARM64_PAN))
-> +		return ((regs->pstate & PSR_PAN_BIT) != 0);
+On Mon, Jul 20, 2015 at 04:20:57PM +0800, Herbert Xu wrote:
+> On Mon, Jul 20, 2015 at 10:18:36AM +0200, Maxime Ripard wrote:
+> > On Mon, Jul 20, 2015 at 04:10:50PM +0800, Herbert Xu wrote:
+> > > On Fri, Jul 17, 2015 at 04:39:37PM +0200, LABBE Corentin wrote:
+> > > > Hello
+> > > > 
+> > > > This is the driver for the Security System included in Allwinner SoC A20.
+> > > > The Security System (SS for short) is a hardware cryptographic accelerator that
+> > > > support AES/MD5/SHA1/DES/3DES/PRNG algorithms.
+> > > > It could be found on others Allwinner SoC: 
+> > > > - A10, A10s, A13, A31 and A33 manual give the same datasheet for SS than A20
+> > > > - A23 speak about a security system but without precisions
+> > > > - A80 and A83T datasheet speak about a security system with more functions
+> > > >   (SHA224/SHA256/RSA/CRC), they will be supported in a separate driver.
+> > > 
+> > > All applied.  Thanks a lot!
+> > 
+> > All applied, DT bits included?
+> 
+> Yes.
 
-Nitpick: no brackets needed for return.
+I thought you needed at least my Acked-by for that, but
+whatever... How are we supposed to handle subsequent DT patches that
+should be merged through arm-soc then?
 
-Otherwise the patch looks fine to me:
+Maxime
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/0d77e068/attachment.sig>
