@@ -1,43 +1,57 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Jul 2015 11:43:32 -0500
-Subject: [PATCH v3 07/46] usb: dwc3: gadget: add ep capabilities support
-In-Reply-To: <1436941953-1327-8-git-send-email-r.baldyga@samsung.com>
-References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
- <1436941953-1327-8-git-send-email-r.baldyga@samsung.com>
-Message-ID: <20150721164331.GG25385@saruman.tx.rr.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Tue, 21 Jul 2015 18:46:11 +0200
+Subject: [PATCH v3 0/2] RTC support for NXP LPC18xx family
+In-Reply-To: <20150721162850.GE2853@piout.net>
+References: <1436635730-15617-1-git-send-email-manabian@gmail.com>
+ <20150721162850.GE2853@piout.net>
+Message-ID: <CAGhQ9VwJvs8qwhDrUd8P0Fz3v-MtQOq+Nfd5YegZZEVbDYNgqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 21 July 2015 at 18:28, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> Hi,
+>
+> On 11/07/2015 at 19:28:48 +0200, Joachim Eastwood wrote :
+>> This patch set adds support for the RTC found on many NXP devices
+>> including LPC178x/18xx/408x/43xx. The RTC provides calendar and
+>> clock functionality together with alarm interrupt support.
+>>
+>> The driver is a rework of an old driver by Kevin Wells. It has been
+>> modified to support modern resource allocation, device tree and
+>> generally cleaned up. Driver was originally written to support the
+>> LPC24xx platform but since this platform isn't upstream support has
+>> been removed. The LPC24xx name is still kept to preserve the origin
+>> of this hardware block.
+>>
+>> Been a while since the last version, but this version should address
+>> all comments from Josh and Alexandre on v2. There has also been some
+>> rework from my side. Please have a look.
+>>
+>> changes since v2:
+>>  - rework hw init
+>>  - update Kconfig text
+>>  - remove unused registers defines
+>>  - misc clean ups
+>>  - rebase on 4.2-rc1
+>>
+>> changes since v1:
+>>  - s/lpc2k/lpc24xx for better consistency
+>>  - fix Kconfig entry
+>>  - drop support for old versions for the ip block
+>>
+>> Patch set is based on Linux v4.2-rc1.
+>>
+>> Joachim Eastwood (2):
+>>   rtc: add rtc-lpc24xx driver
+>>   doc: dt: add documentation for nxp,lpc1788-rtc
+>>
+>
+> Applied both after adding a proper commit log to the second patch,
+> reordering to avoid a checkpatch warning and fixing the typo in kevin's
+> mail address.
 
-On Wed, Jul 15, 2015 at 08:31:54AM +0200, Robert Baldyga wrote:
-> Convert endpoint configuration to new capabilities model.
-> 
-> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-> ---
->  drivers/usb/dwc3/gadget.c | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
-> 
-> diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
-> index 333a7c0..8d1f768 100644
-> --- a/drivers/usb/dwc3/gadget.c
-> +++ b/drivers/usb/dwc3/gadget.c
-> @@ -1713,6 +1713,19 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
->  				return ret;
->  		}
->  
-> +		if (epnum == 0) {
-> +			dep->endpoint.caps.type_control = true;
+Thanks for fixing up and applying, Alexandre.
 
-as the name says, this function deals with hw endpoints. This means ep1
-is also control.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/a80db706/attachment-0001.sig>
+regards,
+Joachim Eastwood
