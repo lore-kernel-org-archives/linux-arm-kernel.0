@@ -1,35 +1,41 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 21 Jul 2015 15:30:33 +0800
-Subject: [PATCH v3 5/5] iommu/arm-smmu: describe the limitation of #iommu-cells
+Date: Tue, 21 Jul 2015 15:30:31 +0800
+Subject: [PATCH v3 3/5] iommu/arm-smmu: rename __arm_smmu_get_pci_sid
 In-Reply-To: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1437463833-16112-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1437463833-16112-4-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Only support #iommu-cells = <1>.
+Remove the words "pci", to make this function can also be used by
+non-pci devices.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-index 3443e0f..7d110a1 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu-v3.txt
-@@ -5,6 +5,12 @@ revisions, replacing the MMIO register interface with in-memory command
- and event queues and adding support for the ATS and PRI components of
- the PCIe specification.
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 9daf4cc..216c9d4 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1734,7 +1734,7 @@ static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *sidp)
+ 	return 0; /* Continue walking */
+ }
 
-+Please read ./iommu.txt first, here list something special as below:
-+
-+** SMMUv3 limited properties:
-+- #iommu-cells      : fixed to <1>. The pci root device is a special case,
-+                      its IDs can be omitted in dts, seems #iommu-cells = <0>.
-+
- ** SMMUv3 required properties:
-
- - compatible        : Should include:
+-static void __arm_smmu_release_pci_iommudata(void *data)
++static void __arm_smmu_release_iommudata(void *data)
+ {
+ 	kfree(data);
+ }
+@@ -1811,7 +1811,7 @@ static int __arm_smmu_add_device(struct device *dev, u32 sid)
+ 		smmu_group->ste.valid	= true;
+ 		smmu_group->smmu	= smmu;
+ 		iommu_group_set_iommudata(group, smmu_group,
+-					  __arm_smmu_release_pci_iommudata);
++					  __arm_smmu_release_iommudata);
+ 	} else {
+ 		smmu = smmu_group->smmu;
+ 	}
 --
 1.8.0
