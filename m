@@ -1,48 +1,172 @@
 From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 21 Jul 2015 04:12:00 +0300
-Subject: [PATCH 3/4] ARM: OMAP2+: omap3-pandora: add backlight support
+Date: Tue, 21 Jul 2015 04:12:01 +0300
+Subject: [PATCH 4/4] ARM: OMAP2+: omap3-pandora: add wifi support
 In-Reply-To: <1437441121-31658-1-git-send-email-notasas@gmail.com>
 References: <1437441121-31658-1-git-send-email-notasas@gmail.com>
-Message-ID: <1437441121-31658-3-git-send-email-notasas@gmail.com>
+Message-ID: <1437441121-31658-4-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add backlight support via pdata-quirks as it's driver lacks DT support.
+Add wl1251 support via pdata-quirks as it's driver lacks DT
+support. MMC3 is marked disabled in DT so that MMC3 instance of
+hsmmc driver is probed using platform data with special card init
+callback.
 
 Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
 ---
- arch/arm/mach-omap2/pdata-quirks.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/omap3-pandora-common.dtsi |   5 ++
+ arch/arm/mach-omap2/pdata-quirks.c          | 101 ++++++++++++++++++++++++++++
+ 2 files changed, 106 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 821171c..3c97aa49 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -268,6 +268,16 @@ static void __init omap3_tao3530_legacy_init(void)
- {
- 	hsmmc2_internal_input_clk();
- }
-+
-+static struct platform_device pandora_backlight = {
-+	.name	= "pandora-backlight",
-+	.id	= -1,
+diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+index 6e82c4a..f2084e6 100644
+--- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
++++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+@@ -514,6 +514,11 @@
+ 	/*wp-gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;*/	/* GPIO_127 */
+ };
+ 
++/* mmc3 is probed using pdata-quirks to pass wl1251 card data */
++&mmc3 {
++	status = "disabled";
 +};
 +
-+static void __init omap3_pandora_legacy_init(void)
+ /* bluetooth*/
+ &uart1 {
+ };
+diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
+index 3c97aa49..95f6724 100644
+--- a/arch/arm/mach-omap2/pdata-quirks.c
++++ b/arch/arm/mach-omap2/pdata-quirks.c
+@@ -14,6 +14,11 @@
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
+ #include <linux/ti_wilink_st.h>
++#include <linux/wl12xx.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/host.h>
++#include <linux/regulator/machine.h>
++#include <linux/regulator/fixed.h>
+ 
+ #include <linux/platform_data/pinctrl-single.h>
+ #include <linux/platform_data/iommu-omap.h>
+@@ -25,6 +30,7 @@
+ #include "omap_device.h"
+ #include "omap-secure.h"
+ #include "soc.h"
++#include "hsmmc.h"
+ 
+ struct pdata_init {
+ 	const char *compatible;
+@@ -269,14 +275,109 @@ static void __init omap3_tao3530_legacy_init(void)
+ 	hsmmc2_internal_input_clk();
+ }
+ 
++/* omap3pandora legacy devices */
++#define PANDORA_WIFI_IRQ_GPIO		21
++#define PANDORA_WIFI_NRESET_GPIO	23
++
+ static struct platform_device pandora_backlight = {
+ 	.name	= "pandora-backlight",
+ 	.id	= -1,
+ };
+ 
++static struct regulator_consumer_supply pandora_vmmc3_supply[] = {
++	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.2"),
++};
++
++static struct regulator_init_data pandora_vmmc3 = {
++	.constraints = {
++		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
++	},
++	.num_consumer_supplies	= ARRAY_SIZE(pandora_vmmc3_supply),
++	.consumer_supplies	= pandora_vmmc3_supply,
++};
++
++static struct fixed_voltage_config pandora_vwlan = {
++	.supply_name		= "vwlan",
++	.microvolts		= 1800000, /* 1.8V */
++	.gpio			= PANDORA_WIFI_NRESET_GPIO,
++	.startup_delay		= 50000, /* 50ms */
++	.enable_high		= 1,
++	.init_data		= &pandora_vmmc3,
++};
++
++static struct platform_device pandora_vwlan_device = {
++	.name		= "reg-fixed-voltage",
++	.id		= 1,
++	.dev = {
++		.platform_data = &pandora_vwlan,
++	},
++};
++
++static void pandora_wl1251_init_card(struct mmc_card *card)
 +{
-+	platform_device_register(&pandora_backlight);
++	/*
++	 * We have TI wl1251 attached to MMC3. Pass this information to
++	 * SDIO core because it can't be probed by normal methods.
++	 */
++	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
++		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
++		card->cccr.wide_bus = 1;
++		card->cis.vendor = 0x104c;
++		card->cis.device = 0x9066;
++		card->cis.blksize = 512;
++		card->cis.max_dtr = 24000000;
++		card->ocr = 0x80;
++	}
 +}
++
++static struct omap2_hsmmc_info pandora_mmc3[] = {
++	{
++		.mmc		= 3,
++		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
++		.gpio_cd	= -EINVAL,
++		.gpio_wp	= -EINVAL,
++		.init_card	= pandora_wl1251_init_card,
++	},
++	{}	/* Terminator */
++};
++
++static void __init pandora_wl1251_init(void)
++{
++	struct wl1251_platform_data pandora_wl1251_pdata;
++	int ret;
++
++	memset(&pandora_wl1251_pdata, 0, sizeof(pandora_wl1251_pdata));
++
++	pandora_wl1251_pdata.power_gpio = -1;
++
++	ret = gpio_request_one(PANDORA_WIFI_IRQ_GPIO, GPIOF_IN, "wl1251 irq");
++	if (ret < 0)
++		goto fail;
++
++	pandora_wl1251_pdata.irq = gpio_to_irq(PANDORA_WIFI_IRQ_GPIO);
++	if (pandora_wl1251_pdata.irq < 0)
++		goto fail_irq;
++
++	pandora_wl1251_pdata.use_eeprom = true;
++	ret = wl1251_set_platform_data(&pandora_wl1251_pdata);
++	if (ret < 0)
++		goto fail_irq;
++
++	return;
++
++fail_irq:
++	gpio_free(PANDORA_WIFI_IRQ_GPIO);
++fail:
++	pr_err("wl1251 board initialisation failed\n");
++}
++
+ static void __init omap3_pandora_legacy_init(void)
+ {
+ 	platform_device_register(&pandora_backlight);
++	platform_device_register(&pandora_vwlan_device);
++	omap_hsmmc_init(pandora_mmc3);
++	omap_hsmmc_late_init(pandora_mmc3);
++	pandora_wl1251_init();
+ }
  #endif /* CONFIG_ARCH_OMAP3 */
  
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
-@@ -381,6 +391,8 @@ static struct pdata_init pdata_quirks[] __initdata = {
- 	{ "ti,omap3-evm-37xx", omap3_evm_legacy_init, },
- 	{ "ti,am3517-evm", am3517_evm_legacy_init, },
- 	{ "technexion,omap3-tao3530", omap3_tao3530_legacy_init, },
-+	{ "openpandora,omap3-pandora-600mhz", omap3_pandora_legacy_init, },
-+	{ "openpandora,omap3-pandora-1ghz", omap3_pandora_legacy_init, },
- #endif
- #ifdef CONFIG_SOC_OMAP5
- 	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
 -- 
 1.9.1
