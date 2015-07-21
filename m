@@ -1,31 +1,75 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 21 Jul 2015 14:10:28 -0700
-Subject: [GIT PULL] pxa-dt for v4.3
-In-Reply-To: <87wpxyfna5.fsf@belgarion.home>
-References: <87wpxyfna5.fsf@belgarion.home>
-Message-ID: <20150721211028.GB13353@localhost>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 21 Jul 2015 16:05:41 -0500
+Subject: [PATCHv2] ARM: socfpga: add reset for the Arria 10 platform
+Message-ID: <1437512741-14099-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 18, 2015 at 12:10:42AM +0200, Robert Jarzmik wrote:
-> Hi Arnd, Kevin, and Olof,
-> 
-> This is the pxa pull request for 4.3 device-tree. It is mostly dma centric, with
-> one fix and 2 new IPs support, camera host and usb host.
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/rjarzmik/linux.git tags/tags/pxa-dt-4.3
-> 
-> for you to fetch changes up to fb18539b3c8f03e550b8afb21cf53db2a2235dbe:
-> 
->   ARM: dts: pxa: fix power i2c definition (2015-07-10 22:29:22 +0200)
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Merged, thanks!
+Since the Arria10's reset register offset is different from the Cyclone/Arria 5,
+it's best to add a new DT_MACHINE_START() for the Arria10.
 
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v2: use altera_a10_dt_match for the A10 machine desc
+---
+ arch/arm/mach-socfpga/core.h    |  1 +
+ arch/arm/mach-socfpga/socfpga.c | 26 ++++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
 
--Olof
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 7259c37..5bc6ea8 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -25,6 +25,7 @@
+ #define SOCFPGA_RSTMGR_MODPERRST	0x14
+ #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
+ 
++#define SOCFPGA_A10_RSTMGR_CTRL		0xC
+ #define SOCFPGA_A10_RSTMGR_MODMPURST	0x20
+ 
+ /* System Manager bits */
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 19643a7..a1c0efa 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -74,6 +74,19 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
+ 	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
+ }
+ 
++static void socfpga_arria10_restart(enum reboot_mode mode, const char *cmd)
++{
++	u32 temp;
++
++	temp = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
++
++	if (mode == REBOOT_HARD)
++		temp |= RSTMGR_CTRL_SWCOLDRSTREQ;
++	else
++		temp |= RSTMGR_CTRL_SWWARMRSTREQ;
++	writel(temp, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
++}
++
+ static const char *altera_dt_match[] = {
+ 	"altr,socfpga",
+ 	NULL
+@@ -86,3 +99,16 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
+ MACHINE_END
++
++static const char *altera_a10_dt_match[] = {
++	"altr,socfpga-arria10",
++	NULL
++};
++
++DT_MACHINE_START(SOCFPGA_A10, "Altera SOCFPGA Arria10")
++	.l2c_aux_val	= 0,
++	.l2c_aux_mask	= ~0,
++	.init_irq	= socfpga_init_irq,
++	.restart	= socfpga_arria10_restart,
++	.dt_compat	= altera_a10_dt_match,
++MACHINE_END
+-- 
+2.4.5
