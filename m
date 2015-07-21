@@ -1,48 +1,64 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Jul 2015 14:16:30 -0700
-Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
-In-Reply-To: <1437511283-14216-1-git-send-email-dianders@chromium.org>
-References: <1437511283-14216-1-git-send-email-dianders@chromium.org>
-Message-ID: <55AEB6AE.2070006@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 16:17:31 -0500
+Subject: [PATCH v4 07/19] PCI/MSI: Let pci_msi_get_domain use struct
+ device's msi_domain
+In-Reply-To: <1436962613-17359-8-git-send-email-marc.zyngier@arm.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150721211731.GA3691@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2015 01:41 PM, Douglas Anderson wrote:
-> In the TRM we see that BWADJ is "a 12-bit bus that selects the values
-> 1-4096 for the bandwidth divider (NB)":
->   NB = BWADJ[11:0] + 1
-> The recommended setting of NB: NB = NF / 2.
->
-> So:
->    NB = NF / 2
->    BWADJ[11:0] + 1 = NF / 2
->    BWADJ[11:0] = NF / 2 - 1
->
-> Right now, we have:
->
-> {                                               \
->          .rate   = _rate##U,                     \
->          .nr = _nr,                              \
->          .nf = _nf,                              \
->          .no = _no,                              \
->          .bwadj = (_nf >> 1),                    \
-> }
->
-> That means we set bwadj to NF / 2, not NF / 2 - 1
->
-> All of this is a bit confusing because we specify "NR" (the 1-based
-> value), "NF" (the 1-based value), "NO" (the 1-based value), but
-> "BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
->
-> Let's change to working with "NB" and fix the off by one error.  This
-> may affect PLL jitter in a small way (hopefully for the better).
->
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->
+Hi Marc,
 
-There's no Fixes tag or stable Cc so I take it this isn't fixing any 
-manifesting regression, more of a visual inspection bug find?
+On Wed, Jul 15, 2015 at 01:16:41PM +0100, Marc Zyngier wrote:
+> Now that we can easily find which MSI domain a PCI device is
+> using, use dev_get_msi_domain as a way to retrieve the information.
+> 
+> The original code is still used as a fallback.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/msi.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index ef4ec6e..c77fdaf 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+>  {
+>  	struct irq_domain *domain = NULL;
+>  
+> -	if (dev->bus->msi)
+> +	domain = dev_get_msi_domain(&dev->dev);
+> +	if (!domain && dev->bus->msi)
+>  		domain = dev->bus->msi->domain;
+>  	if (!domain)
+>  		domain = arch_get_pci_msi_domain(dev);
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I think this would be slightly easier to read as:
+
+    struct irq_domain *domain;
+
+    domain = dev_get_msi_domain(&dev->dev);
+    if (domain)
+	return domain;
+
+    if (dev->bus->msi && (domain = dev->bus->msi->domain))
+	return domain;
+
+    return arch_get_pci_msi_domain(dev);
+
+I'm not a huge fan of assignments inside "if" conditions, and checkpatch
+might even complain about it, but it exposes the fallback order pretty well
+here.  I guess we could also just repeat the dev->bus->msi->domain
+expression:
+
+    if (dev->bus->msi && dev->bus->msi->domain)
+	return dev->bus->msi->domain;
+
+We can at least get rid of the superfluous initialization of domain to
+NULL.
+
+Bjorn
