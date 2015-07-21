@@ -1,42 +1,46 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 21 Jul 2015 14:07:02 -0700
-Subject: [Patch v3 5/5] ARM: tegra: enable NAND flash on Colibri T20
-In-Reply-To: <1431282602-7137-6-git-send-email-dev@lynxeye.de>
-References: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
- <1431282602-7137-6-git-send-email-dev@lynxeye.de>
-Message-ID: <20150721210702.GM24125@google.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 21 Jul 2015 14:05:42 -0700
+Subject: [GIT PULL] Samsung 1st fixes for v4.2
+In-Reply-To: <55ADBF14.30304@kernel.org>
+References: <55ADBF14.30304@kernel.org>
+Message-ID: <20150721210542.GA13353@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 10, 2015 at 08:30:02PM +0200, Lucas Stach wrote:
-> This enables the on-module ONFI conformant NAND flash.
+Hi Kukjin,
+
+On Tue, Jul 21, 2015 at 12:40:04PM +0900, Kukjin Kim wrote:
+> Hi,
 > 
-> Signed-off-by: Lucas Stach <dev@lynxeye.de>
-> ---
->  arch/arm/boot/dts/tegra20-colibri-512.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+> Please pull samsung fixes for v4.2.
 > 
-> diff --git a/arch/arm/boot/dts/tegra20-colibri-512.dtsi b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-> index 8e0066a..540b3fd 100644
-> --- a/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-> +++ b/arch/arm/boot/dts/tegra20-colibri-512.dtsi
-> @@ -455,6 +455,13 @@
->  		};
->  	};
->  
-> +	nand at 70008000 {
-> +		status = "okay";
-> +		nand-bus-width = <8>;
-> +		nand-on-flash-bbt;
-> +		nvidia,wp-gpios = <&gpio TEGRA_GPIO(S, 0) GPIO_ACTIVE_HIGH>;
+> Thanks,
+> Kukjin
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-fixes-1
+> 
+> for you to fetch changes up to 300bde79f3d86b1af6fcde7b7b2439ecffccbff4:
+> 
+>   ARM: dts: add CPU OPP and regulator supply property for exynos4210
+> (2015-07-21 12:32:29 +0900)
 
-^^ Is write-protect support necessary, or just optional? b/c you didn't
-implement support in the NAND driver yet.
+Was there a reason you rebased Krzystztof's branch? The contents is identical.
 
-> +	};
-> +
->  	usb at c5004000 {
->  		status = "okay";
->  		nvidia,phy-reset-gpio = <&gpio TEGRA_GPIO(V, 1)
+In cases like those, feel free to just forward the pull request to us
+and we can do it directly. If you have more patches you want to add into
+the same fixes branch then you can just merge his in and apply yours on
+top. That's for example how Tony Lindgren tends to handle OMAP -- he'll
+forward a pull request from Paul Walmsley if that's the only contents
+he has.
 
-Brian
+Anyway, merged.
+
+
+-Olof
