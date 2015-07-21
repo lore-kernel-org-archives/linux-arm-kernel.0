@@ -1,212 +1,125 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Tue, 21 Jul 2015 16:56:45 +0800
-Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
-Message-ID: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 21 Jul 2015 10:09:10 +0100
+Subject: [PATCH v4 1/2] mfd: devicetree: add bindings for Atmel Flexcom
+In-Reply-To: <337ab4936bd6ec2f24c42e2f8f363df21f491a02.1434967670.git.cyrille.pitchen@atmel.com>
+References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
+ <337ab4936bd6ec2f24c42e2f8f363df21f491a02.1434967670.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150721090910.GG3061@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add power management suspend/resume support for the fsl-edma
-driver.
+On Mon, 22 Jun 2015, Cyrille Pitchen wrote:
 
-eDMA acted as a basic function used by others. What it needs to do is
-the two steps below to support power management.
+> This patch documents the DT bindings for the Atmel Flexcom which will be
+> introduced by sama5d2x SoCs. These bindings will be used by the actual Flexcom
+> driver to be sent in another patch.
+> 
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 58 ++++++++++++++++++++++
+>  1 file changed, 58 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> new file mode 100644
+> index 0000000..38f0e43
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> @@ -0,0 +1,58 @@
+> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
+> +
+> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
+> +controller and an USART. Only one function can be used at a time and is chosen
+> +at boot time according to the device tree.
+> +
+> +Required properties:
+> +- compatible: "atmel,sama5d2-flexcom"
+> +- reg: shall be the offset/length value for Flexcom dedicated I/O registers
+> +  (without USART, TWI or SPI registers).
+> +- clocks: shall be the Flexcom peripheral clock from PMC.
+> +- #address-cells: should be <1>
+> +- #size-cells: should be <1>
+> +- ranges: one range for the full I/O register region (including USART, TWI and
+> +  SPI registers)
+> +- atmel,flexcom-mode: shall be a string among { "spi", "usart", "i2c", "twi" }.
+> +  "i2c" and "twi" are synonymous.
 
-In fsl_edma_suspend_late:
-Check whether the DMA chan is idle and if it is not idle, stop PM
-operation.
+Please use a numerical value instead.  You can then define it in
+include/dt-bindings/*
 
-In fsl_edma_resume_early:
-Enable the eDMA and wait for being used.
+This is only required if you supply more than one child node.  Is that
+the plan?  I ask because you only have one child node in the example
+below.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- drivers/dma/fsl-edma.c | 83 ++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 80 insertions(+), 3 deletions(-)
+This document is pretty hard to read.  Please line everything up
+nicely, so it's easy on the eye:
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 915eec3..cf8b06c 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -116,6 +116,10 @@
- 				BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
- 				BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
- 				BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
-+enum fsl_edma_pm_state {
-+	RUNNING = 0,
-+	SUSPENDED,
-+};
- 
- struct fsl_edma_hw_tcd {
- 	__le32	saddr;
-@@ -147,6 +151,9 @@ struct fsl_edma_slave_config {
- struct fsl_edma_chan {
- 	struct virt_dma_chan		vchan;
- 	enum dma_status			status;
-+	enum fsl_edma_pm_state		pm_state;
-+	bool				idle;
-+	u32				slave_id;
- 	struct fsl_edma_engine		*edma;
- 	struct fsl_edma_desc		*edesc;
- 	struct fsl_edma_slave_config	fsc;
-@@ -298,6 +305,7 @@ static int fsl_edma_terminate_all(struct dma_chan *chan)
- 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
- 	fsl_edma_disable_request(fsl_chan);
- 	fsl_chan->edesc = NULL;
-+	fsl_chan->idle = true;
- 	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
- 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
- 	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
-@@ -313,6 +321,7 @@ static int fsl_edma_pause(struct dma_chan *chan)
- 	if (fsl_chan->edesc) {
- 		fsl_edma_disable_request(fsl_chan);
- 		fsl_chan->status = DMA_PAUSED;
-+		fsl_chan->idle = true;
- 	}
- 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
- 	return 0;
-@@ -327,6 +336,7 @@ static int fsl_edma_resume(struct dma_chan *chan)
- 	if (fsl_chan->edesc) {
- 		fsl_edma_enable_request(fsl_chan);
- 		fsl_chan->status = DMA_IN_PROGRESS;
-+		fsl_chan->idle = false;
- 	}
- 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
- 	return 0;
-@@ -648,6 +658,7 @@ static void fsl_edma_xfer_desc(struct fsl_edma_chan *fsl_chan)
- 	fsl_edma_set_tcd_regs(fsl_chan, fsl_chan->edesc->tcd[0].vtcd);
- 	fsl_edma_enable_request(fsl_chan);
- 	fsl_chan->status = DMA_IN_PROGRESS;
-+	fsl_chan->idle = false;
- }
- 
- static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
-@@ -676,6 +687,7 @@ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
- 				vchan_cookie_complete(&fsl_chan->edesc->vdesc);
- 				fsl_chan->edesc = NULL;
- 				fsl_chan->status = DMA_COMPLETE;
-+				fsl_chan->idle = true;
- 			} else {
- 				vchan_cyclic_callback(&fsl_chan->edesc->vdesc);
- 			}
-@@ -704,6 +716,7 @@ static irqreturn_t fsl_edma_err_handler(int irq, void *dev_id)
- 			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch),
- 				fsl_edma->membase + EDMA_CERR);
- 			fsl_edma->chans[ch].status = DMA_ERROR;
-+			fsl_edma->chans[ch].idle = true;
- 		}
- 	}
- 	return IRQ_HANDLED;
-@@ -724,6 +737,12 @@ static void fsl_edma_issue_pending(struct dma_chan *chan)
- 
- 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
- 
-+	if (unlikely(fsl_chan->pm_state != RUNNING)) {
-+		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+		/* cannot submit due to suspend */
-+		return;
-+	}
-+
- 	if (vchan_issue_pending(&fsl_chan->vchan) && !fsl_chan->edesc)
- 		fsl_edma_xfer_desc(fsl_chan);
- 
-@@ -735,6 +754,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
- {
- 	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
- 	struct dma_chan *chan, *_chan;
-+	struct fsl_edma_chan *fsl_chan;
- 	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
- 
- 	if (dma_spec->args_count != 2)
-@@ -748,8 +768,10 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
- 			chan = dma_get_slave_channel(chan);
- 			if (chan) {
- 				chan->device->privatecnt++;
--				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
--					dma_spec->args[1], true);
-+				fsl_chan = to_fsl_edma_chan(chan);
-+				fsl_chan->slave_id = dma_spec->args[1];
-+				fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
-+						true);
- 				mutex_unlock(&fsl_edma->fsl_edma_mutex);
- 				return chan;
- 			}
-@@ -888,7 +910,9 @@ static int fsl_edma_probe(struct platform_device *pdev)
- 		struct fsl_edma_chan *fsl_chan = &fsl_edma->chans[i];
- 
- 		fsl_chan->edma = fsl_edma;
--
-+		fsl_chan->pm_state = RUNNING;
-+		fsl_chan->slave_id = 0;
-+		fsl_chan->idle = true;
- 		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
- 		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
- 
-@@ -959,6 +983,58 @@ static int fsl_edma_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static int fsl_edma_suspend_late(struct device *dev)
-+{
-+	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-+	struct fsl_edma_chan *fsl_chan;
-+	unsigned long flags;
-+	int i;
-+
-+	for (i = 0; i < fsl_edma->n_chans; i++) {
-+		fsl_chan = &fsl_edma->chans[i];
-+		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-+		/* Make sure chan is idle or can not into suspend. */
-+		if (unlikely(!fsl_chan->idle))
-+			goto out;
-+		fsl_chan->pm_state = SUSPENDED;
-+		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	}
-+	return 0;
-+
-+out:
-+	for (; i >= 0; i--) {
-+		fsl_chan = &fsl_edma->chans[i];
-+		fsl_chan->pm_state = RUNNING;
-+		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-+	}
-+	return -EBUSY;
-+}
-+
-+static int fsl_edma_resume_early(struct device *dev)
-+{
-+	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-+	struct fsl_edma_chan *fsl_chan;
-+	int i;
-+
-+	for (i = 0; i < fsl_edma->n_chans; i++) {
-+		fsl_chan = &fsl_edma->chans[i];
-+		fsl_chan->pm_state = RUNNING;
-+		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
-+		if (fsl_chan->slave_id != 0)
-+			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-+	}
-+
-+	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-+			fsl_edma->membase + EDMA_CR);
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops fsl_edma_pm_ops = {
-+	.suspend_late   = fsl_edma_suspend_late,
-+	.resume_early   = fsl_edma_resume_early,
-+};
-+
- static const struct of_device_id fsl_edma_dt_ids[] = {
- 	{ .compatible = "fsl,vf610-edma", },
- 	{ /* sentinel */ }
-@@ -969,6 +1045,7 @@ static struct platform_driver fsl_edma_driver = {
- 	.driver		= {
- 		.name	= "fsl-edma",
- 		.of_match_table = fsl_edma_dt_ids,
-+		.pm     = &fsl_edma_pm_ops,
- 	},
- 	.probe          = fsl_edma_probe,
- 	.remove		= fsl_edma_remove,
+- compatible: 	      "atmel,sama5d2-flexcom"
+- reg: 		      shall be the offset/length value for Flexcom dedicated I/O registers
+  		      (without USART, TWI or SPI registers).
+- clocks: 	      shall be the Flexcom peripheral clock from PMC.
+- #address-cells:     should be <1>
+- #size-cells: 	      should be <1>
+- ranges: 	      one range for the full I/O register region (including USART, TWI and
+  		      SPI registers)
+- atmel,flexcom-mode: shall be a string among { "spi", "usart", "i2c", "twi" }.
+  		      "i2c" and "twi" are synonymous.
+
+> +Required child:
+> +a child device of type matching the "atmel,flexcom-mode" property.
+> +The reg property of this child should be:
+> +- <0x200 0x200> for USART
+> +- <0x400 0x200> for SPI
+> +- <0x600 0x200> for I2C
+> +
+> +The phandle provided by the clocks property of the child is the same as one for
+> +the Flexcom parent.
+> +Other properties remain unchanged. See documentation of the respective device.
+
+Please point to the other documentation.
+
+../uart/<blah>
+../spi/<blah>
+../i2c/<blah>
+
+> +Example:
+> +
+> +flx0: flexcom at f8034000 {
+
+What references this node?  If nothing, then you can remove the label.
+
+> +	compatible = "atmel,sama5d2-flexcom";
+> +	reg = <0xf8034000 0x200>;
+> +	clocks = <&flx0_clk>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges = <0x0 0xf8034000 0x800>;
+> +	atmel,flexcom-mode = "spi";
+> +
+> +	spi at f8034400 {
+> +		compatible = "atmel,at91rm9200-spi";
+> +		reg = <0x400 0x200>;
+> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_flx0_ioset1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		clocks = <&flx0_clk>;
+> +		clock-names = "spi_clk";
+> +		atmel,fifo-size = <32>;
+> +
+> +		mtd_dataflash at 0 {
+> +			compatible = "atmel,at25f512b";
+> +			reg = <0>;
+> +			spi-max-frequency = <20000000>;
+> +		};
+> +	};
+> +};
+
 -- 
-2.1.0.27.g96db324
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
