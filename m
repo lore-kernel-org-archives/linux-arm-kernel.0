@@ -1,71 +1,80 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 21 Jul 2015 15:50:51 +0200
-Subject: [RFC PATCH 09/16] Add DEVM_GPIO_NAMED()
+Date: Tue, 21 Jul 2015 15:50:52 +0200
+Subject: [RFC PATCH 10/16] Add DEVM_REGULATOR()
 In-Reply-To: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1437486658-28365-10-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1437486658-28365-11-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
- drivers/gpio/devres.c         | 16 ++++++++++++++++
- include/linux/gpio/consumer.h | 11 +++++++++++
- 2 files changed, 27 insertions(+)
+ drivers/regulator/devres.c         | 18 ++++++++++++++++++
+ include/linux/regulator/consumer.h | 10 ++++++++++
+ 2 files changed, 28 insertions(+)
 
-diff --git a/drivers/gpio/devres.c b/drivers/gpio/devres.c
-index 07ba82317ece..b1e7a51ff72d 100644
---- a/drivers/gpio/devres.c
-+++ b/drivers/gpio/devres.c
-@@ -390,3 +390,19 @@ void devm_gpio_free(struct device *dev, unsigned int gpio)
- 		&gpio));
+diff --git a/drivers/regulator/devres.c b/drivers/regulator/devres.c
+index 6ec1d400adae..ff1328ca8fd6 100644
+--- a/drivers/regulator/devres.c
++++ b/drivers/regulator/devres.c
+@@ -15,7 +15,9 @@
+ #include <linux/regmap.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/driver.h>
++#include <linux/regulator/of_regulator.h>
+ #include <linux/module.h>
++#include <linux/of_platform.h>
+ 
+ #include "internal.h"
+ 
+@@ -498,3 +500,19 @@ void devm_regulator_unregister_notifier(struct regulator *regulator,
+ 		WARN_ON(rc);
  }
- EXPORT_SYMBOL(devm_gpio_free);
+ EXPORT_SYMBOL_GPL(devm_regulator_unregister_notifier);
 +
-+int devm_acquire_gpio_named(struct device *dev,
-+			    const struct devm_resource *resource)
++int devm_acquire_regulator(struct device *dev,
++			   const struct devm_resource *resource)
 +{
-+	struct gpio_desc *desc, **descp;
++	struct regulator *regulator, **regulatorp;
 +
-+	desc = devm_get_gpiod_from_child(dev, resource->name, dev->fwnode);
-+	if (IS_ERR(desc))
-+		return PTR_ERR(desc);
++	regulator = devm_regulator_get(dev, resource->name);
++	if (IS_ERR(regulator))
++		return PTR_ERR(regulator);
 +
-+	descp = dev_get_drvdata(dev) + resource->offset;
-+	*descp = desc;
++	regulatorp = dev_get_drvdata(dev) + resource->offset;
++	*regulatorp = regulator;
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL(devm_acquire_gpio_named);
-diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-index adac255aee86..df868f7c4dc7 100644
---- a/include/linux/gpio/consumer.h
-+++ b/include/linux/gpio/consumer.h
-@@ -6,6 +6,7 @@
- #include <linux/kernel.h>
++EXPORT_SYMBOL(devm_acquire_regulator);
+diff --git a/include/linux/regulator/consumer.h b/include/linux/regulator/consumer.h
+index 2ba4a40919c8..ece4f076f7e3 100644
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -38,6 +38,7 @@
+ #include <linux/err.h>
  
  struct device;
 +struct devm_resource;
+ struct notifier_block;
+ struct regmap;
  
- /**
-  * Opaque descriptor for a GPIO. These are obtained using gpiod_get() and are
-@@ -139,6 +140,16 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
- struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
- 					    const char *con_id,
- 					    struct fwnode_handle *child);
+@@ -173,6 +174,15 @@ struct regulator *__must_check devm_regulator_get_optional(struct device *dev,
+ void regulator_put(struct regulator *regulator);
+ void devm_regulator_put(struct regulator *regulator);
+ 
++int devm_acquire_regulator(struct device *dev,
++			   const struct devm_resource *resource);
 +
-+int devm_acquire_gpio_named(struct device *dev,
-+			    const struct devm_resource *resource);
-+
-+#define DEVM_GPIO_NAMED(_struct, _member, _name) {			\
-+	.initfunc = devm_acquire_gpio_named,				\
-+	.offset = offsetof_t(struct _struct, _member, struct gpio_desc *),\
++#define DEVM_REGULATOR(_struct, _member, _name) {			\
++	.initfunc = devm_acquire_regulator,				\
++	.offset = offsetof_t(struct _struct, _member, struct regulator *),\
 +	.name = _name,							\
 +}
 +
- #else /* CONFIG_GPIOLIB */
- 
- static inline int gpiod_count(struct device *dev, const char *con_id)
+ int regulator_register_supply_alias(struct device *dev, const char *id,
+ 				    struct device *alias_dev,
+ 				    const char *alias_id);
 -- 
 2.4.3
