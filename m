@@ -1,31 +1,27 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 21 Jul 2015 16:53:52 +0200
-Subject: [PATCH v2 0/2] ARM: orion5x: DTS support for Linkstation LS-WTGL
-In-Reply-To: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
-References: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <20150721145352.GI21011@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 21 Jul 2015 16:01:22 +0100
+Subject: [RFC PATCH 3/4] iommu/arm-smmu: Add support for specifying clocks
+In-Reply-To: <1437152005-25092-4-git-send-email-sricharan@codeaurora.org>
+References: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
+ <1437152005-25092-4-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20150721150122.GH31095@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 11:49:15PM +0900, Roger Shimizu wrote:
-> Dear Orion5x Maintainer,
+On Fri, Jul 17, 2015 at 05:53:24PM +0100, Sricharan R wrote:
+> From: Mitchel Humpherys <mitchelh@codeaurora.org>
 > 
-> I'd like to add DTS support for a bit older linkstation orion5x device, LS-WTGL.
-> I have tested againt latest kernel next/dt branch on my box and it works fine.
-> Please consider to merge. Thank you!
-> 
-> Changelog(v2):
-> - remove commented lines in DTS
-> - use GPL/X11 dual license
-> - some changes in orion5x_defconfig
+> On some platforms with tight power constraints it is polite to only
+> leave your clocks on for as long as you absolutely need them. Currently
+> we assume that all clocks necessary for SMMU register access are always
+> on.
 
-Hi Roger
+You've borrowed this commit message from Mitch's previous version of
+this patch, but now you leave the clocks enabled most of the time so it
+doesn't make much sense anymore.
 
-Thanks for the respin.
+Anyway, I'm OK with this kind of clock management in the driver, but I
+think that anything more fine-grained needs to be designed into the IOMMU
+core.
 
-Acked-by: Andrew Lunn <andrew@lunn.ch>
-
-Don't be too worried if it takes time to get merged. People are on
-vacation at the moment. But it should get into 4.3.
-
-	 Andrew
+Will
