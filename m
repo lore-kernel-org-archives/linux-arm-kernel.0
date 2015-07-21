@@ -1,97 +1,212 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Jul 2015 12:36:27 +0200
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
-Message-ID: <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 21 Jul 2015 11:52:00 +0100
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+ (Sascha Hauer's message of "Tue, 21 Jul 2015 09:21:32 +0200")
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <9hhk2tteqb3.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 17, 2015 at 11:32 PM, Andrey Ryabinin
-<ryabinin.a.a@gmail.com> wrote:
-> 2015-06-13 18:25 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->>
->> On Fri, Jun 12, 2015 at 8:14 PM, Andrey Ryabinin <ryabinin.a.a@gmail.com> wrote:
->> > 2015-06-11 16:39 GMT+03:00 Linus Walleij <linus.walleij@linaro.org>:
->> >> On Fri, May 15, 2015 at 3:59 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
->> >>
->> >>> This patch adds arch specific code for kernel address sanitizer
->> >>> (see Documentation/kasan.txt).
->> >>
->> >> I looked closer at this again ... I am trying to get KASan up for
->> >> ARM(32) with some tricks and hacks.
->> >>
->> >
->> > I have some patches for that. They still need some polishing, but works for me.
->> > I could share after I get back to office on Tuesday.
->>
->> OK! I'd be happy to test!
->>
+Hi Sascha,
+
+Sascha Hauer <s.hauer@pengutronix.de> writes:
+
+> The thermal code uses int, long and unsigned long for temperatures
+> in different places.
 >
-> I've pushed it here : git://github.com/aryabinin/linux.git kasan/arm_v0
+> Using an unsigned type limits the thermal framework to positive
+> temperatures without need. Also several drivers currently will report
+> temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> immediately shut the machine down due to overtemperature if started below
+> 0?C.
 >
-> It far from ready. Firstly I've tried it only in qemu and it works.
+> 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
+> is above the melting point of all known materials.
+>
+> Consistently use a plain 'int' for temperatures throughout the thermal code and
+> the drivers. This only changes the places in the drivers where the temperature
+> is passed around as pointer, when drivers internally use another type this is
+> not changed.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reviewed-by: Jean Delvare <jdelvare@suse.de>
+> Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
+> Reviewed-by: Darren Hart <dvhart@linux.intel.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Reviewed-by: Peter Feuerer <peter@piie.net>
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
 
-Hm what QEMU model are you using? I tried to test it with Versatile
-(the most common) and it kinda boots and hangs:
+The changes below look good.
 
-Memory: 106116K/131072K available (3067K kernel code, 166K rwdata,
-864K rodata, 3072K init, 130K bss, 24956K reserved, 0K cma-reserved)
-Virtual kernel memory layout:
-    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-    fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
-    kasan   : 0x9f000000 - 0xbf000000   ( 512 MB)
-    vmalloc : 0xc8800000 - 0xff000000   ( 872 MB)
-(...)
+For the power_allocator governor and corresponding trace events,
 
-Looks correct, no highmem on this beast.
+Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
 
-Then I get this.
+Thanks
 
-Unable to handle kernel NULL pointer dereference at virtual address 00000130
-pgd = c5ea8000
-[00000130] *pgd=00000000
-Internal error: Oops: 5 [#1] ARM
-Modules linked in:
-CPU: 0 PID: 19 Comm: modprobe Not tainted 4.1.0-rc8+ #7
-Hardware name: ARM-Versatile (Device Tree Support)
-task: c5e0b5a0 ti: c5ea0000 task.ti: c5ea0000
-PC is at v4wbi_flush_user_tlb_range+0x10/0x4c
-LR is at move_page_tables+0x218/0x308
-pc : [<c001e870>]    lr : [<c008f230>]    psr: 20000153
-sp : c5ea7df0  ip : c5e8c000  fp : ff8ec000
-r10: 00bf334f  r9 : c5ead3b0  r8 : 9e8ec000
-r7 : 00000001  r6 : 00002000  r5 : 9f000000  r4 : 9effe000
-r3 : 00000000  r2 : c5e8a000  r1 : 9f000000  r0 : 9effe000
-Flags: nzCv  IRQs on  FIQs off  Mode SVC_32  ISA ARM  Segment user
-Control: 00093177  Table: 05ea8000  DAC: 00000015
-Process modprobe (pid: 19, stack limit = 0xc5ea0190)
-Stack: (0xc5ea7df0 to 0xc5ea8000)
-7de0:                                     00000000 9f000000 c5e8a000 00000000
-7e00: 00000000 00000000 c5e8a000 9effe000 000000c0 c5e8a000 c68c5700 9e8ec000
-7e20: c5e8c034 9effe000 9e8ea000 9f000000 00002000 c00a9384 00002000 00000000
-7e40: c5e8c000 00000000 00000000 c5e8a000 00000000 00000000 00000000 00000000
-7e60: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-7e80: c5e870e0 5e5e8830 c0701808 00000013 c5ea7ec0 c5eac000 c5e870e0 c5e26140
-7ea0: c68c5700 00000000 c5ea7ec0 c5eac000 c5e870e0 c6a2d8c0 00000001 c00e4530
-7ec0: c68c5700 00000080 c5df2480 9f000000 00000000 c5ea0000 0000000a c00a99ec
-7ee0: 00000017 c5ea7ef4 00000000 00000000 00000000 c7f10e60 c0377bc0 c0bf3f99
-7f00: 0000000f 00000000 00000000 c00a9c28 9efff000 c06fa2c8 c68c5700 c06f9eb8
-7f20: 00000001 fffffff8 c68c5700 00000000 00000001 c00a9770 c5e0b5a0 00000013
-7f40: c5e87ee0 c06ef0c8 c6a60000 c00aabd0 c5e8c034 00000000 00000000 c5e0b790
-7f60: c06e8190 c5ddcc60 c5d4c300 0000003f ffffffff 00000000 00000000 00000000
-7f80: 00000000 c00aad00 00000000 00000000 00000000 c0030f48 c5d4c300 c0030e54
-7fa0: 00000000 00000000 00000000 c0014960 00000000 00000000 00000000 00000000
-7fc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
-7fe0: 00000000 00000000 00000000 00000000 00000013 00000000 00000000 00000000
-[<c001e870>] (v4wbi_flush_user_tlb_range) from [<00000000>] (  (null))
-Code: e592c020 e3cd3d7f e3c3303f e593300c (e5933130)
----[ end trace b3c4eba35670ba77 ]---
+> Cc: Zhang Rui <rui.zhang@intel.com>
+> Cc: Eduardo Valentin <edubezval@gmail.com>
+> Cc: linux-pm at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: Jean Delvare <jdelvare@suse.de>
+> Cc: Peter Feuerer <peter@piie.net>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Lukasz Majewski <l.majewski@samsung.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-acpi at vger.kernel.org
+> Cc: platform-driver-x86 at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Darren Hart <dvhart@infradead.org>
+> Cc: lm-sensors at lm-sensors.org
+> ---
+>
+> changes since v1:
+> - Add missing pieces for power_allocator driver 
+>
+>  drivers/acpi/thermal.c                             | 12 +++++-----
+>  drivers/hwmon/lm75.c                               |  2 +-
+>  drivers/hwmon/ntc_thermistor.c                     |  2 +-
+>  drivers/hwmon/tmp102.c                             |  2 +-
+>  drivers/input/touchscreen/sun4i-ts.c               |  8 +++----
+>  drivers/platform/x86/acerhdf.c                     |  9 ++++----
+>  drivers/platform/x86/intel_mid_thermal.c           |  9 ++++----
+>  drivers/power/power_supply_core.c                  |  2 +-
+>  drivers/thermal/armada_thermal.c                   |  2 +-
+>  drivers/thermal/db8500_thermal.c                   |  7 +++---
+>  drivers/thermal/dove_thermal.c                     |  2 +-
+>  drivers/thermal/fair_share.c                       |  2 +-
+>  drivers/thermal/gov_bang_bang.c                    |  5 ++--
+>  drivers/thermal/hisi_thermal.c                     |  4 ++--
+>  drivers/thermal/imx_thermal.c                      | 27 +++++++++++-----------
+>  drivers/thermal/int340x_thermal/int3400_thermal.c  |  2 +-
+>  .../thermal/int340x_thermal/int340x_thermal_zone.c | 10 ++++----
+>  .../thermal/int340x_thermal/int340x_thermal_zone.h |  8 +++----
+>  .../int340x_thermal/processor_thermal_device.c     |  4 ++--
+>  drivers/thermal/intel_quark_dts_thermal.c          | 13 +++++------
+>  drivers/thermal/intel_soc_dts_iosf.c               |  8 +++----
+>  drivers/thermal/kirkwood_thermal.c                 |  2 +-
+>  drivers/thermal/of-thermal.c                       | 14 +++++------
+>  drivers/thermal/power_allocator.c                  | 16 ++++++-------
+>  drivers/thermal/qcom-spmi-temp-alarm.c             |  2 +-
+>  drivers/thermal/rcar_thermal.c                     |  7 +++---
+>  drivers/thermal/rockchip_thermal.c                 | 10 ++++----
+>  drivers/thermal/samsung/exynos_tmu.c               | 23 +++++++++---------
+>  drivers/thermal/spear_thermal.c                    |  2 +-
+>  drivers/thermal/st/st_thermal.c                    |  5 ++--
+>  drivers/thermal/step_wise.c                        |  4 ++--
+>  drivers/thermal/tegra_soctherm.c                   |  4 ++--
+>  drivers/thermal/thermal_core.c                     | 26 ++++++++++-----------
+>  drivers/thermal/thermal_hwmon.c                    | 10 ++++----
+>  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 10 ++++----
+>  drivers/thermal/x86_pkg_temp_thermal.c             | 10 ++++----
+>  include/linux/thermal.h                            | 26 +++++++++------------
+>  include/trace/events/thermal_power_allocator.h     |  6 ++---
+>  38 files changed, 151 insertions(+), 166 deletions(-)
+>
 
-Yours,
-Linus Walleij
+[...]
+
+> diff --git a/drivers/thermal/power_allocator.c b/drivers/thermal/power_allocator.c
+> index 4672250..045aea59 100644
+> --- a/drivers/thermal/power_allocator.c
+> +++ b/drivers/thermal/power_allocator.c
+> @@ -92,8 +92,8 @@ struct power_allocator_params {
+>   * Return: The power budget for the next period.
+>   */
+>  static u32 pid_controller(struct thermal_zone_device *tz,
+> -			  unsigned long current_temp,
+> -			  unsigned long control_temp,
+> +			  int current_temp,
+> +			  int control_temp,
+>  			  u32 max_allocatable_power)
+>  {
+>  	s64 p, i, d, power_range;
+> @@ -102,7 +102,7 @@ static u32 pid_controller(struct thermal_zone_device *tz,
+>  
+>  	max_power_frac = int_to_frac(max_allocatable_power);
+>  
+> -	err = ((s32)control_temp - (s32)current_temp);
+> +	err = control_temp - current_temp;
+>  	err = int_to_frac(err);
+>  
+>  	/* Calculate the proportional term */
+> @@ -223,8 +223,8 @@ static void divvy_up_power(u32 *req_power, u32 *max_power, int num_actors,
+>  }
+>  
+>  static int allocate_power(struct thermal_zone_device *tz,
+> -			  unsigned long current_temp,
+> -			  unsigned long control_temp)
+> +			  int current_temp,
+> +			  int control_temp)
+>  {
+>  	struct thermal_instance *instance;
+>  	struct power_allocator_params *params = tz->governor_data;
+> @@ -326,7 +326,7 @@ static int allocate_power(struct thermal_zone_device *tz,
+>  				      granted_power, total_granted_power,
+>  				      num_actors, power_range,
+>  				      max_allocatable_power, current_temp,
+> -				      (s32)control_temp - (s32)current_temp);
+> +				      control_temp - current_temp);
+>  
+>  	devm_kfree(&tz->device, req_power);
+>  unlock:
+> @@ -411,7 +411,7 @@ static int power_allocator_bind(struct thermal_zone_device *tz)
+>  {
+>  	int ret;
+>  	struct power_allocator_params *params;
+> -	unsigned long switch_on_temp, control_temp;
+> +	int switch_on_temp, control_temp;
+>  	u32 temperature_threshold;
+>  
+>  	if (!tz->tzp || !tz->tzp->sustainable_power) {
+> @@ -476,7 +476,7 @@ static void power_allocator_unbind(struct thermal_zone_device *tz)
+>  static int power_allocator_throttle(struct thermal_zone_device *tz, int trip)
+>  {
+>  	int ret;
+> -	unsigned long switch_on_temp, control_temp, current_temp;
+> +	int switch_on_temp, control_temp, current_temp;
+>  	struct power_allocator_params *params = tz->governor_data;
+>  
+>  	/*
+
+[...]
+
+> diff --git a/include/trace/events/thermal_power_allocator.h b/include/trace/events/thermal_power_allocator.h
+> index 12e1321..5afae8f 100644
+> --- a/include/trace/events/thermal_power_allocator.h
+> +++ b/include/trace/events/thermal_power_allocator.h
+> @@ -11,7 +11,7 @@ TRACE_EVENT(thermal_power_allocator,
+>  		 u32 total_req_power, u32 *granted_power,
+>  		 u32 total_granted_power, size_t num_actors,
+>  		 u32 power_range, u32 max_allocatable_power,
+> -		 unsigned long current_temp, s32 delta_temp),
+> +		 int current_temp, s32 delta_temp),
+>  	TP_ARGS(tz, req_power, total_req_power, granted_power,
+>  		total_granted_power, num_actors, power_range,
+>  		max_allocatable_power, current_temp, delta_temp),
+> @@ -24,7 +24,7 @@ TRACE_EVENT(thermal_power_allocator,
+>  		__field(size_t,        num_actors               )
+>  		__field(u32,           power_range              )
+>  		__field(u32,           max_allocatable_power    )
+> -		__field(unsigned long, current_temp             )
+> +		__field(int,           current_temp             )
+>  		__field(s32,           delta_temp               )
+>  	),
+>  	TP_fast_assign(
+> @@ -42,7 +42,7 @@ TRACE_EVENT(thermal_power_allocator,
+>  		__entry->delta_temp = delta_temp;
+>  	),
+>  
+> -	TP_printk("thermal_zone_id=%d req_power={%s} total_req_power=%u granted_power={%s} total_granted_power=%u power_range=%u max_allocatable_power=%u current_temperature=%lu delta_temperature=%d",
+> +	TP_printk("thermal_zone_id=%d req_power={%s} total_req_power=%u granted_power={%s} total_granted_power=%u power_range=%u max_allocatable_power=%u current_temperature=%d delta_temperature=%d",
+>  		__entry->tz_id,
+>  		__print_array(__get_dynamic_array(req_power),
+>                                __entry->num_actors, 4),
