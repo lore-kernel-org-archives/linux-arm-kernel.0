@@ -1,30 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Jul 2015 23:27:56 +0200
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <55AE56DB.4040607@samsung.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
- <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
- <55AE56DB.4040607@samsung.com>
-Message-ID: <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 16:30:29 -0500
+Subject: [PATCH v4 05/19] PCI/MSI: of: Add support for OF-provided
+ msi_domain
+In-Reply-To: <1436962613-17359-6-git-send-email-marc.zyngier@arm.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150721213029.GJ21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 4:27 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
+On Wed, Jul 15, 2015 at 01:16:39PM +0100, Marc Zyngier wrote:
+> In order to populate the PHB msi_domain, use the "msi-parent"
+> attribute to lookup a corresponding irq domain. If found,
+> this is our MSI domain.
+> 
+> This gets plugged into the core PCI code.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/pci/of.c    | 19 +++++++++++++++++++
+>  drivers/pci/probe.c |  1 +
+>  include/linux/pci.h |  2 ++
+>  3 files changed, 22 insertions(+)
+> 
+> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+> index f092993..09df465 100644
+> --- a/drivers/pci/of.c
+> +++ b/drivers/pci/of.c
+> @@ -9,6 +9,7 @@
+>   * 2 of the License, or (at your option) any later version.
+>   */
+>  
+> +#include <linux/irqdomain.h>
+>  #include <linux/kernel.h>
+>  #include <linux/pci.h>
+>  #include <linux/of.h>
+> @@ -59,3 +60,21 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
+>  		return of_node_get(bus->bridge->parent->of_node);
+>  	return NULL;
+>  }
+> +
+> +void pci_set_phb_of_msi_domain(struct pci_bus *bus)
+> +{
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> +	struct device_node *np;
+> +	struct irq_domain *d;
+> +
+> +	if (!bus->dev.of_node)
+> +		return;
+> +	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
+> +	if (!np)
+> +		return;
+> +	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
+> +	if (!d)
+> +		d = irq_find_host(np);
+> +	dev_set_msi_domain(&bus->dev, d);
+> +#endif
+> +}
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 376f6fa..c80626f 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -663,6 +663,7 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+>  
+>  void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
+>  {
+> +	pci_set_phb_of_msi_domain(bus);
 
-> I used vexpress. Anyway, it doesn't matter now, since I have an update
-> with a lot of stuff fixed, and it works on hardware.
-> I still need to do some work on it and tomorrow, probably, I will share.
-
-Ah awesome. I have a stash of ARM boards so I can test it on a
-range of hardware once you feel it's ready.
-
-Sorry for pulling stuff out of your hands, people are excited about
-KASan ARM32 as it turns out.
-
-Yours,
-Linus Walleij
+The code itself is OK with me, but "phb" is an abbreviation that we haven't
+really been using in the PCI core, so I'd prefer something else.  Maybe
+"pci_set_host_of_msi_domain()"?  Or even (for symmetry with the pcibios
+function), "pci_set_host_bridge_of_msi_domain()", although that is getting
+pretty wordy?
