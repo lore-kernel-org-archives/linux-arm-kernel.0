@@ -1,204 +1,189 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 21 Jul 2015 10:34:20 +0100
-Subject: [PATCH V3 07/19] soc: tegra: pmc: Wait for powergate state to
- change
-In-Reply-To: <20150717101658.GK3057@ulmo>
+Date: Tue, 21 Jul 2015 10:38:32 +0100
+Subject: [PATCH V3 08/19] soc: tegra: pmc: Clean-up PMC helper functions
+In-Reply-To: <20150717102546.GL3057@ulmo>
 References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-8-git-send-email-jonathanh@nvidia.com>
- <20150717101658.GK3057@ulmo>
-Message-ID: <55AE121C.8000207@nvidia.com>
+ <1436791197-32358-9-git-send-email-jonathanh@nvidia.com>
+ <20150717102546.GL3057@ulmo>
+Message-ID: <55AE1318.4030503@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 17/07/15 11:17, Thierry Reding wrote:
+On 17/07/15 11:25, Thierry Reding wrote:
 > * PGP Signed by an unknown key
 > 
-> On Mon, Jul 13, 2015 at 01:39:45PM +0100, Jon Hunter wrote:
->> Currently, the function tegra_powergate_set() simply sets the desired
->> powergate state but does not wait for the state to change. In some
->> circumstances this can be desirable. However, in most cases we should
->> wait for the state to change before proceeding. Therefore, add a
->> parameter to tegra_powergate_set() to indicate whether we should wait
->> for the state to change.
+> On Mon, Jul 13, 2015 at 01:39:46PM +0100, Jon Hunter wrote:
+>> The following clean-ups have been made to the PMC code:
 >>
->> By adding this feature, we can also eliminate the polling loop from
->> tegra30_boot_secondary().
+>> 1. Add a macro for determining the state of a PMC powergate
+>> 2. Use the readx_poll_timeout() function instead of implementing a local
+>>    polling loop with a timeout.
+>> 3. Use a case-statement in the function that removes the powergate clamp
+>>    instead of multiple if-statements to improve readability.
 >>
 >> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 >> ---
->>  arch/arm/mach-tegra/platsmp.c | 18 ++++--------------
->>  drivers/soc/tegra/pmc.c       | 29 +++++++++++++++++++++++------
->>  include/soc/tegra/pmc.h       |  2 +-
->>  3 files changed, 28 insertions(+), 21 deletions(-)
+>>  drivers/soc/tegra/pmc.c | 72 ++++++++++++++++++++++++-------------------------
+>>  1 file changed, 35 insertions(+), 37 deletions(-)
 >>
->> diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
->> index b45086666648..13982b5936c0 100644
->> --- a/arch/arm/mach-tegra/platsmp.c
->> +++ b/arch/arm/mach-tegra/platsmp.c
->> @@ -108,19 +108,9 @@ static int tegra30_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  	 * be un-gated by un-toggling the power gate register
->>  	 * manually.
->>  	 */
->> -	if (!tegra_pmc_cpu_is_powered(cpu)) {
->> -		ret = tegra_pmc_cpu_power_on(cpu);
->> -		if (ret)
->> -			return ret;
->> -
->> -		/* Wait for the power to come up. */
->> -		timeout = jiffies + msecs_to_jiffies(100);
->> -		while (!tegra_pmc_cpu_is_powered(cpu)) {
->> -			if (time_after(jiffies, timeout))
->> -				return -ETIMEDOUT;
->> -			udelay(10);
->> -		}
->> -	}
->> +	ret = tegra_pmc_cpu_power_on(cpu, true);
->> +	if (ret)
->> +		return ret;
->>  
->>  remove_clamps:
->>  	/* CPU partition is powered. Enable the CPU clock. */
->> @@ -162,7 +152,7 @@ static int tegra114_boot_secondary(unsigned int cpu, struct task_struct *idle)
->>  		 * also initial power state in flow controller. After that,
->>  		 * the CPU's power state is maintained by flow controller.
->>  		 */
->> -		ret = tegra_pmc_cpu_power_on(cpu);
->> +		ret = tegra_pmc_cpu_power_on(cpu, false);
->>  	}
->>  
->>  	return ret;
 >> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
->> index 300f11e0c3bb..c0635bdd4ee3 100644
+>> index c0635bdd4ee3..180d434deec5 100644
 >> --- a/drivers/soc/tegra/pmc.c
 >> +++ b/drivers/soc/tegra/pmc.c
->> @@ -175,9 +175,11 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
->>   * @id: partition ID
->>   * @new_state: new state of the partition
+>> @@ -28,6 +28,7 @@
+>>  #include <linux/export.h>
+>>  #include <linux/init.h>
+>>  #include <linux/io.h>
+>> +#include <linux/iopoll.h>
+>>  #include <linux/of.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/platform_device.h>
+>> @@ -56,6 +57,8 @@
+>>  #define  PWRGATE_TOGGLE_START		(1 << 8)
+>>  
+>>  #define REMOVE_CLAMPING			0x34
+>> +#define  REMOVE_CLAMPING_VDEC		(1 << 3)
+>> +#define  REMOVE_CLAMPING_PCIE		(1 << 4)
+>>  
+>>  #define PWRGATE_STATUS			0x38
+>>  
+>> @@ -101,6 +104,8 @@
+>>  
+>>  #define GPU_RG_CNTRL			0x2d4
+>>  
+>> +#define PMC_PWRGATE_STATE(val, id)	(!!(val & BIT(id)))
 > 
-> The comment here isn't updated.
+> I find double-negations very difficult to read. ((value & BIT(id)) != 0)
+> is clearer in my opinion. Also I'd suggest status or value as the first
+> parameter name, for consistency with other parts of the driver.
 > 
+>> +
+>>  struct tegra_pmc_soc {
+>>  	unsigned int num_powergates;
+>>  	const char *const *powergates;
+>> @@ -177,15 +182,14 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
 >>   */
->> -static int tegra_powergate_set(int id, bool new_state)
->> +static int tegra_powergate_set(int id, bool new_state, bool wait)
-> 
-> Can we please not chain boolean parameters, it makes the call sites
-> impossible to parse for humans. Instead, can we simply leave
-> tegra_powergate_set() as it is and add another function, such as
-> tegra_powergate_set_sync() or tegra_powergate_set_and_wait(), to achieve
-> the same? You may have to split out a tegra_powergate_set_unlocked() or
-> similar to make sure you get to keep the lock across both operations:
-> 
-> 	static int tegra_powergate_set_unlocked(int id, bool new_state)
-> 	{
-> 		...
-> 	}
-> 
-> 	static int tegra_powergate_set(int id, bool new_state)
-> 	{
-> 		int err;
-> 
-> 		mutex_lock(&pmc->powergates_lock);
-> 		err = tegra_powergate_set_unlocked(id, new_state);
-> 		mutex_unlock(&pmc->powergates_lock);
-> 
-> 		return err;
-> 	}
-> 
-> 	/*
-> 	 * Must be called with pmc->powergates_lock mutex held.
-> 	 */
-> 	static int tegra_powergate_wait(int id, bool new_state)
-> 	{
-> 		...
-> 	}
-> 
-> 	static int tegra_powergate_set_and_wait(int id, bool new_state)
-> 	{
-> 		int err;
-> 
-> 		mutex_lock(&pmc->powergates_lock);
-> 
-> 		err = tegra_powergate_set_unlocked(id, new_state);
-> 		if (err < 0)
-> 			goto unlock;
-> 
-> 		err = tegra_powergate_wait(id, new_state);
-> 		if (err < 0)
-> 			goto unlock;
-> 
-> 	unlock:
-> 		mutex_unlock(&pmc->powergates_lock);
-> 		return err;
-> 	}
-> 
+>>  static int tegra_powergate_set(int id, bool new_state, bool wait)
 >>  {
->> +	unsigned long timeout;
->>  	bool status;
->> +	int ret = 0;
+>> -	unsigned long timeout;
+>> -	bool status;
+>>  	int ret = 0;
+>> +	u32 val;
 >>  
 >>  	mutex_lock(&pmc->powergates_lock);
 >>  
->> @@ -190,9 +192,23 @@ static int tegra_powergate_set(int id, bool new_state)
+>> -	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+>> +	val = tegra_pmc_readl(PWRGATE_STATUS);
 >>  
+>> -	if (status == new_state) {
+>> +	if (PMC_PWRGATE_STATE(val, id) == new_state) {
+>>  		mutex_unlock(&pmc->powergates_lock);
+>>  		return 0;
+>>  	}
+>> @@ -193,17 +197,9 @@ static int tegra_powergate_set(int id, bool new_state, bool wait)
 >>  	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
 >>  
->> +	if (wait) {
->> +		timeout = jiffies + msecs_to_jiffies(100);
->> +		ret = -ETIMEDOUT;
->> +
->> +		while (time_before(jiffies, timeout)) {
->> +			status = !!(tegra_pmc_readl(PWRGATE_STATUS) & BIT(id));
->> +			if (status == new_state) {
->> +				ret = 0;
->> +				break;
->> +			}
->> +			udelay(10);
->> +		}
->> +	}
->> +
+>>  	if (wait) {
+>> -		timeout = jiffies + msecs_to_jiffies(100);
+>> -		ret = -ETIMEDOUT;
+>> -
+>> -		while (time_before(jiffies, timeout)) {
+>> -			status = !!(tegra_pmc_readl(PWRGATE_STATUS) & BIT(id));
+>> -			if (status == new_state) {
+>> -				ret = 0;
+>> -				break;
+>> -			}
+>> -			udelay(10);
+>> -		}
+>> +		ret = readx_poll_timeout(tegra_pmc_readl, PWRGATE_STATUS,
+>> +				val, PMC_PWRGATE_STATE(val, id) == new_state,
+>> +				10, 100000);
+>>  	}
+>>  
 >>  	mutex_unlock(&pmc->powergates_lock);
->>  
->> -	return 0;
->> +	return ret;
->>  }
->>  
->>  /**
->> @@ -204,7 +220,7 @@ int tegra_powergate_power_on(int id)
->>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->>  		return -EINVAL;
->>  
->> -	return tegra_powergate_set(id, true);
->> +	return tegra_powergate_set(id, true, true);
->>  }
->>  
->>  /**
->> @@ -216,7 +232,7 @@ int tegra_powergate_power_off(int id)
->>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->>  		return -EINVAL;
->>  
->> -	return tegra_powergate_set(id, false);
->> +	return tegra_powergate_set(id, false, true);
->>  }
->>  EXPORT_SYMBOL(tegra_powergate_power_off);
->>  
->> @@ -351,8 +367,9 @@ bool tegra_pmc_cpu_is_powered(int cpuid)
->>  /**
->>   * tegra_pmc_cpu_power_on() - power on CPU partition
->>   * @cpuid: CPU partition ID
->> + * @wait:  Wait for CPU state to transition
+>> @@ -242,13 +238,10 @@ EXPORT_SYMBOL(tegra_powergate_power_off);
 >>   */
->> -int tegra_pmc_cpu_power_on(int cpuid)
->> +int tegra_pmc_cpu_power_on(int cpuid, bool wait)
+>>  int tegra_powergate_is_powered(int id)
+>>  {
+>> -	u32 status;
+>> -
+>>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>>  		return -EINVAL;
+>>  
+>> -	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
+>> -	return !!status;
+>> +	return PMC_PWRGATE_STATE(tegra_pmc_readl(PWRGATE_STATUS), id);
 > 
-> This one is probably fine since it's the only boolean parameter so far.
-> That said, I see that we call this exactly twice, so I wonder if there'd
-> be any harm in having the second occurrence wait as well and hence get
-> rid of the parameter.
+> I'd prefer to keep the two steps here. As a general rule I try never to
+> mix reading or writing a register with other code on the same line.
+> 
+>>  }
+>>  
+>>  /**
+>> @@ -257,34 +250,39 @@ int tegra_powergate_is_powered(int id)
+>>   */
+>>  int tegra_powergate_remove_clamping(int id)
+>>  {
+>> -	u32 mask;
+>> +	u32 val, reg;
+> 
+> Side note: Please use value instead of val since that's the form used
+> elsewhere in the driver. Also reg would be more appropriately called
+> offset or similar because that's what it really is. It would also be
+> more naturally an unsized type, such as unsigned int. But...
+> 
+>>  
+>>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
+>>  		return -EINVAL;
+>>  
+>>  	/*
+>> -	 * On Tegra124 and later, the clamps for the GPU are controlled by a
+>> -	 * separate register (with different semantics).
+>> +	 * In most cases the bit for removing the IO clamping is the same as
+>> +	 * the powergate partition ID, however, this is not always the case.
+>> +	 * Furthermore, on Tegra124 and later, the clamps for the GPU are
+>> +	 * controlled by a separate register (with different semantics). The
+>> +	 * following case-statement handles these exceptions.
+>>  	 */
+>> -	if (id == TEGRA_POWERGATE_3D) {
+>> +	val = 1 << id;
+>> +	reg = REMOVE_CLAMPING;
+>> +
+>> +	switch (id) {
+>> +	case TEGRA_POWERGATE_3D:
+>>  		if (pmc->soc->has_gpu_clamps) {
+>> -			tegra_pmc_writel(0, GPU_RG_CNTRL);
+>> -			return 0;
+>> +			val = 0;
+>> +			reg  = GPU_RG_CNTRL;
+>>  		}
+>> +		break;
+>> +	case TEGRA_POWERGATE_VDEC:
+>> +		val = REMOVE_CLAMPING_VDEC;
+>> +		break;
+>> +	case TEGRA_POWERGATE_PCIE:
+>> +		val = REMOVE_CLAMPING_PCIE;
+>> +		break;
+>> +	default:
+>> +		break;
+>>  	}
+>>  
+>> -	/*
+>> -	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
+>> -	 * swapped relatively to the partition ids
+>> -	 */
+>> -	if (id == TEGRA_POWERGATE_VDEC)
+>> -		mask = (1 << TEGRA_POWERGATE_PCIE);
+>> -	else if (id == TEGRA_POWERGATE_PCIE)
+>> -		mask = (1 << TEGRA_POWERGATE_VDEC);
+>> -	else
+>> -		mask = (1 << id);
+>> -
+>> -	tegra_pmc_writel(mask, REMOVE_CLAMPING);
+>> +	tegra_pmc_writel(val, reg);
+> 
+> ... to be honest, I think the previous code was more straightforward, so
+> I'd prefer if you dropped this particular hunk.
 
-I would agree and think we should drop the 2nd parameter and just always
-wait. This is only done at boot time and so would only add a little
-delay at that point.
-
-Cheers
-Jon
+Ok, I will drop that part. Jon
