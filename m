@@ -1,185 +1,188 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 21 Jul 2015 18:51:40 +0200 (CEST)
-Subject: [PATCH V5 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <BL2PR03MB370B72098E511CFE551588B83840@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1437150300-8134-1-git-send-email-shenwei.wang@freescale.com>
- <1437150300-8134-2-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1507172253520.18576@nanos>
- <BL2PR03MB370B72098E511CFE551588B83840@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1507211827150.18576@nanos>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jul 2015 17:53:39 +0100
+Subject: [PATCH 07/18] arm64: locks: patch in lse instructions when
+ supported by the CPU
+In-Reply-To: <1436779519-2232-8-git-send-email-will.deacon@arm.com>
+References: <1436779519-2232-1-git-send-email-will.deacon@arm.com>
+ <1436779519-2232-8-git-send-email-will.deacon@arm.com>
+Message-ID: <20150721165338.GE7250@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015, Shenwei Wang wrote:
-> > On Fri, 17 Jul 2015, Shenwei Wang wrote:
-> > > +static struct imx_irq_gpcv2 *gpcv2_get_chip_data(void) {
-> > > +	struct irq_data *data;
-> > > +	int virq;
-> > > +
-> > > +	/* Since GPCv2 is the default IRQ domain, its private data can
-> > > +	 * be gotten from any irq descriptor. Here we use interrupt #19
-> > > +	 * which is for snvs-rtc.
-> > > +	 */
-> > 
-> > Yuck. What kind of logic is that?
-> > 
-> > Use some random hardcoded number to find something which has been set by
-> > this driver?
-> > 
-> > > +	virq = irq_find_mapping(0, 19);
-> > > +
-> > > +	for (data = irq_get_irq_data(virq); data;
-> > > +	     data = data->parent_data) {
-> > > +		if (!data->domain)
-> > > +			continue;
-> > > +
-> > > +		if (!strcmp(data->domain->name, "GPCv2"))
-> > 
-> > So you are relying on internal knowledge of the irq domain code which sets the
-> > domain name to the chip name if the domain name is not initialized by other
-> > means.
-> > 
-> > Brilliant, NOT!
-> > 
-> > In other words you are interested in the irq chip associated with that domain and
-> > not with the domain itself.
-> > 
-> > Care to explain what you are trying to do and why you think there are no better
-> > ways to figure that out?
-> > 
-> When I wrote the driver, there were two options to let other modules like suspend 
-> and cpuidle drivers to access this instance of imx_irq_gpcv2:
-> Option #1 is to use the private data pointer of the irqdomain. 
-> Option #2 is to export a global variable here.
-> I selected option #1 because it could decouple this irq driver from those who may
-> use this instance.
+On Mon, Jul 13, 2015 at 10:25:08AM +0100, Will Deacon wrote:
+> @@ -67,15 +78,25 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+>  	unsigned int tmp;
+>  	arch_spinlock_t lockval;
+>  
+> -	asm volatile(
+> -"	prfm	pstl1strm, %2\n"
+> -"1:	ldaxr	%w0, %2\n"
+> -"	eor	%w1, %w0, %w0, ror #16\n"
+> -"	cbnz	%w1, 2f\n"
+> -"	add	%w0, %w0, %3\n"
+> -"	stxr	%w1, %w0, %2\n"
+> -"	cbnz	%w1, 1b\n"
+> -"2:"
+> +	asm volatile(ARM64_LSE_ATOMIC_INSN(
+> +	/* LL/SC */
+> +	"	prfm	pstl1strm, %2\n"
+> +	"1:	ldaxr	%w0, %2\n"
+> +	"	eor	%w1, %w0, %w0, ror #16\n"
+> +	"	cbnz	%w1, 2f\n"
+> +	"	add	%w0, %w0, %3\n"
+> +	"	stxr	%w1, %w0, %2\n"
+> +	"	cbnz	%w1, 1b\n"
+> +	"2:",
+> +	/* LSE atomics */
+> +	"	ldar	%w0, %2\n"
 
-I do not see how that discouples anything. It makes stuff obscure.
+Do we still need an acquire if we fail to take the lock?
 
-> But option #2 is more direct and simple.
+> +	"	eor	%w1, %w0, %w0, ror #16\n"
+> +	"	cbnz	%w1, 1f\n"
+> +	"	add	%w1, %w0, %3\n"
+> +	"	casa	%w0, %w1, %2\n"
+> +	"	and	%w1, %w1, #0xffff\n"
+> +	"	eor	%w1, %w1, %w0, lsr #16\n"
+> +	"1:")
+>  	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
+>  	: "I" (1 << TICKET_SHIFT)
+>  	: "memory");
 
-Well you don't have to export a global variable. All stuff referencing
-this is in the driver itself.
+I wonder if this is any faster with LSE. CAS would have to re-load the
+lock but we already have the value loaded (though most likely the reload
+will be from cache and we save a cbnz that can be mispredicted). I guess
+we'll re-test when we get some real hardware.
 
-I assume there is a single instance of that IP block in the chip. I
-can't see how multiple instances would work.
+Does prfm help in any way with the LDAR?
 
-So instead of doing a completely backwards lookup, you can simply have
-a static variable visible to all functions in the driver:
+> @@ -85,10 +106,19 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+>  
+>  static inline void arch_spin_unlock(arch_spinlock_t *lock)
+>  {
+> -	asm volatile(
+> -"	stlrh	%w1, %0\n"
+> -	: "=Q" (lock->owner)
+> -	: "r" (lock->owner + 1)
+> +	unsigned long tmp;
+> +
+> +	asm volatile(ARM64_LSE_ATOMIC_INSN(
+> +	/* LL/SC */
+> +	"	ldr	%w1, %0\n"
+> +	"	add	%w1, %w1, #1\n"
+> +	"	stlrh	%w1, %0",
+> +	/* LSE atomics */
+> +	"	mov	%w1, #1\n"
+> +	"	nop\n"
+> +	"	staddlh	%w1, %0")
+> +	: "=Q" (lock->owner), "=&r" (tmp)
+> +	:
+>  	: "memory");
+>  }
+>  
+> @@ -125,11 +155,19 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
+>  
+>  	asm volatile(
+>  	"	sevl\n"
+> +	ARM64_LSE_ATOMIC_INSN(
+> +	/* LL/SC */
+>  	"1:	wfe\n"
+>  	"2:	ldaxr	%w0, %1\n"
+>  	"	cbnz	%w0, 1b\n"
+>  	"	stxr	%w0, %w2, %1\n"
+> -	"	cbnz	%w0, 2b\n"
+> +	"	cbnz	%w0, 2b",
+> +	/* LSE atomics */
+> +	"1:	wfe\n"
+> +	"	mov	%w0, wzr\n"
+> +	"	casa	%w0, %w2, %1\n"
+> +	"	nop\n"
+> +	"	cbnz	%w0, 1b")
+>  	: "=&r" (tmp), "+Q" (rw->lock)
+>  	: "r" (0x80000000)
+>  	: "memory");
 
-static struct imx_irq_gpcv2 *imx_irq_gpcv2;
+With WFE in the LL/SC case, we rely on LDAXR to set the exclusive
+monitor and an event would be generated every time it gets cleared. With
+CAS, we no longer have this behaviour, so what guarantees a SEV?
 
-You store the pointer to your allocated data structure at the end of
-your init function.
+> @@ -139,11 +177,16 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+>  {
+>  	unsigned int tmp;
+>  
+> -	asm volatile(
+> +	asm volatile(ARM64_LSE_ATOMIC_INSN(
+> +	/* LL/SC */
+>  	"	ldaxr	%w0, %1\n"
+>  	"	cbnz	%w0, 1f\n"
+>  	"	stxr	%w0, %w2, %1\n"
 
-> > > +	for (i = 0; i < IMR_NUM; i++) {
-> > 
-> > Why is IMR_NUM a hard coded constant and not provided by DT?
-> > 
-> It can be provided by DT. However, as it is a fixed number and will
-> never change once the Chip is produced I selected to hard code it.
+Not a comment to your patch but to the original code: don't we need a
+branch back to ldaxr if stxr fails, like we do for arch_spin_trylock?
+The same comment for arch_read_trylock.
 
-Fair enough.
- 
-> > > +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int
-> > > +on) {
-> > > +	unsigned int idx = d->hwirq / 32;
-> > > +	struct imx_irq_gpcv2 *cd = d->chip_data;
-> > > +	u32 mask, val;
-> > > +	unsigned long flags;
-> > > +	void __iomem *reg;
-> > 
-> > Can you come up with an even less readable way to arrange those declarations?
-> > 
-> Will change the declarations like following:
-> 	u32 mask, val;
-> 	unsigned long flags;
-> 	void __iomem *reg;
-> 
-> 	unsigned int idx = d->hwirq / 32;
-> 	struct imx_irq_gpcv2 *cd = d->chip_data;
+> -	"1:\n"
+> +	"1:",
+> +	/* LSE atomics */
+> +	"	mov	%w0, wzr\n"
+> +	"	casa	%w0, %w2, %1\n"
+> +	"	nop")
+>  	: "=&r" (tmp), "+Q" (rw->lock)
+>  	: "r" (0x80000000)
+>  	: "memory");
+> @@ -153,9 +196,10 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+>  
+>  static inline void arch_write_unlock(arch_rwlock_t *rw)
+>  {
+> -	asm volatile(
+> -	"	stlr	%w1, %0\n"
+> -	: "=Q" (rw->lock) : "r" (0) : "memory");
+> +	asm volatile(ARM64_LSE_ATOMIC_INSN(
+> +	"	stlr	wzr, %0",
+> +	"	swpl	wzr, wzr, %0")
+> +	: "=Q" (rw->lock) :: "memory");
 
-My preferred way would be:
+Is this any better than just STLR? We don't need the memory read.
 
- 	struct imx_irq_gpcv2 *cd = d->chip_data;
- 	unsigned int idx = d->hwirq / 32;
- 	unsigned long flags;
- 	void __iomem *reg;
- 	u32 mask, val;
- 
-but I dont insist as long as the style is consistent in all functions.
- 
-> > > +enum gpcv2_slot {
-> > 
-> > What is this enum for?
-> > 
-> It defined all the power domains that are controlled by GPCv2 block.
+> @@ -172,6 +216,10 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
+>   *
+>   * The memory barriers are implicit with the load-acquire and store-release
+>   * instructions.
+> + *
+> + * Note that in UNDEFINED cases, such as unlocking a lock twice, the LL/SC
+> + * and LSE implementations may exhibit different behaviour (although this
+> + * will have no effect on lockdep).
+>   */
+>  static inline void arch_read_lock(arch_rwlock_t *rw)
+>  {
+> @@ -179,26 +227,43 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
+>  
+>  	asm volatile(
+>  	"	sevl\n"
+> +	ARM64_LSE_ATOMIC_INSN(
+> +	/* LL/SC */
+>  	"1:	wfe\n"
+>  	"2:	ldaxr	%w0, %2\n"
+>  	"	add	%w0, %w0, #1\n"
+>  	"	tbnz	%w0, #31, 1b\n"
+>  	"	stxr	%w1, %w0, %2\n"
+> -	"	cbnz	%w1, 2b\n"
+> +	"	nop\n"
+> +	"	cbnz	%w1, 2b",
+> +	/* LSE atomics */
+> +	"1:	wfe\n"
+> +	"2:	ldr	%w0, %2\n"
+> +	"	adds	%w1, %w0, #1\n"
+> +	"	tbnz	%w1, #31, 1b\n"
+> +	"	casa	%w0, %w1, %2\n"
+> +	"	sbc	%w0, %w1, %w0\n"
+> +	"	cbnz	%w0, 2b")
+>  	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+>  	:
+> -	: "memory");
+> +	: "cc", "memory");
 
-So it wants a proper documentation, right?
- 
-> > > +	CORE0_A7,
-> > > +	CORE1_A7,
-> > > +	SCU_A7,
-> > > +	FAST_MEGA_MIX,
-> > > +	MIPI_PHY,
-> > > +	PCIE_PHY,
-> > > +	USB_OTG1_PHY,
-> > > +	USB_OTG2_PHY,
-> > > +	USB_HSIC_PHY,
-> > > +	CORE0_M4,
-> > 
-> > Namespace?
-> >
-> > > +};
-> > 
-> > > +struct imx_irq_gpcv2 {
-> > > +	spinlock_t lock;
-> > 
-> >   raw_spinlock_t
-> > 
-> > > +	void __iomem *gpc_base;
-> > > +	struct regmap *anatop;
-> > > +	struct regmap *imx_src;
-> > > +	u32 wakeup_sources[IMR_NUM];
-> > > +	u32 enabled_irqs[IMR_NUM];
-> > > +	u32 mfmix_mask[IMR_NUM];
-> > > +	u32 wakeupmix_mask[IMR_NUM];
-> > > +	u32 lpsrmix_mask[IMR_NUM];
-> > > +	u32 cpu2wakeup;
-> > > +	void (*lpm_env_setup)(struct imx_irq_gpcv2 *);
-> > > +	void (*lpm_env_clean)(struct imx_irq_gpcv2 *);
-> > > +	void (*lpm_cpu_power_gate)(struct imx_irq_gpcv2 *, u32, bool);
-> > > +	void (*lpm_plat_power_gate)(struct imx_irq_gpcv2 *, bool);
-> > > +	void (*set_mode)(struct imx_irq_gpcv2 *, enum gpcv2_mode mode);
-> > > +	void (*standby)(struct imx_irq_gpcv2 *);
-> > > +	void (*suspend)(struct imx_irq_gpcv2 *);
-> > > +	void (*set_slot)(struct imx_irq_gpcv2 *cd, u32 index,
-> > > +			enum gpcv2_slot m_core, bool mode, bool ack);
-> > > +	void (*clear_slots)(struct imx_irq_gpcv2 *);
-> > > +	void (*lpm_enable_core)(struct imx_irq_gpcv2 *,
-> > > +			bool enable, u32 offset);
-> > > +
-> > > +
-> > > +	void (*suspend_fn_in_ocram)(void __iomem *ocram_vbase);
-> > > +	void __iomem *ocram_vbase;
-> > 
-> > How many of these struct members are actually relevant to this driver and what
-> > is the purpose of those? A proper KernelDoc comment would shed some light on
-> > it.
-> > 
+Same comment here about WFE.
 
-> This struct defines the properties and functions that GPCv2 block
-> provides. Since GPCv2 has two key functions: Irq wakeup source
-> management and power management, the intention of the struct is to
-> share data and methods among irqchip, suspend, and cpuidle drivers.
-
-I don't think this is a good idea. The cpuidle driver has nothing to
-know about the internals of the irq driver and vice versa. Neither
-does the suspend code.
-
-If you failed to split that proper then your design is wrong.
-
-Thanks,
-
-	tglx
+-- 
+Catalin
