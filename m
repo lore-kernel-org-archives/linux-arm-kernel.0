@@ -1,204 +1,375 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 Jul 2015 16:06:29 +0100
-Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CABb+yY2nAT6V4Q8suAXRtPXrXkArGWVTAW28ts4Z3C_ybuJovA@mail.gmail.com>
-References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
- <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
- <CABb+yY2nAT6V4Q8suAXRtPXrXkArGWVTAW28ts4Z3C_ybuJovA@mail.gmail.com>
-Message-ID: <20150721150629.GJ3061@x1>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 21 Jul 2015 15:07:24 +0000
+Subject: [PATCH V5 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <alpine.DEB.2.11.1507172253520.18576@nanos>
+References: <1437150300-8134-1-git-send-email-shenwei.wang@freescale.com>
+ <1437150300-8134-2-git-send-email-shenwei.wang@freescale.com>
+ <alpine.DEB.2.11.1507172253520.18576@nanos>
+Message-ID: <BL2PR03MB370B72098E511CFE551588B83840@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015, Jassi Brar wrote:
+Hi Thomas,
 
-> On Fri, Jul 17, 2015 at 5:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > ST's platforms currently support a maximum of 5 Mailboxes, one for
-> > each of the supported co-processors situated on the platform.  Each
-> > Mailbox is divided up into 4 instances which consist of 32 channels.
-> > Messages are passed between the application and co-processors using
-> > shared memory areas.  It is the Client's responsibility to manage
-> > these areas.
-> >
-> Thanks. It's a lot better than the old driver. However a few nits as usual :)
+Thank you for the high-quality review. Please check my comments inline below.
 
-Never a problem. :)
-
-> > +
-> > +#define STI_MBOX_INST_MAX      4      /* RAM saving: Max supported instances */
-> >
-> Above you say 5 instances. Another u32 doesn't cost much.
-
-4 instances, 5 mailboxes.
-
-> > +#define STI_MBOX_CHAN_MAX      20     /* RAM saving: Max supported channels  */
-> > +
-> This assumption is reasonable.
+> -----Original Message-----
+> From: Thomas Gleixner [mailto:tglx at linutronix.de]
+> Sent: 2015?7?17? 16:50
+> To: Wang Shenwei-B38339
+> Cc: shawn.guo at linaro.org; jason at lakedaemon.net;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH V5 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
 > 
+> On Fri, 17 Jul 2015, Shenwei Wang wrote:
+> > +++ b/drivers/irqchip/irq-imx-gpcv2.c
+> > @@ -0,0 +1,311 @@
 > > +
-> > +static void sti_mbox_enable_channel(struct mbox_chan *chan)
-> > +{
-> > +       struct sti_channel *chan_info = chan->con_priv;
-> > +       struct sti_mbox_device *mdev = chan_info->mdev;
-> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-> > +       unsigned int instance = chan_info->instance;
-> > +       unsigned int channel = chan_info->channel;
-> > +       unsigned long flags;
-> > +       void __iomem *base;
+> > +/*
+> > + * Copyright (C) 2015 Freescale Semiconductor, Inc.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
 > > +
-> > +       base = mdev->base + (instance * sizeof(u32));
-> > +
-> Maybe have something simpler like MBOX_BASE(instance)? Or some inline
-> function to avoid this 5-lines ritual?
-
-I think some of the functions also make use of the intermediary
-pointers, but I'll look into it.
-
-> > +       spin_lock_irqsave(&sti_mbox_chan_lock, flags);
-> > +       mdev->enabled[instance] |= BIT(channel);
-> > +       writel_relaxed(BIT(channel), base + pdata->ena_set);
-> > +       spin_unlock_irqrestore(&sti_mbox_chan_lock, flags);
-> >
-> You don't need locking for SET/CLR type registers which are meant for
-> when they could be accessed by processors that can not share a lock.
-> So maybe drop the lock here and elsewhere.
-
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/syscore_ops.h>
+> > +#include "irqchip.h"
+> 
+> This file is deprecated. Use linux/irqchip.h instead.
+> 
 Okay.
 
-> However, you need some mechanism to check if you succeeded 'owning'
-> the channel by reading back what you write to own the channel (not
-> sure which is that register here). Usually we need that action and
-> verification when we assign a channel to some user.
-
-I don't think there is a technical reason why it wouldn't succeed.  We
-don't normally read back every register change me make.  Why is this
-IP different?
-
-> > +static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
-> > +{
-> > +       struct sti_channel *chan_info = chan->con_priv;
-> > +       struct sti_mbox_device *mdev = chan_info->mdev;
-> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-> > +       unsigned int instance = chan_info->instance;
-> > +       unsigned int channel = chan_info->channel;
-> > +       void __iomem *base;
+> > +static struct imx_irq_gpcv2 *gpcv2_get_chip_data(void) {
+> > +	struct irq_data *data;
+> > +	int virq;
 > > +
-> > +       if (!sti_mbox_tx_is_ready(chan))
-> > +               return -EBUSY;
-> This is the first thing I look out for in every new driver :)  this
-> check is unnecessary.
-
-In what way?  What if the channel is disabled or there is an IRQ
-already pending?
-
-> > +static void sti_mbox_shutdown_chan(struct mbox_chan *chan)
-> > +{
-> > +       struct sti_channel *chan_info = chan->con_priv;
-> > +       struct mbox_controller *mbox = chan_info->mdev->mbox;
-> > +       int i;
+> > +	/* Since GPCv2 is the default IRQ domain, its private data can
+> > +	 * be gotten from any irq descriptor. Here we use interrupt #19
+> > +	 * which is for snvs-rtc.
+> > +	 */
+> 
+> Yuck. What kind of logic is that?
+> 
+> Use some random hardcoded number to find something which has been set by
+> this driver?
+> 
+> > +	virq = irq_find_mapping(0, 19);
 > > +
-> > +       for (i = 0; i < mbox->num_chans; i++)
-> > +               if (chan == &mbox->chans[i])
-> > +                       break;
+> > +	for (data = irq_get_irq_data(virq); data;
+> > +	     data = data->parent_data) {
+> > +		if (!data->domain)
+> > +			continue;
 > > +
-> > +       if (mbox->num_chans == i) {
-> > +               dev_warn(mbox->dev, "Request to free non-existent channel\n");
-> > +               return;
-> > +       }
+> > +		if (!strcmp(data->domain->name, "GPCv2"))
+> 
+> So you are relying on internal knowledge of the irq domain code which sets the
+> domain name to the chip name if the domain name is not initialized by other
+> means.
+> 
+> Brilliant, NOT!
+> 
+> In other words you are interested in the irq chip associated with that domain and
+> not with the domain itself.
+> 
+> Care to explain what you are trying to do and why you think there are no better
+> ways to figure that out?
+> 
+When I wrote the driver, there were two options to let other modules like suspend 
+and cpuidle drivers to access this instance of imx_irq_gpcv2:
+Option #1 is to use the private data pointer of the irqdomain. 
+Option #2 is to export a global variable here.
+I selected option #1 because it could decouple this irq driver from those who may
+use this instance. But option #2 is more direct and simple.
+ 
+> > +			return data->chip_data;
+> > +	}
 > > +
-> > +       sti_mbox_disable_channel(chan);
-> > +       sti_mbox_clear_irq(chan);
-> > +
-> > +       /* Reset channel */
-> > +       memset(chan, 0, sizeof(*chan));
-> > +       chan->mbox = mbox;
-> > +       chan->txdone_method = TXDONE_BY_POLL;
-> >
-> No please. mbox_chan is owned by the API. At most you could clear con_priv.
+> > +	return 0;
+> 
+> This wants to be 'return NULL;' if at all.
+> 
+Okay.
 
-I will look for the API call to reset the channel then.
-
-> > +static struct mbox_chan *sti_mbox_xlate(struct mbox_controller *mbox,
-> > +                                       const struct of_phandle_args *spec)
-> > +{
-> > +       struct sti_mbox_device *mdev = dev_get_drvdata(mbox->dev);
-> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-> > +       struct sti_channel *chan_info;
-> > +       struct mbox_chan *chan = NULL;
-> > +       unsigned int instance  = spec->args[0];
-> > +       unsigned int channel   = spec->args[1];
-> > +       unsigned int direction = spec->args[2];
-> > +       int i;
-> > +
-> > +       /* Bounds checking */
-> > +       if (instance >= pdata->num_inst || channel  >= pdata->num_chan) {
-> > +               dev_err(mbox->dev,
-> > +                       "Invalid channel requested instance: %d channel: %d\n",
-> > +                       instance, channel);
-> > +               return NULL;
-> > +       }
-> > +
-> > +       for (i = 0; i < mbox->num_chans; i++) {
-> > +               chan_info = mbox->chans[i].con_priv;
-> > +
-> > +               /* Is requested channel free? */
-> > +               if (direction != MBOX_LOOPBACK &&
-> > +                   chan_info &&
-> > +                   mbox->dev == chan_info->mdev->dev &&
-> > +                   instance == chan_info->instance &&
-> > +                   channel == chan_info->channel) {
-> > +                       dev_err(mbox->dev, "Channel in use\n");
-> > +                       return NULL;
-> > +               }
-> > +
-> > +               /* Find the first free slot */
-> > +               if (!chan && !chan_info)
-> > +                       chan = &mbox->chans[i];
->         shouldn't it break out of loop here?
-
-Yes, I guess it should.  Good spot.
-
-> > +       }
-> > +
-> Doesn't mbox->chans[i].con_priv need some locking here?
-
-I can add some.
-
-> > +static const struct sti_mbox_pdata mbox_stih407_pdata = {
-> > +       .num_inst       = 4,
-> > +       .num_chan       = 32,
-> > +       .irq_val        = 0x04,
-> > +       .irq_set        = 0x24,
-> > +       .irq_clr        = 0x44,
-> > +       .ena_val        = 0x64,
-> > +       .ena_set        = 0x84,
-> > +       .ena_clr        = 0xa4,
-> >
-> Register offsets are parameters of the controller
-
-And this is a controller driver?  Not sure I get the point.
-
-> and also these look ugly. Please make these #define's
-
-Sure.
-
-> > +static int __init sti_mbox_init(void)
-> > +{
-> > +       return platform_driver_register(&sti_mbox_driver);
 > > +}
 > > +
-> > +static void __exit sti_mbox_exit(void)
-> > +{
-> > +       platform_driver_unregister(&sti_mbox_driver);
-> > +}
+> > +static int gpcv2_wakeup_source_save(void) {
+> > +	struct imx_irq_gpcv2 *cd;
+> > +	void __iomem *reg;
+> > +	int i;
 > > +
-> > +postcore_initcall(sti_mbox_init);
-> >
-> This seems fragile. Shouldn't the users defer probe if they don't get a channel?
+> > +	cd = gpcv2_get_chip_data();
+> > +	if (!cd)
+> > +		return 0;
+> > +
+> > +	for (i = 0; i < IMR_NUM; i++) {
+> 
+> Why is IMR_NUM a hard coded constant and not provided by DT?
+> 
+It can be provided by DT. However, as it is a fixed number and will never change once the 
+Chip is produced I selected to hard code it.
 
-I'm not sure why we have to be early.  I will investigate.
+> > +		reg = cd->gpc_base + cd->cpu2wakeup + i * 4;
+> > +		cd->enabled_irqs[i] = readl_relaxed(reg);
+> > +		writel_relaxed(cd->wakeup_sources[i], reg);
+> > +	}
+> > +
+> > +	pr_devel("%s ----\r\n", __func__);
+> > +	pr_devel("Enabled IRQ:\t %08X %08X %08X %08X\r\n",
+> > +			cd->enabled_irqs[0],
+> > +			cd->enabled_irqs[1],
+> > +			cd->enabled_irqs[2],
+> > +			cd->enabled_irqs[3]);
+> > +	pr_devel("Wakeup Sources:\t %08X %08X %08X %08X\r\n",
+> > +			cd->wakeup_sources[0],
+> > +			cd->wakeup_sources[1],
+> > +			cd->wakeup_sources[2],
+> > +			cd->wakeup_sources[3]);
+> 
+> Do we really need this debug stuff in mainline?
+> 
+Ok to remove it.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> > +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int
+> > +on) {
+> > +	unsigned int idx = d->hwirq / 32;
+> > +	struct imx_irq_gpcv2 *cd = d->chip_data;
+> > +	u32 mask, val;
+> > +	unsigned long flags;
+> > +	void __iomem *reg;
+> 
+> Can you come up with an even less readable way to arrange those declarations?
+> 
+Will change the declarations like following:
+	u32 mask, val;
+	unsigned long flags;
+	void __iomem *reg;
+
+	unsigned int idx = d->hwirq / 32;
+	struct imx_irq_gpcv2 *cd = d->chip_data;
+
+> > +	spin_lock_irqsave(&cd->lock, flags);
+> 
+> That wants to be a raw spinlock.
+> 
+Will change it to raw_spin_lock
+
+> > +	reg = cd->gpc_base + cd->cpu2wakeup + idx * 4;
+> 
+> This lacks a comment explaining the magic math
+> 
+> > +static void imx_gpcv2_irq_unmask(struct irq_data *d) {
+> > +	void __iomem *reg;
+> > +	struct imx_irq_gpcv2 *cd = d->chip_data;
+> > +	u32 val;
+> > +	unsigned long flags;
+> 
+> Another random variant of arranging declarations.
+> 
+Will change it like following:
+	u32 val;
+	unsigned long flags;
+    void __iomem *reg;
+    struct imx_irq_gpcv2 *cd = d->chip_data;
+
+>>+	spin_lock_irqsave(&cd->lock, flags);
+> 
+> This callback is always called with interrupts disabled, so this wants to be
+> raw_spin_lock()
+> 
+Okay. 
+
+> > +	reg = cd->gpc_base + cd->cpu2wakeup + d->hwirq / 32 * 4;
+> > +	val = readl_relaxed(reg);
+> > +	val &= ~(1 << d->hwirq % 32);
+> > +	writel_relaxed(val, reg);
+> > +	irq_chip_unmask_parent(d);
+> 
+> Why needs this to be called under cd->lock?
+> 
+You are right. Irq_chip_unmask_parent(d) should be moved under cd->lock.
+
+> If there is a requirement to do so, then it needs a comment.
+> 
+> > +	spin_unlock_irqrestore(&cd->lock, flags);
+> 
+> > +static int imx_gpcv2_domain_xlate(struct irq_domain *domain,
+> > +				struct device_node *controller,
+> > +				const u32 *intspec,
+> > +				unsigned int intsize,
+> > +				unsigned long *out_hwirq,
+> > +				unsigned int *out_type)
+> > +{
+> > +	if (domain->of_node != controller)
+> > +		return -EINVAL;	/* Shouldn't happen, really... */
+> 
+> Tail comments are horrible to read. Either your comment has a value then put it
+> above the if construct or just get rid of it.
+> 
+Will remove it.
+
+> > +static int __init imx_gpcv2_irqchip_init(struct device_node *node,
+> > +			       struct device_node *parent) {
+> > +	struct irq_domain *parent_domain, *domain;
+> > +	int i, val;
+> > +	struct imx_irq_gpcv2 *cd;
+> > +
+> > +	if (!parent) {
+> > +		pr_err("%s: no parent, giving up\n", node->full_name);
+> > +		return -ENODEV;
+> > +	}
+> > +
+> > +	parent_domain = irq_find_host(parent);
+> > +	if (!parent_domain) {
+> > +		pr_err("%s: unable to obtain parent domain\n", node->full_name);
+> > +		return -ENXIO;
+> > +	}
+> > +
+> > +	cd = kzalloc(sizeof(struct imx_irq_gpcv2), GFP_KERNEL);
+> > +	BUG_ON(!cd);
+> 
+> This BUG_ON does not make any sense as you just return an error code if
+> something else goes wrong after that.
+> 
+Make sense. Will remove it.
+
+> > +	cd->gpc_base = of_iomap(node, 0);
+> > +	if (!cd->gpc_base) {
+> > +		pr_err("fsl-gpcv2: unable to map gpc registers\n");
+> > +		kzfree(cd);
+> 
+> Surely this needs kzfree because cd contains security relevant data, right?
+> 
+It is not secure data. Will change it to kfree.
+
+> > +	/*
+> > +	 * Due to hardware design requirement, need to make sure GPR
+> 
+> s/requirement/failure/ right?
+> 
+Agree.
+
+> > +	 * interrupt(#32) is unmasked during RUN mode to avoid entering
+> > +	 * DSM by mistake.
+> > +	 */
+> > +	writel_relaxed(~0x1, cd->gpc_base + cd->cpu2wakeup);
+> 
+> Magic constant '~0x1' ?
+> 
+> > +
+> > +	/* Mask the wakeup sources in M/F power domain */
+> > +	cd->mfmix_mask[0] = 0x54010000;
+> > +	cd->mfmix_mask[1] = 0xc00;
+> > +	cd->mfmix_mask[2] = 0x0;
+> > +	cd->mfmix_mask[3] = 0x400010;
+> 
+> Again, really intuitive and self explaining magic constants.
+> 
+> > +
+> > +IRQCHIP_DECLARE(imx_gpcv2, "fsl,imx7d-gpc", imx_gpcv2_irqchip_init);
+> 
+> I'm not a DT expert, but AFAIK there is a requirement to document the bindings
+> somewhere. -ENODOCUMENT!
+> 
+Will add this string in Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+
+> > +
+> > +enum gpcv2_mode {
+> > +	WAIT_CLOCKED,		/* wfi only */
+> 
+> Again, tail comments are horrible to read. Use proper KernelDoc if you want to
+> document stuff. Though I doubt that any of these comments have any value at all.
+> 
+> Aside of that these names are pretty generic and prone to create a namespace
+> clash sooner or later.
+> 
+Will remove the tail comments.
+
+> > +	WAIT_UNCLOCKED,		/* WAIT */
+> > +	WAIT_UNCLOCKED_POWER_OFF,	/* WAIT + SRPG */
+> > +	STOP_POWER_ON,		/* just STOP */
+> > +	STOP_POWER_OFF,		/* STOP + SRPG */
+> > +};
+> > +
+> > +enum gpcv2_slot {
+> 
+> What is this enum for?
+> 
+It defined all the power domains that are controlled by GPCv2 block.
+
+> > +	CORE0_A7,
+> > +	CORE1_A7,
+> > +	SCU_A7,
+> > +	FAST_MEGA_MIX,
+> > +	MIPI_PHY,
+> > +	PCIE_PHY,
+> > +	USB_OTG1_PHY,
+> > +	USB_OTG2_PHY,
+> > +	USB_HSIC_PHY,
+> > +	CORE0_M4,
+> 
+> Namespace?
+> 
+> > +};
+> 
+> > +struct imx_irq_gpcv2 {
+> > +	spinlock_t lock;
+> 
+>   raw_spinlock_t
+> 
+> > +	void __iomem *gpc_base;
+> > +	struct regmap *anatop;
+> > +	struct regmap *imx_src;
+> > +	u32 wakeup_sources[IMR_NUM];
+> > +	u32 enabled_irqs[IMR_NUM];
+> > +	u32 mfmix_mask[IMR_NUM];
+> > +	u32 wakeupmix_mask[IMR_NUM];
+> > +	u32 lpsrmix_mask[IMR_NUM];
+> > +	u32 cpu2wakeup;
+> > +	void (*lpm_env_setup)(struct imx_irq_gpcv2 *);
+> > +	void (*lpm_env_clean)(struct imx_irq_gpcv2 *);
+> > +	void (*lpm_cpu_power_gate)(struct imx_irq_gpcv2 *, u32, bool);
+> > +	void (*lpm_plat_power_gate)(struct imx_irq_gpcv2 *, bool);
+> > +	void (*set_mode)(struct imx_irq_gpcv2 *, enum gpcv2_mode mode);
+> > +	void (*standby)(struct imx_irq_gpcv2 *);
+> > +	void (*suspend)(struct imx_irq_gpcv2 *);
+> > +	void (*set_slot)(struct imx_irq_gpcv2 *cd, u32 index,
+> > +			enum gpcv2_slot m_core, bool mode, bool ack);
+> > +	void (*clear_slots)(struct imx_irq_gpcv2 *);
+> > +	void (*lpm_enable_core)(struct imx_irq_gpcv2 *,
+> > +			bool enable, u32 offset);
+> > +
+> > +
+> > +	void (*suspend_fn_in_ocram)(void __iomem *ocram_vbase);
+> > +	void __iomem *ocram_vbase;
+> 
+> How many of these struct members are actually relevant to this driver and what
+> is the purpose of those? A proper KernelDoc comment would shed some light on
+> it.
+> 
+This struct defines the properties and functions that GPCv2 block provides. Since GPCv2 has
+two key functions: Irq wakeup source management and power management, the 
+intention of the struct is to share data and methods among irqchip, suspend, and cpuidle drivers.
+
+> > +};
+> > +
+> > +void ca7_cpu_resume(void);
+> > +void imx7_suspend(void __iomem *ocram_vbase);
+> 
+> How is that related to the irqchip driver?
+> 
+These two functions are used by suspend driver.
+
+Thanks,
+Shenwei
+
+
+> Thanks,
+> 
+> 	tglx
