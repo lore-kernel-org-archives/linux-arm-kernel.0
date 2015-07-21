@@ -1,53 +1,139 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jul 2015 14:03:32 +0100
-Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
-In-Reply-To: <20150721123408.GA5352@xora-yoga13.xora.org.uk>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
- <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
- <20150721123408.GA5352@xora-yoga13.xora.org.uk>
-Message-ID: <20150721140332.0684e5f5@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 21 Jul 2015 14:03:28 +0100
+Subject: [Xen-devel] [PATCH v2 07/20] block/xen-blkfront: split get_grant
+ in 2
+In-Reply-To: <55AE1F2A.6010300@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-8-git-send-email-julien.grall@citrix.com>
+ <55AE1F2A.6010300@citrix.com>
+Message-ID: <55AE4320.7020000@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015 13:34:08 +0100
-Graeme Gregory <graeme@xora.org.uk> wrote:
+Hi,
 
-> On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
-> > Now that the basic ACPI GSI code is irq domain aware, make sure
-> > that the ACPI support in the GIC doesn't pointlessly deviate from
-> > the DT path.
-> > 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  drivers/irqchip/irq-gic.c       | 17 ++++++-----------
-> >  include/linux/irqchip/arm-gic.h |  2 +-
-> >  2 files changed, 7 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index b41ccf5..f5d365d 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
-> >  {
-> >  	unsigned long ret = 0;
-> >  
-> > -	if (irq_domain_get_of_node(d) != controller)
-> > -		return -EINVAL;
-> This change seems to have nothing to do with the description.
+On 21/07/15 11:30, Roger Pau Monn? wrote:
+> El 09/07/15 a les 22.42, Julien Grall ha escrit:
+>> Prepare the code to support 64KB page granularity. The first
+>> implementation will use a full Linux page per indirect and persistent
+>> grant. When non-persistent grant is used, each page of a bio request
+>> may be split in multiple grant.
+>>
+>> Furthermore, the field page of the grant structure is only used to copy
+>> data from persistent grant or indirect grant. Avoid to set it for other
+>> use case as it will have no meaning given the page will be split in
+>> multiple grant.
+>>
+>> Provide 2 functions, to setup indirect grant, the other for bio page.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>> Cc: Roger Pau Monn? <roger.pau@citrix.com>
+>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>> Cc: David Vrabel <david.vrabel@citrix.com>
+>> ---
+>>     Changes in v2:
+>>         - Patch added
+>> ---
+>>  drivers/block/xen-blkfront.c | 85 ++++++++++++++++++++++++++++++--------------
+>>  1 file changed, 59 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+>> index 7b81d23..95fd067 100644
+>> --- a/drivers/block/xen-blkfront.c
+>> +++ b/drivers/block/xen-blkfront.c
+>> @@ -242,34 +242,77 @@ out_of_memory:
+>>  	return -ENOMEM;
+>>  }
+>>  
+>> -static struct grant *get_grant(grant_ref_t *gref_head,
+>> -			       struct page *page,
+>> -                               struct blkfront_info *info)
+>> +static struct grant *get_free_grant(struct blkfront_info *info)
+>>  {
+>>  	struct grant *gnt_list_entry;
+>> -	unsigned long buffer_mfn;
+>>  
+>>  	BUG_ON(list_empty(&info->grants));
+>>  	gnt_list_entry = list_first_entry(&info->grants, struct grant,
+>> -	                                  node);
+>> +					  node);
+> 
+> Stray change?
 
-It has everything to do with making this function usable in the context
-of ACPI ;-).
+No the indentation was wrong before.
 
-This is another ugly aspect of the irqdomain part, where "controller"
-is actually the device_node extracted from of_phandle_args. This will
-actually be the domain_token, and this comparison would fail with ACPI.
-I may add another patch for that.
+> 
+>>  	list_del(&gnt_list_entry->node);
+>>  
+>> -	if (gnt_list_entry->gref != GRANT_INVALID_REF) {
+>> +	if (gnt_list_entry->gref != GRANT_INVALID_REF)
+>>  		info->persistent_gnts_c--;
+>> +
+>> +	return gnt_list_entry;
+>> +}
+>> +
+>> +static void grant_foreign_access(const struct grant *gnt_list_entry,
+>> +				 const struct blkfront_info *info)
+> 
+> Given that this is just a wrapper I would make it an inline function, or
+> even consider removing it and just call
+> gnttab_page_grant_foreign_access_ref directly.
 
-On DT, this is actually pretty useless, as we're always registering the
-GIC domain with its device_node, so this is really guaranteed to match.
+I prefer to keep the help as it's used in two place and make the caller
+function more readable.
 
-Thanks,
+Most of compiler will try to inline even without the inline. This is the
+case of gcc where both grant_foreign_access and even get_grant are in
+fine inline. If you really want, I can add the inline.
 
-	M.
+>> +{
+>> +	gnttab_page_grant_foreign_access_ref(gnt_list_entry->gref,
+>> +					     info->xbdev->otherend_id,
+>> +					     gnt_list_entry->page,
+>> +					     0);
+>> +}
+>> +
+>> +static struct grant *get_grant(grant_ref_t *gref_head,
+>> +			       unsigned long mfn,
+>> +			       struct blkfront_info *info)
+> 
+> Indentation.
+
+Why? The indentation is valid, tabulation of 8 as requested by the
+coding style, and will be aligned correctly in your editor. This may not
+be the case in your mail reader.
+
+> 
+>> +{
+>> +	struct grant *gnt_list_entry = get_free_grant(info);
+>> +
+>> +	if (gnt_list_entry->gref != GRANT_INVALID_REF)
+>>  		return gnt_list_entry;
+>> +
+>> +	/* Assign a gref to this page */
+>> +	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
+>> +	BUG_ON(gnt_list_entry->gref == -ENOSPC);
+>> +	if (info->feature_persistent)
+>> +		grant_foreign_access(gnt_list_entry, info);
+>> +	else {
+>> +		/* Grant access to the MFN passed by the caller */
+>> +		gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
+>> +			                        info->xbdev->otherend_id,
+>> +				                mfn, 0);
+>>  	}
+>>  
+>> +	return gnt_list_entry;
+>> +}
+>> +
+>> +static struct grant *get_indirect_grant(grant_ref_t *gref_head,
+>> +					struct blkfront_info *info)
+> 
+> Indentation.
+
+Ditto.
+
+Regards,
+
 -- 
-Jazz is not dead. It just smells funny.
+Julien Grall
