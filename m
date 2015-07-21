@@ -1,91 +1,59 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 21 Jul 2015 14:49:38 +0800
-Subject: [PATCH v4 0/5] PCI: hisi: Add PCIe host support for Hisilicon
- Soc Hip05
-In-Reply-To: <1437460947-2328-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1437460947-2328-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55ADEB82.4060404@hisilicon.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 21 Jul 2015 12:24:38 +0530
+Subject: [PATCH V4 2/7] qup: i2c: factor out common code for reuse
+In-Reply-To: <1437380700.6267.1.camel@mm-sol.com>
+References: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>	
+ <1436412350-19519-3-git-send-email-sricharan@codeaurora.org>
+ <1437380700.6267.1.camel@mm-sol.com>
+Message-ID: <000001d0c382$2061ceb0$61256c10$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Very sorry for sending this cover repeatedly :(
-Please ignore this one.
+Hi Ivan,
+  Thnaks for all the reviews.
 
-Zhou
+> -----Original Message-----
+> From: linux-arm-msm-owner at vger.kernel.org [mailto:linux-arm-msm-
+> owner at vger.kernel.org] On Behalf Of Ivan T. Ivanov
+> Sent: Monday, July 20, 2015 1:55 PM
+> To: Sricharan R
+> Cc: devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> galak at codeaurora.org; linux-kernel at vger.kernel.org; linux-
+> i2c at vger.kernel.org; agross at codeaurora.org; dmaengine at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH V4 2/7] qup: i2c: factor out common code for reuse
+> 
+> 
+> Hi Sricharan,
+> 
+> On Thu, 2015-07-09 at 08:55 +0530, Sricharan R wrote:
+> >
+> 
+> >  static int qup_i2c_read_one(struct qup_i2c_dev *qup, struct i2c_msg
+> > *msg)  {
+> > -       unsigned long left;
+> > -       int ret;
+> > +       int ret = 0;
+> >
+> > -       qup->msg = msg;
+> > -       qup->pos  = 0;
+> > +       /*
+> > +               * The QUP block will issue a NACK and STOP on the bus when
+> reaching
+> > +               * the end of the read, the length of the read is specified as one
+> byte
+> > +               * which limits the possible read to 256 (QUP_READ_LIMIT) bytes.
+> > +               */
+> > +       if (msg->len > QUP_READ_LIMIT) {
+> > +               dev_err(qup->dev, "HW not capable of reads over %d bytes\n",
+> > +                       QUP_READ_LIMIT);
+> > +               return -EINVAL;
+> > +       }
+> >
+> 
+> This should be removed. Please see qup_i2c_quirks.
+> 
+  Ok get it, will remove this.
 
-On 2015/7/21 14:42, Zhou Wang wrote:
-> This patchset adds PCIe host support for Hisilicon Soc Hip05. The PCIe hosts
-> use PCIe IP core from Synopsys, So this driver is base on designware PCIe driver.
-> 
-> Hip05 is an ARMv8 architecture Soc. It should be able to use ARM64 PCIe API in
-> designeware PCIe driver. So this patch also adds ARM64 support for designware
-> pcie.
-> 
-> This patchset is based on v4.2-rc1 and Gabriele's patch about of_pci_range
-> fix[1].
-> 
-> Change from v3:
-> - Change 1/5 to what Gabriele suggested.
-> - Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
-> 
-> Change from v2:
-> - Move struct pci_dev *dev and struct pci_sys_data *sys in
->   pcibios_align_resource in 1/5.
-> - Add Gabriele's codes in 2/5 which delete unnecessary information parse and
->   use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
-> - Add maintainer patch 5/5.
-> 
-> Change from RFC v1:
-> - Add 1/4 patch by Arnd which removes align_resource callback in ARM
->   pcibios_align_resource.
-> - Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
-> - Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
->   spear13xx.
-> - Remove unnecessary parentheses of some macros in pcie-hisi.
-> - Use macro to replace some magic values.
-> - Merge two loops together and add some comments about it in context_config
->   function in pcie-hisi.
-> - Modify some value of items in pcie node example in binding document. 
-> 
-> Change from RFC:
-> - delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
->   merge related operations into dw_pcie_host_init.
-> 
-> Link of v3:
-> - http://www.spinics.net/lists/linux-pci/msg42539.html
-> Link of v2:
-> - http://www.spinics.net/lists/linux-pci/msg41844.html
-> Link of RFC v1:
-> - http://www.spinics.net/lists/linux-pci/msg41305.html
-> Link of RFC:
-> - http://www.spinics.net/lists/linux-pci/msg40434.html
-> 
-> [1] https://patchwork.ozlabs.org/patch/495018/
-> 
-> Zhou Wang (5):
->   ARM/PCI: remove align_resource in pci_sys_data
->   PCI: designware: Add ARM64 support
->   PCI: hisi: Add PCIe host support for Hisilicon Soc Hip05
->   Documentation: DT: Add Hisilicon PCIe host binding
->   MAINTAINERS: Add pcie-hisi maintainer
-> 
->  .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
->  MAINTAINERS                                        |   7 +
->  arch/arm/include/asm/mach/pci.h                    |   5 -
->  arch/arm/kernel/bios32.c                           |  12 +-
->  drivers/pci/host/Kconfig                           |   5 +
->  drivers/pci/host/Makefile                          |   1 +
->  drivers/pci/host/pci-dra7xx.c                      |   1 +
->  drivers/pci/host/pci-exynos.c                      |   2 +-
->  drivers/pci/host/pci-imx6.c                        |   2 +-
->  drivers/pci/host/pci-keystone-dw.c                 |   2 +-
->  drivers/pci/host/pci-keystone.c                    |   2 +-
->  drivers/pci/host/pci-layerscape.c                  |   2 +-
->  drivers/pci/host/pcie-designware.c                 | 217 ++++++-----------
->  drivers/pci/host/pcie-designware.h                 |  10 +-
->  drivers/pci/host/pcie-hisi.c                       | 257 +++++++++++++++++++++
->  drivers/pci/host/pcie-spear13xx.c                  |   2 +-
->  16 files changed, 410 insertions(+), 163 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
->  create mode 100644 drivers/pci/host/pcie-hisi.c
-> 
+Regards,
+ Sricharan
