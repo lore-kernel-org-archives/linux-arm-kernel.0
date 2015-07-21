@@ -1,28 +1,55 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 21 Jul 2015 00:30:33 -0700 (PDT)
-Subject: [PATCH v2] net: mvneta: fix refilling for Rx DMA buffers
-In-Reply-To: <1437303653-2236-1-git-send-email-simon.guinot@sequanux.org>
-References: <1437303653-2236-1-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <20150721.003033.1524284435822402813.davem@davemloft.net>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Jul 2015 09:31:11 +0200
+Subject: [PATCH] thermal: consistently use int for temperatures
+In-Reply-To: <9hhd1zrc9yb.fsf@e105922-lin.cambridge.arm.com>
+References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
+ <9hhd1zrc9yb.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20150721073111.GH5161@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <simon.guinot@sequanux.org>
-Date: Sun, 19 Jul 2015 13:00:53 +0200
+Hi Punit,
 
-> With the actual code, if a memory allocation error happens while
-> refilling a Rx descriptor, then the original Rx buffer is both passed
-> to the networking stack (in a SKB) and let in the Rx ring. This leads
-> to various kernel oops and crashes.
+On Fri, Jul 17, 2015 at 12:14:36PM +0100, Punit Agrawal wrote:
+> Hi Sascha,
 > 
-> As a fix, this patch moves Rx descriptor refilling ahead of building
-> SKB with the associated Rx buffer. In case of a memory allocation
-> failure, data is dropped and the original DMA buffer is put back into
-> the Rx ring.
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
 > 
-> Signed-off-by: Simon Guinot <simon.guinot@sequanux.org>
-> Fixes: c5aff18204da ("net: mvneta: driver for Marvell Armada 370/XP network unit")
-> Cc: <stable@vger.kernel.org> # v3.8+
-> Tested-by: Yoann Sculo <yoann@sculo.fr>
+> > The thermal code uses int, long and unsigned long for temperatures
+> > in different places.
+> >
+> > Using an unsigned type limits the thermal framework to positive
+> > temperatures without need. Also several drivers currently will report
+> > temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> > immediately shut the machine down due to overtemperature if started below
+> > 0?C.
+> >
+> > 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
+> > is above the melting point of all known materials.
+> >
+> > Consistently use a plain 'int' for temperatures throughout the thermal code and
+> > the drivers. This only changes the places in the drivers where the temperature
+> > is passed around as pointer, when drivers internally use another type this is
+> > not changed.
+> >
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> Thanks for moving over the thermal sub-system in Linux to consistently
+> use a single type.
+> 
+> In your patch, you missed migrating over power_allocator governor and
+> it's associated trace events. It got merged for v4.2.
+> 
+> Could you incorporate something like below in your next version?
 
-Applied, thanks.
+It seems I have changed drivers/thermal/power_allocator.c but missed
+include/trace/events/thermal_power_allocator.h. Please check out the v2
+patch I just sent.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
