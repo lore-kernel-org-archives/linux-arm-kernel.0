@@ -1,120 +1,67 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 21 Jul 2015 15:50:46 +0200
-Subject: [RFC PATCH 04/16] Add DEVM_IOMAP()
+Date: Tue, 21 Jul 2015 15:50:47 +0200
+Subject: [RFC PATCH 05/16] Add DEVM_RESET()
 In-Reply-To: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1437486658-28365-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1437486658-28365-6-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
- drivers/base/devres.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/device.h | 19 +++++++++++++++++
- 2 files changed, 75 insertions(+)
+ drivers/reset/core.c  | 13 +++++++++++++
+ include/linux/reset.h | 10 ++++++++++
+ 2 files changed, 23 insertions(+)
 
-diff --git a/drivers/base/devres.c b/drivers/base/devres.c
-index 5198ccd28123..6af1ca9fa804 100644
---- a/drivers/base/devres.c
-+++ b/drivers/base/devres.c
-@@ -8,7 +8,10 @@
-  */
- 
- #include <linux/device.h>
-+#include <linux/io.h>
- #include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
- #include <linux/slab.h>
- 
- #include "base.h"
-@@ -1034,3 +1037,56 @@ int devm_resource_alloc(struct device *dev,
-         return 0;
+diff --git a/drivers/reset/core.c b/drivers/reset/core.c
+index 7955e00d04d4..a890c401dbf0 100644
+--- a/drivers/reset/core.c
++++ b/drivers/reset/core.c
+@@ -303,3 +303,16 @@ int device_reset(struct device *dev)
+ 	return ret;
  }
- EXPORT_SYMBOL_GPL(devm_resource_alloc);
+ EXPORT_SYMBOL_GPL(device_reset);
 +
-+int devm_acquire_iomap(struct device *dev,
++int devm_acquire_reset(struct device *dev,
 +		       const struct devm_resource *resource)
 +{
-+	struct resource res, *resp = NULL;
-+	void __iomem *vaddr;
-+	void * __iomem *vaddrp;
-+	int index, ret;
++	struct reset_control **rstp = dev_get_drvdata(dev) + resource->offset;
 +
-+	/* find mem resource from platform device */
-+	if (dev->bus == &platform_bus_type) {
-+		struct platform_device *pdev = to_platform_device(dev);
-+
-+		if (resource->name)
-+			resp = platform_get_resource_byname(pdev,
-+					IORESOURCE_MEM, resource->name);
-+		else
-+			resp = platform_get_resource(pdev,
-+					IORESOURCE_MEM, resource->index);
-+	}
-+
-+	/* try getting resource from device tree if that failed */
-+	if (!resp && dev->of_node) {
-+		if (resource->name)
-+			index = of_property_match_string(dev->of_node,
-+							 "reg-names",
-+							 resource->name);
-+		else
-+			index = resource->index;
-+
-+		ret = of_address_to_resource(dev->of_node, index, &res);
-+		if (ret)
-+			return ret;
-+		resp = &res;
-+	}
-+
-+
-+	if (resource->flags & DEVM_IOMAP_NOREQUEST) {
-+		vaddr = devm_ioremap(dev, resp->start, resource_size(resp));
-+		if (!vaddr)
-+			return -EINVAL;
-+	} else {
-+		vaddr = devm_ioremap_resource(dev, resp);
-+		if (IS_ERR(vaddr))
-+			return PTR_ERR(vaddr);
-+	}
-+
-+	vaddrp = dev_get_drvdata(dev) + resource->offset;
-+	*vaddrp = vaddr;
++	*rstp = devm_reset_control_get(dev, resource->name);
++	if (IS_ERR(*rstp))
++		return PTR_ERR(*rstp);
 +
 +	return 0;
 +}
-+EXPORT_SYMBOL_GPL(devm_acquire_iomap);
-diff --git a/include/linux/device.h b/include/linux/device.h
-index c2bbee6b60ad..edcdc7a30114 100644
---- a/include/linux/device.h
-+++ b/include/linux/device.h
-@@ -687,6 +687,25 @@ extern int devm_resource_alloc(struct device *dev,
- #define DEVM_ALLOC(_struct) \
-         { .initfunc = devm_resource_alloc, .offset = sizeof(struct _struct), }
++EXPORT_SYMBOL_GPL(devm_acquire_reset);
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index da5602bd77d7..1771c5cbfeb1 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -3,6 +3,7 @@
  
-+extern int devm_acquire_iomap(struct device *dev,
-+			      const struct devm_resource *resource);
+ struct device;
+ struct device_node;
++struct devm_resource;
+ struct reset_control;
+ 
+ #ifdef CONFIG_RESET_CONTROLLER
+@@ -38,6 +39,15 @@ static inline struct reset_control *devm_reset_control_get_optional(
+ struct reset_control *of_reset_control_get(struct device_node *node,
+ 					   const char *id);
+ 
++int devm_acquire_reset(struct device *dev,
++		       const struct devm_resource *resource);
 +
-+#define DEVM_IOMAP_NOREQUEST 1
-+
-+#define DEVM_IOMAP(_struct, _member, _index, _flags) {		  \
-+	.initfunc = devm_acquire_iomap,				   \
-+	.offset = offsetof_t(struct _struct, _member, void __iomem *),  \
-+	.index = _index,						\
-+	.flags = _flags,						\
++#define DEVM_RESET(_struct, _member, _name) {	 			\
++	.initfunc = devm_acquire_reset,				 	\
++	.offset = offsetof_t(struct _struct, _member, struct reset_control *),\
++	.name = _name,							\
 +}
 +
-+#define DEVM_IOMAP_NAMED(_struct, _member, _name, _flags) {	     \
-+	.initfunc = devm_acquire_iomap,				   \
-+	.offset = offsetof_t(struct _struct, _member, void __iomem *),  \
-+	.name = _name,						  \
-+	.flags = _flags,						\
-+}
-+
- void __iomem *devm_ioremap_resource(struct device *dev, struct resource *res);
+ #else
  
- /* allows to add/remove a custom action to devres stack */
+ static inline int reset_control_reset(struct reset_control *rstc)
 -- 
 2.4.3
