@@ -1,65 +1,105 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Jul 2015 15:43:27 -0700
-Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
-In-Reply-To: <CAD=FV=VpY4j=HOGCMdFJ8g1bWeUTKqk=GWoEB+EB3y52UMbrLg@mail.gmail.com>
-References: <1437511283-14216-1-git-send-email-dianders@chromium.org>
- <55AEB6AE.2070006@codeaurora.org>
- <CAD=FV=VpY4j=HOGCMdFJ8g1bWeUTKqk=GWoEB+EB3y52UMbrLg@mail.gmail.com>
-Message-ID: <55AECB0F.3090701@codeaurora.org>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 17:44:06 -0500
+Subject: [PATCH v4 1/5] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
+References: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <20150721224406.GM21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2015 03:37 PM, Doug Anderson wrote:
-> Stephen,
->
-> On Tue, Jul 21, 2015 at 2:16 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> On 07/21/2015 01:41 PM, Douglas Anderson wrote:
->>> In the TRM we see that BWADJ is "a 12-bit bus that selects the values
->>> 1-4096 for the bandwidth divider (NB)":
->>>    NB = BWADJ[11:0] + 1
->>> The recommended setting of NB: NB = NF / 2.
->>>
->>> So:
->>>     NB = NF / 2
->>>     BWADJ[11:0] + 1 = NF / 2
->>>     BWADJ[11:0] = NF / 2 - 1
->>>
->>> Right now, we have:
->>>
->>> {                                               \
->>>           .rate   = _rate##U,                     \
->>>           .nr = _nr,                              \
->>>           .nf = _nf,                              \
->>>           .no = _no,                              \
->>>           .bwadj = (_nf >> 1),                    \
->>> }
->>>
->>> That means we set bwadj to NF / 2, not NF / 2 - 1
->>>
->>> All of this is a bit confusing because we specify "NR" (the 1-based
->>> value), "NF" (the 1-based value), "NO" (the 1-based value), but
->>> "BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
->>>
->>> Let's change to working with "NB" and fix the off by one error.  This
->>> may affect PLL jitter in a small way (hopefully for the better).
->>>
->>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
->>>
->> There's no Fixes tag or stable Cc so I take it this isn't fixing any
->> manifesting regression, more of a visual inspection bug find?
-> There is no known problem fixed.  I've been looking at HDMI and
-> controlling PLL jitter is an important part of supporting HDMI clock
-> rates.  That got me to looking at this parameter and deciding that we
-> should set it correctly.  Apparently it doesn't help in any hugely
-> significant way...  I just got done re-testing a whole lot of rates
-> and if it helped or hurt my jitter it's in the noise (AKA there's
-> enough variance run-to-run that it's hard to tell if this made any
-> difference).
->
->
+Hi Zhou & Gabriele,
 
-Ok. Applied to clk-next.
+On Tue, Jul 21, 2015 at 02:48:39PM +0800, Zhou Wang wrote:
+> This patch is needed in order to unify the PCIe designware framework for ARM and
+> ARM64 architectures. In the PCIe designware unification process we are calling
+> pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+> ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+> cause a problem with the function pcibios_align_resource(); in fact this will
+> cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+> "struct pcie_port*" pointer.
+> 
+> This patch solves the issue by removing "align_resource" from "pci_sys_data"
+> struct and defining a static global function pointer in "bios32.c"
+> 
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Can you fix up Gabriele's email address above (currently contains " at ")
+and verify that this sign-off chain is accurate per section 11 of
+Documentation/SubmittingPatches?  The above suggests to me that Gabriele
+originally wrote this patch and Zhou is passing it along.  That might well
+be true; I haven't followed the development, so I'm just double-checking.
+
+> ---
+>  arch/arm/include/asm/mach/pci.h |  5 -----
+>  arch/arm/kernel/bios32.c        | 12 ++++++++----
+>  2 files changed, 8 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 28b9bb3..8a4e4de 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -58,11 +58,6 @@ struct pci_sys_data {
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+>  					/* Resource alignement requirements	*/
+> -	resource_size_t (*align_resource)(struct pci_dev *dev,
+> -					  const struct resource *res,
+> -					  resource_size_t start,
+> -					  resource_size_t size,
+> -					  resource_size_t align);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+>  
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..4cdc64d 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -17,6 +17,11 @@
+>  #include <asm/mach/pci.h>
+>  
+>  static int debug_pci;
+> +static resource_size_t (*align_resource)(struct pci_dev *dev,
+> +		  const struct resource *res,
+> +		  resource_size_t start,
+> +		  resource_size_t size,
+> +		  resource_size_t align) = NULL;
+>  
+>  #ifdef CONFIG_PCI_MSI
+>  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> -		sys->align_resource = hw->align_resource;
+> +		align_resource = hw->align_resource;
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+>  	struct pci_dev *dev = data;
+> -	struct pci_sys_data *sys = dev->sysdata;
+>  	resource_size_t start = res->start;
+>  
+>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+> @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  
+>  	start = (start + align - 1) & ~(align - 1);
+>  
+> -	if (sys->align_resource)
+> -		return sys->align_resource(dev, res, start, size, align);
+> +	if (align_resource)
+> +		return align_resource(dev, res, start, size, align);
+>  
+>  	return start;
+>  }
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
