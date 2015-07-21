@@ -1,64 +1,114 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jul 2015 16:17:31 -0500
-Subject: [PATCH v4 07/19] PCI/MSI: Let pci_msi_get_domain use struct
- device's msi_domain
-In-Reply-To: <1436962613-17359-8-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 21 Jul 2015 16:19:47 -0500
+Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
+ field
+In-Reply-To: <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
 References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
- <1436962613-17359-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150721211731.GA3691@google.com>
+ <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150721211947.GI21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
+> In order to be able to populate the device msi_domain field,
+> add the necesary hooks to propagate the host bridge msi_domain
 
-On Wed, Jul 15, 2015 at 01:16:41PM +0100, Marc Zyngier wrote:
-> Now that we can easily find which MSI domain a PCI device is
-> using, use dev_get_msi_domain as a way to retrieve the information.
+s/necesary/necessary/
+
+> across secondary busses to devices.
 > 
-> The original code is still used as a fallback.
+> So far, nobody populates the initial msi_domain.
 > 
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/pci/msi.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
+>  include/linux/pci.h |  1 +
+>  2 files changed, 31 insertions(+)
 > 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index ef4ec6e..c77fdaf 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -41,7 +41,8 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
->  {
->  	struct irq_domain *domain = NULL;
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index cefd636..376f6fa 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+>  	}
+>  }
 >  
-> -	if (dev->bus->msi)
-> +	domain = dev_get_msi_domain(&dev->dev);
-> +	if (!domain && dev->bus->msi)
->  		domain = dev->bus->msi->domain;
->  	if (!domain)
->  		domain = arch_get_pci_msi_domain(dev);
+> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
+> +{
+> +}
+> +
+> +static void pci_set_bus_msi_domain(struct pci_bus *bus)
+> +{
+> +	struct pci_dev *bridge = bus->self;
+> +
+> +	if (!bridge)
+> +		pcibios_set_host_bridge_msi_domain(bus);
 
-I think this would be slightly easier to read as:
+I would use pci_is_root_bus() here instead of testing "!bridge".
 
-    struct irq_domain *domain;
-
-    domain = dev_get_msi_domain(&dev->dev);
-    if (domain)
-	return domain;
-
-    if (dev->bus->msi && (domain = dev->bus->msi->domain))
-	return domain;
-
-    return arch_get_pci_msi_domain(dev);
-
-I'm not a huge fan of assignments inside "if" conditions, and checkpatch
-might even complain about it, but it exposes the fallback order pretty well
-here.  I guess we could also just repeat the dev->bus->msi->domain
-expression:
-
-    if (dev->bus->msi && dev->bus->msi->domain)
-	return dev->bus->msi->domain;
-
-We can at least get rid of the superfluous initialization of domain to
-NULL.
-
-Bjorn
+> +	else
+> +		dev_set_msi_domain(&bus->dev, dev_get_msi_domain(&bridge->dev));
+> +}
+> +
+>  static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  					   struct pci_dev *bridge, int busnr)
+>  {
+> @@ -714,6 +728,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  	bridge->subordinate = child;
+>  
+>  add_dev:
+> +	pci_set_bus_msi_domain(child);
+>  	ret = device_register(&child->dev);
+>  	WARN_ON(ret < 0);
+>  
+> @@ -1544,6 +1559,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
+>  	pci_enable_acs(dev);
+>  }
+>  
+> +static void pci_set_msi_domain(struct pci_dev *dev)
+> +{
+> +	/*
+> +	 * If no domain has been set through the pcibios callback,
+> +	 * inherit the default from the bus device.
+> +	 */
+> +	if (!dev_get_msi_domain(&dev->dev))
+> +		dev_set_msi_domain(&dev->dev,
+> +				   dev_get_msi_domain(&dev->bus->dev));
+> +}
+> +
+>  void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  {
+>  	int ret;
+> @@ -1585,6 +1611,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+>  	ret = pcibios_add_device(dev);
+>  	WARN_ON(ret < 0);
+>  
+> +	/* Setup MSI irq domain */
+> +	pci_set_msi_domain(dev);
+> +
+>  	/* Notifier could use PCI capabilities */
+>  	dev->match_driver = false;
+>  	ret = device_add(&dev->dev);
+> @@ -1975,6 +2004,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>  	b->bridge = get_device(&bridge->dev);
+>  	device_enable_async_suspend(b->bridge);
+>  	pci_set_bus_of_node(b);
+> +	pci_set_bus_msi_domain(b);
+>  
+>  	if (!parent)
+>  		set_dev_node(b->bridge, pcibus_to_node(b));
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index fbf245f..fe0825f 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1644,6 +1644,7 @@ int pcibios_set_pcie_reset_state(struct pci_dev *dev,
+>  int pcibios_add_device(struct pci_dev *dev);
+>  void pcibios_release_device(struct pci_dev *dev);
+>  void pcibios_penalize_isa_irq(int irq, int active);
+> +void pcibios_set_host_bridge_msi_domain(struct pci_bus *bus);
+>  
+>  #ifdef CONFIG_HIBERNATE_CALLBACKS
+>  extern struct dev_pm_ops pcibios_pm_ops;
+> -- 
+> 2.1.4
+> 
