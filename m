@@ -1,122 +1,68 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 22 Jul 2015 00:06:58 +0530
-Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <20150721174851.GP3061@x1>
-References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
- <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
- <CABb+yY2nAT6V4Q8suAXRtPXrXkArGWVTAW28ts4Z3C_ybuJovA@mail.gmail.com>
- <20150721150629.GJ3061@x1>
- <CABb+yY25DC_hmuUhbEVvdEqdUnM6bJxCjBcamZBL97o=jR83Ug@mail.gmail.com>
- <20150721155253.GN3061@x1>
- <CABb+yY1oKJKJGnn345uzE1mnVk5kCaGTO0b4zzqojN39m2OMyg@mail.gmail.com>
- <20150721174851.GP3061@x1>
-Message-ID: <CABb+yY3==_XJYs=Q8v3fAQbh0SLrgMNP0t048OJroUCcJw0Bgg@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 21 Jul 2015 19:40:53 +0100
+Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <55AE8864.6020608@codeaurora.org>
+References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55AD6412.9070205@codeaurora.org> <55AE13D8.6020301@linaro.org>
+ <55AE8864.6020608@codeaurora.org>
+Message-ID: <55AE9235.4080809@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 11:18 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Tue, 21 Jul 2015, Jassi Brar wrote:
->
->> On Tue, Jul 21, 2015 at 9:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Tue, 21 Jul 2015, Jassi Brar wrote:
->> >
->> >> >
->> >> >> > +static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
->> >> >> > +{
->> >> >> > +       struct sti_channel *chan_info = chan->con_priv;
->> >> >> > +       struct sti_mbox_device *mdev = chan_info->mdev;
->> >> >> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
->> >> >> > +       unsigned int instance = chan_info->instance;
->> >> >> > +       unsigned int channel = chan_info->channel;
->> >> >> > +       void __iomem *base;
->> >> >> > +
->> >> >> > +       if (!sti_mbox_tx_is_ready(chan))
->> >> >> > +               return -EBUSY;
->> >> >> This is the first thing I look out for in every new driver :)  this
->> >> >> check is unnecessary.
->> >> >
->> >> > In what way?  What if the channel is disabled or there is an IRQ
->> >> > already pending?
->> >> >
->> >> API calls send_data() only if last_tx_done() returned true.
->> >
->> > I know for a fact that the 'catchers' in sti_mbox_tx_is_ready() to
->> > fire, because I have triggered them.  I'd really rather keep this
->> > harmless check in.
->> >
->> If you put some printk in send_data() and last_tx_done() you'll see
->> what I mean :)
->>
->> >> >> > +static const struct sti_mbox_pdata mbox_stih407_pdata = {
->> >> >> > +       .num_inst       = 4,
->> >> >> > +       .num_chan       = 32,
->> >> >> > +       .irq_val        = 0x04,
->> >> >> > +       .irq_set        = 0x24,
->> >> >> > +       .irq_clr        = 0x44,
->> >> >> > +       .ena_val        = 0x64,
->> >> >> > +       .ena_set        = 0x84,
->> >> >> > +       .ena_clr        = 0xa4,
->> >> >> >
->> >> >> Register offsets are parameters of the controller
->> >> >
->> >> > And this is a controller driver?  Not sure I get the point.
->> >> >
->> >> Platform_data usually carries board/platform specific parameters.
->> >> Register offset "properties" are as fixed as the behavior of the
->> >> controller, so they should stay inside the code, not come via
->> >> platform_data.
->> >
->> > That's not the case for this controller.  There is nothing preventing
->> > these values from changing on a new board revisions.
->> >
->> Hmm ... interesting! Can't see how enable/disable channel and irq
->> set/clear could be effected by writing to random, but agreed upon,
->> location between two processors. There ought to be some controller
->> listening there?  Now I am more interested in knowing this IP :)
->
-> High level
-> ----------
->
->           MB0       MB1       MB2       MB3       MB4
->       +---------+---------+---------+---------+---------+
-> INST0 |         |         |         |         |         |
->       +---------+---------+---------+---------+---------+
-> INST1 |         |         |         |         |         |
->       +---------+---------+---------+---------+---------+
-> INST2 |         |         |         |         |         |
->       +---------+---------+---------+---------+---------+
-> INST3 |         |         |         |         |         |
->       +---------+---------+---------+---------+---------+
->
-> Low level [each box above looks like this)
-> ------------------------------------------
->
->          1                                                             32
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> IRQ_VAL | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> IRQ_SET | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> IRQ_CLR | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> ENB_VAL | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> ENB_SET | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-> ENB_CLR | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | | |
->         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
->
-> That's it.  That's the entirety of the "IP".
->
-Thanks for taking time out to draw it. Reading code I did get the idea
-that mailbox registers are interleaved rather than usual separate
-regions. But that doesn't change anything.
-   Regardless of the organisation, the registers do have to be at a
-particular address... I mean when you set some bit in ENB_SET
-'register' there has to be "something" beneath it that triggers the
-interrupt. That "something" is the controller, which can't see such
-writes to other locations. Right?  I mean this is just like any other
-device controller which may have register space at different offsets
-but relative addresses of registers won't change across platforms.
 
-thanks.
+
+On 21/07/15 18:59, Stephen Boyd wrote:
+> On 07/21/2015 02:41 AM, Srinivas Kandagatla wrote:
+>> Thanks Stephen for review,
+>>
+>> On 20/07/15 22:11, Stephen Boyd wrote:
+>>> On 07/20/2015 07:43 AM, Srinivas Kandagatla wrote:
+>>>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>>>> new file mode 100644
+>>>> index 0000000..bde5528
+>>>> --- /dev/null
+>>>> +++ b/drivers/nvmem/core.c
+>>>> @@ -0,0 +1,384 @@
+>>>>
+>>>> +
+>>>> +static int nvmem_add_cells(struct nvmem_device *nvmem,
+>>>> +               const struct nvmem_config *cfg)
+>>>> +{
+>>>> +    struct nvmem_cell **cells;
+>>>> +    const struct nvmem_cell_info *info = cfg->cells;
+>>>> +    int i, rval;
+>>>> +
+>>>> +    cells = kzalloc(sizeof(*cells) * cfg->ncells, GFP_KERNEL);
+>>>
+>>> kcalloc?
+>>
+>> Only reason for using kzalloc is to give the code more flexibility to
+>> free any pointer in the array in case of errors.
+>
+> Still lost. The arrays are allocated down below in the for loop. This is
+> allocating a bunch of pointers so using kcalloc() here avoids problems
+> with overflows causing kzalloc() to allocate fewer pointers than
+> requested. I'm not suggesting we replace the for loop with a kcalloc,
+> just this single line.
+>
+Yes we could replace the loop with kcalloc, but the problem is how can 
+we handle freeing an element from that array?
+
+AFAIK we can only free the full array rather than each element if we 
+allocate it via kcalloc, correct me if Am wrong?
+
+>>
+>>>
+>>>> +    if (!cells)
+>>>> +        return -ENOMEM;
+>>>> +
+>>>> +    for (i = 0; i < cfg->ncells; i++) {
+>>>> +        cells[i] = kzalloc(sizeof(**cells), GFP_KERNEL);
+>>>> +        if (!cells[i]) {
+>>>> +            rval = -ENOMEM;
+>>>> +            goto err;
+>>>> +        }
+>>>> +
+>
