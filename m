@@ -1,41 +1,78 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Jul 2015 13:23:26 +0100
-Subject: [PATCH v3 1/6] arm64: kernel: Add cpuid_feature_extract_field() for
- 4bit sign extension
+Date: Tue, 21 Jul 2015 13:23:29 +0100
+Subject: [PATCH v3 4/6] arm64: kernel: Add min_field_value and use '>=' for
+ feature detection
 In-Reply-To: <1437481411-1595-1-git-send-email-james.morse@arm.com>
 References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
-Message-ID: <1437481411-1595-2-git-send-email-james.morse@arm.com>
+Message-ID: <1437481411-1595-5-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on arch/arm/include/asm/cputype.h, this function does the
-shifting and sign extension necessary when accessing cpu feature fields.
+When a new cpu feature is available, the cpu feature bits will have some
+initial value, which is incremented when the feature is updated.
+This patch changes 'register_value' to be 'min_field_value', and checks
+the feature bits value (interpreted as a signed int) is greater than this
+minimum.
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Suggested-by: Russell King <linux@arm.linux.org.uk>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/cpufeature.h | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/include/asm/cpufeature.h |  4 ++--
+ arch/arm64/kernel/cpufeature.c      | 14 +++++++++++---
+ 2 files changed, 13 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index c1044218a63a..9fafa7537997 100644
+index 484fa9425314..f595f7ddd43b 100644
 --- a/arch/arm64/include/asm/cpufeature.h
 +++ b/arch/arm64/include/asm/cpufeature.h
-@@ -70,6 +70,13 @@ static inline void cpus_set_cap(unsigned int num)
- 		__set_bit(num, cpu_hwcaps);
- }
+@@ -42,8 +42,8 @@ struct arm64_cpu_capabilities {
+ 		};
  
-+static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
-+								  int field)
+ 		struct {	/* Feature register checking */
+-			u64 register_mask;
+-			u64 register_value;
++			int field_pos;
++			int min_field_value;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index 650ffc28bedc..74fd0f74b065 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -23,12 +23,20 @@
+ #include <asm/cpufeature.h>
+ 
+ static bool
++feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
 +{
-+	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
++	int val = cpuid_feature_extract_field(reg, entry->field_pos);
++
++	return val >= entry->min_field_value;
 +}
 +
-+
- void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
- 			    const char *info);
- void check_local_cpu_errata(void);
++static bool
+ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
+ {
+ 	u64 val;
+ 
+ 	val = read_cpuid(id_aa64pfr0_el1);
+-	return (val & entry->register_mask) == entry->register_value;
++	return feature_matches(val, entry);
+ }
+ 
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+@@ -36,8 +44,8 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.desc = "GIC system register CPU interface",
+ 		.capability = ARM64_HAS_SYSREG_GIC_CPUIF,
+ 		.matches = has_id_aa64pfr0_feature,
+-		.register_mask = (0xf << 24),
+-		.register_value = (1 << 24),
++		.field_pos = 24,
++		.min_field_value = 1,
+ 	},
+ 	{},
+ };
 -- 
 2.1.4
