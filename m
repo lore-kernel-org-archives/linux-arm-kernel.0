@@ -1,189 +1,190 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 21 Jul 2015 10:38:32 +0100
-Subject: [PATCH V3 08/19] soc: tegra: pmc: Clean-up PMC helper functions
-In-Reply-To: <20150717102546.GL3057@ulmo>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-9-git-send-email-jonathanh@nvidia.com>
- <20150717102546.GL3057@ulmo>
-Message-ID: <55AE1318.4030503@nvidia.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 21 Jul 2015 10:41:44 +0100
+Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <55AD6412.9070205@codeaurora.org>
+References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55AD6412.9070205@codeaurora.org>
+Message-ID: <55AE13D8.6020301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Thanks Stephen for review,
 
-On 17/07/15 11:25, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Mon, Jul 13, 2015 at 01:39:46PM +0100, Jon Hunter wrote:
->> The following clean-ups have been made to the PMC code:
+On 20/07/15 22:11, Stephen Boyd wrote:
+> On 07/20/2015 07:43 AM, Srinivas Kandagatla wrote:
+>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>> new file mode 100644
+>> index 0000000..bde5528
+>> --- /dev/null
+>> +++ b/drivers/nvmem/core.c
+>> @@ -0,0 +1,384 @@
 >>
->> 1. Add a macro for determining the state of a PMC powergate
->> 2. Use the readx_poll_timeout() function instead of implementing a local
->>    polling loop with a timeout.
->> 3. Use a case-statement in the function that removes the powergate clamp
->>    instead of multiple if-statements to improve readability.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->>  drivers/soc/tegra/pmc.c | 72 ++++++++++++++++++++++++-------------------------
->>  1 file changed, 35 insertions(+), 37 deletions(-)
->>
->> diff --git a/drivers/soc/tegra/pmc.c b/drivers/soc/tegra/pmc.c
->> index c0635bdd4ee3..180d434deec5 100644
->> --- a/drivers/soc/tegra/pmc.c
->> +++ b/drivers/soc/tegra/pmc.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/export.h>
->>  #include <linux/init.h>
->>  #include <linux/io.h>
->> +#include <linux/iopoll.h>
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>  #include <linux/platform_device.h>
->> @@ -56,6 +57,8 @@
->>  #define  PWRGATE_TOGGLE_START		(1 << 8)
->>  
->>  #define REMOVE_CLAMPING			0x34
->> +#define  REMOVE_CLAMPING_VDEC		(1 << 3)
->> +#define  REMOVE_CLAMPING_PCIE		(1 << 4)
->>  
->>  #define PWRGATE_STATUS			0x38
->>  
->> @@ -101,6 +104,8 @@
->>  
->>  #define GPU_RG_CNTRL			0x2d4
->>  
->> +#define PMC_PWRGATE_STATE(val, id)	(!!(val & BIT(id)))
-> 
-> I find double-negations very difficult to read. ((value & BIT(id)) != 0)
-> is clearer in my opinion. Also I'd suggest status or value as the first
-> parameter name, for consistency with other parts of the driver.
-> 
 >> +
->>  struct tegra_pmc_soc {
->>  	unsigned int num_powergates;
->>  	const char *const *powergates;
->> @@ -177,15 +182,14 @@ static void tegra_pmc_writel(u32 value, unsigned long offset)
->>   */
->>  static int tegra_powergate_set(int id, bool new_state, bool wait)
->>  {
->> -	unsigned long timeout;
->> -	bool status;
->>  	int ret = 0;
->> +	u32 val;
->>  
->>  	mutex_lock(&pmc->powergates_lock);
->>  
->> -	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
->> +	val = tegra_pmc_readl(PWRGATE_STATUS);
->>  
->> -	if (status == new_state) {
->> +	if (PMC_PWRGATE_STATE(val, id) == new_state) {
->>  		mutex_unlock(&pmc->powergates_lock);
->>  		return 0;
->>  	}
->> @@ -193,17 +197,9 @@ static int tegra_powergate_set(int id, bool new_state, bool wait)
->>  	tegra_pmc_writel(PWRGATE_TOGGLE_START | id, PWRGATE_TOGGLE);
->>  
->>  	if (wait) {
->> -		timeout = jiffies + msecs_to_jiffies(100);
->> -		ret = -ETIMEDOUT;
->> -
->> -		while (time_before(jiffies, timeout)) {
->> -			status = !!(tegra_pmc_readl(PWRGATE_STATUS) & BIT(id));
->> -			if (status == new_state) {
->> -				ret = 0;
->> -				break;
->> -			}
->> -			udelay(10);
->> -		}
->> +		ret = readx_poll_timeout(tegra_pmc_readl, PWRGATE_STATUS,
->> +				val, PMC_PWRGATE_STATE(val, id) == new_state,
->> +				10, 100000);
->>  	}
->>  
->>  	mutex_unlock(&pmc->powergates_lock);
->> @@ -242,13 +238,10 @@ EXPORT_SYMBOL(tegra_powergate_power_off);
->>   */
->>  int tegra_powergate_is_powered(int id)
->>  {
->> -	u32 status;
->> -
->>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->>  		return -EINVAL;
->>  
->> -	status = tegra_pmc_readl(PWRGATE_STATUS) & (1 << id);
->> -	return !!status;
->> +	return PMC_PWRGATE_STATE(tegra_pmc_readl(PWRGATE_STATUS), id);
-> 
-> I'd prefer to keep the two steps here. As a general rule I try never to
-> mix reading or writing a register with other code on the same line.
-> 
->>  }
->>  
->>  /**
->> @@ -257,34 +250,39 @@ int tegra_powergate_is_powered(int id)
->>   */
->>  int tegra_powergate_remove_clamping(int id)
->>  {
->> -	u32 mask;
->> +	u32 val, reg;
-> 
-> Side note: Please use value instead of val since that's the form used
-> elsewhere in the driver. Also reg would be more appropriately called
-> offset or similar because that's what it really is. It would also be
-> more naturally an unsized type, such as unsigned int. But...
-> 
->>  
->>  	if (!pmc->soc || id < 0 || id >= pmc->soc->num_powergates)
->>  		return -EINVAL;
->>  
->>  	/*
->> -	 * On Tegra124 and later, the clamps for the GPU are controlled by a
->> -	 * separate register (with different semantics).
->> +	 * In most cases the bit for removing the IO clamping is the same as
->> +	 * the powergate partition ID, however, this is not always the case.
->> +	 * Furthermore, on Tegra124 and later, the clamps for the GPU are
->> +	 * controlled by a separate register (with different semantics). The
->> +	 * following case-statement handles these exceptions.
->>  	 */
->> -	if (id == TEGRA_POWERGATE_3D) {
->> +	val = 1 << id;
->> +	reg = REMOVE_CLAMPING;
+>> +static int nvmem_add_cells(struct nvmem_device *nvmem,
+>> +               const struct nvmem_config *cfg)
+>> +{
+>> +    struct nvmem_cell **cells;
+>> +    const struct nvmem_cell_info *info = cfg->cells;
+>> +    int i, rval;
 >> +
->> +	switch (id) {
->> +	case TEGRA_POWERGATE_3D:
->>  		if (pmc->soc->has_gpu_clamps) {
->> -			tegra_pmc_writel(0, GPU_RG_CNTRL);
->> -			return 0;
->> +			val = 0;
->> +			reg  = GPU_RG_CNTRL;
->>  		}
->> +		break;
->> +	case TEGRA_POWERGATE_VDEC:
->> +		val = REMOVE_CLAMPING_VDEC;
->> +		break;
->> +	case TEGRA_POWERGATE_PCIE:
->> +		val = REMOVE_CLAMPING_PCIE;
->> +		break;
->> +	default:
->> +		break;
->>  	}
->>  
->> -	/*
->> -	 * Tegra 2 has a bug where PCIE and VDE clamping masks are
->> -	 * swapped relatively to the partition ids
->> -	 */
->> -	if (id == TEGRA_POWERGATE_VDEC)
->> -		mask = (1 << TEGRA_POWERGATE_PCIE);
->> -	else if (id == TEGRA_POWERGATE_PCIE)
->> -		mask = (1 << TEGRA_POWERGATE_VDEC);
->> -	else
->> -		mask = (1 << id);
->> -
->> -	tegra_pmc_writel(mask, REMOVE_CLAMPING);
->> +	tegra_pmc_writel(val, reg);
-> 
-> ... to be honest, I think the previous code was more straightforward, so
-> I'd prefer if you dropped this particular hunk.
+>> +    cells = kzalloc(sizeof(*cells) * cfg->ncells, GFP_KERNEL);
+>
+> kcalloc?
 
-Ok, I will drop that part. Jon
+Only reason for using kzalloc is to give the code more flexibility to 
+free any pointer in the array in case of errors.
+
+>
+>> +    if (!cells)
+>> +        return -ENOMEM;
+>> +
+>> +    for (i = 0; i < cfg->ncells; i++) {
+>> +        cells[i] = kzalloc(sizeof(**cells), GFP_KERNEL);
+>> +        if (!cells[i]) {
+>> +            rval = -ENOMEM;
+>> +            goto err;
+>> +        }
+>> +
+>> +        rval = nvmem_cell_info_to_nvmem_cell(nvmem, &info[i], cells[i]);
+>> +        if (IS_ERR_VALUE(rval)) {
+>> +            kfree(cells[i]);
+>> +            goto err;
+>> +        }
+>> +
+>> +        nvmem_cell_add(cells[i]);
+>> +    }
+>> +
+>> +    nvmem->ncells = cfg->ncells;
+>> +    /* remove tmp array */
+>> +    kfree(cells);
+>> +
+>> +    return 0;
+>> +err:
+>> +    while (--i)
+>> +        nvmem_cell_drop(cells[i]);
+>> +
+>> +    return rval;
+>> +}
+>> +
+>> +/**
+>> + * nvmem_register() - Register a nvmem device for given nvmem_config.
+>> + * Also creates an binary entry in /sys/bus/nvmem/devices/dev-name/nvmem
+>> + *
+>> + * @config: nvmem device configuration with which nvmem device is
+>> created.
+>> + *
+>> + * Return: Will be an ERR_PTR() on error or a valid pointer to
+>> nvmem_device
+>> + * on success.
+>> + */
+>> +
+>
+> Why the newline?
+Yep, fixed it now.
+
+>
+>> +struct nvmem_device *nvmem_register(const struct nvmem_config *config)
+>> +{
+>> +    struct nvmem_device *nvmem;
+>> +    struct device_node *np;
+>> +    struct regmap *rm;
+>> +    int rval;
+>> +
+>> +    if (!config->dev)
+>> +        return ERR_PTR(-EINVAL);
+>> +
+>> +    rm = dev_get_regmap(config->dev, NULL);
+>> +    if (!rm) {
+>> +        dev_err(config->dev, "Regmap not found\n");
+>> +        return ERR_PTR(-EINVAL);
+>> +    }
+>> +
+>> +    nvmem = kzalloc(sizeof(*nvmem), GFP_KERNEL);
+>> +    if (!nvmem)
+>> +        return ERR_PTR(-ENOMEM);
+>> +
+>> +    nvmem->id = ida_simple_get(&nvmem_ida, 0, 0, GFP_KERNEL);
+>> +    if (nvmem->id < 0) {
+>> +        kfree(nvmem);
+>> +        return ERR_PTR(nvmem->id);
+>
+> Oops, we already freed nvmem.
+>
+Oops, Fixed this one too.
+
+>> +    }
+>> +
+>> +    nvmem->regmap = rm;
+>> +    nvmem->owner = config->owner;
+>> +    nvmem->stride = regmap_get_reg_stride(rm);
+>> +    nvmem->word_size = regmap_get_val_bytes(rm);
+>> +    nvmem->size = regmap_get_max_register(rm) + nvmem->stride;
+>> +    nvmem->dev.type = &nvmem_provider_type;
+>> +    nvmem->dev.bus = &nvmem_bus_type;
+>> +    nvmem->dev.parent = config->dev;
+>> +    np = config->dev->of_node;
+>> +    nvmem->dev.of_node = np;
+>> +    dev_set_name(&nvmem->dev, "%s%d",
+>> +             config->name ? : "nvmem", config->id);
+>> +
+>> +    nvmem->read_only = np ? of_property_read_bool(np, "read-only") : 0;
+>
+> of_property_read_bool(NULL, ..) "does the right thing" and returns false
+> already.
+thanks, that should make this more simple.
+>
+>> +
+>> +    nvmem->read_only |= config->read_only;
+>> +
+>> +    device_initialize(&nvmem->dev);
+>> +
+>> +    dev_dbg(&nvmem->dev, "Registering nvmem device %s\n", config->name);
+>> +
+>> +    rval = device_add(&nvmem->dev);
+>> +    if (rval) {
+>> +        ida_simple_remove(&nvmem_ida, nvmem->id);
+>> +        kfree(nvmem);
+>> +        return ERR_PTR(rval);
+>> +    }
+>> +
+>> +    if (device_create_bin_file(&nvmem->dev,
+>> +                nvmem->read_only ? &bin_attr_ro_nvmem :
+>> +                &bin_attr_rw_nvmem))
+>> +        dev_warn(&nvmem->dev, "Failed to create sysfs binary file\n");
+>
+> Why can't we have device_add() add the binary file attribute too?
+>
+Yes we can set dev.groups directly before device_add, I did this change too.
+>> +
+>> +    if (config->cells)
+>> +        nvmem_add_cells(nvmem, config);
+>> +
+>> +    return nvmem;
+>> +}
+>> +EXPORT_SYMBOL_GPL(nvmem_register);
+>> +
+>> +/**
+>> + * nvmem_unregister() - Unregister previously registered nvmem device
+>> + *
+>> + * @nvmem: Pointer to previously registered nvmem device.
+>> + *
+>> + * Return: Will be an negative on error or a zero on success.
+>> + */
+>> +int nvmem_unregister(struct nvmem_device *nvmem)
+>> +{
+>> +    mutex_lock(&nvmem_mutex);
+>> +    if (nvmem->users) {
+>> +        mutex_unlock(&nvmem_mutex);
+>> +        return -EBUSY;
+>> +    }
+>> +    mutex_unlock(&nvmem_mutex);
+>
+> This lock doesn't seem to be doing anything in this patch? Perhaps it
+> should be added in the second patch where consumers start making it useful?
+Ok, make sense. I moved this too.
+I have v9 ready will send it.
+
+--srini
+>
