@@ -1,36 +1,77 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Tue, 21 Jul 2015 14:16:39 +0200
-Subject: [PATCH V2 net-next 2/3] ARM: net: add support for BPF_ANC |
- SKF_AD_PAY_OFFSET in ARM JIT.
-In-Reply-To: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
-References: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1437481000-22835-3-git-send-email-nschichan@freebox.fr>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Jul 2015 14:19:00 +0200
+Subject: [PATCH 2/2] dmaengine: xdmac: Add scatter gathered memset support
+In-Reply-To: <20150717030926.GC5086@localhost>
+References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1436177964-19380-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20150716120154.GN5086@localhost> <20150716141105.GJ28632@lukather>
+ <20150717030926.GC5086@localhost>
+Message-ID: <20150721121900.GB2373@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+On Fri, Jul 17, 2015 at 08:39:26AM +0530, Vinod Koul wrote:
+> On Thu, Jul 16, 2015 at 04:11:05PM +0200, Maxime Ripard wrote:
+> > Hi Vinod,
+> > 
+> > > > +		/*
+> > > > +		 * The scatterlist API gives us only the address and
+> > > > +		 * length of each elements.
+> > > > +		 *
+> > > > +		 * Unfortunately, we don't have the stride, which we
+> > > > +		 * will need to compute.
+> > > > +		 *
+> > > > +		 * That make us end up in a situation like this one:
+> > > > +		 *    len    stride    len    stride    len
+> > > > +		 * +-------+        +-------+        +-------+
+> > > > +		 * |  N-2  |        |  N-1  |        |   N   |
+> > > > +		 * +-------+        +-------+        +-------+
+> > > > +		 *
+> > > > +		 * We need all these three elements (N-2, N-1 and N)
+> > > > +		 * to actually take the decision on whether we need to
+> > > > +		 * queue N-1 or reuse N-2.
+> > > > +		 *
+> > > > +		 * We will only consider N if it is the last element.
+> > > > +		 */
+> > >
+> > > Why do you need stride?
+> > > 
+> > > This is scatterlist so the computation of stride sounds odd here. Ideally
+> > > you should take the scatterlist and program the lli for controller.
+> > 
+> > Because it is sub-optimal if the length and stride are equals from one
+> > descriptors to another. The XDMAC is able to repeat any given
+> > descriptor a given number of time (which is one by default), which
+> > means that if the parameters of the transfer don't change, we simply
+> > have to increment the number of time the descriptor has to be used,
+> > instead of creating a new one that the controller will have to fetch.
+> > 
+> > In the non-optimal case (ie the length and/or stride change from one
+> > scatterlist element to another), we simply fallback to a one LLI per
+> > scatter list element.
+>
+> Sound fine to me. The optimization is a good one then...
+> 
+> Another question though, do you expect stride to be linear for your
+> cases, if so have you actually though about using interleaved API,
+> for these cases
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 67a2d44..fe28beb 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -884,6 +884,14 @@ b_epilogue:
- 			off = offsetof(struct sk_buff, queue_mapping);
- 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
- 			break;
-+		case BPF_ANC | SKF_AD_PAY_OFFSET:
-+			ctx->seen |= SEEN_SKB | SEEN_CALL;
-+
-+			emit(ARM_MOV_R(ARM_R0, r_skb), ctx);
-+			emit_mov_i(ARM_R3, (unsigned int)skb_get_poff, ctx);
-+			emit_blx_r(ARM_R3, ctx);
-+			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
-+			break;
- 		case BPF_LDX | BPF_W | BPF_ABS:
- 			/*
- 			 * load a 32bit word from struct seccomp_data.
+What do you mean by linear? I guess, at least from an API point of
+view, we should expect any stride and length. The scatter gather
+variants of the dmaengine API were already using scatterlist, and the
+interleaved template doesn't really fit our use case here, so I chose
+to use a scatterlist here, mostly for consistency.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/a30caa7d/attachment.sig>
