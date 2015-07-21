@@ -1,29 +1,65 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 21 Jul 2015 09:11:29 -0700
-Subject: [PATCH 08/10] arch: introduce strict_ioremap
-In-Reply-To: <20150721133051.GB8902@lst.de>
-References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150720001817.30857.69287.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150721133051.GB8902@lst.de>
-Message-ID: <CAPcyv4gsvLmB9QPP=C6RqXuyWeBF_JyubnLypUnoEhJiQL0hbA@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 11:14:46 -0500
+Subject: [PATCH v3 0/2] pci: xgene: Add multiple memory ranges support
+In-Reply-To: <cover.1436476099.git.dhdang@apm.com>
+References: <1481643.dA4ocqzitg@wuerfel> <cover.1436476099.git.dhdang@apm.com>
+Message-ID: <20150721161446.GC21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 6:30 AM, Christoph Hellwig <hch@lst.de> wrote:
-> On Sun, Jul 19, 2015 at 08:18:17PM -0400, Dan Williams wrote:
->> In preparation for enabling memremap(), add support for strict mappings.
->> strict_ioremap_<type>() returns NULL if the arch does not implement the
->> mapping type, rather than falling back silently to ioremap().
->
-> Please don't introduce another large number of ioremap variants.
->
-> I think we should go straight to the ioremap_flags variant, although
-> I wonder if we should even bother with ioremap_flags for this use
-> case, given that we really want memremap-like semantics for anything
-> that isn't plain ioremap (and maybe ioremap_nocache).
->
-> Sorry or being the downer, but I really think we need to clean up this
-> mess deeply insted of trying to paper over it.
+On Thu, Jul 09, 2015 at 02:20:10PM -0700, Duc Dang wrote:
+> This patch set adds 1 large (up to 64GB) memory window for each PCIe
+> controller nodes in X-Gene device tree and fix PCIe controller driver
+> to handle multiple memory ranges correctly. These changes are required
+> to support PCIe devices that have huge BAR.
+> 
+> v3 changes:
+> 	1. Explicitly mention in change log that: Each PCIe node in dts 
+> 	will have 1 32-bit non-prefetchable memory window and 1 64-bit 
+> 	prefetchable memory window.
+> 
+> v2 changes:
+>         1. Separate device-tree changes and driver changes into different
+>         patches
+>         2. Explicitly define new large window as 64-bit prefetchable in dts.
+>         3. Use IORESOURCE_PREFETCH flag to determine which PCIe controller
+>         register to be used to configure the memory ranges.
+>  
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi | 23 ++++++++++++++---------
+>  drivers/pci/host/pci-xgene.c           | 12 ++++++++++--
+>  2 files changed, 24 insertions(+), 11 deletions(-)
 
-No worries.  I'll rework the series around the idea that memremap() is
-a replacement rather than a wrapper for ioremap_<type>().
+Applied to pci/host-xgene for v4.3, with changelogs as follows, thanks!
+
+
+commit 80bb3eda7475eb38b688d2e915c191ce6ad20df1
+Author: Duc Dang <dhdang@apm.com>
+Date:   Thu Jul 9 14:20:11 2015 -0700
+
+    arm64: dts: Add APM X-Gene PCIe 64-bit prefetchable window
+    
+    Add a large window (up to 64GB) for X-Gene PCIe nodes to support devices
+    that require huge BARs.
+    
+    Each X-Gene PCIe node will now have two memory windows: a 32-bit
+    non-prefetchable window and a 64-bit prefetchable window.
+    
+    [bhelgaas: changelog]
+    Signed-off-by: Duc Dang <dhdang@apm.com>
+    Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+commit 8ef54f27f6f425fa8deedc237d99b9daf41d68d2
+Author: Duc Dang <dhdang@apm.com>
+Date:   Thu Jul 9 14:20:12 2015 -0700
+
+    PCI: xgene: Add support for a 64-bit prefetchable memory window
+    
+    X-Gene PCIe controller has registers to support multiple memory ranges.
+    
+    Add support for a 64-bit prefetchable memory window.
+    
+    [bhelgaas: changelog]
+    Signed-off-by: Duc Dang <dhdang@apm.com>
+    Signed-off-by: Tanmay Inamdar <tinamdar@apm.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
