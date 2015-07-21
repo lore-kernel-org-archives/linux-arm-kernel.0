@@ -1,41 +1,90 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 21 Jul 2015 21:53:01 +0530
-Subject: [PATCH-v2 1/2] mfd: devicetree: bindings: 88pm800: Add DT property
- for dual phase enable
+Date: Tue, 21 Jul 2015 21:53:02 +0530
+Subject: [PATCH-v2 2/2] regulator: 88pm800: Add support for configuration of
+ dual phase on BUCK1
 In-Reply-To: <1437495782-15767-1-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1437495782-15767-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <1437495782-15767-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <1437495782-15767-3-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-88PM860 family of device supports dual phase mode on BUCK1 supply
-providing total 6A capacity.
-Note that by default they operate independently with 3A capacity.
+88PM860 device supports dual phase mode on BUCK1 output.
+In normal usecase, BUCK1A and BUCK1B operates independently with 3A
+capacity. And they both can work as a dual phase providing 6A capacity.
 
-This patch updates the devicetree binding with DT property
-to enable dual-phase mode on BUCK1.
+This patch updates the regulator driver to read the respective
+DT property and enable dual-phase mode on BUCK1.
+
+Note that, this is init time (one time) initialization.
 
 Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 ---
- Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/regulator/88pm800.c | 31 +++++++++++++++++++++++++++++++
+ include/linux/mfd/88pm80x.h |  3 +++
+ 2 files changed, 34 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
-index dec842f..2c82fcb 100644
---- a/Documentation/devicetree/bindings/mfd/88pm800.txt
-+++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
-@@ -9,6 +9,12 @@ Required parent device properties:
- - #interrupt-cells 	: should be 1.
- 			  The cell is the 88pm80x local IRQ number
+diff --git a/drivers/regulator/88pm800.c b/drivers/regulator/88pm800.c
+index e846e4c..1bf2b35 100644
+--- a/drivers/regulator/88pm800.c
++++ b/drivers/regulator/88pm800.c
+@@ -267,6 +267,31 @@ static struct pm800_regulator_info pm860_regulator_info[] = {
+ 	PM800_LDO(ldo20, LDO20, LDO_ENA1_3, 3, 10000, ldo_volt_table2),
+ };
  
-+Optional properties :
-+- marvell,88pm860-buck1-dualphase-en  : If set, enable dual phase on BUCK1,
-+  providing 6A capacity.
-+  Without this both BUCK1A and BUCK1B operates independently with 3A capacity.
-+  (This property is only applicable to 88PM860)
++static int pm800_regulator_init(struct platform_device *pdev)
++{
++	struct pm800_regulators *pm800_data = platform_get_drvdata(pdev);
++	struct pm80x_chip *chip = pm800_data->chip;
++	int ret;
 +
- 88pm80x family of devices consists of varied group of sub-devices:
++	/* Currently only supported on 88pm860 device */
++	if (chip->type != CHIP_PM860)
++		return 0;
++
++	if (of_property_read_bool(pdev->dev.of_node,
++				"marvell,88pm860-buck1-dualphase-en")) {
++		ret = regmap_update_bits(chip->subchip->regmap_power,
++					PM860_BUCK1_MISC,
++					BUCK1_DUAL_PHASE_SEL,
++					BUCK1_DUAL_PHASE_SEL);
++		if (ret) {
++			dev_err(chip->dev, "failed to set dual-pase mode %d\n", ret);
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
+ static int pm800_regulator_probe(struct platform_device *pdev)
+ {
+ 	struct pm80x_chip *chip = dev_get_drvdata(pdev->dev.parent);
+@@ -336,6 +361,12 @@ static int pm800_regulator_probe(struct platform_device *pdev)
+ 		}
+ 	}
  
- Device		 	Supply Names	 Description
++	ret = pm800_regulator_init(pdev);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to init 88pm800 regulator device\n");
++		return ret;
++	}
++
+ 	return 0;
+ }
+ 
+diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+index a92d173..05d9bad 100644
+--- a/include/linux/mfd/88pm80x.h
++++ b/include/linux/mfd/88pm80x.h
+@@ -295,6 +295,9 @@ enum {
+ #define PM860_BUCK4_MISC2		(0x82)
+ #define PM860_BUCK4_FULL_DRV		BIT(2)
+ 
++#define PM860_BUCK1_MISC		(0x8E)
++#define BUCK1_DUAL_PHASE_SEL		BIT(2)
++
+ struct pm80x_rtc_pdata {
+ 	int		vrtc;
+ 	int		rtc_wakeup;
 -- 
 1.9.1
