@@ -1,64 +1,41 @@
 From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Jul 2015 13:23:25 +0100
-Subject: [PATCH v3 0/6] arm64: kernel: Add support for Privileged Access Never
-Message-ID: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+Date: Tue, 21 Jul 2015 13:23:26 +0100
+Subject: [PATCH v3 1/6] arm64: kernel: Add cpuid_feature_extract_field() for
+ 4bit sign extension
+In-Reply-To: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+Message-ID: <1437481411-1595-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Privileged Access Never (PAN; part of the ARMv8.1
-Extensions). When enabled, this feature causes a permission fault if the kernel
-attempts to access memory that is also accessible by userspace - instead the
-PAN bit must be cleared when accessing userspace memory. (or use the
-ldt*/stt* instructions).
+Based on arch/arm/include/asm/cputype.h, this function does the
+shifting and sign extension necessary when accessing cpu feature fields.
 
-This series detects and enables this feature, and uses alternatives to change
-{get,put}_user() et al to clear the PAN bit while they do their work.
+Signed-off-by: James Morse <james.morse@arm.com>
+Suggested-by: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/cpufeature.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Changes since v 2:
-* Added missing PAN-swivel around  swp emulation. (Thanks to Vladimir Murzin for
-  spotting this!).
-* Use bit shifts in cpuid_feature_extract_field(), to produce better asm.
-* Changed the enable() patch field names, and switched to ints.
-* Removed PSTATE_PAN define and use PSR_PAN_BIT instead.
-
-Changes since v1:
-* Copied cpuid_feature_extract_field() from arch/arm as a new patch, suggested
-  by Russell King [1].
-* Changed feature-detection patch to use cpuid_feature_extract_field() for sign
-  extension, and '>='.
-* Moved SCTLR_EL1_* from asm/cputype.h to asm/sysreg.h
-* Added PSR_PAN_BIT in uapi/asm/ptrace.h
-* Removed the setting of PSTATE_PAN in kernel/process.c
-
-[1] http://www.spinics.net/lists/arm-kernel/msg432518.html
-
-
-James Morse (6):
-  arm64: kernel: Add cpuid_feature_extract_field() for 4bit sign
-    extension
-  arm64: kernel: preparatory: Move config_sctlr_el1
-  arm64: kernel: Add cpufeature 'enable' callback
-  arm64: kernel: Add min_field_value and use '>=' for feature detection
-  arm64: kernel: Add optional CONFIG_ parameter to ALTERNATIVE()
-  arm64: kernel: Add support for Privileged Access Never
-
- arch/arm64/Kconfig                   | 14 +++++++++++++
- arch/arm64/include/asm/alternative.h | 28 ++++++++++++++++++++++---
- arch/arm64/include/asm/cpufeature.h  | 15 +++++++++++---
- arch/arm64/include/asm/cputype.h     |  3 ---
- arch/arm64/include/asm/futex.h       |  8 ++++++++
- arch/arm64/include/asm/processor.h   |  2 ++
- arch/arm64/include/asm/sysreg.h      | 20 ++++++++++++++++++
- arch/arm64/include/asm/uaccess.h     | 11 ++++++++++
- arch/arm64/include/uapi/asm/ptrace.h |  1 +
- arch/arm64/kernel/armv8_deprecated.c | 19 ++++++++---------
- arch/arm64/kernel/cpufeature.c       | 40 +++++++++++++++++++++++++++++++++---
- arch/arm64/lib/clear_user.S          |  8 ++++++++
- arch/arm64/lib/copy_from_user.S      |  8 ++++++++
- arch/arm64/lib/copy_in_user.S        |  8 ++++++++
- arch/arm64/lib/copy_to_user.S        |  8 ++++++++
- arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++
- 16 files changed, 193 insertions(+), 23 deletions(-)
-
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index c1044218a63a..9fafa7537997 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -70,6 +70,13 @@ static inline void cpus_set_cap(unsigned int num)
+ 		__set_bit(num, cpu_hwcaps);
+ }
+ 
++static inline int __attribute_const__ cpuid_feature_extract_field(u64 features,
++								  int field)
++{
++	return (s64)(features << (64 - 4 - field)) >> (64 - 4);
++}
++
++
+ void check_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+ 			    const char *info);
+ void check_local_cpu_errata(void);
 -- 
 2.1.4
