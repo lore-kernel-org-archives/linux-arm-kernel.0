@@ -1,244 +1,83 @@
-From: rui.zhang@intel.com (Zhang, Rui)
-Date: Tue, 21 Jul 2015 13:35:31 +0000
-Subject: [PATCH v2] thermal: consistently use int for temperatures
-In-Reply-To: <9hhk2tteqb3.fsf@e105922-lin.cambridge.arm.com>
-References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
- <9hhk2tteqb3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <744357E9AAD1214791ACBA4B0B9092630153E699@SHSMSX101.ccr.corp.intel.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 21 Jul 2015 15:50:42 +0200
+Subject: [RFC PATCH 0/16] Declarative specification of resources (aka
+ devm_probe)
+Message-ID: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+this is an experiment I carried to find out if having drivers to declare
+their resources could help with dependency discovery. The goal was to
+avoid duplicating information between resource acquisition and
+dependency discovery.
+
+I think this approach can help a lot with reducing boilerplate code in
+the probe() callbacks, but regarding dependency discovery it wouldn't
+really bring much at all when compared to probing devices on-demand from
+the resource acquisition code paths (ie. calling device_attach() from
+devm_regulator_get()).
+
+Because it doesn't help with dependency discovery I'm going to stop
+working on this, but wanted to send it out in case someone else would
+want to work on it. I think it's a pretty neat improvement over how
+things are currently done.
+
+There was a bit of a problem with converting fixed-regulator, because
+it's able to use platform data to find resources out. If it moved to use
+generic properties of the kind that are added with
+device_add_property_set(), it could be made to work more easily (but who
+would change the board files and test the changes?).
+
+The credit for this idea should go to Arnd Bergmann, who also wrote the
+initial PoC on which this is based.
+
+Regards,
+
+Tomeu
 
 
-> -----Original Message-----
-> From: Punit Agrawal [mailto:punit.agrawal at arm.com]
-> Sent: Tuesday, July 21, 2015 6:52 PM
-> To: Sascha Hauer
-> Cc: linux-pm at vger.kernel.org; Zhang, Rui; Eduardo Valentin; linux-
-> kernel at vger.kernel.org; Jean Delvare; Peter Feuerer; Heiko Stuebner;
-> Lukasz Majewski; Stephen Warren; Thierry Reding; linux-
-> acpi at vger.kernel.org; platform-driver-x86 at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-samsung-
-> soc at vger.kernel.org; Guenter Roeck; Rafael J. Wysocki; Maxime Ripard;
-> Darren Hart; lm-sensors at lm-sensors.org
-> Subject: Re: [PATCH v2] thermal: consistently use int for temperatures
-> Importance: High
-> 
-> Hi Sascha,
-> 
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> 
-> > The thermal code uses int, long and unsigned long for temperatures in
-> > different places.
-> >
-> > Using an unsigned type limits the thermal framework to positive
-> > temperatures without need. Also several drivers currently will report
-> > temperatures near UINT_MAX for temperatures below 0?C. This will
-> > probably immediately shut the machine down due to overtemperature if
-> > started below 0?C.
-> >
-> > 'long' is 64bit on several architectures. This is not needed since
-> > INT_MAX ?mC is above the melting point of all known materials.
-> >
-> > Consistently use a plain 'int' for temperatures throughout the thermal
-> > code and the drivers. This only changes the places in the drivers
-> > where the temperature is passed around as pointer, when drivers
-> > internally use another type this is not changed.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > Reviewed-by: Jean Delvare <jdelvare@suse.de>
-> > Reviewed-by: Lukasz Majewski <l.majewski@samsung.com>
-> > Reviewed-by: Darren Hart <dvhart@linux.intel.com>
-> > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > Reviewed-by: Peter Feuerer <peter@piie.net>
-> > Cc: Punit Agrawal <punit.agrawal@arm.com>
-> 
-> The changes below look good.
-> 
-> For the power_allocator governor and corresponding trace events,
-> 
-> Reviewed-by: Punit Agrawal <punit.agrawal@arm.com>
-> 
-> Thanks
-> 
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: Eduardo Valentin <edubezval@gmail.com>
-> > Cc: linux-pm at vger.kernel.org
-> > Cc: linux-kernel at vger.kernel.org
-> > Cc: Jean Delvare <jdelvare@suse.de>
-> > Cc: Peter Feuerer <peter@piie.net>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: Lukasz Majewski <l.majewski@samsung.com>
-> > Cc: Stephen Warren <swarren@wwwdotorg.org>
-> > Cc: Thierry Reding <thierry.reding@gmail.com>
-> > Cc: linux-acpi at vger.kernel.org
-> > Cc: platform-driver-x86 at vger.kernel.org
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Cc: linux-omap at vger.kernel.org
-> > Cc: linux-samsung-soc at vger.kernel.org
-> > Cc: Guenter Roeck <linux@roeck-us.net>
-> > Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Darren Hart <dvhart@infradead.org>
-> > Cc: lm-sensors at lm-sensors.org
-> > ---
-> >
-Patch applied.
+Tomeu Vizoso (16):
+  typecheck_member and offsetof_t
+  add devm_acquire_resources()
+  Add DEVM_ALLOC()
+  Add DEVM_IOMAP()
+  Add DEVM_RESET()
+  Add DEVM_CLOCK()
+  Add DEVM_FWNODE()
+  Add DEVM_IRQ()
+  Add DEVM_GPIO_NAMED()
+  Add DEVM_REGULATOR()
+  Add DEVM_TEGRA_DPAUX()
+  Add DEVM_TEGRA_OUTPUT()
+  tegra-sor: Use devm_resource
+  tegra-dpaux: Use devm_resource
+  tegra-max98090: Use devm_resource
+  fixed-regulator: Use devm_resource
 
-Thanks,
-rui
-> > changes since v1:
-> > - Add missing pieces for power_allocator driver
-> >
-> >  drivers/acpi/thermal.c                             | 12 +++++-----
-> >  drivers/hwmon/lm75.c                               |  2 +-
-> >  drivers/hwmon/ntc_thermistor.c                     |  2 +-
-> >  drivers/hwmon/tmp102.c                             |  2 +-
-> >  drivers/input/touchscreen/sun4i-ts.c               |  8 +++----
-> >  drivers/platform/x86/acerhdf.c                     |  9 ++++----
-> >  drivers/platform/x86/intel_mid_thermal.c           |  9 ++++----
-> >  drivers/power/power_supply_core.c                  |  2 +-
-> >  drivers/thermal/armada_thermal.c                   |  2 +-
-> >  drivers/thermal/db8500_thermal.c                   |  7 +++---
-> >  drivers/thermal/dove_thermal.c                     |  2 +-
-> >  drivers/thermal/fair_share.c                       |  2 +-
-> >  drivers/thermal/gov_bang_bang.c                    |  5 ++--
-> >  drivers/thermal/hisi_thermal.c                     |  4 ++--
-> >  drivers/thermal/imx_thermal.c                      | 27 +++++++++++-----------
-> >  drivers/thermal/int340x_thermal/int3400_thermal.c  |  2 +-
-> > .../thermal/int340x_thermal/int340x_thermal_zone.c | 10 ++++----
-> > .../thermal/int340x_thermal/int340x_thermal_zone.h |  8 +++----
-> >  .../int340x_thermal/processor_thermal_device.c     |  4 ++--
-> >  drivers/thermal/intel_quark_dts_thermal.c          | 13 +++++------
-> >  drivers/thermal/intel_soc_dts_iosf.c               |  8 +++----
-> >  drivers/thermal/kirkwood_thermal.c                 |  2 +-
-> >  drivers/thermal/of-thermal.c                       | 14 +++++------
-> >  drivers/thermal/power_allocator.c                  | 16 ++++++-------
-> >  drivers/thermal/qcom-spmi-temp-alarm.c             |  2 +-
-> >  drivers/thermal/rcar_thermal.c                     |  7 +++---
-> >  drivers/thermal/rockchip_thermal.c                 | 10 ++++----
-> >  drivers/thermal/samsung/exynos_tmu.c               | 23 +++++++++---------
-> >  drivers/thermal/spear_thermal.c                    |  2 +-
-> >  drivers/thermal/st/st_thermal.c                    |  5 ++--
-> >  drivers/thermal/step_wise.c                        |  4 ++--
-> >  drivers/thermal/tegra_soctherm.c                   |  4 ++--
-> >  drivers/thermal/thermal_core.c                     | 26 ++++++++++-----------
-> >  drivers/thermal/thermal_hwmon.c                    | 10 ++++----
-> >  drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 10 ++++----
-> >  drivers/thermal/x86_pkg_temp_thermal.c             | 10 ++++----
-> >  include/linux/thermal.h                            | 26 +++++++++------------
-> >  include/trace/events/thermal_power_allocator.h     |  6 ++---
-> >  38 files changed, 151 insertions(+), 166 deletions(-)
-> >
-> 
-> [...]
-> 
-> > diff --git a/drivers/thermal/power_allocator.c
-> > b/drivers/thermal/power_allocator.c
-> > index 4672250..045aea59 100644
-> > --- a/drivers/thermal/power_allocator.c
-> > +++ b/drivers/thermal/power_allocator.c
-> > @@ -92,8 +92,8 @@ struct power_allocator_params {
-> >   * Return: The power budget for the next period.
-> >   */
-> >  static u32 pid_controller(struct thermal_zone_device *tz,
-> > -			  unsigned long current_temp,
-> > -			  unsigned long control_temp,
-> > +			  int current_temp,
-> > +			  int control_temp,
-> >  			  u32 max_allocatable_power)
-> >  {
-> >  	s64 p, i, d, power_range;
-> > @@ -102,7 +102,7 @@ static u32 pid_controller(struct
-> > thermal_zone_device *tz,
-> >
-> >  	max_power_frac = int_to_frac(max_allocatable_power);
-> >
-> > -	err = ((s32)control_temp - (s32)current_temp);
-> > +	err = control_temp - current_temp;
-> >  	err = int_to_frac(err);
-> >
-> >  	/* Calculate the proportional term */ @@ -223,8 +223,8 @@ static
-> > void divvy_up_power(u32 *req_power, u32 *max_power, int
-> num_actors,  }
-> >
-> >  static int allocate_power(struct thermal_zone_device *tz,
-> > -			  unsigned long current_temp,
-> > -			  unsigned long control_temp)
-> > +			  int current_temp,
-> > +			  int control_temp)
-> >  {
-> >  	struct thermal_instance *instance;
-> >  	struct power_allocator_params *params = tz->governor_data; @@ -
-> 326,7
-> > +326,7 @@ static int allocate_power(struct thermal_zone_device *tz,
-> >  				      granted_power, total_granted_power,
-> >  				      num_actors, power_range,
-> >  				      max_allocatable_power, current_temp,
-> > -				      (s32)control_temp - (s32)current_temp);
-> > +				      control_temp - current_temp);
-> >
-> >  	devm_kfree(&tz->device, req_power);
-> >  unlock:
-> > @@ -411,7 +411,7 @@ static int power_allocator_bind(struct
-> > thermal_zone_device *tz)  {
-> >  	int ret;
-> >  	struct power_allocator_params *params;
-> > -	unsigned long switch_on_temp, control_temp;
-> > +	int switch_on_temp, control_temp;
-> >  	u32 temperature_threshold;
-> >
-> >  	if (!tz->tzp || !tz->tzp->sustainable_power) { @@ -476,7 +476,7 @@
-> > static void power_allocator_unbind(struct thermal_zone_device *tz)
-> > static int power_allocator_throttle(struct thermal_zone_device *tz,
-> > int trip)  {
-> >  	int ret;
-> > -	unsigned long switch_on_temp, control_temp, current_temp;
-> > +	int switch_on_temp, control_temp, current_temp;
-> >  	struct power_allocator_params *params = tz->governor_data;
-> >
-> >  	/*
-> 
-> [...]
-> 
-> > diff --git a/include/trace/events/thermal_power_allocator.h
-> > b/include/trace/events/thermal_power_allocator.h
-> > index 12e1321..5afae8f 100644
-> > --- a/include/trace/events/thermal_power_allocator.h
-> > +++ b/include/trace/events/thermal_power_allocator.h
-> > @@ -11,7 +11,7 @@ TRACE_EVENT(thermal_power_allocator,
-> >  		 u32 total_req_power, u32 *granted_power,
-> >  		 u32 total_granted_power, size_t num_actors,
-> >  		 u32 power_range, u32 max_allocatable_power,
-> > -		 unsigned long current_temp, s32 delta_temp),
-> > +		 int current_temp, s32 delta_temp),
-> >  	TP_ARGS(tz, req_power, total_req_power, granted_power,
-> >  		total_granted_power, num_actors, power_range,
-> >  		max_allocatable_power, current_temp, delta_temp), @@ -
-> 24,7 +24,7 @@
-> > TRACE_EVENT(thermal_power_allocator,
-> >  		__field(size_t,        num_actors               )
-> >  		__field(u32,           power_range              )
-> >  		__field(u32,           max_allocatable_power    )
-> > -		__field(unsigned long, current_temp             )
-> > +		__field(int,           current_temp             )
-> >  		__field(s32,           delta_temp               )
-> >  	),
-> >  	TP_fast_assign(
-> > @@ -42,7 +42,7 @@ TRACE_EVENT(thermal_power_allocator,
-> >  		__entry->delta_temp = delta_temp;
-> >  	),
-> >
-> > -	TP_printk("thermal_zone_id=%d req_power={%s}
-> total_req_power=%u granted_power={%s} total_granted_power=%u
-> power_range=%u max_allocatable_power=%u current_temperature=%lu
-> delta_temperature=%d",
-> > +	TP_printk("thermal_zone_id=%d req_power={%s}
-> total_req_power=%u
-> > +granted_power={%s} total_granted_power=%u power_range=%u
-> > +max_allocatable_power=%u current_temperature=%d
-> > +delta_temperature=%d",
-> >  		__entry->tz_id,
-> >  		__print_array(__get_dynamic_array(req_power),
-> >                                __entry->num_actors, 4),
+ drivers/base/dd.c                  |   4 ++
+ drivers/base/devres.c              | 106 +++++++++++++++++++++++++++++++++++++
+ drivers/base/property.c            |  17 ++++++
+ drivers/clk/clk.c                  |  13 +++++
+ drivers/gpio/devres.c              |  16 ++++++
+ drivers/gpu/drm/tegra/dpaux.c      |  81 ++++++++++++++--------------
+ drivers/gpu/drm/tegra/drm.h        |  24 +++++++++
+ drivers/gpu/drm/tegra/sor.c        |  60 ++++++---------------
+ drivers/regulator/devres.c         |  18 +++++++
+ drivers/regulator/fixed.c          |  33 ++++--------
+ drivers/reset/core.c               |  13 +++++
+ include/linux/clk.h                |  10 ++++
+ include/linux/device.h             |  39 ++++++++++++++
+ include/linux/gpio/consumer.h      |  11 ++++
+ include/linux/interrupt.h          |  24 +++++++++
+ include/linux/property.h           |  10 ++++
+ include/linux/regulator/consumer.h |  10 ++++
+ include/linux/reset.h              |  10 ++++
+ include/linux/stddef.h             |   7 +++
+ kernel/irq/devres.c                |  52 ++++++++++++++++++
+ sound/soc/tegra/tegra_max98090.c   |  69 +++++++++---------------
+ 21 files changed, 474 insertions(+), 153 deletions(-)
+
+-- 
+2.4.3
