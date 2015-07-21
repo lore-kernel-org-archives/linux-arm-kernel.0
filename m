@@ -1,81 +1,37 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 21 Jul 2015 13:39:46 +0530
-Subject: [PATCH V4 4/7] i2c: qup: Transfer each i2c_msg in i2c_msgs
- without a stop bit
-In-Reply-To: <1437391374.6267.7.camel@mm-sol.com>
-References: <1436412350-19519-1-git-send-email-sricharan@codeaurora.org>	
- <1436412350-19519-5-git-send-email-sricharan@codeaurora.org>
- <1437391374.6267.7.camel@mm-sol.com>
-Message-ID: <000601d0c38c$9f4177d0$ddc46770$@codeaurora.org>
+From: long.wanglong@huawei.com (Wang Long)
+Date: Tue, 21 Jul 2015 08:11:01 +0000
+Subject: [PATCH] drivers/irqchip: replace pr_warning by pr_warn
+Message-ID: <1437466261-147373-1-git-send-email-long.wanglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ivan,
+Update the last pr_warning callsite in drivers/irqchip.
 
-> -----Original Message-----
-> From: Ivan T. Ivanov [mailto:iivanov at mm-sol.com]
-> Sent: Monday, July 20, 2015 4:53 PM
-> To: Sricharan R
-> Cc: devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
-> galak at codeaurora.org; linux-kernel at vger.kernel.org; linux-
-> i2c at vger.kernel.org; agross at codeaurora.org; dmaengine at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V4 4/7] i2c: qup: Transfer each i2c_msg in i2c_msgs
-> without a stop bit
-> 
-> 
-> Hi,
-> 
-> On Thu, 2015-07-09 at 08:55 +0530, Sricharan R wrote:
-> 
-> <snip>
-> 
-> >  #define ONE_BYTE                       0x1
-> > +#define QUP_I2C_MX_CONFIG_DURING_RUN   BIT(31)
-> >
-> >  struct qup_i2c_block {
-> >         int     count;
-> > @@ -121,6 +122,7 @@ struct qup_i2c_block {
-> >         int     rx_tag_len;
-> >         int     data_len;
-> >         u8      tags[6];
-> > +       int     config_run;
-> 
-> This is not directly related to "block" control logic, right?
-> Could it made part of qup_i2c_dev structure?
-> 
-   Yes, can move it there.
+Signed-off-by: Wang Long <long.wanglong@huawei.com>
+---
+ drivers/irqchip/exynos-combiner.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> >  };
-> >
-> >  struct qup_i2c_dev {
-> > @@ -152,6 +154,10 @@ struct qup_i2c_dev {
-> >
-> >         int (*qup_i2c_write_one)(struct qup_i2c_dev *qup,
-> >                                         struct i2c_msg *msg);
-> > +       /* Current i2c_msg in i2c_msgs */
-> > +       int     cmsg;
-> > +       /* total num of i2c_msgs */
-> > +       int     num;
-> 
-> I think it will be simpler with just "bool is_last" evaluated in main xfer loop.
-  
-   Hmm ok. Will change it that way. Set it one place and use it other places.
-> 
-> <snip>
-> 
-> >
-> > @@ -374,6 +383,9 @@ static void qup_i2c_get_blk_data(struct
-> qup_i2c_dev *qup,
-> >         /* There are 2 tag bytes that are read in to fifo for every block */
-> >         if (msg->flags & I2C_M_RD)
-> >                 qup->blk.rx_tag_len = qup->blk.count * 2;
-> > +
-> > +       if (qup->cmsg)
-> > +               qup->blk.config_run = QUP_I2C_MX_CONFIG_DURING_RUN;
-> 
-> This could be moved to qup_i2c_xfer_v2() to avoid repeatedly setting it.
-     Ok, correct.
-
-Regards,
- Sricharan
+diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+index 5c82e3b..80104f9 100644
+--- a/drivers/irqchip/exynos-combiner.c
++++ b/drivers/irqchip/exynos-combiner.c
+@@ -185,14 +185,14 @@ static void __init combiner_init(void __iomem *combiner_base,
+ 
+ 	combiner_data = kcalloc(max_nr, sizeof (*combiner_data), GFP_KERNEL);
+ 	if (!combiner_data) {
+-		pr_warning("%s: could not allocate combiner data\n", __func__);
++		pr_warn("%s: could not allocate combiner data\n", __func__);
+ 		return;
+ 	}
+ 
+ 	combiner_irq_domain = irq_domain_add_linear(np, nr_irq,
+ 				&combiner_irq_domain_ops, combiner_data);
+ 	if (WARN_ON(!combiner_irq_domain)) {
+-		pr_warning("%s: irq domain init failed\n", __func__);
++		pr_warn("%s: irq domain init failed\n", __func__);
+ 		return;
+ 	}
+ 
+-- 
+1.8.3.4
