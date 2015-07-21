@@ -1,71 +1,101 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jul 2015 19:02:25 +0100
-Subject: [PATCH v2 03/10] KVM: arm/arm64: vgic: Convert struct vgic_lr
- to use bitfields
-In-Reply-To: <20150717221534.GJ14024@cbox>
-References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
- <1436378202-20224-4-git-send-email-marc.zyngier@arm.com>
- <20150717221534.GJ14024@cbox>
-Message-ID: <55AE8931.7020806@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 21 Jul 2015 19:05:42 +0100
+Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
+In-Reply-To: <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150721180542.GB32187@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/15 23:15, Christoffer Dall wrote:
-> On Wed, Jul 08, 2015 at 06:56:35PM +0100, Marc Zyngier wrote:
->> As we're about to cram more information in the vgic_lr structure
->> (HW interrupt number and additional state information), we switch
->> to a layout similar to the HW's:
->>
->> - use bitfields to save space (we don't need more than 10 bits
->>   to represent the irq numbers)
->> - source CPU and HW interrupt can share the same field, as
->>   a SGI doesn't have a physical line.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
->> ---
->>  include/kvm/arm_vgic.h | 10 +++++++---
->>  1 file changed, 7 insertions(+), 3 deletions(-)
->>
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 133ea00..4f9fa1d 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -95,11 +95,15 @@ enum vgic_type {
->>  #define LR_STATE_ACTIVE		(1 << 1)
->>  #define LR_STATE_MASK		(3 << 0)
->>  #define LR_EOI_INT		(1 << 2)
->> +#define LR_HW			(1 << 3)
->>  
->>  struct vgic_lr {
->> -	u16	irq;
->> -	u8	source;
->> -	u8	state;
->> +	unsigned irq:10;
->> +	union {
->> +		unsigned hwirq:10;
->> +		unsigned source:8;
+On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
+> Now that the basic ACPI GSI code is irq domain aware, make sure
+> that the ACPI support in the GIC doesn't pointlessly deviate from
+> the DT path.
 > 
-> why 8?  why not 3?
-
-Because I can't count :-).
-
->> +	};
->> +	unsigned state:4;
->>  };
->>  
->>  struct vgic_vmcr {
->> -- 
->> 2.1.4
->>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  drivers/irqchip/irq-gic.c       | 17 ++++++-----------
+>  include/linux/irqchip/arm-gic.h |  2 +-
+>  2 files changed, 7 insertions(+), 12 deletions(-)
 > 
-> otherwise:
-> 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index b41ccf5..f5d365d 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>  {
+>  	unsigned long ret = 0;
+>  
+> -	if (irq_domain_get_of_node(d) != controller)
+> -		return -EINVAL;
+>  	if (intsize < 3)
+>  		return -EINVAL;
+>  
+> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
+>  
+>  void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  			   void __iomem *dist_base, void __iomem *cpu_base,
+> -			   u32 percpu_offset, struct device_node *node)
+> +			   u32 percpu_offset, void *domain_token)
+>  {
+>  	irq_hw_number_t hwirq_base;
+>  	struct gic_chip_data *gic;
+> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  		gic_irqs = 1020;
+>  	gic->gic_irqs = gic_irqs;
+>  
+> -	if (node) {		/* DT case */
+> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
+> +	if (domain_token) {		/* DT/ACPI case */
+> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
+>  						    &gic_irq_domain_hierarchy_ops,
+>  						    gic);
+>  	} else {		/* Non-DT case */
+> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  			irq_base = irq_start;
+>  		}
+>  
+> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
+>  					hwirq_base, &gic_irq_domain_ops, gic);
+>  	}
+>  
+> @@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>  	}
+>  
+>  	/*
+> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+> +	 * Initialize zero GIC instance (no multi-GIC support).
+>  	 */
+> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> -	irq_set_default_host(gic_data[0].domain);
+> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
 
-Thanks,
+Nit: the acpi_irq_model_id enum starts from 0, I do not think we will
+use the IRQ domain look-up for the ACPI_IRQ_MODEL_PIC but we have
+to be careful anyway.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Lorenzo
+
+>  
+>  	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+>  	return 0;
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 9de976b..97799b7 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -97,7 +97,7 @@ struct device_node;
+>  
+>  void gic_set_irqchip_flags(unsigned long flags);
+>  void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+> -		    u32 offset, struct device_node *);
+> +		    u32 offset, void *);
+>  void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>  void gic_cpu_if_down(void);
+>  
+> -- 
+> 2.1.4
+> 
