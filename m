@@ -1,51 +1,36 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 21 Jul 2015 11:30:07 +0100
-Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
-In-Reply-To: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <55AE1F2F.3090106@arm.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 21 Jul 2015 11:31:11 +0100
+Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <55AE16BB.9090201@i2se.com>
+References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55AD6412.9070205@codeaurora.org> <55AE13D8.6020301@linaro.org>
+ <55AE16BB.9090201@i2se.com>
+Message-ID: <55AE1F6F.1080109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/07/15 08:30, Zhen Lei wrote:
-> Changelog:
-> v2 -> v3:
-> 1. add support for pci device hotplug, which missed in patch v2.
-> 2. only support #iommu-cells = <1>, add corresponding description in arm,smmu-v3.txt.
-> 3. add function find_smmu_by_device which extracted from find_smmu_by_node, to resolve
->     the problem mentioned by Robin Murphy in [PATCH v2 7/9].
->     Additionally:
->     +    platform_set_drvdata(pdev, smmu);       //Patch v2
->     +	dev->archdata.iommu = smmu;             //Patch v3, dev = &pdev->dev
 
+Hi Stefan,
+On 21/07/15 10:54, Stefan Wahren wrote:
+> Hi Srinivas,
+>
+> Am 21.07.2015 um 11:41 schrieb Srinivas Kandagatla:
+>> >Ok, make sense. I moved this too.
+>> >I have v9 ready will send it.
+>> >
+>> >--srini
+>> >
+> this is not a race. Please give the other (including me:-)  ) some time
+> for testing and reviewing v8.
 
-I didn't give any Reviewed-by tags, much less to revised patches that 
-I've not even looked at yet; please see section 13 of 
-Documentation/SubmittingPatches for what the Reviewed-by tag means.
+Ofcourse, I did not mean it now or today! Am actually going to wait till 
+the end of this week before I post v9.
 
-Robin.
+--srini
 
 >
-> v1 -> v2:
-> update the implementation of patch 1/9 according to Will Deacon's suggestion.
-> update the comment of patch 3/9 and 4/9.
-> use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
-> patch 6/9 is base on Laurent's series, to support probe deferral.
-> patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
-> patch 9/9 add support for a master with multiple stream IDs.
->
-> Zhen Lei (5):
->    iommu/arm-smmu: to support probe deferral
->    iommu/arm-smmu: remove arm_smmu_devices
->    iommu/arm-smmu: rename __arm_smmu_get_pci_sid
->    iommu/arm-smmu: add support for non-pci devices
->    iommu/arm-smmu: describe the limitation of #iommu-cells
->
->   .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   6 +
->   drivers/iommu/arm-smmu-v3.c                        | 209 ++++++++++++++++-----
->   2 files changed, 163 insertions(+), 52 deletions(-)
->
-> --
-> 1.8.0
->
+> Thanks
+> Stefan
 >
