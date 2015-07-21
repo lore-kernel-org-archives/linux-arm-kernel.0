@@ -1,403 +1,164 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jul 2015 18:17:09 +0100
-Subject: [PATCH v2 06/10] KVM: arm/arm64: vgic: Allow dynamic mapping
- of physical/virtual interrupts
-In-Reply-To: <20150717211105.GF14024@cbox>
-References: <1436378202-20224-1-git-send-email-marc.zyngier@arm.com>
- <1436378202-20224-7-git-send-email-marc.zyngier@arm.com>
- <20150717211105.GF14024@cbox>
-Message-ID: <55AE7E95.2020608@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 21 Jul 2015 10:20:44 -0700
+Subject: [PATCH v2 3/4] touchscreen: colibri-vf50-ts: Add touchscreen
+ support for Colibri VF50
+In-Reply-To: <40d7c372e64c7f25b7df3e48930386de@agner.ch>
+References: <cover.1437058481.git.maitysanchayan@gmail.com>
+ <26748bd9a7bde7c2304b6b971f1150bb575e4938.1437058481.git.maitysanchayan@gmail.com>
+ <20150717234242.GJ39282@dtor-ws>
+ <40d7c372e64c7f25b7df3e48930386de@agner.ch>
+Message-ID: <20150721172044.GC39076@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/07/15 22:11, Christoffer Dall wrote:
-> On Wed, Jul 08, 2015 at 06:56:38PM +0100, Marc Zyngier wrote:
->> In order to be able to feed physical interrupts to a guest, we need
->> to be able to establish the virtual-physical mapping between the two
->> worlds.
->>
->> The mappings are kept in a set of RCU lists, indexed by virtual interrupts.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/kvm/arm.c     |   2 +
->>  include/kvm/arm_vgic.h |  25 +++++++++
->>  virt/kvm/arm/vgic.c    | 144 ++++++++++++++++++++++++++++++++++++++++++++++++-
->>  3 files changed, 170 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index 1583a34..d5ce5cc 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -125,6 +125,7 @@ int kvm_arch_init_vm(struct kvm *kvm, unsigned long type)
->>       if (ret)
->>               goto out_free_stage2_pgd;
->>
->> +     kvm_vgic_init(kvm);
->>       kvm_timer_init(kvm);
->>
->>       /* Mark the initial VMID generation invalid */
->> @@ -249,6 +250,7 @@ out:
->>
->>  void kvm_arch_vcpu_postcreate(struct kvm_vcpu *vcpu)
->>  {
->> +     kvm_vgic_vcpu_postcreate(vcpu);
->>  }
->>
->>  void kvm_arch_vcpu_free(struct kvm_vcpu *vcpu)
->> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->> index 4f9fa1d..32e57d2 100644
->> --- a/include/kvm/arm_vgic.h
->> +++ b/include/kvm/arm_vgic.h
->> @@ -159,6 +159,19 @@ struct vgic_io_device {
->>       struct kvm_io_device dev;
->>  };
->>
->> +struct irq_phys_map {
->> +     u32                     virt_irq;
->> +     u32                     phys_irq;
->> +     u32                     irq;
->> +     bool                    active;
->> +};
->> +
->> +struct irq_phys_map_entry {
->> +     struct list_head        entry;
->> +     struct rcu_head         rcu;
->> +     struct irq_phys_map     map;
->> +};
->> +
->>  struct vgic_dist {
->>       spinlock_t              lock;
->>       bool                    in_kernel;
->> @@ -256,6 +269,10 @@ struct vgic_dist {
->>       struct vgic_vm_ops      vm_ops;
->>       struct vgic_io_device   dist_iodev;
->>       struct vgic_io_device   *redist_iodevs;
->> +
->> +     /* Virtual irq to hwirq mapping */
->> +     spinlock_t              irq_phys_map_lock;
->> +     struct list_head        irq_phys_map_list;
->>  };
->>
->>  struct vgic_v2_cpu_if {
->> @@ -307,6 +324,9 @@ struct vgic_cpu {
->>               struct vgic_v2_cpu_if   vgic_v2;
->>               struct vgic_v3_cpu_if   vgic_v3;
->>       };
->> +
->> +     /* Protected by the distributor's irq_phys_map_lock */
->> +     struct list_head        irq_phys_map_list;
->>  };
->>
->>  #define LR_EMPTY     0xff
->> @@ -321,8 +341,10 @@ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
->>  int kvm_vgic_hyp_init(void);
->>  int kvm_vgic_map_resources(struct kvm *kvm);
->>  int kvm_vgic_get_max_vcpus(void);
->> +void kvm_vgic_init(struct kvm *kvm);
->>  int kvm_vgic_create(struct kvm *kvm, u32 type);
->>  void kvm_vgic_destroy(struct kvm *kvm);
->> +void kvm_vgic_vcpu_postcreate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
->>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
->> @@ -331,6 +353,9 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
->>  void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
->>  int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
->>  int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
->> +struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> +                                    int virt_irq, int irq);
->> +int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+Hi Stefan,
+
+On Tue, Jul 21, 2015 at 04:43:36PM +0200, Stefan Agner wrote:
+> Hi Dmitry,
 > 
-> should these functions not have a kvm_ prefix?
-
-Guess that'd be a good idea - VFIO will probably have to use them somehow.
-
->>  #define irqchip_in_kernel(k) (!!((k)->arch.vgic.in_kernel))
->>  #define vgic_initialized(k)  (!!((k)->arch.vgic.nr_cpus))
->> diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
->> index 5bd1695..3424329 100644
->> --- a/virt/kvm/arm/vgic.c
->> +++ b/virt/kvm/arm/vgic.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/of.h>
->>  #include <linux/of_address.h>
->>  #include <linux/of_irq.h>
->> +#include <linux/rculist.h>
->>  #include <linux/uaccess.h>
->>
->>  #include <asm/kvm_emulate.h>
->> @@ -82,6 +83,8 @@ static void vgic_retire_disabled_irqs(struct kvm_vcpu *vcpu);
->>  static void vgic_retire_lr(int lr_nr, int irq, struct kvm_vcpu *vcpu);
->>  static struct vgic_lr vgic_get_lr(const struct kvm_vcpu *vcpu, int lr);
->>  static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr, struct vgic_lr lr_desc);
->> +static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->> +                                             int virt_irq);
->>
->>  static const struct vgic_ops *vgic_ops;
->>  static const struct vgic_params *vgic;
->> @@ -1583,6 +1586,131 @@ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
->>       return IRQ_HANDLED;
->>  }
->>
->> +static struct list_head *vgic_get_irq_phys_map(struct kvm_vcpu *vcpu,
->> +                                            int virt_irq)
->> +{
->> +     if (virt_irq < VGIC_NR_PRIVATE_IRQS)
->> +             return &vcpu->arch.vgic_cpu.irq_phys_map_list;
->> +     else
->> +             return &vcpu->kvm->arch.vgic.irq_phys_map_list;
->> +}
->> +
+> As the original author of the driver I have some remarks to your review
 > 
-> You know what I'm going to ask you for here, but let me help out with
-> the framwork:
+> On 2015-07-18 01:42, Dmitry Torokhov wrote:
+> >> +		/*
+> >> +		 * If touch pressure is too low, stop measuring and reenable
+> >> +		 * touch detection
+> >> +		 */
+> >> +		if (val_p < min_pressure || val_p > 2000)
+> >> +			break;
 > 
-> /**
->  * vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
->  * @vcpu: The VCPU pointer
->  * @virt_irq: The virtual irq number
->  * @irq: The Linux IRQ number
->  *
->  *
->  */
-
-You're making it to easy! ;-)
-
->> +struct irq_phys_map *vgic_map_phys_irq(struct kvm_vcpu *vcpu,
->> +                                    int virt_irq, int irq)
->> +{
->> +     struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +     struct list_head *root = vgic_get_irq_phys_map(vcpu, virt_irq);
->> +     struct irq_phys_map *map;
->> +     struct irq_phys_map_entry *entry;
->> +     struct irq_desc *desc;
->> +     struct irq_data *data;
->> +     int phys_irq;
->> +
->> +     desc = irq_to_desc(irq);
->> +     if (!desc) {
->> +             kvm_err("kvm_arch_timer: can't obtain interrupt descriptor\n");
+> This is where the modules touch pressure is used to stop the measurement
+> process and switch back to interrupt mode. See my remarks at the end.
 > 
-> arch_timer?  this is vgic code, no?
-
--ECUTnPASTE, I'll fix that.
-
->> +             return NULL;
->> +     }
->> +
->> +     data = irq_desc_get_irq_data(desc);
->> +     while (data->parent_data)
->> +             data = data->parent_data;
->> +
->> +     phys_irq = data->hwirq;
->> +
->> +     spin_lock(&dist->irq_phys_map_lock);
->> +
->> +     /* Try to match an existing mapping */
->> +     map = vgic_irq_map_search(vcpu, virt_irq);
->> +     if (map) {
->> +             /* Make sure this mapping matches */
->> +             if (map->phys_irq != phys_irq   ||
->> +                 map->irq      != irq)
+> >> +
+> >> +		/*
+> >> +		 * The pressure may not be enough for the first x and the
+> >> +		 * second y measurement, but, the pressure is ok when the
+> >> +		 * driver is doing the third and fourth measurement. To
+> >> +		 * take care of this, we drop the first measurement always.
+> >> +		 */
+> >> +		if (discard_val_on_start) {
+> >> +			discard_val_on_start = false;
+> >> +		} else {
+> >> +			/*
+> >> +			 * Report touch position and sleep for
+> >> +			 * next measurement
+> >> +			 */
+> >> +			input_report_abs(vf50_ts->ts_input,
+> >> +					ABS_X, VF_ADC_MAX - val_x);
+> >> +			input_report_abs(vf50_ts->ts_input,
+> >> +					ABS_Y, VF_ADC_MAX - val_y);
+> >> +			input_report_abs(vf50_ts->ts_input,
+> >> +					ABS_PRESSURE, val_p);
+> >> +			input_report_key(vf50_ts->ts_input, BTN_TOUCH, 1);
+> >> +			input_sync(vf50_ts->ts_input);
+> >> +		}
+> >> +
+> >> +		msleep(10);
+> >> +	}
+> >> +
+> >> +	/* Report no more touch, reenable touch detection */
+> >> +	input_report_abs(vf50_ts->ts_input, ABS_PRESSURE, 0);
+> >> +	input_report_key(vf50_ts->ts_input, BTN_TOUCH, 0);
+> >> +	input_sync(vf50_ts->ts_input);
+> >> +
+> >> +	vf50_ts_enable_touch_detection(vf50_ts);
+> >> +
+> >> +	/* Wait for the pull-up to be stable on high */
+> >> +	msleep(10);
+> >> +
+> >> +	/* Reenable IRQ to detect touch */
+> >> +	enable_irq(vf50_ts->pen_irq);
+> >> +
+> >> +	dev_dbg(dev, "Reenabled touch detection interrupt\n");
+> >> +}
+> >> +
+> >> +static irqreturn_t vf50_ts_touched(int irq, void *dev_id)
+> >> +{
+> >> +	struct vf50_touch_device *vf50_ts = (struct vf50_touch_device *)dev_id;
+> >> +	struct device *dev = &vf50_ts->pdev->dev;
+> >> +
+> >> +	dev_dbg(dev, "Touch detected, start worker thread\n");
+> >> +
+> >> +	disable_irq_nosync(irq);
+> >> +
+> >> +	/* Disable the touch detection plates */
+> >> +	gpiod_set_value(vf50_ts->gpio_ym, 0);
+> >> +
+> >> +	/* Let the platform mux to default state in order to mux as ADC */
+> >> +	pinctrl_pm_select_default_state(dev);
+> >> +
+> >> +	queue_work(vf50_ts->ts_workqueue, &vf50_ts->ts_work);
+> > 
+> > If you convert this to a threaded interrupt you won't need to
+> > disable/reenable interrupt or queue work. You should also be able to use
+> > gpiod_set_value_cansleep() extending the range of ways the controller
+> > could be connected to systems.
+> > 
 > 
-> when would this happen?  Is this something that should gracefully just
-> be accepted or is it a bug?
+> I'm not sure if a threaded interrupt is the right thing here. While the
+> pen is on the touchscreen (which can be for several seconds)
+> measurements have to be made in a continuous loop. Is it ok for a
+> threaded interrupt to run that long?
 
-This is definitely a bug, hence the NULL value being returned. There is
-already an existing mapping for this virtual interrupt, and the caller
-should handle the problem.
+Yes, why not? Threaded interrupt is simply a kernel thread that is woken
+when hard interrupt handler tells it to wake up. Very similar to
+interrupt + work queue, except that the kernel manages interactions
+properly for you. There are several drivers in kernel that do that, for
+example auo-pixcir-ts.c or tsc2007.c
 
->> +                     map = NULL;
->> +
->> +             goto out;
->> +     }
->> +
->> +     /* Create a new mapping */
->> +     entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
 > 
-> is GFP_ATOMIC really warranted here?  The situatotion where you have an
-> existing map is extremely rare, I suppose, and is in fact an error, so
-> you could just pre-allocate and free on error.
+> I'm also not sure if it is really safe to _not_ disable the pen down
+> GPIO interrupt. If we get a interrupt while measuring, we should ignore
+> that interrupt.
 
-Good point.
+The interrupt management core (you'll have to annotate it as
+IRQF_ONESHOT) will make sure it stays masked properly until the threaded
+handler completes so you do not need to disable it explicitly.
 
->> +     if (!entry)
 > 
-> Here you seem to be returning a valid value on an error?  Perhaps you
-> should return ERR_PTR(-ENOMEM) and generally use ERR_PTR/PTR_ERR here.
-
-Indeed, that'd be nicer.
-
->> +             goto out;
->> +
->> +     map           = &entry->map;
->> +     map->virt_irq = virt_irq;
->> +     map->phys_irq = phys_irq;
->> +     map->irq      = irq;
->> +
->> +     list_add_tail_rcu(&entry->entry, root);
->> +
->> +out:
->> +     spin_unlock(&dist->irq_phys_map_lock);
->> +     return map;
->> +}
->> +
->> +static struct irq_phys_map *vgic_irq_map_search(struct kvm_vcpu *vcpu,
->> +                                             int virt_irq)
->> +{
->> +     struct list_head *root = vgic_get_irq_phys_map(vcpu, virt_irq);
->> +     struct irq_phys_map_entry *entry;
->> +     struct irq_phys_map *map;
->> +
->> +     rcu_read_lock();
->> +
->> +     list_for_each_entry_rcu(entry, root, entry) {
->> +             map = &entry->map;
->> +             if (map->virt_irq == virt_irq) {
->> +                     rcu_read_unlock();
->> +                     return map;
->> +             }
->> +     }
->> +
->> +     rcu_read_unlock();
->> +
->> +     return NULL;
->> +}
->> +
->> +static void vgic_free_phys_irq_map_rcu(struct rcu_head *rcu)
->> +{
->> +     struct irq_phys_map_entry *entry;
->> +
->> +     entry = container_of(rcu, struct irq_phys_map_entry, rcu);
->> +     kfree(entry);
->> +}
->> +
->> +int vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
->> +{
->> +     struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +     struct irq_phys_map_entry *entry;
->> +
->> +     if (!map)
->> +             return -EINVAL;
->> +
->> +     entry = container_of(map, struct irq_phys_map_entry, map);
+> On resistive touch screens the pen down works by relying on the high
+> resistance between the two plates while not being touched. The X-Plate
+> will be pulled high, the Y-Plate is strong GND. We measure on the
+> X-Plate (XM) which is high too. As soon as the plate is touched, XM will
+> be GND (since the resistance over the two plates is way lower then the
+> pull-up resistance). An interrupt on falling edge will trigger.
 > 
-> could this race with vgic_destroy_irq_phys_map, such that
-> vgic_destroy_irq_phys_map removes the entry from the list while we're
-> spinning on the lock, and then when we proceed we free the entry twice?
-
-Hmmm. That's nasty. I guess that the only way around this is to parse
-the list, looking for that particular entry. If destroy already
-happened, we won't find it, catastrophy avoided.
-
->> +
->> +     spin_lock(&dist->irq_phys_map_lock);
->> +     list_del_rcu(&entry->entry);
->> +     call_rcu(&entry->rcu, vgic_free_phys_irq_map_rcu);
->> +     spin_unlock(&dist->irq_phys_map_lock);
->> +
->> +     return 0;
->> +}
->> +
->> +static void vgic_destroy_irq_phys_map(struct kvm *kvm, struct list_head *root)
->> +{
->> +     struct vgic_dist *dist = &kvm->arch.vgic;
->> +     struct irq_phys_map_entry *entry;
->> +
->> +     spin_lock(&dist->irq_phys_map_lock);
->> +
->> +     list_for_each_entry(entry, root, entry) {
->> +             list_del_rcu(&entry->entry);
->> +             call_rcu(&entry->rcu, vgic_free_phys_irq_map_rcu);
->> +     }
->> +
->> +     spin_unlock(&dist->irq_phys_map_lock);
->> +}
->> +
->>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
->>  {
->>       struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> @@ -1591,6 +1719,7 @@ void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
->>       kfree(vgic_cpu->active_shared);
->>       kfree(vgic_cpu->pend_act_shared);
->>       kfree(vgic_cpu->vgic_irq_lr_map);
->> +     vgic_destroy_irq_phys_map(vcpu->kvm, &vgic_cpu->irq_phys_map_list);
->>       vgic_cpu->pending_shared = NULL;
->>       vgic_cpu->active_shared = NULL;
->>       vgic_cpu->pend_act_shared = NULL;
->> @@ -1627,6 +1756,12 @@ static int vgic_vcpu_init_maps(struct kvm_vcpu *vcpu, int nr_irqs)
->>       return 0;
->>  }
->>
->> +void kvm_vgic_vcpu_postcreate(struct kvm_vcpu *vcpu)
->> +{
->> +     struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
->> +     INIT_LIST_HEAD(&vgic_cpu->irq_phys_map_list);
+> Now the measuring takes place, X, Y and pressure by using different
+> measuring methods.
 > 
-> can you do this as part of vgic_init?
-
-No, there is a horrible race with vgic_init which can be lazy (at least
-with GICv2). In the interval, the timer code will try and register its
-interrupt mapping. Pain will follow.
-
->> +}
->> +
->>  /**
->>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
->>   *
->> @@ -1664,6 +1799,7 @@ void kvm_vgic_destroy(struct kvm *kvm)
->>       kfree(dist->irq_spi_target);
->>       kfree(dist->irq_pending_on_cpu);
->>       kfree(dist->irq_active_on_cpu);
->> +     vgic_destroy_irq_phys_map(kvm, &dist->irq_phys_map_list);
->>       dist->irq_sgi_sources = NULL;
->>       dist->irq_spi_cpu = NULL;
->>       dist->irq_spi_target = NULL;
->> @@ -1787,6 +1923,13 @@ static int init_vgic_model(struct kvm *kvm, int type)
->>       return 0;
->>  }
->>
->> +void kvm_vgic_init(struct kvm *kvm)
->> +{
->> +     spin_lock_init(&kvm->arch.vgic.lock);
->> +     spin_lock_init(&kvm->arch.vgic.irq_phys_map_lock);
->> +     INIT_LIST_HEAD(&kvm->arch.vgic.irq_phys_map_list);
+> While Y-Plate measurement the same GPIO interupt pin is used for ADC
+> measurement! The voltage on that pin will at that point depend on the
+> Y-Position of the pen position... Is it guaranteed that the GPIO
+> interrupt is not fired? I guess because we muxed to ADC at that point,
+> it won't lead to a second (spurious) interrupt... However this is a
+> thing which needs to be checked before removing interrupt enable/disable
+> calls.
 > 
-> why can we not do this as part of kvm_vgic_create?
-
-For the same reason as above. The spinlock must be initialized early
-enough for the timer (or any other subsystem) code to call the map
-function and register its interrupts.
-
-> at least we need to think about naming here or document clearly what the
-> various init functions do; it is not clear what the difference between
-> vgic_init and kvm_vgic_init is...
-
-Agreed, this is a bit of a mess. I'll try to come up with a list of init
-functions, their expected execution order, and what is guaranteed at
-which stage.
-
->> +}
->> +
->>  int kvm_vgic_create(struct kvm *kvm, u32 type)
->>  {
->>       int i, vcpu_lock_idx = -1, ret;
->> @@ -1832,7 +1975,6 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
->>       if (ret)
->>               goto out_unlock;
->>
->> -     spin_lock_init(&kvm->arch.vgic.lock);
->>       kvm->arch.vgic.in_kernel = true;
->>       kvm->arch.vgic.vgic_model = type;
->>       kvm->arch.vgic.vctrl_base = vgic->vctrl_base;
->> --
->> 2.1.4
->>
+> >> +};
+> >> +
+> >> +module_platform_driver(vf50_touch_driver);
+> >> +
+> >> +module_param(min_pressure, int, 0600);
+> >> +MODULE_PARM_DESC(min_pressure, "Minimum pressure for touch detection");
+> > 
+> > I'd rather let userspace figure out what it recognizes as valid touch.
+> > 
 > 
+> This is value is used as the termination condition for the measurement
+> loop. It essentially defines at which pressure level we stop measuring
+> X/Y values. Depending on the size and resistance of the plates. However,
+> it is not safe to measure even at low/no pressure, since then we would
+> only get maximum X/Y values. Hence it is crucial that this value is
+> choosen properly, otherwise the driver will report "wrong" X/Y values.
+> 
+> Since we use the value for measurement termination, we need it in kernel
+> space. As far as I know we do not get such a value from user space.
 
-Thanks,
+If this value is device model-specific and not user preference then we
+probably should pass it via device tree data instead of module parameter
+then.
 
-	M.
+Thanks.
+
 -- 
-Jazz is not dead. It just smells funny...
+Dmitry
