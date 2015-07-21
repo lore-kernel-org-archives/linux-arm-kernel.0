@@ -1,51 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 Jul 2015 16:55:39 +0100
-Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
-In-Reply-To: <55AE62F2.4050403@linaro.org>
-References: <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
- <20150717111733.GL11162@sirena.org.uk>
- <55A8F859.2090204@linaro.org> <20150720073011.GA3061@x1>
- <55ACE2FC.2090801@linaro.org> <20150721092148.GI3061@x1>
- <55AE29DF.10102@linaro.org> <20150721151314.GM3061@x1>
- <55AE62F2.4050403@linaro.org>
-Message-ID: <20150721155539.GO3061@x1>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 21 Jul 2015 09:08:56 -0700
+Subject: [PATCH 05/10] arch: unify ioremap prototypes and macro aliases
+In-Reply-To: <20150721133457.GC8902@lst.de>
+References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150720001759.30857.23753.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150721133457.GC8902@lst.de>
+Message-ID: <CAPcyv4i7Sfo54koFC-KB+=YaBZpbW1dndp+DFJhwptFSTpfSVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>>>I have just sent single patch, which has dependency on regulator
-> >>>>changes. Please review, ack and queue up.
-> >>>
-> >>>A little presumptuous, don't you think? ;)
-> >>>
-> >>>>[PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
-> >>>>https://patchwork.kernel.org/patch/6826531/
-> >>>
-> >>>So nothing depends on this anymore, right?
-> >>>
-> >>
-> >>No, regulato patch depends on this.
-> >>Mark needs your tag in order to take above patch through regulator tree.
+On Tue, Jul 21, 2015 at 6:34 AM, Christoph Hellwig <hch@lst.de> wrote:
+>
+> On Sun, Jul 19, 2015 at 08:18:00PM -0400, Dan Williams wrote:
+> > Some archs define the first parameter to ioremap() as unsigned long,
+> > while the balance define it as resource_size_t, similar confusion exists
+> > for the type of the 'size' parameter.  Unify on (resource_size_t,
+> > unsigned long) to enable passing ioremap function pointers.  Also, some
+> > archs use function-like macros for defining ioremap aliases, but
+> > asm-generic/io.h expects object-like macros, unify on the latter.
 > >
-> >That's not how we usually do things.
+> > Move all handling of ioremap aliasing (i.e. ioremap_wt => ioremap) to
+> > include/linux/io.h.  Add a check to lib/devres.c to warn at compile time
+> > if an arch violates type expectations.
+>
+> I don't think devres really has aything to do with this code.
+
+It's one of the only cross-arch C files that is built with HAS_IOMEM.
+It depends on having a common ioremap prototype later in the series.
+
+> > Kill ARCH_HAS_IOREMAP_WC and ARCH_HAS_IOREMAP_WT in favor of just
+> > testing for ioremap_wc, and ioremap_wt being defined.  This arrangement
+> > allows drivers to know when ioremap_<foo> are being re-directed to plain
+> > ioremap.  A later patch uses this arrangement to implement support for
+> > strict mappings.
 > >
-> >However, as this patch is a very simple one, it shouldn't cause too
-> >many issues if it were to go in via the Regulator tree.
-> >
-> 
-> Thanks for your ack.
-> 
-> And I understand your concern, but not sure how would you solve such
-> dependency?
+> > Acked-by: Christoph Hellwig <hch@lst.de>
+>
+> I only ACKed this as a band-aid to get the pmem code in.  Now that
+> we got that in with a less invasive hack I don't see any reasons to
+> do this over doing the proper common prototypes and per-arch runtime checks
+> of flags variant.
 
-We usually share immutable branches, which contain all of the patches
-in the correct order.
-
-> Another point which keeps bugging me is, git-bisect.
-
-... which also mitigates bisect issues.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+That's not too much of a setback.  I had already started to realize
+that nobody really wants the ioremap_<type> variants compared to
+memremap.  So rather than introduce this cleanup and deprecate
+ioremap_<type> over time, let's just skip a step and start converting
+to memremap() with a proper 'flags' parameter for the mapping-type
+right away
