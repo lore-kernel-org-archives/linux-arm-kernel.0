@@ -1,158 +1,73 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Tue, 21 Jul 2015 13:41:23 -0700
-Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
-Message-ID: <1437511283-14216-1-git-send-email-dianders@chromium.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 21 Jul 2015 13:44:41 -0700
+Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and
+ munlockall system calls
+In-Reply-To: <1437508781-28655-3-git-send-email-emunson@akamai.com>
+References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
+ <1437508781-28655-3-git-send-email-emunson@akamai.com>
+Message-ID: <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the TRM we see that BWADJ is "a 12-bit bus that selects the values
-1-4096 for the bandwidth divider (NB)":
- NB = BWADJ[11:0] + 1
-The recommended setting of NB: NB = NF / 2.
+On Tue, 21 Jul 2015 15:59:37 -0400 Eric B Munson <emunson@akamai.com> wrote:
 
-So:
-  NB = NF / 2
-  BWADJ[11:0] + 1 = NF / 2
-  BWADJ[11:0] = NF / 2 - 1
+> With the refactored mlock code, introduce new system calls for mlock,
+> munlock, and munlockall.  The new calls will allow the user to specify
+> what lock states are being added or cleared.  mlock2 and munlock2 are
+> trivial at the moment, but a follow on patch will add a new mlock state
+> making them useful.
+> 
+> munlock2 addresses a limitation of the current implementation.  If a
+> user calls mlockall(MCL_CURRENT | MCL_FUTURE) and then later decides
+> that MCL_FUTURE should be removed, they would have to call munlockall()
+> followed by mlockall(MCL_CURRENT) which could potentially be very
+> expensive.  The new munlockall2 system call allows a user to simply
+> clear the MCL_FUTURE flag.
 
-Right now, we have:
+This is hard.  Maybe we shouldn't have wired up anything other than
+x86.  That's what we usually do with new syscalls.
 
-{                                               \
-        .rate   = _rate##U,                     \
-        .nr = _nr,                              \
-        .nf = _nf,                              \
-        .no = _no,                              \
-        .bwadj = (_nf >> 1),                    \
-}
+You appear to have missed
+mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix.patch:
 
-That means we set bwadj to NF / 2, not NF / 2 - 1
+--- a/arch/arm64/include/asm/unistd.h~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix
++++ a/arch/arm64/include/asm/unistd.h
+@@ -44,7 +44,7 @@
+ #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+ #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+ 
+-#define __NR_compat_syscalls		388
++#define __NR_compat_syscalls		391
+ #endif
+ 
+ #define __ARCH_WANT_SYS_CLONE
 
-All of this is a bit confusing because we specify "NR" (the 1-based
-value), "NF" (the 1-based value), "NO" (the 1-based value), but
-"BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
 
-Let's change to working with "NB" and fix the off by one error.  This
-may affect PLL jitter in a small way (hopefully for the better).
+And mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2.patch:
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
+
+From: Heiko Carstens <heiko.carstens@de.ibm.com>
+Subject: mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2
+
+can we just remove the s390 bits which cause the breakage?
+I will wire up the syscalls as soon as the patch set gets merged.
+
+Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Eric B Munson <emunson@akamai.com>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
 ---
- drivers/clk/rockchip/clk-pll.c    | 18 +++++++++---------
- drivers/clk/rockchip/clk-rk3188.c |  2 +-
- drivers/clk/rockchip/clk-rk3288.c |  2 +-
- drivers/clk/rockchip/clk.h        |  8 ++++----
- 4 files changed, 15 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index 1f88dd1..96903ae 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -120,8 +120,8 @@ static int rockchip_pll_wait_lock(struct rockchip_clk_pll *pll)
- #define RK3066_PLLCON0_NR_SHIFT		8
- #define RK3066_PLLCON1_NF_MASK		0x1fff
- #define RK3066_PLLCON1_NF_SHIFT		0
--#define RK3066_PLLCON2_BWADJ_MASK	0xfff
--#define RK3066_PLLCON2_BWADJ_SHIFT	0
-+#define RK3066_PLLCON2_NB_MASK		0xfff
-+#define RK3066_PLLCON2_NB_SHIFT		0
- #define RK3066_PLLCON3_RESET		(1 << 5)
- #define RK3066_PLLCON3_PWRDOWN		(1 << 1)
- #define RK3066_PLLCON3_BYPASS		(1 << 0)
-@@ -207,8 +207,8 @@ static int rockchip_rk3066_pll_set_rate(struct clk_hw *hw, unsigned long drate,
- 	writel_relaxed(HIWORD_UPDATE(rate->nf - 1, RK3066_PLLCON1_NF_MASK,
- 						   RK3066_PLLCON1_NF_SHIFT),
- 		       pll->reg_base + RK3066_PLLCON(1));
--	writel_relaxed(HIWORD_UPDATE(rate->bwadj, RK3066_PLLCON2_BWADJ_MASK,
--						  RK3066_PLLCON2_BWADJ_SHIFT),
-+	writel_relaxed(HIWORD_UPDATE(rate->nb - 1, RK3066_PLLCON2_NB_MASK,
-+						   RK3066_PLLCON2_NB_SHIFT),
- 		       pll->reg_base + RK3066_PLLCON(2));
- 
- 	/* leave reset and wait the reset_delay */
-@@ -261,7 +261,7 @@ static void rockchip_rk3066_pll_init(struct clk_hw *hw)
- {
- 	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
- 	const struct rockchip_pll_rate_table *rate;
--	unsigned int nf, nr, no, bwadj;
-+	unsigned int nf, nr, no, nb;
- 	unsigned long drate;
- 	u32 pllcon;
- 
-@@ -283,13 +283,13 @@ static void rockchip_rk3066_pll_init(struct clk_hw *hw)
- 	nf = ((pllcon >> RK3066_PLLCON1_NF_SHIFT) & RK3066_PLLCON1_NF_MASK) + 1;
- 
- 	pllcon = readl_relaxed(pll->reg_base + RK3066_PLLCON(2));
--	bwadj = (pllcon >> RK3066_PLLCON2_BWADJ_SHIFT) & RK3066_PLLCON2_BWADJ_MASK;
-+	nb = ((pllcon >> RK3066_PLLCON2_NB_SHIFT) & RK3066_PLLCON2_NB_MASK) + 1;
- 
--	pr_debug("%s: pll %s@%lu: nr (%d:%d); no (%d:%d); nf(%d:%d), bwadj(%d:%d)\n",
-+	pr_debug("%s: pll %s@%lu: nr (%d:%d); no (%d:%d); nf(%d:%d), nb(%d:%d)\n",
- 		 __func__, __clk_get_name(hw->clk), drate, rate->nr, nr,
--		rate->no, no, rate->nf, nf, rate->bwadj, bwadj);
-+		rate->no, no, rate->nf, nf, rate->nb, nb);
- 	if (rate->nr != nr || rate->no != no || rate->nf != nf
--					     || rate->bwadj != bwadj) {
-+					     || rate->nb != nb) {
- 		struct clk *parent = __clk_get_parent(hw->clk);
- 		unsigned long prate;
- 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index edbafbc..0abf22d 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -817,7 +817,7 @@ static void __init rk3188_clk_init(struct device_node *np)
- 
- 		rate = pll->rate_table;
- 		while (rate->rate > 0) {
--			rate->bwadj = 0;
-+			rate->nb = 1;
- 			rate++;
- 		}
- 	}
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index a8bad7d..0df5bae 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -84,7 +84,7 @@ static struct rockchip_pll_rate_table rk3288_pll_rates[] = {
- 	RK3066_PLL_RATE( 742500000, 8, 495, 2),
- 	RK3066_PLL_RATE( 696000000, 1, 58, 2),
- 	RK3066_PLL_RATE( 600000000, 1, 50, 2),
--	RK3066_PLL_RATE_BWADJ(594000000, 1, 198, 8, 1),
-+	RK3066_PLL_RATE_NB(594000000, 1, 198, 8, 1),
- 	RK3066_PLL_RATE( 552000000, 1, 46, 2),
- 	RK3066_PLL_RATE( 504000000, 1, 84, 4),
- 	RK3066_PLL_RATE( 500000000, 3, 125, 2),
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index 93ea335..dc8ecb2 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -83,16 +83,16 @@ enum rockchip_pll_type {
- 	.nr = _nr,				\
- 	.nf = _nf,				\
- 	.no = _no,				\
--	.bwadj = ((_nf) >> 1),			\
-+	.nb = ((_nf) < 2) ? 1 : (_nf) >> 1,	\
- }
- 
--#define RK3066_PLL_RATE_BWADJ(_rate, _nr, _nf, _no, _bw)	\
-+#define RK3066_PLL_RATE_NB(_rate, _nr, _nf, _no, _nb)		\
- {								\
- 	.rate	= _rate##U,					\
- 	.nr = _nr,						\
- 	.nf = _nf,						\
- 	.no = _no,						\
--	.bwadj = _bw,						\
-+	.nb = _nb,						\
- }
- 
- struct rockchip_pll_rate_table {
-@@ -100,7 +100,7 @@ struct rockchip_pll_rate_table {
- 	unsigned int nr;
- 	unsigned int nf;
- 	unsigned int no;
--	unsigned int bwadj;
-+	unsigned int nb;
- };
- 
- /**
--- 
-2.4.3.573.g4eafbef
+ arch/s390/kernel/syscalls.S |    3 ---
+ 1 file changed, 3 deletions(-)
+
+diff -puN arch/s390/kernel/syscalls.S~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2 arch/s390/kernel/syscalls.S
+--- a/arch/s390/kernel/syscalls.S~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2
++++ a/arch/s390/kernel/syscalls.S
+@@ -363,6 +363,3 @@ SYSCALL(sys_bpf,compat_sys_bpf)
+ SYSCALL(sys_s390_pci_mmio_write,compat_sys_s390_pci_mmio_write)
+ SYSCALL(sys_s390_pci_mmio_read,compat_sys_s390_pci_mmio_read)
+ SYSCALL(sys_execveat,compat_sys_execveat)
+-SYSCALL(sys_mlock2,compat_sys_mlock2)			/* 355 */
+-SYSCALL(sys_munlock2,compat_sys_munlock2)
+-SYSCALL(sys_munlockall2,compat_sys_munlockall2)
