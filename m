@@ -1,26 +1,31 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 21 Jul 2015 11:54:03 +0200
-Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
- providers
-In-Reply-To: <55AE13D8.6020301@linaro.org>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
- <55AD6412.9070205@codeaurora.org> <55AE13D8.6020301@linaro.org>
-Message-ID: <55AE16BB.9090201@i2se.com>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Tue, 21 Jul 2015 19:02:31 +0900
+Subject: [PATCH 2/2] ARM: defconfig: add DT support for orion5x_defconfig
+In-Reply-To: <20150720204748.GB21011@lunn.ch>
+References: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
+ <1436878802-25712-3-git-send-email-rogershimizu@gmail.com>
+ <20150720204748.GB21011@lunn.ch>
+Message-ID: <CAEQ9gE=K8ji7nJoQ6f-bRX7obpRf8o1VHhau-BrUY5SUN0G2rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+Dear Andrew,
 
-Am 21.07.2015 um 11:41 schrieb Srinivas Kandagatla:
-> Ok, make sense. I moved this too.
-> I have v9 ready will send it.
->
-> --srini
->
+Thanks for your feedback!
 
-this is not a race. Please give the other (including me :-) ) some time
-for testing and reviewing v8.
+For config of "EARLY_PRINTK" and "NETCONSOLE", I understand your
+concern and I'll remove them.
+However, I want to add another one, which I find it necessary to boot
+on my orion5x hardware:
 
-Thanks
-Stefan
+CONFIG_ARM_ATAG_DTB_COMPAT=y
+
+I need this because the uboot is quite old on that orion5x board and
+the only way to add DT support is to append the DTB at the end of
+zImage.
+I guess other orion5x boards might be the same situation, so this
+config had better go into "orion5x_defconfig".
+Let me know your opinion. Thank you!
+
+Cheers,
+Roger
