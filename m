@@ -1,41 +1,39 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 21 Jul 2015 15:30:31 +0800
-Subject: [PATCH v3 3/5] iommu/arm-smmu: rename __arm_smmu_get_pci_sid
-In-Reply-To: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1437463833-16112-4-git-send-email-thunder.leizhen@huawei.com>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Tue, 21 Jul 2015 16:38:05 +0900
+Subject: [PATCH v2 4/5] drm/rockchip: vop: switch cursor plane to window 3
+In-Reply-To: <1435313249-4549-5-git-send-email-mark.yao@rock-chips.com>
+References: <1435313249-4549-1-git-send-email-mark.yao@rock-chips.com>
+ <1435313249-4549-5-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <CAAFQd5BTJujrzbz2u1jggfV8P9DwZtfJigoV2eiJ5Yesap=7Lw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the words "pci", to make this function can also be used by
-non-pci devices.
+I missed it originally, but if it's not too late yet...
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/iommu/arm-smmu-v3.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Fri, Jun 26, 2015 at 7:07 PM, Mark Yao <mark.yao@rock-chips.com> wrote:
+> Window 1 support scale and yuv format, it's waste use it for a
+> cursor, use window 3 is enough.
+>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+> Changes in v2: None
+>
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index f6ef634..40107bb 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -342,13 +342,14 @@ static const struct vop_reg_data vop_init_reg_table[] = {
+>  /*
+>   * Note: rk3288 has a dedicated 'cursor' window, however, that window requires
+>   * special support to get alpha blending working.  For now, just use overlay
+> - * window 1 for the drm cursor.
+> + * window 3 for the drm cursor.
+> + *
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 9daf4cc..216c9d4 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1734,7 +1734,7 @@ static int __arm_smmu_get_pci_sid(struct pci_dev *pdev, u16 alias, void *sidp)
- 	return 0; /* Continue walking */
- }
+I guess this blank line is not necessary, as pointed on chromium review.
 
--static void __arm_smmu_release_pci_iommudata(void *data)
-+static void __arm_smmu_release_iommudata(void *data)
- {
- 	kfree(data);
- }
-@@ -1811,7 +1811,7 @@ static int __arm_smmu_add_device(struct device *dev, u32 sid)
- 		smmu_group->ste.valid	= true;
- 		smmu_group->smmu	= smmu;
- 		iommu_group_set_iommudata(group, smmu_group,
--					  __arm_smmu_release_pci_iommudata);
-+					  __arm_smmu_release_iommudata);
- 	} else {
- 		smmu = smmu_group->smmu;
- 	}
---
-1.8.0
+Best regards,
+Tomasz
