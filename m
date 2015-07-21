@@ -1,56 +1,70 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 21 Jul 2015 23:04:25 +0200
-Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
-In-Reply-To: <1437511283-14216-1-git-send-email-dianders@chromium.org>
-References: <1437511283-14216-1-git-send-email-dianders@chromium.org>
-Message-ID: <2227753.WV2ipXIsxy@diego>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 21 Jul 2015 14:05:37 -0700
+Subject: [Patch v3 1/5] mtd: nand: tegra: add devicetree binding
+In-Reply-To: <1431282602-7137-2-git-send-email-dev@lynxeye.de>
+References: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
+ <1431282602-7137-2-git-send-email-dev@lynxeye.de>
+Message-ID: <20150721210537.GL24125@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-Am Dienstag, 21. Juli 2015, 13:41:23 schrieb Douglas Anderson:
-> In the TRM we see that BWADJ is "a 12-bit bus that selects the values
-> 1-4096 for the bandwidth divider (NB)":
->  NB = BWADJ[11:0] + 1
-> The recommended setting of NB: NB = NF / 2.
+On Sun, May 10, 2015 at 08:29:58PM +0200, Lucas Stach wrote:
+> This adds the devicetree binding for the Tegra 2 NAND flash
+> controller.
 > 
-> So:
->   NB = NF / 2
->   BWADJ[11:0] + 1 = NF / 2
->   BWADJ[11:0] = NF / 2 - 1
+> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+> ---
+>  .../bindings/mtd/nvidia,tegra20-nand.txt           | 29 ++++++++++++++++++++++
+>  1 file changed, 29 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
 > 
-> Right now, we have:
-> 
-> {                                               \
->         .rate   = _rate##U,                     \
->         .nr = _nr,                              \
->         .nf = _nf,                              \
->         .no = _no,                              \
->         .bwadj = (_nf >> 1),                    \
-> }
-> 
-> That means we set bwadj to NF / 2, not NF / 2 - 1
-> 
-> All of this is a bit confusing because we specify "NR" (the 1-based
-> value), "NF" (the 1-based value), "NO" (the 1-based value), but
-> "BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
-> 
-> Let's change to working with "NB" and fix the off by one error.  This
-> may affect PLL jitter in a small way (hopefully for the better).
-> 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+> diff --git a/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt b/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
+> new file mode 100644
+> index 0000000..522d442
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/nvidia,tegra20-nand.txt
+> @@ -0,0 +1,29 @@
+> +NVIDIA Tegra NAND Flash controller
+> +
+> +Required properties:
+> +- compatible: Must be one of:
+> +  - "nvidia,tegra20-nand"
+> +- reg: MMIO address range
+> +- interrupts: interrupt output of the NFC controller
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +  See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +  - nand
+> +- resets: Must contain an entry for each entry in reset-names.
+> +  See ../reset/reset.txt for details.
+> +- reset-names: Must include the following entries:
+> +  - nand
+> +
+> +Optional properties:
+> +- nvidia,wp-gpios: GPIO used to disable write protection of the flash
 
-we talked about this beforehand in the Chromeos bug and I verified this in the 
-manual for all currently supported Rockchip socs (rk3066 - rk3368), so
+I think write-protect is a pretty common function, so we might want to
+just remove the 'nvidia,' prefix, so we can eventually move your code to
+the core nand_base.c library (BTW, I noticed you grab the GPIO, but you
+don't do anything with it; is that intentional?). In fact, I've seen
+requests for that very feature on the mailing list.
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> +
+> +  Example:
+> +	nand at 70008000 {
+> +		compatible = "nvidia,tegra20-nand";
+> +		reg = <0x70008000 0x100>;
+> +		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&tegra_car TEGRA20_CLK_NDFLASH>;
+> +		clock-names = "nand";
+> +		resets = <&tegra_car 13>;
+> +		reset-names = "nand";
+> +	};
 
+Otherwise, looks good.
 
-Background: the original code stems from a time when I was still operating 
-without documentation and I took this from the upstream kernel from that time 
-and sadly forgot to double check once I had docs.
+Reviewed-by: Brian Norris <computersforpeace@gmail.com>
 
+I have a few comments on the NAND driver, too.
 
-Thanks for fixing this
-Heiko
+Brian
