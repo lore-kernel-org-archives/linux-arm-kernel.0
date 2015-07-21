@@ -1,315 +1,42 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 21 Jul 2015 23:49:16 +0900
-Subject: [PATCH v2 1/2] ARM: dts: orion5x: add buffalo linkstation ls-wtgl
+Date: Tue, 21 Jul 2015 23:49:17 +0900
+Subject: [PATCH v2 2/2] ARM: defconfig: orion5x: add DT support
 In-Reply-To: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
 References: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1437490157-8194-2-git-send-email-rogershimizu@gmail.com>
+Message-ID: <1437490157-8194-3-git-send-email-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dts file to support Buffalo Linkstation LS-WTGL,
-which is marvell orion5x based 2-bay 3.5" HDD NAS.
-Product info:
- - (JPN) http://buffalo.jp/products/catalog/storage/ls-wtgl_r1/
- - (ENG) http://www.buffalotech.com/support-and-downloads/download/LinkStation_Pro_Duo_Manual_web.pdf
+- add 2 DT device entries
+- enable CONFIG_ARM_ATAG_DTB_COMPAT
 
 Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 ---
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts | 273 +++++++++++++++++++++++
- 2 files changed, 274 insertions(+)
- create mode 100644 arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
+ arch/arm/configs/orion5x_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2304076..b6405b0 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -471,6 +471,7 @@ dtb-$(CONFIG_SOC_DRA7XX) += \
- dtb-$(CONFIG_ARCH_ORION5X) += \
- 	orion5x-lacie-d2-network.dtb \
- 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
-+	orion5x-linkstation-lswtgl.dtb \
- 	orion5x-maxtor-shared-storage-2.dtb \
- 	orion5x-rd88f5182-nas.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += \
-diff --git a/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-new file mode 100644
-index 0000000..3daec91
---- /dev/null
-+++ b/arch/arm/boot/dts/orion5x-linkstation-lswtgl.dts
-@@ -0,0 +1,273 @@
-+/*
-+ * Device Tree file for Buffalo Linkstation LS-WTGL
-+ *
-+ * Copyright (C) 2015, Roger Shimizu <rogershimizu@gmail.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include "orion5x-mv88f5182.dtsi"
-+
-+/ {
-+	model = "Buffalo Linkstation LS-WTGL";
-+	compatible = "buffalo,lswtgl", "marvell,orion5x-88f5182", "marvell,orion5x";
-+
-+	memory { /* 64 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x4000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+		linux,stdout-path = &uart0;
-+	};
-+
-+	soc {
-+		ranges = <MBUS_ID(0xf0, 0x01) 0 0xf1000000 0x100000>,
-+		         <MBUS_ID(0x09, 0x00) 0 0xf2200000 0x800>,
-+			 <MBUS_ID(0x01, 0x0f) 0 0xf4000000 0x40000>;
-+
-+		internal-regs {
-+			pinctrl: pinctrl at 10000 {
-+				pinctrl-0 = <&pmx_usb_power &pmx_power_hdd
-+					&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-+				pinctrl-names = "default";
-+
-+				pmx_led_power: pmx-leds {
-+					marvell,pins = "mpp0";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_led_alarm: pmx-leds {
-+					marvell,pins = "mpp2";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_led_info: pmx-leds {
-+					marvell,pins = "mpp3";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_power_hdd: pmx-power-hdd {
-+					marvell,pins = "mpp1";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_usb_power: pmx-usb-power {
-+					marvell,pins = "mpp9";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_sata0: pmx-sata0 {
-+					marvell,pins = "mpp12";
-+					marvell,function = "sata0";
-+				};
-+
-+				pmx_sata1: pmx-sata1 {
-+					marvell,pins = "mpp13";
-+					marvell,function = "sata1";
-+				};
-+
-+				pmx_fan_high: pmx-fan-high {
-+					marvell,pins = "mpp14";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_fan_low: pmx-fan-low {
-+					marvell,pins = "mpp17";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_fan_lock: pmx-fan-lock {
-+					marvell,pins = "mpp6";
-+					marvell,function = "gpio";
-+				};
-+
-+				pmx_power_switch: pmx-power-switch {
-+					marvell,pins = "mpp8", "mpp10";
-+					marvell,function = "gpio";
-+				};
-+			};
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_power_switch>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power-on Switch";
-+			linux,code = <KEY_RESERVED>;
-+			linux,input-type = <5>;
-+			gpios = <&gpio0 8 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 2 {
-+			label = "Power-auto Switch";
-+			linux,code = <KEY_ESC>;
-+			linux,input-type = <5>;
-+			gpios = <&gpio0 10 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio_leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_power &pmx_led_alarm
-+			     &pmx_led_info>;
-+		pinctrl-names = "default";
-+
-+		led at 1 {
-+			label = "lswtgl:blue:power";
-+			gpios = <&gpio0 0 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 2 {
-+			label = "lswtgl:red:alarm";
-+			gpios = <&gpio0 2 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		led at 3 {
-+			label = "lswtgl:amber:info";
-+			gpios = <&gpio0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio_fan {
-+		compatible = "gpio-fan";
-+		pinctrl-0 = <&pmx_fan_low &pmx_fan_high &pmx_fan_lock>;
-+		pinctrl-names = "default";
-+
-+		gpios = <&gpio0 14 GPIO_ACTIVE_LOW
-+			 &gpio0 17 GPIO_ACTIVE_LOW>;
-+
-+		gpio-fan,speed-map = <0 3
-+				1500 2
-+				3250 1
-+				5000 0>;
-+
-+		alarm-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	restart_poweroff {
-+		compatible = "restart-poweroff";
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_power_hdd &pmx_usb_power>;
-+		pinctrl-names = "default";
-+
-+		usb_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		hdd_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "HDD Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			enable-active-high;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+
-+	ethphy: ethernet-phy {
-+		reg = <8>;
-+	};
-+};
-+
-+&eth {
-+	status = "okay";
-+
-+	ethernet-port at 0 {
-+		phy-handle = <&ethphy>;
-+	};
-+};
-+
-+&ehci0 {
-+	status = "okay";
-+};
-+
-+&i2c {
-+	status = "okay";
-+
-+	rtc {
-+		compatible = "ricoh,rs5c372a";
-+		reg = <0x32>;
-+	};
-+};
-+
-+&wdt {
-+	status = "disabled";
-+};
-+
-+&sata {
-+	pinctrl-0 = <&pmx_sata0 &pmx_sata1>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+	nr-ports = <2>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
+diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
+index 855143f..8099417 100644
+--- a/arch/arm/configs/orion5x_defconfig
++++ b/arch/arm/configs/orion5x_defconfig
+@@ -14,8 +14,10 @@ CONFIG_MODULE_UNLOAD=y
+ CONFIG_PARTITION_ADVANCED=y
+ CONFIG_BSD_DISKLABEL=y
+ CONFIG_ARCH_ORION5X=y
++CONFIG_ARCH_ORION5X_DT=y
+ CONFIG_MACH_DB88F5281=y
+ CONFIG_MACH_RD88F5182=y
++CONFIG_MACH_RD88F5182_DT=y
+ CONFIG_MACH_KUROBOX_PRO=y
+ CONFIG_MACH_DNS323=y
+ CONFIG_MACH_TS209=y
+@@ -41,6 +43,7 @@ CONFIG_AEABI=y
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+ CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
+ CONFIG_FPE_NWFPE=y
+ CONFIG_VFP=y
+ CONFIG_NET=y
 -- 
 1.9.1
