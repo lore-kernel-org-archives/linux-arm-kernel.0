@@ -1,29 +1,39 @@
 From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Tue, 21 Jul 2015 14:14:11 +0200
-Subject: [PATCH V2 net 0/3] BPF JIT fixes for ARM
-Message-ID: <1437480854-22684-1-git-send-email-nschichan@freebox.fr>
+Date: Tue, 21 Jul 2015 14:14:14 +0200
+Subject: [PATCH V2 net 3/3] ARM: net: fix vlan access instructions in ARM JIT.
+In-Reply-To: <1437480854-22684-1-git-send-email-nschichan@freebox.fr>
+References: <1437480854-22684-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <1437480854-22684-4-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This makes BPF_ANC | SKF_AD_VLAN_TAG and BPF_ANC | SKF_AD_VLAN_TAG_PRESENT
+have the same behaviour as the in kernel VM and makes the test_bpf LD_VLAN_TAG
+and LD_VLAN_TAG_PRESENT tests pass.
 
-These patches are fixing bugs in the ARM JIT and should probably find
-their way to a stable kernel. All 60 test_bpf tests in Linux 4.1 release
-are now passing OK (was 54 out of 60 before).
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ arch/arm/net/bpf_jit_32.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-Regards,
-
-Changes from original submission:
-* split fixes and features in separate patch series.
-
-Nicolas Schichan (3):
-  ARM: net: fix condition for load_order > 0 when translating load
-    instructions.
-  ARM: net: handle negative offsets in BPF JIT.
-  ARM: net: fix vlan access instructions in ARM JIT.
-
- arch/arm/net/bpf_jit_32.c | 57 ++++++++++++++++++++++++++++++++++++-----------
- 1 file changed, 44 insertions(+), 13 deletions(-)
-
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index d9b2524..c011e22 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -889,9 +889,11 @@ b_epilogue:
+ 			off = offsetof(struct sk_buff, vlan_tci);
+ 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
+ 			if (code == (BPF_ANC | SKF_AD_VLAN_TAG))
+-				OP_IMM3(ARM_AND, r_A, r_A, VLAN_VID_MASK, ctx);
+-			else
+-				OP_IMM3(ARM_AND, r_A, r_A, VLAN_TAG_PRESENT, ctx);
++				OP_IMM3(ARM_AND, r_A, r_A, ~VLAN_TAG_PRESENT, ctx);
++			else {
++				OP_IMM3(ARM_LSR, r_A, r_A, 12, ctx);
++				OP_IMM3(ARM_AND, r_A, r_A, 0x1, ctx);
++			}
+ 			break;
+ 		case BPF_ANC | SKF_AD_QUEUE:
+ 			ctx->seen |= SEEN_SKB;
 -- 
 1.9.1
