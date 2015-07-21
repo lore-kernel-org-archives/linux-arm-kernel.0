@@ -1,42 +1,76 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Tue, 21 Jul 2015 23:49:17 +0900
-Subject: [PATCH v2 2/2] ARM: defconfig: orion5x: add DT support
-In-Reply-To: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
-References: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
-Message-ID: <1437490157-8194-3-git-send-email-rogershimizu@gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 21 Jul 2015 22:50:06 +0800
+Subject: [PATCH 1/2] arm64: dts: Add dts files for Marvell Berlin4CT SoC
+In-Reply-To: <20150721143426.GC10595@leverpostej>
+References: <1437488279-2088-1-git-send-email-jszhang@marvell.com>
+ <1437488279-2088-2-git-send-email-jszhang@marvell.com>
+ <20150721143426.GC10595@leverpostej>
+Message-ID: <20150721225006.04c3d071@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- add 2 DT device entries
-- enable CONFIG_ARM_ATAG_DTB_COMPAT
+Dear Mark,
 
-Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
----
- arch/arm/configs/orion5x_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+Thanks a lot for so quick review!
 
-diff --git a/arch/arm/configs/orion5x_defconfig b/arch/arm/configs/orion5x_defconfig
-index 855143f..8099417 100644
---- a/arch/arm/configs/orion5x_defconfig
-+++ b/arch/arm/configs/orion5x_defconfig
-@@ -14,8 +14,10 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_BSD_DISKLABEL=y
- CONFIG_ARCH_ORION5X=y
-+CONFIG_ARCH_ORION5X_DT=y
- CONFIG_MACH_DB88F5281=y
- CONFIG_MACH_RD88F5182=y
-+CONFIG_MACH_RD88F5182_DT=y
- CONFIG_MACH_KUROBOX_PRO=y
- CONFIG_MACH_DNS323=y
- CONFIG_MACH_TS209=y
-@@ -41,6 +43,7 @@ CONFIG_AEABI=y
- CONFIG_ZBOOT_ROM_TEXT=0x0
- CONFIG_ZBOOT_ROM_BSS=0x0
- CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
- CONFIG_FPE_NWFPE=y
- CONFIG_VFP=y
- CONFIG_NET=y
--- 
-1.9.1
+On Tue, 21 Jul 2015 15:34:26 +0100
+Mark Rutland <mark.rutland@arm.com> wrote:
+
+> Hi,
+> 
+> > +/dts-v1/;
+> > +
+> > +/memreserve/ 0x00000000 0x01000000;
+> 
+> What's this reservation for?
+
+This is reserved for some firmwares' usage.
+
+> 
+> Given you're using PSCI I can't see why we'd expect the kernel to map
+> but not use some memory.
+
+Is it acceptable that we make memory start at 0x01000000 instead of reservation?
+
+> 
+> > +
+> > +#include "berlin4ct.dtsi"
+> > +
+> > +/ {
+> > +	model = "MARVELL BG4CT DMP BOARD";
+> > +	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
+> > +
+> > +	chosen {
+> > +		bootargs = "earlyprintk";
+> > +		stdout-path = "serial0:115200n8";
+> > +	};
+> 
+> You shouldn't need those bootargs; "earlyprintk" does nothing on arm64.
+
+will fix in a newer version
+
+> 
+> [...]
+> 
+> > +		gic: interrupt-controller at 901000 {
+> > +			compatible = "arm,gic-400";
+> > +			#interrupt-cells = <3>;
+> > +			interrupt-controller;
+> > +			reg = <0x901000 0x1000>,
+> > +			      <0x902000 0x1000>,
+> > +			      <0x904000 0x2000>,
+> > +			      <0x906000 0x2000>;
+> > +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> > +		};
+> > +
+> 
+> I believe the size of the cpu interface (the second reg entry) should be
+> 0x2000, as GICC_DIR is at offset 0x1000.
+
+Oh, Yes! Thanks for pointing this out.
+
+> 
+> Otherwise this looks fine.
+> 
+> Thanks,
+> Mark.
