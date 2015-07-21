@@ -1,121 +1,94 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 21 Jul 2015 08:53:34 +0900
-Subject: [RFC 2/3] arm64: refactor save_stack_trace()
-In-Reply-To: <20150720162004.GL9908@arm.com>
-References: <20150716102405.2cc8c406@gandalf.local.home>
- <12F47692-3010-4886-B87D-3D7820609177@gmail.com>
- <20150716113115.45a17f17@gandalf.local.home>
- <20150716121658.7982fdf5@gandalf.local.home>
- <20150717124054.GE26091@leverpostej>
- <20150717090009.720f6bd0@gandalf.local.home>
- <77EA0F10-D5F6-48BD-8652-3B979A978659@gmail.com>
- <20150717104144.6588b2f7@gandalf.local.home>
- <0886A996-40E1-49E9-823C-85E55A858716@gmail.com>
- <1357EA74-B972-4B99-ADB0-BC7E8F06DDB5@gmail.com>
- <20150720162004.GL9908@arm.com>
-Message-ID: <55AD89FE.1010706@linaro.org>
+From: adam.yh.lee@gmail.com (Adam YH Lee)
+Date: Mon, 20 Jul 2015 17:49:15 -0700
+Subject: [V3] [TWL4030 MADC] Fix ADC[3:6] readings
+Message-ID: <1437439755-30618-1-git-send-email-adam.yh.lee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+MADC[3:6] reads incorrect values without these two following changes:
 
-So i don't have to repost my patch here. Please use the original
-commit log message[1/3] as is.
-But please keep in mind that there is still an issue that I mentioned
-in the cover letter; 'Size' field is inaccurate.
-  <reported size> = <its own dynamic local variables>
-                         + <child's local variables>
-and
-  <real size> = <reported size> + <its local variables>
-                                - <child's local variables>
-where "dynamic" means, for example, a variable allocated like the below:
-   int foo(int num) {
-     int array[num];
-     ...
-   }
-(See more details in my ascii art.)
+- enable the 3v1 bias regulator for ADC[3:6]
+- configure ADC[3:6] lines as input, not as USB
 
-Such usage is seldom seen in the kernel, and <reported size> is
-likely equal to <child's local variables>. In other words, we will
-see one-line *displacement* in most cases.
+Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
+---
+ drivers/iio/adc/twl4030-madc.c | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-(We'd better mention it explicitly in the commmit?)
-
-Thanks,
--Takahiro AKASHI
-
-
-On 07/21/2015 01:20 AM, Will Deacon wrote:
-> Hi all,
->
-> On Fri, Jul 17, 2015 at 04:34:21PM +0100, Jungseok Lee wrote:
->> On Jul 17, 2015, at 11:59 PM, Jungseok Lee wrote:
->>> On Jul 17, 2015, at 11:41 PM, Steven Rostedt wrote:
->>>> Thanks! Can you repost patch 1 with the changes I recommended, so that
->>>> I can get an Acked-by from the arm64 maintainers and pull all the
->>>> changes in together. This is fine for a 4.3 release, right? That is, it
->>>> doesn't need to go into 4.2-rcs.
->>>>
->>>
->>> It's not hard to repost a patch, but I feel like we have to wait for Akashi's response.
->>> Also, it might be needed to consider Mark's comment on arch part.
->>>
->>> If they are okay, I will proceed.
->>
->> The [RFC 1/3] patch used in my environment is shaped as follows.
->> I leave the hunk for *only* clear synchronization. This is why I choose this format
->> instead of reposting a patch. I hope it would help to track down this thread.
->>
->> I think this is my best at this point.
->>
->> ----8<----
->> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->> index c5534fa..2b43e20 100644
->> --- a/arch/arm64/include/asm/ftrace.h
->> +++ b/arch/arm64/include/asm/ftrace.h
->> @@ -13,8 +13,9 @@
->>
->>   #include <asm/insn.h>
->>
->> -#define MCOUNT_ADDR		((unsigned long)_mcount)
->> -#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
->> +#define MCOUNT_ADDR			((unsigned long)_mcount)
->> +#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
->> +#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
->>
->>   #ifndef __ASSEMBLY__
->>   #include <linux/compat.h>
->> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> index 407991b..9ab67af 100644
->> --- a/arch/arm64/kernel/stacktrace.c
->> +++ b/arch/arm64/kernel/stacktrace.c
->> @@ -20,6 +20,7 @@
->>   #include <linux/sched.h>
->>   #include <linux/stacktrace.h>
->>
->> +#include <asm/insn.h>
->>   #include <asm/stacktrace.h>
->>
->>   /*
->> @@ -52,7 +53,7 @@ int notrace unwind_frame(struct stackframe *frame)
->>   	 * -4 here because we care about the PC at time of bl,
->>   	 * not where the return will go.
->>   	 */
->> -	frame->pc = *(unsigned long *)(fp + 8) - 4;
->> +	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
->>
->>   	return 0;
->>   }
->
-> The arm64 bits look fine to me:
->
->    Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Steve: feel free to take this along with the other ftrace changes. I don't
-> anticipate any conflicts, but if anything crops up in -next we can sort
-> it out then.
->
-> Thanks!
->
-> Will
->
+diff --git a/drivers/iio/adc/twl4030-madc.c b/drivers/iio/adc/twl4030-madc.c
+index 94c5f05..ae33eba 100644
+--- a/drivers/iio/adc/twl4030-madc.c
++++ b/drivers/iio/adc/twl4030-madc.c
+@@ -45,13 +45,18 @@
+ #include <linux/types.h>
+ #include <linux/gfp.h>
+ #include <linux/err.h>
++#include <linux/regulator/consumer.h>
+ 
+ #include <linux/iio/iio.h>
+ 
++#define TWL4030_USB_SEL_MADC_MCPC	(1<<3)
++#define TWL4030_USB_CARKIT_ANA_CTRL	0xBB
++
+ /**
+  * struct twl4030_madc_data - a container for madc info
+  * @dev:		Pointer to device structure for madc
+  * @lock:		Mutex protecting this data structure
++ * @regulator:		Pointer to bias regulator for madc
+  * @requests:		Array of request struct corresponding to SW1, SW2 and RT
+  * @use_second_irq:	IRQ selection (main or co-processor)
+  * @imr:		Interrupt mask register of MADC
+@@ -60,6 +65,7 @@
+ struct twl4030_madc_data {
+ 	struct device *dev;
+ 	struct mutex lock;	/* mutex protecting this data structure */
++	struct regulator *usb3v1;
+ 	struct twl4030_madc_request requests[TWL4030_MADC_NUM_METHODS];
+ 	bool use_second_irq;
+ 	u8 imr;
+@@ -848,6 +854,33 @@ static int twl4030_madc_probe(struct platform_device *pdev)
+ 		goto err_i2c;
+ 	}
+ 
++	/* Configure MADC[3:6] */
++	ret = twl_i2c_read_u8(TWL_MODULE_USB, &regval,
++			TWL4030_USB_CARKIT_ANA_CTRL);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to read reg CARKIT_ANA_CTRL  0x%X\n",
++				TWL4030_USB_CARKIT_ANA_CTRL);
++		goto err_i2c;
++	}
++	regval |= TWL4030_USB_SEL_MADC_MCPC;
++	ret = twl_i2c_write_u8(TWL_MODULE_USB, regval,
++				 TWL4030_USB_CARKIT_ANA_CTRL);
++	if (ret) {
++		dev_err(&pdev->dev, "unable to write reg CARKIT_ANA_CTRL 0x%X\n",
++				TWL4030_USB_CARKIT_ANA_CTRL);
++		goto err_i2c;
++	}
++
++
++	/* Enable 3v1 bias regulator for MADC[3:6] */
++	madc->usb3v1 = devm_regulator_get(madc->dev, "vusb3v1");
++	if (IS_ERR(madc->usb3v1))
++		return -ENODEV;
++
++	ret = regulator_enable(madc->usb3v1);
++	if (ret)
++		dev_err(madc->dev, "could not enable 3v1 bias regulator\n");
++
+ 	return 0;
+ 
+ err_i2c:
+@@ -867,6 +900,9 @@ static int twl4030_madc_remove(struct platform_device *pdev)
+ 	twl4030_madc_set_current_generator(madc, 0, 0);
+ 	twl4030_madc_set_power(madc, 0);
+ 
++	regulator_disable(madc->usb3v1);
++	devm_regulator_put(madc->usb3v1);
++
+ 	return 0;
+ }
+ 
+-- 
+2.1.4
