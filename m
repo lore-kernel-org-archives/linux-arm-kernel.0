@@ -1,49 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 21 Jul 2015 15:13:58 +0200
-Subject: [PATCH v8 2/2] mmc: host: sdhci: Disable 1.8V signaling for
- arasan 4.9a version of SDHCI controller.
-In-Reply-To: <CAOHikRBkDinUfcOR3Dg12e2Xy_P5TABOpHSnkSpZhRyhLRWGFA@mail.gmail.com>
-References: <1434715227-27399-1-git-send-email-stripathi@apm.com>
- <1434715227-27399-3-git-send-email-stripathi@apm.com>
- <CAOHikRBkDinUfcOR3Dg12e2Xy_P5TABOpHSnkSpZhRyhLRWGFA@mail.gmail.com>
-Message-ID: <CAPDyKFqozGkHRSFYm=P61XnYj4F-kpoYG2CmVDc1tSkT_zQJ5w@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 21 Jul 2015 15:07:27 +0200
+Subject: [PATCH 2/2] ARM: defconfig: add DT support for orion5x_defconfig
+In-Reply-To: <CAEQ9gE=K8ji7nJoQ6f-bRX7obpRf8o1VHhau-BrUY5SUN0G2rA@mail.gmail.com>
+References: <1436878802-25712-1-git-send-email-rogershimizu@gmail.com>
+ <1436878802-25712-3-git-send-email-rogershimizu@gmail.com>
+ <20150720204748.GB21011@lunn.ch>
+ <CAEQ9gE=K8ji7nJoQ6f-bRX7obpRf8o1VHhau-BrUY5SUN0G2rA@mail.gmail.com>
+Message-ID: <20150721130727.GE21011@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 June 2015 at 14:28, Suman Tripathi <stripathi@apm.com> wrote:
-> Hi ,
->
-> On Fri, Jun 19, 2015 at 5:30 PM, Suman Tripathi <stripathi@apm.com> wrote:
->> This patch disables the 1.8V signaling for arasan 4.9a version
->> of SDHCI controller with the help SDHCI_QUIRK2_NO_1_8_V quirk.
->>
->> Signed-off-by: Suman Tripathi <stripathi@apm.com>
->> ---
->> ---
->>  drivers/mmc/host/sdhci-of-arasan.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
->> index 21c0c08..4c99ea4 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -171,7 +171,8 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->>
->>         if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
->>                 host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
->> -               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
->> +               host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23 |
->> +                                SDHCI_QUIRK2_NO_1_8_V;
->>         }
->
->
-> I think I am  wrong here. No-1.8v is something related to board
-> regulator circuitry not related to IP version. So it should be dts
-> driven.
+On Tue, Jul 21, 2015 at 07:02:31PM +0900, Roger Shimizu wrote:
+> Dear Andrew,
+> 
+> Thanks for your feedback!
+> 
+> For config of "EARLY_PRINTK" and "NETCONSOLE", I understand your
+> concern and I'll remove them.
+> However, I want to add another one, which I find it necessary to boot
+> on my orion5x hardware:
+> 
+> CONFIG_ARM_ATAG_DTB_COMPAT=y
 
-Agree!
+Hi Roger
 
-So I guess that will change patch1 and this one can be completely dropped?
+This one is .O.K.
 
-Kind regards
-Uffe
+     Andrew
