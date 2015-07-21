@@ -1,122 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 Jul 2015 10:09:10 +0100
-Subject: [PATCH v4 1/2] mfd: devicetree: add bindings for Atmel Flexcom
-In-Reply-To: <337ab4936bd6ec2f24c42e2f8f363df21f491a02.1434967670.git.cyrille.pitchen@atmel.com>
-References: <cover.1434967670.git.cyrille.pitchen@atmel.com>
- <337ab4936bd6ec2f24c42e2f8f363df21f491a02.1434967670.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150721090910.GG3061@x1>
+Date: Tue, 21 Jul 2015 10:21:48 +0100
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <55ACE2FC.2090801@linaro.org>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
+ <20150717111733.GL11162@sirena.org.uk>
+ <55A8F859.2090204@linaro.org> <20150720073011.GA3061@x1>
+ <55ACE2FC.2090801@linaro.org>
+Message-ID: <20150721092148.GI3061@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 22 Jun 2015, Cyrille Pitchen wrote:
+On Mon, 20 Jul 2015, Vaibhav Hiremath wrote:
 
-> This patch documents the DT bindings for the Atmel Flexcom which will be
-> introduced by sama5d2x SoCs. These bindings will be used by the actual Flexcom
-> driver to be sent in another patch.
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 58 ++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> new file mode 100644
-> index 0000000..38f0e43
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> @@ -0,0 +1,58 @@
-> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
-> +
-> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
-> +controller and an USART. Only one function can be used at a time and is chosen
-> +at boot time according to the device tree.
-> +
-> +Required properties:
-> +- compatible: "atmel,sama5d2-flexcom"
-> +- reg: shall be the offset/length value for Flexcom dedicated I/O registers
-> +  (without USART, TWI or SPI registers).
-> +- clocks: shall be the Flexcom peripheral clock from PMC.
-> +- #address-cells: should be <1>
-> +- #size-cells: should be <1>
-> +- ranges: one range for the full I/O register region (including USART, TWI and
-> +  SPI registers)
-> +- atmel,flexcom-mode: shall be a string among { "spi", "usart", "i2c", "twi" }.
-> +  "i2c" and "twi" are synonymous.
+> On Monday 20 July 2015 01:00 PM, Lee Jones wrote:
+> >On Fri, 17 Jul 2015, Vaibhav Hiremath wrote:
+> >
+> >>
+> >>
+> >>On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
+> >>>On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
+> >>>
+> >>>>Can you merge this into regulator tree?
+> >>>
+> >>>>Link to MFD - https://lkml.org/lkml/2015/7/16/704
+> >>>
+> >>>I need a tag I can pull from Lee.
+> >>>
+> >>Great.
+> >>
+> >>Lee,
+> >>It would be helpful, if you could ack below patch,
+> >>
+> >>https://lkml.org/lkml/2015/7/16/704
+> >
+> >These patches are yet to be reviewed.  I will unmark those patches as
+> >important (meaning they will not be reviewed during this iteration).
+> >Please resubmit a single patch-set containing all of the
+> >dependencies and Mark and I will work it out between us.
+> >
+> 
+> Ok,
+> 
+> I have just sent single patch, which has dependency on regulator
+> changes. Please review, ack and queue up.
 
-Please use a numerical value instead.  You can then define it in
-include/dt-bindings/*
+A little presumptuous, don't you think? ;)
 
-This is only required if you supply more than one child node.  Is that
-the plan?  I ask because you only have one child node in the example
-below.
+> [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
+> https://patchwork.kernel.org/patch/6826531/
 
-This document is pretty hard to read.  Please line everything up
-nicely, so it's easy on the eye:
-
-- compatible: 	      "atmel,sama5d2-flexcom"
-- reg: 		      shall be the offset/length value for Flexcom dedicated I/O registers
-  		      (without USART, TWI or SPI registers).
-- clocks: 	      shall be the Flexcom peripheral clock from PMC.
-- #address-cells:     should be <1>
-- #size-cells: 	      should be <1>
-- ranges: 	      one range for the full I/O register region (including USART, TWI and
-  		      SPI registers)
-- atmel,flexcom-mode: shall be a string among { "spi", "usart", "i2c", "twi" }.
-  		      "i2c" and "twi" are synonymous.
-
-> +Required child:
-> +a child device of type matching the "atmel,flexcom-mode" property.
-> +The reg property of this child should be:
-> +- <0x200 0x200> for USART
-> +- <0x400 0x200> for SPI
-> +- <0x600 0x200> for I2C
-> +
-> +The phandle provided by the clocks property of the child is the same as one for
-> +the Flexcom parent.
-> +Other properties remain unchanged. See documentation of the respective device.
-
-Please point to the other documentation.
-
-../uart/<blah>
-../spi/<blah>
-../i2c/<blah>
-
-> +Example:
-> +
-> +flx0: flexcom at f8034000 {
-
-What references this node?  If nothing, then you can remove the label.
-
-> +	compatible = "atmel,sama5d2-flexcom";
-> +	reg = <0xf8034000 0x200>;
-> +	clocks = <&flx0_clk>;
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +	ranges = <0x0 0xf8034000 0x800>;
-> +	atmel,flexcom-mode = "spi";
-> +
-> +	spi at f8034400 {
-> +		compatible = "atmel,at91rm9200-spi";
-> +		reg = <0x400 0x200>;
-> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_flx0_ioset1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		clocks = <&flx0_clk>;
-> +		clock-names = "spi_clk";
-> +		atmel,fifo-size = <32>;
-> +
-> +		mtd_dataflash at 0 {
-> +			compatible = "atmel,at25f512b";
-> +			reg = <0>;
-> +			spi-max-frequency = <20000000>;
-> +		};
-> +	};
-> +};
+So nothing depends on this anymore, right?
 
 -- 
 Lee Jones
