@@ -1,8 +1,8 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 21 Jul 2015 14:42:22 +0800
+Date: Tue, 21 Jul 2015 14:48:38 +0800
 Subject: [PATCH v4 0/5] PCI: hisi: Add PCIe host support for Hisilicon Soc
  Hip05
-Message-ID: <1437460947-2328-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
