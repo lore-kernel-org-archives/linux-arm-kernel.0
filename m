@@ -1,85 +1,65 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 21 Jul 2015 09:54:03 +0100
-Subject: [PATCH V3 03/19] memory: tegra: add flush operation for Tegra30
- memory clients
-In-Reply-To: <20150717100337.GH3057@ulmo>
-References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
- <1436791197-32358-4-git-send-email-jonathanh@nvidia.com>
- <20150717100337.GH3057@ulmo>
-Message-ID: <55AE08AB.6060903@nvidia.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Tue, 21 Jul 2015 18:00:37 +0900
+Subject: [PATCH 0/9] gpiolib: Add GPIO name support
+In-Reply-To: <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+Message-ID: <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 17/07/15 11:03, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Mon, Jul 13, 2015 at 01:39:41PM +0100, Jon Hunter wrote:
->> From: Vince Hsu <vinceh@nvidia.com>
+On Sat, Jul 18, 2015 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Fri, Jul 17, 2015 at 11:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+>
+>> This is a proposal to add GPIO names to the kernel based on devicetree
+>> descriptions.
 >>
->> This patch adds the hot reset register table and flush related callback
->> functions for Tegra30.
+>> This series adds GPIO name support. Until now it is only possible to use names
+>> for already requested GPIOs (for example what they are used for). It is not
+>> possible to identify GPIOs by a name although most of them have a name for
+>> example in the schematics of the board. This makes it difficult to identify
+>> a specific GPIO from userspace.
 >>
->> Signed-off-by: Vince Hsu <vinceh@nvidia.com>
->> [jonathanh at nvidia.com: Removed tegra_mc_ops and added
->>  metastable_flush_reads.]
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> As the GPIO name information is a hardware description this series uses the
+>> devicetree bindings introduced by the GPIO hogging mechanism, specifically
+>> 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
+>> names as fallback. The gpio numbers still have a higher priority to ensure
+>> backwards compatibility.
 >>
->> ---
->> v3: removal of tegra_mc_ops
->> ---
->>  drivers/memory/tegra/tegra30.c | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
+>> Exported GPIOs are still using their number as directory name (gpio<ID>). But the
+>> directories now contain a 'name' file which is '(null)' for non-existent names
+>> and the name otherwise.
 >>
->> diff --git a/drivers/memory/tegra/tegra30.c b/drivers/memory/tegra/tegra30.c
->> index 1abcd8f6f3ba..3b4987f39b52 100644
->> --- a/drivers/memory/tegra/tegra30.c
->> +++ b/drivers/memory/tegra/tegra30.c
->> @@ -6,6 +6,7 @@
->>   * published by the Free Software Foundation.
->>   */
->>  
->> +#include <linux/device.h>
-> 
-> What do you need this for?
+>> This series can be used to have an easy name mapping for udev with a quite
+>> simple rule similar to this:
+>>         SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
+>>         PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
+>> With this rule udev adds a link for each exported GPIO with a name into
+>> /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
+>> it.
+>
+> I must say I like this series.
+>
+> Because it makes the GPIO sysfs ABI *less* insane. Especially
+> I like the patch that makes a distinction between "label" (use)
+> and "name" (the name of the actual line). That illustrates clearly
+> that this is thought-through.
+>
+> However I still have some doubts as it will expand the sysfs ABI,
+> and we have discussed a char device for GPIO chips as a better
+> alternative, for example since these can do get/set multiple GPIOs
+> with a single context switch (ioctl), whereas sysfs is "one value per file"
+> and would be able to expose some flags better.
 
-Looks like I forgot to remove this, when removing the tegra_mc_ops.
-Thanks, will remove.
+Even if we introduce a new interface (and I don't see traction towards
+this yet), sysfs is just too convenient for 90% of the cases to leave
+it borderline-unusable as it is currently. The obligation to use
+global numbers that potentially change every boot is getting us
+complaints every week or so - this series sounds like a good way to
+reduce our inbox volume, and if only for that, I encourage it being
+pursued. :)
 
->>  #include <linux/of.h>
->>  #include <linux/mm.h>
->>  
->> @@ -936,6 +937,26 @@ static const struct tegra_smmu_swgroup tegra30_swgroups[] = {
->>  	{ .name = "isp",  .swgroup = TEGRA_SWGROUP_ISP,  .reg = 0x258 },
->>  };
->>  
->> +static struct tegra_mc_flush tegra30_mc_flush[] = {
-> 
-> const
+It will also not get in the way of a new user-space interface, so why
+refrain from these extra ~90 lines of code?
 
-Yes, will fix.
-
->> +	{TEGRA_SWGROUP_AFI,        0x200, 0x204,  0},
->> +	{TEGRA_SWGROUP_AVPC,       0x200, 0x204,  1},
->> +	{TEGRA_SWGROUP_DC,         0x200, 0x204,  2},
->> +	{TEGRA_SWGROUP_DCB,        0x200, 0x204,  3},
->> +	{TEGRA_SWGROUP_EPP,        0x200, 0x204,  4},
->> +	{TEGRA_SWGROUP_G2,         0x200, 0x204,  5},
->> +	{TEGRA_SWGROUP_HC,         0x200, 0x204,  6},
->> +	{TEGRA_SWGROUP_HDA,        0x200, 0x204,  7},
->> +	{TEGRA_SWGROUP_ISP,        0x200, 0x204,  8},
->> +	{TEGRA_SWGROUP_MPCORE,     0x200, 0x204,  9},
->> +	{TEGRA_SWGROUP_MPCORELP,   0x200, 0x204, 10},
->> +	{TEGRA_SWGROUP_MPE,        0x200, 0x204, 11},
->> +	{TEGRA_SWGROUP_NV,         0x200, 0x204, 12},
->> +	{TEGRA_SWGROUP_NV2,        0x200, 0x204, 13},
->> +	{TEGRA_SWGROUP_PPCS,       0x200, 0x204, 14},
->> +	{TEGRA_SWGROUP_VDE,        0x200, 0x204, 16},
->> +	{TEGRA_SWGROUP_VI,         0x200, 0x204, 17},
-> 
-> Spaces around { and }, please.
-
-Ok.
-
-Cheers
-Jon
+Alex.
