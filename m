@@ -1,65 +1,212 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Tue, 21 Jul 2015 18:00:37 +0900
-Subject: [PATCH 0/9] gpiolib: Add GPIO name support
-In-Reply-To: <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
-Message-ID: <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
+From: yao.yuan@freescale.com (Yuan Yao)
+Date: Tue, 21 Jul 2015 16:56:45 +0800
+Subject: [PATCH v2] dmaengine: fsl-edma: add PM suspend/resume support
+Message-ID: <1437469005-3162-1-git-send-email-yao.yuan@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 18, 2015 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Fri, Jul 17, 2015 at 11:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
->
->> This is a proposal to add GPIO names to the kernel based on devicetree
->> descriptions.
->>
->> This series adds GPIO name support. Until now it is only possible to use names
->> for already requested GPIOs (for example what they are used for). It is not
->> possible to identify GPIOs by a name although most of them have a name for
->> example in the schematics of the board. This makes it difficult to identify
->> a specific GPIO from userspace.
->>
->> As the GPIO name information is a hardware description this series uses the
->> devicetree bindings introduced by the GPIO hogging mechanism, specifically
->> 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
->> names as fallback. The gpio numbers still have a higher priority to ensure
->> backwards compatibility.
->>
->> Exported GPIOs are still using their number as directory name (gpio<ID>). But the
->> directories now contain a 'name' file which is '(null)' for non-existent names
->> and the name otherwise.
->>
->> This series can be used to have an easy name mapping for udev with a quite
->> simple rule similar to this:
->>         SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
->>         PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
->> With this rule udev adds a link for each exported GPIO with a name into
->> /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
->> it.
->
-> I must say I like this series.
->
-> Because it makes the GPIO sysfs ABI *less* insane. Especially
-> I like the patch that makes a distinction between "label" (use)
-> and "name" (the name of the actual line). That illustrates clearly
-> that this is thought-through.
->
-> However I still have some doubts as it will expand the sysfs ABI,
-> and we have discussed a char device for GPIO chips as a better
-> alternative, for example since these can do get/set multiple GPIOs
-> with a single context switch (ioctl), whereas sysfs is "one value per file"
-> and would be able to expose some flags better.
+This add power management suspend/resume support for the fsl-edma
+driver.
 
-Even if we introduce a new interface (and I don't see traction towards
-this yet), sysfs is just too convenient for 90% of the cases to leave
-it borderline-unusable as it is currently. The obligation to use
-global numbers that potentially change every boot is getting us
-complaints every week or so - this series sounds like a good way to
-reduce our inbox volume, and if only for that, I encourage it being
-pursued. :)
+eDMA acted as a basic function used by others. What it needs to do is
+the two steps below to support power management.
 
-It will also not get in the way of a new user-space interface, so why
-refrain from these extra ~90 lines of code?
+In fsl_edma_suspend_late:
+Check whether the DMA chan is idle and if it is not idle, stop PM
+operation.
 
-Alex.
+In fsl_edma_resume_early:
+Enable the eDMA and wait for being used.
+
+Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
+---
+ drivers/dma/fsl-edma.c | 83 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 80 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
+index 915eec3..cf8b06c 100644
+--- a/drivers/dma/fsl-edma.c
++++ b/drivers/dma/fsl-edma.c
+@@ -116,6 +116,10 @@
+ 				BIT(DMA_SLAVE_BUSWIDTH_2_BYTES) | \
+ 				BIT(DMA_SLAVE_BUSWIDTH_4_BYTES) | \
+ 				BIT(DMA_SLAVE_BUSWIDTH_8_BYTES)
++enum fsl_edma_pm_state {
++	RUNNING = 0,
++	SUSPENDED,
++};
+ 
+ struct fsl_edma_hw_tcd {
+ 	__le32	saddr;
+@@ -147,6 +151,9 @@ struct fsl_edma_slave_config {
+ struct fsl_edma_chan {
+ 	struct virt_dma_chan		vchan;
+ 	enum dma_status			status;
++	enum fsl_edma_pm_state		pm_state;
++	bool				idle;
++	u32				slave_id;
+ 	struct fsl_edma_engine		*edma;
+ 	struct fsl_edma_desc		*edesc;
+ 	struct fsl_edma_slave_config	fsc;
+@@ -298,6 +305,7 @@ static int fsl_edma_terminate_all(struct dma_chan *chan)
+ 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+ 	fsl_edma_disable_request(fsl_chan);
+ 	fsl_chan->edesc = NULL;
++	fsl_chan->idle = true;
+ 	vchan_get_all_descriptors(&fsl_chan->vchan, &head);
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	vchan_dma_desc_free_list(&fsl_chan->vchan, &head);
+@@ -313,6 +321,7 @@ static int fsl_edma_pause(struct dma_chan *chan)
+ 	if (fsl_chan->edesc) {
+ 		fsl_edma_disable_request(fsl_chan);
+ 		fsl_chan->status = DMA_PAUSED;
++		fsl_chan->idle = true;
+ 	}
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	return 0;
+@@ -327,6 +336,7 @@ static int fsl_edma_resume(struct dma_chan *chan)
+ 	if (fsl_chan->edesc) {
+ 		fsl_edma_enable_request(fsl_chan);
+ 		fsl_chan->status = DMA_IN_PROGRESS;
++		fsl_chan->idle = false;
+ 	}
+ 	spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+ 	return 0;
+@@ -648,6 +658,7 @@ static void fsl_edma_xfer_desc(struct fsl_edma_chan *fsl_chan)
+ 	fsl_edma_set_tcd_regs(fsl_chan, fsl_chan->edesc->tcd[0].vtcd);
+ 	fsl_edma_enable_request(fsl_chan);
+ 	fsl_chan->status = DMA_IN_PROGRESS;
++	fsl_chan->idle = false;
+ }
+ 
+ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+@@ -676,6 +687,7 @@ static irqreturn_t fsl_edma_tx_handler(int irq, void *dev_id)
+ 				vchan_cookie_complete(&fsl_chan->edesc->vdesc);
+ 				fsl_chan->edesc = NULL;
+ 				fsl_chan->status = DMA_COMPLETE;
++				fsl_chan->idle = true;
+ 			} else {
+ 				vchan_cyclic_callback(&fsl_chan->edesc->vdesc);
+ 			}
+@@ -704,6 +716,7 @@ static irqreturn_t fsl_edma_err_handler(int irq, void *dev_id)
+ 			edma_writeb(fsl_edma, EDMA_CERR_CERR(ch),
+ 				fsl_edma->membase + EDMA_CERR);
+ 			fsl_edma->chans[ch].status = DMA_ERROR;
++			fsl_edma->chans[ch].idle = true;
+ 		}
+ 	}
+ 	return IRQ_HANDLED;
+@@ -724,6 +737,12 @@ static void fsl_edma_issue_pending(struct dma_chan *chan)
+ 
+ 	spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+ 
++	if (unlikely(fsl_chan->pm_state != RUNNING)) {
++		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++		/* cannot submit due to suspend */
++		return;
++	}
++
+ 	if (vchan_issue_pending(&fsl_chan->vchan) && !fsl_chan->edesc)
+ 		fsl_edma_xfer_desc(fsl_chan);
+ 
+@@ -735,6 +754,7 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ {
+ 	struct fsl_edma_engine *fsl_edma = ofdma->of_dma_data;
+ 	struct dma_chan *chan, *_chan;
++	struct fsl_edma_chan *fsl_chan;
+ 	unsigned long chans_per_mux = fsl_edma->n_chans / DMAMUX_NR;
+ 
+ 	if (dma_spec->args_count != 2)
+@@ -748,8 +768,10 @@ static struct dma_chan *fsl_edma_xlate(struct of_phandle_args *dma_spec,
+ 			chan = dma_get_slave_channel(chan);
+ 			if (chan) {
+ 				chan->device->privatecnt++;
+-				fsl_edma_chan_mux(to_fsl_edma_chan(chan),
+-					dma_spec->args[1], true);
++				fsl_chan = to_fsl_edma_chan(chan);
++				fsl_chan->slave_id = dma_spec->args[1];
++				fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
++						true);
+ 				mutex_unlock(&fsl_edma->fsl_edma_mutex);
+ 				return chan;
+ 			}
+@@ -888,7 +910,9 @@ static int fsl_edma_probe(struct platform_device *pdev)
+ 		struct fsl_edma_chan *fsl_chan = &fsl_edma->chans[i];
+ 
+ 		fsl_chan->edma = fsl_edma;
+-
++		fsl_chan->pm_state = RUNNING;
++		fsl_chan->slave_id = 0;
++		fsl_chan->idle = true;
+ 		fsl_chan->vchan.desc_free = fsl_edma_free_desc;
+ 		vchan_init(&fsl_chan->vchan, &fsl_edma->dma_dev);
+ 
+@@ -959,6 +983,58 @@ static int fsl_edma_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int fsl_edma_suspend_late(struct device *dev)
++{
++	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
++	struct fsl_edma_chan *fsl_chan;
++	unsigned long flags;
++	int i;
++
++	for (i = 0; i < fsl_edma->n_chans; i++) {
++		fsl_chan = &fsl_edma->chans[i];
++		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
++		/* Make sure chan is idle or can not into suspend. */
++		if (unlikely(!fsl_chan->idle))
++			goto out;
++		fsl_chan->pm_state = SUSPENDED;
++		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	}
++	return 0;
++
++out:
++	for (; i >= 0; i--) {
++		fsl_chan = &fsl_edma->chans[i];
++		fsl_chan->pm_state = RUNNING;
++		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
++	}
++	return -EBUSY;
++}
++
++static int fsl_edma_resume_early(struct device *dev)
++{
++	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
++	struct fsl_edma_chan *fsl_chan;
++	int i;
++
++	for (i = 0; i < fsl_edma->n_chans; i++) {
++		fsl_chan = &fsl_edma->chans[i];
++		fsl_chan->pm_state = RUNNING;
++		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
++		if (fsl_chan->slave_id != 0)
++			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
++	}
++
++	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
++			fsl_edma->membase + EDMA_CR);
++
++	return 0;
++}
++
++static const struct dev_pm_ops fsl_edma_pm_ops = {
++	.suspend_late   = fsl_edma_suspend_late,
++	.resume_early   = fsl_edma_resume_early,
++};
++
+ static const struct of_device_id fsl_edma_dt_ids[] = {
+ 	{ .compatible = "fsl,vf610-edma", },
+ 	{ /* sentinel */ }
+@@ -969,6 +1045,7 @@ static struct platform_driver fsl_edma_driver = {
+ 	.driver		= {
+ 		.name	= "fsl-edma",
+ 		.of_match_table = fsl_edma_dt_ids,
++		.pm     = &fsl_edma_pm_ops,
+ 	},
+ 	.probe          = fsl_edma_probe,
+ 	.remove		= fsl_edma_remove,
+-- 
+2.1.0.27.g96db324
