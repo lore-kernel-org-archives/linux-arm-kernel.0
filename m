@@ -1,75 +1,48 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 21 Jul 2015 16:05:41 -0500
-Subject: [PATCHv2] ARM: socfpga: add reset for the Arria 10 platform
-Message-ID: <1437512741-14099-1-git-send-email-dinguyen@opensource.altera.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 21 Jul 2015 14:16:30 -0700
+Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
+In-Reply-To: <1437511283-14216-1-git-send-email-dianders@chromium.org>
+References: <1437511283-14216-1-git-send-email-dianders@chromium.org>
+Message-ID: <55AEB6AE.2070006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On 07/21/2015 01:41 PM, Douglas Anderson wrote:
+> In the TRM we see that BWADJ is "a 12-bit bus that selects the values
+> 1-4096 for the bandwidth divider (NB)":
+>   NB = BWADJ[11:0] + 1
+> The recommended setting of NB: NB = NF / 2.
+>
+> So:
+>    NB = NF / 2
+>    BWADJ[11:0] + 1 = NF / 2
+>    BWADJ[11:0] = NF / 2 - 1
+>
+> Right now, we have:
+>
+> {                                               \
+>          .rate   = _rate##U,                     \
+>          .nr = _nr,                              \
+>          .nf = _nf,                              \
+>          .no = _no,                              \
+>          .bwadj = (_nf >> 1),                    \
+> }
+>
+> That means we set bwadj to NF / 2, not NF / 2 - 1
+>
+> All of this is a bit confusing because we specify "NR" (the 1-based
+> value), "NF" (the 1-based value), "NO" (the 1-based value), but
+> "BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
+>
+> Let's change to working with "NB" and fix the off by one error.  This
+> may affect PLL jitter in a small way (hopefully for the better).
+>
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>
 
-Since the Arria10's reset register offset is different from the Cyclone/Arria 5,
-it's best to add a new DT_MACHINE_START() for the Arria10.
+There's no Fixes tag or stable Cc so I take it this isn't fixing any 
+manifesting regression, more of a visual inspection bug find?
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
-v2: use altera_a10_dt_match for the A10 machine desc
----
- arch/arm/mach-socfpga/core.h    |  1 +
- arch/arm/mach-socfpga/socfpga.c | 26 ++++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
-
-diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
-index 7259c37..5bc6ea8 100644
---- a/arch/arm/mach-socfpga/core.h
-+++ b/arch/arm/mach-socfpga/core.h
-@@ -25,6 +25,7 @@
- #define SOCFPGA_RSTMGR_MODPERRST	0x14
- #define SOCFPGA_RSTMGR_BRGMODRST	0x1c
- 
-+#define SOCFPGA_A10_RSTMGR_CTRL		0xC
- #define SOCFPGA_A10_RSTMGR_MODMPURST	0x20
- 
- /* System Manager bits */
-diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
-index 19643a7..a1c0efa 100644
---- a/arch/arm/mach-socfpga/socfpga.c
-+++ b/arch/arm/mach-socfpga/socfpga.c
-@@ -74,6 +74,19 @@ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
- 	writel(temp, rst_manager_base_addr + SOCFPGA_RSTMGR_CTRL);
- }
- 
-+static void socfpga_arria10_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	u32 temp;
-+
-+	temp = readl(rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
-+
-+	if (mode == REBOOT_HARD)
-+		temp |= RSTMGR_CTRL_SWCOLDRSTREQ;
-+	else
-+		temp |= RSTMGR_CTRL_SWWARMRSTREQ;
-+	writel(temp, rst_manager_base_addr + SOCFPGA_A10_RSTMGR_CTRL);
-+}
-+
- static const char *altera_dt_match[] = {
- 	"altr,socfpga",
- 	NULL
-@@ -86,3 +99,16 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
- 	.restart	= socfpga_cyclone5_restart,
- 	.dt_compat	= altera_dt_match,
- MACHINE_END
-+
-+static const char *altera_a10_dt_match[] = {
-+	"altr,socfpga-arria10",
-+	NULL
-+};
-+
-+DT_MACHINE_START(SOCFPGA_A10, "Altera SOCFPGA Arria10")
-+	.l2c_aux_val	= 0,
-+	.l2c_aux_mask	= ~0,
-+	.init_irq	= socfpga_init_irq,
-+	.restart	= socfpga_arria10_restart,
-+	.dt_compat	= altera_a10_dt_match,
-+MACHINE_END
 -- 
-2.4.5
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
