@@ -1,49 +1,30 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 21 Jul 2015 22:17:59 +0800
-Subject: [PATCH 2/2] arm64: Enable Marvell Berlin SoC family in Kconfig and
- defconfig
-In-Reply-To: <1437488279-2088-1-git-send-email-jszhang@marvell.com>
-References: <1437488279-2088-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1437488279-2088-3-git-send-email-jszhang@marvell.com>
+Date: Tue, 21 Jul 2015 22:17:57 +0800
+Subject: [PATCH 0/2] arm64: Add basic support for Marvell Berlin4CT SoC
+Message-ID: <1437488279-2088-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
-Kconfig and defconfig.
+Marvell Berlin4CT is a SoC based on 64bit ARMv8 architecture. It contains
+quad CA53 cores.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/Kconfig.platforms | 6 ++++++
- arch/arm64/configs/defconfig | 1 +
- 2 files changed, 7 insertions(+)
+This SoC shares many HW IP with BG2Q and other berlin series. This patchset was tested
+on Berlin4CT DMP board, and boot to shell ok.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index f7e4327..37b8fc5 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -1,5 +1,11 @@
- menu "Platform selection"
- 
-+config ARCH_BERLIN
-+	bool "Marvell Berlin SoC Family"
-+	select DW_APB_ICTL
-+	help
-+	  This enables support for Marvell Berlin SoC Family
-+
- config ARCH_EXYNOS
- 	bool
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 506b466..83843f9 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
+Jisheng Zhang (2):
+  arm64: dts: Add dts files for Marvell Berlin4CT SoC
+  arm64: Enable Marvell Berlin SoC family in Kconfig and defconfig
+
+ arch/arm64/Kconfig.platforms                  |   6 +
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/marvell/Makefile          |   5 +
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  68 +++++++++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 160 ++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ 6 files changed, 241 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+
 -- 
 2.1.4
