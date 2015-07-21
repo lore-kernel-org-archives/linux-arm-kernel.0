@@ -1,172 +1,135 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Tue, 21 Jul 2015 04:12:01 +0300
-Subject: [PATCH 4/4] ARM: OMAP2+: omap3-pandora: add wifi support
-In-Reply-To: <1437441121-31658-1-git-send-email-notasas@gmail.com>
-References: <1437441121-31658-1-git-send-email-notasas@gmail.com>
-Message-ID: <1437441121-31658-4-git-send-email-notasas@gmail.com>
+From: shannon.zhao@linaro.org (Shannon Zhao)
+Date: Tue, 21 Jul 2015 09:16:57 +0800
+Subject: [PATCH 04/18] KVM: ARM64: Add reset and access handlers for
+ PMCR_EL0 register
+In-Reply-To: <20150717102133.GN14024@cbox>
+References: <1436149068-3784-1-git-send-email-shannon.zhao@linaro.org>
+ <1436149068-3784-5-git-send-email-shannon.zhao@linaro.org>
+ <20150716195534.GD14024@cbox> <55A8C0B8.1000101@linaro.org>
+ <20150717102133.GN14024@cbox>
+Message-ID: <55AD9D89.7010502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add wl1251 support via pdata-quirks as it's driver lacks DT
-support. MMC3 is marked disabled in DT so that MMC3 instance of
-hsmmc driver is probed using platform data with special card init
-callback.
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
----
- arch/arm/boot/dts/omap3-pandora-common.dtsi |   5 ++
- arch/arm/mach-omap2/pdata-quirks.c          | 101 ++++++++++++++++++++++++++++
- 2 files changed, 106 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-index 6e82c4a..f2084e6 100644
---- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
-+++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
-@@ -514,6 +514,11 @@
- 	/*wp-gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;*/	/* GPIO_127 */
- };
- 
-+/* mmc3 is probed using pdata-quirks to pass wl1251 card data */
-+&mmc3 {
-+	status = "disabled";
-+};
-+
- /* bluetooth*/
- &uart1 {
- };
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 3c97aa49..95f6724 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -14,6 +14,11 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/ti_wilink_st.h>
-+#include <linux/wl12xx.h>
-+#include <linux/mmc/card.h>
-+#include <linux/mmc/host.h>
-+#include <linux/regulator/machine.h>
-+#include <linux/regulator/fixed.h>
- 
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
-@@ -25,6 +30,7 @@
- #include "omap_device.h"
- #include "omap-secure.h"
- #include "soc.h"
-+#include "hsmmc.h"
- 
- struct pdata_init {
- 	const char *compatible;
-@@ -269,14 +275,109 @@ static void __init omap3_tao3530_legacy_init(void)
- 	hsmmc2_internal_input_clk();
- }
- 
-+/* omap3pandora legacy devices */
-+#define PANDORA_WIFI_IRQ_GPIO		21
-+#define PANDORA_WIFI_NRESET_GPIO	23
-+
- static struct platform_device pandora_backlight = {
- 	.name	= "pandora-backlight",
- 	.id	= -1,
- };
- 
-+static struct regulator_consumer_supply pandora_vmmc3_supply[] = {
-+	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.2"),
-+};
-+
-+static struct regulator_init_data pandora_vmmc3 = {
-+	.constraints = {
-+		.valid_ops_mask		= REGULATOR_CHANGE_STATUS,
-+	},
-+	.num_consumer_supplies	= ARRAY_SIZE(pandora_vmmc3_supply),
-+	.consumer_supplies	= pandora_vmmc3_supply,
-+};
-+
-+static struct fixed_voltage_config pandora_vwlan = {
-+	.supply_name		= "vwlan",
-+	.microvolts		= 1800000, /* 1.8V */
-+	.gpio			= PANDORA_WIFI_NRESET_GPIO,
-+	.startup_delay		= 50000, /* 50ms */
-+	.enable_high		= 1,
-+	.init_data		= &pandora_vmmc3,
-+};
-+
-+static struct platform_device pandora_vwlan_device = {
-+	.name		= "reg-fixed-voltage",
-+	.id		= 1,
-+	.dev = {
-+		.platform_data = &pandora_vwlan,
-+	},
-+};
-+
-+static void pandora_wl1251_init_card(struct mmc_card *card)
-+{
-+	/*
-+	 * We have TI wl1251 attached to MMC3. Pass this information to
-+	 * SDIO core because it can't be probed by normal methods.
-+	 */
-+	if (card->type == MMC_TYPE_SDIO || card->type == MMC_TYPE_SD_COMBO) {
-+		card->quirks |= MMC_QUIRK_NONSTD_SDIO;
-+		card->cccr.wide_bus = 1;
-+		card->cis.vendor = 0x104c;
-+		card->cis.device = 0x9066;
-+		card->cis.blksize = 512;
-+		card->cis.max_dtr = 24000000;
-+		card->ocr = 0x80;
-+	}
-+}
-+
-+static struct omap2_hsmmc_info pandora_mmc3[] = {
-+	{
-+		.mmc		= 3,
-+		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_POWER_OFF_CARD,
-+		.gpio_cd	= -EINVAL,
-+		.gpio_wp	= -EINVAL,
-+		.init_card	= pandora_wl1251_init_card,
-+	},
-+	{}	/* Terminator */
-+};
-+
-+static void __init pandora_wl1251_init(void)
-+{
-+	struct wl1251_platform_data pandora_wl1251_pdata;
-+	int ret;
-+
-+	memset(&pandora_wl1251_pdata, 0, sizeof(pandora_wl1251_pdata));
-+
-+	pandora_wl1251_pdata.power_gpio = -1;
-+
-+	ret = gpio_request_one(PANDORA_WIFI_IRQ_GPIO, GPIOF_IN, "wl1251 irq");
-+	if (ret < 0)
-+		goto fail;
-+
-+	pandora_wl1251_pdata.irq = gpio_to_irq(PANDORA_WIFI_IRQ_GPIO);
-+	if (pandora_wl1251_pdata.irq < 0)
-+		goto fail_irq;
-+
-+	pandora_wl1251_pdata.use_eeprom = true;
-+	ret = wl1251_set_platform_data(&pandora_wl1251_pdata);
-+	if (ret < 0)
-+		goto fail_irq;
-+
-+	return;
-+
-+fail_irq:
-+	gpio_free(PANDORA_WIFI_IRQ_GPIO);
-+fail:
-+	pr_err("wl1251 board initialisation failed\n");
-+}
-+
- static void __init omap3_pandora_legacy_init(void)
- {
- 	platform_device_register(&pandora_backlight);
-+	platform_device_register(&pandora_vwlan_device);
-+	omap_hsmmc_init(pandora_mmc3);
-+	omap_hsmmc_late_init(pandora_mmc3);
-+	pandora_wl1251_init();
- }
- #endif /* CONFIG_ARCH_OMAP3 */
- 
+On 2015/7/17 18:21, Christoffer Dall wrote:
+> On Fri, Jul 17, 2015 at 04:45:44PM +0800, Shannon Zhao wrote:
+>>
+>>
+>> On 2015/7/17 3:55, Christoffer Dall wrote:
+>>> On Mon, Jul 06, 2015 at 10:17:34AM +0800, shannon.zhao at linaro.org wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>
+>>>> Add reset handler which gets host value of PMCR_EL0 and make writable
+>>>> bits architecturally UNKNOWN. Add access handler which emulates
+>>>> writing and reading PMCR_EL0 register.
+>>>>
+>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> ---
+>>>>  arch/arm64/kvm/sys_regs.c | 41 ++++++++++++++++++++++++++++++++++++++++-
+>>>>  1 file changed, 40 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+>>>> index c370b40..152ee17 100644
+>>>> --- a/arch/arm64/kvm/sys_regs.c
+>>>> +++ b/arch/arm64/kvm/sys_regs.c
+>>>> @@ -33,6 +33,7 @@
+>>>>  #include <asm/kvm_emulate.h>
+>>>>  #include <asm/kvm_host.h>
+>>>>  #include <asm/kvm_mmu.h>
+>>>> +#include <asm/pmu.h>
+>>>>  
+>>>>  #include <trace/events/kvm.h>
+>>>>  
+>>>> @@ -236,6 +237,44 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>>  	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
+>>>>  }
+>>>>  
+>>>> +static void reset_pmcr_el0(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
+>>>> +{
+>>>> +	u32 pmcr;
+>>>> +
+>>>> +	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
+>>>> +	vcpu_sys_reg(vcpu, PMCR_EL0) = (pmcr & ~ARMV8_PMCR_MASK)
+>>>> +				       | (ARMV8_PMCR_MASK & 0xdecafbad);
+>>>
+>>> You could add a comment that this resets to UNKNOWN as to not make
+>>> people confused about the pseudo-random hex value.
+>>>
+>> Ok.
+>>
+>>> Have we thought about whether we want to tell the guest that it has the
+>>> same PMU as available on the real hardware, or does the virtualization
+>>> layer suggest to us that we should adjust this somehow?
+>>>
+>> I guess here the number of PMU counters is what we can adjust, right?
+>> Are we worried about that the host will run out of counters when guest
+>> and host register lots of events?
+> 
+> that's what I wonder; if perf itself reserves a counter for example,
+> then we'll at best be able to measure with N-1 counters for the guest (N
+> being the number of counters on the physical CPU), so why tell the guest
+> we have N counters?
+> 
+
+I'm not sure whether perf itself reserves one counter. Here I just pass
+the hardware information to guest.
+
+> Of course, we can never even be guaranteed to have N-1 counters
+> avaialable either, so maybe the sane choice is just to tell the guest
+> what kind of hardware we have, and then fiddle the best we can with the
+> remaining counters?  After all, correct functionality of the guest
+> doesn't depend on this, it's a best-effort kind of thing...
+> 
+> Thoughts?
+> 
+>> The PMU of cortex-a57 has 6 counters. IIUC, if one of the guest vcpu
+>> process registers 6 events and some host process register 6 events too,
+>> these events will be monitored in real hardware PMU counter when the
+>> related process runs on the cpu. And when other processes are scheduled
+>> to run, it will switch the contexts of PMU counters.
+> 
+> That depends on the way the counters are used by perf I think.  What if
+> you have system wide events?  What if the KVM (vcpu) process itself is
+> being monitored for some events?
+> 
+
+Not sure what will happen when the number of monitored events is greater
+than counters. I guess the perf layer may balance the events?
+
+>>
+>>>
+>>>> +}
+>>>> +
+>>>> +/* PMCR_EL0 accessor. Only called as long as MDCR_EL2.TPMCR is set. */
+>>>> +static bool access_pmcr(struct kvm_vcpu *vcpu,
+>>>> +			const struct sys_reg_params *p,
+>>>> +			const struct sys_reg_desc *r)
+>>>> +{
+>>>> +	unsigned long val;
+>>>> +
+>>>> +	if (p->is_write) {
+>>>> +		/* Only update writeable bits of PMCR */
+>>>> +		if (!p->is_aarch32)
+>>>> +			val = vcpu_sys_reg(vcpu, r->reg);
+>>>> +		else
+>>>> +			val = vcpu_cp15(vcpu, r->reg);
+>>>
+>>> don't you need to add this function as the handler in the cp15_regs
+>>> array as well?
+>>>
+>> Sorry, I'm not very clear about this. Will look at the codes and
+>> understand the use of cp15_regs.
+>>
+> 
+> I think the point is that you cannot use the same value of r->reg to
+> index into both arrays, so the cp15 index must be passed from the
+> cp15_regs array first.
+> 
+> Thanks,
+> -Christoffer
+> 
+
 -- 
-1.9.1
+Shannon
