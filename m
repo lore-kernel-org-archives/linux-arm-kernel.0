@@ -1,85 +1,89 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 21 Jul 2015 14:48:38 +0800
-Subject: [PATCH v4 0/5] PCI: hisi: Add PCIe host support for Hisilicon Soc
- Hip05
-Message-ID: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
+Date: Tue, 21 Jul 2015 14:48:39 +0800
+Subject: [PATCH v4 1/5] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds PCIe host support for Hisilicon Soc Hip05. The PCIe hosts
-use PCIe IP core from Synopsys, So this driver is base on designware PCIe driver.
+This patch is needed in order to unify the PCIe designware framework for ARM and
+ARM64 architectures. In the PCIe designware unification process we are calling
+pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+cause a problem with the function pcibios_align_resource(); in fact this will
+cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+"struct pcie_port*" pointer.
 
-Hip05 is an ARMv8 architecture Soc. It should be able to use ARM64 PCIe API in
-designeware PCIe driver. So this patch also adds ARM64 support for designware
-pcie.
+This patch solves the issue by removing "align_resource" from "pci_sys_data"
+struct and defining a static global function pointer in "bios32.c"
 
-This patchset is based on v4.2-rc1 and Gabriele's patch about of_pci_range
-fix[1].
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+---
+ arch/arm/include/asm/mach/pci.h |  5 -----
+ arch/arm/kernel/bios32.c        | 12 ++++++++----
+ 2 files changed, 8 insertions(+), 9 deletions(-)
 
-Change from v3:
-- Change 1/5 to what Gabriele suggested.
-- Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
-
-Change from v2:
-- Move struct pci_dev *dev and struct pci_sys_data *sys in
-  pcibios_align_resource in 1/5.
-- Add Gabriele's codes in 2/5 which delete unnecessary information parse and
-  use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
-- Add maintainer patch 5/5.
-
-Change from RFC v1:
-- Add 1/4 patch by Arnd which removes align_resource callback in ARM
-  pcibios_align_resource.
-- Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
-- Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
-  spear13xx.
-- Remove unnecessary parentheses of some macros in pcie-hisi.
-- Use macro to replace some magic values.
-- Merge two loops together and add some comments about it in context_config
-  function in pcie-hisi.
-- Modify some value of items in pcie node example in binding document. 
-
-Change from RFC:
-- delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
-  merge related operations into dw_pcie_host_init.
-
-Link of v3:
-- http://www.spinics.net/lists/linux-pci/msg42539.html
-Link of v2:
-- http://www.spinics.net/lists/linux-pci/msg41844.html
-Link of RFC v1:
-- http://www.spinics.net/lists/linux-pci/msg41305.html
-Link of RFC:
-- http://www.spinics.net/lists/linux-pci/msg40434.html
-
-[1] https://patchwork.ozlabs.org/patch/495018/
-
-Zhou Wang (5):
-  ARM/PCI: remove align_resource in pci_sys_data
-  PCI: designware: Add ARM64 support
-  PCI: hisi: Add PCIe host support for Hisilicon Soc Hip05
-  Documentation: DT: Add Hisilicon PCIe host binding
-  MAINTAINERS: Add pcie-hisi maintainer
-
- .../devicetree/bindings/pci/hisilicon-pcie.txt     |  46 ++++
- MAINTAINERS                                        |   7 +
- arch/arm/include/asm/mach/pci.h                    |   5 -
- arch/arm/kernel/bios32.c                           |  12 +-
- drivers/pci/host/Kconfig                           |   5 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-dra7xx.c                      |   1 +
- drivers/pci/host/pci-exynos.c                      |   2 +-
- drivers/pci/host/pci-imx6.c                        |   2 +-
- drivers/pci/host/pci-keystone-dw.c                 |   2 +-
- drivers/pci/host/pci-keystone.c                    |   2 +-
- drivers/pci/host/pci-layerscape.c                  |   2 +-
- drivers/pci/host/pcie-designware.c                 | 217 ++++++-----------
- drivers/pci/host/pcie-designware.h                 |  10 +-
- drivers/pci/host/pcie-hisi.c                       | 257 +++++++++++++++++++++
- drivers/pci/host/pcie-spear13xx.c                  |   2 +-
- 16 files changed, 410 insertions(+), 163 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
- create mode 100644 drivers/pci/host/pcie-hisi.c
-
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 28b9bb3..8a4e4de 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -58,11 +58,6 @@ struct pci_sys_data {
+ 					/* IRQ mapping				*/
+ 	int		(*map_irq)(const struct pci_dev *, u8, u8);
+ 					/* Resource alignement requirements	*/
+-	resource_size_t (*align_resource)(struct pci_dev *dev,
+-					  const struct resource *res,
+-					  resource_size_t start,
+-					  resource_size_t size,
+-					  resource_size_t align);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+ 
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1..4cdc64d 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -17,6 +17,11 @@
+ #include <asm/mach/pci.h>
+ 
+ static int debug_pci;
++static resource_size_t (*align_resource)(struct pci_dev *dev,
++		  const struct resource *res,
++		  resource_size_t start,
++		  resource_size_t size,
++		  resource_size_t align) = NULL;
+ 
+ #ifdef CONFIG_PCI_MSI
+ struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+@@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 		sys->busnr   = busnr;
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+-		sys->align_resource = hw->align_resource;
++		align_resource = hw->align_resource;
+ 		INIT_LIST_HEAD(&sys->resources);
+ 
+ 		if (hw->private_data)
+@@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 				resource_size_t size, resource_size_t align)
+ {
+ 	struct pci_dev *dev = data;
+-	struct pci_sys_data *sys = dev->sysdata;
+ 	resource_size_t start = res->start;
+ 
+ 	if (res->flags & IORESOURCE_IO && start & 0x300)
+@@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 
+ 	start = (start + align - 1) & ~(align - 1);
+ 
+-	if (sys->align_resource)
+-		return sys->align_resource(dev, res, start, size, align);
++	if (align_resource)
++		return align_resource(dev, res, start, size, align);
+ 
+ 	return start;
+ }
 -- 
 1.9.1
