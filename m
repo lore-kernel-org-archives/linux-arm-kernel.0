@@ -1,74 +1,63 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jul 2015 16:30:29 -0500
-Subject: [PATCH v4 05/19] PCI/MSI: of: Add support for OF-provided
- msi_domain
-In-Reply-To: <1436962613-17359-6-git-send-email-marc.zyngier@arm.com>
-References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
- <1436962613-17359-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150721213029.GJ21967@google.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Tue, 21 Jul 2015 17:35:19 -0400
+Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
+Message-ID: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 01:16:39PM +0100, Marc Zyngier wrote:
-> In order to populate the PHB msi_domain, use the "msi-parent"
-> attribute to lookup a corresponding irq domain. If found,
-> this is our MSI domain.
-> 
-> This gets plugged into the core PCI code.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/pci/of.c    | 19 +++++++++++++++++++
->  drivers/pci/probe.c |  1 +
->  include/linux/pci.h |  2 ++
->  3 files changed, 22 insertions(+)
-> 
-> diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-> index f092993..09df465 100644
-> --- a/drivers/pci/of.c
-> +++ b/drivers/pci/of.c
-> @@ -9,6 +9,7 @@
->   * 2 of the License, or (at your option) any later version.
->   */
->  
-> +#include <linux/irqdomain.h>
->  #include <linux/kernel.h>
->  #include <linux/pci.h>
->  #include <linux/of.h>
-> @@ -59,3 +60,21 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
->  		return of_node_get(bus->bridge->parent->of_node);
->  	return NULL;
->  }
-> +
-> +void pci_set_phb_of_msi_domain(struct pci_bus *bus)
-> +{
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> +	struct device_node *np;
-> +	struct irq_domain *d;
-> +
-> +	if (!bus->dev.of_node)
-> +		return;
-> +	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
-> +	if (!np)
-> +		return;
-> +	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
-> +	if (!d)
-> +		d = irq_find_host(np);
-> +	dev_set_msi_domain(&bus->dev, d);
-> +#endif
-> +}
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 376f6fa..c80626f 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -663,6 +663,7 @@ static void pci_set_bus_speed(struct pci_bus *bus)
->  
->  void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
->  {
-> +	pci_set_phb_of_msi_domain(bus);
+The MPS configuration should be done *before* pci_bus_add_devices().
+After pci_bus_add_devices(), drivers may be bound to devices, and
+the PCI core shouldn't touch device configuration while a driver
+owns the device.
 
-The code itself is OK with me, but "phb" is an abbreviation that we haven't
-really been using in the PCI core, so I'd prefer something else.  Maybe
-"pci_set_host_of_msi_domain()"?  Or even (for symmetry with the pcibios
-function), "pci_set_host_bridge_of_msi_domain()", although that is getting
-pretty wordy?
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+---
+ arch/arm/kernel/bios32.c | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1..17efde7 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+ 	list_for_each_entry(sys, &head, node) {
+ 		struct pci_bus *bus = sys->bus;
+ 
+-		if (!pci_has_flag(PCI_PROBE_ONLY)) {
++		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
++			struct pci_bus *child;
+ 			/*
+ 			 * Size the bridge windows.
+ 			 */
+@@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
+ 			 * Assign resources.
+ 			 */
+ 			pci_bus_assign_resources(bus);
+-		}
+ 
++			list_for_each_entry(child, &bus->children, node)
++				pcie_bus_configure_settings(child);
++		}
+ 		/*
+ 		 * Tell drivers about devices found.
+ 		 */
+ 		pci_bus_add_devices(bus);
+ 	}
+-
+-	list_for_each_entry(sys, &head, node) {
+-		struct pci_bus *bus = sys->bus;
+-
+-		/* Configure PCI Express settings */
+-		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
+-			struct pci_bus *child;
+-
+-			list_for_each_entry(child, &bus->children, node)
+-				pcie_bus_configure_settings(child);
+-		}
+-	}
+ }
+ 
+ #ifndef CONFIG_PCI_HOST_ITE8152
+-- 
+1.9.1
