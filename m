@@ -1,65 +1,33 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jul 2015 10:40:00 -0500
-Subject: [PATCH] PCI: xilinx: Add check for MSI interrupt flag before
- handling as INTx
-In-Reply-To: <1436288059-22925-1-git-send-email-russell.joyce@york.ac.uk>
-References: <1436288059-22925-1-git-send-email-russell.joyce@york.ac.uk>
-Message-ID: <20150721154000.GA21967@google.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 21 Jul 2015 17:51:18 +0200 (CEST)
+Subject: [RFC Patch V1 00/12] Reorganize struct msi_desc to prepare for
+ support of generic MSI
+In-Reply-To: <20150721133031.GF16841@google.com>
+References: <1436428847-8886-1-git-send-email-jiang.liu@linux.intel.com>
+ <20150721133031.GF16841@google.com>
+Message-ID: <alpine.DEB.2.11.1507211749590.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 07, 2015 at 05:54:19PM +0100, Russell Joyce wrote:
-> Occasionally both MSI and INTx bits in the interrupt decode register are
-> set at once by the Xilinx AXI PCIe Bridge, so the MSI flag in the
-> interrupt message should be checked to ensure that the correct handler is
-> used.
-> 
-> If this check is not in place and the interrupt message type is MSI, the
-> INTx handler will be used erroneously when both type bits are set.
-> This will also be followed by a second read of the message FIFO, which can
-> result in the function returning early and the interrupt decode register
-> not being cleared if the FIFO is now empty.
-> 
-> Signed-off-by: Russell Joyce <russell.joyce@york.ac.uk>
+On Tue, 21 Jul 2015, Bjorn Helgaas wrote:
+> Sergei pointed out typos in the "Use for_pci_msi_entry()" subject and
+> changelogs; I assume you'll fix those.
 
-Applied to pci/host-xilinx for v4.3, thanks.
+Yes.
 
-Xilinx guys, speak up if there's any issue with this.
+> Paul had a question on 09/12 regarding Kconfig, and I didn't see a
+> resolution to that.
 
-> ---
->  drivers/pci/host/pcie-xilinx.c | 19 +++++++++++--------
->  1 file changed, 11 insertions(+), 8 deletions(-)
+I'll reply to that right now.
+
+> For the PCI parts:
 > 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index f1a06a0..dcb9b57 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -449,14 +449,17 @@ static irqreturn_t xilinx_pcie_intr_handler(int irq, void *data)
->  			return IRQ_HANDLED;
->  		}
->  
-> -		/* Clear interrupt FIFO register 1 */
-> -		pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-> -			   XILINX_PCIE_REG_RPIFR1);
-> -
-> -		/* Handle INTx Interrupt */
-> -		val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
-> -			XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-> -		generic_handle_irq(irq_find_mapping(port->irq_domain, val));
-> +		if (!(val & XILINX_PCIE_RPIFR1_MSI_INTR)) {
-> +			/* Clear interrupt FIFO register 1 */
-> +			pcie_write(port, XILINX_PCIE_RPIFR1_ALL_MASK,
-> +				   XILINX_PCIE_REG_RPIFR1);
-> +
-> +			/* Handle INTx Interrupt */
-> +			val = ((val & XILINX_PCIE_RPIFR1_INTR_MASK) >>
-> +				XILINX_PCIE_RPIFR1_INTR_SHIFT) + 1;
-> +			generic_handle_irq(irq_find_mapping(port->irq_domain,
-> +							    val));
-> +		}
->  	}
->  
->  	if (status & XILINX_PCIE_INTR_MSI) {
-> -- 
-> 2.1.4
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > 
+> Thomas, I assume you'll take this via your tree.
+
+That's the plan
+
+Thanks,
+
+	tglx
