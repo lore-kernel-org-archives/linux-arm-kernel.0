@@ -1,117 +1,158 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 21 Jul 2015 15:30:18 -0500
-Subject: [PATCH v3 1/4] PCI: iproc: enable arm64 support for iProc PCIe
-In-Reply-To: <1437021563-29139-2-git-send-email-rjui@broadcom.com>
-References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
- <1437021563-29139-2-git-send-email-rjui@broadcom.com>
-Message-ID: <20150721203018.GH21967@google.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Tue, 21 Jul 2015 13:41:23 -0700
+Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
+Message-ID: <1437511283-14216-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 15, 2015 at 09:39:20PM -0700, Ray Jui wrote:
-> This patch enables arm64 support to the iProc PCIe driver
+In the TRM we see that BWADJ is "a 12-bit bus that selects the values
+1-4096 for the bandwidth divider (NB)":
+ NB = BWADJ[11:0] + 1
+The recommended setting of NB: NB = NF / 2.
 
-This needs a little more explanation: ARM has a common struct pci_sys_data
-but ARM64 does not, and ARM needs pci_fixup_irqs() but ARM64 does not (why
-not?), ARM uses the common pci_sys_data for the PCI sysdata while ARM64
-uses a driver-specific sysdata, etc.
+So:
+  NB = NF / 2
+  BWADJ[11:0] + 1 = NF / 2
+  BWADJ[11:0] = NF / 2 - 1
 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
-> Reviewed-by: Scott Branden <sbranden@broadcom.com>
-> ---
->  drivers/pci/host/pcie-iproc.c |   15 ++++-----------
->  drivers/pci/host/pcie-iproc.h |    8 ++++++--
->  2 files changed, 10 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index d77481e..8a556d5 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -58,11 +58,6 @@
->  #define SYS_RC_INTX_EN               0x330
->  #define SYS_RC_INTX_MASK             0xf
->  
-> -static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
-> -{
-> -	return sys->private_data;
-> -}
-> -
->  /**
->   * Note access to the configuration registers are protected at the higher layer
->   * by 'pci_lock' in drivers/pci/access.c
-> @@ -71,8 +66,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
->  					    unsigned int devfn,
->  					    int where)
->  {
-> -	struct pci_sys_data *sys = bus->sysdata;
-> -	struct iproc_pcie *pcie = sys_to_pcie(sys);
-> +	struct iproc_pcie *pcie = bus->sysdata;
->  	unsigned slot = PCI_SLOT(devfn);
->  	unsigned fn = PCI_FUNC(devfn);
->  	unsigned busno = bus->number;
-> @@ -208,10 +202,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->  
->  	iproc_pcie_reset(pcie);
->  
-> -	pcie->sysdata.private_data = pcie;
-> -
-> -	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
-> -				  &pcie->sysdata, res);
-> +	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, pcie, res);
->  	if (!bus) {
->  		dev_err(pcie->dev, "unable to create PCI root bus\n");
->  		ret = -ENOMEM;
-> @@ -229,7 +220,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
->  
->  	pci_scan_child_bus(bus);
->  	pci_assign_unassigned_bus_resources(bus);
-> +#ifdef CONFIG_ARM
->  	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
-> +#endif
->  	pci_bus_add_devices(bus);
->  
->  	return 0;
-> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
-> index ba0a108..0ee9673 100644
-> --- a/drivers/pci/host/pcie-iproc.h
-> +++ b/drivers/pci/host/pcie-iproc.h
-> @@ -18,18 +18,22 @@
->  
->  /**
->   * iProc PCIe device
-> + * @sysdata: Per PCI controller data. This needs to be kept at the beginning of
-> + * struct iproc_pcie, to enable support of both ARM32 and ARM64 platforms with
-> + * minimal changes in the iProc PCIe core driver
->   * @dev: pointer to device data structure
->   * @base: PCIe host controller I/O register base
->   * @resources: linked list of all PCI resources
-> - * @sysdata: Per PCI controller data
->   * @root_bus: pointer to root bus
->   * @phy: optional PHY device that controls the Serdes
->   * @irqs: interrupt IDs
->   */
->  struct iproc_pcie {
-> +#ifdef CONFIG_ARM
-> +	struct pci_sys_data sysdata;
-> +#endif
+Right now, we have:
 
-I'm OK with adding #ifdefs to make this work on both ARM and ARM64.  We can
-at least see the ifdefs and know what needs to be fixed.  I'm a little more
-hesitant about adding code that depends on the position of sysdata within
-struct iproc_pcie.  I'd rather have something ugly and robust that cries
-out for fixing than something minimal and fragile.
+{                                               \
+        .rate   = _rate##U,                     \
+        .nr = _nr,                              \
+        .nf = _nf,                              \
+        .no = _no,                              \
+        .bwadj = (_nf >> 1),                    \
+}
 
-I see that your v1 patch added #ifdef CONFIG_ARM around sysdata at its
-original location below, and you mentioned that you took Arnd's advice to
-move sysdata to the beginning of the structure, but I don't see Arnd's
-email on the list.
+That means we set bwadj to NF / 2, not NF / 2 - 1
 
->  	struct device *dev;
->  	void __iomem *base;
-> -	struct pci_sys_data sysdata;
->  	struct pci_bus *root_bus;
->  	struct phy *phy;
->  	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
-> -- 
-> 1.7.9.5
-> 
+All of this is a bit confusing because we specify "NR" (the 1-based
+value), "NF" (the 1-based value), "NO" (the 1-based value), but
+"BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
+
+Let's change to working with "NB" and fix the off by one error.  This
+may affect PLL jitter in a small way (hopefully for the better).
+
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ drivers/clk/rockchip/clk-pll.c    | 18 +++++++++---------
+ drivers/clk/rockchip/clk-rk3188.c |  2 +-
+ drivers/clk/rockchip/clk-rk3288.c |  2 +-
+ drivers/clk/rockchip/clk.h        |  8 ++++----
+ 4 files changed, 15 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
+index 1f88dd1..96903ae 100644
+--- a/drivers/clk/rockchip/clk-pll.c
++++ b/drivers/clk/rockchip/clk-pll.c
+@@ -120,8 +120,8 @@ static int rockchip_pll_wait_lock(struct rockchip_clk_pll *pll)
+ #define RK3066_PLLCON0_NR_SHIFT		8
+ #define RK3066_PLLCON1_NF_MASK		0x1fff
+ #define RK3066_PLLCON1_NF_SHIFT		0
+-#define RK3066_PLLCON2_BWADJ_MASK	0xfff
+-#define RK3066_PLLCON2_BWADJ_SHIFT	0
++#define RK3066_PLLCON2_NB_MASK		0xfff
++#define RK3066_PLLCON2_NB_SHIFT		0
+ #define RK3066_PLLCON3_RESET		(1 << 5)
+ #define RK3066_PLLCON3_PWRDOWN		(1 << 1)
+ #define RK3066_PLLCON3_BYPASS		(1 << 0)
+@@ -207,8 +207,8 @@ static int rockchip_rk3066_pll_set_rate(struct clk_hw *hw, unsigned long drate,
+ 	writel_relaxed(HIWORD_UPDATE(rate->nf - 1, RK3066_PLLCON1_NF_MASK,
+ 						   RK3066_PLLCON1_NF_SHIFT),
+ 		       pll->reg_base + RK3066_PLLCON(1));
+-	writel_relaxed(HIWORD_UPDATE(rate->bwadj, RK3066_PLLCON2_BWADJ_MASK,
+-						  RK3066_PLLCON2_BWADJ_SHIFT),
++	writel_relaxed(HIWORD_UPDATE(rate->nb - 1, RK3066_PLLCON2_NB_MASK,
++						   RK3066_PLLCON2_NB_SHIFT),
+ 		       pll->reg_base + RK3066_PLLCON(2));
+ 
+ 	/* leave reset and wait the reset_delay */
+@@ -261,7 +261,7 @@ static void rockchip_rk3066_pll_init(struct clk_hw *hw)
+ {
+ 	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
+ 	const struct rockchip_pll_rate_table *rate;
+-	unsigned int nf, nr, no, bwadj;
++	unsigned int nf, nr, no, nb;
+ 	unsigned long drate;
+ 	u32 pllcon;
+ 
+@@ -283,13 +283,13 @@ static void rockchip_rk3066_pll_init(struct clk_hw *hw)
+ 	nf = ((pllcon >> RK3066_PLLCON1_NF_SHIFT) & RK3066_PLLCON1_NF_MASK) + 1;
+ 
+ 	pllcon = readl_relaxed(pll->reg_base + RK3066_PLLCON(2));
+-	bwadj = (pllcon >> RK3066_PLLCON2_BWADJ_SHIFT) & RK3066_PLLCON2_BWADJ_MASK;
++	nb = ((pllcon >> RK3066_PLLCON2_NB_SHIFT) & RK3066_PLLCON2_NB_MASK) + 1;
+ 
+-	pr_debug("%s: pll %s@%lu: nr (%d:%d); no (%d:%d); nf(%d:%d), bwadj(%d:%d)\n",
++	pr_debug("%s: pll %s@%lu: nr (%d:%d); no (%d:%d); nf(%d:%d), nb(%d:%d)\n",
+ 		 __func__, __clk_get_name(hw->clk), drate, rate->nr, nr,
+-		rate->no, no, rate->nf, nf, rate->bwadj, bwadj);
++		rate->no, no, rate->nf, nf, rate->nb, nb);
+ 	if (rate->nr != nr || rate->no != no || rate->nf != nf
+-					     || rate->bwadj != bwadj) {
++					     || rate->nb != nb) {
+ 		struct clk *parent = __clk_get_parent(hw->clk);
+ 		unsigned long prate;
+ 
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index edbafbc..0abf22d 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -817,7 +817,7 @@ static void __init rk3188_clk_init(struct device_node *np)
+ 
+ 		rate = pll->rate_table;
+ 		while (rate->rate > 0) {
+-			rate->bwadj = 0;
++			rate->nb = 1;
+ 			rate++;
+ 		}
+ 	}
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index a8bad7d..0df5bae 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -84,7 +84,7 @@ static struct rockchip_pll_rate_table rk3288_pll_rates[] = {
+ 	RK3066_PLL_RATE( 742500000, 8, 495, 2),
+ 	RK3066_PLL_RATE( 696000000, 1, 58, 2),
+ 	RK3066_PLL_RATE( 600000000, 1, 50, 2),
+-	RK3066_PLL_RATE_BWADJ(594000000, 1, 198, 8, 1),
++	RK3066_PLL_RATE_NB(594000000, 1, 198, 8, 1),
+ 	RK3066_PLL_RATE( 552000000, 1, 46, 2),
+ 	RK3066_PLL_RATE( 504000000, 1, 84, 4),
+ 	RK3066_PLL_RATE( 500000000, 3, 125, 2),
+diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+index 93ea335..dc8ecb2 100644
+--- a/drivers/clk/rockchip/clk.h
++++ b/drivers/clk/rockchip/clk.h
+@@ -83,16 +83,16 @@ enum rockchip_pll_type {
+ 	.nr = _nr,				\
+ 	.nf = _nf,				\
+ 	.no = _no,				\
+-	.bwadj = ((_nf) >> 1),			\
++	.nb = ((_nf) < 2) ? 1 : (_nf) >> 1,	\
+ }
+ 
+-#define RK3066_PLL_RATE_BWADJ(_rate, _nr, _nf, _no, _bw)	\
++#define RK3066_PLL_RATE_NB(_rate, _nr, _nf, _no, _nb)		\
+ {								\
+ 	.rate	= _rate##U,					\
+ 	.nr = _nr,						\
+ 	.nf = _nf,						\
+ 	.no = _no,						\
+-	.bwadj = _bw,						\
++	.nb = _nb,						\
+ }
+ 
+ struct rockchip_pll_rate_table {
+@@ -100,7 +100,7 @@ struct rockchip_pll_rate_table {
+ 	unsigned int nr;
+ 	unsigned int nf;
+ 	unsigned int no;
+-	unsigned int bwadj;
++	unsigned int nb;
+ };
+ 
+ /**
+-- 
+2.4.3.573.g4eafbef
