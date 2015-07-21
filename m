@@ -1,137 +1,97 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 21 Jul 2015 14:03:28 +0100
-Subject: [Xen-devel] [PATCH v2 07/20] block/xen-blkfront: split get_grant
- in 2
-In-Reply-To: <55AE1F2A.6010300@citrix.com>
+Date: Tue, 21 Jul 2015 14:07:54 +0100
+Subject: [Xen-devel] [PATCH v2 15/20] block/xen-blkfront: Make it running
+ on 64KB page granularity
+In-Reply-To: <55AE27C2.8090803@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-8-git-send-email-julien.grall@citrix.com>
- <55AE1F2A.6010300@citrix.com>
-Message-ID: <55AE4320.7020000@citrix.com>
+ <1436474552-31789-16-git-send-email-julien.grall@citrix.com>
+ <55AE27C2.8090803@citrix.com>
+Message-ID: <55AE442A.6080506@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Roger,
 
-On 21/07/15 11:30, Roger Pau Monn? wrote:
+On 21/07/15 12:06, Roger Pau Monn? wrote:
 > El 09/07/15 a les 22.42, Julien Grall ha escrit:
->> Prepare the code to support 64KB page granularity. The first
->> implementation will use a full Linux page per indirect and persistent
->> grant. When non-persistent grant is used, each page of a bio request
->> may be split in multiple grant.
+>> From: Julien Grall <julien.grall@linaro.org>
 >>
->> Furthermore, the field page of the grant structure is only used to copy
->> data from persistent grant or indirect grant. Avoid to set it for other
->> use case as it will have no meaning given the page will be split in
->> multiple grant.
+>> The PV block protocol is using 4KB page granularity. The goal of this
+>> patch is to allow a Linux using 64KB page granularity using block
+>> device on a non-modified Xen.
 >>
->> Provide 2 functions, to setup indirect grant, the other for bio page.
+>> The block API is using segment which should at least be the size of a
+>                          ^ segments
+
+Will fix it.
+
+>> Linux page. Therefore, the driver will have to break the page in chunk
+>                                                             chunks ^
+>> of 4K before giving the page to the backend.
+>>
+>> Breaking a 64KB segment in 4KB chunk will result to have some chunk with
+>> no data.
+> 
+> I would rewrite this as:
+> 
+> Breaking a 64KB page into 4KB chunks can result in chunks with no data.
+
+Sounds good.
+
+>> As the PV protocol always require to have data in the chunk, we
+>> have to count the number of Xen page which will be in use and avoid to
+>                                   ^ pages             remove the "to" ^
+>> sent empty chunk.
+>   ^ sending empty chunks
+>>
+>> Note that, a pre-defined number of grant is reserved before preparing
+>            ^ no coma                 ^ grants are
+>> the request. This pre-defined number is based on the number and the
+>> maximum size of the segments. If each segment contain a very small
+>                                                 ^ contains
+>> amount of data, the driver may reserve too much grant (16 grant is
+>                                              ^ many grants? ^ grants are
+>> reserved per segment with 64KB page granularity).
+>>
+>> Futhermore, in the case of persistent grant we allocate one Linux page
+>   ^ Furthermore  ^ case of using persistent grants
+>> per grant although only the 4KB of the page will be effectively use.
+>                              ^ initial                ^ used.
+>> This could be improved by share the page with multiple grants.
+>                             ^ sharing the page between
+
+Will fix all the typoes, grammatical error in the next version.
+
 >>
 >> Signed-off-by: Julien Grall <julien.grall@citrix.com>
 >> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 >> Cc: Roger Pau Monn? <roger.pau@citrix.com>
 >> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 >> Cc: David Vrabel <david.vrabel@citrix.com>
->> ---
->>     Changes in v2:
->>         - Patch added
->> ---
->>  drivers/block/xen-blkfront.c | 85 ++++++++++++++++++++++++++++++--------------
->>  1 file changed, 59 insertions(+), 26 deletions(-)
->>
->> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
->> index 7b81d23..95fd067 100644
->> --- a/drivers/block/xen-blkfront.c
->> +++ b/drivers/block/xen-blkfront.c
->> @@ -242,34 +242,77 @@ out_of_memory:
->>  	return -ENOMEM;
->>  }
->>  
->> -static struct grant *get_grant(grant_ref_t *gref_head,
->> -			       struct page *page,
->> -                               struct blkfront_info *info)
->> +static struct grant *get_free_grant(struct blkfront_info *info)
->>  {
->>  	struct grant *gnt_list_entry;
->> -	unsigned long buffer_mfn;
->>  
->>  	BUG_ON(list_empty(&info->grants));
->>  	gnt_list_entry = list_first_entry(&info->grants, struct grant,
->> -	                                  node);
->> +					  node);
 > 
-> Stray change?
-
-No the indentation was wrong before.
-
+> This looks much better now, thanks.
 > 
->>  	list_del(&gnt_list_entry->node);
->>  
->> -	if (gnt_list_entry->gref != GRANT_INVALID_REF) {
->> +	if (gnt_list_entry->gref != GRANT_INVALID_REF)
->>  		info->persistent_gnts_c--;
->> +
->> +	return gnt_list_entry;
->> +}
->> +
->> +static void grant_foreign_access(const struct grant *gnt_list_entry,
->> +				 const struct blkfront_info *info)
+> Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+
+Thank you!
+
+>>  	BUG_ON(info->max_indirect_segments == 0 &&
+>> -	       req->nr_phys_segments > BLKIF_MAX_SEGMENTS_PER_REQUEST);
+>> +	       (XEN_PAGES_PER_SEGMENT * req->nr_phys_segments) > BLKIF_MAX_SEGMENTS_PER_REQUEST);
+>>  	BUG_ON(info->max_indirect_segments &&
+>> -	       req->nr_phys_segments > info->max_indirect_segments);
+>> +		(req->nr_phys_segments * XEN_PAGES_PER_SEGMENT) > info->max_indirect_segments);
+>>  	nseg = blk_rq_map_sg(req->q, req, info->shadow[id].sg);
+>> +	nr_page = 0;
+>> +	/* Calculate the number of Xen pages used */
+>> +	for_each_sg(info->shadow[id].sg, sg, nseg, i) {
+>> +		nr_page += (round_up(sg->offset + sg->length, XEN_PAGE_SIZE) - round_down(sg->offset, XEN_PAGE_SIZE)) >> XEN_PAGE_SHIFT;
 > 
-> Given that this is just a wrapper I would make it an inline function, or
-> even consider removing it and just call
-> gnttab_page_grant_foreign_access_ref directly.
+> I haven't counted the characters, but this line looks too long, also you
+> can get rid of the braces since it's a single line statement.
 
-I prefer to keep the help as it's used in two place and make the caller
-function more readable.
-
-Most of compiler will try to inline even without the inline. This is the
-case of gcc where both grant_foreign_access and even get_grant are in
-fine inline. If you really want, I can add the inline.
-
->> +{
->> +	gnttab_page_grant_foreign_access_ref(gnt_list_entry->gref,
->> +					     info->xbdev->otherend_id,
->> +					     gnt_list_entry->page,
->> +					     0);
->> +}
->> +
->> +static struct grant *get_grant(grant_ref_t *gref_head,
->> +			       unsigned long mfn,
->> +			       struct blkfront_info *info)
-> 
-> Indentation.
-
-Why? The indentation is valid, tabulation of 8 as requested by the
-coding style, and will be aligned correctly in your editor. This may not
-be the case in your mail reader.
-
-> 
->> +{
->> +	struct grant *gnt_list_entry = get_free_grant(info);
->> +
->> +	if (gnt_list_entry->gref != GRANT_INVALID_REF)
->>  		return gnt_list_entry;
->> +
->> +	/* Assign a gref to this page */
->> +	gnt_list_entry->gref = gnttab_claim_grant_reference(gref_head);
->> +	BUG_ON(gnt_list_entry->gref == -ENOSPC);
->> +	if (info->feature_persistent)
->> +		grant_foreign_access(gnt_list_entry, info);
->> +	else {
->> +		/* Grant access to the MFN passed by the caller */
->> +		gnttab_grant_foreign_access_ref(gnt_list_entry->gref,
->> +			                        info->xbdev->otherend_id,
->> +				                mfn, 0);
->>  	}
->>  
->> +	return gnt_list_entry;
->> +}
->> +
->> +static struct grant *get_indirect_grant(grant_ref_t *gref_head,
->> +					struct blkfront_info *info)
-> 
-> Indentation.
-
-Ditto.
+I was planning to use gnttab_count_grant added in patch #3 but forgot to
+do it. I will do in the next version.
 
 Regards,
 
