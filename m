@@ -1,91 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jul 2015 11:08:00 +0100
-Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
-In-Reply-To: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 21 Jul 2015 12:10:37 +0200
+Subject: [PATCH 0/9] gpiolib: Add GPIO name support
+In-Reply-To: <20150721095457.GA9981@pengutronix.de>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+ <CAAVeFuL5F=Y2boCWp_TZEAN-kdT-Ob9r-h1-eNVDjBHftFYkeg@mail.gmail.com>
+ <20150721095457.GA9981@pengutronix.de>
+Message-ID: <20150721101037.GB20023@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the basic ACPI GSI code is irq domain aware, make sure
-that the ACPI support in the GIC doesn't pointlessly deviate from
-the DT path.
+Hi,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic.c       | 17 ++++++-----------
- include/linux/irqchip/arm-gic.h |  2 +-
- 2 files changed, 7 insertions(+), 12 deletions(-)
+On Tue, Jul 21, 2015 at 11:54:57AM +0200, Uwe Kleine-K?nig wrote:
+> Hello,
+> 
+> On Tue, Jul 21, 2015 at 06:00:37PM +0900, Alexandre Courbot wrote:
+> > On Sat, Jul 18, 2015 at 5:05 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > > I must say I like this series.
+> I think apart from patch 3 which I'd like to have discussed a bit more,
+> I like it, too. I didn't try, but the series should work fine without
+> patch 3 such that this patch can be discussed separately and the
+> remaining 8 patches can go in?
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index b41ccf5..f5d365d 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
- {
- 	unsigned long ret = 0;
- 
--	if (irq_domain_get_of_node(d) != controller)
--		return -EINVAL;
- 	if (intsize < 3)
- 		return -EINVAL;
- 
-@@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
- 
- void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			   void __iomem *dist_base, void __iomem *cpu_base,
--			   u32 percpu_offset, struct device_node *node)
-+			   u32 percpu_offset, void *domain_token)
- {
- 	irq_hw_number_t hwirq_base;
- 	struct gic_chip_data *gic;
-@@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 		gic_irqs = 1020;
- 	gic->gic_irqs = gic_irqs;
- 
--	if (node) {		/* DT case */
--		gic->domain = irq_domain_add_linear(node, gic_irqs,
-+	if (domain_token) {		/* DT/ACPI case */
-+		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
- 						    &gic_irq_domain_hierarchy_ops,
- 						    gic);
- 	} else {		/* Non-DT case */
-@@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 			irq_base = irq_start;
- 		}
- 
--		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
-+		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
- 					hwirq_base, &gic_irq_domain_ops, gic);
- 	}
- 
-@@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
- 	}
- 
- 	/*
--	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
--	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
--	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
-+	 * Initialize zero GIC instance (no multi-GIC support).
- 	 */
--	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
--	irq_set_default_host(gic_data[0].domain);
-+	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
- 
- 	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
- 	return 0;
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 9de976b..97799b7 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -97,7 +97,7 @@ struct device_node;
- 
- void gic_set_irqchip_flags(unsigned long flags);
- void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
--		    u32 offset, struct device_node *);
-+		    u32 offset, void *);
- void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
- void gic_cpu_if_down(void);
- 
+This series should work without patch 3, yes. Just remove the hogging
+keyword from the gpios defined in the devicetree.
+However some test coverage for this series would be good.
+
+Best regards,
+
+Markus
+
 -- 
-2.1.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/93f5e420/attachment.sig>
