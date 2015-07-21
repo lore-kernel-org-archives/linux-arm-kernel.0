@@ -1,49 +1,72 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Tue, 21 Jul 2015 09:08:56 -0700
-Subject: [PATCH 05/10] arch: unify ioremap prototypes and macro aliases
-In-Reply-To: <20150721133457.GC8902@lst.de>
-References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150720001759.30857.23753.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150721133457.GC8902@lst.de>
-Message-ID: <CAPcyv4i7Sfo54koFC-KB+=YaBZpbW1dndp+DFJhwptFSTpfSVA@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 21 Jul 2015 21:39:04 +0530
+Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <20150721155253.GN3061@x1>
+References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
+ <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
+ <CABb+yY2nAT6V4Q8suAXRtPXrXkArGWVTAW28ts4Z3C_ybuJovA@mail.gmail.com>
+ <20150721150629.GJ3061@x1>
+ <CABb+yY25DC_hmuUhbEVvdEqdUnM6bJxCjBcamZBL97o=jR83Ug@mail.gmail.com>
+ <20150721155253.GN3061@x1>
+Message-ID: <CABb+yY1oKJKJGnn345uzE1mnVk5kCaGTO0b4zzqojN39m2OMyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 6:34 AM, Christoph Hellwig <hch@lst.de> wrote:
+On Tue, Jul 21, 2015 at 9:22 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Tue, 21 Jul 2015, Jassi Brar wrote:
 >
-> On Sun, Jul 19, 2015 at 08:18:00PM -0400, Dan Williams wrote:
-> > Some archs define the first parameter to ioremap() as unsigned long,
-> > while the balance define it as resource_size_t, similar confusion exists
-> > for the type of the 'size' parameter.  Unify on (resource_size_t,
-> > unsigned long) to enable passing ioremap function pointers.  Also, some
-> > archs use function-like macros for defining ioremap aliases, but
-> > asm-generic/io.h expects object-like macros, unify on the latter.
-> >
-> > Move all handling of ioremap aliasing (i.e. ioremap_wt => ioremap) to
-> > include/linux/io.h.  Add a check to lib/devres.c to warn at compile time
-> > if an arch violates type expectations.
+>> >
+>> >> > +static int sti_mbox_send_data(struct mbox_chan *chan, void *data)
+>> >> > +{
+>> >> > +       struct sti_channel *chan_info = chan->con_priv;
+>> >> > +       struct sti_mbox_device *mdev = chan_info->mdev;
+>> >> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
+>> >> > +       unsigned int instance = chan_info->instance;
+>> >> > +       unsigned int channel = chan_info->channel;
+>> >> > +       void __iomem *base;
+>> >> > +
+>> >> > +       if (!sti_mbox_tx_is_ready(chan))
+>> >> > +               return -EBUSY;
+>> >> This is the first thing I look out for in every new driver :)  this
+>> >> check is unnecessary.
+>> >
+>> > In what way?  What if the channel is disabled or there is an IRQ
+>> > already pending?
+>> >
+>> API calls send_data() only if last_tx_done() returned true.
 >
-> I don't think devres really has aything to do with this code.
-
-It's one of the only cross-arch C files that is built with HAS_IOMEM.
-It depends on having a common ioremap prototype later in the series.
-
-> > Kill ARCH_HAS_IOREMAP_WC and ARCH_HAS_IOREMAP_WT in favor of just
-> > testing for ioremap_wc, and ioremap_wt being defined.  This arrangement
-> > allows drivers to know when ioremap_<foo> are being re-directed to plain
-> > ioremap.  A later patch uses this arrangement to implement support for
-> > strict mappings.
-> >
-> > Acked-by: Christoph Hellwig <hch@lst.de>
+> I know for a fact that the 'catchers' in sti_mbox_tx_is_ready() to
+> fire, because I have triggered them.  I'd really rather keep this
+> harmless check in.
 >
-> I only ACKed this as a band-aid to get the pmem code in.  Now that
-> we got that in with a less invasive hack I don't see any reasons to
-> do this over doing the proper common prototypes and per-arch runtime checks
-> of flags variant.
+If you put some printk in send_data() and last_tx_done() you'll see
+what I mean :)
 
-That's not too much of a setback.  I had already started to realize
-that nobody really wants the ioremap_<type> variants compared to
-memremap.  So rather than introduce this cleanup and deprecate
-ioremap_<type> over time, let's just skip a step and start converting
-to memremap() with a proper 'flags' parameter for the mapping-type
-right away
+>> >> > +static const struct sti_mbox_pdata mbox_stih407_pdata = {
+>> >> > +       .num_inst       = 4,
+>> >> > +       .num_chan       = 32,
+>> >> > +       .irq_val        = 0x04,
+>> >> > +       .irq_set        = 0x24,
+>> >> > +       .irq_clr        = 0x44,
+>> >> > +       .ena_val        = 0x64,
+>> >> > +       .ena_set        = 0x84,
+>> >> > +       .ena_clr        = 0xa4,
+>> >> >
+>> >> Register offsets are parameters of the controller
+>> >
+>> > And this is a controller driver?  Not sure I get the point.
+>> >
+>> Platform_data usually carries board/platform specific parameters.
+>> Register offset "properties" are as fixed as the behavior of the
+>> controller, so they should stay inside the code, not come via
+>> platform_data.
+>
+> That's not the case for this controller.  There is nothing preventing
+> these values from changing on a new board revisions.
+>
+Hmm ... interesting! Can't see how enable/disable channel and irq
+set/clear could be effected by writing to random, but agreed upon,
+location between two processors. There ought to be some controller
+listening there?  Now I am more interested in knowing this IP :)
+
+thnx.
