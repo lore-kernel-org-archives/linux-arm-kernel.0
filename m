@@ -1,40 +1,55 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 20 Jul 2015 20:35:05 -0700 (PDT)
-Subject: [PATCH 0/6] BPF JIT fixes and features for ARM
-In-Reply-To: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-References: <1437065195-10887-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20150720.203505.673166237258951387.davem@davemloft.net>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Tue, 21 Jul 2015 12:40:04 +0900
+Subject: [GIT PULL] Samsung 1st fixes for v4.2
+Message-ID: <55ADBF14.30304@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Schichan <nschichan@freebox.fr>
-Date: Thu, 16 Jul 2015 18:46:29 +0200
+Hi,
 
-> This serie fixes issues with the ARM BPF JIT and adds support for more
-> instructions to the ARM BPF JIT.
-> 
-> The first three patches are fixing bugs in the ARM JIT and should
-> probably find their way to a stable kernel.
-> 
-> The last three patches add support to the ARM JIT for more BPF
-> instructions, namely skb netdevice type retrieval, skb payload offset
-> retrieval, and skb packet type retrieval.
-> 
-> With the first three patches, all 60 test_bpf tests in Linux 4.1 release
-> are now passing OK (was 54 out of 60 before).
-> 
-> The last three patches allow 35 tests to use the JIT instead of 29
-> before.
-> 
-> Like previous ARM JIT patches this should go via the net tree.
+Please pull samsung fixes for v4.2.
 
-You've submitted this in a manner which is very mixed up and difficult
-for me to handle.
+Thanks,
+Kukjin
 
-For the bug fixes, create a separate series that targets the 'net' tree.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-Next, create another series with the new features that target 'net-next'.
-Carefully and clearly indicate that the series depends upon the bug fix
-one and I'll sort it out.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-Thanks.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+tags/samsung-fixes-1
+
+for you to fetch changes up to 300bde79f3d86b1af6fcde7b7b2439ecffccbff4:
+
+  ARM: dts: add CPU OPP and regulator supply property for exynos4210
+(2015-07-21 12:32:29 +0900)
+
+----------------------------------------------------------------
+Samsung fixes for v4.2
+
+>From Krzysztof Kozlowski:
+1. Fix exynos3250 MIPI DSI display and MIPI CSIS-2 camera sensorx
+   after adding support for PMU regmap in exynos-video-mipi driver
+   (issue introduced in v4.0).
+2. Bring back cpufreq for exynos4210 after incomplete switch to
+   cpufreq-dt driver in 4.2 merge window. The necessary DT changes
+   for exynos4210 cpufreq was not applied to the same tree as rest
+   of patchset because of multiple conflicts between clk and arm-soc
+   trees. Unfortunately without the change the exynos4210 boards
+   loose cpufreq feature.
+
+----------------------------------------------------------------
+Beata Michalska (1):
+      ARM: dts: Update video-phy node with syscon phandle for exynos3250
+
+Thomas Abraham (1):
+      ARM: dts: add CPU OPP and regulator supply property for exynos4210
+
+ arch/arm/boot/dts/exynos3250.dtsi               |  2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts         |  4 ++++
+ arch/arm/boot/dts/exynos4210-trats.dts          |  4 ++++
+ arch/arm/boot/dts/exynos4210-universal_c210.dts |  4 ++++
+ arch/arm/boot/dts/exynos4210.dtsi               | 12 ++++++++++++
+ 5 files changed, 25 insertions(+), 1 deletion(-)
