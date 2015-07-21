@@ -1,55 +1,173 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 21 Jul 2015 23:37:34 +0200 (CEST)
-Subject: [PATCH V5 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <BL2PR03MB370168620C55576F4A7750683840@BL2PR03MB370.namprd03.prod.outlook.com>
-References: <1437150300-8134-1-git-send-email-shenwei.wang@freescale.com>
- <1437150300-8134-2-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1507172253520.18576@nanos>
- <BL2PR03MB370B72098E511CFE551588B83840@BL2PR03MB370.namprd03.prod.outlook.com>
- <alpine.DEB.2.11.1507211827150.18576@nanos>
- <BL2PR03MB370168620C55576F4A7750683840@BL2PR03MB370.namprd03.prod.outlook.com>
-Message-ID: <alpine.DEB.2.11.1507212324230.18576@nanos>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 17:02:59 -0500
+Subject: [PATCH v3 1/4] PCI: iproc: enable arm64 support for iProc PCIe
+In-Reply-To: <55AEB094.1090601@broadcom.com>
+References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
+ <1437021563-29139-2-git-send-email-rjui@broadcom.com>
+ <20150721203018.GH21967@google.com> <55AEB094.1090601@broadcom.com>
+Message-ID: <20150721220259.GK21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015, Shenwei Wang wrote:
-> > On Tue, 21 Jul 2015, Shenwei Wang wrote:
-> > > This struct defines the properties and functions that GPCv2 block
-> > > provides. Since GPCv2 has two key functions: Irq wakeup source
-> > > management and power management, the intention of the struct is to
-> > > share data and methods among irqchip, suspend, and cpuidle drivers.
+On Tue, Jul 21, 2015 at 01:50:28PM -0700, Ray Jui wrote:
+> 
+> 
+> On 7/21/2015 1:30 PM, Bjorn Helgaas wrote:
+> > On Wed, Jul 15, 2015 at 09:39:20PM -0700, Ray Jui wrote:
+> >> This patch enables arm64 support to the iProc PCIe driver
 > > 
-> > I don't think this is a good idea. The cpuidle driver has nothing to know about the
-> > internals of the irq driver and vice versa. Neither does the suspend code.
+> > This needs a little more explanation: ARM has a common struct pci_sys_data
+> > but ARM64 does not,
+> 
+> Correct, and according to Arnd, there's already work in process of
+> removing the need for pci_sys_data on arm32. Before that is done, we
+> need this in the driver for it to work on both arm32 and arm64.
+> 
+> and ARM needs pci_fixup_irqs() but ARM64 does not (why
+> > not?),
+> 
+> under arch/arm64/kernel/pci.c:
+> 
+>  41 /*
+>  42  * Try to assign the IRQ number from DT when adding a new device
+>  43  */
+>  44 int pcibios_add_device(struct pci_dev *dev)
+>  45 {
+>  46         dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+>  47
+>  48         return 0;
+>  49 }
+> 
+> interrupt is automatically parsed and mapped when adding a new device
+> for arm64.
+> 
+> ARM uses the common pci_sys_data for the PCI sysdata while ARM64
+> > uses a driver-specific sysdata, etc.
+> 
+> Correct. pci_sys_data for arm32 will eventually be removed, so all arm32
+> based PCie host should only need to carry driver specific sysdata.
+
+That all makes sense.  I'm just looking for a condensed version of it in
+the changelog because it takes some digging to figure it out, and in a
+couple months even the implicit context of "somebody's working to combine
+arm32 and arm64" will be gone.  So we need a changelog that motivates this
+patch as it is.
+
+> >> Signed-off-by: Ray Jui <rjui@broadcom.com>
+> >> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> >> ---
+> >>  drivers/pci/host/pcie-iproc.c |   15 ++++-----------
+> >>  drivers/pci/host/pcie-iproc.h |    8 ++++++--
+> >>  2 files changed, 10 insertions(+), 13 deletions(-)
+> >>
+> >> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+> >> index d77481e..8a556d5 100644
+> >> --- a/drivers/pci/host/pcie-iproc.c
+> >> +++ b/drivers/pci/host/pcie-iproc.c
+> >> @@ -58,11 +58,6 @@
+> >>  #define SYS_RC_INTX_EN               0x330
+> >>  #define SYS_RC_INTX_MASK             0xf
+> >>  
+> >> -static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
+> >> -{
+> >> -	return sys->private_data;
+> >> -}
+> >> -
+> >>  /**
+> >>   * Note access to the configuration registers are protected at the higher layer
+> >>   * by 'pci_lock' in drivers/pci/access.c
+> >> @@ -71,8 +66,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
+> >>  					    unsigned int devfn,
+> >>  					    int where)
+> >>  {
+> >> -	struct pci_sys_data *sys = bus->sysdata;
+> >> -	struct iproc_pcie *pcie = sys_to_pcie(sys);
+> >> +	struct iproc_pcie *pcie = bus->sysdata;
+> >>  	unsigned slot = PCI_SLOT(devfn);
+> >>  	unsigned fn = PCI_FUNC(devfn);
+> >>  	unsigned busno = bus->number;
+> >> @@ -208,10 +202,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+> >>  
+> >>  	iproc_pcie_reset(pcie);
+> >>  
+> >> -	pcie->sysdata.private_data = pcie;
+> >> -
+> >> -	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+> >> -				  &pcie->sysdata, res);
+> >> +	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, pcie, res);
+> >>  	if (!bus) {
+> >>  		dev_err(pcie->dev, "unable to create PCI root bus\n");
+> >>  		ret = -ENOMEM;
+> >> @@ -229,7 +220,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+> >>  
+> >>  	pci_scan_child_bus(bus);
+> >>  	pci_assign_unassigned_bus_resources(bus);
+> >> +#ifdef CONFIG_ARM
+> >>  	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
+> >> +#endif
+> >>  	pci_bus_add_devices(bus);
+> >>  
+> >>  	return 0;
+> >> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+> >> index ba0a108..0ee9673 100644
+> >> --- a/drivers/pci/host/pcie-iproc.h
+> >> +++ b/drivers/pci/host/pcie-iproc.h
+> >> @@ -18,18 +18,22 @@
+> >>  
+> >>  /**
+> >>   * iProc PCIe device
+> >> + * @sysdata: Per PCI controller data. This needs to be kept at the beginning of
+> >> + * struct iproc_pcie, to enable support of both ARM32 and ARM64 platforms with
+> >> + * minimal changes in the iProc PCIe core driver
+> >>   * @dev: pointer to device data structure
+> >>   * @base: PCIe host controller I/O register base
+> >>   * @resources: linked list of all PCI resources
+> >> - * @sysdata: Per PCI controller data
+> >>   * @root_bus: pointer to root bus
+> >>   * @phy: optional PHY device that controls the Serdes
+> >>   * @irqs: interrupt IDs
+> >>   */
+> >>  struct iproc_pcie {
+> >> +#ifdef CONFIG_ARM
+> >> +	struct pci_sys_data sysdata;
+> >> +#endif
 > > 
-> > If you failed to split that proper then your design is wrong.
-> > 
-> The implementation has already been spitted totally. The question is
-> if we use the same structure among those drivers or not, since they
-> do share some common data like gpc_base address, enabled_irq, and
-> mfmix_mask. The suspend and cpuidle driver will use those data to
-> decide the hardware power modes and the relating power down sequence
-> of the power domains. The structure is the abstract of the GPCv2
-> hardware, and the current struct declaration matches the low level
-> hardware well. Although it is possible and easy to split it into
-> two, it may introduce either redundant definition for the common
-> properties or have to create a global variable to enable them
-> visible to both the irqchip and the suspend codes.
+> > I'm OK with adding #ifdefs to make this work on both ARM and ARM64.  We can
+> > at least see the ifdefs and know what needs to be fixed.  I'm a little more
+> > hesitant about adding code that depends on the position of sysdata within
+> > struct iproc_pcie.  I'd rather have something ugly and robust that cries
+> > out for fixing than something minimal and fragile.
+> 
+> Yes that was my original code and that was a bit ugly. Arnd proposed
+> this and it does indeed make the look a lot cleaner. But yeah, it now
+> depends on the location of struct pci_sys_data in memory and I see your
+> concern. In fact, I asked exactly the same question to Arnd.
+> 
+> Are you okay with living with this for a little while until struct
+> pci_sys_data is eventually removed from arm32?
+> 
+> > I see that your v1 patch added #ifdef CONFIG_ARM around sysdata at its
+> > original location below, and you mentioned that you took Arnd's advice to
+> > move sysdata to the beginning of the structure, but I don't see Arnd's
+> > email on the list.
+> 
+> Sorry maybe you need to elaborate here. Am I supposed to add Arnd's name
+> in the commit message? Other than that, Arnd is on this email thread.
 
-So the proper way to do this is:
+No, I wasn't looking for Arnd's name in the changelog; I was just hoping to
+read that discussion because it could save me from the embarrassment of
+suggesting something different than Arnd did :)
 
-Have a data structure which contains only the shared information. The
-pointer to this structure can be global.
+Personally I'd rather have ugly ifdefs because they make it obvious where
+the potholes are.  But again, I'm sure Arnd has very good reasons if he
+thinks this is better.
 
-Have per driver data structures which contain the driver private
-stuff.
-
-Think about whether you need all the function pointers in one of the
-structs. IOW, you need them only if a pointer can be changed at
-runtime. If not you can call the function directly as I doubt that any
-of these drivers can be modular.
-
-Thanks,
-
-	tglx
+> >>  	struct device *dev;
+> >>  	void __iomem *base;
+> >> -	struct pci_sys_data sysdata;
+> >>  	struct pci_bus *root_bus;
+> >>  	struct phy *phy;
+> >>  	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
+> >> -- 
+> >> 1.7.9.5
+> >>
