@@ -1,112 +1,93 @@
-From: adam.yh.lee@gmail.com (Adam Lee)
-Date: Mon, 20 Jul 2015 17:53:14 -0700
-Subject: [V3] [TWL4030 MADC] Fix ADC[3:6] readings
-In-Reply-To: <1437439755-30618-1-git-send-email-adam.yh.lee@gmail.com>
-References: <1437439755-30618-1-git-send-email-adam.yh.lee@gmail.com>
-Message-ID: <CAFeBWL6NgLqWu5-oge0qWjSVkgQ+DH1fD4RexNy9zuMEsg1jXg@mail.gmail.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Tue, 21 Jul 2015 04:11:58 +0300
+Subject: [PATCH 1/4] ARM: dts: omap3-pandora: miscellaneous corrections
+Message-ID: <1437441121-31658-1-git-send-email-notasas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
-Just sent up the V3 of my patch. Register configuration is now done in
-madc driver code.
+- add pandora specific compatible name
+- fix mmc2 card detect polarity
+- fix mmc1 and mmc2 write protect polarity
+- disable write protect pins because of production issue and add an
+  explanation why they are disabled
+- fix NAND partition name to reflect the correct address
 
-Another difference from V2 and V1 is that I am using
-`devm_regulator_put` instead of
-`regulator_put` to match the `devm_regulator_get` call.
+Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
+---
+ arch/arm/boot/dts/omap3-pandora-1ghz.dts    |  2 +-
+ arch/arm/boot/dts/omap3-pandora-600mhz.dts  |  2 +-
+ arch/arm/boot/dts/omap3-pandora-common.dtsi | 13 +++++++++----
+ 3 files changed, 11 insertions(+), 6 deletions(-)
 
-I've tested it on Gumstix Overo (OMAP3 + TPS65950).
-
-Let me know,
-
-Adam
-
-On Mon, Jul 20, 2015 at 5:49 PM, Adam YH Lee <adam.yh.lee@gmail.com> wrote:
-> MADC[3:6] reads incorrect values without these two following changes:
->
-> - enable the 3v1 bias regulator for ADC[3:6]
-> - configure ADC[3:6] lines as input, not as USB
->
-> Signed-off-by: Adam YH Lee <adam.yh.lee@gmail.com>
-> ---
->  drivers/iio/adc/twl4030-madc.c | 36 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->
-> diff --git a/drivers/iio/adc/twl4030-madc.c b/drivers/iio/adc/twl4030-madc.c
-> index 94c5f05..ae33eba 100644
-> --- a/drivers/iio/adc/twl4030-madc.c
-> +++ b/drivers/iio/adc/twl4030-madc.c
-> @@ -45,13 +45,18 @@
->  #include <linux/types.h>
->  #include <linux/gfp.h>
->  #include <linux/err.h>
-> +#include <linux/regulator/consumer.h>
->
->  #include <linux/iio/iio.h>
->
-> +#define TWL4030_USB_SEL_MADC_MCPC      (1<<3)
-> +#define TWL4030_USB_CARKIT_ANA_CTRL    0xBB
-> +
->  /**
->   * struct twl4030_madc_data - a container for madc info
->   * @dev:               Pointer to device structure for madc
->   * @lock:              Mutex protecting this data structure
-> + * @regulator:         Pointer to bias regulator for madc
->   * @requests:          Array of request struct corresponding to SW1, SW2 and RT
->   * @use_second_irq:    IRQ selection (main or co-processor)
->   * @imr:               Interrupt mask register of MADC
-> @@ -60,6 +65,7 @@
->  struct twl4030_madc_data {
->         struct device *dev;
->         struct mutex lock;      /* mutex protecting this data structure */
-> +       struct regulator *usb3v1;
->         struct twl4030_madc_request requests[TWL4030_MADC_NUM_METHODS];
->         bool use_second_irq;
->         u8 imr;
-> @@ -848,6 +854,33 @@ static int twl4030_madc_probe(struct platform_device *pdev)
->                 goto err_i2c;
->         }
->
-> +       /* Configure MADC[3:6] */
-> +       ret = twl_i2c_read_u8(TWL_MODULE_USB, &regval,
-> +                       TWL4030_USB_CARKIT_ANA_CTRL);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "unable to read reg CARKIT_ANA_CTRL  0x%X\n",
-> +                               TWL4030_USB_CARKIT_ANA_CTRL);
-> +               goto err_i2c;
-> +       }
-> +       regval |= TWL4030_USB_SEL_MADC_MCPC;
-> +       ret = twl_i2c_write_u8(TWL_MODULE_USB, regval,
-> +                                TWL4030_USB_CARKIT_ANA_CTRL);
-> +       if (ret) {
-> +               dev_err(&pdev->dev, "unable to write reg CARKIT_ANA_CTRL 0x%X\n",
-> +                               TWL4030_USB_CARKIT_ANA_CTRL);
-> +               goto err_i2c;
-> +       }
-> +
-> +
-> +       /* Enable 3v1 bias regulator for MADC[3:6] */
-> +       madc->usb3v1 = devm_regulator_get(madc->dev, "vusb3v1");
-> +       if (IS_ERR(madc->usb3v1))
-> +               return -ENODEV;
-> +
-> +       ret = regulator_enable(madc->usb3v1);
-> +       if (ret)
-> +               dev_err(madc->dev, "could not enable 3v1 bias regulator\n");
-> +
->         return 0;
->
->  err_i2c:
-> @@ -867,6 +900,9 @@ static int twl4030_madc_remove(struct platform_device *pdev)
->         twl4030_madc_set_current_generator(madc, 0, 0);
->         twl4030_madc_set_power(madc, 0);
->
-> +       regulator_disable(madc->usb3v1);
-> +       devm_regulator_put(madc->usb3v1);
-> +
->         return 0;
->  }
->
-> --
-> 2.1.4
->
+diff --git a/arch/arm/boot/dts/omap3-pandora-1ghz.dts b/arch/arm/boot/dts/omap3-pandora-1ghz.dts
+index 9619a28..25498f7 100644
+--- a/arch/arm/boot/dts/omap3-pandora-1ghz.dts
++++ b/arch/arm/boot/dts/omap3-pandora-1ghz.dts
+@@ -19,7 +19,7 @@
+ / {
+ 	model = "Pandora Handheld Console 1GHz";
+ 
+-	compatible = "ti,omap36xx", "ti,omap3";
++	compatible = "openpandora,omap3-pandora-1ghz", "ti,omap36xx", "ti,omap3";
+ };
+ 
+ &omap3_pmx_core2 {
+diff --git a/arch/arm/boot/dts/omap3-pandora-600mhz.dts b/arch/arm/boot/dts/omap3-pandora-600mhz.dts
+index fb803a7..8775897 100644
+--- a/arch/arm/boot/dts/omap3-pandora-600mhz.dts
++++ b/arch/arm/boot/dts/omap3-pandora-600mhz.dts
+@@ -19,7 +19,7 @@
+ / {
+ 	model = "Pandora Handheld Console";
+ 
+-	compatible = "ti,omap3";
++	compatible = "openpandora,omap3-pandora-600mhz", "ti,omap3430", "ti,omap3";
+ };
+ 
+ &omap3_pmx_core2 {
+diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+index 782ab1f..f6363bc 100644
+--- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
++++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+@@ -459,13 +459,18 @@
+ 	power = <50>;
+ };
+ 
++/*
++ * Many pandora boards have been produced with defective write-protect switches
++ * on either slot, so it was decided not to use this feature. If you know
++ * your board has good switches, feel free to uncomment wp-gpios below.
++ */
+ &mmc1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc1_pins>;
+ 	vmmc-supply = <&vmmc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&twl_gpio 0 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio4 30 GPIO_ACTIVE_LOW>;	/* GPIO_126 */
++	/*wp-gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;*/	/* GPIO_126 */
+ };
+ 
+ &mmc2 {
+@@ -473,8 +478,8 @@
+ 	pinctrl-0 = <&mmc2_pins>;
+ 	vmmc-supply = <&vmmc2>;
+ 	bus-width = <4>;
+-	cd-gpios = <&twl_gpio 1 GPIO_ACTIVE_HIGH>;
+-	wp-gpios = <&gpio4 31 GPIO_ACTIVE_LOW>;	/* GPIO_127 */
++	cd-gpios = <&twl_gpio 1 GPIO_ACTIVE_LOW>;
++	/*wp-gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;*/	/* GPIO_127 */
+ };
+ 
+ /* bluetooth*/
+@@ -545,7 +550,7 @@
+ 			reg = <0x280000 0xa00000>;
+ 		};
+ 
+-		filesystem at 680000 {
++		filesystem at c80000 {
+ 			label = "rootfs";
+ 			reg = <0xc80000 0>;	/* 0 = MTDPART_SIZ_FULL */
+ 		};
+-- 
+1.9.1
