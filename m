@@ -1,9 +1,9 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 21 Jul 2015 22:43:58 +0800
-Subject: [PATCH 1/3] arm64: hugetlb: remove paragraph about writing to FSF
+Date: Tue, 21 Jul 2015 22:43:59 +0800
+Subject: [PATCH 2/3] arm64: dts: cavium: remove paragraph about writing to FSF
 In-Reply-To: <1437489840-2368-1-git-send-email-jszhang@marvell.com>
 References: <1437489840-2368-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1437489840-2368-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1437489840-2368-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,39 +12,41 @@ mailing address from GPL notice.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- arch/arm64/include/asm/hugetlb.h | 4 ----
- arch/arm64/mm/hugetlbpage.c      | 4 ----
- 2 files changed, 8 deletions(-)
+ arch/arm64/boot/dts/cavium/thunder-88xx.dts  | 5 -----
+ arch/arm64/boot/dts/cavium/thunder-88xx.dtsi | 5 -----
+ 2 files changed, 10 deletions(-)
 
-diff --git a/arch/arm64/include/asm/hugetlb.h b/arch/arm64/include/asm/hugetlb.h
-index 2fd9b14..bb4052e 100644
---- a/arch/arm64/include/asm/hugetlb.h
-+++ b/arch/arm64/include/asm/hugetlb.h
-@@ -13,10 +13,6 @@
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
+diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dts b/arch/arm64/boot/dts/cavium/thunder-88xx.dts
+index 800ba65..c45039a 100644
+--- a/arch/arm64/boot/dts/cavium/thunder-88xx.dts
++++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dts
+@@ -18,11 +18,6 @@
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- *     You should have received a copy of the GNU General Public
+- *     License along with this library; if not, write to the Free
+- *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+- *     MA 02110-1301 USA
 - *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-  */
- 
- #ifndef __ASM_HUGETLB_H
-diff --git a/arch/arm64/mm/hugetlbpage.c b/arch/arm64/mm/hugetlbpage.c
-index 831ec53..383b03f 100644
---- a/arch/arm64/mm/hugetlbpage.c
-+++ b/arch/arm64/mm/hugetlbpage.c
-@@ -13,10 +13,6 @@
-  * but WITHOUT ANY WARRANTY; without even the implied warranty of
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
+  * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
+diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+index 9cb7cf9..40b6714 100644
+--- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
++++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+@@ -18,11 +18,6 @@
+  *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  *     GNU General Public License for more details.
+  *
+- *     You should have received a copy of the GNU General Public
+- *     License along with this library; if not, write to the Free
+- *     Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston,
+- *     MA 02110-1301 USA
 - *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-  */
- 
- #include <linux/init.h>
+  * Or, alternatively,
+  *
+  *  b) Permission is hereby granted, free of charge, to any person
 -- 
 2.1.4
