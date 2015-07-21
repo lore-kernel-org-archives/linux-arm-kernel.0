@@ -1,88 +1,75 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 21 Jul 2015 12:12:12 +0100
-Subject: [Xen-devel] [PATCH v2 05/20] block/xen-blkfront: Split
- blkif_queue_request in 2
-In-Reply-To: <55AE16EC.2020204@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-6-git-send-email-julien.grall@citrix.com>
- <55AE16EC.2020204@citrix.com>
-Message-ID: <55AE290C.8010103@citrix.com>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Tue, 21 Jul 2015 16:45:43 +0530
+Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
+In-Reply-To: <20150721092148.GI3061@x1>
+References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
+ <20150717111733.GL11162@sirena.org.uk> <55A8F859.2090204@linaro.org>
+ <20150720073011.GA3061@x1> <55ACE2FC.2090801@linaro.org>
+ <20150721092148.GI3061@x1>
+Message-ID: <55AE29DF.10102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
 
-On 21/07/15 10:54, Roger Pau Monn? wrote:
-> El 09/07/15 a les 22.42, Julien Grall ha escrit:
->> Currently, blkif_queue_request has 2 distinct execution path:
->>     - Send a discard request
->>     - Send a read/write request
+
+On Tuesday 21 July 2015 02:51 PM, Lee Jones wrote:
+> On Mon, 20 Jul 2015, Vaibhav Hiremath wrote:
+>
 >>
->> The function is also allocating grants to use for generating the
->> request. Although, this is only used for read/write request.
 >>
->> Rather than having a function with 2 distinct execution path, separate
->> the function in 2. This will also remove one level of tabulation.
+>> On Monday 20 July 2015 01:00 PM, Lee Jones wrote:
+>>> On Fri, 17 Jul 2015, Vaibhav Hiremath wrote:
+>>>
+>>>>
+>>>>
+>>>> On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
+>>>>> On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
+>>>>>
+>>>>>> Can you merge this into regulator tree?
+>>>>>
+>>>>>> Link to MFD - https://lkml.org/lkml/2015/7/16/704
+>>>>>
+>>>>> I need a tag I can pull from Lee.
+>>>>>
+>>>> Great.
+>>>>
+>>>> Lee,
+>>>> It would be helpful, if you could ack below patch,
+>>>>
+>>>> https://lkml.org/lkml/2015/7/16/704
+>>>
+>>> These patches are yet to be reviewed.  I will unmark those patches as
+>>> important (meaning they will not be reviewed during this iteration).
+>>> Please resubmit a single patch-set containing all of the
+>>> dependencies and Mark and I will work it out between us.
+>>>
 >>
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Roger Pau Monn? <roger.pau@citrix.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: David Vrabel <david.vrabel@citrix.com>
-> 
-> Patch looks fine, although with so much indentation changes it's kind of
-> hard to review.
+>> Ok,
+>>
+>> I have just sent single patch, which has dependency on regulator
+>> changes. Please review, ack and queue up.
+>
+> A little presumptuous, don't you think? ;)
+>
+>> [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
+>> https://patchwork.kernel.org/patch/6826531/
+>
+> So nothing depends on this anymore, right?
+>
 
-I wasn't sure how to make this patch more easy to review and it seems
-like diff is getting confused.
+No, regulato patch depends on this.
+Mark needs your tag in order to take above patch through regulator tree.
 
-It's mostly removing one indentation layer (the if (req->cmd_flags ...))
-and move the discard code in a separate function.
 
-> Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+Just to clarify more,
 
-Thank you.
+I have regulator patch which adds support for 88PM860
+https://lkml.org/lkml/2015/7/16/719
 
-> Just one minor change below.
-> 
-> [...]
-> 
->> @@ -595,6 +603,24 @@ static int blkif_queue_request(struct request *req)
->>  	return 0;
->>  }
->>  
->> +/*
->> + * Generate a Xen blkfront IO request from a blk layer request.  Reads
->> + * and writes are handled as expected.
->> + *
->> + * @req: a request struct
->> + */
->> +static int blkif_queue_request(struct request *req)
->> +{
->> +	struct blkfront_info *info = req->rq_disk->private_data;
->> +
->> +	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
->> +		return 1;
->> +
->> +	if (unlikely(req->cmd_flags & (REQ_DISCARD | REQ_SECURE)))
->> +		return blkif_queue_discard_req(req);
->> +	else
->> +		return blkif_queue_rw_req(req);
-> 
-> There's no need for the else clause.
+which depends on above patch
+https://patchwork.kernel.org/patch/6826531/
 
-I find it more readable and obvious to understand than:
-
-if ( ... )
-  return
-return;
-
-when there is only one line in the else. IIRC, the resulting assembly
-will be the same.
-
-Anyway, I can drop the else if you really want.
-
-Regards,
-
--- 
-Julien Grall
+Thanks,
+Vaibhav
