@@ -1,77 +1,64 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 21 Jul 2015 14:19:00 +0200
-Subject: [PATCH 2/2] dmaengine: xdmac: Add scatter gathered memset support
-In-Reply-To: <20150717030926.GC5086@localhost>
-References: <1436177964-19380-1-git-send-email-maxime.ripard@free-electrons.com>
- <1436177964-19380-3-git-send-email-maxime.ripard@free-electrons.com>
- <20150716120154.GN5086@localhost> <20150716141105.GJ28632@lukather>
- <20150717030926.GC5086@localhost>
-Message-ID: <20150721121900.GB2373@lukather>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Jul 2015 13:23:25 +0100
+Subject: [PATCH v3 0/6] arm64: kernel: Add support for Privileged Access Never
+Message-ID: <1437481411-1595-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 08:39:26AM +0530, Vinod Koul wrote:
-> On Thu, Jul 16, 2015 at 04:11:05PM +0200, Maxime Ripard wrote:
-> > Hi Vinod,
-> > 
-> > > > +		/*
-> > > > +		 * The scatterlist API gives us only the address and
-> > > > +		 * length of each elements.
-> > > > +		 *
-> > > > +		 * Unfortunately, we don't have the stride, which we
-> > > > +		 * will need to compute.
-> > > > +		 *
-> > > > +		 * That make us end up in a situation like this one:
-> > > > +		 *    len    stride    len    stride    len
-> > > > +		 * +-------+        +-------+        +-------+
-> > > > +		 * |  N-2  |        |  N-1  |        |   N   |
-> > > > +		 * +-------+        +-------+        +-------+
-> > > > +		 *
-> > > > +		 * We need all these three elements (N-2, N-1 and N)
-> > > > +		 * to actually take the decision on whether we need to
-> > > > +		 * queue N-1 or reuse N-2.
-> > > > +		 *
-> > > > +		 * We will only consider N if it is the last element.
-> > > > +		 */
-> > >
-> > > Why do you need stride?
-> > > 
-> > > This is scatterlist so the computation of stride sounds odd here. Ideally
-> > > you should take the scatterlist and program the lli for controller.
-> > 
-> > Because it is sub-optimal if the length and stride are equals from one
-> > descriptors to another. The XDMAC is able to repeat any given
-> > descriptor a given number of time (which is one by default), which
-> > means that if the parameters of the transfer don't change, we simply
-> > have to increment the number of time the descriptor has to be used,
-> > instead of creating a new one that the controller will have to fetch.
-> > 
-> > In the non-optimal case (ie the length and/or stride change from one
-> > scatterlist element to another), we simply fallback to a one LLI per
-> > scatter list element.
->
-> Sound fine to me. The optimization is a good one then...
-> 
-> Another question though, do you expect stride to be linear for your
-> cases, if so have you actually though about using interleaved API,
-> for these cases
+This series adds support for Privileged Access Never (PAN; part of the ARMv8.1
+Extensions). When enabled, this feature causes a permission fault if the kernel
+attempts to access memory that is also accessible by userspace - instead the
+PAN bit must be cleared when accessing userspace memory. (or use the
+ldt*/stt* instructions).
 
-What do you mean by linear? I guess, at least from an API point of
-view, we should expect any stride and length. The scatter gather
-variants of the dmaengine API were already using scatterlist, and the
-interleaved template doesn't really fit our use case here, so I chose
-to use a scatterlist here, mostly for consistency.
+This series detects and enables this feature, and uses alternatives to change
+{get,put}_user() et al to clear the PAN bit while they do their work.
 
-Maxime
+Changes since v 2:
+* Added missing PAN-swivel around  swp emulation. (Thanks to Vladimir Murzin for
+  spotting this!).
+* Use bit shifts in cpuid_feature_extract_field(), to produce better asm.
+* Changed the enable() patch field names, and switched to ints.
+* Removed PSTATE_PAN define and use PSR_PAN_BIT instead.
+
+Changes since v1:
+* Copied cpuid_feature_extract_field() from arch/arm as a new patch, suggested
+  by Russell King [1].
+* Changed feature-detection patch to use cpuid_feature_extract_field() for sign
+  extension, and '>='.
+* Moved SCTLR_EL1_* from asm/cputype.h to asm/sysreg.h
+* Added PSR_PAN_BIT in uapi/asm/ptrace.h
+* Removed the setting of PSTATE_PAN in kernel/process.c
+
+[1] http://www.spinics.net/lists/arm-kernel/msg432518.html
+
+
+James Morse (6):
+  arm64: kernel: Add cpuid_feature_extract_field() for 4bit sign
+    extension
+  arm64: kernel: preparatory: Move config_sctlr_el1
+  arm64: kernel: Add cpufeature 'enable' callback
+  arm64: kernel: Add min_field_value and use '>=' for feature detection
+  arm64: kernel: Add optional CONFIG_ parameter to ALTERNATIVE()
+  arm64: kernel: Add support for Privileged Access Never
+
+ arch/arm64/Kconfig                   | 14 +++++++++++++
+ arch/arm64/include/asm/alternative.h | 28 ++++++++++++++++++++++---
+ arch/arm64/include/asm/cpufeature.h  | 15 +++++++++++---
+ arch/arm64/include/asm/cputype.h     |  3 ---
+ arch/arm64/include/asm/futex.h       |  8 ++++++++
+ arch/arm64/include/asm/processor.h   |  2 ++
+ arch/arm64/include/asm/sysreg.h      | 20 ++++++++++++++++++
+ arch/arm64/include/asm/uaccess.h     | 11 ++++++++++
+ arch/arm64/include/uapi/asm/ptrace.h |  1 +
+ arch/arm64/kernel/armv8_deprecated.c | 19 ++++++++---------
+ arch/arm64/kernel/cpufeature.c       | 40 +++++++++++++++++++++++++++++++++---
+ arch/arm64/lib/clear_user.S          |  8 ++++++++
+ arch/arm64/lib/copy_from_user.S      |  8 ++++++++
+ arch/arm64/lib/copy_in_user.S        |  8 ++++++++
+ arch/arm64/lib/copy_to_user.S        |  8 ++++++++
+ arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++
+ 16 files changed, 193 insertions(+), 23 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150721/a30caa7d/attachment.sig>
+2.1.4
