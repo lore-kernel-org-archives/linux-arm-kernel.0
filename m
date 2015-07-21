@@ -1,135 +1,38 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Tue, 21 Jul 2015 17:30:04 +0100
-Subject: [PATCH] dtb: Create a common home for cross-architecture dtsi files.
-Message-ID: <1437496204-5438-1-git-send-email-ian.campbell@citrix.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 21 Jul 2015 18:31:47 +0200
+Subject: [PATCH] PCI: xilinx: Add check for MSI interrupt flag before
+ handling as INTx
+In-Reply-To: <20150721154000.GA21967@google.com>
+References: <1436288059-22925-1-git-send-email-russell.joyce@york.ac.uk>
+ <20150721154000.GA21967@google.com>
+Message-ID: <55AE73F3.8050600@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
-LogicTile Express 20MG" added a new dts file to arch/arm64 which
-included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-.dtsi supplied by arch/arm.
+Hi Bjorn,
 
-Unfortunately this causes some issues for the split device tree
-repository[0], since things get moved around there. In that context
-the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+On 07/21/2015 05:40 PM, Bjorn Helgaas wrote:
+> On Tue, Jul 07, 2015 at 05:54:19PM +0100, Russell Joyce wrote:
+>> Occasionally both MSI and INTx bits in the interrupt decode register are
+>> set at once by the Xilinx AXI PCIe Bridge, so the MSI flag in the
+>> interrupt message should be checked to ensure that the correct handler is
+>> used.
+>>
+>> If this check is not in place and the interrupt message type is MSI, the
+>> INTx handler will be used erroneously when both type bits are set.
+>> This will also be followed by a second read of the message FIFO, which can
+>> result in the function returning early and the interrupt decode register
+>> not being cleared if the FIFO is now empty.
+>>
+>> Signed-off-by: Russell Joyce <russell.joyce@york.ac.uk>
+> 
+> Applied to pci/host-xilinx for v4.3, thanks.
+> 
+> Xilinx guys, speak up if there's any issue with this.
 
-The sharing of the .dtsi is legitimate since the baseboard is the same
-for various vexpress systems whatever processor they use.
 
-Rather than using ../../ tricks to pickup .dtsi files from another
-arch this patch creates a new directory include/dt-bindings/dtsi as a
-home for such cross-arch .dtsi files, arranges for it to be in the
-include path when the .dts files are processed by cpp and switches the
-.dts files to use cpp #include instead of /include/.
+I had 2 weeks off and still catching on emails. I will try to test this
+and let you know if there is any problem.
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
-
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kbuild at vger.kernel.org
----
- Documentation/devicetree/bindings/arm/vexpress.txt                    | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts                           | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts                            | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts                               | 2 +-
- arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts                  | 2 +-
- {arch/arm/boot/dts => include/dt-bindings/dtsi}/vexpress-v2m-rs1.dtsi | 0
- scripts/Makefile.lib                                                  | 1 +
- 7 files changed, 6 insertions(+), 5 deletions(-)
- rename {arch/arm/boot/dts => include/dt-bindings/dtsi}/vexpress-v2m-rs1.dtsi (100%)
-
-diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
-index 39844cd..46c6b04 100644
---- a/Documentation/devicetree/bindings/arm/vexpress.txt
-+++ b/Documentation/devicetree/bindings/arm/vexpress.txt
-@@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
- 		/* Active high IRQ 0 is connected to GIC's SPI0 */
- 		interrupt-map = <0 0 0 &gic 0 0 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <vexpress-v2m-rs1.dtsi>
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..85b201e 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -278,6 +278,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 17f63f7..fe5091d 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -636,6 +636,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index d2709b7..a028d59 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -248,6 +248,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-index 5b1d018..b4257ee 100644
---- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-+++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-@@ -186,6 +186,6 @@
- 				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
- 				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
- 
--		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
-+		#include <vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/include/dt-bindings/dtsi/vexpress-v2m-rs1.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-rename to include/dt-bindings/dtsi/vexpress-v2m-rs1.dtsi
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 79e8661..bb10128 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -163,6 +163,7 @@ dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
- 		 -I$(srctree)/drivers/of/testcase-data                   \
-+		 -I$(srctree)/include/dt-bindings/dtsi                   \
- 		 -undef -D__DTS__
- 
- # Finds the multi-part object the current object will be linked into
--- 
-2.1.4
+Thanks,
+Michal
