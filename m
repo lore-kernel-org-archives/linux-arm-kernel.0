@@ -1,63 +1,59 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Tue, 21 Jul 2015 17:35:19 -0400
-Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
-Message-ID: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 21 Jul 2015 16:37:04 -0500
+Subject: [PATCH v4 19/19] PCI/MSI: Drop domain field from msi_controller
+In-Reply-To: <1436962613-17359-20-git-send-email-marc.zyngier@arm.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-20-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150721213704.GC3691@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MPS configuration should be done *before* pci_bus_add_devices().
-After pci_bus_add_devices(), drivers may be bound to devices, and
-the PCI core shouldn't touch device configuration while a driver
-owns the device.
+On Wed, Jul 15, 2015 at 01:16:53PM +0100, Marc Zyngier wrote:
+> The only three users of that field are not using the msi_controller
+> structure anymore, so drop it altogether.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-Reported-by: Bjorn Helgaas <bhelgaas@google.com>
----
- arch/arm/kernel/bios32.c | 19 +++++--------------
- 1 file changed, 5 insertions(+), 14 deletions(-)
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index fcbbbb1..17efde7 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
- 	list_for_each_entry(sys, &head, node) {
- 		struct pci_bus *bus = sys->bus;
- 
--		if (!pci_has_flag(PCI_PROBE_ONLY)) {
-+		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-+			struct pci_bus *child;
- 			/*
- 			 * Size the bridge windows.
- 			 */
-@@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
- 			 * Assign resources.
- 			 */
- 			pci_bus_assign_resources(bus);
--		}
- 
-+			list_for_each_entry(child, &bus->children, node)
-+				pcie_bus_configure_settings(child);
-+		}
- 		/*
- 		 * Tell drivers about devices found.
- 		 */
- 		pci_bus_add_devices(bus);
- 	}
--
--	list_for_each_entry(sys, &head, node) {
--		struct pci_bus *bus = sys->bus;
--
--		/* Configure PCI Express settings */
--		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
--			struct pci_bus *child;
--
--			list_for_each_entry(child, &bus->children, node)
--				pcie_bus_configure_settings(child);
--		}
--	}
- }
- 
- #ifndef CONFIG_PCI_HOST_ITE8152
--- 
-1.9.1
+> ---
+>  drivers/pci/msi.c   | 2 --
+>  include/linux/msi.h | 3 ---
+>  2 files changed, 5 deletions(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index c77fdaf..31bae50 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -42,8 +42,6 @@ static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
+>  	struct irq_domain *domain = NULL;
+>  
+>  	domain = dev_get_msi_domain(&dev->dev);
+> -	if (!domain && dev->bus->msi)
+> -		domain = dev->bus->msi->domain;
+>  	if (!domain)
+>  		domain = arch_get_pci_msi_domain(dev);
+
+I guess this takes care of the "assignment inside if" question :)
+
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index b55cf63..e29c31f 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -124,9 +124,6 @@ struct msi_controller {
+>  	struct device *dev;
+>  	struct device_node *of_node;
+>  	struct list_head list;
+> -#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> -	struct irq_domain *domain;
+> -#endif
+>  
+>  	int (*setup_irq)(struct msi_controller *chip, struct pci_dev *dev,
+>  			 struct msi_desc *desc);
+> -- 
+> 2.1.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
