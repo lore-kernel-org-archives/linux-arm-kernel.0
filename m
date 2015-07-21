@@ -1,33 +1,56 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 21 Jul 2015 14:04:33 -0700
-Subject: [PATCH v3 1/4] PCI: iproc: enable arm64 support for iProc PCIe
-In-Reply-To: <55AEB094.1090601@broadcom.com>
-References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
- <1437021563-29139-2-git-send-email-rjui@broadcom.com>
- <20150721203018.GH21967@google.com> <55AEB094.1090601@broadcom.com>
-Message-ID: <55AEB3E1.6010405@broadcom.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 21 Jul 2015 23:04:25 +0200
+Subject: [PATCH] clk: rockchip: Fix PLL bandwidth
+In-Reply-To: <1437511283-14216-1-git-send-email-dianders@chromium.org>
+References: <1437511283-14216-1-git-send-email-dianders@chromium.org>
+Message-ID: <2227753.WV2ipXIsxy@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Doug,
 
-
-On 7/21/2015 1:50 PM, Ray Jui wrote:
+Am Dienstag, 21. Juli 2015, 13:41:23 schrieb Douglas Anderson:
+> In the TRM we see that BWADJ is "a 12-bit bus that selects the values
+> 1-4096 for the bandwidth divider (NB)":
+>  NB = BWADJ[11:0] + 1
+> The recommended setting of NB: NB = NF / 2.
 > 
+> So:
+>   NB = NF / 2
+>   BWADJ[11:0] + 1 = NF / 2
+>   BWADJ[11:0] = NF / 2 - 1
 > 
-> On 7/21/2015 1:30 PM, Bjorn Helgaas wrote:
->> On Wed, Jul 15, 2015 at 09:39:20PM -0700, Ray Jui wrote:
-
->> I see that your v1 patch added #ifdef CONFIG_ARM around sysdata at its
->> original location below, and you mentioned that you took Arnd's advice to
->> move sysdata to the beginning of the structure, but I don't see Arnd's
->> email on the list.
->>
+> Right now, we have:
 > 
-> Sorry maybe you need to elaborate here. Am I supposed to add Arnd's name
-> in the commit message? Other than that, Arnd is on this email thread.
+> {                                               \
+>         .rate   = _rate##U,                     \
+>         .nr = _nr,                              \
+>         .nf = _nf,                              \
+>         .no = _no,                              \
+>         .bwadj = (_nf >> 1),                    \
+> }
 > 
+> That means we set bwadj to NF / 2, not NF / 2 - 1
+> 
+> All of this is a bit confusing because we specify "NR" (the 1-based
+> value), "NF" (the 1-based value), "NO" (the 1-based value), but
+> "BWADJ" (the 0-based value) instead of "NB" (the 1-based value).
+> 
+> Let's change to working with "NB" and fix the off by one error.  This
+> may affect PLL jitter in a small way (hopefully for the better).
+> 
+> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 
-For your previous question: when Arnd replied, he only replied to me but
-did not reply to all, that's why you cannot find his email....
+we talked about this beforehand in the Chromeos bug and I verified this in the 
+manual for all currently supported Rockchip socs (rk3066 - rk3368), so
 
-Ray
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Background: the original code stems from a time when I was still operating 
+without documentation and I took this from the upstream kernel from that time 
+and sadly forgot to double check once I had docs.
+
+
+Thanks for fixing this
+Heiko
