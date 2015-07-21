@@ -1,53 +1,62 @@
-From: HenryC.Chen@mediatek.com (Henry Chen)
-Date: Tue, 21 Jul 2015 17:52:19 +0800
-Subject: [PATCH 2/2] regulator: MT6311: Add support for MT6311 regulator
-In-Reply-To: <20150720173153.GH11162@sirena.org.uk>
-References: <1437377793-31558-1-git-send-email-henryc.chen@mediatek.com>
- <1437377793-31558-3-git-send-email-henryc.chen@mediatek.com>
- <20150720173153.GH11162@sirena.org.uk>
-Message-ID: <1437472339.30329.57.camel@mtksdaap41>
+From: roger.pau@citrix.com (=?UTF-8?B?Um9nZXIgUGF1IE1vbm7DqQ==?=)
+Date: Tue, 21 Jul 2015 11:54:52 +0200
+Subject: [PATCH v2 05/20] block/xen-blkfront: Split blkif_queue_request
+ in 2
+In-Reply-To: <1436474552-31789-6-git-send-email-julien.grall@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-6-git-send-email-julien.grall@citrix.com>
+Message-ID: <55AE16EC.2020204@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-07-20 at 18:31 +0100, Mark Brown wrote:
-> On Mon, Jul 20, 2015 at 03:36:33PM +0800, Henry Chen wrote:
+El 09/07/15 a les 22.42, Julien Grall ha escrit:
+> Currently, blkif_queue_request has 2 distinct execution path:
+>     - Send a discard request
+>     - Send a read/write request
 > 
-> > @@ -460,6 +460,15 @@ config REGULATOR_MT6397
-> >  	  This driver supports the control of different power rails of device
-> >  	  through regulator interface.
-> >  
-> > +config REGULATOR_MT6311
-> > +	tristate "MediaTek MT6311 PMIC"
+> The function is also allocating grants to use for generating the
+> request. Although, this is only used for read/write request.
 > 
-> Please keep these files sorted, MT6311 should be before MT6397.
+> Rather than having a function with 2 distinct execution path, separate
+> the function in 2. This will also remove one level of tabulation.
 > 
-> > +static struct mt6311_pdata *mt6311_parse_regulators_dt(
-> > +		struct device *dev)
-> > +{
-> > +	struct mt6311_pdata *pdata;
-> > +	struct device_node *node;
-> > +	int i, num, n;
-> > +
-> > +	node = of_get_child_by_name(dev->of_node, "regulators");
-> > +	if (!node) {
-> > +		dev_err(dev, "regulators node not found\n");
-> > +		return ERR_PTR(-ENODEV);
-> > +	}
-> > +
-> > +	num = of_regulator_match(dev, node, mt6311_matches,
-> > +				 ARRAY_SIZE(mt6311_matches));
-> 
-> Please convert this to use the modern method of specifying the regulator
-> DT bindings by providing of_match and regulators_node in the
-> regulator_desc so the core does the mapping for yand regulators_node in
-> the regulator_desc so the core does the mapping for yand regulators_node
-> in the regulator_desc so the core does the mapping for yand
-> regulators_node in the regulator_desc so the core does the mapping for
-> you and you can delete the DT handling code.
-> 
-> Otherwise this driver looks good.
+> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> Cc: Roger Pau Monn? <roger.pau@citrix.com>
+> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+> Cc: David Vrabel <david.vrabel@citrix.com>
 
-Ok, I will correct these on next version.
+Patch looks fine, although with so much indentation changes it's kind of
+hard to review.
 
-Thanks,
-Henry
+Acked-by: Roger Pau Monn? <roger.pau@citrix.com>
+
+Just one minor change below.
+
+[...]
+
+> @@ -595,6 +603,24 @@ static int blkif_queue_request(struct request *req)
+>  	return 0;
+>  }
+>  
+> +/*
+> + * Generate a Xen blkfront IO request from a blk layer request.  Reads
+> + * and writes are handled as expected.
+> + *
+> + * @req: a request struct
+> + */
+> +static int blkif_queue_request(struct request *req)
+> +{
+> +	struct blkfront_info *info = req->rq_disk->private_data;
+> +
+> +	if (unlikely(info->connected != BLKIF_STATE_CONNECTED))
+> +		return 1;
+> +
+> +	if (unlikely(req->cmd_flags & (REQ_DISCARD | REQ_SECURE)))
+> +		return blkif_queue_discard_req(req);
+> +	else
+> +		return blkif_queue_rw_req(req);
+
+There's no need for the else clause.
+
+Roger.
