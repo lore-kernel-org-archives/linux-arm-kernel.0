@@ -1,86 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 21 Jul 2015 18:25:42 +0200 (CEST)
-Subject: [PATCH v8 2/9] nvmem: Add a simple NVMEM framework for consumers
-In-Reply-To: <1437403403-4180-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403403-4180-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1590184041.70825.1437495942088.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 21 Jul 2015 18:28:50 +0200
+Subject: [PATCH v3 0/2] RTC support for NXP LPC18xx family
+In-Reply-To: <1436635730-15617-1-git-send-email-manabian@gmail.com>
+References: <1436635730-15617-1-git-send-email-manabian@gmail.com>
+Message-ID: <20150721162850.GE2853@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
+Hi,
 
-> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 20. Juli 2015 um
-> 16:43 geschrieben:
->
->
-> This patch adds just consumers part of the framework just to enable easy
-> review.
->
-> Up until now, nvmem drivers were stored in drivers/misc, where they all
-> had to duplicate pretty much the same code to register a sysfs file,
-> allow in-kernel users to access the content of the devices they were
-> driving, etc.
->
-> This was also a problem as far as other in-kernel users were involved,
-> since the solutions used were pretty much different from on driver to
-> another, there was a rather big abstraction leak.
->
-> This introduction of this framework aims at solving this. It also
-> introduces DT representation for consumer devices to go get the data they
-> require (MAC Addresses, SoC/Revision ID, part numbers, and so on) from
-> the nvmems.
->
-> Having regmap interface to this framework would give much better
-> abstraction for nvmems on different buses.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of the framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
-> drivers/nvmem/core.c | 415 +++++++++++++++++++++++++++++++++++++++++
-> include/linux/nvmem-consumer.h | 61 ++++++
-> 2 files changed, 476 insertions(+)
->
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index bde5528..de14c36 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> [...]
-> +struct nvmem_cell *of_nvmem_cell_get(struct device_node *np,
-> + const char *name)
-> +{
-> + struct device_node *cell_np, *nvmem_np;
-> + struct nvmem_cell *cell;
-> + struct nvmem_device *nvmem;
-> + const __be32 *addr;
-> + int rval, len, index;
-> +
-> + index = of_property_match_string(np, "nvmem-cell-names", name);
-> +
-> + cell_np = of_parse_phandle(np, "nvmem-cells", index);
-> + if (!cell_np)
-> + return ERR_PTR(-EINVAL);
-> +
-> + nvmem_np = of_get_next_parent(cell_np);
-> + if (!nvmem_np)
-> + return ERR_PTR(-EINVAL);
-> +
-> + nvmem = __nvmem_device_get(nvmem_np, NULL, NULL);
-> + if (IS_ERR(nvmem))
-> + return ERR_CAST(nvmem);
-> +
-> + addr = of_get_property(cell_np, "reg", &len);
-> + if (!addr || (len < 2 * sizeof(int))) {
+On 11/07/2015 at 19:28:48 +0200, Joachim Eastwood wrote :
+> This patch set adds support for the RTC found on many NXP devices
+> including LPC178x/18xx/408x/43xx. The RTC provides calendar and
+> clock functionality together with alarm interrupt support.
+> 
+> The driver is a rework of an old driver by Kevin Wells. It has been
+> modified to support modern resource allocation, device tree and
+> generally cleaned up. Driver was originally written to support the
+> LPC24xx platform but since this platform isn't upstream support has
+> been removed. The LPC24xx name is still kept to preserve the origin
+> of this hardware block.
+> 
+> Been a while since the last version, but this version should address
+> all comments from Josh and Alexandre on v2. There has also been some
+> rework from my side. Please have a look.
+> 
+> changes since v2:
+>  - rework hw init
+>  - update Kconfig text
+>  - remove unused registers defines
+>  - misc clean ups
+>  - rebase on 4.2-rc1
+> 
+> changes since v1:
+>  - s/lpc2k/lpc24xx for better consistency
+>  - fix Kconfig entry
+>  - drop support for old versions for the ip block
+> 
+> Patch set is based on Linux v4.2-rc1.
+> 
+> Joachim Eastwood (2):
+>   rtc: add rtc-lpc24xx driver
+>   doc: dt: add documentation for nxp,lpc1788-rtc
+> 
 
-I'm not sure, but shouldn't be sizeof(u32) more portable?
+Applied both after adding a proper commit log to the second patch,
+reordering to avoid a checkpatch warning and fixing the typo in kevin's
+mail address.
 
-> [...]
-> +
-> + addr = of_get_property(cell_np, "bits", &len);
-> + if (addr && len == (2 * sizeof(int))) {
 
-dito
-
-Regards
-Stefan
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
