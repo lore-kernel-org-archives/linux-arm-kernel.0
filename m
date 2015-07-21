@@ -1,75 +1,46 @@
 From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Tue, 21 Jul 2015 16:45:43 +0530
-Subject: [PATCH 4/5] regulator: 88pm800: Add 88pm860 regulator support
-In-Reply-To: <20150721092148.GI3061@x1>
-References: <1437070618-21330-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437070618-21330-5-git-send-email-vaibhav.hiremath@linaro.org>
- <20150716213429.GE1602@sirena.org.uk> <55A895AC.8070101@linaro.org>
- <20150717111733.GL11162@sirena.org.uk> <55A8F859.2090204@linaro.org>
- <20150720073011.GA3061@x1> <55ACE2FC.2090801@linaro.org>
- <20150721092148.GI3061@x1>
-Message-ID: <55AE29DF.10102@linaro.org>
+Date: Tue, 21 Jul 2015 16:36:59 +0530
+Subject: [PATCH 0/4] clk: 88pm800: Add new clk provider driver for 88PM800 MFD
+Message-ID: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+88PM800 family of devices provides multiple buffered 32.768 KHz clock
+output.
+88PM800 : CLK32k_1, CLK32k_2 and CLK32k_3
+88PM860 : CLK32k_1 and CLK32k_2
+
+This patch-series adds new clock provider driver for enabling/disabling
+buffered 32Khz clock output from 88PM800 family of device. Adds clock device to
+MFD and updates the binding documentation.
+
+The PATCH [1/4], created separately, as it would be easy between maintainers to
+queue it.
 
 
-On Tuesday 21 July 2015 02:51 PM, Lee Jones wrote:
-> On Mon, 20 Jul 2015, Vaibhav Hiremath wrote:
->
->>
->>
->> On Monday 20 July 2015 01:00 PM, Lee Jones wrote:
->>> On Fri, 17 Jul 2015, Vaibhav Hiremath wrote:
->>>
->>>>
->>>>
->>>> On Friday 17 July 2015 04:47 PM, Mark Brown wrote:
->>>>> On Fri, Jul 17, 2015 at 11:12:04AM +0530, Vaibhav Hiremath wrote:
->>>>>
->>>>>> Can you merge this into regulator tree?
->>>>>
->>>>>> Link to MFD - https://lkml.org/lkml/2015/7/16/704
->>>>>
->>>>> I need a tag I can pull from Lee.
->>>>>
->>>> Great.
->>>>
->>>> Lee,
->>>> It would be helpful, if you could ack below patch,
->>>>
->>>> https://lkml.org/lkml/2015/7/16/704
->>>
->>> These patches are yet to be reviewed.  I will unmark those patches as
->>> important (meaning they will not be reviewed during this iteration).
->>> Please resubmit a single patch-set containing all of the
->>> dependencies and Mark and I will work it out between us.
->>>
->>
->> Ok,
->>
->> I have just sent single patch, which has dependency on regulator
->> changes. Please review, ack and queue up.
->
-> A little presumptuous, don't you think? ;)
->
->> [PATCH-v3] mfd: 88pm80x: Add 88pm860 chip type support
->> https://patchwork.kernel.org/patch/6826531/
->
-> So nothing depends on this anymore, right?
->
+Note that, I have access to only 88PM800 and 88PM860 datasheet,
+so enabling support for only above two devices.
 
-No, regulato patch depends on this.
-Mark needs your tag in order to take above patch through regulator tree.
+Testing:
+  - Boot tested on 88PM860 based platform
+  - Clock enable/disable
+  - Non PM860, to make sure that it won't lead to any issues
 
 
-Just to clarify more,
+Vaibhav Hiremath (4):
+  mfd: 88pm800: Update the header file with 32K clk related macros
+  mfd: devicetree: bindings: Add clock subdevice node information
+  clk: 88pm800: Add clk provider driver for 88pm800 family of devices
+  mfd: 88pm800: Add support for clk subdevice
 
-I have regulator patch which adds support for 88PM860
-https://lkml.org/lkml/2015/7/16/719
+ Documentation/devicetree/bindings/mfd/88pm800.txt |  28 ++
+ drivers/clk/Kconfig                               |   8 +
+ drivers/clk/Makefile                              |   1 +
+ drivers/clk/clk-88pm800.c                         | 345 ++++++++++++++++++++++
+ drivers/mfd/88pm800.c                             |  25 ++
+ include/linux/mfd/88pm80x.h                       |  12 +
+ 6 files changed, 419 insertions(+)
+ create mode 100644 drivers/clk/clk-88pm800.c
 
-which depends on above patch
-https://patchwork.kernel.org/patch/6826531/
-
-Thanks,
-Vaibhav
+-- 
+1.9.1
