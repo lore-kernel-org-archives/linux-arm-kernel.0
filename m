@@ -1,108 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 21 Jul 2015 12:33:40 +0100
-Subject: [PATCH v3 1/1] dt: cpufreq: st: Provide bindings for ST's CPUFreq
- implementation
-Message-ID: <1437478420-26419-1-git-send-email-lee.jones@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jul 2015 12:37:05 +0100
+Subject: [PATCH v2 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <55AE1F30.6020803@arm.com>
+References: <1437154221-5736-1-git-send-email-james.morse@arm.com>
+ <1437154221-5736-7-git-send-email-james.morse@arm.com>
+ <55AE1F30.6020803@arm.com>
+Message-ID: <20150721113705.GD7250@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: devicetree at vger.kernel.org
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
+On Tue, Jul 21, 2015 at 11:30:08AM +0100, Suzuki K. Poulose wrote:
+> On 17/07/15 18:30, James Morse wrote:
+> >diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+> >index 56391fbae1e1..f243bb1adaa5 100644
+> >--- a/arch/arm64/include/asm/sysreg.h
+> >+++ b/arch/arm64/include/asm/sysreg.h
+> >@@ -20,12 +20,21 @@
+> >  #ifndef __ASM_SYSREG_H
+> >  #define __ASM_SYSREG_H
+> >
+> >+#include <asm/opcodes.h>
+> >+
+> >  #define SCTLR_EL1_CP15BEN      (0x1 << 5)
+> >  #define SCTLR_EL1_SED          (0x1 << 8)
+> >
+> >  #define sys_reg(op0, op1, crn, crm, op2) \
+> >         ((((op0)-2)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+> >
+> >+#define REG_PSTATE_PAN_IMM                     sys_reg(2, 0, 4, 0, 4)
+> 
+> I think the above encoding is incorrect (even though, the code works fine).
+> While setting the PAN with an immediate value, the PAN is treated just like
+> a Process state field and the encoding becomes:
+>  Op0=0, Op1=0 ...
+> The encoding 2,0 ,... works fine in this case due to a bug in the sys_reg()
+> macro above, where op0 is encoded as (op0 - 2). I took a look at the ARMv8 ARM,
+> section C5.2.{3, 4, 5, 6} and the system instruction class reserves bits[20-19] for Op0.
+> I think we should fix that first and use the appropriate encoding mandated by the
+> architecture to avoid further errors.
 
-Only submitting the binding document as requested by Viresh.
+The sys_reg() was initially meant for MSR/MRS with a register operand
+where op0 is encoded as a single bit (19) and bit 20 is always 1. But
+looking at the overall encoding for MSR/MRS in the ARMv8 ARM, I'm happy
+to make the sys_reg macro more generic with ((op0 & 3) << 19) together
+with changing the 0xd51/0xd53 values in the mrs_s/msr_s macros. Maybe
+with a comment as well on the encoding of op0 (I guess you'll post a
+patch since you started it ;)).
 
-v2 => v3:
- - Using OPP v2
- - Moved OPPs out of the CPU node into their own one
- - Using generic 'opp-hz' property
-
- .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 77 ++++++++++++++++++++++
- 1 file changed, 77 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-
-diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-new file mode 100644
-index 0000000..a478eec
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-@@ -0,0 +1,77 @@
-+Binding for ST's CPUFreq driver
-+===============================
-+
-+Required properties [for working voltage scaling]:
-+-------------------------------------------------
-+
-+Located in CPU's node:
-+
-+- st,syscfg		: Phandle to Major number register
-+				First cell: offset to major number
-+- st,syscfg-eng		: Phandle to Minor number and Pcode registers
-+				First cell: offset to process code
-+				Second cell: offset to minor number
-+
-+Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
-+
-+ - opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
-+  - opp-hz		: CPU frequency [Hz] for this OPP
-+  - st,avs		: List of available voltages [uV] indexed by process code
-+  - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
-+  - st,substrate	: Substrate version this OPP is suitable for [0xFF means ALL]
-+
-+WARNING: The cpu0-opp-list will be provided by the bootloader.  Do not attempt to
-+	 artificially synthesise the cpu0-opp-list node or any of its descendants.
-+	 They are very platform specific and may damage the hardware if created
-+	 incorrectly.
-+
-+Required properties [if voltage scaling properties are missing]:
-+-------------------------------------------------------------------
-+
-+Located in CPU's node:
-+
-+- operating-points	: [See: ../power/opp.txt]
-+
-+Example [safe]:
-+--------------
-+
-+cpus {
-+	cpu at 0 {
-+				 /* kHz     uV   */
-+		operating-points = <1500000 0
-+				    1200000 0
-+				    800000  0
-+				    500000  0>;
-+	};
-+};
-+
-+Example [unsafe]:
-+----------------
-+
-+cpus {
-+	cpu at 0 {
-+		st,syscfg		= <&syscfg [major_offset]>;
-+		st,syscfg-eng   	= <&syscfg_eng [pcode_offset] [minor_offset]>;
-+		operating-points-v2	= <&cpu0_opp_list>;
-+	};
-+};
-+
-+/* ############################################################ */
-+/* # WARNING: Do not attempt to copy/replicate this node,     # */
-+/* #          it is only to be supplied by the bootloader !!! # */
-+/* ############################################################ */
-+cpu0-opp-list {
-+	compatible = "operating-points-v2-sti";
-+	opp0 {
-+		opp-hz		= <1200000000>;
-+		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
-+		st,substrate	= <0xff>;
-+		st,cuts		= <0xff>;
-+	};
-+	opp1 {
-+		opp-hz		= <1500000000>;
-+		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
-+		st,substrate	= <0xff>;
-+		st,cuts		= <0x2>;
-+	};
-+};
 -- 
-1.9.1
+Catalin
