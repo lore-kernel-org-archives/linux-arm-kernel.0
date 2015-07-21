@@ -1,112 +1,102 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 21 Jul 2015 15:50:55 +0200
-Subject: [RFC PATCH 13/16] tegra-sor: Use devm_resource
+Date: Tue, 21 Jul 2015 15:50:58 +0200
+Subject: [RFC PATCH 16/16] fixed-regulator: Use devm_resource
 In-Reply-To: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1437486658-28365-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1437486658-28365-14-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1437486658-28365-17-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
- drivers/gpu/drm/tegra/sor.c | 60 ++++++++++++---------------------------------
- 1 file changed, 15 insertions(+), 45 deletions(-)
+ drivers/regulator/fixed.c | 33 +++++++++++----------------------
+ 1 file changed, 11 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/gpu/drm/tegra/sor.c b/drivers/gpu/drm/tegra/sor.c
-index 7591d8901f9a..ec540ecda601 100644
---- a/drivers/gpu/drm/tegra/sor.c
-+++ b/drivers/gpu/drm/tegra/sor.c
-@@ -1579,55 +1579,13 @@ static const struct host1x_client_ops sor_client_ops = {
+diff --git a/drivers/regulator/fixed.c b/drivers/regulator/fixed.c
+index ff62d69ba0be..4ece78c1260d 100644
+--- a/drivers/regulator/fixed.c
++++ b/drivers/regulator/fixed.c
+@@ -34,6 +34,7 @@
+ struct fixed_voltage_data {
+ 	struct regulator_desc desc;
+ 	struct regulator_dev *dev;
++	struct gpio_desc *gpio;
+ };
  
- static int tegra_sor_probe(struct platform_device *pdev)
+ 
+@@ -78,20 +79,6 @@ of_get_fixed_voltage_config(struct device *dev,
+ 	if (init_data->constraints.boot_on)
+ 		config->enabled_at_boot = true;
+ 
+-	config->gpio = of_get_named_gpio(np, "gpio", 0);
+-	/*
+-	 * of_get_named_gpio() currently returns ENODEV rather than
+-	 * EPROBE_DEFER. This code attempts to be compatible with both
+-	 * for now; the ENODEV check can be removed once the API is fixed.
+-	 * of_get_named_gpio() doesn't differentiate between a missing
+-	 * property (which would be fine here, since the GPIO is optional)
+-	 * and some other error. Patches have been posted for both issues.
+-	 * Once they are check in, we should replace this with:
+-	 * if (config->gpio < 0 && config->gpio != -ENOENT)
+-	 */
+-	if ((config->gpio == -ENODEV) || (config->gpio == -EPROBE_DEFER))
+-		return ERR_PTR(-EPROBE_DEFER);
+-
+ 	of_property_read_u32(np, "startup-delay-us", &config->startup_delay);
+ 
+ 	config->enable_high = of_property_read_bool(np, "enable-active-high");
+@@ -110,20 +97,17 @@ static struct regulator_ops fixed_voltage_ops = {
+ static int reg_fixed_voltage_probe(struct platform_device *pdev)
  {
--	struct device_node *np;
- 	struct tegra_sor *sor;
--	struct resource *regs;
- 	int err;
+ 	struct fixed_voltage_config *config;
+-	struct fixed_voltage_data *drvdata;
++	struct fixed_voltage_data *drvdata = platform_get_drvdata(pdev);
+ 	struct regulator_config cfg = { };
+ 	int ret;
  
--	sor = devm_kzalloc(&pdev->dev, sizeof(*sor), GFP_KERNEL);
--	if (!sor)
+-	drvdata = devm_kzalloc(&pdev->dev, sizeof(struct fixed_voltage_data),
+-			       GFP_KERNEL);
+-	if (!drvdata)
 -		return -ENOMEM;
-+	sor = platform_get_drvdata(pdev);
- 
- 	sor->output.dev = sor->dev = &pdev->dev;
- 
--	np = of_parse_phandle(pdev->dev.of_node, "nvidia,dpaux", 0);
--	if (np) {
--		sor->dpaux = tegra_dpaux_find_by_of_node(np);
--		of_node_put(np);
 -
--		if (!sor->dpaux)
--			return -EPROBE_DEFER;
--	}
--
--	err = tegra_output_probe(&sor->output);
--	if (err < 0)
--		return err;
--
--	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	sor->regs = devm_ioremap_resource(&pdev->dev, regs);
--	if (IS_ERR(sor->regs))
--		return PTR_ERR(sor->regs);
--
--	sor->rst = devm_reset_control_get(&pdev->dev, "sor");
--	if (IS_ERR(sor->rst))
--		return PTR_ERR(sor->rst);
--
--	sor->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(sor->clk))
--		return PTR_ERR(sor->clk);
--
--	sor->clk_parent = devm_clk_get(&pdev->dev, "parent");
--	if (IS_ERR(sor->clk_parent))
--		return PTR_ERR(sor->clk_parent);
--
--	sor->clk_safe = devm_clk_get(&pdev->dev, "safe");
--	if (IS_ERR(sor->clk_safe))
--		return PTR_ERR(sor->clk_safe);
--
--	sor->clk_dp = devm_clk_get(&pdev->dev, "dp");
--	if (IS_ERR(sor->clk_dp))
--		return PTR_ERR(sor->clk_dp);
--
- 	INIT_LIST_HEAD(&sor->client.list);
- 	sor->client.ops = &sor_client_ops;
- 	sor->client.dev = &pdev->dev;
-@@ -1641,8 +1599,6 @@ static int tegra_sor_probe(struct platform_device *pdev)
- 		return err;
+ 	if (pdev->dev.of_node) {
+ 		config = of_get_fixed_voltage_config(&pdev->dev,
+ 						     &drvdata->desc);
+ 		if (IS_ERR(config))
+ 			return PTR_ERR(config);
++
++		config->gpio = desc_to_gpio(drvdata->gpio);
+ 	} else {
+ 		config = dev_get_platdata(&pdev->dev);
+ 	}
+@@ -193,8 +177,6 @@ static int reg_fixed_voltage_probe(struct platform_device *pdev)
+ 		return ret;
  	}
  
--	platform_set_drvdata(pdev, sor);
+-	platform_set_drvdata(pdev, drvdata);
 -
- 	return 0;
- }
+ 	dev_dbg(&pdev->dev, "%s supplying %duV\n", drvdata->desc.name,
+ 		drvdata->desc.fixed_uV);
  
-@@ -1669,10 +1625,24 @@ static const struct of_device_id tegra_sor_of_match[] = {
- };
- MODULE_DEVICE_TABLE(of, tegra_sor_of_match);
+@@ -209,11 +191,18 @@ static const struct of_device_id fixed_of_match[] = {
+ MODULE_DEVICE_TABLE(of, fixed_of_match);
+ #endif
  
-+static const struct devm_resource tegra_sor_resources[] = {
-+	DEVM_ALLOC(tegra_sor),
-+	DEVM_TEGRA_DPAUX(tegra_sor, dpaux, "nvidia,dpaux"),
-+	DEVM_TEGRA_OUTPUT(tegra_sor, output),
-+	DEVM_IOMAP(tegra_sor, regs, 0, 0),
-+	DEVM_RESET(tegra_sor, rst, "sor"),
-+	DEVM_CLOCK(tegra_sor, clk, NULL),
-+	DEVM_CLOCK(tegra_sor, clk_parent, "parent"),
-+	DEVM_CLOCK(tegra_sor, clk_safe, "safe"),
-+	DEVM_CLOCK(tegra_sor, clk_dp, "dp"),
++static const struct devm_resource reg_fixed_resources[] = {
++	DEVM_ALLOC(fixed_voltage_data),
++	DEVM_GPIO_NAMED(fixed_voltage_data, gpio, NULL),
 +	{},
 +};
 +
- struct platform_driver tegra_sor_driver = {
- 	.driver = {
- 		.name = "tegra-sor",
- 		.of_match_table = tegra_sor_of_match,
-+		.resources = tegra_sor_resources,
+ static struct platform_driver regulator_fixed_voltage_driver = {
+ 	.probe		= reg_fixed_voltage_probe,
+ 	.driver		= {
+ 		.name		= "reg-fixed-voltage",
+ 		.of_match_table = of_match_ptr(fixed_of_match),
++		.resources = reg_fixed_resources,
  	},
- 	.probe = tegra_sor_probe,
- 	.remove = tegra_sor_remove,
+ };
+ 
 -- 
 2.4.3
