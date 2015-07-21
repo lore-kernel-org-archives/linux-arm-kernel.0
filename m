@@ -1,116 +1,113 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Tue, 21 Jul 2015 14:14:13 +0200
-Subject: [PATCH V2 net 2/3] ARM: net: handle negative offsets in BPF JIT.
-In-Reply-To: <1437480854-22684-1-git-send-email-nschichan@freebox.fr>
-References: <1437480854-22684-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1437480854-22684-3-git-send-email-nschichan@freebox.fr>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 21 Jul 2015 14:15:51 +0200
+Subject: [PATCH v2] mmc: sunxi: Don't start commands while the card is busy
+In-Reply-To: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+References: <1436541284-11800-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAPDyKFoNe0bghfSXs48stHzZToTc7Hjd5gVPy-VbDF8bzdVVMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previously, the JIT would reject negative offsets known during code
-generation and mishandle negative offsets provided at runtime.
+On 10 July 2015 at 17:14, Hans de Goede <hdegoede@redhat.com> wrote:
+> Some sdio wifi modules have not been working reliable with the sunxi-mmc
+> host code. This turns out to be caused by it starting new commands while
+> the card signals that it is still busy processing a previous command.
 
-Fix that by calling bpf_internal_load_pointer_neg_helper()
-appropriately in the jit_get_skb_{b,h,w} slow path helpers and by forcing
-the execution flow to the slow path helpers when the offset is
-negative.
+Which are those commands? Or more interesting, which response types do
+these commands expect?
+I don't think this is a sunxi specific issue, I have seen similar
+issues for other host controllers.
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 47 ++++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 38 insertions(+), 9 deletions(-)
+I am thinking that perhaps this should be managed by the mmc core
+instead of local hacks to sunxi. Potentially we could make the core to
+invoke the already existing host_ops->card_busy() callback when
+needed...
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 21f5ace..d9b2524 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -74,32 +74,52 @@ struct jit_ctx {
- 
- int bpf_jit_enable __read_mostly;
- 
--static u64 jit_get_skb_b(struct sk_buff *skb, unsigned offset)
-+static inline int call_neg_helper(struct sk_buff *skb, int offset, void *ret,
-+		      unsigned int size)
-+{
-+	void *ptr = bpf_internal_load_pointer_neg_helper(skb, offset, size);
-+
-+	if (!ptr)
-+		return -EFAULT;
-+	memcpy(ret, ptr, size);
-+	return 0;
-+}
-+
-+static u64 jit_get_skb_b(struct sk_buff *skb, int offset)
- {
- 	u8 ret;
- 	int err;
- 
--	err = skb_copy_bits(skb, offset, &ret, 1);
-+	if (offset < 0)
-+		err = call_neg_helper(skb, offset, &ret, 1);
-+	else
-+		err = skb_copy_bits(skb, offset, &ret, 1);
- 
- 	return (u64)err << 32 | ret;
- }
- 
--static u64 jit_get_skb_h(struct sk_buff *skb, unsigned offset)
-+static u64 jit_get_skb_h(struct sk_buff *skb, int offset)
- {
- 	u16 ret;
- 	int err;
- 
--	err = skb_copy_bits(skb, offset, &ret, 2);
-+	if (offset < 0)
-+		err = call_neg_helper(skb, offset, &ret, 2);
-+	else
-+		err = skb_copy_bits(skb, offset, &ret, 2);
- 
- 	return (u64)err << 32 | ntohs(ret);
- }
- 
--static u64 jit_get_skb_w(struct sk_buff *skb, unsigned offset)
-+static u64 jit_get_skb_w(struct sk_buff *skb, int offset)
- {
- 	u32 ret;
- 	int err;
- 
--	err = skb_copy_bits(skb, offset, &ret, 4);
-+	if (offset < 0)
-+		err = call_neg_helper(skb, offset, &ret, 4);
-+	else
-+		err = skb_copy_bits(skb, offset, &ret, 4);
- 
- 	return (u64)err << 32 | ntohl(ret);
- }
-@@ -536,9 +556,6 @@ static int build_body(struct jit_ctx *ctx)
- 		case BPF_LD | BPF_B | BPF_ABS:
- 			load_order = 0;
- load:
--			/* the interpreter will deal with the negative K */
--			if ((int)k < 0)
--				return -ENOTSUPP;
- 			emit_mov_i(r_off, k, ctx);
- load_common:
- 			ctx->seen |= SEEN_DATA | SEEN_CALL;
-@@ -553,6 +570,18 @@ load_common:
- 				condt = ARM_COND_HI;
- 			}
- 
-+			/*
-+			 * test for negative offset, only if we are
-+			 * currently scheduled to take the fast
-+			 * path. this will update the flags so that
-+			 * the slowpath instruction are ignored if the
-+			 * offset is negative.
-+			 *
-+			 * for loard_order == 0 the HI condition will
-+			 * make loads at offset 0 take the slow path too.
-+			 */
-+			_emit(condt, ARM_CMP_I(r_off, 0), ctx);
-+
- 			_emit(condt, ARM_ADD_R(r_scratch, r_off, r_skb_data),
- 			      ctx);
- 
--- 
-1.9.1
+Within this context, could I ask whether you controller supports IRQ
+based HW-busy detection? Or you need polling of the status register?
+
+>
+> This commit fixes this, thereby fixing the wifi reliability issues on
+> the Cubietruck and other sunxi boards using sdio wifi.
+>
+> Reported-by: Eugene K <sigintmailru@gmail.com>
+> Suggested-by: Eugene K <sigintmailru@gmail.com>
+> Cc: Eugene K <sigintmailru@gmail.com>
+> Cc: Arend van Spriel <arend@broadcom.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Properly accredit Eugene K for coming up with the fix for this
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 4d3e1ff..daa90b7 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -289,6 +289,24 @@ static int sunxi_mmc_init_host(struct mmc_host *mmc)
+>         return 0;
+>  }
+>
+> +/* Wait for card to report ready before starting a new cmd */
+> +static int sunxi_mmc_wait_card_ready(struct sunxi_mmc_host *host)
+> +{
+> +       unsigned long expire = jiffies + msecs_to_jiffies(500);
+> +       u32 rval;
+> +
+> +       do {
+> +               rval = mmc_readl(host, REG_STAS);
+> +       } while (time_before(jiffies, expire) && (rval & SDXC_CARD_DATA_BUSY));
+> +
+> +       if (rval & SDXC_CARD_DATA_BUSY) {
+> +               dev_err(mmc_dev(host->mmc), "Error R1 ready timeout\n");
+> +               return -EIO;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static void sunxi_mmc_init_idma_des(struct sunxi_mmc_host *host,
+>                                     struct mmc_data *data)
+>  {
+> @@ -383,6 +401,8 @@ static void sunxi_mmc_send_manual_stop(struct sunxi_mmc_host *host,
+>         u32 arg, cmd_val, ri;
+>         unsigned long expire = jiffies + msecs_to_jiffies(1000);
+>
+> +       sunxi_mmc_wait_card_ready(host);
+> +
+>         cmd_val = SDXC_START | SDXC_RESP_EXPIRE |
+>                   SDXC_STOP_ABORT_CMD | SDXC_CHECK_RESPONSE_CRC;
+>
+> @@ -597,6 +617,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>  {
+>         unsigned long expire = jiffies + msecs_to_jiffies(250);
+>         u32 rval;
+> +       int ret;
+> +
+> +       ret = sunxi_mmc_wait_card_ready(host);
+> +       if (ret)
+> +               return ret;
+>
+>         rval = mmc_readl(host, REG_CLKCR);
+>         rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
+> @@ -785,6 +810,13 @@ static void sunxi_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
+>                 return;
+>         }
+>
+> +       ret = sunxi_mmc_wait_card_ready(host);
+> +       if (ret) {
+> +               mrq->cmd->error = ret;
+> +               mmc_request_done(mmc, mrq);
+> +               return;
+> +       }
+> +
+>         if (data) {
+>                 ret = sunxi_mmc_map_dma(host, data);
+>                 if (ret < 0) {
+> --
+> 2.4.3
+>
+
+Kind regards
+Uffe
