@@ -1,73 +1,161 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 21 Jul 2015 13:44:41 -0700
-Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and
- munlockall system calls
-In-Reply-To: <1437508781-28655-3-git-send-email-emunson@akamai.com>
-References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
- <1437508781-28655-3-git-send-email-emunson@akamai.com>
-Message-ID: <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 21 Jul 2015 13:50:28 -0700
+Subject: [PATCH v3 1/4] PCI: iproc: enable arm64 support for iProc PCIe
+In-Reply-To: <20150721203018.GH21967@google.com>
+References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
+ <1437021563-29139-2-git-send-email-rjui@broadcom.com>
+ <20150721203018.GH21967@google.com>
+Message-ID: <55AEB094.1090601@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015 15:59:37 -0400 Eric B Munson <emunson@akamai.com> wrote:
 
-> With the refactored mlock code, introduce new system calls for mlock,
-> munlock, and munlockall.  The new calls will allow the user to specify
-> what lock states are being added or cleared.  mlock2 and munlock2 are
-> trivial at the moment, but a follow on patch will add a new mlock state
-> making them useful.
+
+On 7/21/2015 1:30 PM, Bjorn Helgaas wrote:
+> On Wed, Jul 15, 2015 at 09:39:20PM -0700, Ray Jui wrote:
+>> This patch enables arm64 support to the iProc PCIe driver
 > 
-> munlock2 addresses a limitation of the current implementation.  If a
-> user calls mlockall(MCL_CURRENT | MCL_FUTURE) and then later decides
-> that MCL_FUTURE should be removed, they would have to call munlockall()
-> followed by mlockall(MCL_CURRENT) which could potentially be very
-> expensive.  The new munlockall2 system call allows a user to simply
-> clear the MCL_FUTURE flag.
+> This needs a little more explanation: ARM has a common struct pci_sys_data
+> but ARM64 does not,
 
-This is hard.  Maybe we shouldn't have wired up anything other than
-x86.  That's what we usually do with new syscalls.
+Correct, and according to Arnd, there's already work in process of
+removing the need for pci_sys_data on arm32. Before that is done, we
+need this in the driver for it to work on both arm32 and arm64.
 
-You appear to have missed
-mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix.patch:
+and ARM needs pci_fixup_irqs() but ARM64 does not (why
+> not?),
 
---- a/arch/arm64/include/asm/unistd.h~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix
-+++ a/arch/arm64/include/asm/unistd.h
-@@ -44,7 +44,7 @@
- #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
- #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
- 
--#define __NR_compat_syscalls		388
-+#define __NR_compat_syscalls		391
- #endif
- 
- #define __ARCH_WANT_SYS_CLONE
+under arch/arm64/kernel/pci.c:
 
+ 41 /*
+ 42  * Try to assign the IRQ number from DT when adding a new device
+ 43  */
+ 44 int pcibios_add_device(struct pci_dev *dev)
+ 45 {
+ 46         dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+ 47
+ 48         return 0;
+ 49 }
 
-And mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2.patch:
+interrupt is automatically parsed and mapped when adding a new device
+for arm64.
 
+ARM uses the common pci_sys_data for the PCI sysdata while ARM64
+> uses a driver-specific sysdata, etc.
+> 
 
-From: Heiko Carstens <heiko.carstens@de.ibm.com>
-Subject: mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2
+Correct. pci_sys_data for arm32 will eventually be removed, so all arm32
+based PCie host should only need to carry driver specific sysdata.
 
-can we just remove the s390 bits which cause the breakage?
-I will wire up the syscalls as soon as the patch set gets merged.
+>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>> ---
+>>  drivers/pci/host/pcie-iproc.c |   15 ++++-----------
+>>  drivers/pci/host/pcie-iproc.h |    8 ++++++--
+>>  2 files changed, 10 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+>> index d77481e..8a556d5 100644
+>> --- a/drivers/pci/host/pcie-iproc.c
+>> +++ b/drivers/pci/host/pcie-iproc.c
+>> @@ -58,11 +58,6 @@
+>>  #define SYS_RC_INTX_EN               0x330
+>>  #define SYS_RC_INTX_MASK             0xf
+>>  
+>> -static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
+>> -{
+>> -	return sys->private_data;
+>> -}
+>> -
+>>  /**
+>>   * Note access to the configuration registers are protected at the higher layer
+>>   * by 'pci_lock' in drivers/pci/access.c
+>> @@ -71,8 +66,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
+>>  					    unsigned int devfn,
+>>  					    int where)
+>>  {
+>> -	struct pci_sys_data *sys = bus->sysdata;
+>> -	struct iproc_pcie *pcie = sys_to_pcie(sys);
+>> +	struct iproc_pcie *pcie = bus->sysdata;
+>>  	unsigned slot = PCI_SLOT(devfn);
+>>  	unsigned fn = PCI_FUNC(devfn);
+>>  	unsigned busno = bus->number;
+>> @@ -208,10 +202,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>  
+>>  	iproc_pcie_reset(pcie);
+>>  
+>> -	pcie->sysdata.private_data = pcie;
+>> -
+>> -	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+>> -				  &pcie->sysdata, res);
+>> +	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, pcie, res);
+>>  	if (!bus) {
+>>  		dev_err(pcie->dev, "unable to create PCI root bus\n");
+>>  		ret = -ENOMEM;
+>> @@ -229,7 +220,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+>>  
+>>  	pci_scan_child_bus(bus);
+>>  	pci_assign_unassigned_bus_resources(bus);
+>> +#ifdef CONFIG_ARM
+>>  	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
+>> +#endif
+>>  	pci_bus_add_devices(bus);
+>>  
+>>  	return 0;
+>> diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+>> index ba0a108..0ee9673 100644
+>> --- a/drivers/pci/host/pcie-iproc.h
+>> +++ b/drivers/pci/host/pcie-iproc.h
+>> @@ -18,18 +18,22 @@
+>>  
+>>  /**
+>>   * iProc PCIe device
+>> + * @sysdata: Per PCI controller data. This needs to be kept at the beginning of
+>> + * struct iproc_pcie, to enable support of both ARM32 and ARM64 platforms with
+>> + * minimal changes in the iProc PCIe core driver
+>>   * @dev: pointer to device data structure
+>>   * @base: PCIe host controller I/O register base
+>>   * @resources: linked list of all PCI resources
+>> - * @sysdata: Per PCI controller data
+>>   * @root_bus: pointer to root bus
+>>   * @phy: optional PHY device that controls the Serdes
+>>   * @irqs: interrupt IDs
+>>   */
+>>  struct iproc_pcie {
+>> +#ifdef CONFIG_ARM
+>> +	struct pci_sys_data sysdata;
+>> +#endif
+> 
+> I'm OK with adding #ifdefs to make this work on both ARM and ARM64.  We can
+> at least see the ifdefs and know what needs to be fixed.  I'm a little more
+> hesitant about adding code that depends on the position of sysdata within
+> struct iproc_pcie.  I'd rather have something ugly and robust that cries
+> out for fixing than something minimal and fragile.
+> 
 
-Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Eric B Munson <emunson@akamai.com>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
----
+Yes that was my original code and that was a bit ugly. Arnd proposed
+this and it does indeed make the look a lot cleaner. But yeah, it now
+depends on the location of struct pci_sys_data in memory and I see your
+concern. In fact, I asked exactly the same question to Arnd.
 
- arch/s390/kernel/syscalls.S |    3 ---
- 1 file changed, 3 deletions(-)
+Are you okay with living with this for a little while until struct
+pci_sys_data is eventually removed from arm32?
 
-diff -puN arch/s390/kernel/syscalls.S~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2 arch/s390/kernel/syscalls.S
---- a/arch/s390/kernel/syscalls.S~mm-mlock-add-new-mlock-munlock-and-munlockall-system-calls-fix-2
-+++ a/arch/s390/kernel/syscalls.S
-@@ -363,6 +363,3 @@ SYSCALL(sys_bpf,compat_sys_bpf)
- SYSCALL(sys_s390_pci_mmio_write,compat_sys_s390_pci_mmio_write)
- SYSCALL(sys_s390_pci_mmio_read,compat_sys_s390_pci_mmio_read)
- SYSCALL(sys_execveat,compat_sys_execveat)
--SYSCALL(sys_mlock2,compat_sys_mlock2)			/* 355 */
--SYSCALL(sys_munlock2,compat_sys_munlock2)
--SYSCALL(sys_munlockall2,compat_sys_munlockall2)
+> I see that your v1 patch added #ifdef CONFIG_ARM around sysdata at its
+> original location below, and you mentioned that you took Arnd's advice to
+> move sysdata to the beginning of the structure, but I don't see Arnd's
+> email on the list.
+> 
+
+Sorry maybe you need to elaborate here. Am I supposed to add Arnd's name
+in the commit message? Other than that, Arnd is on this email thread.
+
+>>  	struct device *dev;
+>>  	void __iomem *base;
+>> -	struct pci_sys_data sysdata;
+>>  	struct pci_bus *root_bus;
+>>  	struct phy *phy;
+>>  	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
+>> -- 
+>> 1.7.9.5
+>>
