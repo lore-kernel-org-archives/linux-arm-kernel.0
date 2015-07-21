@@ -1,55 +1,38 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 21 Jul 2015 09:31:11 +0200
-Subject: [PATCH] thermal: consistently use int for temperatures
-In-Reply-To: <9hhd1zrc9yb.fsf@e105922-lin.cambridge.arm.com>
-References: <1436167189-29835-1-git-send-email-s.hauer@pengutronix.de>
- <9hhd1zrc9yb.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20150721073111.GH5161@pengutronix.de>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 21 Jul 2015 15:30:28 +0800
+Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
+Message-ID: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Punit,
+Changelog:
+v2 -> v3:
+1. add support for pci device hotplug, which missed in patch v2.
+2. only support #iommu-cells = <1>, add corresponding description in arm,smmu-v3.txt.
+3. add function find_smmu_by_device which extracted from find_smmu_by_node, to resolve
+   the problem mentioned by Robin Murphy in [PATCH v2 7/9].
+   Additionally:
+   +    platform_set_drvdata(pdev, smmu);       //Patch v2
+   +	dev->archdata.iommu = smmu;             //Patch v3, dev = &pdev->dev
 
-On Fri, Jul 17, 2015 at 12:14:36PM +0100, Punit Agrawal wrote:
-> Hi Sascha,
-> 
-> Sascha Hauer <s.hauer@pengutronix.de> writes:
-> 
-> > The thermal code uses int, long and unsigned long for temperatures
-> > in different places.
-> >
-> > Using an unsigned type limits the thermal framework to positive
-> > temperatures without need. Also several drivers currently will report
-> > temperatures near UINT_MAX for temperatures below 0?C. This will probably
-> > immediately shut the machine down due to overtemperature if started below
-> > 0?C.
-> >
-> > 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
-> > is above the melting point of all known materials.
-> >
-> > Consistently use a plain 'int' for temperatures throughout the thermal code and
-> > the drivers. This only changes the places in the drivers where the temperature
-> > is passed around as pointer, when drivers internally use another type this is
-> > not changed.
-> >
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Thanks for moving over the thermal sub-system in Linux to consistently
-> use a single type.
-> 
-> In your patch, you missed migrating over power_allocator governor and
-> it's associated trace events. It got merged for v4.2.
-> 
-> Could you incorporate something like below in your next version?
+v1 -> v2:
+update the implementation of patch 1/9 according to Will Deacon's suggestion.
+update the comment of patch 3/9 and 4/9.
+use arm_smmu_options to skip the execution of command CMD_PREFETCH_CONFIG, see patch 5/9.
+patch 6/9 is base on Laurent's series, to support probe deferral.
+patch 7/9 according to Robin Murphy's suggestion, remove global variable arm_smmu_devices, thanks.
+patch 9/9 add support for a master with multiple stream IDs.
 
-It seems I have changed drivers/thermal/power_allocator.c but missed
-include/trace/events/thermal_power_allocator.h. Please check out the v2
-patch I just sent.
+Zhen Lei (5):
+  iommu/arm-smmu: to support probe deferral
+  iommu/arm-smmu: remove arm_smmu_devices
+  iommu/arm-smmu: rename __arm_smmu_get_pci_sid
+  iommu/arm-smmu: add support for non-pci devices
+  iommu/arm-smmu: describe the limitation of #iommu-cells
 
-Sascha
+ .../devicetree/bindings/iommu/arm,smmu-v3.txt      |   6 +
+ drivers/iommu/arm-smmu-v3.c                        | 209 ++++++++++++++++-----
+ 2 files changed, 163 insertions(+), 52 deletions(-)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+--
+1.8.0
