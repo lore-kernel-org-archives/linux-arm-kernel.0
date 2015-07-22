@@ -1,114 +1,231 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 22 Jul 2015 10:38:14 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <201507221024.05496.marex@denx.de>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201507220958.00231.marex@denx.de>
- <CAOMqctQ13JE+GHyj+hU4XL3Uz4+Yt_X6BFU=NO8jXcpRtzMyzQ@mail.gmail.com>
- <201507221024.05496.marex@denx.de>
-Message-ID: <CAOMqctTyHF1ciN3-0yg1smYJ5kbuwfT_kmavTL8ARuZ69wSgAg@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 22 Jul 2015 09:43:12 +0100
+Subject: [PATCH v4 1/8] Documentation: add DT binding for ARM System
+ Control and Power Interface(SCPI) protocol
+In-Reply-To: <1433760002-24120-2-git-send-email-sudeep.holla@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150722084312.GB14923@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 July 2015 at 10:24, Marek Vasut <marex@denx.de> wrote:
-> On Wednesday, July 22, 2015 at 10:18:04 AM, Michal Suchanek wrote:
->> On 22 July 2015 at 09:58, Marek Vasut <marex@denx.de> wrote:
->> > On Wednesday, July 22, 2015 at 09:45:27 AM, Michal Suchanek wrote:
->> >> On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
->> >> > On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
->> >> >> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
->> >> >> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
->> >> >> >> > Or alternatively we could publish the limitations of the channel
->> >> >> >> > using capabilities so SPI knows I have a dmaengine channel and
->> >> >> >> > it can transfer max N length transfers so would be able to
->> >> >> >> > break rather than guessing it or coding in DT. Yes it may come
->> >> >> >> > from DT but that should be dmaengine driver rather than client
->> >> >> >> > driver :)
->> >> >> >> >
->> >> >> >> > This can be done by dma_get_slave_caps(chan, &caps)
->> >> >> >> >
->> >> >> >> > And we add max_length as one more parameter to existing set
->> >> >> >> >
->> >> >> >> > Also all this could be handled in generic SPI-dmaengine layer so
->> >> >> >> > that individual drivers don't have to code it in
->> >> >> >> >
->> >> >> >> > Let me know if this idea is okay, I can push the dmaengine
->> >> >> >> > bits...
->> >> >> >>
->> >> >> >> It would be ok if there was a fixed limit. However, the limit
->> >> >> >> depends on SPI slave settings. Presumably for other buses using
->> >> >> >> the dmaengine the limit would depend on the bus or slave settings
->> >> >> >> as well. I do not see a sane way of passing this all the way to
->> >> >> >> the dmaengine driver.
->> >> >> >
->> >> >> > I don't see why this should be client (SPI) dependent. The max
->> >> >> > length supported is a dmaengine constraint, typically flowing from
->> >> >> > max blocks/length it can transfer. Know this limit can allow
->> >> >> > clients to split transfers.
->> >> >>
->> >> >> In practice on the board I have the maximum transfer length before it
->> >> >> fails depends on SPI bus speed which is set up per slave. I did not
->> >> >> try searching the space of possible settings thorougly and settled
->> >> >> for a setting that gives reasonable speed and transfer length.
->> >> >
->> >> > This looks more like a signal integrity issue though.
->> >>
->> >> It certainly does on the surface. However, when wrong data is
->> >> delivered over the SPI bus (such as when I use wrong phase setting)
->> >> the SPI controller happily delivers wrong data over PIO.
->> >>
->> >> The failure I am seeing is that the pl330 DMA program which repeatedly
->> >> waits for data from the SPI controller never finishes the read loop
->> >> and does not signal the interrupt. It seems it also leaves some data
->> >> in a FIFO somewhere so next command on the flash returns garbage and
->> >> fails.
->> >
->> > I observed something similar on MXS (mx28) SPI block. Do you use mixed
->> > PIO/DMA mode perhaps ?
->>
->> The SPI driver uses PIO for short transfers and DMA for transfers
->> longer than the controller FIFO. This seems to be the standard way to
->> do things.It works flawlessly so long as submitting overly long DMA
->> programs is avoided.
->
-> Can you try doing JUST DMA, no PIO ? I remember seeing some bus synchronisation
-> issues when I did mixed PIO/DMA on the MXS and it was nasty to track down. Just
-> give pure DMA a go to see if the thing stabilizes somehow.
+Hi Sudeep,
 
-It's probably slower to set up DMA for 2-byte commands but it might
-work nonetheless.
+Minor spelling/phrasing corrections:
 
-I will give it a go.
+On Mon, Jun 08, 2015 at 11:39:55AM +0100, Sudeep Holla wrote:
+> This patch adds devicetree binding for System Control and Power
+> Interface (SCPI) Message Protocol used between the Application Cores(AP)
+> and the System Control Processor(SCP). The MHU peripheral provides a
+> mechanism for inter-processor communication between SCP's M3 processor
+> and AP.
+> 
+> SCP offers control and management of the core/cluster power states,
+> various power domain DVFS including the core/cluster, certain system
+> clocks configuration, thermal sensors and many others.
+> 
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> CC: Jassi Brar <jassisinghbrar@gmail.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> ---
+>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 156 +++++++++++++++++++++
+>  1 file changed, 156 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> new file mode 100644
+> index 000000000000..f5f9684e23b3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> @@ -0,0 +1,156 @@
+> +System Control and Power Interface (SCPI) Message Protocol
+> +----------------------------------------------------------
+> +
+> +Firmware implementing the SCPI described in ARM document number ARM DUI 0922B
+> +("ARM Compute Subsystem SCP: Message Interface Protocols")[0] can be used
+> +by Linux to initiate various system control and power operations.
+> +
+> +Required properties:
+> +
+> +- compatible : should be "arm,scpi"
+> +- mboxes: List of phandle and mailbox channel specifiers
+> +	  All the channels reserved by remote SCP firmware for use by
+> +	  SCPI message protocol should be specified in any order
+> +- shmem : List of phandle pointing to the shared memory(SHM) area between the
+> +	  processors using these mailboxes for IPC, one for each mailbox
+> +	  SHM can be any memory reserved for the purpose of this communication
+> +	  between the processors.
+> +
+> +See Documentation/devicetree/bindings/mailbox/mailbox.txt
+> +for more details about the generic mailbox controller and
+> +client driver bindings.
+> +
+> +Clock bindings for the clocks based on SCPI Message Protocol
+> +------------------------------------------------------------
+> +
+> +This binding uses the common clock binding[1].
+> +
+> +Container Node
+> +==============
+> +Required properties:
+> +- compatible : should be "arm,scpi-clocks"
+> +	       All the clocks provided by SCP firmware via SCPI message
+> +	       protocol much be listed as sub-nodes under this node.
+> +
+> +Sub-nodes
+> +=========
+> +Required properties:
+> +- compatible : shall include one of the following
+> +	"arm,scpi-dvfs-clocks" - all the clocks that are variable and index based.
+> +		These clocks don't provide the full range between the limits
+... don't provide an entire range of values between the limits
+> +		but only discrete points within the range. The firmware
+> +		provides the mapping for each such operating frequency and the
+> +		index associated with it. The firmware also manages the
+> +		voltage scaling appropriately with the clock scaling.
+> +	"arm,scpi-variable-clocks" - all the clocks that are variable and provide full
+> +		range within the specified range. The firmware provides the
+		range of values within a specified range. .....
+> +		supported range for each clock.
+> +
+> +Other required properties for all clocks(all from common clock binding):
+> +- #clock-cells : should be set to 1 as each of the SCPI clocks have multiple
+> +	outputs. The clock specifier will be the index to an entry in the list
+> +	of output clocks.
+> +- clock-output-names : shall be the corresponding names of the outputs.
+> +- clock-indices: The identifyng number for the clocks(clock_id) in the node as
 
->
->> > Do you have the option to connect a bus analyzer?
->> > I can probably offer you some tools, I'm in Prague ...
->>
->> The flash chip is accessible when removing the bottom cover. It is
->> VSOP8 package slightly lower than SOP8 so attaching clips to it might
->> be a bit problematic. That's the only accessible part. Everything
->> other than SPI is inside the SoC.
->
-> That might be doable, though you might want to try the above thing first.
->
->> Since SPI has no verification whatsoever the chip might be completely
->> dead and you can still read fine all zeroes or all ones when
->> attempting a read from it. I observed this behaviour when I used a
->> flash chip in a socket and it was not firmly seated. It was with a
->> different SPI controller, though.
->
-> You should run into issues as soon as the SPI NOR framework tries to read
-> status register, no ?
+s/identifyng/identifying/ 
 
-Yes, when the DMA transfer fails the next command fails due to garbage
-lying around. However, you can unload the SPI NOR driver, load spidev
-driver, and read enough garbage to empty the fifos. Then the flash
-identifies as normal again and you can access it.
+> +	expected by the firmware. It can be non linear and hence provide the
+> +	mapping	of identifiers into the clock-output-names array.
+> +
+> +SRAM and Shared Memory for SCPI
+> +-------------------------------
+> +
+> +A small area of SRAM is reserved for SCPI communication between application
+> +processors and SCP.
+> +
+> +Required properties:
+> +- compatible : should be "arm,juno-sram-ns" for Non-secure SRAM on Juno
+> +
+> +The rest of the properties should follow the generic mmio-sram discription
 
-When the flash is not seated properly and acts autistic you get all
-0xff or all 0 back whatever you send to it, obvously. The
-identification by the SPI NOR driver fails then.
+s/discription/description/
 
-Thanks
+> +found in ../../misc/sysram.txt
+> +
+> +Each sub-node represents the reserved area for SCPI.
+> +
+> +Required sub-node properties:
+> +- reg : The base offset and size of the reserved area with the SRAM
+> +- compatible : should be "arm,juno-scp-shmem" for Non-secure SRAM based
+> +	       shared memory on Juno platforms
+> +
+> +[0] http://community.arm.com/servlet/JiveServlet/download/8401-45-18326/DUI0922B_scp_message_interface.pdf
+> +[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> +
+> +Example:
+> +
+> +sram: sram at 50000000 {
+> +	compatible = "arm,juno-sram-ns", "mmio-sram";
+> +	reg = <0x0 0x50000000 0x0 0x10000>;
+> +
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges = <0 0x0 0x50000000 0x10000>;
+> +
+> +	cpu_scp_lpri: scp-shmem at 0 {
+> +		compatible = "arm,juno-scp-shmem";
+> +		reg = <0x0 0x200>;
+> +	};
+> +
+> +	cpu_scp_hpri: scp-shmem at 200 {
+> +		compatible = "arm,juno-scp-shmem";
+> +		reg = <0x200 0x200>;
+> +	};
+> +};
+> +
+> +mailbox: mailbox0 at 40000000 {
+> +	....
+> +	#mbox-cells = <1>;
+> +};
+> +
+> +scpi_protocol: scpi at 2e000000 {
+> +	compatible = "arm,scpi";
+> +	mboxes = <&mailbox 0 &mailbox 1>;
+> +	shmem = <&cpu_scp_lpri &cpu_scp_hpri>;
+> +
+> +	clocks {
+> +		compatible = "arm,scpi-clocks";
+> +
+> +		scpi_dvfs: scpi_clocks at 0 {
+> +			compatible = "arm,scpi-dvfs-clocks";
+> +			#clock-cells = <1>;
+> +			clock-indices = <0>, <1>, <2>;
+> +			clock-output-names = "vbig", "vlittle", "vgpu";
+> +		};
+> +		scpi_clk: scpi_clocks at 3 {
+> +			compatible = "arm,scpi-variable-clocks";
+> +			#clock-cells = <1>;
+> +			clock-indices = <3>, <4>;
+> +			clock-output-names = "pxlclk0", "pxlclk1";
+> +		};
+> +	};
+> +};
+> +
+> +cpu at 0 {
+> +	...
+> +	reg = <0 0>;
+> +	clocks = <&scpi_dvfs 0>;
+> +	clock-names = "vbig";
+> +};
+> +
+> +hdlcd at 7ff60000 {
+> +	...
+> +	reg = <0 0x7ff60000 0 0x1000>;
+> +	clocks = <&scpi_clk 1>;
+> +	clock-names = "pxlclk";
+> +};
+> +
+> +In the above example, the #clock-cells is set to 1 as required.
+> +scpi_dvfs has 3 output clocks namely: vbig, vlittle and vgpu with 0, 1
+> +and 2 as clock-indices. scpi_clk has 2 output clocks namely: pxlclk0 and
+> +pxlclk1 with 3 and 4 as clock-indices.
+> +
+> +The first consumer in the example is cpu at 0 and it has vbig as input clock.
+> +The index '0' in the clock specifier here points to the first entry in the
+> +output clocks of scpi_dvfs for which clock_id asrequired by the firmware
 
-Michal
+s/asrequired/as required/
+
+> +is 0.
+> +
+> +Similarly the second example is hdlcd at 7ff60000 and it has pxlclk0 as input
+> +clock. The index '1' in the clock specifier here points to the second entry
+> +in the output clocks of scpi_clocks for which clock_id as required by the
+> +firmware is 4.
+
+This paragraph doesn't match the example. pxlclk0 is index '0'.
+
+Best regards,
+Liviu
+
+> -- 
+> 1.9.1
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
