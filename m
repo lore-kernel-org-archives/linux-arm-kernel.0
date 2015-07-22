@@ -1,82 +1,96 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 22 Jul 2015 15:46:06 +0900
-Subject: [PATCH 3/4] clk: 88pm800: Add clk provider driver for 88pm800
- family of devices
-In-Reply-To: <55AF37D9.3000006@linaro.org>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-4-git-send-email-vaibhav.hiremath@linaro.org>
- <55AE990E.2040004@codeaurora.org> <55AE9F48.20600@linaro.org>
- <55AEB103.9010205@codeaurora.org> <55AF37D9.3000006@linaro.org>
-Message-ID: <55AF3C2E.7010205@samsung.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 22 Jul 2015 12:40:56 +0530
+Subject: [PATCH v6 00/13] qcom: Add support for GDSCs
+Message-ID: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.07.2015 15:27, Vaibhav Hiremath wrote:
-> 
-> 
-> On Wednesday 22 July 2015 02:22 AM, Stephen Boyd wrote:
->> On 07/21/2015 12:36 PM, Vaibhav Hiremath wrote:
->>>
->>> On Wednesday 22 July 2015 12:40 AM, Stephen Boyd wrote:
->>>> On 07/21/2015 04:07 AM, Vaibhav Hiremath wrote:
->>>>> +
-> 
-> <snip>
-> 
->>>>> +static int pm800_clk_remove(struct platform_device *pdev)
->>>>> +{
->>>>> +    struct pm800_clk *pm800_clks = platform_get_drvdata(pdev);
->>>>> +    int i;
->>>>> +
->>>>> +    of_clk_del_provider(pm800_clks[0].clk_np);
->>>>> +    /* Drop the reference obtained in pm800_clk_parse_dt */
->>>>> +    of_node_put(pm800_clks[0].clk_np);
->>>>
->>>> This is odd. Why are we keeping the reference in the driver?
->>>>
->>>
->>> Honestly I do not have any good answer here. I have to admit that it is
->>> getting carry forwarded from legacy driver.
->>>
->>
->> Well we shouldn't do things if we don't know why we're doing them.
->> Krzysztof?
+GDSCs (Global Distributed Switch Controllers) control switches
+that supply power to an on-chip power domain and hence can be
+programmed in SW to safely power collapse and restore power to the
+respective PDs. They are part of a considerable number of recent QCOM
+SoCs (This series adds support for msm8974, msm8916 and apq8084 devices)
+and are part of the Clock control block.
 
-I am really busy now so I am not following closely other discussions. I
-assume you are referring to clk-s2mps11.c. The of_node_put() matches
-of_get_child_by_name() when parsing DT.
+The series implements support for GDSC using the genpd framework
+modelling these as SW controllable power domains and uses PM clocks
+to control clocks within the gdsc.
 
-So why not of_node_put() just after parsing DT? Well, the result of
-of_get_child_by_name() is stored in state container for entire device
-life-cycle so we can use it in of_clk_del_provider().
+* Client drivers which plan to use GDSC can refer to
+  Documentation/devicetree/bindings/power/power_domain.txt to know
+  how to hook up the power domain for the device through DT
+* Runtime PM specific documentation can be found in
+  Documentation/power/runtime_pm.txt
+* Patches are based of 4.2-rc3
 
-That was the idea behind it. If it looks incorrect I would be happy to
-see a patch :) .
+Changes since v5:
+* Added support to manage clocks with !CONFIG_PM
+* Added RET/OFF support
+* Added support to assert/deassert reset while the GDSC is ON
 
->>
-> 
-> Hold on,
-> After looking more in to this, it seems we really do not need it.
-> It is already taken care by
-> 
-> of_clk_add_provider() and
-> of_clk_del_provider()
-> 
-> Sorry for not investigating this before. Just left out from my eyes
-> somehow.
-> 
-> 
-> Actually I can cleanup clk-s2mps11.c driver as well, but only thing is
-> I can validate it, as I do not have platform to test it.
-> It should be trivial changes.
-> 
-> If somebody can help me out in validation I can submit the patch for
-> clk-s2mps11.c driver as well.
+Changes since v4:
+* Added clock control support using PM clocks
+* Included WA to enable an RCG (needed for Oxili gdsc in 8916)
 
-Sure, I can do this. The clock is present on few devices I can test.
-Depending on the current workqueue it may take few days. Just please
-mark the patch RFT so it won't be applied before receiving
-reviewed/tested tags.
+Changes since v3:
+* static inline'd gdsc_register/unregister stubs
+* error check fixes in gdsc_register
+* dropped oxili_gdsc for 8916 as its broken and needs additional
+WA's not part of this series
+* split dts and driver changes into seperate patches
+* Updated and included Stephanes patch to add gdscs to apq8084 mmcc
+in the series
 
-Best regards,
-Krzysztof
+Changes since v2:
+* gdsc_unregister added
+* gdsc_register/unregister introduced in patch 1/6
+
+Changes since v1:
+* added err checks for regmap apis
+* added gdsc_register() in gdsc.c
+
+Rajendra Nayak (9):
+  clk: qcom: gdsc: Prepare common clk probe to register gdscs
+  clk: qcom: gdsc: Use PM clocks to control gdsc clocks
+  clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+  clk: qcom: gdsc: Enable an RCG before turing on the gdsc
+  clk: qcom: gdsc: Add support for Memory RET/OFF
+  clk: qcom: gdsc: Add support for ON only state
+  clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+  clk: qcom: gdsc: Add GDSCs in apq8084 GCC
+  arm: dts: qcom: Add #power-domain-cells property
+
+Stephane Viau (1):
+  clk: qcom: gdsc: Add GDSCs in apq8084 MMCC
+
+Stephen Boyd (3):
+  clk: qcom: Add support for GDSCs
+  clk: qcom: gdsc: Add GDSCs in msm8974 GCC
+  clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
+
+ arch/arm/boot/dts/qcom-apq8084.dtsi           |   1 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi           |   2 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi         |   1 +
+ drivers/clk/qcom/Kconfig                      |  10 +
+ drivers/clk/qcom/Makefile                     |   1 +
+ drivers/clk/qcom/common.c                     |  17 +-
+ drivers/clk/qcom/common.h                     |   2 +
+ drivers/clk/qcom/gcc-apq8084.c                |  42 ++++
+ drivers/clk/qcom/gcc-msm8916.c                |  52 ++++
+ drivers/clk/qcom/gcc-msm8974.c                |  15 ++
+ drivers/clk/qcom/gdsc.c                       | 343 ++++++++++++++++++++++++++
+ drivers/clk/qcom/gdsc.h                       |  72 ++++++
+ drivers/clk/qcom/mmcc-apq8084.c               |  68 ++++-
+ drivers/clk/qcom/mmcc-msm8974.c               |  72 ++++++
+ include/dt-bindings/clock/qcom,gcc-apq8084.h  |   6 +
+ include/dt-bindings/clock/qcom,gcc-msm8916.h  |   8 +
+ include/dt-bindings/clock/qcom,gcc-msm8974.h  |   3 +
+ include/dt-bindings/clock/qcom,mmcc-apq8084.h |   8 +
+ include/dt-bindings/clock/qcom,mmcc-msm8974.h |   8 +
+ 19 files changed, 729 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/qcom/gdsc.c
+ create mode 100644 drivers/clk/qcom/gdsc.h
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+of Code Aurora Forum, hosted by The Linux Foundation
