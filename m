@@ -1,68 +1,46 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 22 Jul 2015 12:08:00 +0100
-Subject: [PATCH v2 1/5] arm64: alternative: Provide if/else/endif
- assembler macros
-In-Reply-To: <20150720171242.GP9908@arm.com>
-References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
- <1437405004-1296-1-git-send-email-daniel.thompson@linaro.org>
- <1437405004-1296-2-git-send-email-daniel.thompson@linaro.org>
- <20150720171242.GP9908@arm.com>
-Message-ID: <55AF7990.6070105@linaro.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 22 Jul 2015 16:38:52 +0530
+Subject: [RFC PATCH 1/4] iommu/arm-smmu: Init driver using IOMMU_OF_DECLARE
+In-Reply-To: <20150721150306.GI31095@arm.com>
+References: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
+ <1437152005-25092-2-git-send-email-sricharan@codeaurora.org>
+ <20150721150306.GI31095@arm.com>
+Message-ID: <000501d0c46e$ceae9920$6c0bcb60$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/07/15 18:12, Will Deacon wrote:
->> diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
->> index c385a0c4057f..31b19ad18f7e 100644
->> --- a/arch/arm64/include/asm/alternative.h
->> +++ b/arch/arm64/include/asm/alternative.h
->> @@ -77,6 +77,46 @@ void free_alternatives_memory(void);
->>   	.org	. - (662b-661b) + (664b-663b)
->>   .endm
->>
->> +/*
->> + * Begin an alternative code sequence.
->> + *
->> + * The code that follows this marco will be assembled and linked as
->> + * normal. There are no restrictions on this code.
->
-> s/marco/macro/
+Hi Will,
 
-Will fix this.
+> -----Original Message-----
+> From: Will Deacon [mailto:will.deacon at arm.com]
+> Sent: Tuesday, July 21, 2015 8:33 PM
+> To: Sricharan R
+> Cc: linux-arm-kernel at lists.infradead.org;
+iommu at lists.linux-foundation.org;
+> devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> mitchelh at codeaurora.org; robin.murphy at arm.com
+> Subject: Re: [RFC PATCH 1/4] iommu/arm-smmu: Init driver using
+> IOMMU_OF_DECLARE
+> 
+> [adding Robin]
+> 
+> On Fri, Jul 17, 2015 at 05:53:22PM +0100, Sricharan R wrote:
+> > This patch uses IOMMU_OF_DECLARE to register the driver and the
+> > iommu_ops. So when master devices of the iommu are registered,
+> > of_xlate callback can be used to add the master configurations to the
+> > smmu driver.
+> 
+> I'd really prefer to do this on top of Laurent's series reworking some of
+the
+> of_xlate code and I think Robin [CC'd] is working on that. That will also
+pave
+> the way for specifying per-master SMR configuration in the device-tree.
 
+     Ok, understand it. By Rebasing on Laurent's series this patch should
+not
+     be needed at all, dependencies with clock devices should also be
+solved.
+     I will rebase this series over there.
 
->
->> + */
->> +.macro alternative_if_not cap
->> +	.pushsection .altinstructions, "a"
->> +	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
->> +	.popsection
->> +661:
->> +.endm
->> +
->> +/*
->> + * Provide the alternative code sequence.
->> + *
->> + * The code that follows this macro is assembled into a special
->> + * section to be used for dynamic patching. Code that follows this
->> + * macro must:
->> + *
->> + * 1. Be exactly the same length (in bytes) as the default code
->> + *    sequence.
->> + *
->> + * 2. Not jump to local labels defined outside of the alternative
->> + *    sequence.
->
-> Actually, we fix up the branch target during patching. What you can't do
-> is jump into *another* alternative sequence.
-
-Ok. I will update this.
-
-I saw that there must be branch target patching (due to branches to 
-__save_vgic_v3_state) but got it into my head that branches to local 
-labels confused the assembler. I guess I must made an unrelated syntax 
-error because I just done a few tests and can't reproduce anything like 
-that.
-
-
-Daniel.
+Regards,
+ Sricharan
