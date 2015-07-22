@@ -1,88 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jul 2015 18:42:11 +0100
-Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
- field
-In-Reply-To: <20150722165318.GA27197@google.com>
-References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
- <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
- <20150721212644.GB3691@google.com> <55AFABF3.5050303@arm.com>
- <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
- <55AFAE96.4070401@arm.com> <20150722165318.GA27197@google.com>
-Message-ID: <55AFD5F3.3000705@arm.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 22 Jul 2015 10:46:36 -0700
+Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
+ device nodes for APM X-Gene platform
+In-Reply-To: <20150714084004.GA14593@localhost>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <20150714084004.GA14593@localhost>
+Message-ID: <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/15 17:53, Bjorn Helgaas wrote:
-> On Wed, Jul 22, 2015 at 03:54:14PM +0100, Marc Zyngier wrote:
->> On 22/07/15 15:48, Bjorn Helgaas wrote:
->>> On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>>> Hi Bjorn,
->>>>
->>>> On 21/07/15 22:26, Bjorn Helgaas wrote:
->>>>> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
->>>>>> In order to be able to populate the device msi_domain field,
->>>>>> add the necesary hooks to propagate the host bridge msi_domain
->>>>>> across secondary busses to devices.
->>>>>>
->>>>>> So far, nobody populates the initial msi_domain.
->>>>>>
->>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>>> ---
->>>>>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
->>>>>>  include/linux/pci.h |  1 +
->>>>>>  2 files changed, 31 insertions(+)
->>>>>>
->>>>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->>>>>> index cefd636..376f6fa 100644
->>>>>> --- a/drivers/pci/probe.c
->>>>>> +++ b/drivers/pci/probe.c
->>>>>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
->>>>>>      }
->>>>>>  }
->>>>>>
->>>>>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
->>>>>> +{
->>>>>> +}
->>>>>
->>>>> I don't think there's anything in this series that requires this to be a
->>>>> weak function, is there?  This is the only definition I see.
->>>>
->>>> It looks like all the pcibios_* functions so far have a weak attribute,
->>>> and I've added it as a matter of consistency.
->>>
->>> We've used pcibios_* names where we might need an arch-specific
->>> implementation.  I'm not sure that's the case here -- do you envision
->>> an implementation under arch/* someday?  If not, maybe it should just
->>> be a pci_* function instead of pcibios_*.
->>
->> I could definitely see non-OF driven architectures wanting to override this.
->>
->> Or maybe we should turn it the other way around and make it call the
->> various firmware interfaces (OF, ACPI...) until one of them succeeds. In
->> which case your suggestion of making it a pci_* function makes a lot of
->> sense.
-> 
-> Here's my advice, FWIW:
-> 
->   - remove __weak
-> 
->   - rename pcibios_set_host_bridge_msi_domain() to
->     pci_host_bridge_msi_domain() and have it return a struct irq_domain *
-> 
->   - pci_host_bridge_msi_domain() can call whatever firmware- or
->     arch-specific code you need to look up the irq_domain
-> 
->   - move the dev_set_msi_domain() call from pci_set_phb_of_msi_domain() to
->     pci_set_bus_msi_domain()
-> 
+Hi Olof,
 
-Yes, seems to make sense. I end-up with something that looks much more
-readable (pci_set_bus_msi_domain looks fairly neat now).
+>> This patch set adds syscon reboot/poweroff device nodes to support reboot and
+>> poweroff features on X-Gene platform.
+>>
+>> Tai Nguyen (2):
+>>   power: reset: Add syscon reboot device node for APM X-Gene platform
+>>   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
+>>
+>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
+>>  2 files changed, 24 insertions(+)
+>
+> Hi,
+>
+> It's unclear to me what you want to happen to these patches. They are
+> sent to a long list of to-recipients, one of which is arm at kernel.org. In
+> general, specify the person you want to take action on the patch in to
+> with the rest on cc.
 
-I'll post a new version shortly.
+Is there an owner for all DT node files? Is that Catalina as he is
+owner for ARM64 arch folder?
+
+>
+> We generally ask that patches first go to the subarch maintainers,
+> and they in turn send it on to us (either through a pull request or
+> by sending the patches to be applied). In the case of X-Gene, there is
+> no general platform maintainer so we keep getting patches from various
+> engineers at APM and it's unclear to us what your intentions are.
+>
+> I'd prefer to see one (to start with) person in charge of these (i.e. one
+> maintainer from the APM side). Please add that person to the MAINTAINERS
+> file as well.
+
+Are you suggesting that we have one person to start an GIT with
+kernel.org to keep all these misc ack'ed patches for X-Gene (APM) that
+don't seems to have an maintainer/home. Then request an pull by you?
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Loc
