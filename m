@@ -1,73 +1,86 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 22 Jul 2015 17:35:30 +0800
-Subject: [PATCH v3 1/2] arm64: dts: Add dts files for Marvell Berlin4CT SoC
-In-Reply-To: <55AF6017.6040407@arm.com>
-References: <1437555470-6283-1-git-send-email-jszhang@marvell.com>
- <1437555470-6283-2-git-send-email-jszhang@marvell.com>
- <55AF6017.6040407@arm.com>
-Message-ID: <20150722173530.5b7b6621@xhacker>
+From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
+Date: Wed, 22 Jul 2015 15:04:53 +0530
+Subject: [PATCH] clk: s2mps11: Use kcalloc instead of kzalloc for array
+ allocation
+Message-ID: <1437557693-29433-1-git-send-email-vaibhav.hiremath@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sudeep,
+This patch cleans up the driver for,
 
-On Wed, 22 Jul 2015 10:19:19 +0100
-Sudeep Holla <sudeep.holla@arm.com> wrote:
+  - Use devm_kcalloc varient instead of devm_kzalloc for array
+    allocation.
+  - clk_prepare/unprepare, remove "ret" variable as it is not required
+  - use __exit for cleanup function
 
-> 
-> 
-> On 22/07/15 09:57, Jisheng Zhang wrote:
-> > Add initial dtsi file to support Marvell Berlin4CT SoC with
-> > quad Cortex-A53 CPUs.
-> >
-> > It also adds dts file for Marvell Berlin4CT DMP board which is
-> > based on Berlin4CT SoC.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >   arch/arm64/boot/dts/Makefile                  |   1 +
-> >   arch/arm64/boot/dts/marvell/Makefile          |   5 +
-> >   arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  67 +++++++++++
-> >   arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
-> >   4 files changed, 237 insertions(+)
-> >   create mode 100644 arch/arm64/boot/dts/marvell/Makefile
-> >   create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-> >   create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> >
-> 
-> [..]
-> 
-> > diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-> > new file mode 100644
-> > index 0000000..58ed7f1
-> > --- /dev/null
-> > +++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-> > @@ -0,0 +1,67 @@
-> 
-> [..]
-> 
-> > +/dts-v1/;
-> > +
-> > +#include "berlin4ct.dtsi"
-> > +
-> > +/ {
-> > +	model = "MARVELL BG4CT DMP BOARD";
-> > +	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
-> > +
-> > +	chosen {
-> > +		bootargs = "earlycon=uart8250,mmio32,0xf7fcd000";
-> > +		stdout-path = "serial0:115200n8";
-> 
-> Just earlycon without any parameters will suffice. Currently earlycon
-> parsing code has issues and it's being worked out[1]. The serial port
-> details specified in stdout-path will be used by earlycon.
-> 
-> Regards,
-> Sudeep
-> 
-> [1] https://lkml.org/lkml/2015/4/8/604
+As I am referring this driver as a reference for my 88pm800 clk driver,
+applying same changes here as well.
 
-I just found all arm64 ports don't have bootargs, so neither earlycon, I will
-follow this behavior. Will send out v4 later.
+Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+---
+Since I do not have platform to test, it would be helpful if someone
+tests it for me.
+I have build tested it.
 
-Thanks
+ drivers/clk/clk-s2mps11.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
+index 9b13a30..e17c66a 100644
+--- a/drivers/clk/clk-s2mps11.c
++++ b/drivers/clk/clk-s2mps11.c
+@@ -58,21 +58,17 @@ static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
+ static int s2mps11_clk_prepare(struct clk_hw *hw)
+ {
+ 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+-	int ret;
+ 
+-	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
++	return regmap_update_bits(s2mps11->iodev->regmap_pmic,
+ 				 s2mps11->reg,
+ 				 s2mps11->mask, s2mps11->mask);
+-
+-	return ret;
+ }
+ 
+ static void s2mps11_clk_unprepare(struct clk_hw *hw)
+ {
+ 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
+-	int ret;
+ 
+-	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic, s2mps11->reg,
++	regmap_update_bits(s2mps11->iodev->regmap_pmic, s2mps11->reg,
+ 			   s2mps11->mask, ~s2mps11->mask);
+ }
+ 
+@@ -186,15 +182,15 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
+ 	struct clk_init_data *clks_init;
+ 	int i, ret = 0;
+ 
+-	s2mps11_clks = devm_kzalloc(&pdev->dev, sizeof(*s2mps11_clk) *
+-					S2MPS11_CLKS_NUM, GFP_KERNEL);
++	s2mps11_clks = devm_kcalloc(&pdev->dev, S2MPS11_CLKS_NUM,
++				sizeof(*s2mps11_clk), GFP_KERNEL);
+ 	if (!s2mps11_clks)
+ 		return -ENOMEM;
+ 
+ 	s2mps11_clk = s2mps11_clks;
+ 
+-	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
+-				 S2MPS11_CLKS_NUM, GFP_KERNEL);
++	clk_table = devm_kcalloc(&pdev->dev, S2MPS11_CLKS_NUM,
++				sizeof(struct clk *), GFP_KERNEL);
+ 	if (!clk_table)
+ 		return -ENOMEM;
+ 
+@@ -322,7 +318,7 @@ static int __init s2mps11_clk_init(void)
+ }
+ subsys_initcall(s2mps11_clk_init);
+ 
+-static void __init s2mps11_clk_cleanup(void)
++static void __exit s2mps11_clk_cleanup(void)
+ {
+ 	platform_driver_unregister(&s2mps11_clk_driver);
+ }
+-- 
+1.9.1
