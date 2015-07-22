@@ -1,58 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 22 Jul 2015 18:00:23 +0100
-Subject: [PATCH] regmap: Add function check before called format_val
-In-Reply-To: <1437575494.30329.80.camel@mtksdaap41>
-References: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
- <20150720150254.GC11162@sirena.org.uk>
- <1437458845.30329.51.camel@mtksdaap41>
- <20150721172550.GY11162@sirena.org.uk>
- <1437575494.30329.80.camel@mtksdaap41>
-Message-ID: <20150722170023.GZ11162@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Jul 2015 18:01:40 +0100
+Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <20150721123830.GD25887@localhost>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+ <1437481411-1595-7-git-send-email-james.morse@arm.com>
+ <20150721123830.GD25887@localhost>
+Message-ID: <20150722170140.GR6650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 10:31:34PM +0800, Henry Chen wrote:
-> On Tue, 2015-07-21 at 18:25 +0100, Mark Brown wrote:
+Hi James,
 
-> > OK, so the issue here is that when we fall back to regmap_read() we may
-> > do so because we have reg_read() and reg_write() functions which in turn
-> > imply no formatting.  The expectation here is that val must be an array
-> > of int.  The code doesn't completely take that into account though and
-> > the user you're pointing at is assuming it's an array of 16 bit values
-> > which isn't totally unreasonable if it did specify val_bits (we don't
-> > check for that).
+On Tue, Jul 21, 2015 at 01:38:31PM +0100, Catalin Marinas wrote:
+> On Tue, Jul 21, 2015 at 01:23:31PM +0100, James Morse wrote:
+> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > index 94d98cd1aad8..149a36ea9673 100644
+> > --- a/arch/arm64/mm/fault.c
+> > +++ b/arch/arm64/mm/fault.c
+> > @@ -30,9 +30,11 @@
+> >  #include <linux/highmem.h>
+> >  #include <linux/perf_event.h>
+> >  
+> > +#include <asm/cpufeature.h>
+> >  #include <asm/exception.h>
+> >  #include <asm/debug-monitors.h>
+> >  #include <asm/esr.h>
+> > +#include <asm/sysreg.h>
+> >  #include <asm/system_misc.h>
+> >  #include <asm/pgtable.h>
+> >  #include <asm/tlbflush.h>
+> > @@ -147,6 +149,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+> >  		__do_kernel_fault(mm, addr, esr, regs);
+> >  }
+> >  
+> > +static bool pan_enabled(struct pt_regs *regs)
+> > +{
+> > +	if (IS_ENABLED(CONFIG_ARM64_PAN))
+> > +		return ((regs->pstate & PSR_PAN_BIT) != 0);
+> 
+> Nitpick: no brackets needed for return.
+> 
+> Otherwise the patch looks fine to me:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> So, could I call regmap_bulk_read() on rtc-mt6307.c, should I need to
-> change it ?
+I've applied your series with the exception of this last one, as it
+conflicts with some other patches I have queued for 4.3. Please can you
+rebase this against the arm64 "devel" branch? (usually it would be
+for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
+build is broken atm).
 
-It should be fine but you may need to change to pass an array of
-unsigned int instead of an array of u16 in.
+Thanks,
 
-> > > Maybe it was not the good fix for this, but should be a problem need to
-> > > be reported, or should I need to give the regmap_bus on mtk_pmic_wrap.c?
-
-> > That file isn't in mainline...
-
-> oh...it's mtk-pmic-wrap.c, sorry about that.
-
-Found it - thanks.
-
-> > memcpy() is definitely not a safe way to move from an unsigned int to a
-> > u16 which is what your specific use case is trying to do.  I'll need to
-> > do an audit of existing users (or someone else will!) to figure out what
-> > people are doing with .val_bits in drivers using reg_read() and
-> > reg_write() but I think what we should be doing here is probably
-> > providing appropriate conversion functions based on val_bits on init.
-
-> Ok, got it, memcpy() should not be used here anymore.
-
-Right.  We just need to do a survey of existing users and figure out
-what the least disruptive format function to provide is.  That way we
-don't have to special case other code that uses formatting.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150722/c26e0687/attachment.sig>
+Will
