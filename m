@@ -1,46 +1,47 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Thu, 23 Jul 2015 00:10:37 +0200
-Subject: [PATCH] memory: pl172: fix modular build
-In-Reply-To: <20150722184345.GB11162@sirena.org.uk>
-References: <20150722184345.GB11162@sirena.org.uk>
-Message-ID: <1437603037-18395-1-git-send-email-manabian@gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 22 Jul 2015 15:32:33 -0700
+Subject: [Patch v3 1/5] mtd: nand: tegra: add devicetree binding
+In-Reply-To: <1437596129.2289.2.camel@lynxeye.de>
+References: <1431282602-7137-1-git-send-email-dev@lynxeye.de>
+ <1431282602-7137-2-git-send-email-dev@lynxeye.de>
+ <20150721210537.GL24125@google.com>
+ <1437596129.2289.2.camel@lynxeye.de>
+Message-ID: <20150722223233.GA8876@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building pl172 as a module fails with:
-> ERROR: "of_default_bus_match_table" [drivers/memory/pl172.ko] undefined!
+On Wed, Jul 22, 2015 at 10:15:29PM +0200, Lucas Stach wrote:
+> Am Dienstag, den 21.07.2015, 14:05 -0700 schrieb Brian Norris:
+> > > +Optional properties:
+> > > +- nvidia,wp-gpios: GPIO used to disable write protection of the flash
+> > 
+> > I think write-protect is a pretty common function, so we might want to
+> > just remove the 'nvidia,' prefix, so we can eventually move your code to
+> > the core nand_base.c library (BTW, I noticed you grab the GPIO, but you
+> > don't do anything with it; is that intentional?). In fact, I've seen
+> > requests for that very feature on the mailing list.
+> > 
+> 
+> Actually I request and activate the GPIO in the driver, so the chip is
+> permanently unprotected.
 
-Because the symbol of_default_bus_match_table isn't exported by the OF
-core code so can't be referenced from modules. Fix this by removing
-the usage of of_default_bus_match_table for now. The side effect of
-this is that child nodes can't use "simple-bus" or "simple-mfd".
+Whoops, I missed that part. I'm not too familiar with the GPIO API.
+Thanks for clearing that up.
 
-Reported-by: Mark Brown <broonie@kernel.org>
-Signed-off-by: Joachim Eastwood <manabian@gmail.com>
----
+> I agree that it would be nice to integrate this better into the NAND
+> core. If it's okay for you I'll drop the nvidia prefix and follow up
+> with patches to move this to the core after this driver is in. I don't
+> really want this driver get blocked on more dependencies.
 
-This should fix the allmod build failure introduces by the
-pl172 driver that Mark encountered. After this fix the driver
-should builds just fine as a module and there is no behavior
-change when boot my devkit either since none of children under
-pl172 uses "simple-bus/mfd" right now.
+Perfect. Yes, sorry for the delays, and I think most things look really
+good, actually.
 
- drivers/memory/pl172.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+And I guess I wasn't clear: I'd only ask you to change the binding name
+now, since we can't change that later; the code can be moved at a later
+time, once the DT ABI is set. FWIW, there are other features that might
+be useful alongside common NAND write-protect support. For instance, a
+user might want to gain a little extra safety by having MTD bring WP#
+low only when erasing/writing, so that most of the time, the flash is
+protected. 
 
-diff --git a/drivers/memory/pl172.c b/drivers/memory/pl172.c
-index 3a8e57ee96f0..b2ef6072fbf4 100644
---- a/drivers/memory/pl172.c
-+++ b/drivers/memory/pl172.c
-@@ -255,8 +255,7 @@ static int pl172_probe(struct amba_device *adev, const struct amba_id *id)
- 		if (ret)
- 			continue;
- 
--		of_platform_populate(child_np, of_default_bus_match_table,
--				     NULL, dev);
-+		of_platform_populate(child_np, NULL, NULL, dev);
- 	}
- 
- 	return 0;
--- 
-1.8.0
+Brian
