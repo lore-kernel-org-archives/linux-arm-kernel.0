@@ -1,30 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jul 2015 02:41:18 -0700
-Subject: [GIT PULL 3/3]  defconfig changes for v4.3
-In-Reply-To: <pull-1437549432-994499>
-References: <pull-1437549432-994499>
-Message-ID: <pull-1437549432-994499-3>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Wed, 22 Jul 2015 11:42:08 +0200
+Subject: [PATCH 9/9] ARM: STi: DT: Rename st_pll3200c32_407_c0_x into
+ st_pll3200c32_cx_x
+In-Reply-To: <1435068567-30995-10-git-send-email-gabriel.fernandez@linaro.org>
+References: <1435068567-30995-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1435068567-30995-10-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <55AF6570.3010505@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+Hi Gabriel,
 
-  Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+On 06/23/2015 04:09 PM, Gabriel Fernandez wrote:
+> Use a generic name for this kind of PLL
+>
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+> ---
+>   Documentation/devicetree/bindings/clock/st/st,clkgen-pll.txt | 4 ++--
+>   arch/arm/boot/dts/stih407-clock.dtsi                         | 4 ++--
+>   arch/arm/boot/dts/stih410-clock.dtsi                         | 4 ++--
+>   arch/arm/boot/dts/stih418-clock.dtsi                         | 4 ++--
+>   4 files changed, 8 insertions(+), 8 deletions(-)
+>
+>
 
-are available in the git repository at:
+Patch applied to sti-dt-for-v4.3.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.3/defconfig
-
-for you to fetch changes up to da104dc845afbebcad6d87bd5810c266a426f4dc:
-
-  ARM: omap2plus_defconfig: enable support for M25P80 SPI NOR (2015-07-16 00:54:53 -0700)
-
-----------------------------------------------------------------
-Sekhar Nori (4):
-      ARM: omap2plus_defconfig: enable support for TI ADC
-      ARM: omap2plus_defconfig: enable support for TI touchscreen
-      ARM: omap2plus_defconfig: enable support for TI CPTS
-      ARM: omap2plus_defconfig: enable support for M25P80 SPI NOR
-
- arch/arm/configs/omap2plus_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+Thanks!
+Maxime
