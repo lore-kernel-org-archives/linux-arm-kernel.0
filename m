@@ -1,52 +1,77 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 22 Jul 2015 17:34:25 +0300
-Subject: [PATCH v3 1/5] mm: kasan: introduce generic
- kasan_populate_zero_shadow()
-In-Reply-To: <20150722141719.GA16627@e104818-lin.cambridge.arm.com>
-References: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
- <1437561037-31995-2-git-send-email-a.ryabinin@samsung.com>
- <20150722141719.GA16627@e104818-lin.cambridge.arm.com>
-Message-ID: <55AFA9F1.5070703@samsung.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 22 Jul 2015 22:05:42 +0800
+Subject: [PATCH v3 2/5] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1437573945-31586-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 05:17 PM, Catalin Marinas wrote:
-> On Wed, Jul 22, 2015 at 01:30:33PM +0300, Andrey Ryabinin wrote:
->> diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
->> index e1840f3..2390dba 100644
->> --- a/arch/x86/mm/kasan_init_64.c
->> +++ b/arch/x86/mm/kasan_init_64.c
->> @@ -12,9 +12,9 @@
->>  extern pgd_t early_level4_pgt[PTRS_PER_PGD];
->>  extern struct range pfn_mapped[E820_X_MAX];
->>  
->> -static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
->> -static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> -static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
->> +pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
->> +pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
->> +pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
->>  
->>  /*
->>   * This page used as early shadow. We don't use empty_zero_page
->> @@ -24,7 +24,7 @@ static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
->>   * that allowed to access, but not instrumented by kasan
->>   * (vmalloc/vmemmap ...).
->>   */
->> -static unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
->> +unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
-> 
-> Did you lose part of the patch when rebasing? I can see you copied
-> kasan_populate_zero_shadow() to the mm code but it's still present in
-> the x86 one and the above changes to remove static seem meaningless.
-> 
-> Or you plan to submit the rest of the x86 code separately?
-> 
+add a DT binding documentation of xHCI host controller for the
+MT8173 SoC from Mediatek.
 
-Yes, I was going to send x86 patch later.
-Static has to be removed because this conflicts with kasan_zero_p* declarations in include/linux/kasan.h.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        | 50 ++++++++++++++++++++++
+ 1 file changed, 50 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 
-> BTW, you could even move kasan_zero_p[tme]d arrays to mm/.
-> 
-
-Makes sense.
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+new file mode 100644
+index 0000000..444494d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -0,0 +1,50 @@
++MT65XX xhci
++
++The device node for Mediatek SOC usb3.0 host controller
++
++Required properties:
++ - compatible : supports "mediatek,mt8173-xhci"
++ - reg        : Offset and length of registers
++ - interrupts : Interrupt mode, number and trigger mode
++ - power-domains: to enable usb's mtcmos
++ - vusb33-supply:  regulator of usb avdd3.3v
++ - clocks     : must support all clocks that xhci needs
++ - clock-names: should be "sys_mac" for sys and mac clocks, and
++	"wakeup_deb_p0", "wakeup_deb_p1" for wakeup debounce control
++	clocks
++ - phys	: the phys that xhci will bind, currently supports up to two
++	phys, so phy index should not greater than one.
++ - phy-names : should be "phy-X" format, X equals to 0 or 1
++ - usb3-lpm-capable: supports USB3 LPM
++ - mediatek,usb-wakeup: to access usb wakeup control register
++ - mediatek,wakeup-src: 1: ip sleep wakeup mode; 2: line state wakeup
++	mode; others means don't enable wakeup source of usb
++ - mediatek,u2port-num: the number should not greater than the number
++	of phys
++
++Optional properties:
++ - vbus-supply : reference to the VBUS regulator;
++
++Example:
++usb: usb30 at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x4000>,
++	      <0 0x11280000 0 0x0800>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++		 <&pericfg CLK_PERI_USB0>,
++		 <&pericfg CLK_PERI_USB1>;
++	clock-names = "sys_mac",
++		      "wakeup_deb_p0",
++		      "wakeup_deb_p1";
++	phys = <&u3phy 0>, <&u3phy 1>;
++	phy-names = "phy-0", "phy-1";
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	usb3-lpm-capable;
++	mediatek,usb-wakeup = <&pericfg>;
++	mediatek,wakeup-src = <1>;
++	mediatek,u2port-num = <2>;
++	status = "okay";
++};
+-- 
+1.8.1.1.dirty
