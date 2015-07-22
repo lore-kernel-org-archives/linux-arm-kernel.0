@@ -1,211 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 22 Jul 2015 13:52:07 +0100
-Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <55AF6D59.8080505@arm.com>
-References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
- <55AF62BA.1000702@hisilicon.com> <55AF6D59.8080505@arm.com>
-Message-ID: <20150722125207.GB537@red-moon>
+From: rogershimizu@gmail.com (Roger Shimizu)
+Date: Wed, 22 Jul 2015 21:52:54 +0900
+Subject: [PATCH v2 0/2] ARM: orion5x: DTS support for Linkstation LS-WTGL
+In-Reply-To: <20150721145352.GI21011@lunn.ch>
+References: <1437490157-8194-1-git-send-email-rogershimizu@gmail.com>
+ <20150721145352.GI21011@lunn.ch>
+Message-ID: <CAEQ9gEneqT=ZBSmknpW4_+80cSQEzshweTQuGQhWh-wgzLF8yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 11:15:53AM +0100, Marc Zyngier wrote:
-> On 22/07/15 10:30, Zhou Wang wrote:
-> > On 2015/7/13 18:43, Lorenzo Pieralisi wrote:
-> >> On ARM PCI systems relying on the pcibios API to initialize PCI host
-> >> controllers, the pcibios_msi_controller weak callback is used to look-up
-> >> the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
-> >>
-> >> pci_sys_data is an arch specific structure, which prevents using the
-> >> same mechanism (so same PCI host controller drivers) on ARM64 systems.
-> >>
-> >> Since the struct pci_bus already contains an msi_controller pointer and
-> >> the kernel already uses it to look-up the msi controller,
-> >> this patch converts ARM host controller and relate pcibios/host bridges
-> >> initialization routines so that the msi_controller pointer look-up can be
-> >> carried out by PCI core code through the struct pci_bus msi pointer,
-> >> removing the need for arch specific pcibios_msi_controller callback
-> >> and the related pci_sys_data msi_ctrl pointer.
-> >>
-> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Cc: Pratyush Anand <pratyush.anand@gmail.com>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Jingoo Han <jingoohan1@gmail.com>
-> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> >> Cc: Simon Horman <horms@verge.net.au>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >> Cc: Michal Simek <michal.simek@xilinx.com>
-> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >> Bjorn, all,
-> >>
-> >> I am posting this patch to sound out if that's a reasonable approach.
-> >> xgene implements MSI look-up this way at present and this would represent
-> >> another step forward towards having common drivers for ARM/ARM64, comments
-> >> and testing welcome.
-> >>
-> >> Thanks,
-> >> Lorenzo
-> >>
-> >>  arch/arm/include/asm/mach/pci.h    |  3 ---
-> >>  arch/arm/kernel/bios32.c           | 35 +++++++++++++++++------------------
-> >>  drivers/pci/host/pcie-designware.c |  9 +++++++--
-> >>  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
-> >>  4 files changed, 34 insertions(+), 25 deletions(-)
-> >>
-> >> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> >> index 28b9bb3..32abc0c 100644
-> >> --- a/arch/arm/include/asm/mach/pci.h
-> >> +++ b/arch/arm/include/asm/mach/pci.h
-> >> @@ -42,9 +42,6 @@ struct hw_pci {
-> >>   * Per-controller structure
-> >>   */
-> >>  struct pci_sys_data {
-> >> -#ifdef CONFIG_PCI_MSI
-> >> -	struct msi_controller *msi_ctrl;
-> >> -#endif
-> >>  	struct list_head node;
-> >>  	int		busnr;		/* primary bus number			*/
-> >>  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-> >> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> >> index fcbbbb1..c841b33 100644
-> >> --- a/arch/arm/kernel/bios32.c
-> >> +++ b/arch/arm/kernel/bios32.c
-> >> @@ -18,15 +18,6 @@
-> >>  
-> >>  static int debug_pci;
-> >>  
-> >> -#ifdef CONFIG_PCI_MSI
-> >> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
-> >> -{
-> >> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
-> >> -
-> >> -	return sysdata->msi_ctrl;
-> >> -}
-> >> -#endif
-> >> -
-> >>  /*
-> >>   * We can't use pci_get_device() here since we are
-> >>   * called from interrupt context.
-> >> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-> >>  		if (!sys)
-> >>  			panic("PCI: unable to allocate sys data!");
-> >>  
-> >> -#ifdef CONFIG_PCI_MSI
-> >> -		sys->msi_ctrl = hw->msi_ctrl;
-> >> -#endif
-> >>  		sys->busnr   = busnr;
-> >>  		sys->swizzle = hw->swizzle;
-> >>  		sys->map_irq = hw->map_irq;
-> >> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-> >>  				break;
-> >>  			}
-> >>  
-> >> -			if (hw->scan)
-> >> +			if (hw->scan) {
-> >>  				sys->bus = hw->scan(nr, sys);
-> >> -			else
-> >> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
-> >> -						hw->ops, sys, &sys->resources);
-> >> +				if (!sys->bus)
-> >> +					panic("PCI: unable to scan bus!");
-> >> +			} else {
-> >> +				sys->bus = pci_create_root_bus(parent,
-> >> +							       sys->busnr,
-> >> +							       hw->ops, sys,
-> >> +							       &sys->resources);
-> >> +				if (WARN_ON(!sys->bus)) {
-> >> +					kfree(sys);
-> >> +					break;
-> >> +				}
-> >> +#ifdef CONFIG_PCI_MSI
-> >> +				sys->bus->msi = hw->msi_ctrl;
-> >> +#endif
-> >>  
-> >> -			if (!sys->bus)
-> >> -				panic("PCI: unable to scan bus!");
-> >> +				pci_scan_child_bus(sys->bus);
-> >> +			}
-> >>  
-> >>  			busnr = sys->bus->busn_res.end + 1;
-> >>  
-> >> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> >> index 69486be..e584dfa 100644
-> >> --- a/drivers/pci/host/pcie-designware.c
-> >> +++ b/drivers/pci/host/pcie-designware.c
-> >> @@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
-> >>  
-> >>  #ifdef CONFIG_PCI_MSI
-> >>  	dw_pcie_msi_chip.dev = pp->dev;
-> >> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
-> >>  #endif
-> >>  
-> >>  	dw_pci.nr_controllers = 1;
-> >> @@ -708,11 +707,17 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> >>  	struct pcie_port *pp = sys_to_pcie(sys);
-> >>  
-> >>  	pp->root_bus_nr = sys->busnr;
-> >> -	bus = pci_scan_root_bus(pp->dev, sys->busnr,
-> >> +	bus = pci_create_root_bus(pp->dev, sys->busnr,
-> >>  				  &dw_pcie_ops, sys, &sys->resources);
-> >>  	if (!bus)
-> >>  		return NULL;
-> >>  
-> >> +#ifdef CONFIG_PCI_MSI
-> >> +	bus->msi = &dw_pcie_msi_chip;
-> >> +#endif
-> >> +
-> >> +	pci_scan_child_bus(bus);
-> >> +
-> >>  	if (bus && pp->ops->scan_bus)
-> >>  		pp->ops->scan_bus(pp);
-> >>  
-> >> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> >> index f1a06a0..b21eb7d 100644
-> >> --- a/drivers/pci/host/pcie-xilinx.c
-> >> +++ b/drivers/pci/host/pcie-xilinx.c
-> >> @@ -647,9 +647,18 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> >>  	struct pci_bus *bus;
-> >>  
-> >>  	port->root_busno = sys->busnr;
-> >> -	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
-> >> +	bus = pci_create_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
-> >>  				sys, &sys->resources);
-> >>  
-> >> +	if (!bus)
-> >> +		return NULL;
-> >> +
-> >> +#ifdef CONFIG_PCI_MSI
-> >> +	bus->msi = &xilinx_pcie_msi_chip;
-> >> +#endif
-> >> +
-> >> +	pci_scan_child_bus(bus);
-> >> +
-> >>  	return bus;
-> >>  }
-> >>  
-> >> @@ -847,7 +856,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
-> >>  
-> >>  #ifdef CONFIG_PCI_MSI
-> >>  	xilinx_pcie_msi_chip.dev = port->dev;
-> >> -	hw.msi_ctrl = &xilinx_pcie_msi_chip;
-> >>  #endif
-> >>  	pci_common_init_dev(dev, &hw);
-> >>  
-> >>
-> > 
-> > Hi Lorenzo,
-> > 
-> > I wonder if we can delete weak pcibios_msi_controller and the call in
-> > pci_msi_controller in drivers/pci/msi.c
-> 
-> Yeah, I think we can replace it with a straight "return NULL;" in
-> pci_msi_controller, as ARM is the only arch to implement this function
-> (which Lorenzo now removes).
+Dear Andew,
 
-Agreed, I did not do it since I wanted to get feedback on the approach
-first, if we agree that's the right thing to do we can kill
-pcibios_msi_controller() in the core too (since it becomes unused).
+Thanks for your review & acked-by.
+I'm sorry for the push yesterday. I was seeing Linus's complaint on
+gmail's spam filter issue and was wondering whether my email got
+filtered, too.
+It seems alright since, I can wait for the formal 4.2 and then 4.3 for sure.
 
-Lorenzo
+Cheers,
+Roger
+
+On Tue, Jul 21, 2015 at 11:53 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Tue, Jul 21, 2015 at 11:49:15PM +0900, Roger Shimizu wrote:
+>> Dear Orion5x Maintainer,
+>>
+>> I'd like to add DTS support for a bit older linkstation orion5x device, LS-WTGL.
+>> I have tested againt latest kernel next/dt branch on my box and it works fine.
+>> Please consider to merge. Thank you!
+>>
+>> Changelog(v2):
+>> - remove commented lines in DTS
+>> - use GPL/X11 dual license
+>> - some changes in orion5x_defconfig
+>
+> Hi Roger
+>
+> Thanks for the respin.
+>
+> Acked-by: Andrew Lunn <andrew@lunn.ch>
+>
+> Don't be too worried if it takes time to get merged. People are on
+> vacation at the moment. But it should get into 4.3.
+>
+>          Andrew
