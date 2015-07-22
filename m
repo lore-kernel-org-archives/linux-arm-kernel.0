@@ -1,176 +1,67 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 22 Jul 2015 14:04:13 +0100
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
+Date: Wed, 22 Jul 2015 14:04:12 +0100
+Subject: [PATCH v7 2/5] ARM: sti: stih410-clocks: Identify critical clocks
 In-Reply-To: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
 References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1437570255-21049-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These new API calls will firstly provide a mechanisms to tag a clock as
-critical and secondly allow any knowledgeable driver to (un)gate clocks,
-even if they are marked as critical.
+Lots of platforms contain clocks which if turned off would prove fatal.
+The only way to recover is to restart the board(s).  This driver takes
+references to clocks which are required to be always-on.  The Common
+Clk Framework will then take references to them.  This way they will
+not be turned off during the clk_disabled_unused() procedure.
 
-Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+In this patch we are identifying clocks, which if gated would render
+the STiH410 development board unserviceable.
+
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h |  2 ++
- include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
- 3 files changed, 77 insertions(+)
+ arch/arm/boot/dts/stih410-clock.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 61c3fc5..486b1da 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index 6b5803a..0a72c56 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -103,6 +103,7 @@
+ 				clocks = <&clk_sysin>;
  
- /***    private data structures    ***/
+ 				clock-output-names = "clk-s-a0-pll-ofd-0";
++				critical-clock = <0>; /* clk-s-a0-pll-ofd-0 */
+ 			};
  
-+/**
-+ * struct critical -	Provides 'play' over critical clocks.  A clock can be
-+ *			marked as critical, meaning that it should not be
-+ *			disabled.  However, if a driver which is aware of the
-+ *			critical behaviour wants to control it, it can do so
-+ *			using clk_enable_critical() and clk_disable_critical().
-+ *
-+ * @enabled	Is clock critical?  Once set, doesn't change
-+ * @leave_on	Self explanatory.  Can be disabled by knowledgeable drivers
-+ */
-+struct critical {
-+	bool enabled;
-+	bool leave_on;
-+};
+ 			clk_s_a0_flexgen: clk-s-a0-flexgen {
+@@ -115,6 +116,8 @@
+ 
+ 				clock-output-names = "clk-ic-lmi0",
+ 						     "clk-ic-lmi1";
 +
- struct clk_core {
- 	const char		*name;
- 	const struct clk_ops	*ops;
-@@ -75,6 +90,7 @@ struct clk_core {
- 	struct dentry		*dentry;
- #endif
- 	struct kref		ref;
-+	struct critical		critical;
- };
++				critical-clock = <CLK_IC_LMI0>;
+ 			};
+ 		};
  
- struct clk {
-@@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
- 	if (WARN_ON(clk->enable_count == 0))
- 		return;
+@@ -142,6 +145,7 @@
+ 				clocks = <&clk_sysin>;
  
-+	/* Refuse to turn off a critical clock */
-+	if (clk->enable_count == 1 && clk->critical.leave_on)
-+		return;
-+
- 	if (--clk->enable_count > 0)
- 		return;
+ 				clock-output-names = "clk-s-c0-pll0-odf-0";
++				critical-clock = <0>; /* clk-s-c0-pll0-odf-0 */
+ 			};
  
-@@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
- }
- EXPORT_SYMBOL_GPL(clk_disable);
+ 			clk_s_c0_pll1: clk-s-c0-pll1 {
+@@ -204,6 +208,12 @@
+ 						     "clk-clust-hades",
+ 						     "clk-hwpe-hades",
+ 						     "clk-fc-hades";
++
++				critical-clock = <CLK_ICN_CPU>,
++						 <CLK_TX_ICN_DMU>,
++						 <CLK_EXT2F_A9>,
++						 <CLK_ICN_LMI>,
++						 <CLK_ICN_SBC>;
+ 			};
+ 		};
  
-+void clk_disable_critical(struct clk *clk)
-+{
-+	clk->core->critical.leave_on = false;
-+	clk_disable(clk);
-+}
-+EXPORT_SYMBOL_GPL(clk_disable_critical);
-+
- static int clk_core_enable(struct clk_core *clk)
- {
- 	int ret = 0;
-@@ -1100,6 +1127,15 @@ int clk_enable(struct clk *clk)
- }
- EXPORT_SYMBOL_GPL(clk_enable);
- 
-+int clk_enable_critical(struct clk *clk)
-+{
-+	if (clk->core->critical.enabled)
-+		clk->core->critical.leave_on = true;
-+
-+	return clk_enable(clk);
-+}
-+EXPORT_SYMBOL_GPL(clk_enable_critical);
-+
- static unsigned long clk_core_round_rate_nolock(struct clk_core *clk,
- 						unsigned long rate,
- 						unsigned long min_rate,
-@@ -2482,6 +2518,15 @@ fail_out:
- }
- EXPORT_SYMBOL_GPL(clk_register);
- 
-+void clk_init_critical(struct clk *clk)
-+{
-+	struct critical *critical = &clk->core->critical;
-+
-+	critical->enabled = true;
-+	critical->leave_on = true;
-+}
-+EXPORT_SYMBOL_GPL(clk_init_critical);
-+
- /*
-  * Free memory allocated for a clock.
-  * Caller must hold prepare_lock.
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 5591ea7..15ef8c9 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -563,6 +563,8 @@ struct clk *devm_clk_register(struct device *dev, struct clk_hw *hw);
- void clk_unregister(struct clk *clk);
- void devm_clk_unregister(struct device *dev, struct clk *clk);
- 
-+void clk_init_critical(struct clk *clk);
-+
- /* helper functions */
- const char *__clk_get_name(struct clk *clk);
- struct clk_hw *__clk_get_hw(struct clk *clk);
-diff --git a/include/linux/clk.h b/include/linux/clk.h
-index 8381bbf..9807f3b 100644
---- a/include/linux/clk.h
-+++ b/include/linux/clk.h
-@@ -231,6 +231,19 @@ struct clk *devm_clk_get(struct device *dev, const char *id);
- int clk_enable(struct clk *clk);
- 
- /**
-+ * clk_enable_critical - inform the system when the clock source should be
-+ * 			 running, even if clock is critical.
-+ * @clk: clock source
-+ *
-+ * If the clock can not be enabled/disabled, this should return success.
-+ *
-+ * May be called from atomic contexts.
-+ *
-+ * Returns success (0) or negative errno.
-+ */
-+int clk_enable_critical(struct clk *clk);
-+
-+/**
-  * clk_disable - inform the system when the clock source is no longer required.
-  * @clk: clock source
-  *
-@@ -247,6 +260,23 @@ int clk_enable(struct clk *clk);
- void clk_disable(struct clk *clk);
- 
- /**
-+ * clk_disable_critical - inform the system when the clock source is no
-+ * 			  longer required, even if clock is critical.
-+ * @clk: clock source
-+ *
-+ * Inform the system that a clock source is no longer required by
-+ * a driver and may be shut down.
-+ *
-+ * May be called from atomic contexts.
-+ *
-+ * Implementation detail: if the clock source is shared between
-+ * multiple drivers, clk_enable_critical() calls must be balanced
-+ * by the same number of clk_disable_critical() calls for the clock
-+ * source to be disabled.
-+ */
-+void clk_disable_critical(struct clk *clk);
-+
-+/**
-  * clk_get_rate - obtain the current clock rate (in Hz) for a clock source.
-  *		  This is only valid once the clock source has been enabled.
-  * @clk: clock source
 -- 
 1.9.1
