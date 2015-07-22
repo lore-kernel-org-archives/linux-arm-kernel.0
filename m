@@ -1,44 +1,88 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 22 Jul 2015 19:23:01 +0200
-Subject: [GIT PULL]STi SoC changes for v4.3, round 1
-Message-ID: <55AFD175.6030807@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jul 2015 18:42:11 +0100
+Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
+ field
+In-Reply-To: <20150722165318.GA27197@google.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
+ <20150721212644.GB3691@google.com> <55AFABF3.5050303@arm.com>
+ <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
+ <55AFAE96.4070401@arm.com> <20150722165318.GA27197@google.com>
+Message-ID: <55AFD5F3.3000705@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof, Kevin,
+On 22/07/15 17:53, Bjorn Helgaas wrote:
+> On Wed, Jul 22, 2015 at 03:54:14PM +0100, Marc Zyngier wrote:
+>> On 22/07/15 15:48, Bjorn Helgaas wrote:
+>>> On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> Hi Bjorn,
+>>>>
+>>>> On 21/07/15 22:26, Bjorn Helgaas wrote:
+>>>>> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
+>>>>>> In order to be able to populate the device msi_domain field,
+>>>>>> add the necesary hooks to propagate the host bridge msi_domain
+>>>>>> across secondary busses to devices.
+>>>>>>
+>>>>>> So far, nobody populates the initial msi_domain.
+>>>>>>
+>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> ---
+>>>>>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
+>>>>>>  include/linux/pci.h |  1 +
+>>>>>>  2 files changed, 31 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>>>>>> index cefd636..376f6fa 100644
+>>>>>> --- a/drivers/pci/probe.c
+>>>>>> +++ b/drivers/pci/probe.c
+>>>>>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+>>>>>>      }
+>>>>>>  }
+>>>>>>
+>>>>>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
+>>>>>> +{
+>>>>>> +}
+>>>>>
+>>>>> I don't think there's anything in this series that requires this to be a
+>>>>> weak function, is there?  This is the only definition I see.
+>>>>
+>>>> It looks like all the pcibios_* functions so far have a weak attribute,
+>>>> and I've added it as a matter of consistency.
+>>>
+>>> We've used pcibios_* names where we might need an arch-specific
+>>> implementation.  I'm not sure that's the case here -- do you envision
+>>> an implementation under arch/* someday?  If not, maybe it should just
+>>> be a pci_* function instead of pcibios_*.
+>>
+>> I could definitely see non-OF driven architectures wanting to override this.
+>>
+>> Or maybe we should turn it the other way around and make it call the
+>> various firmware interfaces (OF, ACPI...) until one of them succeeds. In
+>> which case your suggestion of making it a pci_* function makes a lot of
+>> sense.
+> 
+> Here's my advice, FWIW:
+> 
+>   - remove __weak
+> 
+>   - rename pcibios_set_host_bridge_msi_domain() to
+>     pci_host_bridge_msi_domain() and have it return a struct irq_domain *
+> 
+>   - pci_host_bridge_msi_domain() can call whatever firmware- or
+>     arch-specific code you need to look up the irq_domain
+> 
+>   - move the dev_set_msi_domain() call from pci_set_phb_of_msi_domain() to
+>     pci_set_bus_msi_domain()
+> 
 
-Please consider this first round of STi SoC changes for v4.3:
+Yes, seems to make sense. I end-up with something that looks much more
+readable (pci_set_bus_msi_domain looks fairly neat now).
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+I'll post a new version shortly.
 
-   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+Thanks,
 
-are available in the git repository at:
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-soc-for-v4.3-1
-
-for you to fetch changes up to 50de4dd4bc6a6e378841a6705696d2c1f37ac038:
-
-   ARM: STi: Remove platform call to trace_hardirqs_off() (2015-07-22 
-11:15:30 +0200)
-
-----------------------------------------------------------------
-STi SoC updates for v4.3, round 1.
-
-Highlights:
------------
-  - Add code to release secondary cores from holding pen.
-  - Remove useless call to trace_hardirqs_off() in secondary core init 
-function.
-
-----------------------------------------------------------------
-Peter Griffin (2):
-       ARM: STi: Add code to release secondary cores from holding pen.
-       ARM: STi: Remove platform call to trace_hardirqs_off()
-
-  arch/arm/mach-sti/headsmp.S |  1 +
-  arch/arm/mach-sti/platsmp.c | 57 
-+++++++++++++++++++++++++++++++++++++++++----
-  arch/arm/mach-sti/smp.h     |  2 ++
-  3 files changed, 55 insertions(+), 5 deletions(-)
+	M.
+-- 
+Jazz is not dead. It just smells funny...
