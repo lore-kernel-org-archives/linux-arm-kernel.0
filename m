@@ -1,41 +1,46 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 22 Jul 2015 20:54:24 +0300
-Subject: [PATCH v2 5/5] arm64: add KASan support
-In-Reply-To: <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
-References: <1431698344-28054-1-git-send-email-a.ryabinin@samsung.com>
- <1431698344-28054-6-git-send-email-a.ryabinin@samsung.com>
- <CACRpkdaRJJjCXR=vK1M2YhR26JZfGoBB+jcqz8r2MhERfxRzqA@mail.gmail.com>
- <CAPAsAGy-r8Z2N09wKV+e0kLfbwxd-eWK6N5Xajsnqq9jfyWqcQ@mail.gmail.com>
- <CACRpkdZmHLMxosLXjyOPdkavo=UNzmTcHOLF5vV4cS1ULfbq6A@mail.gmail.com>
- <CAPAsAGw-iawTpjJh66rQN5fqBFT6UBZCcv2eKx7JTqCXzhzpsw@mail.gmail.com>
- <CACRpkdY2i2M27gP_fXawkFrC_GFgWaKr5rEn6d47refNPiEk=g@mail.gmail.com>
- <55AE56DB.4040607@samsung.com>
- <CACRpkdYaqK8upK-3b01JbO_y+sHnk4-Hm1MfvjSy0tKUkFREtQ@mail.gmail.com>
-Message-ID: <55AFD8D0.9020308@samsung.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 22 Jul 2015 11:02:44 -0700
+Subject: [PATCH v2 4/4] irqchip: Add bcm2836 interrupt controller for
+ Raspberry Pi 2.
+In-Reply-To: <55AEFB57.6030902@wwwdotorg.org>
+References: <1436837718-956-1-git-send-email-eric@anholt.net>
+ <1436837718-956-5-git-send-email-eric@anholt.net>
+ <55AEFB57.6030902@wwwdotorg.org>
+Message-ID: <87egk0gjej.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 12:27 AM, Linus Walleij wrote:
-> On Tue, Jul 21, 2015 at 4:27 PM, Andrey Ryabinin <a.ryabinin@samsung.com> wrote:
-> 
->> I used vexpress. Anyway, it doesn't matter now, since I have an update
->> with a lot of stuff fixed, and it works on hardware.
->> I still need to do some work on it and tomorrow, probably, I will share.
-> 
-> Ah awesome. I have a stash of ARM boards so I can test it on a
-> range of hardware once you feel it's ready.
-> 
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-So here is updated version:
-	git://github.com/aryabinin/linux.git kasan/arm_v0_1
+> On 07/13/2015 07:35 PM, Eric Anholt wrote:
+>> This interrupt controller is the new root interrupt controller with
+>> the timer, PMU events, and IPIs, and the bcm2835's interrupt
+>> controller is chained off of it to handle the peripherals.
+>
+>> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+>
+>> +static void bcm2836_arm_irqchip_mask_pmu_irq(struct irq_data *d)
+>> +{
+>> +	pr_err("%d: mask PMU\n", smp_processor_id());
+>> +	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_CLR);
+>> +}
+>> +
+>> +static void bcm2836_arm_irqchip_unmask_pmu_irq(struct irq_data *d)
+>> +{
+>> +	pr_err("%d: unmask PMU\n", smp_processor_id());
+>> +	writel(1 << smp_processor_id(), intc.base + LOCAL_PM_ROUTING_SET);
+>> +}
+>
+> Are those pr_err() calls left-over debug, or is there some reason it's
+> an error to call those functions?
 
-The code is still ugly in some places and it probably have some bugs.
-Lightly tested on exynos 5410/5420.
-
-
-> Sorry for pulling stuff out of your hands, people are excited about
-> KASan ARM32 as it turns out.
-> 
-> Yours,
-> Linus Walleij
-> 
+Yeah, I was trying to figure out whether the PMU bits worked.  We're
+failing before the point of IRQ probe, though (I don't see anything that
+would set arm_pmu->supported_cpus for us).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150722/77c9390a/attachment.sig>
