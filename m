@@ -1,72 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 22 Jul 2015 21:11:50 +0300
-Subject: [PATCH v3 5/5] arm64: dts: mediatek: add xHCI & usb phy for mt8173
-In-Reply-To: <1437573945-31586-6-git-send-email-chunfeng.yun@mediatek.com>
-References: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
- <1437573945-31586-6-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <55AFDCE6.2060608@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Jul 2015 19:14:40 +0100
+Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <55AFDB46.3060302@arm.com>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+ <1437481411-1595-7-git-send-email-james.morse@arm.com>
+ <20150721123830.GD25887@localhost> <20150722170140.GR6650@arm.com>
+ <55AFDB46.3060302@arm.com>
+Message-ID: <20150722181440.GS6650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Wed, Jul 22, 2015 at 07:04:54PM +0100, James Morse wrote:
+> On 22/07/15 18:01, Will Deacon wrote:
+> > I've applied your series with the exception of this last one, as it
+> > conflicts with some other patches I have queued for 4.3. Please can you
+> > rebase this against the arm64 "devel" branch? (usually it would be
+> > for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
+> > build is broken atm).
+> 
+> The version of patch 5 "arm64: kernel: Add optional CONFIG_ parameter to
+> ALTERNATIVE()" in your tree has:
+> 
+> > [will: removed unused asm macro changes for now to avoid conflicts]
+> 
+> Those were used in arch/arm64/lib/clear_user.S and friends.
+> I shall remove the 'CONFIG_ARM64_PAN' from those four asm files - it can be
+> tidied up later.
 
-On 07/22/2015 05:05 PM, Chunfeng Yun wrote:
+Ah, damn, I didn't realise you'd made the ALTERNATIVE macro work for both
+C and asm. The reason I changed it is because I don't know what's best to
+do with the new alternative_if_not macros -- having an enabled argument
+for the _else and _endif variants is really odd.
 
-> add xHCI and phy drivers for MT8173-EVB
+I think the options are:
 
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   arch/arm64/boot/dts/mediatek/mt8173-evb.dts | 15 ++++++++++++++
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi    | 31 +++++++++++++++++++++++++++++
->   2 files changed, 46 insertions(+)
+  (1) Just spit out a NOP (you're current approach)
+  (2) Use #ifdefs at the caller
+  (3) Only have the option for alternative_insn
+  (4) Add the option to all the alternative_ macros
 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> index f433c21..202b2b9 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-> @@ -13,6 +13,7 @@
->    */
->
->   /dts-v1/;
-> +#include <dt-bindings/gpio/gpio.h>
->   #include "mt8173.dtsi"
->
->   / {
-> @@ -32,6 +33,15 @@
->   	};
->
->   	chosen { };
-> +
-> +	usb_p1_vbus: fixedregulator at 0 {
+What do you reckon?
 
-    Just "regulator at 0" please. This is more in line with what ePAPR requires 
-from the node names.
-
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
->   };
->
->   &pwrap {
-[...]
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 0696f8f..aa1ecc7 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-[...]
-> @@ -393,6 +394,36 @@
->   			#size-cells = <0>;
->   			status = "disabled";
->   		};
-> +
-> +		usb: usb30 at 11270000 {
-
-    ePAPR standardizes the name "usb" for such nodes, please fix.
-
-[...]
-
-MBR, Sergei
+Will
