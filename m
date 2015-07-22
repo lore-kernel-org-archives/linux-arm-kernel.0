@@ -1,40 +1,68 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 22 Jul 2015 20:53:10 +0800
-Subject: [PATCH V2 11/11] dts: mmc: fsl-imx-esdhc: remove fsl,
- cd-controller support
-In-Reply-To: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
-References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1437569590-5228-12-git-send-email-aisheng.dong@freescale.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 22 Jul 2015 21:59:42 +0800
+Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
+In-Reply-To: <55A49D35.7010002@web.de>
+References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
+ <20150709075032.GD23464@tiger>
+ <20150709092949.GB3917@shlinux1.ap.freescale.net>
+ <20150709132736.GG23464@tiger>
+ <20150713114310.GA9453@shlinux1.ap.freescale.net>
+ <55A49D35.7010002@web.de>
+Message-ID: <20150722135939.GA13623@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's not supported by driver anymore after using runtime pm
-and there's no user of it, so delete it now.
+On Tue, Jul 14, 2015 at 07:25:09AM +0200, Soeren Moch wrote:
+> 
+> 
+> On 13.07.2015 13:43, Dong Aisheng wrote:
+> > On Thu, Jul 09, 2015 at 09:27:36PM +0800, Shawn Guo wrote:
+> >> On Thu, Jul 09, 2015 at 05:29:50PM +0800, Dong Aisheng wrote:
+> >>> I agree with you.
+> >>> One difference is that i'd like to fix it ASAP without reverting 8d86e4f
+> >>> due to more patches depends on it is already there as i mentioned above..
+> >>> Revert it may need to revert a lot others.
+> >>>
+> >>> The pain is that v4.1 is left broken.
+> >>
+> >> Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
+> >> know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
+> >> the best option.  I suggest you rebase the dts series on top of
+> >> v4.2-rc1, and send it via mmc tree.
+> >>
+> > 
+> > Yes, will go that way.
+> > 
+> > Then you may need help take care of new dts going through your tree
+> > to make sure no broken code in again.
+> 
+> Dong,
+> 
+> I use a microSD card (mmc0) with the root filesystem on a tbs2910 board.
+> I cannot see any difference between linux-4.0 and linux-4.1 (vanilla
+> kernel with corresponding dtb), there is absolutely no problem with card
+> detect.
+> 
+> Can you please explain what exactly is broken in linux-4.1?
+> 
 
-Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
----
- Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt | 2 --
- 1 file changed, 2 deletions(-)
+The CD function is broken.
+If you enable CONFIG_MMC_DEBUG, you will see the MMC core keep polling the
+card because MMC_CAP_NEEDS_POLL is wrongly set.
+You can refer to cover-letter for more detailed explaination.
 
-diff --git a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-index 5d0376b..211e778 100644
---- a/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-+++ b/Documentation/devicetree/bindings/mmc/fsl-imx-esdhc.txt
-@@ -17,7 +17,6 @@ Required properties:
- 	       "fsl,imx6sx-usdhc"
- 
- Optional properties:
--- fsl,cd-controller : Indicate to use controller internal card detection
- - fsl,wp-controller : Indicate to use controller internal write protection
- - fsl,delay-line : Specify the number of delay cells for override mode.
-   This is used to set the clock delay for DLL(Delay Line) on override mode
-@@ -35,7 +34,6 @@ esdhc at 70004000 {
- 	compatible = "fsl,imx51-esdhc";
- 	reg = <0x70004000 0x4000>;
- 	interrupts = <1>;
--	fsl,cd-controller;
- 	fsl,wp-controller;
- };
- 
--- 
-1.9.1
+If you're using a non-removable card(having non-removable property in dts),
+you may not have this issue.
+
+Regards
+Dong Aisheng
+
+> Thanks,
+> Soeren
+> 
+> > Thanks
+> > 
+> > Regards
+> > Dong Aisheng
+> > 
+> >> Shawn
