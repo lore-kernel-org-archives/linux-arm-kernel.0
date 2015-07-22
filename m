@@ -1,101 +1,81 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 22 Jul 2015 22:22:17 +0800
-Subject: [PATCH v4] PCI: Store PCIe bus address in struct of_pci_range
-Message-ID: <1437574937-135566-1-git-send-email-gabriele.paoloni@huawei.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Wed, 22 Jul 2015 22:08:10 +0800
+Subject: [PATCH v2 1/5] clk: remove duplicated code with
+ __clk_set_parent_after
+In-Reply-To: <20150715122955.GB30570@shlinux1.ap.freescale.net>
+References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+ <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+ <20150528040919.22384.79189@quantum>
+ <20150715122522.GA30570@shlinux1.ap.freescale.net>
+ <20150715122955.GB30570@shlinux1.ap.freescale.net>
+Message-ID: <20150722140809.GC13623@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: gabriele paoloni <gabriele.paoloni@huawei.com>
+Ping...
 
-    This patch is needed port PCIe designware to new DT parsing API
-    As discussed in
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
-    in designware we have a problem as the PCI addresses in the PCIe controller
-    address space are required in order to perform correct HW operation.
-
-    In order to solve this problem commit
-    f4c55c5a3 "PCI: designware: Program ATU with untranslated address"
-    added code to read the PCIe controller start address directly from the
-    DT ranges.
-
-    In the new DT parsing API of_pci_get_host_bridge_resources() hides the
-    DT parser from the host controller drivers, so it is not possible
-    for drivers to parse values directly from the DT.
-
-    In http://www.spinics.net/lists/linux-pci/msg42540.html we already tried
-    to use the new DT parsing API but there is a bug (obviously) in setting
-    the <*>_mod_base addresses
-    Applying this patch we can easily set "<*>_mod_base = win->__res.start"
-
-    This patch adds a new field in "struct of_pci_range" to store the
-    pci bus start address; it fills the field in of_pci_range_parser_one();
-    in of_pci_get_host_bridge_resources() it retrieves the resource entry
-    after it is created and added to the resource list and uses
-    entry->__res.start to store the pci controller address
-
-    the patch is based on 4.2-rc1
-
-    Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-    Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/of/address.c       | 2 ++
- drivers/of/of_pci.c        | 4 ++++
- include/linux/of_address.h | 1 +
- 3 files changed, 7 insertions(+)
-
-diff --git a/drivers/of/address.c b/drivers/of/address.c
-index 8bfda6a..23a5793 100644
---- a/drivers/of/address.c
-+++ b/drivers/of/address.c
-@@ -253,6 +253,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
- 						struct of_pci_range *range)
- {
- 	const int na = 3, ns = 2;
-+	const int p_ns = of_n_size_cells(parser->node);
- 
- 	if (!range)
- 		return NULL;
-@@ -265,6 +266,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
- 	range->pci_addr = of_read_number(parser->range + 1, ns);
- 	range->cpu_addr = of_translate_address(parser->node,
- 				parser->range + na);
-+	range->bus_addr = of_read_number(parser->range + na, p_ns);
- 	range->size = of_read_number(parser->range + parser->pna + na, ns);
- 
- 	parser->range += parser->np;
-diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-index 5751dc5..fe57030 100644
---- a/drivers/of/of_pci.c
-+++ b/drivers/of/of_pci.c
-@@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
- 
- 	pr_debug("Parsing ranges property...\n");
- 	for_each_of_pci_range(&parser, &range) {
-+		struct resource_entry *entry;
- 		/* Read next ranges element */
- 		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
- 			snprintf(range_type, 4, " IO");
-@@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
- 		}
- 
- 		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
-+		entry = list_last_entry(resources, struct resource_entry, node);
-+		/* we are using __res for storing the PCI controller address */
-+		entry->__res.start = range.bus_addr;
- 	}
- 
- 	return 0;
-diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-index d88e81b..865f96e 100644
---- a/include/linux/of_address.h
-+++ b/include/linux/of_address.h
-@@ -16,6 +16,7 @@ struct of_pci_range {
- 	u32 pci_space;
- 	u64 pci_addr;
- 	u64 cpu_addr;
-+	u64 bus_addr;
- 	u64 size;
- 	u32 flags;
- };
--- 
-1.9.1
+On Wed, Jul 15, 2015 at 08:29:56PM +0800, Dong Aisheng wrote:
+> On Wed, Jul 15, 2015 at 08:25:24PM +0800, Dong Aisheng wrote:
+> > Hi Mike,
+> > 
+> > On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
+> > > Quoting Dong Aisheng (2015-05-14 06:28:59)
+> > > > __clk_set_parent_after() actually used the second argument then we
+> > > > could put this duplicate logic in there and call it with a different
+> > > > order of arguments in the success vs. error paths in this function.
+> > > > 
+> > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > > 
+> > > Patch looks good to me.
+> > > 
+> > > Also just noticed that the second argument to __clk_set_parent_after is
+> > > never used :-(
+> > > 
+> > 
+> > Ping...
+> > 
+> > I did not see this patch series in your tree for v4.2 rc.
+> > Is this got missed?
+> > 
+> 
+> Updated Mike's email address.
+> 
+> Regards
+> Dong Aisheng
+> 
+> > Regards
+> > Dong Aisheng
+> > 
+> > > Regards,
+> > > Mike
+> > > 
+> > > > ---
+> > > >  drivers/clk/clk.c | 8 +-------
+> > > >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > > index 659f2b0..0e813ea 100644
+> > > > --- a/drivers/clk/clk.c
+> > > > +++ b/drivers/clk/clk.c
+> > > > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
+> > > >                 flags = clk_enable_lock();
+> > > >                 clk_reparent(core, old_parent);
+> > > >                 clk_enable_unlock(flags);
+> > > > +               __clk_set_parent_after(core, old_parent, parent);
+> > > >  
+> > > > -               if (core->prepare_count) {
+> > > > -                       flags = clk_enable_lock();
+> > > > -                       clk_core_disable(core);
+> > > > -                       clk_core_disable(parent);
+> > > > -                       clk_enable_unlock(flags);
+> > > > -                       clk_core_unprepare(parent);
+> > > > -               }
+> > > >                 return ret;
+> > > >         }
+> > > >  
+> > > > -- 
+> > > > 1.9.1
+> > > > 
