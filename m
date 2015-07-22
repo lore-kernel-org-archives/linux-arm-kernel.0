@@ -1,78 +1,86 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 22 Jul 2015 12:40:58 +0530
-Subject: [PATCH v6 02/13] clk: qcom: gdsc: Prepare common clk probe to
- register gdscs
+Date: Wed, 22 Jul 2015 12:40:59 +0530
+Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc clocks
 In-Reply-To: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
 References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1437549069-29655-3-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clk probe registers a clk provider and a reset controller.
-Update it to register a genpd provider using the gdsc data provided
-by each platform.
+The devices within a gdsc power domain, quite often have additional
+clocks to be turned on/off along with the power domain itself.
+Once the drivers for these devices are converted to use runtime PM,
+it would be possible to remove all clock handling from the drivers if
+the gdsc driver can handle it.
+Use PM clocks to add support for this. A list of con_ids[] specified
+per gdsc would be the clocks turned on/off on every device start/stop
+callbacks.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/common.c | 16 +++++++++++++++-
- drivers/clk/qcom/common.h |  2 ++
- 2 files changed, 17 insertions(+), 1 deletion(-)
+ drivers/clk/qcom/gdsc.c | 35 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 35 insertions(+)
 
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index f7101e3..2776679 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -21,6 +21,7 @@
- #include "clk-rcg.h"
- #include "clk-regmap.h"
- #include "reset.h"
-+#include "gdsc.h"
+diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+index a59655b..3125809 100644
+--- a/drivers/clk/qcom/gdsc.c
++++ b/drivers/clk/qcom/gdsc.c
+@@ -14,6 +14,7 @@
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/jiffies.h>
++#include <linux/pm_clock.h>
+ #include <linux/slab.h>
+ #include "gdsc.h"
  
- struct qcom_cc {
- 	struct qcom_reset_controller reset;
-@@ -120,8 +121,20 @@ int qcom_cc_really_probe(struct platform_device *pdev,
+@@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain *domain)
+ 	return gdsc_toggle_logic(sc, false);
+ }
  
- 	ret = reset_controller_register(&reset->rcdev);
- 	if (ret)
--		of_clk_del_provider(dev->of_node);
-+		goto err_reset;
- 
-+	if (desc->gdscs && desc->num_gdscs) {
-+		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
-+		if (ret)
-+			goto err_pd;
++static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
++{
++	int ret;
++	struct gdsc *sc = domain_to_gdsc(domain);
++	char **con_id, *con_ids[] = { "core", "iface", NULL };
++
++	ret = pm_clk_create(dev);
++	if (ret) {
++		dev_err(dev, "pm_clk_create failed %d\n", ret);
++		return ret;
 +	}
 +
++	for (con_id = con_ids; *con_id; con_id++) {
++		ret = pm_clk_add(dev, *con_id);
++		if (ret) {
++			dev_err(dev, "pm_clk_add failed %d\n", ret);
++			goto fail;
++		}
++	}
 +	return 0;
-+err_pd:
-+	dev_err(dev, "Failed to register power domains\n");
-+	reset_controller_unregister(&reset->rcdev);
-+err_reset:
-+	of_clk_del_provider(dev->of_node);
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
-@@ -140,6 +153,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
- 
- void qcom_cc_remove(struct platform_device *pdev)
++fail:
++	pm_clk_destroy(dev);
++	return ret;
++};
++
++static void gdsc_detach(struct generic_pm_domain *domain, struct device *dev)
++{
++	pm_clk_destroy(dev);
++	return;
++};
++
+ static int gdsc_init(struct gdsc *sc)
  {
-+	gdsc_unregister(&pdev->dev);
- 	of_clk_del_provider(pdev->dev.of_node);
- 	reset_controller_unregister(platform_get_drvdata(pdev));
- }
-diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
-index 7a0e737..2892b71f 100644
---- a/drivers/clk/qcom/common.h
-+++ b/drivers/clk/qcom/common.h
-@@ -28,6 +28,8 @@ struct qcom_cc_desc {
- 	size_t num_clks;
- 	const struct qcom_reset_map *resets;
- 	size_t num_resets;
-+	struct gdsc **gdscs;
-+	size_t num_gdscs;
- };
+ 	u32 mask, val;
+@@ -127,6 +159,9 @@ static int gdsc_init(struct gdsc *sc)
  
- extern const struct freq_tbl *qcom_find_freq(const struct freq_tbl *f,
+ 	sc->pd.power_off = gdsc_disable;
+ 	sc->pd.power_on = gdsc_enable;
++	sc->pd.attach_dev = gdsc_attach;
++	sc->pd.detach_dev = gdsc_detach;
++	sc->pd.flags = GENPD_FLAG_PM_CLK;
+ 	pm_genpd_init(&sc->pd, NULL, !on);
+ 
+ 	return 0;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
