@@ -1,61 +1,28 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Wed, 22 Jul 2015 20:00:52 +0800
-Subject: [PATCH v2 1/2] dt-bindings: regulator: mt6311: Add document for 
-In-Reply-To: <1437566453-13117-1-git-send-email-henryc.chen@mediatek.com>
-References: <1437566453-13117-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <1437566453-13117-2-git-send-email-henryc.chen@mediatek.com>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 22 Jul 2015 07:32:20 -0500
+Subject: [RESEND][PATCH 0/4] spi: davinci: Improve prescaler limit support
+Message-ID: <1437568344-18889-1-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a list of supported regulator names to the devicetree
-binding documentation for Mediatek MT6311 PMIC.
+Currently the prescale limit is treated as one size fits all value even
+though there are differences depending on the SOC. This patchset insures
+that the proper prescale limit is used for each platform/SoC.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- .../bindings/regulator/mt6311-regulator.txt        | 35 ++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/regulator/mt6311-regulator.txt
+Franklin S Cooper Jr (4):
+  spi: davinci: Set prescale value based on register value
+  spi: davinci: Choose correct pre-scaler limit based on SOC
+  ARM: davinci: Set proper SPI prescale limit value
+  ARM: dts: keystone: Add ti,keystone-spi for SPI
 
-diff --git a/Documentation/devicetree/bindings/regulator/mt6311-regulator.txt b/Documentation/devicetree/bindings/regulator/mt6311-regulator.txt
-new file mode 100644
-index 0000000..9387d6d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/regulator/mt6311-regulator.txt
-@@ -0,0 +1,35 @@
-+Mediatek MT6311 Regulator Driver
-+
-+Required properties:
-+- compatible: "mediatek,mt6311-regulator"
-+- reg: I2C slave address, usually 0x6b.
-+- regulators: List of regulators provided by this controller. It is named
-+  to VDVFS and VBIASN.
-+  The definition for each of these nodes is defined using the standard binding
-+  for regulators at Documentation/devicetree/bindings/regulator/regulator.txt.
-+
-+The valid names for regulators are:
-+BUCK:
-+  VDVFS
-+LDO:
-+  VBIASN
-+
-+Example:
-+	pmic: mt6311 at 6B {
-+		compatible = "mediatek,mt6311-regulator";
-+		reg = <0x6B>;
-+
-+		regulators {
-+			mt6311_vcpu_reg: VDVFS {
-+				regulator-name = "VDVFS";
-+				regulator-min-microvolt = < 600000>;
-+				regulator-max-microvolt = <1400000>;
-+				regulator-ramp-delay = <10000>;
-+			};
-+			mt6311_ldo_reg: VBIASN {
-+				regulator-name = "VBIASN";
-+				regulator-min-microvolt = <200000>;
-+				regulator-max-microvolt = <800000>;
-+			};
-+		};
-+	};
+ .../devicetree/bindings/spi/spi-davinci.txt        |  2 +
+ arch/arm/boot/dts/keystone.dtsi                    |  6 +--
+ arch/arm/mach-davinci/devices-da8xx.c              |  2 +
+ arch/arm/mach-davinci/dm355.c                      |  1 +
+ arch/arm/mach-davinci/dm365.c                      |  1 +
+ drivers/spi/spi-davinci.c                          | 50 +++++++++++++++++-----
+ include/linux/platform_data/spi-davinci.h          |  1 +
+ 7 files changed, 50 insertions(+), 13 deletions(-)
+
 -- 
-1.8.1.1.dirty
+1.9.1
