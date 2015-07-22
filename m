@@ -1,43 +1,114 @@
 From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 22 Jul 2015 10:19:25 +0530
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctSzzUV1J8Vj03XJ3Y70R9ynVErP4RZVtbjarDcZ9JLnaw@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <20150604171547.GA1530@localhost.localdomain>
- <CAOMqctSCL9E-kCBryeaMvtssSP12RY=kyfPuwSYx9wc=Lv9kGQ@mail.gmail.com>
- <201507151352.27689.marex@denx.de>
- <20150715155946.GB21362@localhost>
- <CAOMqctTJEg7EauKfrqW-6rUQ-QOmtkTfkgOyz0rCuyh_-XrW5w@mail.gmail.com>
- <20150721042932.GF23525@localhost>
- <CAOMqctSzzUV1J8Vj03XJ3Y70R9ynVErP4RZVtbjarDcZ9JLnaw@mail.gmail.com>
-Message-ID: <20150722044925.GN23525@localhost>
+Date: Wed, 22 Jul 2015 10:40:11 +0530
+Subject: [PATCHv4 2/6] dmaengine: mv_xor: add suspend/resume support
+In-Reply-To: <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150722051011.GQ23525@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
-> > Or alternatively we could publish the limitations of the channel using
-> > capabilities so SPI knows I have a dmaengine channel and it can transfer max N
-> > length transfers so would be able to break rather than guessing it or coding
-> > in DT. Yes it may come from DT but that should be dmaengine driver rather
-> > than client driver :)
-> >
-> > This can be done by dma_get_slave_caps(chan, &caps)
-> >
-> > And we add max_length as one more parameter to existing set
-> >
-> > Also all this could be handled in generic SPI-dmaengine layer so that
-> > individual drivers don't have to code it in
-> >
-> > Let me know if this idea is okay, I can push the dmaengine bits...
+On Wed, Jul 08, 2015 at 04:28:15PM +0200, Thomas Petazzoni wrote:
+> This commit adds suspend/resume support to the mv_xor driver. The
+> config and interrupt mask registers must be saved and restored, and
+> upon resume, the MBus windows configuration must also be done again.
 > 
-> It would be ok if there was a fixed limit. However, the limit depends
-> on SPI slave settings. Presumably for other buses using the dmaengine
-> the limit would depend on the bus or slave settings as well. I do not
-> see a sane way of passing this all the way to the dmaengine driver.
-I don't see why this should be client (SPI) dependent. The max length
-supported is a dmaengine constraint, typically flowing from max
-blocks/length it can transfer. Know this limit can allow clients to split
-transfers.
+> Tested on Armada 388 GP, with a RAID 5 array, accessed before and
+> after a suspend to RAM cycle.
+> 
+> Based on work from Ofer Heifetz and Lior Amsalem.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/dma/mv_xor.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+>  drivers/dma/mv_xor.h |  1 +
+>  2 files changed, 48 insertions(+)
+> 
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index f1325f6..0a3ddc2 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -1121,6 +1121,51 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
+>  	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
+>  }
+>  
+> +static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
+> +{
+> +	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
+> +	int i;
+> +
+> +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+> +		struct mv_xor_chan *mv_chan = xordev->channels[i];
+> +
+> +		if (!mv_chan)
+> +			continue;
+> +
+> +		mv_chan->saved_config_reg =
+> +			readl_relaxed(XOR_CONFIG(mv_chan));
+> +		mv_chan->saved_int_mask_reg =
+> +			readl_relaxed(XOR_INTR_MASK(mv_chan));
+this sound fine, but I am missing the suspension of the channel. If a
+transfer was active while suspend was invoked then how would this work?
 
 -- 
 ~Vinod
+
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int mv_xor_resume(struct platform_device *dev)
+> +{
+> +	struct mv_xor_device *xordev = platform_get_drvdata(dev);
+> +	const struct mbus_dram_target_info *dram;
+> +	int i;
+> +
+> +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+> +		struct mv_xor_chan *mv_chan = xordev->channels[i];
+> +
+> +		if (!mv_chan)
+> +			continue;
+> +
+> +		writel_relaxed(mv_chan->saved_config_reg,
+> +			       XOR_CONFIG(mv_chan));
+> +		writel_relaxed(mv_chan->saved_int_mask_reg,
+> +			       XOR_INTR_MASK(mv_chan));
+> +	}
+> +
+> +	dram = mv_mbus_dram_info();
+> +	if (dram)
+> +		mv_xor_conf_mbus_windows(xordev, dram);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct of_device_id mv_xor_dt_ids[] = {
+>  	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
+>  	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
+> @@ -1284,6 +1329,8 @@ static int mv_xor_remove(struct platform_device *pdev)
+>  static struct platform_driver mv_xor_driver = {
+>  	.probe		= mv_xor_probe,
+>  	.remove		= mv_xor_remove,
+> +	.suspend        = mv_xor_suspend,
+> +	.resume         = mv_xor_resume,
+>  	.driver		= {
+>  		.name	        = MV_XOR_NAME,
+>  		.of_match_table = of_match_ptr(mv_xor_dt_ids),
+> diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
+> index b7455b4..41a2e8d 100644
+> --- a/drivers/dma/mv_xor.h
+> +++ b/drivers/dma/mv_xor.h
+> @@ -126,6 +126,7 @@ struct mv_xor_chan {
+>  	char			dummy_src[MV_XOR_MIN_BYTE_COUNT];
+>  	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
+>  	dma_addr_t		dummy_src_addr, dummy_dst_addr;
+> +	u32                     saved_config_reg, saved_int_mask_reg;
+>  };
+>  
+>  /**
+> -- 
+> 2.4.5
+> 
+
+-- 
