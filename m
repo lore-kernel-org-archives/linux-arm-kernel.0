@@ -1,50 +1,67 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 22 Jul 2015 07:32:24 -0500
-Subject: [RESEND][PATCH 4/4] ARM: dts: keystone: Add ti,keystone-spi for SPI
-In-Reply-To: <1437568344-18889-1-git-send-email-fcooper@ti.com>
-References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
-Message-ID: <1437568344-18889-5-git-send-email-fcooper@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jul 2015 13:43:34 +0100
+Subject: [PATCH 1/5] genirq: irqdomain: Use an accessor for the of_node
+ field
+In-Reply-To: <alpine.DEB.2.11.1507220958090.18576@nanos>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
+ <55AF47D7.8010304@linaro.org> <55AF4BBA.5030209@arm.com>
+ <alpine.DEB.2.11.1507220958090.18576@nanos>
+Message-ID: <55AF8FF6.3080901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ti,keystone-spi to the compatible field for the SPI node. This new
-entry insures that the proper prescaler limit is used for keystone devices
+On 22/07/15 08:58, Thomas Gleixner wrote:
+> On Wed, 22 Jul 2015, Marc Zyngier wrote:
+>>
+>> Looks like my coccinelle foo is still lacking a bit... Oh well.
+> 
+> Please post your semantic patch and don't forget to Cc Julia Lawall :)
+> 
 
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
----
- arch/arm/boot/dts/keystone.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Bah, found the problem. My semantic patch is extremely simple:
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index c06542b..ea2e1cd 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -136,7 +136,7 @@
- 		};
- 
- 		spi0: spi at 21000400 {
--			compatible = "ti,dm6441-spi";
-+			compatible = "ti,keystone-spi", "ti,dm6441-spi";
- 			reg = <0x21000400 0x200>;
- 			num-cs = <4>;
- 			ti,davinci-spi-intr-line = <0>;
-@@ -147,7 +147,7 @@
- 		};
- 
- 		spi1: spi at 21000600 {
--			compatible = "ti,dm6441-spi";
-+			compatible = "ti,keystone-spi", "ti,dm6441-spi";
- 			reg = <0x21000600 0x200>;
- 			num-cs = <4>;
- 			ti,davinci-spi-intr-line = <0>;
-@@ -158,7 +158,7 @@
- 		};
- 
- 		spi2: spi at 21000800 {
--			compatible = "ti,dm6441-spi";
-+			compatible = "ti,keystone-spi", "ti,dm6441-spi";
- 			reg = <0x21000800 0x200>;
- 			num-cs = <4>;
- 			ti,davinci-spi-intr-line = <0>;
+@init@
+struct irq_domain *ptr;
+position pos;
+@@
+
+(
+ptr at pos->of_node
+)
+
+
+@ script:python @
+p1 << init.pos;
+@@
+
+for p in p1:
+    print "%s:%s" % (p.file,p.line)
+
+as I'm just grepping through the tree (I don't feel confident enough to
+do the patching, and some cases are a bit more complicated).
+
+But I forgot to add arch/$ARCH/include/asm as an include search path for
+spatch. That had the side effect of spatch being unable to identify
+constructs like:
+
+arch/$ARCH/include/asm/foo.h:
+
+	struct foo {
+		struct irq_domain *bar;
+	};
+
+arch/$ARCH/.../foo.c:
+
+	struct foo foo;
+	if (foo->bar->of_node) { ... }
+
+Since spatch knows nothing about struct foo, it cannot identify bar as a
+struct irq_domain, hence missing this occurrence.
+
+Once I fixed the include path, I found an additional couple of victims.
+I really love this thing! :-)
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
