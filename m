@@ -1,44 +1,80 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 21 Jul 2015 19:01:30 -0500
-Subject: [PATCH 0/4] Add DRA7 IOMMU DT nodes
-Message-ID: <1437523294-20058-1-git-send-email-s-anna@ti.com>
+Date: Tue, 21 Jul 2015 19:01:33 -0500
+Subject: [PATCH 3/4] ARM: dts: DRA7: Add common IOMMU nodes
+In-Reply-To: <1437523294-20058-1-git-send-email-s-anna@ti.com>
+References: <1437523294-20058-1-git-send-email-s-anna@ti.com>
+Message-ID: <1437523294-20058-4-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The DRA7xx family of SOCs have two IPUs and one DSP processor
+subsystems in common. The IOMMU DT nodes have been added for
+these processor subsystems, and have been disabled by default.
 
-The following patches add the basic DT nodes for the DSP
-and IPU IOMMU devices for the DRA7xx SoC family. The first
-two patches add syscon nodes for DSP_SYSTEM sub-modules, while
-the last two add the IOMMU nodes.
+These MMUs are very similar to those on OMAP4 and OMAP5, with
+the only difference being the presence of a second MMU within
+the DSP subsystem for the EDMA port. The DSP IOMMUs also need
+an additional 'ti,syscon-mmuconfig' property compared to the
+IPU IOMMUs.
 
-The IPU IOMMU nodes mostly are similar to existing ones on OMAP4
-and OMAP5. The DSP sub-system though has two MMUs, with a dedicated
-MMU for the internal EDMA engine. On previous SoCs, a single MMU
-served both the DSP processor and the internal EDMA. The DSP IOMMU
-nodes require a new property to reference the syscon nodes, as they
-each need a specific bit to be set in a register within the
-corresponding DSP_SYSTEM sub-module. So, these are pending based
-on the equivalent bindings update series [1]. Please let me know
-if the binding looks ok to you, as this seems it can be done in
-couple of ways.
+NOTE: The enabling of these nodes is left to the respective
+board dts files.
 
-Patches are based on 4.2-rc3.
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-regards
-Suman
-
-[1] http://marc.info/?l=linux-omap&m=143752295508435&w=2
-
-Suman Anna (4):
-  ARM: dts: DRA7: Add dsp1_system syscon node
-  ARM: dts: DRA74x: Add dsp2_system syscon node
-  ARM: dts: DRA7: Add common IOMMU nodes
-  ARM: dts: DRA74x: Add IOMMU nodes for DSP2
-
- arch/arm/boot/dts/dra7.dtsi   | 45 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/dra74x.dtsi | 25 ++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
-
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 1c96729641b6..0754df4ca59c 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -911,6 +911,46 @@
+ 			status = "disabled";
+ 		};
+ 
++		mmu0_dsp1: mmu at 40d01000 {
++			compatible = "ti,dra7-dsp-iommu";
++			reg = <0x40d01000 0x100>;
++			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu0_dsp1";
++			#iommu-cells = <0>;
++			ti,syscon-mmuconfig = <&dsp1_system 0x0>;
++			status = "disabled";
++		};
++
++		mmu1_dsp1: mmu at 40d02000 {
++			compatible = "ti,dra7-dsp-iommu";
++			reg = <0x40d02000 0x100>;
++			interrupts = <GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu1_dsp1";
++			#iommu-cells = <0>;
++			ti,syscon-mmuconfig = <&dsp1_system 0x1>;
++			status = "disabled";
++		};
++
++		mmu_ipu1: mmu at 58882000 {
++			compatible = "ti,dra7-iommu";
++			reg = <0x58882000 0x100>;
++			interrupts = <GIC_SPI 395 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu_ipu1";
++			#iommu-cells = <0>;
++			ti,iommu-bus-err-back;
++			status = "disabled";
++		};
++
++		mmu_ipu2: mmu at 55082000 {
++			compatible = "ti,dra7-iommu";
++			reg = <0x55082000 0x100>;
++			interrupts = <GIC_SPI 396 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu_ipu2";
++			#iommu-cells = <0>;
++			ti,iommu-bus-err-back;
++			status = "disabled";
++		};
++
+ 		abb_mpu: regulator-abb-mpu {
+ 			compatible = "ti,abb-v3";
+ 			regulator-name = "abb_mpu";
 -- 
 2.4.4
