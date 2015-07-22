@@ -1,38 +1,64 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 22 Jul 2015 12:21:02 +0100
-Subject: [PATCH v3 2/5] arm64: mm: Adopt new alternative assembler macros
+Date: Wed, 22 Jul 2015 12:21:03 +0100
+Subject: [PATCH v3 3/5] arm64: kernel: Adopt new alternative assembler macros
 In-Reply-To: <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
  <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437564065-4356-3-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437564065-4356-4-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the dynamic patching for ARM64_WORKAROUND_CLEAN_CACHE over to
+Convert the dynamic patching for ARM64_WORKAROUND_845719 over to
 the newly added alternative assembler macros.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm64/mm/cache.S | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/entry.S | 29 +++++++++++++----------------
+ 1 file changed, 13 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
-index bdeb5d38c2dd..eb48d5df4a0f 100644
---- a/arch/arm64/mm/cache.S
-+++ b/arch/arm64/mm/cache.S
-@@ -143,7 +143,12 @@ __dma_clean_range:
- 	dcache_line_size x2, x3
- 	sub	x3, x2, #1
- 	bic	x0, x0, x3
--1:	alternative_insn "dc cvac, x0", "dc civac, x0", ARM64_WORKAROUND_CLEAN_CACHE
-+1:
-+alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
-+	dc	cvac, x0
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index a7691a378668..be8a70d4028c 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -122,26 +122,23 @@
+ 	ct_user_enter
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
+-
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+-
+-#undef SEQUENCE_ORG
+-#undef SEQUENCE_ALT
+-
++alternative_if_not ARM64_WORKAROUND_845719
++	nop
++	nop
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+-
+-#define SEQUENCE_ORG	"nop ; nop ; nop"
+-#define SEQUENCE_ALT	"tbz x22, #4, 1f ; mrs x29, contextidr_el1; msr contextidr_el1, x29; 1:"
+-
++	nop
++#endif
 +alternative_else
-+	dc	civac, x0
++	tbz	x22, #4, 1f
++#ifdef CONFIG_PID_IN_CONTEXTIDR
++	mrs	x29, contextidr_el1
++	msr	contextidr_el1, x29
+ #else
+-
+-#define SEQUENCE_ORG	"nop ; nop"
+-#define SEQUENCE_ALT	"tbz x22, #4, 1f ; msr contextidr_el1, xzr; 1:"
+-
++	msr contextidr_el1, xzr
+ #endif
+-
+-	alternative_insn SEQUENCE_ORG, SEQUENCE_ALT, ARM64_WORKAROUND_845719
+-
++1:
 +alternative_endif
- 	add	x0, x0, x2
- 	cmp	x0, x1
- 	b.lo	1b
+ #endif
+ 	.endif
+ 	msr	elr_el1, x21			// set up the return data
 -- 
 2.4.3
