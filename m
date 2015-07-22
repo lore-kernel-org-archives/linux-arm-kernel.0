@@ -1,37 +1,66 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 22 Jul 2015 11:25:16 +1000
-Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and
- munlockall system calls
-In-Reply-To: <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
-References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
- <1437508781-28655-3-git-send-email-emunson@akamai.com>
- <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
-Message-ID: <1437528316.16792.7.camel@ellerman.id.au>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 21 Jul 2015 18:29:39 -0700
+Subject: [PATCH v4 0/4] Add Broadcom North Star 2 support
+Message-ID: <1437528583-855-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-21 at 13:44 -0700, Andrew Morton wrote:
-> On Tue, 21 Jul 2015 15:59:37 -0400 Eric B Munson <emunson@akamai.com> wrote:
-> 
-> > With the refactored mlock code, introduce new system calls for mlock,
-> > munlock, and munlockall.  The new calls will allow the user to specify
-> > what lock states are being added or cleared.  mlock2 and munlock2 are
-> > trivial at the moment, but a follow on patch will add a new mlock state
-> > making them useful.
-> > 
-> > munlock2 addresses a limitation of the current implementation.  If a
-> > user calls mlockall(MCL_CURRENT | MCL_FUTURE) and then later decides
-> > that MCL_FUTURE should be removed, they would have to call munlockall()
-> > followed by mlockall(MCL_CURRENT) which could potentially be very
-> > expensive.  The new munlockall2 system call allows a user to simply
-> > clear the MCL_FUTURE flag.
-> 
-> This is hard.  Maybe we shouldn't have wired up anything other than
-> x86.  That's what we usually do with new syscalls.
+This patch series adds Broadcom North Star 2 (NS2) SoC support. NS2 is an ARMv8
+based SoC and under the Broadcom iProc family.
 
-Yeah I think so.
+Sorry for tying this with the Broadcom iProc PCIe driver fixes for ARM64. I
+have to tie them together because iProc PCIe support is enabled by default
+when ARCH_BCM_IPROC is enabled. Without the fixes in the iProc PCIe driver,
+enabling CONFIG_ARCH_BCM_IPROC would break the build for arm64 defconfig. Let
+me know if there's a better way to handle this.
 
-You haven't wired it up properly on powerpc, but I haven't mentioned it because
-I'd rather we did it.
+This patch series is generated based on v4.2-rc2 and tested on Broadcom NS2 SVK
 
-cheers
+Code available on GITHUB: https://github.com/Broadcom/arm64-linux.git
+branch is ns2-core-v4
+
+Changes from V3:
+- Add more paragraph to the iProc PCIe arm64 support patch commit message to
+explain the change and anticipated future change in more details
+
+Changes from V2:
+- Drop hardcoded earlycon kernel command line paramter in NS2 SVK dts file
+because 1) earlycon is a debugging feature that can be enabled in the
+bootloader and should not be enabled by default in the board dts file and 2)
+of_earlycon should be used and support should be added to 8250 DW driver
+
+Changes from V1:
+- Took Arnd's advice to tweak the location of struct pci_sys_data within
+struct iproc_pcie. This helps to get rid of most of the CONFIG_ARM wrap in
+iProc PCIe core driver
+- Use stdout-path and alias for serial console in NS2 SVK dts
+- Add all 4 CPU descriptions in NS2 dtsi
+- Remove "clock-frequency" property in the armv8 timer node so timer frequency
+can be determined based on readings from CNTFRQ_EL0
+- Remove config flag ARCH_BCM_NS2. Leave only ARCH_BCM_IPROC for all Broadcom
+arm64 SoCs as advised
+
+Ray Jui (4):
+  PCI: iproc: enable arm64 support for iProc PCIe
+  PCI: iproc: Fix ARM64 dependency in Kconfig
+  arm64: Add Broadcom iProc family support
+  arm64: dts: Add Broadcom North Star 2 support
+
+ Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
+ arch/arm64/Kconfig                                |    5 +
+ arch/arm64/boot/dts/Makefile                      |    1 +
+ arch/arm64/boot/dts/broadcom/Makefile             |    5 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   59 +++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi             |  118 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                      |    2 +
+ drivers/pci/host/Kconfig                          |    2 +-
+ drivers/pci/host/pcie-iproc.c                     |   15 +--
+ drivers/pci/host/pcie-iproc.h                     |    8 +-
+ 10 files changed, 210 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
+
+-- 
+1.7.9.5
