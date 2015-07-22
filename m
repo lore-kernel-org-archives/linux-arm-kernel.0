@@ -1,53 +1,66 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 22 Jul 2015 09:48:06 -0500
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jul 2015 15:54:14 +0100
 Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
  field
-In-Reply-To: <55AFABF3.5050303@arm.com>
+In-Reply-To: <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
 References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
  <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
  <20150721212644.GB3691@google.com> <55AFABF3.5050303@arm.com>
-Message-ID: <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
+ <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
+Message-ID: <55AFAE96.4070401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Hi Bjorn,
->
-> On 21/07/15 22:26, Bjorn Helgaas wrote:
->> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
->>> In order to be able to populate the device msi_domain field,
->>> add the necesary hooks to propagate the host bridge msi_domain
->>> across secondary busses to devices.
->>>
->>> So far, nobody populates the initial msi_domain.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
->>>  include/linux/pci.h |  1 +
->>>  2 files changed, 31 insertions(+)
->>>
->>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->>> index cefd636..376f6fa 100644
->>> --- a/drivers/pci/probe.c
->>> +++ b/drivers/pci/probe.c
->>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
->>>      }
->>>  }
->>>
->>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
->>> +{
->>> +}
+On 22/07/15 15:48, Bjorn Helgaas wrote:
+> On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Hi Bjorn,
 >>
->> I don't think there's anything in this series that requires this to be a
->> weak function, is there?  This is the only definition I see.
->
-> It looks like all the pcibios_* functions so far have a weak attribute,
-> and I've added it as a matter of consistency.
+>> On 21/07/15 22:26, Bjorn Helgaas wrote:
+>>> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
+>>>> In order to be able to populate the device msi_domain field,
+>>>> add the necesary hooks to propagate the host bridge msi_domain
+>>>> across secondary busses to devices.
+>>>>
+>>>> So far, nobody populates the initial msi_domain.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
+>>>>  include/linux/pci.h |  1 +
+>>>>  2 files changed, 31 insertions(+)
+>>>>
+>>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+>>>> index cefd636..376f6fa 100644
+>>>> --- a/drivers/pci/probe.c
+>>>> +++ b/drivers/pci/probe.c
+>>>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+>>>>      }
+>>>>  }
+>>>>
+>>>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
+>>>> +{
+>>>> +}
+>>>
+>>> I don't think there's anything in this series that requires this to be a
+>>> weak function, is there?  This is the only definition I see.
+>>
+>> It looks like all the pcibios_* functions so far have a weak attribute,
+>> and I've added it as a matter of consistency.
+> 
+> We've used pcibios_* names where we might need an arch-specific
+> implementation.  I'm not sure that's the case here -- do you envision
+> an implementation under arch/* someday?  If not, maybe it should just
+> be a pci_* function instead of pcibios_*.
 
-We've used pcibios_* names where we might need an arch-specific
-implementation.  I'm not sure that's the case here -- do you envision
-an implementation under arch/* someday?  If not, maybe it should just
-be a pci_* function instead of pcibios_*.
+I could definitely see non-OF driven architectures wanting to override this.
 
-Bjorn
+Or maybe we should turn it the other way around and make it call the
+various firmware interfaces (OF, ACPI...) until one of them succeeds. In
+which case your suggestion of making it a pci_* function makes a lot of
+sense.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
