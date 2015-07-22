@@ -1,66 +1,53 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 21 Jul 2015 17:01:02 -0700
-Subject: [PATCH v3 1/4] PCI: iproc: enable arm64 support for iProc PCIe
-In-Reply-To: <20150721220259.GK21967@google.com>
-References: <1437021563-29139-1-git-send-email-rjui@broadcom.com>
- <1437021563-29139-2-git-send-email-rjui@broadcom.com>
- <20150721203018.GH21967@google.com> <55AEB094.1090601@broadcom.com>
- <20150721220259.GK21967@google.com>
-Message-ID: <55AEDD3E.6060808@broadcom.com>
+From: s-anna@ti.com (Suman Anna)
+Date: Tue, 21 Jul 2015 19:01:34 -0500
+Subject: [PATCH 4/4] ARM: dts: DRA74x: Add IOMMU nodes for DSP2
+In-Reply-To: <1437523294-20058-1-git-send-email-s-anna@ti.com>
+References: <1437523294-20058-1-git-send-email-s-anna@ti.com>
+Message-ID: <1437523294-20058-5-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The DRA74x family of SoCs have a second DSP, that also has
+two MMUs just like the DSP1 subsystem. Add the IOMMU nodes
+for this DSP2 subsystem in disabled state to the DRA74x
+specific DTS file, the nodes would need to be enabled
+appropriately in the respective board DTS files.
 
+Signed-off-by: Suman Anna <s-anna@ti.com>
+---
+ arch/arm/boot/dts/dra74x.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-On 7/21/2015 3:02 PM, Bjorn Helgaas wrote:
-> On Tue, Jul 21, 2015 at 01:50:28PM -0700, Ray Jui wrote:
->>
->>
->> On 7/21/2015 1:30 PM, Bjorn Helgaas wrote:
->>> On Wed, Jul 15, 2015 at 09:39:20PM -0700, Ray Jui wrote:
->>>> This patch enables arm64 support to the iProc PCIe driver
->>>
->>> This needs a little more explanation: ARM has a common struct pci_sys_data
->>> but ARM64 does not,
->>
->> Correct, and according to Arnd, there's already work in process of
->> removing the need for pci_sys_data on arm32. Before that is done, we
->> need this in the driver for it to work on both arm32 and arm64.
->>
->> and ARM needs pci_fixup_irqs() but ARM64 does not (why
->>> not?),
->>
->> under arch/arm64/kernel/pci.c:
->>
->>  41 /*
->>  42  * Try to assign the IRQ number from DT when adding a new device
->>  43  */
->>  44 int pcibios_add_device(struct pci_dev *dev)
->>  45 {
->>  46         dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
->>  47
->>  48         return 0;
->>  49 }
->>
->> interrupt is automatically parsed and mapped when adding a new device
->> for arm64.
->>
->> ARM uses the common pci_sys_data for the PCI sysdata while ARM64
->>> uses a driver-specific sysdata, etc.
->>
->> Correct. pci_sys_data for arm32 will eventually be removed, so all arm32
->> based PCie host should only need to carry driver specific sysdata.
-> 
-> That all makes sense.  I'm just looking for a condensed version of it in
-> the changelog because it takes some digging to figure it out, and in a
-> couple months even the implicit context of "somebody's working to combine
-> arm32 and arm64" will be gone.  So we need a changelog that motivates this
-> patch as it is.
-> 
-
-Okay I will re-submit a new patch with a commit message that explains
-the change in more details.
-
-Thanks,
-
-Ray
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+index 6cb112450ddd..612cc7e13bab 100644
+--- a/arch/arm/boot/dts/dra74x.dtsi
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -76,6 +76,26 @@
+ 				dr_mode = "otg";
+ 			};
+ 		};
++
++		mmu0_dsp2: mmu at 41501000 {
++			compatible = "ti,dra7-dsp-iommu";
++			reg = <0x41501000 0x100>;
++			interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu0_dsp2";
++			#iommu-cells = <0>;
++			ti,syscon-mmuconfig = <&dsp2_system 0x0>;
++			status = "disabled";
++		};
++
++		mmu1_dsp2: mmu at 41502000 {
++			compatible = "ti,dra7-dsp-iommu";
++			reg = <0x41502000 0x100>;
++			interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
++			ti,hwmods = "mmu1_dsp2";
++			#iommu-cells = <0>;
++			ti,syscon-mmuconfig = <&dsp2_system 0x1>;
++			status = "disabled";
++		};
+ 	};
+ };
+ 
+-- 
+2.4.4
