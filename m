@@ -1,57 +1,64 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Wed, 22 Jul 2015 07:32:21 -0500
-Subject: [RESEND][PATCH 1/4] spi: davinci: Set prescale value based on
- register value
+Date: Wed, 22 Jul 2015 07:32:23 -0500
+Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit value
 In-Reply-To: <1437568344-18889-1-git-send-email-fcooper@ti.com>
 References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
-Message-ID: <1437568344-18889-2-git-send-email-fcooper@ti.com>
+Message-ID: <1437568344-18889-4-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Within davinci_spi_get_prescale() the prescale has two meanings. First one
-being the calculated prescale value and then at the end translates it to the
-prescale value that will be written to the SPI register.
-
-At first glance this can be confusing especially when comparing the minimum
-prescale value against what is seen in the TRM.
-
-To simplify things make it clear that the calculated prescale value will always
-be based on the value that will be written into the SPI register.
+SPI Davinci driver has been updated to allow SOCs to specify their minimum
+prescale value. Update the various SOCs board files that use this driver with
+their proper prescaler limit.
 
 Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 ---
- drivers/spi/spi-davinci.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-davinci/devices-da8xx.c | 2 ++
+ arch/arm/mach-davinci/dm355.c         | 1 +
+ arch/arm/mach-davinci/dm365.c         | 1 +
+ 3 files changed, 4 insertions(+)
 
-diff --git a/drivers/spi/spi-davinci.c b/drivers/spi/spi-davinci.c
-index 987afeb..b4605c4 100644
---- a/drivers/spi/spi-davinci.c
-+++ b/drivers/spi/spi-davinci.c
-@@ -255,7 +255,7 @@ static void davinci_spi_chipselect(struct spi_device *spi, int value)
-  * This function calculates the prescale value that generates a clock rate
-  * less than or equal to the specified maximum.
-  *
-- * Returns: calculated prescale - 1 for easy programming into SPI registers
-+ * Returns: calculated prescale value for easy programming into SPI registers
-  * or negative error number if valid prescalar cannot be updated.
-  */
- static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
-@@ -263,12 +263,13 @@ static inline int davinci_spi_get_prescale(struct davinci_spi *dspi,
- {
- 	int ret;
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index ddfdd82..29e08aa 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -1010,11 +1010,13 @@ static struct davinci_spi_platform_data da8xx_spi_pdata[] = {
+ 		.version	= SPI_VERSION_2,
+ 		.intr_line	= 1,
+ 		.dma_event_q	= EVENTQ_0,
++		.prescaler_limit = 2,
+ 	},
+ 	[1] = {
+ 		.version	= SPI_VERSION_2,
+ 		.intr_line	= 1,
+ 		.dma_event_q	= EVENTQ_0,
++		.prescaler_limit = 2,
+ 	},
+ };
  
--	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz);
-+	/* Subtract 1 to match what will be programmed into SPI register. */
-+	ret = DIV_ROUND_UP(clk_get_rate(dspi->clk), max_speed_hz) - 1;
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 9cbeda7..567dc56 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -411,6 +411,7 @@ static struct davinci_spi_platform_data dm355_spi0_pdata = {
+ 	.num_chipselect = 2,
+ 	.cshold_bug	= true,
+ 	.dma_event_q	= EVENTQ_1,
++	.prescaler_limit = 1,
+ };
+ static struct platform_device dm355_spi0_device = {
+ 	.name = "spi_davinci",
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index e3a3c54..6a890a8 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -646,6 +646,7 @@ static struct davinci_spi_platform_data dm365_spi0_pdata = {
+ 	.version 	= SPI_VERSION_1,
+ 	.num_chipselect = 2,
+ 	.dma_event_q	= EVENTQ_3,
++	.prescaler_limit = 1,
+ };
  
--	if (ret < 1 || ret > 256)
-+	if (ret < 0 || ret > 255)
- 		return -EINVAL;
- 
--	return ret - 1;
-+	return ret;
- }
- 
- /**
+ static struct resource dm365_spi0_resources[] = {
 -- 
 1.9.1
