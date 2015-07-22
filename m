@@ -1,120 +1,200 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 22 Jul 2015 11:01:56 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctTyHF1ciN3-0yg1smYJ5kbuwfT_kmavTL8ARuZ69wSgAg@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201507221024.05496.marex@denx.de>
- <CAOMqctTyHF1ciN3-0yg1smYJ5kbuwfT_kmavTL8ARuZ69wSgAg@mail.gmail.com>
-Message-ID: <201507221101.56441.marex@denx.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Jul 2015 10:02:48 +0100
+Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
+In-Reply-To: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20150722090248.GA344@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 22, 2015 at 10:38:14 AM, Michal Suchanek wrote:
-> On 22 July 2015 at 10:24, Marek Vasut <marex@denx.de> wrote:
-> > On Wednesday, July 22, 2015 at 10:18:04 AM, Michal Suchanek wrote:
-> >> On 22 July 2015 at 09:58, Marek Vasut <marex@denx.de> wrote:
-> >> > On Wednesday, July 22, 2015 at 09:45:27 AM, Michal Suchanek wrote:
-> >> >> On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
-> >> >> > On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
-> >> >> >> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
-> >> >> >> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
-> >> >> >> >> > Or alternatively we could publish the limitations of the
-> >> >> >> >> > channel using capabilities so SPI knows I have a dmaengine
-> >> >> >> >> > channel and it can transfer max N length transfers so would
-> >> >> >> >> > be able to break rather than guessing it or coding in DT.
-> >> >> >> >> > Yes it may come from DT but that should be dmaengine driver
-> >> >> >> >> > rather than client driver :)
-> >> >> >> >> > 
-> >> >> >> >> > This can be done by dma_get_slave_caps(chan, &caps)
-> >> >> >> >> > 
-> >> >> >> >> > And we add max_length as one more parameter to existing set
-> >> >> >> >> > 
-> >> >> >> >> > Also all this could be handled in generic SPI-dmaengine layer
-> >> >> >> >> > so that individual drivers don't have to code it in
-> >> >> >> >> > 
-> >> >> >> >> > Let me know if this idea is okay, I can push the dmaengine
-> >> >> >> >> > bits...
-> >> >> >> >> 
-> >> >> >> >> It would be ok if there was a fixed limit. However, the limit
-> >> >> >> >> depends on SPI slave settings. Presumably for other buses using
-> >> >> >> >> the dmaengine the limit would depend on the bus or slave
-> >> >> >> >> settings as well. I do not see a sane way of passing this all
-> >> >> >> >> the way to the dmaengine driver.
-> >> >> >> > 
-> >> >> >> > I don't see why this should be client (SPI) dependent. The max
-> >> >> >> > length supported is a dmaengine constraint, typically flowing
-> >> >> >> > from max blocks/length it can transfer. Know this limit can
-> >> >> >> > allow clients to split transfers.
-> >> >> >> 
-> >> >> >> In practice on the board I have the maximum transfer length before
-> >> >> >> it fails depends on SPI bus speed which is set up per slave. I
-> >> >> >> did not try searching the space of possible settings thorougly
-> >> >> >> and settled for a setting that gives reasonable speed and
-> >> >> >> transfer length.
-> >> >> > 
-> >> >> > This looks more like a signal integrity issue though.
-> >> >> 
-> >> >> It certainly does on the surface. However, when wrong data is
-> >> >> delivered over the SPI bus (such as when I use wrong phase setting)
-> >> >> the SPI controller happily delivers wrong data over PIO.
-> >> >> 
-> >> >> The failure I am seeing is that the pl330 DMA program which
-> >> >> repeatedly waits for data from the SPI controller never finishes the
-> >> >> read loop and does not signal the interrupt. It seems it also leaves
-> >> >> some data in a FIFO somewhere so next command on the flash returns
-> >> >> garbage and fails.
-> >> > 
-> >> > I observed something similar on MXS (mx28) SPI block. Do you use mixed
-> >> > PIO/DMA mode perhaps ?
-> >> 
-> >> The SPI driver uses PIO for short transfers and DMA for transfers
-> >> longer than the controller FIFO. This seems to be the standard way to
-> >> do things.It works flawlessly so long as submitting overly long DMA
-> >> programs is avoided.
-> > 
-> > Can you try doing JUST DMA, no PIO ? I remember seeing some bus
-> > synchronisation issues when I did mixed PIO/DMA on the MXS and it was
-> > nasty to track down. Just give pure DMA a go to see if the thing
-> > stabilizes somehow.
+On Mon, Jul 13, 2015 at 11:43:25AM +0100, Lorenzo Pieralisi wrote:
+> On ARM PCI systems relying on the pcibios API to initialize PCI host
+> controllers, the pcibios_msi_controller weak callback is used to look-up
+> the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
 > 
-> It's probably slower to set up DMA for 2-byte commands but it might
-> work nonetheless.
+> pci_sys_data is an arch specific structure, which prevents using the
+> same mechanism (so same PCI host controller drivers) on ARM64 systems.
+> 
+> Since the struct pci_bus already contains an msi_controller pointer and
+> the kernel already uses it to look-up the msi controller,
+> this patch converts ARM host controller and relate pcibios/host bridges
+> initialization routines so that the msi_controller pointer look-up can be
+> carried out by PCI core code through the struct pci_bus msi pointer,
+> removing the need for arch specific pcibios_msi_controller callback
+> and the related pci_sys_data msi_ctrl pointer.
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Pratyush Anand <pratyush.anand@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Jingoo Han <jingoohan1@gmail.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Simon Horman <horms@verge.net.au>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+> Bjorn, all,
+> 
+> I am posting this patch to sound out if that's a reasonable approach.
+> xgene implements MSI look-up this way at present and this would represent
+> another step forward towards having common drivers for ARM/ARM64, comments
+> and testing welcome.
 
-It is, the overhead will be considerable. It might help the stability
-though. I'm really looking forward to the results!
+Any comments/testing on this patch ? I do not have platforms
+with these host bridges handy (apart from an iMX6 Sabrelite)
+so I can't test on them (change is quite mechanical though),
+help on testing and feedback on the patch much appreciated.
 
-> I will give it a go.
-> 
-> >> > Do you have the option to connect a bus analyzer?
-> >> > I can probably offer you some tools, I'm in Prague ...
-> >> 
-> >> The flash chip is accessible when removing the bottom cover. It is
-> >> VSOP8 package slightly lower than SOP8 so attaching clips to it might
-> >> be a bit problematic. That's the only accessible part. Everything
-> >> other than SPI is inside the SoC.
-> > 
-> > That might be doable, though you might want to try the above thing first.
-> > 
-> >> Since SPI has no verification whatsoever the chip might be completely
-> >> dead and you can still read fine all zeroes or all ones when
-> >> attempting a read from it. I observed this behaviour when I used a
-> >> flash chip in a socket and it was not firmly seated. It was with a
-> >> different SPI controller, though.
-> > 
-> > You should run into issues as soon as the SPI NOR framework tries to read
-> > status register, no ?
-> 
-> Yes, when the DMA transfer fails the next command fails due to garbage
-> lying around. However, you can unload the SPI NOR driver, load spidev
-> driver, and read enough garbage to empty the fifos. Then the flash
-> identifies as normal again and you can access it.
+Thanks,
+Lorenzo
 
-Yikes :(
-
-> When the flash is not seated properly and acts autistic you get all
-> 0xff or all 0 back whatever you send to it, obvously. The
-> identification by the SPI NOR driver fails then.
+>  arch/arm/include/asm/mach/pci.h    |  3 ---
+>  arch/arm/kernel/bios32.c           | 35 +++++++++++++++++------------------
+>  drivers/pci/host/pcie-designware.c |  9 +++++++--
+>  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
+>  4 files changed, 34 insertions(+), 25 deletions(-)
 > 
-> Thanks
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 28b9bb3..32abc0c 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -42,9 +42,6 @@ struct hw_pci {
+>   * Per-controller structure
+>   */
+>  struct pci_sys_data {
+> -#ifdef CONFIG_PCI_MSI
+> -	struct msi_controller *msi_ctrl;
+> -#endif
+>  	struct list_head node;
+>  	int		busnr;		/* primary bus number			*/
+>  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..c841b33 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -18,15 +18,6 @@
+>  
+>  static int debug_pci;
+>  
+> -#ifdef CONFIG_PCI_MSI
+> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> -{
+> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
+> -
+> -	return sysdata->msi_ctrl;
+> -}
+> -#endif
+> -
+>  /*
+>   * We can't use pci_get_device() here since we are
+>   * called from interrupt context.
+> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		if (!sys)
+>  			panic("PCI: unable to allocate sys data!");
+>  
+> -#ifdef CONFIG_PCI_MSI
+> -		sys->msi_ctrl = hw->msi_ctrl;
+> -#endif
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  				break;
+>  			}
+>  
+> -			if (hw->scan)
+> +			if (hw->scan) {
+>  				sys->bus = hw->scan(nr, sys);
+> -			else
+> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+> -						hw->ops, sys, &sys->resources);
+> +				if (!sys->bus)
+> +					panic("PCI: unable to scan bus!");
+> +			} else {
+> +				sys->bus = pci_create_root_bus(parent,
+> +							       sys->busnr,
+> +							       hw->ops, sys,
+> +							       &sys->resources);
+> +				if (WARN_ON(!sys->bus)) {
+> +					kfree(sys);
+> +					break;
+> +				}
+> +#ifdef CONFIG_PCI_MSI
+> +				sys->bus->msi = hw->msi_ctrl;
+> +#endif
+>  
+> -			if (!sys->bus)
+> -				panic("PCI: unable to scan bus!");
+> +				pci_scan_child_bus(sys->bus);
+> +			}
+>  
+>  			busnr = sys->bus->busn_res.end + 1;
+>  
+> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> index 69486be..e584dfa 100644
+> --- a/drivers/pci/host/pcie-designware.c
+> +++ b/drivers/pci/host/pcie-designware.c
+> @@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>  
+>  #ifdef CONFIG_PCI_MSI
+>  	dw_pcie_msi_chip.dev = pp->dev;
+> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
+>  #endif
+>  
+>  	dw_pci.nr_controllers = 1;
+> @@ -708,11 +707,17 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>  	struct pcie_port *pp = sys_to_pcie(sys);
+>  
+>  	pp->root_bus_nr = sys->busnr;
+> -	bus = pci_scan_root_bus(pp->dev, sys->busnr,
+> +	bus = pci_create_root_bus(pp->dev, sys->busnr,
+>  				  &dw_pcie_ops, sys, &sys->resources);
+>  	if (!bus)
+>  		return NULL;
+>  
+> +#ifdef CONFIG_PCI_MSI
+> +	bus->msi = &dw_pcie_msi_chip;
+> +#endif
+> +
+> +	pci_scan_child_bus(bus);
+> +
+>  	if (bus && pp->ops->scan_bus)
+>  		pp->ops->scan_bus(pp);
+>  
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index f1a06a0..b21eb7d 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -647,9 +647,18 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>  	struct pci_bus *bus;
+>  
+>  	port->root_busno = sys->busnr;
+> -	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
+> +	bus = pci_create_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
+>  				sys, &sys->resources);
+>  
+> +	if (!bus)
+> +		return NULL;
+> +
+> +#ifdef CONFIG_PCI_MSI
+> +	bus->msi = &xilinx_pcie_msi_chip;
+> +#endif
+> +
+> +	pci_scan_child_bus(bus);
+> +
+>  	return bus;
+>  }
+>  
+> @@ -847,7 +856,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+>  
+>  #ifdef CONFIG_PCI_MSI
+>  	xilinx_pcie_msi_chip.dev = port->dev;
+> -	hw.msi_ctrl = &xilinx_pcie_msi_chip;
+>  #endif
+>  	pci_common_init_dev(dev, &hw);
+>  
+> -- 
+> 2.2.1
 > 
-> Michal
