@@ -1,85 +1,118 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 21 Jul 2015 19:50:35 -0600
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <55A4F709.1000501@tronnes.org>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
- <55A09710.3030509@wwwdotorg.org> <55A135B4.1060309@tronnes.org>
- <55A4952A.3090309@wwwdotorg.org> <55A4F709.1000501@tronnes.org>
-Message-ID: <55AEF6EB.5080403@wwwdotorg.org>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Wed, 22 Jul 2015 10:00:30 +0800
+Subject: [PATCH v4 1/5] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <20150721224406.GM21967@google.com>
+References: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
+ <20150721224406.GM21967@google.com>
+Message-ID: <55AEF93E.9040508@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/14/2015 05:48 AM, Noralf Tr?nnes wrote:
-> Den 14.07.2015 06:50, skrev Stephen Warren:
->> On 07/11/2015 09:26 AM, Noralf Tr?nnes wrote:
->>> Den 11.07.2015 06:09, skrev Stephen Warren:
->>>> (Sorry for the slow reply; I was on vacation)
->>>>
->>>> On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
->>>>> Den 18.06.2015 04:26, skrev Stephen Warren:
->>>>>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
->>>>>>> Add a duplicate irq range with an offset on the hwirq's so the
->>>>>>> driver can detect that enable_fiq() is used.
->>>>>>> Tested with downstream dwc_otg USB controller driver.
->>>>>> This basically looks OK, but a few comments/thoughts:
->>>>>> b) Doesn't the driver need to refuse some operation (handler
->>>>>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
->>>>>> FIQ range, since the FIQ control register only allows routing 1
->>>>>> IRQ to
->>>>>> FIQ.
->>>>> claim_fiq() protects the FIQ. See d) answer below.
->>>> That assumes the IRQ is "accessed" via the fiq-specific APIs. Since
->>>> this
->>>> patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
->>>> doesn't do anything special to prevent clients from using IRQs n..2n-1
->>>> via the existing IRQ APIs, it's quite possible the a buggy client
->>>> would.
->>> Yes, but doesn't this apply to all irq use, using the wrong one doesn't
->>> work.
->>> If FIQ's where in more common use, we might have seen a FIQ IRQ flag
->>> instead
->>> of special FIQ irqs.
->>>
->>>> (From another email):
->>>>>>> c) The DT binding needs updating to describe the extra IRQs:
->>>>>>>
->>>>>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
->>>>>>>>
->>>>>>>>
->>>>>> Ok.
->>>>> I have seconds thoughts on this:
->>>>> This patch does not change the DT bindings so I don't see what update
->>>>> I should make. This patch only adds support for the Linux way of
->>>>> handling FIQ's through enable_fiq(). It doesn't change how interrupts
->>>>> are described in the DT.
->>>> The intention of the patch may not be to expand the set of IRQs
->>>> available via DT, but it does in practice. I think you need to add a
->>>> custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
->>>> be translated from DT, and not IRQs n..2n-1. If you do that, then I
->>>> agree that no DT binding update should be required.
->>> armctrl_xlate() maps to the same hwirqs as before. This patch adds a
->>> new range of hwirqs at the end of the "real" hwirq range.
->>> It's not possible to get to these FIQ shadow hwirqs through DT.
->> What prevents a DT from (incorrectly) referencing the extra hwirqs?
+On 2015/7/22 6:44, Bjorn Helgaas wrote:
+> Hi Zhou & Gabriele,
 > 
-> armctrl_xlate() has these limits:
+> On Tue, Jul 21, 2015 at 02:48:39PM +0800, Zhou Wang wrote:
+>> This patch is needed in order to unify the PCIe designware framework for ARM and
+>> ARM64 architectures. In the PCIe designware unification process we are calling
+>> pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+>> ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+>> cause a problem with the function pcibios_align_resource(); in fact this will
+>> cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+>> "struct pcie_port*" pointer.
+>>
+>> This patch solves the issue by removing "align_resource" from "pci_sys_data"
+>> struct and defining a static global function pointer in "bios32.c"
+>>
+>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 > 
-> if (WARN_ON(intspec[0] >= NR_BANKS))
-> if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
-> if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
-> 
-> Thus the maximum values allowed are:
-> intspec[0]: (NR_BANKS - 1) = 2
-> intspec[1]: (IRQS_PER_BANK - 1) = 31
-> 
-> This gives a maximum hwirq:
-> *out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
-> *out_hwirq = (2 << 5) | 31 = 95
-> 
-> The FIQ shadow hwirq range starts at 96:
-> irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i) + NUMBER_IRQS);
-> 
-> NUMBER_IRQS = MAKE_HWIRQ(NR_BANKS, 0) = 96
+> Can you fix up Gabriele's email address above (currently contains " at ")
+> and verify that this sign-off chain is accurate per section 11 of
+> Documentation/SubmittingPatches?  The above suggests to me that Gabriele
+> originally wrote this patch and Zhou is passing it along.  That might well
+> be true; I haven't followed the development, so I'm just double-checking.
+>
 
-Great, thanks for the explanation. That should be fine then.
+Hi Bjorn,
+
+Sorry about above mistake. Will change it in next version.
+
+Thanks for your reminding,
+Zhou
+
+>> ---
+>>  arch/arm/include/asm/mach/pci.h |  5 -----
+>>  arch/arm/kernel/bios32.c        | 12 ++++++++----
+>>  2 files changed, 8 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+>> index 28b9bb3..8a4e4de 100644
+>> --- a/arch/arm/include/asm/mach/pci.h
+>> +++ b/arch/arm/include/asm/mach/pci.h
+>> @@ -58,11 +58,6 @@ struct pci_sys_data {
+>>  					/* IRQ mapping				*/
+>>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+>>  					/* Resource alignement requirements	*/
+>> -	resource_size_t (*align_resource)(struct pci_dev *dev,
+>> -					  const struct resource *res,
+>> -					  resource_size_t start,
+>> -					  resource_size_t size,
+>> -					  resource_size_t align);
+>>  	void		*private_data;	/* platform controller private data	*/
+>>  };
+>>  
+>> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+>> index fcbbbb1..4cdc64d 100644
+>> --- a/arch/arm/kernel/bios32.c
+>> +++ b/arch/arm/kernel/bios32.c
+>> @@ -17,6 +17,11 @@
+>>  #include <asm/mach/pci.h>
+>>  
+>>  static int debug_pci;
+>> +static resource_size_t (*align_resource)(struct pci_dev *dev,
+>> +		  const struct resource *res,
+>> +		  resource_size_t start,
+>> +		  resource_size_t size,
+>> +		  resource_size_t align) = NULL;
+>>  
+>>  #ifdef CONFIG_PCI_MSI
+>>  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+>> @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>>  		sys->busnr   = busnr;
+>>  		sys->swizzle = hw->swizzle;
+>>  		sys->map_irq = hw->map_irq;
+>> -		sys->align_resource = hw->align_resource;
+>> +		align_resource = hw->align_resource;
+>>  		INIT_LIST_HEAD(&sys->resources);
+>>  
+>>  		if (hw->private_data)
+>> @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>>  				resource_size_t size, resource_size_t align)
+>>  {
+>>  	struct pci_dev *dev = data;
+>> -	struct pci_sys_data *sys = dev->sysdata;
+>>  	resource_size_t start = res->start;
+>>  
+>>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+>> @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>>  
+>>  	start = (start + align - 1) & ~(align - 1);
+>>  
+>> -	if (sys->align_resource)
+>> -		return sys->align_resource(dev, res, start, size, align);
+>> +	if (align_resource)
+>> +		return align_resource(dev, res, start, size, align);
+>>  
+>>  	return start;
+>>  }
+>> -- 
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
