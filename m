@@ -1,74 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 22 Jul 2015 16:40:30 +0100
-Subject: [PATCH v4 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI support
- on Juno
-In-Reply-To: <20150722132809.GG14923@e106497-lin.cambridge.arm.com>
-References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
- <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
- <20150722132809.GG14923@e106497-lin.cambridge.arm.com>
-Message-ID: <55AFB96E.1050406@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jul 2015 16:49:41 +0100
+Subject: [PATCH v3 4/5] arm64: add KASAN support
+In-Reply-To: <1437561037-31995-5-git-send-email-a.ryabinin@samsung.com>
+References: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
+ <1437561037-31995-5-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150722154941.GE16627@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jul 22, 2015 at 01:30:36PM +0300, Andrey Ryabinin wrote:
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 318175f..61ebb7c 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -46,6 +46,7 @@ config ARM64
+>  	select HAVE_ARCH_AUDITSYSCALL
+>  	select HAVE_ARCH_BITREVERSE
+>  	select HAVE_ARCH_JUMP_LABEL
+> +	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
+>  	select HAVE_ARCH_KGDB
+>  	select HAVE_ARCH_SECCOMP_FILTER
+>  	select HAVE_ARCH_TRACEHOOK
+> @@ -122,6 +123,22 @@ config GENERIC_CSUM
+>  config GENERIC_CALIBRATE_DELAY
+>  	def_bool y
+>  
+> +config KASAN_SHADOW_OFFSET
+> +	hex
+> +	depends on KASAN
+> +	default 0xdfff200000000000 if ARM64_VA_BITS_48
+> +	default 0xdffffc8000000000 if ARM64_VA_BITS_42
+> +	default 0xdfffff9000000000 if ARM64_VA_BITS_39
+> +	help
+> +	  This value used to address to corresponding shadow address
+
+"This value is used to map an address to the corresponding shadow
+address..." (unless you meant something else but the above doesn't read
+well).
+
+> +	  by the following formula:
+> +	      shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
+> +
+> +	  (1 << 61) shadow addresses - [KASAN_SHADOW_OFFSET,KASAN_SHADOW_END]
+> +	  cover all 64-bits of virtual addresses. So KASAN_SHADOW_OFFSET
+> +	  should satisfy the following equation:
+> +	      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
+
+I think we should generate KASAN_SHADOW_OFFSET in the Makefile directly
+using some awk snippet/script (we are going to get a 47-bit VA as well
+with 16KB page configuration):
+
+---------8<-----------------
+#!/bin/awk -f
+
+BEGIN {
+	# 32-bit arithmetics
+	va_bits = ARGV[1] - 32
+	va_start = and(0xffffffff, lshift(0xffffffff, va_bits))
+	shadow_end = va_start + lshift(1, va_bits - 3)
+	shadow_offset = shadow_end - lshift(1, 64 - 3 - 32)
+	printf("0x%x00000000\n", shadow_offset)
+}
+-------8<-----------------
 
 
-On 22/07/15 14:28, Liviu Dudau wrote:
-> On Mon, Jun 08, 2015 at 11:40:00AM +0100, Sudeep Holla wrote:
->> This patch adds support for the MHU mailbox peripheral used on Juno by
->> application processors to communicate with remote SCP handling most of
->> the CPU/system power management. It also adds the SRAM reserving the
->> shared memory and SCPI message protocol using that shared memory.
->>
->> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
->> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   arch/arm64/boot/dts/arm/juno-base.dtsi   | 31 +++++++++++++++++++++++++++++++
->>   arch/arm64/boot/dts/arm/juno-clocks.dtsi | 23 +++++++++++++++++++++++
->>   2 files changed, 54 insertions(+)
->>
+Otherwise the code looks fine.
 
-[..]
-
->> diff --git a/arch/arm64/boot/dts/arm/juno-clocks.dtsi b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
->> index 25352ed943e6..64af7370815a 100644
->> --- a/arch/arm64/boot/dts/arm/juno-clocks.dtsi
->> +++ b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
->> @@ -42,3 +42,26 @@
->>   		clock-frequency = <400000000>;
->>   		clock-output-names = "faxi_clk";
->>   	};
->> +
->> +	scpi {
->> +		compatible = "arm,scpi";
->> +		mboxes = <&mailbox 1>;
->> +		shmem = <&cpu_scp_hpri>;
->> +
->> +		clocks {
->> +			compatible = "arm,scpi-clocks";
->> +
->> +			scpi_dvfs: scpi_clocks at 0 {
->> +				compatible = "arm,scpi-dvfs-clocks";
->> +				#clock-cells = <1>;
->> +				clock-indices = <0>, <1>, <2>;
->> +				clock-output-names = "vbig", "vlittle", "vgpu";
->> +			};
->> +			scpi_clk: scpi_clocks at 3 {
->> +				compatible = "arm,scpi-variable-clocks";
->> +				#clock-cells = <1>;
->> +				clock-indices = <3>, <4>;
->
-> Subject to you addressing Mark's comments regarding the indices values (maybe choose
-> a different property to show the fact that the index is actually an SCPI index
-> rather than the clock's), you can add my
->
-
-I don't understand why we need to do that. I will anyway follow up on
-that thread.
-
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Thanks for all the ACKs.
-
-Regards,
-Sudeep
+-- 
+Catalin
