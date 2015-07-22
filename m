@@ -1,132 +1,73 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 22 Jul 2015 17:33:07 +0800
-Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
-In-Reply-To: <55AF5A10.5000106@arm.com>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
- <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
- <20150721180542.GB32187@red-moon> <55AE8B8D.8050002@arm.com>
- <55AF55C2.4060807@linaro.org> <55AF5A10.5000106@arm.com>
-Message-ID: <55AF6353.1080204@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 22 Jul 2015 17:35:30 +0800
+Subject: [PATCH v3 1/2] arm64: dts: Add dts files for Marvell Berlin4CT SoC
+In-Reply-To: <55AF6017.6040407@arm.com>
+References: <1437555470-6283-1-git-send-email-jszhang@marvell.com>
+ <1437555470-6283-2-git-send-email-jszhang@marvell.com>
+ <55AF6017.6040407@arm.com>
+Message-ID: <20150722173530.5b7b6621@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 04:53 PM, Marc Zyngier wrote:
-> On 22/07/15 09:35, Hanjun Guo wrote:
->> On 07/22/2015 02:12 AM, Marc Zyngier wrote:
->>> On 21/07/15 19:05, Lorenzo Pieralisi wrote:
->>>> On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
->>>>> Now that the basic ACPI GSI code is irq domain aware, make sure
->>>>> that the ACPI support in the GIC doesn't pointlessly deviate from
->>>>> the DT path.
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>    drivers/irqchip/irq-gic.c       | 17 ++++++-----------
->>>>>    include/linux/irqchip/arm-gic.h |  2 +-
->>>>>    2 files changed, 7 insertions(+), 12 deletions(-)
->>>>>
->>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>>>> index b41ccf5..f5d365d 100644
->>>>> --- a/drivers/irqchip/irq-gic.c
->>>>> +++ b/drivers/irqchip/irq-gic.c
->>>>> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->>>>>    {
->>>>>    	unsigned long ret = 0;
->>>>>
->>>>> -	if (irq_domain_get_of_node(d) != controller)
->>>>> -		return -EINVAL;
->>>>>    	if (intsize < 3)
->>>>>    		return -EINVAL;
->>>>>
->>>>> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
->>>>>
->>>>>    void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>    			   void __iomem *dist_base, void __iomem *cpu_base,
->>>>> -			   u32 percpu_offset, struct device_node *node)
->>>>> +			   u32 percpu_offset, void *domain_token)
->>>>>    {
->>>>>    	irq_hw_number_t hwirq_base;
->>>>>    	struct gic_chip_data *gic;
->>>>> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>    		gic_irqs = 1020;
->>>>>    	gic->gic_irqs = gic_irqs;
->>>>>
->>>>> -	if (node) {		/* DT case */
->>>>> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
->>>>> +	if (domain_token) {		/* DT/ACPI case */
->>>>> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
->>>>>    						    &gic_irq_domain_hierarchy_ops,
->>>>>    						    gic);
->>>>>    	} else {		/* Non-DT case */
->>>>> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>>>    			irq_base = irq_start;
->>>>>    		}
->>>>>
->>>>> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->>>>> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
->>>>>    					hwirq_base, &gic_irq_domain_ops, gic);
->>>>>    	}
->>>>>
->>>>> @@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
->>>>>    	}
->>>>>
->>>>>    	/*
->>>>> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->>>>> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
->>>>> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->>>>> +	 * Initialize zero GIC instance (no multi-GIC support).
->>>>>    	 */
->>>>> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->>>>> -	irq_set_default_host(gic_data[0].domain);
->>>>> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
->>>>
->>>> Nit: the acpi_irq_model_id enum starts from 0, I do not think we will
->>>> use the IRQ domain look-up for the ACPI_IRQ_MODEL_PIC but we have
->>>> to be careful anyway.
->>>
->>> Yeah, I noticed that one too, but couldn't imagine the PIC being
->>> migrated to that model just yet. It looks like it would be pretty
->>> harmless to set ACPI_IRQ_MODEL_PIC to 1, and introduce
->>> ACPI_IRQ_MODEL_ILLEGAL as zero.
->>
->> I think this will be a problem, because acpi_irq_model_id enum actually
->> is defined by the ACPI spec, and the value is used to report to BIOS
->> the current interrupt model used by OS, see section 5.8.1 _PIC Method
->> in ACPI 6.0:
->>
->> 0 ? PIC mode
->> 1 ? APIC mode
->> 2 ? SAPIC mode
->> Other values ?Reserved
->
-> Ah, right.
->
->> so we can't set ACPI_IRQ_MODEL_PIC to 1 as it may break the firmware,
->> also _PIC method actually is not needed for ARM platform at all, we
->> don't need to report to firmware the interrupt model used by OS on
->> ARM, it only used by legacy IA platforms, actually I'm planning to
->> remove acpi_irq_model_id on ARM64.
->
-> Remove? I don't get it. Either ACPI_IRQ_MODEL_GIC is a leval value, and
-> you can't remove it, or it is not, and I wonder how it ended up here the
-> first place.
+Dear Sudeep,
 
-The best solution is that we don't call _PIC method on ARM at all
-(acpi_irq_model is used for _PIC method), but we can live with it since
-there is no harm if ARM firmware don't care about the value or ARM
-firmware don't define _PIC method in DSDT.
+On Wed, 22 Jul 2015 10:19:19 +0100
+Sudeep Holla <sudeep.holla@arm.com> wrote:
 
->
->> So to me acpi_irq_model_id is suitable for the token, can we use
->                               is *not* ?
->> another one as the token? how about the GIC ID in the MADT table?
->> and this also can be used for x86 (IOAPIC IDs) too.
->
-> You can use whatever you want, just not a pointer. I'll add a token
-> parameter to the acpi_set_irq_model function that I mentioned in my
-> reply to Lorenzo.
+> 
+> 
+> On 22/07/15 09:57, Jisheng Zhang wrote:
+> > Add initial dtsi file to support Marvell Berlin4CT SoC with
+> > quad Cortex-A53 CPUs.
+> >
+> > It also adds dts file for Marvell Berlin4CT DMP board which is
+> > based on Berlin4CT SoC.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >   arch/arm64/boot/dts/Makefile                  |   1 +
+> >   arch/arm64/boot/dts/marvell/Makefile          |   5 +
+> >   arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  67 +++++++++++
+> >   arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
+> >   4 files changed, 237 insertions(+)
+> >   create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+> >   create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+> >   create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+> >
+> 
+> [..]
+> 
+> > diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+> > new file mode 100644
+> > index 0000000..58ed7f1
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+> > @@ -0,0 +1,67 @@
+> 
+> [..]
+> 
+> > +/dts-v1/;
+> > +
+> > +#include "berlin4ct.dtsi"
+> > +
+> > +/ {
+> > +	model = "MARVELL BG4CT DMP BOARD";
+> > +	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
+> > +
+> > +	chosen {
+> > +		bootargs = "earlycon=uart8250,mmio32,0xf7fcd000";
+> > +		stdout-path = "serial0:115200n8";
+> 
+> Just earlycon without any parameters will suffice. Currently earlycon
+> parsing code has issues and it's being worked out[1]. The serial port
+> details specified in stdout-path will be used by earlycon.
+> 
+> Regards,
+> Sudeep
+> 
+> [1] https://lkml.org/lkml/2015/4/8/604
 
-Thank you, I will wait for the v2 to rebase my ACPI GICv3 patches.
+I just found all arm64 ports don't have bootargs, so neither earlycon, I will
+follow this behavior. Will send out v4 later.
 
 Thanks
-Hanjun
