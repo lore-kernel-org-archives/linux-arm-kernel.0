@@ -1,64 +1,67 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 22 Jul 2015 09:58:00 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctTmRy0gOchdUQ+VnoV-oJz0v9NpUPLi1pxO_O9QrLXsZA@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <201507220933.19752.marex@denx.de>
- <CAOMqctTmRy0gOchdUQ+VnoV-oJz0v9NpUPLi1pxO_O9QrLXsZA@mail.gmail.com>
-Message-ID: <201507220958.00231.marex@denx.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 22 Jul 2015 09:57:56 +0200 (CEST)
+Subject: [PATCH 1/5] genirq: irqdomain: Use an accessor for the of_node
+ field
+In-Reply-To: <55AF47D7.8010304@linaro.org>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
+ <55AF47D7.8010304@linaro.org>
+Message-ID: <alpine.DEB.2.11.1507220937350.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 22, 2015 at 09:45:27 AM, Michal Suchanek wrote:
-> On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
-> > On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
-> >> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
-> >> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
-> >> >> > Or alternatively we could publish the limitations of the channel
-> >> >> > using capabilities so SPI knows I have a dmaengine channel and it
-> >> >> > can transfer max N length transfers so would be able to break
-> >> >> > rather than guessing it or coding in DT. Yes it may come from DT
-> >> >> > but that should be dmaengine driver rather than client driver :)
-> >> >> > 
-> >> >> > This can be done by dma_get_slave_caps(chan, &caps)
-> >> >> > 
-> >> >> > And we add max_length as one more parameter to existing set
-> >> >> > 
-> >> >> > Also all this could be handled in generic SPI-dmaengine layer so
-> >> >> > that individual drivers don't have to code it in
-> >> >> > 
-> >> >> > Let me know if this idea is okay, I can push the dmaengine bits...
-> >> >> 
-> >> >> It would be ok if there was a fixed limit. However, the limit depends
-> >> >> on SPI slave settings. Presumably for other buses using the dmaengine
-> >> >> the limit would depend on the bus or slave settings as well. I do not
-> >> >> see a sane way of passing this all the way to the dmaengine driver.
-> >> > 
-> >> > I don't see why this should be client (SPI) dependent. The max length
-> >> > supported is a dmaengine constraint, typically flowing from max
-> >> > blocks/length it can transfer. Know this limit can allow clients to
-> >> > split transfers.
-> >> 
-> >> In practice on the board I have the maximum transfer length before it
-> >> fails depends on SPI bus speed which is set up per slave. I did not
-> >> try searching the space of possible settings thorougly and settled for
-> >> a setting that gives reasonable speed and transfer length.
+BOn Wed, 22 Jul 2015, Hanjun Guo wrote:
+
+> On 07/21/2015 06:07 PM, Marc Zyngier wrote:
+> > The struct irq_domain contains a "struct device_node *" field
+> > (of_node) that is almost the only link between the irqdomain
+> > and the device tree infrastructure.
 > > 
-> > This looks more like a signal integrity issue though.
+>1;2802;0c > In order to prepare for the removal of that field, convert all
+> > users outside of kernel/irq/irqdomain.c to use an accessor.
+> > 
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> >   arch/mips/cavium-octeon/octeon-irq.c          | 4 ++--
+> >   arch/powerpc/platforms/cell/axon_msi.c        | 2 +-
+> >   arch/powerpc/platforms/cell/spider-pic.c      | 9 ++++++---
+> >   arch/powerpc/platforms/powernv/opal-irqchip.c | 2 +-
+> >   arch/powerpc/sysdev/ehv_pic.c                 | 3 ++-
+> >   arch/powerpc/sysdev/fsl_msi.c                 | 2 +-
+> >   arch/powerpc/sysdev/i8259.c                   | 3 ++-
+> >   arch/powerpc/sysdev/ipic.c                    | 3 ++-
+> >   arch/powerpc/sysdev/mpic.c                    | 3 ++-
+> >   arch/powerpc/sysdev/mpic_msi.c                | 2 +-
+> >   arch/powerpc/sysdev/qe_lib/qe_ic.c            | 3 ++-
+> >   drivers/gpio/gpio-sodaville.c                 | 2 +-
+> >   drivers/irqchip/exynos-combiner.c             | 2 +-
+> >   drivers/irqchip/irq-atmel-aic-common.c        | 2 +-
+> >   drivers/irqchip/irq-crossbar.c                | 4 ++--
+> >   drivers/irqchip/irq-gic-v2m.c                 | 2 +-
+> >   drivers/irqchip/irq-gic-v3-its.c              | 2 +-
+> >   drivers/irqchip/irq-gic-v3.c                  | 2 +-
+> >   drivers/irqchip/irq-gic.c                     | 2 +-
+> >   drivers/irqchip/irq-hip04.c                   | 2 +-
+> >   drivers/irqchip/irq-mtk-sysirq.c              | 2 +-
+> >   drivers/irqchip/irq-s3c24xx.c                 | 4 ++--
+> >   drivers/irqchip/irq-tegra.c                   | 4 ++--
+> >   drivers/irqchip/irq-vf610-mscm-ir.c           | 5 +++--
+> >   drivers/spmi/spmi-pmic-arb.c                  | 2 +-
+> >   include/linux/irqdomain.h                     | 5 +++++
+> >   26 files changed, 46 insertions(+), 32 deletions(-)
 > 
-> It certainly does on the surface. However, when wrong data is
-> delivered over the SPI bus (such as when I use wrong phase setting)
-> the SPI controller happily delivers wrong data over PIO.
+> It seems to me that some other files missed,
+> in arch/powerpc/platforms/pasemi/msi.c:
 > 
-> The failure I am seeing is that the pl330 DMA program which repeatedly
-> waits for data from the SPI controller never finishes the read loop
-> and does not signal the interrupt. It seems it also leaves some data
-> in a FIFO somewhere so next command on the flash returns garbage and
-> fails.
+>         if (!mpic->irqhost->of_node ||
+>             !of_device_is_compatible(mpic->irqhost->of_node,
+>                                      "pasemi,pwrficient-openpic"))
+>                 return -ENODEV;
+> 
+> If you need more eyes to find all of them, please count me in :)
 
-I observed something similar on MXS (mx28) SPI block. Do you use mixed
-PIO/DMA mode perhaps ? Do you have the option to connect a bus analyzer?
-I can probably offer you some tools, I'm in Prague ...
+The proper tool to find them is coccinelle, not eyes.
 
-Best regards,
-Marek Vasut
+Thanks,
+
+	tglx
