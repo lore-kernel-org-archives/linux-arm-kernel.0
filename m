@@ -1,8 +1,10 @@
 From: romain.perier@gmail.com (Romain Perier)
-Date: Wed, 22 Jul 2015 07:43:26 +0200
+Date: Wed, 22 Jul 2015 07:43:27 +0200
 Subject: [PATCH 1/2] ARM: dts: rockchip: Use correct dts properties for tsadc
  node
-Message-ID: <1437543807-19852-1-git-send-email-romain.perier@gmail.com>
+In-Reply-To: <1437543807-19852-1-git-send-email-romain.perier@gmail.com>
+References: <1437543807-19852-1-git-send-email-romain.perier@gmail.com>
+Message-ID: <1437543807-19852-2-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
