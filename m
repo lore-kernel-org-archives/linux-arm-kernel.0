@@ -1,45 +1,75 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jul 2015 19:14:40 +0100
-Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
- Never
-In-Reply-To: <55AFDB46.3060302@arm.com>
-References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
- <1437481411-1595-7-git-send-email-james.morse@arm.com>
- <20150721123830.GD25887@localhost> <20150722170140.GR6650@arm.com>
- <55AFDB46.3060302@arm.com>
-Message-ID: <20150722181440.GS6650@arm.com>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Wed, 22 Jul 2015 13:15:16 -0500
+Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
+In-Reply-To: <20140804142507.GP30458@sirena.org.uk>
+References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
+ <1398657227-20721-4-git-send-email-b32955@freescale.com>
+ <20140730050843.GE11952@brian-ubuntu>
+ <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
+ <20140730074500.GF11952@brian-ubuntu>
+ <20140730104607.GQ17528@sirena.org.uk>
+ <20140802020617.GS3711@ld-irv-0074>
+ <CAMuHMdWxzKG1TTUVgYqfRP0Prp85HPwVxH7NQp7S-pNeLfFqjA@mail.gmail.com>
+ <20140804142507.GP30458@sirena.org.uk>
+Message-ID: <CAHrpEqQNSgkakXN8kAT1FwPv7Ou_ERkOTJrX-4Vmb=TogzsF2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 07:04:54PM +0100, James Morse wrote:
-> On 22/07/15 18:01, Will Deacon wrote:
-> > I've applied your series with the exception of this last one, as it
-> > conflicts with some other patches I have queued for 4.3. Please can you
-> > rebase this against the arm64 "devel" branch? (usually it would be
-> > for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
-> > build is broken atm).
-> 
-> The version of patch 5 "arm64: kernel: Add optional CONFIG_ parameter to
-> ALTERNATIVE()" in your tree has:
-> 
-> > [will: removed unused asm macro changes for now to avoid conflicts]
-> 
-> Those were used in arch/arm64/lib/clear_user.S and friends.
-> I shall remove the 'CONFIG_ARM64_PAN' from those four asm files - it can be
-> tidied up later.
+On Mon, Aug 4, 2014 at 9:25 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Sat, Aug 02, 2014 at 11:09:09AM +0200, Geert Uytterhoeven wrote:
+>> On Sat, Aug 2, 2014 at 4:06 AM, Brian Norris
+>> > On Wed, Jul 30, 2014 at 11:46:07AM +0100, Mark Brown wrote:
+>
+>> >> I don't know what DDR is in this context, sorry.
+>
+>> > I think it's just the ability to latch data on both the rising and
+>> > falling edges of the SPI clock. For SPI flash, it seems to be used for
+>> > the data portion of the opcode/address/data sequence.
+>
+>> > Yeah, I suppose it could be wedged in later if drivers/spi/ ever adopts
+>> > a solution.
+>
+>> I think this can just be another SPI_* spi_device.mode flag.
+>
+> Sounds like it yes - I was wondering if this might be one of the modes
+> with extra clock cycles that I've heard mentioned before which might be
+> a little more fun.
+>
+>> Do we need bindings for this in
+>> Documentation/devicetree/bindings/spi/spi-bus.txt?
+>> Unlike Quad SPI transfer support, this doesn't need special wiring, so DDR
+>> capability is an intrinsic property of the SPI slave, and the mode bit can just
+>> be set in the SPI slave driver, without any DT magic?
+>
+> Right, unless we run into things like board design issues causing
+> constraints this is something that can be enabled by the two drivers
+> without needing DT configuration.
 
-Ah, damn, I didn't realise you'd made the ALTERNATIVE macro work for both
-C and asm. The reason I changed it is because I don't know what's best to
-do with the new alternative_if_not macros -- having an enabled argument
-for the _else and _endif variants is really odd.
+All:
 
-I think the options are:
+we plan resume this work.
+I need direction how go ahead further.
 
-  (1) Just spit out a NOP (you're current approach)
-  (2) Use #ifdefs at the caller
-  (3) Only have the option for alternative_insn
-  (4) Add the option to all the alternative_ macros
+I go through this email thread.
 
-What do you reckon?
+The discussion focus on how to get dummy cycle information.
 
-Will
+Shijie get it from DT.
+
+Brain suggest get from CFI or map id table if I understand correct.
+
+Accodring to spec
+http://www.spansion.com/Support/Datasheets/S25FL128S_256S_00.pdf
+
+Table 8.10
+
+Dummy cycle depend on frequency, read command.
+
+if information saved in driver, it will be huge table.
+
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
