@@ -1,61 +1,51 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 22 Jul 2015 20:53:05 +0800
-Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
- platform
+Date: Wed, 22 Jul 2015 20:53:09 +0800
+Subject: [PATCH V2 10/11] mmc: sdhci-esdhc-imx: clear f_max in boarddata
 In-Reply-To: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
 References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1437569590-5228-11-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current card detect probe process is that when driver finds a valid
-ESDHC_CD_GPIO, it will clear the quirk SDHCI_QUIRK_BROKEN_CARD_DETECTION
-which is set by default for all esdhc/usdhc controllers.
-Then host driver will know there's a valid card detect function.
+After commit 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()"),
+it's not used anymore.
 
-Commit 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
-breaks GPIO CD function for dt platform that it will return directly
-when find ESDHC_CD_GPIO for dt platform which result in the later wrongly
-to keep SDHCI_QUIRK_BROKEN_CARD_DETECTION for all dt platforms.
-Then MMC_CAP_NEEDS_POLL will be used instead even there's a valid
-GPIO card detect.
-
-This patch adds back this function and follows the original approach to
-clear the quirk if find an valid CD GPIO for dt platforms.
-
-Fixes: 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
 Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c          | 7 +------
+ include/linux/platform_data/mmc-esdhc-imx.h | 1 -
+ 2 files changed, 1 insertion(+), 7 deletions(-)
 
 diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index faf0cb9..4815391 100644
+index 1b0e618..c6b9f64 100644
 --- a/drivers/mmc/host/sdhci-esdhc-imx.c
 +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -881,6 +881,7 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
- 			 struct esdhc_platform_data *boarddata)
+@@ -581,13 +581,8 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
+ static unsigned int esdhc_pltfm_get_max_clock(struct sdhci_host *host)
  {
- 	struct device_node *np = pdev->dev.of_node;
-+	int ret;
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+-	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+-	struct esdhc_platform_data *boarddata = &imx_data->boarddata;
  
- 	if (!np)
- 		return -ENODEV;
-@@ -917,7 +918,14 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
- 	mmc_of_parse_voltage(np, &host->ocr_mask);
- 
- 	/* call to generic mmc_of_parse to support additional capabilities */
--	return mmc_of_parse(host->mmc);
-+	ret = mmc_of_parse(host->mmc);
-+	if (ret)
-+		return ret;
-+
-+	if (!IS_ERR_VALUE(mmc_gpio_get_cd(host->mmc)))
-+		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
-+
-+	return 0;
+-	if (boarddata->f_max && (boarddata->f_max < pltfm_host->clock))
+-		return boarddata->f_max;
+-	else
+-		return pltfm_host->clock;
++	return pltfm_host->clock;
  }
- #else
- static inline int
+ 
+ static unsigned int esdhc_pltfm_get_min_clock(struct sdhci_host *host)
+diff --git a/include/linux/platform_data/mmc-esdhc-imx.h b/include/linux/platform_data/mmc-esdhc-imx.h
+index 75f70f6..e1571ef 100644
+--- a/include/linux/platform_data/mmc-esdhc-imx.h
++++ b/include/linux/platform_data/mmc-esdhc-imx.h
+@@ -43,7 +43,6 @@ struct esdhc_platform_data {
+ 	enum wp_types wp_type;
+ 	enum cd_types cd_type;
+ 	int max_bus_width;
+-	unsigned int f_max;
+ 	bool support_vsel;
+ 	unsigned int delay_line;
+ };
 -- 
 1.9.1
