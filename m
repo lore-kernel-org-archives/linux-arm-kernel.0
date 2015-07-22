@@ -1,64 +1,110 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Wed, 22 Jul 2015 16:24:49 +0800
-Subject: [PATCH 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT
- when setup
-In-Reply-To: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
-References: <1436779969-18610-1-git-send-email-yingjoe.chen@mediatek.com>
- <1436779969-18610-2-git-send-email-yingjoe.chen@mediatek.com>
- <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
-Message-ID: <1437553489.22203.6.camel@mtksdaap41>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 22 Jul 2015 16:35:14 +0800
+Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
+In-Reply-To: <55AE8B8D.8050002@arm.com>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
+ <20150721180542.GB32187@red-moon> <55AE8B8D.8050002@arm.com>
+Message-ID: <55AF55C2.4060807@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-14 at 15:39 +0800, Daniel Kurtz wrote:
-> Hi Yingjoe,
-> 
-> On Mon, Jul 13, 2015 at 5:32 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > Spurious mtk timer interrupt is noticed at boot and cause kernel
-> > crash. It seems if GPT is enabled, it will latch irq status even
-> > when its IRQ is disabled. When irq is enabled afterward, we see
-> > spurious interrupt.
-> > Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> > ---
-> >  drivers/clocksource/mtk_timer.c | 16 ++++++++++------
-> >  1 file changed, 10 insertions(+), 6 deletions(-)
-> >
-> > diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
-> > index 68ab423..237c20b 100644
-> > --- a/drivers/clocksource/mtk_timer.c
-> > +++ b/drivers/clocksource/mtk_timer.c
-> > @@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
-> >         writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
-> >  }
-> >
-> > -static void
-> > -mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
-> > +static void mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer,
-> > +                           u8 option, bool enable)
-> 
-> This function can be: __init
-> 
-> Other than this tiny nit, and the small potential conflict in patch 4,
-> this whole series is:
-> 
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> 
-> (I do think it is a bit strange that the mediatek,mt6577-timer binding
-> does not use "clock-names", but that is independent of this patch
-> set).
-> 
+On 07/22/2015 02:12 AM, Marc Zyngier wrote:
+> On 21/07/15 19:05, Lorenzo Pieralisi wrote:
+>> On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
+>>> Now that the basic ACPI GSI code is irq domain aware, make sure
+>>> that the ACPI support in the GIC doesn't pointlessly deviate from
+>>> the DT path.
+>>>
+>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>> ---
+>>>   drivers/irqchip/irq-gic.c       | 17 ++++++-----------
+>>>   include/linux/irqchip/arm-gic.h |  2 +-
+>>>   2 files changed, 7 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index b41ccf5..f5d365d 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>>>   {
+>>>   	unsigned long ret = 0;
+>>>
+>>> -	if (irq_domain_get_of_node(d) != controller)
+>>> -		return -EINVAL;
+>>>   	if (intsize < 3)
+>>>   		return -EINVAL;
+>>>
+>>> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
+>>>
+>>>   void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>   			   void __iomem *dist_base, void __iomem *cpu_base,
+>>> -			   u32 percpu_offset, struct device_node *node)
+>>> +			   u32 percpu_offset, void *domain_token)
+>>>   {
+>>>   	irq_hw_number_t hwirq_base;
+>>>   	struct gic_chip_data *gic;
+>>> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>   		gic_irqs = 1020;
+>>>   	gic->gic_irqs = gic_irqs;
+>>>
+>>> -	if (node) {		/* DT case */
+>>> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>> +	if (domain_token) {		/* DT/ACPI case */
+>>> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
+>>>   						    &gic_irq_domain_hierarchy_ops,
+>>>   						    gic);
+>>>   	} else {		/* Non-DT case */
+>>> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>   			irq_base = irq_start;
+>>>   		}
+>>>
+>>> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+>>> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
+>>>   					hwirq_base, &gic_irq_domain_ops, gic);
+>>>   	}
+>>>
+>>> @@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>>>   	}
+>>>
+>>>   	/*
+>>> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+>>> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+>>> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+>>> +	 * Initialize zero GIC instance (no multi-GIC support).
+>>>   	 */
+>>> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+>>> -	irq_set_default_host(gic_data[0].domain);
+>>> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
+>>
+>> Nit: the acpi_irq_model_id enum starts from 0, I do not think we will
+>> use the IRQ domain look-up for the ACPI_IRQ_MODEL_PIC but we have
+>> to be careful anyway.
+>
+> Yeah, I noticed that one too, but couldn't imagine the PIC being
+> migrated to that model just yet. It looks like it would be pretty
+> harmless to set ACPI_IRQ_MODEL_PIC to 1, and introduce
+> ACPI_IRQ_MODEL_ILLEGAL as zero.
 
+I think this will be a problem, because acpi_irq_model_id enum actually
+is defined by the ACPI spec, and the value is used to report to BIOS
+the current interrupt model used by OS, see section 5.8.1 _PIC Method
+in ACPI 6.0:
 
-Hi Daniel,
+0 ? PIC mode
+1 ? APIC mode
+2 ? SAPIC mode
+Other values ?Reserved
 
-Thanks for your review.
+so we can't set ACPI_IRQ_MODEL_PIC to 1 as it may break the firmware,
+also _PIC method actually is not needed for ARM platform at all, we
+don't need to report to firmware the interrupt model used by OS on
+ARM, it only used by legacy IA platforms, actually I'm planning to
+remove acpi_irq_model_id on ARM64.
 
-I added __init as you suggested, and Pi-Cheng already sent an updated
-version of his patch to resolve the conflict[1].
+So to me acpi_irq_model_id is suitable for the token, can we use
+another one as the token? how about the GIC ID in the MADT table?
+and this also can be used for x86 (IOAPIC IDs) too.
 
-Joe.C
-
-[1]
-http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001592.html
+Thanks
+Hanjun
