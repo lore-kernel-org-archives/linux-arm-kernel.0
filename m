@@ -1,32 +1,77 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 22 Jul 2015 16:13:39 +0800
-Subject: [PATCH 2/5] genirq: irqdomain: Remove irqdomain dependency on
- struct device_node
-In-Reply-To: <20150721175623.GA32187@red-moon>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
- <1437473280-11431-3-git-send-email-marc.zyngier@arm.com>
- <20150721175623.GA32187@red-moon>
-Message-ID: <55AF50B3.5090804@linaro.org>
+From: yingjoe.chen@mediatek.com (Yingjoe Chen)
+Date: Wed, 22 Jul 2015 16:14:38 +0800
+Subject: [PATCH v2 1/5] clocksource: mediatek: do not enable GPT_CLK_EVT when
+ setup
+In-Reply-To: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+References: <CAGS+omD8k_Cfxv3bYyjmjtLbiavo-WmJPn0Z-CBhN_nnv65Tag@mail.gmail.com>
+Message-ID: <1437552878-3684-1-git-send-email-yingjoe.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 01:56 AM, Lorenzo Pieralisi wrote:
-> On Tue, Jul 21, 2015 at 11:07:57AM +0100, Marc Zyngier wrote:
->> struct device_node is very much DT specific, and the original authors
->> of the irqdomain subsystem recognized that tie, and went as far as
->> mentionning that this could be replaced by some "void *token",
->> should another firmware infrastructure be using it.
->
-> Yes, that's similar to the problem Rafael solved with fwnode_handle,
-> I do not know if we can extend the fwnode_handle to manage these
-> generic tokens too, but the approach you have taken seem the right
-> one to me (and you are doing this for components that are not really
-> attached to struct device so I am not sure the fwnode_handle approach
-> can be shoehorned to solve it).
+Spurious mtk timer interrupt is noticed at boot and cause kernel
+crash. It seems if GPT is enabled, it will latch irq status even
+when its IRQ is disabled. When irq is enabled afterward, we see
+spurious interrupt.
+Change init flow to only enable GPT_CLK_SRC at mtk_timer_init.
 
-If I understand correctly, fwnode_handle is not better , since
-we need to update every caller of irqdomain functions as it's a new
-type of pointer, that's will be the big change, void * is just fine.
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+---
 
-Thanks
-Hanjun
+Update to my patch [1], added __init as Daniel suggest. This is the
+only patch that need to change in that series, so I only sent this one.
+
+http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001545.html
+
+ drivers/clocksource/mtk_timer.c | 16 ++++++++++------
+ 1 file changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 68ab423..2ba5b66 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -156,9 +156,11 @@ static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+ 	writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+ }
+ 
+-static void
+-mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
++static void __init mtk_timer_setup(struct mtk_clock_event_device *evt,
++				   u8 timer, u8 option, bool enable)
+ {
++	u32 val;
++
+ 	writel(TIMER_CTRL_CLEAR | TIMER_CTRL_DISABLE,
+ 		evt->gpt_base + TIMER_CTRL_REG(timer));
+ 
+@@ -167,8 +169,10 @@ mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+ 
+ 	writel(0x0, evt->gpt_base + TIMER_CMP_REG(timer));
+ 
+-	writel(TIMER_CTRL_OP(option) | TIMER_CTRL_ENABLE,
+-			evt->gpt_base + TIMER_CTRL_REG(timer));
++	val = TIMER_CTRL_OP(option);
++	if (enable)
++		val |= TIMER_CTRL_ENABLE;
++	writel(val, evt->gpt_base + TIMER_CTRL_REG(timer));
+ }
+ 
+ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+@@ -235,12 +239,12 @@ static void __init mtk_timer_init(struct device_node *node)
+ 	evt->ticks_per_jiffy = DIV_ROUND_UP(rate, HZ);
+ 
+ 	/* Configure clock source */
+-	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN);
++	mtk_timer_setup(evt, GPT_CLK_SRC, TIMER_CTRL_OP_FREERUN, true);
+ 	clocksource_mmio_init(evt->gpt_base + TIMER_CNT_REG(GPT_CLK_SRC),
+ 			node->name, rate, 300, 32, clocksource_mmio_readl_up);
+ 
+ 	/* Configure clock event */
+-	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT);
++	mtk_timer_setup(evt, GPT_CLK_EVT, TIMER_CTRL_OP_REPEAT, false);
+ 	clockevents_config_and_register(&evt->dev, rate, 0x3,
+ 					0xffffffff);
+ 
+-- 
+1.8.1.1.dirty
