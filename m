@@ -1,13 +1,13 @@
 From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 22 Jul 2015 19:22:52 +0200
-Subject: [GIT PULL] STi DT changes for v4.3, round 1
-Message-ID: <55AFD16C.7020006@st.com>
+Date: Wed, 22 Jul 2015 19:23:01 +0200
+Subject: [GIT PULL]STi SoC changes for v4.3, round 1
+Message-ID: <55AFD175.6030807@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+Hi Arnd, Olof, Kevin,
 
-Please consider this first round of STi DT updates for v4.3:
+Please consider this first round of STi SoC changes for v4.3:
 
 The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
@@ -16,54 +16,29 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 are available in the git repository at:
 
    https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git 
-tags/sti-dt-for-v4.3-1
+tags/sti-soc-for-v4.3-1
 
-for you to fetch changes up to 794445095791aa4f92dfd802f08b541167d63ecc:
+for you to fetch changes up to 50de4dd4bc6a6e378841a6705696d2c1f37ac038:
 
-   ARM: DT: STiH410: Add bdisp dt nodes (2015-07-22 15:05:31 +0200)
+   ARM: STi: Remove platform call to trace_hardirqs_off() (2015-07-22 
+11:15:30 +0200)
 
 ----------------------------------------------------------------
-STi DT update for v4.3, round 1.
+STi SoC updates for v4.3, round 1.
 
 Highlights:
 -----------
-  - Add pinctrl configurations for transport stream channels
-  - Add cpu-release-addr properties to STiH407 and STiH418
-  - Add PWM regulator support so STIH407 family
-  - Add BDISP node to STiH407
+  - Add code to release secondary cores from holding pen.
+  - Remove useless call to trace_hardirqs_off() in secondary core init 
+function.
 
 ----------------------------------------------------------------
-Fabien Dessenne (1):
-       ARM: DT: STiH410: Add bdisp dt nodes
+Peter Griffin (2):
+       ARM: STi: Add code to release secondary cores from holding pen.
+       ARM: STi: Remove platform call to trace_hardirqs_off()
 
-Gabriel Fernandez (1):
-       ARM: STi: DT: Rename st_pll3200c32_407_c0_x into st_pll3200c32_cx_x
-
-Lee Jones (2):
-       ARM: STi: STiH407: Move PWM nodes STiH407 => STiH407-family
-       ARM: STi: STiH407: Add PWM Regulator node
-
-Peter Griffin (11):
-       ARM: STi: DT: Add STiH407 family tsin0 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsin1 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsin2 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsin3 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsin4 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsin5 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsout0 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family tsout1 pinctrl configuration
-       ARM: STi: DT: Add STiH407 family mtsin0 pinctrl configuration
-       ARM: STi: DT: STiH407: Add cpu-release-addr dt property.
-       ARM: STi: DT: STiH418: Add cpu-release-addr dt property.
-
-  .../devicetree/bindings/clock/st/st,clkgen-pll.txt |   4 +-
-  arch/arm/boot/dts/stih407-clock.dtsi               |   4 +-
-  arch/arm/boot/dts/stih407-family.dtsi              |  45 +++++
-  arch/arm/boot/dts/stih407-pinctrl.dtsi             | 200 
-+++++++++++++++++++++
-  arch/arm/boot/dts/stih407.dtsi                     |  28 ---
-  arch/arm/boot/dts/stih410-clock.dtsi               |   4 +-
-  arch/arm/boot/dts/stih410.dtsi                     |  12 ++
-  arch/arm/boot/dts/stih418-clock.dtsi               |   4 +-
-  arch/arm/boot/dts/stih418.dtsi                     |   4 +
-  9 files changed, 269 insertions(+), 36 deletions(-)
+  arch/arm/mach-sti/headsmp.S |  1 +
+  arch/arm/mach-sti/platsmp.c | 57 
++++++++++++++++++++++++++++++++++++++++++----
+  arch/arm/mach-sti/smp.h     |  2 ++
+  3 files changed, 55 insertions(+), 5 deletions(-)
