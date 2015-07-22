@@ -1,89 +1,102 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Wed, 22 Jul 2015 15:11:29 +1000
-Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
- to common include file
-In-Reply-To: <55AF2037.2000803@linaro.org>
-References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
- <1434386579-6045-2-git-send-email-dave.long@linaro.org>
- <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
- <5581BCD0.2040405@linaro.org> <1435634945.24866.2.camel@ellerman.id.au>
- <55AF2037.2000803@linaro.org>
-Message-ID: <1437541889.16792.11.camel@ellerman.id.au>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 22 Jul 2015 10:46:53 +0530
+Subject: [PATCHv4 3/6] dmaengine: mv_xor: remove support for dmacap,* DT
+ properties
+In-Reply-To: <1436365699-6862-4-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1436365699-6862-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20150722051653.GR23525@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-07-22 at 00:46 -0400, David Long wrote:
-> On 06/29/15 23:29, Michael Ellerman wrote:
-> > On Wed, 2015-06-17 at 14:30 -0400, David Long wrote:
-> >> On 06/16/15 09:17, Rob Herring wrote:
-> >>> On Mon, Jun 15, 2015 at 11:42 AM, David Long <dave.long@linaro.org> wrote:
-> >>>>
-> >>>>    #define REG_OFFSET_NAME(r) \
-> >>>>           {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
-> >>>>    #define REG_OFFSET_END {.name = NULL, .offset = 0}
-> >>>
-> >>> Can't you also move these? ARM is complicated with the "ARM_"
-> >>> prefixing, but the others appear to be the same. Maybe you can remove
-> >>> the prefix or redefine the macro for ARM.
-> >>
-> >> That would mandate that all the architecture-specific pt_regs structures
-> >> would have to use a top-level named field for each named register.
-> >
-> > Why does it mandate that?
-> >
-> > See eg. powerpc where we use REG_OFFSET_NAME for the top-level named fields and
-> > then a different macro for the array elements:
-> >
-> >    #define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
-> >    #define GPR_OFFSET_NAME(num)	\
-> >    	{.name = STR(gpr##num), .offset = offsetof(struct pt_regs, gpr[num])}
-> >
-> >    static const struct pt_regs_offset regoffset_table[] = {
-> >    	GPR_OFFSET_NAME(0),
-> >    	GPR_OFFSET_NAME(1),
-> >    	GPR_OFFSET_NAME(2),
-> >    	GPR_OFFSET_NAME(3),
-> >    	...
-> >    	REG_OFFSET_NAME(nip),
-> >    	REG_OFFSET_NAME(msr),
-> >
-> >
-> > So I don't see why REG_OFFSET_NAME couldn't be common.
-> >
+On Wed, Jul 08, 2015 at 04:28:16PM +0200, Thomas Petazzoni wrote:
+> The only reason why we had dmacap,* properties is because back when
+> DMA_MEMSET was supported, only one out of the two channels per engine
+> could do a memset operation. But this is something that the driver
+> already knows anyway, and since then, the DMA_MEMSET support has been
+> removed.
 > 
-> Sorry for the delay in responding to this.
+> The driver is already well aware of what each channel supports and the
+> one to one mapping between Linux specific implementation details (such
+> as dmacap,interrupt enabling DMA_INTERRUPT) and DT properties is a
+> good indication that these DT properties are wrong.
 > 
-> OK, so you're saying architectures that don't want this constraint can 
-> make their own macro.  Seems to make this whole exercise slightly less 
-> useful, but whatever.
-
-Well yeah.
-
-In fact of the 4 arches that use REG_OFFSET_NAME, 2 already have another macro
-for specially named registers (powerpc & sh).
-
-> I see three ways to go here:
+> Therefore, this commit simply gets rid of these dmacap,* properties,
+> they are now ignored, and the driver is responsible for knowing the
+> capabilities of the hardware with regard to the dmaengine subsystem
+> expectations.
 > 
-> 1) Leave it as is.
-> 2) Force all architectures to use a common definition.
-> 3) Provide a common definition that all architectures (except "arm") 
-> currently using this functionality will use.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Reviewed-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/dma/mv-xor.txt | 10 ++++------
+>  drivers/dma/mv_xor.c                             |  9 +++------
+>  2 files changed, 7 insertions(+), 12 deletions(-)
 > 
-> I have a v2 patch to implement #3, ready to post.  Do we think this is 
-> the way to go?
+> diff --git a/Documentation/devicetree/bindings/dma/mv-xor.txt b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> index cc29c35..276ef81 100644
+> --- a/Documentation/devicetree/bindings/dma/mv-xor.txt
+> +++ b/Documentation/devicetree/bindings/dma/mv-xor.txt
+> @@ -12,10 +12,13 @@ XOR engine has. Those sub-nodes have the following required
+>  properties:
+>  - interrupts: interrupt of the XOR channel
+>  
+> -And the following optional properties:
+> +The sub-nodes used to contain one or several of the following
+> +properties, but they are now deprecated:
+>  - dmacap,memcpy to indicate that the XOR channel is capable of memcpy operations
+>  - dmacap,memset to indicate that the XOR channel is capable of memset operations
+>  - dmacap,xor to indicate that the XOR channel is capable of xor operations
+> +- dmacap,interrupt to indicate that the XOR channel is capable of
+> +  generating interrupts
+>  
+>  Example:
+>  
+> @@ -28,13 +31,8 @@ xor at d0060900 {
+>  
+>  	xor00 {
+>  	      interrupts = <51>;
+> -	      dmacap,memcpy;
+> -	      dmacap,xor;
+>  	};
+>  	xor01 {
+>  	      interrupts = <52>;
+> -	      dmacap,memcpy;
+> -	      dmacap,xor;
+> -	      dmacap,memset;
+I maybe wrong but there was an assumption that DT properties, even if bad
+are always there as they need to be treated as kernel ABI.
 
-Yeah I think it is. How are you making it conditional? Just #ifndef REG_OFFSET_NAME?
+How will it work if someone has older DT implementation or older driver?
 
-> I don't like #2 because I really don't want to rename all 
-> uses of the current register fields for arm since this is 
-> architecture-specific code to begin with and since it affects code in 39 
-> arm source files.
+Arnd, what are the rules here and are they documented anywhere?
 
-I guess you're talking about renaming all the ARM_x regs to x. That would
-likely cause problems because they're implemented as #defines,
-eg. #define r0 uregs[0] would probably confuse your assembler.
+-- 
+~Vinod
+>  	};
+>  };
+> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+> index 0a3ddc2..6aedc36 100644
+> --- a/drivers/dma/mv_xor.c
+> +++ b/drivers/dma/mv_xor.c
+> @@ -1236,12 +1236,9 @@ static int mv_xor_probe(struct platform_device *pdev)
+>  			op_in_desc = (int)of_id->data;
+>  
+>  			dma_cap_zero(cap_mask);
+> -			if (of_property_read_bool(np, "dmacap,memcpy"))
+> -				dma_cap_set(DMA_MEMCPY, cap_mask);
+> -			if (of_property_read_bool(np, "dmacap,xor"))
+> -				dma_cap_set(DMA_XOR, cap_mask);
+> -			if (of_property_read_bool(np, "dmacap,interrupt"))
+> -				dma_cap_set(DMA_INTERRUPT, cap_mask);
+> +			dma_cap_set(DMA_MEMCPY, cap_mask);
+> +			dma_cap_set(DMA_XOR, cap_mask);
+> +			dma_cap_set(DMA_INTERRUPT, cap_mask);
+>  
+>  			irq = irq_of_parse_and_map(np, 0);
+>  			if (!irq) {
+> -- 
+> 2.4.5
+> 
 
-The clean thing to do would be to have the in-kernel struct pt_regs have actual
-named members, but that would still be an intrusive change.
-
-cheers
+-- 
