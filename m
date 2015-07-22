@@ -1,80 +1,89 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Wed, 22 Jul 2015 13:18:23 -0500
-Subject: [PATCH v2 03/10] mtd: spi-nor: add DDR quad read support
-In-Reply-To: <CAHrpEqQNSgkakXN8kAT1FwPv7Ou_ERkOTJrX-4Vmb=TogzsF2A@mail.gmail.com>
-References: <1398657227-20721-1-git-send-email-b32955@freescale.com>
- <1398657227-20721-4-git-send-email-b32955@freescale.com>
- <20140730050843.GE11952@brian-ubuntu>
- <20140730064413.GA15547@shldeISGChi005.sh.intel.com>
- <20140730074500.GF11952@brian-ubuntu>
- <20140730104607.GQ17528@sirena.org.uk>
- <20140802020617.GS3711@ld-irv-0074>
- <CAMuHMdWxzKG1TTUVgYqfRP0Prp85HPwVxH7NQp7S-pNeLfFqjA@mail.gmail.com>
- <20140804142507.GP30458@sirena.org.uk>
- <CAHrpEqQNSgkakXN8kAT1FwPv7Ou_ERkOTJrX-4Vmb=TogzsF2A@mail.gmail.com>
-Message-ID: <CAHrpEqR7GH7JtAncmcNOeJJsa9GyuE-0VeK3vgat9FFPVdynyg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 22 Jul 2015 11:20:33 -0700
+Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
+ device nodes for APM X-Gene platform
+In-Reply-To: <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <20150714084004.GA14593@localhost>
+ <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
+ <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
+ <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
+Message-ID: <CAOesGMimzcUDW4e1etxZNerEusWmEtT_um8XZoT0MkFpCnTf5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 1:15 PM, Zhi Li <lznuaa@gmail.com> wrote:
-> On Mon, Aug 4, 2014 at 9:25 AM, Mark Brown <broonie@kernel.org> wrote:
->> On Sat, Aug 02, 2014 at 11:09:09AM +0200, Geert Uytterhoeven wrote:
->>> On Sat, Aug 2, 2014 at 4:06 AM, Brian Norris
->>> > On Wed, Jul 30, 2014 at 11:46:07AM +0100, Mark Brown wrote:
->>
->>> >> I don't know what DDR is in this context, sorry.
->>
->>> > I think it's just the ability to latch data on both the rising and
->>> > falling edges of the SPI clock. For SPI flash, it seems to be used for
->>> > the data portion of the opcode/address/data sequence.
->>
->>> > Yeah, I suppose it could be wedged in later if drivers/spi/ ever adopts
->>> > a solution.
->>
->>> I think this can just be another SPI_* spi_device.mode flag.
->>
->> Sounds like it yes - I was wondering if this might be one of the modes
->> with extra clock cycles that I've heard mentioned before which might be
->> a little more fun.
->>
->>> Do we need bindings for this in
->>> Documentation/devicetree/bindings/spi/spi-bus.txt?
->>> Unlike Quad SPI transfer support, this doesn't need special wiring, so DDR
->>> capability is an intrinsic property of the SPI slave, and the mode bit can just
->>> be set in the SPI slave driver, without any DT magic?
->>
->> Right, unless we run into things like board design issues causing
->> constraints this is something that can be enabled by the two drivers
->> without needing DT configuration.
+On Wed, Jul 22, 2015 at 11:10 AM, Loc Ho <lho@apm.com> wrote:
+> Hi Olof,,
 >
-> All:
+>>>
+>>>>> This patch set adds syscon reboot/poweroff device nodes to support reboot and
+>>>>> poweroff features on X-Gene platform.
+>>>>>
+>>>>> Tai Nguyen (2):
+>>>>>   power: reset: Add syscon reboot device node for APM X-Gene platform
+>>>>>   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
+>>>>>
+>>>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>>>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
+>>>>>  2 files changed, 24 insertions(+)
+>>>>
+>>>> Hi,
+>>>>
+>>>> It's unclear to me what you want to happen to these patches. They are
+>>>> sent to a long list of to-recipients, one of which is arm at kernel.org. In
+>>>> general, specify the person you want to take action on the patch in to
+>>>> with the rest on cc.
+>>>
+>>> Is there an owner for all DT node files? Is that Catalina as he is
+>>> owner for ARM64 arch folder?
+>>
+>> The ARM64 DT changes get merged through arm-soc, i.e. they get sent to
+>> arm at kernel.org by the platform maintainers and picked up by us from
+>> there (Arnd, Kevin or myself).
+>>
+>>>> We generally ask that patches first go to the subarch maintainers,
+>>>> and they in turn send it on to us (either through a pull request or
+>>>> by sending the patches to be applied). In the case of X-Gene, there is
+>>>> no general platform maintainer so we keep getting patches from various
+>>>> engineers at APM and it's unclear to us what your intentions are.
+>>>>
+>>>> I'd prefer to see one (to start with) person in charge of these (i.e. one
+>>>> maintainer from the APM side). Please add that person to the MAINTAINERS
+>>>> file as well.
+>>>
+>>> Are you suggesting that we have one person to start an GIT with
+>>> kernel.org to keep all these misc ack'ed patches for X-Gene (APM) that
+>>> don't seems to have an maintainer/home. Then request an pull by you?
+>>
+>> Pull requests are convenient for us, but if it's just a patch or two,
+>> sending them directly in email is fine as well.
+>
+> If there is an chance in pulling this power off/reset patches for
+> 4.2-rc4, can you pull in as patches? Otherwise, we will go the GIT
+> pull request.
 
-Just update shijie's email address.
+We can definitely pick them up and queue them for 4.3 (see below). We
+normally want the bulk of patches before -rc4/5, but we take smaller
+updates closer to the merge window as well.
 
+>> What I want to avoid is a large number of people sending us patches
+>> directly, which is why we ask for platform maintainers to coordinate
+>> and aggregate patches to send on to us. That way we have one person
+>> down the chain that we knows how we want the code delivered, and that
+>> can do a round of reviews before we get it.
 >
-> we plan resume this work.
-> I need direction how go ahead further.
->
-> I go through this email thread.
->
-> The discussion focus on how to get dummy cycle information.
->
-> Shijie get it from DT.
->
-> Brain suggest get from CFI or map id table if I understand correct.
->
-> Accodring to spec
-> http://www.spansion.com/Support/Datasheets/S25FL128S_256S_00.pdf
->
-> Table 8.10
->
-> Dummy cycle depend on frequency, read command.
->
-> if information saved in driver, it will be huge table.
->
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
+> We will get an GIT setup up for this and Duc Dang will contact you for
+> pull request when ready.
+
+Ok, sounds good. If you have people in the bay area that need PGP keys
+signed for this, I'd be happy to help.
+
+As far as the current DT patches, there's been several sent by
+different people. Please aggregate them into one patch series and send
+that (as git send-email is fine) to us to queue for 4.3.
+
+
+Thanks!
+
+
+-Olof
