@@ -1,86 +1,49 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 22 Jul 2015 15:04:53 +0530
-Subject: [PATCH] clk: s2mps11: Use kcalloc instead of kzalloc for array
- allocation
-Message-ID: <1437557693-29433-1-git-send-email-vaibhav.hiremath@linaro.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 22 Jul 2015 17:39:52 +0800
+Subject: [PATCH v4 2/2] arm64: Enable Marvell Berlin SoC family in Kconfig and
+ defconfig
+In-Reply-To: <1437557992-7111-1-git-send-email-jszhang@marvell.com>
+References: <1437557992-7111-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1437557992-7111-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the driver for,
+This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
+Kconfig and defconfig.
 
-  - Use devm_kcalloc varient instead of devm_kzalloc for array
-    allocation.
-  - clk_prepare/unprepare, remove "ret" variable as it is not required
-  - use __exit for cleanup function
-
-As I am referring this driver as a reference for my 88pm800 clk driver,
-applying same changes here as well.
-
-Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
-Since I do not have platform to test, it would be helpful if someone
-tests it for me.
-I have build tested it.
+ arch/arm64/Kconfig.platforms | 6 ++++++
+ arch/arm64/configs/defconfig | 1 +
+ 2 files changed, 7 insertions(+)
 
- drivers/clk/clk-s2mps11.c | 18 +++++++-----------
- 1 file changed, 7 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index 9b13a30..e17c66a 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -58,21 +58,17 @@ static struct s2mps11_clk *to_s2mps11_clk(struct clk_hw *hw)
- static int s2mps11_clk_prepare(struct clk_hw *hw)
- {
- 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
--	int ret;
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index f7e4327..37b8fc5 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -1,5 +1,11 @@
+ menu "Platform selection"
  
--	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic,
-+	return regmap_update_bits(s2mps11->iodev->regmap_pmic,
- 				 s2mps11->reg,
- 				 s2mps11->mask, s2mps11->mask);
--
--	return ret;
- }
- 
- static void s2mps11_clk_unprepare(struct clk_hw *hw)
- {
- 	struct s2mps11_clk *s2mps11 = to_s2mps11_clk(hw);
--	int ret;
- 
--	ret = regmap_update_bits(s2mps11->iodev->regmap_pmic, s2mps11->reg,
-+	regmap_update_bits(s2mps11->iodev->regmap_pmic, s2mps11->reg,
- 			   s2mps11->mask, ~s2mps11->mask);
- }
- 
-@@ -186,15 +182,15 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 	struct clk_init_data *clks_init;
- 	int i, ret = 0;
- 
--	s2mps11_clks = devm_kzalloc(&pdev->dev, sizeof(*s2mps11_clk) *
--					S2MPS11_CLKS_NUM, GFP_KERNEL);
-+	s2mps11_clks = devm_kcalloc(&pdev->dev, S2MPS11_CLKS_NUM,
-+				sizeof(*s2mps11_clk), GFP_KERNEL);
- 	if (!s2mps11_clks)
- 		return -ENOMEM;
- 
- 	s2mps11_clk = s2mps11_clks;
- 
--	clk_table = devm_kzalloc(&pdev->dev, sizeof(struct clk *) *
--				 S2MPS11_CLKS_NUM, GFP_KERNEL);
-+	clk_table = devm_kcalloc(&pdev->dev, S2MPS11_CLKS_NUM,
-+				sizeof(struct clk *), GFP_KERNEL);
- 	if (!clk_table)
- 		return -ENOMEM;
- 
-@@ -322,7 +318,7 @@ static int __init s2mps11_clk_init(void)
- }
- subsys_initcall(s2mps11_clk_init);
- 
--static void __init s2mps11_clk_cleanup(void)
-+static void __exit s2mps11_clk_cleanup(void)
- {
- 	platform_driver_unregister(&s2mps11_clk_driver);
- }
++config ARCH_BERLIN
++	bool "Marvell Berlin SoC Family"
++	select DW_APB_ICTL
++	help
++	  This enables support for Marvell Berlin SoC Family
++
+ config ARCH_EXYNOS
+ 	bool
+ 	help
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 506b466..83843f9 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -31,6 +31,7 @@ CONFIG_MODULES=y
+ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_BLK_DEV_BSG is not set
+ # CONFIG_IOSCHED_DEADLINE is not set
++CONFIG_ARCH_BERLIN=y
+ CONFIG_ARCH_EXYNOS7=y
+ CONFIG_ARCH_FSL_LS2085A=y
+ CONFIG_ARCH_HISI=y
 -- 
-1.9.1
+2.1.4
