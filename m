@@ -1,73 +1,120 @@
-From: lho@apm.com (Loc Ho)
-Date: Wed, 22 Jul 2015 11:10:03 -0700
-Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
- device nodes for APM X-Gene platform
-In-Reply-To: <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
-References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
- <20150714084004.GA14593@localhost>
- <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
- <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
-Message-ID: <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Wed, 22 Jul 2015 18:11:17 +0000
+Subject: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+In-Reply-To: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
+References: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <BL2PR03MB3703AB8E97B8E39801A2E4A83830@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,,
+Kind PING.
 
->>
->>>> This patch set adds syscon reboot/poweroff device nodes to support reboot and
->>>> poweroff features on X-Gene platform.
->>>>
->>>> Tai Nguyen (2):
->>>>   power: reset: Add syscon reboot device node for APM X-Gene platform
->>>>   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
->>>>
->>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
->>>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
->>>>  2 files changed, 24 insertions(+)
->>>
->>> Hi,
->>>
->>> It's unclear to me what you want to happen to these patches. They are
->>> sent to a long list of to-recipients, one of which is arm at kernel.org. In
->>> general, specify the person you want to take action on the patch in to
->>> with the rest on cc.
->>
->> Is there an owner for all DT node files? Is that Catalina as he is
->> owner for ARM64 arch folder?
->
-> The ARM64 DT changes get merged through arm-soc, i.e. they get sent to
-> arm at kernel.org by the platform maintainers and picked up by us from
-> there (Arnd, Kevin or myself).
->
->>> We generally ask that patches first go to the subarch maintainers,
->>> and they in turn send it on to us (either through a pull request or
->>> by sending the patches to be applied). In the case of X-Gene, there is
->>> no general platform maintainer so we keep getting patches from various
->>> engineers at APM and it's unclear to us what your intentions are.
->>>
->>> I'd prefer to see one (to start with) person in charge of these (i.e. one
->>> maintainer from the APM side). Please add that person to the MAINTAINERS
->>> file as well.
->>
->> Are you suggesting that we have one person to start an GIT with
->> kernel.org to keep all these misc ack'ed patches for X-Gene (APM) that
->> don't seems to have an maintainer/home. Then request an pull by you?
->
-> Pull requests are convenient for us, but if it's just a patch or two,
-> sending them directly in email is fine as well.
-
-If there is an chance in pulling this power off/reset patches for
-4.2-rc4, can you pull in as patches? Otherwise, we will go the GIT
-pull request.
-
->
-> What I want to avoid is a large number of people sending us patches
-> directly, which is why we ask for platform maintainers to coordinate
-> and aggregate patches to send on to us. That way we have one person
-> down the chain that we knows how we want the code delivered, and that
-> can do a round of reviews before we get it.
-
-We will get an GIT setup up for this and Duc Dang will contact you for
-pull request when ready.
-
--Loc
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On
+> Behalf Of Shenwei Wang
+> Sent: 2015?7?17? 15:30
+> To: gregkh at linuxfoundation.org
+> Cc: linux-arm-kernel at lists.infradead.org; linux-serial at vger.kernel.org
+> Subject: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to ram/disk
+> 
+> When system goes into low power states like SUSPEND_MEM and HIBERNATION,
+> the hardware IP block may be powered off to reduce the power consumption.
+> This power down may cause problems on some imx platforms, because the
+> hardware settings are reset to its power on default values which may differ from
+> the ones when it power off. This patch added the dev_pm_ops and implemented
+> two callbacks: suspend_noirq and resume_noirq, which will save the necessory
+> hardware parameters right before power down and recover them before system
+> uses the hardware.
+> 
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> ---
+>  drivers/tty/serial/imx.c | 54
+> ++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c index
+> c8cfa06..acaaa68 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -216,6 +216,7 @@ struct imx_port {
+>  	unsigned int		tx_bytes;
+>  	unsigned int		dma_tx_nents;
+>  	wait_queue_head_t	dma_wait;
+> +	unsigned int            saved_reg[10];
+>  };
+> 
+>  struct imx_port_ucrs {
+> @@ -1986,6 +1987,58 @@ static int serial_imx_remove(struct platform_device
+> *pdev)
+>  	return uart_remove_one_port(&imx_reg, &sport->port);  }
+> 
+> +static int imx_serial_port_suspend_noirq(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct imx_port *sport = platform_get_drvdata(pdev);
+> +
+> +	/* Save necessary regs */
+> +	clk_enable(sport->clk_ipg);
+> +	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
+> +	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
+> +	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
+> +	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
+> +	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
+> +	sport->saved_reg[5] = readl(sport->port.membase + UESC);
+> +	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
+> +	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
+> +	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
+> +	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
+> +	clk_disable(sport->clk_ipg);
+> +
+> +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
+> +
+> +	return 0;
+> +}
+> +
+> +static int imx_serial_port_resume_noirq(struct device *dev) {
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct imx_port *sport = platform_get_drvdata(pdev);
+> +
+> +	clk_enable(sport->clk_ipg);
+> +	writel(sport->saved_reg[4], sport->port.membase + UFCR);
+> +	writel(sport->saved_reg[5], sport->port.membase + UESC);
+> +	writel(sport->saved_reg[6], sport->port.membase + UTIM);
+> +	writel(sport->saved_reg[7], sport->port.membase + UBIR);
+> +	writel(sport->saved_reg[8], sport->port.membase + UBMR);
+> +	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
+> +	writel(sport->saved_reg[0], sport->port.membase + UCR1);
+> +	writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
+> +	writel(sport->saved_reg[2], sport->port.membase + UCR3);
+> +	writel(sport->saved_reg[3], sport->port.membase + UCR4);
+> +	clk_disable(sport->clk_ipg);
+> +
+> +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops imx_serial_port_pm_ops = {
+> +	.suspend_noirq = imx_serial_port_suspend_noirq,
+> +	.resume_noirq = imx_serial_port_resume_noirq, };
+> +
+>  static struct platform_driver serial_imx_driver = {
+>  	.probe		= serial_imx_probe,
+>  	.remove		= serial_imx_remove,
+> @@ -1996,6 +2049,7 @@ static struct platform_driver serial_imx_driver = {
+>  	.driver		= {
+>  		.name	= "imx-uart",
+>  		.of_match_table = imx_uart_dt_ids,
+> +		.pm	= &imx_serial_port_pm_ops,
+>  	},
+>  };
+> 
+> --
+> 2.5.0.rc2
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
