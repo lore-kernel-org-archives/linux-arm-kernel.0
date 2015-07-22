@@ -1,34 +1,27 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 22 Jul 2015 12:55:37 -0700
-Subject: [PATCH 2/2] MAINTAINERS: Explicitly add linux-arm-kernel for bcm2835
-In-Reply-To: <1437594937-28583-1-git-send-email-eric@anholt.net>
-References: <1437594937-28583-1-git-send-email-eric@anholt.net>
-Message-ID: <1437594937-28583-2-git-send-email-eric@anholt.net>
+From: r-woodruff2@ti.com (Woodruff, Richard)
+Date: Wed, 22 Jul 2015 20:13:08 +0000
+Subject: [PATCH 3/4] Revert "ARM: OMAP4: remove dead kconfig option
+ OMAP4_ERRATA_I688"
+In-Reply-To: <E1ZFQmH-0006GH-22@rmk-PC.arm.linux.org.uk>
+References: <20150715174647.GA7557@n2100.arm.linux.org.uk>
+ <E1ZFQmH-0006GH-22@rmk-PC.arm.linux.org.uk>
+Message-ID: <EF62F09C0797D947AD4180A1043C0DF740BB3AD2@DLEE11.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-get_maintainers.pl would list linux-arm-kernel for most bcm2835
-changes because it's under arch/arm, but might not for other bcm2835
-drivers.  Most ARM architectures appear to list linux-arm-kernel as an
-appropriate list as well.
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Russell King
+> Sent: Wednesday, July 15, 2015 12:47 PM
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Suggested-by: Stephen Warren <swarren@wwwdotorg.org>
----
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+> This reverts commit 606da4826b89b044b51e3a84958b802204cfe4c7.
+> 
+> We actually need this code for proper behaviour of OMAP4, and it needs
+> fixing a different way other than just removing the code.  Disabling code
+> which is necessary in the hopes of persuing multiplatform kernels is a stupid
+> approach.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1c51379..226beaa 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2219,6 +2219,7 @@ M:	Stephen Warren <swarren@wwwdotorg.org>
- M:	Lee Jones <lee@kernel.org>
- M:	Eric Anholt <eric@anholt.net>
- L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
- S:	Maintained
- N:	bcm2835
--- 
-2.1.4
+The series looks good.  It improves code generation and fixes race issues which have been see production devices running Linux.
+
+Acked-by: Richard Woodruff <r-woodruff2@ti.com>
