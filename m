@@ -1,58 +1,61 @@
-From: marex@denx.de (Marek Vasut)
-Date: Wed, 22 Jul 2015 09:33:19 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctQH4MnKMthOnuPgB-A5k6PCOAmhwHzJfn7gE3R4w8bufg@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <20150722044925.GN23525@localhost>
- <CAOMqctQH4MnKMthOnuPgB-A5k6PCOAmhwHzJfn7gE3R4w8bufg@mail.gmail.com>
-Message-ID: <201507220933.19752.marex@denx.de>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 22 Jul 2015 15:35:51 +0800
+Subject: [PATCH 1/5] genirq: irqdomain: Use an accessor for the of_node
+ field
+In-Reply-To: <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55AF47D7.8010304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
-> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
-> >> > Or alternatively we could publish the limitations of the channel using
-> >> > capabilities so SPI knows I have a dmaengine channel and it can
-> >> > transfer max N length transfers so would be able to break rather than
-> >> > guessing it or coding in DT. Yes it may come from DT but that should
-> >> > be dmaengine driver rather than client driver :)
-> >> > 
-> >> > This can be done by dma_get_slave_caps(chan, &caps)
-> >> > 
-> >> > And we add max_length as one more parameter to existing set
-> >> > 
-> >> > Also all this could be handled in generic SPI-dmaengine layer so that
-> >> > individual drivers don't have to code it in
-> >> > 
-> >> > Let me know if this idea is okay, I can push the dmaengine bits...
-> >> 
-> >> It would be ok if there was a fixed limit. However, the limit depends
-> >> on SPI slave settings. Presumably for other buses using the dmaengine
-> >> the limit would depend on the bus or slave settings as well. I do not
-> >> see a sane way of passing this all the way to the dmaengine driver.
-> > 
-> > I don't see why this should be client (SPI) dependent. The max length
-> > supported is a dmaengine constraint, typically flowing from max
-> > blocks/length it can transfer. Know this limit can allow clients to split
-> > transfers.
-> 
-> In practice on the board I have the maximum transfer length before it
-> fails depends on SPI bus speed which is set up per slave. I did not
-> try searching the space of possible settings thorougly and settled for
-> a setting that gives reasonable speed and transfer length.
+On 07/21/2015 06:07 PM, Marc Zyngier wrote:
+> The struct irq_domain contains a "struct device_node *" field
+> (of_node) that is almost the only link between the irqdomain
+> and the device tree infrastructure.
+>
+> In order to prepare for the removal of that field, convert all
+> users outside of kernel/irq/irqdomain.c to use an accessor.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/mips/cavium-octeon/octeon-irq.c          | 4 ++--
+>   arch/powerpc/platforms/cell/axon_msi.c        | 2 +-
+>   arch/powerpc/platforms/cell/spider-pic.c      | 9 ++++++---
+>   arch/powerpc/platforms/powernv/opal-irqchip.c | 2 +-
+>   arch/powerpc/sysdev/ehv_pic.c                 | 3 ++-
+>   arch/powerpc/sysdev/fsl_msi.c                 | 2 +-
+>   arch/powerpc/sysdev/i8259.c                   | 3 ++-
+>   arch/powerpc/sysdev/ipic.c                    | 3 ++-
+>   arch/powerpc/sysdev/mpic.c                    | 3 ++-
+>   arch/powerpc/sysdev/mpic_msi.c                | 2 +-
+>   arch/powerpc/sysdev/qe_lib/qe_ic.c            | 3 ++-
+>   drivers/gpio/gpio-sodaville.c                 | 2 +-
+>   drivers/irqchip/exynos-combiner.c             | 2 +-
+>   drivers/irqchip/irq-atmel-aic-common.c        | 2 +-
+>   drivers/irqchip/irq-crossbar.c                | 4 ++--
+>   drivers/irqchip/irq-gic-v2m.c                 | 2 +-
+>   drivers/irqchip/irq-gic-v3-its.c              | 2 +-
+>   drivers/irqchip/irq-gic-v3.c                  | 2 +-
+>   drivers/irqchip/irq-gic.c                     | 2 +-
+>   drivers/irqchip/irq-hip04.c                   | 2 +-
+>   drivers/irqchip/irq-mtk-sysirq.c              | 2 +-
+>   drivers/irqchip/irq-s3c24xx.c                 | 4 ++--
+>   drivers/irqchip/irq-tegra.c                   | 4 ++--
+>   drivers/irqchip/irq-vf610-mscm-ir.c           | 5 +++--
+>   drivers/spmi/spmi-pmic-arb.c                  | 2 +-
+>   include/linux/irqdomain.h                     | 5 +++++
+>   26 files changed, 46 insertions(+), 32 deletions(-)
 
-This looks more like a signal integrity issue though.
+It seems to me that some other files missed,
+in arch/powerpc/platforms/pasemi/msi.c:
 
-> However, if this was not tied to the particular slave setting picked
-> in the current DT a formula would be needed that translates arbitrary
-> client settings to transfer size limit and there would be need to
-> somehow get the client settings to the formula in the dmaengine
-> driver.
-> 
-> Thanks
-> 
-> Michal
+         if (!mpic->irqhost->of_node ||
+             !of_device_is_compatible(mpic->irqhost->of_node,
+                                      "pasemi,pwrficient-openpic"))
+                 return -ENODEV;
 
-Best regards,
-Marek Vasut
+If you need more eyes to find all of them, please count me in :)
+
+Thanks
+Hanjun
