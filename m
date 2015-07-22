@@ -1,43 +1,129 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jul 2015 14:24:16 +0100
-Subject: [GIT PULL] arm64 fixes for 4.2
-Message-ID: <20150722132415.GA17651@e104818-lin.cambridge.arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 22 Jul 2015 14:28:09 +0100
+Subject: [PATCH v4 6/8] arm64: dts: add SRAM, MHU mailbox and SCPI
+ support on Juno
+In-Reply-To: <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
+References: <1433760002-24120-1-git-send-email-sudeep.holla@arm.com>
+ <1433760002-24120-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20150722132809.GG14923@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Jun 08, 2015 at 11:40:00AM +0100, Sudeep Holla wrote:
+> This patch adds support for the MHU mailbox peripheral used on Juno by
+> application processors to communicate with remote SCP handling most of
+> the CPU/system power management. It also adds the SRAM reserving the
+> shared memory and SCPI message protocol using that shared memory.
+> 
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi   | 31 +++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-clocks.dtsi | 23 +++++++++++++++++++++++
+>  2 files changed, 54 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index e3ee96036eca..f8069a98da25 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -17,6 +17,18 @@
+>  		};
+>  	};
+>  
+> +	mailbox: mhu at 2b1f0000 {
+> +		compatible = "arm,mhu", "arm,primecell";
+> +		reg = <0x0 0x2b1f0000 0x0 0x1000>;
+> +		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>,
+> +			     <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
+> +		interrupt-names = "mhu_lpri_rx",
+> +				  "mhu_hpri_rx";
+> +		#mbox-cells = <1>;
+> +		clocks = <&soc_refclk100mhz>;
+> +		clock-names = "apb_pclk";
+> +	};
+> +
+>  	gic: interrupt-controller at 2c010000 {
+>  		compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>  		reg = <0x0 0x2c010000 0 0x1000>,
+> @@ -44,6 +56,25 @@
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+>  	};
+>  
+> +	sram: sram at 2e000000 {
+> +		compatible = "arm,juno-sram-ns", "mmio-sram";
+> +		reg = <0x0 0x2e000000 0x0 0x8000>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges = <0 0x0 0x2e000000 0x8000>;
+> +
+> +		cpu_scp_lpri: scp-shmem at 0 {
+> +			compatible = "arm,juno-scp-shmem";
+> +			reg = <0x0 0x200>;
+> +		};
+> +
+> +		cpu_scp_hpri: scp-shmem at 200 {
+> +			compatible = "arm,juno-scp-shmem";
+> +			reg = <0x200 0x200>;
+> +		};
+> +	};
+> +
+>  	/include/ "juno-clocks.dtsi"
+>  
+>  	dma at 7ff00000 {
+> diff --git a/arch/arm64/boot/dts/arm/juno-clocks.dtsi b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+> index 25352ed943e6..64af7370815a 100644
+> --- a/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
+> @@ -42,3 +42,26 @@
+>  		clock-frequency = <400000000>;
+>  		clock-output-names = "faxi_clk";
+>  	};
+> +
+> +	scpi {
+> +		compatible = "arm,scpi";
+> +		mboxes = <&mailbox 1>;
+> +		shmem = <&cpu_scp_hpri>;
+> +
+> +		clocks {
+> +			compatible = "arm,scpi-clocks";
+> +
+> +			scpi_dvfs: scpi_clocks at 0 {
+> +				compatible = "arm,scpi-dvfs-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <0>, <1>, <2>;
+> +				clock-output-names = "vbig", "vlittle", "vgpu";
+> +			};
+> +			scpi_clk: scpi_clocks at 3 {
+> +				compatible = "arm,scpi-variable-clocks";
+> +				#clock-cells = <1>;
+> +				clock-indices = <3>, <4>;
 
-Please pull the arm64 patches below. Thanks.
+Subject to you addressing Mark's comments regarding the indices values (maybe choose
+a different property to show the fact that the index is actually an SCPI index
+rather than the clock's), you can add my
 
-The following changes since commit 52721d9d3334c1cb1f76219a161084094ec634dc:
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-  Linux 4.2-rc3 (2015-07-19 14:45:02 -0700)
+Best regards,
+Liviu
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 3bc38fc110c642c0a455a5214465bb4d62805a75:
-
-  ARM64/irq: Use access helper irq_data_get_affinity_mask() (2015-07-22 10:57:09 +0100)
-
-----------------------------------------------------------------
-- arm64 build fix following the move of the thread_struct to the end of
-  task_struct and the asm offsets becoming too large for the AArch64 ISA
-
-- preparatory patch for moving irq_data struct members (applied now to
-  reduce dependency for the next merging window)
-
-----------------------------------------------------------------
-Jiang Liu (1):
-      ARM64/irq: Use access helper irq_data_get_affinity_mask()
-
-Will Deacon (1):
-      arm64: switch_to: calculate cpu context pointer using separate register
-
- arch/arm64/kernel/entry.S | 5 +++--
- arch/arm64/kernel/irq.c   | 4 ++--
- 2 files changed, 5 insertions(+), 4 deletions(-)
+> +				clock-output-names = "pxlclk0", "pxlclk1";
+> +			};
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
 
 -- 
-Catalin
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
