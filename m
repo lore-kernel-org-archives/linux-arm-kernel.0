@@ -1,53 +1,64 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Wed, 22 Jul 2015 13:30:34 +0300
-Subject: [PATCH v3 2/5] arm64: introduce VA_START macro - the first kernel
- virtual address.
+Date: Wed, 22 Jul 2015 13:30:37 +0300
+Subject: [PATCH v3 5/5] ARM64: kasan: print memory assignment
 In-Reply-To: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
 References: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1437561037-31995-3-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1437561037-31995-6-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to not use lengthy (UL(0xffffffffffffffff) << VA_BITS) everywhere,
-replace it with VA_START.
+From: Linus Walleij <linus.walleij@linaro.org>
 
+This prints out the virtual memory assigned to KASan in the
+boot crawl along with other memory assignments, if and only
+if KASan is activated.
+
+Example dmesg from the Juno Development board:
+
+Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
+2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
+Virtual kernel memory layout:
+    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
+    vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
+    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+              0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
+    fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
+    PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
+    modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
+    memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
+      .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
+      .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
+      .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
+
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- arch/arm64/include/asm/memory.h  | 2 ++
- arch/arm64/include/asm/pgtable.h | 2 +-
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/mm/init.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index f800d45..288c19d 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -42,12 +42,14 @@
-  * PAGE_OFFSET - the virtual address of the start of the kernel image (top
-  *		 (VA_BITS - 1))
-  * VA_BITS - the maximum number of bits for virtual addresses.
-+ * VA_START - the first kernel virtual address.
-  * TASK_SIZE - the maximum size of a user space task.
-  * TASK_UNMAPPED_BASE - the lower boundary of the mmap VM area.
-  * The module space lives between the addresses given by TASK_SIZE
-  * and PAGE_OFFSET - it must be within 128MB of the kernel text.
-  */
- #define VA_BITS			(CONFIG_ARM64_VA_BITS)
-+#define VA_START		(UL(0xffffffffffffffff) << VA_BITS)
- #define PAGE_OFFSET		(UL(0xffffffffffffffff) << (VA_BITS - 1))
- #define MODULES_END		(PAGE_OFFSET)
- #define MODULES_VADDR		(MODULES_END - SZ_64M)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 56283f8..a1f9f61 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -40,7 +40,7 @@
-  *	fixed mappings and modules
-  */
- #define VMEMMAP_SIZE		ALIGN((1UL << (VA_BITS - PAGE_SHIFT)) * sizeof(struct page), PUD_SIZE)
--#define VMALLOC_START		(UL(0xffffffffffffffff) << VA_BITS)
-+#define VMALLOC_START		(VA_START)
- #define VMALLOC_END		(PAGE_OFFSET - PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index ad87ce8..3930692 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -298,6 +298,9 @@ void __init mem_init(void)
+ #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
  
- #define vmemmap			((struct page *)(VMALLOC_END + SZ_64K))
+ 	pr_notice("Virtual kernel memory layout:\n"
++#ifdef CONFIG_KASAN
++		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n"
++#endif
+ 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+ 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
+@@ -310,6 +313,9 @@ void __init mem_init(void)
+ 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
+ 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
+ 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
++#ifdef CONFIG_KASAN
++		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
++#endif
+ 		  MLG(VMALLOC_START, VMALLOC_END),
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+ 		  MLG((unsigned long)vmemmap,
 -- 
 2.4.5
