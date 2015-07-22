@@ -1,40 +1,61 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Wed, 22 Jul 2015 17:01:30 +0200
-Subject: [PATCH] ARM: dts: i.MX35: Fix can support
-Message-ID: <1437577290-26321-1-git-send-email-denis@eukrea.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Jul 2015 16:17:39 +0100
+Subject: [PATCH v3 4/5] arm64: kvm: Adopt new alternative assembler macros
+In-Reply-To: <1437564065-4356-5-git-send-email-daniel.thompson@linaro.org>
+References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
+ <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
+ <1437564065-4356-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <20150722151739.GM6650@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/boot/dts/imx35.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Marc, Christoffer,
 
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index b6478e9..e6540b5 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -286,8 +286,8 @@
- 			can1: can at 53fe4000 {
- 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fe4000 0x1000>;
--				clocks = <&clks 33>;
--				clock-names = "ipg";
-+				clocks = <&clks 33>, <&clks 33>;
-+				clock-names = "ipg", "per";
- 				interrupts = <43>;
- 				status = "disabled";
- 			};
-@@ -295,8 +295,8 @@
- 			can2: can at 53fe8000 {
- 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fe8000 0x1000>;
--				clocks = <&clks 34>;
--				clock-names = "ipg";
-+				clocks = <&clks 34>, <&clks 34>;
-+				clock-names = "ipg", "per";
- 				interrupts = <44>;
- 				status = "disabled";
- 			};
--- 
-2.4.5
+On Wed, Jul 22, 2015 at 12:21:04PM +0100, Daniel Thompson wrote:
+> Convert the dynamic patching for ARM64_HAS_SYSREG_GIC_CPUIF over to
+> the newly added alternative assembler macros.
+
+Do you mind if I take this via the arm64 tree? It won't apply in
+isolation and I'd expect conflicts to be small/trivial to resolve.
+
+Cheers,
+
+Will
+
+> ---
+>  arch/arm64/kvm/hyp.S | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index 17a8fb14f428..10915aaf0b01 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -810,7 +810,11 @@
+>   * Call into the vgic backend for state saving
+>   */
+>  .macro save_vgic_state
+> -	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
+> +alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+> +	bl	__save_vgic_v2_state
+> +alternative_else
+> +	bl	__save_vgic_v3_state
+> +alternative_endif
+>  	mrs	x24, hcr_el2
+>  	mov	x25, #HCR_INT_OVERRIDE
+>  	neg	x25, x25
+> @@ -827,7 +831,11 @@
+>  	orr	x24, x24, #HCR_INT_OVERRIDE
+>  	orr	x24, x24, x25
+>  	msr	hcr_el2, x24
+> -	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
+> +alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
+> +	bl	__restore_vgic_v2_state
+> +alternative_else
+> +	bl	__restore_vgic_v3_state
+> +alternative_endif
+>  .endm
+>  
+>  .macro save_timer_state
+> -- 
+> 2.4.3
+> 
