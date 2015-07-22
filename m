@@ -1,304 +1,159 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 22 Jul 2015 16:47:37 +0800
-Subject: [PATCH v2 1/2] arm64: dts: Add dts files for Marvell Berlin4CT SoC
-In-Reply-To: <1437554657-5367-2-git-send-email-jszhang@marvell.com>
-References: <1437554657-5367-1-git-send-email-jszhang@marvell.com>
- <1437554657-5367-2-git-send-email-jszhang@marvell.com>
-Message-ID: <20150722164737.2824053e@xhacker>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Wed, 22 Jul 2015 09:47:53 +0100
+Subject: [PATCH] dtb: Create a common home for cross-architecture dtsi
+ files.
+In-Reply-To: <1437496204-5438-1-git-send-email-ian.campbell@citrix.com>
+References: <1437496204-5438-1-git-send-email-ian.campbell@citrix.com>
+Message-ID: <20150722084753.GC14923@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Jul 2015 16:44:16 +0800
-Jisheng Zhang <jszhang@marvell.com> wrote:
+On Tue, Jul 21, 2015 at 05:30:04PM +0100, Ian Campbell wrote:
+> Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
+> LogicTile Express 20MG" added a new dts file to arch/arm64 which
+> included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
+> .dtsi supplied by arch/arm.
+> 
+> Unfortunately this causes some issues for the split device tree
+> repository[0], since things get moved around there. In that context
+> the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
+> while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+> 
+> The sharing of the .dtsi is legitimate since the baseboard is the same
+> for various vexpress systems whatever processor they use.
+> 
+> Rather than using ../../ tricks to pickup .dtsi files from another
+> arch this patch creates a new directory include/dt-bindings/dtsi as a
+> home for such cross-arch .dtsi files, arranges for it to be in the
+> include path when the .dts files are processed by cpp and switches the
+> .dts files to use cpp #include instead of /include/.
+> 
+> [0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+> 
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Kristina Martsenko <kristina.martsenko@arm.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kbuild at vger.kernel.org
 
-> Add initial dtsi file to support Marvell Berlin4CT SoC with
-> quad Cortex-A53 CPUs.
-> 
-> It also adds dts file for Marvell Berlin4CT DMP board which is
-> based on Berlin4CT SoC.
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+
+Picking your brains here: would it be worth to have some vendor directories in
+this shared area or we can hope that there will be very few files living here?
+
+Best regards,
+Liviu
+
 > ---
->  arch/arm64/boot/dts/Makefile                  |   1 +
->  arch/arm64/boot/dts/marvell/Makefile          |   5 +
->  arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  68 +++++++++++
->  arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
->  4 files changed, 238 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/marvell/Makefile
->  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
->  create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+>  Documentation/devicetree/bindings/arm/vexpress.txt                    | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts                           | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts                            | 2 +-
+>  arch/arm/boot/dts/vexpress-v2p-ca5s.dts                               | 2 +-
+>  arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts                  | 2 +-
+>  {arch/arm/boot/dts => include/dt-bindings/dtsi}/vexpress-v2m-rs1.dtsi | 0
+>  scripts/Makefile.lib                                                  | 1 +
+>  7 files changed, 6 insertions(+), 5 deletions(-)
+>  rename {arch/arm/boot/dts => include/dt-bindings/dtsi}/vexpress-v2m-rs1.dtsi (100%)
 > 
-> diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-> index 0c57290..61e9493 100644
-> --- a/arch/arm64/boot/dts/Makefile
-> +++ b/arch/arm64/boot/dts/Makefile
-> @@ -5,6 +5,7 @@ dts-dirs += cavium
->  dts-dirs += exynos
->  dts-dirs += freescale
->  dts-dirs += hisilicon
-> +dts-dirs += marvell
->  dts-dirs += mediatek
->  dts-dirs += qcom
->  dts-dirs += rockchip
-> diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-> new file mode 100644
-> index 0000000..e2f6afa
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/Makefile
-> @@ -0,0 +1,5 @@
-> +dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
-> +
-> +always		:= $(dtb-y)
-> +subdir-y	:= $(dts-dirs)
-> +clean-files	:= *.dtb
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-> new file mode 100644
-> index 0000000..87c8252
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-> @@ -0,0 +1,68 @@
-> +/*
-> + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> + *
-> + * Author: Jisheng Zhang <jszhang@marvell.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +
-> +/memreserve/ 0x00000000 0x01000000;
+> diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
+> index 39844cd..46c6b04 100644
+> --- a/Documentation/devicetree/bindings/arm/vexpress.txt
+> +++ b/Documentation/devicetree/bindings/arm/vexpress.txt
+> @@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
+>  		/* Active high IRQ 0 is connected to GIC's SPI0 */
+>  		interrupt-map = <0 0 0 &gic 0 0 4>;
+>  
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+> +		#include <vexpress-v2m-rs1.dtsi>
+>  	};
+>  };
+>  
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> index 9420053..85b201e 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
+> @@ -278,6 +278,6 @@
+>  				<0 0 41 &gic 0 41 4>,
+>  				<0 0 42 &gic 0 42 4>;
+>  
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+> +		#include <vexpress-v2m-rs1.dtsi>
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> index 17f63f7..fe5091d 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
+> @@ -636,6 +636,6 @@
+>  				<0 0 41 &gic 0 41 4>,
+>  				<0 0 42 &gic 0 42 4>;
+>  
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+> +		#include <vexpress-v2m-rs1.dtsi>
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> index d2709b7..a028d59 100644
+> --- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> +++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
+> @@ -248,6 +248,6 @@
+>  				<0 0 41 &gic 0 41 4>,
+>  				<0 0 42 &gic 0 42 4>;
+>  
+> -		/include/ "vexpress-v2m-rs1.dtsi"
+> +		#include <vexpress-v2m-rs1.dtsi>
+>  	};
+>  };
+> diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> index 5b1d018..b4257ee 100644
+> --- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> +++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
+> @@ -186,6 +186,6 @@
+>  				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+>  				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
+>  
+> -		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
+> +		#include <vexpress-v2m-rs1.dtsi>
+>  	};
+>  };
+> diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/include/dt-bindings/dtsi/vexpress-v2m-rs1.dtsi
+> similarity index 100%
+> rename from arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
+> rename to include/dt-bindings/dtsi/vexpress-v2m-rs1.dtsi
+> diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
+> index 79e8661..bb10128 100644
+> --- a/scripts/Makefile.lib
+> +++ b/scripts/Makefile.lib
+> @@ -163,6 +163,7 @@ dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
+>  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
+>  		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
+>  		 -I$(srctree)/drivers/of/testcase-data                   \
+> +		 -I$(srctree)/include/dt-bindings/dtsi                   \
+>  		 -undef -D__DTS__
+>  
+>  # Finds the multi-part object the current object will be linked into
+> -- 
+> 2.1.4
+> 
 
-oops, sorry, the memreserve still exist. Please ignore patch v2, I'll send
-v3.
-
-Sorry for inconvenience,
-Jisheng
-
-> +
-> +#include "berlin4ct.dtsi"
-> +
-> +/ {
-> +	model = "MARVELL BG4CT DMP BOARD";
-> +	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
-> +
-> +	chosen {
-> +		stdout-path = "serial0:115200n8";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		/* the first 16MB is for firmwares's usage */
-> +		reg = <0 0x01000000 0 0x80000000>;
-> +	};
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> new file mode 100644
-> index 0000000..becaedc
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-> @@ -0,0 +1,164 @@
-> +/*
-> + * Copyright (C) 2015 Marvell Technology Group Ltd.
-> + *
-> + * Author: Jisheng Zhang <jszhang@marvell.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPLv2 or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This library is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This library is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "marvell,berlin";
-> +	interrupt-parent = <&gic>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	aliases {
-> +		serial0 = &uart0;
-> +	};
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu0: cpu at 0 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x0>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x1>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x2>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			compatible = "arm,cortex-a53", "arm,armv8";
-> +			device_type = "cpu";
-> +			reg = <0x3>;
-> +			enable-method = "psci";
-> +		};
-> +	};
-> +
-> +	pmu {
-> +		compatible = "arm,armv8-pmuv3";
-> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-> +			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-affinity = <&cpu0>,
-> +				     <&cpu1>,
-> +				     <&cpu2>,
-> +				     <&cpu3>;
-> +	};
-> +
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-> +	};
-> +
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges = <0 0 0xf7000000 0x1000000>;
-> +
-> +		osc: osc {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <25000000>;
-> +		};
-> +
-> +		gic: interrupt-controller at 901000 {
-> +			compatible = "arm,gic-400";
-> +			#interrupt-cells = <3>;
-> +			interrupt-controller;
-> +			reg = <0x901000 0x1000>,
-> +			      <0x902000 0x2000>,
-> +			      <0x904000 0x2000>,
-> +			      <0x906000 0x2000>;
-> +			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-> +		};
-> +
-> +		apb at fc0000 {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges = <0 0xfc0000 0x10000>;
-> +			interrupt-parent = <&sic>;
-> +
-> +			sic: interrupt-controller at 1000 {
-> +				compatible = "snps,dw-apb-ictl";
-> +				reg = <0x1000 0x30>;
-> +				interrupt-controller;
-> +				#interrupt-cells = <1>;
-> +				interrupt-parent = <&gic>;
-> +				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			uart0: uart at d000 {
-> +				compatible = "snps,dw-apb-uart";
-> +				reg = <0xd000 0x100>;
-> +				interrupts = <8>;
-> +				clocks = <&osc>;
-> +				reg-shift = <2>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +	};
-> +};
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
