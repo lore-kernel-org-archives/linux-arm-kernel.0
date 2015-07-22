@@ -1,293 +1,171 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 22 Jul 2015 17:39:51 +0800
-Subject: [PATCH v4 1/2] arm64: dts: Add dts files for Marvell Berlin4CT SoC
-In-Reply-To: <1437557992-7111-1-git-send-email-jszhang@marvell.com>
-References: <1437557992-7111-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1437557992-7111-2-git-send-email-jszhang@marvell.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Wed, 22 Jul 2015 17:39:35 +0800
+Subject: [PATCH] ASoC: mediatek: Add suspend/resume callbacks
+Message-ID: <1437557975-48183-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dtsi file to support Marvell Berlin4CT SoC with
-quad Cortex-A53 CPUs.
+This adds suspend/resume callbacks, which are common for each DAI.
+To be able to continue the last playback/capture after resume
+when suspend was done during a playback/capture, in the callbacks
+we do backup/restore of registers which were set before prepare stage.
+Registers to be backup/restore are defined in a backup list array.
 
-It also adds dts file for Marvell Berlin4CT DMP board which is
-based on Berlin4CT SoC.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
 ---
- arch/arm64/boot/dts/Makefile                  |   1 +
- arch/arm64/boot/dts/marvell/Makefile          |   5 +
- arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
- arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
- 4 files changed, 236 insertions(+)
- create mode 100644 arch/arm64/boot/dts/marvell/Makefile
- create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
- create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+ sound/soc/mediatek/mtk-afe-common.h |  8 ----
+ sound/soc/mediatek/mtk-afe-pcm.c    | 77 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 0c57290..61e9493 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -5,6 +5,7 @@ dts-dirs += cavium
- dts-dirs += exynos
- dts-dirs += freescale
- dts-dirs += hisilicon
-+dts-dirs += marvell
- dts-dirs += mediatek
- dts-dirs += qcom
- dts-dirs += rockchip
-diff --git a/arch/arm64/boot/dts/marvell/Makefile b/arch/arm64/boot/dts/marvell/Makefile
-new file mode 100644
-index 0000000..e2f6afa
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_BERLIN) += berlin4ct-dmp.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-new file mode 100644
-index 0000000..d1152c0
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (C) 2015 Marvell Technology Group Ltd.
-+ *
-+ * Author: Jisheng Zhang <jszhang@marvell.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "berlin4ct.dtsi"
-+
-+/ {
-+	model = "MARVELL BG4CT DMP BOARD";
-+	compatible = "marvell,berlin4ct-dmp", "marvell,berlin4ct", "marvell,berlin";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		/* the first 16MB is for firmwares's usage */
-+		reg = <0 0x01000000 0 0x80000000>;
-+	};
+diff --git a/sound/soc/mediatek/mtk-afe-common.h b/sound/soc/mediatek/mtk-afe-common.h
+index a88b175..cc4393c 100644
+--- a/sound/soc/mediatek/mtk-afe-common.h
++++ b/sound/soc/mediatek/mtk-afe-common.h
+@@ -98,12 +98,4 @@ struct mtk_afe_memif {
+ 	const struct mtk_afe_irq_data *irqdata;
+ };
+ 
+-struct mtk_afe {
+-	/* address for ioremap audio hardware register */
+-	void __iomem *base_addr;
+-	struct device *dev;
+-	struct regmap *regmap;
+-	struct mtk_afe_memif memif[MTK_AFE_MEMIF_NUM];
+-	struct clk *clocks[MTK_CLK_NUM];
+-};
+ #endif
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index de38d2e..55471ee 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -45,18 +45,21 @@
+ /* Memory interface */
+ #define AFE_DL1_BASE		0x0040
+ #define AFE_DL1_CUR		0x0044
++#define AFE_DL1_END		0x0048
+ #define AFE_DL2_BASE		0x0050
+ #define AFE_DL2_CUR		0x0054
+ #define AFE_AWB_BASE		0x0070
+ #define AFE_AWB_CUR		0x007c
+ #define AFE_VUL_BASE		0x0080
+ #define AFE_VUL_CUR		0x008c
++#define AFE_VUL_END		0x0088
+ #define AFE_DAI_BASE		0x0090
+ #define AFE_DAI_CUR		0x009c
+ #define AFE_MOD_PCM_BASE	0x0330
+ #define AFE_MOD_PCM_CUR		0x033c
+ #define AFE_HDMI_OUT_BASE	0x0374
+ #define AFE_HDMI_OUT_CUR	0x0378
++#define AFE_HDMI_OUT_END	0x037c
+ 
+ #define AFE_ADDA2_TOP_CON0	0x0600
+ 
+@@ -127,6 +130,34 @@ enum afe_tdm_ch_start {
+ 	AFE_TDM_CH_ZERO,
+ };
+ 
++static const unsigned int mtk_afe_backup_list[] = {
++	AUDIO_TOP_CON0,
++	AFE_CONN1,
++	AFE_CONN2,
++	AFE_CONN7,
++	AFE_CONN8,
++	AFE_DAC_CON1,
++	AFE_DL1_BASE,
++	AFE_DL1_END,
++	AFE_VUL_BASE,
++	AFE_VUL_END,
++	AFE_HDMI_OUT_BASE,
++	AFE_HDMI_OUT_END,
++	AFE_HDMI_CONN0,
++	AFE_DAC_CON0,
 +};
 +
-+&uart0 {
-+	status = "okay";
++struct mtk_afe {
++	/* address for ioremap audio hardware register */
++	void __iomem *base_addr;
++	struct device *dev;
++	struct regmap *regmap;
++	struct mtk_afe_memif memif[MTK_AFE_MEMIF_NUM];
++	struct clk *clocks[MTK_CLK_NUM];
++	unsigned int backup_regs[ARRAY_SIZE(mtk_afe_backup_list)];
++	bool suspended;
 +};
-diff --git a/arch/arm64/boot/dts/marvell/berlin4ct.dtsi b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-new file mode 100644
-index 0000000..becaedc
---- /dev/null
-+++ b/arch/arm64/boot/dts/marvell/berlin4ct.dtsi
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (C) 2015 Marvell Technology Group Ltd.
-+ *
-+ * Author: Jisheng Zhang <jszhang@marvell.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
 +
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
+ static const struct snd_pcm_hardware mtk_afe_hardware = {
+ 	.info = (SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
+ 		 SNDRV_PCM_INFO_MMAP_VALID),
+@@ -722,11 +753,53 @@ static const struct snd_soc_dai_ops mtk_afe_hdmi_ops = {
+ 
+ };
+ 
++static int mtk_afe_runtime_suspend(struct device *dev);
++static int mtk_afe_runtime_resume(struct device *dev);
 +
-+/ {
-+	compatible = "marvell,berlin";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
++static int mtk_afe_dai_suspend(struct snd_soc_dai *dai)
++{
++	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
++	int i;
 +
-+	aliases {
-+		serial0 = &uart0;
-+	};
++	dev_dbg(afe->dev, "%s\n", __func__);
++	if (pm_runtime_status_suspended(afe->dev) || afe->suspended)
++		return 0;
 +
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
++	for (i = 0; i < ARRAY_SIZE(mtk_afe_backup_list); i++)
++		regmap_read(afe->regmap, mtk_afe_backup_list[i],
++			    &afe->backup_regs[i]);
 +
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	afe->suspended = true;
++	mtk_afe_runtime_suspend(afe->dev);
++	return 0;
++}
 +
-+		cpu0: cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x0>;
-+			enable-method = "psci";
-+		};
++static int mtk_afe_dai_resume(struct snd_soc_dai *dai)
++{
++	struct mtk_afe *afe = snd_soc_dai_get_drvdata(dai);
++	int i = 0;
 +
-+		cpu1: cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x1>;
-+			enable-method = "psci";
-+		};
++	dev_dbg(afe->dev, "%s\n", __func__);
++	if (pm_runtime_status_suspended(afe->dev) || !afe->suspended)
++		return 0;
 +
-+		cpu2: cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x2>;
-+			enable-method = "psci";
-+		};
++	mtk_afe_runtime_resume(afe->dev);
 +
-+		cpu3: cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0x3>;
-+			enable-method = "psci";
-+		};
-+	};
++	for (i = 0; i < ARRAY_SIZE(mtk_afe_backup_list); i++)
++		regmap_write(afe->regmap, mtk_afe_backup_list[i],
++			     afe->backup_regs[i]);
 +
-+	pmu {
-+		compatible = "arm,armv8-pmuv3";
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>;
-+	};
++	afe->suspended = false;
++	return 0;
++}
 +
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0xf7000000 0x1000000>;
-+
-+		osc: osc {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <25000000>;
-+		};
-+
-+		gic: interrupt-controller at 901000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x901000 0x1000>,
-+			      <0x902000 0x2000>,
-+			      <0x904000 0x2000>,
-+			      <0x906000 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		apb at fc0000 {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0xfc0000 0x10000>;
-+			interrupt-parent = <&sic>;
-+
-+			sic: interrupt-controller at 1000 {
-+				compatible = "snps,dw-apb-ictl";
-+				reg = <0x1000 0x30>;
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				interrupt-parent = <&gic>;
-+				interrupts = <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
-+			uart0: uart at d000 {
-+				compatible = "snps,dw-apb-uart";
-+				reg = <0xd000 0x100>;
-+				interrupts = <8>;
-+				clocks = <&osc>;
-+				reg-shift = <2>;
-+				status = "disabled";
-+			};
-+		};
-+	};
-+};
+ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
+ 	/* FE DAIs: memory intefaces to CPU */
+ 	{
+ 		.name = "DL1", /* downlink 1 */
+ 		.id = MTK_AFE_MEMIF_DL1,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
+ 		.playback = {
+ 			.stream_name = "DL1",
+ 			.channels_min = 1,
+@@ -738,6 +811,8 @@ static struct snd_soc_dai_driver mtk_afe_pcm_dais[] = {
+ 	}, {
+ 		.name = "VUL", /* voice uplink */
+ 		.id = MTK_AFE_MEMIF_VUL,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
+ 		.capture = {
+ 			.stream_name = "VUL",
+ 			.channels_min = 1,
+@@ -774,6 +849,8 @@ static struct snd_soc_dai_driver mtk_afe_hdmi_dais[] = {
+ 	{
+ 		.name = "HDMI",
+ 		.id = MTK_AFE_MEMIF_HDMI,
++		.suspend = mtk_afe_dai_suspend,
++		.resume = mtk_afe_dai_resume,
+ 		.playback = {
+ 			.stream_name = "HDMI",
+ 			.channels_min = 2,
 -- 
-2.1.4
+1.8.1.1.dirty
