@@ -1,76 +1,75 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 22 Jul 2015 18:25:20 +0200
-Subject: [PATCH v2 1/5] mtd: spi-nor: notify (Q)SPI controller about
- protocol change
-In-Reply-To: <201507221541.46135.marex@denx.de>
-References: <cover.1437569902.git.cyrille.pitchen@atmel.com>
- <036f143509fed3f303508d1688d68012790f835a.1437569902.git.cyrille.pitchen@atmel.com>
- <201507221541.46135.marex@denx.de>
-Message-ID: <55AFC3F0.5050002@atmel.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Wed, 22 Jul 2015 11:53:18 -0500
+Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
+ field
+In-Reply-To: <55AFAE96.4070401@arm.com>
+References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
+ <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
+ <20150721212644.GB3691@google.com> <55AFABF3.5050303@arm.com>
+ <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
+ <55AFAE96.4070401@arm.com>
+Message-ID: <20150722165318.GA27197@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Wed, Jul 22, 2015 at 03:54:14PM +0100, Marc Zyngier wrote:
+> On 22/07/15 15:48, Bjorn Helgaas wrote:
+> > On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> Hi Bjorn,
+> >>
+> >> On 21/07/15 22:26, Bjorn Helgaas wrote:
+> >>> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
+> >>>> In order to be able to populate the device msi_domain field,
+> >>>> add the necesary hooks to propagate the host bridge msi_domain
+> >>>> across secondary busses to devices.
+> >>>>
+> >>>> So far, nobody populates the initial msi_domain.
+> >>>>
+> >>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >>>> ---
+> >>>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
+> >>>>  include/linux/pci.h |  1 +
+> >>>>  2 files changed, 31 insertions(+)
+> >>>>
+> >>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> >>>> index cefd636..376f6fa 100644
+> >>>> --- a/drivers/pci/probe.c
+> >>>> +++ b/drivers/pci/probe.c
+> >>>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+> >>>>      }
+> >>>>  }
+> >>>>
+> >>>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
+> >>>> +{
+> >>>> +}
+> >>>
+> >>> I don't think there's anything in this series that requires this to be a
+> >>> weak function, is there?  This is the only definition I see.
+> >>
+> >> It looks like all the pcibios_* functions so far have a weak attribute,
+> >> and I've added it as a matter of consistency.
+> > 
+> > We've used pcibios_* names where we might need an arch-specific
+> > implementation.  I'm not sure that's the case here -- do you envision
+> > an implementation under arch/* someday?  If not, maybe it should just
+> > be a pci_* function instead of pcibios_*.
+> 
+> I could definitely see non-OF driven architectures wanting to override this.
+> 
+> Or maybe we should turn it the other way around and make it call the
+> various firmware interfaces (OF, ACPI...) until one of them succeeds. In
+> which case your suggestion of making it a pci_* function makes a lot of
+> sense.
 
-Le 22/07/2015 15:41, Marek Vasut a ?crit :
-> On Wednesday, July 22, 2015 at 03:17:06 PM, Cyrille Pitchen wrote:
->> Once the Quad SPI mode has been enabled on a Micron flash memory, this
->> device expects ALL the following commands to use the SPI 4-4-4 protocol.
->> The (Q)SPI controller needs to be notified about the protocol change so it
->> can adapt and keep on dialoging with the Micron memory.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> ---
->>  drivers/mtd/spi-nor/spi-nor.c | 17 +++++++++++++++++
->>  include/linux/mtd/spi-nor.h   | 13 +++++++++++++
->>  2 files changed, 30 insertions(+)
->>
->> diff --git a/drivers/mtd/spi-nor/spi-nor.c b/drivers/mtd/spi-nor/spi-nor.c
->> index d78831b4422b..93627d4e6be8 100644
->> --- a/drivers/mtd/spi-nor/spi-nor.c
->> +++ b/drivers/mtd/spi-nor/spi-nor.c
->> @@ -163,6 +163,18 @@ static inline int write_disable(struct spi_nor *nor)
->>  	return nor->write_reg(nor, SPINOR_OP_WRDI, NULL, 0, 0);
->>  }
->>
->> +/*
->> + * Notify the (Q)SPI controller about the new protocol to be used.
-> 
-> Hi!
-> 
-> Can you please just reword this a little, so that it is absolutelly clear
-> even to the less bright of us (like me) that this is a notification coming
-> from the upper layers (ie. the spi-nor framework) toward the hardware ?
-> 
-Sure, no problem! what about the following?
+Here's my advice, FWIW:
 
-/*
- * Let the spi-nor framework notify lower layers, especially the driver of the
- * (Q)SPI controller, about the new protocol to be used. Indeed, once the
- * spi-nor framework has sent manufacturer specific commands to a memory to
- * enable its Quad SPI mode, it should immediately after tell the QSPI
- * controller to use the very same Quad SPI protocol as expected by the memory.
- */
+  - remove __weak
 
->> + */
->> +static inline int spi_nor_set_protocol(struct spi_nor *nor,
->> +				       enum spi_protocol proto)
->> +{
->> +	if (nor->set_protocol)
->> +		return nor->set_protocol(nor, proto);
->> +
->> +	return 0;
->> +}
->> +
->>  static inline struct spi_nor *mtd_to_spi_nor(struct mtd_info *mtd)
->>  {
->>  	return mtd->priv;
-> 
-> [...]
-> 
-> Best regards,
-> Marek Vasut
-> 
-Best regards,
+  - rename pcibios_set_host_bridge_msi_domain() to
+    pci_host_bridge_msi_domain() and have it return a struct irq_domain *
 
-Cyrille
+  - pci_host_bridge_msi_domain() can call whatever firmware- or
+    arch-specific code you need to look up the irq_domain
+
+  - move the dev_set_msi_domain() call from pci_set_phb_of_msi_domain() to
+    pci_set_bus_msi_domain()
