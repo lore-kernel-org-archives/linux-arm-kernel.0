@@ -1,71 +1,85 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 22 Jul 2015 13:46:53 +0530
-Subject: [PATCH 3/4] clk: 88pm800: Add clk provider driver for 88pm800
- family of devices
-In-Reply-To: <55AF3C2E.7010205@samsung.com>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-4-git-send-email-vaibhav.hiremath@linaro.org>
- <55AE990E.2040004@codeaurora.org> <55AE9F48.20600@linaro.org>
- <55AEB103.9010205@codeaurora.org> <55AF37D9.3000006@linaro.org>
- <55AF3C2E.7010205@samsung.com>
-Message-ID: <55AF5175.2010701@linaro.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 22 Jul 2015 10:18:04 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <201507220958.00231.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507220933.19752.marex@denx.de>
+ <CAOMqctTmRy0gOchdUQ+VnoV-oJz0v9NpUPLi1pxO_O9QrLXsZA@mail.gmail.com>
+ <201507220958.00231.marex@denx.de>
+Message-ID: <CAOMqctQ13JE+GHyj+hU4XL3Uz4+Yt_X6BFU=NO8jXcpRtzMyzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 22 July 2015 12:16 PM, Krzysztof Kozlowski wrote:
-> On 22.07.2015 15:27, Vaibhav Hiremath wrote:
+On 22 July 2015 at 09:58, Marek Vasut <marex@denx.de> wrote:
+> On Wednesday, July 22, 2015 at 09:45:27 AM, Michal Suchanek wrote:
+>> On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
+>> > On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
+>> >> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
+>> >> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
+>> >> >> > Or alternatively we could publish the limitations of the channel
+>> >> >> > using capabilities so SPI knows I have a dmaengine channel and it
+>> >> >> > can transfer max N length transfers so would be able to break
+>> >> >> > rather than guessing it or coding in DT. Yes it may come from DT
+>> >> >> > but that should be dmaengine driver rather than client driver :)
+>> >> >> >
+>> >> >> > This can be done by dma_get_slave_caps(chan, &caps)
+>> >> >> >
+>> >> >> > And we add max_length as one more parameter to existing set
+>> >> >> >
+>> >> >> > Also all this could be handled in generic SPI-dmaengine layer so
+>> >> >> > that individual drivers don't have to code it in
+>> >> >> >
+>> >> >> > Let me know if this idea is okay, I can push the dmaengine bits...
+>> >> >>
+>> >> >> It would be ok if there was a fixed limit. However, the limit depends
+>> >> >> on SPI slave settings. Presumably for other buses using the dmaengine
+>> >> >> the limit would depend on the bus or slave settings as well. I do not
+>> >> >> see a sane way of passing this all the way to the dmaengine driver.
+>> >> >
+>> >> > I don't see why this should be client (SPI) dependent. The max length
+>> >> > supported is a dmaengine constraint, typically flowing from max
+>> >> > blocks/length it can transfer. Know this limit can allow clients to
+>> >> > split transfers.
+>> >>
+>> >> In practice on the board I have the maximum transfer length before it
+>> >> fails depends on SPI bus speed which is set up per slave. I did not
+>> >> try searching the space of possible settings thorougly and settled for
+>> >> a setting that gives reasonable speed and transfer length.
+>> >
+>> > This looks more like a signal integrity issue though.
 >>
+>> It certainly does on the surface. However, when wrong data is
+>> delivered over the SPI bus (such as when I use wrong phase setting)
+>> the SPI controller happily delivers wrong data over PIO.
 >>
->> On Wednesday 22 July 2015 02:22 AM, Stephen Boyd wrote:
->>> On 07/21/2015 12:36 PM, Vaibhav Hiremath wrote:
->>>>
->>>> On Wednesday 22 July 2015 12:40 AM, Stephen Boyd wrote:
->>>>> On 07/21/2015 04:07 AM, Vaibhav Hiremath wrote:
->>>>>> +
->>
->> <snip>
->>
->>>>>> +static int pm800_clk_remove(struct platform_device *pdev)
->>>>>> +{
->>>>>> +    struct pm800_clk *pm800_clks = platform_get_drvdata(pdev);
->>>>>> +    int i;
->>>>>> +
->>>>>> +    of_clk_del_provider(pm800_clks[0].clk_np);
->>>>>> +    /* Drop the reference obtained in pm800_clk_parse_dt */
->>>>>> +    of_node_put(pm800_clks[0].clk_np);
->>>>>
->>>>> This is odd. Why are we keeping the reference in the driver?
->>>>>
->>>>
->>>> Honestly I do not have any good answer here. I have to admit that it is
->>>> getting carry forwarded from legacy driver.
->>>>
->>>
->>> Well we shouldn't do things if we don't know why we're doing them.
->>> Krzysztof?
+>> The failure I am seeing is that the pl330 DMA program which repeatedly
+>> waits for data from the SPI controller never finishes the read loop
+>> and does not signal the interrupt. It seems it also leaves some data
+>> in a FIFO somewhere so next command on the flash returns garbage and
+>> fails.
 >
-> I am really busy now so I am not following closely other discussions. I
-> assume you are referring to clk-s2mps11.c. The of_node_put() matches
-> of_get_child_by_name() when parsing DT.
->
-> So why not of_node_put() just after parsing DT? Well, the result of
-> of_get_child_by_name() is stored in state container for entire device
-> life-cycle so we can use it in of_clk_del_provider().
->
-> That was the idea behind it. If it looks incorrect I would be happy to
-> see a patch :) .
->
+> I observed something similar on MXS (mx28) SPI block. Do you use mixed
+> PIO/DMA mode perhaps ?
 
-About to respond, I digged more on kobject stuff and sequence in
-of/dynamic.c and
+The SPI driver uses PIO for short transfers and DMA for transfers
+longer than the controller FIFO. This seems to be the standard way to
+do things.It works flawlessly so long as submitting overly long DMA
+programs is avoided.
 
-I think you are right, we need of_node_put, as a result of
-of_get_child_by_name().
+> Do you have the option to connect a bus analyzer?
+> I can probably offer you some tools, I'm in Prague ...
 
-Stephen,
-Please let me know if you think otherwise.
+The flash chip is accessible when removing the bottom cover. It is
+VSOP8 package slightly lower than SOP8 so attaching clips to it might
+be a bit problematic. That's the only accessible part. Everything
+other than SPI is inside the SoC.
 
-Thanks,
-Vaibhav
+Since SPI has no verification whatsoever the chip might be completely
+dead and you can still read fine all zeroes or all ones when
+attempting a read from it. I observed this behaviour when I used a
+flash chip in a socket and it was not firmly seated. It was with a
+different SPI controller, though.
+
+Thanks
+
+Michal
