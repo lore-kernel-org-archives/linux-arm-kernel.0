@@ -1,68 +1,22 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 22 Jul 2015 21:59:42 +0800
-Subject: [PATCH 0/6] mmc: sdhci-esdhci-imx: fix cd/wp regression
-In-Reply-To: <55A49D35.7010002@web.de>
-References: <1434564337-24720-1-git-send-email-aisheng.dong@freescale.com>
- <20150709075032.GD23464@tiger>
- <20150709092949.GB3917@shlinux1.ap.freescale.net>
- <20150709132736.GG23464@tiger>
- <20150713114310.GA9453@shlinux1.ap.freescale.net>
- <55A49D35.7010002@web.de>
-Message-ID: <20150722135939.GA13623@shlinux1.ap.freescale.net>
+From: noralf@tronnes.org (=?UTF-8?B?Tm9yYWxmIFRyw7hubmVz?=)
+Date: Wed, 22 Jul 2015 16:07:57 +0200
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <55822C71.2040409@wwwdotorg.org>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <55822C71.2040409@wwwdotorg.org>
+Message-ID: <55AFA3BD.80507@tronnes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 07:25:09AM +0200, Soeren Moch wrote:
-> 
-> 
-> On 13.07.2015 13:43, Dong Aisheng wrote:
-> > On Thu, Jul 09, 2015 at 09:27:36PM +0800, Shawn Guo wrote:
-> >> On Thu, Jul 09, 2015 at 05:29:50PM +0800, Dong Aisheng wrote:
-> >>> I agree with you.
-> >>> One difference is that i'd like to fix it ASAP without reverting 8d86e4f
-> >>> due to more patches depends on it is already there as i mentioned above..
-> >>> Revert it may need to revert a lot others.
-> >>>
-> >>> The pain is that v4.1 is left broken.
-> >>
-> >> Oh, crap!  I thought it's been there with only v4.2-rc1, and did not
-> >> know v4.1 is already broken.  In that case, reverting 8d86e4f isn't
-> >> the best option.  I suggest you rebase the dts series on top of
-> >> v4.2-rc1, and send it via mmc tree.
-> >>
-> > 
-> > Yes, will go that way.
-> > 
-> > Then you may need help take care of new dts going through your tree
-> > to make sure no broken code in again.
-> 
-> Dong,
-> 
-> I use a microSD card (mmc0) with the root filesystem on a tbs2910 board.
-> I cannot see any difference between linux-4.0 and linux-4.1 (vanilla
-> kernel with corresponding dtb), there is absolutely no problem with card
-> detect.
-> 
-> Can you please explain what exactly is broken in linux-4.1?
-> 
 
-The CD function is broken.
-If you enable CONFIG_MMC_DEBUG, you will see the MMC core keep polling the
-card because MMC_CAP_NEEDS_POLL is wrongly set.
-You can refer to cover-letter for more detailed explaination.
+Den 18.06.2015 04:26, skrev Stephen Warren:
+> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
+>> Add a duplicate irq range with an offset on the hwirq's so the
+>> driver can detect that enable_fiq() is used.
+>> Tested with downstream dwc_otg USB controller driver.
+> This basically looks OK, but a few comments/thoughts:
+>
+> a) Should the Kconfig change be a separate patch since it's a separate
+> subsystem?
 
-If you're using a non-removable card(having non-removable property in dts),
-you may not have this issue.
-
-Regards
-Dong Aisheng
-
-> Thanks,
-> Soeren
-> 
-> > Thanks
-> > 
-> > Regards
-> > Dong Aisheng
-> > 
-> >> Shawn
+Is this a yes since you haven't acked it?
