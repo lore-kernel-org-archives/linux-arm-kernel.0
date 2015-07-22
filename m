@@ -1,16 +1,38 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jul 2015 15:24:10 +0100
-Subject: [PATCH v3 3/5] arm64: move PGD_SIZE definition to pgalloc.h
-In-Reply-To: <1437561037-31995-4-git-send-email-a.ryabinin@samsung.com>
+Date: Wed, 22 Jul 2015 15:24:40 +0100
+Subject: [PATCH v3 5/5] ARM64: kasan: print memory assignment
+In-Reply-To: <1437561037-31995-6-git-send-email-a.ryabinin@samsung.com>
 References: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
- <1437561037-31995-4-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150722142410.GC16627@e104818-lin.cambridge.arm.com>
+ <1437561037-31995-6-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150722142440.GD16627@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 01:30:35PM +0300, Andrey Ryabinin wrote:
-> This will be used by KASAN latter.
+On Wed, Jul 22, 2015 at 01:30:37PM +0300, Andrey Ryabinin wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
+> This prints out the virtual memory assigned to KASan in the
+> boot crawl along with other memory assignments, if and only
+> if KASan is activated.
+> 
+> Example dmesg from the Juno Development board:
+> 
+> Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
+> 2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
+> Virtual kernel memory layout:
+>     kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
+>     vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
+>     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+>               0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
+>     fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
+>     PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
+>     modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
+>     memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
+>       .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
+>       .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
+>       .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
