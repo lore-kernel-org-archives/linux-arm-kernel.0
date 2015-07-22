@@ -1,257 +1,85 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 21 Jul 2015 18:29:43 -0700
-Subject: [PATCH v4 4/4] arm64: dts: Add Broadcom North Star 2 support
-In-Reply-To: <1437528583-855-1-git-send-email-rjui@broadcom.com>
-References: <1437528583-855-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1437528583-855-5-git-send-email-rjui@broadcom.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 21 Jul 2015 19:50:35 -0600
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <55A4F709.1000501@tronnes.org>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <55822C71.2040409@wwwdotorg.org> <5582C87C.20008@tronnes.org>
+ <55A09710.3030509@wwwdotorg.org> <55A135B4.1060309@tronnes.org>
+ <55A4952A.3090309@wwwdotorg.org> <55A4F709.1000501@tronnes.org>
+Message-ID: <55AEF6EB.5080403@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Broadcom NS2 device tree binding document. Also add initial device
-tree dtsi for Broadcom North Star 2 (NS2) SoC and board support for NS2
-SVK board
+On 07/14/2015 05:48 AM, Noralf Tr?nnes wrote:
+> Den 14.07.2015 06:50, skrev Stephen Warren:
+>> On 07/11/2015 09:26 AM, Noralf Tr?nnes wrote:
+>>> Den 11.07.2015 06:09, skrev Stephen Warren:
+>>>> (Sorry for the slow reply; I was on vacation)
+>>>>
+>>>> On 06/18/2015 07:32 AM, Noralf Tr?nnes wrote:
+>>>>> Den 18.06.2015 04:26, skrev Stephen Warren:
+>>>>>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
+>>>>>>> Add a duplicate irq range with an offset on the hwirq's so the
+>>>>>>> driver can detect that enable_fiq() is used.
+>>>>>>> Tested with downstream dwc_otg USB controller driver.
+>>>>>> This basically looks OK, but a few comments/thoughts:
+>>>>>> b) Doesn't the driver need to refuse some operation (handler
+>>>>>> registration, IRQ setup, IRQ enable, ...?) for more than 1 IRQ in the
+>>>>>> FIQ range, since the FIQ control register only allows routing 1
+>>>>>> IRQ to
+>>>>>> FIQ.
+>>>>> claim_fiq() protects the FIQ. See d) answer below.
+>>>> That assumes the IRQ is "accessed" via the fiq-specific APIs. Since
+>>>> this
+>>>> patch changes the IRQ domain from having n IRQs to having 2*n IRQs, and
+>>>> doesn't do anything special to prevent clients from using IRQs n..2n-1
+>>>> via the existing IRQ APIs, it's quite possible the a buggy client
+>>>> would.
+>>> Yes, but doesn't this apply to all irq use, using the wrong one doesn't
+>>> work.
+>>> If FIQ's where in more common use, we might have seen a FIQ IRQ flag
+>>> instead
+>>> of special FIQ irqs.
+>>>
+>>>> (From another email):
+>>>>>>> c) The DT binding needs updating to describe the extra IRQs:
+>>>>>>>
+>>>>>>>> Documentation/devicetree/bindings/interrupt-controller/brcm,bcm28armctrl-ic.txt
+>>>>>>>>
+>>>>>>>>
+>>>>>> Ok.
+>>>>> I have seconds thoughts on this:
+>>>>> This patch does not change the DT bindings so I don't see what update
+>>>>> I should make. This patch only adds support for the Linux way of
+>>>>> handling FIQ's through enable_fiq(). It doesn't change how interrupts
+>>>>> are described in the DT.
+>>>> The intention of the patch may not be to expand the set of IRQs
+>>>> available via DT, but it does in practice. I think you need to add a
+>>>> custom of_xlate for the IRQ domain to ensure that only IRQs 0..n-1 can
+>>>> be translated from DT, and not IRQs n..2n-1. If you do that, then I
+>>>> agree that no DT binding update should be required.
+>>> armctrl_xlate() maps to the same hwirqs as before. This patch adds a
+>>> new range of hwirqs at the end of the "real" hwirq range.
+>>> It's not possible to get to these FIQ shadow hwirqs through DT.
+>> What prevents a DT from (incorrectly) referencing the extra hwirqs?
+> 
+> armctrl_xlate() has these limits:
+> 
+> if (WARN_ON(intspec[0] >= NR_BANKS))
+> if (WARN_ON(intspec[1] >= IRQS_PER_BANK))
+> if (WARN_ON(intspec[0] == 0 && intspec[1] >= NR_IRQS_BANK0))
+> 
+> Thus the maximum values allowed are:
+> intspec[0]: (NR_BANKS - 1) = 2
+> intspec[1]: (IRQS_PER_BANK - 1) = 31
+> 
+> This gives a maximum hwirq:
+> *out_hwirq = MAKE_HWIRQ(intspec[0], intspec[1]);
+> *out_hwirq = (2 << 5) | 31 = 95
+> 
+> The FIQ shadow hwirq range starts at 96:
+> irq = irq_create_mapping(intc.domain, MAKE_HWIRQ(b, i) + NUMBER_IRQS);
+> 
+> NUMBER_IRQS = MAKE_HWIRQ(NR_BANKS, 0) = 96
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Signed-off-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
- arch/arm64/boot/dts/Makefile                      |    1 +
- arch/arm64/boot/dts/broadcom/Makefile             |    5 +
- arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   59 +++++++++++
- arch/arm64/boot/dts/broadcom/ns2.dtsi             |  118 +++++++++++++++++++++
- 5 files changed, 192 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
- create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
- create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
-
-diff --git a/Documentation/devicetree/bindings/arm/bcm/ns2.txt b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
-new file mode 100644
-index 0000000..35f056f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/bcm/ns2.txt
-@@ -0,0 +1,9 @@
-+Broadcom North Star 2 (NS2) device tree bindings
-+------------------------------------------------
-+
-+Boards with NS2 shall have the following properties:
-+
-+Required root node property:
-+
-+NS2 SVK board
-+compatible = "brcm,ns2-svk", "brcm,ns2";
-diff --git a/arch/arm64/boot/dts/Makefile b/arch/arm64/boot/dts/Makefile
-index 38913be..9f95941 100644
---- a/arch/arm64/boot/dts/Makefile
-+++ b/arch/arm64/boot/dts/Makefile
-@@ -1,6 +1,7 @@
- dts-dirs += amd
- dts-dirs += apm
- dts-dirs += arm
-+dts-dirs += broadcom
- dts-dirs += cavium
- dts-dirs += exynos
- dts-dirs += freescale
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-new file mode 100644
-index 0000000..e21fe66
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -0,0 +1,5 @@
-+dtb-$(CONFIG_ARCH_BCM_IPROC) += ns2-svk.dtb
-+
-+always		:= $(dtb-y)
-+subdir-y	:= $(dts-dirs)
-+clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-new file mode 100644
-index 0000000..244baf8
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -0,0 +1,59 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+/dts-v1/;
-+
-+#include "ns2.dtsi"
-+
-+/ {
-+	model = "Broadcom NS2 SVK";
-+	compatible = "brcm,ns2-svk", "brcm,ns2";
-+
-+	aliases {
-+		serial0 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x000000000 0x80000000 0x00000000 0x40000000>;
-+	};
-+
-+	soc: soc {
-+		uart3: serial at 66130000 {
-+			status = "ok";
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-new file mode 100644
-index 0000000..3c92d92
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -0,0 +1,118 @@
-+/*
-+ *  BSD LICENSE
-+ *
-+ *  Copyright(c) 2015 Broadcom Corporation.  All rights reserved.
-+ *
-+ *  Redistribution and use in source and binary forms, with or without
-+ *  modification, are permitted provided that the following conditions
-+ *  are met:
-+ *
-+ *    * Redistributions of source code must retain the above copyright
-+ *      notice, this list of conditions and the following disclaimer.
-+ *    * Redistributions in binary form must reproduce the above copyright
-+ *      notice, this list of conditions and the following disclaimer in
-+ *      the documentation and/or other materials provided with the
-+ *      distribution.
-+ *    * Neither the name of Broadcom Corporation nor the names of its
-+ *      contributors may be used to endorse or promote products derived
-+ *      from this software without specific prior written permission.
-+ *
-+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/memreserve/ 0x84b00000 0x00000008;
-+
-+/ {
-+	compatible = "brcm,ns2";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0 0>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0 0x84b00000>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0 1>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0 0x84b00000>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0 2>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0 0x84b00000>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0 3>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0 0x84b00000>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0xff) |
-+			      IRQ_TYPE_EDGE_RISING)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(0xff) |
-+			      IRQ_TYPE_EDGE_RISING)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(0xff) |
-+			      IRQ_TYPE_EDGE_RISING)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(0xff) |
-+			      IRQ_TYPE_EDGE_RISING)>;
-+	};
-+
-+	soc: soc {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0 0xffffffff>;
-+
-+		gic: interrupt-controller at 65210000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0x65210000 0x1000>,
-+			      <0x65220000 0x1000>,
-+			      <0x65240000 0x2000>,
-+			      <0x65260000 0x1000>;
-+		};
-+
-+		uart3: serial at 66130000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x66130000 0x100>;
-+			interrupts = <GIC_SPI 393 IRQ_TYPE_LEVEL_HIGH>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clock-frequency = <23961600>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-1.7.9.5
+Great, thanks for the explanation. That should be fine then.
