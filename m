@@ -1,50 +1,43 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 22 Jul 2015 12:21:04 +0100
-Subject: [PATCH v3 4/5] arm64: kvm: Adopt new alternative assembler macros
+Date: Wed, 22 Jul 2015 12:21:05 +0100
+Subject: [PATCH v3 5/5] arm64: alternative: Remove alternative_insn macro
 In-Reply-To: <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
  <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437564065-4356-5-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437564065-4356-6-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the dynamic patching for ARM64_HAS_SYSREG_GIC_CPUIF over to
-the newly added alternative assembler macros.
+This macro has been superceded by the alterntive_if_not/else/endif
+macro family and is no longer used anywhere in the kerne. Remove it.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm64/kvm/hyp.S | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/alternative.h | 12 ------------
+ 1 file changed, 12 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 17a8fb14f428..10915aaf0b01 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -810,7 +810,11 @@
-  * Call into the vgic backend for state saving
-  */
- .macro save_vgic_state
--	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+	bl	__save_vgic_v2_state
-+alternative_else
-+	bl	__save_vgic_v3_state
-+alternative_endif
- 	mrs	x24, hcr_el2
- 	mov	x25, #HCR_INT_OVERRIDE
- 	neg	x25, x25
-@@ -827,7 +831,11 @@
- 	orr	x24, x24, #HCR_INT_OVERRIDE
- 	orr	x24, x24, x25
- 	msr	hcr_el2, x24
--	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-+alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-+	bl	__restore_vgic_v2_state
-+alternative_else
-+	bl	__restore_vgic_v3_state
-+alternative_endif
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index e86681ad0931..81c7369eb358 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -65,18 +65,6 @@ void free_alternatives_memory(void);
+ 	.byte \alt_len
  .endm
  
- .macro save_timer_state
+-.macro alternative_insn insn1 insn2 cap
+-661:	\insn1
+-662:	.pushsection .altinstructions, "a"
+-	altinstruction_entry 661b, 663f, \cap, 662b-661b, 664f-663f
+-	.popsection
+-	.pushsection .altinstr_replacement, "ax"
+-663:	\insn2
+-664:	.popsection
+-	.org	. - (664b-663b) + (662b-661b)
+-	.org	. - (662b-661b) + (664b-663b)
+-.endm
+-
+ /*
+  * Begin an alternative code sequence.
+  *
 -- 
 2.4.3
