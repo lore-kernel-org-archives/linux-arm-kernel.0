@@ -1,35 +1,31 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 22 Jul 2015 19:49:15 +0000
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-Message-ID: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 22 Jul 2015 12:55:36 -0700
+Subject: [PATCH 1/2] MAINTAINERS: Add myself as a bcm2835 co-maintainer.
+Message-ID: <1437594937-28583-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin/Will,
+The current maintainers have limited free time to work on the
+architecture, and I'm motivated to do so for my work on graphics for
+Broadcom.  Arnd and Florian suggested to me that this might be the way
+forward.
 
-This is not a patch mean to be applied, but a query about whether there
-is any reason to not enable 48-bit VA by default in the arm64 defconfig.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
-reasons mentioned in [1].
-
-Based on the comment in [1] by Catalin, it seems that the intent
-is to turn this on by default.
-
-Is there any issues anyone sees with a patch that does this:
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4e17e7e..5acf75d 100644
-@@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
- CONFIG_PCI=y
- CONFIG_PCI_MSI=y
- CONFIG_PCI_XGENE=y
-+CONFIG_ARM64_VA_BITS_48=y
- CONFIG_SMP=y
- CONFIG_PREEMPT=y
- CONFIG_KSM=y
-
-Thanks,
-Stuart
-
-[1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2d3d55c..1c51379 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2217,6 +2217,7 @@ F:	drivers/clocksource/bcm_kona_timer.c
+ BROADCOM BCM2835 ARM ARCHITECTURE
+ M:	Stephen Warren <swarren@wwwdotorg.org>
+ M:	Lee Jones <lee@kernel.org>
++M:	Eric Anholt <eric@anholt.net>
+ L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+ S:	Maintained
+-- 
+2.1.4
