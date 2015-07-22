@@ -1,62 +1,151 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 22 Jul 2015 09:45:27 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <201507220933.19752.marex@denx.de>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <20150722044925.GN23525@localhost>
- <CAOMqctQH4MnKMthOnuPgB-A5k6PCOAmhwHzJfn7gE3R4w8bufg@mail.gmail.com>
- <201507220933.19752.marex@denx.de>
-Message-ID: <CAOMqctTmRy0gOchdUQ+VnoV-oJz0v9NpUPLi1pxO_O9QrLXsZA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Jul 2015 08:46:04 +0100
+Subject: [PATCH 4/5] acpi: gsi: Use acpi_gsi_descriptor to allocate
+ interrupts
+In-Reply-To: <20150721181646.GC32187@red-moon>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-5-git-send-email-marc.zyngier@arm.com>
+ <20150721181646.GC32187@red-moon>
+Message-ID: <55AF4A3C.1010608@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
-> On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
->> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
->> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
->> >> > Or alternatively we could publish the limitations of the channel using
->> >> > capabilities so SPI knows I have a dmaengine channel and it can
->> >> > transfer max N length transfers so would be able to break rather than
->> >> > guessing it or coding in DT. Yes it may come from DT but that should
->> >> > be dmaengine driver rather than client driver :)
->> >> >
->> >> > This can be done by dma_get_slave_caps(chan, &caps)
->> >> >
->> >> > And we add max_length as one more parameter to existing set
->> >> >
->> >> > Also all this could be handled in generic SPI-dmaengine layer so that
->> >> > individual drivers don't have to code it in
->> >> >
->> >> > Let me know if this idea is okay, I can push the dmaengine bits...
->> >>
->> >> It would be ok if there was a fixed limit. However, the limit depends
->> >> on SPI slave settings. Presumably for other buses using the dmaengine
->> >> the limit would depend on the bus or slave settings as well. I do not
->> >> see a sane way of passing this all the way to the dmaengine driver.
->> >
->> > I don't see why this should be client (SPI) dependent. The max length
->> > supported is a dmaengine constraint, typically flowing from max
->> > blocks/length it can transfer. Know this limit can allow clients to split
->> > transfers.
+On 21/07/15 19:16, Lorenzo Pieralisi wrote:
+> On Tue, Jul 21, 2015 at 11:07:59AM +0100, Marc Zyngier wrote:
+>> Now that the irqdomain layer is a bit more ACPI friendly, add the
+>> mapping code that allows irq_create_acpi_mapping to be called.
 >>
->> In practice on the board I have the maximum transfer length before it
->> fails depends on SPI bus speed which is set up per slave. I did not
->> try searching the space of possible settings thorougly and settled for
->> a setting that gives reasonable speed and transfer length.
->
-> This looks more like a signal integrity issue though.
->
+>> As we only support the GIC so far, support is pretty limited.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  drivers/acpi/gsi.c | 54 ++++++++++++++++++++++++++++++++++++------------------
+>>  1 file changed, 36 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+>> index 38208f2..005d843 100644
+>> --- a/drivers/acpi/gsi.c
+>> +++ b/drivers/acpi/gsi.c
+>> @@ -33,6 +33,12 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+>>  	}
+>>  }
+>>  
+>> +static struct irq_domain *irq_find_acpi_domain(enum acpi_irq_model_id id,
+>> +					       enum irq_domain_bus_token bus_token)
+>> +{
+>> +	return irq_find_matching_host((void *)id, bus_token);
+>> +}
+>> +
+>>  /**
+>>   * acpi_gsi_to_irq() - Retrieve the linux irq number for a given GSI
+>>   * @gsi: GSI IRQ number to map
+>> @@ -45,12 +51,10 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+>>   */
+>>  int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
+>>  {
+>> -	/*
+>> -	 * Only default domain is supported at present, always find
+>> -	 * the mapping corresponding to default domain by passing NULL
+>> -	 * as irq_domain parameter
+>> -	 */
+>> -	*irq = irq_find_mapping(NULL, gsi);
+>> +	struct irq_domain *d = irq_find_acpi_domain(acpi_irq_model,
+>> +						    DOMAIN_BUS_ANY);
+>> +
+>> +	*irq = irq_find_mapping(d, gsi);
+>>  	/*
+>>  	 * *irq == 0 means no mapping, that should
+>>  	 * be reported as a failure
+>> @@ -72,23 +76,35 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>>  int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+>>  		      int polarity)
+>>  {
+>> -	unsigned int irq;
+>> +	struct acpi_gsi_descriptor data;
+>>  	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+>> +	struct irq_domain *d = irq_find_acpi_domain(acpi_irq_model,
+>> +						    DOMAIN_BUS_ANY);
+>>  
+>>  	/*
+>> -	 * There is no way at present to look-up the IRQ domain on ACPI,
+>> -	 * hence always create mapping referring to the default domain
+>> -	 * by passing NULL as irq_domain parameter
+>> +	 * Populate the GSI descriptor in a way that matches the way
+>> +	 * the driver expects its of_phandle_args.
+>>  	 */
+>> -	irq = irq_create_mapping(NULL, gsi);
+>> -	if (!irq)
+>> +	switch (acpi_irq_model) {
+>> +	case ACPI_IRQ_MODEL_GIC:
+>> +		if (gsi >= 32) {
+>> +			data.param[0] = 0;
+>> +			data.param[1] = gsi - 32;
+>> +			data.param[2] = irq_type;
+>> +		} else {
+>> +			data.param[0] = 1;
+>> +			data.param[1] = gsi - 16;
+>> +			data.param[2] = 0xff << 4 | irq_type;
+>> +		}
+>> +
+>> +		data.param_count = 3;
+>> +		break;
+>> +	default:
+>> +		pr_warn("Unknown acpi_irq_model = %d\n", acpi_irq_model);
+>>  		return -EINVAL;
+>> +	}
+> 
+> Nit: you could move the switch in a function (in this file) so that
+> code that is irq model specific is self-contained and in a function
+> on its own, if we ever have to add other irq models later I think it
+> is easier to parse.
 
-It certainly does on the surface. However, when wrong data is
-delivered over the SPI bus (such as when I use wrong phase setting)
-the SPI controller happily delivers wrong data over PIO.
+Yup, makes sense.
 
-The failure I am seeing is that the pl330 DMA program which repeatedly
-waits for data from the SPI controller never finishes the read loop
-and does not signal the interrupt. It seems it also leaves some data
-in a FIFO somewhere so next command on the flash returns garbage and
-fails.
+Actually, having given it a bit more thoughts, there is not reason why
+this translation function should be located in this file. The interrupt
+controller driver, instead of doing a
 
-Thanks
+acpi_irq_model = ACPI_IRQ_MODEL_BLAH;
 
-Michal
+could as well be doing
+
+acpi_set_irq_model(ACPI_IRQ_MODEL_BLAH, blah_acpi_gsi_desc_populate);
+
+making the whole thing completely interrupt-controller agnostic.
+
+Thanks,
+
+	M.
+
+> 
+> Lorenzo
+> 
+>>  
+>> -	/* Set irq type if specified and different than the current one */
+>> -	if (irq_type != IRQ_TYPE_NONE &&
+>> -		irq_type != irq_get_trigger_type(irq))
+>> -		irq_set_irq_type(irq, irq_type);
+>> -	return irq;
+>> +	return irq_create_acpi_mapping(d, &data);
+>>  }
+>>  EXPORT_SYMBOL_GPL(acpi_register_gsi);
+>>  
+>> @@ -98,7 +114,9 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
+>>   */
+>>  void acpi_unregister_gsi(u32 gsi)
+>>  {
+>> -	int irq = irq_find_mapping(NULL, gsi);
+>> +	struct irq_domain *d = irq_find_acpi_domain(acpi_irq_model,
+>> +						    DOMAIN_BUS_ANY);
+>> +	int irq = irq_find_mapping(d, gsi);
+>>  
+>>  	irq_dispose_mapping(irq);
+>>  }
+>> -- 
+>> 2.1.4
+>>
+> 
+
+
+-- 
+Jazz is not dead. It just smells funny...
