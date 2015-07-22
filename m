@@ -1,81 +1,38 @@
 From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Wed, 22 Jul 2015 12:21:01 +0100
-Subject: [PATCH v3 1/5] arm64: alternative: Provide if/else/endif assembler
- macros
+Date: Wed, 22 Jul 2015 12:21:02 +0100
+Subject: [PATCH v3 2/5] arm64: mm: Adopt new alternative assembler macros
 In-Reply-To: <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
 References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
  <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <1437564065-4356-2-git-send-email-daniel.thompson@linaro.org>
+Message-ID: <1437564065-4356-3-git-send-email-daniel.thompson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing alternative_insn macro has some limitations that make it
-hard to work with. In particular the fact it takes instructions from it
-own macro arguments means it doesn't play very nicely with C pre-processor
-macros because the macro arguments look like a string to the C
-pre-processor. Workarounds are (probably) possible but things start to
-look ugly.
-
-Introduce an alternative set of macros that allows instructions to be
-presented to the assembler as normal and switch everything over to the
-new macros.
+Convert the dynamic patching for ARM64_WORKAROUND_CLEAN_CACHE over to
+the newly added alternative assembler macros.
 
 Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
 ---
- arch/arm64/include/asm/alternative.h | 41 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm64/mm/cache.S | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index c385a0c4057f..e86681ad0931 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -77,6 +77,47 @@ void free_alternatives_memory(void);
- 	.org	. - (662b-661b) + (664b-663b)
- .endm
- 
-+/*
-+ * Begin an alternative code sequence.
-+ *
-+ * The code that follows this macro will be assembled and linked as
-+ * normal. There are no restrictions on this code.
-+ */
-+.macro alternative_if_not cap
-+	.pushsection .altinstructions, "a"
-+	altinstruction_entry 661f, 663f, \cap, 662f-661f, 664f-663f
-+	.popsection
-+661:
-+.endm
-+
-+/*
-+ * Provide the alternative code sequence.
-+ *
-+ * The code that follows this macro is assembled into a special
-+ * section to be used for dynamic patching. Code that follows this
-+ * macro must:
-+ *
-+ * 1. Be exactly the same length (in bytes) as the default code
-+ *    sequence.
-+ *
-+ * 2. Not contain a branch target that is used outside of the
-+ *    alternative sequence it is defined in (branches into an
-+ *    alternative sequence are not fixed up).
-+ */
-+.macro alternative_else
-+662:	.pushsection .altinstr_replacement, "ax"
-+663:
-+.endm
-+
-+/*
-+ * Complete an alternative code sequence.
-+ */
-+.macro alternative_endif
-+664:	.popsection
-+	.org	. - (664b-663b) + (662b-661b)
-+	.org	. - (662b-661b) + (664b-663b)
-+.endm
-+
- #endif  /*  __ASSEMBLY__  */
- 
- #endif /* __ASM_ALTERNATIVE_H */
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index bdeb5d38c2dd..eb48d5df4a0f 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -143,7 +143,12 @@ __dma_clean_range:
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x0, x0, x3
+-1:	alternative_insn "dc cvac, x0", "dc civac, x0", ARM64_WORKAROUND_CLEAN_CACHE
++1:
++alternative_if_not ARM64_WORKAROUND_CLEAN_CACHE
++	dc	cvac, x0
++alternative_else
++	dc	civac, x0
++alternative_endif
+ 	add	x0, x0, x2
+ 	cmp	x0, x1
+ 	b.lo	1b
 -- 
 2.4.3
