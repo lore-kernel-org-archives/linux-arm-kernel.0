@@ -1,203 +1,63 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 22 Jul 2015 12:23:57 +0200
-Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel Flexible
- Serial Communication Unit
-In-Reply-To: <cover.1437558598.git.cyrille.pitchen@atmel.com>
-References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
-Message-ID: <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
+From: a.ryabinin@samsung.com (Andrey Ryabinin)
+Date: Wed, 22 Jul 2015 13:30:32 +0300
+Subject: [PATCH v3 0/5] KASAN for arm64
+Message-ID: <1437561037-31995-1-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-integrates one SPI controller, one I2C controller and one USART. Only one
-function can be enabled at a time. This driver selects the function once
-for all, when the Flexcom is probed, finding the first (should be unique)
-available DT child node which compatible property contains one of the
-following strings:
-- "-usart"
-- "-spi"
-- "-i2c"
+For git users patches are available in git:
+ 	git://github.com/aryabinin/linux.git kasan/arm64v3
 
-This driver has chosen to present the Flexcom to the system as a MFD so
-the implementation is seamless for the existing Atmel SPI, I2C and USART
-drivers.
+Changes since v2:
+ - Rebase on top of v4.2-rc3
+ - Address feedback from Catalin.
+ - Print memory assignment fro Linus
+ - Add message about KASAN being initialized
 
-Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-USART drivers take advantage of this new feature.
+Changes since v1:
+ - Address feedback from Catalin.
+ - Generalize some kasan init code from arch/x86/mm/kasan_init_64.c
+    and reuse it for arm64.
+ - Some bugfixes, including:
+   	add missing arm64/include/asm/kasan.h
+	add tlb flush after changing ttbr1
+ - Add code comments.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
----
- drivers/mfd/Kconfig         |  11 ++++
- drivers/mfd/Makefile        |   1 +
- drivers/mfd/atmel-flexcom.c | 126 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 138 insertions(+)
- create mode 100644 drivers/mfd/atmel-flexcom.c
 
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index d5ad04dad081..9b33ad0653d1 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
- 	  additional drivers must be enabled in order to use the
- 	  functionality of the device.
- 
-+config MFD_ATMEL_FLEXCOM
-+	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-+	select MFD_CORE
-+	depends on OF
-+	help
-+	  Select this to get support for Atmel Flexcom. This is a wrapper
-+	  which embeds a SPI controller, a I2C controller and a USART. Only
-+	  one function can be used at a time. The choice is done at boot time
-+	  by the probe function of this MFD driver according to a device tree
-+	  property.
-+
- config MFD_ATMEL_HLCDC
- 	tristate "Atmel HLCDC (High-end LCD Controller)"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index 0e5cfeba107c..c666bf51abf3 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
- obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
- obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
- obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-+obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
- obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
- obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
- obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-new file mode 100644
-index 000000000000..8ba1862fbb74
---- /dev/null
-+++ b/drivers/mfd/atmel-flexcom.c
-@@ -0,0 +1,126 @@
-+/*
-+ * Driver for Atmel Flexcom
-+ *
-+ * Copyright (C) 2015 Atmel Corporation
-+ *
-+ * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+
-+/* I/O register offsets */
-+#define FLEX_MR		0x0	/* Mode Register */
-+#define FLEX_VERSION	0xfc	/* Version Register */
-+
-+/* Mode Register bit fields */
-+#define FLEX_MR_OPMODE_MASK	0x3
-+#define FLEX_MR_OPMODE_NO_COM	0x0
-+#define FLEX_MR_OPMODE_USART	0x1
-+#define FLEX_MR_OPMODE_SPI	0x2
-+#define FLEX_MR_OPMODE_TWI	0x3
-+
-+
-+static int atmel_flexcom_probe(struct platform_device *pdev)
-+{
-+	struct device_node *child, *np = pdev->dev.of_node;
-+	struct clk *clk;
-+	struct resource *res;
-+	void __iomem *base;
-+	u32 opmode = FLEX_MR_OPMODE_NO_COM;
-+	int err;
-+
-+	for_each_child_of_node(np, child) {
-+		const char *compatible;
-+		int cplen;
-+
-+		if (!of_device_is_available(child))
-+			continue;
-+
-+		compatible = of_get_property(child, "compatible", &cplen);
-+		if (!compatible || strlen(compatible) > cplen)
-+			continue;
-+
-+		if (strstr(compatible, "-usart")) {
-+			opmode = FLEX_MR_OPMODE_USART;
-+			break;
-+		}
-+
-+		if (strstr(compatible, "-spi")) {
-+			opmode = FLEX_MR_OPMODE_SPI;
-+			break;
-+		}
-+
-+		if (strstr(compatible, "-i2c")) {
-+			opmode = FLEX_MR_OPMODE_TWI;
-+			break;
-+		}
-+	}
-+
-+	if (opmode == FLEX_MR_OPMODE_NO_COM)
-+		return -EINVAL;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	err = clk_prepare_enable(clk);
-+	if (err)
-+		return err;
-+
-+	/*
-+	 * Set the Operating Mode in the Mode Register: only the selected device
-+	 * is clocked. Hence, registers of the other serial devices remain
-+	 * inaccessible and are read as zero. Also the external I/O lines of the
-+	 * Flexcom are muxed to reach the selected device.
-+	 */
-+	writel(opmode, base + FLEX_MR);
-+
-+	clk_disable_unprepare(clk);
-+
-+	return of_platform_populate(np, NULL, NULL, &pdev->dev);
-+}
-+
-+static const struct of_device_id atmel_flexcom_of_match[] = {
-+	{ .compatible = "atmel,sama5d2-flexcom" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
-+
-+static struct platform_driver atmel_flexcom_driver = {
-+	.driver		= {
-+		.name	= "atmel_flexcom",
-+		.of_match_table = atmel_flexcom_of_match,
-+	},
-+	.probe		= atmel_flexcom_probe,
-+};
-+
-+module_platform_driver(atmel_flexcom_driver);
-+
-+MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
-+MODULE_LICENSE("GPL v2");
+Andrey Ryabinin (4):
+  mm: kasan: introduce generic kasan_populate_zero_shadow()
+  arm64: introduce VA_START macro - the first kernel virtual address.
+  arm64: move PGD_SIZE definition to pgalloc.h
+  arm64: add KASAN support
+
+Linus Walleij (1):
+  ARM64: kasan: print memory assignment
+
+ arch/arm64/Kconfig               |  17 ++++
+ arch/arm64/include/asm/kasan.h   |  24 ++++++
+ arch/arm64/include/asm/memory.h  |   2 +
+ arch/arm64/include/asm/pgalloc.h |   1 +
+ arch/arm64/include/asm/pgtable.h |   9 +-
+ arch/arm64/include/asm/string.h  |  16 ++++
+ arch/arm64/kernel/arm64ksyms.c   |   3 +
+ arch/arm64/kernel/head.S         |   3 +
+ arch/arm64/kernel/module.c       |  16 +++-
+ arch/arm64/kernel/setup.c        |   2 +
+ arch/arm64/lib/memcpy.S          |   3 +
+ arch/arm64/lib/memmove.S         |   7 +-
+ arch/arm64/lib/memset.S          |   3 +
+ arch/arm64/mm/Makefile           |   3 +
+ arch/arm64/mm/init.c             |   6 ++
+ arch/arm64/mm/kasan_init.c       | 176 +++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/pgd.c              |   2 -
+ arch/x86/mm/kasan_init_64.c      |   8 +-
+ include/linux/kasan.h            |   8 ++
+ mm/kasan/Makefile                |   2 +-
+ mm/kasan/kasan_init.c            | 142 +++++++++++++++++++++++++++++++
+ 21 files changed, 440 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kasan.h
+ create mode 100644 arch/arm64/mm/kasan_init.c
+ create mode 100644 mm/kasan/kasan_init.c
+
 -- 
-1.8.2.2
+2.4.5
