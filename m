@@ -1,61 +1,49 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 22 Jul 2015 15:35:51 +0800
-Subject: [PATCH 1/5] genirq: irqdomain: Use an accessor for the of_node
- field
-In-Reply-To: <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
- <1437473280-11431-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55AF47D7.8010304@linaro.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 22 Jul 2015 08:38:56 +0100
+Subject: [PATCH 11/12] [media] tsin: c8sectpfe: Add Kconfig and Makefile
+ for the driver.
+In-Reply-To: <1435216998.4528.100.camel@tiscali.nl>
+References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
+ <1435158670-7195-12-git-send-email-peter.griffin@linaro.org>
+ <1435216998.4528.100.camel@tiscali.nl>
+Message-ID: <20150722073856.GA32601@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/21/2015 06:07 PM, Marc Zyngier wrote:
-> The struct irq_domain contains a "struct device_node *" field
-> (of_node) that is almost the only link between the irqdomain
-> and the device tree infrastructure.
->
-> In order to prepare for the removal of that field, convert all
-> users outside of kernel/irq/irqdomain.c to use an accessor.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   arch/mips/cavium-octeon/octeon-irq.c          | 4 ++--
->   arch/powerpc/platforms/cell/axon_msi.c        | 2 +-
->   arch/powerpc/platforms/cell/spider-pic.c      | 9 ++++++---
->   arch/powerpc/platforms/powernv/opal-irqchip.c | 2 +-
->   arch/powerpc/sysdev/ehv_pic.c                 | 3 ++-
->   arch/powerpc/sysdev/fsl_msi.c                 | 2 +-
->   arch/powerpc/sysdev/i8259.c                   | 3 ++-
->   arch/powerpc/sysdev/ipic.c                    | 3 ++-
->   arch/powerpc/sysdev/mpic.c                    | 3 ++-
->   arch/powerpc/sysdev/mpic_msi.c                | 2 +-
->   arch/powerpc/sysdev/qe_lib/qe_ic.c            | 3 ++-
->   drivers/gpio/gpio-sodaville.c                 | 2 +-
->   drivers/irqchip/exynos-combiner.c             | 2 +-
->   drivers/irqchip/irq-atmel-aic-common.c        | 2 +-
->   drivers/irqchip/irq-crossbar.c                | 4 ++--
->   drivers/irqchip/irq-gic-v2m.c                 | 2 +-
->   drivers/irqchip/irq-gic-v3-its.c              | 2 +-
->   drivers/irqchip/irq-gic-v3.c                  | 2 +-
->   drivers/irqchip/irq-gic.c                     | 2 +-
->   drivers/irqchip/irq-hip04.c                   | 2 +-
->   drivers/irqchip/irq-mtk-sysirq.c              | 2 +-
->   drivers/irqchip/irq-s3c24xx.c                 | 4 ++--
->   drivers/irqchip/irq-tegra.c                   | 4 ++--
->   drivers/irqchip/irq-vf610-mscm-ir.c           | 5 +++--
->   drivers/spmi/spmi-pmic-arb.c                  | 2 +-
->   include/linux/irqdomain.h                     | 5 +++++
->   26 files changed, 46 insertions(+), 32 deletions(-)
+Hi Paul,
 
-It seems to me that some other files missed,
-in arch/powerpc/platforms/pasemi/msi.c:
+Thanks for reviewing.
 
-         if (!mpic->irqhost->of_node ||
-             !of_device_is_compatible(mpic->irqhost->of_node,
-                                      "pasemi,pwrficient-openpic"))
-                 return -ENODEV;
+On Thu, 25 Jun 2015, Paul Bolle wrote:
 
-If you need more eyes to find all of them, please count me in :)
+> On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
+> > --- /dev/null
+> > +++ b/drivers/media/tsin/c8sectpfe/Makefile
+> 
+> > +c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o
+> > +
+> > +obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
+> > +
+> > +ifneq ($(CONFIG_DVB_C8SECTPFE),)
+> > +	c8sectpfe-y += c8sectpfe-debugfs.o
+> > +endif
+> 
+> Isn't the above equivalent to
+>     c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o c8sectpfe-debugfs.o
+> 
+>     obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
+> 
+> Or am I missing something subtle here?
 
-Thanks
-Hanjun
+No I think I just messed up. Will fix in v2.
+
+I suspect what happened  was I was starting to add a CONFIG_DVB_C8SECTPFE_DEBUGFS
+Kconfig option, and then forgot ;)
+
+In v2 I have added a "select DEBUG_FS" to Kconfig for the driver, and put it all on one
+line. Also at the same time fixing some other Kconfig dependencies I noticed so
+it now has 'select LIBELF_32' and 'select FW_LOADER'.
+
+regards,
+
+Peter.
