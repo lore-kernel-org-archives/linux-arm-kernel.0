@@ -1,66 +1,40 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 22 Jul 2015 15:54:14 +0100
-Subject: [PATCH v4 04/19] PCI/MSI: Add hooks to populate the msi_domain
- field
-In-Reply-To: <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
-References: <1436962613-17359-1-git-send-email-marc.zyngier@arm.com>
- <1436962613-17359-5-git-send-email-marc.zyngier@arm.com>
- <20150721212644.GB3691@google.com> <55AFABF3.5050303@arm.com>
- <CAErSpo5GRHp0-51tj8XiXKLujkLmtdmhg+gJOy0szJpP3002cQ@mail.gmail.com>
-Message-ID: <55AFAE96.4070401@arm.com>
+From: denis@eukrea.com (Denis Carikli)
+Date: Wed, 22 Jul 2015 17:01:30 +0200
+Subject: [PATCH] ARM: dts: i.MX35: Fix can support
+Message-ID: <1437577290-26321-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/15 15:48, Bjorn Helgaas wrote:
-> On Wed, Jul 22, 2015 at 9:42 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Hi Bjorn,
->>
->> On 21/07/15 22:26, Bjorn Helgaas wrote:
->>> On Wed, Jul 15, 2015 at 01:16:38PM +0100, Marc Zyngier wrote:
->>>> In order to be able to populate the device msi_domain field,
->>>> add the necesary hooks to propagate the host bridge msi_domain
->>>> across secondary busses to devices.
->>>>
->>>> So far, nobody populates the initial msi_domain.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>  drivers/pci/probe.c | 30 ++++++++++++++++++++++++++++++
->>>>  include/linux/pci.h |  1 +
->>>>  2 files changed, 31 insertions(+)
->>>>
->>>> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->>>> index cefd636..376f6fa 100644
->>>> --- a/drivers/pci/probe.c
->>>> +++ b/drivers/pci/probe.c
->>>> @@ -661,6 +661,20 @@ static void pci_set_bus_speed(struct pci_bus *bus)
->>>>      }
->>>>  }
->>>>
->>>> +void __weak pcibios_set_host_bridge_msi_domain(struct pci_bus *bus)
->>>> +{
->>>> +}
->>>
->>> I don't think there's anything in this series that requires this to be a
->>> weak function, is there?  This is the only definition I see.
->>
->> It looks like all the pcibios_* functions so far have a weak attribute,
->> and I've added it as a matter of consistency.
-> 
-> We've used pcibios_* names where we might need an arch-specific
-> implementation.  I'm not sure that's the case here -- do you envision
-> an implementation under arch/* someday?  If not, maybe it should just
-> be a pci_* function instead of pcibios_*.
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+---
+ arch/arm/boot/dts/imx35.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-I could definitely see non-OF driven architectures wanting to override this.
-
-Or maybe we should turn it the other way around and make it call the
-various firmware interfaces (OF, ACPI...) until one of them succeeds. In
-which case your suggestion of making it a pci_* function makes a lot of
-sense.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index b6478e9..e6540b5 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -286,8 +286,8 @@
+ 			can1: can at 53fe4000 {
+ 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
+ 				reg = <0x53fe4000 0x1000>;
+-				clocks = <&clks 33>;
+-				clock-names = "ipg";
++				clocks = <&clks 33>, <&clks 33>;
++				clock-names = "ipg", "per";
+ 				interrupts = <43>;
+ 				status = "disabled";
+ 			};
+@@ -295,8 +295,8 @@
+ 			can2: can at 53fe8000 {
+ 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
+ 				reg = <0x53fe8000 0x1000>;
+-				clocks = <&clks 34>;
+-				clock-names = "ipg";
++				clocks = <&clks 34>, <&clks 34>;
++				clock-names = "ipg", "per";
+ 				interrupts = <44>;
+ 				status = "disabled";
+ 			};
 -- 
-Jazz is not dead. It just smells funny...
+2.4.5
