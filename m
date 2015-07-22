@@ -1,201 +1,132 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Wed, 22 Jul 2015 17:30:34 +0800
-Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <55AF62BA.1000702@hisilicon.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 22 Jul 2015 17:33:07 +0800
+Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
+In-Reply-To: <55AF5A10.5000106@arm.com>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+ <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
+ <20150721180542.GB32187@red-moon> <55AE8B8D.8050002@arm.com>
+ <55AF55C2.4060807@linaro.org> <55AF5A10.5000106@arm.com>
+Message-ID: <55AF6353.1080204@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/13 18:43, Lorenzo Pieralisi wrote:
-> On ARM PCI systems relying on the pcibios API to initialize PCI host
-> controllers, the pcibios_msi_controller weak callback is used to look-up
-> the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
-> 
-> pci_sys_data is an arch specific structure, which prevents using the
-> same mechanism (so same PCI host controller drivers) on ARM64 systems.
-> 
-> Since the struct pci_bus already contains an msi_controller pointer and
-> the kernel already uses it to look-up the msi controller,
-> this patch converts ARM host controller and relate pcibios/host bridges
-> initialization routines so that the msi_controller pointer look-up can be
-> carried out by PCI core code through the struct pci_bus msi pointer,
-> removing the need for arch specific pcibios_msi_controller callback
-> and the related pci_sys_data msi_ctrl pointer.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Pratyush Anand <pratyush.anand@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jingoo Han <jingoohan1@gmail.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> Bjorn, all,
-> 
-> I am posting this patch to sound out if that's a reasonable approach.
-> xgene implements MSI look-up this way at present and this would represent
-> another step forward towards having common drivers for ARM/ARM64, comments
-> and testing welcome.
-> 
-> Thanks,
-> Lorenzo
-> 
->  arch/arm/include/asm/mach/pci.h    |  3 ---
->  arch/arm/kernel/bios32.c           | 35 +++++++++++++++++------------------
->  drivers/pci/host/pcie-designware.c |  9 +++++++--
->  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
->  4 files changed, 34 insertions(+), 25 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index 28b9bb3..32abc0c 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -42,9 +42,6 @@ struct hw_pci {
->   * Per-controller structure
->   */
->  struct pci_sys_data {
-> -#ifdef CONFIG_PCI_MSI
-> -	struct msi_controller *msi_ctrl;
-> -#endif
->  	struct list_head node;
->  	int		busnr;		/* primary bus number			*/
->  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1..c841b33 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -18,15 +18,6 @@
->  
->  static int debug_pci;
->  
-> -#ifdef CONFIG_PCI_MSI
-> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
-> -{
-> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
-> -
-> -	return sysdata->msi_ctrl;
-> -}
-> -#endif
-> -
->  /*
->   * We can't use pci_get_device() here since we are
->   * called from interrupt context.
-> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		if (!sys)
->  			panic("PCI: unable to allocate sys data!");
->  
-> -#ifdef CONFIG_PCI_MSI
-> -		sys->msi_ctrl = hw->msi_ctrl;
-> -#endif
->  		sys->busnr   = busnr;
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
-> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  				break;
->  			}
->  
-> -			if (hw->scan)
-> +			if (hw->scan) {
->  				sys->bus = hw->scan(nr, sys);
-> -			else
-> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
-> -						hw->ops, sys, &sys->resources);
-> +				if (!sys->bus)
-> +					panic("PCI: unable to scan bus!");
-> +			} else {
-> +				sys->bus = pci_create_root_bus(parent,
-> +							       sys->busnr,
-> +							       hw->ops, sys,
-> +							       &sys->resources);
-> +				if (WARN_ON(!sys->bus)) {
-> +					kfree(sys);
-> +					break;
-> +				}
-> +#ifdef CONFIG_PCI_MSI
-> +				sys->bus->msi = hw->msi_ctrl;
-> +#endif
->  
-> -			if (!sys->bus)
-> -				panic("PCI: unable to scan bus!");
-> +				pci_scan_child_bus(sys->bus);
-> +			}
->  
->  			busnr = sys->bus->busn_res.end + 1;
->  
-> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-> index 69486be..e584dfa 100644
-> --- a/drivers/pci/host/pcie-designware.c
-> +++ b/drivers/pci/host/pcie-designware.c
-> @@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->  
->  #ifdef CONFIG_PCI_MSI
->  	dw_pcie_msi_chip.dev = pp->dev;
-> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
->  #endif
->  
->  	dw_pci.nr_controllers = 1;
-> @@ -708,11 +707,17 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  	struct pcie_port *pp = sys_to_pcie(sys);
->  
->  	pp->root_bus_nr = sys->busnr;
-> -	bus = pci_scan_root_bus(pp->dev, sys->busnr,
-> +	bus = pci_create_root_bus(pp->dev, sys->busnr,
->  				  &dw_pcie_ops, sys, &sys->resources);
->  	if (!bus)
->  		return NULL;
->  
-> +#ifdef CONFIG_PCI_MSI
-> +	bus->msi = &dw_pcie_msi_chip;
-> +#endif
-> +
-> +	pci_scan_child_bus(bus);
-> +
->  	if (bus && pp->ops->scan_bus)
->  		pp->ops->scan_bus(pp);
->  
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index f1a06a0..b21eb7d 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -647,9 +647,18 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
->  	struct pci_bus *bus;
->  
->  	port->root_busno = sys->busnr;
-> -	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
-> +	bus = pci_create_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
->  				sys, &sys->resources);
->  
-> +	if (!bus)
-> +		return NULL;
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +	bus->msi = &xilinx_pcie_msi_chip;
-> +#endif
-> +
-> +	pci_scan_child_bus(bus);
-> +
->  	return bus;
->  }
->  
-> @@ -847,7 +856,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
->  
->  #ifdef CONFIG_PCI_MSI
->  	xilinx_pcie_msi_chip.dev = port->dev;
-> -	hw.msi_ctrl = &xilinx_pcie_msi_chip;
->  #endif
->  	pci_common_init_dev(dev, &hw);
->  
-> 
+On 07/22/2015 04:53 PM, Marc Zyngier wrote:
+> On 22/07/15 09:35, Hanjun Guo wrote:
+>> On 07/22/2015 02:12 AM, Marc Zyngier wrote:
+>>> On 21/07/15 19:05, Lorenzo Pieralisi wrote:
+>>>> On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
+>>>>> Now that the basic ACPI GSI code is irq domain aware, make sure
+>>>>> that the ACPI support in the GIC doesn't pointlessly deviate from
+>>>>> the DT path.
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>    drivers/irqchip/irq-gic.c       | 17 ++++++-----------
+>>>>>    include/linux/irqchip/arm-gic.h |  2 +-
+>>>>>    2 files changed, 7 insertions(+), 12 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>>>> index b41ccf5..f5d365d 100644
+>>>>> --- a/drivers/irqchip/irq-gic.c
+>>>>> +++ b/drivers/irqchip/irq-gic.c
+>>>>> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>>>>>    {
+>>>>>    	unsigned long ret = 0;
+>>>>>
+>>>>> -	if (irq_domain_get_of_node(d) != controller)
+>>>>> -		return -EINVAL;
+>>>>>    	if (intsize < 3)
+>>>>>    		return -EINVAL;
+>>>>>
+>>>>> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
+>>>>>
+>>>>>    void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>    			   void __iomem *dist_base, void __iomem *cpu_base,
+>>>>> -			   u32 percpu_offset, struct device_node *node)
+>>>>> +			   u32 percpu_offset, void *domain_token)
+>>>>>    {
+>>>>>    	irq_hw_number_t hwirq_base;
+>>>>>    	struct gic_chip_data *gic;
+>>>>> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>    		gic_irqs = 1020;
+>>>>>    	gic->gic_irqs = gic_irqs;
+>>>>>
+>>>>> -	if (node) {		/* DT case */
+>>>>> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
+>>>>> +	if (domain_token) {		/* DT/ACPI case */
+>>>>> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
+>>>>>    						    &gic_irq_domain_hierarchy_ops,
+>>>>>    						    gic);
+>>>>>    	} else {		/* Non-DT case */
+>>>>> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>>>>>    			irq_base = irq_start;
+>>>>>    		}
+>>>>>
+>>>>> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+>>>>> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
+>>>>>    					hwirq_base, &gic_irq_domain_ops, gic);
+>>>>>    	}
+>>>>>
+>>>>> @@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>>>>>    	}
+>>>>>
+>>>>>    	/*
+>>>>> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+>>>>> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+>>>>> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+>>>>> +	 * Initialize zero GIC instance (no multi-GIC support).
+>>>>>    	 */
+>>>>> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+>>>>> -	irq_set_default_host(gic_data[0].domain);
+>>>>> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
+>>>>
+>>>> Nit: the acpi_irq_model_id enum starts from 0, I do not think we will
+>>>> use the IRQ domain look-up for the ACPI_IRQ_MODEL_PIC but we have
+>>>> to be careful anyway.
+>>>
+>>> Yeah, I noticed that one too, but couldn't imagine the PIC being
+>>> migrated to that model just yet. It looks like it would be pretty
+>>> harmless to set ACPI_IRQ_MODEL_PIC to 1, and introduce
+>>> ACPI_IRQ_MODEL_ILLEGAL as zero.
+>>
+>> I think this will be a problem, because acpi_irq_model_id enum actually
+>> is defined by the ACPI spec, and the value is used to report to BIOS
+>> the current interrupt model used by OS, see section 5.8.1 _PIC Method
+>> in ACPI 6.0:
+>>
+>> 0 ? PIC mode
+>> 1 ? APIC mode
+>> 2 ? SAPIC mode
+>> Other values ?Reserved
+>
+> Ah, right.
+>
+>> so we can't set ACPI_IRQ_MODEL_PIC to 1 as it may break the firmware,
+>> also _PIC method actually is not needed for ARM platform at all, we
+>> don't need to report to firmware the interrupt model used by OS on
+>> ARM, it only used by legacy IA platforms, actually I'm planning to
+>> remove acpi_irq_model_id on ARM64.
+>
+> Remove? I don't get it. Either ACPI_IRQ_MODEL_GIC is a leval value, and
+> you can't remove it, or it is not, and I wonder how it ended up here the
+> first place.
 
-Hi Lorenzo,
+The best solution is that we don't call _PIC method on ARM at all
+(acpi_irq_model is used for _PIC method), but we can live with it since
+there is no harm if ARM firmware don't care about the value or ARM
+firmware don't define _PIC method in DSDT.
 
-I wonder if we can delete weak pcibios_msi_controller and the call in
-pci_msi_controller in drivers/pci/msi.c
+>
+>> So to me acpi_irq_model_id is suitable for the token, can we use
+>                               is *not* ?
+>> another one as the token? how about the GIC ID in the MADT table?
+>> and this also can be used for x86 (IOAPIC IDs) too.
+>
+> You can use whatever you want, just not a pointer. I'll add a token
+> parameter to the acpi_set_irq_model function that I mentioned in my
+> reply to Lorenzo.
 
-Regards,
-Zhou
+Thank you, I will wait for the v2 to rebase my ACPI GICv3 patches.
+
+Thanks
+Hanjun
