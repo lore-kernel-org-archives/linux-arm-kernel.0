@@ -1,48 +1,35 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 22 Jul 2015 10:54:25 +0530
-Subject: [PATCH v2 1/2] input: touchscreen: pixcir_i2c_ts: Add support
- for optional wakeup interrupt
-In-Reply-To: <20150720062407.GA13092@dtor-ws>
-References: <1437367814-27785-1-git-send-email-vigneshr@ti.com>
- <1437367814-27785-2-git-send-email-vigneshr@ti.com>
- <20150720060929.GW17550@atomide.com> <20150720062407.GA13092@dtor-ws>
-Message-ID: <55AF2909.5090609@ti.com>
+From: romain.perier@gmail.com (Romain Perier)
+Date: Wed, 22 Jul 2015 07:43:26 +0200
+Subject: [PATCH 1/2] ARM: dts: rockchip: Use correct dts properties for tsadc
+ node
+Message-ID: <1437543807-19852-1-git-send-email-romain.perier@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+tsadc-tshut-mode and tsadc-tshut-polarity properties don't exist. The rockchip
+thermal driver looks for rockchip,hw-tshut-mode and rockchip,hw-tshut-polarity
+instead, otherwise it might freeze or hang the device according to the default
+mode or polarity used.
 
-On 07/20/2015 11:54 AM, Dmitry Torokhov wrote:
-> On Sun, Jul 19, 2015 at 11:09:30PM -0700, Tony Lindgren wrote:
->> * Vignesh R <vigneshr@ti.com> [150719 21:53]:
->>> @@ -445,6 +443,8 @@ static struct pixcir_ts_platform_data *pixcir_parse_dt(struct device *dev)
->>>  	dev_dbg(dev, "%s: x %d, y %d, gpio %d\n", __func__,
->>>  		pdata->x_max + 1, pdata->y_max + 1, pdata->gpio_attb);
->>>  
->>> +	pdata->wakeirq = of_irq_get_byname(dev->of_node, "wakeupirq");
->>> +
->>>  	return pdata;
->>
->> What about handling -EPROVE_DEFER here? At least pinctrl-single can be
->> be a loadable module for the dedicated wakeirqs.
-> 
-> Right. I think we should only allow -ENODATA to continue and return
-> error in all other cases.
+Signed-off-by: Romain Perier <romain.perier@gmail.com>
+---
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
--EINVAL will be returned if "interrupt-names" is not specified. I will
-make execption for -ENODATA & -EINVAL, and return error in all other cases?
-
-> 
-> Also, I think "irq" suffix on name is redundant.
-
-Ok, will drop "irq" suffix:
-
-+		interrupt-names = "tsc", "wakeup";
-
-> 
-> Thanks.
-> 
-
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index 627d113..cc76cf7 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -367,8 +367,8 @@
+ &tsadc {
+ 	status = "okay";
+ 
+-	tsadc-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
+-	tsadc-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
++	rockchip,hw-tshut-mode = <1>; /* tshut mode 0:CRU 1:GPIO */
++	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
+ };
+ 
+ &uart0 {
 -- 
-Regards
-Vignesh
+2.1.4
