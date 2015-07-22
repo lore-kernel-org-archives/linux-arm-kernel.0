@@ -1,110 +1,114 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 22 Jul 2015 16:35:14 +0800
-Subject: [PATCH 5/5] irqchip: GIC: Switch ACPI support to stacked domains
-In-Reply-To: <55AE8B8D.8050002@arm.com>
-References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
- <1437473280-11431-6-git-send-email-marc.zyngier@arm.com>
- <20150721180542.GB32187@red-moon> <55AE8B8D.8050002@arm.com>
-Message-ID: <55AF55C2.4060807@linaro.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 22 Jul 2015 10:38:14 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <201507221024.05496.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507220958.00231.marex@denx.de>
+ <CAOMqctQ13JE+GHyj+hU4XL3Uz4+Yt_X6BFU=NO8jXcpRtzMyzQ@mail.gmail.com>
+ <201507221024.05496.marex@denx.de>
+Message-ID: <CAOMqctTyHF1ciN3-0yg1smYJ5kbuwfT_kmavTL8ARuZ69wSgAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 02:12 AM, Marc Zyngier wrote:
-> On 21/07/15 19:05, Lorenzo Pieralisi wrote:
->> On Tue, Jul 21, 2015 at 11:08:00AM +0100, Marc Zyngier wrote:
->>> Now that the basic ACPI GSI code is irq domain aware, make sure
->>> that the ACPI support in the GIC doesn't pointlessly deviate from
->>> the DT path.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>   drivers/irqchip/irq-gic.c       | 17 ++++++-----------
->>>   include/linux/irqchip/arm-gic.h |  2 +-
->>>   2 files changed, 7 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->>> index b41ccf5..f5d365d 100644
->>> --- a/drivers/irqchip/irq-gic.c
->>> +++ b/drivers/irqchip/irq-gic.c
->>> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
->>>   {
->>>   	unsigned long ret = 0;
->>>
->>> -	if (irq_domain_get_of_node(d) != controller)
->>> -		return -EINVAL;
->>>   	if (intsize < 3)
->>>   		return -EINVAL;
->>>
->>> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
->>>
->>>   void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>   			   void __iomem *dist_base, void __iomem *cpu_base,
->>> -			   u32 percpu_offset, struct device_node *node)
->>> +			   u32 percpu_offset, void *domain_token)
->>>   {
->>>   	irq_hw_number_t hwirq_base;
->>>   	struct gic_chip_data *gic;
->>> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>   		gic_irqs = 1020;
->>>   	gic->gic_irqs = gic_irqs;
->>>
->>> -	if (node) {		/* DT case */
->>> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
->>> +	if (domain_token) {		/* DT/ACPI case */
->>> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
->>>   						    &gic_irq_domain_hierarchy_ops,
->>>   						    gic);
->>>   	} else {		/* Non-DT case */
->>> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>>   			irq_base = irq_start;
->>>   		}
->>>
->>> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
->>> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
->>>   					hwirq_base, &gic_irq_domain_ops, gic);
->>>   	}
->>>
->>> @@ -1132,12 +1130,9 @@ gic_v2_acpi_init(struct acpi_table_header *table)
->>>   	}
->>>
->>>   	/*
->>> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
->>> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
->>> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
->>> +	 * Initialize zero GIC instance (no multi-GIC support).
->>>   	 */
->>> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
->>> -	irq_set_default_host(gic_data[0].domain);
->>> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
+On 22 July 2015 at 10:24, Marek Vasut <marex@denx.de> wrote:
+> On Wednesday, July 22, 2015 at 10:18:04 AM, Michal Suchanek wrote:
+>> On 22 July 2015 at 09:58, Marek Vasut <marex@denx.de> wrote:
+>> > On Wednesday, July 22, 2015 at 09:45:27 AM, Michal Suchanek wrote:
+>> >> On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
+>> >> > On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
+>> >> >> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
+>> >> >> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
+>> >> >> >> > Or alternatively we could publish the limitations of the channel
+>> >> >> >> > using capabilities so SPI knows I have a dmaengine channel and
+>> >> >> >> > it can transfer max N length transfers so would be able to
+>> >> >> >> > break rather than guessing it or coding in DT. Yes it may come
+>> >> >> >> > from DT but that should be dmaengine driver rather than client
+>> >> >> >> > driver :)
+>> >> >> >> >
+>> >> >> >> > This can be done by dma_get_slave_caps(chan, &caps)
+>> >> >> >> >
+>> >> >> >> > And we add max_length as one more parameter to existing set
+>> >> >> >> >
+>> >> >> >> > Also all this could be handled in generic SPI-dmaengine layer so
+>> >> >> >> > that individual drivers don't have to code it in
+>> >> >> >> >
+>> >> >> >> > Let me know if this idea is okay, I can push the dmaengine
+>> >> >> >> > bits...
+>> >> >> >>
+>> >> >> >> It would be ok if there was a fixed limit. However, the limit
+>> >> >> >> depends on SPI slave settings. Presumably for other buses using
+>> >> >> >> the dmaengine the limit would depend on the bus or slave settings
+>> >> >> >> as well. I do not see a sane way of passing this all the way to
+>> >> >> >> the dmaengine driver.
+>> >> >> >
+>> >> >> > I don't see why this should be client (SPI) dependent. The max
+>> >> >> > length supported is a dmaengine constraint, typically flowing from
+>> >> >> > max blocks/length it can transfer. Know this limit can allow
+>> >> >> > clients to split transfers.
+>> >> >>
+>> >> >> In practice on the board I have the maximum transfer length before it
+>> >> >> fails depends on SPI bus speed which is set up per slave. I did not
+>> >> >> try searching the space of possible settings thorougly and settled
+>> >> >> for a setting that gives reasonable speed and transfer length.
+>> >> >
+>> >> > This looks more like a signal integrity issue though.
+>> >>
+>> >> It certainly does on the surface. However, when wrong data is
+>> >> delivered over the SPI bus (such as when I use wrong phase setting)
+>> >> the SPI controller happily delivers wrong data over PIO.
+>> >>
+>> >> The failure I am seeing is that the pl330 DMA program which repeatedly
+>> >> waits for data from the SPI controller never finishes the read loop
+>> >> and does not signal the interrupt. It seems it also leaves some data
+>> >> in a FIFO somewhere so next command on the flash returns garbage and
+>> >> fails.
+>> >
+>> > I observed something similar on MXS (mx28) SPI block. Do you use mixed
+>> > PIO/DMA mode perhaps ?
 >>
->> Nit: the acpi_irq_model_id enum starts from 0, I do not think we will
->> use the IRQ domain look-up for the ACPI_IRQ_MODEL_PIC but we have
->> to be careful anyway.
+>> The SPI driver uses PIO for short transfers and DMA for transfers
+>> longer than the controller FIFO. This seems to be the standard way to
+>> do things.It works flawlessly so long as submitting overly long DMA
+>> programs is avoided.
 >
-> Yeah, I noticed that one too, but couldn't imagine the PIC being
-> migrated to that model just yet. It looks like it would be pretty
-> harmless to set ACPI_IRQ_MODEL_PIC to 1, and introduce
-> ACPI_IRQ_MODEL_ILLEGAL as zero.
+> Can you try doing JUST DMA, no PIO ? I remember seeing some bus synchronisation
+> issues when I did mixed PIO/DMA on the MXS and it was nasty to track down. Just
+> give pure DMA a go to see if the thing stabilizes somehow.
 
-I think this will be a problem, because acpi_irq_model_id enum actually
-is defined by the ACPI spec, and the value is used to report to BIOS
-the current interrupt model used by OS, see section 5.8.1 _PIC Method
-in ACPI 6.0:
+It's probably slower to set up DMA for 2-byte commands but it might
+work nonetheless.
 
-0 ? PIC mode
-1 ? APIC mode
-2 ? SAPIC mode
-Other values ?Reserved
+I will give it a go.
 
-so we can't set ACPI_IRQ_MODEL_PIC to 1 as it may break the firmware,
-also _PIC method actually is not needed for ARM platform at all, we
-don't need to report to firmware the interrupt model used by OS on
-ARM, it only used by legacy IA platforms, actually I'm planning to
-remove acpi_irq_model_id on ARM64.
+>
+>> > Do you have the option to connect a bus analyzer?
+>> > I can probably offer you some tools, I'm in Prague ...
+>>
+>> The flash chip is accessible when removing the bottom cover. It is
+>> VSOP8 package slightly lower than SOP8 so attaching clips to it might
+>> be a bit problematic. That's the only accessible part. Everything
+>> other than SPI is inside the SoC.
+>
+> That might be doable, though you might want to try the above thing first.
+>
+>> Since SPI has no verification whatsoever the chip might be completely
+>> dead and you can still read fine all zeroes or all ones when
+>> attempting a read from it. I observed this behaviour when I used a
+>> flash chip in a socket and it was not firmly seated. It was with a
+>> different SPI controller, though.
+>
+> You should run into issues as soon as the SPI NOR framework tries to read
+> status register, no ?
 
-So to me acpi_irq_model_id is suitable for the token, can we use
-another one as the token? how about the GIC ID in the MADT table?
-and this also can be used for x86 (IOAPIC IDs) too.
+Yes, when the DMA transfer fails the next command fails due to garbage
+lying around. However, you can unload the SPI NOR driver, load spidev
+driver, and read enough garbage to empty the fifos. Then the flash
+identifies as normal again and you can access it.
+
+When the flash is not seated properly and acts autistic you get all
+0xff or all 0 back whatever you send to it, obvously. The
+identification by the SPI NOR driver fails then.
 
 Thanks
-Hanjun
+
+Michal
