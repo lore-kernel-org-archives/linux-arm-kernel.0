@@ -1,28 +1,34 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 22 Jul 2015 20:04:34 +0200
-Subject: [PATCH] ARM: dts: i.MX35: Fix can support
-In-Reply-To: <1437577290-26321-1-git-send-email-denis@eukrea.com>
-References: <1437577290-26321-1-git-send-email-denis@eukrea.com>
-Message-ID: <20150722180434.GA745@pengutronix.de>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 22 Jul 2015 19:04:54 +0100
+Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <20150722170140.GR6650@arm.com>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+ <1437481411-1595-7-git-send-email-james.morse@arm.com>
+ <20150721123830.GD25887@localhost> <20150722170140.GR6650@arm.com>
+Message-ID: <55AFDB46.3060302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Will,
 
-On Wed, Jul 22, 2015 at 05:01:30PM +0200, Denis Carikli wrote:
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+On 22/07/15 18:01, Will Deacon wrote:
+> I've applied your series with the exception of this last one, as it
+> conflicts with some other patches I have queued for 4.3. Please can you
+> rebase this against the arm64 "devel" branch? (usually it would be
+> for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
+> build is broken atm).
 
-something like:
+The version of patch 5 "arm64: kernel: Add optional CONFIG_ parameter to
+ALTERNATIVE()" in your tree has:
 
-	Since commit 23147826523 ("asjksad dsajksdkljf") the can driver
-	requires a dt nodes to have a second clock. Add them to imx35 to
-	fix probing the flex can driver on the respective platforms.
+> [will: removed unused asm macro changes for now to avoid conflicts]
 
-in the changelog would be nice.
+Those were used in arch/arm64/lib/clear_user.S and friends.
+I shall remove the 'CONFIG_ARM64_PAN' from those four asm files - it can be
+tidied up later.
 
-Best regards,
-Uwe
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+
+James
