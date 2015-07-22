@@ -1,48 +1,28 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Wed, 22 Jul 2015 11:12:00 +0200
-Subject: [PATCH v2 3/3] ARM: STi: DT: STiH418: Add cpu-release-addr dt
- property.
-In-Reply-To: <1433856824-30689-4-git-send-email-peter.griffin@linaro.org>
-References: <1433856824-30689-1-git-send-email-peter.griffin@linaro.org>
- <1433856824-30689-4-git-send-email-peter.griffin@linaro.org>
-Message-ID: <55AF5E60.2040105@st.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Wed, 22 Jul 2015 11:16:10 +0200
+Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and munlockall
+ system calls
+In-Reply-To: <1437508781-28655-3-git-send-email-emunson@akamai.com>
+References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
+ <1437508781-28655-3-git-send-email-emunson@akamai.com>
+Message-ID: <55AF5F5A.3000707@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI Peter,
-
-On 06/09/2015 03:33 PM, Peter Griffin wrote:
-> To enable SMP when booting via u-boot we need to specify the
-> newly implemented cpu-release-addr DT property for cores 2 & 3.
-> Cores 0 & 1 are inherited from stih407-family.dtsi.
+On 07/21/2015 09:59 PM, Eric B Munson wrote:
+> With the refactored mlock code, introduce new system calls for mlock,
+> munlock, and munlockall.  The new calls will allow the user to specify
+> what lock states are being added or cleared.  mlock2 and munlock2 are
+> trivial at the moment, but a follow on patch will add a new mlock state
+> making them useful.
 >
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->   arch/arm/boot/dts/stih418.dtsi | 4 ++++
->   1 file changed, 4 insertions(+)
+> munlock2 addresses a limitation of the current implementation.  If a
+
+   ^ munlockall2?
+
+> user calls mlockall(MCL_CURRENT | MCL_FUTURE) and then later decides
+> that MCL_FUTURE should be removed, they would have to call munlockall()
+> followed by mlockall(MCL_CURRENT) which could potentially be very
+> expensive.  The new munlockall2 system call allows a user to simply
+> clear the MCL_FUTURE flag.
 >
-> diff --git a/arch/arm/boot/dts/stih418.dtsi b/arch/arm/boot/dts/stih418.dtsi
-> index 354d90f..8160a75 100644
-> --- a/arch/arm/boot/dts/stih418.dtsi
-> +++ b/arch/arm/boot/dts/stih418.dtsi
-> @@ -17,11 +17,15 @@
->   			device_type = "cpu";
->   			compatible = "arm,cortex-a9";
->   			reg = <2>;
-> +			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
-> +			cpu-release-addr = <0x94100A4>;
->   		};
->   		cpu at 3 {
->   			device_type = "cpu";
->   			compatible = "arm,cortex-a9";
->   			reg = <3>;
-> +			/* u-boot puts hpen in SBC dmem at 0xa4 offset */
-> +			cpu-release-addr = <0x94100A4>;
->   		};
->   	};
->   
-
-Patch applied for v4.3.
-
-Thanks,
-Maxime
