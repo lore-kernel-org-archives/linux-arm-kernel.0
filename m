@@ -1,61 +1,45 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Jul 2015 16:17:39 +0100
-Subject: [PATCH v3 4/5] arm64: kvm: Adopt new alternative assembler macros
-In-Reply-To: <1437564065-4356-5-git-send-email-daniel.thompson@linaro.org>
-References: <1436536130-31438-1-git-send-email-daniel.thompson@linaro.org>
- <1437564065-4356-1-git-send-email-daniel.thompson@linaro.org>
- <1437564065-4356-5-git-send-email-daniel.thompson@linaro.org>
-Message-ID: <20150722151739.GM6650@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 22 Jul 2015 17:19:23 +0200
+Subject: Having Linux handle different "types" of memory
+Message-ID: <55AFB47B.301@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc, Christoffer,
+Hello everyone,
 
-On Wed, Jul 22, 2015 at 12:21:04PM +0100, Daniel Thompson wrote:
-> Convert the dynamic patching for ARM64_HAS_SYSREG_GIC_CPUIF over to
-> the newly added alternative assembler macros.
+I'm using an ARMv7 platform (Cortex A9) on Linux 3.14
 
-Do you mind if I take this via the arm64 tree? It won't apply in
-isolation and I'd expect conflicts to be small/trivial to resolve.
+The system supports two memory modules.
 
-Cheers,
+For performance reasons, memory is "transparently" interleaved
+(with a 128-byte grain). That is, when the CPU accesses addresses
+0-127, it hits DRAM0; addresses 128-255, it hits DRAM1, and so on.
 
-Will
+The problem is that other devices in the system, mainly the
+Ethernet controller, didn't get the "transparent interleaving"
+treatment. They just see DRAM0 and DRAM1. And I'm guessing this
+will generate all kinds of "interesting" problems when I try to
+DMA from the Ethernet controller's memory to DRAM...
 
-> ---
->  arch/arm64/kvm/hyp.S | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> index 17a8fb14f428..10915aaf0b01 100644
-> --- a/arch/arm64/kvm/hyp.S
-> +++ b/arch/arm64/kvm/hyp.S
-> @@ -810,7 +810,11 @@
->   * Call into the vgic backend for state saving
->   */
->  .macro save_vgic_state
-> -	alternative_insn "bl __save_vgic_v2_state", "bl __save_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-> +alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-> +	bl	__save_vgic_v2_state
-> +alternative_else
-> +	bl	__save_vgic_v3_state
-> +alternative_endif
->  	mrs	x24, hcr_el2
->  	mov	x25, #HCR_INT_OVERRIDE
->  	neg	x25, x25
-> @@ -827,7 +831,11 @@
->  	orr	x24, x24, #HCR_INT_OVERRIDE
->  	orr	x24, x24, x25
->  	msr	hcr_el2, x24
-> -	alternative_insn "bl __restore_vgic_v2_state", "bl __restore_vgic_v3_state", ARM64_HAS_SYSREG_GIC_CPUIF
-> +alternative_if_not ARM64_HAS_SYSREG_GIC_CPUIF
-> +	bl	__restore_vgic_v2_state
-> +alternative_else
-> +	bl	__restore_vgic_v3_state
-> +alternative_endif
->  .endm
->  
->  .macro save_timer_state
-> -- 
-> 2.4.3
-> 
+Is there a way to tell Linux:
+
+1) this 1GB memory chunk here is for you and your private allocations,
+but don't use it for talking to devices/peripherals.
+
+2) this 1GB memory chunk there is for talking to devices/peripherals,
+but it has lower performance, so try not to use it for your own
+private memory pools, but you can if memory is /really/ tight.
+
+Is there something like this?
+
+Maybe one of the NUMA policies?
+https://www.kernel.org/doc/Documentation/vm/numa_memory_policy.txt
+(I don't see any arch/arm/mm/numa.c however)
+
+Maybe I can pretend that there is some kind of IOMMU?
+https://www.kernel.org/doc/Documentation/DMA-API-HOWTO.txt
+arch/arm/include/asm/dma-iommu.h
+
+Or maybe there is an obvious solution that I'm missing?
+
+Regards.
