@@ -1,36 +1,63 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Wed, 22 Jul 2015 19:02:03 +0200
-Subject: [PATCH] ARM: dts: Add STM32429i-EVAL board support
-In-Reply-To: <1436693957-30855-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1436693957-30855-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <55AFCC8B.4090209@gmail.com>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Wed, 22 Jul 2015 12:07:37 -0500
+Subject: [PATCH v6 0/2] IMX GPCv2 drivers for wakeup source and suspend
+Message-ID: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+IMX7D contains a new version of GPC IP block (GPCv2). It has two
+major functions: power management and wakeup source management.
 
+Two drivers were developed to support these functions:
+One irqchip driver (irq-imx-gpcv2.c) is to manage
+the interrupt wakeup source. One suspend driver (pm-imx7.c) is used
+to manage the system power states.
 
-On 07/12/2015 11:39 AM, Maxime Coquelin wrote:
-> Main features of STM32429i-EVAL evaluation kit are:
->   - STM32F429 Cortex-M4 MCU @180MHz
->     * 2MB internal Flash
->     * 256KB internal RAM
->   - 32MB SDRAM
->   - 16MB NOR Flash
->   - 2MB SRAM
->   - 4.3" TFT LCD with resistive touchscreen
->   - SDCard connector (SDIO compatible)
->   - 1x USB 2.0 OTG + 1x USB 1.1 OTG
->   - Ethernet
->
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->   arch/arm/boot/dts/Makefile           |  4 +-
->   arch/arm/boot/dts/stm32429i-eval.dts | 75 ++++++++++++++++++++++++++++++++++++
->   2 files changed, 78 insertions(+), 1 deletion(-)
->   create mode 100644 arch/arm/boot/dts/stm32429i-eval.dts
->
->
-Applied to next/dt-for-v4.3.
+Patch V6:
+	Clean up the codes (irq-imx-gpcv2.c) according to the review
+	feedback of Thomas Glx
+	Use raw_spin_lock in the irq_mask and irq_unmask callbacks
+	Split the struct definition into two: irqchip and suspend
+	Unified coding style
 
-Best regards,
-Maxime
+Patch V5:
+	Splitted it into two patches per Thomas Gleixner suggestion.
+	-- one for irqchip
+	-- one for suspend
+
+Patch V4:
+	Splitted the driver into two function drivers: one irqchip driver
+	for wakeup source management, and one suspend driver for power
+	state management.
+
+Patch V3:
+	Added the assemble codes (suspend-imx7.S) for SUSPEND_MEM state.
+	Supported the SUSPEND_MEM power mode.
+
+Patch V2:
+	Added the basic driver APIs for power management.
+	Supported the STANDBY power mode.
+
+Patch V1:
+	Implemented the driver for IRQ wakeup sources.
+
+Shenwei Wang (2):
+  irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup sources
+  ARM: imx: Add suspend codes for imx7D
+
+ arch/arm/mach-imx/Kconfig        |   1 +
+ arch/arm/mach-imx/Makefile       |   2 +
+ arch/arm/mach-imx/pm-imx7.c      | 765 +++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-imx/suspend-imx7.S | 529 +++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig          |   7 +
+ drivers/irqchip/Makefile         |   1 +
+ drivers/irqchip/irq-imx-gpcv2.c  | 263 ++++++++++++++
+ include/soc/imx/gpcv2.h          | 163 +++++++++
+ 8 files changed, 1731 insertions(+)
+ create mode 100644 arch/arm/mach-imx/pm-imx7.c
+ create mode 100644 arch/arm/mach-imx/suspend-imx7.S
+ create mode 100644 drivers/irqchip/irq-imx-gpcv2.c
+ create mode 100644 include/soc/imx/gpcv2.h
+
+--
+2.5.0.rc2
