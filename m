@@ -1,475 +1,73 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 22 Jul 2015 19:05:54 +0100
-Subject: [PATCH v4] arm64: kernel: Add support for Privileged Access Never
-In-Reply-To: <20150722170140.GR6650@arm.com>
-References: <20150722170140.GR6650@arm.com>
-Message-ID: <1437588354-31278-1-git-send-email-james.morse@arm.com>
+From: lho@apm.com (Loc Ho)
+Date: Wed, 22 Jul 2015 11:10:03 -0700
+Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
+ device nodes for APM X-Gene platform
+In-Reply-To: <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <20150714084004.GA14593@localhost>
+ <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
+ <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
+Message-ID: <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'Privileged Access Never' is a new arm8.1 feature which prevents
-privileged code from accessing any virtual address where read or write
-access is also permitted at EL0.
+Hi Olof,,
 
-This patch enables the PAN feature on all CPUs, and modifies {get,put}_user
-helpers temporarily to permit access.
+>>
+>>>> This patch set adds syscon reboot/poweroff device nodes to support reboot and
+>>>> poweroff features on X-Gene platform.
+>>>>
+>>>> Tai Nguyen (2):
+>>>>   power: reset: Add syscon reboot device node for APM X-Gene platform
+>>>>   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
+>>>>
+>>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
+>>>>  2 files changed, 24 insertions(+)
+>>>
+>>> Hi,
+>>>
+>>> It's unclear to me what you want to happen to these patches. They are
+>>> sent to a long list of to-recipients, one of which is arm at kernel.org. In
+>>> general, specify the person you want to take action on the patch in to
+>>> with the rest on cc.
+>>
+>> Is there an owner for all DT node files? Is that Catalina as he is
+>> owner for ARM64 arch folder?
+>
+> The ARM64 DT changes get merged through arm-soc, i.e. they get sent to
+> arm at kernel.org by the platform maintainers and picked up by us from
+> there (Arnd, Kevin or myself).
+>
+>>> We generally ask that patches first go to the subarch maintainers,
+>>> and they in turn send it on to us (either through a pull request or
+>>> by sending the patches to be applied). In the case of X-Gene, there is
+>>> no general platform maintainer so we keep getting patches from various
+>>> engineers at APM and it's unclear to us what your intentions are.
+>>>
+>>> I'd prefer to see one (to start with) person in charge of these (i.e. one
+>>> maintainer from the APM side). Please add that person to the MAINTAINERS
+>>> file as well.
+>>
+>> Are you suggesting that we have one person to start an GIT with
+>> kernel.org to keep all these misc ack'ed patches for X-Gene (APM) that
+>> don't seems to have an maintainer/home. Then request an pull by you?
+>
+> Pull requests are convenient for us, but if it's just a patch or two,
+> sending them directly in email is fine as well.
 
-This will catch kernel bugs where user memory is accessed directly.
-'Unprivileged loads and stores' using ldtrb et al are unaffected by PAN.
+If there is an chance in pulling this power off/reset patches for
+4.2-rc4, can you pull in as patches? Otherwise, we will go the GIT
+pull request.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
-This version is rebased against the arm64 'devel' branch, somewhere
-after Suzuki's "arm64: Generalise msr_s/mrs_s operations" patch.
+>
+> What I want to avoid is a large number of people sending us patches
+> directly, which is why we ask for platform maintainers to coordinate
+> and aggregate patches to send on to us. That way we have one person
+> down the chain that we knows how we want the code delivered, and that
+> can do a round of reviews before we get it.
 
- arch/arm64/Kconfig                   | 14 ++++++++++++++
- arch/arm64/include/asm/cpufeature.h  |  3 ++-
- arch/arm64/include/asm/futex.h       |  8 ++++++++
- arch/arm64/include/asm/processor.h   |  2 ++
- arch/arm64/include/asm/sysreg.h      |  8 ++++++++
- arch/arm64/include/asm/uaccess.h     | 11 +++++++++++
- arch/arm64/include/uapi/asm/ptrace.h |  1 +
- arch/arm64/kernel/armv8_deprecated.c |  8 +++++++-
- arch/arm64/kernel/cpufeature.c       | 20 ++++++++++++++++++++
- arch/arm64/lib/clear_user.S          |  6 ++++++
- arch/arm64/lib/copy_from_user.S      |  6 ++++++
- arch/arm64/lib/copy_in_user.S        |  6 ++++++
- arch/arm64/lib/copy_to_user.S        |  6 ++++++
- arch/arm64/mm/fault.c                | 23 +++++++++++++++++++++++
- 14 files changed, 120 insertions(+), 2 deletions(-)
+We will get an GIT setup up for this and Duc Dang will contact you for
+pull request when ready.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index de8dee60fd82..c2bd79a02a6c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -596,6 +596,20 @@ config FORCE_MAX_ZONEORDER
- 	default "14" if (ARM64_64K_PAGES && TRANSPARENT_HUGEPAGE)
- 	default "11"
- 
-+config ARM64_PAN
-+	bool "Enable support for Privileged Access Never (PAN)"
-+	default y
-+	help
-+	 Privileged Access Never (PAN; part of the ARMv8.1 Extensions)
-+	 prevents the kernel or hypervisor from accessing user-space (EL0)
-+	 memory directly.
-+
-+	 Choosing this option will cause any unprotected (not using
-+	 copy_to_user et al) memory access to fail with a permission fault.
-+
-+	 The feature is detected at runtime, and will remain as a 'nop'
-+	 instruction if the cpu does not implement the feature.
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index f595f7ddd43b..d71140b76773 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -25,8 +25,9 @@
- #define ARM64_WORKAROUND_DEVICE_LOAD_ACQUIRE	1
- #define ARM64_WORKAROUND_845719			2
- #define ARM64_HAS_SYSREG_GIC_CPUIF		3
-+#define ARM64_HAS_PAN				4
- 
--#define ARM64_NCAPS				4
-+#define ARM64_NCAPS				5
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 74069b3bd919..775e85b9d1f2 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -20,10 +20,16 @@
- 
- #include <linux/futex.h>
- #include <linux/uaccess.h>
-+
-+#include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/errno.h>
-+#include <asm/sysreg.h>
- 
- #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
- 	asm volatile(							\
-+	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,		\
-+		    CONFIG_ARM64_PAN)					\
- "1:	ldxr	%w1, %2\n"						\
- 	insn "\n"							\
- "2:	stlxr	%w3, %w0, %2\n"						\
-@@ -39,6 +45,8 @@
- "	.align	3\n"							\
- "	.quad	1b, 4b, 2b, 4b\n"					\
- "	.popsection\n"							\
-+	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,		\
-+		    CONFIG_ARM64_PAN)					\
- 	: "=&r" (ret), "=&r" (oldval), "+Q" (*uaddr), "=&r" (tmp)	\
- 	: "r" (oparg), "Ir" (-EFAULT)					\
- 	: "memory")
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index e4c893e54f01..98f32355dc97 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -186,4 +186,6 @@ static inline void spin_lock_prefetch(const void *x)
- 
- #endif
- 
-+void cpu_enable_pan(void);
-+
- #endif /* __ASM_PROCESSOR_H */
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 5295bcbcb374..a7f3d4b2514d 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -20,6 +20,8 @@
- #ifndef __ASM_SYSREG_H
- #define __ASM_SYSREG_H
- 
-+#include <asm/opcodes.h>
-+
- #define SCTLR_EL1_CP15BEN	(0x1 << 5)
- #define SCTLR_EL1_SED		(0x1 << 8)
- 
-@@ -36,6 +38,12 @@
- #define sys_reg(op0, op1, crn, crm, op2) \
- 	((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
- 
-+#define REG_PSTATE_PAN_IMM                     sys_reg(0, 0, 4, 0, 4)
-+#define SCTLR_EL1_SPAN                         (1 << 23)
-+
-+#define SET_PSTATE_PAN(x) __inst_arm(0xd5000000 | REG_PSTATE_PAN_IMM |\
-+				     (!!x)<<8 | 0x1f)
-+
- #ifdef __ASSEMBLY__
- 
- 	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 07e1ba449bf1..b2ede967fe7d 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -24,7 +24,10 @@
- #include <linux/string.h>
- #include <linux/thread_info.h>
- 
-+#include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/ptrace.h>
-+#include <asm/sysreg.h>
- #include <asm/errno.h>
- #include <asm/memory.h>
- #include <asm/compiler.h>
-@@ -131,6 +134,8 @@ static inline void set_fs(mm_segment_t fs)
- do {									\
- 	unsigned long __gu_val;						\
- 	__chk_user_ptr(ptr);						\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
- 		__get_user_asm("ldrb", "%w", __gu_val, (ptr), (err));	\
-@@ -148,6 +153,8 @@ do {									\
- 		BUILD_BUG();						\
- 	}								\
- 	(x) = (__force __typeof__(*(ptr)))__gu_val;			\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+			CONFIG_ARM64_PAN));				\
- } while (0)
- 
- #define __get_user(x, ptr)						\
-@@ -194,6 +201,8 @@ do {									\
- do {									\
- 	__typeof__(*(ptr)) __pu_val = (x);				\
- 	__chk_user_ptr(ptr);						\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+			CONFIG_ARM64_PAN));				\
- 	switch (sizeof(*(ptr))) {					\
- 	case 1:								\
- 		__put_user_asm("strb", "%w", __pu_val, (ptr), (err));	\
-@@ -210,6 +219,8 @@ do {									\
- 	default:							\
- 		BUILD_BUG();						\
- 	}								\
-+	asm(ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+			CONFIG_ARM64_PAN));				\
- } while (0)
- 
- #define __put_user(x, ptr)						\
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index 6913643bbe54..208db3df135a 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -44,6 +44,7 @@
- #define PSR_I_BIT	0x00000080
- #define PSR_A_BIT	0x00000100
- #define PSR_D_BIT	0x00000200
-+#define PSR_PAN_BIT	0x00400000
- #define PSR_Q_BIT	0x08000000
- #define PSR_V_BIT	0x10000000
- #define PSR_C_BIT	0x20000000
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 78d56bff91fd..bcee7abac68e 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -14,6 +14,8 @@
- #include <linux/slab.h>
- #include <linux/sysctl.h>
- 
-+#include <asm/alternative.h>
-+#include <asm/cpufeature.h>
- #include <asm/insn.h>
- #include <asm/opcodes.h>
- #include <asm/sysreg.h>
-@@ -280,6 +282,8 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
-  */
- #define __user_swpX_asm(data, addr, res, temp, B)		\
- 	__asm__ __volatile__(					\
-+	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-+		    CONFIG_ARM64_PAN)				\
- 	"	mov		%w2, %w1\n"			\
- 	"0:	ldxr"B"		%w1, [%3]\n"			\
- 	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
-@@ -295,7 +299,9 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	"	.align		3\n"				\
- 	"	.quad		0b, 3b\n"			\
- 	"	.quad		1b, 3b\n"			\
--	"	.popsection"					\
-+	"	.popsection\n"					\
-+	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
-+		CONFIG_ARM64_PAN)				\
- 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
- 	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
- 	: "memory")
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 74fd0f74b065..978fa169d3c3 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -21,6 +21,7 @@
- #include <linux/types.h>
- #include <asm/cpu.h>
- #include <asm/cpufeature.h>
-+#include <asm/processor.h>
- 
- static bool
- feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
-@@ -39,6 +40,15 @@ has_id_aa64pfr0_feature(const struct arm64_cpu_capabilities *entry)
- 	return feature_matches(val, entry);
- }
- 
-+static bool __maybe_unused
-+has_id_aa64mmfr1_feature(const struct arm64_cpu_capabilities *entry)
-+{
-+	u64 val;
-+
-+	val = read_cpuid(id_aa64mmfr1_el1);
-+	return feature_matches(val, entry);
-+}
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -47,6 +57,16 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.field_pos = 24,
- 		.min_field_value = 1,
- 	},
-+#ifdef CONFIG_ARM64_PAN
-+	{
-+		.desc = "Privileged Access Never",
-+		.capability = ARM64_HAS_PAN,
-+		.matches = has_id_aa64mmfr1_feature,
-+		.field_pos = 20,
-+		.min_field_value = 1,
-+		.enable = cpu_enable_pan,
-+	},
-+#endif /* CONFIG_ARM64_PAN */
- 	{},
- };
- 
-diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
-index c17967fdf5f6..96ed5cfecb7f 100644
---- a/arch/arm64/lib/clear_user.S
-+++ b/arch/arm64/lib/clear_user.S
-@@ -16,7 +16,11 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- #include <linux/linkage.h>
-+
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
- 
- 	.text
- 
-@@ -29,6 +33,7 @@
-  * Alignment fixed up by hardware.
-  */
- ENTRY(__clear_user)
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN
- 	mov	x2, x1			// save the size for fixup return
- 	subs	x1, x1, #8
- 	b.mi	2f
-@@ -48,6 +53,7 @@ USER(9f, strh	wzr, [x0], #2	)
- 	b.mi	5f
- USER(9f, strb	wzr, [x0]	)
- 5:	mov	x0, #0
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN
- 	ret
- ENDPROC(__clear_user)
- 
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 47c3fa5ae4ae..e73819dd47d2 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -15,7 +15,11 @@
-  */
- 
- #include <linux/linkage.h>
-+
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
- 
- /*
-  * Copy from user space to a kernel buffer (alignment handled by the hardware)
-@@ -28,6 +32,7 @@
-  *	x0 - bytes not copied
-  */
- ENTRY(__copy_from_user)
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN
- 	add	x5, x1, x2			// upper user buffer boundary
- 	subs	x2, x2, #16
- 	b.mi	1f
-@@ -56,6 +61,7 @@ USER(9f, ldrh	w3, [x1], #2	)
- USER(9f, ldrb	w3, [x1]	)
- 	strb	w3, [x0]
- 5:	mov	x0, #0
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN
- 	ret
- ENDPROC(__copy_from_user)
- 
-diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
-index 436bcc5d77b5..9e6376a3e247 100644
---- a/arch/arm64/lib/copy_in_user.S
-+++ b/arch/arm64/lib/copy_in_user.S
-@@ -17,7 +17,11 @@
-  */
- 
- #include <linux/linkage.h>
-+
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
- 
- /*
-  * Copy from user space to user space (alignment handled by the hardware)
-@@ -30,6 +34,7 @@
-  *	x0 - bytes not copied
-  */
- ENTRY(__copy_in_user)
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN
- 	add	x5, x0, x2			// upper user buffer boundary
- 	subs	x2, x2, #16
- 	b.mi	1f
-@@ -58,6 +63,7 @@ USER(9f, strh	w3, [x0], #2	)
- USER(9f, ldrb	w3, [x1]	)
- USER(9f, strb	w3, [x0]	)
- 5:	mov	x0, #0
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN
- 	ret
- ENDPROC(__copy_in_user)
- 
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index f5e1f526f408..936199faba3f 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -15,7 +15,11 @@
-  */
- 
- #include <linux/linkage.h>
-+
-+#include <asm/alternative.h>
- #include <asm/assembler.h>
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
- 
- /*
-  * Copy to user space from a kernel buffer (alignment handled by the hardware)
-@@ -28,6 +32,7 @@
-  *	x0 - bytes not copied
-  */
- ENTRY(__copy_to_user)
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(0)), ARM64_HAS_PAN
- 	add	x5, x0, x2			// upper user buffer boundary
- 	subs	x2, x2, #16
- 	b.mi	1f
-@@ -56,6 +61,7 @@ USER(9f, strh	w3, [x0], #2	)
- 	ldrb	w3, [x1]
- USER(9f, strb	w3, [x0]	)
- 5:	mov	x0, #0
-+alternative_insn "nop", __stringify(SET_PSTATE_PAN(1)), ARM64_HAS_PAN
- 	ret
- ENDPROC(__copy_to_user)
- 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 94d98cd1aad8..5fe96ef31e0e 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -30,9 +30,11 @@
- #include <linux/highmem.h>
- #include <linux/perf_event.h>
- 
-+#include <asm/cpufeature.h>
- #include <asm/exception.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
-+#include <asm/sysreg.h>
- #include <asm/system_misc.h>
- #include <asm/pgtable.h>
- #include <asm/tlbflush.h>
-@@ -147,6 +149,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
- 		__do_kernel_fault(mm, addr, esr, regs);
- }
- 
-+static bool pan_enabled(struct pt_regs *regs)
-+{
-+	if (IS_ENABLED(CONFIG_ARM64_PAN))
-+		return (regs->pstate & PSR_PAN_BIT) != 0;
-+	return false;
-+}
-+
- #define VM_FAULT_BADMAP		0x010000
- #define VM_FAULT_BADACCESS	0x020000
- 
-@@ -224,6 +233,13 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
- 	}
- 
- 	/*
-+	 * PAN bit set implies the fault happened in kernel space, but not
-+	 * in the arch's user access functions.
-+	 */
-+	if (pan_enabled(regs))
-+		goto no_context;
-+
-+	/*
- 	 * As per x86, we may deadlock here. However, since the kernel only
- 	 * validly references user space from well defined areas of the code,
- 	 * we can bug out early if this is from code which shouldn't.
-@@ -536,3 +552,10 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 
- 	return 0;
- }
-+
-+#ifdef CONFIG_ARM64_PAN
-+void cpu_enable_pan(void)
-+{
-+	config_sctlr_el1(SCTLR_EL1_SPAN, 0);
-+}
-+#endif /* CONFIG_ARM64_PAN */
--- 
-2.1.4
+-Loc
