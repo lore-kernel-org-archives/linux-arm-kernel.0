@@ -1,114 +1,211 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 22 Jul 2015 14:50:31 +0200
-Subject: [PATCH v2 2/2] regulator: mt6311: Add support for mt6311 regulator
-In-Reply-To: <1437566453-13117-3-git-send-email-henryc.chen@mediatek.com>
-References: <1437566453-13117-1-git-send-email-henryc.chen@mediatek.com>
- <1437566453-13117-3-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <CABxcv=ncxfeqo1vfz6XzJWYUOGeFGAbDmz2M_PzM+8PBQvXjgw@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 22 Jul 2015 13:52:07 +0100
+Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
+In-Reply-To: <55AF6D59.8080505@arm.com>
+References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <55AF62BA.1000702@hisilicon.com> <55AF6D59.8080505@arm.com>
+Message-ID: <20150722125207.GB537@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Henry,
+On Wed, Jul 22, 2015 at 11:15:53AM +0100, Marc Zyngier wrote:
+> On 22/07/15 10:30, Zhou Wang wrote:
+> > On 2015/7/13 18:43, Lorenzo Pieralisi wrote:
+> >> On ARM PCI systems relying on the pcibios API to initialize PCI host
+> >> controllers, the pcibios_msi_controller weak callback is used to look-up
+> >> the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
+> >>
+> >> pci_sys_data is an arch specific structure, which prevents using the
+> >> same mechanism (so same PCI host controller drivers) on ARM64 systems.
+> >>
+> >> Since the struct pci_bus already contains an msi_controller pointer and
+> >> the kernel already uses it to look-up the msi controller,
+> >> this patch converts ARM host controller and relate pcibios/host bridges
+> >> initialization routines so that the msi_controller pointer look-up can be
+> >> carried out by PCI core code through the struct pci_bus msi pointer,
+> >> removing the need for arch specific pcibios_msi_controller callback
+> >> and the related pci_sys_data msi_ctrl pointer.
+> >>
+> >> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Cc: Pratyush Anand <pratyush.anand@gmail.com>
+> >> Cc: Arnd Bergmann <arnd@arndb.de>
+> >> Cc: Jingoo Han <jingoohan1@gmail.com>
+> >> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> >> Cc: Simon Horman <horms@verge.net.au>
+> >> Cc: Russell King <linux@arm.linux.org.uk>
+> >> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> >> Cc: Thierry Reding <thierry.reding@gmail.com>
+> >> Cc: Michal Simek <michal.simek@xilinx.com>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >> Bjorn, all,
+> >>
+> >> I am posting this patch to sound out if that's a reasonable approach.
+> >> xgene implements MSI look-up this way at present and this would represent
+> >> another step forward towards having common drivers for ARM/ARM64, comments
+> >> and testing welcome.
+> >>
+> >> Thanks,
+> >> Lorenzo
+> >>
+> >>  arch/arm/include/asm/mach/pci.h    |  3 ---
+> >>  arch/arm/kernel/bios32.c           | 35 +++++++++++++++++------------------
+> >>  drivers/pci/host/pcie-designware.c |  9 +++++++--
+> >>  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
+> >>  4 files changed, 34 insertions(+), 25 deletions(-)
+> >>
+> >> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> >> index 28b9bb3..32abc0c 100644
+> >> --- a/arch/arm/include/asm/mach/pci.h
+> >> +++ b/arch/arm/include/asm/mach/pci.h
+> >> @@ -42,9 +42,6 @@ struct hw_pci {
+> >>   * Per-controller structure
+> >>   */
+> >>  struct pci_sys_data {
+> >> -#ifdef CONFIG_PCI_MSI
+> >> -	struct msi_controller *msi_ctrl;
+> >> -#endif
+> >>  	struct list_head node;
+> >>  	int		busnr;		/* primary bus number			*/
+> >>  	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
+> >> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> >> index fcbbbb1..c841b33 100644
+> >> --- a/arch/arm/kernel/bios32.c
+> >> +++ b/arch/arm/kernel/bios32.c
+> >> @@ -18,15 +18,6 @@
+> >>  
+> >>  static int debug_pci;
+> >>  
+> >> -#ifdef CONFIG_PCI_MSI
+> >> -struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> >> -{
+> >> -	struct pci_sys_data *sysdata = dev->bus->sysdata;
+> >> -
+> >> -	return sysdata->msi_ctrl;
+> >> -}
+> >> -#endif
+> >> -
+> >>  /*
+> >>   * We can't use pci_get_device() here since we are
+> >>   * called from interrupt context.
+> >> @@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> >>  		if (!sys)
+> >>  			panic("PCI: unable to allocate sys data!");
+> >>  
+> >> -#ifdef CONFIG_PCI_MSI
+> >> -		sys->msi_ctrl = hw->msi_ctrl;
+> >> -#endif
+> >>  		sys->busnr   = busnr;
+> >>  		sys->swizzle = hw->swizzle;
+> >>  		sys->map_irq = hw->map_irq;
+> >> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> >>  				break;
+> >>  			}
+> >>  
+> >> -			if (hw->scan)
+> >> +			if (hw->scan) {
+> >>  				sys->bus = hw->scan(nr, sys);
+> >> -			else
+> >> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+> >> -						hw->ops, sys, &sys->resources);
+> >> +				if (!sys->bus)
+> >> +					panic("PCI: unable to scan bus!");
+> >> +			} else {
+> >> +				sys->bus = pci_create_root_bus(parent,
+> >> +							       sys->busnr,
+> >> +							       hw->ops, sys,
+> >> +							       &sys->resources);
+> >> +				if (WARN_ON(!sys->bus)) {
+> >> +					kfree(sys);
+> >> +					break;
+> >> +				}
+> >> +#ifdef CONFIG_PCI_MSI
+> >> +				sys->bus->msi = hw->msi_ctrl;
+> >> +#endif
+> >>  
+> >> -			if (!sys->bus)
+> >> -				panic("PCI: unable to scan bus!");
+> >> +				pci_scan_child_bus(sys->bus);
+> >> +			}
+> >>  
+> >>  			busnr = sys->bus->busn_res.end + 1;
+> >>  
+> >> diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+> >> index 69486be..e584dfa 100644
+> >> --- a/drivers/pci/host/pcie-designware.c
+> >> +++ b/drivers/pci/host/pcie-designware.c
+> >> @@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+> >>  
+> >>  #ifdef CONFIG_PCI_MSI
+> >>  	dw_pcie_msi_chip.dev = pp->dev;
+> >> -	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
+> >>  #endif
+> >>  
+> >>  	dw_pci.nr_controllers = 1;
+> >> @@ -708,11 +707,17 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> >>  	struct pcie_port *pp = sys_to_pcie(sys);
+> >>  
+> >>  	pp->root_bus_nr = sys->busnr;
+> >> -	bus = pci_scan_root_bus(pp->dev, sys->busnr,
+> >> +	bus = pci_create_root_bus(pp->dev, sys->busnr,
+> >>  				  &dw_pcie_ops, sys, &sys->resources);
+> >>  	if (!bus)
+> >>  		return NULL;
+> >>  
+> >> +#ifdef CONFIG_PCI_MSI
+> >> +	bus->msi = &dw_pcie_msi_chip;
+> >> +#endif
+> >> +
+> >> +	pci_scan_child_bus(bus);
+> >> +
+> >>  	if (bus && pp->ops->scan_bus)
+> >>  		pp->ops->scan_bus(pp);
+> >>  
+> >> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> >> index f1a06a0..b21eb7d 100644
+> >> --- a/drivers/pci/host/pcie-xilinx.c
+> >> +++ b/drivers/pci/host/pcie-xilinx.c
+> >> @@ -647,9 +647,18 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> >>  	struct pci_bus *bus;
+> >>  
+> >>  	port->root_busno = sys->busnr;
+> >> -	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
+> >> +	bus = pci_create_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
+> >>  				sys, &sys->resources);
+> >>  
+> >> +	if (!bus)
+> >> +		return NULL;
+> >> +
+> >> +#ifdef CONFIG_PCI_MSI
+> >> +	bus->msi = &xilinx_pcie_msi_chip;
+> >> +#endif
+> >> +
+> >> +	pci_scan_child_bus(bus);
+> >> +
+> >>  	return bus;
+> >>  }
+> >>  
+> >> @@ -847,7 +856,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
+> >>  
+> >>  #ifdef CONFIG_PCI_MSI
+> >>  	xilinx_pcie_msi_chip.dev = port->dev;
+> >> -	hw.msi_ctrl = &xilinx_pcie_msi_chip;
+> >>  #endif
+> >>  	pci_common_init_dev(dev, &hw);
+> >>  
+> >>
+> > 
+> > Hi Lorenzo,
+> > 
+> > I wonder if we can delete weak pcibios_msi_controller and the call in
+> > pci_msi_controller in drivers/pci/msi.c
+> 
+> Yeah, I think we can replace it with a straight "return NULL;" in
+> pci_msi_controller, as ARM is the only arch to implement this function
+> (which Lorenzo now removes).
 
-On Wed, Jul 22, 2015 at 2:00 PM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> Add regulator support for mt6311.
-> It has 2 regulaotrs - Buck and LDO, provide the related buck/ldo voltage
-> data to the driver, and creates the regulator_desc table. Supported
-> operations for Buck are enabled/disabled and voltage change, only
-> enabled/disabled for LDO.
->
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> ---
->  drivers/regulator/Kconfig            |   9 ++
->  drivers/regulator/Makefile           |   1 +
->  drivers/regulator/mt6311-regulator.c | 208 +++++++++++++++++++++++++++++++++++
->  drivers/regulator/mt6311-regulator.h |  65 +++++++++++
->  include/linux/regulator/mt6311.h     |  29 +++++
->  5 files changed, 312 insertions(+)
->  create mode 100644 drivers/regulator/mt6311-regulator.c
->  create mode 100644 drivers/regulator/mt6311-regulator.h
->  create mode 100644 include/linux/regulator/mt6311.h
->
-> diff --git a/drivers/regulator/Kconfig b/drivers/regulator/Kconfig
-> index bef3bde..aab09ac 100644
-> --- a/drivers/regulator/Kconfig
-> +++ b/drivers/regulator/Kconfig
-> @@ -451,6 +451,15 @@ config REGULATOR_MC13892
->           Say y here to support the regulators found on the Freescale MC13892
->           PMIC.
->
-> +config REGULATOR_MT6311
-> +       tristate "MediaTek MT6311 PMIC"
-> +       depends on I2C
-> +       help
-> +         Say y here to select this option to enable the power regulator of
-> +         MediaTek MT6311 PMIC.
-> +         This driver supports the control of different power rails of device
-> +         through regulator interface.
-> +
->  config REGULATOR_MT6397
->         tristate "MediaTek MT6397 PMIC"
->         depends on MFD_MT6397
-> diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
-> index 91bf762..45e790f 100644
-> --- a/drivers/regulator/Makefile
-> +++ b/drivers/regulator/Makefile
-> @@ -60,6 +60,7 @@ obj-$(CONFIG_REGULATOR_MAX77843) += max77843.o
->  obj-$(CONFIG_REGULATOR_MC13783) += mc13783-regulator.o
->  obj-$(CONFIG_REGULATOR_MC13892) += mc13892-regulator.o
->  obj-$(CONFIG_REGULATOR_MC13XXX_CORE) +=  mc13xxx-regulator-core.o
-> +obj-$(CONFIG_REGULATOR_MT6311) += mt6311-regulator.o
->  obj-$(CONFIG_REGULATOR_MT6397) += mt6397-regulator.o
->  obj-$(CONFIG_REGULATOR_QCOM_RPM) += qcom_rpm-regulator.o
->  obj-$(CONFIG_REGULATOR_QCOM_SPMI) += qcom_spmi-regulator.o
-> diff --git a/drivers/regulator/mt6311-regulator.c b/drivers/regulator/mt6311-regulator.c
-> new file mode 100644
-> index 0000000..d990dc9
-> --- /dev/null
-> +++ b/drivers/regulator/mt6311-regulator.c
-> @@ -0,0 +1,208 @@
-> +/*
-> + * Copyright (c) 2015 MediaTek Inc.
-> + * Author: Henry Chen <henryc.chen@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/gpio.h>
-> +#include <linux/i2c.h>
-> +#include <linux/init.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/module.h>
-> +#include <linux/regmap.h>
-> +#include <linux/regulator/driver.h>
-> +#include <linux/regulator/machine.h>
-> +#include <linux/regulator/of_regulator.h>
-> +#include <linux/regulator/mt6311.h>
-> +#include <linux/slab.h>
-> +#include "mt6311-regulator.h"
-> +
-> +struct mt6311 {
-> +       struct device *dev;
-> +       struct regmap *regmap;
-> +       struct regulator_dev *rdev[MT6311_MAX_REGULATORS];
-> +       int num_regulator;
-> +       int chip_cid;
-> +};
+Agreed, I did not do it since I wanted to get feedback on the approach
+first, if we agree that's the right thing to do we can kill
+pcibios_msi_controller() in the core too (since it becomes unused).
 
-It seems this struct can be removed, the rdev, num_regulator and
-chip_cid fields are set but not used and dev and regmap are only used
-to set the struct regulator_config fields in mt6311_regulator_init().
-But that won't be necessary if you just remove the
-mt6311_regulator_init() function and move the regulator registration
-logic to mt6311_i2c_probe().
-
-Best regards,
-Javier
+Lorenzo
