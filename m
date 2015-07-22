@@ -1,114 +1,89 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 22 Jul 2015 10:40:11 +0530
-Subject: [PATCHv4 2/6] dmaengine: mv_xor: add suspend/resume support
-In-Reply-To: <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20150722051011.GQ23525@localhost>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Wed, 22 Jul 2015 15:11:29 +1000
+Subject: [PATCH 1/2] Move the pt_regs_offset struct definition from arch
+ to common include file
+In-Reply-To: <55AF2037.2000803@linaro.org>
+References: <1434386579-6045-1-git-send-email-dave.long@linaro.org>
+ <1434386579-6045-2-git-send-email-dave.long@linaro.org>
+ <CAL_JsqK3L9Hv9bhAtwAAXVYjLJBTOG9=4ddOo-SFqnD-_KieCQ@mail.gmail.com>
+ <5581BCD0.2040405@linaro.org> <1435634945.24866.2.camel@ellerman.id.au>
+ <55AF2037.2000803@linaro.org>
+Message-ID: <1437541889.16792.11.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 08, 2015 at 04:28:15PM +0200, Thomas Petazzoni wrote:
-> This commit adds suspend/resume support to the mv_xor driver. The
-> config and interrupt mask registers must be saved and restored, and
-> upon resume, the MBus windows configuration must also be done again.
+On Wed, 2015-07-22 at 00:46 -0400, David Long wrote:
+> On 06/29/15 23:29, Michael Ellerman wrote:
+> > On Wed, 2015-06-17 at 14:30 -0400, David Long wrote:
+> >> On 06/16/15 09:17, Rob Herring wrote:
+> >>> On Mon, Jun 15, 2015 at 11:42 AM, David Long <dave.long@linaro.org> wrote:
+> >>>>
+> >>>>    #define REG_OFFSET_NAME(r) \
+> >>>>           {.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
+> >>>>    #define REG_OFFSET_END {.name = NULL, .offset = 0}
+> >>>
+> >>> Can't you also move these? ARM is complicated with the "ARM_"
+> >>> prefixing, but the others appear to be the same. Maybe you can remove
+> >>> the prefix or redefine the macro for ARM.
+> >>
+> >> That would mandate that all the architecture-specific pt_regs structures
+> >> would have to use a top-level named field for each named register.
+> >
+> > Why does it mandate that?
+> >
+> > See eg. powerpc where we use REG_OFFSET_NAME for the top-level named fields and
+> > then a different macro for the array elements:
+> >
+> >    #define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
+> >    #define GPR_OFFSET_NAME(num)	\
+> >    	{.name = STR(gpr##num), .offset = offsetof(struct pt_regs, gpr[num])}
+> >
+> >    static const struct pt_regs_offset regoffset_table[] = {
+> >    	GPR_OFFSET_NAME(0),
+> >    	GPR_OFFSET_NAME(1),
+> >    	GPR_OFFSET_NAME(2),
+> >    	GPR_OFFSET_NAME(3),
+> >    	...
+> >    	REG_OFFSET_NAME(nip),
+> >    	REG_OFFSET_NAME(msr),
+> >
+> >
+> > So I don't see why REG_OFFSET_NAME couldn't be common.
+> >
 > 
-> Tested on Armada 388 GP, with a RAID 5 array, accessed before and
-> after a suspend to RAM cycle.
+> Sorry for the delay in responding to this.
 > 
-> Based on work from Ofer Heifetz and Lior Amsalem.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/dma/mv_xor.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/dma/mv_xor.h |  1 +
->  2 files changed, 48 insertions(+)
-> 
-> diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
-> index f1325f6..0a3ddc2 100644
-> --- a/drivers/dma/mv_xor.c
-> +++ b/drivers/dma/mv_xor.c
-> @@ -1121,6 +1121,51 @@ mv_xor_conf_mbus_windows(struct mv_xor_device *xordev,
->  	writel(0, base + WINDOW_OVERRIDE_CTRL(1));
->  }
->  
-> +static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-> +		struct mv_xor_chan *mv_chan = xordev->channels[i];
-> +
-> +		if (!mv_chan)
-> +			continue;
-> +
-> +		mv_chan->saved_config_reg =
-> +			readl_relaxed(XOR_CONFIG(mv_chan));
-> +		mv_chan->saved_int_mask_reg =
-> +			readl_relaxed(XOR_INTR_MASK(mv_chan));
-this sound fine, but I am missing the suspension of the channel. If a
-transfer was active while suspend was invoked then how would this work?
+> OK, so you're saying architectures that don't want this constraint can 
+> make their own macro.  Seems to make this whole exercise slightly less 
+> useful, but whatever.
 
--- 
-~Vinod
+Well yeah.
 
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int mv_xor_resume(struct platform_device *dev)
-> +{
-> +	struct mv_xor_device *xordev = platform_get_drvdata(dev);
-> +	const struct mbus_dram_target_info *dram;
-> +	int i;
-> +
-> +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
-> +		struct mv_xor_chan *mv_chan = xordev->channels[i];
-> +
-> +		if (!mv_chan)
-> +			continue;
-> +
-> +		writel_relaxed(mv_chan->saved_config_reg,
-> +			       XOR_CONFIG(mv_chan));
-> +		writel_relaxed(mv_chan->saved_int_mask_reg,
-> +			       XOR_INTR_MASK(mv_chan));
-> +	}
-> +
-> +	dram = mv_mbus_dram_info();
-> +	if (dram)
-> +		mv_xor_conf_mbus_windows(xordev, dram);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct of_device_id mv_xor_dt_ids[] = {
->  	{ .compatible = "marvell,orion-xor", .data = (void *)XOR_MODE_IN_REG },
->  	{ .compatible = "marvell,armada-380-xor", .data = (void *)XOR_MODE_IN_DESC },
-> @@ -1284,6 +1329,8 @@ static int mv_xor_remove(struct platform_device *pdev)
->  static struct platform_driver mv_xor_driver = {
->  	.probe		= mv_xor_probe,
->  	.remove		= mv_xor_remove,
-> +	.suspend        = mv_xor_suspend,
-> +	.resume         = mv_xor_resume,
->  	.driver		= {
->  		.name	        = MV_XOR_NAME,
->  		.of_match_table = of_match_ptr(mv_xor_dt_ids),
-> diff --git a/drivers/dma/mv_xor.h b/drivers/dma/mv_xor.h
-> index b7455b4..41a2e8d 100644
-> --- a/drivers/dma/mv_xor.h
-> +++ b/drivers/dma/mv_xor.h
-> @@ -126,6 +126,7 @@ struct mv_xor_chan {
->  	char			dummy_src[MV_XOR_MIN_BYTE_COUNT];
->  	char			dummy_dst[MV_XOR_MIN_BYTE_COUNT];
->  	dma_addr_t		dummy_src_addr, dummy_dst_addr;
-> +	u32                     saved_config_reg, saved_int_mask_reg;
->  };
->  
->  /**
-> -- 
-> 2.4.5
+In fact of the 4 arches that use REG_OFFSET_NAME, 2 already have another macro
+for specially named registers (powerpc & sh).
+
+> I see three ways to go here:
 > 
+> 1) Leave it as is.
+> 2) Force all architectures to use a common definition.
+> 3) Provide a common definition that all architectures (except "arm") 
+> currently using this functionality will use.
+> 
+> I have a v2 patch to implement #3, ready to post.  Do we think this is 
+> the way to go?
 
--- 
+Yeah I think it is. How are you making it conditional? Just #ifndef REG_OFFSET_NAME?
+
+> I don't like #2 because I really don't want to rename all 
+> uses of the current register fields for arm since this is 
+> architecture-specific code to begin with and since it affects code in 39 
+> arm source files.
+
+I guess you're talking about renaming all the ARM_x regs to x. That would
+likely cause problems because they're implemented as #defines,
+eg. #define r0 uregs[0] would probably confuse your assembler.
+
+The clean thing to do would be to have the in-kernel struct pt_regs have actual
+named members, but that would still be an intrusive change.
+
+cheers
