@@ -1,81 +1,58 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Wed, 22 Jul 2015 18:59:21 +0200
-Subject: [PATCH v2 2/5] Documentation: mtd: add a DT property to set the
- number of dummy cycles
-In-Reply-To: <201507221543.54761.marex@denx.de>
-References: <cover.1437569902.git.cyrille.pitchen@atmel.com>
- <8119e3b46b91e43c10466b2400c6938a113b1c02.1437569902.git.cyrille.pitchen@atmel.com>
- <201507221543.54761.marex@denx.de>
-Message-ID: <55AFCBE9.2030700@atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 22 Jul 2015 18:00:23 +0100
+Subject: [PATCH] regmap: Add function check before called format_val
+In-Reply-To: <1437575494.30329.80.camel@mtksdaap41>
+References: <1437396110-5192-1-git-send-email-henryc.chen@mediatek.com>
+ <20150720150254.GC11162@sirena.org.uk>
+ <1437458845.30329.51.camel@mtksdaap41>
+ <20150721172550.GY11162@sirena.org.uk>
+ <1437575494.30329.80.camel@mtksdaap41>
+Message-ID: <20150722170023.GZ11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On Wed, Jul 22, 2015 at 10:31:34PM +0800, Henry Chen wrote:
+> On Tue, 2015-07-21 at 18:25 +0100, Mark Brown wrote:
 
-Le 22/07/2015 15:43, Marek Vasut a ?crit :
-> On Wednesday, July 22, 2015 at 03:17:07 PM, Cyrille Pitchen wrote:
->> Depending on the SPI clock frequency, the Fast Read op code and the
->> Single/Dual Data Rate mode, the number of dummy cycles can be tuned to
->> improve transfer speed.
->> The actual number of dummy cycles is specific for each memory model and is
->> provided by the manufacturer thanks to the memory datasheet.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> ---
->>  Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
->> b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt index
->> 2bee68103b01..4387567d8024 100644
->> --- a/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
->> +++ b/Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt
->> @@ -19,6 +19,11 @@ Optional properties:
->>                     all chips and support for it can not be detected at
->> runtime. Refer to your chips' datasheet to check if this is supported by
->> your chip.
->> +- m25p,num-dummy-cycles : Set the number of dummy cycles for Fast Read
->> commands. +                          Depending on the manufacturer
->> additional dedicated +                          commands are sent to the
->> flash memory so the +                          controller and the memory
->> can agree on the number of +                          dummy cycles to use.
-> 
-> Can't you just try negotiating this value at probe time, starting with some
-> high value and see how low you can get with the negotiations ? This way, you'd 
-> be able to effectively auto-detect this value at probe-time.
-> 
-> I might be wrong though :)
-> 
-I don't know whether it would be reliable enough. It is the exact same idea as
-for the latency code used by Spansion QSPI memories. Micron memories allow to
-skip the step of converting the number of dummy cycles into a latency code, you
-directly program the right number of dummy cycles into a Micron specific
-register, the Volatile Configuration Register.
+> > OK, so the issue here is that when we fall back to regmap_read() we may
+> > do so because we have reg_read() and reg_write() functions which in turn
+> > imply no formatting.  The expectation here is that val must be an array
+> > of int.  The code doesn't completely take that into account though and
+> > the user you're pointing at is assuming it's an array of 16 bit values
+> > which isn't totally unreasonable if it did specify val_bits (we don't
+> > check for that).
 
-However for both manufacturers the number of dummy cycles to use during Fast 
-Read commands is given though tables found into the memory datasheet. The
-number of dummy cycles depends on the Fast Read command, the SPI bus clock
-frequency and the Single/Dual Data Rate mode.
+> So, could I call regmap_bulk_read() on rtc-mt6307.c, should I need to
+> change it ?
 
-It should be confirmed by Quad SPI memory manufacturers but since the number of
-dummy cycles depends on the bus clock frequency, I guess the values provided by
-the datasheets are recommendations. I think a too low value should not be so
-easy to detect. For a given frequency one Fast Read command may succeed whereas
-the same command with the very same number of dummy cycles might fail on the
-next try. To be honest, I'm not sure about the memory behavior in limit
-conditions so maybe the command will always succeed or always fail.
+It should be fine but you may need to change to pass an array of
+unsigned int instead of an array of u16 in.
 
-Also we can't be sure the read data are valid if we don't write them first. So
-we would have to save the original data to restore them at the end of the
-probing. Writing data at each probe would also reduce the memory lifetime. We
-should also be aware of the bad blocks, which is more a job for upper layers.
+> > > Maybe it was not the good fix for this, but should be a problem need to
+> > > be reported, or should I need to give the regmap_bus on mtk_pmic_wrap.c?
 
-It would be interesting to have some feedbacks from Micron, Spansion or other
-QSPI memory manufacturer :)
+> > That file isn't in mainline...
 
-> Best regards,
-> Marek Vasut
-> 
-Best regards,
+> oh...it's mtk-pmic-wrap.c, sorry about that.
 
-Cyrille
+Found it - thanks.
+
+> > memcpy() is definitely not a safe way to move from an unsigned int to a
+> > u16 which is what your specific use case is trying to do.  I'll need to
+> > do an audit of existing users (or someone else will!) to figure out what
+> > people are doing with .val_bits in drivers using reg_read() and
+> > reg_write() but I think what we should be doing here is probably
+> > providing appropriate conversion functions based on val_bits on init.
+
+> Ok, got it, memcpy() should not be used here anymore.
+
+Right.  We just need to do a survey of existing users and figure out
+what the least disruptive format function to provide is.  That way we
+don't have to special case other code that uses formatting.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150722/c26e0687/attachment.sig>
