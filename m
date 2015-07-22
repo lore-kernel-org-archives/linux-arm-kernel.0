@@ -1,49 +1,62 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 22 Jul 2015 08:38:56 +0100
-Subject: [PATCH 11/12] [media] tsin: c8sectpfe: Add Kconfig and Makefile
- for the driver.
-In-Reply-To: <1435216998.4528.100.camel@tiscali.nl>
-References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
- <1435158670-7195-12-git-send-email-peter.griffin@linaro.org>
- <1435216998.4528.100.camel@tiscali.nl>
-Message-ID: <20150722073856.GA32601@griffinp-ThinkPad-X1-Carbon-2nd>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Wed, 22 Jul 2015 09:45:27 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <201507220933.19752.marex@denx.de>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <20150722044925.GN23525@localhost>
+ <CAOMqctQH4MnKMthOnuPgB-A5k6PCOAmhwHzJfn7gE3R4w8bufg@mail.gmail.com>
+ <201507220933.19752.marex@denx.de>
+Message-ID: <CAOMqctTmRy0gOchdUQ+VnoV-oJz0v9NpUPLi1pxO_O9QrLXsZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
+On 22 July 2015 at 09:33, Marek Vasut <marex@denx.de> wrote:
+> On Wednesday, July 22, 2015 at 09:30:54 AM, Michal Suchanek wrote:
+>> On 22 July 2015 at 06:49, Vinod Koul <vinod.koul@intel.com> wrote:
+>> > On Tue, Jul 21, 2015 at 10:14:11AM +0200, Michal Suchanek wrote:
+>> >> > Or alternatively we could publish the limitations of the channel using
+>> >> > capabilities so SPI knows I have a dmaengine channel and it can
+>> >> > transfer max N length transfers so would be able to break rather than
+>> >> > guessing it or coding in DT. Yes it may come from DT but that should
+>> >> > be dmaengine driver rather than client driver :)
+>> >> >
+>> >> > This can be done by dma_get_slave_caps(chan, &caps)
+>> >> >
+>> >> > And we add max_length as one more parameter to existing set
+>> >> >
+>> >> > Also all this could be handled in generic SPI-dmaengine layer so that
+>> >> > individual drivers don't have to code it in
+>> >> >
+>> >> > Let me know if this idea is okay, I can push the dmaengine bits...
+>> >>
+>> >> It would be ok if there was a fixed limit. However, the limit depends
+>> >> on SPI slave settings. Presumably for other buses using the dmaengine
+>> >> the limit would depend on the bus or slave settings as well. I do not
+>> >> see a sane way of passing this all the way to the dmaengine driver.
+>> >
+>> > I don't see why this should be client (SPI) dependent. The max length
+>> > supported is a dmaengine constraint, typically flowing from max
+>> > blocks/length it can transfer. Know this limit can allow clients to split
+>> > transfers.
+>>
+>> In practice on the board I have the maximum transfer length before it
+>> fails depends on SPI bus speed which is set up per slave. I did not
+>> try searching the space of possible settings thorougly and settled for
+>> a setting that gives reasonable speed and transfer length.
+>
+> This looks more like a signal integrity issue though.
+>
 
-Thanks for reviewing.
+It certainly does on the surface. However, when wrong data is
+delivered over the SPI bus (such as when I use wrong phase setting)
+the SPI controller happily delivers wrong data over PIO.
 
-On Thu, 25 Jun 2015, Paul Bolle wrote:
+The failure I am seeing is that the pl330 DMA program which repeatedly
+waits for data from the SPI controller never finishes the read loop
+and does not signal the interrupt. It seems it also leaves some data
+in a FIFO somewhere so next command on the flash returns garbage and
+fails.
 
-> On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
-> > --- /dev/null
-> > +++ b/drivers/media/tsin/c8sectpfe/Makefile
-> 
-> > +c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o
-> > +
-> > +obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
-> > +
-> > +ifneq ($(CONFIG_DVB_C8SECTPFE),)
-> > +	c8sectpfe-y += c8sectpfe-debugfs.o
-> > +endif
-> 
-> Isn't the above equivalent to
->     c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o c8sectpfe-debugfs.o
-> 
->     obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
-> 
-> Or am I missing something subtle here?
+Thanks
 
-No I think I just messed up. Will fix in v2.
-
-I suspect what happened  was I was starting to add a CONFIG_DVB_C8SECTPFE_DEBUGFS
-Kconfig option, and then forgot ;)
-
-In v2 I have added a "select DEBUG_FS" to Kconfig for the driver, and put it all on one
-line. Also at the same time fixing some other Kconfig dependencies I noticed so
-it now has 'select LIBELF_32' and 'select FW_LOADER'.
-
-regards,
-
-Peter.
+Michal
