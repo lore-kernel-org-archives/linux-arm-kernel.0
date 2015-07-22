@@ -1,65 +1,61 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Wed, 22 Jul 2015 20:53:07 +0800
-Subject: [PATCH V2 08/11] mmc: sdhci: make max-frequency property in device
- tree work
+Date: Wed, 22 Jul 2015 20:53:05 +0800
+Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
+ platform
 In-Reply-To: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
 References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1437569590-5228-9-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Device tree provides option to specify the max freqency with property
-"max-frequency" in dts and common parse function mmc_of_parse() will
-parse it and use this value to set host->f_max to tell the MMC core
-the maxinum frequency the host works.
+Current card detect probe process is that when driver finds a valid
+ESDHC_CD_GPIO, it will clear the quirk SDHCI_QUIRK_BROKEN_CARD_DETECTION
+which is set by default for all esdhc/usdhc controllers.
+Then host driver will know there's a valid card detect function.
 
-However, current sdhci driver will finally overwrite this value with
-host->max_clk regardless of the max-frequency property.
+Commit 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
+breaks GPIO CD function for dt platform that it will return directly
+when find ESDHC_CD_GPIO for dt platform which result in the later wrongly
+to keep SDHCI_QUIRK_BROKEN_CARD_DETECTION for all dt platforms.
+Then MMC_CAP_NEEDS_POLL will be used instead even there's a valid
+GPIO card detect.
 
-This patch makes sure not overwrite the max-frequency set from device
-tree and do basic sanity check.
+This patch adds back this function and follows the original approach to
+clear the quirk if find an valid CD GPIO for dt platforms.
 
+Fixes: 8d86e4fcccf6 ("mmc: sdhci-esdhc-imx: Call mmc_of_parse()")
 Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
 ---
- drivers/mmc/host/sdhci.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/mmc/host/sdhci-esdhc-imx.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 947033d..c83d110 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2874,6 +2874,7 @@ int sdhci_add_host(struct sdhci_host *host)
- 	u32 max_current_caps;
- 	unsigned int ocr_avail;
- 	unsigned int override_timeout_clk;
-+	u32 max_clk;
- 	int ret;
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index faf0cb9..4815391 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -881,6 +881,7 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ 			 struct esdhc_platform_data *boarddata)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
++	int ret;
  
- 	WARN_ON(host == NULL);
-@@ -3058,18 +3059,22 @@ int sdhci_add_host(struct sdhci_host *host)
- 	 * Set host parameters.
- 	 */
- 	mmc->ops = &sdhci_ops;
--	mmc->f_max = host->max_clk;
-+	max_clk = host->max_clk;
-+
- 	if (host->ops->get_min_clock)
- 		mmc->f_min = host->ops->get_min_clock(host);
- 	else if (host->version >= SDHCI_SPEC_300) {
- 		if (host->clk_mul) {
- 			mmc->f_min = (host->max_clk * host->clk_mul) / 1024;
--			mmc->f_max = host->max_clk * host->clk_mul;
-+			max_clk = host->max_clk * host->clk_mul;
- 		} else
- 			mmc->f_min = host->max_clk / SDHCI_MAX_DIV_SPEC_300;
- 	} else
- 		mmc->f_min = host->max_clk / SDHCI_MAX_DIV_SPEC_200;
+ 	if (!np)
+ 		return -ENODEV;
+@@ -917,7 +918,14 @@ sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+ 	mmc_of_parse_voltage(np, &host->ocr_mask);
  
-+	if (!mmc->f_max || (mmc->f_max && (mmc->f_max > max_clk)))
-+		mmc->f_max = max_clk;
+ 	/* call to generic mmc_of_parse to support additional capabilities */
+-	return mmc_of_parse(host->mmc);
++	ret = mmc_of_parse(host->mmc);
++	if (ret)
++		return ret;
 +
- 	if (!(host->quirks & SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK)) {
- 		host->timeout_clk = (caps[0] & SDHCI_TIMEOUT_CLK_MASK) >>
- 					SDHCI_TIMEOUT_CLK_SHIFT;
++	if (!IS_ERR_VALUE(mmc_gpio_get_cd(host->mmc)))
++		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
++
++	return 0;
+ }
+ #else
+ static inline int
 -- 
 1.9.1
