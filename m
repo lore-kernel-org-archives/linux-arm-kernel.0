@@ -1,46 +1,44 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 21 Jul 2015 19:01:31 -0500
-Subject: [PATCH 1/4] ARM: dts: DRA7: Add dsp1_system syscon node
-In-Reply-To: <1437523294-20058-1-git-send-email-s-anna@ti.com>
-References: <1437523294-20058-1-git-send-email-s-anna@ti.com>
-Message-ID: <1437523294-20058-2-git-send-email-s-anna@ti.com>
+Date: Tue, 21 Jul 2015 19:01:30 -0500
+Subject: [PATCH 0/4] Add DRA7 IOMMU DT nodes
+Message-ID: <1437523294-20058-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DSP_SYSTEM sub-module is a dedicated system control logic
-module present within a DRA7 DSP processor sub-system. This
-module is responsible for power management, clock generation
-and connection to the device PRCM module.
+Hi Tony,
 
-Add a syscon node for this module for the DSP1 processor
-sub-system. This is added as a syscon node as it is a common
-configuration module that can be used by the different IOMMU
-instances and the corresponding remoteproc device.
+The following patches add the basic DT nodes for the DSP
+and IPU IOMMU devices for the DRA7xx SoC family. The first
+two patches add syscon nodes for DSP_SYSTEM sub-modules, while
+the last two add the IOMMU nodes.
 
-The node is added to the common dra7.dtsi file, as the DSP1
-processor sub-system is mostly common across all the variants
-of the DRA7 SoC family.
+The IPU IOMMU nodes mostly are similar to existing ones on OMAP4
+and OMAP5. The DSP sub-system though has two MMUs, with a dedicated
+MMU for the internal EDMA engine. On previous SoCs, a single MMU
+served both the DSP processor and the internal EDMA. The DSP IOMMU
+nodes require a new property to reference the syscon nodes, as they
+each need a specific bit to be set in a register within the
+corresponding DSP_SYSTEM sub-module. So, these are pending based
+on the equivalent bindings update series [1]. Please let me know
+if the binding looks ok to you, as this seems it can be done in
+couple of ways.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+Patches are based on 4.2-rc3.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 8f1e25bcecbd..1c96729641b6 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -296,6 +296,11 @@
- 			reg = <0x4a002e00 0x7c>;
- 		};
- 
-+		dsp1_system: dsp_system at 40d00000 {
-+			compatible = "syscon";
-+			reg = <0x40d00000 0x100>;
-+		};
-+
- 		sdma: dma-controller at 4a056000 {
- 			compatible = "ti,omap4430-sdma";
- 			reg = <0x4a056000 0x1000>;
+regards
+Suman
+
+[1] http://marc.info/?l=linux-omap&m=143752295508435&w=2
+
+Suman Anna (4):
+  ARM: dts: DRA7: Add dsp1_system syscon node
+  ARM: dts: DRA74x: Add dsp2_system syscon node
+  ARM: dts: DRA7: Add common IOMMU nodes
+  ARM: dts: DRA74x: Add IOMMU nodes for DSP2
+
+ arch/arm/boot/dts/dra7.dtsi   | 45 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra74x.dtsi | 25 ++++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
+
 -- 
 2.4.4
