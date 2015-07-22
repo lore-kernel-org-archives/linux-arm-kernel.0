@@ -1,64 +1,43 @@
-From: vaibhav.hiremath@linaro.org (Vaibhav Hiremath)
-Date: Wed, 22 Jul 2015 11:57:37 +0530
-Subject: [PATCH 3/4] clk: 88pm800: Add clk provider driver for 88pm800
- family of devices
-In-Reply-To: <55AEB103.9010205@codeaurora.org>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-4-git-send-email-vaibhav.hiremath@linaro.org>
- <55AE990E.2040004@codeaurora.org> <55AE9F48.20600@linaro.org>
- <55AEB103.9010205@codeaurora.org>
-Message-ID: <55AF37D9.3000006@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 22 Jul 2015 14:45:52 +0800
+Subject: [PATCH 0/5] Making the generic ACPI GSI layer irqdomain aware
+In-Reply-To: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+References: <1437473280-11431-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55AF3C20.2060103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marc,
 
-
-On Wednesday 22 July 2015 02:22 AM, Stephen Boyd wrote:
-> On 07/21/2015 12:36 PM, Vaibhav Hiremath wrote:
->>
->> On Wednesday 22 July 2015 12:40 AM, Stephen Boyd wrote:
->>> On 07/21/2015 04:07 AM, Vaibhav Hiremath wrote:
->>>> +
-
-<snip>
-
->>>> +static int pm800_clk_remove(struct platform_device *pdev)
->>>> +{
->>>> +    struct pm800_clk *pm800_clks = platform_get_drvdata(pdev);
->>>> +    int i;
->>>> +
->>>> +    of_clk_del_provider(pm800_clks[0].clk_np);
->>>> +    /* Drop the reference obtained in pm800_clk_parse_dt */
->>>> +    of_node_put(pm800_clks[0].clk_np);
->>>
->>> This is odd. Why are we keeping the reference in the driver?
->>>
->>
->> Honestly I do not have any good answer here. I have to admit that it is
->> getting carry forwarded from legacy driver.
->>
+On 07/21/2015 06:07 PM, Marc Zyngier wrote:
+> The irqdomain code is not entierely really ACPI friendly, as it has
+> some built-in knowledge of the device-tree. Nothing too harmful, but
+> enough to scare the ARM ACPI developpers which end up with their own
+> version of the square wheel.
 >
-> Well we shouldn't do things if we don't know why we're doing them.
-> Krzysztof?
+> This small patch series adapt the irqdomain code to remove the hurdles
+> that prevent the full blown irqdomain subsystem to be used on ACPI,
+> creates an interface between the GSI layer and the irqdomain, and as
+> an example, convert the ARM GIC ACPI support to use irqdomains as
+> originally intended.
 >
+> Overall, this gives us a way to use irqdomains on both DT and ACPI
+> enabled platforms, having very little changes made to the actual
+> drivers (other than the probing infrastructure). Because we keep the
+> flow of information between the various layers identical between ACPI
+> and DT, we immediately benefit from the existing infrastructure.
+>
+> I'd really like to hear what people think of that approach, as it
+> looks to me a lot simpler than the other approaches currently put on
+> the list. The "convert the GSI information to be DT friendly" is
+> admitedly not very pretty, but I see it as a stepping stone towards
+> unifying the two structures.
+>
+> This has been test-booted on Juno, and is based on my irq/ncpi-msi-2
+> branch.
 
-Hold on,
-After looking more in to this, it seems we really do not need it.
-It is already taken care by
+Thank you very much for putting them together, really appreciated. I
+will comment on each patch and test them.
 
-of_clk_add_provider() and
-of_clk_del_provider()
-
-Sorry for not investigating this before. Just left out from my eyes
-somehow.
-
-
-Actually I can cleanup clk-s2mps11.c driver as well, but only thing is
-I can validate it, as I do not have platform to test it.
-It should be trivial changes.
-
-If somebody can help me out in validation I can submit the patch for
-clk-s2mps11.c driver as well.
-
-Thanks,
-Vaibhav
+Thanks
+Hanjun
