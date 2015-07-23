@@ -1,60 +1,148 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 23 Jul 2015 17:26:40 +0200
-Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
- providers
-In-Reply-To: <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55B107B0.5010706@i2se.com>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Thu, 23 Jul 2015 21:05:29 +0530
+Subject: [PATCH v2 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
+In-Reply-To: <55A7CE59.6010600@ti.com>
+References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
+ <1433332284-10766-3-git-send-email-vigneshr@ti.com>
+ <alpine.DEB.2.02.1507152029460.32764@utopia.booyaka.com>
+ <55A7CE59.6010600@ti.com>
+Message-ID: <55B109C1.80901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas,
 
-Am 20.07.2015 um 16:43 schrieb Srinivas Kandagatla:
-> This patch adds just providers part of the framework just to enable easy
-> review.
->
-> Up until now, NVMEM drivers like eeprom were stored in drivers/misc,
-> where they all had to duplicate pretty much the same code to register
-> a sysfs file, allow in-kernel users to access the content of the devices
-> they were driving, etc.
->
-> This was also a problem as far as other in-kernel users were involved,
-> since the solutions used were pretty much different from on driver to
-> another, there was a rather big abstraction leak.
->
-> This introduction of this framework aims at solving this. It also
-> introduces DT representation for consumer devices to go get the data
-> they require (MAC Addresses, SoC/Revision ID, part numbers, and so on)
-> from the nvmems.
->
-> Having regmap interface to this framework would give much better
-> abstraction for nvmems on different buses.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [Maxime Ripard: intial version of eeprom framework]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/Kconfig                |   2 +
->  drivers/Makefile               |   1 +
->  drivers/nvmem/Kconfig          |  13 ++
->  drivers/nvmem/Makefile         |   6 +
->  drivers/nvmem/core.c           | 384 +++++++++++++++++++++++++++++++++++++++++
->  include/linux/nvmem-consumer.h |  23 +++
->  include/linux/nvmem-provider.h |  47 +++++
->  7 files changed, 476 insertions(+)
->  create mode 100644 drivers/nvmem/Kconfig
->  create mode 100644 drivers/nvmem/Makefile
->  create mode 100644 drivers/nvmem/core.c
->  create mode 100644 include/linux/nvmem-consumer.h
->  create mode 100644 include/linux/nvmem-provider.h
 
-i've tested this patch with my mxs-ocotp driver [1].
-
-So you can add
-
-Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+On 7/16/2015 9:01 PM, R, Vignesh wrote:
+> Hi,
+> 
+> On 07/16/2015 03:24 AM, Paul Walmsley wrote:
+>> Hi,
+>>
+>> some comments.
+>>
+>> On Wed, 3 Jun 2015, Vignesh R wrote:
+>>
+>>> Add hwmod entries for the PWMSS on DRA7.
+>>>
+>>> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
+>>> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
+>>> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
+>>> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
+>>> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
+>>
+>> Is the divide-by-two coming from PWMSS_EPWM.EPWM_TBCTL[HSPCLKDIV]?  Or is 
+>> HSPCLKDIV a separate divider after the divide-by-2 you mention above?
+> 
+> No, it not related to HSPCLKDIV. The TRM wrongly states L4PER2_L3_GICLK
+> as clock input for PWMSS. But actually  L4PER2_L4_GICLK(=L3_GICLK/2) is
+> the clock input for PWMSS. This will be updated in TRM soon.
+> 
+>>
+>>> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> ---
+>>>
+>>> v2:
+>>>  * add TRM references.
+>>>
+>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 239 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 239 insertions(+)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> index 0e64c2fac0b5..86a7ac9a3138 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+>>> @@ -362,6 +362,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
+>>>  	},
+>>>  };
+>>>  
+>>> +/* pwmss  */
+>>> +static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
+>>> +	.rev_offs	= 0x0,
+>>> +	.sysc_offs	= 0x4,
+>>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_RESET_STATUS,
+>>
+>> This doesn't match SPRUHZ6 Table 29-13 "PWMSS_SYSCONFIG".  There's no 
+>> RESETSTATUS bit.  There is a SOFTRESET bit. 
+>>
+>> Could you please confirm whether this is intentional?
+> 
+> sorry my bad... I will change this in v3.
+> 
+>>
+>>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+>>> +	.sysc_fields	= &omap_hwmod_sysc_type2,
+>>> +};
+>>> +
+>>> +struct omap_hwmod_class dra7xx_epwmss_hwmod_class = {
+>>> +	.name		= "epwmss",
+>>> +	.sysc		= &dra7xx_epwmss_sysc,
+>>> +};
+>>> +
+>>> +static struct omap_hwmod_class dra7xx_ecap_hwmod_class = {
+>>> +	.name		= "ecap",
+>>> +};
+>>> +
+>>> +static struct omap_hwmod_class dra7xx_eqep_hwmod_class = {
+>>> +	.name		= "eqep",
+>>> +};
+>>> +
+>>> +struct omap_hwmod_class dra7xx_ehrpwm_hwmod_class = {
+>>> +	.name		= "ehrpwm",
+>>> +};
+>>> +
+>>> +/* epwmss0 */
+>>> +struct omap_hwmod dra7xx_epwmss0_hwmod = {
+>>> +	.name		= "epwmss0",
+>>> +	.class		= &dra7xx_epwmss_hwmod_class,
+>>> +	.clkdm_name	= "l4per2_clkdm",
+>>> +	.main_clk	= "l4_root_clk_div",
+>>> +	.prcm		= {
+>>> +		.omap4	= {
+>>> +			.modulemode	= MODULEMODE_SWCTRL,
+>>> +			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS1_CLKCTRL_OFFSET,
+>>> +			.context_offs	= DRA7XX_RM_L4PER2_PWMSS1_CONTEXT_OFFSET,
+>>> +		},
+>>> +	},
+>>
+>> Per my comment on the previous patch, sounds like it might be better to 
+>> mark this as HWMOD_SWSUP_SIDLE?  Then again, see the next comment below 
+>> re: main_clk.
+>>
+>>> +};
+>>> +
+>>> +/* ecap0 */
+>>> +struct omap_hwmod dra7xx_ecap0_hwmod = {
+>>> +	.name		= "ecap0",
+>>> +	.class		= &dra7xx_ecap_hwmod_class,
+>>> +	.clkdm_name	= "l4per2_clkdm",
+>>> +	.main_clk	= "l4_root_clk_div",
+>>
+>> Looking at SPRUHZ6 Section 29.1.4.2 "PWMSS Modules Local Clock Gating", 
+>> there appears to be a local "mini-PRCM" for the PWMSS which implements 
+>> clock gating and reports back on the status of what I'd guess is the local 
+>> clock gating FSM.
+>>
+>> So from that point of view, you should probably create a clock driver that 
+>> manages both the clock gate request bit and the FSM status bit.  It should 
+>> be something that can be reused for the other PWMSS IP blocks.  Then 
+>> you'd create per-IP block clock nodes and set the main_clk to point to 
+>> that node.
+>>
+> 
+> Since, this register is within the config space of PWMSS, the individual
+> gating and reporting for the modules within PWMSS
+> (PWMSS_CLKCONFIG) is currently being taken care by pwm-tipwmss.c(almost
+> the sole function this driver is doing). It has been the same since
+> am335x. Adding new clock nodes will result in driver changes and also
+> changes to am335x, am437x (and other platforms) hwmod files. It also
+> involves adding new nodes to clocks.dtsi and it will be difficult to
+> maintain backward compatibility for older platforms. Is it not better to
+> keep this as is, in order to maintain consistency (with am335x, am437x
+> etc) and also that these clock bits are within IP's config space?
+> 
+ping...
 
 Regards
-Stefan
+Vignesh
