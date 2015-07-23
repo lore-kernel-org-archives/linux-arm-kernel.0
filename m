@@ -1,180 +1,104 @@
-From: djkurtz@google.com (Daniel Kurtz)
-Date: Thu, 23 Jul 2015 22:40:38 +0800
-Subject: [PATCH v3 6/6] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <1437037475-9065-7-git-send-email-yong.wu@mediatek.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-7-git-send-email-yong.wu@mediatek.com>
-Message-ID: <CAGS+omB5xS8LoQR9-S8iqhdsRb4OWQ_B656dJSincLZ9nby1ZA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jul 2015 15:46:01 +0100
+Subject: [PATCH v3] mfd: atmel-hlcdc: implement config synchronization
+In-Reply-To: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150723144601.GF3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yong,
+On Tue, 07 Jul 2015, Boris Brezillon wrote:
 
-On Thu, Jul 16, 2015 at 5:04 PM, Yong Wu <yong.wu@mediatek.com> wrote:
->
-> This patch add the iommu/larbs nodes for mt8173
-
-To what tree does this apply?
-Please rebase these patches (especially this one) on an Matthias'
-current v4.2-next/for-next.
-
-
->
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> Some HLCDC registers cannot be written until the hardware has finished
+> applying the previous configuration request. If they are written while
+> an action is still in progress, the new configuration might be silently
+> ignored, resulting in unpredictable behavior.
+> 
+> Hide the config synchronization stuff in a regmap implementation and use
+> this implementation instead of the generic mmio one.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
 > ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   81 ++++++++++++++++++++++++++++++
->  1 file changed, 81 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index e81ac1f..7b8e73c 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -14,6 +14,7 @@
->  #include <dt-bindings/clock/mt8173-clk.h>
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/memory/mt8173-larb-port.h>
->  #include <dt-bindings/power/mt8173-power.h>
->  #include <dt-bindings/reset-controller/mt8173-resets.h>
->  #include "mt8173-pinfunc.h"
-> @@ -240,6 +241,17 @@
->                         reg = <0 0x10200620 0 0x20>;
->                 };
->
-> +               iommu: mmsys_iommu at 10205000 {
+> Changes since v2:
+>  - reword the commit message
+> 
+> Changes since v1:
+>  - add a 100 usec timeout
+> ---
+>  drivers/mfd/atmel-hlcdc.c | 35 +++++++++++++++++++++++++++++++++--
+>  1 file changed, 33 insertions(+), 2 deletions(-)
 
-This name should be generic, like this (this comment really applies to
-the binding patch):
+Applied, thanks.
 
-   iommu: iommu at 10205000
-
-> +                       compatible = "mediatek,mt8173-m4u";
-> +                       reg = <0 0x10205000 0 0x1000>;
-> +                       interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-> +                       clocks = <&infracfg CLK_INFRA_M4U>;
-> +                       clock-names = "bclk";
-> +                       mediatek,larb = <&larb0 &larb1 &larb2
-> +                                       &larb3 &larb4 &larb5>;
-
-Tiny nit... please align the "&".
-
-Otherwise, this one is:
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
-Thanks!
--Dan
-
-> +                       #iommu-cells = <2>;
-> +               };
-> +
->                 apmixedsys: clock-controller at 10209000 {
->                         compatible = "mediatek,mt8173-apmixedsys";
->                         reg = <0 0x10209000 0 0x1000>;
-> @@ -401,29 +413,98 @@
->                         #clock-cells = <1>;
->                 };
->
-> +               larb0: larb at 14021000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x14021000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +                       clocks = <&mmsys CLK_MM_SMI_LARB0>,
-> +                                <&mmsys CLK_MM_SMI_LARB0>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
-> +               smi_common: smi at 14022000 {
-> +                       compatible = "mediatek,mt8173-smi";
-> +                       reg = <0 0x14022000 0 0x1000>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +                       clocks = <&mmsys CLK_MM_SMI_COMMON>,
-> +                                <&mmsys CLK_MM_SMI_COMMON>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
-> +               larb4: larb at 14027000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x14027000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> +                       clocks = <&mmsys CLK_MM_SMI_LARB4>,
-> +                                <&mmsys CLK_MM_SMI_LARB4>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
->                 imgsys: imgsys at 15000000 {
->                         compatible = "mediatek,mt8173-imgsys", "syscon";
->                         reg = <0 0x15000000 0 0x1000>;
->                         #clock-cells = <1>;
->                 };
->
-> +               larb2: larb at 15001000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x15001000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-> +                       clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-> +                                <&imgsys CLK_IMG_LARB2_SMI>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
->                 vdecsys: vdecsys at 16000000 {
->                         compatible = "mediatek,mt8173-vdecsys", "syscon";
->                         reg = <0 0x16000000 0 0x1000>;
->                         #clock-cells = <1>;
->                 };
->
-> +               larb1: larb at 16010000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x16010000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-> +                       clocks = <&vdecsys CLK_VDEC_CKEN>,
-> +                                <&vdecsys CLK_VDEC_LARB_CKEN>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
->                 vencsys: vencsys at 18000000 {
->                         compatible = "mediatek,mt8173-vencsys", "syscon";
->                         reg = <0 0x18000000 0 0x1000>;
->                         #clock-cells = <1>;
->                 };
->
-> +               larb3: larb at 18001000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x18001000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-> +                       clocks = <&vencsys CLK_VENC_CKE1>,
-> +                                <&vencsys CLK_VENC_CKE0>;
-> +                       clock-names = "apb", "smi";
-> +               };
-> +
->                 vencltsys: vencltsys at 19000000 {
->                         compatible = "mediatek,mt8173-vencltsys", "syscon";
->                         reg = <0 0x19000000 0 0x1000>;
->                         #clock-cells = <1>;
->                 };
-> +
-> +               larb5: larb at 19001000 {
-> +                       compatible = "mediatek,mt8173-smi-larb";
-> +                       reg = <0 0x19001000 0 0x1000>;
-> +                       mediatek,smi = <&smi_common>;
-> +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-> +                       clocks = <&vencltsys CLK_VENCLT_CKE1>,
-> +                                <&vencltsys CLK_VENCLT_CKE0>;
-> +                       clock-names = "apb", "smi";
-> +               };
->         };
+> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
+> index cfd58f4..04e01cc 100644
+> --- a/drivers/mfd/atmel-hlcdc.c
+> +++ b/drivers/mfd/atmel-hlcdc.c
+> @@ -18,6 +18,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/iopoll.h>
+>  #include <linux/mfd/atmel-hlcdc.h>
+>  #include <linux/mfd/core.h>
+>  #include <linux/module.h>
+> @@ -37,11 +38,41 @@ static const struct mfd_cell atmel_hlcdc_cells[] = {
+>  	},
 >  };
->
-> --
-> 1.7.9.5
->
-
-
+>  
+> +static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
+> +					unsigned int val)
+> +{
+> +	void __iomem *regs = context;
+> +
+> +	if (reg <= ATMEL_HLCDC_DIS) {
+> +		u32 status;
+> +
+> +		readl_poll_timeout(regs + ATMEL_HLCDC_SR, status,
+> +				   !(status & ATMEL_HLCDC_SIP), 1, 100);
+> +	}
+> +
+> +	writel(val, regs + reg);
+> +
+> +	return 0;
+> +}
+> +
+> +static int regmap_atmel_hlcdc_reg_read(void *context, unsigned int reg,
+> +				       unsigned int *val)
+> +{
+> +	void __iomem *regs = context;
+> +
+> +	*val = readl(regs + reg);
+> +
+> +	return 0;
+> +}
+> +
+>  static const struct regmap_config atmel_hlcdc_regmap_config = {
+>  	.reg_bits = 32,
+>  	.val_bits = 32,
+>  	.reg_stride = 4,
+>  	.max_register = ATMEL_HLCDC_REG_MAX,
+> +	.reg_write = regmap_atmel_hlcdc_reg_write,
+> +	.reg_read = regmap_atmel_hlcdc_reg_read,
+> +	.fast_io = true,
+>  };
+>  
+>  static int atmel_hlcdc_probe(struct platform_device *pdev)
+> @@ -82,8 +113,8 @@ static int atmel_hlcdc_probe(struct platform_device *pdev)
+>  		return PTR_ERR(hlcdc->slow_clk);
+>  	}
+>  
+> -	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
+> -					      &atmel_hlcdc_regmap_config);
+> +	hlcdc->regmap = devm_regmap_init(dev, NULL, regs,
+> +					 &atmel_hlcdc_regmap_config);
+>  	if (IS_ERR(hlcdc->regmap))
+>  		return PTR_ERR(hlcdc->regmap);
+>  
 
 -- 
-Daniel Kurtz | Software Engineer | djkurtz at google.com | 650.204.0722
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
