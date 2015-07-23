@@ -1,48 +1,35 @@
-From: denis@eukrea.com (Denis Carikli)
-Date: Thu, 23 Jul 2015 10:31:12 +0200
-Subject: [PATCH v2] ARM: dts: i.MX35: Fix can support.
-In-Reply-To: <20150722180434.GA745@pengutronix.de>
-References: <20150722180434.GA745@pengutronix.de>
-Message-ID: <1437640272-5054-1-git-send-email-denis@eukrea.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 23 Jul 2015 14:04:24 +0530
+Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc
+ clocks
+In-Reply-To: <55B03CE9.4050903@codeaurora.org>
+References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
+ <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
+ <55B03CE9.4050903@codeaurora.org>
+Message-ID: <55B0A710.9080209@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 3d42a379b6fa5b46058e3302b1802b29f64865bb
-("can: flexcan: add 2nd clock to support imx53 and newer")
-the can driver requires a dt nodes to have a second clock.
-Add them to imx35 to fix probing the flex can driver on the
-respective platforms.
+On 07/23/2015 06:31 AM, Stephen Boyd wrote:
+> On 07/22/2015 12:10 AM, Rajendra Nayak wrote:
+>> @@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain
+>> *domain)
+>>       return gdsc_toggle_logic(sc, false);
+>>   }
+>> +static int gdsc_attach(struct generic_pm_domain *domain, struct
+>> device *dev)
+>> +{
+>> +    int ret;
+>> +    struct gdsc *sc = domain_to_gdsc(domain);
+>> +    char **con_id, *con_ids[] = { "core", "iface", NULL };
+>
+> const?
+>
+> This is where I get scared of sniffing too much SoC glue. What's to
+> enforce the "core", and "iface" naming scheme? What's to enforce there
+> being two clocks vs. one? Maybe a better approach would be to use
+> of_clk_get() and iterate through all clocks of the device, or to encode
+> the clock names in the gdsc structure.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
----
- arch/arm/boot/dts/imx35.dtsi | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
-index b6478e9..e6540b5 100644
---- a/arch/arm/boot/dts/imx35.dtsi
-+++ b/arch/arm/boot/dts/imx35.dtsi
-@@ -286,8 +286,8 @@
- 			can1: can at 53fe4000 {
- 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fe4000 0x1000>;
--				clocks = <&clks 33>;
--				clock-names = "ipg";
-+				clocks = <&clks 33>, <&clks 33>;
-+				clock-names = "ipg", "per";
- 				interrupts = <43>;
- 				status = "disabled";
- 			};
-@@ -295,8 +295,8 @@
- 			can2: can at 53fe8000 {
- 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
- 				reg = <0x53fe8000 0x1000>;
--				clocks = <&clks 34>;
--				clock-names = "ipg";
-+				clocks = <&clks 34>, <&clks 34>;
-+				clock-names = "ipg", "per";
- 				interrupts = <44>;
- 				status = "disabled";
- 			};
--- 
-2.4.5
+I had the clock names in the gdsc structure in v5. I should probably go
+back to having it that way.
