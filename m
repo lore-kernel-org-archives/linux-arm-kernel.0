@@ -1,49 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 15:52:40 +0100
-Subject: [PATCH v5 04/19] PCI/MSI: Add hooks to populate the msi_domain
- field
-In-Reply-To: <20150723130637.GR21967@google.com>
-References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
- <1437643598-19795-5-git-send-email-marc.zyngier@arm.com>
- <20150723130637.GR21967@google.com>
-Message-ID: <55B0FFB8.3030506@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jul 2015 15:45:06 +0100
+Subject: [PATCH 2/2] MAINTAINERS: add an entry for the Maxim MAX77802
+ PMIC drivers
+In-Reply-To: <1437121078-26409-3-git-send-email-javier@osg.samsung.com>
+References: <1437121078-26409-1-git-send-email-javier@osg.samsung.com>
+ <1437121078-26409-3-git-send-email-javier@osg.samsung.com>
+Message-ID: <20150723144506.GE3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/07/15 14:06, Bjorn Helgaas wrote:
-> On Thu, Jul 23, 2015 at 10:26:23AM +0100, Marc Zyngier wrote:
->> In order to be able to populate the device msi_domain field,
->> add the necessary hooks to propagate the host bridge msi_domain
->> across secondary busses to devices.
->>
->> So far, nobody populates the initial msi_domain.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+On Fri, 17 Jul 2015, Javier Martinez Canillas wrote:
+
+> I added support for the max77802 drivers and have been maintaining them.
+> So add an entry for these drivers to make tools like get_maintainer.pl
+> to work and make people submitting patches add me to the CC list.
 > 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
->> +static void pci_set_msi_domain(struct pci_dev *dev)
->> +{
->> +	/*
->> +	 * If no domain has been set through the pcibios callback,
->> +	 * inherit the default from the bus device.
+> ---
 > 
-> Nit: there isn't a pcibios callback anymore.
+>  MAINTAINERS | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 
-There is actually one, in pci_add_device:
+Applied, thanks.
 
-	[...]
-	ret = pcibios_add_device(dev);
-	WARN_ON(ret < 0);
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index d802d19a4ecc..5d964568f207 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6570,6 +6570,14 @@ S:	Supported
+>  F:	drivers/power/max14577_charger.c
+>  F:	drivers/power/max77693_charger.c
+>  
+> +MAXIM MAX77802 MULTIFUNCTION PMIC DEVICE DRIVERS
+> +M:	Javier Martinez Canillas <javier@osg.samsung.com>
+> +L:	linux-kernel at vger.kernel.org
+> +S:	Supported
+> +F:	drivers/*/*max77802.c
+> +F:	Documentation/devicetree/bindings/*/*max77802.txt
+> +F:	include/dt-bindings/*/*max77802.h
+> +
+>  MAXIM PMIC AND MUIC DRIVERS FOR EXYNOS BASED BOARDS
+>  M:	Chanwoo Choi <cw00.choi@samsung.com>
+>  M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-	/* Setup MSI irq domain */
-	pci_set_msi_domain(dev);
-	[...]
-
-pcibios_add_device is the one I was referring to. I'll clarify the comment.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
