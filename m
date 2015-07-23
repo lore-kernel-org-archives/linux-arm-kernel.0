@@ -1,109 +1,25 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 23 Jul 2015 21:48:57 +0200
-Subject: [PATCH v7 1/2] mfd: devicetree: add bindings for Atmel Flexcom
-In-Reply-To: <60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
-References: <cover.1437669004.git.cyrille.pitchen@atmel.com>
- <60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150723214857.4322c758@bbrezillon>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 23 Jul 2015 15:07:52 -0500
+Subject: [PATCH] drivers: qcom: Select QCOM_SCM unconditionally for QCOM_PM
+In-Reply-To: <20150714215412.GC24088@qualcomm.com>
+References: <55A01D84.8070701@ti.com>
+ <1436559480-9239-1-git-send-email-lina.iyer@linaro.org>
+ <20150714215412.GC24088@qualcomm.com>
+Message-ID: <20150723200752.GA23662@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015 18:42:55 +0200
-Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
-
-> This patch documents the DT bindings for the Atmel Flexcom which will be
-> introduced by sama5d2x SoCs. These bindings will be used by the actual
-> Flexcom driver to be sent in another patch.
+On Tue, Jul 14, 2015 at 04:54:12PM -0500, Andy Gross wrote:
+> On Fri, Jul 10, 2015 at 02:18:00PM -0600, Lina Iyer wrote:
+> > Enable QCOM_SCM for QCOM power management driver
+> > 
+> > Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 > 
-> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> ---
->  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
->  1 file changed, 68 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> new file mode 100644
-> index 000000000000..a63226b7a9cb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
-> @@ -0,0 +1,68 @@
-> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
-> +
-> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
-> +controller and an USART. Only one function can be used at a time and is chosen
-> +at boot time according to the device tree.
-> +
-> +Required properties:
-> +- compatible:		Should be "atmel,sama5d2-flexcom"
-> +- reg:			Should be the pair (offset, size) for the Flexcom
-> +			dedicated I/O registers (without USART, TWI or SPI
-> +			registers).
-> +- clocks:		Should be the Flexcom peripheral clock from PMC.
-> +- #address-cells:	Should be <2>
-> +- #size-cells:		Should be <1>
-> +- ranges:		Should be a list of ranges.
-> +			One range per peripheral wrapped by the Flexcom. So each
-> +			range is a triplet (child_addr, parent_addr, size). The
-> +			first u32 of "child_addr" is the value to be set in the
-> +			Operating Mode bitfield of the Flexcom Mode Register.
-> +			Then "parent_addr" stores the base address of the
-> +			corresponding peripheral in the system memory. Finally,
-> +			"size" if the size of the memory region of this
-> +			peripheral.
-> +
-> +Required child:
-> +A single available child for the serial controller to enable.
-> +
-> +Required properties of this child:
-> +- reg:			Should be a pair (child_addr, size) with child_addr
-> +			matching one of the parent ranges.
-> +- clocks:		Should be the very same phandle as for the parent's one.
-> +
-> +Other properties remain unchanged. See documentation of the respective device:
-> +- ../serial/atmel-usart.txt
-> +- ../spi/spi_atmel.txt
-> +- ../i2c/i2c-at91.txt
-> +
-> +Example:
-> +
-> +flexcom at f8034000 {
-> +	compatible = "atmel,sama5d2-flexcom";
-> +	reg = <0xf8034000 0x200>;
-> +	clocks = <&flx0_clk>;
-> +	#address-cells = <2>;
-> +	#size-cells = <1>;
-> +	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
-> +		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
-> +		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
-> +
-> +	spi at f8034400 {
+> Acked-by: Andy Gross <agross@codeaurora.org>
 
-Should be:
-
-	spi at 2,0 {
-
-> +		compatible = "atmel,at91rm9200-spi";
-> +		reg = <2 0 0x200>;
-> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_flx0_default>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		clocks = <&flx0_clk>;
-> +		clock-names = "spi_clk";
-> +		atmel,fifo-size = <32>;
-> +
-> +		mtd_dataflash at 0 {
-> +			compatible = "atmel,at25f512b";
-> +			reg = <0>;
-> +			spi-max-frequency = <20000000>;
-> +		};
-> +	};
-> +};
-
-
+Applied.
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
