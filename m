@@ -1,68 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Jul 2015 12:55:55 +0100
-Subject: [PATCH 1/2] devicetree: bindings: rtc: add bindings for xilinx
- zynqmp rtc
-In-Reply-To: <1437648710-6857-1-git-send-email-suneel.garapati@xilinx.com>
-References: <1437648710-6857-1-git-send-email-suneel.garapati@xilinx.com>
-Message-ID: <20150723115555.GC12330@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 23 Jul 2015 13:00:03 +0100
+Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <20150721123830.GD25887@localhost>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+ <1437481411-1595-7-git-send-email-james.morse@arm.com>
+ <20150721123830.GD25887@localhost>
+Message-ID: <20150723120002.GB445@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 11:51:49AM +0100, Suneel Garapati wrote:
-> adds file for description on device node bindings for RTC
-> found on Xilinx Zynq Ultrascale+ MPSoC.
+On Tue, Jul 21, 2015 at 01:38:31PM +0100, Catalin Marinas wrote:
+> On Tue, Jul 21, 2015 at 01:23:31PM +0100, James Morse wrote:
+> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> > index 94d98cd1aad8..149a36ea9673 100644
+> > --- a/arch/arm64/mm/fault.c
+> > +++ b/arch/arm64/mm/fault.c
+> > @@ -30,9 +30,11 @@
+> >  #include <linux/highmem.h>
+> >  #include <linux/perf_event.h>
+> >  
+> > +#include <asm/cpufeature.h>
+> >  #include <asm/exception.h>
+> >  #include <asm/debug-monitors.h>
+> >  #include <asm/esr.h>
+> > +#include <asm/sysreg.h>
+> >  #include <asm/system_misc.h>
+> >  #include <asm/pgtable.h>
+> >  #include <asm/tlbflush.h>
+> > @@ -147,6 +149,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+> >  		__do_kernel_fault(mm, addr, esr, regs);
+> >  }
+> >  
+> > +static bool pan_enabled(struct pt_regs *regs)
+> > +{
+> > +	if (IS_ENABLED(CONFIG_ARM64_PAN))
+> > +		return ((regs->pstate & PSR_PAN_BIT) != 0);
 > 
-> Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
-> ---
->  Documentation/devicetree/bindings/rtc/xlnx-rtc.txt | 25 ++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/xlnx-rtc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/xlnx-rtc.txt b/Documentation/devicetree/bindings/rtc/xlnx-rtc.txt
-> new file mode 100644
-> index 0000000..2b05243
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/xlnx-rtc.txt
-> @@ -0,0 +1,25 @@
-> +* Xilinx Zynq Ultrascale+ MPSoC Real Time Clock
-> +
-> +RTC controller for the Xilinx Zynq MPSoC Real Time Clock
-> +Separate IRQ lines for seconds and alarm
-> +
-> +Required properties:
-> +- compatible: Should be "xlnx,zynqmp-rtc"
-> +- reg: Physical base address of the controller and length
-> +       of memory mapped region.
-> +- interrupts: IRQ lines for the RTC.
-> +- interrupt names: Names for interrupt lines
+> Nitpick: no brackets needed for return.
 
-interrupt-names has a '-', and you need to state which names are
-expected.
+Couldn't we just write this function as:
 
-> +
-> +Optional:
-> +- calibration: calibration value for 1 sec period which will
-> +		be programmed directly to calibration register
+  return IS_ENABLED(CONFIG_ARM64_PAN) && (regs->pstate & PSR_PAN_BIT);
 
-When and why would I set this?
+?
 
-Mark.
-
-> +
-> +Example:
-> +rtc: rtc at ffa60000 {
-> +	compatible = "xlnx,zynqmp-rtc";
-> +	reg = <0x0 0xffa60000 0x100>;
-> +	interrupt-parent = <&gic>;
-> +	interrupts = <0 26 4>, <0 27 4>;
-> +	interrupt-names = "alm", "sec";
-> +	calibration = <0x198233>;
-> +};
-> --
-> 2.1.2
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Will
