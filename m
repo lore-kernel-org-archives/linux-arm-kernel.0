@@ -1,187 +1,488 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Jul 2015 22:21:17 +0200
-Subject: [PATCH v2] ARM: dts: rockchip: Add veyron-speedy board
-In-Reply-To: <1437670249-9510-1-git-send-email-romain.perier@gmail.com>
-References: <1437670249-9510-1-git-send-email-romain.perier@gmail.com>
-Message-ID: <2973046.XRmeZKJr7n@diego>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Thu, 23 Jul 2015 17:38:08 -0300
+Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <55AEE8F5.3020700@roeck-us.net>
+References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <55AEE8F5.3020700@roeck-us.net>
+Message-ID: <55B150B0.9020100@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Romain,
+Hi Guenter,
 
-I've applied the patch to my dts branch for 4.3 after fixing some smallish 
-issues:
+El 21/07/15 a las 21:51, Guenter Roeck escibi?:
+> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
+>> This commit adds support for the watchdog timer found in NXP LPC SoCs
+>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
+>> share the same watchdog hardware.
+>>
+>> Watchdog driver registers a restart handler that will restart the system
+>> by performing an incorrect feed after ensuring the watchdog is enabled in
+>> reset mode.
+>>
+>> As watchdog cannot be disabled in hardware, driver's stop routine will
+>> regularly send a keepalive ping using a timer.
+>>
+>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+> 
+> Hi Ariel,
+> 
+> sorry for the delayed response. Comments below.
+> 
+> Guenter
+> 
+>> ---
+>>   drivers/watchdog/Kconfig       |  11 ++
+>>   drivers/watchdog/Makefile      |   1 +
+>>   drivers/watchdog/lpc18xx_wdt.c | 344
+>> +++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 356 insertions(+)
+>>   create mode 100644 drivers/watchdog/lpc18xx_wdt.c
+>>
+>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>> index 742fbbc..af5e2e3 100644
+>> --- a/drivers/watchdog/Kconfig
+>> +++ b/drivers/watchdog/Kconfig
+>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
+>>         To compile this driver as a module, choose M here: the
+>>         module will be called digicolor_wdt.
+>>
+>> +config LPC18XX_WATCHDOG
+>> +    tristate "LPC18xx/43xx Watchdog"
+>> +    depends on ARCH_LPC18XX || COMPILE_TEST
+>> +    select WATCHDOG_CORE
+>> +    help
+>> +      Say Y here if to include support for the watchdog timer
+>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
+>> +      processors.
+>> +      To compile this driver as a module, choose M here: the
+>> +      module will be called lpc18xx_wdt.
+>> +
+>>   # AVR32 Architecture
+>>
+>>   config AT32AP700X_WDT
+>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+>> index 59ea9a1..1b0ef48 100644
+>> --- a/drivers/watchdog/Makefile
+>> +++ b/drivers/watchdog/Makefile
+>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>>   obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+>>   obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+>>   obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
+>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
+>>
+>>   # AVR32 Architecture
+>>   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
+>> b/drivers/watchdog/lpc18xx_wdt.c
+>> new file mode 100644
+>> index 0000000..2b489fc
+>> --- /dev/null
+>> +++ b/drivers/watchdog/lpc18xx_wdt.c
+>> @@ -0,0 +1,344 @@
+>> +/*
+>> + * NXP LPC18xx Watchdog Timer (WDT)
+>> + *
+>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or
+>> modify it
+>> + * under the terms of the GNU General Public License version 2 as
+>> published by
+>> + * the Free Software Foundation.
+>> + *
+>> + * Notes
+>> + * -----
+>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
+>> a 24-bit
+>> + * counter which decrements on every clock cycle.
+>> + *
+>> + */
+>> +
+>> +#include <linux/clk.h>
+>> +#include <linux/io.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/reboot.h>
+>> +#include <linux/watchdog.h>
+>> +
+>> +/* Registers */
+>> +#define LPC18XX_WDT_MOD            0x00
+>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
+>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
+>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
+> 
+> Not used.
 
-
-Am Donnerstag, 23. Juli 2015, 18:50:49 schrieb Romain Perier:
-> Which is formally known as The Asus C201 chromebook
-
-						^ typo the with small "t"
+That's right. I'll remove it.
 
 > 
-> Signed-off-by: Romain Perier <romain.perier@gmail.com>
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
-> ---
+>> +
+>> +#define LPC18XX_WDT_TC            0x04
+>> +#define LPC18XX_WDT_TC_MIN        0xff
+>> +#define LPC18XX_WDT_TC_MAX        0xffffff
+>> +
+>> +#define LPC18XX_WDT_FEED        0x08
+>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
+>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
+>> +
+>> +#define LPC18XX_WDT_TV            0x0c
+>> +
+>> +/* Clock pre-scaler */
+>> +#define LPC18XX_WDT_CLK_DIV        4
+>> +
+>> +/* Timeout values in seconds */
+>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
+>> +
 > 
-> Changes in v2:
->  - Remove dvs-gpio (not used in mainline yet)
->  - Remove edp subnode in pinctrl (not used in mainline yet)
->  - Reordering disable-wp correctly
+> This is (still) really low for Linux. Something like min(30, max_timeout)
+> might make more sense.
+
+Remember that hardware limits timeout to a maximum value of 5.
+
+As you said before we could use a soft timer, but I not sure that's a
+good idea. As Ezequiel said [0], it might be adding bloat and we must
+consider that this watchdog controller is included in cortex-M MCUs.
+
+[0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
+
 > 
->  Documentation/devicetree/bindings/arm/rockchip.txt |  10 +-
->  arch/arm/boot/dts/Makefile                         |   3 +-
->  arch/arm/boot/dts/rk3288-veyron-speedy.dts         | 155
-> +++++++++++++++++++++ 3 files changed, 166 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/boot/dts/rk3288-veyron-speedy.dts
+>> +static int heartbeat;
+>> +module_param(heartbeat, int, 0);
+>> +MODULE_PARM_DESC(heartbeat, "Watchdog heartbeats in seconds "
+>> +    "(default=" __MODULE_STRING(LPC18XX_WDT_DEF_TIMEOUT) ")");
+>> +
+>> +static bool nowayout = WATCHDOG_NOWAYOUT;
+>> +module_param(nowayout, bool, 0);
+>> +MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
+>> +    "(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+>> +
+>> +static DEFINE_SPINLOCK(wdt_lock);
+>> +
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt
-> b/Documentation/devicetree/bindings/arm/rockchip.txt index
-> 6de18bd2..da02022 100644
-> --- a/Documentation/devicetree/bindings/arm/rockchip.txt
-> +++ b/Documentation/devicetree/bindings/arm/rockchip.txt
-> @@ -37,4 +37,12 @@ Rockchip platforms device tree bindings
->  - Google Pinky (dev-board):
->      Required root node properties:
->        - compatible = "google,veyron-pinky-rev2", "google,veyron-pinky",
-> -		     "google,veyron", "rockchip,rk3288";
-> \ No newline at end of file
-> +		     "google,veyron", "rockchip,rk3288";
-> +
-> +- Google Speedy (Asus C201 Chromebook):
-> +    Required root node properties:
-> +      - compatible = "google,veyron-speedy-rev9",
-> "google,veyron-speedy-rev8", +		     "google,veyron-speedy-rev7",
-> "google,veyron-speedy-rev6",
-> +		     "google,veyron-speedy-rev5", "google,veyron-speedy-rev4",
-> +		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
-> +		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 4993b3b..bf5225a 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -490,7 +490,8 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
->  	rk3288-firefly-beta.dtb \
->  	rk3288-firefly.dtb \
->  	rk3288-veyron-jerry.dtb \
-> -	rk3288-veyron-pinky.dtb
-> +	rk3288-veyron-pinky.dtb \
-> +	rk3288-veyron-speedy.dtb
->  dtb-$(CONFIG_ARCH_S3C24XX) += \
->  	s3c2416-smdk2416.dtb
->  dtb-$(CONFIG_ARCH_S3C64XX) += \
+> Why is this lock not defined as part of lpc18xx_wdt_dev ?
 
-both the board description as well as the Makefile did not apply cleanly, as 
-you seem to have based it on some unknown branch.
-Please try to base patches on either linux-next or my version specific topic 
-branch - v4.3-armsoc/dts in this case.
+There's no reason. I'll move it into lpc18xx_wdt_dev, where it should be.
 
+> 
+>> +struct lpc18xx_wdt_dev {
+>> +    struct watchdog_device wdt_dev;
+>> +    struct clk *wdt_clk;
+>> +    struct clk *reg_clk;
+>> +    void __iomem *base;
+>> +    struct timer_list timer;
+>> +    struct notifier_block restart_handler;
+>> +};
+>> +
+>> +static int lpc18xx_wdt_feed(struct watchdog_device *wdt_dev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +    unsigned long flags;
+>> +
+>> +    /*
+>> +     * An abort condition will occur if an interrupt happens during
+>> the feed
+>> +     * sequence.
+>> +     */
+>> +    spin_lock_irqsave(&wdt_lock, flags);
+>> +    writel(LPC18XX_WDT_FEED_MAGIC1, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +    writel(LPC18XX_WDT_FEED_MAGIC2, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +    spin_unlock_irqrestore(&wdt_lock, flags);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static void lpc18xx_wdt_timer_feed(unsigned long data)
+>> +{
+>> +    struct watchdog_device *wdt_dev = (struct watchdog_device *) data;
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +
+>> +    lpc18xx_wdt_feed(wdt_dev);
+>> +
+>> +    /* Use safe value (1/2 of real timeout) */
+>> +    mod_timer(&lpc18xx_wdt->timer, jiffies +
+>> +          msecs_to_jiffies((wdt_dev->timeout * MSEC_PER_SEC) / 2));
+>> +}
+>> +
+>> +/*
+>> + * Since LPC18xx Watchdog cannot be disabled in hardware, we must
+>> keep feeding
+>> + * it with a timer until userspace watchdog software takes over.
+>> + */
+>> +static int lpc18xx_wdt_stop(struct watchdog_device *wdt_dev)
+>> +{
+>> +    lpc18xx_wdt_timer_feed((unsigned long) wdt_dev);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static void __lpc18xx_wdt_set_timeout(struct lpc18xx_wdt_dev
+>> *lpc18xx_wdt)
+>> +{
+>> +    unsigned long clk_rate = clk_get_rate(lpc18xx_wdt->wdt_clk);
+>> +    unsigned int val;
+>> +
+>> +    val = DIV_ROUND_UP(lpc18xx_wdt->wdt_dev.timeout * clk_rate,
+>> +               LPC18XX_WDT_CLK_DIV);
+>> +    writel(val, lpc18xx_wdt->base + LPC18XX_WDT_TC);
+>> +}
+>> +
+>> +static int lpc18xx_wdt_set_timeout(struct watchdog_device *wdt_dev,
+>> +                   unsigned int new_timeout)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +
+>> +    lpc18xx_wdt->wdt_dev.timeout = new_timeout;
+>> +    __lpc18xx_wdt_set_timeout(lpc18xx_wdt);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +
+>> +unsigned int lpc18xx_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +    unsigned long clk_rate = clk_get_rate(lpc18xx_wdt->wdt_clk);
+>> +    unsigned int val;
+>> +
+>> +    val = readl(lpc18xx_wdt->base + LPC18XX_WDT_TV);
+>> +    return (val * LPC18XX_WDT_CLK_DIV) / clk_rate;
+>> +}
+>> +
+>> +static int lpc18xx_wdt_start(struct watchdog_device *wdt_dev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = watchdog_get_drvdata(wdt_dev);
+>> +    unsigned int val;
+>> +
+>> +    if (timer_pending(&lpc18xx_wdt->timer))
+>> +        del_timer(&lpc18xx_wdt->timer);
+>> +
+>> +    val = readl(lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+>> +    val |= LPC18XX_WDT_MOD_WDEN;
+>> +    val |= LPC18XX_WDT_MOD_WDRESET;
+>> +    writel(val, lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+>> +
+>> +    /*
+>> +     * Setting the WDEN bit in the WDMOD register is not sufficient to
+>> +     * enable the Watchdog. A valid feed sequence must be completed
+>> after
+>> +     * setting WDEN before the Watchdog is capable of generating a
+>> reset.
+>> +     */
+>> +    lpc18xx_wdt_feed(wdt_dev);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static struct watchdog_info lpc18xx_wdt_info = {
+>> +    .identity    = "NXP LPC18xx Watchdog",
+>> +    .options    = WDIOF_SETTIMEOUT |
+>> +              WDIOF_KEEPALIVEPING |
+>> +              WDIOF_MAGICCLOSE,
+>> +};
+>> +
+>> +static const struct watchdog_ops lpc18xx_wdt_ops = {
+>> +    .owner        = THIS_MODULE,
+>> +    .start        = lpc18xx_wdt_start,
+>> +    .stop        = lpc18xx_wdt_stop,
+>> +    .ping        = lpc18xx_wdt_feed,
+>> +    .set_timeout    = lpc18xx_wdt_set_timeout,
+>> +    .get_timeleft    = lpc18xx_wdt_get_timeleft,
+>> +};
+>> +
+>> +static int lpc18xx_wdt_restart(struct notifier_block *this, unsigned
+>> long mode,
+>> +                   void *cmd)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = container_of(this,
+>> +                struct lpc18xx_wdt_dev, restart_handler);
+>> +    unsigned long flags;
+>> +    int val;
+>> +
+>> +    /*
+>> +     * Incorrect feed sequence causes immediate watchdog reset if
+>> enabled.
+>> +     */
+>> +    spin_lock_irqsave(&wdt_lock, flags);
+>> +
+>> +    val = readl(lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+>> +    val |= LPC18XX_WDT_MOD_WDEN;
+>> +    val |= LPC18XX_WDT_MOD_WDRESET;
+>> +    writel(val, lpc18xx_wdt->base + LPC18XX_WDT_MOD);
+>> +
+>> +    writel(LPC18XX_WDT_FEED_MAGIC1, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +    writel(LPC18XX_WDT_FEED_MAGIC2, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +
+>> +    writel(LPC18XX_WDT_FEED_MAGIC1, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +    writel(LPC18XX_WDT_FEED_MAGIC1, lpc18xx_wdt->base +
+>> LPC18XX_WDT_FEED);
+>> +
+>> +    spin_unlock_irqrestore(&wdt_lock, flags);
+>> +
+>> +    return NOTIFY_OK;
+>> +}
+>> +
+>> +static int lpc18xx_wdt_probe(struct platform_device *pdev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt;
+>> +    unsigned long clk_rate;
+>> +    struct resource *res;
+>> +    int ret;
+>> +
+>> +    lpc18xx_wdt = devm_kzalloc(&pdev->dev, sizeof(*lpc18xx_wdt),
+>> +                   GFP_KERNEL);
+> 
+> Given how often you use &pdev->dev, it might make sense to have a local
+> variable
+> for it.
+> 
+>     struct device *dev = &pdev->dev;
 
-> diff --git a/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> b/arch/arm/boot/dts/rk3288-veyron-speedy.dts new file mode 100644
-> index 0000000..fdb2a73
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/rk3288-veyron-speedy.dts
-> @@ -0,0 +1,155 @@
-> +/*
-> + * Google Veyron Speedy Rev 1+ board device tree source
-> + *
-> + * Copyright 2015 Google, Inc
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + *  Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +/dts-v1/;
-> +#include "rk3288-veyron-chromebook.dtsi"
-> +#include "cros-ec-sbs.dtsi"
-> +
-> +/ {
-> +	model = "Google Speedy";
-> +	compatible = "google,veyron-speedy-rev9", "google,veyron-speedy-rev8",
-> +		     "google,veyron-speedy-rev7", "google,veyron-speedy-rev6",
-> +		     "google,veyron-speedy-rev5", "google,veyron-speedy-rev4",
-> +		     "google,veyron-speedy-rev3", "google,veyron-speedy-rev2",
-> +		     "google,veyron-speedy", "google,veyron", "rockchip,rk3288";
-> +
-> +	panel_regulator: panel-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio7 14 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&lcd_enable_h>;
-> +		regulator-name = "panel_regulator";
-> +		vin-supply = <&vcc33_sys>;
-> +	};
-> +
-> +	vcc18_lcd: vcc18-lcd {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio2 13 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&avdd_1v8_disp_en>;
-> +		regulator-name = "vcc18_lcd";
-> +		regulator-always-on;
-> +		regulator-boot-on;
-> +		vin-supply = <&vcc18_wl>;
-> +	};
-> +
-> +	backlight_regulator: backlight-regulator {
-> +		compatible = "regulator-fixed";
-> +		enable-active-high;
-> +		gpio = <&gpio2 12 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&bl_pwr_en>;
-> +		regulator-name = "backlight_regulator";
-> +		vin-supply = <&vcc33_sys>;
-> +		startup-delay-us = <15000>;
-> +	};
-> +};
-> +
-> +&rk808 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pmic_int_l &dvs_1 &dvs_2>;
+OK. Will do that.
 
-removed the dvs_1 and dvs_2 pinctrl accesses here.
+> 
+> 
+>> +    if (!lpc18xx_wdt)
+>> +        return -ENOMEM;
+>> +
+>> +    res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +    lpc18xx_wdt->base = devm_ioremap_resource(&pdev->dev, res);
+>> +    if (IS_ERR(lpc18xx_wdt->base))
+>> +        return PTR_ERR(lpc18xx_wdt->base);
+>> +
+>> +    lpc18xx_wdt->reg_clk = devm_clk_get(&pdev->dev, "reg");
+>> +    if (IS_ERR(lpc18xx_wdt->reg_clk)) {
+>> +        dev_err(&pdev->dev, "failed to get the reg clock\n");
+>> +        return PTR_ERR(lpc18xx_wdt->reg_clk);
+>> +    }
+>> +
+>> +    lpc18xx_wdt->wdt_clk = devm_clk_get(&pdev->dev, "wdtclk");
+>> +    if (IS_ERR(lpc18xx_wdt->wdt_clk)) {
+>> +        dev_err(&pdev->dev, "failed to get the wdt clock\n");
+>> +        return PTR_ERR(lpc18xx_wdt->wdt_clk);
+>> +    }
+>> +
+>> +    ret = clk_prepare_enable(lpc18xx_wdt->reg_clk);
+>> +    if (ret) {
+>> +        dev_err(&pdev->dev, "could not prepare or enable sys clock\n");
+>> +        return ret;
+>> +    }
+>> +
+>> +    ret = clk_prepare_enable(lpc18xx_wdt->wdt_clk);
+>> +    if (ret) {
+>> +        dev_err(&pdev->dev, "could not prepare or enable wdt clock\n");
+>> +        goto disable_reg_clk;
+>> +    }
+>> +
+>> +    /* We use the clock rate to calculate timeouts */
+>> +    clk_rate = clk_get_rate(lpc18xx_wdt->wdt_clk);
+>> +    if (clk_rate == 0) {
+>> +        dev_err(&pdev->dev, "failed to get clock rate\n");
+>> +        ret = -EINVAL;
+>> +        goto disable_wdt_clk;
+>> +    }
+>> +
+> It might make sense to store clk_rate locally so you don't have to read it
+> at runtime.
 
-The pin definitions below are staying, but I'd like to completely keep from 
-using the pins until the support lands. The binding change seems to have made 
-it today, but I'd like to wait until the regulator change also gets accepted 
-too.
+OK. Will do that.
 
-
-Heiko
+> 
+>> +    lpc18xx_wdt->wdt_dev.info = &lpc18xx_wdt_info;
+>> +    lpc18xx_wdt->wdt_dev.ops = &lpc18xx_wdt_ops;
+>> +    lpc18xx_wdt->wdt_dev.timeout = LPC18XX_WDT_DEF_TIMEOUT;
+>> +
+>> +    lpc18xx_wdt->wdt_dev.min_timeout = DIV_ROUND_UP(LPC18XX_WDT_TC_MIN *
+>> +                        LPC18XX_WDT_CLK_DIV, clk_rate);
+>> +
+>> +    lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
+>> +                        LPC18XX_WDT_CLK_DIV) / clk_rate;
+>> +
+>> +    lpc18xx_wdt->wdt_dev.parent = &pdev->dev;
+>> +    watchdog_set_drvdata(&lpc18xx_wdt->wdt_dev, lpc18xx_wdt);
+>> +
+>> +    ret = watchdog_init_timeout(&lpc18xx_wdt->wdt_dev, heartbeat,
+>> +                    &pdev->dev);
+>> +
+>> +    __lpc18xx_wdt_set_timeout(lpc18xx_wdt);
+>> +
+>> +    setup_timer(&lpc18xx_wdt->timer, lpc18xx_wdt_timer_feed,
+>> +            (unsigned long)&lpc18xx_wdt->wdt_dev);
+>> +
+>> +    watchdog_set_nowayout(&lpc18xx_wdt->wdt_dev, nowayout);
+>> +
+>> +    platform_set_drvdata(pdev, lpc18xx_wdt);
+>> +
+>> +    ret = watchdog_register_device(&lpc18xx_wdt->wdt_dev);
+>> +    if (ret)
+>> +        goto disable_wdt_clk;
+>> +
+>> +    lpc18xx_wdt->restart_handler.notifier_call = lpc18xx_wdt_restart;
+>> +    lpc18xx_wdt->restart_handler.priority = 128;
+>> +    ret = register_restart_handler(&lpc18xx_wdt->restart_handler);
+>> +    if (ret)
+>> +        dev_warn(&pdev->dev, "failed to register restart handler: %d\n",
+>> +             ret);
+>> +
+>> +    return 0;
+>> +
+>> +disable_wdt_clk:
+>> +    clk_disable_unprepare(lpc18xx_wdt->wdt_clk);
+>> +disable_reg_clk:
+>> +    clk_disable_unprepare(lpc18xx_wdt->reg_clk);
+>> +    return ret;
+>> +}
+>> +
+>> +static void lpc18xx_wdt_shutdown(struct platform_device *pdev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = platform_get_drvdata(pdev);
+>> +
+>> +    lpc18xx_wdt_stop(&lpc18xx_wdt->wdt_dev);
+>> +}
+>> +
+>> +static int lpc18xx_wdt_remove(struct platform_device *pdev)
+>> +{
+>> +    struct lpc18xx_wdt_dev *lpc18xx_wdt = platform_get_drvdata(pdev);
+>> +
+>> +    unregister_restart_handler(&lpc18xx_wdt->restart_handler);
+>> +
+>> +    dev_warn(&pdev->dev, "I quit now, hardware will probably
+>> reboot!\n");
+>> +    del_timer(&lpc18xx_wdt->timer);
+>> +
+>> +    watchdog_unregister_device(&lpc18xx_wdt->wdt_dev);
+>> +    clk_disable_unprepare(lpc18xx_wdt->wdt_clk);
+>> +    clk_disable_unprepare(lpc18xx_wdt->reg_clk);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +static const struct of_device_id lpc18xx_wdt_match[] = {
+>> +    { .compatible = "nxp,lpc1850-wwdt" },
+>> +    {}
+>> +};
+>> +MODULE_DEVICE_TABLE(of, lpc18xx_wdt_match);
+>> +
+>> +static struct platform_driver lpc18xx_wdt_driver = {
+>> +    .driver = {
+>> +        .name = "lpc18xx-wdt",
+>> +        .of_match_table    = lpc18xx_wdt_match,
+>> +    },
+>> +    .probe = lpc18xx_wdt_probe,
+>> +    .remove = lpc18xx_wdt_remove,
+>> +    .shutdown = lpc18xx_wdt_shutdown,
+>> +};
+>> +module_platform_driver(lpc18xx_wdt_driver);
+>> +
+>> +MODULE_AUTHOR("Ariel D'Alessandro <ariel@vanguardiasur.com.ar>");
+>> +MODULE_DESCRIPTION("NXP LPC18xx Watchdog Timer Driver");
+>> +MODULE_LICENSE("GPL v2");
+>>
+> 
