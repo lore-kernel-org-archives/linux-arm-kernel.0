@@ -1,90 +1,100 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Thu, 23 Jul 2015 18:18:08 +0100
-Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn
- in the grant structure
-In-Reply-To: <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
- <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
-Message-ID: <55B121D0.8070507@citrix.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Thu, 23 Jul 2015 20:23:26 +0300
+Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
+References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
+ <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <CALW4P+K5PqVxPehWcSX2-t_rENpsV_RB7TNeJ9sN-EdZUOXm4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+Hi Lee,
 
-On 16/07/15 16:11, Stefano Stabellini wrote:
-> On Thu, 9 Jul 2015, Julien Grall wrote:
->> All the usage of the field pfn are done using the same idiom:
->>
->> pfn_to_page(grant->pfn)
->>
->> This will  return always the same page. Store directly the page in the
->> grant to clean up the code.
->>
->> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> Cc: Roger Pau Monn? <roger.pau@citrix.com>
->> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> Cc: David Vrabel <david.vrabel@citrix.com>
->> ---
->>     Changes in v2:
->>         - Patch added
->> ---
->>  drivers/block/xen-blkfront.c | 37 ++++++++++++++++++-------------------
->>  1 file changed, 18 insertions(+), 19 deletions(-)
->>
->> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
->> index 7107d58..7b81d23 100644
->> --- a/drivers/block/xen-blkfront.c
->> +++ b/drivers/block/xen-blkfront.c
->> @@ -67,7 +67,7 @@ enum blkif_state {
->>  
->>  struct grant {
->>  	grant_ref_t gref;
->> -	unsigned long pfn;
->> +	struct page *page;
->>  	struct list_head node;
->>  };
->>  
->> @@ -219,7 +219,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
->>  				kfree(gnt_list_entry);
->>  				goto out_of_memory;
->>  			}
->> -			gnt_list_entry->pfn = page_to_pfn(granted_page);
->> +			gnt_list_entry->page = granted_page;
->>  		}
->>  
->>  		gnt_list_entry->gref = GRANT_INVALID_REF;
->> @@ -234,7 +234,7 @@ out_of_memory:
->>  	                         &info->grants, node) {
->>  		list_del(&gnt_list_entry->node);
->>  		if (info->feature_persistent)
->> -			__free_page(pfn_to_page(gnt_list_entry->pfn));
->> +			__free_page(gnt_list_entry->page);
->>  		kfree(gnt_list_entry);
->>  		i--;
->>  	}
->> @@ -243,7 +243,7 @@ out_of_memory:
->>  }
->>  
->>  static struct grant *get_grant(grant_ref_t *gref_head,
->> -                               unsigned long pfn,
->> +			       struct page *page,
->>                                 struct blkfront_info *info)
-> 
-> indentation
+On Fri, Jul 17, 2015 at 3:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> ST's platforms currently support a maximum of 5 Mailboxes, one for
+> each of the supported co-processors situated on the platform.  Each
+> Mailbox is divided up into 4 instances which consist of 32 channels.
+> Messages are passed between the application and co-processors using
+> shared memory areas.  It is the Client's responsibility to manage
+> these areas.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/mailbox/Kconfig       |   7 +
+>  drivers/mailbox/Makefile      |   2 +
+>  drivers/mailbox/mailbox-sti.c | 562 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 571 insertions(+)
+>  create mode 100644 drivers/mailbox/mailbox-sti.c
 
-The indentation of the parameters wasn't valid. I will indent correctly
-"struct blkfront_info *info" rather than to use invalid indent.
+[..]
+
+> +static irqreturn_t sti_mbox_thread_handler(int irq, void *data)
+> +{
+> +       struct sti_mbox_device *mdev = data;
+> +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
+> +       struct mbox_chan *chan;
+> +       unsigned int instance;
+> +
+> +       for (instance = 0; instance < pdata->num_inst; instance++) {
+> +keep_looking:
+> +               chan = sti_mbox_irq_to_channel(mdev, instance);
+> +               if (!chan)
+> +                       continue;
+> +
+> +               mbox_chan_received_data(chan, NULL);
+> +               sti_mbox_clear_irq(chan);
+> +               sti_mbox_enable_channel(chan);
+> +               goto keep_looking;
+> +       }
+> +
+> +       return IRQ_HANDLED;
+> +}
+> +
+> +static irqreturn_t sti_mbox_irq_handler(int irq, void *data)
+> +{
+> +       struct sti_mbox_device *mdev = data;
+> +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
+> +       struct sti_channel *chan_info;
+> +       struct mbox_chan *chan;
+> +       unsigned int instance;
+> +       int ret = IRQ_NONE;
+> +
+> +       for (instance = 0; instance < pdata->num_inst; instance++) {
+> +               chan = sti_mbox_irq_to_channel(mdev, instance);
+> +               if (!chan)
+> +                       continue;
+> +               chan_info = chan->con_priv;
+> +
+> +               if (!sti_mbox_channel_is_enabled(chan)) {
+> +                       dev_warn(mdev->dev,
+> +                                "Unexpected IRQ: %s\n"
+> +                                "  instance: %d: channel: %d [enabled: %x]\n",
+> +                                mdev->name, chan_info->instance,
+> +                                chan_info->channel, mdev->enabled[instance]);
+> +                       ret = IRQ_HANDLED;
+> +                       continue;
+> +               }
+> +
+> +               sti_mbox_disable_channel(chan);
+> +               ret = IRQ_WAKE_THREAD;
+> +       }
+> +
+> +       if (ret == IRQ_NONE)
+> +               dev_err(mdev->dev, "Spurious IRQ - was a channel requested?\n");
+> +
+> +       return ret;
+> +}
+
+With such usage of ret variable can it happen that handling of last
+but one channel/instance will set ret to IRQ_WAKE_THREAD and at the
+same time handling of last channel/instance will set ret to
+IRQ_HANDLED during iteration loop and finally generic subsystem will
+not wake up thread handler because it will receive IRQ_HANDLED?
+Just checking.
 
 
-> Aside from this:
-> 
-> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-Thank you,
-
-Regards,
+[..]
 
 -- 
-Julien Grall
+Thanks,
+Alexey Klimov
