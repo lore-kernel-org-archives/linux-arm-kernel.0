@@ -1,111 +1,110 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 23 Jul 2015 19:06:04 +0100
-Subject: [PATCH v4 1/5] ARM/PCI: remove align_resource in pci_sys_data
-In-Reply-To: <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
-References: <1437461323-3531-1-git-send-email-wangzhou1@hisilicon.com>
- <1437461323-3531-2-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <20150723180604.GD23324@red-moon>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Thu, 23 Jul 2015 11:26:11 -0700
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <55B131C3.8050009@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ing Thomas and Jason for pci-mvebu]
+On 07/23/2015 09:52 AM, Mark Rutland wrote:
+[...]
+> +MSI clients
+> +===========
+> +
+> +MSI clients are devices which generate MSIs. For each MSI they wish to
+> +generate, the doorbell and payload may be configured, though sideband
+> +information may not be configurable.
+> +
+> +Required properties:
+> +--------------------
+> +
+> +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
+> +  controller which the device is capable of using.
+> +
 
-On Tue, Jul 21, 2015 at 07:48:39AM +0100, Zhou Wang wrote:
-> This patch is needed in order to unify the PCIe designware framework for ARM and
-> ARM64 architectures. In the PCIe designware unification process we are calling
-> pci_create_root_bus() passing a "sysdata" parameter that is the same for both
-> ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
-> cause a problem with the function pcibios_align_resource(); in fact this will
-> cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
-> "struct pcie_port*" pointer.
-> 
-> This patch solves the issue by removing "align_resource" from "pci_sys_data"
-> struct and defining a static global function pointer in "bios32.c"
-> 
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+We say here that "msi-parent" consists of pairs ...
 
-Arnd, Rob any opinion on this ? It is really the last blocking bit
-to having common ARM/ARM64 drivers (and get rid of pci_sys_data) so I
-would like to get this sorted asap (having a global function pointer
-might be a temporary solution before moving it to the host bridge
-structure).
+> +  This property is unordered, and MSIs may be allocated from any combination of
+> +  MSI controllers listed in the msi-parent property.
+> +
+> +  If a device has restrictions on the allocation of MSIs, these restrictions
+> +  must be described with additional properties.
+> +
+> +  When #msi-cells is non-zero, busses with an msi-parent will require
+> +  additional properties to describe the relationship between devices on the bus
+> +  and the set of MSIs they can potentially generate.
+> +
+> +
+> +Example
+> +=======
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	msi_a: msi-controller at a {
+> +		reg = <0xa 0xf00>;
+> +		compatible = "vendor-a,some-controller";
+> +		msi-controller;
+> +		/* No sideband data, so #msi-cells omitted */
+> +	};
+> +
+> +	msi_b: msi-controller at b {
+> +		reg = <0xb 0xf00>;
+> +		compatible = "vendor-b,another-controller";
+> +		msi-controller;
+> +		/* Each device has some unique ID */
+> +		#msi-cells = <1>;
+> +	};
+> +
+> +	msi_c: msi-controller at c {
+> +		reg = <0xb 0xf00>;
+> +		compatible = "vendor-b,another-controller";
+> +		msi-controller;
+> +		/* Each device has some unique ID */
+> +		#msi-cells = <1>;
+> +	};
+> +
+> +	dev at 0 {
+> +		reg = <0x0 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +
+> +		/* Can only generate MSIs to msi_a */
+> +		msi-parent = <&msi_a>;
 
-Comments welcome.
 
-Thanks !
-Lorenzo
+My device-tree syntax foo is a little rusty, but doesn't "msi-parent" 
+need a pair of elements?  This has only the phandle.
 
-> ---
->  arch/arm/include/asm/mach/pci.h |  5 -----
->  arch/arm/kernel/bios32.c        | 12 ++++++++----
->  2 files changed, 8 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> index 28b9bb3..8a4e4de 100644
-> --- a/arch/arm/include/asm/mach/pci.h
-> +++ b/arch/arm/include/asm/mach/pci.h
-> @@ -58,11 +58,6 @@ struct pci_sys_data {
->  					/* IRQ mapping				*/
->  	int		(*map_irq)(const struct pci_dev *, u8, u8);
->  					/* Resource alignement requirements	*/
-> -	resource_size_t (*align_resource)(struct pci_dev *dev,
-> -					  const struct resource *res,
-> -					  resource_size_t start,
-> -					  resource_size_t size,
-> -					  resource_size_t align);
->  	void		*private_data;	/* platform controller private data	*/
->  };
->  
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1..4cdc64d 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -17,6 +17,11 @@
->  #include <asm/mach/pci.h>
->  
->  static int debug_pci;
-> +static resource_size_t (*align_resource)(struct pci_dev *dev,
-> +		  const struct resource *res,
-> +		  resource_size_t start,
-> +		  resource_size_t size,
-> +		  resource_size_t align) = NULL;
->  
->  #ifdef CONFIG_PCI_MSI
->  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
-> @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
->  		sys->busnr   = busnr;
->  		sys->swizzle = hw->swizzle;
->  		sys->map_irq = hw->map_irq;
-> -		sys->align_resource = hw->align_resource;
-> +		align_resource = hw->align_resource;
->  		INIT_LIST_HEAD(&sys->resources);
->  
->  		if (hw->private_data)
-> @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  				resource_size_t size, resource_size_t align)
->  {
->  	struct pci_dev *dev = data;
-> -	struct pci_sys_data *sys = dev->sysdata;
->  	resource_size_t start = res->start;
->  
->  	if (res->flags & IORESOURCE_IO && start & 0x300)
-> @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
->  
->  	start = (start + align - 1) & ~(align - 1);
->  
-> -	if (sys->align_resource)
-> -		return sys->align_resource(dev, res, start, size, align);
-> +	if (align_resource)
-> +		return align_resource(dev, res, start, size, align);
->  
->  	return start;
->  }
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +	};
+> +
+> +	dev at 1 {
+> +		reg = <0x1 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +
+> +		/*
+> +		 * Can generate MSIs to either A or B.
+> +		 */
+> +		msi-parent = <&msi_a>, <&msi_b 0x17>;
+
+
+... same here, ...
+
+> +	};
+> +
+> +	dev at 2 {
+> +		reg = <0x2 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +		/*
+> +		 * Has different IDs at each MSI controller.
+> +		 * Can generate MSIs to all of the MSI controllers.
+> +		 */
+> +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
+
+... and here
+
+> +	};
+> +};
+>
