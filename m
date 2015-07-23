@@ -1,107 +1,86 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 23 Jul 2015 18:09:20 +0200
-Subject: [PATCH v2 3/4] mfd: Add DT binding for Maxim MAX77802 IC
-In-Reply-To: <20150723151652.GK3436@x1>
-References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
- <1437114567-17629-4-git-send-email-javier@osg.samsung.com>
- <20150723151652.GK3436@x1>
-Message-ID: <55B111B0.7000803@osg.samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 23 Jul 2015 09:10:55 -0700
+Subject: [PATCH v2 1/2] watchdog: add wdt suspend/resume support
+In-Reply-To: <1437630551-39650-2-git-send-email-eddie.huang@mediatek.com>
+References: <1437630551-39650-1-git-send-email-eddie.huang@mediatek.com>
+ <1437630551-39650-2-git-send-email-eddie.huang@mediatek.com>
+Message-ID: <55B1120F.7010204@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
-
-Thanks for your feedback.
-
-On 07/23/2015 05:16 PM, Lee Jones wrote:
-> On Fri, 17 Jul 2015, Javier Martinez Canillas wrote:
-> 
->> The MAX77802 is a chip that contains regulators, 2 32kHz clocks,
->> a RTC and an I2C interface to program the individual components.
->>
->> The are already DT bindings for the regulators and clocks and
->> these reference to a bindings/mfd/max77802.txt file, that didn't
->> exist, for the details about the PMIC.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->> Changes in v2:
->> - Use the correct "maxim,max77802" compatible string.
->>   Suggested by Krzysztof Kozlowski
->> - Use a pmic generic node name for the max77802 node example.
->>   Suggested by Sergei Shtylyov.
->>
->>  Documentation/devicetree/bindings/mfd/max77802.txt | 26 ++++++++++++++++++++++
->>  1 file changed, 26 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/max77802.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/max77802.txt b/Documentation/devicetree/bindings/mfd/max77802.txt
->> new file mode 100644
->> index 000000000000..c60cdec50d36
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/max77802.txt
->> @@ -0,0 +1,26 @@
->> +Maxim MAX77802 multi-function device
->> +
->> +The Maxim MAX77802 is a power management chip (PMIC) that contains 10 high
->> +efficiency Buck regulators, 32 Low-dropout (LDO) regulators used to power
-> 
-> Would be good to capitalise the works in the acronyms, so
-> "Low-DropOut" and "Power Management IC".
+On 07/22/2015 10:49 PM, Eddie Huang wrote:
+> From: Greta Zhang <greta.zhang@mediatek.com>
 >
-
-Ok.
- 
->> +up application processors and peripherals, a 2-channel 32kHz clock outputs,
->> +a Real-Time-Clock (RTC) and a I2C interface to program the individual
->> +regulators, clocks outputs and the RTC.
->> +
->> +Binding for the built-in 32k clock generator block is defined separately
->> +in the bindings/clk/maxim,max77802.txt file and binding for the regulators
-> 
-> s/bindings/../
+> add wdt driver suspend/resume support
 >
+> Signed-off-by: Greta Zhang <greta.zhang@mediatek.com>
+> Signed-off-by: Roger Lu <roger.lu@mediatek.com>
+> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 
-Ok.
- 
->> +is defined in the bindings/regulator/max77802.txt file.
->> +
->> +Required properties:
->> +- compatible : Must be "maxim,max77802";
->> +- reg : Specifies the i2c slave address of PMIC block.
-> 
-> s/i2c/I2C/
-> 
->> +- interrupts : This i2c device has an IRQ line connected to the main SoC.
-> 
-> As above.
+
+Subject line should identify the driver, ie mtk_wdt.
+"wdt" doesn't really help.
+
+Other than that,
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
+Guenter
+
+> ---
+>   drivers/watchdog/mtk_wdt.c | 30 ++++++++++++++++++++++++++++++
+>   1 file changed, 30 insertions(+)
 >
-
-Ok. I'll change it.
- 
->> +- interrupt-parent : The parent interrupt controller.
->> +
->> +Example:
->> +
->> +	max77802: pmic at 09 {
->> +		compatible = "maxim,max77802";
->> +		interrupt-parent = <&intc>;
->> +		interrupts = <26 0>;
-> 
-> Is there a define in include/dt-bindings/interrupt-controller to
-> replace 0?  IRQ_TYPE_NONE perhaps.
+> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+> index 938b987..056412c 100644
+> --- a/drivers/watchdog/mtk_wdt.c
+> +++ b/drivers/watchdog/mtk_wdt.c
+> @@ -221,17 +221,47 @@ static int mtk_wdt_remove(struct platform_device *pdev)
+>   	return 0;
+>   }
 >
-
-Yes, I'll change that as well.
- 
->> +		reg = <0x09>;
->> +	};
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> +#ifdef CONFIG_PM_SLEEP
+> +static int mtk_wdt_suspend(struct device *dev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&mtk_wdt->wdt_dev))
+> +		mtk_wdt_stop(&mtk_wdt->wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int mtk_wdt_resume(struct device *dev)
+> +{
+> +	struct mtk_wdt_dev *mtk_wdt = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&mtk_wdt->wdt_dev)) {
+> +		mtk_wdt_start(&mtk_wdt->wdt_dev);
+> +		mtk_wdt_ping(&mtk_wdt->wdt_dev);
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> +
+>   static const struct of_device_id mtk_wdt_dt_ids[] = {
+>   	{ .compatible = "mediatek,mt6589-wdt" },
+>   	{ /* sentinel */ }
+>   };
+>   MODULE_DEVICE_TABLE(of, mtk_wdt_dt_ids);
+>
+> +static const struct dev_pm_ops mtk_wdt_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(mtk_wdt_suspend,
+> +				mtk_wdt_resume)
+> +};
+> +
+>   static struct platform_driver mtk_wdt_driver = {
+>   	.probe		= mtk_wdt_probe,
+>   	.remove		= mtk_wdt_remove,
+>   	.driver		= {
+>   		.name		= DRV_NAME,
+> +		.pm		= &mtk_wdt_pm_ops,
+>   		.of_match_table	= mtk_wdt_dt_ids,
+>   	},
+>   };
+>
