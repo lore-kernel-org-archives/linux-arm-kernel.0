@@ -1,72 +1,67 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Thu, 23 Jul 2015 16:50:26 +0100
-Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
- providers
-In-Reply-To: <55B107B0.5010706@i2se.com>
-References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
- <55B107B0.5010706@i2se.com>
-Message-ID: <55B10D42.1020803@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jul 2015 16:52:33 +0100
+Subject: [PATCH 1/4] mfd: 88pm800: Update the header file with 32K clk
+ related macros
+In-Reply-To: <1437476823-3358-2-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437476823-3358-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150723155233.GT3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 21 Jul 2015, Vaibhav Hiremath wrote:
 
+> Update header file with required macros for 32KHz buffered clock
+> output of 88PM800 family of device.
+> These macros will be used in clk provider driver.
+> 
+> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
+> ---
+>  include/linux/mfd/88pm80x.h | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
+> index 05d9bad..680e4eb 100644
+> --- a/include/linux/mfd/88pm80x.h
+> +++ b/include/linux/mfd/88pm80x.h
+> @@ -91,6 +91,7 @@ enum {
+>  /* Referance and low power registers */
+>  #define PM800_LOW_POWER1		(0x20)
+>  #define PM800_LOW_POWER2		(0x21)
+> +#define PM800_LOW_POWER2_XO_LJ_EN	BIT(5)
+>  
+>  #define PM800_LOW_POWER_CONFIG3		(0x22)
+>  #define PM800_LDOBK_FREEZE		BIT(7)
+> @@ -138,6 +139,13 @@ enum {
+>  #define PM800_ALARM			BIT(5)
+>  #define PM800_RTC1_USE_XO		BIT(7)
+>  
+> +#define PM800_32K_OUTX_SEL_MASK		(0x3)
+> +/* 32KHz clk output sel mode */
+> +#define PM800_32K_OUTX_SEL_ZERO		(0x0)
+> +#define PM800_32K_OUTX_SEL_INT_32KHZ	(0x1)
+> +#define PM800_32K_OUTX_SEL_XO_32KHZ	(0x2)
+> +#define PM800_32K_OUTX_SEL_HIZ		(0x3)
 
-On 23/07/15 16:26, Stefan Wahren wrote:
-> Hi Srinivas,
->
-> Am 20.07.2015 um 16:43 schrieb Srinivas Kandagatla:
->> This patch adds just providers part of the framework just to enable easy
->> review.
->>
->> Up until now, NVMEM drivers like eeprom were stored in drivers/misc,
->> where they all had to duplicate pretty much the same code to register
->> a sysfs file, allow in-kernel users to access the content of the devices
->> they were driving, etc.
->>
->> This was also a problem as far as other in-kernel users were involved,
->> since the solutions used were pretty much different from on driver to
->> another, there was a rather big abstraction leak.
->>
->> This introduction of this framework aims at solving this. It also
->> introduces DT representation for consumer devices to go get the data
->> they require (MAC Addresses, SoC/Revision ID, part numbers, and so on)
->> from the nvmems.
->>
->> Having regmap interface to this framework would give much better
->> abstraction for nvmems on different buses.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> [Maxime Ripard: intial version of eeprom framework]
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>   drivers/Kconfig                |   2 +
->>   drivers/Makefile               |   1 +
->>   drivers/nvmem/Kconfig          |  13 ++
->>   drivers/nvmem/Makefile         |   6 +
->>   drivers/nvmem/core.c           | 384 +++++++++++++++++++++++++++++++++++++++++
->>   include/linux/nvmem-consumer.h |  23 +++
->>   include/linux/nvmem-provider.h |  47 +++++
->>   7 files changed, 476 insertions(+)
->>   create mode 100644 drivers/nvmem/Kconfig
->>   create mode 100644 drivers/nvmem/Makefile
->>   create mode 100644 drivers/nvmem/core.c
->>   create mode 100644 include/linux/nvmem-consumer.h
->>   create mode 100644 include/linux/nvmem-provider.h
->
-> i've tested this patch with my mxs-ocotp driver [1].
->
-> So you can add
->
-> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
->
-Thanks for tested-by, That helps.
+Why do these need to be in brackets?
 
---srini
+>  /* Regulator Control Registers: BUCK1,BUCK5,LDO1 have DVC */
+>  
+>  /* buck registers */
+> @@ -208,6 +216,10 @@ enum {
+>  #define PM800_PMOD_MEAS1		0x52
+>  #define PM800_PMOD_MEAS2		0x53
+>  
+> +/* Oscillator control */
+> +#define PM800_OSC_CNTRL1		(0x50)
+> +#define PM800_OSC_CNTRL1_OSC_FREERUN_EN	BIT(1)
+> +
+>  #define PM800_GPADC0_MEAS1		0x54
+>  #define PM800_GPADC0_MEAS2		0x55
+>  #define PM800_GPADC1_MEAS1		0x56
 
-
-
-
-> Regards
-> Stefan
->
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
