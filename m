@@ -1,44 +1,112 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 23 Jul 2015 20:24:06 +0530
-Subject: [PATCH v3 2/2] ARM: dts: am437x-gp-evm: Add wakeup interrupt source
- for pixcir_i2c_tsc
+Date: Thu, 23 Jul 2015 20:24:05 +0530
+Subject: [PATCH v3 1/2] input: touchscreen: pixcir_i2c_ts: Add support for
+ optional wakeup interrupt
 In-Reply-To: <1437663246-16049-1-git-send-email-vigneshr@ti.com>
 References: <1437663246-16049-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1437663246-16049-3-git-send-email-vigneshr@ti.com>
+Message-ID: <1437663246-16049-2-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pixcir_i2c_tsc driver can now wakeup the system from lower power state
-via pinctrl and IO daisy chain using generic wakeirq framwework. Add
-optional wakeup irq entry to allow pixcir_i2c_tsc to wake system from
-low power state.
+On am437x-gp-evm, pixcir touchscreen can wake the system from low power
+state by generating wake-up interrupt via pinctrl and IO daisy chain.
+Add support for optional wakeup interrupt source by regsitering to
+automated wake IRQ framework introduced by commit 4990d4fe327b ("PM /
+Wakeirq: Add automated device wake IRQ handling").
+This is similar in approach to commit 2a0b965cfb6e ("serial: omap: Add
+support for optional wake-up")
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
 
 v3:
- * Drop "irq" suffix from interrupt-names.
+ * handle error code returned by of_irq_get_byname()
 
 v2:
- * Add interrupt-names property.
+ * use of_irq_get_byname()
+ * remove enable/disable_wake_irq()
 
- arch/arm/boot/dts/am437x-gp-evm.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/input/touchscreen/pixcir_i2c_ts.c | 22 ++++++++++++++++++----
+ include/linux/input/pixcir_ts.h           |  1 +
+ 2 files changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am437x-gp-evm.dts b/arch/arm/boot/dts/am437x-gp-evm.dts
-index 84aa30c3235a..99209a137c63 100644
---- a/arch/arm/boot/dts/am437x-gp-evm.dts
-+++ b/arch/arm/boot/dts/am437x-gp-evm.dts
-@@ -503,6 +503,10 @@
+diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+index 8f3e243a62bf..3a4ab358bf52 100644
+--- a/drivers/input/touchscreen/pixcir_i2c_ts.c
++++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+@@ -29,6 +29,8 @@
+ #include <linux/of.h>
+ #include <linux/of_gpio.h>
+ #include <linux/of_device.h>
++#include <linux/of_irq.h>
++#include <linux/pm_wakeirq.h>
  
- 		attb-gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+ #define PIXCIR_MAX_SLOTS       5 /* Max fingers supported by driver */
  
-+		interrupts-extended = <&gpio3 22 GPIO_ACTIVE_HIGH>,
-+				      <&am43xx_pinmux 0x264>;
-+		interrupt-names = "tsc", "wakeup";
+@@ -364,8 +366,6 @@ static int __maybe_unused pixcir_i2c_ts_suspend(struct device *dev)
+ 				goto unlock;
+ 			}
+ 		}
+-
+-		enable_irq_wake(client->irq);
+ 	} else if (input->users) {
+ 		ret = pixcir_stop(ts);
+ 	}
+@@ -386,8 +386,6 @@ static int __maybe_unused pixcir_i2c_ts_resume(struct device *dev)
+ 	mutex_lock(&input->mutex);
+ 
+ 	if (device_may_wakeup(&client->dev)) {
+-		disable_irq_wake(client->irq);
+-
+ 		if (!input->users) {
+ 			ret = pixcir_stop(ts);
+ 			if (ret) {
+@@ -445,6 +443,13 @@ static struct pixcir_ts_platform_data *pixcir_parse_dt(struct device *dev)
+ 	dev_dbg(dev, "%s: x %d, y %d, gpio %d\n", __func__,
+ 		pdata->x_max + 1, pdata->y_max + 1, pdata->gpio_attb);
+ 
++	pdata->wakeirq = of_irq_get_byname(dev->of_node, "wakeup");
++	if (pdata->wakeirq < 0 && pdata->wakeirq != -ENODATA &&
++	    pdata->wakeirq != -EINVAL) {
++		dev_err(dev, "Failed to get wakeirq\n");
++		return ERR_PTR(pdata->wakeirq);
++	}
 +
- 		touchscreen-size-x = <1024>;
- 		touchscreen-size-y = <600>;
- 	};
+ 	return pdata;
+ }
+ #else
+@@ -564,11 +569,20 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+ 	i2c_set_clientdata(client, tsdata);
+ 	device_init_wakeup(&client->dev, 1);
+ 
++	/* Register wakeirq */
++	error = (pdata->wakeirq > 0) ?
++		dev_pm_set_dedicated_wake_irq(dev, pdata->wakeirq) :
++		dev_pm_set_wake_irq(dev, client->irq);
++	if (error)
++		dev_info(dev, "unable to setup wakeirq %d\n",
++			 error);
++
+ 	return 0;
+ }
+ 
+ static int pixcir_i2c_ts_remove(struct i2c_client *client)
+ {
++	dev_pm_clear_wake_irq(&client->dev);
+ 	device_init_wakeup(&client->dev, 0);
+ 
+ 	return 0;
+diff --git a/include/linux/input/pixcir_ts.h b/include/linux/input/pixcir_ts.h
+index 7bae83b7c396..da573de5a5ee 100644
+--- a/include/linux/input/pixcir_ts.h
++++ b/include/linux/input/pixcir_ts.h
+@@ -58,6 +58,7 @@ struct pixcir_ts_platform_data {
+ 	int x_max;
+ 	int y_max;
+ 	int gpio_attb;		/* GPIO connected to ATTB line */
++	int wakeirq;
+ 	struct pixcir_i2c_chip_data chip;
+ };
+ 
 -- 
 2.4.5
