@@ -1,65 +1,59 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 23 Jul 2015 13:57:38 +0000 (UTC)
-Subject: [GIT PULL] ARM: OMAP2+: hwmod fixes for v4.2-rc
-Message-ID: <alpine.DEB.2.02.1507231357020.29543@utopia.booyaka.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Thu, 23 Jul 2015 13:59:32 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <55B0E1AD.60409@arm.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+Message-ID: <CY1PR0301MB0748088CE59C15EDE1FA07F687820@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------BEGIN PGP SIGNED MESSAGE-----
-Hash: SHA1
 
-Hi Tony,
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, July 23, 2015 7:44 AM
+> To: Yoder Stuart-B08248; Catalin Marinas; Will Deacon
+> Cc: linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+> 
+> On 22/07/15 20:49, Stuart Yoder wrote:
+> > Catalin/Will,
+> >
+> > This is not a patch mean to be applied, but a query about whether there
+> > is any reason to not enable 48-bit VA by default in the arm64 defconfig.
+> >
+> > The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
+> > reasons mentioned in [1].
+> >
+> > Based on the comment in [1] by Catalin, it seems that the intent
+> > is to turn this on by default.
+> >
+> > Is there any issues anyone sees with a patch that does this:
+> >
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index 4e17e7e..5acf75d 100644
+> > @@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
+> >  CONFIG_PCI=y
+> >  CONFIG_PCI_MSI=y
+> >  CONFIG_PCI_XGENE=y
+> > +CONFIG_ARM64_VA_BITS_48=y
+> >  CONFIG_SMP=y
+> >  CONFIG_PREEMPT=y
+> >  CONFIG_KSM=y
+> >
+> > Thanks,
+> > Stuart
+> >
+> > [1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
+> >
+> 
+> Is that still a requirement now that our idmap can use 4 levels (as part
+> of dd006da)?
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+Thanks for the pointer... it looks like the patch series you referenced
+solves the issue, so the defconfig change is not needed.  We're currently
+on 4.0, and I guess need to get to 4.1.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.2-rc/omap-fixes-a
-
-for you to fetch changes up to 9a258afa928b45e6dd2efcac46ccf7eea705d35a:
-
-  ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc (2015-07-23 06:35:25 -0600)
-
-- ----------------------------------------------------------------
-ARM: OMAP2+: hwmod fixes for v4.2-rc
-
-Two fixes against v4.2-rc1.  The first, for DRA7xx platforms,
-corrects some incorrect GPMC hardware description data.  The
-second one will ensure that the hwmod code will wait for any
-module with CPU-accessible registers to become ready before
-attempting to access it.
-
-Basic build, boot, and PM test logs are available here:
-
-http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2-rc/20150723065408/
-
-Note that I do not have a DRA7xx or AM43xx board, and therefore
-cannot test on those platforms.
-
-- ----------------------------------------------------------------
-Roger Quadros (2):
-      ARM: DRA7: hwmod: fix gpmc hwmod
-      ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc
-
- arch/arm/mach-omap2/omap_hwmod.c          | 24 ++++++++++++++++--------
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  5 ++---
- 2 files changed, 18 insertions(+), 11 deletions(-)
------BEGIN PGP SIGNATURE-----
-Version: GnuPG v1
-
-iQIcBAEBAgAGBQJVsPKkAAoJEMePsQ0LvSpLcXoP/1WSdYaC65HEPHJjDV3Wpq5L
-vKmjqXnLiYzcpdjX7ByTa0SiUwMRNie4P0N1Zm0yTjRCoJIrnmAI/GB9ZXq/E7wN
-RTTZoEaq+Cqt69JY4xySL8ASTgXPMZkelNOH9JO8/yMWHKE3WEDnhDJ32QN/3Isf
-WF7GDJQC/utlHS4BgFoQBpBv2LSgrqrt+TsX1CKqWhvVTd4moPNBXtNoCb7VC5P3
-ciuUWNFi4y+g1zAPyhe/Q1bzRyDRefEFUesyRx3aHGpTd3VLHWvSK9tEqSjt+EM4
-LA/l5lRHjAFcTGuSBRytpE1zhPW7+gSWgFLsJYDnfXmo7Sp9IgFr3Dcbcj++Sbj0
-HD64ZXQPfn0WRPphZNh8h6+KWVfXv9x8pLmAzy7zn2w7qPBEWMurjbdvUSF2aczZ
-tU+kf+YAyOwA36Goj+NeBqdno0lHPU7++HeHywx5znNFpExqQ+r/T0pOqAmDxPJS
-PFUSE67ax+AkIyS9syCaTDYrj3Al5pOvqjWdMgtETKZdfDbK1r5dFdv+ywO1hIKj
-Y5/n8rBfRZRL33Y6pd/kvEf9y7vMgMMhUDfEX1QJoh0karrvLPJGtBQhRs11n11Q
-PZ+MOh5I6ZPz3zTlcAyCqKVeebcJN5DQmuntuK3raDDllPGGrgPO2vNsjbqSC9DO
-+z4jg0SH51c0LgK/Eum5
-=UnJq
------END PGP SIGNATURE-----
+Thanks,
+Stuart
