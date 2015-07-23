@@ -1,48 +1,99 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 23 Jul 2015 10:36:54 -0500
-Subject: [PATCH v5 04/19] PCI/MSI: Add hooks to populate the msi_domain
- field
-In-Reply-To: <55B0FFB8.3030506@arm.com>
-References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
- <1437643598-19795-5-git-send-email-marc.zyngier@arm.com>
- <20150723130637.GR21967@google.com> <55B0FFB8.3030506@arm.com>
-Message-ID: <CAErSpo5DgUMB4FYrjLXnLf8KFx-KPpd_bCnogSv_nsADuV0tjA@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 23 Jul 2015 16:48:42 +0100
+Subject: [PATCH v8 8/9] nvmem: sunxi: Move the SID driver to the nvmem
+ framework
+In-Reply-To: <2114639619.71276.1437496724946.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1437403462-4432-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <2114639619.71276.1437496724946.JavaMail.open-xchange@oxbsltgw08.schlund.de>
+Message-ID: <55B10CDA.2050801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 9:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 23/07/15 14:06, Bjorn Helgaas wrote:
->> On Thu, Jul 23, 2015 at 10:26:23AM +0100, Marc Zyngier wrote:
->>> In order to be able to populate the device msi_domain field,
->>> add the necessary hooks to propagate the host bridge msi_domain
->>> across secondary busses to devices.
->>>
->>> So far, nobody populates the initial msi_domain.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->>
->>> +static void pci_set_msi_domain(struct pci_dev *dev)
->>> +{
->>> +    /*
->>> +     * If no domain has been set through the pcibios callback,
->>> +     * inherit the default from the bus device.
->>
->> Nit: there isn't a pcibios callback anymore.
->
-> There is actually one, in pci_add_device:
->
->         [...]
->         ret = pcibios_add_device(dev);
->         WARN_ON(ret < 0);
->
->         /* Setup MSI irq domain */
->         pci_set_msi_domain(dev);
->         [...]
->
-> pcibios_add_device is the one I was referring to. I'll clarify the comment.
 
-Oh, right!  I thought you were referring to
-pcibios_set_host_bridge_msi_domain(), which got removed, but of course
-that wouldn't even make sense.
+
+On 21/07/15 17:38, Stefan Wahren wrote:
+> Hi Srinivas,
+>
+>> Srinivas Kandagatla <srinivas.kandagatla@linaro.org> hat am 20. Juli 2015 um
+>> 16:44 geschrieben:
+>>
+>>
+>> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Now that we have the nvmem framework, we can consolidate the common
+>> driver code. Move the driver to the framework, and hopefully, it will
+>> fix the sysfs file creation race.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> [srinivas.kandagatla: Moved to regmap based EEPROM framework]
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>> Documentation/ABI/testing/sysfs-driver-sunxi-sid | 22 ---
+>> .../bindings/misc/allwinner,sunxi-sid.txt | 17 ---
+>> .../bindings/nvmem/allwinner,sunxi-sid.txt | 21 +++
+>> drivers/misc/eeprom/Kconfig | 13 --
+>> drivers/misc/eeprom/Makefile | 1 -
+>> drivers/misc/eeprom/sunxi_sid.c | 156 --------------------
+>> drivers/nvmem/Kconfig | 11 ++
+>> drivers/nvmem/Makefile | 2 +
+>> drivers/nvmem/sunxi_sid.c | 159 +++++++++++++++++++++
+>> 9 files changed, 193 insertions(+), 209 deletions(-)
+>> delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
+>> delete mode 100644
+>> Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
+>> create mode 100644
+>> Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
+>> delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
+>> create mode 100644 drivers/nvmem/sunxi_sid.c
+>>
+>> [...]
+>> -static int sunxi_sid_probe(struct platform_device *pdev)
+>> -{
+>> - struct sunxi_sid_data *sid_data;
+>> - struct resource *res;
+>> - const struct of_device_id *of_dev_id;
+>> - u8 *entropy;
+>> - unsigned int i;
+>> -
+>> - sid_data = devm_kzalloc(&pdev->dev, sizeof(struct sunxi_sid_data),
+>> - GFP_KERNEL);
+>> - if (!sid_data)
+>> - return -ENOMEM;
+>> -
+>> - res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> - sid_data->reg_base = devm_ioremap_resource(&pdev->dev, res);
+>> - if (IS_ERR(sid_data->reg_base))
+>> - return PTR_ERR(sid_data->reg_base);
+>> -
+>> - of_dev_id = of_match_device(sunxi_sid_of_match, &pdev->dev);
+>> - if (!of_dev_id)
+>> - return -ENODEV;
+>> - sid_data->keysize = (int)of_dev_id->data;
+>> -
+>> - platform_set_drvdata(pdev, sid_data);
+>> -
+>> - sid_bin_attr.size = sid_data->keysize;
+>> - if (device_create_bin_file(&pdev->dev, &sid_bin_attr))
+>> - return -ENODEV;
+>> -
+>> - entropy = kzalloc(sizeof(u8) * sid_data->keysize, GFP_KERNEL);
+>> - for (i = 0; i < sid_data->keysize; i++)
+>> - entropy[i] = sunxi_sid_read_byte(sid_data, i);
+>> - add_device_randomness(entropy, sid_data->keysize);
+>> - kfree(entropy);
+>> -
+>
+> in case of porting a driver to a new framework, i would expect the same
+> features.
+> The ported driver do not add the Security ID to the device randomness.
+>
+> What's the reason for this difference?
+Not sure why it was discarded in the first place, but I can put it back 
+which will atleast add some data to random pool.
+
+--srini
+>
+> Regards
+> Stefan
+>
