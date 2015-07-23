@@ -1,66 +1,38 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 22 Jul 2015 22:30:07 -0500
-Subject: [PATCH 3/3] ARM: socfpga: dts: add missing clock gates to socfpga.dtsi
-In-Reply-To: <1437622207-1760-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1437622207-1760-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1437622207-1760-3-git-send-email-dinguyen@opensource.altera.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Thu, 23 Jul 2015 11:39:57 +0800
+Subject: [PATCH v3] regulator: mt6311: Add support for MT6311 regulator 
+Message-ID: <1437622799-28115-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matthew Gerlach <mgerlach@opensource.altera.com>
+This patch set adds support for the MediaTek PMIC mt6311 regulator driver,
+ which adds mt6311 related buck/ldo voltage data to the driver,
+ and creates the regulator_desc table.
 
-The gates for the clocks coming out of the sdram pll
-were missing.  The change adds the missing nodes to
-the device tree.
+Changes in v3:
+- Removed the struct mt6311 since the members of mt6311 were not be necessary.
 
-Signed-off-by: Matthew Gerlach <mgerlach@opensource.altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga.dtsi | 31 ++++++++++++++++++++++++++++++-
- 1 file changed, 30 insertions(+), 1 deletion(-)
+Changes in v2:
+- Re-ordered the sequence of makefile and Kconfig.
+- Specifying the regulator DT bindings by providing of_match and 
+regulators_node in the regulator_desc and delete the DT handling code.
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index b0acaec..86e0fb6 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -481,8 +481,37 @@
- 						clocks = <&f2s_periph_ref_clk>, <&main_qspi_clk>, <&per_qspi_clk>;
- 						clk-gate = <0xa0 11>;
- 					};
-+
-+					ddr_dqs_clk_gate: ddr_dqs_clk_gate {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&ddr_dqs_clk>;
-+						clk-gate = <0xd8 0>;
-+					};
-+
-+					ddr_2x_dqs_clk_gate: ddr_2x_dqs_clk_gate {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&ddr_2x_dqs_clk>;
-+						clk-gate = <0xd8 1>;
-+					};
-+
-+					ddr_dq_clk_gate: ddr_dq_clk_gate {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&ddr_dq_clk>;
-+						clk-gate = <0xd8 2>;
-+					};
-+
-+					h2f_user2_clk: h2f_user2_clk {
-+						#clock-cells = <0>;
-+						compatible = "altr,socfpga-gate-clk";
-+						clocks = <&h2f_usr2_clk>;
-+						clk-gate = <0xd8 3>;
-+					};
-+
- 				};
--			};
-+		};
- 
- 		gmac0: ethernet at ff700000 {
- 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+
+Henry Chen (2):
+  dt-bindings: regulator: mt6311: Add document for mt6311 regulator
+  regulator: mt6311: Add support for mt6311 regulator
+
+ .../bindings/regulator/mt6311-regulator.txt        |  35 ++++
+ drivers/regulator/Kconfig                          |   9 +
+ drivers/regulator/Makefile                         |   1 +
+ drivers/regulator/mt6311-regulator.c               | 183 +++++++++++++++++++++
+ drivers/regulator/mt6311-regulator.h               |  65 ++++++++
+ include/linux/regulator/mt6311.h                   |  29 ++++
+ 6 files changed, 322 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/regulator/mt6311-regulator.txt
+ create mode 100644 drivers/regulator/mt6311-regulator.c
+ create mode 100644 drivers/regulator/mt6311-regulator.h
+ create mode 100644 include/linux/regulator/mt6311.h
+
 -- 
-2.4.5
+1.8.1.1.dirty
