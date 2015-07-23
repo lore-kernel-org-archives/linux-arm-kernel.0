@@ -1,77 +1,24 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jul 2015 18:01:29 -0700
-Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc
- clocks
-In-Reply-To: <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
-Message-ID: <55B03CE9.4050903@codeaurora.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 22 Jul 2015 18:02:58 -0700
+Subject: [PATCH 09/10] arch: introduce memremap()
+In-Reply-To: <20150723005543.GK30479@wotan.suse.de>
+References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150720001822.30857.65670.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150721235848.GI30479@wotan.suse.de>
+ <CAPcyv4jXyHzXUmr1LNL3vTzgced8Onrq9OZR2Ub1E85HnOru1Q@mail.gmail.com>
+ <20150722225557.GJ30479@wotan.suse.de>
+ <CAPcyv4hH7+Dr7NHYXcLfE_-QUwhE9b9tesjjcj4gk4pqJLajBQ@mail.gmail.com>
+ <20150723005543.GK30479@wotan.suse.de>
+Message-ID: <CAPcyv4gwdNV8vbf4O8aVC87xpiwjMfnd9uRLaQ26R95SiaSosg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 12:10 AM, Rajendra Nayak wrote:
-> @@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain *domain)
->   	return gdsc_toggle_logic(sc, false);
->   }
->   
-> +static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
-> +{
-> +	int ret;
-> +	struct gdsc *sc = domain_to_gdsc(domain);
-> +	char **con_id, *con_ids[] = { "core", "iface", NULL };
+On Wed, Jul 22, 2015 at 5:55 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
+> On Wed, Jul 22, 2015 at 04:15:41PM -0700, Dan Williams wrote:
+> Anyway so why is WB and WT allowed if you are going to remove WC and not add UC?
+>
 
-const?
-
-This is where I get scared of sniffing too much SoC glue. What's to 
-enforce the "core", and "iface" naming scheme? What's to enforce there 
-being two clocks vs. one? Maybe a better approach would be to use 
-of_clk_get() and iterate through all clocks of the device, or to encode 
-the clock names in the gdsc structure.
-
-The problem I'm getting at is that we're going through the consumer 
-struct device's mapping of names to clks when we're inside this SoC glue 
-code that has to know about what the consumer has decided to do. This 
-code becomes tightly coupled with that decision that doesn't seem to be 
-under the glue code's control. Using of_clk_get() sidesteps that 
-problem, with the loss of flexibility of deciding which clock does what 
-so at least it's a step in the right direction. But if we want to 
-control individual clocks then we have to know which clock is which. 
-Maybe we should associate clk_hw pointers with the gdscs and then export 
-__clk_hw_create_clk() so that drivers can turn clk_hw pointers into clocks?
-
-> +
-> +	ret = pm_clk_create(dev);
-> +	if (ret) {
-> +		dev_err(dev, "pm_clk_create failed %d\n", ret);
-
-Who cares? debug?
-
-> +		return ret;
-> +	}
-> +
-> +	for (con_id = con_ids; *con_id; con_id++) {
-> +		ret = pm_clk_add(dev, *con_id);
-> +		if (ret) {
-> +			dev_err(dev, "pm_clk_add failed %d\n", ret);
-
-Who cares? debug?
-
-> +			goto fail;
-> +		}
-> +	}
-> +	return 0;
-> +fail:
-> +	pm_clk_destroy(dev);
-> +	return ret;
-> +};
-> +
-> +static void gdsc_detach(struct generic_pm_domain *domain, struct device *dev)
-> +{
-> +	pm_clk_destroy(dev);
-> +	return;
-
-useless return
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Because all existing usages of WB and WT mappings are clearly free of
+I/O side effect concerns.  The WC and now UC usages are a muddy mix of
+"sometimes there's I/O side effects, but it depends by arch and
+driver".
