@@ -1,78 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 14:05:10 +0100
-Subject: [PATCH v2 4/7] acpi: gsi: Always perform an irq domain lookup
-In-Reply-To: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
-References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437656713-9677-5-git-send-email-marc.zyngier@arm.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 23 Jul 2015 08:05:24 -0500
+Subject: [PATCH v5 02/19] PCI: MSI: Register irq domain with specific token
+In-Reply-To: <1437643598-19795-3-git-send-email-marc.zyngier@arm.com>
+References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
+ <1437643598-19795-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20150723130524.GQ21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of directly passing NULL to the various irq_domain functions,
-start by looking up the domain with a domain_token.
+Nit: "PCI/MSI" in subject so it matches the rest.
 
-As domain_token is permanently set to NULL, the lookup function will
-return the same value (no domain found) and the default will be used,
-preserving the current behaviour.
+On Thu, Jul 23, 2015 at 10:26:21AM +0100, Marc Zyngier wrote:
+> When creating a PCI/MSI domain, tag it with DOMAIN_BUS_PCI_MSI so
+> that it can be looked-up using irq_find_matching_host().
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/acpi/gsi.c | 22 +++++++++-------------
- 1 file changed, 9 insertions(+), 13 deletions(-)
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 
-diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-index 38208f2..a745880 100644
---- a/drivers/acpi/gsi.c
-+++ b/drivers/acpi/gsi.c
-@@ -14,6 +14,8 @@
- 
- enum acpi_irq_model_id acpi_irq_model;
- 
-+static void *acpi_gsi_domain_token;
-+
- static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
- {
- 	switch (polarity) {
-@@ -45,12 +47,9 @@ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
-  */
- int acpi_gsi_to_irq(u32 gsi, unsigned int *irq)
- {
--	/*
--	 * Only default domain is supported at present, always find
--	 * the mapping corresponding to default domain by passing NULL
--	 * as irq_domain parameter
--	 */
--	*irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_matching_host(acpi_gsi_domain_token);
-+
-+	*irq = irq_find_mapping(d, gsi);
- 	/*
- 	 * *irq == 0 means no mapping, that should
- 	 * be reported as a failure
-@@ -74,13 +73,9 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
- {
- 	unsigned int irq;
- 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
- 
--	/*
--	 * There is no way at present to look-up the IRQ domain on ACPI,
--	 * hence always create mapping referring to the default domain
--	 * by passing NULL as irq_domain parameter
--	 */
--	irq = irq_create_mapping(NULL, gsi);
-+	irq = irq_create_mapping(d, gsi);
- 	if (!irq)
- 		return -EINVAL;
- 
-@@ -98,7 +93,8 @@ EXPORT_SYMBOL_GPL(acpi_register_gsi);
-  */
- void acpi_unregister_gsi(u32 gsi)
- {
--	int irq = irq_find_mapping(NULL, gsi);
-+	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
-+	int irq = irq_find_mapping(d, gsi);
- 
- 	irq_dispose_mapping(irq);
- }
--- 
-2.1.4
+> ---
+>  drivers/pci/msi.c         | 8 +++++++-
+>  include/linux/irqdomain.h | 1 +
+>  2 files changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 373d96e..ef4ec6e 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -1273,12 +1273,18 @@ struct irq_domain *pci_msi_create_irq_domain(struct device_node *node,
+>  					     struct msi_domain_info *info,
+>  					     struct irq_domain *parent)
+>  {
+> +	struct irq_domain *domain;
+> +
+>  	if (info->flags & MSI_FLAG_USE_DEF_DOM_OPS)
+>  		pci_msi_domain_update_dom_ops(info);
+>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+>  		pci_msi_domain_update_chip_ops(info);
+>  
+> -	return msi_create_irq_domain(node, info, parent);
+> +	domain = msi_create_irq_domain(node, info, parent);
+> +	if (domain)
+> +		domain->bus_token = DOMAIN_BUS_PCI_MSI;
+> +
+> +	return domain;
+
+Nit2: I have a slight preference, hardly worth mentioning in such a simple
+case, for this:
+
+    domain = msi_create_irq_domain(node, info, parent);
+    if (!domain)
+	return NULL;
+
+    domain->bus_token = DOMAIN_BUS_PCI_MSI;
+    return domain;
+
+>  }
+>  
+>  /**
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index 91a83ad..25e9e66 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -54,6 +54,7 @@ struct irq_data;
+>   */
+>  enum irq_domain_bus_token {
+>  	DOMAIN_BUS_ANY		= 0,
+> +	DOMAIN_BUS_PCI_MSI,
+>  };
+>  
+>  /**
+> -- 
+> 2.1.4
+> 
