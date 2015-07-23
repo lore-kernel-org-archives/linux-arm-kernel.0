@@ -1,182 +1,157 @@
-From: HenryC.Chen@mediatek.com (Henry Chen)
-Date: Thu, 23 Jul 2015 19:04:05 +0800
-Subject: [PATCH v3 2/2] regulator: mt6311: Add support for mt6311 regulator
-In-Reply-To: <CABxcv=kgvCtHxuu0RDbFWEim+HYX74wEYXh8K7a6tT74R5YSuA@mail.gmail.com>
-References: <1437622799-28115-1-git-send-email-henryc.chen@mediatek.com>
- <1437622799-28115-3-git-send-email-henryc.chen@mediatek.com>
- <CABxcv=kgvCtHxuu0RDbFWEim+HYX74wEYXh8K7a6tT74R5YSuA@mail.gmail.com>
-Message-ID: <1437649445.30329.90.camel@mtksdaap41>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 23 Jul 2015 12:11:53 +0100
+Subject: [PATCH v3 1/1] dt: cpufreq: st: Provide bindings for ST's
+ CPUFreq implementation
+In-Reply-To: <20150723095254.GN5322@linux>
+References: <1437478420-26419-1-git-send-email-lee.jones@linaro.org>
+ <20150723095254.GN5322@linux>
+Message-ID: <20150723111055.GZ3061@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-23 at 11:07 +0200, Javier Martinez Canillas wrote:
+On Thu, 23 Jul 2015, Viresh Kumar wrote:
 
-> > +
-> > +       if (ret < 0)
-> > +               dev_err(&i2c->dev, "Failed to initialize regulator: %d\n", ret);
-> > +
+> Cc'ing few more people who were involved in opp-v2 discussions.
 > 
-> I don't think this is necessary, you are already adding logs for all
-> the error conditions.
-
-Yes, I will remove it.
-
+> Guys, please take a closer look as this is the first user platform
+> that wants to extend opp-v2 bindings with platform specific stuff.
 > 
-> > +       return ret;
-> > +}
-> > +
-> > +static const struct i2c_device_id mt6311_i2c_id[] = {
-> > +       {"mt6311", 0},
-> > +       {},
-> > +};
-> > +MODULE_DEVICE_TABLE(i2c, mt6311_i2c_id);
-> > +
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id mt6311_dt_ids[] = {
-> > +       { .compatible = "mediatek,mt6311-regulator",
-> > +         .data = &mt6311_i2c_id[0] },
-> > +       {},
-> > +};
-> > +MODULE_DEVICE_TABLE(of, mt6311_dt_ids);
-> > +#endif
-> > +
-> > +static struct i2c_driver mt6311_regulator_driver = {
-> > +       .driver = {
-> > +               .name = "mt6311",
-> > +               .owner = THIS_MODULE,
-> > +               .of_match_table = of_match_ptr(mt6311_dt_ids),
-> 
-> of_match_ptr() is NULL when CONFIG_OF is not defined so you don't need
-> the additional #ifdef
-> CONFIG_OF around mt6311_dt_ids.
-
-If CONFIG_OF is not defined and without #ifdef CONFIG_OF around
-mt6311_dt_ids, it will allocate a struct mt6311_dt_ids but no one used
-on here, right?
-
-Henry
-
-> > +       },
-> > +       .probe = mt6311_i2c_probe,
-> > +       .id_table = mt6311_i2c_id,
-> > +};
-> > +
-> > +module_i2c_driver(mt6311_regulator_driver);
-> > +
-> > +MODULE_AUTHOR("Henry Chen <henryc.chen@mediatek.com>");
-> > +MODULE_DESCRIPTION("Regulator device driver for Mediatek MT6311");
-> > +MODULE_LICENSE("GPL v2");
-> > diff --git a/drivers/regulator/mt6311-regulator.h b/drivers/regulator/mt6311-regulator.h
+> On 21-07-15, 12:33, Lee Jones wrote:
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> > 
+> > Only submitting the binding document as requested by Viresh.
+> > 
+> > v2 => v3:
+> >  - Using OPP v2
+> >  - Moved OPPs out of the CPU node into their own one
+> >  - Using generic 'opp-hz' property
+> > 
+> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 77 ++++++++++++++++++++++
+> >  1 file changed, 77 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
 > > new file mode 100644
-> > index 0000000..5218db4
+> > index 0000000..a478eec
 > > --- /dev/null
-> > +++ b/drivers/regulator/mt6311-regulator.h
-> > @@ -0,0 +1,65 @@
-> > +/*
-> > + * Copyright (c) 2015 MediaTek Inc.
-> > + * Author: Henry Chen <henryc.chen@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
+> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> 
+> These are used by cpufreq, but they aren't really cpufreq bindings.
+> 
+> These are opp bindings and must present at:
+> Documentation/devicetree/bindings/power/opp/st.txt and we should move
+> opp.txt in that folder as well..
+
+Sure.
+
+> > @@ -0,0 +1,77 @@
+> > +Binding for ST's CPUFreq driver
+> > +===============================
 > > +
-> > +#ifndef __MT6311_REGULATOR_H__
-> > +#define __MT6311_REGULATOR_H__
+> > +Required properties [for working voltage scaling]:
+> > +-------------------------------------------------
 > > +
-> > +#define MT6311_SWCID              0x01
+> > +Located in CPU's node:
+> 
+> I hope below registers are used to define which OPPs are valid for the
+> CPU and so shouldn't these be present under opp node instead of CPU?
+
+Yes, I neglected to change this when I moved the other bindings.
+
+Will change.
+
+> > +- st,syscfg		: Phandle to Major number register
+> > +				First cell: offset to major number
+> > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
+> > +				First cell: offset to process code
+> > +				Second cell: offset to minor number
 > > +
-> > +#define MT6311_TOP_INT_CON        0x18
-> > +#define MT6311_TOP_INT_MON        0x19
+> > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
 > > +
-> > +#define MT6311_VDVFS11_CON0       0x87
-> > +#define MT6311_VDVFS11_CON7       0x88
-> > +#define MT6311_VDVFS11_CON8       0x89
-> > +#define MT6311_VDVFS11_CON9       0x8A
-> > +#define MT6311_VDVFS11_CON10      0x8B
-> > +#define MT6311_VDVFS11_CON11      0x8C
-> > +#define MT6311_VDVFS11_CON12      0x8D
-> > +#define MT6311_VDVFS11_CON13      0x8E
-> > +#define MT6311_VDVFS11_CON14      0x8F
-> > +#define MT6311_VDVFS11_CON15      0x90
-> > +#define MT6311_VDVFS11_CON16      0x91
-> > +#define MT6311_VDVFS11_CON17      0x92
-> > +#define MT6311_VDVFS11_CON18      0x93
-> > +#define MT6311_VDVFS11_CON19      0x94
+> > + - opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
+> > +  - opp-hz		: CPU frequency [Hz] for this OPP
+> 
+> Not sure if you are required to re define it. In case you want to, the
+> please add a link here to the bindings that define it. So that we
+> don't think they are newer bindings.
+
+Sure.
+
+> > +  - st,avs		: List of available voltages [uV] indexed by process code
+> > +  - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
+> > +  - st,substrate	: Substrate version this OPP is suitable for [0xFF means ALL]
+> 
+> @Stephen: Any idea if these can be relevant for other platforms and we
+> can move them to generic bindings?
+> 
+> > +WARNING: The cpu0-opp-list will be provided by the bootloader.  Do not attempt to
+> > +	 artificially synthesise the cpu0-opp-list node or any of its descendants.
+> > +	 They are very platform specific and may damage the hardware if created
+> > +	 incorrectly.
 > > +
-> > +#define MT6311_LDO_CON0           0xCC
-> > +#define MT6311_LDO_OCFB0          0xCD
-> > +#define MT6311_LDO_CON2           0xCE
-> > +#define MT6311_LDO_CON3           0xCF
-> > +#define MT6311_LDO_CON4           0xD0
-> > +#define MT6311_FQMTR_CON0         0xD1
-> > +#define MT6311_FQMTR_CON1         0xD2
-> > +#define MT6311_FQMTR_CON2         0xD3
-> > +#define MT6311_FQMTR_CON3         0xD4
-> > +#define MT6311_FQMTR_CON4         0xD5
+> > +Required properties [if voltage scaling properties are missing]:
+> > +-------------------------------------------------------------------
 > > +
-> > +#define MT6311_PMIC_RG_INT_POL_MASK                      0x1
-> > +#define MT6311_PMIC_RG_INT_EN_MASK                       0x2
-> > +#define MT6311_PMIC_RG_BUCK_OC_INT_STATUS_MASK           0x10
+> > +Located in CPU's node:
 > > +
-> > +#define MT6311_PMIC_VDVFS11_EN_CTRL_MASK                 0x1
-> > +#define MT6311_PMIC_VDVFS11_VOSEL_CTRL_MASK              0x2
-> > +#define MT6311_PMIC_VDVFS11_EN_SEL_MASK                  0x3
-> > +#define MT6311_PMIC_VDVFS11_VOSEL_SEL_MASK               0xc
-> > +#define MT6311_PMIC_VDVFS11_EN_MASK                      0x1
-> > +#define MT6311_PMIC_VDVFS11_VOSEL_MASK                   0x7F
-> > +#define MT6311_PMIC_VDVFS11_VOSEL_ON_MASK                0x7F
-> > +#define MT6311_PMIC_VDVFS11_VOSEL_SLEEP_MASK             0x7F
-> > +#define MT6311_PMIC_NI_VDVFS11_VOSEL_MASK                0x7F
+> > +- operating-points	: [See: ../power/opp.txt]
 > > +
-> > +#define MT6311_PMIC_RG_VBIASN_EN_MASK                    0x1
+> > +Example [safe]:
+> > +--------------
 > > +
-> > +#endif
-> > diff --git a/include/linux/regulator/mt6311.h b/include/linux/regulator/mt6311.h
-> > new file mode 100644
-> > index 0000000..8473259
-> > --- /dev/null
-> > +++ b/include/linux/regulator/mt6311.h
-> > @@ -0,0 +1,29 @@
-> > +/*
-> > + * Copyright (c) 2015 MediaTek Inc.
-> > + * Author: Henry Chen <henryc.chen@mediatek.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
+> > +cpus {
+> > +	cpu at 0 {
+> > +				 /* kHz     uV   */
+> > +		operating-points = <1500000 0
+> > +				    1200000 0
+> > +				    800000  0
+> > +				    500000  0>;
+> > +	};
+> > +};
+> 
+> Why do you want to keep these as well?
+
+We need this as a fall-back, in case anyone boots using a bootloader
+which isn't equipped to supply the OPP list.  If this happens we can
+not use voltage scaling and he best thing we can do is operate using
+only frequency scaling.
+
+> > +Example [unsafe]:
+> > +----------------
 > > +
-> > +#ifndef __LINUX_REGULATOR_MT6311_H
-> > +#define __LINUX_REGULATOR_MT6311_H
-> > +
-> > +#define MT6311_MAX_REGULATORS  2
-> > +
-> > +enum {
-> > +       MT6311_ID_VDVFS = 0,
-> > +       MT6311_ID_VBIASN,
+> > +cpus {
+> > +	cpu at 0 {
+> > +		st,syscfg		= <&syscfg [major_offset]>;
+> > +		st,syscfg-eng   	= <&syscfg_eng [pcode_offset] [minor_offset]>;
+> > +		operating-points-v2	= <&cpu0_opp_list>;
+> > +	};
 > > +};
 > > +
-> > +#define MT6311_E1_CID_CODE    0x10
-> > +#define MT6311_E2_CID_CODE    0x20
-> > +#define MT6311_E3_CID_CODE    0x30
-> > +
-> > +#endif /* __LINUX_REGULATOR_MT6311_H */
-> > --
+> > +/* ############################################################ */
+> > +/* # WARNING: Do not attempt to copy/replicate this node,     # */
+> > +/* #          it is only to be supplied by the bootloader !!! # */
+> > +/* ############################################################ */
+> > +cpu0-opp-list {
+> > +	compatible = "operating-points-v2-sti";
+> > +	opp0 {
+> > +		opp-hz		= <1200000000>;
+> > +		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
+> > +		st,substrate	= <0xff>;
+> > +		st,cuts		= <0xff>;
+> > +	};
+> > +	opp1 {
+> > +		opp-hz		= <1500000000>;
+> > +		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
+> > +		st,substrate	= <0xff>;
+> > +		st,cuts		= <0x2>;
+> > +	};
+> > +};
 > 
-> Besides those comments, it looks good to me now.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Best regards,
-> Javier
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
