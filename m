@@ -1,43 +1,193 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Thu, 23 Jul 2015 09:06:28 +0300
-Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
-In-Reply-To: <CACna6rzFYpwbzM+s-KzFQmTym4iLVn+Ap+DWgFmAZzhWKTQfJw@mail.gmail.com>
- (=?utf-8?Q?=22Rafa=C5=82_Mi=C5=82ecki=22's?= message of "Thu, 23 Jul 2015
- 02:30:41 +0200")
-References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
- <CACna6rzFYpwbzM+s-KzFQmTym4iLVn+Ap+DWgFmAZzhWKTQfJw@mail.gmail.com>
-Message-ID: <871tfzif17.fsf@kamboji.qca.qualcomm.com>
+From: b18965@freescale.com (Alison Wang)
+Date: Thu, 23 Jul 2015 14:06:53 +0800
+Subject: [PATCH v2] ARM: configs: Add Freescale LS1021A defconfig
+Message-ID: <1437631613-45979-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rafa? Mi?ecki <zajec5@gmail.com> writes:
+Add Freescale LS1021A initial defconfig file.
+The LS1021A SoC is a dual-core Cortex-A7 based processor.
 
->> +       if (bus->host_pdev) {
->> +               struct device *dev = &bus->host_pdev->dev;
->> +
->> +               of_platform_populate(dev->of_node, of_default_bus_match_table,
->> +                                    NULL, dev);
->> +       }
->> +
->
-> This caused a compile error when using bcma as module:
-> ERROR: "of_default_bus_match_table" [drivers/bcma/bcma.ko] undefined!
->
-> There are two options I guess:
-> 1) Export of_default_bus_match_table
-> 2) Use some better condition like
-> if (IS_BUILTIN(CONFIG_BCMA) && bus->host_pdev)
->
-> Unfortunately I'm on my long holidays right now.
->
-> Hauke: do you think you can find a moment to handle this?
+LS1021A has some special configure options against common V7 SOCs,
+such as CONFIG_THUMB2_KERNEL, CONFIG_VMSPLIT_2G, CONFIG_VFP...
 
-I can cook up a patch which uses IS_BUILTIN() so that we get the build
-working again. You can fix this better once you come back.
+Enable I2C, LPUART, eDMA, WDT, GIANFAR, Sound, DSPI at default.
 
-> Sorry for the problem :|
+Signed-off-by: Haikun Wang <haikun.wang@freescale.com>
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+---
+Changes since v1:
+- Enable GIANFAR, Sound and DSPI.
 
-No worries, enjoy your vacation :)
+ arch/arm/configs/ls1021a_defconfig | 160 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 160 insertions(+)
+ create mode 100644 arch/arm/configs/ls1021a_defconfig
 
+diff --git a/arch/arm/configs/ls1021a_defconfig b/arch/arm/configs/ls1021a_defconfig
+new file mode 100644
+index 0000000..079c48f
+--- /dev/null
++++ b/arch/arm/configs/ls1021a_defconfig
+@@ -0,0 +1,160 @@
++CONFIG_SYSVIPC=y
++CONFIG_POSIX_MQUEUE=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_LOG_BUF_SHIFT=16
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_CC_OPTIMIZE_FOR_SIZE=y
++CONFIG_SYSCTL_SYSCALL=y
++CONFIG_KALLSYMS_ALL=y
++CONFIG_EMBEDDED=y
++CONFIG_PROFILING=y
++CONFIG_OPROFILE=y
++CONFIG_KPROBES=y
++CONFIG_JUMP_LABEL=y
++CONFIG_MODULES=y
++CONFIG_MODULE_FORCE_LOAD=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_BLK_CMDLINE_PARSER=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_LS1021A=y
++CONFIG_ARM_LPAE=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_SMP=y
++CONFIG_VMSPLIT_2G=y
++CONFIG_PREEMPT_VOLUNTARY=y
++CONFIG_THUMB2_KERNEL=y
++CONFIG_HIGHMEM=y
++CONFIG_CLEANCACHE=y
++CONFIG_FRONTSWAP=y
++CONFIG_CMDLINE="console=ttyS0,115200"
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++CONFIG_BINFMT_MISC=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_UNIX_DIAG=y
++CONFIG_XFRM_USER=y
++CONFIG_NET_KEY=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_ADVANCED_ROUTER=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_MROUTE=y
++CONFIG_INET_AH=y
++CONFIG_INET_ESP=y
++CONFIG_INET_IPCOMP=y
++CONFIG_INET_UDP_DIAG=m
++CONFIG_NETFILTER=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_BE_BYTE_SWAP=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_NAND=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=256000
++CONFIG_BLK_DEV_SD=y
++CONFIG_CHR_DEV_SG=y
++CONFIG_ATA=y
++CONFIG_NETDEVICES=y
++CONFIG_GIANFAR=y
++CONFIG_VITESSE_PHY=y
++CONFIG_BROADCOM_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_NATIONAL_PHY=y
++CONFIG_MICREL_PHY=y
++CONFIG_MDIO_BUS_MUX_MMIOREG=y
++CONFIG_INPUT_EVDEV=y
++CONFIG_SERIO_SERPORT=m
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_EXTENDED=y
++CONFIG_SERIAL_8250_SHARE_IRQ=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_HW_RANDOM=y
++CONFIG_I2C=y
++CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_MUX=y
++CONFIG_I2C_MUX_PCA954x=y
++CONFIG_I2C_IMX=y
++CONFIG_SPI=y
++CONFIG_SPI_FSL_DSPI=y
++CONFIG_GPIO_SYSFS=y
++CONFIG_SENSORS_LM90=y
++CONFIG_SENSORS_INA2XX=y
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_DEBUG=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_SOUND=y
++# CONFIG_SOUND_OSS_CORE_PRECLAIM is not set
++CONFIG_SND=y
++CONFIG_SND_MIXER_OSS=y
++CONFIG_SND_PCM_OSS=y
++# CONFIG_SND_ARM is not set
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_FSL_SAI=y
++CONFIG_SND_SOC_SGTL5000=y
++CONFIG_SND_SIMPLE_CARD=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_ARASAN=y
++CONFIG_NEW_LEDS=y
++CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_TRIGGERS=y
++CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_DS3232=y
++CONFIG_DMADEVICES=y
++CONFIG_FSL_EDMA=y
++CONFIG_CLK_QORIQ=y
++CONFIG_MEMORY=y
++CONFIG_EXT2_FS=y
++CONFIG_EXT2_FS_XATTR=y
++CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
++CONFIG_FANOTIFY=y
++CONFIG_ISO9660_FS=m
++CONFIG_JOLIET=y
++CONFIG_ZISOFS=y
++CONFIG_UDF_FS=m
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=m
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_JFFS2_FS=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_DEFAULT="cp437"
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ASCII=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_ISO8859_2=y
++CONFIG_NLS_ISO8859_15=y
++CONFIG_NLS_UTF8=y
++CONFIG_DEBUG_SECTION_MISMATCH=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_CRYPTO_LZO=y
++CONFIG_CRC_CCITT=m
++CONFIG_CRC_T10DIF=y
++CONFIG_CRC7=m
++CONFIG_LIBCRC32C=m
 -- 
-Kalle Valo
+2.1.0.27.g96db324
