@@ -1,104 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 15:46:01 +0100
-Subject: [PATCH v3] mfd: atmel-hlcdc: implement config synchronization
-In-Reply-To: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1436289403-20524-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20150723144601.GF3436@x1>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 23 Jul 2015 15:52:40 +0100
+Subject: [PATCH v5 04/19] PCI/MSI: Add hooks to populate the msi_domain
+ field
+In-Reply-To: <20150723130637.GR21967@google.com>
+References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
+ <1437643598-19795-5-git-send-email-marc.zyngier@arm.com>
+ <20150723130637.GR21967@google.com>
+Message-ID: <55B0FFB8.3030506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jul 2015, Boris Brezillon wrote:
-
-> Some HLCDC registers cannot be written until the hardware has finished
-> applying the previous configuration request. If they are written while
-> an action is still in progress, the new configuration might be silently
-> ignored, resulting in unpredictable behavior.
+On 23/07/15 14:06, Bjorn Helgaas wrote:
+> On Thu, Jul 23, 2015 at 10:26:23AM +0100, Marc Zyngier wrote:
+>> In order to be able to populate the device msi_domain field,
+>> add the necessary hooks to propagate the host bridge msi_domain
+>> across secondary busses to devices.
+>>
+>> So far, nobody populates the initial msi_domain.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Hide the config synchronization stuff in a regmap implementation and use
-> this implementation instead of the generic mmio one.
+> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> +static void pci_set_msi_domain(struct pci_dev *dev)
+>> +{
+>> +	/*
+>> +	 * If no domain has been set through the pcibios callback,
+>> +	 * inherit the default from the bus device.
 > 
-> ---
-> Changes since v2:
->  - reword the commit message
-> 
-> Changes since v1:
->  - add a 100 usec timeout
-> ---
->  drivers/mfd/atmel-hlcdc.c | 35 +++++++++++++++++++++++++++++++++--
->  1 file changed, 33 insertions(+), 2 deletions(-)
+> Nit: there isn't a pcibios callback anymore.
 
-Applied, thanks.
+There is actually one, in pci_add_device:
 
-> diff --git a/drivers/mfd/atmel-hlcdc.c b/drivers/mfd/atmel-hlcdc.c
-> index cfd58f4..04e01cc 100644
-> --- a/drivers/mfd/atmel-hlcdc.c
-> +++ b/drivers/mfd/atmel-hlcdc.c
-> @@ -18,6 +18,7 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/iopoll.h>
->  #include <linux/mfd/atmel-hlcdc.h>
->  #include <linux/mfd/core.h>
->  #include <linux/module.h>
-> @@ -37,11 +38,41 @@ static const struct mfd_cell atmel_hlcdc_cells[] = {
->  	},
->  };
->  
-> +static int regmap_atmel_hlcdc_reg_write(void *context, unsigned int reg,
-> +					unsigned int val)
-> +{
-> +	void __iomem *regs = context;
-> +
-> +	if (reg <= ATMEL_HLCDC_DIS) {
-> +		u32 status;
-> +
-> +		readl_poll_timeout(regs + ATMEL_HLCDC_SR, status,
-> +				   !(status & ATMEL_HLCDC_SIP), 1, 100);
-> +	}
-> +
-> +	writel(val, regs + reg);
-> +
-> +	return 0;
-> +}
-> +
-> +static int regmap_atmel_hlcdc_reg_read(void *context, unsigned int reg,
-> +				       unsigned int *val)
-> +{
-> +	void __iomem *regs = context;
-> +
-> +	*val = readl(regs + reg);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct regmap_config atmel_hlcdc_regmap_config = {
->  	.reg_bits = 32,
->  	.val_bits = 32,
->  	.reg_stride = 4,
->  	.max_register = ATMEL_HLCDC_REG_MAX,
-> +	.reg_write = regmap_atmel_hlcdc_reg_write,
-> +	.reg_read = regmap_atmel_hlcdc_reg_read,
-> +	.fast_io = true,
->  };
->  
->  static int atmel_hlcdc_probe(struct platform_device *pdev)
-> @@ -82,8 +113,8 @@ static int atmel_hlcdc_probe(struct platform_device *pdev)
->  		return PTR_ERR(hlcdc->slow_clk);
->  	}
->  
-> -	hlcdc->regmap = devm_regmap_init_mmio(dev, regs,
-> -					      &atmel_hlcdc_regmap_config);
-> +	hlcdc->regmap = devm_regmap_init(dev, NULL, regs,
-> +					 &atmel_hlcdc_regmap_config);
->  	if (IS_ERR(hlcdc->regmap))
->  		return PTR_ERR(hlcdc->regmap);
->  
+	[...]
+	ret = pcibios_add_device(dev);
+	WARN_ON(ret < 0);
 
+	/* Setup MSI irq domain */
+	pci_set_msi_domain(dev);
+	[...]
+
+pcibios_add_device is the one I was referring to. I'll clarify the comment.
+
+Thanks,
+
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
