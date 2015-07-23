@@ -1,57 +1,57 @@
-From: aalonso@freescale.com (Alonso Adrian)
-Date: Thu, 23 Jul 2015 19:34:56 +0000
-Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
- lpsr
-In-Reply-To: <20150717033429.GC12927@tiger>
-References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
- <20150715072307.GM4119@tiger>
- <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
- <20150716155034.GN4119@tiger>
- <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
- <BN3PR03MB15095AD84AD5738B142F6F8CA8990@BN3PR03MB1509.namprd03.prod.outlook.com>
- <20150717033429.GC12927@tiger>
-Message-ID: <BN3PR03MB150926F2FABADED18630B27CA8820@BN3PR03MB1509.namprd03.prod.outlook.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 23 Jul 2015 15:46:50 -0400 (EDT)
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <55B07048.3000609@tul.cz>
+Message-ID: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, 23 Jul 2015, Petr Cvek wrote:
 
-The approach you mention is already supported in FSL kernel tree see
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.14.38_6ul7d_beta&id=a37ea06ddccbefb8660af0ac259c30d98540bdc2
-
-I will rework and proposed a new patch series soon.
-
-Thanks for your reviews :)
-
-Regards
-Adrian
-
-> -----Original Message-----
-> From: linux-gpio-owner at vger.kernel.org [mailto:linux-gpio-
-> owner at vger.kernel.org] On Behalf Of Shawn Guo
-> Sent: Thursday, July 16, 2015 10:34 PM
-> To: Alonso Lazcano Adrian-B38018
-> Cc: Zhi Li; devicetree at vger.kernel.org; Li Frank-B20596; Garg Nitin-B37173;
-> linus.walleij at linaro.org; linux-gpio at vger.kernel.org; robh+dt at kernel.org;
-> shawn.guo at linaro.org; Huang Yongcai-B20788; linux-arm-
-> kernel at lists.infradead.org; Gong Yibin-B38343
-> Subject: Re: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
-> lpsr
+> Hello,
 > 
-> On Thu, Jul 16, 2015 at 08:39:33PM +0000, Alonso Adrian wrote:
-> > Hi All,
-> >
-> > I will sent a new patch series including documentation for pad group
-> > id encoding in
-> > Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
-> >
-> > Thanks for your comments :)
+> Is this:
 > 
-> Do not get me wrong.  The problem with the patch is not merely missing the
-> document update.
+> 	case USB_ENDPOINT_XFER_INT:
+> 		/* Bulk endpoints handle interrupt transfers,
+> 		 * except the toggle-quirky iso-synch kind
+> 		 */
+> 		if (!ep->caps.type_int && !ep->caps.type_bulk)
+> 			return 0;
 > 
-> Shawn
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in the body
-> of a message to majordomo at vger.kernel.org More majordomo info at
-> http://vger.kernel.org/majordomo-info.html
+> ... or original:
+> 
+> 			switch (type) {
+> 			case USB_ENDPOINT_XFER_INT:
+> 				/* bulk endpoints handle interrupt transfers,
+> 				 * except the toggle-quirky iso-synch kind
+> 				 */
+> 				if ('s' == tmp[2])	{// == "-iso"
+> 					return 0;
+> 
+> code still valid? 
+
+It's hard to understand your question.  Are you asking whether this 
+code is still present in the current version of the kernel?  You can 
+find out for yourself easily enough.
+
+> It seems that it allows using a BULK endpoint for requested INT
+> endpoint. For my PXA27x machine the original code returns BULK EP
+> even with valid INT endpoint definition (because BULK EPs are defined
+> earlier than INT EPs).
+
+Yes, it does allow a bulk endpoint to be used when an interrupt 
+endpoint was requested.  However, it won't return a bulk endpoint if 
+all the bulk endpoints are already in use.
+
+> This part of the code is from pre git era
+> 
+> 	1da177e4c3f41524e886b7f1b8a0c1fc7321cac2
+> 
+> before pxa27x driver was written and only few chips was supported.
+> Does anyone know if the INT endpoints works now?
+
+What makes you think they might not work?
+
+Alan Stern
