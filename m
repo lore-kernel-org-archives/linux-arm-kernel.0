@@ -1,48 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 23 Jul 2015 13:00:03 +0100
-Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
- Never
-In-Reply-To: <20150721123830.GD25887@localhost>
-References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
- <1437481411-1595-7-git-send-email-james.morse@arm.com>
- <20150721123830.GD25887@localhost>
-Message-ID: <20150723120002.GB445@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 23 Jul 2015 14:07:59 +0200
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20150723120759.GA17690@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 01:38:31PM +0100, Catalin Marinas wrote:
-> On Tue, Jul 21, 2015 at 01:23:31PM +0100, James Morse wrote:
-> > diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> > index 94d98cd1aad8..149a36ea9673 100644
-> > --- a/arch/arm64/mm/fault.c
-> > +++ b/arch/arm64/mm/fault.c
-> > @@ -30,9 +30,11 @@
-> >  #include <linux/highmem.h>
-> >  #include <linux/perf_event.h>
-> >  
-> > +#include <asm/cpufeature.h>
-> >  #include <asm/exception.h>
-> >  #include <asm/debug-monitors.h>
-> >  #include <asm/esr.h>
-> > +#include <asm/sysreg.h>
-> >  #include <asm/system_misc.h>
-> >  #include <asm/pgtable.h>
-> >  #include <asm/tlbflush.h>
-> > @@ -147,6 +149,13 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
-> >  		__do_kernel_fault(mm, addr, esr, regs);
-> >  }
-> >  
-> > +static bool pan_enabled(struct pt_regs *regs)
-> > +{
-> > +	if (IS_ENABLED(CONFIG_ARM64_PAN))
-> > +		return ((regs->pstate & PSR_PAN_BIT) != 0);
+On Tue 2015-07-21 09:21:32, Sascha Hauer wrote:
+> The thermal code uses int, long and unsigned long for temperatures
+> in different places.
 > 
-> Nitpick: no brackets needed for return.
+> Using an unsigned type limits the thermal framework to positive
+> temperatures without need. Also several drivers currently will report
+> temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> immediately shut the machine down due to overtemperature if started below
+> 0?C.
+> 
+> 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
+> is above the melting point of all known materials.
 
-Couldn't we just write this function as:
+Can we do something like
 
-  return IS_ENABLED(CONFIG_ARM64_PAN) && (regs->pstate & PSR_PAN_BIT);
+typedef millicelsius_t int;
 
-?
+...to document the units?
 
-Will
+> Consistently use a plain 'int' for temperatures throughout the thermal code and
+> the drivers. This only changes the places in the drivers where the temperature
+> is passed around as pointer, when drivers internally use another type this is
+> not changed.
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
