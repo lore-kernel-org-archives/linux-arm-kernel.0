@@ -1,157 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 12:11:53 +0100
-Subject: [PATCH v3 1/1] dt: cpufreq: st: Provide bindings for ST's
- CPUFreq implementation
-In-Reply-To: <20150723095254.GN5322@linux>
-References: <1437478420-26419-1-git-send-email-lee.jones@linaro.org>
- <20150723095254.GN5322@linux>
-Message-ID: <20150723111055.GZ3061@x1>
+From: nikhil.badola@freescale.com (Badola Nikhil)
+Date: Thu, 23 Jul 2015 11:26:19 +0000
+Subject: [PATCH 3/3] arm: dts: ls1021a: Add snps, configure-gfladj property
+ to USB3 node
+In-Reply-To: <1564365.o2o69FAsZI@ws-stein>
+References: <1437646378-1910-1-git-send-email-nikhil.badola@freescale.com>
+ <1564365.o2o69FAsZI@ws-stein>
+Message-ID: <SN1PR0301MB16290E4A5E871BCAEC4E06FCF3820@SN1PR0301MB1629.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Viresh Kumar wrote:
-
-> Cc'ing few more people who were involved in opp-v2 discussions.
+> -----Original Message-----
+> From: Alexander Stein [mailto:alexander.stein at systec-electronic.com]
+> Sent: Thursday, July 23, 2015 3:41 PM
+> To: Badola Nikhil-B46172
+> Cc: linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org
+> Subject: Re: [PATCH 3/3] arm: dts: ls1021a: Add snps,configure-gfladj
+> property to USB3 node
 > 
-> Guys, please take a closer look as this is the first user platform
-> that wants to extend opp-v2 bindings with platform specific stuff.
+> On Thursday 23 July 2015 15:42:58, Nikhil Badola wrote:
+> > Add "snps,configure-gfladj" boolean property to USB3 node. This
+> > property
+>                       ^^^^^^
+> This does not match...
 > 
-> On 21-07-15, 12:33, Lee Jones wrote:
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > is used to determine if frame length adjustment is required
+> >
+> > Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
 > > ---
-> > 
-> > Only submitting the binding document as requested by Viresh.
-> > 
-> > v2 => v3:
-> >  - Using OPP v2
-> >  - Moved OPPs out of the CPU node into their own one
-> >  - Using generic 'opp-hz' property
-> > 
-> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 77 ++++++++++++++++++++++
-> >  1 file changed, 77 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-> > new file mode 100644
-> > index 0000000..a478eec
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> >  arch/arm/boot/dts/ls1021a.dtsi | 1 +
+> >  1 file changed, 1 insertion(+)
+> >
+> > diff --git a/arch/arm/boot/dts/ls1021a.dtsi
+> > b/arch/arm/boot/dts/ls1021a.dtsi index c70bb27..f03f842 100644
+> > --- a/arch/arm/boot/dts/ls1021a.dtsi
+> > +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> > @@ -404,6 +404,7 @@
+> >  			reg = <0x0 0x3100000 0x0 0x10000>;
+> >  			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+> >  			dr_mode = "host";
+> > +			snps,configure-fladj = <0x20>;
+>                              ^^^^^
+> ...that. The same is for the subject. I guess these "gfladj" are just leftovers as
+> patch 1 & 2 talk about "fladj"
+
+Fladj stands for Frame Length ADJustment whereas the register used for this is gfladj.
+Yes we intend to override fladj, hence using fladj in patch 1 and 2. I will remove gladj from 
+subject and description.
+Further, I will be changing the property to "snps,fladj-override" as suggested by Mark in patch 1
+and send next patch version.
+Please let me know if there are any other comments. 
+
 > 
-> These are used by cpufreq, but they aren't really cpufreq bindings.
+> Best regards,
+> Alexander
+> --
+> Dipl.-Inf. Alexander Stein
+> SYS TEC electronic GmbH
+> alexander.stein at systec-electronic.com
 > 
-> These are opp bindings and must present at:
-> Documentation/devicetree/bindings/power/opp/st.txt and we should move
-> opp.txt in that folder as well..
-
-Sure.
-
-> > @@ -0,0 +1,77 @@
-> > +Binding for ST's CPUFreq driver
-> > +===============================
-> > +
-> > +Required properties [for working voltage scaling]:
-> > +-------------------------------------------------
-> > +
-> > +Located in CPU's node:
+> Legal and Commercial Address:
+> Am Windrad 2
+> 08468 Heinsdorfergrund
+> Germany
 > 
-> I hope below registers are used to define which OPPs are valid for the
-> CPU and so shouldn't these be present under opp node instead of CPU?
-
-Yes, I neglected to change this when I moved the other bindings.
-
-Will change.
-
-> > +- st,syscfg		: Phandle to Major number register
-> > +				First cell: offset to major number
-> > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
-> > +				First cell: offset to process code
-> > +				Second cell: offset to minor number
-> > +
-> > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
-> > +
-> > + - opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
-> > +  - opp-hz		: CPU frequency [Hz] for this OPP
+> Office: +49 (0) 3765 38600-0
+> Fax:    +49 (0) 3765 38600-4100
 > 
-> Not sure if you are required to re define it. In case you want to, the
-> please add a link here to the bindings that define it. So that we
-> don't think they are newer bindings.
-
-Sure.
-
-> > +  - st,avs		: List of available voltages [uV] indexed by process code
-> > +  - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
-> > +  - st,substrate	: Substrate version this OPP is suitable for [0xFF means ALL]
-> 
-> @Stephen: Any idea if these can be relevant for other platforms and we
-> can move them to generic bindings?
-> 
-> > +WARNING: The cpu0-opp-list will be provided by the bootloader.  Do not attempt to
-> > +	 artificially synthesise the cpu0-opp-list node or any of its descendants.
-> > +	 They are very platform specific and may damage the hardware if created
-> > +	 incorrectly.
-> > +
-> > +Required properties [if voltage scaling properties are missing]:
-> > +-------------------------------------------------------------------
-> > +
-> > +Located in CPU's node:
-> > +
-> > +- operating-points	: [See: ../power/opp.txt]
-> > +
-> > +Example [safe]:
-> > +--------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +				 /* kHz     uV   */
-> > +		operating-points = <1500000 0
-> > +				    1200000 0
-> > +				    800000  0
-> > +				    500000  0>;
-> > +	};
-> > +};
-> 
-> Why do you want to keep these as well?
-
-We need this as a fall-back, in case anyone boots using a bootloader
-which isn't equipped to supply the OPP list.  If this happens we can
-not use voltage scaling and he best thing we can do is operate using
-only frequency scaling.
-
-> > +Example [unsafe]:
-> > +----------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +		st,syscfg		= <&syscfg [major_offset]>;
-> > +		st,syscfg-eng   	= <&syscfg_eng [pcode_offset] [minor_offset]>;
-> > +		operating-points-v2	= <&cpu0_opp_list>;
-> > +	};
-> > +};
-> > +
-> > +/* ############################################################ */
-> > +/* # WARNING: Do not attempt to copy/replicate this node,     # */
-> > +/* #          it is only to be supplied by the bootloader !!! # */
-> > +/* ############################################################ */
-> > +cpu0-opp-list {
-> > +	compatible = "operating-points-v2-sti";
-> > +	opp0 {
-> > +		opp-hz		= <1200000000>;
-> > +		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
-> > +		st,substrate	= <0xff>;
-> > +		st,cuts		= <0xff>;
-> > +	};
-> > +	opp1 {
-> > +		opp-hz		= <1500000000>;
-> > +		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
-> > +		st,substrate	= <0xff>;
-> > +		st,cuts		= <0x2>;
-> > +	};
-> > +};
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Managing Directors:
+> 	Director Technology/CEO: Dipl.-Phys. Siegmar Schmidt;
+> 	Director Commercial Affairs/COO: Dipl. Ing. (FH) Armin von Collrepp
+> Commercial Registry:
+> 	Amtsgericht Chemnitz, HRB 28082; USt.-Id Nr. DE150534010
