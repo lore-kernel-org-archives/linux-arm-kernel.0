@@ -1,68 +1,59 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Thu, 23 Jul 2015 16:25:10 +0200
-Subject: [PATCH v3 2/2] regulator: mt6311: Add support for mt6311 regulator
-In-Reply-To: <1437649445.30329.90.camel@mtksdaap41>
-References: <1437622799-28115-1-git-send-email-henryc.chen@mediatek.com>
- <1437622799-28115-3-git-send-email-henryc.chen@mediatek.com>
- <CABxcv=kgvCtHxuu0RDbFWEim+HYX74wEYXh8K7a6tT74R5YSuA@mail.gmail.com>
- <1437649445.30329.90.camel@mtksdaap41>
-Message-ID: <CABxcv==yOSgQKai0tn9=NGRvKv_3qHgoXUKZT3+M4fK43YWV1w@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 23 Jul 2015 09:36:35 -0500
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <55B07048.3000609@tul.cz>
+References: <55B07048.3000609@tul.cz>
+Message-ID: <20150723143635.GB21984@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Henry,
+Hi,
 
-On Thu, Jul 23, 2015 at 1:04 PM, Henry Chen <HenryC.Chen@mediatek.com> wrote:
-> On Thu, 2015-07-23 at 11:07 +0200, Javier Martinez Canillas wrote:
->
->> > +
->> > +       if (ret < 0)
->> > +               dev_err(&i2c->dev, "Failed to initialize regulator: %d\n", ret);
->> > +
->>
->> I don't think this is necessary, you are already adding logs for all
->> the error conditions.
->
-> Yes, I will remove it.
->
->>
->> > +       return ret;
->> > +}
->> > +
->> > +static const struct i2c_device_id mt6311_i2c_id[] = {
->> > +       {"mt6311", 0},
->> > +       {},
->> > +};
->> > +MODULE_DEVICE_TABLE(i2c, mt6311_i2c_id);
->> > +
->> > +#ifdef CONFIG_OF
->> > +static const struct of_device_id mt6311_dt_ids[] = {
->> > +       { .compatible = "mediatek,mt6311-regulator",
->> > +         .data = &mt6311_i2c_id[0] },
->> > +       {},
->> > +};
->> > +MODULE_DEVICE_TABLE(of, mt6311_dt_ids);
->> > +#endif
->> > +
->> > +static struct i2c_driver mt6311_regulator_driver = {
->> > +       .driver = {
->> > +               .name = "mt6311",
->> > +               .owner = THIS_MODULE,
->> > +               .of_match_table = of_match_ptr(mt6311_dt_ids),
->>
->> of_match_ptr() is NULL when CONFIG_OF is not defined so you don't need
->> the additional #ifdef
->> CONFIG_OF around mt6311_dt_ids.
->
-> If CONFIG_OF is not defined and without #ifdef CONFIG_OF around
-> mt6311_dt_ids, it will allocate a struct mt6311_dt_ids but no one used
-> on here, right?
->
+On Thu, Jul 23, 2015 at 06:40:40AM +0200, Petr Cvek wrote:
+> Hello,
+> 
+> Is this:
+> 
+> 	case USB_ENDPOINT_XFER_INT:
+> 		/* Bulk endpoints handle interrupt transfers,
+> 		 * except the toggle-quirky iso-synch kind
+> 		 */
+> 		if (!ep->caps.type_int && !ep->caps.type_bulk)
+> 			return 0;
+> 
+> ... or original:
+> 
+> 			switch (type) {
+> 			case USB_ENDPOINT_XFER_INT:
+> 				/* bulk endpoints handle interrupt transfers,
+> 				 * except the toggle-quirky iso-synch kind
+> 				 */
+> 				if ('s' == tmp[2])	{// == "-iso"
+> 					return 0;
+> 
+> code still valid? 
+> 
+> It seems that it allows using a BULK endpoint for requested INT
+> endpoint. For my PXA27x machine the original code returns BULK EP even
+> with valid INT endpoint definition (because BULK EPs are defined
+> earlier than INT EPs).
+> 
+> This part of the code is from pre git era
+> 
+> 	1da177e4c3f41524e886b7f1b8a0c1fc7321cac2
+> 
+> before pxa27x driver was written and only few chips was supported.
+> Does anyone know if the INT endpoints works now?
 
-You are right, sorry for the noise.
+it's very difficult to read your reply when you remove all context.
 
-> Henry
->
-
-Best regards,
-Javier
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150723/b205a82f/attachment.sig>
