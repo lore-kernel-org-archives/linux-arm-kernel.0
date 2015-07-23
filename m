@@ -1,71 +1,48 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Jul 2015 10:30:21 +0200
-Subject: [PATCH v2 2/2] ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when
- entering shallow suspend
-In-Reply-To: <4610448.RXXf22Qoxl@diego>
-References: <4610448.RXXf22Qoxl@diego>
-Message-ID: <119805978.5m38dsFzWM@diego>
+From: denis@eukrea.com (Denis Carikli)
+Date: Thu, 23 Jul 2015 10:31:12 +0200
+Subject: [PATCH v2] ARM: dts: i.MX35: Fix can support.
+In-Reply-To: <20150722180434.GA745@pengutronix.de>
+References: <20150722180434.GA745@pengutronix.de>
+Message-ID: <1437640272-5054-1-git-send-email-denis@eukrea.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMU_GPIOINT_WAKEUP_EN seems needed when entering the shallow suspend
-(with logic staying on) but does not seem to be needed for the deep
-suspend for unknown reasons.
-Testing revealed that this setting really is necessary to reliably
-resume the veyron devices from suspend.
+Since commit 3d42a379b6fa5b46058e3302b1802b29f64865bb
+("can: flexcan: add 2nd clock to support imx53 and newer")
+the can driver requires a dt nodes to have a second clock.
+Add them to imx35 to fix probing the flex can driver on the
+respective platforms.
 
-Reported-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Denis Carikli <denis@eukrea.com>
 ---
- arch/arm/mach-rockchip/pm.c | 9 ++++++---
- arch/arm/mach-rockchip/pm.h | 1 +
- 2 files changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx35.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-index 04d3028..801541e 100644
---- a/arch/arm/mach-rockchip/pm.c
-+++ b/arch/arm/mach-rockchip/pm.c
-@@ -123,9 +123,6 @@ static void rk3288_slp_mode_set(int level)
- 	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
- 		     rk3288_bootram_phy);
- 
--	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
--		     PMU_ARMINT_WAKEUP_EN);
--
- 	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
- 		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
- 		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
-@@ -146,6 +143,9 @@ static void rk3288_slp_mode_set(int level)
- 		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
- 			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
- 
-+		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-+			     PMU_ARMINT_WAKEUP_EN);
-+
- 		/* 30ms on a 32kHz clock for osc and pmic stabilization */
- 		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 32 * 30);
- 		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
-@@ -157,6 +157,9 @@ static void rk3288_slp_mode_set(int level)
- 		 */
- 		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
- 
-+		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
-+			     PMU_ARMINT_WAKEUP_EN | PMU_GPIOINT_WAKEUP_EN);
-+
- 		/* 30ms on a 24MHz clock for osc and pmic stabilization */
- 		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 24000 * 30);
- 		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
-diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index 8a55ee2..b5af26f 100644
---- a/arch/arm/mach-rockchip/pm.h
-+++ b/arch/arm/mach-rockchip/pm.h
-@@ -61,6 +61,7 @@ static inline void rockchip_suspend_init(void)
- 
- /* PMU_WAKEUP_CFG1 bits */
- #define PMU_ARMINT_WAKEUP_EN		BIT(0)
-+#define PMU_GPIOINT_WAKEUP_EN		BIT(3)
- 
- enum rk3288_pwr_mode_con {
- 	PMU_PWR_MODE_EN = 0,
+diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+index b6478e9..e6540b5 100644
+--- a/arch/arm/boot/dts/imx35.dtsi
++++ b/arch/arm/boot/dts/imx35.dtsi
+@@ -286,8 +286,8 @@
+ 			can1: can at 53fe4000 {
+ 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
+ 				reg = <0x53fe4000 0x1000>;
+-				clocks = <&clks 33>;
+-				clock-names = "ipg";
++				clocks = <&clks 33>, <&clks 33>;
++				clock-names = "ipg", "per";
+ 				interrupts = <43>;
+ 				status = "disabled";
+ 			};
+@@ -295,8 +295,8 @@
+ 			can2: can at 53fe8000 {
+ 				compatible = "fsl,imx35-flexcan", "fsl,p1010-flexcan";
+ 				reg = <0x53fe8000 0x1000>;
+-				clocks = <&clks 34>;
+-				clock-names = "ipg";
++				clocks = <&clks 34>, <&clks 34>;
++				clock-names = "ipg", "per";
+ 				interrupts = <44>;
+ 				status = "disabled";
+ 			};
 -- 
-2.1.4
+2.4.5
