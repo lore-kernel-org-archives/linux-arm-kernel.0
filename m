@@ -1,24 +1,29 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 23 Jul 2015 13:58:11 +0900
-Subject: [PATCH 4/4] mfd: 88pm800: Add support for clk subdevice
-In-Reply-To: <1437476823-3358-5-git-send-email-vaibhav.hiremath@linaro.org>
+Date: Thu, 23 Jul 2015 14:08:03 +0900
+Subject: [PATCH 2/4] mfd: devicetree: bindings: Add clock subdevice node
+ information
+In-Reply-To: <1437476823-3358-3-git-send-email-vaibhav.hiremath@linaro.org>
 References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <CAJKOXPd_cKoj05DmriyKu3xrNMtEr0A=CsRJJP2-JZ0JyrdOrQ@mail.gmail.com>
+ <1437476823-3358-3-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <CAJKOXPeUJ-7je67q+9X1_FcFiczoQ6rqwMAoPLswapFEmqGGVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 2015-07-21 20:07 GMT+09:00 Vaibhav Hiremath <vaibhav.hiremath@linaro.org>:
-> This patch adds mfd_cell/clk-subdevice for 88PM800 MFD
-> (and family of devices).
+> This patch updates the binding documentation for optional
+> clocks node and related information for buffered 32KHz clock.
 >
 > Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 > ---
->  drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
->
+>  Documentation/devicetree/bindings/mfd/88pm800.txt | 28 +++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
 
-Looks OK:
++Cc Stephen Boyd (clocks)
+
+We had a discussion whether clock bindings should be put in MFD
+bindings documentation or into separate file in bindings/clock but
+either way is fine for me:
+
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
 Best regards,
