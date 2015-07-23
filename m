@@ -1,221 +1,105 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 08:32:17 +0100
-Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
- Flexible Serial Communication Unit
-In-Reply-To: <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
+Date: Thu, 23 Jul 2015 08:35:01 +0100
+Subject: [PATCH v6 1/2] mfd: devicetree: add bindings for Atmel Flexcom
+In-Reply-To: <bfff43813c2dc0a265bb644a87dcdd5fe58fc3e3.1437558598.git.cyrille.pitchen@atmel.com>
 References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
- <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
-Message-ID: <20150723073217.GT3061@x1>
+ <bfff43813c2dc0a265bb644a87dcdd5fe58fc3e3.1437558598.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150723073501.GU3061@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
 
-> This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-> integrates one SPI controller, one I2C controller and one USART. Only one
-> function can be enabled at a time. This driver selects the function once
-> for all, when the Flexcom is probed, finding the first (should be unique)
-> available DT child node which compatible property contains one of the
-> following strings:
-> - "-usart"
-> - "-spi"
-> - "-i2c"
-> 
-> This driver has chosen to present the Flexcom to the system as a MFD so
-> the implementation is seamless for the existing Atmel SPI, I2C and USART
-> drivers.
-> 
-> Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-> USART drivers take advantage of this new feature.
+> This patch documents the DT bindings for the Atmel Flexcom which will be
+> introduced by sama5d2x SoCs. These bindings will be used by the actual
+> Flexcom driver to be sent in another patch.
 > 
 > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > ---
->  drivers/mfd/Kconfig         |  11 ++++
->  drivers/mfd/Makefile        |   1 +
->  drivers/mfd/atmel-flexcom.c | 126 ++++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 138 insertions(+)
->  create mode 100644 drivers/mfd/atmel-flexcom.c
+>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 67 ++++++++++++++++++++++
+>  1 file changed, 67 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
 > 
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index d5ad04dad081..9b33ad0653d1 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -59,6 +59,17 @@ config MFD_AAT2870_CORE
->  	  additional drivers must be enabled in order to use the
->  	  functionality of the device.
->  
-> +config MFD_ATMEL_FLEXCOM
-> +	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-> +	select MFD_CORE
-> +	depends on OF
-> +	help
-> +	  Select this to get support for Atmel Flexcom. This is a wrapper
-> +	  which embeds a SPI controller, a I2C controller and a USART. Only
-> +	  one function can be used at a time. The choice is done at boot time
-> +	  by the probe function of this MFD driver according to a device tree
-> +	  property.
-> +
->  config MFD_ATMEL_HLCDC
->  	tristate "Atmel HLCDC (High-end LCD Controller)"
->  	select MFD_CORE
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 0e5cfeba107c..c666bf51abf3 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
->  obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
->  obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
->  obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-> +obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
->  obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
->  obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
->  obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-> diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
 > new file mode 100644
-> index 000000000000..8ba1862fbb74
+> index 000000000000..87a366b95ecf
 > --- /dev/null
-> +++ b/drivers/mfd/atmel-flexcom.c
-> @@ -0,0 +1,126 @@
-> +/*
-> + * Driver for Atmel Flexcom
-> + *
-> + * Copyright (C) 2015 Atmel Corporation
-> + *
-> + * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> @@ -0,0 +1,67 @@
+> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
 > +
-> +#include <linux/module.h>
-> +#include <linux/types.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/of.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/clk.h>
+> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
+> +controller and an USART. Only one function can be used at a time and is chosen
+> +at boot time according to the device tree.
 > +
-> +/* I/O register offsets */
-> +#define FLEX_MR		0x0	/* Mode Register */
-> +#define FLEX_VERSION	0xfc	/* Version Register */
+> +Required properties:
+> +- compatible:		"atmel,sama5d2-flexcom"
+> +- reg:			shall be the offset/length value for Flexcom dedicated
+> +			I/O registers (without USART, TWI or SPI registers).
+> +- clocks:		shall be the Flexcom peripheral clock from PMC.
+> +- #address-cells:	should be <1>
+> +- #size-cells:		should be <1>
+> +- ranges:		one range for the full I/O register region (including
+> +			USART, TWI and SPI registers).
 > +
-> +/* Mode Register bit fields */
-> +#define FLEX_MR_OPMODE_MASK	0x3
-> +#define FLEX_MR_OPMODE_NO_COM	0x0
-> +#define FLEX_MR_OPMODE_USART	0x1
-> +#define FLEX_MR_OPMODE_SPI	0x2
-> +#define FLEX_MR_OPMODE_TWI	0x3
-> +
-> +
-> +static int atmel_flexcom_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *child, *np = pdev->dev.of_node;
-> +	struct clk *clk;
-> +	struct resource *res;
-> +	void __iomem *base;
-> +	u32 opmode = FLEX_MR_OPMODE_NO_COM;
-> +	int err;
-> +
-> +	for_each_child_of_node(np, child) {
-> +		const char *compatible;
-> +		int cplen;
-> +
-> +		if (!of_device_is_available(child))
-> +			continue;
-> +
-> +		compatible = of_get_property(child, "compatible", &cplen);
-> +		if (!compatible || strlen(compatible) > cplen)
-> +			continue;
-> +
-> +		if (strstr(compatible, "-usart")) {
-> +			opmode = FLEX_MR_OPMODE_USART;
-> +			break;
-> +		}
-> +
-> +		if (strstr(compatible, "-spi")) {
-> +			opmode = FLEX_MR_OPMODE_SPI;
-> +			break;
-> +		}
-> +
-> +		if (strstr(compatible, "-i2c")) {
-> +			opmode = FLEX_MR_OPMODE_TWI;
-> +			break;
-> +		}
-> +	}
+> +Required child:
+> +a single available child for the serial controller to enable.
 
->From what I understand Flexcom is a wrapper which can sit above any
-number of SPI, I2C and/or UART devices.  Devices which you don't
-really have any control over (source code wise).  So wouldn't it be
-better to match on the details you do have control over i.e. the node
-name, rather than the compatible string?
+Not a fan of uppercase characters I see.
 
-I would personally match on of_find_node_by_name() to future-proof
-your implementation.
+Nevertheless, documentation looks fine and doesn't introduce any new
+properties, which we like.
 
-> +	if (opmode == FLEX_MR_OPMODE_NO_COM)
-> +		return -EINVAL;
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> +One of the following substrings must be found inside the compatible property of
+> +this child to enable the right serial controller:
+> +- "-usart"
+> +- "-spi"
+> +- "-i2c"
 > +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
+> +The reg property of this child should be:
+> +- <0x200 0x200> for USART
+> +- <0x400 0x200> for SPI
+> +- <0x600 0x200> for I2C
 > +
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk))
-> +		return PTR_ERR(clk);
+> +The phandle provided by the clocks property of the child is the same as one for
+> +the Flexcom parent.
 > +
-> +	err = clk_prepare_enable(clk);
-> +	if (err)
-> +		return err;
+> +Other properties remain unchanged. See documentation of the respective device:
+> +- ../serial/atmel-usart.txt
+> +- ../spi/spi_atmel.txt
+> +- ../i2c/i2c-at91.txt
 > +
-> +	/*
-> +	 * Set the Operating Mode in the Mode Register: only the selected device
-> +	 * is clocked. Hence, registers of the other serial devices remain
-> +	 * inaccessible and are read as zero. Also the external I/O lines of the
-> +	 * Flexcom are muxed to reach the selected device.
-> +	 */
-> +	writel(opmode, base + FLEX_MR);
+> +Example:
 > +
-> +	clk_disable_unprepare(clk);
+> +flexcom at f8034000 {
+> +	compatible = "atmel,sama5d2-flexcom";
+> +	reg = <0xf8034000 0x200>;
+> +	clocks = <&flx0_clk>;
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	ranges = <0x0 0xf8034000 0x800>;
 > +
-> +	return of_platform_populate(np, NULL, NULL, &pdev->dev);
-> +}
+> +	spi at f8034400 {
+> +		compatible = "atmel,at91rm9200-spi";
+> +		reg = <0x400 0x200>;
+> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_flx0_default>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		clocks = <&flx0_clk>;
+> +		clock-names = "spi_clk";
+> +		atmel,fifo-size = <32>;
 > +
-> +static const struct of_device_id atmel_flexcom_of_match[] = {
-> +	{ .compatible = "atmel,sama5d2-flexcom" },
-> +	{ /* sentinel */ }
+> +		mtd_dataflash at 0 {
+> +			compatible = "atmel,at25f512b";
+> +			reg = <0>;
+> +			spi-max-frequency = <20000000>;
+> +		};
+> +	};
 > +};
-> +MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
-> +
-> +static struct platform_driver atmel_flexcom_driver = {
-> +	.driver		= {
-> +		.name	= "atmel_flexcom",
-> +		.of_match_table = atmel_flexcom_of_match,
-> +	},
-> +	.probe		= atmel_flexcom_probe,
-> +};
-
-This way of lining code up looks weird.  I do like straight lines when
-code has the same indentation, but you're attempting to match lines at
-different levels (and not matching on lines that are on the same
-level).
-
-> +module_platform_driver(atmel_flexcom_driver);
-> +
-> +MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
-> +MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
-> +MODULE_LICENSE("GPL v2");
 
 -- 
 Lee Jones
