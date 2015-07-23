@@ -1,79 +1,173 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Thu, 23 Jul 2015 09:18:35 +0800
-Subject: [PATCH v3 0/5] Mediatek xHCI support
-In-Reply-To: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1437614315.3040.3.camel@mhfsdcap03>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Wed, 22 Jul 2015 18:58:54 -0700
+Subject: [3.13.y-ckt stable] Patch "clocksource: exynos_mct: Avoid blocking
+ calls in the cpu hotplug notifier" has been added to staging queue
+Message-ID: <1437616734-21317-1-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, add a title
+This is a note to let you know that I have just added a patch titled
 
-On Wed, 2015-07-22 at 22:05 +0800, Chunfeng Yun wrote:
-> From ac1e8724bfa47494223bad0af450c1a63cd2fe0c Mon Sep 17 00:00:00 2001
-> From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Date: Wed, 22 Jul 2015 21:15:15 +0800
-> Subject: [PATCH 0/5] *** SUBJECT HERE ***
-> 
-> The patch supports MediaTek's xHCI controller.
-> 
-> There are some differences from xHCI spec:
-> 1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
-> Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
-> much as that defined in xHCI spec.
-> 
-> 2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
-> number of packets that remain to be transferred for a TD after processing all
-> Max packets in all previous TRBs,that means don't include the current TRB's,
-> but in xHCI spec it includes the current ones.
-> 
-> 3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
-> architecture defines some extra SW scheduling parameters for HW. According to
-> these parameters provided by SW, the xHC can easily decide whether a
-> synchronous endpoint should be scheduled in a specific uFrame. The extra SW
-> scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
-> And a bandwidth scheduler algorithm is added to support such feature.
-> 
-> A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
-> supports two usb2.0 ports and one usb3.0 port.
-> 
-> Change in v3:
-> 1. implement generic phy
-> 2. move opperations for IPPC and wakeup from phy driver to xHCI driver
-> 3. seperate quirk functions into a single C file to fix up dependence issue
-> 
-> Chunfeng Yun (5):
->   dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
->   dt-bindings: Add a binding for Mediatek xHCI host controller
->   usb: phy: add usb3.0 phy driver for mt65xx SoCs
->   xhci: mediatek: support MTK xHCI host controller
->   arm64: dts: mediatek: add xHCI & usb phy for mt8173
-> 
->  .../devicetree/bindings/phy/phy-mt65xx-u3.txt      |  21 +
->  .../devicetree/bindings/usb/mt8173-xhci.txt        |  50 ++
->  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  15 +
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  31 +
->  drivers/phy/Kconfig                                |   9 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-mt65xx-usb3.c                      | 426 +++++++++++
->  drivers/usb/host/Kconfig                           |   9 +
->  drivers/usb/host/Makefile                          |   4 +
->  drivers/usb/host/xhci-mtk-sch.c                    | 436 +++++++++++
->  drivers/usb/host/xhci-mtk.c                        | 836 +++++++++++++++++++++
->  drivers/usb/host/xhci-mtk.h                        | 135 ++++
->  drivers/usb/host/xhci-ring.c                       |  35 +-
->  drivers/usb/host/xhci.c                            |  19 +-
->  drivers/usb/host/xhci.h                            |   1 +
->  15 files changed, 2021 insertions(+), 7 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-u3.txt
->  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
->  create mode 100644 drivers/phy/phy-mt65xx-usb3.c
->  create mode 100644 drivers/usb/host/xhci-mtk-sch.c
->  create mode 100644 drivers/usb/host/xhci-mtk.c
->  create mode 100644 drivers/usb/host/xhci-mtk.h
-> 
-> --
-> 1.8.1.1.dirty
-> 
-> In-Reply-To: 
-> 
+    clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier
+
+to the linux-3.13.y-queue branch of the 3.13.y-ckt extended stable tree 
+which can be found at:
+
+    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-3.13.y-queue
+
+This patch is scheduled to be released in version 3.13.11-ckt24.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.13.y-ckt tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Kamal
+
+------
+
+>From a20f75f426f0b67b72fe4e93f3abbeb6728bbfe2 Mon Sep 17 00:00:00 2001
+From: Damian Eppel <d.eppel@samsung.com>
+Date: Fri, 26 Jun 2015 15:23:04 +0200
+Subject: clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug
+ notifier
+
+commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
+
+Whilst testing cpu hotplug events on kernel configured with
+DEBUG_PREEMPT and DEBUG_ATOMIC_SLEEP we get following BUG message,
+caused by calling request_irq() and free_irq() in the context of
+hotplug notification (which is in this case atomic context).
+
+[   40.785859] CPU1: Software reset
+[   40.786660] BUG: sleeping function called from invalid context at mm/slub.c:1241
+[   40.786668] in_atomic(): 1, irqs_disabled(): 128, pid: 0, name: swapper/1
+[   40.786678] Preemption disabled at:[<  (null)>]   (null)
+[   40.786681]
+[   40.786692] CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.19.0-rc4-00024-g7dca860 #36
+[   40.786698] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   40.786728] [<c0014a00>] (unwind_backtrace) from [<c0011980>] (show_stack+0x10/0x14)
+[   40.786747] [<c0011980>] (show_stack) from [<c0449ba0>] (dump_stack+0x70/0xbc)
+[   40.786767] [<c0449ba0>] (dump_stack) from [<c00c6124>] (kmem_cache_alloc+0xd8/0x170)
+[   40.786785] [<c00c6124>] (kmem_cache_alloc) from [<c005d6f8>] (request_threaded_irq+0x64/0x128)
+[   40.786804] [<c005d6f8>] (request_threaded_irq) from [<c0350b8c>] (exynos4_local_timer_setup+0xc0/0x13c)
+[   40.786820] [<c0350b8c>] (exynos4_local_timer_setup) from [<c0350ca8>] (exynos4_mct_cpu_notify+0x30/0xa8)
+[   40.786838] [<c0350ca8>] (exynos4_mct_cpu_notify) from [<c003b330>] (notifier_call_chain+0x44/0x84)
+[   40.786857] [<c003b330>] (notifier_call_chain) from [<c0022fd4>] (__cpu_notify+0x28/0x44)
+[   40.786873] [<c0022fd4>] (__cpu_notify) from [<c0013714>] (secondary_start_kernel+0xec/0x150)
+[   40.786886] [<c0013714>] (secondary_start_kernel) from [<40008764>] (0x40008764)
+
+Interrupts cannot be requested/freed in the CPU_STARTING/CPU_DYING
+notifications which run on the hotplugged cpu with interrupts and
+preemption disabled.
+
+To avoid the issue, request the interrupts for all possible cpus in
+the boot code. The interrupts are marked NO_AUTOENABLE to avoid a racy
+request_irq/disable_irq() sequence. The flag prevents the
+request_irq() code from enabling the interrupt immediately.
+
+The interrupt is then enabled in the CPU_STARTING notifier of the
+hotplugged cpu and again disabled with disable_irq_nosync() in the
+CPU_DYING notifier.
+
+[ tglx: Massaged changelog to match the patch ]
+
+Fixes: 7114cd749a12 ("clocksource: exynos_mct: use (request/free)_irq calls for local timer registration")
+Reported-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Marcin Jabrzyk <m.jabrzyk@samsung.com>
+Signed-off-by: Damian Eppel <d.eppel@samsung.com>
+Cc: m.szyprowski at samsung.com
+Cc: kyungmin.park at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: kgene at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1435324984-7328-1-git-send-email-d.eppel at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ drivers/clocksource/exynos_mct.c | 43 ++++++++++++++++++++++++++++------------
+ 1 file changed, 30 insertions(+), 13 deletions(-)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index 12fbec7..fc0e502 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -418,15 +418,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ 	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
+
+ 	if (mct_int_type == MCT_INT_SPI) {
+-		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
+-		if (request_irq(evt->irq, exynos4_mct_tick_isr,
+-				IRQF_TIMER | IRQF_NOBALANCING,
+-				evt->name, mevt)) {
+-			pr_err("exynos-mct: cannot register IRQ %d\n",
+-				evt->irq);
++
++		if (evt->irq == -1)
+ 			return -EIO;
+-		}
+-		irq_force_affinity(mct_irqs[MCT_L0_IRQ + cpu], cpumask_of(cpu));
++
++		irq_force_affinity(evt->irq, cpumask_of(cpu));
++		enable_irq(evt->irq);
+ 	} else {
+ 		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+ 	}
+@@ -439,10 +436,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
+ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+ {
+ 	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+-	if (mct_int_type == MCT_INT_SPI)
+-		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
+-	else
++	if (mct_int_type == MCT_INT_SPI) {
++		if (evt->irq != -1)
++			disable_irq_nosync(evt->irq);
++	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
++	}
+ }
+
+ static int exynos4_mct_cpu_notify(struct notifier_block *self,
+@@ -474,7 +473,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+
+ static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+ {
+-	int err;
++	int err, cpu;
+ 	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+ 	struct clk *mct_clk, *tick_clk;
+
+@@ -501,7 +500,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+ 		WARN(err, "MCT: can't request IRQ %d (%d)\n",
+ 		     mct_irqs[MCT_L0_IRQ], err);
+ 	} else {
+-		irq_set_affinity(mct_irqs[MCT_L0_IRQ], cpumask_of(0));
++		for_each_possible_cpu(cpu) {
++			int mct_irq = mct_irqs[MCT_L0_IRQ + cpu];
++			struct mct_clock_event_device *pcpu_mevt =
++				per_cpu_ptr(&percpu_mct_tick, cpu);
++
++			pcpu_mevt->evt.irq = -1;
++
++			irq_set_status_flags(mct_irq, IRQ_NOAUTOEN);
++			if (request_irq(mct_irq,
++					exynos4_mct_tick_isr,
++					IRQF_TIMER | IRQF_NOBALANCING,
++					pcpu_mevt->name, pcpu_mevt)) {
++				pr_err("exynos-mct: cannot register IRQ (cpu%d)\n",
++									cpu);
++
++				continue;
++			}
++			pcpu_mevt->evt.irq = mct_irq;
++		}
+ 	}
+
+ 	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
+--
+1.9.1
