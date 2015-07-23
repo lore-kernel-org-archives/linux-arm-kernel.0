@@ -1,38 +1,18 @@
 From: kamal@canonical.com (Kamal Mostafa)
-Date: Wed, 22 Jul 2015 18:58:54 -0700
-Subject: [3.13.y-ckt stable] Patch "clocksource: exynos_mct: Avoid blocking
- calls in the cpu hotplug notifier" has been added to staging queue
-Message-ID: <1437616734-21317-1-git-send-email-kamal@canonical.com>
+Date: Wed, 22 Jul 2015 19:00:09 -0700
+Subject: [PATCH 3.13.y-ckt 091/132] clocksource: exynos_mct: Avoid blocking
+ calls in the cpu hotplug notifier
+In-Reply-To: <1437616850-23266-1-git-send-email-kamal@canonical.com>
+References: <1437616850-23266-1-git-send-email-kamal@canonical.com>
+Message-ID: <1437616850-23266-92-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a note to let you know that I have just added a patch titled
+3.13.11-ckt24 -stable review patch.  If anyone has any objections, please let me know.
 
-    clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier
+------------------
 
-to the linux-3.13.y-queue branch of the 3.13.y-ckt extended stable tree 
-which can be found at:
-
-    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-3.13.y-queue
-
-This patch is scheduled to be released in version 3.13.11-ckt24.
-
-If you, or anyone else, feels it should not be added to this tree, please 
-reply to this email.
-
-For more information about the 3.13.y-ckt tree, see
-https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
-
-Thanks.
--Kamal
-
-------
-
->From a20f75f426f0b67b72fe4e93f3abbeb6728bbfe2 Mon Sep 17 00:00:00 2001
 From: Damian Eppel <d.eppel@samsung.com>
-Date: Fri, 26 Jun 2015 15:23:04 +0200
-Subject: clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug
- notifier
 
 commit 56a94f13919c0db5958611b388e1581b4852f3c9 upstream.
 
@@ -98,7 +78,7 @@ index 12fbec7..fc0e502 100644
 +++ b/drivers/clocksource/exynos_mct.c
 @@ -418,15 +418,12 @@ static int exynos4_local_timer_setup(struct clock_event_device *evt)
  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
-
+ 
  	if (mct_int_type == MCT_INT_SPI) {
 -		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
 -		if (request_irq(evt->irq, exynos4_mct_tick_isr,
@@ -131,17 +111,17 @@ index 12fbec7..fc0e502 100644
  		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
 +	}
  }
-
+ 
  static int exynos4_mct_cpu_notify(struct notifier_block *self,
 @@ -474,7 +473,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
-
+ 
  static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
  {
 -	int err;
 +	int err, cpu;
  	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
  	struct clk *mct_clk, *tick_clk;
-
+ 
 @@ -501,7 +500,25 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
  		WARN(err, "MCT: can't request IRQ %d (%d)\n",
  		     mct_irqs[MCT_L0_IRQ], err);
@@ -167,7 +147,7 @@ index 12fbec7..fc0e502 100644
 +			pcpu_mevt->evt.irq = mct_irq;
 +		}
  	}
-
+ 
  	err = register_cpu_notifier(&exynos4_mct_cpu_nb);
---
+-- 
 1.9.1
