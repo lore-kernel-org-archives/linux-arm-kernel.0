@@ -1,60 +1,60 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 23 Jul 2015 17:18:14 +0200
-Subject: [PATCH v8 8/9] nvmem: sunxi: Move the SID driver to the nvmem
- framework
-In-Reply-To: <1437403462-4432-1-git-send-email-srinivas.kandagatla@linaro.org>
+Date: Thu, 23 Jul 2015 17:26:40 +0200
+Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1437403462-4432-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55B105B6.7000502@i2se.com>
+ <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <55B107B0.5010706@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Srinivas,
 
-Am 20.07.2015 um 16:44 schrieb Srinivas Kandagatla:
-> From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Am 20.07.2015 um 16:43 schrieb Srinivas Kandagatla:
+> This patch adds just providers part of the framework just to enable easy
+> review.
 >
-> Now that we have the nvmem framework, we can consolidate the common
-> driver code. Move the driver to the framework, and hopefully, it will
-> fix the sysfs file creation race.
+> Up until now, NVMEM drivers like eeprom were stored in drivers/misc,
+> where they all had to duplicate pretty much the same code to register
+> a sysfs file, allow in-kernel users to access the content of the devices
+> they were driving, etc.
+>
+> This was also a problem as far as other in-kernel users were involved,
+> since the solutions used were pretty much different from on driver to
+> another, there was a rather big abstraction leak.
+>
+> This introduction of this framework aims at solving this. It also
+> introduces DT representation for consumer devices to go get the data
+> they require (MAC Addresses, SoC/Revision ID, part numbers, and so on)
+> from the nvmems.
+>
+> Having regmap interface to this framework would give much better
+> abstraction for nvmems on different buses.
 >
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> [srinivas.kandagatla: Moved to regmap based EEPROM framework]
+> [Maxime Ripard: intial version of eeprom framework]
 > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 > ---
->  Documentation/ABI/testing/sysfs-driver-sunxi-sid   |  22 ---
->  .../bindings/misc/allwinner,sunxi-sid.txt          |  17 ---
->  .../bindings/nvmem/allwinner,sunxi-sid.txt         |  21 +++
->  drivers/misc/eeprom/Kconfig                        |  13 --
->  drivers/misc/eeprom/Makefile                       |   1 -
->  drivers/misc/eeprom/sunxi_sid.c                    | 156 --------------------
->  drivers/nvmem/Kconfig                              |  11 ++
->  drivers/nvmem/Makefile                             |   2 +
->  drivers/nvmem/sunxi_sid.c                          | 159 +++++++++++++++++++++
->  9 files changed, 193 insertions(+), 209 deletions(-)
->  delete mode 100644 Documentation/ABI/testing/sysfs-driver-sunxi-sid
->  delete mode 100644 Documentation/devicetree/bindings/misc/allwinner,sunxi-sid.txt
->  create mode 100644 Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
->  delete mode 100644 drivers/misc/eeprom/sunxi_sid.c
->  create mode 100644 drivers/nvmem/sunxi_sid.c
->
-> [...]
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index ff44fe9..4328b93 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -8,3 +8,5 @@ nvmem_core-y			:= core.o
->  # Devices
->  obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
->  nvmem_qfprom-y			:= qfprom.o
-> +obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
-> +nvmem_sunxi_sid-y		:= sunxi_sid.o
+>  drivers/Kconfig                |   2 +
+>  drivers/Makefile               |   1 +
+>  drivers/nvmem/Kconfig          |  13 ++
+>  drivers/nvmem/Makefile         |   6 +
+>  drivers/nvmem/core.c           | 384 +++++++++++++++++++++++++++++++++++++++++
+>  include/linux/nvmem-consumer.h |  23 +++
+>  include/linux/nvmem-provider.h |  47 +++++
+>  7 files changed, 476 insertions(+)
+>  create mode 100644 drivers/nvmem/Kconfig
+>  create mode 100644 drivers/nvmem/Makefile
+>  create mode 100644 drivers/nvmem/core.c
+>  create mode 100644 include/linux/nvmem-consumer.h
+>  create mode 100644 include/linux/nvmem-provider.h
 
-is it really necessary to have 2 lines for a single driver?
+i've tested this patch with my mxs-ocotp driver [1].
 
-Why not the following line?
+So you can add
 
-obj-$(CONFIG_NVMEM_SUNXI_SID)	+= sunxi_sid.o
+Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
 
 Regards
 Stefan
