@@ -1,44 +1,68 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Jul 2015 15:58:45 +0530
-Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc
- clocks
-In-Reply-To: <55B0B255.9050803@mm-sol.com>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
- <55B03CE9.4050903@codeaurora.org> <55B0A710.9080209@codeaurora.org>
- <55B0B255.9050803@mm-sol.com>
-Message-ID: <55B0C1DD.3080908@codeaurora.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 23 Jul 2015 12:37:58 +0200
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <744357E9AAD1214791ACBA4B0B9092630153E699@SHSMSX101.ccr.corp.intel.com>
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+ <9hhk2tteqb3.fsf@e105922-lin.cambridge.arm.com>
+ <744357E9AAD1214791ACBA4B0B9092630153E699@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <20150723103758.GI18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Zhang,
+
+On Tue, Jul 21, 2015 at 01:35:31PM +0000, Zhang, Rui wrote:
+> > >
+> Patch applied.
+
+Thanks for applying. I missed to convert another place, so we get a new
+compiler warning. The attached patch fixes this (suitable for git rebase
+--autosquash). Please let me know if you can handle this or if you
+prefer a new patch instead.
+
+Thanks
+ Sascha
 
 
-On 07/23/2015 02:52 PM, Stanimir Varbanov wrote:
-> On 07/23/2015 11:34 AM, Rajendra Nayak wrote:
->> On 07/23/2015 06:31 AM, Stephen Boyd wrote:
->>> On 07/22/2015 12:10 AM, Rajendra Nayak wrote:
->>>> @@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain
->>>> *domain)
->>>>        return gdsc_toggle_logic(sc, false);
->>>>    }
->>>> +static int gdsc_attach(struct generic_pm_domain *domain, struct
->>>> device *dev)
->>>> +{
->>>> +    int ret;
->>>> +    struct gdsc *sc = domain_to_gdsc(domain);
->>>> +    char **con_id, *con_ids[] = { "core", "iface", NULL };
->>>
->>> const?
->>>
->>> This is where I get scared of sniffing too much SoC glue. What's to
->>> enforce the "core", and "iface" naming scheme? What's to enforce there
->>> being two clocks vs. one? Maybe a better approach would be to use
->>> of_clk_get() and iterate through all clocks of the device, or to encode
->>> the clock names in the gdsc structure.
->>
->> I had the clock names in the gdsc structure in v5. I should probably go
->> back to having it that way.
->
-> Rajendra, If you decide to go back please look at that comment [1], as well.
+-----------------------------8<-------------------------------------
 
-yes, thanks, I will.
+>From 4907a7c32fd16eaf9f31d9f904276c9a0176b717 Mon Sep 17 00:00:00 2001
+From: Sascha Hauer <s.hauer@pengutronix.de>
+Date: Thu, 23 Jul 2015 12:32:31 +0200
+Subject: [PATCH] fixup! thermal: consistently use int for temperatures
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+fixes:
+drivers/power/charger-manager.c: In function ?cm_get_battery_temperature?:
+drivers/power/charger-manager.c:622:45: warning: passing argument 2 of ?thermal_zone_get_temp? from incompatible pointer type
+   ret = thermal_zone_get_temp(cm->tzd_batt, (unsigned long *)temp);
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ drivers/power/charger-manager.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-manager.c
+index 1c202cc..907293e 100644
+--- a/drivers/power/charger-manager.c
++++ b/drivers/power/charger-manager.c
+@@ -619,7 +619,7 @@ static int cm_get_battery_temperature(struct charger_manager *cm,
+ 
+ #ifdef CONFIG_THERMAL
+ 	if (cm->tzd_batt) {
+-		ret = thermal_zone_get_temp(cm->tzd_batt, (unsigned long *)temp);
++		ret = thermal_zone_get_temp(cm->tzd_batt, temp);
+ 		if (!ret)
+ 			/* Calibrate temperature unit */
+ 			*temp /= 100;
+-- 
+2.1.4
+
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
