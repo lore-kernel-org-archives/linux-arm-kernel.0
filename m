@@ -1,55 +1,54 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Thu, 23 Jul 2015 11:54:47 +0200
-Subject: [PATCH v2] ARM: dts: i.MX35: Fix can support.
-In-Reply-To: <55B0B87D.5070800@i2se.com>
-References: <20150722180434.GA745@pengutronix.de>
- <1437640272-5054-1-git-send-email-denis@eukrea.com>
- <55B0ACBD.6030903@i2se.com> <55B0B3E8.20900@pengutronix.de>
- <55B0B87D.5070800@i2se.com>
-Message-ID: <55B0B9E7.6040109@pengutronix.de>
+From: alexander.stein@systec-electronic.com (Alexander Stein)
+Date: Thu, 23 Jul 2015 12:11:28 +0200
+Subject: [PATCH 3/3] arm: dts: ls1021a: Add snps,
+ configure-gfladj property to USB3 node
+In-Reply-To: <1437646378-1910-1-git-send-email-nikhil.badola@freescale.com>
+References: <1437646378-1910-1-git-send-email-nikhil.badola@freescale.com>
+Message-ID: <1564365.o2o69FAsZI@ws-stein>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 11:48 AM, Stefan Wahren wrote:
-> Am 23.07.2015 um 11:29 schrieb Marc Kleine-Budde:
->> On 07/23/2015 10:58 AM, Stefan Wahren wrote:
->>> Hi Denis,
->>>
->>> [ add Marc to CC ]
->>>
->>> Am 23.07.2015 um 10:31 schrieb Denis Carikli:
->>>> Since commit 3d42a379b6fa5b46058e3302b1802b29f64865bb
->>>> ("can: flexcan: add 2nd clock to support imx53 and newer")
->>>> the can driver requires a dt nodes to have a second clock.
->>>> Add them to imx35 to fix probing the flex can driver on the
->>>> respective platforms.
->>> could you describe the problem more in detail or do you have a log in
->>> case the probing failed?
->>>
->>> According to Marc's commit this fix shouldn't be necessary.
->> In the pre DT era and without a clock name, a single clock is
->> sufficient. But with clock name or DT with clock-name you need both a
->> "ipg" and a "per" clock. The imx35.dtsi was added with one clock only,
->> so it was probably never working on mx35 with DT.
+On Thursday 23 July 2015 15:42:58, Nikhil Badola wrote:
+> Add "snps,configure-gfladj" boolean property to USB3 node. This property
+                      ^^^^^^
+This does not match...
+
+> is used to determine if frame length adjustment is required
 > 
-> Okay the other plaforms like mx25 and mx28 already had 2 clocks defined.
+> Signed-off-by: Nikhil Badola <nikhil.badola@freescale.com>
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> But why doesn't say the binding doc nothing about those required clocks?
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index c70bb27..f03f842 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -404,6 +404,7 @@
+>  			reg = <0x0 0x3100000 0x0 0x10000>;
+>  			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
+>  			dr_mode = "host";
+> +			snps,configure-fladj = <0x20>;
+                             ^^^^^
+...that. The same is for the subject. I guess these "gfladj" are just leftovers as patch 1 & 2 talk about "fladj"
 
-Good question - Dokumentation bug...
-
-Marc
-
+Best regards,
+Alexander
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+Dipl.-Inf. Alexander Stein
+SYS TEC electronic GmbH
+alexander.stein at systec-electronic.com
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 455 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150723/c0a6912e/attachment.sig>
+Legal and Commercial Address:
+Am Windrad 2
+08468 Heinsdorfergrund
+Germany
+
+Office: +49 (0) 3765 38600-0
+Fax:    +49 (0) 3765 38600-4100
+ 
+Managing Directors:
+	Director Technology/CEO: Dipl.-Phys. Siegmar Schmidt;
+	Director Commercial Affairs/COO: Dipl. Ing. (FH) Armin von Collrepp
+Commercial Registry:
+	Amtsgericht Chemnitz, HRB 28082; USt.-Id Nr. DE150534010
