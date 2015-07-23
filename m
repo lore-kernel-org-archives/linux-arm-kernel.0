@@ -1,46 +1,65 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 14:48:00 +0100
-Subject: [PATCH 1/2] MAINTAINERS: add Device Tree binding doc for
- max77686 regulator
-In-Reply-To: <1437121078-26409-2-git-send-email-javier@osg.samsung.com>
-References: <1437121078-26409-1-git-send-email-javier@osg.samsung.com>
- <1437121078-26409-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <20150723134800.GD3436@x1>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 23 Jul 2015 13:57:38 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: hwmod fixes for v4.2-rc
+Message-ID: <alpine.DEB.2.02.1507231357020.29543@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jul 2015, Javier Martinez Canillas wrote:
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-> The Device Tree binding documentation for the Maxim max77686 regulators
-> has been moved from the Multi-Function Device DT binding section to its
-> own Documentation/devicetree/bindings/regulator/max77686.txt file.
-> 
-> Use a wilcard so both the mfd and regulator DT bindings are resolved.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Tony,
 
-Applied, thanks.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2af741410533..d802d19a4ecc 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -6583,7 +6583,7 @@ F:	drivers/extcon/extcon-max77693.c
->  F:	drivers/rtc/rtc-max77686.c
->  F:	drivers/clk/clk-max77686.c
->  F:	Documentation/devicetree/bindings/mfd/max14577.txt
-> -F:	Documentation/devicetree/bindings/mfd/max77686.txt
-> +F:	Documentation/devicetree/bindings/*/max77686.txt
->  F:	Documentation/devicetree/bindings/mfd/max77693.txt
->  F:	Documentation/devicetree/bindings/clock/maxim,max77686.txt
->  F:	include/linux/mfd/max14577*.h
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.2-rc/omap-fixes-a
+
+for you to fetch changes up to 9a258afa928b45e6dd2efcac46ccf7eea705d35a:
+
+  ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc (2015-07-23 06:35:25 -0600)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: hwmod fixes for v4.2-rc
+
+Two fixes against v4.2-rc1.  The first, for DRA7xx platforms,
+corrects some incorrect GPMC hardware description data.  The
+second one will ensure that the hwmod code will wait for any
+module with CPU-accessible registers to become ready before
+attempting to access it.
+
+Basic build, boot, and PM test logs are available here:
+
+http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2-rc/20150723065408/
+
+Note that I do not have a DRA7xx or AM43xx board, and therefore
+cannot test on those platforms.
+
+- ----------------------------------------------------------------
+Roger Quadros (2):
+      ARM: DRA7: hwmod: fix gpmc hwmod
+      ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc
+
+ arch/arm/mach-omap2/omap_hwmod.c          | 24 ++++++++++++++++--------
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  5 ++---
+ 2 files changed, 18 insertions(+), 11 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJVsPKkAAoJEMePsQ0LvSpLcXoP/1WSdYaC65HEPHJjDV3Wpq5L
+vKmjqXnLiYzcpdjX7ByTa0SiUwMRNie4P0N1Zm0yTjRCoJIrnmAI/GB9ZXq/E7wN
+RTTZoEaq+Cqt69JY4xySL8ASTgXPMZkelNOH9JO8/yMWHKE3WEDnhDJ32QN/3Isf
+WF7GDJQC/utlHS4BgFoQBpBv2LSgrqrt+TsX1CKqWhvVTd4moPNBXtNoCb7VC5P3
+ciuUWNFi4y+g1zAPyhe/Q1bzRyDRefEFUesyRx3aHGpTd3VLHWvSK9tEqSjt+EM4
+LA/l5lRHjAFcTGuSBRytpE1zhPW7+gSWgFLsJYDnfXmo7Sp9IgFr3Dcbcj++Sbj0
+HD64ZXQPfn0WRPphZNh8h6+KWVfXv9x8pLmAzy7zn2w7qPBEWMurjbdvUSF2aczZ
+tU+kf+YAyOwA36Goj+NeBqdno0lHPU7++HeHywx5znNFpExqQ+r/T0pOqAmDxPJS
+PFUSE67ax+AkIyS9syCaTDYrj3Al5pOvqjWdMgtETKZdfDbK1r5dFdv+ywO1hIKj
+Y5/n8rBfRZRL33Y6pd/kvEf9y7vMgMMhUDfEX1QJoh0karrvLPJGtBQhRs11n11Q
+PZ+MOh5I6ZPz3zTlcAyCqKVeebcJN5DQmuntuK3raDDllPGGrgPO2vNsjbqSC9DO
++z4jg0SH51c0LgK/Eum5
+=UnJq
+-----END PGP SIGNATURE-----
