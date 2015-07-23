@@ -1,66 +1,71 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 23 Jul 2015 10:30:14 +0200
-Subject: [PATCH] PM / devfreq: event: Remove incorrect property in
- exynos-ppmu DT binding
-In-Reply-To: <55B0A376.2080906@samsung.com>
-References: <1436770732-9430-1-git-send-email-javier@osg.samsung.com>
- <55B0A376.2080906@samsung.com>
-Message-ID: <55B0A616.2070608@osg.samsung.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 23 Jul 2015 10:30:21 +0200
+Subject: [PATCH v2 2/2] ARM: rockchip: enable PMU_GPIOINT_WAKEUP_EN when
+ entering shallow suspend
+In-Reply-To: <4610448.RXXf22Qoxl@diego>
+References: <4610448.RXXf22Qoxl@diego>
+Message-ID: <119805978.5m38dsFzWM@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Chanwoo,
+PMU_GPIOINT_WAKEUP_EN seems needed when entering the shallow suspend
+(with logic staying on) but does not seem to be needed for the deep
+suspend for unknown reasons.
+Testing revealed that this setting really is necessary to reliably
+resume the veyron devices from suspend.
 
-On 07/23/2015 10:19 AM, Chanwoo Choi wrote:
-> Hi Javier,
-> 
-> On 07/13/2015 03:58 PM, Javier Martinez Canillas wrote:
->> The exynos-ppmu driver is only a clock consumer and not a clock
->> provider but its Device Tree binding listed #clock-cells as an
->> optional property.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> 
->> ---
->> 
->> Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt | 1
->> - 1 file changed, 1 deletion(-)
->> 
->> diff --git
->> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
->> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
->> index b54bf3a2ff57..aed486692880 100644 ---
->> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
->> +++
->> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
->> @@ -17,7 +17,6 @@ Required properties: Optional properties: -
->> clock-names : the name of clock used by the PPMU, "ppmu" - clocks :
->> phandles for clock specified in "clock-names" property --
->> #clock-cells: should be 1.
->> 
->> Example1 : PPMU nodes in exynos3250.dtsi are listed below.
->> 
->> 
-> 
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> 
-> + Devfreq maintainer (Myungjoo Ham)
+Reported-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-rockchip/pm.c | 9 ++++++---
+ arch/arm/mach-rockchip/pm.h | 1 +
+ 2 files changed, 7 insertions(+), 3 deletions(-)
 
-Thanks for the review and for cc'ing Myungjoo. The get_maintainer.pl script
-didn't tell me that so I think Documentation/devicetree/bindings/devfreq/
-sub-dir should be added to the DEVICE FREQUENCY (DEVFREQ) entry in the
-MAINTAINERS file.
-
-> I think that this patch will be more appropriate on devfreq git tree 
-> than linux-samsung git tree.
->
-
-Agreed.
-
-> Thanks, Chanwoo Choi --
-
-Best regards,
+diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+index 04d3028..801541e 100644
+--- a/arch/arm/mach-rockchip/pm.c
++++ b/arch/arm/mach-rockchip/pm.c
+@@ -123,9 +123,6 @@ static void rk3288_slp_mode_set(int level)
+ 	regmap_write(sgrf_regmap, RK3288_SGRF_FAST_BOOT_ADDR,
+ 		     rk3288_bootram_phy);
+ 
+-	regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
+-		     PMU_ARMINT_WAKEUP_EN);
+-
+ 	mode_set = BIT(PMU_GLOBAL_INT_DISABLE) | BIT(PMU_L2FLUSH_EN) |
+ 		   BIT(PMU_SREF0_ENTER_EN) | BIT(PMU_SREF1_ENTER_EN) |
+ 		   BIT(PMU_DDR0_GATING_EN) | BIT(PMU_DDR1_GATING_EN) |
+@@ -146,6 +143,9 @@ static void rk3288_slp_mode_set(int level)
+ 		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+ 			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+ 
++		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
++			     PMU_ARMINT_WAKEUP_EN);
++
+ 		/* 30ms on a 32kHz clock for osc and pmic stabilization */
+ 		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 32 * 30);
+ 		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
+@@ -157,6 +157,9 @@ static void rk3288_slp_mode_set(int level)
+ 		 */
+ 		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
+ 
++		regmap_write(pmu_regmap, RK3288_PMU_WAKEUP_CFG1,
++			     PMU_ARMINT_WAKEUP_EN | PMU_GPIOINT_WAKEUP_EN);
++
+ 		/* 30ms on a 24MHz clock for osc and pmic stabilization */
+ 		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 24000 * 30);
+ 		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
+diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
+index 8a55ee2..b5af26f 100644
+--- a/arch/arm/mach-rockchip/pm.h
++++ b/arch/arm/mach-rockchip/pm.h
+@@ -61,6 +61,7 @@ static inline void rockchip_suspend_init(void)
+ 
+ /* PMU_WAKEUP_CFG1 bits */
+ #define PMU_ARMINT_WAKEUP_EN		BIT(0)
++#define PMU_GPIOINT_WAKEUP_EN		BIT(3)
+ 
+ enum rk3288_pwr_mode_con {
+ 	PMU_PWR_MODE_EN = 0,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.1.4
