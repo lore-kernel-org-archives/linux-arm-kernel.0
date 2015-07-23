@@ -1,57 +1,109 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 23 Jul 2015 15:46:50 -0400 (EDT)
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <55B07048.3000609@tul.cz>
-Message-ID: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 23 Jul 2015 21:48:57 +0200
+Subject: [PATCH v7 1/2] mfd: devicetree: add bindings for Atmel Flexcom
+In-Reply-To: <60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
+References: <cover.1437669004.git.cyrille.pitchen@atmel.com>
+ <60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
+Message-ID: <20150723214857.4322c758@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Petr Cvek wrote:
+On Thu, 23 Jul 2015 18:42:55 +0200
+Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
 
-> Hello,
+> This patch documents the DT bindings for the Atmel Flexcom which will be
+> introduced by sama5d2x SoCs. These bindings will be used by the actual
+> Flexcom driver to be sent in another patch.
 > 
-> Is this:
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> ---
+>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
 > 
-> 	case USB_ENDPOINT_XFER_INT:
-> 		/* Bulk endpoints handle interrupt transfers,
-> 		 * except the toggle-quirky iso-synch kind
-> 		 */
-> 		if (!ep->caps.type_int && !ep->caps.type_bulk)
-> 			return 0;
-> 
-> ... or original:
-> 
-> 			switch (type) {
-> 			case USB_ENDPOINT_XFER_INT:
-> 				/* bulk endpoints handle interrupt transfers,
-> 				 * except the toggle-quirky iso-synch kind
-> 				 */
-> 				if ('s' == tmp[2])	{// == "-iso"
-> 					return 0;
-> 
-> code still valid? 
+> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> new file mode 100644
+> index 000000000000..a63226b7a9cb
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> @@ -0,0 +1,68 @@
+> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
+> +
+> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
+> +controller and an USART. Only one function can be used at a time and is chosen
+> +at boot time according to the device tree.
+> +
+> +Required properties:
+> +- compatible:		Should be "atmel,sama5d2-flexcom"
+> +- reg:			Should be the pair (offset, size) for the Flexcom
+> +			dedicated I/O registers (without USART, TWI or SPI
+> +			registers).
+> +- clocks:		Should be the Flexcom peripheral clock from PMC.
+> +- #address-cells:	Should be <2>
+> +- #size-cells:		Should be <1>
+> +- ranges:		Should be a list of ranges.
+> +			One range per peripheral wrapped by the Flexcom. So each
+> +			range is a triplet (child_addr, parent_addr, size). The
+> +			first u32 of "child_addr" is the value to be set in the
+> +			Operating Mode bitfield of the Flexcom Mode Register.
+> +			Then "parent_addr" stores the base address of the
+> +			corresponding peripheral in the system memory. Finally,
+> +			"size" if the size of the memory region of this
+> +			peripheral.
+> +
+> +Required child:
+> +A single available child for the serial controller to enable.
+> +
+> +Required properties of this child:
+> +- reg:			Should be a pair (child_addr, size) with child_addr
+> +			matching one of the parent ranges.
+> +- clocks:		Should be the very same phandle as for the parent's one.
+> +
+> +Other properties remain unchanged. See documentation of the respective device:
+> +- ../serial/atmel-usart.txt
+> +- ../spi/spi_atmel.txt
+> +- ../i2c/i2c-at91.txt
+> +
+> +Example:
+> +
+> +flexcom at f8034000 {
+> +	compatible = "atmel,sama5d2-flexcom";
+> +	reg = <0xf8034000 0x200>;
+> +	clocks = <&flx0_clk>;
+> +	#address-cells = <2>;
+> +	#size-cells = <1>;
+> +	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
+> +		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
+> +		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
+> +
+> +	spi at f8034400 {
 
-It's hard to understand your question.  Are you asking whether this 
-code is still present in the current version of the kernel?  You can 
-find out for yourself easily enough.
+Should be:
 
-> It seems that it allows using a BULK endpoint for requested INT
-> endpoint. For my PXA27x machine the original code returns BULK EP
-> even with valid INT endpoint definition (because BULK EPs are defined
-> earlier than INT EPs).
+	spi at 2,0 {
 
-Yes, it does allow a bulk endpoint to be used when an interrupt 
-endpoint was requested.  However, it won't return a bulk endpoint if 
-all the bulk endpoints are already in use.
+> +		compatible = "atmel,at91rm9200-spi";
+> +		reg = <2 0 0x200>;
+> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_flx0_default>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		clocks = <&flx0_clk>;
+> +		clock-names = "spi_clk";
+> +		atmel,fifo-size = <32>;
+> +
+> +		mtd_dataflash at 0 {
+> +			compatible = "atmel,at25f512b";
+> +			reg = <0>;
+> +			spi-max-frequency = <20000000>;
+> +		};
+> +	};
+> +};
 
-> This part of the code is from pre git era
-> 
-> 	1da177e4c3f41524e886b7f1b8a0c1fc7321cac2
-> 
-> before pxa27x driver was written and only few chips was supported.
-> Does anyone know if the INT endpoints works now?
 
-What makes you think they might not work?
 
-Alan Stern
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
