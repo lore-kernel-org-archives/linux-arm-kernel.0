@@ -1,71 +1,34 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 23 Jul 2015 02:48:01 +0200
-Subject: [PATCH 1/3] ARM: OMAP2+: N900: always enable IBE bit
+Date: Thu, 23 Jul 2015 02:48:02 +0200
+Subject: [PATCH 2/3] ARM: update errata 430973 documentation
 In-Reply-To: <1437612483-30160-1-git-send-email-sre@kernel.org>
 References: <1437612483-30160-1-git-send-email-sre@kernel.org>
-Message-ID: <1437612483-30160-2-git-send-email-sre@kernel.org>
+Message-ID: <1437612483-30160-3-git-send-email-sre@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel's workaround for Errata 430973 consists of a BTAC/BTB
-flush at context switch. This requires the IBE bit being set, which
-should normally be done by the bootloader.
-
-Since the Nokia N900's bootloader is not easily replaceable,
-a pdata quirk enables the IBE bit for the Nokia N900. Until
-e748994f5cc5, the flush at context switch required
-CONFIG_ARM_ERRATA_430973, so the same check has been used
-for setting the IBE bit.
-
-Since all sold N900s are assumed to be affected, the guard
-can be removed now, so that the IBE bit is always set.
+The Errata 430973 workaround config option only enables the
+IBE bit, which should be done by the bootloader if possible.
 
 Signed-off-by: Sebastian Reichel <sre@kernel.org>
 ---
- arch/arm/mach-omap2/board-rx51.c   |  2 --
- arch/arm/mach-omap2/pdata-quirks.c | 11 ++---------
- 2 files changed, 2 insertions(+), 11 deletions(-)
+ arch/arm/Kconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index 2d1e5a6..3df01cc 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -108,11 +108,9 @@ static void __init rx51_init(void)
- 	rx51_peripherals_init();
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 1c50210..0e4929b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1078,6 +1078,10 @@ config ARM_ERRATA_430973
+ 	  and also flushes the branch target cache at every context switch.
+ 	  Note that setting specific bits in the ACTLR register may not be
+ 	  available in non-secure mode.
++	  Instead of enabling this option, it is recommended to enable the
++	  workaround by setting the IBE bit from the bootloader, since the
++	  BTB/BTAC operations are always executed for context switches on
++	  Cortex-A8.
  
- 	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
--#ifdef CONFIG_ARM_ERRATA_430973
- 		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
- 		/* set IBE to 1 */
- 		rx51_secure_update_aux_cr(BIT(6), 0);
--#endif
- 	}
- 
- 	/* Ensure SDRC pins are mux'd for self-refresh */
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index 821171c..0aa438d 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -249,18 +249,11 @@ static void __init nokia_n900_legacy_init(void)
- 	hsmmc2_internal_input_clk();
- 
- 	if (omap_type() == OMAP2_DEVICE_TYPE_SEC) {
--		if (IS_ENABLED(CONFIG_ARM_ERRATA_430973)) {
--			pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
--			/* set IBE to 1 */
--			rx51_secure_update_aux_cr(BIT(6), 0);
--		} else {
--			pr_warn("RX-51: Not enabling ARM errata 430973 workaround\n");
--			pr_warn("Thumb binaries may crash randomly without this workaround\n");
--		}
-+		pr_info("RX-51: Enabling ARM errata 430973 workaround\n");
-+		rx51_secure_update_aux_cr(BIT(6), 0); /* set IBE to 1 */
- 
- 		pr_info("RX-51: Registring OMAP3 HWRNG device\n");
- 		platform_device_register(&omap3_rom_rng_device);
--
- 	}
- }
- 
+ config ARM_ERRATA_458693
+ 	bool "ARM errata: Processor deadlock when a false hazard is created"
 -- 
 2.1.4
