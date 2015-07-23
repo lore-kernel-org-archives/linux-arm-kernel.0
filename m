@@ -1,48 +1,107 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 13:44:29 +0100
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <55B0E1AD.60409@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 23 Jul 2015 14:50:07 +0200
+Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <20150723091311.GX3061@x1>
+References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
+ <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
+ <20150723073217.GT3061@x1> <20150723100101.7290242b@bbrezillon>
+ <20150723091311.GX3061@x1>
+Message-ID: <20150723145007.099d01c2@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/15 20:49, Stuart Yoder wrote:
-> Catalin/Will,
+On Thu, 23 Jul 2015 10:13:11 +0100
+Lee Jones <lee.jones@linaro.org> wrote:
+
+> On Thu, 23 Jul 2015, Boris Brezillon wrote:
 > 
-> This is not a patch mean to be applied, but a query about whether there
-> is any reason to not enable 48-bit VA by default in the arm64 defconfig.
+> > Hi Lee,
+> > 
+> > On Thu, 23 Jul 2015 08:32:17 +0100
+> > Lee Jones <lee.jones@linaro.org> wrote:
+> > 
+> > > On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
+> > > > +	for_each_child_of_node(np, child) {
+> > > > +		const char *compatible;
+> > > > +		int cplen;
+> > > > +
+> > > > +		if (!of_device_is_available(child))
+> > > > +			continue;
+> > > > +
+> > > > +		compatible = of_get_property(child, "compatible", &cplen);
+> > > > +		if (!compatible || strlen(compatible) > cplen)
+> > > > +			continue;
+> > > > +
+> > > > +		if (strstr(compatible, "-usart")) {
+> > > > +			opmode = FLEX_MR_OPMODE_USART;
+> > > > +			break;
+> > > > +		}
+> > > > +
+> > > > +		if (strstr(compatible, "-spi")) {
+> > > > +			opmode = FLEX_MR_OPMODE_SPI;
+> > > > +			break;
+> > > > +		}
+> > > > +
+> > > > +		if (strstr(compatible, "-i2c")) {
+> > > > +			opmode = FLEX_MR_OPMODE_TWI;
+> > > > +			break;
+> > > > +		}
+> > > > +	}
+> > > 
+> > > From what I understand Flexcom is a wrapper which can sit above any
+> > > number of SPI, I2C and/or UART devices.  Devices which you don't
+> > > really have any control over (source code wise).  So wouldn't it be
+> > > better to match on the details you do have control over i.e. the node
+> > > name, rather than the compatible string?
+> > > 
+> > > I would personally match on of_find_node_by_name() to future-proof
+> > > your implementation.
+> > 
+> > Actually, I think using compatible strings is more future-proof than
+> > using the node names, because nothing in the DT bindings doc enforce the
+> > node name, and usually what we use to attach a node to a specific
+> > driver is the compatible string (this one is specified in the bindings
+> > doc).
 > 
-> The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
-> reasons mentioned in [1].
+> I know what you're saying, but what if someone uses the Flexcom driver
+> to wrap a different type of SPI driver where (for instance) the
+> compatible string used is "<name>-<newtype>".  Then we'd have to keep
+> adding more lines here to accommodate.
 > 
-> Based on the comment in [1] by Catalin, it seems that the intent
-> is to turn this on by default.
+> Whereas if we used the child node name which only pertains to _this_
+> driver, we would then have full control and know that (unless it
+> Flexcom is used for a completely different type of serial controller)
+> we wouldn't have to keep expanding the code to accommodate.
+
+You're right about the complexity implied by the compat string
+maintenance, but I still think using node names to detect the mode is
+a bad idea.
+
+Let's take another example making both solution unsuitable: what if
+the flexcom-v2 exposes 2 devices of the same type, they will both have
+the same name and the same compatible string, and we'll have no way to
+detect the appropriate mode. That's why I think none of our suggestion
+is future-proof.
+
 > 
-> Is there any issues anyone sees with a patch that does this:
+> > Regarding the implementation itself, I would match the child node with
+> > an of_device_id table rather than trying to find a specific substring
+> > in the compatible string, but I think that's only a matter of taste.
 > 
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 4e17e7e..5acf75d 100644
-> @@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
->  CONFIG_PCI=y
->  CONFIG_PCI_MSI=y
->  CONFIG_PCI_XGENE=y
-> +CONFIG_ARM64_VA_BITS_48=y
->  CONFIG_SMP=y
->  CONFIG_PREEMPT=y
->  CONFIG_KSM=y
-> 
-> Thanks,
-> Stuart
-> 
-> [1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
+> You mean duplicate each of the supported device's compatible strings
+> in this driver, then fetch the attributed of_match_device()->data
+> value?
 > 
 
-Is that still a requirement now that our idmap can use 4 levels (as part
-of dd006da)?
+Yes, and that's definitely not a good idea, but I think Cyrille has
+found a better approach (I'll let him explain).
 
-Thanks,
+Best Regards,
 
-	M.
+Boris
+
 -- 
-Jazz is not dead. It just smells funny...
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
