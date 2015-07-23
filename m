@@ -1,58 +1,60 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 23 Jul 2015 09:12:44 -0700
-Subject: [PATCH v2 2/2] watchdog: add wdt shutdown callback to disable
- wdt if enabled
-In-Reply-To: <1437630551-39650-3-git-send-email-eddie.huang@mediatek.com>
-References: <1437630551-39650-1-git-send-email-eddie.huang@mediatek.com>
- <1437630551-39650-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <55B1127C.4080800@roeck-us.net>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Thu, 23 Jul 2015 17:12:50 +0100
+Subject: [PATCHv2 0/3] regmap: Use different lockdep class for each
+ regmap init call
+In-Reply-To: <CANMq1KD8rOHjtWA1Eiw9GATdTeq1Ch4bga4ZAty26auvWyX7Og@mail.gmail.com>
+References: <1436337018-32464-1-git-send-email-drinkcat@chromium.org>
+ <CANMq1KD8rOHjtWA1Eiw9GATdTeq1Ch4bga4ZAty26auvWyX7Og@mail.gmail.com>
+Message-ID: <20150723161250.GA19124@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 10:49 PM, Eddie Huang wrote:
-> From: Greta Zhang <greta.zhang@mediatek.com>
->
-> Without .shutdown(), watchdog might reset the system during power off.
-> For example, if watchdog's timeout is set to 30s, then it is reset to
-> zero by mtk_wdt_ping(). During power off, no app will ping watchdog,
-> but watchdog is still running and may trigger reset.
->
-> Signed-off-by: Greta Zhang <greta.zhang@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+On Thu, Jul 23, 2015 at 09:45:53AM +0100, Nicolas Boichat wrote:
+> Hi Mark,
+> 
+> On Wed, Jul 8, 2015 at 2:30 PM, Nicolas Boichat <drinkcat@chromium.org> wrote:
+> > Second version. Small fixup in the regmap patch itself [3/3] (the
+> > declaration of __devm_regmap_init_ac97 was missing lock_key/name
+> > parameters).
+> >
+> > Also, there are 2 drivers that are using function pointers named
+> > "regmap_init", which causes problems as it is now a macro: put these
+> > in parentheses to prevent the preprocessor from substituting them.
+> >
+> > Patches 1+2 should be pushed first to avoid breaking git bissect.
+> >
+> > Compile tested with allyesconfig on x86_64 and arm.
+> >
+> > Nicolas Boichat (3):
+> >   mfd: vexpress: Add parentheses around bridge->ops->regmap_init call
+> >   thermal: sti: Add parentheses around bridge->ops->regmap_init call
+> >   regmap: Use different lockdep class for each regmap init call
+> 
+> What's the status of this series (and the additional documentation
+> fix: https://lkml.org/lkml/2015/7/8/385)?
+> 
+> Do we need acks from the mfd/vexpress and thermal maintainers?
+> (mfd/vexpress maintainers are Liviu Dudau, Sudeep Holla, and Lorenzo
+> Pieralisi, I'm less clear about thermal, maybe Eduardo Valentin?)
 
-Except for the subject line,
+Hi Nicolas,
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+Me and Lorenzo are currently tied with other tasks this week, hope to be
+able to review your patches next week.
 
-> ---
->   drivers/watchdog/mtk_wdt.c | 9 +++++++++
->   1 file changed, 9 insertions(+)
->
-> diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
-> index 056412c..6ad9df9 100644
-> --- a/drivers/watchdog/mtk_wdt.c
-> +++ b/drivers/watchdog/mtk_wdt.c
-> @@ -210,6 +210,14 @@ static int mtk_wdt_probe(struct platform_device *pdev)
->   	return 0;
->   }
->
-> +static void mtk_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
-> +
-> +	if (watchdog_active(&mtk_wdt->wdt_dev))
-> +		mtk_wdt_stop(&mtk_wdt->wdt_dev);
-> +}
-> +
->   static int mtk_wdt_remove(struct platform_device *pdev)
->   {
->   	struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
-> @@ -259,6 +267,7 @@ static const struct dev_pm_ops mtk_wdt_pm_ops = {
->   static struct platform_driver mtk_wdt_driver = {
->   	.probe		= mtk_wdt_probe,
->   	.remove		= mtk_wdt_remove,
-> +	.shutdown	= mtk_wdt_shutdown,
->   	.driver		= {
->   		.name		= DRV_NAME,
->   		.pm		= &mtk_wdt_pm_ops,
->
+Best regards,
+Liviu
+
+> 
+> Thanks!
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
