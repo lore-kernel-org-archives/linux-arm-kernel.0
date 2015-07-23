@@ -1,64 +1,47 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 16:52:33 +0100
-Subject: [PATCH 1/4] mfd: 88pm800: Update the header file with 32K clk
- related macros
-In-Reply-To: <1437476823-3358-2-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-2-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150723155233.GT3436@x1>
+Date: Thu, 23 Jul 2015 16:53:22 +0100
+Subject: [PATCH-v2 1/2] mfd: devicetree: bindings: 88pm800: Add DT
+ property for dual phase enable
+In-Reply-To: <1437495782-15767-2-git-send-email-vaibhav.hiremath@linaro.org>
+References: <1437495782-15767-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1437495782-15767-2-git-send-email-vaibhav.hiremath@linaro.org>
+Message-ID: <20150723155322.GU3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, 21 Jul 2015, Vaibhav Hiremath wrote:
 
-> Update header file with required macros for 32KHz buffered clock
-> output of 88PM800 family of device.
-> These macros will be used in clk provider driver.
+> 88PM860 family of device supports dual phase mode on BUCK1 supply
+> providing total 6A capacity.
+> Note that by default they operate independently with 3A capacity.
+> 
+> This patch updates the devicetree binding with DT property
+> to enable dual-phase mode on BUCK1.
 > 
 > Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
 > ---
->  include/linux/mfd/88pm80x.h | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  Documentation/devicetree/bindings/mfd/88pm800.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/include/linux/mfd/88pm80x.h b/include/linux/mfd/88pm80x.h
-> index 05d9bad..680e4eb 100644
-> --- a/include/linux/mfd/88pm80x.h
-> +++ b/include/linux/mfd/88pm80x.h
-> @@ -91,6 +91,7 @@ enum {
->  /* Referance and low power registers */
->  #define PM800_LOW_POWER1		(0x20)
->  #define PM800_LOW_POWER2		(0x21)
-> +#define PM800_LOW_POWER2_XO_LJ_EN	BIT(5)
+> diff --git a/Documentation/devicetree/bindings/mfd/88pm800.txt b/Documentation/devicetree/bindings/mfd/88pm800.txt
+> index dec842f..2c82fcb 100644
+> --- a/Documentation/devicetree/bindings/mfd/88pm800.txt
+> +++ b/Documentation/devicetree/bindings/mfd/88pm800.txt
+> @@ -9,6 +9,12 @@ Required parent device properties:
+>  - #interrupt-cells 	: should be 1.
+>  			  The cell is the 88pm80x local IRQ number
 >  
->  #define PM800_LOW_POWER_CONFIG3		(0x22)
->  #define PM800_LDOBK_FREEZE		BIT(7)
-> @@ -138,6 +139,13 @@ enum {
->  #define PM800_ALARM			BIT(5)
->  #define PM800_RTC1_USE_XO		BIT(7)
->  
-> +#define PM800_32K_OUTX_SEL_MASK		(0x3)
-> +/* 32KHz clk output sel mode */
-> +#define PM800_32K_OUTX_SEL_ZERO		(0x0)
-> +#define PM800_32K_OUTX_SEL_INT_32KHZ	(0x1)
-> +#define PM800_32K_OUTX_SEL_XO_32KHZ	(0x2)
-> +#define PM800_32K_OUTX_SEL_HIZ		(0x3)
+> +Optional properties :
+> +- marvell,88pm860-buck1-dualphase-en  : If set, enable dual phase on BUCK1,
+> +  providing 6A capacity.
+> +  Without this both BUCK1A and BUCK1B operates independently with 3A capacity.
+> +  (This property is only applicable to 88PM860)
 
-Why do these need to be in brackets?
+You need to get Mark Brown to Ack this.
 
->  /* Regulator Control Registers: BUCK1,BUCK5,LDO1 have DVC */
+>  88pm80x family of devices consists of varied group of sub-devices:
 >  
->  /* buck registers */
-> @@ -208,6 +216,10 @@ enum {
->  #define PM800_PMOD_MEAS1		0x52
->  #define PM800_PMOD_MEAS2		0x53
->  
-> +/* Oscillator control */
-> +#define PM800_OSC_CNTRL1		(0x50)
-> +#define PM800_OSC_CNTRL1_OSC_FREERUN_EN	BIT(1)
-> +
->  #define PM800_GPADC0_MEAS1		0x54
->  #define PM800_GPADC0_MEAS2		0x55
->  #define PM800_GPADC1_MEAS1		0x56
+>  Device		 	Supply Names	 Description
 
 -- 
 Lee Jones
