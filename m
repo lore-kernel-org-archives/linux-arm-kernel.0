@@ -1,21 +1,22 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 23 Jul 2015 15:56:46 -0500
-Subject: [PATCH 3/3] ARM: dts: qcom: Replace gpio node with pinctrl node
-In-Reply-To: <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20150723205646.GE13658@qualcomm.com>
+Date: Thu, 23 Jul 2015 15:59:43 -0500
+Subject: [PATCH 1/5] ARM: dts: qcom: Replace gpio node with pinctrl node
+In-Reply-To: <1434486676-21812-2-git-send-email-sboyd@codeaurora.org>
+References: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
+ <1434486676-21812-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150723205943.GF13658@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 05, 2015 at 03:52:25PM -0700, Bjorn Andersson wrote:
-> Replace the standalone gpio driver with pinctrl-msm as we now have
-> msm8660 support there.
+On Tue, Jun 16, 2015 at 01:31:12PM -0700, Stephen Boyd wrote:
+> Now that we have a proper pinctrl driver for the gpio block we
+> can change the compatible field here and configure the pinmux on
+> msm8960 devices.
 > 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 
-Applied, thanks!
+Applied, thanks
 
 -- 
 Qualcomm Innovation Center, Inc.
