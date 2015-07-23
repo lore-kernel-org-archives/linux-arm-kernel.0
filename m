@@ -1,83 +1,72 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 16:50:08 +0100
-Subject: [PATCH 4/4] mfd: 88pm800: Add support for clk subdevice
-In-Reply-To: <1437476823-3358-5-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437476823-3358-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437476823-3358-5-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150723155008.GS3436@x1>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Thu, 23 Jul 2015 16:50:26 +0100
+Subject: [PATCH v8 1/9] nvmem: Add a simple NVMEM framework for nvmem
+ providers
+In-Reply-To: <55B107B0.5010706@i2se.com>
+References: <1437403352-4091-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1437403392-4136-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55B107B0.5010706@i2se.com>
+Message-ID: <55B10D42.1020803@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jul 2015, Vaibhav Hiremath wrote:
 
-> This patch adds mfd_cell/clk-subdevice for 88PM800 MFD
-> (and family of devices).
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  drivers/mfd/88pm800.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/mfd/88pm800.c b/drivers/mfd/88pm800.c
-> index f104a32..9723eac 100644
-> --- a/drivers/mfd/88pm800.c
-> +++ b/drivers/mfd/88pm800.c
-> @@ -173,6 +173,14 @@ static const struct mfd_cell regulator_devs[] = {
->  	},
->  };
->  
-> +static struct mfd_cell clk_devs[] = {
-> +	{
-> +	 .name = "88pm80x-clk",
-> +	 .of_compatible = "marvell,88pm800-clk",
-> +	 .id = -1,
-> +	},
-> +};
 
-Why does each device in 88pm800.c have it's own mfd_cell?
+On 23/07/15 16:26, Stefan Wahren wrote:
+> Hi Srinivas,
+>
+> Am 20.07.2015 um 16:43 schrieb Srinivas Kandagatla:
+>> This patch adds just providers part of the framework just to enable easy
+>> review.
+>>
+>> Up until now, NVMEM drivers like eeprom were stored in drivers/misc,
+>> where they all had to duplicate pretty much the same code to register
+>> a sysfs file, allow in-kernel users to access the content of the devices
+>> they were driving, etc.
+>>
+>> This was also a problem as far as other in-kernel users were involved,
+>> since the solutions used were pretty much different from on driver to
+>> another, there was a rather big abstraction leak.
+>>
+>> This introduction of this framework aims at solving this. It also
+>> introduces DT representation for consumer devices to go get the data
+>> they require (MAC Addresses, SoC/Revision ID, part numbers, and so on)
+>> from the nvmems.
+>>
+>> Having regmap interface to this framework would give much better
+>> abstraction for nvmems on different buses.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> [Maxime Ripard: intial version of eeprom framework]
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   drivers/Kconfig                |   2 +
+>>   drivers/Makefile               |   1 +
+>>   drivers/nvmem/Kconfig          |  13 ++
+>>   drivers/nvmem/Makefile         |   6 +
+>>   drivers/nvmem/core.c           | 384 +++++++++++++++++++++++++++++++++++++++++
+>>   include/linux/nvmem-consumer.h |  23 +++
+>>   include/linux/nvmem-provider.h |  47 +++++
+>>   7 files changed, 476 insertions(+)
+>>   create mode 100644 drivers/nvmem/Kconfig
+>>   create mode 100644 drivers/nvmem/Makefile
+>>   create mode 100644 drivers/nvmem/core.c
+>>   create mode 100644 include/linux/nvmem-consumer.h
+>>   create mode 100644 include/linux/nvmem-provider.h
+>
+> i've tested this patch with my mxs-ocotp driver [1].
+>
+> So you can add
+>
+> Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+>
+Thanks for tested-by, That helps.
 
-Take the opportunity to correct the tabbing in the remainder of the
-file.  Make that fix-up patch 1 of this set.  Then fixup this patch.
+--srini
 
->  static const struct regmap_irq pm800_irqs[] = {
->  	/* INT0 */
->  	[PM800_IRQ_ONKEY] = {
-> @@ -344,6 +352,17 @@ static int device_regulator_init(struct pm80x_chip *chip)
->  			      ARRAY_SIZE(regulator_devs), NULL, 0, NULL);
->  }
->  
-> +static int device_clk_init(struct pm80x_chip *chip)
-> +{
-> +	if (chip->type == CHIP_PM800)
-> +		clk_devs[0].name = "88pm800-clk";
-> +	else if (chip->type == CHIP_PM860)
-> +		clk_devs[0].name = "88pm860-clk";
-> +
-> +	return mfd_add_devices(chip->dev, 0, &clk_devs[0],
-> +			      ARRAY_SIZE(clk_devs), NULL, 0, NULL);
-> +}
-> +
->  static int device_irq_init_800(struct pm80x_chip *chip)
->  {
->  	struct regmap *map = chip->regmap;
-> @@ -513,6 +532,12 @@ static int device_800_init(struct pm80x_chip *chip)
->  		goto out;
->  	}
->  
-> +	ret = device_clk_init(chip);
-> +	if (ret) {
-> +		dev_err(chip->dev, "Failed to add clk subdev\n");
-> +		goto out;
-> +	}
 
-Why do these have to be seperate?
 
->  	return 0;
->  out_dev:
->  	mfd_remove_devices(chip->dev);
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> Regards
+> Stefan
+>
