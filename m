@@ -1,35 +1,44 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Thu, 23 Jul 2015 14:04:24 +0530
-Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc
- clocks
-In-Reply-To: <55B03CE9.4050903@codeaurora.org>
+Date: Thu, 23 Jul 2015 14:05:48 +0530
+Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+In-Reply-To: <55B03D65.8040207@codeaurora.org>
 References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
- <55B03CE9.4050903@codeaurora.org>
-Message-ID: <55B0A710.9080209@codeaurora.org>
+ <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
+ <55B03D65.8040207@codeaurora.org>
+Message-ID: <55B0A764.6010708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 06:31 AM, Stephen Boyd wrote:
-> On 07/22/2015 12:10 AM, Rajendra Nayak wrote:
->> @@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain
->> *domain)
->>       return gdsc_toggle_logic(sc, false);
->>   }
->> +static int gdsc_attach(struct generic_pm_domain *domain, struct
->> device *dev)
->> +{
->> +    int ret;
->> +    struct gdsc *sc = domain_to_gdsc(domain);
->> +    char **con_id, *con_ids[] = { "core", "iface", NULL };
->
-> const?
->
-> This is where I get scared of sniffing too much SoC glue. What's to
-> enforce the "core", and "iface" naming scheme? What's to enforce there
-> being two clocks vs. one? Maybe a better approach would be to use
-> of_clk_get() and iterate through all clocks of the device, or to encode
-> the clock names in the gdsc structure.
+[]..
 
-I had the clock names in the gdsc structure in v5. I should probably go
-back to having it that way.
+>> +
+>> +#ifndef CONFIG_PM
+>> +static void enable_clock(struct device *dev, const char *con_id)
+>> +{
+>> +    struct clk *clk;
+>> +
+>> +    clk = clk_get(dev, con_id);
+>> +    if (!IS_ERR(clk)) {
+>> +        clk_prepare_enable(clk);
+>> +        clk_put(clk);
+>> +    }
+>> +}
+>> +
+>> +static void disable_clock(struct device *dev, const char *con_id)
+>> +{
+>> +    struct clk *clk;
+>> +
+>> +    clk = clk_get(dev, con_id);
+>> +    if (!IS_ERR(clk)) {
+>> +        clk_disable_unprepare(clk);
+>> +        clk_put(clk);
+>> +    }
+>> +}
+>
+> Is there a reason why this whole patch isn't generic code? I recall some
+> discussion but I forgot now and there isn't any mention of why this
+> isn't generic code in the commit text.
+
+If by generic code, you mean using PM clocks, then this thread should
+give some context..
+http://www.spinics.net/lists/arm-kernel/msg414072.html
