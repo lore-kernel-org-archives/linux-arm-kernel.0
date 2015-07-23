@@ -1,49 +1,107 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 10:26:26 +0100
-Subject: [PATCH v5 07/19] PCI/MSI: Let pci_msi_get_domain use struct device's
- msi_domain
+Date: Thu, 23 Jul 2015 10:26:24 +0100
+Subject: [PATCH v5 05/19] PCI/MSI: of: Add support for OF-provided msi_domain
 In-Reply-To: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
 References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437643598-19795-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437643598-19795-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we can easily find which MSI domain a PCI device is
-using, use dev_get_msi_domain as a way to retrieve the information.
+In order to populate the PCI host bridge msi_domain, use the
+"msi-parent" attribute to lookup a corresponding irq domain.
+If found, this is our MSI domain.
 
-The original code is still used as a fallback.
+This gets plugged into the core PCI code.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/msi.c | 14 ++++++++------
- 1 file changed, 8 insertions(+), 6 deletions(-)
+ drivers/pci/of.c    | 21 +++++++++++++++++++++
+ drivers/pci/probe.c |  5 ++++-
+ include/linux/pci.h |  4 ++++
+ 3 files changed, 29 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index ef4ec6e..da3c607 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -39,14 +39,16 @@ struct irq_domain * __weak arch_get_pci_msi_domain(struct pci_dev *dev)
+diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+index f092993..e2ebb7d 100644
+--- a/drivers/pci/of.c
++++ b/drivers/pci/of.c
+@@ -9,6 +9,7 @@
+  * 2 of the License, or (at your option) any later version.
+  */
  
- static struct irq_domain *pci_msi_get_domain(struct pci_dev *dev)
- {
--	struct irq_domain *domain = NULL;
-+	struct irq_domain *domain;
++#include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/of.h>
+@@ -59,3 +60,23 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
+ 		return of_node_get(bus->bridge->parent->of_node);
+ 	return NULL;
+ }
 +
-+	domain = dev_get_msi_domain(&dev->dev);
-+	if (domain)
-+		return domain;
++struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
++{
++#ifdef CONFIG_IRQ_DOMAIN
++	struct device_node *np;
++	struct irq_domain *d;
++
++	if (!bus->dev.of_node)
++		return NULL;
++	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
++	if (!np)
++		return NULL;
++	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
++	if (!d)
++		d = irq_find_host(np);
++	return d;
++#else
++	return NULL;
++#endif
++}
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 2fd4f8e..b30eb6e 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -663,12 +663,15 @@ static void pci_set_bus_speed(struct pci_bus *bus)
  
--	if (dev->bus->msi)
--		domain = dev->bus->msi->domain;
--	if (!domain)
--		domain = arch_get_pci_msi_domain(dev);
-+	if (dev->bus->msi && (domain = dev->bus->msi->domain))
-+		return domain;
+ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
+ {
++	struct irq_domain *d;
++
+ 	/*
+ 	 * Any firmware interface that can resolve the msi_domain
+ 	 * should be called from here.
+ 	 */
++	d = pci_host_bridge_of_msi_domain(bus);
  
--	return domain;
-+	return arch_get_pci_msi_domain(dev);
+-	return NULL;
++	return d;
  }
  
- static int pci_msi_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+ static void pci_set_bus_msi_domain(struct pci_bus *bus)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index fbf245f..772616d 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1841,10 +1841,12 @@ int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
+ /* PCI <-> OF binding helpers */
+ #ifdef CONFIG_OF
+ struct device_node;
++struct irq_domain;
+ void pci_set_of_node(struct pci_dev *dev);
+ void pci_release_of_node(struct pci_dev *dev);
+ void pci_set_bus_of_node(struct pci_bus *bus);
+ void pci_release_bus_of_node(struct pci_bus *bus);
++struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus);
+ 
+ /* Arch may override this (weak) */
+ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
+@@ -1867,6 +1869,8 @@ static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
+ static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
+ static inline struct device_node *
+ pci_device_to_OF_node(const struct pci_dev *pdev) { return NULL; }
++static inline struct irq_domain *
++pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
+ #endif  /* CONFIG_OF */
+ 
+ #ifdef CONFIG_EEH
 -- 
 2.1.4
