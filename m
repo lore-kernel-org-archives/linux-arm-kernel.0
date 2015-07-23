@@ -1,75 +1,40 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 23 Jul 2015 09:59:36 -0500
-Subject: [PATCH] ARM/PCI: set MPS before pci_bus_add_devices()
-In-Reply-To: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
-References: <1437514519-18545-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <20150723145936.GX21967@google.com>
+Date: Thu, 23 Jul 2015 10:10:18 -0500
+Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
+In-Reply-To: <20150722124929.GA537@red-moon>
+References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150722090248.GA344@red-moon> <55AF6149.4000601@arm.com>
+ <20150722124929.GA537@red-moon>
+Message-ID: <20150723151018.GY21967@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 05:35:19PM -0400, Murali Karicheri wrote:
-> The MPS configuration should be done *before* pci_bus_add_devices().
-> After pci_bus_add_devices(), drivers may be bound to devices, and
-> the PCI core shouldn't touch device configuration while a driver
-> owns the device.
+On Wed, Jul 22, 2015 at 01:49:29PM +0100, Lorenzo Pieralisi wrote:
+
+> > >> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+> > >>  				break;
+> > >>  			}
+> > >>  
+> > >> -			if (hw->scan)
+> > >> +			if (hw->scan) {
+> > >>  				sys->bus = hw->scan(nr, sys);
+> > >> -			else
+> > >> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+> > >> -						hw->ops, sys, &sys->resources);
+> > >> +				if (!sys->bus)
+> > >> +					panic("PCI: unable to scan bus!");
+> > 
+> > This was in the original code, but I have to ask: Do we really want to
+> > panic the kernel if we couldn't scan the bus? Worse case, the system
+> > won't be able to boot at all and will panic somewhere else anyway, but
+> > we should give the user a chance to understand what's happening...
 > 
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
-> Reported-by: Bjorn Helgaas <bhelgaas@google.com>
+> No, it was in the original code but I was very tempted to remove it
+> or merge the error paths and make it a warning, and that's what I am
+> going to do, unless someone complains (that panic statement has been there
+> forever).
 
-Applied to pci/enumeration for v4.3, thanks!  I removed the "bus" test; let
-me know if you think that's incorrect.
+I agree the panic should be removed.  I would do it in a separate patch
+since it's not related to your main objective here.
 
-> ---
->  arch/arm/kernel/bios32.c | 19 +++++--------------
->  1 file changed, 5 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index fcbbbb1..17efde7 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -520,7 +520,8 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->  	list_for_each_entry(sys, &head, node) {
->  		struct pci_bus *bus = sys->bus;
->  
-> -		if (!pci_has_flag(PCI_PROBE_ONLY)) {
-> +		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-
-I think the test for "bus" being non-NULL is superfluous here.  If "bus"
-were NULL, we would already oops in pci_bus_add_devices().
-
-> +			struct pci_bus *child;
->  			/*
->  			 * Size the bridge windows.
->  			 */
-> @@ -530,25 +531,15 @@ void pci_common_init_dev(struct device *parent, struct hw_pci *hw)
->  			 * Assign resources.
->  			 */
->  			pci_bus_assign_resources(bus);
-> -		}
->  
-> +			list_for_each_entry(child, &bus->children, node)
-> +				pcie_bus_configure_settings(child);
-> +		}
->  		/*
->  		 * Tell drivers about devices found.
->  		 */
->  		pci_bus_add_devices(bus);
->  	}
-> -
-> -	list_for_each_entry(sys, &head, node) {
-> -		struct pci_bus *bus = sys->bus;
-> -
-> -		/* Configure PCI Express settings */
-> -		if (bus && !pci_has_flag(PCI_PROBE_ONLY)) {
-> -			struct pci_bus *child;
-> -
-> -			list_for_each_entry(child, &bus->children, node)
-> -				pcie_bus_configure_settings(child);
-> -		}
-> -	}
->  }
->  
->  #ifndef CONFIG_PCI_HOST_ITE8152
-> -- 
-> 1.9.1
-> 
+Bjorn
