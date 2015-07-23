@@ -1,161 +1,24 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 23 Jul 2015 14:21:53 -0700
-Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <55B150B0.9020100@vanguardiasur.com.ar>
-References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
- <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
-Message-ID: <55B15AF1.3030509@roeck-us.net>
+From: agross@codeaurora.org (Andy Gross)
+Date: Thu, 23 Jul 2015 16:24:18 -0500
+Subject: [PATCH 2/5] ARM: dts: qcom: Add MSM8960 RPM and RPM regulator
+ nodes
+In-Reply-To: <1434486676-21812-3-git-send-email-sboyd@codeaurora.org>
+References: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
+ <1434486676-21812-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150723212418.GI13658@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
-> Hi Guenter,
->
-> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
->> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
->>> This commit adds support for the watchdog timer found in NXP LPC SoCs
->>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
->>> share the same watchdog hardware.
->>>
->>> Watchdog driver registers a restart handler that will restart the system
->>> by performing an incorrect feed after ensuring the watchdog is enabled in
->>> reset mode.
->>>
->>> As watchdog cannot be disabled in hardware, driver's stop routine will
->>> regularly send a keepalive ping using a timer.
->>>
->>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>
->> Hi Ariel,
->>
->> sorry for the delayed response. Comments below.
->>
->> Guenter
->>
->>> ---
->>>    drivers/watchdog/Kconfig       |  11 ++
->>>    drivers/watchdog/Makefile      |   1 +
->>>    drivers/watchdog/lpc18xx_wdt.c | 344
->>> +++++++++++++++++++++++++++++++++++++++++
->>>    3 files changed, 356 insertions(+)
->>>    create mode 100644 drivers/watchdog/lpc18xx_wdt.c
->>>
->>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>> index 742fbbc..af5e2e3 100644
->>> --- a/drivers/watchdog/Kconfig
->>> +++ b/drivers/watchdog/Kconfig
->>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
->>>          To compile this driver as a module, choose M here: the
->>>          module will be called digicolor_wdt.
->>>
->>> +config LPC18XX_WATCHDOG
->>> +    tristate "LPC18xx/43xx Watchdog"
->>> +    depends on ARCH_LPC18XX || COMPILE_TEST
->>> +    select WATCHDOG_CORE
->>> +    help
->>> +      Say Y here if to include support for the watchdog timer
->>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
->>> +      processors.
->>> +      To compile this driver as a module, choose M here: the
->>> +      module will be called lpc18xx_wdt.
->>> +
->>>    # AVR32 Architecture
->>>
->>>    config AT32AP700X_WDT
->>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
->>> index 59ea9a1..1b0ef48 100644
->>> --- a/drivers/watchdog/Makefile
->>> +++ b/drivers/watchdog/Makefile
->>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
->>>    obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
->>>    obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
->>>    obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->>>
->>>    # AVR32 Architecture
->>>    obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
->>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
->>> b/drivers/watchdog/lpc18xx_wdt.c
->>> new file mode 100644
->>> index 0000000..2b489fc
->>> --- /dev/null
->>> +++ b/drivers/watchdog/lpc18xx_wdt.c
->>> @@ -0,0 +1,344 @@
->>> +/*
->>> + * NXP LPC18xx Watchdog Timer (WDT)
->>> + *
->>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or
->>> modify it
->>> + * under the terms of the GNU General Public License version 2 as
->>> published by
->>> + * the Free Software Foundation.
->>> + *
->>> + * Notes
->>> + * -----
->>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
->>> a 24-bit
->>> + * counter which decrements on every clock cycle.
->>> + *
->>> + */
->>> +
->>> +#include <linux/clk.h>
->>> +#include <linux/io.h>
->>> +#include <linux/module.h>
->>> +#include <linux/of.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/reboot.h>
->>> +#include <linux/watchdog.h>
->>> +
->>> +/* Registers */
->>> +#define LPC18XX_WDT_MOD            0x00
->>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
->>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
->>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
->>
->> Not used.
->
-> That's right. I'll remove it.
->
->>
->>> +
->>> +#define LPC18XX_WDT_TC            0x04
->>> +#define LPC18XX_WDT_TC_MIN        0xff
->>> +#define LPC18XX_WDT_TC_MAX        0xffffff
->>> +
->>> +#define LPC18XX_WDT_FEED        0x08
->>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
->>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
->>> +
->>> +#define LPC18XX_WDT_TV            0x0c
->>> +
->>> +/* Clock pre-scaler */
->>> +#define LPC18XX_WDT_CLK_DIV        4
->>> +
->>> +/* Timeout values in seconds */
->>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
->>> +
->>
->> This is (still) really low for Linux. Something like min(30, max_timeout)
->> might make more sense.
->
-> Remember that hardware limits timeout to a maximum value of 5.
->
-> As you said before we could use a soft timer, but I not sure that's a
-> good idea. As Ezequiel said [0], it might be adding bloat and we must
-> consider that this watchdog controller is included in cortex-M MCUs.
->
-> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
->
+On Tue, Jun 16, 2015 at 01:31:13PM -0700, Stephen Boyd wrote:
+> Add the basic RPM and RPM regulator nodes that boards can fill in
+> with their board specific details.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-Further down you have
-	lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
-	                      LPC18XX_WDT_CLK_DIV) / clk_rate;
+Applied, thanks
 
-which seems to contradict this statement. If the maximum timeout is 5 seconds,
-why don't you set max_timeout to a fixed value of 5 seconds ?
-
-Thanks,
-Guenter
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
