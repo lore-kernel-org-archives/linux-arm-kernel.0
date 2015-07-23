@@ -1,45 +1,40 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 23 Jul 2015 17:52:44 +0100
-Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
+Date: Thu, 23 Jul 2015 17:52:45 +0100
+Subject: [PATCH 3/3] Docs: dt: add PCI IOMMU map bindings
 In-Reply-To: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
 References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1437670365-20704-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently msi-parent is used by a few bindings to describe the
-relationship between a PCI root complex and a single MSI controller, but
-this property does not have a generic binding document.
+The existing IOMMU bindings are able to specify the relationship between
+masters and IOMMUs, but they are insufficient for describing the general
+case of hotpluggable busses such as PCI where the set of masters is not
+known until runtime, and the relationship between masters and IOMMUs is
+a property of the integration of the system.
 
-Additionally, msi-parent is insufficient to describe more complex
-relationships between MSI controllers and devices under a root complex,
-where devices may be able to target multiple MSI controllers, or where
-MSI controllers use (non-probeable) sideband information to distinguish
-devices.
-
-This patch adds a generic binding for mapping PCI devices to MSI
-controllers. This document covers msi-parent, and a new msi-map property
-(specific to PCI*) which may be used to map devices (identified by their
-Requester ID) to sideband data for each MSI controller that they may
-target.
+This patch adds a generic binding for mapping PCI devices to IOMMUs,
+using a new iommu-map property (specific to PCI*) which may be used to
+map devices (identified by their Requester ID) to sideband data for the
+IOMMU which they master through.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
- 1 file changed, 220 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
+ .../devicetree/bindings/pci/pci-iommu.txt          | 171 +++++++++++++++++++++
+ 1 file changed, 171 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
 
-diff --git a/Documentation/devicetree/bindings/pci/pci-msi.txt b/Documentation/devicetree/bindings/pci/pci-msi.txt
+diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
 new file mode 100644
-index 0000000..9b3cc81
+index 0000000..56c8296
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/pci-msi.txt
-@@ -0,0 +1,220 @@
++++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+@@ -0,0 +1,171 @@
 +This document describes the generic device tree binding for describing the
-+relationship between PCI devices and MSI controllers.
++relationship between PCI(e) devices and IOMMU(s).
 +
-+Each PCI device under a root complex is uniquely identified by its Requester ID
-+(AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
++Each PCI(e) device under a root complex is uniquely identified by its Requester
++ID (AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
 +Function number.
 +
 +For the purpose of this document, when treated as a numeric value, a RID is
@@ -50,14 +45,17 @@ index 0000000..9b3cc81
 +* Bits [2:0] are the Function number.
 +* Any other bits required for padding must be zero.
 +
-+MSIs may be distinguished in part through the use of sideband data accompanying
-+writes. In the case of PCI devices, this sideband data may be derived from the
-+Requester ID. A mechanism is required to associate a device with both the MSI
-+controllers it can address, and the sideband data that will be associated with
-+its writes to those controllers.
++IOMMUs may distinguish PCI devices through sideband data derived from the
++Requester ID. While a given PCI device can only master through one IOMMU, a
++root complex may split masters across a set of IOMMUs (e.g. with one IOMMU per
++bus).
 +
-+For generic MSI bindings, see
-+Documentation/devicetree/bindings/interrupt-controller/msi.txt.
++The generic 'iommus' property is insufficient to describe this relationship,
++and a mechanism is required to map from a PCI device to its IOMMU and sideband
++data.
++
++For generic IOMMU bindings, see
++Documentation/devicetree/bindings/iommu/iommu.txt.
 +
 +
 +PCI root complex
@@ -66,31 +64,17 @@ index 0000000..9b3cc81
 +Optional properties
 +-------------------
 +
-+- msi-map: Maps a Requester ID to an MSI controller and associated
-+  msi-specifier data. The property is an arbitrary number of tuples of
-+  (rid-base,msi-controller,msi-base,length), where:
++- iommu-map: Maps a Requester ID to an IOMMU and associated iommu-specifier
++  data.
 +
-+  * rid-base is a single cell describing the first RID matched by the entry.
-+
-+  * msi-controller is a single phandle to an MSI controller
-+
-+  * msi-base is an msi-specifier describing the msi-specifier produced for the
-+    first RID matched by the entry.
-+
-+  * length is a single cell describing how many consecutive RIDs are matched
-+    following the rid-base.
++  The property is an arbitrary number of tuples of
++  (rid-base,iommu,iommu-base,length).
 +
 +  Any RID r in the interval [rid-base, rid-base + length) is associated with
-+  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
++  the listed IOMMU, with the iommu-specifier (r - rid-base + iommu-base).
 +
-+- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
-+  to an msi-specifier per the msi-map property.
-+
-+- msi-parent: Describes the MSI parent of the root complex itself. Where
-+  the root complex and MSI controller do not pass sideband data with MSI
-+  writes, this property may be used to describe the MSI controller(s)
-+  used by PCI devices under the root complex, if defined as such in the
-+  binding for the root complex.
++- iommu-map-mask: A mask to be applied to each Requester ID prior to being
++  mapped to an iommu-specifier per the iommu-map property.
 +
 +
 +Example (1)
@@ -100,11 +84,10 @@ index 0000000..9b3cc81
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
-+	msi: msi-controller at a {
++	iommu: iommu at a {
 +		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
 +	};
 +
 +	pci: pci at f {
@@ -113,10 +96,10 @@ index 0000000..9b3cc81
 +		device_type = "pci";
 +
 +		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, identity-mapped.
++		 * The sideband data provided to the IOMMU is the RID,
++		 * identity-mapped.
 +		 */
-+		msi-map = <0x0 &msi_a 0x0 0x10000>,
++		iommu-map = <0x0 &iommu 0x0 0x10000>;
 +	};
 +};
 +
@@ -128,11 +111,10 @@ index 0000000..9b3cc81
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
-+	msi: msi-controller at a {
++	iommu: iommu at a {
 +		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
 +	};
 +
 +	pci: pci at f {
@@ -141,11 +123,11 @@ index 0000000..9b3cc81
 +		device_type = "pci";
 +
 +		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, masked to only the device and function bits.
++		 * The sideband data provided to the IOMMU is the RID with the
++		 * function bits masked out.
 +		 */
-+		msi-map = <0x0 &msi_a 0x0 0x100>,
-+		msi-map-mask = <0xff>
++		iommu-map = <0x0 &iommu 0x0 0x10000>;
++		iommu-map-mask = <0xfff8>;
 +	};
 +};
 +
@@ -157,11 +139,10 @@ index 0000000..9b3cc81
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
-+	msi: msi-controller at a {
++	iommu: iommu at a {
 +		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
 +	};
 +
 +	pci: pci at f {
@@ -170,12 +151,11 @@ index 0000000..9b3cc81
 +		device_type = "pci";
 +
 +		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, but the high bit of the bus number is
-+		 * ignored.
++		 * The sideband data provided to the IOMMU is the RID,
++		 * but the high bits of the bus number are flipped.
 +		 */
-+		msi-map = <0x0000 &msi 0x0000 0x8000>,
-+			  <0x8000 &msi 0x0000 0x8000>;
++		iommu-map = <0x0000 &iommu 0x8000 0x8000>,
++			    <0x8000 &iommu 0x0000 0x8000>;
 +	};
 +};
 +
@@ -187,11 +167,22 @@ index 0000000..9b3cc81
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
-+	msi: msi-controller at a {
++	iommu_a: iommu at a {
 +		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
++	};
++
++	iommu_b: iommu at b {
++		reg = <0xb 0x1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
++	};
++
++	iommu_c: iommu at c {
++		reg = <0xc 0x1>;
++		compatible = "vendor,some-iommu";
++		#iommu-cells = <1>;
 +	};
 +
 +	pci: pci at f {
@@ -200,59 +191,14 @@ index 0000000..9b3cc81
 +		device_type = "pci";
 +
 +		/*
-+		 * The sideband data provided to the MSI controller is
-+		 * the RID, but the high bit of the bus number is
-+		 * negated.
++		 * Devices with bus number 0-127 are mastered via IOMMU
++		 * a, with sideband data being RID[14:0].
++		 * Devices with bus number 128-255 are mastered via
++		 * IOMMU b, with sideband data being RID[14:0].
++		 * No devices master via IOMMU c.
 +		 */
-+		msi-map = <0x0000 &msi 0x8000 0x8000>,
-+			  <0x8000 &msi 0x0000 0x8000>;
-+	};
-+};
-+
-+
-+Example (5)
-+===========
-+
-+/ {
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	msi_a: msi-controller at a {
-+		reg = <0xa 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	msi_b: msi-controller at b {
-+		reg = <0xb 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	msi_c: msi-controller at c {
-+		reg = <0xc 0x1>;
-+		compatible = "vendor,some-controller";
-+		msi-controller;
-+		#msi-cells = <1>;
-+	};
-+
-+	pci: pci at c {
-+		reg = <0xf 0x1>;
-+		compatible = "vendor,pcie-root-complex";
-+		device_type = "pci";
-+
-+		/*
-+		 * The sideband data provided to MSI controller a is the
-+		 * RID, but the high bit of the bus number is negated.
-+		 * The sideband data provided to MSI controller b is the
-+		 * RID, identity-mapped.
-+		 * MSI controller c is not addressable.
-+		 */
-+		msi-map = <0x0000 &msi_a 0x8000 0x08000>,
-+			  <0x8000 &msi_a 0x0000 0x08000>,
-+			  <0x0000 &msi_b 0x0000 0x10000>;
++		iommu-map = <0x0000 &iommu_a 0x0000 0x8000>,
++			    <0x8000 &iommu_b 0x0000 0x8000>;
 +	};
 +};
 -- 
