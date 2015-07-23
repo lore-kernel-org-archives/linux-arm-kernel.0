@@ -1,52 +1,45 @@
 From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Wed, 22 Jul 2015 22:30:06 -0500
-Subject: [PATCH 2/3] ARM: socfpga: dts: Fix gpio dts entry for the correct
- clock
-In-Reply-To: <1437622207-1760-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1437622207-1760-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <1437622207-1760-2-git-send-email-dinguyen@opensource.altera.com>
+Date: Wed, 22 Jul 2015 22:30:05 -0500
+Subject: [PATCH 1/3] ARM: socfpga: dts: Correct the parent clock for l3_sp_clk
+ and dbg_clk
+Message-ID: <1437622207-1760-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-The correct clock for the HPS gpio(s) should be the l4_mp_clk.
+The l3_sp_clk's parent should be the l3_mp_clk. This will account for
+the extra divider that is present for the l3_mp_clk.
+
+The dbg_clk's parent should be the dbg_at_clk. This will account for
+the extra divider that is present for the dbg_at_clk.
 
 Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 ---
- arch/arm/boot/dts/socfpga.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/socfpga.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 7860935..b0acaec 100644
+index 1e3c833..7860935 100644
 --- a/arch/arm/boot/dts/socfpga.dtsi
 +++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -565,7 +565,7 @@
- 			#size-cells = <0>;
- 			compatible = "snps,dw-apb-gpio";
- 			reg = <0xff708000 0x1000>;
--			clocks = <&per_base_clk>;
-+			clocks = <&l4_mp_clk>;
- 			status = "disabled";
+@@ -318,7 +318,7 @@
+ 					l3_sp_clk: l3_sp_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&mainclk>;
++						clocks = <&l3_mp_clk>;
+ 						div-reg = <0x64 2 2>;
+ 					};
  
- 			porta: gpio-controller at 0 {
-@@ -585,7 +585,7 @@
- 			#size-cells = <0>;
- 			compatible = "snps,dw-apb-gpio";
- 			reg = <0xff709000 0x1000>;
--			clocks = <&per_base_clk>;
-+			clocks = <&l4_mp_clk>;
- 			status = "disabled";
- 
- 			portb: gpio-controller at 0 {
-@@ -605,7 +605,7 @@
- 			#size-cells = <0>;
- 			compatible = "snps,dw-apb-gpio";
- 			reg = <0xff70a000 0x1000>;
--			clocks = <&per_base_clk>;
-+			clocks = <&l4_mp_clk>;
- 			status = "disabled";
- 
- 			portc: gpio-controller at 0 {
+@@ -349,7 +349,7 @@
+ 					dbg_clk: dbg_clk {
+ 						#clock-cells = <0>;
+ 						compatible = "altr,socfpga-gate-clk";
+-						clocks = <&dbg_base_clk>;
++						clocks = <&dbg_at_clk>;
+ 						div-reg = <0x68 2 2>;
+ 						clk-gate = <0x60 5>;
+ 					};
 -- 
 2.4.5
