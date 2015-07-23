@@ -1,85 +1,33 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 23 Jul 2015 10:13:11 +0100
-Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
- Flexible Serial Communication Unit
-In-Reply-To: <20150723100101.7290242b@bbrezillon>
-References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
- <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
- <20150723073217.GT3061@x1> <20150723100101.7290242b@bbrezillon>
-Message-ID: <20150723091311.GX3061@x1>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Thu, 23 Jul 2015 17:10:39 +0800
+Subject: [PATCH  v3 0/4] Add Mediatek SPI bus driver
+Message-ID: <1437642643-11966-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Boris Brezillon wrote:
+Change in v3:
+1. support fifo mode function.
+2. support any non-prime length transfer in dma mode.
+3. use interrupt to handle scatterlist.
+4. fix review comment.
 
-> Hi Lee,
-> 
-> On Thu, 23 Jul 2015 08:32:17 +0100
-> Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
-> > > +	for_each_child_of_node(np, child) {
-> > > +		const char *compatible;
-> > > +		int cplen;
-> > > +
-> > > +		if (!of_device_is_available(child))
-> > > +			continue;
-> > > +
-> > > +		compatible = of_get_property(child, "compatible", &cplen);
-> > > +		if (!compatible || strlen(compatible) > cplen)
-> > > +			continue;
-> > > +
-> > > +		if (strstr(compatible, "-usart")) {
-> > > +			opmode = FLEX_MR_OPMODE_USART;
-> > > +			break;
-> > > +		}
-> > > +
-> > > +		if (strstr(compatible, "-spi")) {
-> > > +			opmode = FLEX_MR_OPMODE_SPI;
-> > > +			break;
-> > > +		}
-> > > +
-> > > +		if (strstr(compatible, "-i2c")) {
-> > > +			opmode = FLEX_MR_OPMODE_TWI;
-> > > +			break;
-> > > +		}
-> > > +	}
-> > 
-> > From what I understand Flexcom is a wrapper which can sit above any
-> > number of SPI, I2C and/or UART devices.  Devices which you don't
-> > really have any control over (source code wise).  So wouldn't it be
-> > better to match on the details you do have control over i.e. the node
-> > name, rather than the compatible string?
-> > 
-> > I would personally match on of_find_node_by_name() to future-proof
-> > your implementation.
-> 
-> Actually, I think using compatible strings is more future-proof than
-> using the node names, because nothing in the DT bindings doc enforce the
-> node name, and usually what we use to attach a node to a specific
-> driver is the compatible string (this one is specified in the bindings
-> doc).
+Leilk Liu (4):
+  spi: support spi without dma channel to use can_dma()
+  dt-bindings: ARM: Mediatek: Document devicetree bindings for spi bus
+  spi: mediatek: Add spi bus for Mediatek MT8173
+  arm64: dts: Add spi bus dts
 
-I know what you're saying, but what if someone uses the Flexcom driver
-to wrap a different type of SPI driver where (for instance) the
-compatible string used is "<name>-<newtype>".  Then we'd have to keep
-adding more lines here to accommodate.
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |  38 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  23 +
+ drivers/spi/Kconfig                                |   9 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-mt65xx.c                           | 817 +++++++++++++++++++++
+ drivers/spi/spi.c                                  |  22 +-
+ include/linux/platform_data/spi-mt65xx.h           |  22 +
+ 7 files changed, 928 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+ create mode 100644 drivers/spi/spi-mt65xx.c
+ create mode 100644 include/linux/platform_data/spi-mt65xx.h
 
-Whereas if we used the child node name which only pertains to _this_
-driver, we would then have full control and know that (unless it
-Flexcom is used for a completely different type of serial controller)
-we wouldn't have to keep expanding the code to accommodate.
-
-> Regarding the implementation itself, I would match the child node with
-> an of_device_id table rather than trying to find a specific substring
-> in the compatible string, but I think that's only a matter of taste.
-
-You mean duplicate each of the supported device's compatible strings
-in this driver, then fetch the attributed of_match_device()->data
-value?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+--
+1.8.1.1.dirty
