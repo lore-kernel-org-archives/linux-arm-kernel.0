@@ -1,73 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 23 Jul 2015 16:58:16 +0900
-Subject: [GIT PULL] ARM: EXYNOS: mach: Improvements for 4.3
-In-Reply-To: <55AED996.9090208@samsung.com>
-References: <1437014519-19571-1-git-send-email-k.kozlowski@samsung.com>
- <1437014519-19571-2-git-send-email-k.kozlowski@samsung.com>
- <06bb01d0c372$756f2250$604d66f0$@kernel.org>
- <CAJKOXPeHu7WB7ZJJsjMSPXgiB24ryqufSuPDhFxiXoYDMjLHcg@mail.gmail.com>
- <CAJKOXPeJyoG1sw_Oxznx75WPrk2CcQMxtXrq_MiPHm15E7k+8g@mail.gmail.com>
- <55AED996.9090208@samsung.com>
-Message-ID: <028b01d0c51d$553710e0$ffa532a0$@kernel.org>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 23 Jul 2015 08:58:26 +0100
+Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
+ Never
+In-Reply-To: <20150722181440.GS6650@arm.com>
+References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
+ <1437481411-1595-7-git-send-email-james.morse@arm.com>
+ <20150721123830.GD25887@localhost> <20150722170140.GR6650@arm.com>
+ <55AFDB46.3060302@arm.com> <20150722181440.GS6650@arm.com>
+Message-ID: <55B09EA2.8070101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski wrote:
+On 22/07/15 19:14, Will Deacon wrote:
+> On Wed, Jul 22, 2015 at 07:04:54PM +0100, James Morse wrote:
+>> On 22/07/15 18:01, Will Deacon wrote:
+>>> I've applied your series with the exception of this last one, as it
+>>> conflicts with some other patches I have queued for 4.3. Please can you
+>>> rebase this against the arm64 "devel" branch? (usually it would be
+>>> for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
+>>> build is broken atm).
+>>
+>> The version of patch 5 "arm64: kernel: Add optional CONFIG_ parameter to
+>> ALTERNATIVE()" in your tree has:
+>>
+>>> [will: removed unused asm macro changes for now to avoid conflicts]
+>>
+>> Those were used in arch/arm64/lib/clear_user.S and friends.
+>> I shall remove the 'CONFIG_ARM64_PAN' from those four asm files - it can be
+>> tidied up later.
 > 
-> On 21.07.2015 14:21, Krzysztof Kozlowski wrote:
-> > 2015-07-21 14:13 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> >> 2015-07-21 14:02 GMT+09:00 Kukjin Kim <kgene@kernel.org>:
-> >>> Krzysztof Kozlowski wrote:
+> Ah, damn, I didn't realise you'd made the ALTERNATIVE macro work for both
+> C and asm. The reason I changed it is because I don't know what's best to
+> do with the new alternative_if_not macros -- having an enabled argument
+> for the _else and _endif variants is really odd.
+> 
+> I think the options are:
+> 
+>   (1) Just spit out a NOP (you're current approach)
+>   (2) Use #ifdefs at the caller
+>   (3) Only have the option for alternative_insn
+>   (4) Add the option to all the alternative_ macros
+> 
+> What do you reckon?
 
-[...]
+I would go with (1) for now, it only affects four functions, not the
+uaccess.h macros, where it would be inlined all over the place.
 
-> >>>> --
-> >>>
-> >>> Applied above changes into fixes/non-critical, next/cleanup-samsung,
-> >>> next/dt-samsung and next/cpufreq-clk-samsung according to the change.
-> >
-> > Cc-ed Bartlomiej,
-> >
-> > One issue found: splitting DTS change for Exynos 5250 cpufreq to
-> > separate branch will break bisectability. The commit "ARM: dts:
-> > Exynos5250: add CPU OPP and regulator supply property":
-> > 1. MUST be put after "clk: samsung: exynos5250: add cpu clock
-> > configuration data and instantiate cpu clock" to prevent build
-> > failures,
-> > 2. should be put before "ARM: Exynos: switch to using generic cpufreq
-> > driver for Exynos5250" to prevent lost cpufreq functionality.
-> >
-> > Doing otherwise would lose bisectability which is really unfortunate
-> > when you can simply avoid it. This should remain in the same branch -
-> > next/cpufreq-clk-samsung.
-> 
-> Dear Kukjin,
-> 
-> Nothing changed since yesterday... so let me point this in a more clear
-> way. The way you divided the patchset causes build errors:
-> 
-> --------------
-> HEAD is now at 565872a601c4... ARM: dts: add CPU OPP and regulator
-> supply property for exynos5250
-> 
-> ERROR: Failed build: -A arm -c exynos on
-> 565872a601c4d91a75b917b1fb40ff27ad7ebb08
-> 
-> LOGS:
-> Error: ../arch/arm/boot/dts/exynos5250.dtsi:65.21-22 syntax error
-> FATAL ERROR: Unable to parse input tree
-> make[2]: *** [arch/arm/boot/dts/exynos5250-arndale.dtb] Error 1
-> make[1]: *** [dtbs] Error 2
-> make[1]: *** Waiting for unfinished jobs....
-> make: *** [sub-make] Error 2
-> --------------
-> 
-> This breaks bisectability without any special valid reason.
-> 
-Hi,
+(4) can be a future optimisation.
 
-I couldn't check e-mail yesterday because of annual health check.
-Anyway, I'll look at the error and handle it soon.
 
-Thanks for your check.
-Kukjin
+James
