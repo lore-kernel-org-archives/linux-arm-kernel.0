@@ -1,36 +1,45 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 23 Jul 2015 09:38:21 +0900
-Subject: [PATCH] clk: s2mps11: Use kcalloc instead of kzalloc for array
- allocation
-In-Reply-To: <1437557693-29433-1-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437557693-29433-1-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <55B0377D.10908@samsung.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 23 Jul 2015 02:48:03 +0200
+Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to Kconfig
+In-Reply-To: <1437612483-30160-1-git-send-email-sre@kernel.org>
+References: <1437612483-30160-1-git-send-email-sre@kernel.org>
+Message-ID: <1437612483-30160-4-git-send-email-sre@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.07.2015 18:34, Vaibhav Hiremath wrote:
-> This patch cleans up the driver for,
-> 
->   - Use devm_kcalloc varient instead of devm_kzalloc for array
->     allocation.
->   - clk_prepare/unprepare, remove "ret" variable as it is not required
->   - use __exit for cleanup function
-> 
-> As I am referring this driver as a reference for my 88pm800 clk driver,
-> applying same changes here as well.
-> 
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
-> Since I do not have platform to test, it would be helpful if someone
-> tests it for me.
-> I have build tested it.
-> 
->  drivers/clk/clk-s2mps11.c | 18 +++++++-----------
->  1 file changed, 7 insertions(+), 11 deletions(-)
+Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
+in one option less to think about when configuring the kernel.
 
-Looks good, simplifies the code and fixes the __init/__exit.
+Signed-off-by: Sebastian Reichel <sre@kernel.org>
+---
+ arch/arm/Kconfig      | 1 +
+ arch/arm/mm/proc-v7.S | 2 +-
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0e4929b..f0e2d92 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1066,6 +1066,7 @@ config ARM_ERRATA_411920
+ config ARM_ERRATA_430973
+ 	bool "ARM errata: Stale prediction on replaced interworking branch"
+ 	depends on CPU_V7
++	depends on !ARCH_MULTIPLATFORM
+ 	help
+ 	  This option enables the workaround for the 430973 Cortex-A8
+ 	  r1p* erratum. If a code sequence containing an ARM/Thumb
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 0716bbe..494e844 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -294,7 +294,7 @@ __v7_ca17mp_setup:
+  *  r9: MIDR
+  */
+ __ca8_errata:
+-#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
++#ifdef CONFIG_ARM_ERRATA_430973
+ 	teq	r3, #0x00100000			@ only present in r1p*
+ 	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
+ 	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+-- 
+2.1.4
