@@ -1,24 +1,119 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 22 Jul 2015 18:02:58 -0700
-Subject: [PATCH 09/10] arch: introduce memremap()
-In-Reply-To: <20150723005543.GK30479@wotan.suse.de>
-References: <20150720001614.30857.89063.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150720001822.30857.65670.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150721235848.GI30479@wotan.suse.de>
- <CAPcyv4jXyHzXUmr1LNL3vTzgced8Onrq9OZR2Ub1E85HnOru1Q@mail.gmail.com>
- <20150722225557.GJ30479@wotan.suse.de>
- <CAPcyv4hH7+Dr7NHYXcLfE_-QUwhE9b9tesjjcj4gk4pqJLajBQ@mail.gmail.com>
- <20150723005543.GK30479@wotan.suse.de>
-Message-ID: <CAPcyv4gwdNV8vbf4O8aVC87xpiwjMfnd9uRLaQ26R95SiaSosg@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 22 Jul 2015 18:03:33 -0700
+Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+In-Reply-To: <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
+References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
+ <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <55B03D65.8040207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 5:55 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
-> On Wed, Jul 22, 2015 at 04:15:41PM -0700, Dan Williams wrote:
-> Anyway so why is WB and WT allowed if you are going to remove WC and not add UC?
+On 07/22/2015 12:11 AM, Rajendra Nayak wrote:
+> With CONFIG_PM disabled, turn the devices clocks on during
+> driver binding to the device, and turn them off when the
+> driver is unbound from the device.
 >
+> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
+> ---
+>   drivers/clk/qcom/gdsc.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++
+>   1 file changed, 59 insertions(+)
+>
+> diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
+> index 3125809..9ddd2f8 100644
+> --- a/drivers/clk/qcom/gdsc.c
+> +++ b/drivers/clk/qcom/gdsc.c
+> @@ -16,6 +16,7 @@
+>   #include <linux/jiffies.h>
+>   #include <linux/pm_clock.h>
+>   #include <linux/slab.h>
+> +#include <linux/platform_device.h>
 
-Because all existing usages of WB and WT mappings are clearly free of
-I/O side effect concerns.  The WC and now UC usages are a muddy mix of
-"sometimes there's I/O side effects, but it depends by arch and
-driver".
+#include <linux/clk.h>?
+
+>   #include "gdsc.h"
+>   
+>   #define PWR_ON_MASK		BIT(31)
+> @@ -200,3 +201,61 @@ void gdsc_unregister(struct device *dev)
+>   {
+>   	of_genpd_del_provider(dev->of_node);
+>   }
+> +
+> +#ifndef CONFIG_PM
+> +static void enable_clock(struct device *dev, const char *con_id)
+> +{
+> +	struct clk *clk;
+> +
+> +	clk = clk_get(dev, con_id);
+> +	if (!IS_ERR(clk)) {
+> +		clk_prepare_enable(clk);
+> +		clk_put(clk);
+> +	}
+> +}
+> +
+> +static void disable_clock(struct device *dev, const char *con_id)
+> +{
+> +	struct clk *clk;
+> +
+> +	clk = clk_get(dev, con_id);
+> +	if (!IS_ERR(clk)) {
+> +		clk_disable_unprepare(clk);
+> +		clk_put(clk);
+> +	}
+> +}
+
+Is there a reason why this whole patch isn't generic code? I recall some 
+discussion but I forgot now and there isn't any mention of why this 
+isn't generic code in the commit text.
+
+> +
+> +static int clk_notify(struct notifier_block *nb, unsigned long action,
+> +		      void *data)
+> +{
+> +	int sz;
+> +	struct device *dev = data;
+> +	char **con_id, *con_ids[] = { "core", "iface", NULL };
+
+This again?
+
+> +
+> +	if (!of_find_property(dev->of_node, "power-domains", &sz))
+> +		return 0;
+> +
+> +	switch (action) {
+> +	case BUS_NOTIFY_BIND_DRIVER:
+> +		for (con_id = con_ids; *con_id; con_id++)
+> +			enable_clock(dev, *con_id);
+> +		break;
+> +	case BUS_NOTIFY_UNBOUND_DRIVER:
+> +		for (con_id = con_ids; *con_id; con_id++)
+> +			disable_clock(dev, *con_id);
+> +		break;
+> +	}
+> +	return 0;
+> +}
+> +
+> +struct notifier_block nb = {
+
+static?
+
+> +	.notifier_call = clk_notify,
+> +};
+> +
+> +int qcom_pm_runtime_init(void)
+
+static? __init?
+
+> +{
+> +	bus_register_notifier(&platform_bus_type, &nb);
+> +	return 0;
+
+return bus_register_notifier()?
+
+> +}
+> +core_initcall(qcom_pm_runtime_init);
+> +#endif
+
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
