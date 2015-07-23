@@ -1,110 +1,57 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 23 Jul 2015 11:26:11 -0700
-Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
-In-Reply-To: <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
-Message-ID: <55B131C3.8050009@caviumnetworks.com>
+From: aalonso@freescale.com (Alonso Adrian)
+Date: Thu, 23 Jul 2015 19:34:56 +0000
+Subject: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+ lpsr
+In-Reply-To: <20150717033429.GC12927@tiger>
+References: <1436295725-19011-1-git-send-email-aalonso@freescale.com>
+ <20150715072307.GM4119@tiger>
+ <BN3PR03MB1509DFB6A1513A23C48476CFA89A0@BN3PR03MB1509.namprd03.prod.outlook.com>
+ <20150716155034.GN4119@tiger>
+ <CAHrpEqQv4uzQ7+EnFV7rwnhAzaSnEfwoo+_SFRsvMh-nR3PdBw@mail.gmail.com>
+ <BN3PR03MB15095AD84AD5738B142F6F8CA8990@BN3PR03MB1509.namprd03.prod.outlook.com>
+ <20150717033429.GC12927@tiger>
+Message-ID: <BN3PR03MB150926F2FABADED18630B27CA8820@BN3PR03MB1509.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 09:52 AM, Mark Rutland wrote:
-[...]
-> +MSI clients
-> +===========
-> +
-> +MSI clients are devices which generate MSIs. For each MSI they wish to
-> +generate, the doorbell and payload may be configured, though sideband
-> +information may not be configurable.
-> +
-> +Required properties:
-> +--------------------
-> +
-> +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
-> +  controller which the device is capable of using.
-> +
+Hi Shawn,
 
-We say here that "msi-parent" consists of pairs ...
+The approach you mention is already supported in FSL kernel tree see
+http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/commit/?h=imx_3.14.38_6ul7d_beta&id=a37ea06ddccbefb8660af0ac259c30d98540bdc2
 
-> +  This property is unordered, and MSIs may be allocated from any combination of
-> +  MSI controllers listed in the msi-parent property.
-> +
-> +  If a device has restrictions on the allocation of MSIs, these restrictions
-> +  must be described with additional properties.
-> +
-> +  When #msi-cells is non-zero, busses with an msi-parent will require
-> +  additional properties to describe the relationship between devices on the bus
-> +  and the set of MSIs they can potentially generate.
-> +
-> +
-> +Example
-> +=======
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi_a: msi-controller at a {
-> +		reg = <0xa 0xf00>;
-> +		compatible = "vendor-a,some-controller";
-> +		msi-controller;
-> +		/* No sideband data, so #msi-cells omitted */
-> +	};
-> +
-> +	msi_b: msi-controller at b {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	msi_c: msi-controller at c {
-> +		reg = <0xb 0xf00>;
-> +		compatible = "vendor-b,another-controller";
-> +		msi-controller;
-> +		/* Each device has some unique ID */
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	dev at 0 {
-> +		reg = <0x0 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/* Can only generate MSIs to msi_a */
-> +		msi-parent = <&msi_a>;
+I will rework and proposed a new patch series soon.
 
+Thanks for your reviews :)
 
-My device-tree syntax foo is a little rusty, but doesn't "msi-parent" 
-need a pair of elements?  This has only the phandle.
+Regards
+Adrian
 
-> +	};
-> +
-> +	dev at 1 {
-> +		reg = <0x1 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +
-> +		/*
-> +		 * Can generate MSIs to either A or B.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>;
-
-
-... same here, ...
-
-> +	};
-> +
-> +	dev at 2 {
-> +		reg = <0x2 0xf00>;
-> +		compatible = "vendor-c,some-device";
-> +		/*
-> +		 * Has different IDs at each MSI controller.
-> +		 * Can generate MSIs to all of the MSI controllers.
-> +		 */
-> +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
-
-... and here
-
-> +	};
-> +};
->
+> -----Original Message-----
+> From: linux-gpio-owner at vger.kernel.org [mailto:linux-gpio-
+> owner at vger.kernel.org] On Behalf Of Shawn Guo
+> Sent: Thursday, July 16, 2015 10:34 PM
+> To: Alonso Lazcano Adrian-B38018
+> Cc: Zhi Li; devicetree at vger.kernel.org; Li Frank-B20596; Garg Nitin-B37173;
+> linus.walleij at linaro.org; linux-gpio at vger.kernel.org; robh+dt at kernel.org;
+> shawn.guo at linaro.org; Huang Yongcai-B20788; linux-arm-
+> kernel at lists.infradead.org; Gong Yibin-B38343
+> Subject: Re: [PATCH][v3] ARM: imx: pinctrl-imx: imx7d: add support for iomuxc
+> lpsr
+> 
+> On Thu, Jul 16, 2015 at 08:39:33PM +0000, Alonso Adrian wrote:
+> > Hi All,
+> >
+> > I will sent a new patch series including documentation for pad group
+> > id encoding in
+> > Documentation/devicetree/bindings/pinctrl/fsl,imx7d-pinctrl.txt
+> >
+> > Thanks for your comments :)
+> 
+> Do not get me wrong.  The problem with the patch is not merely missing the
+> document update.
+> 
+> Shawn
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-gpio" in the body
+> of a message to majordomo at vger.kernel.org More majordomo info at
+> http://vger.kernel.org/majordomo-info.html
