@@ -1,20 +1,21 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 23 Jul 2015 15:51:05 -0500
-Subject: [PATCH v2 09/11] ARM: dts: msm8974: Add smem reservation and node
-In-Reply-To: <1435355419-23602-10-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1435355419-23602-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1435355419-23602-10-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <20150723205105.GD13658@qualcomm.com>
+Date: Thu, 23 Jul 2015 15:56:46 -0500
+Subject: [PATCH 3/3] ARM: dts: qcom: Replace gpio node with pinctrl node
+In-Reply-To: <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1433544745-325-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1433544745-325-4-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20150723205646.GE13658@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 26, 2015 at 02:50:17PM -0700, bjorn at kryo.se wrote:
-> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+On Fri, Jun 05, 2015 at 03:52:25PM -0700, Bjorn Andersson wrote:
+> Replace the standalone gpio driver with pinctrl-msm as we now have
+> msm8660 support there.
 > 
 > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > ---
 
-Applied, thanks.
+Applied, thanks!
 
 -- 
 Qualcomm Innovation Center, Inc.
