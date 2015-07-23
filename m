@@ -1,131 +1,18 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 23 Jul 2015 12:45:25 +0800
-Subject: [PATCH 1/2] watchdog: add wdt suspend/resume support
-In-Reply-To: <55AF11CD.3070801@roeck-us.net>
-References: <1437535610-51314-1-git-send-email-eddie.huang@mediatek.com>
- <1437535610-51314-2-git-send-email-eddie.huang@mediatek.com>
- <55AF11CD.3070801@roeck-us.net>
-Message-ID: <1437626725.10821.2.camel@mtksdaap41>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 23 Jul 2015 12:45:48 +0800
+Subject: [PATCH V2 00/11] mmc: sdhci-esdhci-imx: fix cd/wp regression
+In-Reply-To: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
+References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <20150723044548.GG12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-21 at 20:45 -0700, Guenter Roeck wrote:
-> On 07/21/2015 08:26 PM, Eddie Huang wrote:
-> > From: Greta Zhang <greta.zhang@mediatek.com>
-> >
-> > add wdt driver suspend/resume support
-> >
-> > Signed-off-by: Greta Zhang <greta.zhang@mediatek.com>
-> > Signed-off-by: Roger Lu <roger.lu@mediatek.com>
-> > Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
-> > ---
-> >   drivers/watchdog/mtk_wdt.c | 38 ++++++++++++++++++++++++++++++++++++++
-> >   1 file changed, 38 insertions(+)
-> >
-> > diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
-> > index 938b987..5ef3910 100644
-> > --- a/drivers/watchdog/mtk_wdt.c
-> > +++ b/drivers/watchdog/mtk_wdt.c
-> > @@ -65,6 +65,7 @@ struct mtk_wdt_dev {
-> >   	struct watchdog_device wdt_dev;
-> >   	void __iomem *wdt_base;
-> >   	struct notifier_block restart_handler;
-> > +	bool started;
-> 
-> Any reason why you can not use watchdog_active() ?
+On Wed, Jul 22, 2015 at 08:52:59PM +0800, Dong Aisheng wrote:
+> Dong Aisheng (11):
+>   dts: imx51: fix sd card gpio polarity specified in device tree
+>   dts: imx53: fix sd card gpio polarity specified in device tree
+>   dts: imx6: fix sd card gpio polarity specified in device tree
+>   dts: imx25: fix sd card gpio polarity specified in device tree
+>   dts: imx7: fix sd card gpio polarity specified in device tree
 
-Will change to use watchdog_active()
-
-> 
-> >   };
-> >
-> >   static int mtk_reset_handler(struct notifier_block *this, unsigned long mode,
-> > @@ -125,6 +126,8 @@ static int mtk_wdt_stop(struct watchdog_device *wdt_dev)
-> >   	reg &= ~WDT_MODE_EN;
-> >   	iowrite32(reg, wdt_base + WDT_MODE);
-> >
-> > +	mtk_wdt->started = false;
-> > +
-> >   	return 0;
-> >   }
-> >
-> > @@ -135,6 +138,8 @@ static int mtk_wdt_start(struct watchdog_device *wdt_dev)
-> >   	void __iomem *wdt_base = mtk_wdt->wdt_base;
-> >   	int ret;
-> >
-> > +	mtk_wdt->started = true;
-> > +
-> >   	ret = mtk_wdt_set_timeout(wdt_dev, wdt_dev->timeout);
-> >   	if (ret < 0)
-> >   		return ret;
-> > @@ -174,6 +179,8 @@ static int mtk_wdt_probe(struct platform_device *pdev)
-> >
-> >   	platform_set_drvdata(pdev, mtk_wdt);
-> >
-> > +	mtk_wdt->started = false;
-> > +
-> >   	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> >   	mtk_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
-> >   	if (IS_ERR(mtk_wdt->wdt_base))
-> > @@ -221,6 +228,35 @@ static int mtk_wdt_remove(struct platform_device *pdev)
-> >   	return 0;
-> >   }
-> >
-> > +#ifdef CONFIG_PM
-> > +static int mtk_wdt_suspend(struct platform_device *pdev, pm_message_t state)
-> > +{
-> > +	struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
-> > +
-> > +	if (mtk_wdt->started) {
-> > +		mtk_wdt_stop(&mtk_wdt->wdt_dev);
-> > +		mtk_wdt->started = true;
-> 
-> ?????
-> 
-Because mtk_wdt_stop() change mtk_wdt->started to false, so set
-mtk_wdt->started back to true here. This code is not necessary if use
-watchdog_active()
-
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int mtk_wdt_resume(struct platform_device *pdev)
-> > +{
-> > +	struct mtk_wdt_dev *mtk_wdt = platform_get_drvdata(pdev);
-> > +
-> > +	if (mtk_wdt->started) {
-> > +		mtk_wdt_start(&mtk_wdt->wdt_dev);
-> > +		mtk_wdt_ping(&mtk_wdt->wdt_dev);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +#else
-> > +#define	mtk_wdt_suspend	NULL
-> > +#define	mtk_wdt_resume	NULL
-> > +#endif
-> > +
-> >   static const struct of_device_id mtk_wdt_dt_ids[] = {
-> >   	{ .compatible = "mediatek,mt6589-wdt" },
-> >   	{ /* sentinel */ }
-> > @@ -230,6 +266,8 @@ MODULE_DEVICE_TABLE(of, mtk_wdt_dt_ids);
-> >   static struct platform_driver mtk_wdt_driver = {
-> >   	.probe		= mtk_wdt_probe,
-> >   	.remove		= mtk_wdt_remove,
-> > +	.suspend	= mtk_wdt_suspend,
-> > +	.resume		= mtk_wdt_resume,
-> >   	.driver		= {
-> >   		.name		= DRV_NAME,
-> >   		.of_match_table	= mtk_wdt_dt_ids,
-> 
-> Typically drivers would use struct dev_pm_ops and
->                  .pm = &mtk_wdt_pm_ops,
-> 
-> Any reason for not using the same mechanism ?
-> 
-Will change to use dev_pm_ops
-
-Eddie
-Thanks
+Acked-by: Shawn Guo <shawnguo@kernel.org>
