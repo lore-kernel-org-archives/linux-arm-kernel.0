@@ -1,23 +1,44 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jul 2015 18:09:05 -0700
-Subject: [PATCH v6 10/13] clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
-In-Reply-To: <1437549069-29655-11-git-send-email-rnayak@codeaurora.org>
+Date: Wed, 22 Jul 2015 18:11:50 -0700
+Subject: [PATCH v6 07/13] clk: qcom: gdsc: Add support for ON only state
+In-Reply-To: <1437549069-29655-8-git-send-email-rnayak@codeaurora.org>
 References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-11-git-send-email-rnayak@codeaurora.org>
-Message-ID: <55B03EB1.4030406@codeaurora.org>
+ <1437549069-29655-8-git-send-email-rnayak@codeaurora.org>
+Message-ID: <55B03F56.8030503@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 07/22/2015 12:11 AM, Rajendra Nayak wrote:
-> From: Stephen Boyd <sboyd@codeaurora.org>
->
-> Add the GDSC instances that exist as part of msm8974 MMCC block
->
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
->
+> @@ -200,6 +224,12 @@ static int gdsc_init(struct gdsc *sc)
+>   	if (ret)
+>   		return ret;
+>   
+> +	/* Force gdsc ON if only ON state is supported */
+> +	if (sc->pwrsts == PWRSTS_ON)
+> +		ret = gdsc_toggle_logic(sc, true);
+> +		if (ret)
+> +			return ret;
 
- From here on it looks fine, just routine data additions.
+This is missing braces. Please test :)
+
+> +
+>   	on = gdsc_is_enabled(sc);
+>   	if (on < 0)
+>   		return on;
+>
+> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+> index 87c4ace..0d1c4fb 100644
+> --- a/drivers/clk/qcom/gdsc.h
+> +++ b/drivers/clk/qcom/gdsc.h
+> @@ -17,6 +17,7 @@
+>   #include <linux/clk.h>
+>   #include <linux/pm_domain.h>
+>   #include <linux/regmap.h>
+> +#include <linux/reset-controller.h>
+
+Do we need this include either? Just forward declare stuff. Same comment 
+goes for the clk include.
+
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
