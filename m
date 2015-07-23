@@ -1,45 +1,79 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 22 Jul 2015 18:11:50 -0700
-Subject: [PATCH v6 07/13] clk: qcom: gdsc: Add support for ON only state
-In-Reply-To: <1437549069-29655-8-git-send-email-rnayak@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-8-git-send-email-rnayak@codeaurora.org>
-Message-ID: <55B03F56.8030503@codeaurora.org>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Thu, 23 Jul 2015 09:18:35 +0800
+Subject: [PATCH v3 0/5] Mediatek xHCI support
+In-Reply-To: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1437573945-31586-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1437614315.3040.3.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 12:11 AM, Rajendra Nayak wrote:
-> @@ -200,6 +224,12 @@ static int gdsc_init(struct gdsc *sc)
->   	if (ret)
->   		return ret;
->   
-> +	/* Force gdsc ON if only ON state is supported */
-> +	if (sc->pwrsts == PWRSTS_ON)
-> +		ret = gdsc_toggle_logic(sc, true);
-> +		if (ret)
-> +			return ret;
+Sorry, add a title
 
-This is missing braces. Please test :)
-
-> +
->   	on = gdsc_is_enabled(sc);
->   	if (on < 0)
->   		return on;
->
-> diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-> index 87c4ace..0d1c4fb 100644
-> --- a/drivers/clk/qcom/gdsc.h
-> +++ b/drivers/clk/qcom/gdsc.h
-> @@ -17,6 +17,7 @@
->   #include <linux/clk.h>
->   #include <linux/pm_domain.h>
->   #include <linux/regmap.h>
-> +#include <linux/reset-controller.h>
-
-Do we need this include either? Just forward declare stuff. Same comment 
-goes for the clk include.
-
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+On Wed, 2015-07-22 at 22:05 +0800, Chunfeng Yun wrote:
+> From ac1e8724bfa47494223bad0af450c1a63cd2fe0c Mon Sep 17 00:00:00 2001
+> From: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Date: Wed, 22 Jul 2015 21:15:15 +0800
+> Subject: [PATCH 0/5] *** SUBJECT HERE ***
+> 
+> The patch supports MediaTek's xHCI controller.
+> 
+> There are some differences from xHCI spec:
+> 1. The interval is specified in 250 * 8ns increments for Interrupt Moderation
+> Interval(IMODI) of the Interrupter Moderation(IMOD) register, it is 8 times as
+> much as that defined in xHCI spec.
+> 
+> 2. For the value of TD Size in Normal TRB, MTK's xHCI controller defines a
+> number of packets that remain to be transferred for a TD after processing all
+> Max packets in all previous TRBs,that means don't include the current TRB's,
+> but in xHCI spec it includes the current ones.
+> 
+> 3. To minimize the scheduling effort for synchronous endpoints in xHC, the MTK
+> architecture defines some extra SW scheduling parameters for HW. According to
+> these parameters provided by SW, the xHC can easily decide whether a
+> synchronous endpoint should be scheduled in a specific uFrame. The extra SW
+> scheduling parameters are put into reserved DWs in Slot and Endpoint Context.
+> And a bandwidth scheduler algorithm is added to support such feature.
+> 
+> A usb3.0 phy driver is also added which used by mt65xx SoCs platform, it
+> supports two usb2.0 ports and one usb3.0 port.
+> 
+> Change in v3:
+> 1. implement generic phy
+> 2. move opperations for IPPC and wakeup from phy driver to xHCI driver
+> 3. seperate quirk functions into a single C file to fix up dependence issue
+> 
+> Chunfeng Yun (5):
+>   dt-bindings: Add usb3.0 phy binding for MT65xx SoCs
+>   dt-bindings: Add a binding for Mediatek xHCI host controller
+>   usb: phy: add usb3.0 phy driver for mt65xx SoCs
+>   xhci: mediatek: support MTK xHCI host controller
+>   arm64: dts: mediatek: add xHCI & usb phy for mt8173
+> 
+>  .../devicetree/bindings/phy/phy-mt65xx-u3.txt      |  21 +
+>  .../devicetree/bindings/usb/mt8173-xhci.txt        |  50 ++
+>  arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |  15 +
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  31 +
+>  drivers/phy/Kconfig                                |   9 +
+>  drivers/phy/Makefile                               |   1 +
+>  drivers/phy/phy-mt65xx-usb3.c                      | 426 +++++++++++
+>  drivers/usb/host/Kconfig                           |   9 +
+>  drivers/usb/host/Makefile                          |   4 +
+>  drivers/usb/host/xhci-mtk-sch.c                    | 436 +++++++++++
+>  drivers/usb/host/xhci-mtk.c                        | 836 +++++++++++++++++++++
+>  drivers/usb/host/xhci-mtk.h                        | 135 ++++
+>  drivers/usb/host/xhci-ring.c                       |  35 +-
+>  drivers/usb/host/xhci.c                            |  19 +-
+>  drivers/usb/host/xhci.h                            |   1 +
+>  15 files changed, 2021 insertions(+), 7 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/phy/phy-mt65xx-u3.txt
+>  create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+>  create mode 100644 drivers/phy/phy-mt65xx-usb3.c
+>  create mode 100644 drivers/usb/host/xhci-mtk-sch.c
+>  create mode 100644 drivers/usb/host/xhci-mtk.c
+>  create mode 100644 drivers/usb/host/xhci-mtk.h
+> 
+> --
+> 1.8.1.1.dirty
+> 
+> In-Reply-To: 
+> 
