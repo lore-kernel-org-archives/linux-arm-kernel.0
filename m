@@ -1,26 +1,25 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 23 Jul 2015 19:37:03 +0200
-Subject: [PATCH v2 2/2] watchdog: add wdt shutdown callback to disable wdt
- if enabled
-In-Reply-To: <1437630551-39650-3-git-send-email-eddie.huang@mediatek.com>
-References: <1437630551-39650-1-git-send-email-eddie.huang@mediatek.com>
- <1437630551-39650-3-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <1488521.5eJqASov2O@ubix>
+Date: Thu, 23 Jul 2015 20:02:19 +0200
+Subject: [PATCH] ARM: mediatek: Add regmap to mediatek Kconfig
+In-Reply-To: <1437166406-14233-1-git-send-email-matthias.bgg@gmail.com>
+References: <1437166406-14233-1-git-send-email-matthias.bgg@gmail.com>
+Message-ID: <1437677861.d66HCIve0i@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 23, 2015 01:49:11 PM Eddie Huang wrote:
-> From: Greta Zhang <greta.zhang@mediatek.com>
+On Friday, July 17, 2015 10:53:26 PM Matthias Brugger wrote:
+> Mediatek SoC needs the regmap/syscon infrastructure.
+> The infrastructure is used by the clock and pinctrl driver.
+> This patch adds MD_SYSCON to Kconfig for all Mediatek devices.
 > 
-> Without .shutdown(), watchdog might reset the system during power off.
-> For example, if watchdog's timeout is set to 30s, then it is reset to
-> zero by mtk_wdt_ping(). During power off, no app will ping watchdog,
-> but watchdog is still running and may trigger reset.
-> 
-> Signed-off-by: Greta Zhang <greta.zhang@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 > ---
->  drivers/watchdog/mtk_wdt.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+>  arch/arm/mach-mediatek/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-mediatek/Kconfig b/arch/arm/mach-mediatek/Kconfig
+> index 9f59e58..aeece17 100644
+> --- a/arch/arm/mach-mediatek/Kconfig
+> +++ b/arch/arm/mach-mediatek/Kconfig
 
-Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+applied to v4.2-next/soc
