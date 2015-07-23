@@ -1,52 +1,72 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 23 Jul 2015 08:58:26 +0100
-Subject: [PATCH v3 6/6] arm64: kernel: Add support for Privileged Access
- Never
-In-Reply-To: <20150722181440.GS6650@arm.com>
-References: <1437481411-1595-1-git-send-email-james.morse@arm.com>
- <1437481411-1595-7-git-send-email-james.morse@arm.com>
- <20150721123830.GD25887@localhost> <20150722170140.GR6650@arm.com>
- <55AFDB46.3060302@arm.com> <20150722181440.GS6650@arm.com>
-Message-ID: <55B09EA2.8070101@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 23 Jul 2015 10:01:01 +0200
+Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <20150723073217.GT3061@x1>
+References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
+ <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
+ <20150723073217.GT3061@x1>
+Message-ID: <20150723100101.7290242b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/07/15 19:14, Will Deacon wrote:
-> On Wed, Jul 22, 2015 at 07:04:54PM +0100, James Morse wrote:
->> On 22/07/15 18:01, Will Deacon wrote:
->>> I've applied your series with the exception of this last one, as it
->>> conflicts with some other patches I have queued for 4.3. Please can you
->>> rebase this against the arm64 "devel" branch? (usually it would be
->>> for-next/core, but I'm holding off stabilising until -rc4 since allmodconfig
->>> build is broken atm).
->>
->> The version of patch 5 "arm64: kernel: Add optional CONFIG_ parameter to
->> ALTERNATIVE()" in your tree has:
->>
->>> [will: removed unused asm macro changes for now to avoid conflicts]
->>
->> Those were used in arch/arm64/lib/clear_user.S and friends.
->> I shall remove the 'CONFIG_ARM64_PAN' from those four asm files - it can be
->> tidied up later.
-> 
-> Ah, damn, I didn't realise you'd made the ALTERNATIVE macro work for both
-> C and asm. The reason I changed it is because I don't know what's best to
-> do with the new alternative_if_not macros -- having an enabled argument
-> for the _else and _endif variants is really odd.
-> 
-> I think the options are:
-> 
->   (1) Just spit out a NOP (you're current approach)
->   (2) Use #ifdefs at the caller
->   (3) Only have the option for alternative_insn
->   (4) Add the option to all the alternative_ macros
-> 
-> What do you reckon?
+Hi Lee,
 
-I would go with (1) for now, it only affects four functions, not the
-uaccess.h macros, where it would be inlined all over the place.
+On Thu, 23 Jul 2015 08:32:17 +0100
+Lee Jones <lee.jones@linaro.org> wrote:
 
-(4) can be a future optimisation.
+> On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
+> > +	for_each_child_of_node(np, child) {
+> > +		const char *compatible;
+> > +		int cplen;
+> > +
+> > +		if (!of_device_is_available(child))
+> > +			continue;
+> > +
+> > +		compatible = of_get_property(child, "compatible", &cplen);
+> > +		if (!compatible || strlen(compatible) > cplen)
+> > +			continue;
+> > +
+> > +		if (strstr(compatible, "-usart")) {
+> > +			opmode = FLEX_MR_OPMODE_USART;
+> > +			break;
+> > +		}
+> > +
+> > +		if (strstr(compatible, "-spi")) {
+> > +			opmode = FLEX_MR_OPMODE_SPI;
+> > +			break;
+> > +		}
+> > +
+> > +		if (strstr(compatible, "-i2c")) {
+> > +			opmode = FLEX_MR_OPMODE_TWI;
+> > +			break;
+> > +		}
+> > +	}
+> 
+> From what I understand Flexcom is a wrapper which can sit above any
+> number of SPI, I2C and/or UART devices.  Devices which you don't
+> really have any control over (source code wise).  So wouldn't it be
+> better to match on the details you do have control over i.e. the node
+> name, rather than the compatible string?
+> 
+> I would personally match on of_find_node_by_name() to future-proof
+> your implementation.
 
+Actually, I think using compatible strings is more future-proof than
+using the node names, because nothing in the DT bindings doc enforce the
+node name, and usually what we use to attach a node to a specific
+driver is the compatible string (this one is specified in the bindings
+doc).
 
-James
+Regarding the implementation itself, I would match the child node with
+an of_device_id table rather than trying to find a specific substring
+in the compatible string, but I think that's only a matter of taste.
+
+Best Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
