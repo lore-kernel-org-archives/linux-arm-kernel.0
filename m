@@ -1,36 +1,33 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 23 Jul 2015 13:40:18 +0200
-Subject: [PATCH] ARM: dts: Use stdout-path in STM32F429 Discovery board
-In-Reply-To: <1437628173-9447-1-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1437628173-9447-1-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <55B0D2A2.9080604@suse.de>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Thu, 23 Jul 2015 19:45:53 +0800
+Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
+Message-ID: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.07.2015 um 07:09 schrieb Maxime Coquelin:
-> This patch replaces use of linux,stdout-path by stdout-path as per
+A little change to patch_map() function,
+use set_fixmap_offset() to make code more clear.
 
-s/by/with/
+Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+---
+ arch/arm64/kernel/insn.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-> "chosen" DT bindings documentation.
-> 
-> Doing that, the "console" argument is no more needed in kernel command
-> line.
-> 
-> Reported-by: Olof Johansson <olof@lixom.net>
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->  arch/arm/boot/dts/stm32f429-disco.dts | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-
-Other than that,
-
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-
-Regards,
-Andreas
-
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index dd9671c..7dafd5a 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+ 		return addr;
+ 
+ 	BUG_ON(!page);
+-	set_fixmap(fixmap, page_to_phys(page));
+-
+-	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
++	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
++			(addr & ~PAGE_MASK));
+ }
+ 
+ static void __kprobes patch_unmap(int fixmap)
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-21284 (AG N?rnberg)
+1.9.1
