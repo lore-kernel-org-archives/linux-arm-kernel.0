@@ -1,63 +1,44 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Thu, 23 Jul 2015 17:10:41 +0800
-Subject: [PATCH v3 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1437642643-11966-1-git-send-email-leilk.liu@mediatek.com>
-References: <1437642643-11966-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1437642643-11966-3-git-send-email-leilk.liu@mediatek.com>
+From: svarbanov@mm-sol.com (Stanimir Varbanov)
+Date: Thu, 23 Jul 2015 12:22:29 +0300
+Subject: [PATCH v6 03/13] clk: qcom: gdsc: Use PM clocks to control gdsc
+ clocks
+In-Reply-To: <55B0A710.9080209@codeaurora.org>
+References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
+ <1437549069-29655-4-git-send-email-rnayak@codeaurora.org>
+ <55B03CE9.4050903@codeaurora.org> <55B0A710.9080209@codeaurora.org>
+Message-ID: <55B0B255.9050803@mm-sol.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change-Id: I6cadbf2e51d2cc4eacd518a24d5a9a1da93d4db5
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+On 07/23/2015 11:34 AM, Rajendra Nayak wrote:
+> On 07/23/2015 06:31 AM, Stephen Boyd wrote:
+>> On 07/22/2015 12:10 AM, Rajendra Nayak wrote:
+>>> @@ -104,6 +105,37 @@ static int gdsc_disable(struct generic_pm_domain
+>>> *domain)
+>>>       return gdsc_toggle_logic(sc, false);
+>>>   }
+>>> +static int gdsc_attach(struct generic_pm_domain *domain, struct
+>>> device *dev)
+>>> +{
+>>> +    int ret;
+>>> +    struct gdsc *sc = domain_to_gdsc(domain);
+>>> +    char **con_id, *con_ids[] = { "core", "iface", NULL };
+>>
+>> const?
+>>
+>> This is where I get scared of sniffing too much SoC glue. What's to
+>> enforce the "core", and "iface" naming scheme? What's to enforce there
+>> being two clocks vs. one? Maybe a better approach would be to use
+>> of_clk_get() and iterate through all clocks of the device, or to encode
+>> the clock names in the gdsc structure.
+> 
+> I had the clock names in the gdsc structure in v5. I should probably go
+> back to having it that way.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-new file mode 100644
-index 0000000..f8005d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -0,0 +1,38 @@
-+MTK SPI device
-+
-+Required properties:
-+- compatible: should be one of the following.
-+    - mediatek,mt8173-spi: for mt8173 platforms
-+    - mediatek,mt8135-spi: for mt8135 platforms
-+    - mediatek,mt6589-spi: for mt6589 platforms
-+
-+- #address-cells: should be 1.
-+
-+- #size-cells: should be 0.
-+
-+- reg: Address and length of the register set for the device
-+
-+- interrupts: Should contain spi interrupt
-+
-+- clocks: phandles to input clocks.
-+
-+- clock-names: tuple listing input clock names.
-+	Required elements: "main"
-+
-+- pad-select: should specify spi pad used, only required for MT8173.
-+        This value should be 0~3.
-+
-+Example:
-+
-+- SoC Specific Portion:
-+spi: spi at 1100a000 {
-+	compatible = "mediatek,mt8173-spi";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0 0x1100a000 0 0x1000>;
-+	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-+	clocks = <&pericfg CLK_PERI_SPI0>;
-+	clock-names = "main";
-+	pad-select = <0>;
-+	status = "disabled";
-+};
+Rajendra, If you decide to go back please look at that comment [1], as well.
+
 -- 
-1.8.1.1.dirty
+regards,
+Stan
+
+[1] http://www.spinics.net/lists/linux-arm-msm/msg15040.html
