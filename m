@@ -1,44 +1,90 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 23 Jul 2015 18:15:25 +0100
-Subject: [RFT PATCH] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <20150723151018.GY21967@google.com>
-References: <1436784206-14414-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20150722090248.GA344@red-moon> <55AF6149.4000601@arm.com>
- <20150722124929.GA537@red-moon> <20150723151018.GY21967@google.com>
-Message-ID: <20150723171514.GA23324@red-moon>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Thu, 23 Jul 2015 18:18:08 +0100
+Subject: [PATCH v2 06/20] block/xen-blkfront: Store a page rather a pfn
+ in the grant structure
+In-Reply-To: <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-7-git-send-email-julien.grall@citrix.com>
+ <alpine.DEB.2.02.1507161610570.17378@kaball.uk.xensource.com>
+Message-ID: <55B121D0.8070507@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 04:10:18PM +0100, Bjorn Helgaas wrote:
-> On Wed, Jul 22, 2015 at 01:49:29PM +0100, Lorenzo Pieralisi wrote:
-> 
-> > > >> @@ -483,14 +471,25 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-> > > >>  				break;
-> > > >>  			}
-> > > >>  
-> > > >> -			if (hw->scan)
-> > > >> +			if (hw->scan) {
-> > > >>  				sys->bus = hw->scan(nr, sys);
-> > > >> -			else
-> > > >> -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
-> > > >> -						hw->ops, sys, &sys->resources);
-> > > >> +				if (!sys->bus)
-> > > >> +					panic("PCI: unable to scan bus!");
-> > > 
-> > > This was in the original code, but I have to ask: Do we really want to
-> > > panic the kernel if we couldn't scan the bus? Worse case, the system
-> > > won't be able to boot at all and will panic somewhere else anyway, but
-> > > we should give the user a chance to understand what's happening...
-> > 
-> > No, it was in the original code but I was very tempted to remove it
-> > or merge the error paths and make it a warning, and that's what I am
-> > going to do, unless someone complains (that panic statement has been there
-> > forever).
-> 
-> I agree the panic should be removed.  I would do it in a separate patch
-> since it's not related to your main objective here.
+Hi Stefano,
 
-Ok, I will post v2 shortly.
+On 16/07/15 16:11, Stefano Stabellini wrote:
+> On Thu, 9 Jul 2015, Julien Grall wrote:
+>> All the usage of the field pfn are done using the same idiom:
+>>
+>> pfn_to_page(grant->pfn)
+>>
+>> This will  return always the same page. Store directly the page in the
+>> grant to clean up the code.
+>>
+>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>> Cc: Roger Pau Monn? <roger.pau@citrix.com>
+>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>> Cc: David Vrabel <david.vrabel@citrix.com>
+>> ---
+>>     Changes in v2:
+>>         - Patch added
+>> ---
+>>  drivers/block/xen-blkfront.c | 37 ++++++++++++++++++-------------------
+>>  1 file changed, 18 insertions(+), 19 deletions(-)
+>>
+>> diff --git a/drivers/block/xen-blkfront.c b/drivers/block/xen-blkfront.c
+>> index 7107d58..7b81d23 100644
+>> --- a/drivers/block/xen-blkfront.c
+>> +++ b/drivers/block/xen-blkfront.c
+>> @@ -67,7 +67,7 @@ enum blkif_state {
+>>  
+>>  struct grant {
+>>  	grant_ref_t gref;
+>> -	unsigned long pfn;
+>> +	struct page *page;
+>>  	struct list_head node;
+>>  };
+>>  
+>> @@ -219,7 +219,7 @@ static int fill_grant_buffer(struct blkfront_info *info, int num)
+>>  				kfree(gnt_list_entry);
+>>  				goto out_of_memory;
+>>  			}
+>> -			gnt_list_entry->pfn = page_to_pfn(granted_page);
+>> +			gnt_list_entry->page = granted_page;
+>>  		}
+>>  
+>>  		gnt_list_entry->gref = GRANT_INVALID_REF;
+>> @@ -234,7 +234,7 @@ out_of_memory:
+>>  	                         &info->grants, node) {
+>>  		list_del(&gnt_list_entry->node);
+>>  		if (info->feature_persistent)
+>> -			__free_page(pfn_to_page(gnt_list_entry->pfn));
+>> +			__free_page(gnt_list_entry->page);
+>>  		kfree(gnt_list_entry);
+>>  		i--;
+>>  	}
+>> @@ -243,7 +243,7 @@ out_of_memory:
+>>  }
+>>  
+>>  static struct grant *get_grant(grant_ref_t *gref_head,
+>> -                               unsigned long pfn,
+>> +			       struct page *page,
+>>                                 struct blkfront_info *info)
+> 
+> indentation
 
-Thanks !
-Lorenzo
+The indentation of the parameters wasn't valid. I will indent correctly
+"struct blkfront_info *info" rather than to use invalid indent.
+
+
+> Aside from this:
+> 
+> Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+
+Thank you,
+
+Regards,
+
+-- 
+Julien Grall
