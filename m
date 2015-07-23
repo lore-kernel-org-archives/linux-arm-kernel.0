@@ -1,59 +1,118 @@
-From: svarbanov@mm-sol.com (Stanimir Varbanov)
-Date: Thu, 23 Jul 2015 12:09:08 +0300
-Subject: [PATCH v6 01/13] clk: qcom: Add support for GDSCs
-In-Reply-To: <55B03495.8050902@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-2-git-send-email-rnayak@codeaurora.org>
- <55B03495.8050902@codeaurora.org>
-Message-ID: <55B0AF34.2000706@mm-sol.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 23 Jul 2015 11:11:58 +0200
+Subject: [PATCH V2 00/11] mmc: sdhci-esdhci-imx: fix cd/wp regression
+In-Reply-To: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
+References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <CAPDyKFqX-9e3+Ciefp2afjiZOUUg2KbzGuy=5DgVxjtz86XW7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<snip>
++Johan Derycke
 
->> +
->> +int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
->> +          struct regmap *regmap)
->> +{
->> +    int i, ret;
->> +    struct genpd_onecell_data *data;
->> +
->> +    data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
->> +    if (!data)
->> +        return -ENOMEM;
->> +
->> +    data->domains = devm_kcalloc(dev, num, sizeof(*data->domains),
->> +                     GFP_KERNEL);
->> +    if (!data->domains)
->> +        return -ENOMEM;
->> +
->> +    data->num_domains = num;
->> +    for (i = 0; i < num; i++) {
->> +        if (!scs[i])
->> +            continue;
->> +        scs[i]->regmap = regmap;
->> +        ret = gdsc_init(scs[i]);
->> +        if (ret)
->> +            return ret;
->> +        data->domains[i] = &scs[i]->pd;
->> +    }
->> +
->> +    return of_genpd_add_provider_onecell(dev->of_node, data);
->> +}
-> 
-> EXPORT_SYMBOL?
-> 
->> +
->> +void gdsc_unregister(struct device *dev)
->> +{
->> +    of_genpd_del_provider(dev->of_node);
->> +}
-> 
-> EXPORT_SYMBOL?
+On 22 July 2015 at 14:52, Dong Aisheng <aisheng.dong@freescale.com> wrote:
+> This is a rebase version of former two patch series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351167.html
+> http://www.spinics.net/lists/arm-kernel/msg426156.html
+>
+> No other changes.
+>
+> Commit 8d86e4f mmc: sdhci-esdhc-imx: Call mmc_of_parse()
+> seriously break the sd card detect/write protect function
+> of most IMX platforms since a lot of GPIO flags of cd-gpios/wp-gpios
+> are wrongly set in devicetree.
+>
+> It breaks the following things:
+> 1) cd-gpio function enable
+> Most IMX boards GPIO card detect function becomes unwork and using card
+> polling mode instead by mistake.
+> Openning CONFIG_MMC_DEBUG will easily see that.
+> It is caused by the default quirk SDHCI_QUIRK_BROKEN_CARD_DETECTION
+> is not cleared for dt platform by commit 8d86e4f, then
+> MMC_CAP_NEEDS_POLL is wrongly set.
+>
+> This is fixed by patch 6~7
+>
+> 2) cd-gpio/wp-gpio polarity
+> Before commit 8d86e4f, we do not use GPIO flags passed from
+> devicetree. But after it, GPIO flags specfied in dt becomes valid
+> and will affect the normal cd/wp function.
+>
+> This is fixed by patch 1~5
+>
+> 3) max-frequency not work in sdhci
+> mmc_of_parse will parse the max-frequency from devicetree,
+> however, its value will be overwritten by common sdhci driver
+> finnally,so it does not actually work.
+> Patch 8 is to fix it.
+>
+> 4) patch 9~11 clear unneeded parsing code after switch to mmc_of_parse().
+>
+> The series is based on ulf/next tree.
+>
+> I also CCed this patch series to all board maintainer related in this
+> change, hope they can help test it.
+> I only tested some freescale IMX boards.
+>
+> Dong Aisheng (11):
+>   dts: imx51: fix sd card gpio polarity specified in device tree
+>   dts: imx53: fix sd card gpio polarity specified in device tree
+>   dts: imx6: fix sd card gpio polarity specified in device tree
+>   dts: imx25: fix sd card gpio polarity specified in device tree
+>   dts: imx7: fix sd card gpio polarity specified in device tree
+>   mmc: sdhci-esdhc-imx: fix cd regression for dt platform
+>   mmc: sdhci-esdhc-imx: move all non dt probe code into one function
+>   mmc: sdhci: make max-frequency property in device tree work
+>   mmc: sdhci-esdhc-imx: remove duplicated dts parsing
+>   mmc: sdhci-esdhc-imx: clear f_max in boarddata
+>   dts: mmc: fsl-imx-esdhc: remove fsl,cd-controller support
+>
+>  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |   2 -
+>  arch/arm/boot/dts/imx25-pdk.dts                    |   4 +-
+>  arch/arm/boot/dts/imx51-apf51dev.dts               |   2 +-
+>  arch/arm/boot/dts/imx53-ard.dts                    |   4 +-
+>  arch/arm/boot/dts/imx53-m53evk.dts                 |   4 +-
+>  arch/arm/boot/dts/imx53-qsb-common.dtsi            |   4 +-
+>  arch/arm/boot/dts/imx53-smd.dts                    |   4 +-
+>  arch/arm/boot/dts/imx53-tqma53.dtsi                |   4 +-
+>  arch/arm/boot/dts/imx53-tx53.dtsi                  |   4 +-
+>  arch/arm/boot/dts/imx53-voipac-bsb.dts             |   4 +-
+>  arch/arm/boot/dts/imx6dl-riotboard.dts             |   8 +-
+>  arch/arm/boot/dts/imx6q-arm2.dts                   |   5 +-
+>  arch/arm/boot/dts/imx6q-gk802.dts                  |   3 +-
+>  arch/arm/boot/dts/imx6q-tbs2910.dts                |   4 +-
+>  arch/arm/boot/dts/imx6qdl-aristainetos.dtsi        |   4 +-
+>  arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi       |   4 +-
+>  arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             |   2 +-
+>  arch/arm/boot/dts/imx6qdl-dfi-fs700-m60.dtsi       |   4 +-
+>  arch/arm/boot/dts/imx6qdl-gw52xx.dtsi              |   2 +-
+>  arch/arm/boot/dts/imx6qdl-gw53xx.dtsi              |   2 +-
+>  arch/arm/boot/dts/imx6qdl-gw54xx.dtsi              |   2 +-
+>  arch/arm/boot/dts/imx6qdl-hummingboard.dtsi        |   2 +-
+>  arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi          |   4 +-
+>  arch/arm/boot/dts/imx6qdl-phytec-pfla02.dtsi       |   8 +-
+>  arch/arm/boot/dts/imx6qdl-rex.dtsi                 |   4 +-
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   4 +-
+>  arch/arm/boot/dts/imx6qdl-sabrelite.dtsi           |   6 +-
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi             |   8 +-
+>  arch/arm/boot/dts/imx6qdl-tx6.dtsi                 |   4 +-
+>  arch/arm/boot/dts/imx6qdl-wandboard.dtsi           |   6 +-
+>  arch/arm/boot/dts/imx6sl-evk.dts                   |  10 +-
+>  arch/arm/boot/dts/imx6sx-sabreauto.dts             |   4 +-
+>  arch/arm/boot/dts/imx6sx-sdb.dtsi                  |   4 +-
+>  arch/arm/boot/dts/imx7d-sdb.dts                    |   4 +-
+>  drivers/mmc/host/sdhci-esdhc-imx.c                 | 210 ++++++++++-----------
+>  drivers/mmc/host/sdhci.c                           |   9 +-
+>  include/linux/platform_data/mmc-esdhc-imx.h        |   1 -
+>  37 files changed, 185 insertions(+), 179 deletions(-)
+>
+> --
+> 1.9.1
+>
 
-Stephen, gdsc_register/unregister are internal to the qcom clk driver
-why to export them?
+I have applied this for my fixes branch, with a small change to fix
+some white-spaces in patch3 which  checkpatch complained about.
 
--- 
-regards,
-Stan
+Thanks!
+
+Kind regards
+Uffe
