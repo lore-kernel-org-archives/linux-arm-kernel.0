@@ -1,75 +1,110 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 23 Jul 2015 08:05:24 -0500
-Subject: [PATCH v5 02/19] PCI: MSI: Register irq domain with specific token
-In-Reply-To: <1437643598-19795-3-git-send-email-marc.zyngier@arm.com>
-References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
- <1437643598-19795-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20150723130524.GQ21967@google.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 23 Jul 2015 14:05:11 +0100
+Subject: [PATCH v2 5/7] acpi: gsi: Add acpi_set_irq_model to initialize the
+ GSI layer
+In-Reply-To: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437656713-9677-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nit: "PCI/MSI" in subject so it matches the rest.
+In order to start embrassing irqdomains at the GSI level, introduce
+a new initializer:
 
-On Thu, Jul 23, 2015 at 10:26:21AM +0100, Marc Zyngier wrote:
-> When creating a PCI/MSI domain, tag it with DOMAIN_BUS_PCI_MSI so
-> that it can be looked-up using irq_find_matching_host().
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+void acpi_set_irq_model(enum acpi_irq_model_id model,
+			unsigned long domain_token,
+			int (*populate)(struct acpi_gsi_descriptor *,
+					u32, unsigned int));
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+where:
+- model is the value assigned to acpi_irq_model
+- domain_token is the identifier for the irqdomain mapping
+  GSI interrupts
+- populate is a function provided by the interrupt controller,
+  populating a struct acpi_gsi_descriptor based on a GSI and
+  the interrupt trigger information
 
-> ---
->  drivers/pci/msi.c         | 8 +++++++-
->  include/linux/irqdomain.h | 1 +
->  2 files changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 373d96e..ef4ec6e 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -1273,12 +1273,18 @@ struct irq_domain *pci_msi_create_irq_domain(struct device_node *node,
->  					     struct msi_domain_info *info,
->  					     struct irq_domain *parent)
->  {
-> +	struct irq_domain *domain;
-> +
->  	if (info->flags & MSI_FLAG_USE_DEF_DOM_OPS)
->  		pci_msi_domain_update_dom_ops(info);
->  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
->  		pci_msi_domain_update_chip_ops(info);
->  
-> -	return msi_create_irq_domain(node, info, parent);
-> +	domain = msi_create_irq_domain(node, info, parent);
-> +	if (domain)
-> +		domain->bus_token = DOMAIN_BUS_PCI_MSI;
-> +
-> +	return domain;
+As nobody calls this code yet, the current code is left in place.
 
-Nit2: I have a slight preference, hardly worth mentioning in such a simple
-case, for this:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/acpi/gsi.c   | 32 ++++++++++++++++++++++++++++++++
+ include/linux/acpi.h |  5 +++++
+ 2 files changed, 37 insertions(+)
 
-    domain = msi_create_irq_domain(node, info, parent);
-    if (!domain)
-	return NULL;
-
-    domain->bus_token = DOMAIN_BUS_PCI_MSI;
-    return domain;
-
->  }
->  
->  /**
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index 91a83ad..25e9e66 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -54,6 +54,7 @@ struct irq_data;
->   */
->  enum irq_domain_bus_token {
->  	DOMAIN_BUS_ANY		= 0,
-> +	DOMAIN_BUS_PCI_MSI,
->  };
->  
->  /**
-> -- 
-> 2.1.4
-> 
+diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+index a745880..e6f4a0c 100644
+--- a/drivers/acpi/gsi.c
++++ b/drivers/acpi/gsi.c
+@@ -16,6 +16,9 @@ enum acpi_irq_model_id acpi_irq_model;
+ 
+ static void *acpi_gsi_domain_token;
+ 
++static int (*acpi_gsi_descriptor_populate)(struct acpi_gsi_descriptor *data,
++					   u32 gsi, unsigned int irq_type);
++
+ static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+ {
+ 	switch (polarity) {
+@@ -71,10 +74,20 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+ 		      int polarity)
+ {
++	int err;
+ 	unsigned int irq;
+ 	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+ 	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
+ 
++	if (acpi_gsi_descriptor_populate) {
++		struct acpi_gsi_descriptor data;
++		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
++		if (err)
++			return err;
++
++		return irq_create_acpi_mapping(d, &data);
++	}
++
+ 	irq = irq_create_mapping(d, gsi);
+ 	if (!irq)
+ 		return -EINVAL;
+@@ -99,3 +112,22 @@ void acpi_unregister_gsi(u32 gsi)
+ 	irq_dispose_mapping(irq);
+ }
+ EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
++
++/**
++ * acpi_set_irq_model - Setup the GSI irqdomain information
++ * @model: the value assigned to acpi_irq_model
++ * @domain_token: the irq_domain identifier for mapping and looking up
++ *                GSI interrupts
++ * @populate: provided by the interrupt controller, populating a
++ *            struct acpi_gsi_descriptor based on a GSI and
++ *            the interrupt trigger information
++ */
++void acpi_set_irq_model(enum acpi_irq_model_id model,
++			unsigned long domain_token,
++			int (*populate)(struct acpi_gsi_descriptor *,
++					u32, unsigned int))
++{
++	acpi_irq_model = model;
++	acpi_gsi_domain_token = (void *)domain_token;
++	acpi_gsi_descriptor_populate = populate;
++}
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 2f23ab0..0820cb1 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -214,6 +214,11 @@ struct acpi_gsi_descriptor {
+ unsigned int irq_create_acpi_mapping(struct irq_domain *d,
+ 				     struct acpi_gsi_descriptor *irq_data);
+ 
++void acpi_set_irq_model(enum acpi_irq_model_id model,
++			unsigned long domain_token,
++			int (*populate)(struct acpi_gsi_descriptor *,
++					u32, unsigned int));
++
+ #ifdef CONFIG_X86_IO_APIC
+ extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
+ #else
+-- 
+2.1.4
