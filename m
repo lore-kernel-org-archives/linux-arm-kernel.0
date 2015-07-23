@@ -1,333 +1,182 @@
-From: suneel.garapati@xilinx.com (Suneel Garapati)
-Date: Thu, 23 Jul 2015 16:21:50 +0530
-Subject: [PATCH 2/2] drivers: rtc: add xilinx zynqmp rtc driver
-In-Reply-To: <1437648710-6857-1-git-send-email-suneel.garapati@xilinx.com>
-References: <1437648710-6857-1-git-send-email-suneel.garapati@xilinx.com>
-Message-ID: <1437648710-6857-2-git-send-email-suneel.garapati@xilinx.com>
+From: HenryC.Chen@mediatek.com (Henry Chen)
+Date: Thu, 23 Jul 2015 19:04:05 +0800
+Subject: [PATCH v3 2/2] regulator: mt6311: Add support for mt6311 regulator
+In-Reply-To: <CABxcv=kgvCtHxuu0RDbFWEim+HYX74wEYXh8K7a6tT74R5YSuA@mail.gmail.com>
+References: <1437622799-28115-1-git-send-email-henryc.chen@mediatek.com>
+ <1437622799-28115-3-git-send-email-henryc.chen@mediatek.com>
+ <CABxcv=kgvCtHxuu0RDbFWEim+HYX74wEYXh8K7a6tT74R5YSuA@mail.gmail.com>
+Message-ID: <1437649445.30329.90.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-adds support for RTC controller found on
-Xilinx Zynq Ultrascale+ MPSoC platform.
+On Thu, 2015-07-23 at 11:07 +0200, Javier Martinez Canillas wrote:
 
-Signed-off-by: Suneel Garapati <suneel.garapati@xilinx.com>
----
- drivers/rtc/Kconfig      |   7 ++
- drivers/rtc/Makefile     |   1 +
- drivers/rtc/rtc-zynqmp.c | 278 +++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 286 insertions(+)
- create mode 100644 drivers/rtc/rtc-zynqmp.c
+> > +
+> > +       if (ret < 0)
+> > +               dev_err(&i2c->dev, "Failed to initialize regulator: %d\n", ret);
+> > +
+> 
+> I don't think this is necessary, you are already adding logs for all
+> the error conditions.
 
-diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
-index e132ccb..e44705b 100644
---- a/drivers/rtc/Kconfig
-+++ b/drivers/rtc/Kconfig
-@@ -1116,6 +1116,13 @@ config RTC_DRV_OPAL
-	  This driver can also be built as a module. If so, the module
-	  will be called rtc-opal.
+Yes, I will remove it.
 
-+config RTC_DRV_ZYNQMP
-+	tristate "Xilinx Zynq Ultrascale+ MPSoC RTC"
-+	depends on OF
-+	help
-+	  If you say yes here you get support for the RTC controller found on
-+	  Xilinx Zynq Ultrascale+ MPSoC.
-+
- comment "on-CPU RTC drivers"
+> 
+> > +       return ret;
+> > +}
+> > +
+> > +static const struct i2c_device_id mt6311_i2c_id[] = {
+> > +       {"mt6311", 0},
+> > +       {},
+> > +};
+> > +MODULE_DEVICE_TABLE(i2c, mt6311_i2c_id);
+> > +
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id mt6311_dt_ids[] = {
+> > +       { .compatible = "mediatek,mt6311-regulator",
+> > +         .data = &mt6311_i2c_id[0] },
+> > +       {},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mt6311_dt_ids);
+> > +#endif
+> > +
+> > +static struct i2c_driver mt6311_regulator_driver = {
+> > +       .driver = {
+> > +               .name = "mt6311",
+> > +               .owner = THIS_MODULE,
+> > +               .of_match_table = of_match_ptr(mt6311_dt_ids),
+> 
+> of_match_ptr() is NULL when CONFIG_OF is not defined so you don't need
+> the additional #ifdef
+> CONFIG_OF around mt6311_dt_ids.
 
- config RTC_DRV_DAVINCI
-diff --git a/drivers/rtc/Makefile b/drivers/rtc/Makefile
-index 2797384..e491eb5 100644
---- a/drivers/rtc/Makefile
-+++ b/drivers/rtc/Makefile
-@@ -159,3 +159,4 @@ obj-$(CONFIG_RTC_DRV_WM831X)	+= rtc-wm831x.o
- obj-$(CONFIG_RTC_DRV_WM8350)	+= rtc-wm8350.o
- obj-$(CONFIG_RTC_DRV_X1205)	+= rtc-x1205.o
- obj-$(CONFIG_RTC_DRV_XGENE)	+= rtc-xgene.o
-+obj-$(CONFIG_RTC_DRV_ZYNQMP)	+= rtc-zynqmp.o
-diff --git a/drivers/rtc/rtc-zynqmp.c b/drivers/rtc/rtc-zynqmp.c
-new file mode 100644
-index 0000000..59018b7
---- /dev/null
-+++ b/drivers/rtc/rtc-zynqmp.c
-@@ -0,0 +1,278 @@
-+/*
-+ * Xilinx Zynq Ultrascale+ MPSoC Real Time Clock Driver
-+ *
-+ * Copyright (C) 2015 Xilinx, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ *
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
-+#include <linux/rtc.h>
-+
-+/* RTC Registers */
-+#define RTC_SET_TM_WR		0x00
-+#define RTC_SET_TM_RD		0x04
-+#define RTC_CALIB_WR		0x08
-+#define RTC_CALIB_RD		0x0C
-+#define RTC_CUR_TM		0x10
-+#define RTC_CUR_TICK		0x14
-+#define RTC_ALRM		0x18
-+#define RTC_INT_STS		0x20
-+#define RTC_INT_MASK		0x24
-+#define RTC_INT_EN		0x28
-+#define RTC_INT_DIS		0x2C
-+#define RTC_CTRL		0x40
-+
-+#define RTC_FR_EN		BIT(20)
-+#define RTC_FR_DATSHIFT		16
-+#define RTC_TICK_MASK		0xFFFF
-+#define RTC_INT_SEC		BIT(0)
-+#define RTC_INT_ALRM		BIT(1)
-+#define RTC_OSC_EN		BIT(24)
-+
-+#define RTC_CALIB_DEF		0x198233
-+#define RTC_CALIB_MASK		0x1FFFFF
-+
-+struct xlnx_rtc_dev {
-+	struct rtc_device	*rtc;
-+	void __iomem		*reg_base;
-+	int			alm_irq;
-+	int			sec_irq;
-+};
-+
-+static int xlnx_rtc_set_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long new_time;
-+
-+	rtc_tm_to_time(tm, &new_time);
-+	writel(new_time, xrtcdev->reg_base + RTC_SET_TM_WR);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_read_time(struct device *dev, struct rtc_time *tm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time_to_tm(readl(xrtcdev->reg_base + RTC_CUR_TM), tm);
-+
-+	return rtc_valid_tm(tm);
-+}
-+
-+static int xlnx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	rtc_time_to_tm(readl(xrtcdev->reg_base + RTC_ALRM), &alrm->time);
-+	alrm->enabled = readl(xrtcdev->reg_base + RTC_INT_MASK) & RTC_INT_ALRM;
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_alarm_irq_enable(struct device *dev, u32 enabled)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+
-+	if (enabled)
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_EN);
-+	else
-+		writel(RTC_INT_ALRM, xrtcdev->reg_base + RTC_INT_DIS);
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = dev_get_drvdata(dev);
-+	unsigned long alarm_time;
-+
-+	rtc_tm_to_time(&alrm->time, &alarm_time);
-+
-+	writel((u32) alarm_time, (xrtcdev->reg_base + RTC_ALRM));
-+
-+	xlnx_rtc_alarm_irq_enable(dev, alrm->enabled);
-+
-+	return 0;
-+}
-+
-+static void xlnx_init_rtc(struct xlnx_rtc_dev *xrtcdev, u32 calibval)
-+{
-+	/*
-+	 * Based on crystal freq of 33.330 KHz
-+	 * set the secounds counter and enable, set fractions counter
-+	 * to default value suggested as per design spec
-+	 * to correct RTC delay in frequency over period of time.
-+	 */
-+	calibval &= RTC_CALIB_MASK;
-+	writel(calibval, (xrtcdev->reg_base + RTC_CALIB_WR));
-+}
-+
-+static const struct rtc_class_ops xlnx_rtc_ops = {
-+	.set_time	  = xlnx_rtc_set_time,
-+	.read_time	  = xlnx_rtc_read_time,
-+	.read_alarm	  = xlnx_rtc_read_alarm,
-+	.set_alarm	  = xlnx_rtc_set_alarm,
-+	.alarm_irq_enable = xlnx_rtc_alarm_irq_enable,
-+};
-+
-+static irqreturn_t xlnx_rtc_interrupt(int irq, void *id)
-+{
-+	struct xlnx_rtc_dev *xrtcdev = (struct xlnx_rtc_dev *) id;
-+	unsigned int status;
-+
-+	status = readl(xrtcdev->reg_base + RTC_INT_STS);
-+	/* Check if interrupt asserted */
-+	if (!(status & (RTC_INT_SEC | RTC_INT_ALRM)))
-+		return IRQ_NONE;
-+
-+	/* Clear interrupt */
-+	writel(status, xrtcdev->reg_base + RTC_INT_STS);
-+
-+	if (status & RTC_INT_SEC)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_UF);
-+	if (status & RTC_INT_ALRM)
-+		rtc_update_irq(xrtcdev->rtc, 1, RTC_IRQF | RTC_AF);
-+	if (status & RTC_INT_ALRM)
-+		printk("alarm interrupt\n");
-+	return IRQ_HANDLED;
-+}
-+
-+static int xlnx_rtc_probe(struct platform_device *pdev)
-+{
-+	struct xlnx_rtc_dev *xrtcdev;
-+	struct resource *res;
-+	int ret;
-+	unsigned int calibvalue;
-+
-+	xrtcdev = devm_kzalloc(&pdev->dev, sizeof(*xrtcdev), GFP_KERNEL);
-+	if (!xrtcdev)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, xrtcdev);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	xrtcdev->reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(xrtcdev->reg_base))
-+		return PTR_ERR(xrtcdev->reg_base);
-+
-+	xrtcdev->alm_irq = platform_get_irq_byname(pdev, "alm");
-+	if (xrtcdev->alm_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->alm_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->alm_irq,
-+				xlnx_rtc_interrupt, 0,
-+				dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	xrtcdev->sec_irq = platform_get_irq_byname(pdev, "sec");
-+	if (xrtcdev->sec_irq < 0) {
-+		dev_err(&pdev->dev, "no irq resource\n");
-+		return xrtcdev->sec_irq;
-+	}
-+	ret = devm_request_irq(&pdev->dev, xrtcdev->sec_irq,
-+				xlnx_rtc_interrupt, 0,
-+				dev_name(&pdev->dev), xrtcdev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "request irq failed\n");
-+		return ret;
-+	}
-+
-+	ret = of_property_read_u32(pdev->dev.of_node, "calibration",
-+					&calibvalue);
-+	if (ret)
-+		calibvalue = RTC_CALIB_DEF;
-+
-+	xlnx_init_rtc(xrtcdev, calibvalue);
-+
-+	device_init_wakeup(&pdev->dev, 1);
-+
-+	xrtcdev->rtc = devm_rtc_device_register(&pdev->dev, pdev->name,
-+					 &xlnx_rtc_ops, THIS_MODULE);
-+	if (IS_ERR(xrtcdev->rtc)) {
-+		return PTR_ERR(xrtcdev->rtc);
-+	}
-+
-+	return 0;
-+}
-+
-+static int xlnx_rtc_remove(struct platform_device *pdev)
-+{
-+	xlnx_rtc_alarm_irq_enable(&pdev->dev, 0);
-+	device_init_wakeup(&pdev->dev, 0);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev)) {
-+		enable_irq_wake(xrtcdev->alm_irq);
-+	} else {
-+		xlnx_rtc_alarm_irq_enable(dev, 0);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused xlnx_rtc_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct xlnx_rtc_dev *xrtcdev = platform_get_drvdata(pdev);
-+
-+	if (device_may_wakeup(&pdev->dev)) {
-+		disable_irq_wake(xrtcdev->alm_irq);
-+	} else {
-+		xlnx_rtc_alarm_irq_enable(dev, 1);
-+	}
-+
-+	return 0;
-+}
-+
-+static SIMPLE_DEV_PM_OPS(xlnx_rtc_pm_ops, xlnx_rtc_suspend, xlnx_rtc_resume);
-+
-+static const struct of_device_id xlnx_rtc_of_match[] = {
-+	{.compatible = "xlnx,zynqmp-rtc" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, xlnx_rtc_of_match);
-+
-+static struct platform_driver xlnx_rtc_driver = {
-+	.probe		= xlnx_rtc_probe,
-+	.remove		= xlnx_rtc_remove,
-+	.driver		= {
-+		.name	= KBUILD_MODNAME,
-+		.pm	= &xlnx_rtc_pm_ops,
-+		.of_match_table	= xlnx_rtc_of_match,
-+	},
-+};
-+
-+module_platform_driver(xlnx_rtc_driver);
-+
-+MODULE_DESCRIPTION("Xilinx Zynq MPSoC RTC driver");
-+MODULE_AUTHOR("Xilinx Inc.");
-+MODULE_LICENSE("GPL v2");
---
-2.1.2
+If CONFIG_OF is not defined and without #ifdef CONFIG_OF around
+mt6311_dt_ids, it will allocate a struct mt6311_dt_ids but no one used
+on here, right?
+
+Henry
+
+> > +       },
+> > +       .probe = mt6311_i2c_probe,
+> > +       .id_table = mt6311_i2c_id,
+> > +};
+> > +
+> > +module_i2c_driver(mt6311_regulator_driver);
+> > +
+> > +MODULE_AUTHOR("Henry Chen <henryc.chen@mediatek.com>");
+> > +MODULE_DESCRIPTION("Regulator device driver for Mediatek MT6311");
+> > +MODULE_LICENSE("GPL v2");
+> > diff --git a/drivers/regulator/mt6311-regulator.h b/drivers/regulator/mt6311-regulator.h
+> > new file mode 100644
+> > index 0000000..5218db4
+> > --- /dev/null
+> > +++ b/drivers/regulator/mt6311-regulator.h
+> > @@ -0,0 +1,65 @@
+> > +/*
+> > + * Copyright (c) 2015 MediaTek Inc.
+> > + * Author: Henry Chen <henryc.chen@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#ifndef __MT6311_REGULATOR_H__
+> > +#define __MT6311_REGULATOR_H__
+> > +
+> > +#define MT6311_SWCID              0x01
+> > +
+> > +#define MT6311_TOP_INT_CON        0x18
+> > +#define MT6311_TOP_INT_MON        0x19
+> > +
+> > +#define MT6311_VDVFS11_CON0       0x87
+> > +#define MT6311_VDVFS11_CON7       0x88
+> > +#define MT6311_VDVFS11_CON8       0x89
+> > +#define MT6311_VDVFS11_CON9       0x8A
+> > +#define MT6311_VDVFS11_CON10      0x8B
+> > +#define MT6311_VDVFS11_CON11      0x8C
+> > +#define MT6311_VDVFS11_CON12      0x8D
+> > +#define MT6311_VDVFS11_CON13      0x8E
+> > +#define MT6311_VDVFS11_CON14      0x8F
+> > +#define MT6311_VDVFS11_CON15      0x90
+> > +#define MT6311_VDVFS11_CON16      0x91
+> > +#define MT6311_VDVFS11_CON17      0x92
+> > +#define MT6311_VDVFS11_CON18      0x93
+> > +#define MT6311_VDVFS11_CON19      0x94
+> > +
+> > +#define MT6311_LDO_CON0           0xCC
+> > +#define MT6311_LDO_OCFB0          0xCD
+> > +#define MT6311_LDO_CON2           0xCE
+> > +#define MT6311_LDO_CON3           0xCF
+> > +#define MT6311_LDO_CON4           0xD0
+> > +#define MT6311_FQMTR_CON0         0xD1
+> > +#define MT6311_FQMTR_CON1         0xD2
+> > +#define MT6311_FQMTR_CON2         0xD3
+> > +#define MT6311_FQMTR_CON3         0xD4
+> > +#define MT6311_FQMTR_CON4         0xD5
+> > +
+> > +#define MT6311_PMIC_RG_INT_POL_MASK                      0x1
+> > +#define MT6311_PMIC_RG_INT_EN_MASK                       0x2
+> > +#define MT6311_PMIC_RG_BUCK_OC_INT_STATUS_MASK           0x10
+> > +
+> > +#define MT6311_PMIC_VDVFS11_EN_CTRL_MASK                 0x1
+> > +#define MT6311_PMIC_VDVFS11_VOSEL_CTRL_MASK              0x2
+> > +#define MT6311_PMIC_VDVFS11_EN_SEL_MASK                  0x3
+> > +#define MT6311_PMIC_VDVFS11_VOSEL_SEL_MASK               0xc
+> > +#define MT6311_PMIC_VDVFS11_EN_MASK                      0x1
+> > +#define MT6311_PMIC_VDVFS11_VOSEL_MASK                   0x7F
+> > +#define MT6311_PMIC_VDVFS11_VOSEL_ON_MASK                0x7F
+> > +#define MT6311_PMIC_VDVFS11_VOSEL_SLEEP_MASK             0x7F
+> > +#define MT6311_PMIC_NI_VDVFS11_VOSEL_MASK                0x7F
+> > +
+> > +#define MT6311_PMIC_RG_VBIASN_EN_MASK                    0x1
+> > +
+> > +#endif
+> > diff --git a/include/linux/regulator/mt6311.h b/include/linux/regulator/mt6311.h
+> > new file mode 100644
+> > index 0000000..8473259
+> > --- /dev/null
+> > +++ b/include/linux/regulator/mt6311.h
+> > @@ -0,0 +1,29 @@
+> > +/*
+> > + * Copyright (c) 2015 MediaTek Inc.
+> > + * Author: Henry Chen <henryc.chen@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#ifndef __LINUX_REGULATOR_MT6311_H
+> > +#define __LINUX_REGULATOR_MT6311_H
+> > +
+> > +#define MT6311_MAX_REGULATORS  2
+> > +
+> > +enum {
+> > +       MT6311_ID_VDVFS = 0,
+> > +       MT6311_ID_VBIASN,
+> > +};
+> > +
+> > +#define MT6311_E1_CID_CODE    0x10
+> > +#define MT6311_E2_CID_CODE    0x20
+> > +#define MT6311_E3_CID_CODE    0x30
+> > +
+> > +#endif /* __LINUX_REGULATOR_MT6311_H */
+> > --
+> 
+> Besides those comments, it looks good to me now.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> Best regards,
+> Javier
