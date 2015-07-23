@@ -1,37 +1,33 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 23 Jul 2015 15:51:00 -0700
-Subject: [RFC 1/3] docs: dts: Added documentation for Xilinx Zynq PL Reset
- bindings.
+Date: Thu, 23 Jul 2015 15:51:01 -0700
+Subject: [RFC 2/3] dts: zynq: Add devicetree entry for PL reset controller.
 In-Reply-To: <1437691862-21312-1-git-send-email-moritz.fischer@ettus.com>
 References: <1437691862-21312-1-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1437691862-21312-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <1437691862-21312-3-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 ---
- Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+ arch/arm/boot/dts/zynq-7000.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-new file mode 100644
-index 0000000..ac4499e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-@@ -0,0 +1,13 @@
-+Xilinx Zynq PL Reset Manager
+diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+index b429e1d..a56fe11 100644
+--- a/arch/arm/boot/dts/zynq-7000.dtsi
++++ b/arch/arm/boot/dts/zynq-7000.dtsi
+@@ -258,6 +258,12 @@
+ 				reg = <0x100 0x100>;
+ 			};
+ 
++			rstc: rstc at 240 {
++				#reset-cells = <1>;
++				compatible = "xlnx,zynq-reset-pl";
++				syscon = <&slcr>;
++			};
 +
-+Required properties:
-+- compatible: "xlnx,zynq-reset-pl"
-+- syscon <&slcr>;
-+- #reset-cells: 1
-+
-+Example:
-+	rstc: rstc at 240 {
-+		#reset-cells = <1>;
-+		compatible = "xlnx,zynq-reset-pl";
-+		syscon = <&slcr>;
-+	};
+ 			pinctrl0: pinctrl at 700 {
+ 				compatible = "xlnx,pinctrl-zynq";
+ 				reg = <0x700 0x200>;
 -- 
 2.4.3
