@@ -1,81 +1,66 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 23 Jul 2015 10:29:34 +0200
-Subject: [PATCH v2 1/2] ARM: rockchip: set correct stabilization thresholds in
- suspend
-Message-ID: <4610448.RXXf22Qoxl@diego>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 23 Jul 2015 10:30:14 +0200
+Subject: [PATCH] PM / devfreq: event: Remove incorrect property in
+ exynos-ppmu DT binding
+In-Reply-To: <55B0A376.2080906@samsung.com>
+References: <1436770732-9430-1-git-send-email-javier@osg.samsung.com>
+ <55B0A376.2080906@samsung.com>
+Message-ID: <55B0A616.2070608@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the stabilization thresholds for the oscillator and external pmu
-are statically set to 30ms based on a 32kHz clock rate. This leaves out the
-case when we don't switch to the 32kHz clock when only entering the shallow
-suspend mode where the logic keeps running.
+Hello Chanwoo,
 
-So, set the correct threshold after we have determined if we switch to the
-32kHz clock or stay with the 24MHz one.
+On 07/23/2015 10:19 AM, Chanwoo Choi wrote:
+> Hi Javier,
+> 
+> On 07/13/2015 03:58 PM, Javier Martinez Canillas wrote:
+>> The exynos-ppmu driver is only a clock consumer and not a clock
+>> provider but its Device Tree binding listed #clock-cells as an
+>> optional property.
+>> 
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> 
+>> ---
+>> 
+>> Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt | 1
+>> - 1 file changed, 1 deletion(-)
+>> 
+>> diff --git
+>> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt
+>> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>> index b54bf3a2ff57..aed486692880 100644 ---
+>> a/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>> +++
+>> b/Documentation/devicetree/bindings/devfreq/event/exynos-ppmu.txt 
+>> @@ -17,7 +17,6 @@ Required properties: Optional properties: -
+>> clock-names : the name of clock used by the PPMU, "ppmu" - clocks :
+>> phandles for clock specified in "clock-names" property --
+>> #clock-cells: should be 1.
+>> 
+>> Example1 : PPMU nodes in exynos3250.dtsi are listed below.
+>> 
+>> 
+> 
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> 
+> + Devfreq maintainer (Myungjoo Ham)
 
-Reported-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes since v1:
-- 24MHz oriented threshold is only needed in shallow suspend, the deep
-  suspend always switches to 32kHz and only leaves the 24MHz oscillator
-  running if needed for stuff like usb wakeup
+Thanks for the review and for cc'ing Myungjoo. The get_maintainer.pl script
+didn't tell me that so I think Documentation/devicetree/bindings/devfreq/
+sub-dir should be added to the DEVICE FREQUENCY (DEVFREQ) entry in the
+MAINTAINERS file.
 
- arch/arm/mach-rockchip/pm.c | 11 ++++++++---
- arch/arm/mach-rockchip/pm.h |  4 ----
- 2 files changed, 8 insertions(+), 7 deletions(-)
+> I think that this patch will be more appropriate on devfreq git tree 
+> than linux-samsung git tree.
+>
 
-diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-index 892bace..04d3028 100644
---- a/arch/arm/mach-rockchip/pm.c
-+++ b/arch/arm/mach-rockchip/pm.c
-@@ -145,6 +145,10 @@ static void rk3288_slp_mode_set(int level)
- 
- 		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
- 			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
-+
-+		/* 30ms on a 32kHz clock for osc and pmic stabilization */
-+		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 32 * 30);
-+		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
- 	} else {
- 		/*
- 		 * arm off, logic normal
-@@ -152,6 +156,10 @@ static void rk3288_slp_mode_set(int level)
- 		 * wakeup will be error
- 		 */
- 		mode_set |= BIT(PMU_CLK_CORE_SRC_GATE_EN);
-+
-+		/* 30ms on a 24MHz clock for osc and pmic stabilization */
-+		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 24000 * 30);
-+		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 24000 * 30);
- 	}
- 
- 	regmap_write(pmu_regmap, RK3288_PMU_PWRMODE_CON, mode_set);
-@@ -262,9 +270,6 @@ static int rk3288_suspend_init(struct device_node *np)
- 	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
- 	       rk3288_bootram_sz);
- 
--	regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, OSC_STABL_CNT_THRESH);
--	regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, PMU_STABL_CNT_THRESH);
--
- 	return 0;
- }
- 
-diff --git a/arch/arm/mach-rockchip/pm.h b/arch/arm/mach-rockchip/pm.h
-index b6494c2..8a55ee2 100644
---- a/arch/arm/mach-rockchip/pm.h
-+++ b/arch/arm/mach-rockchip/pm.h
-@@ -62,10 +62,6 @@ static inline void rockchip_suspend_init(void)
- /* PMU_WAKEUP_CFG1 bits */
- #define PMU_ARMINT_WAKEUP_EN		BIT(0)
- 
--/* wait 30ms for OSC stable and 30ms for pmic stable */
--#define OSC_STABL_CNT_THRESH	(32 * 30)
--#define PMU_STABL_CNT_THRESH	(32 * 30)
--
- enum rk3288_pwr_mode_con {
- 	PMU_PWR_MODE_EN = 0,
- 	PMU_CLK_CORE_SRC_GATE_EN,
+Agreed.
+
+> Thanks, Chanwoo Choi --
+
+Best regards,
 -- 
-2.1.4
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
