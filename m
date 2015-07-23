@@ -1,22 +1,21 @@
 From: agross@codeaurora.org (Andy Gross)
-Date: Thu, 23 Jul 2015 16:02:51 -0500
-Subject: [PATCH 5/5] ARM: qcom_defconfig: Enable options for KS8851
- ethernet
-In-Reply-To: <1434486676-21812-6-git-send-email-sboyd@codeaurora.org>
+Date: Thu, 23 Jul 2015 16:04:25 -0500
+Subject: [PATCH 3/5] ARM: dts: qcom: Add MSM8960 CDP RPM regulators
+In-Reply-To: <1434486676-21812-4-git-send-email-sboyd@codeaurora.org>
 References: <1434486676-21812-1-git-send-email-sboyd@codeaurora.org>
- <1434486676-21812-6-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20150723210251.GG13658@qualcomm.com>
+ <1434486676-21812-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20150723210425.GH13658@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 16, 2015 at 01:31:16PM -0700, Stephen Boyd wrote:
-> Enable the RPM and RPM regulator drivers as well as the KS8851
-> ethernet driver so that ethernet works on MSM8960 CDP.
+On Tue, Jun 16, 2015 at 01:31:14PM -0700, Stephen Boyd wrote:
+> Add RPM regulators and configure their constraints on the MSM8960
+> CDP so that we can control these supplies.
 > 
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
 
-Applied, thanks!
+Applied, thanks
 
 -- 
 Qualcomm Innovation Center, Inc.
