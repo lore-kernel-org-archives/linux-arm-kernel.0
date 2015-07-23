@@ -1,94 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 10:26:27 +0100
-Subject: [PATCH v5 08/19] platform: of: Assign MSI domain to platform device
+Date: Thu, 23 Jul 2015 10:26:36 +0100
+Subject: [PATCH v5 17/19] irqchip: GICv2m: Add platform MSI support
 In-Reply-To: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
 References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437643598-19795-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437643598-19795-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As for PCI, we're able to populate the msi_domain field at probe time,
-provided that the device tree has an "msi-parent" property.
+In order to support non-PCI MSI with GICv2m, add the minimal
+required entry points for the MSI domain, which is actually almost
+nothing (we just use the defaults provided by the core code).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/of/irq.c          | 21 +++++++++++++++++++++
- drivers/of/platform.c     |  1 +
- include/linux/irqdomain.h |  1 +
- include/linux/of_irq.h    |  1 +
- 4 files changed, 24 insertions(+)
+ drivers/irqchip/irq-gic-v2m.c | 33 +++++++++++++++++++++++++--------
+ 1 file changed, 25 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-index 3cf7a01..2956d72 100644
---- a/drivers/of/irq.c
-+++ b/drivers/of/irq.c
-@@ -18,6 +18,7 @@
-  * driver.
-  */
- 
-+#include <linux/device.h>
- #include <linux/errno.h>
- #include <linux/list.h>
- #include <linux/module.h>
-@@ -576,3 +577,23 @@ err:
- 		kfree(desc);
- 	}
- }
-+
-+/**
-+ * of_msi_configure - Set the msi_domain field of a device
-+ * @dev: device structure to associate with an MSI irq domain
-+ * @np: device node for that device
-+ */
-+void of_msi_configure(struct device *dev, struct device_node *np)
-+{
-+	struct device_node *msi_np;
-+	struct irq_domain *d;
-+
-+	msi_np = of_parse_phandle(np, "msi-parent", 0);
-+	if (!msi_np)
-+		return;
-+
-+	d = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
-+	if (!d)
-+		d = irq_find_host(msi_np);
-+	dev_set_msi_domain(dev, d);
-+}
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index ddf8e42..8a002d6 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -184,6 +184,7 @@ static struct platform_device *of_platform_device_create_pdata(
- 	dev->dev.bus = &platform_bus_type;
- 	dev->dev.platform_data = platform_data;
- 	of_dma_configure(&dev->dev, dev->dev.of_node);
-+	of_msi_configure(&dev->dev, dev->dev.of_node);
- 
- 	if (of_device_add(dev) != 0) {
- 		of_dma_deconfigure(&dev->dev);
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index 25e9e66..b4a74f7 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -55,6 +55,7 @@ struct irq_data;
- enum irq_domain_bus_token {
- 	DOMAIN_BUS_ANY		= 0,
- 	DOMAIN_BUS_PCI_MSI,
-+	DOMAIN_BUS_PLATFORM_MSI,
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index ec9c376..db04fc1 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -50,7 +50,6 @@ struct v2m_data {
+ 	u32 spi_start;		/* The SPI number that MSIs start */
+ 	u32 nr_spis;		/* The number of SPIs for MSIs */
+ 	unsigned long *bm;	/* MSI vector bitmap */
+-	struct irq_domain *domain;
  };
  
- /**
-diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
-index d884929..4bcbd58 100644
---- a/include/linux/of_irq.h
-+++ b/include/linux/of_irq.h
-@@ -74,6 +74,7 @@ static inline int of_irq_to_resource_table(struct device_node *dev,
-  */
- extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
- extern struct device_node *of_irq_find_parent(struct device_node *child);
-+extern void of_msi_configure(struct device *dev, struct device_node *np);
+ static void gicv2m_mask_msi_irq(struct irq_data *d)
+@@ -212,12 +211,25 @@ static bool is_msi_spi_valid(u32 base, u32 num)
+ 	return true;
+ }
  
- #else /* !CONFIG_OF */
- static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
++static struct irq_chip gicv2m_pmsi_irq_chip = {
++	.name			= "pMSI",
++};
++
++static struct msi_domain_ops gicv2m_pmsi_ops = {
++};
++
++static struct msi_domain_info gicv2m_pmsi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &gicv2m_pmsi_ops,
++	.chip	= &gicv2m_pmsi_irq_chip,
++};
++
+ static int __init gicv2m_init_one(struct device_node *node,
+ 				  struct irq_domain *parent)
+ {
+ 	int ret;
+ 	struct v2m_data *v2m;
+-	struct irq_domain *inner_domain;
++	struct irq_domain *inner_domain, *pci_domain, *plat_domain;
+ 
+ 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+ 	if (!v2m) {
+@@ -270,10 +282,13 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 
+ 	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+ 	inner_domain->parent = parent;
+-	v2m->domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
+-						inner_domain);
+-	if (!v2m->domain) {
+-		pr_err("Failed to create MSI domain\n");
++	pci_domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
++					       inner_domain);
++	plat_domain = platform_msi_create_irq_domain(node,
++						     &gicv2m_pmsi_domain_info,
++						     inner_domain);
++	if (!pci_domain || !plat_domain) {
++		pr_err("Failed to create MSI domains\n");
+ 		ret = -ENOMEM;
+ 		goto err_free_domains;
+ 	}
+@@ -287,8 +302,10 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 	return 0;
+ 
+ err_free_domains:
+-	if (v2m->domain)
+-		irq_domain_remove(v2m->domain);
++	if (plat_domain)
++		irq_domain_remove(plat_domain);
++	if (pci_domain)
++		irq_domain_remove(pci_domain);
+ 	if (inner_domain)
+ 		irq_domain_remove(inner_domain);
+ err_free_bm:
 -- 
 2.1.4
