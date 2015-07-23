@@ -1,50 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 23 Jul 2015 10:26:25 +0100
-Subject: [PATCH v5 06/19] PCI/MSI: of: Allow msi_domain lookup using the host
- bridge node
+Date: Thu, 23 Jul 2015 10:26:27 +0100
+Subject: [PATCH v5 08/19] platform: of: Assign MSI domain to platform device
 In-Reply-To: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
 References: <1437643598-19795-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437643598-19795-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437643598-19795-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A number of platforms do not need to use the msi-parent property,
-as the host bridge itself provides the MSI controller.
-
-Allow this configuration by performing an irq domain lookup based
-on the host bridge node if it doesn't have a valid msi-parent property.
+As for PCI, we're able to populate the msi_domain field at probe time,
+provided that the device tree has an "msi-parent" property.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/of.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/of/irq.c          | 21 +++++++++++++++++++++
+ drivers/of/platform.c     |  1 +
+ include/linux/irqdomain.h |  1 +
+ include/linux/of_irq.h    |  1 +
+ 4 files changed, 24 insertions(+)
 
-diff --git a/drivers/pci/of.c b/drivers/pci/of.c
-index e2ebb7d..fcfdadf 100644
---- a/drivers/pci/of.c
-+++ b/drivers/pci/of.c
-@@ -69,12 +69,21 @@ struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
+diff --git a/drivers/of/irq.c b/drivers/of/irq.c
+index 3cf7a01..2956d72 100644
+--- a/drivers/of/irq.c
++++ b/drivers/of/irq.c
+@@ -18,6 +18,7 @@
+  * driver.
+  */
  
- 	if (!bus->dev.of_node)
- 		return NULL;
++#include <linux/device.h>
+ #include <linux/errno.h>
+ #include <linux/list.h>
+ #include <linux/module.h>
+@@ -576,3 +577,23 @@ err:
+ 		kfree(desc);
+ 	}
+ }
 +
-+	/* Start looking for a phandle to an MSI controller. */
- 	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
++/**
++ * of_msi_configure - Set the msi_domain field of a device
++ * @dev: device structure to associate with an MSI irq domain
++ * @np: device node for that device
++ */
++void of_msi_configure(struct device *dev, struct device_node *np)
++{
++	struct device_node *msi_np;
++	struct irq_domain *d;
 +
-+	/*
-+	 * If we don't have an msi-parent property, look for a domain
-+	 * directly attached to the host bridge.
-+	 */
- 	if (!np)
--		return NULL;
-+		np = bus->dev.of_node;
++	msi_np = of_parse_phandle(np, "msi-parent", 0);
++	if (!msi_np)
++		return;
 +
- 	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
- 	if (!d)
- 		d = irq_find_host(np);
-+
- 	return d;
- #else
- 	return NULL;
++	d = irq_find_matching_host(msi_np, DOMAIN_BUS_PLATFORM_MSI);
++	if (!d)
++		d = irq_find_host(msi_np);
++	dev_set_msi_domain(dev, d);
++}
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index ddf8e42..8a002d6 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -184,6 +184,7 @@ static struct platform_device *of_platform_device_create_pdata(
+ 	dev->dev.bus = &platform_bus_type;
+ 	dev->dev.platform_data = platform_data;
+ 	of_dma_configure(&dev->dev, dev->dev.of_node);
++	of_msi_configure(&dev->dev, dev->dev.of_node);
+ 
+ 	if (of_device_add(dev) != 0) {
+ 		of_dma_deconfigure(&dev->dev);
+diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+index 25e9e66..b4a74f7 100644
+--- a/include/linux/irqdomain.h
++++ b/include/linux/irqdomain.h
+@@ -55,6 +55,7 @@ struct irq_data;
+ enum irq_domain_bus_token {
+ 	DOMAIN_BUS_ANY		= 0,
+ 	DOMAIN_BUS_PCI_MSI,
++	DOMAIN_BUS_PLATFORM_MSI,
+ };
+ 
+ /**
+diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+index d884929..4bcbd58 100644
+--- a/include/linux/of_irq.h
++++ b/include/linux/of_irq.h
+@@ -74,6 +74,7 @@ static inline int of_irq_to_resource_table(struct device_node *dev,
+  */
+ extern unsigned int irq_of_parse_and_map(struct device_node *node, int index);
+ extern struct device_node *of_irq_find_parent(struct device_node *child);
++extern void of_msi_configure(struct device *dev, struct device_node *np);
+ 
+ #else /* !CONFIG_OF */
+ static inline unsigned int irq_of_parse_and_map(struct device_node *dev,
 -- 
 2.1.4
