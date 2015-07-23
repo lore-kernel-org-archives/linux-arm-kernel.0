@@ -1,38 +1,34 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 22 Jul 2015 23:27:53 -0700
-Subject: [GIT PULL 3/3]  defconfig changes for v4.3g
-In-Reply-To: <20150722233002.GC2909@localhost>
-References: <pull-1437549432-994499>
- <55af65af.c65f460a.1c26.7cc3SMTPIN_ADDED_BROKEN@mx.google.com>
- <20150722233002.GC2909@localhost>
-Message-ID: <20150723062752.GB16878@atomide.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Thu, 23 Jul 2015 08:58:31 +0200
+Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and munlockall
+ system calls
+In-Reply-To: <20150722141501.GA3203@akamai.com>
+References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
+ <1437508781-28655-3-git-send-email-emunson@akamai.com>
+ <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
+ <1437528316.16792.7.camel@ellerman.id.au>
+ <20150722141501.GA3203@akamai.com>
+Message-ID: <20150723065830.GA5919@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [150722 16:45]:
-> On Wed, Jul 22, 2015 at 02:41:18AM -0700, Tony Lindgren wrote:
-> > The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
+On Wed, Jul 22, 2015 at 10:15:01AM -0400, Eric B Munson wrote:
+
 > > 
-> >   Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
+> > You haven't wired it up properly on powerpc, but I haven't mentioned it because
+> > I'd rather we did it.
 > > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap omap-for-v4.3/defconfig
-> > 
-> > for you to fetch changes up to da104dc845afbebcad6d87bd5810c266a426f4dc:
-> > 
-> >   ARM: omap2plus_defconfig: enable support for M25P80 SPI NOR (2015-07-16 00:54:53 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Sekhar Nori (4):
-> >       ARM: omap2plus_defconfig: enable support for TI ADC
-> >       ARM: omap2plus_defconfig: enable support for TI touchscreen
-> >       ARM: omap2plus_defconfig: enable support for TI CPTS
-> >       ARM: omap2plus_defconfig: enable support for M25P80 SPI NOR
+> > cheers
 > 
-> I think you meant to send this pull request for
-> tags/omap-for-v4.3/defconfig-signed instead, so that's what I merged.
+> It looks like I will be spinning a V5, so I will drop all but the x86
+> system calls additions in that version.
 
-Oops indeed thanks.
+The MIPS bits are looking good however, so
 
-Tony
+Acked-by: Ralf Baechle <ralf@linux-mips.org>
+
+With my ack, will you keep them or maybe carry them as a separate patch?
+
+Cheers,
+
+  Ralf
