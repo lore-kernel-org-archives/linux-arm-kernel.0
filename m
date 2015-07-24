@@ -1,50 +1,38 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Fri, 24 Jul 2015 17:16:23 +0000
-Subject: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to
- ram/disk
-In-Reply-To: <20150724003722.GA14027@kroah.com>
-References: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
- <20150724003722.GA14027@kroah.com>
-Message-ID: <BL2PR03MB370BD6DAA817B559802A8BF83810@BL2PR03MB370.namprd03.prod.outlook.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Jul 2015 19:25:51 +0200
+Subject: [PATCH 03/10] OPP: Allocate dev_opp from _add_device_opp()
+In-Reply-To: <20150703064554.GB4564@linux>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <5595CD68.9040701@codeaurora.org> <20150703064554.GB4564@linux>
+Message-ID: <11329348.G3iY8nuDiD@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> -----Original Message-----
-> From: Greg KH [mailto:gregkh at linuxfoundation.org]
-> Sent: 2015?7?23? 19:37
-> To: Wang Shenwei-B38339
-> Cc: linux-serial at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to
-> ram/disk
-> > +	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
-> > +	sport->saved_reg[5] = readl(sport->port.membase + UESC);
-> > +	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
-> > +	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
-> > +	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
-> > +	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
-> > +	clk_disable(sport->clk_ipg);
-> > +
-> > +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
+Hi,
+
+On Friday, July 03, 2015 12:15:54 PM Viresh Kumar wrote:
+> On 02-07-15, 16:46, Stephen Boyd wrote:
+> > Looking better.
 > 
-> You have a struct device, please use dev_dbg() instead.
-
-Adopted in PATCH v2.
-
+> And does this look perfect ? :)
 > 
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +	writel(sport->saved_reg[2], sport->port.membase + UCR3);
-> > +	writel(sport->saved_reg[3], sport->port.membase + UCR4);
-> > +	clk_disable(sport->clk_ipg);
-> > +
-> > +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
+> ------------------8<----------------
 > 
-> Same here, please use dev_dbg()
+> Message-Id: <7c23b93b6b328e0b14b5c5096c3c3322e3d8ee4b.1435905782.git.viresh.kumar@linaro.org>
+> From: Viresh Kumar <viresh.kumar@linaro.org>
+> Date: Fri, 12 Jun 2015 12:43:14 +0530
+> Subject: [PATCH] OPP: Allocate dev_opp from _add_device_opp()
+> 
+> There is no need to complicate _opp_add_dynamic() with allocation of
+> dev_opp as well. Allocate it from _add_device_opp() instead.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-Adopted in PATCH v2.
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Thanks,
-Shenwei
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
