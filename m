@@ -1,93 +1,101 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 24 Jul 2015 14:03:14 +0100
-Subject: [Xen-devel] [PATCH v2 01/20] xen: Add Xen specific page definition
-In-Reply-To: <55B214C5.3020501@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
- <55B20540.3020000@citrix.com> <55B207C6.4020300@citrix.com>
- <55B209D9.1080602@citrix.com> <55B20ABE.7000609@citrix.com>
- <55B214C5.3020501@citrix.com>
-Message-ID: <55B23792.5090802@citrix.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Jul 2015 14:04:34 +0100
+Subject: [PATCH v2] arm64/efi: prefer AllocatePages() over
+ efi_low_alloc() for vmlinux
+In-Reply-To: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20150724130434.GA21234@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 11:34, David Vrabel wrote:
-> On 24/07/15 10:51, Julien Grall wrote:
->> On 24/07/15 10:48, David Vrabel wrote:
->>> On 24/07/15 10:39, Julien Grall wrote:
->>>> Hi David,
->>>>
->>>> On 24/07/15 10:28, David Vrabel wrote:
->>>>> On 09/07/15 21:42, Julien Grall wrote:
->>>>>> The Xen hypercall interface is always using 4K page granularity on ARM
->>>>>> and x86 architecture.
->>>>>>
->>>>>> With the incoming support of 64K page granularity for ARM64 guest, it
->>>>>> won't be possible to re-use the Linux page definition in Xen drivers.
->>>>>>
->>>>>> Introduce Xen page definition helpers based on the Linux page
->>>>>> definition. They have exactly the same name but prefixed with
->>>>>> XEN_/xen_ prefix.
->>>>>>
->>>>>> Also modify page_to_pfn to use new Xen page definition.
->>>>>>
->>>>>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->>>>>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>>>>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>>>>> Cc: David Vrabel <david.vrabel@citrix.com>
->>>>>> ---
->>>>>>     I'm wondering if we should drop page_to_pfn has the macro will likely
->>>>>>     misuse when Linux is using 64KB page granularity.
->>>>>
->>>>> I think we want xen_gfn_to_page() and xen_page_to_gfn() and Xen
->>>>> front/back drivers never deal with PFNs only GFNs.
->>>>
->>>> What is xen_gfn_to_page and xen_page_to_gfn? Neither Linux, nor my
->>>> series have them.
->>>
->>> I suggesting that you introduce these.
->>
->> It's still not clear to me what you are suggesting here... Do you
->> suggest to rename xen_pfn_to_page and xen_page_to_pfn by xen_gfn_to_page
->> and xen_page_to_gfn?
+On Fri, Jul 24, 2015 at 12:38:27PM +0100, Ard Biesheuvel wrote:
+> When allocating memory for the kernel image, try the AllocatePages()
+> boot service to obtain memory at the preferred offset of
+> 'dram_base + TEXT_OFFSET', and only revert to efi_low_alloc() if that
+> fails. This is the only way to allocate at the base of DRAM if DRAM
+> starts at 0x0, since efi_low_alloc() refuses to allocate at 0x0.
 > 
-> Effectively, yes but it would be better to think that:
+> Tested-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
+> ---
+> v2:
+> - reshuffle code flow to make it more logical, and have only a single
+>   memcpy() invocation at the end of the function
+> ---
+>  arch/arm64/kernel/efi-stub.c | 41 ++++++++++++++++++++++++++++++++---------
+>  1 file changed, 32 insertions(+), 9 deletions(-)
 > 
-> PFNs index guest-sized pages (which may be 64 KiB).
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> index f5374065ad53..816120ece6bc 100644
+> --- a/arch/arm64/kernel/efi-stub.c
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -13,7 +13,7 @@
+>  #include <asm/efi.h>
+>  #include <asm/sections.h>
+>  
+> -efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
+> +efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+>  					unsigned long *image_addr,
+>  					unsigned long *image_size,
+>  					unsigned long *reserve_addr,
+> @@ -23,21 +23,44 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
+>  {
+>  	efi_status_t status;
+>  	unsigned long kernel_size, kernel_memsize = 0;
+> +	unsigned long nr_pages;
+> +	void *old_image_addr = (void *)*image_addr;
+>  
+>  	/* Relocate the image, if required. */
+>  	kernel_size = _edata - _text;
+>  	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>  		kernel_memsize = kernel_size + (_end - _edata);
+> -		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+> -				       SZ_2M, reserve_addr);
+> +
+> +		/*
+> +		 * First, try a straight allocation at the preferred offset.
+> +		 * This will work around the issue where, if dram_base == 0x0,
+> +		 * efi_low_alloc() refuses to allocate at 0x0 (to prevent the
+> +		 * address of the allocation to be mistaken for a FAIL return
+> +		 * value or a NULL pointer). It will also ensure that, on
+> +		 * platforms where the [dram_base, dram_base + TEXT_OFFSET)
+> +		 * interval is partially occupied by the firmware (like on APM
+> +		 * Mustang), we can still place the kernel at the address
+> +		 * 'dram_base + TEXT_OFFSET'.
+> +		 */
+> +		*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+> +		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+> +			   EFI_PAGE_SIZE;
+> +		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+> +					EFI_LOADER_DATA, nr_pages,
+> +					(efi_physical_addr_t *)reserve_addr);
+>  		if (status != EFI_SUCCESS) {
+> -			pr_efi_err(sys_table, "Failed to relocate kernel\n");
+> -			return status;
+> +			kernel_memsize += TEXT_OFFSET;
+> +			status = efi_low_alloc(sys_table_arg, kernel_memsize,
+> +					       SZ_2M, reserve_addr);
+> +
+> +			if (status != EFI_SUCCESS) {
+> +				pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
+> +				return status;
+> +			}
+> +			*image_addr = *reserve_addr + TEXT_OFFSET;
+>  		}
+> -		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
+> -		       kernel_size);
+> -		*image_addr = *reserve_addr + TEXT_OFFSET;
+> -		*reserve_size = kernel_memsize + TEXT_OFFSET;
+> +		memcpy((void *)*image_addr, old_image_addr, kernel_size);
+> +		*reserve_size = kernel_memsize;
+>  	}
+>  
+>  
+> -- 
+> 1.9.1
 > 
-> GFNs index Xen-sized pages (which is always 4 KiB).
-
-If I'm understanding correctly you mean:
-
-#define xen_page_to_gfn(page)	\
-((page_to_pfn(page) << PAGE_SHIFT) >> XEN_PAGE_SHIFT))
-
-static page_to_mfn(struct page *page)
-{
-	return pfn_to_mfn(xen_page_to_gfn(page));
-}
-
-Although in some place you are suggesting to use:
-
-xen_page_to_gfn(virt_to_page(info->intf)) (see patch #11) where it
-suggests to rename page_to_mfn in xen_page_to_gfn.
-
-I think it would make more sense to use the latter one. We would also
-need to name to describe a PFN (pseudo-physical frame number based on
-xen/include/xen/mm.h) but with 4K granularity and not the Linux granularity.
-
-It's useful to have it in some place in order to iter on the 4K pfn (see
-gnttab_foreach_grant and xen_apply_to_page). Maybe xpfn for Xen
-pseudo-physical frame number?
-
-I will preprend some patches into this serie to rename the function with
-their correct naming.
-
-I have in mind pfn_to_mfn which should be name into pfn_to_gfn given the
-usage. Similarly, this function is mis-used on ARM because the function
-may return an MFN where we expect a GFN.
-
-Regards,
-
--- 
-Julien Grall
