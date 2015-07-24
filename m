@@ -1,38 +1,96 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:26 +0900
-Subject: [PATCH 5/9] ARM: shmobile: lager: Fix adv7511 IRQ sensing
+Date: Fri, 24 Jul 2015 17:41:27 +0900
+Subject: [PATCH 6/9] ARM: shmobile: r8a7790: Add Audio CTU support on DTSI
 In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
 References: <cover.1437724902.git.horms+renesas@verge.net.au>
-Message-ID: <850346eccc2d32dd6d0a3b08e6ac127b8982c067.1437724902.git.horms+renesas@verge.net.au>
+Message-ID: <a7163784961e513a6d8c60b264737af623d1f33c.1437724902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The adv7511 IRQ is low level triggered, not falling edge triggered. The
-wrong sense configuration results in no interrupt being triggered at
-all, breaking hotplug detection. Fix it.
-
-Reported-by: Ben Hutchings <ben.hutchings@codethink.co.uk>
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Tested-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7790.dtsi            | 16 ++++++++++++++++
+ include/dt-bindings/clock/r8a7790-clock.h |  2 ++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 5ae07a8385c5..37dec5269491 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -548,7 +548,7 @@
- 		compatible = "adi,adv7511w";
- 		reg = <0x39>;
- 		interrupt-parent = <&gpio1>;
--		interrupts = <15 IRQ_TYPE_EDGE_FALLING>;
-+		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3ae0c3bfb9b9..6aa1d759690b 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -1303,6 +1303,7 @@
+ 				<&mstp10_clks R8A7790_CLK_SCU_ALL>, <&mstp10_clks R8A7790_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7790_CLK_SCU_ALL>, <&mstp10_clks R8A7790_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7790_CLK_SCU_ALL>, <&mstp10_clks R8A7790_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7790_CLK_SCU_ALL>, <&mstp10_clks R8A7790_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7790_CLK_SCU_ALL>, <&mstp10_clks R8A7790_CLK_SCU_ALL>;
  
- 		adi,input-depth = <8>;
- 		adi,input-colorspace = "rgb";
+ 			#clock-cells = <1>;
+@@ -1312,6 +1313,7 @@
+ 				R8A7790_CLK_SSI4 R8A7790_CLK_SSI3 R8A7790_CLK_SSI2 R8A7790_CLK_SSI1 R8A7790_CLK_SSI0
+ 				R8A7790_CLK_SCU_ALL
+ 				R8A7790_CLK_SCU_DVC1 R8A7790_CLK_SCU_DVC0
++				R8A7790_CLK_SCU_CTU1_MIX1 R8A7790_CLK_SCU_CTU0_MIX0
+ 				R8A7790_CLK_SCU_SRC9 R8A7790_CLK_SCU_SRC8 R8A7790_CLK_SCU_SRC7 R8A7790_CLK_SCU_SRC6 R8A7790_CLK_SCU_SRC5
+ 				R8A7790_CLK_SCU_SRC4 R8A7790_CLK_SCU_SRC3 R8A7790_CLK_SCU_SRC2 R8A7790_CLK_SCU_SRC1 R8A7790_CLK_SCU_SRC0
+ 			>;
+@@ -1321,6 +1323,7 @@
+ 				"ssi4", "ssi3", "ssi2", "ssi1", "ssi0",
+ 				"scu-all",
+ 				"scu-dvc1", "scu-dvc0",
++				"scu-ctu1-mix1", "scu-ctu0-mix0",
+ 				"scu-src9", "scu-src8", "scu-src7", "scu-src6", "scu-src5",
+ 				"scu-src4", "scu-src3", "scu-src2", "scu-src1", "scu-src0";
+ 		};
+@@ -1536,6 +1539,7 @@
+ 			<&mstp10_clks R8A7790_CLK_SCU_SRC5>, <&mstp10_clks R8A7790_CLK_SCU_SRC4>,
+ 			<&mstp10_clks R8A7790_CLK_SCU_SRC3>, <&mstp10_clks R8A7790_CLK_SCU_SRC2>,
+ 			<&mstp10_clks R8A7790_CLK_SCU_SRC1>, <&mstp10_clks R8A7790_CLK_SCU_SRC0>,
++			<&mstp10_clks R8A7790_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7790_CLK_SCU_CTU1_MIX1>,
+ 			<&mstp10_clks R8A7790_CLK_SCU_DVC0>, <&mstp10_clks R8A7790_CLK_SCU_DVC1>,
+ 			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
+ 		clock-names = "ssi-all",
+@@ -1543,6 +1547,7 @@
+ 				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
+ 				"src.9", "src.8", "src.7", "src.6", "src.5",
+ 				"src.4", "src.3", "src.2", "src.1", "src.0",
++				"ctu.0", "ctu.1",
+ 				"dvc.0", "dvc.1",
+ 				"clk_a", "clk_b", "clk_c", "clk_i";
+ 
+@@ -1559,6 +1564,17 @@
+ 			};
+ 		};
+ 
++		rcar_sound,ctu {
++			ctu00: ctu at 0 { };
++			ctu01: ctu at 1 { };
++			ctu02: ctu at 2 { };
++			ctu03: ctu at 3 { };
++			ctu10: ctu at 4 { };
++			ctu11: ctu at 5 { };
++			ctu12: ctu at 6 { };
++			ctu13: ctu at 7 { };
++		};
++
+ 		rcar_sound,src {
+ 			src0: src at 0 {
+ 				interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/include/dt-bindings/clock/r8a7790-clock.h b/include/dt-bindings/clock/r8a7790-clock.h
+index e119ef372ba3..7b1ad8922eec 100644
+--- a/include/dt-bindings/clock/r8a7790-clock.h
++++ b/include/dt-bindings/clock/r8a7790-clock.h
+@@ -144,6 +144,8 @@
+ #define R8A7790_CLK_SCU_ALL		17
+ #define R8A7790_CLK_SCU_DVC1		18
+ #define R8A7790_CLK_SCU_DVC0		19
++#define R8A7790_CLK_SCU_CTU1_MIX1	20
++#define R8A7790_CLK_SCU_CTU0_MIX0	21
+ #define R8A7790_CLK_SCU_SRC9		22
+ #define R8A7790_CLK_SCU_SRC8		23
+ #define R8A7790_CLK_SCU_SRC7		24
 -- 
 2.1.4
