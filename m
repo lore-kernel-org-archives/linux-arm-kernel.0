@@ -1,110 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jul 2015 11:49:04 +0100
-Subject: [PATCH] arm64/efi: prefer AllocatePages() over efi_low_alloc()
- for vmlinux
-In-Reply-To: <1437730913-18077-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1437730913-18077-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20150724104904.GB4348@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 24 Jul 2015 11:52:09 +0100
+Subject: [RFC PATCH 0/2] spi: add dual parallel & stacked mode support in
+ Zynq MPSoC GQSPI controller
+In-Reply-To: <7CFCFE83B8145347A1D424EC939F1C3CA81D12@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1436445895-25504-1-git-send-email-ranjit.waghmode@xilinx.com>
+ <20150714164005.GE11162@sirena.org.uk>
+ <7CFCFE83B8145347A1D424EC939F1C3CA7E53D@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20150715160146.GS11162@sirena.org.uk>
+ <7CFCFE83B8145347A1D424EC939F1C3CA7E758@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <20150716085739.GT11162@sirena.org.uk>
+ <7CFCFE83B8145347A1D424EC939F1C3CA81D12@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <20150724105209.GI11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Fri, Jul 24, 2015 at 10:42:35AM +0000, Ranjit Abhimanyu Waghmode wrote:
 
-On Fri, Jul 24, 2015 at 10:41:53AM +0100, Ard Biesheuvel wrote:
-> When allocating memory for the kernel image, try the AllocatePages()
-> boot service to obtain memory at the preferred offset of
-> 'dram_base + TEXT_OFFSET', and only revert to efi_low_alloc() if that
-> fails. This is the only way to allocate at the base of DRAM if DRAM
-> starts at 0x0, since efi_low_alloc() refuses to allocate at 0x0.
->
-> Tested-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi-stub.c | 47 ++++++++++++++++++++++++++++++++++++--------
->  1 file changed, 39 insertions(+), 8 deletions(-)
+As I think you've been asked before please fix your mail client to word
+wrap within paragraphs so your mails are more legible.
+
+> To support the dual parallel mode in this controller, following minor
+> things can be added to the driver.
+
+> 1) Controller needs to know in which mode it is working, then it's
+> obvious to set the appropriate flag for the same
+> 2) There are more than one chip selects, so need to set the same
 > 
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index f5374065ad53..c8df74d14368 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -13,7 +13,7 @@
->  #include <asm/efi.h>
->  #include <asm/sections.h>
->  
-> -efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
-> +efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+> So kindly suggest your view on the above request.
 
-Any reason for the _arg addition?
-
->  					unsigned long *image_addr,
->  					unsigned long *image_size,
->  					unsigned long *reserve_addr,
-> @@ -23,21 +23,52 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
->  {
->  	efi_status_t status;
->  	unsigned long kernel_size, kernel_memsize = 0;
-> +	unsigned long nr_pages;
->  
->  	/* Relocate the image, if required. */
->  	kernel_size = _edata - _text;
->  	if (*image_addr != (dram_base + TEXT_OFFSET)) {
->  		kernel_memsize = kernel_size + (_end - _edata);
-> -		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
-> -				       SZ_2M, reserve_addr);
-> +
-> +		//
-> +		// First, try a straight allocation at the preferred offset.
-> +		// This will work around the issue where, if dram_base == 0x0,
-> +		// efi_low_alloc() refuses to allocate at 0x0 (to prevent the
-> +		// address of the allocation to be mistaken for a FAIL return
-> +		// value or a NULL pointer). It will also ensure that, on
-> +		// platforms where the [dram_base, dram_base + TEXT_OFFSET)
-> +		// interval is partially occupied by the firmware (like on APM
-> +		// Mustang), we can still place the kernel at the address
-> +		// 'dram_base + TEXT_OFFSET'.
-> +		//
-
-/*
- * Nit: please use the standard comment style
- */
-
-> +		*reserve_addr = dram_base + TEXT_OFFSET;
-> +		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-> +			   EFI_PAGE_SIZE;
-> +		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
-> +					EFI_LOADER_DATA, nr_pages,
-> +					(efi_physical_addr_t *)reserve_addr);
-> +		if (status == EFI_SUCCESS) {
-> +			memcpy((void *)*reserve_addr, (void *)*image_addr,
-> +			       kernel_size);
-> +			*image_addr = *reserve_addr;
-> +			*reserve_size = kernel_memsize;
-> +		} else {
-> +			status = efi_low_alloc(sys_table_arg,
-> +					       kernel_memsize + TEXT_OFFSET,
-> +					       SZ_2M, reserve_addr);
-> +
-> +			if (status == EFI_SUCCESS) {
-> +				memcpy((void *)*reserve_addr + TEXT_OFFSET,
-> +				       (void *)*image_addr,
-> +				       kernel_size);
-> +				*image_addr = *reserve_addr + TEXT_OFFSET;
-> +				*reserve_size = kernel_memsize + TEXT_OFFSET;
-> +			}
-> +		}
->  		if (status != EFI_SUCCESS) {
-> -			pr_efi_err(sys_table, "Failed to relocate kernel\n");
-> +			pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
->  			return status;
->  		}
-> -		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
-> -		       kernel_size);
-
-Could we have a new_image_addr assigned in each case, and keep the
-common memcpy here, followed by assignment to *image_addr? That would
-save a couple of lines and guarantee the two cases stay in sync.
-
-Otherwise this looks good to me.
-
-Thanks,
-Mark.
+I'm not entirely sure what you're asking here from the point of view of
+SPI, sorry - what exactly are you requesting?  If you want to add
+support for new SPI bus modes please go ahead and do that, you need to
+clearly document what any new modes you're adding are so that other
+people can understand them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/69d936b7/attachment.sig>
