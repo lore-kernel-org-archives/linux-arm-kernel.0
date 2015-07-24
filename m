@@ -1,46 +1,23 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 24 Jul 2015 16:37:49 +0100
-Subject: [PATCH v3 9/9] arm64/BUG: Show explicit backtrace for WARNs
-In-Reply-To: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
-References: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1437752284-14847-10-git-send-email-Dave.Martin@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jul 2015 16:40:43 +0100
+Subject: [PATCH v2 16/20] arm64: atomics: tidy up common atomic{,64}_*
+ macros
+In-Reply-To: <1437734531-10698-17-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-17-git-send-email-will.deacon@arm.com>
+Message-ID: <20150724154043.GQ3550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic slowpath WARN implementation prints a backtrace, but
-the report_bug() based implementation does not, opting to print the
-registers instead which is generally not as useful.
+On Fri, Jul 24, 2015 at 11:42:07AM +0100, Will Deacon wrote:
+> The common (i.e. identical for ll/sc and lse) atomic macros in atomic.h
+> are needlessley different for atomic_t and atomic64_t.
+> 
+> This patch tidies up the definitions to make them consistent across the
+> two atomic types and factors out common code such as the add_unless
+> implementation based on cmpxchg.
+> 
+> Reviewed-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Ideally, report_bug() should be fixed to make the behaviour more
-consistent, but in the meantime this patch generates a backtrace
-directly from the arm64 backend instead so that this functionality
-is not lost with the migration to report_bug().
-
-As a side-effect, the backtrace will be outside the oops end
-marker, but that's hard to avoid without modifying generic code.
-
-This patch can go away if report_bug() grows the ability in the
-future to generate a backtrace directly or call an arch hook at the
-appropriate time.
-
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/kernel/traps.c |    2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index b10f4bf..bc3dfc5 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -487,6 +487,8 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
- 		break;
- 
- 	case BUG_TRAP_TYPE_WARN:
-+		/* Ideally, report_bug() should backtrace for us... but no. */
-+		dump_backtrace(regs, NULL);
- 		break;
- 
- 	default:
--- 
-1.7.10.4
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
