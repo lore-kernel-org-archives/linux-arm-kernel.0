@@ -1,116 +1,101 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 23 Jul 2015 17:39:18 -0700
-Subject: [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock
- configuration data and instantiate cpu clock
-In-Reply-To: <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
-References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
- <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150724003918.642.78653@quantum>
+From: feng.wu@intel.com (Wu, Feng)
+Date: Fri, 24 Jul 2015 01:27:29 +0000
+Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
+In-Reply-To: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <E959C4978C3B6342920538CF579893F00264820D@SHSMSX104.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Bartlomiej Zolnierkiewicz (2015-07-01 06:10:35)
-> From: Thomas Abraham <thomas.ab@samsung.com>
-> 
-> With the addition of the new Samsung specific cpu-clock type, the
-> arm clock can be represented as a cpu-clock type. Add the CPU clock
-> configuration data and instantiate the CPU clock type for Exynos5250.
-> 
-> Changes by Bartlomiej:
-> - split Exynos5250 support from the original patch
-> - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
-> 
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-Acked-by: Michael Turquette <mturquette@baylibre.com>
 
-If Kukjin wants to merge this through the samsung tree then an immutable
-branch would be much appreciated.
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/samsung/clk-exynos5250.c   | 31 +++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/exynos5250.h |  1 +
->  2 files changed, 32 insertions(+)
+> -----Original Message-----
+> From: linux-kernel-owner at vger.kernel.org
+> [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Eric Auger
+> Sent: Monday, July 06, 2015 8:11 PM
+> To: eric.auger at st.com; eric.auger at linaro.org;
+> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
+> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
+> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
+> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
+> b.reynal at virtualopensystems.com
+> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
+> Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index 70ec3d2..d87f34d 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -19,6 +19,7 @@
->  #include <linux/syscore_ops.h>
->  
->  #include "clk.h"
-> +#include "clk-cpu.h"
->  
->  #define APLL_LOCK              0x0
->  #define APLL_CON0              0x100
-> @@ -748,6 +749,32 @@ static struct samsung_pll_clock exynos5250_plls[nr_plls] __initdata = {
->                 VPLL_LOCK, VPLL_CON0, NULL),
->  };
->  
-> +#define E5250_CPU_DIV0(apll, pclk_dbg, atb, periph, acp, cpud)         \
-> +               ((((apll) << 24) | ((pclk_dbg) << 20) | ((atb) << 16) | \
-> +                ((periph) << 12) | ((acp) << 8) | ((cpud) << 4)))
-> +#define E5250_CPU_DIV1(hpm, copy)                                      \
-> +               (((hpm) << 4) | (copy))
-> +
-> +static const struct exynos_cpuclk_cfg_data exynos5250_armclk_d[] __initconst = {
-> +       { 1700000, E5250_CPU_DIV0(5, 3, 7, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
-> +       { 1600000, E5250_CPU_DIV0(4, 1, 7, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
-> +       { 1500000, E5250_CPU_DIV0(4, 1, 7, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
-> +       { 1400000, E5250_CPU_DIV0(4, 1, 6, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
-> +       { 1300000, E5250_CPU_DIV0(3, 1, 6, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
-> +       { 1200000, E5250_CPU_DIV0(3, 1, 5, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
-> +       { 1100000, E5250_CPU_DIV0(3, 1, 5, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
-> +       { 1000000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  900000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  800000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  700000, E5250_CPU_DIV0(1, 1, 3, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  600000, E5250_CPU_DIV0(1, 1, 3, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  500000, E5250_CPU_DIV0(1, 1, 2, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  400000, E5250_CPU_DIV0(1, 1, 2, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  300000, E5250_CPU_DIV0(1, 1, 1, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  200000, E5250_CPU_DIV0(1, 1, 1, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
-> +       {  0 },
-> +};
-> +
->  static const struct of_device_id ext_clk_match[] __initconst = {
->         { .compatible = "samsung,clock-xxti", .data = (void *)0, },
->         { },
-> @@ -797,6 +824,10 @@ static void __init exynos5250_clk_init(struct device_node *np)
->                         ARRAY_SIZE(exynos5250_div_clks));
->         samsung_clk_register_gate(ctx, exynos5250_gate_clks,
->                         ARRAY_SIZE(exynos5250_gate_clks));
-> +       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
-> +                       mout_cpu_p[0], mout_cpu_p[1], 0x200,
-> +                       exynos5250_armclk_d, ARRAY_SIZE(exynos5250_armclk_d),
-> +                       CLK_CPU_HAS_DIV1);
->  
->         /*
->          * Enable arm clock down (in idle) and set arm divider
-> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
-> index 4273891d..8183d1c 100644
-> --- a/include/dt-bindings/clock/exynos5250.h
-> +++ b/include/dt-bindings/clock/exynos5250.h
-> @@ -21,6 +21,7 @@
->  #define CLK_FOUT_CPLL          6
->  #define CLK_FOUT_EPLL          7
->  #define CLK_FOUT_VPLL          8
-> +#define CLK_ARM_CLK            9
->  
->  /* gate for special clocks (sclk) */
->  #define CLK_SCLK_CAM_BAYER     128
-> -- 
+> This series introduces and extends the IRQ bypass manager written
+> by Alex and transforms irqfd into an IRQ bypass manager consumer.
+> The producer part, in my case the VFIO platform driver will be introduced
+> separately. That code should be usable by both ARM IRQ forwarding
+> and Intel Posted Interrupts.
+> 
+> The IRQ bypass manager enables to setup a negotiated link between an
+> IRQ producer and an IRQ consumer (typically the VFIO driver and KVM irqfd).
+> 
+> The series currently includes Alex's code which was sent my email.
+> Its structure obvioulsy will adapt to Alex's will.
+> 
+> Also the irq bypass manager gets compiled/linked on arm/arm64 along
+> with KVM and VFIO platform driver.
+> 
+> can be found at:
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-
+> bypass-fwd-v2
+> 
+> Best Regards
+> 
+> Eric
+> 
+> History:
+> v1 -> v2:
+> - isolate the bypass manager and irqfd consumer in this series
+> - take into account Paolo's comments and use container_of strategy and
+>   remove additional fields introduced in v1.
+> - create kvm_irqfd.h
+> - add unregistration in irqfd_shutdown
+
+Hi Eric,
+
+[4/6], [5/6], and [6/6] of this series are common to forwarded irq and posted
+interrupts, did you have a chance to get a new version of them based on
+Alex's latest irqbypass manager patch:
+
+https://lkml.org/lkml/2015/7/16/810
+
+Thanks a lot!
+
+Thanks,
+Feng
+
+> 
+> v1: originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
+>     bypass manager (https://lkml.org/lkml/2015/7/2/268)
+> 
+> 
+> Eric Auger (6):
+>   KVM: arm/arm64: select IRQ_BYPASS_MANAGER
+>   VFIO: platform: select IRQ_BYPASS_MANAGER
+>   irq: bypass: Extend skeleton for ARM forwarding control
+>   KVM: create kvm_irqfd.h
+>   KVM: introduce kvm_arch functions for IRQ bypass
+>   KVM: eventfd: add irq bypass consumer management
+> 
+>  arch/arm/kvm/Kconfig          |   1 +
+>  arch/arm64/kvm/Kconfig        |   1 +
+>  drivers/vfio/platform/Kconfig |   1 +
+>  include/linux/irqbypass.h     |  19 ++++++--
+>  include/linux/kvm_host.h      |  37 ++++++++++++++
+>  include/linux/kvm_irqfd.h     |  70 +++++++++++++++++++++++++++
+>  kernel/irq/bypass.c           |  44 +++++++++++++++--
+>  virt/kvm/Kconfig              |   3 ++
+>  virt/kvm/eventfd.c            | 109 +++++++++++++-----------------------------
+>  9 files changed, 203 insertions(+), 82 deletions(-)
+>  create mode 100644 include/linux/kvm_irqfd.h
+> 
+> --
 > 1.9.1
 > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
