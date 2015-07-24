@@ -1,240 +1,120 @@
 From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 24 Jul 2015 19:41:54 +0300
-Subject: [PATCH v4 2/7] mm: kasan: introduce generic
- kasan_populate_zero_shadow()
+Date: Fri, 24 Jul 2015 19:41:53 +0300
+Subject: [PATCH v4 1/7] x86/kasan: generate KASAN_SHADOW_OFFSET in Makefile
 In-Reply-To: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
 References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1437756119-12817-3-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <1437756119-12817-2-git-send-email-a.ryabinin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce generic kasan_populate_zero_shadow(start, end).
-This function maps kasan_zero_page to the [start, end] addresses.
+ARM64 has several different address space layouts and its
+going to have one more at least. Different address space layouts
+have different shadow offsets, so every new layout require adding
+new default value for CONFIG_KASAN_SHADOW_OFFSET.
+It's possible to generate KASAN_SHADOW_OFFSET in Makefile, so
+the shadow address for every possible layout will be auto-generated.
 
-In follow on patches it will be used for ARMv8 (and maybe other
-architectures) and will replace x86_64 specific populate_zero_shadow().
+However, we should do this in x86 too, because generic code
+depend on having CONFIG_KASAN_SHADOW_OFFSET.
+There is no functional changes here.
 
 Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 ---
- arch/x86/mm/kasan_init_64.c |  14 ----
- include/linux/kasan.h       |   8 +++
- mm/kasan/Makefile           |   2 +-
- mm/kasan/kasan_init.c       | 151 ++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 160 insertions(+), 15 deletions(-)
- create mode 100644 mm/kasan/kasan_init.c
+ arch/x86/Kconfig             |  5 -----
+ arch/x86/Makefile            |  2 ++
+ arch/x86/include/asm/kasan.h | 21 +++++++++++++--------
+ include/linux/kasan.h        |  1 -
+ scripts/Makefile.kasan       |  2 +-
+ 5 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/arch/x86/mm/kasan_init_64.c b/arch/x86/mm/kasan_init_64.c
-index e1840f3..812086c 100644
---- a/arch/x86/mm/kasan_init_64.c
-+++ b/arch/x86/mm/kasan_init_64.c
-@@ -12,20 +12,6 @@
- extern pgd_t early_level4_pgt[PTRS_PER_PGD];
- extern struct range pfn_mapped[E820_X_MAX];
+diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+index b3a1a5d..6d6dd6f 100644
+--- a/arch/x86/Kconfig
++++ b/arch/x86/Kconfig
+@@ -255,11 +255,6 @@ config ARCH_SUPPORTS_OPTIMIZED_INLINING
+ config ARCH_SUPPORTS_DEBUG_PAGEALLOC
+ 	def_bool y
  
--static pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
--static pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
--static pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
+-config KASAN_SHADOW_OFFSET
+-	hex
+-	depends on KASAN
+-	default 0xdffffc0000000000
 -
+ config HAVE_INTEL_TXT
+ 	def_bool y
+ 	depends on INTEL_IOMMU && ACPI
+diff --git a/arch/x86/Makefile b/arch/x86/Makefile
+index 118e6de..c666989 100644
+--- a/arch/x86/Makefile
++++ b/arch/x86/Makefile
+@@ -39,6 +39,8 @@ ifdef CONFIG_X86_NEED_RELOCS
+         LDFLAGS_vmlinux := --emit-relocs
+ endif
+ 
++KASAN_SHADOW_OFFSET := 0xdffffc0000000000
++
+ ifeq ($(CONFIG_X86_32),y)
+         BITS := 32
+         UTS_MACHINE := i386
+diff --git a/arch/x86/include/asm/kasan.h b/arch/x86/include/asm/kasan.h
+index 74a2a8d..88881f6 100644
+--- a/arch/x86/include/asm/kasan.h
++++ b/arch/x86/include/asm/kasan.h
+@@ -1,17 +1,22 @@
+ #ifndef _ASM_X86_KASAN_H
+ #define _ASM_X86_KASAN_H
+ 
 -/*
-- * This page used as early shadow. We don't use empty_zero_page
-- * at early stages, stack instrumentation could write some garbage
-- * to this page.
-- * Latter we reuse it as zero shadow for large ranges of memory
-- * that allowed to access, but not instrumented by kasan
-- * (vmalloc/vmemmap ...).
+- * Compiler uses shadow offset assuming that addresses start
+- * from 0. Kernel addresses don't start from 0, so shadow
+- * for kernel really starts from compiler's shadow offset +
+- * 'kernel address space start' >> KASAN_SHADOW_SCALE_SHIFT
 - */
--static unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
--
- static int __init map_range(struct range *range)
- {
- 	unsigned long start;
+-#define KASAN_SHADOW_START      (KASAN_SHADOW_OFFSET + \
+-					(0xffff800000000000ULL >> 3))
++#define KASAN_SHADOW_START      (0xffffec0000000000ULL)
+ /* 47 bits for kernel address -> (47 - 3) bits for shadow */
+ #define KASAN_SHADOW_END        (KASAN_SHADOW_START + (1ULL << (47 - 3)))
+ 
++/*
++ * This value is used to map an address to the corresponding shadow
++ * address by the following formula:
++ *	shadow_addr = (address >> 3) + KASAN_SHADOW_OFFSET;
++ *
++ * (1 << 61) shadow addresses - [KASAN_SHADOW_OFFSET,KASAN_SHADOW_END]
++ * cover all 64-bits of virtual addresses. So KASAN_SHADOW_OFFSET
++ * should satisfy the following equation:
++ *      KASAN_SHADOW_OFFSET = KASAN_SHADOW_END - (1ULL << 61)
++ */
++#define KASAN_SHADOW_OFFSET (KASAN_SHADOW_END - (1UL << (64 - 3)))
++
+ #ifndef __ASSEMBLY__
+ 
+ #ifdef CONFIG_KASAN
 diff --git a/include/linux/kasan.h b/include/linux/kasan.h
-index 6fb1c7d..d795f53 100644
+index 5486d77..6fb1c7d 100644
 --- a/include/linux/kasan.h
 +++ b/include/linux/kasan.h
-@@ -12,8 +12,16 @@ struct vm_struct;
+@@ -10,7 +10,6 @@ struct vm_struct;
+ #ifdef CONFIG_KASAN
+ 
  #define KASAN_SHADOW_SCALE_SHIFT 3
+-#define KASAN_SHADOW_OFFSET _AC(CONFIG_KASAN_SHADOW_OFFSET, UL)
  
  #include <asm/kasan.h>
-+#include <asm/pgtable.h>
  #include <linux/sched.h>
+diff --git a/scripts/Makefile.kasan b/scripts/Makefile.kasan
+index 3f874d2..19d9a61 100644
+--- a/scripts/Makefile.kasan
++++ b/scripts/Makefile.kasan
+@@ -8,7 +8,7 @@ endif
+ CFLAGS_KASAN_MINIMAL := -fsanitize=kernel-address
  
-+extern unsigned char kasan_zero_page[PAGE_SIZE];
-+extern pte_t kasan_zero_pte[PTRS_PER_PTE];
-+extern pmd_t kasan_zero_pmd[PTRS_PER_PMD];
-+extern pud_t kasan_zero_pud[PTRS_PER_PUD];
-+
-+void kasan_populate_zero_shadow(const void *from, const void *to);
-+
- static inline void *kasan_mem_to_shadow(const void *addr)
- {
- 	return (void *)((unsigned long)addr >> KASAN_SHADOW_SCALE_SHIFT)
-diff --git a/mm/kasan/Makefile b/mm/kasan/Makefile
-index bd837b8..6471014 100644
---- a/mm/kasan/Makefile
-+++ b/mm/kasan/Makefile
-@@ -5,4 +5,4 @@ CFLAGS_REMOVE_kasan.o = -pg
- # see: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=63533
- CFLAGS_kasan.o := $(call cc-option, -fno-conserve-stack -fno-stack-protector)
+ CFLAGS_KASAN := $(call cc-option, -fsanitize=kernel-address \
+-		-fasan-shadow-offset=$(CONFIG_KASAN_SHADOW_OFFSET) \
++		-fasan-shadow-offset=$(KASAN_SHADOW_OFFSET) \
+ 		--param asan-stack=1 --param asan-globals=1 \
+ 		--param asan-instrumentation-with-call-threshold=$(call_threshold))
  
--obj-y := kasan.o report.o
-+obj-y := kasan.o report.o kasan_init.o
-diff --git a/mm/kasan/kasan_init.c b/mm/kasan/kasan_init.c
-new file mode 100644
-index 0000000..e276853
---- /dev/null
-+++ b/mm/kasan/kasan_init.c
-@@ -0,0 +1,151 @@
-+/*
-+ * This file contains some kasan initialization code.
-+ *
-+ * Copyright (c) 2015 Samsung Electronics Co., Ltd.
-+ * Author: Andrey Ryabinin
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/bootmem.h>
-+#include <linux/init.h>
-+#include <linux/kasan.h>
-+#include <linux/kernel.h>
-+#include <linux/memblock.h>
-+#include <linux/pfn.h>
-+
-+#include <asm/page.h>
-+#include <asm/pgalloc.h>
-+
-+/*
-+ * This page serves two purposes:
-+ *   - It used as early shadow memory. The entire shadow region populated
-+ *     with this page, before we will be able to setup normal shadow memory.
-+ *   - Latter it reused it as zero shadow to cover large ranges of memory
-+ *     that allowed to access, but not handled by kasan (vmalloc/vmemmap ...).
-+ */
-+unsigned char kasan_zero_page[PAGE_SIZE] __page_aligned_bss;
-+
-+#if CONFIG_PGTABLE_LEVELS > 3
-+pud_t kasan_zero_pud[PTRS_PER_PUD] __page_aligned_bss;
-+#endif
-+#if CONFIG_PGTABLE_LEVELS > 2
-+pmd_t kasan_zero_pmd[PTRS_PER_PMD] __page_aligned_bss;
-+#endif
-+pte_t kasan_zero_pte[PTRS_PER_PTE] __page_aligned_bss;
-+
-+static __init void *early_alloc(size_t size, int node)
-+{
-+	return memblock_virt_alloc_try_nid(size, size, __pa(MAX_DMA_ADDRESS),
-+					BOOTMEM_ALLOC_ACCESSIBLE, node);
-+}
-+
-+static void __init zero_pte_populate(pmd_t *pmd, unsigned long addr,
-+				unsigned long end)
-+{
-+	pte_t *pte = pte_offset_kernel(pmd, addr);
-+	pte_t zero_pte;
-+
-+	zero_pte = pfn_pte(PFN_DOWN(__pa(kasan_zero_page)), PAGE_KERNEL);
-+	zero_pte = pte_wrprotect(zero_pte);
-+
-+	while (addr + PAGE_SIZE <= end) {
-+		set_pte_at(&init_mm, addr, pte, zero_pte);
-+		addr += PAGE_SIZE;
-+		pte = pte_offset_kernel(pmd, addr);
-+	}
-+}
-+
-+static void __init zero_pmd_populate(pud_t *pud, unsigned long addr,
-+				unsigned long end)
-+{
-+	pmd_t *pmd = pmd_offset(pud, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PMD_SIZE) && end - addr >= PMD_SIZE) {
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pmd_none(*pmd)) {
-+			pmd_populate_kernel(&init_mm, pmd,
-+					early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pte_populate(pmd, addr, next);
-+	} while (pmd++, addr = next, addr != end);
-+}
-+
-+static void __init zero_pud_populate(pgd_t *pgd, unsigned long addr,
-+				unsigned long end)
-+{
-+	pud_t *pud = pud_offset(pgd, addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pud_addr_end(addr, end);
-+		if (IS_ALIGNED(addr, PUD_SIZE) && end - addr >= PUD_SIZE) {
-+			pmd_t *pmd;
-+
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pud_none(*pud)) {
-+			pud_populate(&init_mm, pud,
-+				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pmd_populate(pud, addr, next);
-+	} while (pud++, addr = next, addr != end);
-+}
-+
-+/**
-+ * kasan_populate_zero_shadow - populate shadow memory region with
-+ *                               kasan_zero_page
-+ * @from - start of the memory range to populate
-+ * @to   - end of the memory range to populate
-+ */
-+void __init kasan_populate_zero_shadow(const void *from, const void *to)
-+{
-+	unsigned long addr = (unsigned long)from;
-+	unsigned long end = (unsigned long)to;
-+	pgd_t *pgd = pgd_offset_k(addr);
-+	unsigned long next;
-+
-+	do {
-+		next = pgd_addr_end(addr, end);
-+
-+		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
-+			pud_t *pud;
-+			pmd_t *pmd;
-+
-+			/*
-+			 * kasan_zero_pud should be populated with pmds
-+			 * at this moment.
-+			 * [pud,pmd]_populate*() below needed only for
-+			 * 3,2 - level page tables where we don't have
-+			 * puds,pmds, so pgd_populate(), pud_populate()
-+			 * is noops.
-+			 */
-+			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-+			pud = pud_offset(pgd, addr);
-+			pud_populate(&init_mm, pud, kasan_zero_pmd);
-+			pmd = pmd_offset(pud, addr);
-+			pmd_populate_kernel(&init_mm, pmd, kasan_zero_pte);
-+			continue;
-+		}
-+
-+		if (pgd_none(*pgd)) {
-+			pgd_populate(&init_mm, pgd,
-+				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-+		}
-+		zero_pud_populate(pgd, addr, next);
-+	} while (pgd++, addr = next, addr != end);
-+}
 -- 
 2.4.5
