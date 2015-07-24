@@ -1,65 +1,55 @@
-From: a.ryabinin@samsung.com (Andrey Ryabinin)
-Date: Fri, 24 Jul 2015 19:41:58 +0300
-Subject: [PATCH v4 6/7] ARM64: kasan: print memory assignment
-In-Reply-To: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
-References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <1437756119-12817-7-git-send-email-a.ryabinin@samsung.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 24 Jul 2015 17:46:21 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+In-Reply-To: <20150724151559.GA12324@kroah.com>
+References: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
+ <20150723220550.GA15032@kroah.com>
+ <20150724095605.GI10670@e103592.cambridge.arm.com>
+ <20150724151559.GA12324@kroah.com>
+Message-ID: <20150724164619.GK10670@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Jul 24, 2015 at 08:15:59AM -0700, Greg Kroah-Hartman wrote:
+> On Fri, Jul 24, 2015 at 10:56:06AM +0100, Dave Martin wrote:
+> > On Thu, Jul 23, 2015 at 03:05:50PM -0700, Greg Kroah-Hartman wrote:
+> > > On Thu, Jul 09, 2015 at 11:57:12AM +0100, Dave Martin wrote:
+> > > > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+> > > > sufficient to inhibit pl011_int() from being triggered by a local
+> > > > IRQ and trying to re-take the same lock.  This can lead to
+> > > > deadlocks.
+> > > > 
+> > > > This patch uses the _irq() locking variants instead to ensure that
+> > > > pl011_int() handling for a given port is deferred until any
+> > > > pl011_tx_softirq() work for that port is complete.
+> > > > 
+> > > > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > > Tested-by: Robin Murphy <robin.murphy@arm.com>
+> > > > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > > > Cc: stable <stable@vger.kernel.org> # 4.1
+> > > > ---
+> > > >  drivers/tty/serial/amba-pl011.c |    4 ++--
+> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > 
+> > > This doesn't apply at all to 4.2-rc3, so I can't apply it :(
+> > 
+> > This is applicable to 4.1 stable only, since the code this patch fixes
+> > was replaced in 4.2-rc1.
+> > 
+> > Apologies, I didn't make that clear in the text.
+> 
+> I can't do anything with a 4.1-only patch, please read
+> Documentation/stable_kernel_rules.txt for how to get a patch into the
+> stable kernel releases.
 
-This prints out the virtual memory assigned to KASan in the
-boot crawl along with other memory assignments, if and only
-if KASan is activated.
+OK, reposted[1] with a clear reference to the equivalent upstream
+commit, and explanation of why this patch is different, which I'm
+guessing is what was missing.
 
-Example dmesg from the Juno Development board:
+Is that sufficient?
 
-Memory: 1691156K/2080768K available (5465K kernel code, 444K rwdata,
-2160K rodata, 340K init, 217K bss, 373228K reserved, 16384K cma-reserved)
-Virtual kernel memory layout:
-    kasan   : 0xffffff8000000000 - 0xffffff9000000000   (    64 GB)
-    vmalloc : 0xffffff9000000000 - 0xffffffbdbfff0000   (   182 GB)
-    vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
-              0xffffffbdc2000000 - 0xffffffbdc3fc0000   (    31 MB actual)
-    fixed   : 0xffffffbffabfd000 - 0xffffffbffac00000   (    12 KB)
-    PCI I/O : 0xffffffbffae00000 - 0xffffffbffbe00000   (    16 MB)
-    modules : 0xffffffbffc000000 - 0xffffffc000000000   (    64 MB)
-    memory  : 0xffffffc000000000 - 0xffffffc07f000000   (  2032 MB)
-      .init : 0xffffffc0007f5000 - 0xffffffc00084a000   (   340 KB)
-      .text : 0xffffffc000080000 - 0xffffffc0007f45b4   (  7634 KB)
-      .data : 0xffffffc000850000 - 0xffffffc0008bf200   (   445 KB)
+Cheers
+---Dave
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/mm/init.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index ad87ce8..3930692 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -298,6 +298,9 @@ void __init mem_init(void)
- #define MLK_ROUNDUP(b, t) b, t, DIV_ROUND_UP(((t) - (b)), SZ_1K)
- 
- 	pr_notice("Virtual kernel memory layout:\n"
-+#ifdef CONFIG_KASAN
-+		  "    kasan   : 0x%16lx - 0x%16lx   (%6ld GB)\n"
-+#endif
- 		  "    vmalloc : 0x%16lx - 0x%16lx   (%6ld GB)\n"
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  "    vmemmap : 0x%16lx - 0x%16lx   (%6ld GB maximum)\n"
-@@ -310,6 +313,9 @@ void __init mem_init(void)
- 		  "      .init : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .text : 0x%p" " - 0x%p" "   (%6ld KB)\n"
- 		  "      .data : 0x%p" " - 0x%p" "   (%6ld KB)\n",
-+#ifdef CONFIG_KASAN
-+		  MLG(KASAN_SHADOW_START, KASAN_SHADOW_END),
-+#endif
- 		  MLG(VMALLOC_START, VMALLOC_END),
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
- 		  MLG((unsigned long)vmemmap,
--- 
-2.4.5
+[1] http://marc.info/?l=linux-serial&m=143775597205041&w=2
