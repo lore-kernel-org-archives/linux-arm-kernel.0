@@ -1,19 +1,29 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jul 2015 16:32:57 +0100
-Subject: [PATCH v2 15/20] arm64: cmpxchg: avoid memory barrier on
- comparison failure
-In-Reply-To: <1437734531-10698-16-git-send-email-will.deacon@arm.com>
-References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
- <1437734531-10698-16-git-send-email-will.deacon@arm.com>
-Message-ID: <20150724153256.GP3550@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 24 Jul 2015 16:37:04 +0100
+Subject: [PATCH v2 0/2] spi: dw: Reintroduce optional 16 bit data
+ register I/O
+In-Reply-To: <1437751812.29746.74.camel@linux.intel.com>
+References: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+ <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+ <1437751812.29746.74.camel@linux.intel.com>
+Message-ID: <20150724153704.GM11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 11:42:06AM +0100, Will Deacon wrote:
-> cmpxchg doesn't require memory barrier semantics when the value
-> comparison fails, so make the barrier conditional on success.
-> 
-> Reviewed-by: Steve Capper <steve.capper@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Fri, Jul 24, 2015 at 06:30:12PM +0300, Andy Shevchenko wrote:
+> On Wed, 2015-06-24 at 18:34 +0200, Michael van der Westhuizen wrote:
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > With this series applied:
+> >   m25p80 spi32766.0: m25p40 (512 Kbytes)
+
+> Mark, what do you think about this? For me it looks okay.
+
+Please don't send content free pings, if you want me to review a patch
+please send me the patch.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/c746fd8c/attachment.sig>
