@@ -1,35 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:43 +0900
-Subject: [PATCH 2/9] ARM: shmobile: r8a7779: Generic SMP ops
+Date: Fri, 24 Jul 2015 17:41:44 +0900
+Subject: [PATCH 3/9] ARM: shmobile: Enable fixed voltage regulator in
+ shmobile_defconfig
 In-Reply-To: <cover.1437726584.git.horms+renesas@verge.net.au>
 References: <cover.1437726584.git.horms+renesas@verge.net.au>
-Message-ID: <44ade5edf90ccd38efa741240efb2586239c9751.1437726584.git.horms+renesas@verge.net.au>
+Message-ID: <719074d8b2209ead1f33d935dfa3f7dd8c83e018.1437726584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
+however, MACH_MARZEN is going away along with the board code it enables.
 
-Add a r8a7779-specific SMP operation pointer to support
-all 4 CPU cores through SMP on r8a7779 without C board code.
-
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Magnus Damm <damm@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c | 1 +
+ arch/arm/configs/shmobile_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 5625fd1c89c0..2c3e433f84ca 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -772,6 +772,7 @@ static const char *r8a7779_compat_dt[] __initdata = {
- };
- 
- DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
-+	.smp		= smp_ops(r8a7779_smp_ops),
- 	.map_io		= r8a7779_map_io,
- 	.init_early	= shmobile_init_delay,
- 	.init_time	= r8a7779_init_time,
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 9961fbd633f8..9fece82a4127 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -121,6 +121,7 @@ CONFIG_WATCHDOG=y
+ CONFIG_DA9063_WATCHDOG=y
+ CONFIG_MFD_AS3711=y
+ CONFIG_MFD_DA9063=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_AS3711=y
+ CONFIG_REGULATOR_DA9210=y
+ CONFIG_REGULATOR_GPIO=y
 -- 
 2.1.4
