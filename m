@@ -1,26 +1,31 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 24 Jul 2015 11:43:40 +0100
-Subject: [Xen-devel] [PATCH v2 01/20] xen: Add Xen specific page definition
-In-Reply-To: <55B214C5.3020501@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
- <55B20540.3020000@citrix.com> <55B207C6.4020300@citrix.com>
- <55B209D9.1080602@citrix.com> <55B20ABE.7000609@citrix.com>
- <55B214C5.3020501@citrix.com>
-Message-ID: <1437734620.24746.62.camel@citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jul 2015 11:42:11 +0100
+Subject: [PATCH v2 20/20] arm64: kconfig: select HAVE_CMPXCHG_LOCAL
+In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-21-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 11:34 +0100, David Vrabel wrote:
-> it would be better to think that:
-> 
-> PFNs index guest-sized pages (which may be 64 KiB).
-> 
-> GFNs index Xen-sized pages (which is always 4 KiB).
+We implement an optimised cmpxchg_local macro, so let the kernel know.
 
-This concept could be usefully added to the comment in
-xen/include/xen/mm.h IMHO.
+Reviewed-by: Steve Capper <steve.capper@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-> 
-> David
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index d11b1af62438..19ea772a5d7b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -53,6 +53,7 @@ config ARM64
+ 	select HAVE_C_RECORDMCOUNT
+ 	select HAVE_CC_STACKPROTECTOR
+ 	select HAVE_CMPXCHG_DOUBLE
++	select HAVE_CMPXCHG_LOCAL
+ 	select HAVE_DEBUG_BUGVERBOSE
+ 	select HAVE_DEBUG_KMEMLEAK
+ 	select HAVE_DMA_API_DEBUG
+-- 
+2.1.4
