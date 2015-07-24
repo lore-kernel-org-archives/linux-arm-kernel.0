@@ -1,87 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jul 2015 11:07:24 +0100
-Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
-In-Reply-To: <20150724095618.GB23074@leverpostej>
-References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
- <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
- <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
- <20150724095618.GB23074@leverpostej>
-Message-ID: <20150724100724.GA4348@leverpostej>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Fri, 24 Jul 2015 11:10:39 +0100
+Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
+ a Linux page into Xen page
+In-Reply-To: <55B20B56.7020605@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
+ <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
+Message-ID: <55B20F1F.60902@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 10:56:18AM +0100, Mark Rutland wrote:
-> On Fri, Jul 24, 2015 at 04:56:59AM +0100, yalin wang wrote:
-> > 
-> > > On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > 
-> > > On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
-> > >> A little change to patch_map() function,
-> > >> use set_fixmap_offset() to make code more clear.
-> > >> 
-> > >> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-> > >> ---
-> > >> arch/arm64/kernel/insn.c | 5 ++---
-> > >> 1 file changed, 2 insertions(+), 3 deletions(-)
-> > >> 
-> > >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> > >> index dd9671c..7dafd5a 100644
-> > >> --- a/arch/arm64/kernel/insn.c
-> > >> +++ b/arch/arm64/kernel/insn.c
-> > >> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
-> > >> 		return addr;
-> > >> 
-> > >> 	BUG_ON(!page);
-> > >> -	set_fixmap(fixmap, page_to_phys(page));
-> > >> -
-> > >> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> > >> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-> > >> +			(addr & ~PAGE_MASK));
-> > > 
-> > > It looks fine. Do you get any compiler warning for the automatic pointer
-> > > to long conversion? You may want to add some explicit casts, otherwise:
-> > > 
-> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > i have build it, there is no warning about this change. :)
+On 24/07/15 10:54, Julien Grall wrote:
+> On 24/07/15 10:31, David Vrabel wrote:
+>> On 09/07/15 21:42, Julien Grall wrote:
+>>> The Xen interface is always using 4KB page. This means that a Linux page
+>>> may be split across multiple Xen page when the page granularity is not
+>>> the same.
+>>>
+>>> This helper will break down a Linux page into 4KB chunk and call the
+>>> helper on each of them.
+>> [...]
+>>> --- a/include/xen/page.h
+>>> +++ b/include/xen/page.h
+>>> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
+>>>  
+>>>  extern unsigned long xen_released_pages;
+>>>  
+>>> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
+>>> +
+>>> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
+>>> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
+>>> +				    void *data)
+>>
+>> I think this should be outlined (unless you have measurements that
+>> support making it inlined).
 > 
-> I see no warnings with defconfig, but there's an (unrelated) set of warnings if
-> CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA are enabled:
+> I don't have any performance measurements. Although, when Linux is using
+> 4KB page granularity, the loop in this helper will be dropped by the
+> helper. The code would look like:
+> 
+> unsigned long pfn = xen_page_to_pfn(page);
+> 
+> ret = fn(page, fn, data);
+> if (ret)
+>   return ret;
+> 
+> The compiler could even inline the callback (fn). So it drops 2
+> functions call.
 
-Actually they aren't unrelated after all. the unsigned long addr in
-__set_fixmap_offset shadows the void* addr from patch_map making the
-types match.
+Ok, keep it inlined.
 
-With a few underscores addrd to __set_fixmap_offset's addr, I get the
-following regarding patch_map:
+>> Also perhaps make it
+>>
+>> int xen_for_each_gfn(struct page *page,
+>>                      xen_gfn_fn_t fn, void *data);
+> 
+> gfn standing for Guest Frame Number right?
 
-----
-In file included from ./arch/arm64/include/asm/fixmap.h:85:0,
-                 from arch/arm64/kernel/insn.c:32:
-arch/arm64/kernel/insn.c: In function ?patch_map?:
-arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
-    (addr & ~PAGE_MASK));
-          ^
-include/asm-generic/fixmap.h:73:20: note: in definition of macro ?__set_fixmap_offset?
-  __set_fixmap(idx, phys, flags);         \
-                    ^
-arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
-  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-                 ^
-arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
-    (addr & ~PAGE_MASK));
-          ^
-include/asm-generic/fixmap.h:74:32: note: in definition of macro ?__set_fixmap_offset?
-  __addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
-                                ^
-arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
-  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-                 ^
-make[1]: *** [arch/arm64/kernel/insn.o] Error 1
-make: *** [arch/arm64/kernel/insn.o] Error 2
-----
+Yes.  This suggestion is just changing the name to make it more obvious
+what it does.
 
-we need both the cast in patch_map, and an update to __set_fixmap_offset to
-prevent the name clash.
-
-Thanks,
-Mark.
+David
