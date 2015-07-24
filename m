@@ -1,49 +1,51 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 25 Jul 2015 00:11:02 +0200
-Subject: [PATCH v2] thermal: consistently use int for temperatures
-In-Reply-To: <55B244BE.1060203@roeck-us.net>
-References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
- <20150723120759.GA17690@amd>
- <20150724062948.GK18700@pengutronix.de>
- <55B244BE.1060203@roeck-us.net>
-Message-ID: <20150724221102.GA31517@amd>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Fri, 24 Jul 2015 17:42:58 -0500
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+Message-ID: <20150724224258.GA23990@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2015-07-24 06:59:26, Guenter Roeck wrote:
-> On 07/23/2015 11:29 PM, Sascha Hauer wrote:
-> >On Thu, Jul 23, 2015 at 02:07:59PM +0200, Pavel Machek wrote:
-> >>On Tue 2015-07-21 09:21:32, Sascha Hauer wrote:
-> >>>The thermal code uses int, long and unsigned long for temperatures
-> >>>in different places.
-> >>>
-> >>>Using an unsigned type limits the thermal framework to positive
-> >>>temperatures without need. Also several drivers currently will report
-> >>>temperatures near UINT_MAX for temperatures below 0?C. This will probably
-> >>>immediately shut the machine down due to overtemperature if started below
-> >>>0?C.
-> >>>
-> >>>'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
-> >>>is above the melting point of all known materials.
-> >>
-> >>Can we do something like
-> >>
-> >>typedef millicelsius_t int;
-> >>
-> >>...to document the units?
-> >
-> >I am not very fond of typedefs and I am not sure this adds any value. I
-> >could change it when more people ask for it, but I just sent the new
-> >version without this.
-> >
-> 
-> I thought we are supposed to not introduce new typedefs anyway.
+I regularly see faults like this on an APM X-Gene:
 
-You are not supposed to typedef struct, but typedef for millicelsius_t
-would be ok. And it is your only chance if you want people to pay
-attention. If you make it int, someone will pass it to long or
-something else..
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+  U-Boot 2013.04-mustang_sw_1.14.14 (Dec 16 2014 - 15:59:33)
+  CPU0: APM ARM 64-bit Potenza Rev B0 2400MHz PCP 2400MHz
+       32 KB ICACHE, 32 KB DCACHE
+       SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+  ...
+  Unhandled fault: synchronous external abort (0x96000010) at 0xffffff8000110034
+  Internal error: : 96000010 [#1] SMP
+  Modules linked in:
+  CPU: 0 PID: 3723 Comm: ... 4.1.0-smp-DEV #3
+  Hardware name: APM X-Gene Mustang board (DT)
+  task: ffffffc7dc1a4140 ti: ffffffc7dc118000 task.ti: ffffffc7dc118000
+  PC is at pci_generic_config_read32+0x4c/0xb8
+  LR is at pci_generic_config_read32+0x40/0xb8
+  pc : [<ffffffc00033b90c>] lr : [<ffffffc00033b900>] pstate: 600001c5
+  ...
+  Call trace:
+  [<ffffffc00033b90c>] pci_generic_config_read32+0x4c/0xb8
+  [<ffffffc00033bf58>] pci_user_read_config_byte+0x60/0xc4
+  [<ffffffc0003496a8>] pci_read_config+0x15c/0x238
+  [<ffffffc0002393b4>] sysfs_kf_bin_read+0x68/0xa0
+  [<ffffffc00023896c>] kernfs_fop_read+0x9c/0x1ac
+  [<ffffffc0001c361c>] __vfs_read+0x44/0x128
+  [<ffffffc0001c3e28>] vfs_read+0x84/0x144
+  [<ffffffc0001c4764>] SyS_read+0x50/0xb0
+
+  # lspci
+  00:00.0 PCI bridge: Applied Micro Circuits Corp. Device e004 (rev 04)
+  01:00.0 Ethernet controller: Mellanox Technologies MT27520 Family
+
+I first saw this on an ancient kernel and thought it was likely specific to
+my environment, but I'm now using an almost unmodified v4.1 kernel and
+still seeing it.  Does anybody else see this?  The box does have a PCI card
+installed, but I haven't yet worked out what device's config space we're
+trying to read.
+
+Is there anything I can do to debug this?  I'm not an arm64 guy, but my
+impression is that this is a page fault, and the address seems to be in the
+"cfg" area ioremapped by xgene_pcie_map_reg(), so I'm not sure this is
+really a PCI issue -- maybe that page mapping got trashed by somebody else?
+
+Bjorn
