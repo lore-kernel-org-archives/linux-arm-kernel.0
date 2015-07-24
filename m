@@ -1,37 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jul 2015 12:31:49 +0100
-Subject: [PATCH] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <1437558438.8383.72.camel@citrix.com>
-References: <1437496204-5438-1-git-send-email-ian.campbell@citrix.com>
- <20150722084753.GC14923@e106497-lin.cambridge.arm.com>
- <1437558438.8383.72.camel@citrix.com>
-Message-ID: <20150724113149.GE4348@leverpostej>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 24 Jul 2015 19:32:32 +0800
+Subject: [PATCH v4 7/7] arm64: dts: mt8173: Add subsystem clock controller
+ device nodes
+In-Reply-To: <1437706925-3222-8-git-send-email-jamesjj.liao@mediatek.com>
+References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1437706925-3222-8-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <CAGS+omAUAHZUJQMnWJbH7NXB_Etp=OF3dWyMB7Ri1+rAyzyPBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 10:47:18AM +0100, Ian Campbell wrote:
-> On Wed, 2015-07-22 at 09:47 +0100, Liviu Dudau wrote:
-> > 
-> > Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> 
-> Thanks.
-> 
-> > Picking your brains here: would it be worth to have some vendor directories in
-> > this shared area or we can hope that there will be very few files living here?
-> 
-> I'm honestly not sure.
-> 
-> I don't expect there will be very many files under here, and I would
-> expect the norm would be that common .dtsi files used by multiple
-> arches would be things from the same vendor, but I don't think we can
-> guarantee that.
+On Fri, Jul 24, 2015 at 11:02 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> This patch adds device nodes providing subsystem clocks on MT8173,
+> includes mmsys, imgsys, vdecsys, vencsys and vencltsys.
+>
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> ---
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 37 ++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index a2f63e4..8731d24 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -88,6 +88,13 @@
+>                 #clock-cells = <0>;
+>         };
+>
+> +       cpum_ck: dummy_clk {
 
-I'm not so sure that this area will remain small. I suspect we'll see
-a reasonable amount of sharing for arm/arm64 where two SoCs differ sith
-s/Cortex-A7/Cortex-A53/, for example.
+I'm not a big fan of this "dummy_clk".
+The 'name' part of the devicetree node is supposed to be generic.
+So, perhaps just oscillator at 2, and move it down below clk32k: oscillator at 1.
+Otherwise:
 
-Perhaps we could wait until the that starts to happen; we managed to
-survive for a while before moving arm64's dts into subdirs.
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-Mark.
+
+-Dan
+
+
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <0>;
+> +               clock-output-names = "cpum_ck";
+> +       };
+> +
+>         clk26m: oscillator at 0 {
+>                 compatible = "fixed-clock";
+>                 #clock-cells = <0>;
+> @@ -227,6 +234,36 @@
+>                         clocks = <&uart_clk>;
+>                         status = "disabled";
+>                 };
+> +
+> +               mmsys: clock-controller at 14000000 {
+> +                       compatible = "mediatek,mt8173-mmsys", "syscon";
+> +                       reg = <0 0x14000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               imgsys: clock-controller at 15000000 {
+> +                       compatible = "mediatek,mt8173-imgsys", "syscon";
+> +                       reg = <0 0x15000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               vdecsys: clock-controller at 16000000 {
+> +                       compatible = "mediatek,mt8173-vdecsys", "syscon";
+> +                       reg = <0 0x16000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               vencsys: clock-controller at 18000000 {
+> +                       compatible = "mediatek,mt8173-vencsys", "syscon";
+> +                       reg = <0 0x18000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+> +
+> +               vencltsys: clock-controller at 19000000 {
+> +                       compatible = "mediatek,mt8173-vencltsys", "syscon";
+> +                       reg = <0 0x19000000 0 0x1000>;
+> +                       #clock-cells = <1>;
+> +               };
+>         };
+>  };
+>
+> --
+> 1.8.1.1.dirty
+>
