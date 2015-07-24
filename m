@@ -1,149 +1,143 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jul 2015 11:42:06 +0100
-Subject: [PATCH v2 15/20] arm64: cmpxchg: avoid memory barrier on comparison
- failure
+Date: Fri, 24 Jul 2015 11:42:07 +0100
+Subject: [PATCH v2 16/20] arm64: atomics: tidy up common atomic{,64}_* macros
 In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
 References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1437734531-10698-16-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-17-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cmpxchg doesn't require memory barrier semantics when the value
-comparison fails, so make the barrier conditional on success.
+The common (i.e. identical for ll/sc and lse) atomic macros in atomic.h
+are needlessley different for atomic_t and atomic64_t.
+
+This patch tidies up the definitions to make them consistent across the
+two atomic types and factors out common code such as the add_unless
+implementation based on cmpxchg.
 
 Reviewed-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 48 ++++++++++++++++-------------------
- 1 file changed, 22 insertions(+), 26 deletions(-)
+ arch/arm64/include/asm/atomic.h | 92 +++++++++++++++++------------------------
+ 1 file changed, 38 insertions(+), 54 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index d21091bae901..fb26f2b1f300 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -92,19 +92,18 @@ __LL_SC_PREFIX(atomic_cmpxchg(atomic_t *ptr, int old, int new))
- 	unsigned long tmp;
- 	int oldval;
+diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
+index ee32776d926c..51816ab2312d 100644
+--- a/arch/arm64/include/asm/atomic.h
++++ b/arch/arm64/include/asm/atomic.h
+@@ -26,8 +26,6 @@
+ #include <asm/barrier.h>
+ #include <asm/lse.h>
  
--	smp_mb();
+-#define ATOMIC_INIT(i)	{ (i) }
 -
- 	asm volatile("// atomic_cmpxchg\n"
- "1:	ldxr	%w1, %2\n"
- "	eor	%w0, %w1, %w3\n"
- "	cbnz	%w0, 2f\n"
--"	stxr	%w0, %w4, %2\n"
-+"	stlxr	%w0, %w4, %2\n"
- "	cbnz	%w0, 1b\n"
-+"	dmb	ish\n"
- "2:"
- 	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Lr" (old), "r" (new));
-+	: "Lr" (old), "r" (new)
-+	: "memory");
+ #ifdef __KERNEL__
  
--	smp_mb();
- 	return oldval;
- }
- __LL_SC_EXPORT(atomic_cmpxchg);
-@@ -164,19 +163,18 @@ __LL_SC_PREFIX(atomic64_cmpxchg(atomic64_t *ptr, long old, long new))
- 	long oldval;
- 	unsigned long res;
+ #define __ARM64_IN_ATOMIC_IMPL
+@@ -42,67 +40,53 @@
  
--	smp_mb();
+ #include <asm/cmpxchg.h>
+ 
+-/*
+- * On ARM, ordinary assignment (str instruction) doesn't clear the local
+- * strex/ldrex monitor on some implementations. The reason we can use it for
+- * atomic_set() is the clrex or dummy strex done on every exception return.
+- */
+-#define atomic_read(v)	ACCESS_ONCE((v)->counter)
+-#define atomic_set(v,i)	(((v)->counter) = (i))
 -
- 	asm volatile("// atomic64_cmpxchg\n"
- "1:	ldxr	%1, %2\n"
- "	eor	%0, %1, %3\n"
- "	cbnz	%w0, 2f\n"
--"	stxr	%w0, %4, %2\n"
-+"	stlxr	%w0, %4, %2\n"
- "	cbnz	%w0, 1b\n"
-+"	dmb	ish\n"
- "2:"
- 	: "=&r" (res), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Lr" (old), "r" (new));
-+	: "Lr" (old), "r" (new)
-+	: "memory");
+-#define atomic_xchg(v, new) (xchg(&((v)->counter), new))
+-
+-static inline int __atomic_add_unless(atomic_t *v, int a, int u)
+-{
+-	int c, old;
+-
+-	c = atomic_read(v);
+-	while (c != u && (old = atomic_cmpxchg((v), c, c + a)) != c)
+-		c = old;
+-	return c;
+-}
++#define ___atomic_add_unless(v, a, u, sfx)				\
++({									\
++	typeof((v)->counter) c, old;					\
++									\
++	c = atomic##sfx##_read(v);					\
++	while (c != (u) &&						\
++	      (old = atomic##sfx##_cmpxchg((v), c, c + (a))) != c)	\
++		c = old;						\
++	c;								\
++ })
  
--	smp_mb();
- 	return oldval;
- }
- __LL_SC_EXPORT(atomic64_cmpxchg);
-@@ -203,7 +201,7 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
- }
- __LL_SC_EXPORT(atomic64_dec_if_positive);
+-#define atomic_inc(v)		atomic_add(1, v)
+-#define atomic_dec(v)		atomic_sub(1, v)
++#define ATOMIC_INIT(i)	{ (i) }
  
--#define __CMPXCHG_CASE(w, sz, name, mb, cl)				\
-+#define __CMPXCHG_CASE(w, sz, name, mb, rel, cl)			\
- __LL_SC_INLINE unsigned long						\
- __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- 				     unsigned long old,			\
-@@ -212,11 +210,10 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- 	unsigned long tmp, oldval;					\
- 									\
- 	asm volatile(							\
--	"	" #mb "\n"						\
- 	"1:	ldxr" #sz "\t%" #w "[oldval], %[v]\n"			\
- 	"	eor	%" #w "[tmp], %" #w "[oldval], %" #w "[old]\n"	\
- 	"	cbnz	%" #w "[tmp], 2f\n"				\
--	"	stxr" #sz "\t%w[tmp], %" #w "[new], %[v]\n"		\
-+	"	st" #rel "xr" #sz "\t%w[tmp], %" #w "[new], %[v]\n"	\
- 	"	cbnz	%w[tmp], 1b\n"					\
- 	"	" #mb "\n"						\
- 	"	mov	%" #w "[oldval], %" #w "[old]\n"		\
-@@ -230,18 +227,18 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- }									\
- __LL_SC_EXPORT(__cmpxchg_case_##name);
+-#define atomic_inc_and_test(v)	(atomic_add_return(1, v) == 0)
+-#define atomic_dec_and_test(v)	(atomic_sub_return(1, v) == 0)
+-#define atomic_inc_return(v)    (atomic_add_return(1, v))
+-#define atomic_dec_return(v)    (atomic_sub_return(1, v))
+-#define atomic_sub_and_test(i, v) (atomic_sub_return(i, v) == 0)
++#define atomic_read(v)			READ_ONCE((v)->counter)
++#define atomic_set(v, i)		(((v)->counter) = (i))
++#define atomic_xchg(v, new)		xchg(&((v)->counter), (new))
  
--__CMPXCHG_CASE(w, b,    1,        ,         )
--__CMPXCHG_CASE(w, h,    2,        ,         )
--__CMPXCHG_CASE(w,  ,    4,        ,         )
--__CMPXCHG_CASE( ,  ,    8,        ,         )
--__CMPXCHG_CASE(w, b, mb_1, dmb ish, "memory")
--__CMPXCHG_CASE(w, h, mb_2, dmb ish, "memory")
--__CMPXCHG_CASE(w,  , mb_4, dmb ish, "memory")
--__CMPXCHG_CASE( ,  , mb_8, dmb ish, "memory")
-+__CMPXCHG_CASE(w, b,    1,        ,  ,         )
-+__CMPXCHG_CASE(w, h,    2,        ,  ,         )
-+__CMPXCHG_CASE(w,  ,    4,        ,  ,         )
-+__CMPXCHG_CASE( ,  ,    8,        ,  ,         )
-+__CMPXCHG_CASE(w, b, mb_1, dmb ish, l, "memory")
-+__CMPXCHG_CASE(w, h, mb_2, dmb ish, l, "memory")
-+__CMPXCHG_CASE(w,  , mb_4, dmb ish, l, "memory")
-+__CMPXCHG_CASE( ,  , mb_8, dmb ish, l, "memory")
+-#define atomic_add_negative(i,v) (atomic_add_return(i, v) < 0)
++#define atomic_inc(v)			atomic_add(1, (v))
++#define atomic_dec(v)			atomic_sub(1, (v))
++#define atomic_inc_return(v)		atomic_add_return(1, (v))
++#define atomic_dec_return(v)		atomic_sub_return(1, (v))
++#define atomic_inc_and_test(v)		(atomic_inc_return(v) == 0)
++#define atomic_dec_and_test(v)		(atomic_dec_return(v) == 0)
++#define atomic_sub_and_test(i, v)	(atomic_sub_return((i), (v)) == 0)
++#define atomic_add_negative(i, v)	(atomic_add_return((i), (v)) < 0)
++#define __atomic_add_unless(v, a, u)	___atomic_add_unless(v, a, u,)
  
- #undef __CMPXCHG_CASE
+ /*
+  * 64-bit atomic operations.
+  */
+-#define ATOMIC64_INIT(i) { (i) }
+-
+-#define atomic64_read(v)	ACCESS_ONCE((v)->counter)
+-#define atomic64_set(v,i)	(((v)->counter) = (i))
+-
+-#define atomic64_xchg(v, new) (xchg(&((v)->counter), new))
+-
+-static inline int atomic64_add_unless(atomic64_t *v, long a, long u)
+-{
+-	long c, old;
+-
+-	c = atomic64_read(v);
+-	while (c != u && (old = atomic64_cmpxchg((v), c, c + a)) != c)
+-		c = old;
++#define ATOMIC64_INIT			ATOMIC_INIT
++#define atomic64_read			atomic_read
++#define atomic64_set			atomic_set
++#define atomic64_xchg			atomic_xchg
++
++#define atomic64_inc(v)			atomic64_add(1, (v))
++#define atomic64_dec(v)			atomic64_sub(1, (v))
++#define atomic64_inc_return(v)		atomic64_add_return(1, (v))
++#define atomic64_dec_return(v)		atomic64_sub_return(1, (v))
++#define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
++#define atomic64_dec_and_test(v)	(atomic64_dec_return(v) == 0)
++#define atomic64_sub_and_test(i, v)	(atomic64_sub_return((i), (v)) == 0)
++#define atomic64_add_negative(i, v)	(atomic64_add_return((i), (v)) < 0)
++#define atomic64_add_unless(v, a, u)	(___atomic_add_unless(v, a, u, 64) != u)
  
--#define __CMPXCHG_DBL(name, mb, cl)					\
-+#define __CMPXCHG_DBL(name, mb, rel, cl)				\
- __LL_SC_INLINE int							\
- __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- 				      unsigned long old2,		\
-@@ -252,13 +249,12 @@ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- 	unsigned long tmp, ret;						\
- 									\
- 	asm volatile("// __cmpxchg_double" #name "\n"			\
--	"	" #mb "\n"						\
- 	"1:	ldxp	%0, %1, %2\n"					\
- 	"	eor	%0, %0, %3\n"					\
- 	"	eor	%1, %1, %4\n"					\
- 	"	orr	%1, %0, %1\n"					\
- 	"	cbnz	%1, 2f\n"					\
--	"	stxp	%w0, %5, %6, %2\n"				\
-+	"	st" #rel "xp	%w0, %5, %6, %2\n"			\
- 	"	cbnz	%w0, 1b\n"					\
- 	"	" #mb "\n"						\
- 	"2:"								\
-@@ -270,8 +266,8 @@ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- }									\
- __LL_SC_EXPORT(__cmpxchg_double##name);
+-	return c != u;
+-}
++#define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1, 0)
  
--__CMPXCHG_DBL(   ,        ,         )
--__CMPXCHG_DBL(_mb, dmb ish, "memory")
-+__CMPXCHG_DBL(   ,        ,  ,         )
-+__CMPXCHG_DBL(_mb, dmb ish, l, "memory")
+-#define atomic64_add_negative(a, v)	(atomic64_add_return((a), (v)) < 0)
+-#define atomic64_inc(v)			atomic64_add(1LL, (v))
+-#define atomic64_inc_return(v)		atomic64_add_return(1LL, (v))
+-#define atomic64_inc_and_test(v)	(atomic64_inc_return(v) == 0)
+-#define atomic64_sub_and_test(a, v)	(atomic64_sub_return((a), (v)) == 0)
+-#define atomic64_dec(v)			atomic64_sub(1LL, (v))
+-#define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
+-#define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
+-#define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1LL, 0LL)
  
- #undef __CMPXCHG_DBL
- 
+ #endif
+ #endif
 -- 
 2.1.4
