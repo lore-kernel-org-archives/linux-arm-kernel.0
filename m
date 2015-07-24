@@ -1,15 +1,16 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 Jul 2015 10:42:37 +0200
-Subject: [PATCH v7 2/2] mfd: atmel-flexcom: add a driver for Atmel Flexible
- Serial Communication Unit
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 Jul 2015 09:43:55 +0100
+Subject: [PATCH v7 2/2] mfd: atmel-flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
 In-Reply-To: <55921f08b2d5d14256141edbe12287fba55860c4.1437669004.git.cyrille.pitchen@atmel.com>
 References: <cover.1437669004.git.cyrille.pitchen@atmel.com>
  <55921f08b2d5d14256141edbe12287fba55860c4.1437669004.git.cyrille.pitchen@atmel.com>
-Message-ID: <55B1FA7D.9080306@atmel.com>
+Message-ID: <20150724084355.GY3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/07/2015 18:42, Cyrille Pitchen a ?crit :
+On Thu, 23 Jul 2015, Cyrille Pitchen wrote:
+
 > This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
 > integrates one SPI controller, one I2C controller and one USART. Only one
 > function can be enabled at a time. This driver selects the function once
@@ -22,13 +23,7 @@ Le 23/07/2015 18:42, Cyrille Pitchen a ?crit :
 > 
 > Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
 > USART drivers take advantage of this new feature.
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Thank you.
-
-Bye,
-
-
+> 
 > Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 > ---
 >  drivers/mfd/Kconfig         |  11 +++++
@@ -55,7 +50,13 @@ Bye,
 > +	  one function can be used at a time. The choice is done at boot time
 > +	  by the probe function of this MFD driver according to a device tree
 > +	  property.
-> +
+
+Please grep for QCOM_GSBI in drivers/soc/qcom/*
+
+Similar right?
+
+Perhaps this should live in drivers/soc/atmel/* instead?
+
 >  config MFD_ATMEL_HLCDC
 >  	tristate "Atmel HLCDC (High-end LCD Controller)"
 >  	select MFD_CORE
@@ -138,9 +139,16 @@ Bye,
 > +	 */
 > +	err = of_property_read_u32_index(child, "reg", 0, &opmode);
 > +	of_node_put(child);
+
+Don't think you need to of_node_put() after a u32 read.
+
 > +	if (err)
 > +		return -EINVAL;
-> +
+
+Why are you making up your own return value.
+
+Just return err.
+
 > +	if ((opmode == FLEX_MR_OPMODE_NO_COM) ||
 > +	    (opmode & ~FLEX_MR_OPMODE_MASK))
 > +		return -EINVAL;
@@ -190,8 +198,9 @@ Bye,
 > +MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
 > +MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
 > +MODULE_LICENSE("GPL v2");
-> 
-
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
