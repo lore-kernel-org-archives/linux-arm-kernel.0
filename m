@@ -1,68 +1,87 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Fri, 24 Jul 2015 18:06:52 +0800
-Subject: [PATCH v2 7/7] acpi: gsi: Cleanup acpi_register_gsi
-In-Reply-To: <1437656713-9677-8-git-send-email-marc.zyngier@arm.com>
-References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
- <1437656713-9677-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <55B20E3C.1010809@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Jul 2015 11:07:24 +0100
+Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
+In-Reply-To: <20150724095618.GB23074@leverpostej>
+References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
+ <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
+ <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
+ <20150724095618.GB23074@leverpostej>
+Message-ID: <20150724100724.GA4348@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/23/2015 09:05 PM, Marc Zyngier wrote:
-> As the only user of drivers/acpi/gsi.c is now using acpi_set_irq_model
-> to set acpi_gsi_descriptor_populate to something meaningful, we can
-> always rely on that information to be present (its absence is an error),
-> and guarantee that new interrupt controllers will use this API.
->
-> Take this opportunity to cleanup acpi_register_gsi.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->   drivers/acpi/gsi.c | 24 ++++++++----------------
->   1 file changed, 8 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
-> index e6f4a0c..85aa831 100644
-> --- a/drivers/acpi/gsi.c
-> +++ b/drivers/acpi/gsi.c
-> @@ -75,28 +75,20 @@ int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
->   		      int polarity)
->   {
->   	int err;
-> -	unsigned int irq;
-> +	struct acpi_gsi_descriptor data;
->   	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
->   	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
->
-> -	if (acpi_gsi_descriptor_populate) {
-> -		struct acpi_gsi_descriptor data;
-> -		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
-> -		if (err)
-> -			return err;
-> -
-> -		return irq_create_acpi_mapping(d, &data);
-> +	if (WARN_ON(!acpi_gsi_descriptor_populate)) {
-> +		pr_warn("GSI: No registered irqchip, giving up\n");
-> +		return -EINVAL;
->   	}
->
-> -	irq = irq_create_mapping(d, gsi);
-> -	if (!irq)
-> -		return -EINVAL;
-> +	err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
-> +	if (err)
-> +		return err;
->
-> -	/* Set irq type if specified and different than the current one */
-> -	if (irq_type != IRQ_TYPE_NONE &&
-> -		irq_type != irq_get_trigger_type(irq))
-> -		irq_set_irq_type(irq, irq_type);
-> -	return irq;
-> +	return irq_create_acpi_mapping(d, &data);
+On Fri, Jul 24, 2015 at 10:56:18AM +0100, Mark Rutland wrote:
+> On Fri, Jul 24, 2015 at 04:56:59AM +0100, yalin wang wrote:
+> > 
+> > > On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > 
+> > > On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
+> > >> A little change to patch_map() function,
+> > >> use set_fixmap_offset() to make code more clear.
+> > >> 
+> > >> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> > >> ---
+> > >> arch/arm64/kernel/insn.c | 5 ++---
+> > >> 1 file changed, 2 insertions(+), 3 deletions(-)
+> > >> 
+> > >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> > >> index dd9671c..7dafd5a 100644
+> > >> --- a/arch/arm64/kernel/insn.c
+> > >> +++ b/arch/arm64/kernel/insn.c
+> > >> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+> > >> 		return addr;
+> > >> 
+> > >> 	BUG_ON(!page);
+> > >> -	set_fixmap(fixmap, page_to_phys(page));
+> > >> -
+> > >> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> > >> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+> > >> +			(addr & ~PAGE_MASK));
+> > > 
+> > > It looks fine. Do you get any compiler warning for the automatic pointer
+> > > to long conversion? You may want to add some explicit casts, otherwise:
+> > > 
+> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> > i have build it, there is no warning about this change. :)
+> 
+> I see no warnings with defconfig, but there's an (unrelated) set of warnings if
+> CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA are enabled:
 
-For ARM64,
+Actually they aren't unrelated after all. the unsigned long addr in
+__set_fixmap_offset shadows the void* addr from patch_map making the
+types match.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+With a few underscores addrd to __set_fixmap_offset's addr, I get the
+following regarding patch_map:
 
-Thanks
-Hanjun
+----
+In file included from ./arch/arm64/include/asm/fixmap.h:85:0,
+                 from arch/arm64/kernel/insn.c:32:
+arch/arm64/kernel/insn.c: In function ?patch_map?:
+arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
+    (addr & ~PAGE_MASK));
+          ^
+include/asm-generic/fixmap.h:73:20: note: in definition of macro ?__set_fixmap_offset?
+  __set_fixmap(idx, phys, flags);         \
+                    ^
+arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
+  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+                 ^
+arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
+    (addr & ~PAGE_MASK));
+          ^
+include/asm-generic/fixmap.h:74:32: note: in definition of macro ?__set_fixmap_offset?
+  __addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
+                                ^
+arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
+  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+                 ^
+make[1]: *** [arch/arm64/kernel/insn.o] Error 1
+make: *** [arch/arm64/kernel/insn.o] Error 2
+----
+
+we need both the cast in patch_map, and an update to __set_fixmap_offset to
+prevent the name clash.
+
+Thanks,
+Mark.
