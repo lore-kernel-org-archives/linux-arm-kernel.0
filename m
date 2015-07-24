@@ -1,60 +1,69 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Fri, 24 Jul 2015 13:43:13 +0800
-Subject: [PATCH v3 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20150721145910.GG31095@arm.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
- <20150721145910.GG31095@arm.com>
-Message-ID: <1437716593.23932.73.camel@mhfsdcap03>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 24 Jul 2015 07:50:38 +0200
+Subject: [RESEND PATCH 2/6] soc: Mediatek: Add SCPSYS CPU power domain
+ driver
+In-Reply-To: <1437703323.11272.12.camel@mtkswgap22>
+References: <srv_scott.shu@mediatek.com>
+ <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+ <1434650481-39421-3-git-send-email-scott.shu@mediatek.com>
+ <20150623055351.GA22419@pengutronix.de>
+ <1437703323.11272.12.camel@mtkswgap22>
+Message-ID: <20150724055038.GJ18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-21 at 15:59 +0100, Will Deacon wrote:
-> Hi Yong Wu,
+On Fri, Jul 24, 2015 at 10:02:03AM +0800, Scott Shu wrote:
+> On Tue, 2015-06-23 at 07:53 +0200, Sascha Hauer wrote:
+> > Hi Scott,
+> > 
+> > On Fri, Jun 19, 2015 at 02:01:17AM +0800, Scott Shu wrote:
+> > > This adds a CPU power domain driver for the Mediatek SCPSYS unit on
+> > > MT6580.
+> > 
+> > This seems to be support for the very same hardware as I am posting
+> > here:
+> > 
+> > https://lkml.org/lkml/2015/6/22/41
+> > 
+> > We should consolidate this.
+> > 
+> > My driver is currently handles all power domains except the CPUs while
+> > yours handles only the CPUs.
+> > I currently haven't looked whether CPUs can just be part of a power
+> > domain aswell, but if that works this would probably be the way to go.
+> > 
+> > Sascha
+> > 
+> > 
+> Hi Sascga,
 > 
-> On Thu, Jul 16, 2015 at 10:04:34AM +0100, Yong Wu wrote:
-> > This patch adds support for mediatek m4u (MultiMedia Memory Management
-> > Unit).
+> We had posted new patch set in following link, but still keep our
+> original framework.
+> http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001498.html
 > 
-> [...]
+> As we mentioned in the new email thread, the SMP operations (smp_boot_secondary)
+> will be executed before registering the scpsys_drv driver, so the CPUs power
+> domain is controlled on arch/arm/mach-$(MACHINE) directory. 
 > 
-> > +static void mtk_iommu_tlb_flush_all(void *cookie)
-> > +{
-> > +       struct mtk_iommu_domain *domain = cookie;
-> > +       void __iomem *base;
-> > +
-> > +       base = domain->data->base;
-> > +       writel(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
-> > +       writel(F_ALL_INVLD, base + REG_MMU_INVALIDATE);
-> 
-> This needs to be synchronous, so you probably want to call
-> mtk_iommu_tlb_sync at the end.
+> Please kindly provide your comments and suggestion. Thank you very much.
 
->From our spec, we have to wait until HW done after tlb flush range.
-But it don't need wait after tlb flush all.
-so It isn't necessary to add mtk_iommu_tlb_sync in tlb_flush_all here.
+I think that instead of explaining why have to duplicate the code you
+should rather search for ways how the code can be shared. Yes, we'll
+need a second (early) entry point to the driver. Maybe we even have to
+create the shared code which is then called from the driver and your
+early architecture code.
+You'll probably have to do this separation between early code and
+regular driver code in your driver anyway, since I bet the MT6580 also
+has some power domains which shall be controlled by the regular Linux
+power domain code later. Also we probably could control the CPU power
+domains for the MT8173 in the SCPSYS driver aswell, we just don't have
+to because we use PSCI there. You see we are approaching the same
+problem from two different corners. Let's find a way to share the code.
 
-> 
-> > +}
-> > +
-> > +static void mtk_iommu_tlb_add_flush(unsigned long iova, size_t size,
-> > +                                   bool leaf, void *cookie)
-> > +{
-> > +       struct mtk_iommu_domain *domain = cookie;
-> > +       void __iomem *base = domain->data->base;
-> > +       unsigned int iova_start = iova, iova_end = iova + size - 1;
-> > +
-> > +       writel(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
-> > +
-> > +       writel(iova_start, base + REG_MMU_INVLD_START_A);
-> > +       writel(iova_end, base + REG_MMU_INVLD_END_A);
-> > +       writel(F_MMU_INV_RANGE, base + REG_MMU_INVALIDATE);
-> 
-> Why are you using writel instead of writel_relaxed? I asked this before
-> but I don't think you replied.
+Sascha
 
-Sorry, I didn't notice _relax last time. I will improve in next version.
-Thanks very much.
-
-> 
-> Will
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
