@@ -1,122 +1,140 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Fri, 24 Jul 2015 16:02:37 +0100
-Subject: [RFC PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-Message-ID: <1437750157-25238-1-git-send-email-steve.capper@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 Jul 2015 16:07:35 +0100
+Subject: [PATCH v7 1/2] mfd: devicetree: add bindings for Atmel Flexcom
+In-Reply-To: <20150724145613.GG3436@x1>
+References: <cover.1437669004.git.cyrille.pitchen@atmel.com>
+ <60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
+ <20150723214857.4322c758@bbrezillon> <55B1F9B7.2080206@atmel.com>
+ <20150724145613.GG3436@x1>
+Message-ID: <20150724150735.GH3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It can be useful for JIT software to be aware of MIDR_EL1 and
-REVIDR_EL1 to ascertain the presence of any core errata that could
-affect codegen.
+On Fri, 24 Jul 2015, Lee Jones wrote:
 
-This patch exposes these registers through sysfs:
+> On Fri, 24 Jul 2015, Nicolas Ferre wrote:
+> 
+> > Le 23/07/2015 21:48, Boris Brezillon a ?crit :
+> > > On Thu, 23 Jul 2015 18:42:55 +0200
+> > > Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+> > > 
+> > >> This patch documents the DT bindings for the Atmel Flexcom which will be
+> > >> introduced by sama5d2x SoCs. These bindings will be used by the actual
+> > >> Flexcom driver to be sent in another patch.
+> > >>
+> > >> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> > >> ---
+> > >>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
+> > >>  1 file changed, 68 insertions(+)
+> > >>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> > >>
+> > >> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> > >> new file mode 100644
+> > >> index 000000000000..a63226b7a9cb
+> > >> --- /dev/null
+> > >> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+> > >> @@ -0,0 +1,68 @@
+> > >> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
+> > >> +
+> > >> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
+> > >> +controller and an USART. Only one function can be used at a time and is chosen
+> > >> +at boot time according to the device tree.
+> > >> +
+> > >> +Required properties:
+> > >> +- compatible:		Should be "atmel,sama5d2-flexcom"
+> > >> +- reg:			Should be the pair (offset, size) for the Flexcom
+> > >> +			dedicated I/O registers (without USART, TWI or SPI
+> > >> +			registers).
+> > >> +- clocks:		Should be the Flexcom peripheral clock from PMC.
+> > >> +- #address-cells:	Should be <2>
+> > >> +- #size-cells:		Should be <1>
+> > >> +- ranges:		Should be a list of ranges.
+> > >> +			One range per peripheral wrapped by the Flexcom. So each
+> > >> +			range is a triplet (child_addr, parent_addr, size). The
+> > >> +			first u32 of "child_addr" is the value to be set in the
+> > >> +			Operating Mode bitfield of the Flexcom Mode Register.
+> > >> +			Then "parent_addr" stores the base address of the
+> > >> +			corresponding peripheral in the system memory. Finally,
+> > >> +			"size" if the size of the memory region of this
+> > >> +			peripheral.
+> > >> +
+> > >> +Required child:
+> > >> +A single available child for the serial controller to enable.
+> > >> +
+> > >> +Required properties of this child:
+> > >> +- reg:			Should be a pair (child_addr, size) with child_addr
+> > >> +			matching one of the parent ranges.
+> > >> +- clocks:		Should be the very same phandle as for the parent's one.
+> > >> +
+> > >> +Other properties remain unchanged. See documentation of the respective device:
+> > >> +- ../serial/atmel-usart.txt
+> > >> +- ../spi/spi_atmel.txt
+> > >> +- ../i2c/i2c-at91.txt
+> > >> +
+> > >> +Example:
+> > >> +
+> > >> +flexcom at f8034000 {
+> > >> +	compatible = "atmel,sama5d2-flexcom";
+> > >> +	reg = <0xf8034000 0x200>;
+> > >> +	clocks = <&flx0_clk>;
+> > >> +	#address-cells = <2>;
+> > >> +	#size-cells = <1>;
+> > >> +	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
+> > >> +		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
+> > >> +		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
+> > 
+> > Yes, the opmode(s) are exactly the values described in the product
+> > datasheet.
+> > 
+> > >> +
+> > >> +	spi at f8034400 {
+> > > 
+> > > Should be:
+> > > 
+> > > 	spi at 2,0 {
+> > 
+> > Yep!
+> > 
+> > I was silently following the discussion in the background and I admit
+> > that this approach is pretty elegant.
+> > 
+> > So, if this approach is validated you can also add my:
+> > Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Please see my reply to v6 for the usual way to achieve this.
 
-/sys/devices/system/cpu/cpu$ID/identification/midr
-/sys/devices/system/cpu/cpu$ID/identification/revidr
+Ah, actually scrap that.  Looks like I was thinking you were doing
+something different.  Well I don't know enough about the advanced use
+of the ranges property to comment on this.  I need to call for some
+assistance from the DT chaps.
 
-where $ID is the cpu number. For big.LITTLE systems, one can have a
-mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-to be enumerated.
+> > >> +		compatible = "atmel,at91rm9200-spi";
+> > >> +		reg = <2 0 0x200>;
+> > >> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
+> > >> +		pinctrl-names = "default";
+> > >> +		pinctrl-0 = <&pinctrl_flx0_default>;
+> > >> +		#address-cells = <1>;
+> > >> +		#size-cells = <0>;
+> > >> +		clocks = <&flx0_clk>;
+> > >> +		clock-names = "spi_clk";
+> > >> +		atmel,fifo-size = <32>;
+> > >> +
+> > >> +		mtd_dataflash at 0 {
+> > >> +			compatible = "atmel,at25f512b";
+> > >> +			reg = <0>;
+> > >> +			spi-max-frequency = <20000000>;
+> > >> +		};
+> > >> +	};
+> > >> +};
+> > > 
+> > > 
+> > > 
+> > 
+> > 
+> 
 
-If the kernel does not have valid information to populate these entries
-with, an empty string is returned to userspace.
-
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
----
-
-Hello,
-
-This RFC is meant to sit on top of Suzuki's set at:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358990.html
-
-On systems with different core types (for instance big.LITTLE systems),
-we need to be *very* careful that the REVIDR and MIDR are both read
-from the same core. Thus these registers are exposed in /sys rather
-than via MRS emulation.
-
-Cheers,
 -- 
-Steve
-
----
- arch/arm64/include/asm/cpu.h |  1 +
- arch/arm64/kernel/cpuinfo.c  | 48 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 49 insertions(+)
-
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 17a871d..048b7bf 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -187,6 +187,7 @@ struct cpuinfo_arm64 {
- 	u32		reg_cntfrq;
- 	u32		reg_dczid;
- 	u32		reg_midr;
-+	u32		reg_revidr;
- 
- 	u64		reg_id_aa64dfr0;
- 	u64		reg_id_aa64dfr1;
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 678e7f6..d50eda1 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -533,6 +533,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_ctr = read_cpuid_cachetype();
- 	info->reg_dczid = read_cpuid(DCZID_EL0);
- 	info->reg_midr = read_cpuid_id();
-+	info->reg_revidr = read_cpuid(REVIDR_EL1);
- 
- 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
- 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
-@@ -886,3 +887,50 @@ int __init arm64_cpuinfo_init(void)
- }
- 
- late_initcall(arm64_cpuinfo_init);
-+
-+#define CPUINFO_ATTR_RO(_name)							\
-+	static ssize_t show_##_name (struct device *dev,			\
-+			struct device_attribute *attr, char *buf)		\
-+	{									\
-+		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-+										\
-+		if (info->reg_midr)						\
-+			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
-+		else								\
-+			return 0;						\
-+	}									\
-+	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-+
-+CPUINFO_ATTR_RO(midr);
-+CPUINFO_ATTR_RO(revidr);
-+
-+static struct attribute *cpuregs_attrs[] = {
-+	&dev_attr_midr.attr,
-+	&dev_attr_revidr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group cpuregs_attr_group = {
-+	.attrs = cpuregs_attrs,
-+	.name = "identification"
-+};
-+
-+static int __init cpuinfo_regs_init(void)
-+{
-+	int cpu, ret;
-+
-+	for_each_present_cpu(cpu) {
-+		struct device *dev = get_cpu_device(cpu);
-+
-+		if (!dev)
-+			return -1;
-+
-+		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+device_initcall(cpuinfo_regs_init);
--- 
-2.1.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
