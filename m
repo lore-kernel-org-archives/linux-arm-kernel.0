@@ -1,79 +1,46 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Fri, 24 Jul 2015 08:42:47 -0700
-Subject: [PATCH v4 3/4] arm64: Add Broadcom iProc family support
-In-Reply-To: <20150724085103.GA30410@arm.com>
-References: <1437528583-855-1-git-send-email-rjui@broadcom.com>
- <1437528583-855-4-git-send-email-rjui@broadcom.com>
- <20150724085103.GA30410@arm.com>
-Message-ID: <55B25CF7.4070403@broadcom.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 24 Jul 2015 16:37:49 +0100
+Subject: [PATCH v3 9/9] arm64/BUG: Show explicit backtrace for WARNs
+In-Reply-To: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
+References: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1437752284-14847-10-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+The generic slowpath WARN implementation prints a backtrace, but
+the report_bug() based implementation does not, opting to print the
+registers instead which is generally not as useful.
 
-On 7/24/2015 1:51 AM, Will Deacon wrote:
-> (adding Olof)
-> 
-> On Wed, Jul 22, 2015 at 02:29:42AM +0100, Ray Jui wrote:
->> This patch adds support to Broadcom's iProc family of arm64 based SoCs
->> in the arm64 Kconfig and defconfig files
->>
->> Signed-off-by: Ray Jui <rjui@broadcom.com>
->> Reviewed-by: Scott Branden <sbranden@broadcom.com>
->> ---
->>  arch/arm64/Kconfig           |    5 +++++
->>  arch/arm64/configs/defconfig |    2 ++
->>  2 files changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 318175f..969ef4a 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -162,6 +162,11 @@ source "kernel/Kconfig.freezer"
->>  
->>  menu "Platform selection"
->>  
->> +config ARCH_BCM_IPROC
->> +	bool "Broadcom iProc SoC Family"
->> +	help
->> +	  This enables support for Broadcom iProc based SoCs
->> +
-> 
-> The arm-soc guys have a patch moving the platform-related config options
-> out into Kconfig.platforms, so I think you need to co-ordinate with them.
-> 
+Ideally, report_bug() should be fixed to make the behaviour more
+consistent, but in the meantime this patch generates a backtrace
+directly from the arm64 backend instead so that this functionality
+is not lost with the migration to report_bug().
 
-Thanks for letting me know. I see that those patches are already merged
-into for-next under arm-soc. I guess I should generate a new patch
-series based on for-next and move this config option to Kconfig.platform?
+As a side-effect, the backtrace will be outside the oops end
+marker, but that's hard to avoid without modifying generic code.
 
-Olof, any comment?
+This patch can go away if report_bug() grows the ability in the
+future to generate a backtrace directly or call an arch hook at the
+appropriate time.
 
->>  config ARCH_EXYNOS
->>  	bool
->>  	help
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index 4e17e7e..c83d51f 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -31,6 +31,7 @@ CONFIG_MODULES=y
->>  CONFIG_MODULE_UNLOAD=y
->>  # CONFIG_BLK_DEV_BSG is not set
->>  # CONFIG_IOSCHED_DEADLINE is not set
->> +CONFIG_ARCH_BCM_IPROC=y
->>  CONFIG_ARCH_EXYNOS7=y
->>  CONFIG_ARCH_FSL_LS2085A=y
->>  CONFIG_ARCH_HISI=y
->> @@ -102,6 +103,7 @@ CONFIG_SERIO_AMBAKMI=y
->>  CONFIG_LEGACY_PTY_COUNT=16
->>  CONFIG_SERIAL_8250=y
->>  CONFIG_SERIAL_8250_CONSOLE=y
->> +CONFIG_SERIAL_8250_DW=y
->>  CONFIG_SERIAL_8250_MT6577=y
->>  CONFIG_SERIAL_AMBA_PL011=y
->>  CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-> 
-> I'm fine with this.
-> 
-> Will
-> 
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/traps.c |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index b10f4bf..bc3dfc5 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -487,6 +487,8 @@ static int bug_handler(struct pt_regs *regs, unsigned int esr)
+ 		break;
+ 
+ 	case BUG_TRAP_TYPE_WARN:
++		/* Ideally, report_bug() should backtrace for us... but no. */
++		dump_backtrace(regs, NULL);
+ 		break;
+ 
+ 	default:
+-- 
+1.7.10.4
