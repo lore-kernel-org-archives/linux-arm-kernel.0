@@ -1,207 +1,215 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jul 2015 11:42:08 +0100
-Subject: [PATCH v2 17/20] arm64: atomics: prefetch the destination word for
- write prior to stxr
+Date: Fri, 24 Jul 2015 11:42:04 +0100
+Subject: [PATCH v2 13/20] arm64: cmpxchg_dbl: patch in lse instructions when
+ supported by the CPU
 In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
 References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1437734531-10698-18-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-14-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cost of changing a cacheline from shared to exclusive state can be
-significant, especially when this is triggered by an exclusive store,
-since it may result in having to retry the transaction.
+On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+it makes sense to use them in preference to ll/sc sequences.
 
-This patch makes use of prfm to prefetch cachelines for write prior to
-ldxr/stxr loops when using the ll/sc atomic routines.
+This patch introduces runtime patching of our cmpxchg_double primitives
+so that the LSE casp instruction is used instead.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 9 +++++++++
- arch/arm64/include/asm/cmpxchg.h      | 8 ++++++++
- arch/arm64/include/asm/futex.h        | 2 ++
- arch/arm64/lib/bitops.S               | 2 ++
- 4 files changed, 21 insertions(+)
+ arch/arm64/include/asm/atomic_ll_sc.h | 34 ++++++++++++++++++
+ arch/arm64/include/asm/atomic_lse.h   | 43 ++++++++++++++++++++++
+ arch/arm64/include/asm/cmpxchg.h      | 68 +++++++++--------------------------
+ 3 files changed, 94 insertions(+), 51 deletions(-)
 
 diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index fb26f2b1f300..652877fefae6 100644
+index b4298f9a898f..77d3aabf52ad 100644
 --- a/arch/arm64/include/asm/atomic_ll_sc.h
 +++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -45,6 +45,7 @@ __LL_SC_PREFIX(atomic_##op(int i, atomic_t *v))				\
- 	int result;							\
- 									\
- 	asm volatile("// atomic_" #op "\n"				\
-+"	prfm	pstl1strm, %2\n"					\
- "1:	ldxr	%w0, %2\n"						\
- "	" #asm_op "	%w0, %w0, %w3\n"				\
- "	stxr	%w1, %w0, %2\n"						\
-@@ -62,6 +63,7 @@ __LL_SC_PREFIX(atomic_##op##_return(int i, atomic_t *v))		\
- 	int result;							\
- 									\
- 	asm volatile("// atomic_" #op "_return\n"			\
-+"	prfm	pstl1strm, %2\n"					\
- "1:	ldxr	%w0, %2\n"						\
- "	" #asm_op "	%w0, %w0, %w3\n"				\
- "	stlxr	%w1, %w0, %2\n"						\
-@@ -93,6 +95,7 @@ __LL_SC_PREFIX(atomic_cmpxchg(atomic_t *ptr, int old, int new))
- 	int oldval;
+@@ -243,4 +243,38 @@ __CMPXCHG_CASE( ,  , mb_8, dmb ish, "memory")
  
- 	asm volatile("// atomic_cmpxchg\n"
-+"	prfm	pstl1strm, %2\n"
- "1:	ldxr	%w1, %2\n"
- "	eor	%w0, %w1, %w3\n"
- "	cbnz	%w0, 2f\n"
-@@ -116,6 +119,7 @@ __LL_SC_PREFIX(atomic64_##op(long i, atomic64_t *v))			\
- 	unsigned long tmp;						\
- 									\
- 	asm volatile("// atomic64_" #op "\n"				\
-+"	prfm	pstl1strm, %2\n"					\
- "1:	ldxr	%0, %2\n"						\
- "	" #asm_op "	%0, %0, %3\n"					\
- "	stxr	%w1, %0, %2\n"						\
-@@ -133,6 +137,7 @@ __LL_SC_PREFIX(atomic64_##op##_return(long i, atomic64_t *v))		\
- 	unsigned long tmp;						\
- 									\
- 	asm volatile("// atomic64_" #op "_return\n"			\
-+"	prfm	pstl1strm, %2\n"					\
- "1:	ldxr	%0, %2\n"						\
- "	" #asm_op "	%0, %0, %3\n"					\
- "	stlxr	%w1, %0, %2\n"						\
-@@ -164,6 +169,7 @@ __LL_SC_PREFIX(atomic64_cmpxchg(atomic64_t *ptr, long old, long new))
- 	unsigned long res;
+ #undef __CMPXCHG_CASE
  
- 	asm volatile("// atomic64_cmpxchg\n"
-+"	prfm	pstl1strm, %2\n"
- "1:	ldxr	%1, %2\n"
- "	eor	%0, %1, %3\n"
- "	cbnz	%w0, 2f\n"
-@@ -186,6 +192,7 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
- 	unsigned long tmp;
++#define __CMPXCHG_DBL(name, mb, cl)					\
++__LL_SC_INLINE int							\
++__LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
++				      unsigned long old2,		\
++				      unsigned long new1,		\
++				      unsigned long new2,		\
++				      volatile void *ptr))		\
++{									\
++	unsigned long tmp, ret;						\
++									\
++	asm volatile("// __cmpxchg_double" #name "\n"			\
++	"	" #mb "\n"						\
++	"1:	ldxp	%0, %1, %2\n"					\
++	"	eor	%0, %0, %3\n"					\
++	"	eor	%1, %1, %4\n"					\
++	"	orr	%1, %0, %1\n"					\
++	"	cbnz	%1, 2f\n"					\
++	"	stxp	%w0, %5, %6, %2\n"				\
++	"	cbnz	%w0, 1b\n"					\
++	"	" #mb "\n"						\
++	"2:"								\
++	: "=&r" (tmp), "=&r" (ret), "+Q" (*(unsigned long *)ptr)	\
++	: "r" (old1), "r" (old2), "r" (new1), "r" (new2)		\
++	: cl);								\
++									\
++	return ret;							\
++}									\
++__LL_SC_EXPORT(__cmpxchg_double##name);
++
++__CMPXCHG_DBL(   ,        ,         )
++__CMPXCHG_DBL(_mb, dmb ish, "memory")
++
++#undef __CMPXCHG_DBL
++
+ #endif	/* __ASM_ATOMIC_LL_SC_H */
+diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
+index 5136c3ab48e9..db41a63691cd 100644
+--- a/arch/arm64/include/asm/atomic_lse.h
++++ b/arch/arm64/include/asm/atomic_lse.h
+@@ -282,4 +282,47 @@ __CMPXCHG_CASE(x,  , mb_8, al, "memory")
+ #undef __LL_SC_CMPXCHG
+ #undef __CMPXCHG_CASE
  
- 	asm volatile("// atomic64_dec_if_positive\n"
-+"	prfm	pstl1strm, %2\n"
- "1:	ldxr	%0, %2\n"
- "	subs	%0, %0, #1\n"
- "	b.mi	2f\n"
-@@ -210,6 +217,7 @@ __LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
- 	unsigned long tmp, oldval;					\
- 									\
- 	asm volatile(							\
-+	"	prfm	pstl1strm, %2\n"				\
- 	"1:	ldxr" #sz "\t%" #w "[oldval], %[v]\n"			\
- 	"	eor	%" #w "[tmp], %" #w "[oldval], %" #w "[old]\n"	\
- 	"	cbnz	%" #w "[tmp], 2f\n"				\
-@@ -249,6 +257,7 @@ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- 	unsigned long tmp, ret;						\
- 									\
- 	asm volatile("// __cmpxchg_double" #name "\n"			\
-+	"	prfm	pstl1strm, %2\n"				\
- 	"1:	ldxp	%0, %1, %2\n"					\
- 	"	eor	%0, %0, %3\n"					\
- 	"	eor	%1, %1, %4\n"					\
++#define __LL_SC_CMPXCHG_DBL(op)	__LL_SC_CALL(__cmpxchg_double##op)
++
++#define __CMPXCHG_DBL(name, mb, cl...)					\
++static inline int __cmpxchg_double##name(unsigned long old1,		\
++					 unsigned long old2,		\
++					 unsigned long new1,		\
++					 unsigned long new2,		\
++					 volatile void *ptr)		\
++{									\
++	unsigned long oldval1 = old1;					\
++	unsigned long oldval2 = old2;					\
++	register unsigned long x0 asm ("x0") = old1;			\
++	register unsigned long x1 asm ("x1") = old2;			\
++	register unsigned long x2 asm ("x2") = new1;			\
++	register unsigned long x3 asm ("x3") = new2;			\
++	register unsigned long x4 asm ("x4") = (unsigned long)ptr;	\
++									\
++	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
++	/* LL/SC */							\
++	"	nop\n"							\
++	"	nop\n"							\
++	"	nop\n"							\
++	__LL_SC_CMPXCHG_DBL(name),					\
++	/* LSE atomics */						\
++	"	casp" #mb "\t%[old1], %[old2], %[new1], %[new2], %[v]\n"\
++	"	eor	%[old1], %[old1], %[oldval1]\n"			\
++	"	eor	%[old2], %[old2], %[oldval2]\n"			\
++	"	orr	%[old1], %[old1], %[old2]")			\
++	: [old1] "+r" (x0), [old2] "+r" (x1),				\
++	  [v] "+Q" (*(unsigned long *)ptr)				\
++	: [new1] "r" (x2), [new2] "r" (x3), [ptr] "r" (x4),		\
++	  [oldval1] "r" (oldval1), [oldval2] "r" (oldval2)		\
++	: "x30" , ##cl);						\
++									\
++	return x0;							\
++}
++
++__CMPXCHG_DBL(   ,   )
++__CMPXCHG_DBL(_mb, al, "memory")
++
++#undef __LL_SC_CMPXCHG_DBL
++#undef __CMPXCHG_DBL
++
+ #endif	/* __ASM_ATOMIC_LSE_H */
 diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index f70212629d02..7bfda0944c9b 100644
+index 60a558127cef..f70212629d02 100644
 --- a/arch/arm64/include/asm/cmpxchg.h
 +++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -33,12 +33,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 	case 1:
- 		asm volatile(ARM64_LSE_ATOMIC_INSN(
- 		/* LL/SC */
-+		"	prfm	pstl1strm, %2\n"
- 		"1:	ldxrb	%w0, %2\n"
- 		"	stlxrb	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
- 		"	dmb	ish",
- 		/* LSE atomics */
- 		"	nop\n"
-+		"	nop\n"
- 		"	swpalb	%w3, %w0, %2\n"
- 		"	nop\n"
- 		"	nop")
-@@ -49,12 +51,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 	case 2:
- 		asm volatile(ARM64_LSE_ATOMIC_INSN(
- 		/* LL/SC */
-+		"	prfm	pstl1strm, %2\n"
- 		"1:	ldxrh	%w0, %2\n"
- 		"	stlxrh	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
- 		"	dmb	ish",
- 		/* LSE atomics */
- 		"	nop\n"
-+		"	nop\n"
- 		"	swpalh	%w3, %w0, %2\n"
- 		"	nop\n"
- 		"	nop")
-@@ -65,12 +69,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 	case 4:
- 		asm volatile(ARM64_LSE_ATOMIC_INSN(
- 		/* LL/SC */
-+		"	prfm	pstl1strm, %2\n"
- 		"1:	ldxr	%w0, %2\n"
- 		"	stlxr	%w1, %w3, %2\n"
- 		"	cbnz	%w1, 1b\n"
- 		"	dmb	ish",
- 		/* LSE atomics */
- 		"	nop\n"
-+		"	nop\n"
- 		"	swpal	%w3, %w0, %2\n"
- 		"	nop\n"
- 		"	nop")
-@@ -81,12 +87,14 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- 	case 8:
- 		asm volatile(ARM64_LSE_ATOMIC_INSN(
- 		/* LL/SC */
-+		"	prfm	pstl1strm, %2\n"
- 		"1:	ldxr	%0, %2\n"
- 		"	stlxr	%w1, %3, %2\n"
- 		"	cbnz	%w1, 1b\n"
- 		"	dmb	ish",
- 		/* LSE atomics */
- 		"	nop\n"
-+		"	nop\n"
- 		"	swpal	%3, %0, %2\n"
- 		"	nop\n"
- 		"	nop")
-diff --git a/arch/arm64/include/asm/futex.h b/arch/arm64/include/asm/futex.h
-index 74069b3bd919..a681608faf9a 100644
---- a/arch/arm64/include/asm/futex.h
-+++ b/arch/arm64/include/asm/futex.h
-@@ -24,6 +24,7 @@
+@@ -128,51 +128,6 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
+ 	unreachable();
+ }
  
- #define __futex_atomic_op(insn, ret, oldval, uaddr, tmp, oparg)		\
- 	asm volatile(							\
-+"	prfm	pstl1strm, %2\n"					\
- "1:	ldxr	%w1, %2\n"						\
- 	insn "\n"							\
- "2:	stlxr	%w3, %w0, %2\n"						\
-@@ -112,6 +113,7 @@ futex_atomic_cmpxchg_inatomic(u32 *uval, u32 __user *uaddr,
- 		return -EFAULT;
+-#define system_has_cmpxchg_double()     1
+-
+-static inline int __cmpxchg_double(volatile void *ptr1, volatile void *ptr2,
+-		unsigned long old1, unsigned long old2,
+-		unsigned long new1, unsigned long new2, int size)
+-{
+-	unsigned long loop, lost;
+-
+-	switch (size) {
+-	case 8:
+-		VM_BUG_ON((unsigned long *)ptr2 - (unsigned long *)ptr1 != 1);
+-		do {
+-			asm volatile("// __cmpxchg_double8\n"
+-			"	ldxp	%0, %1, %2\n"
+-			"	eor	%0, %0, %3\n"
+-			"	eor	%1, %1, %4\n"
+-			"	orr	%1, %0, %1\n"
+-			"	mov	%w0, #0\n"
+-			"	cbnz	%1, 1f\n"
+-			"	stxp	%w0, %5, %6, %2\n"
+-			"1:\n"
+-				: "=&r"(loop), "=&r"(lost), "+Q" (*(u64 *)ptr1)
+-				: "r" (old1), "r"(old2), "r"(new1), "r"(new2));
+-		} while (loop);
+-		break;
+-	default:
+-		BUILD_BUG();
+-	}
+-
+-	return !lost;
+-}
+-
+-static inline int __cmpxchg_double_mb(volatile void *ptr1, volatile void *ptr2,
+-			unsigned long old1, unsigned long old2,
+-			unsigned long new1, unsigned long new2, int size)
+-{
+-	int ret;
+-
+-	smp_mb();
+-	ret = __cmpxchg_double(ptr1, ptr2, old1, old2, new1, new2, size);
+-	smp_mb();
+-
+-	return ret;
+-}
+-
+ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 					 unsigned long new, int size)
+ {
+@@ -210,21 +165,32 @@ static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
+ 	__ret; \
+ })
  
- 	asm volatile("// futex_atomic_cmpxchg_inatomic\n"
-+"	prfm	pstl1strm, %2\n"
- "1:	ldxr	%w1, %2\n"
- "	sub	%w3, %w1, %w4\n"
- "	cbnz	%w3, 3f\n"
-diff --git a/arch/arm64/lib/bitops.S b/arch/arm64/lib/bitops.S
-index bc18457c2bba..43ac736baa5b 100644
---- a/arch/arm64/lib/bitops.S
-+++ b/arch/arm64/lib/bitops.S
-@@ -31,6 +31,7 @@ ENTRY(	\name	)
- 	eor	w0, w0, w3		// Clear low bits
- 	mov	x2, #1
- 	add	x1, x1, x0, lsr #3	// Get word offset
-+alt_lse "	prfm	pstl1strm, [x1]",	"nop"
- 	lsl	x3, x2, x3		// Create mask
++#define system_has_cmpxchg_double()     1
++
++#define __cmpxchg_double_check(ptr1, ptr2)					\
++({										\
++	if (sizeof(*(ptr1)) != 8)						\
++		BUILD_BUG();							\
++	VM_BUG_ON((unsigned long *)(ptr2) - (unsigned long *)(ptr1) != 1);	\
++})
++
+ #define cmpxchg_double(ptr1, ptr2, o1, o2, n1, n2) \
+ ({\
+ 	int __ret;\
+-	__ret = __cmpxchg_double_mb((ptr1), (ptr2), (unsigned long)(o1), \
+-			(unsigned long)(o2), (unsigned long)(n1), \
+-			(unsigned long)(n2), sizeof(*(ptr1)));\
++	__cmpxchg_double_check(ptr1, ptr2); \
++	__ret = !__cmpxchg_double_mb((unsigned long)(o1), (unsigned long)(o2), \
++				     (unsigned long)(n1), (unsigned long)(n2), \
++				     ptr1); \
+ 	__ret; \
+ })
  
- alt_lse	"1:	ldxr	x2, [x1]",		"\lse	x3, [x1]"
-@@ -48,6 +49,7 @@ ENTRY(	\name	)
- 	eor	w0, w0, w3		// Clear low bits
- 	mov	x2, #1
- 	add	x1, x1, x0, lsr #3	// Get word offset
-+alt_lse "	prfm	pstl1strm, [x1]",	"nop"
- 	lsl	x4, x2, x3		// Create mask
+ #define cmpxchg_double_local(ptr1, ptr2, o1, o2, n1, n2) \
+ ({\
+ 	int __ret;\
+-	__ret = __cmpxchg_double((ptr1), (ptr2), (unsigned long)(o1), \
+-			(unsigned long)(o2), (unsigned long)(n1), \
+-			(unsigned long)(n2), sizeof(*(ptr1)));\
++	__cmpxchg_double_check(ptr1, ptr2); \
++	__ret = !__cmpxchg_double((unsigned long)(o1), (unsigned long)(o2), \
++				  (unsigned long)(n1), (unsigned long)(n2), \
++				  ptr1); \
+ 	__ret; \
+ })
  
- alt_lse	"1:	ldxr	x2, [x1]",		"\lse	x4, x2, [x1]"
 -- 
 2.1.4
