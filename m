@@ -1,58 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 23 Jul 2015 21:18:58 -0700
-Subject: [GIT PULL] ARM: OMAP2+: hwmod fixes for v4.2-rc
-In-Reply-To: <alpine.DEB.2.02.1507231357020.29543@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1507231357020.29543@utopia.booyaka.com>
-Message-ID: <20150724041857.GF16878@atomide.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Fri, 24 Jul 2015 06:40:43 +0200
+Subject: [RFC 1/3] docs: dts: Added documentation for Xilinx Zynq PL Reset
+ bindings.
+In-Reply-To: <1437691862-21312-2-git-send-email-moritz.fischer@ettus.com>
+References: <1437691862-21312-1-git-send-email-moritz.fischer@ettus.com>
+ <1437691862-21312-2-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <55B1C1CB.2050402@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 07/24/2015 12:51 AM, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> new file mode 100644
+> index 0000000..ac4499e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> @@ -0,0 +1,13 @@
+> +Xilinx Zynq PL Reset Manager
 
-Can you guys please pull this into arm soc fixes for v4.2 directly?
+I think there is no reason to be just PL specific.
+> +
+> +Required properties:
+> +- compatible: "xlnx,zynq-reset-pl"
+> +- syscon <&slcr>;
+> +- #reset-cells: 1
+> +
+> +Example:
+> +	rstc: rstc at 240 {
 
-I don't have other omap fixes queued at this point.
+@200 then here
 
-Regards,
+> +		#reset-cells = <1>;
+> +		compatible = "xlnx,zynq-reset-pl";
 
-Tony
+Compatible should be first below node name.
 
-* Paul Walmsley <paul@pwsan.com> [150723 07:00]:
-> Hi Tony,
+You should add also reg property 0x200 0x50
+
+> +		syscon = <&slcr>;
+> +	};
 > 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.2-rc/omap-fixes-a
-> 
-> for you to fetch changes up to 9a258afa928b45e6dd2efcac46ccf7eea705d35a:
-> 
->   ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc (2015-07-23 06:35:25 -0600)
-> 
-> ----------------------------------------------------------------
-> ARM: OMAP2+: hwmod fixes for v4.2-rc
-> 
-> Two fixes against v4.2-rc1.  The first, for DRA7xx platforms,
-> corrects some incorrect GPMC hardware description data.  The
-> second one will ensure that the hwmod code will wait for any
-> module with CPU-accessible registers to become ready before
-> attempting to access it.
-> 
-> Basic build, boot, and PM test logs are available here:
-> 
-> http://www.pwsan.com/omap/testlogs/omap-hwmod-a-for-v4.2-rc/20150723065408/
-> 
-> Note that I do not have a DRA7xx or AM43xx board, and therefore
-> cannot test on those platforms.
-> 
-> ----------------------------------------------------------------
-> Roger Quadros (2):
->       ARM: DRA7: hwmod: fix gpmc hwmod
->       ARM: OMAP2+: hwmod: Fix _wait_target_ready() for hwmods without sysc
-> 
->  arch/arm/mach-omap2/omap_hwmod.c          | 24 ++++++++++++++++--------
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c |  5 ++---
->  2 files changed, 18 insertions(+), 11 deletions(-)
+
+Thanks,
+Michal
