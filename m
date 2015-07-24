@@ -1,187 +1,106 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Jul 2015 07:04:01 -0700
-Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <55B243B3.7050702@vanguardiasur.com.ar>
-References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
- <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
- <55B15AF1.3030509@roeck-us.net> <55B243B3.7050702@vanguardiasur.com.ar>
-Message-ID: <55B245D1.1020208@roeck-us.net>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Fri, 24 Jul 2015 09:23:33 -0500
+Subject: [PATCH v2] Serial: imx: add dev_pm_ops to support suspend to ram/disk
+Message-ID: <1437747813-9473-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2015 06:54 AM, Ariel D'Alessandro wrote:
->
->
-> El 23/07/15 a las 18:21, Guenter Roeck escibi?:
->> On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
->>> Hi Guenter,
->>>
->>> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
->>>> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
->>>>> This commit adds support for the watchdog timer found in NXP LPC SoCs
->>>>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
->>>>> share the same watchdog hardware.
->>>>>
->>>>> Watchdog driver registers a restart handler that will restart the
->>>>> system
->>>>> by performing an incorrect feed after ensuring the watchdog is
->>>>> enabled in
->>>>> reset mode.
->>>>>
->>>>> As watchdog cannot be disabled in hardware, driver's stop routine will
->>>>> regularly send a keepalive ping using a timer.
->>>>>
->>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>>>
->>>> Hi Ariel,
->>>>
->>>> sorry for the delayed response. Comments below.
->>>>
->>>> Guenter
->>>>
->>>>> ---
->>>>>     drivers/watchdog/Kconfig       |  11 ++
->>>>>     drivers/watchdog/Makefile      |   1 +
->>>>>     drivers/watchdog/lpc18xx_wdt.c | 344
->>>>> +++++++++++++++++++++++++++++++++++++++++
->>>>>     3 files changed, 356 insertions(+)
->>>>>     create mode 100644 drivers/watchdog/lpc18xx_wdt.c
->>>>>
->>>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>>>> index 742fbbc..af5e2e3 100644
->>>>> --- a/drivers/watchdog/Kconfig
->>>>> +++ b/drivers/watchdog/Kconfig
->>>>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
->>>>>           To compile this driver as a module, choose M here: the
->>>>>           module will be called digicolor_wdt.
->>>>>
->>>>> +config LPC18XX_WATCHDOG
->>>>> +    tristate "LPC18xx/43xx Watchdog"
->>>>> +    depends on ARCH_LPC18XX || COMPILE_TEST
->>>>> +    select WATCHDOG_CORE
->>>>> +    help
->>>>> +      Say Y here if to include support for the watchdog timer
->>>>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
->>>>> +      processors.
->>>>> +      To compile this driver as a module, choose M here: the
->>>>> +      module will be called lpc18xx_wdt.
->>>>> +
->>>>>     # AVR32 Architecture
->>>>>
->>>>>     config AT32AP700X_WDT
->>>>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
->>>>> index 59ea9a1..1b0ef48 100644
->>>>> --- a/drivers/watchdog/Makefile
->>>>> +++ b/drivers/watchdog/Makefile
->>>>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
->>>>>     obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
->>>>>     obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
->>>>>     obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->>>>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->>>>>
->>>>>     # AVR32 Architecture
->>>>>     obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
->>>>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
->>>>> b/drivers/watchdog/lpc18xx_wdt.c
->>>>> new file mode 100644
->>>>> index 0000000..2b489fc
->>>>> --- /dev/null
->>>>> +++ b/drivers/watchdog/lpc18xx_wdt.c
->>>>> @@ -0,0 +1,344 @@
->>>>> +/*
->>>>> + * NXP LPC18xx Watchdog Timer (WDT)
->>>>> + *
->>>>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
->>>>> + *
->>>>> + * This program is free software; you can redistribute it and/or
->>>>> modify it
->>>>> + * under the terms of the GNU General Public License version 2 as
->>>>> published by
->>>>> + * the Free Software Foundation.
->>>>> + *
->>>>> + * Notes
->>>>> + * -----
->>>>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
->>>>> a 24-bit
->>>>> + * counter which decrements on every clock cycle.
->>>>> + *
->>>>> + */
->>>>> +
->>>>> +#include <linux/clk.h>
->>>>> +#include <linux/io.h>
->>>>> +#include <linux/module.h>
->>>>> +#include <linux/of.h>
->>>>> +#include <linux/platform_device.h>
->>>>> +#include <linux/reboot.h>
->>>>> +#include <linux/watchdog.h>
->>>>> +
->>>>> +/* Registers */
->>>>> +#define LPC18XX_WDT_MOD            0x00
->>>>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
->>>>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
->>>>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
->>>>
->>>> Not used.
->>>
->>> That's right. I'll remove it.
->>>
->>>>
->>>>> +
->>>>> +#define LPC18XX_WDT_TC            0x04
->>>>> +#define LPC18XX_WDT_TC_MIN        0xff
->>>>> +#define LPC18XX_WDT_TC_MAX        0xffffff
->>>>> +
->>>>> +#define LPC18XX_WDT_FEED        0x08
->>>>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
->>>>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
->>>>> +
->>>>> +#define LPC18XX_WDT_TV            0x0c
->>>>> +
->>>>> +/* Clock pre-scaler */
->>>>> +#define LPC18XX_WDT_CLK_DIV        4
->>>>> +
->>>>> +/* Timeout values in seconds */
->>>>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
->>>>> +
->>>>
->>>> This is (still) really low for Linux. Something like min(30,
->>>> max_timeout)
->>>> might make more sense.
->>>
->>> Remember that hardware limits timeout to a maximum value of 5.
->>>
->>> As you said before we could use a soft timer, but I not sure that's a
->>> good idea. As Ezequiel said [0], it might be adding bloat and we must
->>> consider that this watchdog controller is included in cortex-M MCUs.
->>>
->>> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
->>>
->>
->> Further down you have
->>      lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
->>                            LPC18XX_WDT_CLK_DIV) / clk_rate;
->>
->> which seems to contradict this statement. If the maximum timeout is 5
->> seconds,
->> why don't you set max_timeout to a fixed value of 5 seconds ?
->
-> Well, I think that's the less hardcoded way. It might allow the driver
-> to be extended to another HW variant that configures the wdt clk rate.
->
-> I see what's your point. As you proposed, using the same criterion I
-> should do this:
->
-> #define LPC18XX_WDT_DEF_TIMEOUT         (unsigned int)30
->
-> and further down, in probe function:
->
-> lpc18xx_wdt->wdt_dev.timeout = min(LPC18XX_WDT_DEF_TIMEOUT,
-> 				   lpc18xx_wdt->wdt_dev.max_timeout);
->
-> Is this close enough to your solution?
->
-Yes, but why the typecast for LPC18XX_WDT_DEF_TIMEOUT ?
+When system goes into low power states like SUSPEND_MEM and
+HIBERNATION, the hardware IP block may be powered off to reduce
+the power consumption. This power down may cause problems on
+some imx platforms, because the hardware settings are reset to
+its power on default values which may differ from the ones when
+it power off. This patch added the dev_pm_ops and implemented
+two callbacks: suspend_noirq and resume_noirq, which will save
+the necessory hardware parameters right before power down and
+recover them before system uses the hardware.
 
-Thanks,
-Guenter
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+Change log:
+	v2	Change pr_debug to dev_dbg per GregK's review feedback.
+
+ drivers/tty/serial/imx.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 2c90dc3..ef4d3fd 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -216,6 +216,7 @@ struct imx_port {
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+ 	wait_queue_head_t	dma_wait;
++	unsigned int            saved_reg[10];
+ };
+
+ struct imx_port_ucrs {
+@@ -1992,6 +1993,58 @@ static int serial_imx_remove(struct platform_device *pdev)
+ 	return uart_remove_one_port(&imx_reg, &sport->port);
+ }
+
++static int imx_serial_port_suspend_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	/* Save necessary regs */
++	clk_enable(sport->clk_ipg);
++	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
++	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
++	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
++	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
++	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
++	sport->saved_reg[5] = readl(sport->port.membase + UESC);
++	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
++	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
++	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
++	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
++	clk_disable(sport->clk_ipg);
++
++	dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static int imx_serial_port_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	clk_enable(sport->clk_ipg);
++	writel(sport->saved_reg[4], sport->port.membase + UFCR);
++	writel(sport->saved_reg[5], sport->port.membase + UESC);
++	writel(sport->saved_reg[6], sport->port.membase + UTIM);
++	writel(sport->saved_reg[7], sport->port.membase + UBIR);
++	writel(sport->saved_reg[8], sport->port.membase + UBMR);
++	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
++	writel(sport->saved_reg[0], sport->port.membase + UCR1);
++	writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
++	writel(sport->saved_reg[2], sport->port.membase + UCR3);
++	writel(sport->saved_reg[3], sport->port.membase + UCR4);
++	clk_disable(sport->clk_ipg);
++
++	dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static const struct dev_pm_ops imx_serial_port_pm_ops = {
++	.suspend_noirq = imx_serial_port_suspend_noirq,
++	.resume_noirq = imx_serial_port_resume_noirq,
++};
++
+ static struct platform_driver serial_imx_driver = {
+ 	.probe		= serial_imx_probe,
+ 	.remove		= serial_imx_remove,
+@@ -2002,6 +2055,7 @@ static struct platform_driver serial_imx_driver = {
+ 	.driver		= {
+ 		.name	= "imx-uart",
+ 		.of_match_table = imx_uart_dt_ids,
++		.pm	= &imx_serial_port_pm_ops,
+ 	},
+ };
+
+--
+2.5.0.rc2
