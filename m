@@ -1,101 +1,92 @@
-From: feng.wu@intel.com (Wu, Feng)
-Date: Fri, 24 Jul 2015 01:27:29 +0000
-Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-In-Reply-To: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
-References: <1436184692-20927-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <E959C4978C3B6342920538CF579893F00264820D@SHSMSX104.ccr.corp.intel.com>
+From: rui.zhang@intel.com (Zhang, Rui)
+Date: Fri, 24 Jul 2015 01:31:36 +0000
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <20150723103758.GI18700@pengutronix.de>
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+ <9hhk2tteqb3.fsf@e105922-lin.cambridge.arm.com>
+ <744357E9AAD1214791ACBA4B0B9092630153E699@SHSMSX101.ccr.corp.intel.com>
+ <20150723103758.GI18700@pengutronix.de>
+Message-ID: <744357E9AAD1214791ACBA4B0B9092631DD16EED@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org
-> [mailto:linux-kernel-owner at vger.kernel.org] On Behalf Of Eric Auger
-> Sent: Monday, July 06, 2015 8:11 PM
-> To: eric.auger at st.com; eric.auger at linaro.org;
-> linux-arm-kernel at lists.infradead.org; kvmarm at lists.cs.columbia.edu;
-> kvm at vger.kernel.org; christoffer.dall at linaro.org; marc.zyngier at arm.com;
-> alex.williamson at redhat.com; pbonzini at redhat.com; avi.kivity at gmail.com;
-> mtosatti at redhat.com; Wu, Feng; joro at 8bytes.org;
-> b.reynal at virtualopensystems.com
-> Cc: linux-kernel at vger.kernel.org; patches at linaro.org
-> Subject: [RFC v2 0/6] IRQ bypass manager and irqfd consumer
-> 
-> This series introduces and extends the IRQ bypass manager written
-> by Alex and transforms irqfd into an IRQ bypass manager consumer.
-> The producer part, in my case the VFIO platform driver will be introduced
-> separately. That code should be usable by both ARM IRQ forwarding
-> and Intel Posted Interrupts.
-> 
-> The IRQ bypass manager enables to setup a negotiated link between an
-> IRQ producer and an IRQ consumer (typically the VFIO driver and KVM irqfd).
-> 
-> The series currently includes Alex's code which was sent my email.
-> Its structure obvioulsy will adapt to Alex's will.
-> 
-> Also the irq bypass manager gets compiled/linked on arm/arm64 along
-> with KVM and VFIO platform driver.
-> 
-> can be found at:
-> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.2-rc1-
-> bypass-fwd-v2
-> 
-> Best Regards
-> 
-> Eric
-> 
-> History:
-> v1 -> v2:
-> - isolate the bypass manager and irqfd consumer in this series
-> - take into account Paolo's comments and use container_of strategy and
->   remove additional fields introduced in v1.
-> - create kvm_irqfd.h
-> - add unregistration in irqfd_shutdown
-
-Hi Eric,
-
-[4/6], [5/6], and [6/6] of this series are common to forwarded irq and posted
-interrupts, did you have a chance to get a new version of them based on
-Alex's latest irqbypass manager patch:
-
-https://lkml.org/lkml/2015/7/16/810
-
-Thanks a lot!
+As the original patch has not been in upstream, I'd prefer a refreshed patch, rather than an incremental fix.
 
 Thanks,
-Feng
+rui
 
+> -----Original Message-----
+> From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
+> Sent: Thursday, July 23, 2015 6:38 PM
+> To: Zhang, Rui
+> Cc: Punit Agrawal; linux-pm at vger.kernel.org; Eduardo Valentin; linux-
+> kernel at vger.kernel.org; Jean Delvare; Peter Feuerer; Heiko Stuebner;
+> Lukasz Majewski; Stephen Warren; Thierry Reding; linux-
+> acpi at vger.kernel.org; platform-driver-x86 at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-omap at vger.kernel.org; linux-samsung-
+> soc at vger.kernel.org; Guenter Roeck; Rafael J. Wysocki; Maxime Ripard;
+> Darren Hart; lm-sensors at lm-sensors.org
+> Subject: Re: [PATCH v2] thermal: consistently use int for temperatures
+> Importance: High
 > 
-> v1: originally part of [RFC 00/17] ARM IRQ forward control based on IRQ
->     bypass manager (https://lkml.org/lkml/2015/7/2/268)
+> Hi Zhang,
+> 
+> On Tue, Jul 21, 2015 at 01:35:31PM +0000, Zhang, Rui wrote:
+> > > >
+> > Patch applied.
+> 
+> Thanks for applying. I missed to convert another place, so we get a new
+> compiler warning. The attached patch fixes this (suitable for git rebase --
+> autosquash). Please let me know if you can handle this or if you prefer a new
+> patch instead.
+> 
+> Thanks
+>  Sascha
 > 
 > 
-> Eric Auger (6):
->   KVM: arm/arm64: select IRQ_BYPASS_MANAGER
->   VFIO: platform: select IRQ_BYPASS_MANAGER
->   irq: bypass: Extend skeleton for ARM forwarding control
->   KVM: create kvm_irqfd.h
->   KVM: introduce kvm_arch functions for IRQ bypass
->   KVM: eventfd: add irq bypass consumer management
+> -----------------------------8<-------------------------------------
 > 
->  arch/arm/kvm/Kconfig          |   1 +
->  arch/arm64/kvm/Kconfig        |   1 +
->  drivers/vfio/platform/Kconfig |   1 +
->  include/linux/irqbypass.h     |  19 ++++++--
->  include/linux/kvm_host.h      |  37 ++++++++++++++
->  include/linux/kvm_irqfd.h     |  70 +++++++++++++++++++++++++++
->  kernel/irq/bypass.c           |  44 +++++++++++++++--
->  virt/kvm/Kconfig              |   3 ++
->  virt/kvm/eventfd.c            | 109 +++++++++++++-----------------------------
->  9 files changed, 203 insertions(+), 82 deletions(-)
->  create mode 100644 include/linux/kvm_irqfd.h
+> From 4907a7c32fd16eaf9f31d9f904276c9a0176b717 Mon Sep 17 00:00:00 2001
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> Date: Thu, 23 Jul 2015 12:32:31 +0200
+> Subject: [PATCH] fixup! thermal: consistently use int for temperatures
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
+> 
+> fixes:
+> drivers/power/charger-manager.c: In function
+> ?cm_get_battery_temperature?:
+> drivers/power/charger-manager.c:622:45: warning: passing argument 2 of
+> ?thermal_zone_get_temp? from incompatible pointer type
+>    ret = thermal_zone_get_temp(cm->tzd_batt, (unsigned long *)temp);
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  drivers/power/charger-manager.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/power/charger-manager.c b/drivers/power/charger-
+> manager.c index 1c202cc..907293e 100644
+> --- a/drivers/power/charger-manager.c
+> +++ b/drivers/power/charger-manager.c
+> @@ -619,7 +619,7 @@ static int cm_get_battery_temperature(struct
+> charger_manager *cm,
+> 
+>  #ifdef CONFIG_THERMAL
+>  	if (cm->tzd_batt) {
+> -		ret = thermal_zone_get_temp(cm->tzd_batt, (unsigned long
+> *)temp);
+> +		ret = thermal_zone_get_temp(cm->tzd_batt, temp);
+>  		if (!ret)
+>  			/* Calibrate temperature unit */
+>  			*temp /= 100;
+> --
+> 2.1.4
+> 
 > 
 > --
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Pengutronix e.K.                           |                             |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+> Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
