@@ -1,35 +1,22 @@
-From: lee@kernel.org (Lee Jones)
-Date: Fri, 24 Jul 2015 16:22:17 +0100
-Subject: [PATCH v4 8/8] ARM: bcm2835: Use the firmware on rpi to get the
- EMMC clock.
-In-Reply-To: <1437420787-32137-9-git-send-email-eric@anholt.net>
-References: <1437420787-32137-1-git-send-email-eric@anholt.net>
- <1437420787-32137-9-git-send-email-eric@anholt.net>
-Message-ID: <20150724152217.GM3436@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jul 2015 16:42:18 +0100
+Subject: [PATCH v2 17/20] arm64: atomics: prefetch the destination word
+ for write prior to stxr
+In-Reply-To: <1437734531-10698-18-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-18-git-send-email-will.deacon@arm.com>
+Message-ID: <20150724154218.GR3550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jul 2015, Eric Anholt wrote:
-
-> This updates the MMC frequency from 100Mhz to 250Mhz.
+On Fri, Jul 24, 2015 at 11:42:08AM +0100, Will Deacon wrote:
+> The cost of changing a cacheline from shared to exclusive state can be
+> significant, especially when this is triggered by an exclusive store,
+> since it may result in having to retry the transaction.
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  arch/arm/boot/dts/bcm2835-rpi.dtsi | 1 +
->  1 file changed, 1 insertion(+)
+> This patch makes use of prfm to prefetch cachelines for write prior to
+> ldxr/stxr loops when using the ll/sc atomic routines.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-For my own reference:
- Acked-by: Lee Jones <lee@kernel.org>
-
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index 0a32123..5d370cb 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -62,6 +62,7 @@
->  &sdhci {
->  	status = "okay";
->  	bus-width = <4>;
-> +	clocks = <&firmware_clocks RPI_CLOCK_EMMC>;
->  };
->  
->  &uart0 {
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
