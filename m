@@ -1,46 +1,73 @@
-From: emunson@akamai.com (Eric B Munson)
-Date: Fri, 24 Jul 2015 10:39:36 -0400
-Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and munlockall
- system calls
-In-Reply-To: <20150723065830.GA5919@linux-mips.org>
-References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
- <1437508781-28655-3-git-send-email-emunson@akamai.com>
- <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
- <1437528316.16792.7.camel@ellerman.id.au>
- <20150722141501.GA3203@akamai.com>
- <20150723065830.GA5919@linux-mips.org>
-Message-ID: <20150724143936.GE9203@akamai.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jul 2015 15:41:03 +0100
+Subject: [PATCH] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
+References: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
+Message-ID: <20150724144103.GC12569@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Ralf Baechle wrote:
+On Fri, Jul 24, 2015 at 06:54:23AM +0100, Jerin Jacob wrote:
+> certain X11 servers and user space network drivers frameworks
+> need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to access PCI bar
+> address space from user space.
+> 
+> Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+> ---
+>  arch/arm64/include/asm/pci.h |  6 ++++++
+>  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
+>  2 files changed, 26 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> index b008a72..e7afe8d 100644
+> --- a/arch/arm64/include/asm/pci.h
+> +++ b/arch/arm64/include/asm/pci.h
+> @@ -39,5 +39,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+>  }
+>  #endif  /* CONFIG_PCI */
+>  
+> +#define HAVE_PCI_MMAP
+> +
+> +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> +	enum pci_mmap_state mmap_state, int write_combine);
+> +
+> +
+>  #endif  /* __KERNEL__ */
+>  #endif  /* __ASM_PCI_H */
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 4095379..94b04c7 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -71,3 +71,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  	return NULL;
+>  }
+>  #endif
+> +
+> +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> +		enum pci_mmap_state mmap_state, int write_combine)
+> +{
+> +	/*
+> +	* I/O space can be accessed via normal processor loads and stores on
+> +	* this platform but for now we elect not to do this and portable
+> +	* drivers should not do this anyway.
+> +	*/
+> +	if (mmap_state == pci_mmap_io)
+> +		return -EINVAL;
+> +
+> +	if (write_combine)
+> +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> +	else
+> +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> +
+> +	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+> +	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
+> +}
 
-> On Wed, Jul 22, 2015 at 10:15:01AM -0400, Eric B Munson wrote:
-> 
-> > > 
-> > > You haven't wired it up properly on powerpc, but I haven't mentioned it because
-> > > I'd rather we did it.
-> > > 
-> > > cheers
-> > 
-> > It looks like I will be spinning a V5, so I will drop all but the x86
-> > system calls additions in that version.
-> 
-> The MIPS bits are looking good however, so
-> 
-> Acked-by: Ralf Baechle <ralf@linux-mips.org>
-> 
-> With my ack, will you keep them or maybe carry them as a separate patch?
+So pci_iomap_range chooses the memory attributes based on the BAR flags
+(and even then it looks weird -- CACHEABLE => ioremap, else ioremap_nocache,
+which is just the same as ioremap on arm64).
 
-I will keep the MIPS additions as a separate patch in the series, though
-I have dropped two of the new syscalls after some discussion.  So I will
-not include your ack on the new patch.
+It would be good to understand (a) why this is different and (b) what
+the consistent set of attributes should be.
 
-Eric
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/318afb28/attachment.sig>
+Will
