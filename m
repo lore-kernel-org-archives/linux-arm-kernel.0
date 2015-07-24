@@ -1,57 +1,96 @@
-From: mturquette@linaro.org (Michael Turquette)
-Date: Thu, 23 Jul 2015 17:00:01 -0700
-Subject: [PATCH v2 1/7] clk: Add a basic factor clock
-In-Reply-To: <20150523074930.GI8557@lukather>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
- <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
- <20150523074930.GI8557@lukather>
-Message-ID: <20150724000001.642.84690@quantum>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 23 Jul 2015 17:11:35 -0700
+Subject: [PATCH v2 1/5] clk: remove duplicated code with
+ __clk_set_parent_after
+In-Reply-To: <20150722140809.GC13623@shlinux1.ap.freescale.net>
+References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
+ <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
+ <20150528040919.22384.79189@quantum>
+ <20150715122522.GA30570@shlinux1.ap.freescale.net>
+ <20150715122955.GB30570@shlinux1.ap.freescale.net>
+ <20150722140809.GC13623@shlinux1.ap.freescale.net>
+Message-ID: <20150724001135.642.54711@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-05-23 00:49:30)
-> On Fri, May 22, 2015 at 12:35:35PM +0800, Chen-Yu Tsai wrote:
-> > Hi,
-> > 
-> > On Fri, May 22, 2015 at 4:54 AM, Maxime Ripard
-> > <maxime.ripard@free-electrons.com> wrote:
-> > > Some clocks are using a factor component, however, unlike their mux, gate
-> > > or divider counterpart, these factors don't have a basic clock
-> > > implementation.
-> > 
-> > I think "multiplier" would be a better name here, considering it is the
-> > counterpart of "divider". "factor" implies you can multiply and/or divide
-> > the clock rate.
+Quoting Dong Aisheng (2015-07-22 07:08:10)
+> Ping...
 > 
-> You're probably right, I didn't though of it that way :)
+> On Wed, Jul 15, 2015 at 08:29:56PM +0800, Dong Aisheng wrote:
+> > On Wed, Jul 15, 2015 at 08:25:24PM +0800, Dong Aisheng wrote:
+> > > Hi Mike,
+> > > 
+> > > On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
+> > > > Quoting Dong Aisheng (2015-05-14 06:28:59)
+> > > > > __clk_set_parent_after() actually used the second argument then we
+> > > > > could put this duplicate logic in there and call it with a different
+> > > > > order of arguments in the success vs. error paths in this function.
+> > > > > 
+> > > > > Cc: Mike Turquette <mturquette@linaro.org>
+> > > > > Cc: Stephen Boyd <sboyd@codeaurora.org>
+> > > > > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> > > > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+> > > > 
+> > > > Patch looks good to me.
+> > > > 
+> > > > Also just noticed that the second argument to __clk_set_parent_after is
+> > > > never used :-(
+> > > > 
+> > > 
+> > > Ping...
+> > > 
+> > > I did not see this patch series in your tree for v4.2 rc.
+> > > Is this got missed?
 
-I also prefer multiplier over factor.
+Dong Aisheng,
 
-Jim Quinlan submitted a similar patch. See here:
+Yes it was missed. My apologies. Can you refresh it and re-send?
 
-http://www.spinics.net/lists/linux-clk/msg00691.html
-
-I nacked that patch because Stephen and I are trying to figure out how
-the basic clock types should work going forward. Code reuse is good, but
-they are not very maintainable.
-
-Since there are two potential users of this code, I should reconsider.
-Can you two come up with a common implementation that works for both of
-you?  Please do not put any CLK_OF_DECLARE stuff in there (there isn't
-any now, but I wanted to be clear).
-
-Regards,
+Thanks,
 Mike
 
-> 
-> > Unless of course you plan to add that? :)
-> 
-> Hmmm, no, not really.
-> 
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> > > 
+> > 
+> > Updated Mike's email address.
+> > 
+> > Regards
+> > Dong Aisheng
+> > 
+> > > Regards
+> > > Dong Aisheng
+> > > 
+> > > > Regards,
+> > > > Mike
+> > > > 
+> > > > > ---
+> > > > >  drivers/clk/clk.c | 8 +-------
+> > > > >  1 file changed, 1 insertion(+), 7 deletions(-)
+> > > > > 
+> > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > > > index 659f2b0..0e813ea 100644
+> > > > > --- a/drivers/clk/clk.c
+> > > > > +++ b/drivers/clk/clk.c
+> > > > > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
+> > > > >                 flags = clk_enable_lock();
+> > > > >                 clk_reparent(core, old_parent);
+> > > > >                 clk_enable_unlock(flags);
+> > > > > +               __clk_set_parent_after(core, old_parent, parent);
+> > > > >  
+> > > > > -               if (core->prepare_count) {
+> > > > > -                       flags = clk_enable_lock();
+> > > > > -                       clk_core_disable(core);
+> > > > > -                       clk_core_disable(parent);
+> > > > > -                       clk_enable_unlock(flags);
+> > > > > -                       clk_core_unprepare(parent);
+> > > > > -               }
+> > > > >                 return ret;
+> > > > >         }
+> > > > >  
+> > > > > -- 
+> > > > > 1.9.1
+> > > > > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
