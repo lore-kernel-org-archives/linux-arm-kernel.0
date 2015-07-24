@@ -1,73 +1,98 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 24 Jul 2015 11:01:58 +0800
-Subject: [PATCH v4 0/7] Add Mediatek MT8173 subsystem clocks support
-Message-ID: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+Date: Fri, 24 Jul 2015 11:02:01 +0800
+Subject: [PATCH v4 3/7] clk: mediatek: mt8173: Fix enabling of critical clocks
+In-Reply-To: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1437706925-3222-4-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is based on 4.2-rc1 and [1], and contains subsystem
-clocks support for Mediatek MT8173.
+From: Sascha Hauer <s.hauer@pengutronix.de>
 
-Previous reviews can be found in [2][3]. This patchset merge the 2
-patchsets because of the dependency.
+On the MT8173 the clocks are provided by different units. To enable
+the critical clocks we must be sure that all parent clocks are already
+registered, otherwise the parents of the critical clocks end up being
+unused and get disabled later.
 
-The most different from previous patchset are removing clk_null and
-split usb clock support into a separated source file.
+On MT8173, for example, it is the CLK_TOP clocks that have CLK_APMIXED
+PLLs as their parents, so we cannot enable the CLK_TOP critical clocks
+until the CLK_APMIXED clocks have all been registered.
 
-changes since v3:
-- Remove clk_null dependency from root clocks.
-- Use fixed-rate clocks with typical rate to replace clk_null.
-- Add clk-apmixed.c to implement ref2usb_tx.
-- Use clock-controller as the name of clock providers.
+To find a place where all parents are registered we try each time
+after we've registered some clocks if all known providers are present
+now and only then we enable the critical clocks.
 
-changes since v2:
-- Rebase to 4.2-rc1.
-- Add device tree nodes for subsystem clocks.
-- Fine tune comments of patches.
-- Add __init, __initconst and const to init data and functions.
-- Removed unused code from init functions of subsystem clocks.
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
+ drivers/clk/mediatek/clk-mt8173.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-changes since v1:
-- Add CA7PLL and CA15PLL as critical clocks.
-- Use the same register descriptor for imgsys, vensys and vencltsys.
-- Generalize apmixedsys special clocks registration.
-
-[1] https://patchwork.kernel.org/patch/6446341/
-[2] https://lkml.org/lkml/2015/7/10/254
-[3] https://lkml.org/lkml/2015/7/10/230
-
-James Liao (6):
-  clk: mediatek: Add fixed clocks support for Mediatek SoC.
-  clk: mediatek: Fix rate and dependency of MT8173 clocks
-  dt-bindings: ARM: Mediatek: Document devicetree bindings for clock
-    controllers
-  clk: mediatek: Add subsystem clocks of MT8173
-  clk: mediatek: Add USB clock support in MT8173 APMIXEDSYS
-  arm64: dts: mt8173: Add subsystem clock controller device nodes
-
-Sascha Hauer (1):
-  clk: mediatek: mt8173: Fix enabling of critical clocks
-
- .../bindings/arm/mediatek/mediatek,imgsys.txt      |  22 ++
- .../bindings/arm/mediatek/mediatek,mmsys.txt       |  22 ++
- .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  22 ++
- .../bindings/arm/mediatek/mediatek,vencltsys.txt   |  22 ++
- .../bindings/arm/mediatek/mediatek,vencsys.txt     |  22 ++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  37 +++
- drivers/clk/mediatek/Makefile                      |   2 +-
- drivers/clk/mediatek/clk-apmixed.c                 | 137 +++++++++
- drivers/clk/mediatek/clk-mt8173.c                  | 321 ++++++++++++++++++++-
- drivers/clk/mediatek/clk-mtk.c                     |  23 ++
- drivers/clk/mediatek/clk-mtk.h                     |  45 ++-
- drivers/clk/mediatek/clk-pll.c                     |   7 +-
- include/dt-bindings/clock/mt8173-clk.h             | 101 ++++++-
- 13 files changed, 756 insertions(+), 27 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
- create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
- create mode 100644 drivers/clk/mediatek/clk-apmixed.c
-
---
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 50b3266..a72ce82 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -699,6 +699,22 @@ static const struct mtk_composite peri_clks[] __initconst = {
+ 	MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
+ };
+ 
++static struct clk_onecell_data *mt8173_top_clk_data;
++static struct clk_onecell_data *mt8173_pll_clk_data;
++
++static void __init mtk_clk_enable_critical(void)
++{
++	if (!mt8173_top_clk_data || !mt8173_pll_clk_data)
++		return;
++
++	clk_prepare_enable(mt8173_pll_clk_data->clks[CLK_APMIXED_ARMCA15PLL]);
++	clk_prepare_enable(mt8173_pll_clk_data->clks[CLK_APMIXED_ARMCA7PLL]);
++	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_MEM_SEL]);
++	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_DDRPHYCFG_SEL]);
++	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_CCI400_SEL]);
++	clk_prepare_enable(mt8173_top_clk_data->clks[CLK_TOP_RTC_SEL]);
++}
++
+ static void __init mtk_topckgen_init(struct device_node *node)
+ {
+ 	struct clk_onecell_data *clk_data;
+@@ -711,19 +727,19 @@ static void __init mtk_topckgen_init(struct device_node *node)
+ 		return;
+ 	}
+ 
+-	clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
++	mt8173_top_clk_data = clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
+ 
+ 	mtk_clk_register_fixed_clks(fixed_clks, ARRAY_SIZE(fixed_clks), clk_data);
+ 	mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
+ 	mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes), base,
+ 			&mt8173_clk_lock, clk_data);
+ 
+-	clk_prepare_enable(clk_data->clks[CLK_TOP_CCI400_SEL]);
+-
+ 	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+ 	if (r)
+ 		pr_err("%s(): could not register clock provider: %d\n",
+ 			__func__, r);
++
++	mtk_clk_enable_critical();
+ }
+ CLK_OF_DECLARE(mtk_topckgen, "mediatek,mt8173-topckgen", mtk_topckgen_init);
+ 
+@@ -817,13 +833,13 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
+ {
+ 	struct clk_onecell_data *clk_data;
+ 
+-	clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
++	mt8173_pll_clk_data = clk_data = mtk_alloc_clk_data(CLK_APMIXED_NR_CLK);
+ 	if (!clk_data)
+ 		return;
+ 
+ 	mtk_clk_register_plls(node, plls, ARRAY_SIZE(plls), clk_data);
+ 
+-	clk_prepare_enable(clk_data->clks[CLK_APMIXED_ARMCA15PLL]);
++	mtk_clk_enable_critical();
+ }
+ CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8173-apmixedsys",
+ 		mtk_apmixedsys_init);
+-- 
 1.8.1.1.dirty
