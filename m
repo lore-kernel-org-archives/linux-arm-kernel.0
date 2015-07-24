@@ -1,34 +1,54 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Jul 2015 22:04:23 -0600
-Subject: [PATCH] irqchip: bcm2835: Add FIQ support
-In-Reply-To: <55AFA3BD.80507@tronnes.org>
-References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
- <55822C71.2040409@wwwdotorg.org> <55AFA3BD.80507@tronnes.org>
-Message-ID: <55B1B947.6080102@wwwdotorg.org>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Fri, 24 Jul 2015 13:08:27 +0900
+Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+In-Reply-To: <55B1B3B0.8090106@kernel.org>
+References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
+ <4464631.oZyVO4Z0Ov@amdc1976> <093101d0b8c3$4b5d3ec0$e217bc40$@kernel.org>
+ <20150724003005.642.21781@quantum> <55B1B3B0.8090106@kernel.org>
+Message-ID: <55B1BA3B.3080906@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 08:07 AM, Noralf Tr?nnes wrote:
+On 07/24/15 12:40, Kukjin Kim wrote:
+> On 07/24/15 09:30, Michael Turquette wrote:
+>> Quoting Kukjin Kim (2015-07-07 07:43:31)
+>>> Bartlomiej Zolnierkiewicz wrote:
 > 
-> Den 18.06.2015 04:26, skrev Stephen Warren:
->> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
->>> Add a duplicate irq range with an offset on the hwirq's so the
->>> driver can detect that enable_fiq() is used.
->>> Tested with downstream dwc_otg USB controller driver.
->> This basically looks OK, but a few comments/thoughts:
+> [...]
+> 
+>>>>> Chanwoo Choi (3):
+>>>>>   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
+>>>>>   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+>>>>>   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
+>>>>>
+>>>>>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+>>>>>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+>>>>>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+>>>>>  arch/arm/mach-exynos/exynos.c           |  1 +
+>>>>>  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
+>>>>>  include/dt-bindings/clock/exynos3250.h  |  1 +
+>>>>>  6 files changed, 55 insertions(+), 2 deletions(-)
+>>>>
+>>>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+>>>>
+>>>> Thank you for working on this.
+>>>>
+>>> +1 Thanks.
+>>>
+>>> Mike and Sylwester, if you're OK on this series, I'd like to pick up in Samsung
+>>> tree together. And if you want, I could provide topic branch for clk tree.
 >>
->> a) Should the Kconfig change be a separate patch since it's a separate
->> subsystem?
+>> Kukjin,
+>>
+>> A topic branch would be great.
+>>
+> Sure, BTW it means you did 'ack' on this clk change? If not, please let
+> em know ;-) I'll let you know once the topic branch is ready.
 > 
-> Is this a yes since you haven't acked it?
+Mike,
 
-I didn't ack it because I thought there were still outstanding review
-comments. Looking back at the thread, everything is resolved.
+Done, the topic branch 'v4.3-topic/clk-samsung' in samsung tree is for
+your clk tree.
 
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-
-Whether the driver and Kconfig patch need to be in separate patches
-largely depends on who will merge it. If there's a desire to merge the
-two parts through separate subsystems, separate patches will be needed,
-else not. I'll leave that up to the IRQ subsystem maintainers and Lee
-(or Eric) since they're actually merging the bcm2835 patches.
+Thanks,
+Kukjin
