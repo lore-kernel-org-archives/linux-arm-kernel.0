@@ -1,50 +1,39 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Jul 2015 10:40:31 +0200
-Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
-Message-ID: <8769951.Y5Edyg2WDJ@ubix>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 24 Jul 2015 17:41:15 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.3
+Message-ID: <cover.1437725206.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 20, 2015 04:17:15 PM YH Huang wrote:
-> Document the device-tree binding of MediatTek display PWM.
-> The PWM has one channel to control the backlight brightness for display.
-> It supports MT8173 and MT6595.
-> 
-> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> ---
->  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42
-> ++++++++++++++++++++++ 1 file changed, 42 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt new file mode
-> 100644
-> index 0000000..f8f59ba
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> @@ -0,0 +1,42 @@
-> +MediaTek display PWM controller
-> +
-> +Required properties:
-> + - compatible: should be "mediatek,<name>-disp-pwm":
-> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-I had another look on the mt6589 datasheet and for me it doesn't look like as 
-if this drivers is compatible to mt6589.
+Please consider these second round of Renesas ARM based SoC cleanup for v4.3.
 
-DISP_PWM_CON_0 offset 0x10 maps to interrupt enable register and 
-DISP_PWM_CON_1 offset 0x14 maps to interrupt status register.
+This pull request is based on the previous round of
+such requests, tagged as renesas-cleanup-for-v4.3,
+which I have already sent a pull-request for.
 
-This looks wrong to me, as you use both registers to write clock divider and 
-clock period.
 
-Regarding that this is v6 of the patch set, I would propose that you just drop 
-the compatible string for mt6589 or you implement the register offset on basis 
-of the compatible string so that mt6589 can you the driver as well.
+The following changes since commit 20834a406ee20b57c796f9911f06600b71c75788:
 
-Best regards,
-Matthias
+  ARM: shmobile: timer: r8a73a4 and r8a7790 are multi-platform only (2015-07-06 09:29:46 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v4.3
+
+for you to fetch changes up to 151dd346a2dadaa151d5110553e3fb08774c888e:
+
+  ARM: shmobile: apmu: silence build warnings (2015-07-14 16:35:24 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Cleanup for v4.3
+
+* Silence APMU build warnings
+
+----------------------------------------------------------------
+Wolfram Sang (1):
+      ARM: shmobile: apmu: silence build warnings
+
+ arch/arm/mach-shmobile/platsmp-apmu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
