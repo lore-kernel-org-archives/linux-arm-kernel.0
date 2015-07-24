@@ -1,103 +1,54 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Jul 2015 10:52:49 +0100
-Subject: [PATCH 3/6] mailbox: Add support for ST's Mailbox IP
-In-Reply-To: <CALW4P+K5PqVxPehWcSX2-t_rENpsV_RB7TNeJ9sN-EdZUOXm4Q@mail.gmail.com>
-References: <1437134647-28298-1-git-send-email-lee.jones@linaro.org>
- <1437134647-28298-4-git-send-email-lee.jones@linaro.org>
- <CALW4P+K5PqVxPehWcSX2-t_rENpsV_RB7TNeJ9sN-EdZUOXm4Q@mail.gmail.com>
-Message-ID: <20150724095249.GB3436@x1>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 24 Jul 2015 10:51:58 +0100
+Subject: [Xen-devel] [PATCH v2 01/20] xen: Add Xen specific page definition
+In-Reply-To: <55B209D9.1080602@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
+ <55B20540.3020000@citrix.com> <55B207C6.4020300@citrix.com>
+ <55B209D9.1080602@citrix.com>
+Message-ID: <55B20ABE.7000609@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Alexey Klimov wrote:
-> On Fri, Jul 17, 2015 at 3:04 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > ST's platforms currently support a maximum of 5 Mailboxes, one for
-> > each of the supported co-processors situated on the platform.  Each
-> > Mailbox is divided up into 4 instances which consist of 32 channels.
-> > Messages are passed between the application and co-processors using
-> > shared memory areas.  It is the Client's responsibility to manage
-> > these areas.
-> >
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/mailbox/Kconfig       |   7 +
-> >  drivers/mailbox/Makefile      |   2 +
-> >  drivers/mailbox/mailbox-sti.c | 562 ++++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 571 insertions(+)
-> >  create mode 100644 drivers/mailbox/mailbox-sti.c
+On 24/07/15 10:48, David Vrabel wrote:
+> On 24/07/15 10:39, Julien Grall wrote:
+>> Hi David,
+>>
+>> On 24/07/15 10:28, David Vrabel wrote:
+>>> On 09/07/15 21:42, Julien Grall wrote:
+>>>> The Xen hypercall interface is always using 4K page granularity on ARM
+>>>> and x86 architecture.
+>>>>
+>>>> With the incoming support of 64K page granularity for ARM64 guest, it
+>>>> won't be possible to re-use the Linux page definition in Xen drivers.
+>>>>
+>>>> Introduce Xen page definition helpers based on the Linux page
+>>>> definition. They have exactly the same name but prefixed with
+>>>> XEN_/xen_ prefix.
+>>>>
+>>>> Also modify page_to_pfn to use new Xen page definition.
+>>>>
+>>>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
+>>>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>>>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>>>> Cc: David Vrabel <david.vrabel@citrix.com>
+>>>> ---
+>>>>     I'm wondering if we should drop page_to_pfn has the macro will likely
+>>>>     misuse when Linux is using 64KB page granularity.
+>>>
+>>> I think we want xen_gfn_to_page() and xen_page_to_gfn() and Xen
+>>> front/back drivers never deal with PFNs only GFNs.
+>>
+>> What is xen_gfn_to_page and xen_page_to_gfn? Neither Linux, nor my
+>> series have them.
 > 
-> [..]
-> 
-> > +static irqreturn_t sti_mbox_thread_handler(int irq, void *data)
-> > +{
-> > +       struct sti_mbox_device *mdev = data;
-> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-> > +       struct mbox_chan *chan;
-> > +       unsigned int instance;
-> > +
-> > +       for (instance = 0; instance < pdata->num_inst; instance++) {
-> > +keep_looking:
-> > +               chan = sti_mbox_irq_to_channel(mdev, instance);
-> > +               if (!chan)
-> > +                       continue;
-> > +
-> > +               mbox_chan_received_data(chan, NULL);
-> > +               sti_mbox_clear_irq(chan);
-> > +               sti_mbox_enable_channel(chan);
-> > +               goto keep_looking;
-> > +       }
-> > +
-> > +       return IRQ_HANDLED;
-> > +}
-> > +
-> > +static irqreturn_t sti_mbox_irq_handler(int irq, void *data)
-> > +{
-> > +       struct sti_mbox_device *mdev = data;
-> > +       struct sti_mbox_pdata *pdata = dev_get_platdata(mdev->dev);
-> > +       struct sti_channel *chan_info;
-> > +       struct mbox_chan *chan;
-> > +       unsigned int instance;
-> > +       int ret = IRQ_NONE;
-> > +
-> > +       for (instance = 0; instance < pdata->num_inst; instance++) {
-> > +               chan = sti_mbox_irq_to_channel(mdev, instance);
-> > +               if (!chan)
-> > +                       continue;
-> > +               chan_info = chan->con_priv;
-> > +
-> > +               if (!sti_mbox_channel_is_enabled(chan)) {
-> > +                       dev_warn(mdev->dev,
-> > +                                "Unexpected IRQ: %s\n"
-> > +                                "  instance: %d: channel: %d [enabled: %x]\n",
-> > +                                mdev->name, chan_info->instance,
-> > +                                chan_info->channel, mdev->enabled[instance]);
-> > +                       ret = IRQ_HANDLED;
-> > +                       continue;
-> > +               }
-> > +
-> > +               sti_mbox_disable_channel(chan);
-> > +               ret = IRQ_WAKE_THREAD;
-> > +       }
-> > +
-> > +       if (ret == IRQ_NONE)
-> > +               dev_err(mdev->dev, "Spurious IRQ - was a channel requested?\n");
-> > +
-> > +       return ret;
-> > +}
-> 
-> With such usage of ret variable can it happen that handling of last
-> but one channel/instance will set ret to IRQ_WAKE_THREAD and at the
-> same time handling of last channel/instance will set ret to
-> IRQ_HANDLED during iteration loop and finally generic subsystem will
-> not wake up thread handler because it will receive IRQ_HANDLED?
-> Just checking.
+> I suggesting that you introduce these.
 
-Yes, I guess that it theoretically possible.  Now fixed.
+It's still not clear to me what you are suggesting here... Do you
+suggest to rename xen_pfn_to_page and xen_page_to_pfn by xen_gfn_to_page
+and xen_page_to_gfn?
 
-Thanks for the spot.
+Regards,
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Julien Grall
