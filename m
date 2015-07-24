@@ -1,63 +1,139 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 24 Jul 2015 11:10:39 +0100
-Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
- a Linux page into Xen page
-In-Reply-To: <55B20B56.7020605@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
- <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
-Message-ID: <55B20F1F.60902@citrix.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 24 Jul 2015 11:16:20 +0100
+Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
+ Flexible Serial Communication Unit
+In-Reply-To: <55B1195F.4000104@atmel.com>
+References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
+ <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
+ <20150723073217.GT3061@x1> <20150723100101.7290242b@bbrezillon>
+ <20150723091311.GX3061@x1> <20150723145007.099d01c2@bbrezillon>
+ <55B1195F.4000104@atmel.com>
+Message-ID: <20150724101620.GE3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 10:54, Julien Grall wrote:
-> On 24/07/15 10:31, David Vrabel wrote:
->> On 09/07/15 21:42, Julien Grall wrote:
->>> The Xen interface is always using 4KB page. This means that a Linux page
->>> may be split across multiple Xen page when the page granularity is not
->>> the same.
->>>
->>> This helper will break down a Linux page into 4KB chunk and call the
->>> helper on each of them.
->> [...]
->>> --- a/include/xen/page.h
->>> +++ b/include/xen/page.h
->>> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
->>>  
->>>  extern unsigned long xen_released_pages;
->>>  
->>> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
->>> +
->>> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
->>> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
->>> +				    void *data)
->>
->> I think this should be outlined (unless you have measurements that
->> support making it inlined).
-> 
-> I don't have any performance measurements. Although, when Linux is using
-> 4KB page granularity, the loop in this helper will be dropped by the
-> helper. The code would look like:
-> 
-> unsigned long pfn = xen_page_to_pfn(page);
-> 
-> ret = fn(page, fn, data);
-> if (ret)
->   return ret;
-> 
-> The compiler could even inline the callback (fn). So it drops 2
-> functions call.
+On Thu, 23 Jul 2015, Cyrille Pitchen wrote:
 
-Ok, keep it inlined.
-
->> Also perhaps make it
->>
->> int xen_for_each_gfn(struct page *page,
->>                      xen_gfn_fn_t fn, void *data);
+> Hi all,
 > 
-> gfn standing for Guest Frame Number right?
+> Le 23/07/2015 14:50, Boris Brezillon a ?crit :
+> > On Thu, 23 Jul 2015 10:13:11 +0100
+> > Lee Jones <lee.jones@linaro.org> wrote:
+> > 
+> >> On Thu, 23 Jul 2015, Boris Brezillon wrote:
+> >>
+> >>> Hi Lee,
+> >>>
+> >>> On Thu, 23 Jul 2015 08:32:17 +0100
+> >>> Lee Jones <lee.jones@linaro.org> wrote:
+> >>>
+> >>>> On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
+> >>>>> +	for_each_child_of_node(np, child) {
+> >>>>> +		const char *compatible;
+> >>>>> +		int cplen;
+> >>>>> +
+> >>>>> +		if (!of_device_is_available(child))
+> >>>>> +			continue;
+> >>>>> +
+> >>>>> +		compatible = of_get_property(child, "compatible", &cplen);
+> >>>>> +		if (!compatible || strlen(compatible) > cplen)
+> >>>>> +			continue;
+> >>>>> +
+> >>>>> +		if (strstr(compatible, "-usart")) {
+> >>>>> +			opmode = FLEX_MR_OPMODE_USART;
+> >>>>> +			break;
+> >>>>> +		}
+> >>>>> +
+> >>>>> +		if (strstr(compatible, "-spi")) {
+> >>>>> +			opmode = FLEX_MR_OPMODE_SPI;
+> >>>>> +			break;
+> >>>>> +		}
+> >>>>> +
+> >>>>> +		if (strstr(compatible, "-i2c")) {
+> >>>>> +			opmode = FLEX_MR_OPMODE_TWI;
+> >>>>> +			break;
+> >>>>> +		}
+> >>>>> +	}
+> >>>>
+> >>>> From what I understand Flexcom is a wrapper which can sit above any
+> >>>> number of SPI, I2C and/or UART devices.  Devices which you don't
+> >>>> really have any control over (source code wise).  So wouldn't it be
+> >>>> better to match on the details you do have control over i.e. the node
+> >>>> name, rather than the compatible string?
+> >>>>
+> >>>> I would personally match on of_find_node_by_name() to future-proof
+> >>>> your implementation.
+> >>>
+> >>> Actually, I think using compatible strings is more future-proof than
+> >>> using the node names, because nothing in the DT bindings doc enforce the
+> >>> node name, and usually what we use to attach a node to a specific
+> >>> driver is the compatible string (this one is specified in the bindings
+> >>> doc).
+> >>
+> >> I know what you're saying, but what if someone uses the Flexcom driver
+> >> to wrap a different type of SPI driver where (for instance) the
+> >> compatible string used is "<name>-<newtype>".  Then we'd have to keep
+> >> adding more lines here to accommodate.
+> >>
+> >> Whereas if we used the child node name which only pertains to _this_
+> >> driver, we would then have full control and know that (unless it
+> >> Flexcom is used for a completely different type of serial controller)
+> >> we wouldn't have to keep expanding the code to accommodate.
+> > 
+> > You're right about the complexity implied by the compat string
+> > maintenance, but I still think using node names to detect the mode is
+> > a bad idea.
+> > 
+> > Let's take another example making both solution unsuitable: what if
+> > the flexcom-v2 exposes 2 devices of the same type, they will both have
+> > the same name and the same compatible string, and we'll have no way to
+> > detect the appropriate mode. That's why I think none of our suggestion
+> > is future-proof.
+> > 
+> >>
+> >>> Regarding the implementation itself, I would match the child node with
+> >>> an of_device_id table rather than trying to find a specific substring
+> >>> in the compatible string, but I think that's only a matter of taste.
+> >>
+> >> You mean duplicate each of the supported device's compatible strings
+> >> in this driver, then fetch the attributed of_match_device()->data
+> >> value?
+> >>
+> > 
+> > Yes, and that's definitely not a good idea, but I think Cyrille has
+> > found a better approach (I'll let him explain).
+> 
+> Indeed, what about taking advantage of the "ranges" property?
+> 
+> For the Flexcom:
+> #address-cells = <2>;
+> #size-cells = <1>;
+> ranges = <1 0 0xf8034200 0x200    /* opmode 1: USART */
+>           2 0 0xf8034400 0x200    /* opmode 2: SPI */
+>           3 0 0xf8034600 0x200>;  /* opmode 3: I2C */
+> 
+> Then for the single available child (for instance the SPI controller):
+> reg = <2 0 0x200>;
+> 
+> So the Operating Mode to be set into the Flexcom Mode Register is read from
+> the very first u32 of the "reg" property of the child.
+> 
+> No need to introduce any new DT property and the mapping remains easy to
+> maintain to follow hardware upgrades.
 
-Yes.  This suggestion is just changing the name to make it more obvious
-what it does.
+When we do things like this we normally do:
 
-David
+    reg <base base_size>, <mode mode_size>;
+    reg-names "base", "mode";
+
+Then use:
+
+     platform_get_resource_byname()
+
+.... to fetch them.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
