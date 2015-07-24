@@ -1,261 +1,271 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jul 2015 11:42:03 +0100
-Subject: [PATCH v2 12/20] arm64: cmpxchg: patch in lse instructions when
+Date: Fri, 24 Jul 2015 11:42:00 +0100
+Subject: [PATCH v2 09/20] arm64: locks: patch in lse instructions when
  supported by the CPU
 In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
 References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1437734531-10698-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
 it makes sense to use them in preference to ll/sc sequences.
 
-This patch introduces runtime patching of our cmpxchg primitives so that
-the LSE cas instruction is used instead.
+This patch introduces runtime patching of our locking functions so that
+LSE atomic instructions are used for spinlocks and rwlocks.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic.h       |  3 +-
- arch/arm64/include/asm/atomic_ll_sc.h | 38 ++++++++++++++++
- arch/arm64/include/asm/atomic_lse.h   | 39 ++++++++++++++++
- arch/arm64/include/asm/cmpxchg.h      | 84 ++++++++---------------------------
- 4 files changed, 98 insertions(+), 66 deletions(-)
+ arch/arm64/include/asm/spinlock.h | 137 ++++++++++++++++++++++++++++++--------
+ 1 file changed, 108 insertions(+), 29 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic.h b/arch/arm64/include/asm/atomic.h
-index cb53efa23f62..ee32776d926c 100644
---- a/arch/arm64/include/asm/atomic.h
-+++ b/arch/arm64/include/asm/atomic.h
-@@ -24,7 +24,6 @@
- #include <linux/types.h>
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index 0f08ba5cfb33..87ae7efa1211 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -16,6 +16,7 @@
+ #ifndef __ASM_SPINLOCK_H
+ #define __ASM_SPINLOCK_H
  
- #include <asm/barrier.h>
--#include <asm/cmpxchg.h>
- #include <asm/lse.h>
++#include <asm/lse.h>
+ #include <asm/spinlock_types.h>
+ #include <asm/processor.h>
  
- #define ATOMIC_INIT(i)	{ (i) }
-@@ -41,6 +40,8 @@
+@@ -38,11 +39,21 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
  
- #undef __ARM64_IN_ATOMIC_IMPL
- 
-+#include <asm/cmpxchg.h>
+ 	asm volatile(
+ 	/* Atomically increment the next ticket. */
++	ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ "	prfm	pstl1strm, %3\n"
+ "1:	ldaxr	%w0, %3\n"
+ "	add	%w1, %w0, %w5\n"
+ "	stxr	%w2, %w1, %3\n"
+-"	cbnz	%w2, 1b\n"
++"	cbnz	%w2, 1b\n",
++	/* LSE atomics */
++"	mov	%w2, %w5\n"
++"	ldadda	%w2, %w0, %3\n"
++"	nop\n"
++"	nop\n"
++"	nop\n"
++	)
 +
- /*
-  * On ARM, ordinary assignment (str instruction) doesn't clear the local
-  * strex/ldrex monitor on some implementations. The reason we can use it for
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index 9cf298914ac3..b4298f9a898f 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -205,4 +205,42 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
- }
- __LL_SC_EXPORT(atomic64_dec_if_positive);
+ 	/* Did we get the lock? */
+ "	eor	%w1, %w0, %w0, ror #16\n"
+ "	cbz	%w1, 3f\n"
+@@ -67,15 +78,25 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+ 	unsigned int tmp;
+ 	arch_spinlock_t lockval;
  
-+#define __CMPXCHG_CASE(w, sz, name, mb, cl)				\
-+__LL_SC_INLINE unsigned long						\
-+__LL_SC_PREFIX(__cmpxchg_case_##name(volatile void *ptr,		\
-+				     unsigned long old,			\
-+				     unsigned long new))		\
-+{									\
-+	unsigned long tmp, oldval;					\
-+									\
-+	asm volatile(							\
-+	"	" #mb "\n"						\
-+	"1:	ldxr" #sz "\t%" #w "[oldval], %[v]\n"			\
-+	"	eor	%" #w "[tmp], %" #w "[oldval], %" #w "[old]\n"	\
-+	"	cbnz	%" #w "[tmp], 2f\n"				\
-+	"	stxr" #sz "\t%w[tmp], %" #w "[new], %[v]\n"		\
-+	"	cbnz	%w[tmp], 1b\n"					\
-+	"	" #mb "\n"						\
-+	"	mov	%" #w "[oldval], %" #w "[old]\n"		\
-+	"2:"								\
-+	: [tmp] "=&r" (tmp), [oldval] "=&r" (oldval),			\
-+	  [v] "+Q" (*(unsigned long *)ptr)				\
-+	: [old] "Lr" (old), [new] "r" (new)				\
-+	: cl);								\
-+									\
-+	return oldval;							\
-+}									\
-+__LL_SC_EXPORT(__cmpxchg_case_##name);
-+
-+__CMPXCHG_CASE(w, b,    1,        ,         )
-+__CMPXCHG_CASE(w, h,    2,        ,         )
-+__CMPXCHG_CASE(w,  ,    4,        ,         )
-+__CMPXCHG_CASE( ,  ,    8,        ,         )
-+__CMPXCHG_CASE(w, b, mb_1, dmb ish, "memory")
-+__CMPXCHG_CASE(w, h, mb_2, dmb ish, "memory")
-+__CMPXCHG_CASE(w,  , mb_4, dmb ish, "memory")
-+__CMPXCHG_CASE( ,  , mb_8, dmb ish, "memory")
-+
-+#undef __CMPXCHG_CASE
-+
- #endif	/* __ASM_ATOMIC_LL_SC_H */
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index e6e544bce331..5136c3ab48e9 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -243,4 +243,43 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
+-	asm volatile(
+-"	prfm	pstl1strm, %2\n"
+-"1:	ldaxr	%w0, %2\n"
+-"	eor	%w1, %w0, %w0, ror #16\n"
+-"	cbnz	%w1, 2f\n"
+-"	add	%w0, %w0, %3\n"
+-"	stxr	%w1, %w0, %2\n"
+-"	cbnz	%w1, 1b\n"
+-"2:"
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	prfm	pstl1strm, %2\n"
++	"1:	ldaxr	%w0, %2\n"
++	"	eor	%w1, %w0, %w0, ror #16\n"
++	"	cbnz	%w1, 2f\n"
++	"	add	%w0, %w0, %3\n"
++	"	stxr	%w1, %w0, %2\n"
++	"	cbnz	%w1, 1b\n"
++	"2:",
++	/* LSE atomics */
++	"	ldr	%w0, %2\n"
++	"	eor	%w1, %w0, %w0, ror #16\n"
++	"	cbnz	%w1, 1f\n"
++	"	add	%w1, %w0, %3\n"
++	"	casa	%w0, %w1, %2\n"
++	"	and	%w1, %w1, #0xffff\n"
++	"	eor	%w1, %w1, %w0, lsr #16\n"
++	"1:")
+ 	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
+ 	: "I" (1 << TICKET_SHIFT)
+ 	: "memory");
+@@ -85,10 +106,19 @@ static inline int arch_spin_trylock(arch_spinlock_t *lock)
  
- #undef __LL_SC_ATOMIC64
- 
-+#define __LL_SC_CMPXCHG(op)	__LL_SC_CALL(__cmpxchg_case_##op)
-+
-+#define __CMPXCHG_CASE(w, sz, name, mb, cl...)				\
-+static inline unsigned long __cmpxchg_case_##name(volatile void *ptr,	\
-+						  unsigned long old,	\
-+						  unsigned long new)	\
-+{									\
-+	register unsigned long x0 asm ("x0") = (unsigned long)ptr;	\
-+	register unsigned long x1 asm ("x1") = old;			\
-+	register unsigned long x2 asm ("x2") = new;			\
-+									\
-+	asm volatile(ARM64_LSE_ATOMIC_INSN(				\
-+	/* LL/SC */							\
-+	"nop\n"								\
-+	__LL_SC_CMPXCHG(name)						\
-+	"nop",								\
-+	/* LSE atomics */						\
-+	"	mov	" #w "30, %" #w "[old]\n"			\
-+	"	cas" #mb #sz "\t" #w "30, %" #w "[new], %[v]\n"		\
-+	"	mov	%" #w "[ret], " #w "30")			\
-+	: [ret] "+r" (x0), [v] "+Q" (*(unsigned long *)ptr)		\
-+	: [old] "r" (x1), [new] "r" (x2)				\
-+	: "x30" , ##cl);						\
-+									\
-+	return x0;							\
-+}
-+
-+__CMPXCHG_CASE(w, b,    1,   )
-+__CMPXCHG_CASE(w, h,    2,   )
-+__CMPXCHG_CASE(w,  ,    4,   )
-+__CMPXCHG_CASE(x,  ,    8,   )
-+__CMPXCHG_CASE(w, b, mb_1, al, "memory")
-+__CMPXCHG_CASE(w, h, mb_2, al, "memory")
-+__CMPXCHG_CASE(w,  , mb_4, al, "memory")
-+__CMPXCHG_CASE(x,  , mb_8, al, "memory")
-+
-+#undef __LL_SC_CMPXCHG
-+#undef __CMPXCHG_CASE
-+
- #endif	/* __ASM_ATOMIC_LSE_H */
-diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
-index d0cce8068902..60a558127cef 100644
---- a/arch/arm64/include/asm/cmpxchg.h
-+++ b/arch/arm64/include/asm/cmpxchg.h
-@@ -21,6 +21,7 @@
- #include <linux/bug.h>
- #include <linux/mmdebug.h>
- 
-+#include <asm/atomic.h>
- #include <asm/barrier.h>
- #include <asm/lse.h>
- 
-@@ -111,74 +112,20 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
- static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
- 				      unsigned long new, int size)
+ static inline void arch_spin_unlock(arch_spinlock_t *lock)
  {
--	unsigned long oldval = 0, res;
--
- 	switch (size) {
- 	case 1:
--		do {
--			asm volatile("// __cmpxchg1\n"
--			"	ldxrb	%w1, %2\n"
--			"	mov	%w0, #0\n"
--			"	cmp	%w1, %w3\n"
--			"	b.ne	1f\n"
--			"	stxrb	%w0, %w4, %2\n"
--			"1:\n"
--				: "=&r" (res), "=&r" (oldval), "+Q" (*(u8 *)ptr)
--				: "Ir" (old), "r" (new)
--				: "cc");
--		} while (res);
--		break;
--
-+		return __cmpxchg_case_1(ptr, old, new);
- 	case 2:
--		do {
--			asm volatile("// __cmpxchg2\n"
--			"	ldxrh	%w1, %2\n"
--			"	mov	%w0, #0\n"
--			"	cmp	%w1, %w3\n"
--			"	b.ne	1f\n"
--			"	stxrh	%w0, %w4, %2\n"
--			"1:\n"
--				: "=&r" (res), "=&r" (oldval), "+Q" (*(u16 *)ptr)
--				: "Ir" (old), "r" (new)
--				: "cc");
--		} while (res);
--		break;
--
-+		return __cmpxchg_case_2(ptr, old, new);
- 	case 4:
--		do {
--			asm volatile("// __cmpxchg4\n"
--			"	ldxr	%w1, %2\n"
--			"	mov	%w0, #0\n"
--			"	cmp	%w1, %w3\n"
--			"	b.ne	1f\n"
--			"	stxr	%w0, %w4, %2\n"
--			"1:\n"
--				: "=&r" (res), "=&r" (oldval), "+Q" (*(u32 *)ptr)
--				: "Ir" (old), "r" (new)
--				: "cc");
--		} while (res);
--		break;
--
-+		return __cmpxchg_case_4(ptr, old, new);
- 	case 8:
--		do {
--			asm volatile("// __cmpxchg8\n"
--			"	ldxr	%1, %2\n"
--			"	mov	%w0, #0\n"
--			"	cmp	%1, %3\n"
--			"	b.ne	1f\n"
--			"	stxr	%w0, %4, %2\n"
--			"1:\n"
--				: "=&r" (res), "=&r" (oldval), "+Q" (*(u64 *)ptr)
--				: "Ir" (old), "r" (new)
--				: "cc");
--		} while (res);
--		break;
--
-+		return __cmpxchg_case_8(ptr, old, new);
- 	default:
- 		BUILD_BUG();
- 	}
- 
--	return oldval;
-+	unreachable();
+-	asm volatile(
+-"	stlrh	%w1, %0\n"
+-	: "=Q" (lock->owner)
+-	: "r" (lock->owner + 1)
++	unsigned long tmp;
++
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	ldr	%w1, %0\n"
++	"	add	%w1, %w1, #1\n"
++	"	stlrh	%w1, %0",
++	/* LSE atomics */
++	"	mov	%w1, #1\n"
++	"	nop\n"
++	"	staddlh	%w1, %0")
++	: "=Q" (lock->owner), "=&r" (tmp)
++	:
+ 	: "memory");
  }
  
- #define system_has_cmpxchg_double()     1
-@@ -229,13 +176,20 @@ static inline int __cmpxchg_double_mb(volatile void *ptr1, volatile void *ptr2,
- static inline unsigned long __cmpxchg_mb(volatile void *ptr, unsigned long old,
- 					 unsigned long new, int size)
+@@ -123,13 +153,24 @@ static inline void arch_write_lock(arch_rwlock_t *rw)
  {
--	unsigned long ret;
--
--	smp_mb();
--	ret = __cmpxchg(ptr, old, new, size);
--	smp_mb();
-+	switch (size) {
-+	case 1:
-+		return __cmpxchg_case_mb_1(ptr, old, new);
-+	case 2:
-+		return __cmpxchg_case_mb_2(ptr, old, new);
-+	case 4:
-+		return __cmpxchg_case_mb_4(ptr, old, new);
-+	case 8:
-+		return __cmpxchg_case_mb_8(ptr, old, new);
-+	default:
-+		BUILD_BUG();
-+	}
+ 	unsigned int tmp;
  
--	return ret;
-+	unreachable();
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"	sevl\n"
+ 	"1:	wfe\n"
+ 	"2:	ldaxr	%w0, %1\n"
+ 	"	cbnz	%w0, 1b\n"
+ 	"	stxr	%w0, %w2, %1\n"
+ 	"	cbnz	%w0, 2b\n"
++	"	nop",
++	/* LSE atomics */
++	"1:	mov	%w0, wzr\n"
++	"2:	casa	%w0, %w2, %1\n"
++	"	cbz	%w0, 3f\n"
++	"	ldxr	%w0, %1\n"
++	"	cbz	%w0, 2b\n"
++	"	wfe\n"
++	"	b	1b\n"
++	"3:")
+ 	: "=&r" (tmp), "+Q" (rw->lock)
+ 	: "r" (0x80000000)
+ 	: "memory");
+@@ -139,12 +180,18 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+ {
+ 	unsigned int tmp;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	ldaxr	%w0, %1\n"
+ 	"	cbnz	%w0, 2f\n"
+ 	"	stxr	%w0, %w2, %1\n"
+ 	"	cbnz	%w0, 1b\n"
+-	"2:\n"
++	"2:",
++	/* LSE atomics */
++	"	mov	%w0, wzr\n"
++	"	casa	%w0, %w2, %1\n"
++	"	nop\n"
++	"	nop")
+ 	: "=&r" (tmp), "+Q" (rw->lock)
+ 	: "r" (0x80000000)
+ 	: "memory");
+@@ -154,9 +201,10 @@ static inline int arch_write_trylock(arch_rwlock_t *rw)
+ 
+ static inline void arch_write_unlock(arch_rwlock_t *rw)
+ {
+-	asm volatile(
+-	"	stlr	%w1, %0\n"
+-	: "=Q" (rw->lock) : "r" (0) : "memory");
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	"	stlr	wzr, %0",
++	"	swpl	wzr, wzr, %0")
++	: "=Q" (rw->lock) :: "memory");
  }
  
- #define cmpxchg(ptr, o, n) \
+ /* write_can_lock - would write_trylock() succeed? */
+@@ -173,6 +221,10 @@ static inline void arch_write_unlock(arch_rwlock_t *rw)
+  *
+  * The memory barriers are implicit with the load-acquire and store-release
+  * instructions.
++ *
++ * Note that in UNDEFINED cases, such as unlocking a lock twice, the LL/SC
++ * and LSE implementations may exhibit different behaviour (although this
++ * will have no effect on lockdep).
+  */
+ static inline void arch_read_lock(arch_rwlock_t *rw)
+ {
+@@ -180,26 +232,43 @@ static inline void arch_read_lock(arch_rwlock_t *rw)
+ 
+ 	asm volatile(
+ 	"	sevl\n"
++	ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	wfe\n"
+ 	"2:	ldaxr	%w0, %2\n"
+ 	"	add	%w0, %w0, #1\n"
+ 	"	tbnz	%w0, #31, 1b\n"
+ 	"	stxr	%w1, %w0, %2\n"
+-	"	cbnz	%w1, 2b\n"
++	"	nop\n"
++	"	cbnz	%w1, 2b",
++	/* LSE atomics */
++	"1:	wfe\n"
++	"2:	ldxr	%w0, %2\n"
++	"	adds	%w1, %w0, #1\n"
++	"	tbnz	%w1, #31, 1b\n"
++	"	casa	%w0, %w1, %2\n"
++	"	sbc	%w0, %w1, %w0\n"
++	"	cbnz	%w0, 2b")
+ 	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+-	: "memory");
++	: "cc", "memory");
+ }
+ 
+ static inline void arch_read_unlock(arch_rwlock_t *rw)
+ {
+ 	unsigned int tmp, tmp2;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
+ 	"1:	ldxr	%w0, %2\n"
+ 	"	sub	%w0, %w0, #1\n"
+ 	"	stlxr	%w1, %w0, %2\n"
+-	"	cbnz	%w1, 1b\n"
++	"	cbnz	%w1, 1b",
++	/* LSE atomics */
++	"	movn	%w0, #0\n"
++	"	nop\n"
++	"	nop\n"
++	"	staddl	%w0, %2")
+ 	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+ 	: "memory");
+@@ -207,18 +276,28 @@ static inline void arch_read_unlock(arch_rwlock_t *rw)
+ 
+ static inline int arch_read_trylock(arch_rwlock_t *rw)
+ {
+-	unsigned int tmp, tmp2 = 1;
++	unsigned int tmp, tmp2;
+ 
+-	asm volatile(
++	asm volatile(ARM64_LSE_ATOMIC_INSN(
++	/* LL/SC */
++	"	mov	%w1, #1\n"
+ 	"1:	ldaxr	%w0, %2\n"
+ 	"	add	%w0, %w0, #1\n"
+ 	"	tbnz	%w0, #31, 2f\n"
+ 	"	stxr	%w1, %w0, %2\n"
+ 	"	cbnz	%w1, 1b\n"
+-	"2:\n"
+-	: "=&r" (tmp), "+r" (tmp2), "+Q" (rw->lock)
++	"2:",
++	/* LSE atomics */
++	"	ldr	%w0, %2\n"
++	"	adds	%w1, %w0, #1\n"
++	"	tbnz	%w1, #31, 1f\n"
++	"	casa	%w0, %w1, %2\n"
++	"	sbc	%w1, %w1, %w0\n"
++	"	nop\n"
++	"1:")
++	: "=&r" (tmp), "=&r" (tmp2), "+Q" (rw->lock)
+ 	:
+-	: "memory");
++	: "cc", "memory");
+ 
+ 	return !tmp2;
+ }
 -- 
 2.1.4
