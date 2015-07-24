@@ -1,37 +1,52 @@
 From: lee@kernel.org (Lee Jones)
-Date: Fri, 24 Jul 2015 16:23:36 +0100
-Subject: [PATCH v4 7/8] ARM: bcm2835: Tie SPI clock to the core clock rate.
-In-Reply-To: <1437420787-32137-8-git-send-email-eric@anholt.net>
-References: <1437420787-32137-1-git-send-email-eric@anholt.net>
- <1437420787-32137-8-git-send-email-eric@anholt.net>
-Message-ID: <20150724152336.GP3436@x1>
+Date: Fri, 24 Jul 2015 16:24:36 +0100
+Subject: [PATCH v7 1/3] dt/bindings: Add binding for the Raspberry Pi
+ firmware driver
+In-Reply-To: <1437198880-8467-1-git-send-email-eric@anholt.net>
+References: <1437198880-8467-1-git-send-email-eric@anholt.net>
+Message-ID: <20150724152436.GQ3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jul 2015, Eric Anholt wrote:
+On Fri, 17 Jul 2015, Eric Anholt wrote:
 
-> We were previously using a fixed clock declared in the 2835 DT, but
-> it's actually the core clock, and it might not be the same if you had
-> adjusted it using the firmware's config.txt.
+> This driver will provide support for calls into the firmware that will
+> be used by other drivers like cpufreq and vc4.
 > 
 > Signed-off-by: Eric Anholt <eric@anholt.net>
 > Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 > ---
->  arch/arm/boot/dts/bcm2835-rpi.dtsi | 4 ++++
->  1 file changed, 4 insertions(+)
+> 
+> v2: Improve commit message, point to mailbox.txt for how mboxes work.
+> v3: Use Lee's suggestion for mailbox phandle docs, fix spelling of
+>     "raspberry".
+> v4: Change the compatible string to "raspberrypi,bcm2835-firmware"
+>     (requested by Lee, agreed by Stephen)
+> v5: Add missing s-o-b, fix spelling.
+> 
+>  .../bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt      | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
 
-For my own reference:
- Acked-by: Lee Jones <lee@kernel.org>
+Acked-by: Lee Jones <lee@kernel.org>
 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index 9549eb8..0a32123 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -69,3 +69,7 @@
->  		 <&firmware_clocks RPI_CLOCK_CORE>;
->  	clock-names = "uartclk", "apb_pclk";
->  };
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> new file mode 100644
+> index 0000000..6824b31
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+> @@ -0,0 +1,14 @@
+> +Raspberry Pi VideoCore firmware driver
 > +
-> +&spi {
-> +	clocks = <&firmware_clocks RPI_CLOCK_CORE>;
+> +Required properties:
+> +
+> +- compatible:		Should be "raspberrypi,bcm2835-firmware"
+> +- mboxes:		Phandle to the firmware device's Mailbox.
+> +			  (See: ../mailbox/mailbox.txt for more information)
+> +
+> +Example:
+> +
+> +firmware {
+> +	compatible = "raspberrypi,bcm2835-firmware";
+> +	mboxes = <&mailbox>;
 > +};
