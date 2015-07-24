@@ -1,187 +1,135 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 24 Jul 2015 12:01:51 +0200
-Subject: [PATCH v8 2/2] mfd: atmel-flexcom: add a driver for Atmel Flexible
- Serial Communication Unit
-In-Reply-To: <cover.1437731428.git.cyrille.pitchen@atmel.com>
-References: <cover.1437731428.git.cyrille.pitchen@atmel.com>
-Message-ID: <cfa89adf3da1975b9eb2185c3961a09889e124bc.1437731428.git.cyrille.pitchen@atmel.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 24 Jul 2015 18:03:43 +0800
+Subject: [PATCH v2 6/7] irqchip: GIC: Switch ACPI support to stacked
+ domains
+In-Reply-To: <1437656713-9677-7-git-send-email-marc.zyngier@arm.com>
+References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+ <1437656713-9677-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55B20D7F.2050704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver supports the new Atmel Flexcom. The Flexcom is a wrapper which
-integrates one SPI controller, one I2C controller and one USART. Only one
-function can be enabled at a time. This driver selects the function once
-for all, when the Flexcom is probed, using the "reg" property of the first
-(should be unique) available DT child node.
+On 07/23/2015 09:05 PM, Marc Zyngier wrote:
+> Now that the basic ACPI GSI code is irq domain aware, make sure
+> that the ACPI support in the GIC doesn't pointlessly deviate from
+> the DT path.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-This driver has chosen to present the Flexcom to the system as a MFD so
-the implementation is seamless for the existing Atmel SPI, I2C and USART
-drivers.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Also the Flexcom embeds FIFOs: the latest patches of the SPI, I2C and
-USART drivers take advantage of this new feature.
+Thanks
+Hanjun
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/mfd/Kconfig         |  11 +++++
- drivers/mfd/Makefile        |   1 +
- drivers/mfd/atmel-flexcom.c | 113 ++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 125 insertions(+)
- create mode 100644 drivers/mfd/atmel-flexcom.c
-
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index 653815950aa2..2c75472c679c 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -60,6 +60,17 @@ config MFD_AAT2870_CORE
- 	  additional drivers must be enabled in order to use the
- 	  functionality of the device.
- 
-+config MFD_ATMEL_FLEXCOM
-+	tristate "Atmel Flexcom (Flexible Serial Communication Unit)"
-+	select MFD_CORE
-+	depends on OF
-+	help
-+	  Select this to get support for Atmel Flexcom. This is a wrapper
-+	  which embeds a SPI controller, a I2C controller and a USART. Only
-+	  one function can be used at a time. The choice is done at boot time
-+	  by the probe function of this MFD driver according to a device tree
-+	  property.
-+
- config MFD_ATMEL_HLCDC
- 	tristate "Atmel HLCDC (High-end LCD Controller)"
- 	select MFD_CORE
-diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-index ea40e076cb61..0705eb2d873d 100644
---- a/drivers/mfd/Makefile
-+++ b/drivers/mfd/Makefile
-@@ -160,6 +160,7 @@ obj-$(CONFIG_MFD_SPMI_PMIC)	+= qcom-spmi-pmic.o
- obj-$(CONFIG_TPS65911_COMPARATOR)	+= tps65911-comparator.o
- obj-$(CONFIG_MFD_TPS65090)	+= tps65090.o
- obj-$(CONFIG_MFD_AAT2870_CORE)	+= aat2870-core.o
-+obj-$(CONFIG_MFD_ATMEL_FLEXCOM)	+= atmel-flexcom.o
- obj-$(CONFIG_MFD_ATMEL_HLCDC)	+= atmel-hlcdc.o
- obj-$(CONFIG_MFD_INTEL_MSIC)	+= intel_msic.o
- obj-$(CONFIG_MFD_PALMAS)	+= palmas.o
-diff --git a/drivers/mfd/atmel-flexcom.c b/drivers/mfd/atmel-flexcom.c
-new file mode 100644
-index 000000000000..b0c6f5556b17
---- /dev/null
-+++ b/drivers/mfd/atmel-flexcom.c
-@@ -0,0 +1,113 @@
-+/*
-+ * Driver for Atmel Flexcom
-+ *
-+ * Copyright (C) 2015 Atmel Corporation
-+ *
-+ * Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/types.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/err.h>
-+#include <linux/io.h>
-+#include <linux/clk.h>
-+
-+/* I/O register offsets */
-+#define FLEX_MR		0x0	/* Mode Register */
-+#define FLEX_VERSION	0xfc	/* Version Register */
-+
-+/* Mode Register bit fields */
-+#define FLEX_MR_OPMODE_MASK	0x3
-+#define FLEX_MR_OPMODE_NO_COM	0x0
-+#define FLEX_MR_OPMODE_USART	0x1
-+#define FLEX_MR_OPMODE_SPI	0x2
-+#define FLEX_MR_OPMODE_TWI	0x3
-+
-+
-+static int atmel_flexcom_probe(struct platform_device *pdev)
-+{
-+	struct device_node *child, *np = pdev->dev.of_node;
-+	struct clk *clk;
-+	struct resource *res;
-+	void __iomem *base;
-+	u32 opmode;
-+	int err;
-+
-+	child = of_get_next_available_child(np, NULL);
-+	if (!child)
-+		return -ENODEV;
-+
-+	/*
-+	 * The Operating Mode is stored into the first u32 of the reg property
-+	 * of the child.
-+	 */
-+	err = of_property_read_u32_index(child, "reg", 0, &opmode);
-+	of_node_put(child);
-+	if (err)
-+		return err;
-+
-+	if ((opmode == FLEX_MR_OPMODE_NO_COM) ||
-+	    (opmode & ~FLEX_MR_OPMODE_MASK))
-+		return -EINVAL;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	err = clk_prepare_enable(clk);
-+	if (err)
-+		return err;
-+
-+	/*
-+	 * Set the Operating Mode in the Mode Register: only the selected device
-+	 * is clocked. Hence, registers of the other serial devices remain
-+	 * inaccessible and are read as zero. Also the external I/O lines of the
-+	 * Flexcom are muxed to reach the selected device.
-+	 */
-+	writel(opmode, base + FLEX_MR);
-+
-+	clk_disable_unprepare(clk);
-+
-+	return of_platform_populate(np, NULL, NULL, &pdev->dev);
-+}
-+
-+static const struct of_device_id atmel_flexcom_of_match[] = {
-+	{ .compatible = "atmel,sama5d2-flexcom" },
-+	{ /* sentinel */ }
-+};
-+MODULE_DEVICE_TABLE(of, atmel_flexcom_of_match);
-+
-+static struct platform_driver atmel_flexcom_driver = {
-+	.probe	= atmel_flexcom_probe,
-+	.driver	= {
-+		.name		= "atmel_flexcom",
-+		.of_match_table	= atmel_flexcom_of_match,
-+	},
-+};
-+
-+module_platform_driver(atmel_flexcom_driver);
-+
-+MODULE_AUTHOR("Cyrille Pitchen <cyrille.pitchen@atmel.com>");
-+MODULE_DESCRIPTION("Atmel Flexcom MFD driver");
-+MODULE_LICENSE("GPL v2");
--- 
-1.8.2.2
+> ---
+>   drivers/irqchip/irq-gic.c       | 45 ++++++++++++++++++++++++++++++-----------
+>   include/linux/irqchip/arm-gic.h |  2 +-
+>   2 files changed, 34 insertions(+), 13 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index b41ccf5..ce531e6 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -813,8 +813,6 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+>   {
+>   	unsigned long ret = 0;
+>
+> -	if (irq_domain_get_of_node(d) != controller)
+> -		return -EINVAL;
+>   	if (intsize < 3)
+>   		return -EINVAL;
+>
+> @@ -887,7 +885,7 @@ void gic_set_irqchip_flags(unsigned long flags)
+>
+>   void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>   			   void __iomem *dist_base, void __iomem *cpu_base,
+> -			   u32 percpu_offset, struct device_node *node)
+> +			   u32 percpu_offset, void *domain_token)
+>   {
+>   	irq_hw_number_t hwirq_base;
+>   	struct gic_chip_data *gic;
+> @@ -946,8 +944,8 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>   		gic_irqs = 1020;
+>   	gic->gic_irqs = gic_irqs;
+>
+> -	if (node) {		/* DT case */
+> -		gic->domain = irq_domain_add_linear(node, gic_irqs,
+> +	if (domain_token) {		/* DT/ACPI case */
+> +		gic->domain = irq_domain_add_linear(domain_token, gic_irqs,
+>   						    &gic_irq_domain_hierarchy_ops,
+>   						    gic);
+>   	} else {		/* Non-DT case */
+> @@ -973,7 +971,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>   			irq_base = irq_start;
+>   		}
+>
+> -		gic->domain = irq_domain_add_legacy(node, gic_irqs, irq_base,
+> +		gic->domain = irq_domain_add_legacy(NULL, gic_irqs, irq_base,
+>   					hwirq_base, &gic_irq_domain_ops, gic);
+>   	}
+>
+> @@ -1086,6 +1084,31 @@ gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
+>   	return 0;
+>   }
+>
+> +static int gic_acpi_gsi_desc_populate(struct acpi_gsi_descriptor *data,
+> +				      u32 gsi, unsigned int irq_type)
+> +{
+> +	/*
+> +	 * Encode GSI and triggering information the way the GIC likes
+> +	 * them.
+> +	 */
+> +	if (WARN_ON(gsi < 16))
+> +		return -EINVAL;
+> +
+> +	if (gsi >= 32) {
+> +		data->param[0] = 0;		/* SPI */
+> +		data->param[1] = gsi - 32;
+> +		data->param[2] = irq_type;
+> +	} else {
+> +		data->param[0] = 1; 		/* PPI */
+> +		data->param[1] = gsi - 16;
+> +		data->param[2] = 0xff << 4 | irq_type;
+> +	}
+> +
+> +	data->param_count = 3;
+> +
+> +	return 0;
+> +}
+> +
+>   int __init
+>   gic_v2_acpi_init(struct acpi_table_header *table)
+>   {
+> @@ -1132,14 +1155,12 @@ gic_v2_acpi_init(struct acpi_table_header *table)
+>   	}
+>
+>   	/*
+> -	 * Initialize zero GIC instance (no multi-GIC support). Also, set GIC
+> -	 * as default IRQ domain to allow for GSI registration and GSI to IRQ
+> -	 * number translation (see acpi_register_gsi() and acpi_gsi_to_irq()).
+> +	 * Initialize zero GIC instance (no multi-GIC support).
+>   	 */
+> -	gic_init_bases(0, -1, dist_base, cpu_base, 0, NULL);
+> -	irq_set_default_host(gic_data[0].domain);
+> +	gic_init_bases(0, -1, dist_base, cpu_base, 0, (void *)ACPI_IRQ_MODEL_GIC);
+>
+> -	acpi_irq_model = ACPI_IRQ_MODEL_GIC;
+> +	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, ACPI_IRQ_MODEL_GIC,
+> +			   gic_acpi_gsi_desc_populate);
+>   	return 0;
+>   }
+>   #endif
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index 9de976b..97799b7 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -97,7 +97,7 @@ struct device_node;
+>
+>   void gic_set_irqchip_flags(unsigned long flags);
+>   void gic_init_bases(unsigned int, int, void __iomem *, void __iomem *,
+> -		    u32 offset, struct device_node *);
+> +		    u32 offset, void *);
+>   void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+>   void gic_cpu_if_down(void);
+>
+>
