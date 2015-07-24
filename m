@@ -1,71 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:46 +0900
-Subject: [PATCH 5/9] ARM: shmobile: r8a7779: Cleanup header file
+Date: Fri, 24 Jul 2015 17:41:48 +0900
+Subject: [PATCH 7/9] ARM: multi_v7_defconfig: Remove Marzen
 In-Reply-To: <cover.1437726584.git.horms+renesas@verge.net.au>
 References: <cover.1437726584.git.horms+renesas@verge.net.au>
-Message-ID: <a73e4d95da66fea42db3a3f884ac16cbd5b934a9.1437726584.git.horms+renesas@verge.net.au>
+Message-ID: <8dd80b6d7c5bac89315d07c0c2495fe31d0cb348.1437726584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+Kill of the defconfig bits now when the marzen-reference board code is gone.
 
-Remove unused function prototypes from r8a7779.h and
-make the functions static.
+Based on work by Magnus Damm.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Magnus Damm <damm@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c | 2 +-
- arch/arm/mach-shmobile/r8a7779.h       | 2 --
- arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
- 3 files changed, 2 insertions(+), 4 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index fa8ab2cc9187..a376ba3b67c0 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -201,7 +201,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("rcar-du-r8a7779", &mstp_clks[MSTP103]), /* DU */
- };
- 
--void __init r8a7779_clock_init(void)
-+static void __init r8a7779_clock_init(void)
- {
- 	u32 mode = r8a7779_read_mode_pins();
- 	int k, ret = 0;
-diff --git a/arch/arm/mach-shmobile/r8a7779.h b/arch/arm/mach-shmobile/r8a7779.h
-index 19f97046dd70..f69c7477178b 100644
---- a/arch/arm/mach-shmobile/r8a7779.h
-+++ b/arch/arm/mach-shmobile/r8a7779.h
-@@ -11,7 +11,6 @@ enum {
- };
- 
- extern void r8a7779_init_irq_extpin(int irlm);
--extern void r8a7779_init_irq_extpin_dt(int irlm);
- extern void r8a7779_init_irq_dt(void);
- extern void r8a7779_map_io(void);
- extern void r8a7779_earlytimer_init(void);
-@@ -19,7 +18,6 @@ extern void r8a7779_add_early_devices(void);
- extern void r8a7779_add_standard_devices(void);
- extern void r8a7779_init_late(void);
- extern u32 r8a7779_read_mode_pins(void);
--extern void r8a7779_clock_init(void);
- extern void r8a7779_pinmux_init(void);
- extern void r8a7779_pm_init(void);
- extern void r8a7779_register_twd(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 2c3e433f84ca..f436cba958fa 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -99,7 +99,7 @@ static struct resource irqpin0_resources[] __initdata = {
- 	DEFINE_RES_IRQ(gic_spi(30)), /* IRQ3 */
- };
- 
--void __init r8a7779_init_irq_extpin_dt(int irlm)
-+static void __init r8a7779_init_irq_extpin_dt(int irlm)
- {
- 	void __iomem *icr0 = ioremap_nocache(0xfe780000, PAGE_SIZE);
- 	u32 tmp;
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 6d83a1bf0c74..b34cd868daa5 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -82,7 +82,6 @@ CONFIG_ARCH_R8A7790=y
+ CONFIG_ARCH_R8A7791=y
+ CONFIG_ARCH_R8A7794=y
+ CONFIG_ARCH_SH73A0=y
+-CONFIG_MACH_MARZEN=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_ARCH_TEGRA=y
 -- 
 2.1.4
