@@ -1,427 +1,183 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 24 Jul 2015 11:02:03 +0800
-Subject: [PATCH v4 5/7] clk: mediatek: Add subsystem clocks of MT8173
-In-Reply-To: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1437706925-3222-6-git-send-email-jamesjj.liao@mediatek.com>
+From: jianwei.wang.chn@gmail.com (jianwei wang)
+Date: Fri, 24 Jul 2015 11:21:57 +0800
+Subject: [PATCH v11 1/5] drm/layerscape: Add Freescale DCU DRM driver
+In-Reply-To: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
+References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
+Message-ID: <CANk3uyCOCALEjH7Sk4pJtvowyL4qnAiPmUzcrFha3GbuCTAP9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most multimedia subsystem clocks will be accessed by multiple
-drivers, so it's a better way to manage these clocks in CCF.
-This patch adds clock support for MM, IMG, VDEC, VENC and VENC_LT
-subsystems.
+Hi Dave,
 
-Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
----
- drivers/clk/mediatek/clk-mt8173.c      | 267 +++++++++++++++++++++++++++++++++
- include/dt-bindings/clock/mt8173-clk.h |  97 +++++++++++-
- 2 files changed, 361 insertions(+), 3 deletions(-)
+I think Freescale DCU DRM driver is ready now, can it land?
 
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index a72ce82..2cf6620 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -27,6 +27,10 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
- static const struct mtk_fixed_clk fixed_clks[] __initconst = {
- 	FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
- 	FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
-+	FIXED_CLK(CLK_TOP_DSI0_DIG, "dsi0_dig", "clk26m", 130 * MHZ),
-+	FIXED_CLK(CLK_TOP_DSI1_DIG, "dsi1_dig", "clk26m", 130 * MHZ),
-+	FIXED_CLK(CLK_TOP_LVDS_PXL, "lvds_pxl", "lvdspll", 148.5 * MHZ),
-+	FIXED_CLK(CLK_TOP_LVDS_CTS, "lvds_cts", "lvdspll", 51.975 * MHZ),
- };
- 
- static const struct mtk_fixed_factor top_divs[] __initconst = {
-@@ -699,6 +703,183 @@ static const struct mtk_composite peri_clks[] __initconst = {
- 	MUX(CLK_PERI_UART3_SEL, "uart3_ck_sel", uart_ck_sel_parents, 0x40c, 3, 1),
- };
- 
-+static const struct mtk_gate_regs cg_regs_4_8_0 = {
-+	.set_ofs = 0x0004,
-+	.clr_ofs = 0x0008,
-+	.sta_ofs = 0x0000,
-+};
-+
-+#define GATE_IMG(_id, _name, _parent, _shift) {			\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &cg_regs_4_8_0,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr,		\
-+	}
-+
-+static const struct mtk_gate img_clks[] __initconst = {
-+	GATE_IMG(CLK_IMG_LARB2_SMI, "img_larb2_smi", "mm_sel", 0),
-+	GATE_IMG(CLK_IMG_CAM_SMI, "img_cam_smi", "mm_sel", 5),
-+	GATE_IMG(CLK_IMG_CAM_CAM, "img_cam_cam", "mm_sel", 6),
-+	GATE_IMG(CLK_IMG_SEN_TG, "img_sen_tg", "camtg_sel", 7),
-+	GATE_IMG(CLK_IMG_SEN_CAM, "img_sen_cam", "mm_sel", 8),
-+	GATE_IMG(CLK_IMG_CAM_SV, "img_cam_sv", "mm_sel", 9),
-+	GATE_IMG(CLK_IMG_FD, "img_fd", "mm_sel", 11),
-+};
-+
-+static const struct mtk_gate_regs mm0_cg_regs = {
-+	.set_ofs = 0x0104,
-+	.clr_ofs = 0x0108,
-+	.sta_ofs = 0x0100,
-+};
-+
-+static const struct mtk_gate_regs mm1_cg_regs = {
-+	.set_ofs = 0x0114,
-+	.clr_ofs = 0x0118,
-+	.sta_ofs = 0x0110,
-+};
-+
-+#define GATE_MM0(_id, _name, _parent, _shift) {			\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &mm0_cg_regs,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr,		\
-+	}
-+
-+#define GATE_MM1(_id, _name, _parent, _shift) {			\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &mm1_cg_regs,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr,		\
-+	}
-+
-+static const struct mtk_gate mm_clks[] __initconst = {
-+	/* MM0 */
-+	GATE_MM0(CLK_MM_SMI_COMMON, "mm_smi_common", "mm_sel", 0),
-+	GATE_MM0(CLK_MM_SMI_LARB0, "mm_smi_larb0", "mm_sel", 1),
-+	GATE_MM0(CLK_MM_CAM_MDP, "mm_cam_mdp", "mm_sel", 2),
-+	GATE_MM0(CLK_MM_MDP_RDMA0, "mm_mdp_rdma0", "mm_sel", 3),
-+	GATE_MM0(CLK_MM_MDP_RDMA1, "mm_mdp_rdma1", "mm_sel", 4),
-+	GATE_MM0(CLK_MM_MDP_RSZ0, "mm_mdp_rsz0", "mm_sel", 5),
-+	GATE_MM0(CLK_MM_MDP_RSZ1, "mm_mdp_rsz1", "mm_sel", 6),
-+	GATE_MM0(CLK_MM_MDP_RSZ2, "mm_mdp_rsz2", "mm_sel", 7),
-+	GATE_MM0(CLK_MM_MDP_TDSHP0, "mm_mdp_tdshp0", "mm_sel", 8),
-+	GATE_MM0(CLK_MM_MDP_TDSHP1, "mm_mdp_tdshp1", "mm_sel", 9),
-+	GATE_MM0(CLK_MM_MDP_WDMA, "mm_mdp_wdma", "mm_sel", 11),
-+	GATE_MM0(CLK_MM_MDP_WROT0, "mm_mdp_wrot0", "mm_sel", 12),
-+	GATE_MM0(CLK_MM_MDP_WROT1, "mm_mdp_wrot1", "mm_sel", 13),
-+	GATE_MM0(CLK_MM_FAKE_ENG, "mm_fake_eng", "mm_sel", 14),
-+	GATE_MM0(CLK_MM_MUTEX_32K, "mm_mutex_32k", "rtc_sel", 15),
-+	GATE_MM0(CLK_MM_DISP_OVL0, "mm_disp_ovl0", "mm_sel", 16),
-+	GATE_MM0(CLK_MM_DISP_OVL1, "mm_disp_ovl1", "mm_sel", 17),
-+	GATE_MM0(CLK_MM_DISP_RDMA0, "mm_disp_rdma0", "mm_sel", 18),
-+	GATE_MM0(CLK_MM_DISP_RDMA1, "mm_disp_rdma1", "mm_sel", 19),
-+	GATE_MM0(CLK_MM_DISP_RDMA2, "mm_disp_rdma2", "mm_sel", 20),
-+	GATE_MM0(CLK_MM_DISP_WDMA0, "mm_disp_wdma0", "mm_sel", 21),
-+	GATE_MM0(CLK_MM_DISP_WDMA1, "mm_disp_wdma1", "mm_sel", 22),
-+	GATE_MM0(CLK_MM_DISP_COLOR0, "mm_disp_color0", "mm_sel", 23),
-+	GATE_MM0(CLK_MM_DISP_COLOR1, "mm_disp_color1", "mm_sel", 24),
-+	GATE_MM0(CLK_MM_DISP_AAL, "mm_disp_aal", "mm_sel", 25),
-+	GATE_MM0(CLK_MM_DISP_GAMMA, "mm_disp_gamma", "mm_sel", 26),
-+	GATE_MM0(CLK_MM_DISP_UFOE, "mm_disp_ufoe", "mm_sel", 27),
-+	GATE_MM0(CLK_MM_DISP_SPLIT0, "mm_disp_split0", "mm_sel", 28),
-+	GATE_MM0(CLK_MM_DISP_SPLIT1, "mm_disp_split1", "mm_sel", 29),
-+	GATE_MM0(CLK_MM_DISP_MERGE, "mm_disp_merge", "mm_sel", 30),
-+	GATE_MM0(CLK_MM_DISP_OD, "mm_disp_od", "mm_sel", 31),
-+	/* MM1 */
-+	GATE_MM1(CLK_MM_DISP_PWM0MM, "mm_disp_pwm0mm", "mm_sel", 0),
-+	GATE_MM1(CLK_MM_DISP_PWM026M, "mm_disp_pwm026m", "pwm_sel", 1),
-+	GATE_MM1(CLK_MM_DISP_PWM1MM, "mm_disp_pwm1mm", "mm_sel", 2),
-+	GATE_MM1(CLK_MM_DISP_PWM126M, "mm_disp_pwm126m", "pwm_sel", 3),
-+	GATE_MM1(CLK_MM_DSI0_ENGINE, "mm_dsi0_engine", "mm_sel", 4),
-+	GATE_MM1(CLK_MM_DSI0_DIGITAL, "mm_dsi0_digital", "dsi0_dig", 5),
-+	GATE_MM1(CLK_MM_DSI1_ENGINE, "mm_dsi1_engine", "mm_sel", 6),
-+	GATE_MM1(CLK_MM_DSI1_DIGITAL, "mm_dsi1_digital", "dsi1_dig", 7),
-+	GATE_MM1(CLK_MM_DPI_PIXEL, "mm_dpi_pixel", "dpi0_sel", 8),
-+	GATE_MM1(CLK_MM_DPI_ENGINE, "mm_dpi_engine", "mm_sel", 9),
-+	GATE_MM1(CLK_MM_DPI1_PIXEL, "mm_dpi1_pixel", "lvds_pxl", 10),
-+	GATE_MM1(CLK_MM_DPI1_ENGINE, "mm_dpi1_engine", "mm_sel", 11),
-+	GATE_MM1(CLK_MM_HDMI_PIXEL, "mm_hdmi_pixel", "dpi0_sel", 12),
-+	GATE_MM1(CLK_MM_HDMI_PLLCK, "mm_hdmi_pllck", "hdmi_sel", 13),
-+	GATE_MM1(CLK_MM_HDMI_AUDIO, "mm_hdmi_audio", "apll1", 14),
-+	GATE_MM1(CLK_MM_HDMI_SPDIF, "mm_hdmi_spdif", "apll2", 15),
-+	GATE_MM1(CLK_MM_LVDS_PIXEL, "mm_lvds_pixel", "lvds_pxl", 16),
-+	GATE_MM1(CLK_MM_LVDS_CTS, "mm_lvds_cts", "lvds_cts", 17),
-+	GATE_MM1(CLK_MM_SMI_LARB4, "mm_smi_larb4", "mm_sel", 18),
-+	GATE_MM1(CLK_MM_HDMI_HDCP, "mm_hdmi_hdcp", "hdcp_sel", 19),
-+	GATE_MM1(CLK_MM_HDMI_HDCP24M, "mm_hdmi_hdcp24m", "hdcp_24m_sel", 20),
-+};
-+
-+static const struct mtk_gate_regs vdec0_cg_regs = {
-+	.set_ofs = 0x0000,
-+	.clr_ofs = 0x0004,
-+	.sta_ofs = 0x0000,
-+};
-+
-+static const struct mtk_gate_regs vdec1_cg_regs = {
-+	.set_ofs = 0x0008,
-+	.clr_ofs = 0x000c,
-+	.sta_ofs = 0x0008,
-+};
-+
-+#define GATE_VDEC0(_id, _name, _parent, _shift) {		\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &vdec0_cg_regs,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr_inv,		\
-+	}
-+
-+#define GATE_VDEC1(_id, _name, _parent, _shift) {		\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &vdec1_cg_regs,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr_inv,		\
-+	}
-+
-+static const struct mtk_gate vdec_clks[] __initconst = {
-+	GATE_VDEC0(CLK_VDEC_CKEN, "vdec_cken", "vdec_sel", 0),
-+	GATE_VDEC1(CLK_VDEC_LARB_CKEN, "vdec_larb_cken", "mm_sel", 0),
-+};
-+
-+#define GATE_VENC(_id, _name, _parent, _shift) {		\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &cg_regs_4_8_0,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr_inv,		\
-+	}
-+
-+static const struct mtk_gate venc_clks[] __initconst = {
-+	GATE_VENC(CLK_VENC_CKE0, "venc_cke0", "mm_sel", 0),
-+	GATE_VENC(CLK_VENC_CKE1, "venc_cke1", "venc_sel", 4),
-+	GATE_VENC(CLK_VENC_CKE2, "venc_cke2", "venc_sel", 8),
-+	GATE_VENC(CLK_VENC_CKE3, "venc_cke3", "venc_sel", 12),
-+};
-+
-+#define GATE_VENCLT(_id, _name, _parent, _shift) {		\
-+		.id = _id,					\
-+		.name = _name,					\
-+		.parent_name = _parent,				\
-+		.regs = &cg_regs_4_8_0,				\
-+		.shift = _shift,				\
-+		.ops = &mtk_clk_gate_ops_setclr_inv,		\
-+	}
-+
-+static const struct mtk_gate venclt_clks[] __initconst = {
-+	GATE_VENCLT(CLK_VENCLT_CKE0, "venclt_cke0", "mm_sel", 0),
-+	GATE_VENCLT(CLK_VENCLT_CKE1, "venclt_cke1", "venclt_sel", 4),
-+};
-+
- static struct clk_onecell_data *mt8173_top_clk_data;
- static struct clk_onecell_data *mt8173_pll_clk_data;
- 
-@@ -843,3 +1024,89 @@ static void __init mtk_apmixedsys_init(struct device_node *node)
- }
- CLK_OF_DECLARE(mtk_apmixedsys, "mediatek,mt8173-apmixedsys",
- 		mtk_apmixedsys_init);
-+
-+static void __init mtk_imgsys_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_IMG_NR_CLK);
-+
-+	mtk_clk_register_gates(node, img_clks, ARRAY_SIZE(img_clks),
-+						clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
-+}
-+CLK_OF_DECLARE(mtk_imgsys, "mediatek,mt8173-imgsys", mtk_imgsys_init);
-+
-+static void __init mtk_mmsys_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_MM_NR_CLK);
-+
-+	mtk_clk_register_gates(node, mm_clks, ARRAY_SIZE(mm_clks),
-+						clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
-+}
-+CLK_OF_DECLARE(mtk_mmsys, "mediatek,mt8173-mmsys", mtk_mmsys_init);
-+
-+static void __init mtk_vdecsys_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_VDEC_NR_CLK);
-+
-+	mtk_clk_register_gates(node, vdec_clks, ARRAY_SIZE(vdec_clks),
-+						clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
-+}
-+CLK_OF_DECLARE(mtk_vdecsys, "mediatek,mt8173-vdecsys", mtk_vdecsys_init);
-+
-+static void __init mtk_vencsys_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_VENC_NR_CLK);
-+
-+	mtk_clk_register_gates(node, venc_clks, ARRAY_SIZE(venc_clks),
-+						clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
-+}
-+CLK_OF_DECLARE(mtk_vencsys, "mediatek,mt8173-vencsys", mtk_vencsys_init);
-+
-+static void __init mtk_vencltsys_init(struct device_node *node)
-+{
-+	struct clk_onecell_data *clk_data;
-+	int r;
-+
-+	clk_data = mtk_alloc_clk_data(CLK_VENCLT_NR_CLK);
-+
-+	mtk_clk_register_gates(node, venclt_clks, ARRAY_SIZE(venclt_clks),
-+						clk_data);
-+
-+	r = of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+	if (r)
-+		pr_err("%s(): could not register clock provider: %d\n",
-+			__func__, r);
-+}
-+CLK_OF_DECLARE(mtk_vencltsys, "mediatek,mt8173-vencltsys", mtk_vencltsys_init);
-diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-index 7230c38..87820ee 100644
---- a/include/dt-bindings/clock/mt8173-clk.h
-+++ b/include/dt-bindings/clock/mt8173-clk.h
-@@ -153,12 +153,16 @@
- #define CLK_TOP_I2S2_M_SEL		135
- #define CLK_TOP_I2S3_M_SEL		136
- #define CLK_TOP_I2S3_B_SEL		137
--#define CLK_TOP_NR_CLK			138
-+#define CLK_TOP_DSI0_DIG		138
-+#define CLK_TOP_DSI1_DIG		139
-+#define CLK_TOP_LVDS_PXL		140
-+#define CLK_TOP_LVDS_CTS		141
-+#define CLK_TOP_NR_CLK			142
- 
- /* APMIXED_SYS */
- 
--#define CLK_APMIXED_ARMCA15PLL	1
--#define CLK_APMIXED_ARMCA7PLL	2
-+#define CLK_APMIXED_ARMCA15PLL		1
-+#define CLK_APMIXED_ARMCA7PLL		2
- #define CLK_APMIXED_MAINPLL		3
- #define CLK_APMIXED_UNIVPLL		4
- #define CLK_APMIXED_MMPLL		5
-@@ -231,4 +235,91 @@
- #define CLK_PERI_UART3_SEL		39
- #define CLK_PERI_NR_CLK			40
- 
-+/* IMG_SYS */
-+
-+#define CLK_IMG_LARB2_SMI		1
-+#define CLK_IMG_CAM_SMI			2
-+#define CLK_IMG_CAM_CAM			3
-+#define CLK_IMG_SEN_TG			4
-+#define CLK_IMG_SEN_CAM			5
-+#define CLK_IMG_CAM_SV			6
-+#define CLK_IMG_FD			7
-+#define CLK_IMG_NR_CLK			8
-+
-+/* MM_SYS */
-+
-+#define CLK_MM_SMI_COMMON		1
-+#define CLK_MM_SMI_LARB0		2
-+#define CLK_MM_CAM_MDP			3
-+#define CLK_MM_MDP_RDMA0		4
-+#define CLK_MM_MDP_RDMA1		5
-+#define CLK_MM_MDP_RSZ0			6
-+#define CLK_MM_MDP_RSZ1			7
-+#define CLK_MM_MDP_RSZ2			8
-+#define CLK_MM_MDP_TDSHP0		9
-+#define CLK_MM_MDP_TDSHP1		10
-+#define CLK_MM_MDP_WDMA			11
-+#define CLK_MM_MDP_WROT0		12
-+#define CLK_MM_MDP_WROT1		13
-+#define CLK_MM_FAKE_ENG			14
-+#define CLK_MM_MUTEX_32K		15
-+#define CLK_MM_DISP_OVL0		16
-+#define CLK_MM_DISP_OVL1		17
-+#define CLK_MM_DISP_RDMA0		18
-+#define CLK_MM_DISP_RDMA1		19
-+#define CLK_MM_DISP_RDMA2		20
-+#define CLK_MM_DISP_WDMA0		21
-+#define CLK_MM_DISP_WDMA1		22
-+#define CLK_MM_DISP_COLOR0		23
-+#define CLK_MM_DISP_COLOR1		24
-+#define CLK_MM_DISP_AAL			25
-+#define CLK_MM_DISP_GAMMA		26
-+#define CLK_MM_DISP_UFOE		27
-+#define CLK_MM_DISP_SPLIT0		28
-+#define CLK_MM_DISP_SPLIT1		29
-+#define CLK_MM_DISP_MERGE		30
-+#define CLK_MM_DISP_OD			31
-+#define CLK_MM_DISP_PWM0MM		32
-+#define CLK_MM_DISP_PWM026M		33
-+#define CLK_MM_DISP_PWM1MM		34
-+#define CLK_MM_DISP_PWM126M		35
-+#define CLK_MM_DSI0_ENGINE		36
-+#define CLK_MM_DSI0_DIGITAL		37
-+#define CLK_MM_DSI1_ENGINE		38
-+#define CLK_MM_DSI1_DIGITAL		39
-+#define CLK_MM_DPI_PIXEL		40
-+#define CLK_MM_DPI_ENGINE		41
-+#define CLK_MM_DPI1_PIXEL		42
-+#define CLK_MM_DPI1_ENGINE		43
-+#define CLK_MM_HDMI_PIXEL		44
-+#define CLK_MM_HDMI_PLLCK		45
-+#define CLK_MM_HDMI_AUDIO		46
-+#define CLK_MM_HDMI_SPDIF		47
-+#define CLK_MM_LVDS_PIXEL		48
-+#define CLK_MM_LVDS_CTS			49
-+#define CLK_MM_SMI_LARB4		50
-+#define CLK_MM_HDMI_HDCP		51
-+#define CLK_MM_HDMI_HDCP24M		52
-+#define CLK_MM_NR_CLK			53
-+
-+/* VDEC_SYS */
-+
-+#define CLK_VDEC_CKEN			1
-+#define CLK_VDEC_LARB_CKEN		2
-+#define CLK_VDEC_NR_CLK			3
-+
-+/* VENC_SYS */
-+
-+#define CLK_VENC_CKE0			1
-+#define CLK_VENC_CKE1			2
-+#define CLK_VENC_CKE2			3
-+#define CLK_VENC_CKE3			4
-+#define CLK_VENC_NR_CLK			5
-+
-+/* VENCLT_SYS */
-+
-+#define CLK_VENCLT_CKE0			1
-+#define CLK_VENCLT_CKE1			2
-+#define CLK_VENCLT_NR_CLK		3
-+
- #endif /* _DT_BINDINGS_CLK_MT8173_H */
--- 
-1.8.1.1.dirty
+I have worked on this driver for about nine month. Daniel Vetter,
+Thierry Reding, Mark yao,
+Alexander Stein, Paul Bolle, Alison Wang, Stefan Agner reviewed this
+pathset. The latest
+version v11 has been send out about an week, and no more comments any more.
+
+BR.
+Jianwei
+
+On Mon, Jul 20, 2015 at 5:53 PM, Jianwei Wang
+<jianwei.wang.chn@gmail.com> wrote:
+> This patch add support for Two Dimensional Animation and Compositing
+> Engine (2D-ACE) on the Freescale SoCs.
+>
+> 2D-ACE is a Freescale display controller. 2D-ACE describes
+> the functionality of the module extremely well its name is a value
+> that cannot be used as a token in programming languages.
+> Instead the valid token "DCU" is used to tag the register names and
+> function names.
+>
+> The Display Controller Unit (DCU) module is a system master that
+> fetches graphics stored in internal or external memory and displays
+> them on a TFT LCD panel. A wide range of panel sizes is supported
+> and the timing of the interface signals is highly configurable.
+> Graphics are read directly from memory and then blended in real-time,
+> which allows for dynamic content creation with minimal CPU
+> intervention.
+>
+> The features:
+> (1) Full RGB888 output to TFT LCD panel.
+> (2) Blending of each pixel using up to 4 source layers
+> dependent
+> on size of panel.
+> (3) Each graphic layer can be placed with one pixel resolution
+> in either axis.
+> (4) Each graphic layer support RGB565 and RGB888 direct colors
+> without alpha channel and BGRA8888 BGRA4444 ARGB1555 direct
+> colors
+> with an alpha channel and YUV422 format.
+> (5) Each graphic layer support alpha blending with 8-bit
+> resolution.
+>
+> This is a simplified version, only one primary plane, one
+> framebuffer, one crtc, one connector and one encoder for TFT
+> LCD panel.
+>
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> Reviewed-by: Alison Wang <alison.wang@freescale.com>
+> ---
+>
+>
+> Changed in V11
+> -set regmap_config.cache_type to REGCACHE_FLAT
+> Advanced by Alexander Stein
+>
+> Changed in V10
+> -adjust commit log, remove meaningless statement
+> -cleanup code for it's format and style.
+> -remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
+> -remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
+> -add vendor prefix for panel pandle
+> -make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
+> -introduce per-SoC capability structure to avoid check on the OF node's compatible string
+> -Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
+> -move DCU config sentence to the right place
+> -move get resources functions to  ->probe()
+> -move fsl,dcu.txt to video/ folder
+> -add big-endian describe
+> All advaced by Thierry Reding
+>
+> Changed in V9
+>
+> -put node after calling of_drm_find_panel
+> -split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
+> -check regmap_write/regmap_read return return value
+> -remove useless ".owner    = THIS_MODULE,"
+> All advanced by Mark Yao
+>
+> Changed in V8
+>
+> - Remove useless code
+>  #define DRIVER_NAME     "fsl-dcu-drm"
+>  MODULE_ALIAS("platform:fsl-dcu-drm");
+> Adviced by Paul Bolle
+>
+> Changed in V7
+>
+> - Remove redundant functions and replace deprecated hooker
+> Adviced by Daniel Vetter
+> - Replace drm_platform_init with drm_dev_alloc/register
+> Adviced by Daniel Vetter
+>
+> Changed in V6
+>
+> - Add NEC nl4827hc19_05b panel to panel-simple.c
+> Adviced by Mark Yao
+> - Add DRIVER_ATOMIC for driver_features
+> Adviced by Mark Yao
+> - check fsl_dev if it's NULL at PM suspend/resume
+> Adviced by Mark Yao
+>
+> Changed in V5
+>
+> - Update commit message
+> - Add layer registers initialization
+> - Remove unused functions
+> - Rename driver folder
+> Adviced by Stefan Agner
+> - Move pixel clock control functions to fsl_dcu_drm_drv.c
+> - remove redundant enable the clock implicitly using regmap
+> - Add maintainer message
+>
+> Changed in V4:
+>
+> -This version doesn't have functionality changed
+> Just a minor adjustment.
+>
+> Changed in V3:
+>
+> - Test driver on Vybrid board and add compatible string
+> - Remove unused functions
+> - set default crtc for encoder
+> - replace legacy functions with atomic help functions
+> Adviced by Daniel Vetter
+> - Set the unique name of the DRM device
+> - Implement irq handle function for vblank interrupt
+>
+> Changed in v2:
+> - Add atomic support
+> Adviced by Daniel Vetter
+> - Modify bindings file
+> - Rename node for compatibility
+> - Move platform related code out for compatibility
+> Adviced by Stefan Agner
+>
+>
+>  .../devicetree/bindings/video/fsl,dcu.txt          |  22 ++
+>  MAINTAINERS                                        |   8 +
+>  drivers/gpu/drm/Kconfig                            |   2 +
+>  drivers/gpu/drm/Makefile                           |   1 +
+>  drivers/gpu/drm/fsl-dcu/Kconfig                    |  18 +
+>  drivers/gpu/drm/fsl-dcu/Makefile                   |   7 +
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         | 208 +++++++++++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h         |  19 +
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          | 403 +++++++++++++++++++++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          | 197 ++++++++++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c        |  23 ++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  43 +++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  33 ++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c        | 261 +++++++++++++
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h        |  17 +
+>  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          | 182 ++++++++++
+>  16 files changed, 1444 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/fsl,dcu.txt
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/Kconfig
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/Makefile
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h
+>  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
+>
