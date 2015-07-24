@@ -1,32 +1,107 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 24 Jul 2015 15:58:28 +0900
-Subject: [PATCH] serial: 8250_uniphier: call clk_disable_unprepare() on
- failure path
-Message-ID: <1437721108-19037-1-git-send-email-yamada.masahiro@socionext.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Jul 2015 08:04:22 +0100
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <55B131C3.8050009@caviumnetworks.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+ <55B131C3.8050009@caviumnetworks.com>
+Message-ID: <20150724080422.48cb64e2@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If serial8250_register_8250_port() fails, disable and unprepare the
-clock before exiting.
+On Thu, 23 Jul 2015 19:26:11 +0100
+David Daney <ddaney@caviumnetworks.com> wrote:
 
-Fixes: 1a8d2903cb6a ("serial: 8250_uniphier: add UniPhier serial driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+> On 07/23/2015 09:52 AM, Mark Rutland wrote:
+> [...]
+> > +MSI clients
+> > +===========
+> > +
+> > +MSI clients are devices which generate MSIs. For each MSI they wish to
+> > +generate, the doorbell and payload may be configured, though sideband
+> > +information may not be configurable.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
+> > +  controller which the device is capable of using.
+> > +
+> 
+> We say here that "msi-parent" consists of pairs ...
+> 
+> > +  This property is unordered, and MSIs may be allocated from any combination of
+> > +  MSI controllers listed in the msi-parent property.
+> > +
+> > +  If a device has restrictions on the allocation of MSIs, these restrictions
+> > +  must be described with additional properties.
+> > +
+> > +  When #msi-cells is non-zero, busses with an msi-parent will require
+> > +  additional properties to describe the relationship between devices on the bus
+> > +  and the set of MSIs they can potentially generate.
+> > +
+> > +
+> > +Example
+> > +=======
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	msi_a: msi-controller at a {
+> > +		reg = <0xa 0xf00>;
+> > +		compatible = "vendor-a,some-controller";
+> > +		msi-controller;
+> > +		/* No sideband data, so #msi-cells omitted */
+> > +	};
+> > +
+> > +	msi_b: msi-controller at b {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	msi_c: msi-controller at c {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	dev at 0 {
+> > +		reg = <0x0 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +
+> > +		/* Can only generate MSIs to msi_a */
+> > +		msi-parent = <&msi_a>;
+> 
+> 
+> My device-tree syntax foo is a little rusty, but doesn't "msi-parent" 
+> need a pair of elements?  This has only the phandle.
 
- drivers/tty/serial/8250/8250_uniphier.c | 1 +
- 1 file changed, 1 insertion(+)
+This is a pair in the sense of (phandle, msi-specifier).
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 7d79425..d11621e 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -218,6 +218,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
- 	ret = serial8250_register_8250_port(&up);
- 	if (ret < 0) {
- 		dev_err(dev, "failed to register 8250 port\n");
-+		clk_disable_unprepare(priv->clk);
- 		return ret;
- 	}
- 
+msi_a doesn't have a #msi-cells, so its msi-specifier is of size 0. In
+that case, the pair is (phandle, empty-set).
+
+You could also have something like:
+
+	msi_d: msi-controller at d {
+		#msi-cells = <2>;
+	};
+
+	dev at f {
+		msi-parent = <&msi_d 0x1 0x2>;
+	};
+
+and msi-parent in this case would still be a pair, with an
+msi-specifier of size 2.
+
+Hope this helps,
+
+	M.
 -- 
-1.9.1
+Without deviation from the norm, progress is not possible.
