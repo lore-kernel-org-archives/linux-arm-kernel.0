@@ -1,116 +1,198 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Fri, 24 Jul 2015 12:53:01 +0800
-Subject: [PATCH 16/18] ARM/w90x900/time: Migrate to new 'set-state'
- interface
-In-Reply-To: <6c724d4388997588f38587213ce1ab7d3925b87c.1437101996.git.viresh.kumar@linaro.org>
-References: <cover.1437101996.git.viresh.kumar@linaro.org>
- <6c724d4388997588f38587213ce1ab7d3925b87c.1437101996.git.viresh.kumar@linaro.org>
-Message-ID: <CAKT61h-vXLcXZJAi=uarBwgoPu0jH37nsxsV_SrAa_-7h8aAyQ@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 24 Jul 2015 09:48:59 +0200
+Subject: [PATCH v11 1/5] drm/layerscape: Add Freescale DCU DRM driver
+In-Reply-To: <CANk3uyCOCALEjH7Sk4pJtvowyL4qnAiPmUzcrFha3GbuCTAP9Q@mail.gmail.com>
+References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
+ <CANk3uyCOCALEjH7Sk4pJtvowyL4qnAiPmUzcrFha3GbuCTAP9Q@mail.gmail.com>
+Message-ID: <20150724074859.GJ16722@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-07-17 13:11 GMT+08:00 Viresh Kumar <viresh.kumar@linaro.org>:
-> Migrate w90x900 driver to the new 'set-state' interface provided by
-> clockevents core, the earlier 'set-mode' interface is marked obsolete
-> now.
->
-> This also enables us to implement callbacks for new states of clockevent
-> devices, for example: ONESHOT_STOPPED.
->
-> Cc: Wan ZongShun <mcuos.com@gmail.com>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  arch/arm/mach-w90x900/time.c | 51 ++++++++++++++++++++++++--------------------
->  1 file changed, 28 insertions(+), 23 deletions(-)
->
-> diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-> index 9230d3725599..cd1966ec9143 100644
-> --- a/arch/arm/mach-w90x900/time.c
-> +++ b/arch/arm/mach-w90x900/time.c
-> @@ -48,31 +48,32 @@
->
->  static unsigned int timer0_load;
->
-> -static void nuc900_clockevent_setmode(enum clock_event_mode mode,
-> -               struct clock_event_device *clk)
-> +static int nuc900_clockevent_shutdown(struct clock_event_device *evt)
->  {
-> -       unsigned int val;
-> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
->
-> -       val = __raw_readl(REG_TCSR0);
-> -       val &= ~(0x03 << 27);
-> +       __raw_writel(val, REG_TCSR0);
-> +       return 0;
-> +}
-> +
-> +static int nuc900_clockevent_set_oneshot(struct clock_event_device *evt)
-> +{
-> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
->
-> -       switch (mode) {
-> -       case CLOCK_EVT_MODE_PERIODIC:
-> -               __raw_writel(timer0_load, REG_TICR0);
-> -               val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
-> -               break;
-> +       val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
->
-> -       case CLOCK_EVT_MODE_ONESHOT:
-> -               val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
-> -               break;
-> +       __raw_writel(val, REG_TCSR0);
-> +       return 0;
-> +}
->
-> -       case CLOCK_EVT_MODE_UNUSED:
-> -       case CLOCK_EVT_MODE_SHUTDOWN:
-> -       case CLOCK_EVT_MODE_RESUME:
-> -               break;
-> -       }
-> +static int nuc900_clockevent_set_periodic(struct clock_event_device *evt)
-> +{
-> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
->
-> +       __raw_writel(timer0_load, REG_TICR0);
-> +       val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
->         __raw_writel(val, REG_TCSR0);
-> +       return 0;
->  }
->
->  static int nuc900_clockevent_setnextevent(unsigned long evt,
-> @@ -90,11 +91,15 @@ static int nuc900_clockevent_setnextevent(unsigned long evt,
->  }
->
->  static struct clock_event_device nuc900_clockevent_device = {
-> -       .name           = "nuc900-timer0",
-> -       .features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-> -       .set_mode       = nuc900_clockevent_setmode,
-> -       .set_next_event = nuc900_clockevent_setnextevent,
-> -       .rating         = 300,
-> +       .name                   = "nuc900-timer0",
-> +       .features               = CLOCK_EVT_FEAT_PERIODIC |
-> +                                 CLOCK_EVT_FEAT_ONESHOT,
-> +       .set_state_shutdown     = nuc900_clockevent_shutdown,
-> +       .set_state_periodic     = nuc900_clockevent_set_periodic,
-> +       .set_state_oneshot      = nuc900_clockevent_set_oneshot,
-> +       .tick_resume            = nuc900_clockevent_shutdown,
-> +       .set_next_event         = nuc900_clockevent_setnextevent,
-> +       .rating                 = 300,
->  };
->
+On Fri, Jul 24, 2015 at 11:21:57AM +0800, jianwei wang wrote:
+> Hi Dave,
+> 
+> I think Freescale DCU DRM driver is ready now, can it land?
+> 
+> I have worked on this driver for about nine month. Daniel Vetter,
+> Thierry Reding, Mark yao,
+> Alexander Stein, Paul Bolle, Alison Wang, Stefan Agner reviewed this
+> pathset. The latest
+> version v11 has been send out about an week, and no more comments any more.
 
-Acked-by: Wan zongshun <mcuos.com@gmail.com>
+On a quick look about overall process there's a few bits missing still:
+- review from dt maintainer for the device-tree pieces (review from an
+  original author like Alice Wang doesn't count).
+- needs one patch for MAINTAINER entry for drm/layerscape.
+- just send a pull request to Dave once you have this all.
 
-thanks!
-
->  /*IRQ handler for the timer*/
-> --
-> 2.4.0
->
-
-
+Cheers, Daniel
+> 
+> BR.
+> Jianwei
+> 
+> On Mon, Jul 20, 2015 at 5:53 PM, Jianwei Wang
+> <jianwei.wang.chn@gmail.com> wrote:
+> > This patch add support for Two Dimensional Animation and Compositing
+> > Engine (2D-ACE) on the Freescale SoCs.
+> >
+> > 2D-ACE is a Freescale display controller. 2D-ACE describes
+> > the functionality of the module extremely well its name is a value
+> > that cannot be used as a token in programming languages.
+> > Instead the valid token "DCU" is used to tag the register names and
+> > function names.
+> >
+> > The Display Controller Unit (DCU) module is a system master that
+> > fetches graphics stored in internal or external memory and displays
+> > them on a TFT LCD panel. A wide range of panel sizes is supported
+> > and the timing of the interface signals is highly configurable.
+> > Graphics are read directly from memory and then blended in real-time,
+> > which allows for dynamic content creation with minimal CPU
+> > intervention.
+> >
+> > The features:
+> > (1) Full RGB888 output to TFT LCD panel.
+> > (2) Blending of each pixel using up to 4 source layers
+> > dependent
+> > on size of panel.
+> > (3) Each graphic layer can be placed with one pixel resolution
+> > in either axis.
+> > (4) Each graphic layer support RGB565 and RGB888 direct colors
+> > without alpha channel and BGRA8888 BGRA4444 ARGB1555 direct
+> > colors
+> > with an alpha channel and YUV422 format.
+> > (5) Each graphic layer support alpha blending with 8-bit
+> > resolution.
+> >
+> > This is a simplified version, only one primary plane, one
+> > framebuffer, one crtc, one connector and one encoder for TFT
+> > LCD panel.
+> >
+> > Signed-off-by: Alison Wang <b18965@freescale.com>
+> > Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> > Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+> > Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+> > Reviewed-by: Alison Wang <alison.wang@freescale.com>
+> > ---
+> >
+> >
+> > Changed in V11
+> > -set regmap_config.cache_type to REGCACHE_FLAT
+> > Advanced by Alexander Stein
+> >
+> > Changed in V10
+> > -adjust commit log, remove meaningless statement
+> > -cleanup code for it's format and style.
+> > -remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
+> > -remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
+> > -add vendor prefix for panel pandle
+> > -make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
+> > -introduce per-SoC capability structure to avoid check on the OF node's compatible string
+> > -Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
+> > -move DCU config sentence to the right place
+> > -move get resources functions to  ->probe()
+> > -move fsl,dcu.txt to video/ folder
+> > -add big-endian describe
+> > All advaced by Thierry Reding
+> >
+> > Changed in V9
+> >
+> > -put node after calling of_drm_find_panel
+> > -split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
+> > -check regmap_write/regmap_read return return value
+> > -remove useless ".owner    = THIS_MODULE,"
+> > All advanced by Mark Yao
+> >
+> > Changed in V8
+> >
+> > - Remove useless code
+> >  #define DRIVER_NAME     "fsl-dcu-drm"
+> >  MODULE_ALIAS("platform:fsl-dcu-drm");
+> > Adviced by Paul Bolle
+> >
+> > Changed in V7
+> >
+> > - Remove redundant functions and replace deprecated hooker
+> > Adviced by Daniel Vetter
+> > - Replace drm_platform_init with drm_dev_alloc/register
+> > Adviced by Daniel Vetter
+> >
+> > Changed in V6
+> >
+> > - Add NEC nl4827hc19_05b panel to panel-simple.c
+> > Adviced by Mark Yao
+> > - Add DRIVER_ATOMIC for driver_features
+> > Adviced by Mark Yao
+> > - check fsl_dev if it's NULL at PM suspend/resume
+> > Adviced by Mark Yao
+> >
+> > Changed in V5
+> >
+> > - Update commit message
+> > - Add layer registers initialization
+> > - Remove unused functions
+> > - Rename driver folder
+> > Adviced by Stefan Agner
+> > - Move pixel clock control functions to fsl_dcu_drm_drv.c
+> > - remove redundant enable the clock implicitly using regmap
+> > - Add maintainer message
+> >
+> > Changed in V4:
+> >
+> > -This version doesn't have functionality changed
+> > Just a minor adjustment.
+> >
+> > Changed in V3:
+> >
+> > - Test driver on Vybrid board and add compatible string
+> > - Remove unused functions
+> > - set default crtc for encoder
+> > - replace legacy functions with atomic help functions
+> > Adviced by Daniel Vetter
+> > - Set the unique name of the DRM device
+> > - Implement irq handle function for vblank interrupt
+> >
+> > Changed in v2:
+> > - Add atomic support
+> > Adviced by Daniel Vetter
+> > - Modify bindings file
+> > - Rename node for compatibility
+> > - Move platform related code out for compatibility
+> > Adviced by Stefan Agner
+> >
+> >
+> >  .../devicetree/bindings/video/fsl,dcu.txt          |  22 ++
+> >  MAINTAINERS                                        |   8 +
+> >  drivers/gpu/drm/Kconfig                            |   2 +
+> >  drivers/gpu/drm/Makefile                           |   1 +
+> >  drivers/gpu/drm/fsl-dcu/Kconfig                    |  18 +
+> >  drivers/gpu/drm/fsl-dcu/Makefile                   |   7 +
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         | 208 +++++++++++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h         |  19 +
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          | 403 +++++++++++++++++++++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          | 197 ++++++++++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c        |  23 ++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  43 +++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  33 ++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c        | 261 +++++++++++++
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h        |  17 +
+> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          | 182 ++++++++++
+> >  16 files changed, 1444 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,dcu.txt
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/Kconfig
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/Makefile
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h
+> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
+> >
 
 -- 
----
-Vincent Wan(Zongshun)
-www.mcuos.com
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
