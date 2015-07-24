@@ -1,104 +1,116 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 24 Jul 2015 08:50:17 +0200
-Subject: [PATCH v2 1/7] clk: Add a basic factor clock
-In-Reply-To: <20150724000001.642.84690@quantum>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
- <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
- <20150523074930.GI8557@lukather> <20150724000001.642.84690@quantum>
-Message-ID: <20150724065017.GJ2373@lukather>
+From: mcuos.com@gmail.com (Wan ZongShun)
+Date: Fri, 24 Jul 2015 12:53:01 +0800
+Subject: [PATCH 16/18] ARM/w90x900/time: Migrate to new 'set-state'
+ interface
+In-Reply-To: <6c724d4388997588f38587213ce1ab7d3925b87c.1437101996.git.viresh.kumar@linaro.org>
+References: <cover.1437101996.git.viresh.kumar@linaro.org>
+ <6c724d4388997588f38587213ce1ab7d3925b87c.1437101996.git.viresh.kumar@linaro.org>
+Message-ID: <CAKT61h-vXLcXZJAi=uarBwgoPu0jH37nsxsV_SrAa_-7h8aAyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+2015-07-17 13:11 GMT+08:00 Viresh Kumar <viresh.kumar@linaro.org>:
+> Migrate w90x900 driver to the new 'set-state' interface provided by
+> clockevents core, the earlier 'set-mode' interface is marked obsolete
+> now.
+>
+> This also enables us to implement callbacks for new states of clockevent
+> devices, for example: ONESHOT_STOPPED.
+>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  arch/arm/mach-w90x900/time.c | 51 ++++++++++++++++++++++++--------------------
+>  1 file changed, 28 insertions(+), 23 deletions(-)
+>
+> diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
+> index 9230d3725599..cd1966ec9143 100644
+> --- a/arch/arm/mach-w90x900/time.c
+> +++ b/arch/arm/mach-w90x900/time.c
+> @@ -48,31 +48,32 @@
+>
+>  static unsigned int timer0_load;
+>
+> -static void nuc900_clockevent_setmode(enum clock_event_mode mode,
+> -               struct clock_event_device *clk)
+> +static int nuc900_clockevent_shutdown(struct clock_event_device *evt)
+>  {
+> -       unsigned int val;
+> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
+>
+> -       val = __raw_readl(REG_TCSR0);
+> -       val &= ~(0x03 << 27);
+> +       __raw_writel(val, REG_TCSR0);
+> +       return 0;
+> +}
+> +
+> +static int nuc900_clockevent_set_oneshot(struct clock_event_device *evt)
+> +{
+> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
+>
+> -       switch (mode) {
+> -       case CLOCK_EVT_MODE_PERIODIC:
+> -               __raw_writel(timer0_load, REG_TICR0);
+> -               val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
+> -               break;
+> +       val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
+>
+> -       case CLOCK_EVT_MODE_ONESHOT:
+> -               val |= (ONESHOT | COUNTEN | INTEN | PRESCALE);
+> -               break;
+> +       __raw_writel(val, REG_TCSR0);
+> +       return 0;
+> +}
+>
+> -       case CLOCK_EVT_MODE_UNUSED:
+> -       case CLOCK_EVT_MODE_SHUTDOWN:
+> -       case CLOCK_EVT_MODE_RESUME:
+> -               break;
+> -       }
+> +static int nuc900_clockevent_set_periodic(struct clock_event_device *evt)
+> +{
+> +       unsigned int val = __raw_readl(REG_TCSR0) & ~(0x03 << 27);
+>
+> +       __raw_writel(timer0_load, REG_TICR0);
+> +       val |= (PERIOD | COUNTEN | INTEN | PRESCALE);
+>         __raw_writel(val, REG_TCSR0);
+> +       return 0;
+>  }
+>
+>  static int nuc900_clockevent_setnextevent(unsigned long evt,
+> @@ -90,11 +91,15 @@ static int nuc900_clockevent_setnextevent(unsigned long evt,
+>  }
+>
+>  static struct clock_event_device nuc900_clockevent_device = {
+> -       .name           = "nuc900-timer0",
+> -       .features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> -       .set_mode       = nuc900_clockevent_setmode,
+> -       .set_next_event = nuc900_clockevent_setnextevent,
+> -       .rating         = 300,
+> +       .name                   = "nuc900-timer0",
+> +       .features               = CLOCK_EVT_FEAT_PERIODIC |
+> +                                 CLOCK_EVT_FEAT_ONESHOT,
+> +       .set_state_shutdown     = nuc900_clockevent_shutdown,
+> +       .set_state_periodic     = nuc900_clockevent_set_periodic,
+> +       .set_state_oneshot      = nuc900_clockevent_set_oneshot,
+> +       .tick_resume            = nuc900_clockevent_shutdown,
+> +       .set_next_event         = nuc900_clockevent_setnextevent,
+> +       .rating                 = 300,
+>  };
+>
 
-On Thu, Jul 23, 2015 at 05:00:01PM -0700, Michael Turquette wrote:
-> Quoting Maxime Ripard (2015-05-23 00:49:30)
-> > On Fri, May 22, 2015 at 12:35:35PM +0800, Chen-Yu Tsai wrote:
-> > > Hi,
-> > > 
-> > > On Fri, May 22, 2015 at 4:54 AM, Maxime Ripard
-> > > <maxime.ripard@free-electrons.com> wrote:
-> > > > Some clocks are using a factor component, however, unlike their mux, gate
-> > > > or divider counterpart, these factors don't have a basic clock
-> > > > implementation.
-> > > 
-> > > I think "multiplier" would be a better name here, considering it is the
-> > > counterpart of "divider". "factor" implies you can multiply and/or divide
-> > > the clock rate.
-> > 
-> > You're probably right, I didn't though of it that way :)
-> 
-> I also prefer multiplier over factor.
+Acked-by: Wan zongshun <mcuos.com@gmail.com>
 
-Ok. Note that I re-submitted it some time this week and forgot to
-change it, but I'm perfectly fine with the name.
+thanks!
 
-> Jim Quinlan submitted a similar patch. See here:
-> 
-> http://www.spinics.net/lists/linux-clk/msg00691.html
+>  /*IRQ handler for the timer*/
+> --
+> 2.4.0
+>
 
-It looks very similar indeed.
 
-> I nacked that patch because Stephen and I are trying to figure out how
-> the basic clock types should work going forward. Code reuse is good, but
-> they are not very maintainable.
-
-What are the issues with maintaining them? The only drawback I'm
-seeing with introducing such a driver is that you can't really have a
-clock that is both a divider and a multiplier, but that can be solved
-by splitting it into two sub-clocks.
-
->From a pure maintainance point of view, refusing it would mean that
-each and every platform would have to come up with its own
-implementation. For example, we do have clk-factors.c for sunxi that
-does just that, and implies some cooperation from each clock driver
-that have to provide some code to determine the various components of
-the output formula. This can prove to be very challenging (and bug
-prone) for clocks like the audio one we have where we have 1
-multiplier and 2 dividers that needs some adjusting.
-
-Splitting it into sub-clocks for each of these components would allow
-to have less bugs, while keeping the whole thing very simple, and the
-implementation on the driver side very trivial.
-
-Overall, the clk-factors code we have (client side) is approximately a
-thousand lines of code logic that could be replaced by (less) trivial
-probing code for such a driver.
-
-> Since there are two potential users of this code, I should reconsider.
-
-Like I said, eventually, I'd like to leverage that code a lot more
-than for the single clock alone, and I think it could benefit other
-platforms too (like Jim has proven).
-
-> Can you two come up with a common implementation that works for both of
-> you?
-
-Yes, sure. Jim, how do you want to go with this? Do you want to
-resubmit your patch on top of 4.2-rc something so that I could give it
-a try? Otherwise, I posted such a patch this week
-
-https://lkml.kernel.org/r/1437235304-2208-1-git-send-email-maxime.ripard at free-electrons.com
-
-Can you give it a try and your feedback?
-
-> Please do not put any CLK_OF_DECLARE stuff in there (there isn't
-> any now, but I wanted to be clear).
-
-That's never been my intention ;)
-
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/5dffba06/attachment-0001.sig>
+---
+Vincent Wan(Zongshun)
+www.mcuos.com
