@@ -1,55 +1,52 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Jul 2015 14:56:47 +0200
-Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <CAGS+omAzhfCAoGArK8XUMhNFuqiErPcvGh0q=+Se1dHeBnJyUg@mail.gmail.com>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <8769951.Y5Edyg2WDJ@ubix>
- <CAGS+omAzhfCAoGArK8XUMhNFuqiErPcvGh0q=+Se1dHeBnJyUg@mail.gmail.com>
-Message-ID: <10346793.XDV1BVipfn@ubix>
+Date: Fri, 24 Jul 2015 14:59:37 +0200
+Subject: [RESEND PATCH 0/6] This series adds SMP support for the MediaTek
+ MT6580.
+In-Reply-To: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+References: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
+Message-ID: <2431941.t2bpkCFJl8@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, July 24, 2015 05:00:13 PM Daniel Kurtz wrote:
-> On Fri, Jul 24, 2015 at 4:40 PM, Matthias Brugger
+On Friday, June 19, 2015 02:01:15 AM Scott Shu wrote:
+> This patchset adds support SMP on MediaTek MT6580 Cortex-A7 qual core SoC.
 > 
-> <matthias.bgg@gmail.com> wrote:
-> > On Monday, July 20, 2015 04:17:15 PM YH Huang wrote:
-> >> Document the device-tree binding of MediatTek display PWM.
-> >> The PWM has one channel to control the backlight brightness for display.
-> >> It supports MT8173 and MT6595.
-> >> 
-> >> Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> >> ---
-> >> 
-> >>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42
-> >> 
-> >> ++++++++++++++++++++++ 1 file changed, 42 insertions(+)
-> >> 
-> >>  create mode 100644
-> >>  Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >> b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt new file mode
-> >> 100644
-> >> index 0000000..f8f59ba
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
-> >> @@ -0,0 +1,42 @@
-> >> +MediaTek display PWM controller
-> >> +
-> >> +Required properties:
-> >> + - compatible: should be "mediatek,<name>-disp-pwm":
-> >> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
-> >> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
-> > 
-> > I had another look on the mt6589 datasheet and for me it doesn't look like
-> > as if this drivers is compatible to mt6589.
+> This is based on v4.1-rc1 and following patch series:
+> (1) Yingjoe Chen's "Add SMP bringup support for mt65xx socs" [1]
+> (2) Mars Cheng's "Add mt6580 basic chip support" [2]
+> (3) Sascha Hauer's "Mediatek SCPSYS power domain support" [3]
 > 
-> Matthias - the compatible is "mt6595", not mt6589 :-).
-> Which datasheet did you check?
+> The secondary cores are power off as default on MT6580, this change adds
+> a new enable-method to turn on power to the cores during booting process.
 > 
+> The System Power Manager (SPM) inside the SCPSYS is for the CPU MTCMOS
+> power domain control. Please check [3] for more information about SCPSYS.
+> 
+> [1] https://lkml.org/lkml/2015/5/16/33
+> [2] https://lkml.org/lkml/2015/6/3/113
+> [3] https://lkml.org/lkml/2015/6/9/172
+> 
+> 
+> Scott Shu (6):
+>   Document: bindings: DT: Add SMP enable method for MT6580 SoC platform
+>   soc: Mediatek: Add SCPSYS CPU power domain driver
+>   ARM: mediatek: add smp bringup code
+>   ARM: Mediatek: enable GPT6 on boot up to make arch timer working for
+> MT6580 ARM: dts: mt6580: Add device nodes to the MT6580 dtsi file.
+>   ARM: dts: mt6580: enable basic SMP bringup for MT6580
+> 
+>  Documentation/devicetree/bindings/arm/cpus.txt |   1 +
+>  arch/arm/boot/dts/mt6580.dtsi                  |  25 +++
+>  arch/arm/mach-mediatek/Makefile                |   2 +-
+>  arch/arm/mach-mediatek/generic.h               |  24 +++
+>  arch/arm/mach-mediatek/hotplug.c               | 229
+> +++++++++++++++++++++++++ arch/arm/mach-mediatek/mediatek.c              | 
+>  4 +-
+>  arch/arm/mach-mediatek/platsmp.c               | 113 +++++++++++-
+>  7 files changed, 395 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/mach-mediatek/generic.h
+>  create mode 100644 arch/arm/mach-mediatek/hotplug.c
 
-In further versions the driver stated it support mt6589, so I didn' realize 
-that it is mt6595 now. Logically I checked mt6589 datasheet... :(
 
-Sorry for the noise!
+The whole series is missing a Signed-off-by tag, please add them to the next 
+version. The Signed-off-by is mandatory for any patch to get accepted.
