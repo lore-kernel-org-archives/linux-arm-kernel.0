@@ -1,22 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jul 2015 09:59:54 +0100
-Subject: [PATCH 0/2] Last level (leaf) TLBI support
-Message-ID: <1437728396-5408-1-git-send-email-catalin.marinas@arm.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 24 Jul 2015 17:00:13 +0800
+Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <8769951.Y5Edyg2WDJ@ubix>
+References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+ <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
+ <8769951.Y5Edyg2WDJ@ubix>
+Message-ID: <CAGS+omAzhfCAoGArK8XUMhNFuqiErPcvGh0q=+Se1dHeBnJyUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 introduces TLBI operations that only invalidate the last level
-of a page table (block entry). The first patch in the series is just a
-minor clean-up to avoid defining too many functions. The second patch
-introduces the last level TLBI support for flush_tlb_page() and
-tlb_flush(). The flush_tlb_range() function cannot be changed since it
-is used in THP code for collapsing multiple small pages into a huge
-page.
+On Fri, Jul 24, 2015 at 4:40 PM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+> On Monday, July 20, 2015 04:17:15 PM YH Huang wrote:
+>> Document the device-tree binding of MediatTek display PWM.
+>> The PWM has one channel to control the backlight brightness for display.
+>> It supports MT8173 and MT6595.
+>>
+>> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+>> ---
+>>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42
+>> ++++++++++++++++++++++ 1 file changed, 42 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>> b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt new file mode
+>> 100644
+>> index 0000000..f8f59ba
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>> @@ -0,0 +1,42 @@
+>> +MediaTek display PWM controller
+>> +
+>> +Required properties:
+>> + - compatible: should be "mediatek,<name>-disp-pwm":
+>> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+>> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
+>
+> I had another look on the mt6589 datasheet and for me it doesn't look like as
+> if this drivers is compatible to mt6589.
 
-Catalin Marinas (2):
-  arm64: Clean up __flush_tlb(_kernel)_range functions
-  arm64: Use last level TLBI for user pte changes
+Matthias - the compatible is "mt6595", not mt6589 :-).
+Which datasheet did you check?
 
- arch/arm64/include/asm/tlb.h      |  7 +++-
- arch/arm64/include/asm/tlbflush.h | 69 ++++++++++++++++++++++++---------------
- 2 files changed, 48 insertions(+), 28 deletions(-)
+-Dan
+
+
+>
+> DISP_PWM_CON_0 offset 0x10 maps to interrupt enable register and
+> DISP_PWM_CON_1 offset 0x14 maps to interrupt status register.
+>
+> This looks wrong to me, as you use both registers to write clock divider and
+> clock period.
+>
+> Regarding that this is v6 of the patch set, I would propose that you just drop
+> the compatible string for mt6589 or you implement the register offset on basis
+> of the compatible string so that mt6589 can you the driver as well.
+>
+> Best regards,
+> Matthias
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
