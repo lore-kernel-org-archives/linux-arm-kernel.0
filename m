@@ -1,60 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 23 Jul 2015 22:13:27 -0600
-Subject: [PATCH v2 2/4] irqchip: bcm2835: If a parent interrupt is
- registered, chain from it.
-In-Reply-To: <87bnf4giq7.fsf@eliezer.anholt.net>
-References: <1436837718-956-1-git-send-email-eric@anholt.net>
- <1436837718-956-3-git-send-email-eric@anholt.net>
- <55AEFB1D.6090108@wwwdotorg.org> <87bnf4giq7.fsf@eliezer.anholt.net>
-Message-ID: <55B1BB67.1090603@wwwdotorg.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 23 Jul 2015 21:15:52 -0700
+Subject: [GIT PULL] ARM: OMAP2+: PRCM and hwmod changes for v4.3
+In-Reply-To: <alpine.DEB.2.02.1507231456540.29543@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1507231456540.29543@utopia.booyaka.com>
+Message-ID: <20150724041552.GE16878@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/22/2015 12:17 PM, Eric Anholt wrote:
-> Stephen Warren <swarren@wwwdotorg.org> writes:
+* Paul Walmsley <paul@pwsan.com> [150723 08:01]:
+> Hi Tony,
 > 
->> On 07/13/2015 07:35 PM, Eric Anholt wrote:
->>> The BCM2836 (Raspberry Pi 2) uses two levels of interrupt
->>> handling with the CPU-local interrupts being the root, so we
->>> need to register ours as chained off of the CPU's local
->>> interrupt.
->> 
->> Sorry for the slow review; laziness after vacation!
->> 
->>> diff --git
->>> a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>> b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>
->>>
->>> 
-+The BCM2836 contains the same interrupt controller with the same
->>> +interrupts, but the per-CPU interrupt controller is the root,
->>> and an +interrupt there indicates that the ARMCTRL has an
->>> interrupt to handle. + Required properties:
->>> 
->>> - compatible : should be "brcm,bcm2835-armctrl-ic"
->> 
->> Since there are some differences between the bcm2835 and bcm2836
->> HW blocks, I'd expect the compatible value to be different for
->> each. In particular...
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
-> Well, there are actually no differences within this block of the HW
-> (HDL is unmodified), it's just where the output interrupt line gets
-> consumed. But it's not much extra to add a new compatible value, so
-> sure.
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.3/omap-hwmod-prcm-a
+> 
+> for you to fetch changes up to 3b86616e3058462c340710dc7a5ac34ec8453944:
+> 
+>   Merge branch 'prcm-a-for-v4.3' into hwmod-prcm-for-v4.3 (2015-07-23 08:49:57 -0600)
+> 
+> ----------------------------------------------------------------
+> ARM: OMAP2+: PRCM and hwmod changes for v4.3
+> 
+> This series adds:
+> 
+> - I/O wakeup support for AM43xx
+> - register lock and unlock support to the hwmod code (needed for the RTC
+>   IP blocks on some chips)
+> - several fixes for sparse warnings and an unnecessary null pointer test
+> - a DRA7xx clockdomain configuration workaround, to deal with some hardware
+>   bugs
+> 
+> Basic build, boot, and PM tests are here:
+> 
+> http://www.pwsan.com/omap/testlogs/hwmod-prcm-for-v4.3/20150723080012/
+> 
+> Since I do not have an AM43xx or DRA7xx device, I can't test on those
+> platforms.
 
-Mmm. I suppose that's true indeed.
+Thanks pulling into omap-for-v4.3/soc.
 
-So, I guess either of the following is fine for bcm2836 by me:
+Regards,
 
-compatible = "brcm,bcm2836-armctrl-ic";
-compatible = "brcm,bcm2836-armctrl-ic", "brcm,bcm2835-armctrl-ic";
-
-The 2836 value is always needed since DT should contain the most
-specific compatible value for the implementation. The 2835 value is
-optional based on whether the HW block is 100% backwards-compatible
-with the older HW block; a driver for the old block can run unmodified
-against the new block. It's debatable whether that's true here; the
-interface to this HW block itself is unchanged between
-implementations, yet the way the driver for it integrates into the
-system differs since it either is/isn't a top-level IRQ chip.
+Tony
