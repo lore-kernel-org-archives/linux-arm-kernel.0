@@ -1,34 +1,122 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:44 +0900
-Subject: [PATCH 3/9] ARM: shmobile: Enable fixed voltage regulator in
- shmobile_defconfig
+Date: Fri, 24 Jul 2015 17:41:45 +0900
+Subject: [PATCH 4/9] ARM: shmobile: marzen-reference: Remove C board code
 In-Reply-To: <cover.1437726584.git.horms+renesas@verge.net.au>
 References: <cover.1437726584.git.horms+renesas@verge.net.au>
-Message-ID: <719074d8b2209ead1f33d935dfa3f7dd8c83e018.1437726584.git.horms+renesas@verge.net.au>
+Message-ID: <d2fb6bdaffc7438e75ffbd669623a2b61cdad3d8.1437726584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is selected by MACH_MARZEN which is enabled in shmobile_defconfig,
-however, MACH_MARZEN is going away along with the board code it enables.
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Acked-by: Magnus Damm <damm@opensource.se>
+The generic r8a7779 machine vector is now feature-wise equivalent
+to the Marzen-reference case, so simply remove the Marzen C board
+code to fall over on the generic r8a7779 machine vector.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/shmobile_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-shmobile/Kconfig                  |  7 ----
+ arch/arm/mach-shmobile/Makefile                 |  4 +-
+ arch/arm/mach-shmobile/board-marzen-reference.c | 56 -------------------------
+ 3 files changed, 1 insertion(+), 66 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/board-marzen-reference.c
 
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 9961fbd633f8..9fece82a4127 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -121,6 +121,7 @@ CONFIG_WATCHDOG=y
- CONFIG_DA9063_WATCHDOG=y
- CONFIG_MFD_AS3711=y
- CONFIG_MFD_DA9063=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_GPIO=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 45006479d461..3d6f46cb8b18 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -89,13 +89,6 @@ config ARCH_SH73A0
+ 	select ARCH_RMOBILE
+ 	select RENESAS_INTC_IRQPIN
+ 
+-comment "Renesas ARM SoCs Board Type"
+-
+-config MACH_MARZEN
+-	bool "MARZEN board"
+-	depends on ARCH_R8A7779
+-	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-
+ comment "Renesas ARM SoCs System Configuration"
+ endif
+ 
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 89e463de4479..08b12b4d3f90 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -51,9 +51,7 @@ obj-$(CONFIG_PM_RMOBILE)	+= pm-rmobile.o
+ obj-$(CONFIG_ARCH_RCAR_GEN2)	+= pm-rcar-gen2.o
+ 
+ # Board objects
+-ifdef CONFIG_ARCH_SHMOBILE_MULTI
+-obj-$(CONFIG_MACH_MARZEN)	+= board-marzen-reference.o
+-else
++ifndef CONFIG_ARCH_SHMOBILE_MULTI
+ obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
+ obj-$(CONFIG_MACH_BOCKW_REFERENCE)	+= board-bockw-reference.o
+ obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+deleted file mode 100644
+index b15eb923263f..000000000000
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ /dev/null
+@@ -1,56 +0,0 @@
+-/*
+- * marzen board support - Reference DT implementation
+- *
+- * Copyright (C) 2011  Renesas Solutions Corp.
+- * Copyright (C) 2011  Magnus Damm
+- * Copyright (C) 2013  Simon Horman
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-#include <linux/clk/shmobile.h>
+-#include <linux/clocksource.h>
+-#include <linux/of_platform.h>
+-
+-#include <asm/irq.h>
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-#include "irqs.h"
+-#include "r8a7779.h"
+-
+-static void __init marzen_init_timer(void)
+-{
+-	r8a7779_clocks_init(r8a7779_read_mode_pins());
+-	clocksource_of_init();
+-}
+-
+-static void __init marzen_init(void)
+-{
+-	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+-	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
+-}
+-
+-static const char *marzen_boards_compat_dt[] __initdata = {
+-	"renesas,marzen",
+-	"renesas,marzen-reference",
+-	NULL,
+-};
+-
+-DT_MACHINE_START(MARZEN, "marzen")
+-	.smp		= smp_ops(r8a7779_smp_ops),
+-	.map_io		= r8a7779_map_io,
+-	.init_early	= shmobile_init_delay,
+-	.init_time	= marzen_init_timer,
+-	.init_irq	= r8a7779_init_irq_dt,
+-	.init_machine	= marzen_init,
+-	.init_late	= shmobile_init_late,
+-	.dt_compat	= marzen_boards_compat_dt,
+-MACHINE_END
 -- 
 2.1.4
