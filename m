@@ -1,42 +1,34 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Fri, 24 Jul 2015 11:56:59 +0800
-Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
-In-Reply-To: <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
-References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
- <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
-Message-ID: <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 23 Jul 2015 22:04:23 -0600
+Subject: [PATCH] irqchip: bcm2835: Add FIQ support
+In-Reply-To: <55AFA3BD.80507@tronnes.org>
+References: <1434130016-26574-1-git-send-email-noralf@tronnes.org>
+ <55822C71.2040409@wwwdotorg.org> <55AFA3BD.80507@tronnes.org>
+Message-ID: <55B1B947.6080102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 07/22/2015 08:07 AM, Noralf Tr?nnes wrote:
+> 
+> Den 18.06.2015 04:26, skrev Stephen Warren:
+>> On 06/12/2015 11:26 AM, Noralf Tr?nnes wrote:
+>>> Add a duplicate irq range with an offset on the hwirq's so the
+>>> driver can detect that enable_fiq() is used.
+>>> Tested with downstream dwc_otg USB controller driver.
+>> This basically looks OK, but a few comments/thoughts:
+>>
+>> a) Should the Kconfig change be a separate patch since it's a separate
+>> subsystem?
+> 
+> Is this a yes since you haven't acked it?
 
-> On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
->> A little change to patch_map() function,
->> use set_fixmap_offset() to make code more clear.
->> 
->> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->> ---
->> arch/arm64/kernel/insn.c | 5 ++---
->> 1 file changed, 2 insertions(+), 3 deletions(-)
->> 
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index dd9671c..7dafd5a 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->> 		return addr;
->> 
->> 	BUG_ON(!page);
->> -	set_fixmap(fixmap, page_to_phys(page));
->> -
->> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
->> +			(addr & ~PAGE_MASK));
-> 
-> It looks fine. Do you get any compiler warning for the automatic pointer
-> to long conversion? You may want to add some explicit casts, otherwise:
-> 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-i have build it, there is no warning about this change. :)
-Thanks
+I didn't ack it because I thought there were still outstanding review
+comments. Looking back at the thread, everything is resolved.
+
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+
+Whether the driver and Kconfig patch need to be in separate patches
+largely depends on who will merge it. If there's a desire to merge the
+two parts through separate subsystems, separate patches will be needed,
+else not. I'll leave that up to the IRQ subsystem maintainers and Lee
+(or Eric) since they're actually merging the bcm2835 patches.
