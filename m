@@ -1,94 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:47 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Marzen Board Removal for v4.3
-Message-ID: <cover.1437726584.git.horms+renesas@verge.net.au>
+Date: Fri, 24 Jul 2015 17:41:42 +0900
+Subject: [PATCH 1/9] ARM: shmobile: r8a7779: Generic CCF and timer support
+In-Reply-To: <cover.1437726584.git.horms+renesas@verge.net.au>
+References: <cover.1437726584.git.horms+renesas@verge.net.au>
+Message-ID: <131c2e0480b0f7afefbc9a46cc4e158e17caa844.1437726584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Magnus Damm <damm+renesas@opensource.se>
 
-Please consider these Renesas ARM based SoC marzen board removal for v4.3.
+Add a r8a7779-specific callback to initialize CCF and
+clocksources. With this in place we are one step closer
+to be able to use r8a7779 without C board code.
 
-This series removes legacy r8a7779 SoC and marzen board code.
-It does so in a way that does not introduce feature regressions
-when when booting the r8a7779/marzen board using shmobile_defconfig,
-which provides for booting using multiplatform, a scenario which previously
-used board code to provide some features including SMP.
+Also add a multiplatform wrapper to avoid breaking the
+r8a7779 marzen legacy case.
 
-Because of the above this series modifies SoC and DT files,
-and then removes code. And because of that it was not entirely clear to
-me which branch it should go into, so I have provided it in a stand-alone
-branch.
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7779.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Unfortunately this branch has a number of minor conflicts with the "Renesas
-ARM Based SoC Cleanup for v4.3", tagged as renesas-cleanup-for-v4.3, which
-you have previously pulled.
-
-A resolution to those conflicts can be found in the
-renesas-next-20150724-v4.2-rc1 tag of the renesas tree.
-
-I would be happy to rebase these patches on top of renesas-cleanup-for-v4.3
-and resubmit a conflict-free pull request if you like.
-
-On a more positive note, I believe this to well over 8000 lines of legacy
-code removed in this cycle :)
-
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-marzen-board-removal-for-v4.3
-
-for you to fetch changes up to 3fecc170e5b7b141a2db6c8bc40607fb323c3aa2:
-
-  ARM: shmobile: r8a7779: Remove legacy SoC code (2015-07-17 10:34:51 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Marzen Board Removal for v4.3
-
-* Remove legacy r8a7779 SoC code
-* Remove legacy marzen board code
-
-3fecc170e5b7 ARM: shmobile: r8a7779: Remove legacy SoC code
-9d35777f2b96 ARM: shmobile: marzen: Remove legacy board code
-8dd80b6d7c5b ARM: multi_v7_defconfig: Remove Marzen
-824fd0fb7daa ARM: shmobile: Remove Marzen from shmobile_defconfig
-a73e4d95da66 ARM: shmobile: r8a7779: Cleanup header file
-d2fb6bdaffc7 ARM: shmobile: marzen-reference: Remove C board code
-719074d8b220 ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
-44ade5edf90c ARM: shmobile: r8a7779: Generic SMP ops
-131c2e0480b0 ARM: shmobile: r8a7779: Generic CCF and timer support
-
-----------------------------------------------------------------
-Magnus Damm (7):
-      ARM: shmobile: r8a7779: Generic CCF and timer support
-      ARM: shmobile: r8a7779: Generic SMP ops
-      ARM: shmobile: marzen-reference: Remove C board code
-      ARM: shmobile: r8a7779: Cleanup header file
-      ARM: shmobile: Remove Marzen from shmobile_defconfig
-      ARM: shmobile: marzen: Remove legacy board code
-      ARM: shmobile: r8a7779: Remove legacy SoC code
-
-Simon Horman (2):
-      ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
-      ARM: multi_v7_defconfig: Remove Marzen
-
- arch/arm/boot/dts/Makefile                      |   1 -
- arch/arm/configs/multi_v7_defconfig             |   1 -
- arch/arm/configs/shmobile_defconfig             |   2 +-
- arch/arm/mach-shmobile/Kconfig                  |  14 -
- arch/arm/mach-shmobile/Makefile                 |   6 +-
- arch/arm/mach-shmobile/Makefile.boot            |   1 -
- arch/arm/mach-shmobile/board-marzen-reference.c |  56 --
- arch/arm/mach-shmobile/board-marzen.c           | 347 ------------
- arch/arm/mach-shmobile/clock-r8a7779.c          | 271 ----------
- arch/arm/mach-shmobile/r8a7779.h                |  19 -
- arch/arm/mach-shmobile/setup-r8a7779.c          | 681 +-----------------------
- arch/arm/mach-shmobile/smp-r8a7779.c            |   9 -
- 12 files changed, 16 insertions(+), 1392 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/board-marzen-reference.c
- delete mode 100644 arch/arm/mach-shmobile/board-marzen.c
- delete mode 100644 arch/arm/mach-shmobile/clock-r8a7779.c
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index c03e562be12b..5625fd1c89c0 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -14,6 +14,8 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  * GNU General Public License for more details.
+  */
++#include <linux/clk/shmobile.h>
++#include <linux/clocksource.h>
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
+@@ -756,6 +758,14 @@ u32 __init r8a7779_read_mode_pins(void)
+ 	return mode;
+ }
+ 
++#ifdef CONFIG_ARCH_SHMOBILE_MULTI
++
++static void __init r8a7779_init_time(void)
++{
++	r8a7779_clocks_init(r8a7779_read_mode_pins());
++	clocksource_of_init();
++}
++
+ static const char *r8a7779_compat_dt[] __initdata = {
+ 	"renesas,r8a7779",
+ 	NULL,
+@@ -764,8 +774,10 @@ static const char *r8a7779_compat_dt[] __initdata = {
+ DT_MACHINE_START(R8A7779_DT, "Generic R8A7779 (Flattened Device Tree)")
+ 	.map_io		= r8a7779_map_io,
+ 	.init_early	= shmobile_init_delay,
++	.init_time	= r8a7779_init_time,
+ 	.init_irq	= r8a7779_init_irq_dt,
+ 	.init_late	= shmobile_init_late,
+ 	.dt_compat	= r8a7779_compat_dt,
+ MACHINE_END
++#endif /* CONFIG_ARCH_SHMOBILE_MULTI */
+ #endif /* CONFIG_USE_OF */
+-- 
+2.1.4
