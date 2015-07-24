@@ -1,37 +1,52 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 24 Jul 2015 17:10:21 +0200
-Subject: [PATCH v3 4/4] power: Add an axp20x-usb-power driver
-In-Reply-To: <1435316357-26606-4-git-send-email-hdegoede@redhat.com>
-References: <1435316357-26606-1-git-send-email-hdegoede@redhat.com>
- <1435316357-26606-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20150724151020.GH27569@earth>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 24 Jul 2015 16:14:54 +0100
+Subject: [PATCH v4] arm64: kernel: Add support for Privileged Access Never
+In-Reply-To: <20150723130752.GC445@arm.com>
+References: <20150722170140.GR6650@arm.com>
+ <1437588354-31278-1-git-send-email-james.morse@arm.com>
+ <20150723130752.GC445@arm.com>
+Message-ID: <55B2566E.2090905@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jun 26, 2015 at 12:59:17PM +0200, Hans de Goede wrote:
-> This adds a driver for the usb power_supply bits of the axp20x PMICs.
+On 23/07/15 14:07, Will Deacon wrote:
+> Hi James,
 > 
-> I initially started writing my own driver, before coming aware of
-> Bruno Pr?mont's excellent earlier RFC with a driver for this.
+> First off, thanks for rebasing this patch.
 > 
-> My driver was lacking CURRENT_MAX and VOLTAGE_MIN support Bruno's
-> drvier has, so I've copied the code for those from his driver.
+> On Wed, Jul 22, 2015 at 07:05:54PM +0100, James Morse wrote:
+>> 'Privileged Access Never' is a new arm8.1 feature which prevents
+>> privileged code from accessing any virtual address where read or write
+>> access is also permitted at EL0.
+>>
+>> This patch enables the PAN feature on all CPUs, and modifies {get,put}_user
+>> helpers temporarily to permit access.
+>>
+>> This will catch kernel bugs where user memory is accessed directly.
+>> 'Unprivileged loads and stores' using ldtrb et al are unaffected by PAN.
+>>
+>> Signed-off-by: James Morse <james.morse@arm.com>
+>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> ---
+>> This version is rebased against the arm64 'devel' branch, somewhere
+>> after Suzuki's "arm64: Generalise msr_s/mrs_s operations" patch.
 > 
-> Note that the AC-power-supply and battery charger bits will need separate
-> drivers. Each one needs its own devictree child-node so that other
-> devicetree nodes can reference the right power-supply, and thus each one
-> will get its own mfd-cell / platform_device and platform-driver.
+> Now, having spoken with Catalin, we reckon that it's probably best to
+> bite the bullet and add the enable parameter to the conditional alternative
+> asm macros anyway; it's still fairly early days for 4.3 so we've got time
+> to get this right.
+> 
+> In that light, I've got the following diff against this patch (see below)
+> and then another patch on top of that adding the extra parameters.
+> 
+> Could you take a look please? Sorry for messing you about.
 
-Once the other comments have been taken care of, the driver looks ok
-to me.
+Fine by me ...
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/894209e1/attachment.sig>
+If you're able to merge it all together, please do. Otherwise I will try to
+find time to send a v5.
+
+
+
+James
