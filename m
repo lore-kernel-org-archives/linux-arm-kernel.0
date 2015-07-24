@@ -1,123 +1,50 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 24 Jul 2015 10:39:19 +0200
-Subject: [PATCH v7 1/2] mfd: devicetree: add bindings for Atmel Flexcom
-In-Reply-To: <20150723214857.4322c758@bbrezillon>
-References: <cover.1437669004.git.cyrille.pitchen@atmel.com>	<60057bbf7d39ec63d391d26271747cf0228a3ed1.1437669004.git.cyrille.pitchen@atmel.com>
- <20150723214857.4322c758@bbrezillon>
-Message-ID: <55B1F9B7.2080206@atmel.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Jul 2015 10:40:31 +0200
+Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
+In-Reply-To: <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
+References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+ <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
+Message-ID: <8769951.Y5Edyg2WDJ@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/07/2015 21:48, Boris Brezillon a ?crit :
-> On Thu, 23 Jul 2015 18:42:55 +0200
-> Cyrille Pitchen <cyrille.pitchen@atmel.com> wrote:
+On Monday, July 20, 2015 04:17:15 PM YH Huang wrote:
+> Document the device-tree binding of MediatTek display PWM.
+> The PWM has one channel to control the backlight brightness for display.
+> It supports MT8173 and MT6595.
 > 
->> This patch documents the DT bindings for the Atmel Flexcom which will be
->> introduced by sama5d2x SoCs. These bindings will be used by the actual
->> Flexcom driver to be sent in another patch.
->>
->> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
->> ---
->>  .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
->>  1 file changed, 68 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->>
->> diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->> new file mode 100644
->> index 000000000000..a63226b7a9cb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
->> @@ -0,0 +1,68 @@
->> +* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
->> +
->> +The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
->> +controller and an USART. Only one function can be used at a time and is chosen
->> +at boot time according to the device tree.
->> +
->> +Required properties:
->> +- compatible:		Should be "atmel,sama5d2-flexcom"
->> +- reg:			Should be the pair (offset, size) for the Flexcom
->> +			dedicated I/O registers (without USART, TWI or SPI
->> +			registers).
->> +- clocks:		Should be the Flexcom peripheral clock from PMC.
->> +- #address-cells:	Should be <2>
->> +- #size-cells:		Should be <1>
->> +- ranges:		Should be a list of ranges.
->> +			One range per peripheral wrapped by the Flexcom. So each
->> +			range is a triplet (child_addr, parent_addr, size). The
->> +			first u32 of "child_addr" is the value to be set in the
->> +			Operating Mode bitfield of the Flexcom Mode Register.
->> +			Then "parent_addr" stores the base address of the
->> +			corresponding peripheral in the system memory. Finally,
->> +			"size" if the size of the memory region of this
->> +			peripheral.
->> +
->> +Required child:
->> +A single available child for the serial controller to enable.
->> +
->> +Required properties of this child:
->> +- reg:			Should be a pair (child_addr, size) with child_addr
->> +			matching one of the parent ranges.
->> +- clocks:		Should be the very same phandle as for the parent's one.
->> +
->> +Other properties remain unchanged. See documentation of the respective device:
->> +- ../serial/atmel-usart.txt
->> +- ../spi/spi_atmel.txt
->> +- ../i2c/i2c-at91.txt
->> +
->> +Example:
->> +
->> +flexcom at f8034000 {
->> +	compatible = "atmel,sama5d2-flexcom";
->> +	reg = <0xf8034000 0x200>;
->> +	clocks = <&flx0_clk>;
->> +	#address-cells = <2>;
->> +	#size-cells = <1>;
->> +	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
->> +		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
->> +		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
-
-Yes, the opmode(s) are exactly the values described in the product
-datasheet.
-
->> +
->> +	spi at f8034400 {
+> Signed-off-by: YH Huang <yh.huang@mediatek.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42
+> ++++++++++++++++++++++ 1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
 > 
-> Should be:
-> 
-> 	spi at 2,0 {
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt new file mode
+> 100644
+> index 0000000..f8f59ba
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> @@ -0,0 +1,42 @@
+> +MediaTek display PWM controller
+> +
+> +Required properties:
+> + - compatible: should be "mediatek,<name>-disp-pwm":
+> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
 
-Yep!
+I had another look on the mt6589 datasheet and for me it doesn't look like as 
+if this drivers is compatible to mt6589.
 
-I was silently following the discussion in the background and I admit
-that this approach is pretty elegant.
+DISP_PWM_CON_0 offset 0x10 maps to interrupt enable register and 
+DISP_PWM_CON_1 offset 0x14 maps to interrupt status register.
 
-So, if this approach is validated you can also add my:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+This looks wrong to me, as you use both registers to write clock divider and 
+clock period.
 
+Regarding that this is v6 of the patch set, I would propose that you just drop 
+the compatible string for mt6589 or you implement the register offset on basis 
+of the compatible string so that mt6589 can you the driver as well.
 
->> +		compatible = "atmel,at91rm9200-spi";
->> +		reg = <2 0 0x200>;
->> +		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_flx0_default>;
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		clocks = <&flx0_clk>;
->> +		clock-names = "spi_clk";
->> +		atmel,fifo-size = <32>;
->> +
->> +		mtd_dataflash at 0 {
->> +			compatible = "atmel,at25f512b";
->> +			reg = <0>;
->> +			spi-max-frequency = <20000000>;
->> +		};
->> +	};
->> +};
-> 
-> 
-> 
-
-
--- 
-Nicolas Ferre
+Best regards,
+Matthias
