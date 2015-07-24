@@ -1,67 +1,76 @@
-From: emunson@akamai.com (Eric B Munson)
-Date: Fri, 24 Jul 2015 11:53:13 -0400
-Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and munlockall
- system calls
-In-Reply-To: <55B25DDE.8090107@roeck-us.net>
-References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
- <1437508781-28655-3-git-send-email-emunson@akamai.com>
- <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
- <1437528316.16792.7.camel@ellerman.id.au>
- <20150722141501.GA3203@akamai.com>
- <20150723065830.GA5919@linux-mips.org>
- <20150724143936.GE9203@akamai.com> <55B25DDE.8090107@roeck-us.net>
-Message-ID: <20150724155313.GF9203@akamai.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 24 Jul 2015 16:55:00 +0100
+Subject: [PATCH v3 02/11] arm/arm64: KVM: Move vgic handling to a
+ non-preemptible section
+In-Reply-To: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
+References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437753309-17989-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Jul 2015, Guenter Roeck wrote:
+As we're about to introduce some serious GIC-poking to the vgic code,
+it is important to make sure that we're going to poke the part of
+the GIC that belongs to the CPU we're about to run on (otherwise,
+we'd end up with some unexpected interrupts firing)...
 
-> On 07/24/2015 07:39 AM, Eric B Munson wrote:
-> >On Thu, 23 Jul 2015, Ralf Baechle wrote:
-> >
-> >>On Wed, Jul 22, 2015 at 10:15:01AM -0400, Eric B Munson wrote:
-> >>
-> >>>>
-> >>>>You haven't wired it up properly on powerpc, but I haven't mentioned it because
-> >>>>I'd rather we did it.
-> >>>>
-> >>>>cheers
-> >>>
-> >>>It looks like I will be spinning a V5, so I will drop all but the x86
-> >>>system calls additions in that version.
-> >>
-> >>The MIPS bits are looking good however, so
-> >>
-> >>Acked-by: Ralf Baechle <ralf@linux-mips.org>
-> >>
-> >>With my ack, will you keep them or maybe carry them as a separate patch?
-> >
-> >I will keep the MIPS additions as a separate patch in the series, though
-> >I have dropped two of the new syscalls after some discussion.  So I will
-> >not include your ack on the new patch.
-> >
-> >Eric
-> >
-> 
-> Hi Eric,
-> 
-> next-20150724 still has some failures due to this patch set. Are those
-> being looked at (I know parisc builds fail, but there may be others) ?
-> 
-> Thanks,
-> Guenter
+Introducing a non-preemptible section in kvm_arch_vcpu_ioctl_run
+prevents the problem from occuring.
 
-Guenter,
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/arm.c | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-Yes, the next respin will drop all new arch syscall entries except
-x86[_64] and MIPS.  I will leave it up to arch maintainers to add the
-entries.
-
-Eric
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/10ecb7c6/attachment-0001.sig>
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index 1141d21..f1bf418 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -523,10 +523,20 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (vcpu->arch.pause)
+ 			vcpu_pause(vcpu);
+ 
++		/*
++		 * Disarming the background timer must be done in a
++		 * preemptible context, as this call may sleep.
++		 */
+ 		kvm_timer_flush_hwstate(vcpu);
+-		kvm_vgic_flush_hwstate(vcpu);
+ 
++		/*
++		 * Preparing the interrupts to be injected also
++		 * involves poking the GIC, which must be done in a
++		 * non-preemptible context.
++		 */
+ 		preempt_disable();
++		kvm_vgic_flush_hwstate(vcpu);
++
+ 		local_irq_disable();
+ 
+ 		/*
+@@ -539,8 +549,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm)) {
+ 			local_irq_enable();
+-			preempt_enable();
+ 			kvm_vgic_sync_hwstate(vcpu);
++			preempt_enable();
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			continue;
+ 		}
+@@ -585,9 +595,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		 */
+ 		kvm_guest_exit();
+ 		trace_kvm_exit(kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+-		preempt_enable();
+ 
+ 		kvm_vgic_sync_hwstate(vcpu);
++
++		preempt_enable();
++
+ 		kvm_timer_sync_hwstate(vcpu);
+ 
+ 		ret = handle_exit(vcpu, run, ret);
+-- 
+2.1.4
