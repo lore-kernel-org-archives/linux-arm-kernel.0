@@ -1,148 +1,146 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jul 2015 16:55:02 +0100
-Subject: [PATCH v3 04/11] KVM: arm/arm64: vgic: Allow HW irq to be encoded in
- LR
+Date: Fri, 24 Jul 2015 16:55:08 +0100
+Subject: [PATCH v3 10/11] KVM: arm/arm64: timer: Allow the timer to control
+ the active state
 In-Reply-To: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
 References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437753309-17989-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1437753309-17989-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that struct vgic_lr supports the LR_HW bit and carries a hwirq
-field, we can encode that information into the list registers.
+In order to remove the crude hack where we sneak the masked bit
+into the timer's control register, make use of the phys_irq_map
+API control the active state of the interrupt.
 
-This patch provides implementations for both GICv2 and GICv3.
+This causes some limited changes to allow for potential error
+propagation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  3 +++
- include/linux/irqchip/arm-gic.h    |  3 ++-
- virt/kvm/arm/vgic-v2.c             | 16 +++++++++++++++-
- virt/kvm/arm/vgic-v3.c             | 21 ++++++++++++++++++---
- 4 files changed, 38 insertions(+), 5 deletions(-)
+ arch/arm/kvm/reset.c         |  4 +---
+ arch/arm64/kvm/reset.c       |  4 +---
+ include/kvm/arm_arch_timer.h |  7 +++++--
+ virt/kvm/arm/arch_timer.c    | 29 ++++++++++++++++++++++-------
+ 4 files changed, 29 insertions(+), 15 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index ffbc034..cf637d6 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -268,9 +268,12 @@
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index f558c07..eeb85858 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -77,7 +77,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_reset_coprocs(vcpu);
  
- #define ICH_LR_EOI			(1UL << 41)
- #define ICH_LR_GROUP			(1UL << 60)
-+#define ICH_LR_HW			(1UL << 61)
- #define ICH_LR_STATE			(3UL << 62)
- #define ICH_LR_PENDING_BIT		(1UL << 62)
- #define ICH_LR_ACTIVE_BIT		(1UL << 63)
-+#define ICH_LR_PHYS_ID_SHIFT		32
-+#define ICH_LR_PHYS_ID_MASK		(0x3ffUL << ICH_LR_PHYS_ID_SHIFT)
- 
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 9de976b..ca88dad 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -71,11 +71,12 @@
- 
- #define GICH_LR_VIRTUALID		(0x3ff << 0)
- #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
--#define GICH_LR_PHYSID_CPUID		(7 << GICH_LR_PHYSID_CPUID_SHIFT)
-+#define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
- #define GICH_LR_STATE			(3 << 28)
- #define GICH_LR_PENDING_BIT		(1 << 28)
- #define GICH_LR_ACTIVE_BIT		(1 << 29)
- #define GICH_LR_EOI			(1 << 19)
-+#define GICH_LR_HW			(1 << 31)
- 
- #define GICH_VMCR_CTRL_SHIFT		0
- #define GICH_VMCR_CTRL_MASK		(0x21f << GICH_VMCR_CTRL_SHIFT)
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index f9b9c7c..8d7b04d 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -48,6 +48,10 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 		lr_desc.state |= LR_STATE_ACTIVE;
- 	if (val & GICH_LR_EOI)
- 		lr_desc.state |= LR_EOI_INT;
-+	if (val & GICH_LR_HW) {
-+		lr_desc.state |= LR_HW;
-+		lr_desc.hwirq = (val & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
-+	}
- 
- 	return lr_desc;
+ 	/* Reset arch_timer context */
+-	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+-
+-	return 0;
++	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
  }
-@@ -55,7 +59,9 @@ static struct vgic_lr vgic_v2_get_lr(const struct kvm_vcpu *vcpu, int lr)
- static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
- 			   struct vgic_lr lr_desc)
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index b4af618..91cf535 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -121,7 +121,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_reset_sys_regs(vcpu);
+ 
+ 	/* Reset timer */
+-	kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+-
+-	return 0;
++	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index e596675..e1e4d7c 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -52,13 +52,16 @@ struct arch_timer_cpu {
+ 
+ 	/* Timer IRQ */
+ 	const struct kvm_irq_level	*irq;
++
++	/* VGIC mapping */
++	struct irq_phys_map		*map;
+ };
+ 
+ int kvm_timer_hyp_init(void);
+ void kvm_timer_enable(struct kvm *kvm);
+ void kvm_timer_init(struct kvm *kvm);
+-void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			  const struct kvm_irq_level *irq);
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
++			 const struct kvm_irq_level *irq);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 98c95f2..76e38d2 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -64,10 +64,10 @@ static void kvm_timer_inject_irq(struct kvm_vcpu *vcpu)
+ 	int ret;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+-	timer->cntv_ctl |= ARCH_TIMER_CTRL_IT_MASK;
+-	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+-				  timer->irq->irq,
+-				  timer->irq->level);
++	kvm_vgic_set_phys_irq_active(timer->map, true);
++	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
++					 timer->map,
++					 timer->irq->level);
+ 	WARN_ON(ret);
+ }
+ 
+@@ -117,7 +117,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+ 	cycle_t cval, now;
+ 
+ 	if ((timer->cntv_ctl & ARCH_TIMER_CTRL_IT_MASK) ||
+-		!(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE))
++	    !(timer->cntv_ctl & ARCH_TIMER_CTRL_ENABLE) ||
++	    kvm_vgic_get_phys_irq_active(timer->map))
+ 		return false;
+ 
+ 	cval = timer->cntv_cval;
+@@ -184,10 +185,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	timer_arm(timer, ns);
+ }
+ 
+-void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			  const struct kvm_irq_level *irq)
++int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
++			 const struct kvm_irq_level *irq)
  {
--	u32 lr_val = (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT) | lr_desc.irq;
-+	u32 lr_val;
-+
-+	lr_val = lr_desc.irq;
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct irq_phys_map *map;
  
- 	if (lr_desc.state & LR_STATE_PENDING)
- 		lr_val |= GICH_LR_PENDING_BIT;
-@@ -64,6 +70,14 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	if (lr_desc.state & LR_EOI_INT)
- 		lr_val |= GICH_LR_EOI;
- 
-+	if (lr_desc.state & LR_HW) {
-+		lr_val |= GICH_LR_HW;
-+		lr_val |= (u32)lr_desc.hwirq << GICH_LR_PHYSID_CPUID_SHIFT;
-+	}
-+
-+	if (lr_desc.irq < VGIC_NR_SGIS)
-+		lr_val |= (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT);
-+
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
- }
- 
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index dff0602..afbf925 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -67,6 +67,10 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 		lr_desc.state |= LR_STATE_ACTIVE;
- 	if (val & ICH_LR_EOI)
- 		lr_desc.state |= LR_EOI_INT;
-+	if (val & ICH_LR_HW) {
-+		lr_desc.state |= LR_HW;
-+		lr_desc.hwirq = (val >> ICH_LR_PHYS_ID_SHIFT) & GENMASK(9, 0);
-+	}
- 
- 	return lr_desc;
- }
-@@ -84,10 +88,17 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	 * Eventually we want to make this configurable, so we may revisit
- 	 * this in the future.
+ 	/*
+ 	 * The vcpu timer irq number cannot be determined in
+@@ -196,6 +198,17 @@ void kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	 * vcpu timer irq number when the vcpu is reset.
  	 */
--	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+	switch (vcpu->kvm->arch.vgic.vgic_model) {
-+	case KVM_DEV_TYPE_ARM_VGIC_V3:
- 		lr_val |= ICH_LR_GROUP;
--	else
--		lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
-+		break;
-+	case  KVM_DEV_TYPE_ARM_VGIC_V2:
-+		if (lr_desc.irq < VGIC_NR_SGIS)
-+			lr_val |= (u32)lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT;
-+		break;
-+	default:
-+		BUG();
-+	}
- 
- 	if (lr_desc.state & LR_STATE_PENDING)
- 		lr_val |= ICH_LR_PENDING_BIT;
-@@ -95,6 +106,10 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
- 		lr_val |= ICH_LR_ACTIVE_BIT;
- 	if (lr_desc.state & LR_EOI_INT)
- 		lr_val |= ICH_LR_EOI;
-+	if (lr_desc.state & LR_HW) {
-+		lr_val |= ICH_LR_HW;
-+		lr_val |= ((u64)lr_desc.hwirq) << ICH_LR_PHYS_ID_SHIFT;
-+	}
- 
- 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
+ 	timer->irq = irq;
++
++	/*
++	 * Tell the VGIC that the virtual interrupt is tied to a
++	 * physical interrupt. We do that once per VCPU.
++	 */
++	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
++	if (WARN_ON(IS_ERR(map)))
++		return PTR_ERR(map);
++
++	timer->map = map;
++	return 0;
  }
+ 
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+@@ -335,6 +348,8 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 
+ 	timer_disarm(timer);
++	if (timer->map)
++		kvm_vgic_unmap_phys_irq(vcpu, timer->map);
+ }
+ 
+ void kvm_timer_enable(struct kvm *kvm)
 -- 
 2.1.4
