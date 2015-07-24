@@ -1,34 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:24 +0900
-Subject: [PATCH 3/9] ARM: shmobile: lager: add sound label on DTS
+Date: Fri, 24 Jul 2015 17:41:23 +0900
+Subject: [PATCH 2/9] ARM: shmobile: emev2: kzm9d: enable IIC busses
 In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
 References: <cover.1437724902.git.horms+renesas@verge.net.au>
-Message-ID: <30be0ba5f92c9a728bf3b3f41dbf3240eb3bbc11.1437724902.git.horms+renesas@verge.net.au>
+Message-ID: <c53b0c92a829fe804f2f5f749ebc907658ebcf75.1437724902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-It is easy to modify settings for Test or other purpose if sound has label
-
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/emev2-kzm9d.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 2eb8a995ae9f..5ae07a8385c5 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -174,7 +174,7 @@
- 			  1800000 0>;
+diff --git a/arch/arm/boot/dts/emev2-kzm9d.dts b/arch/arm/boot/dts/emev2-kzm9d.dts
+index 1dee0aa4f40c..955c24ee4a8c 100644
+--- a/arch/arm/boot/dts/emev2-kzm9d.dts
++++ b/arch/arm/boot/dts/emev2-kzm9d.dts
+@@ -95,6 +95,14 @@
  	};
+ };
  
--	sound {
-+	rsnd_ak4643: sound {
- 		compatible = "simple-audio-card";
- 
- 		simple-audio-card,format = "left_j";
++&iic0 {
++	status = "okay";
++};
++
++&iic1 {
++	status = "okay";
++};
++
+ &pfc {
+ 	uart1_pins: serial at e1030000 {
+ 		renesas,groups = "uart1_ctrl", "uart1_data";
 -- 
 2.1.4
