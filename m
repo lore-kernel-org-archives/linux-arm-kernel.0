@@ -1,47 +1,51 @@
 From: david.vrabel@citrix.com (David Vrabel)
-Date: Fri, 24 Jul 2015 10:31:39 +0100
-Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
- a Linux page into Xen page
-In-Reply-To: <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
+Date: Fri, 24 Jul 2015 10:35:44 +0100
+Subject: [Xen-devel] [PATCH v2 04/20] xen/grant: Add helper
+ gnttab_page_grant_foreign_access_ref
+In-Reply-To: <1436474552-31789-5-git-send-email-julien.grall@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
-Message-ID: <55B205FB.5080209@citrix.com>
+ <1436474552-31789-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <55B206F0.3060108@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/07/15 21:42, Julien Grall wrote:
-> The Xen interface is always using 4KB page. This means that a Linux page
-> may be split across multiple Xen page when the page granularity is not
-> the same.
+> Many PV drivers contain the idiom:
 > 
-> This helper will break down a Linux page into 4KB chunk and call the
-> helper on each of them.
+> pfn = page_to_mfn(...) /* Or similar */
+> gnttab_grant_foreign_access_ref
+> 
+> Replace it by a new helper. Note that when Linux is using a different
+> page granularity than Xen, the helper only gives access to the first 4KB
+> grant.
+> 
+> This is useful where drivers are allocating a full Linux page for each
+> grant.
+> 
+> Also include xen/interface/grant_table.h rather than xen/grant_table.h in
+> asm/page.h for x86 to fix a compilation issue [1]. Only the former is
+> useful in order to get the structure definition.
+> 
+> [1] Interpendency between asm/page.h and xen/grant_table.h which result
+> to page_mfn not being defined when necessary.
 [...]
-> --- a/include/xen/page.h
-> +++ b/include/xen/page.h
-> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
+> --- a/include/xen/grant_table.h
+> +++ b/include/xen/grant_table.h
+> @@ -131,6 +131,15 @@ void gnttab_cancel_free_callback(struct gnttab_free_callback *callback);
+>  void gnttab_grant_foreign_access_ref(grant_ref_t ref, domid_t domid,
+>  				     unsigned long frame, int readonly);
 >  
->  extern unsigned long xen_released_pages;
->  
-> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
-> +
-> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
-> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
-> +				    void *data)
+> +/* Give access to the first 4K of the page */
+> +static inline void gnttab_page_grant_foreign_access_ref(
+> +	grant_ref_t ref, domid_t domid,
+> +	struct page *page, int readonly)
+> +{
+> +	gnttab_grant_foreign_access_ref(ref, domid, page_to_mfn(page),
 
-I think this should be outlined (unless you have measurements that
-support making it inlined).
+Obviously this would use the new xen_page_to_gfn() macro here.
 
-Also perhaps make it
+Otherwise,
 
-int xen_for_each_gfn(struct page *page,
-                     xen_gfn_fn_t fn, void *data);
-
-or
-
-int xen_for_each_gfn(struct page **page, unsigned int count,
-                     xen_gfn_fn_t fn, void *data);
-
-?
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
 David
