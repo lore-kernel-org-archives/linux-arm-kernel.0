@@ -1,48 +1,21 @@
-From: lee@kernel.org (Lee Jones)
-Date: Fri, 24 Jul 2015 16:25:17 +0100
-Subject: [PATCH v7 3/3] ARM: bcm2835: Add the firmware driver information
- to the RPi DT
-In-Reply-To: <1437198880-8467-3-git-send-email-eric@anholt.net>
-References: <1437198880-8467-1-git-send-email-eric@anholt.net>
- <1437198880-8467-3-git-send-email-eric@anholt.net>
-Message-ID: <20150724152517.GR3436@x1>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jul 2015 16:29:31 +0100
+Subject: [PATCH v2 13/20] arm64: cmpxchg_dbl: patch in lse instructions
+ when supported by the CPU
+In-Reply-To: <1437734531-10698-14-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-14-git-send-email-will.deacon@arm.com>
+Message-ID: <20150724152931.GN3550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jul 2015, Eric Anholt wrote:
+On Fri, Jul 24, 2015 at 11:42:04AM +0100, Will Deacon wrote:
+> On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+> it makes sense to use them in preference to ll/sc sequences.
+> 
+> This patch introduces runtime patching of our cmpxchg_double primitives
+> so that the LSE casp instruction is used instead.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> Acked-by: Lee Jones <lee@kernel.org> (previous version with pm-domains)
-
-For this version:
-  Acked-by: Lee Jones <lee@kernel.org>
-
-> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-> ---
-> 
-> v2: Drop pm-domains stuff since I've dropped it from the firmware
->     driver for now, until we get drivers/base fixed.
-> 
-> v3: Rename the compatible to "raspberrypi,bcm2835-firmware"
-> 
->  arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> index 46780bb..ab5474e 100644
-> --- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> +++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-> @@ -14,6 +14,13 @@
->  			linux,default-trigger = "heartbeat";
->  		};
->  	};
-> +
-> +	soc {
-> +		firmware: firmware {
-> +			compatible = "raspberrypi,bcm2835-firmware";
-> +			mboxes = <&mailbox>;
-> +		};
-> +	};
->  };
->  
->  &gpio {
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
