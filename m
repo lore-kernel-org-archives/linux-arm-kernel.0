@@ -1,52 +1,49 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 24 Jul 2015 14:59:37 +0200
-Subject: [RESEND PATCH 0/6] This series adds SMP support for the MediaTek
- MT6580.
-In-Reply-To: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
-References: <1434650481-39421-1-git-send-email-scott.shu@mediatek.com>
-Message-ID: <2431941.t2bpkCFJl8@ubix>
+From: HenryC.Chen@mediatek.com (Henry Chen)
+Date: Fri, 24 Jul 2015 20:59:58 +0800
+Subject: [PATCH v4 1/2] dt-bindings: regulator: mt6311: Add document for
+ mt6311 regulator
+In-Reply-To: <CABxcv=kuUbDyzFR2bU7vcvvsqg_yQuqBn5S20=uaH9iBCL_xBQ@mail.gmail.com>
+References: <1437715481-31528-1-git-send-email-henryc.chen@mediatek.com>
+ <1437715481-31528-2-git-send-email-henryc.chen@mediatek.com>
+ <CABxcv=kuUbDyzFR2bU7vcvvsqg_yQuqBn5S20=uaH9iBCL_xBQ@mail.gmail.com>
+Message-ID: <1437742798.30329.100.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 19, 2015 02:01:15 AM Scott Shu wrote:
-> This patchset adds support SMP on MediaTek MT6580 Cortex-A7 qual core SoC.
-> 
-> This is based on v4.1-rc1 and following patch series:
-> (1) Yingjoe Chen's "Add SMP bringup support for mt65xx socs" [1]
-> (2) Mars Cheng's "Add mt6580 basic chip support" [2]
-> (3) Sascha Hauer's "Mediatek SCPSYS power domain support" [3]
-> 
-> The secondary cores are power off as default on MT6580, this change adds
-> a new enable-method to turn on power to the cores during booting process.
-> 
-> The System Power Manager (SPM) inside the SCPSYS is for the CPU MTCMOS
-> power domain control. Please check [3] for more information about SCPSYS.
-> 
-> [1] https://lkml.org/lkml/2015/5/16/33
-> [2] https://lkml.org/lkml/2015/6/3/113
-> [3] https://lkml.org/lkml/2015/6/9/172
-> 
-> 
-> Scott Shu (6):
->   Document: bindings: DT: Add SMP enable method for MT6580 SoC platform
->   soc: Mediatek: Add SCPSYS CPU power domain driver
->   ARM: mediatek: add smp bringup code
->   ARM: Mediatek: enable GPT6 on boot up to make arch timer working for
-> MT6580 ARM: dts: mt6580: Add device nodes to the MT6580 dtsi file.
->   ARM: dts: mt6580: enable basic SMP bringup for MT6580
-> 
->  Documentation/devicetree/bindings/arm/cpus.txt |   1 +
->  arch/arm/boot/dts/mt6580.dtsi                  |  25 +++
->  arch/arm/mach-mediatek/Makefile                |   2 +-
->  arch/arm/mach-mediatek/generic.h               |  24 +++
->  arch/arm/mach-mediatek/hotplug.c               | 229
-> +++++++++++++++++++++++++ arch/arm/mach-mediatek/mediatek.c              | 
->  4 +-
->  arch/arm/mach-mediatek/platsmp.c               | 113 +++++++++++-
->  7 files changed, 395 insertions(+), 3 deletions(-)
->  create mode 100644 arch/arm/mach-mediatek/generic.h
->  create mode 100644 arch/arm/mach-mediatek/hotplug.c
+Hi Javier,
 
+On Fri, 2015-07-24 at 10:32 +0200, Javier Martinez Canillas wrote:
+> Hello Henry,
+> 
+> I believe Mark asked you to use a subject lines reflecting the style
+> for the subsystem, so the subject should had been something like:
+> 
+> regulators: mt6311: Add DT binding document
+> 
+> On Fri, Jul 24, 2015 at 7:24 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
+> > This patch adds a list of supported regulator names to the devicetree
+> > binding documentation for Mediatek MT6311 PMIC.
+> >
+> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> > ---
+> 
+> I know is in your cover letter, but usually is good to also include a
+> history log of the changes for each patch so people know what changed.
+> Everything between the '---' and the diff are omitted by tools like
+> git am so you can add there.  You can use tools like patman that do
+> this automatically for you.
+> 
+Ok, got it, I will follow that.
 
-The whole series is missing a Signed-off-by tag, please add them to the next 
-version. The Signed-off-by is mandatory for any patch to get accepted.
+> Also, I said that you could add my Reviewed-by after the node name
+> change so you should had carried that. So again:
+
+Sorry, did you mean I need to resent again?
+
+Thanks for advise.
+Henry
+
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> Best regards,
+> Javier
