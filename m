@@ -1,39 +1,28 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:15 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.3
-Message-ID: <cover.1437725206.git.horms+renesas@verge.net.au>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 24 Jul 2015 10:42:05 +0200
+Subject: [PATCH v6 0/3] Add MediaTek display PWM driver
+In-Reply-To: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+Message-ID: <2181696.fQcvS98Cqx@ubix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+On Monday, July 20, 2015 04:17:14 PM YH Huang wrote:
+> This patch series add the use of display PWM driver, documentation
+> and device tree for Mediatek SoCs. The driver is used to support
+> the backlight of the panel. This is based on v4.2-rc1.
+> 
+> The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
+> clk: mediatek: Add subsystem clocks of MT8173
+> 
+> Change in v6:
+> 1. Enable clocks in the pwm_enable function
+> 2. Remove suspend/resume code since pwm-backlight driver has done the same
+> things 3. Revise some code to make it easier to read
+> 
 
-Please consider these second round of Renesas ARM based SoC cleanup for v4.3.
+Can you please provide the whole change log for all versions the next time.
+It's easier this way to understand the evolution of the series.
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-cleanup-for-v4.3,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 20834a406ee20b57c796f9911f06600b71c75788:
-
-  ARM: shmobile: timer: r8a73a4 and r8a7790 are multi-platform only (2015-07-06 09:29:46 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v4.3
-
-for you to fetch changes up to 151dd346a2dadaa151d5110553e3fb08774c888e:
-
-  ARM: shmobile: apmu: silence build warnings (2015-07-14 16:35:24 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC Cleanup for v4.3
-
-* Silence APMU build warnings
-
-----------------------------------------------------------------
-Wolfram Sang (1):
-      ARM: shmobile: apmu: silence build warnings
-
- arch/arm/mach-shmobile/platsmp-apmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks,
+Matthias
