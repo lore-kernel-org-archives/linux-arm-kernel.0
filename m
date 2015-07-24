@@ -1,74 +1,96 @@
 From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Fri, 24 Jul 2015 12:01:49 +0200
-Subject: [PATCH v8 0/2] mfd: flexcom: add a driver for Flexcom
-Message-ID: <cover.1437731428.git.cyrille.pitchen@atmel.com>
+Date: Fri, 24 Jul 2015 12:01:50 +0200
+Subject: [PATCH v8 1/2] mfd: devicetree: add bindings for Atmel Flexcom
+In-Reply-To: <cover.1437731428.git.cyrille.pitchen@atmel.com>
+References: <cover.1437731428.git.cyrille.pitchen@atmel.com>
+Message-ID: <738a001f14a5fa4fa8e5f90ad859a318cba0de42.1437731428.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ChangeLog
+This patch documents the DT bindings for the Atmel Flexcom which will be
+introduced by sama5d2x SoCs. These bindings will be used by the actual
+Flexcom driver to be sent in another patch.
 
-v8:
-- fix the name of the spi node in the DT example: from spi at f8034400 to
-  spi at 2,0
-- use the return code of op_property_read_u32_index() instead of -EINVAL
-  to report error.
-- add Acked-by from Nicolas Ferre
-
-v7:
-- read the operating mode from the very first u32 of the reg property from
-  the first available child node (should be unique).
-- update the DT bindings documentation accordingly.
-
-v6:
-- select the operating mode according to the "compatible" DT property of
-  the first available child node (should be unique).
-- remove the "atmel,flexcom-mode" DT property so the need of a header file
-  defining macros for the possible values of this deprecated property.
-
-v5:
-- create a header file containing macros used by DT bindings
-- use numeric constants instead of strings to select the Flexcom mode
-- change the license to "GPL v2"
-- update the DT binding documentation to make it more readable and add
-  references to USART, SPI and I2C DT binding documentations. remove the
-  useless label in the Example section.
-- change the register prefix from FX_ to FLEX_ to match the Flexcom
-  programmer datasheet.
-- rename some variables to make them more understandable.
-
-v4:
-- check clk_prepare_enable() return code in atmel_flexcom_probe()
-- add a commit message to the DT binding patch
-
-v3:
-- remove MODULE_ALIAS()
-- add Acked-by from Boris Brezillon and Alexandre Belloni
-
-v2:
-- enhance the documentation of DT bindings and change the way the "ranges"
-  property is used.
-- replace __raw_readl() and __raw_writel() by readl() and writel().
-- change the module license to "GPL" for v2 or later
-- print the selected flexcom mode after the hardware version
-
-v1:
-This series of patches a support to the Atmel Flexcom, a wrapper which
-integrates an USART, a SPI controller and a TWI controller. Only one
-peripheral can be used at a time. The active function is selected though
-the Flexcom Mode Register.
-
-Cyrille Pitchen (2):
-  mfd: devicetree: add bindings for Atmel Flexcom
-  mfd: atmel-flexcom: add a driver for Atmel Flexible Serial
-    Communication Unit
-
- .../devicetree/bindings/mfd/atmel-flexcom.txt      |  68 +++++++++++++
- drivers/mfd/Kconfig                                |  11 ++
- drivers/mfd/Makefile                               |   1 +
- drivers/mfd/atmel-flexcom.c                        | 113 +++++++++++++++++++++
- 4 files changed, 193 insertions(+)
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ .../devicetree/bindings/mfd/atmel-flexcom.txt      | 68 ++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
- create mode 100644 drivers/mfd/atmel-flexcom.c
 
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+new file mode 100644
+index 000000000000..588d527dbfa7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel-flexcom.txt
+@@ -0,0 +1,68 @@
++* Device tree bindings for Atmel Flexcom (Flexible Serial Communication Unit)
++
++The Atmel Flexcom is just a wrapper which embeds a SPI controller, an I2C
++controller and an USART. Only one function can be used at a time and is chosen
++at boot time according to the device tree.
++
++Required properties:
++- compatible:		Should be "atmel,sama5d2-flexcom"
++- reg:			Should be the pair (offset, size) for the Flexcom
++			dedicated I/O registers (without USART, TWI or SPI
++			registers).
++- clocks:		Should be the Flexcom peripheral clock from PMC.
++- #address-cells:	Should be <2>
++- #size-cells:		Should be <1>
++- ranges:		Should be a list of ranges.
++			One range per peripheral wrapped by the Flexcom. So each
++			range is a triplet (child_addr, parent_addr, size). The
++			first u32 of "child_addr" is the value to be set in the
++			Operating Mode bitfield of the Flexcom Mode Register.
++			Then "parent_addr" stores the base address of the
++			corresponding peripheral in the system memory. Finally,
++			"size" if the size of the memory region of this
++			peripheral.
++
++Required child:
++A single available child for the serial controller to enable.
++
++Required properties of this child:
++- reg:			Should be a pair (child_addr, size) with child_addr
++			matching one of the parent ranges.
++- clocks:		Should be the very same phandle as for the parent's one.
++
++Other properties remain unchanged. See documentation of the respective device:
++- ../serial/atmel-usart.txt
++- ../spi/spi_atmel.txt
++- ../i2c/i2c-at91.txt
++
++Example:
++
++flexcom at f8034000 {
++	compatible = "atmel,sama5d2-flexcom";
++	reg = <0xf8034000 0x200>;
++	clocks = <&flx0_clk>;
++	#address-cells = <2>;
++	#size-cells = <1>;
++	ranges = <1 0 0xf8034200 0x200		/* opmode 1: USART */
++		  2 0 0xf8034400 0x200		/* opmode 2: SPI */
++		  3 0 0xf8034600 0x200>;	/* opmode 3: I2C */
++
++	spi at 2,0 {
++		compatible = "atmel,at91rm9200-spi";
++		reg = <2 0 0x200>;
++		interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_flx0_default>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clocks = <&flx0_clk>;
++		clock-names = "spi_clk";
++		atmel,fifo-size = <32>;
++
++		mtd_dataflash at 0 {
++			compatible = "atmel,at25f512b";
++			reg = <0>;
++			spi-max-frequency = <20000000>;
++		};
++	};
++};
 -- 
 1.8.2.2
