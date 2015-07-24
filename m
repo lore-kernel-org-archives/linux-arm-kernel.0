@@ -1,27 +1,37 @@
 From: mikhail.ulyanov@cogentembedded.com (Mikhail Ulyanov)
-Date: Fri, 24 Jul 2015 16:25:44 +0300
-Subject: [PATCH 0/2] ARM: shmobile: Add JPU device nodes to Renesas R-Car SoCs.
-Message-ID: <1437744346-499-1-git-send-email-mikhail.ulyanov@cogentembedded.com>
+Date: Fri, 24 Jul 2015 16:25:45 +0300
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: Add JPU device node.
+In-Reply-To: <1437744346-499-1-git-send-email-mikhail.ulyanov@cogentembedded.com>
+References: <1437744346-499-1-git-send-email-mikhail.ulyanov@cogentembedded.com>
+Message-ID: <1437744346-499-2-git-send-email-mikhail.ulyanov@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches contains device tree nodes definitions for JPEG
-codec peripheral found in the Renesas R-Car SoCs.
+This patch contains device tree node definition for JPEG codec peripheral
+found in the Renesas R-Car r8a7790 SoC.
 
-This series of patches is against the renesas-devel-20150720-v4.2-rc3
-of https://kernel.googlesource.com/pub/scm/linux/kernel/git/horms/renesas
-
-The driver itself was accepted by Hans Verkuil
-http://git.linuxtv.org/cgit.cgi/hverkuil/media_tree.git
-commit hash 761a0eee505f3a7051b187e67cd28c50b385d409
-
-Mikhail Ulyanov (2):
-  ARM: shmobile: r8a7790: Add JPU device node.
-  ARM: shmobile: r8a7791: Add JPU device node.
-
+Signed-off-by: Mikhail Ulyanov <mikhail.ulyanov@cogentembedded.com>
+---
  arch/arm/boot/dts/r8a7790.dtsi | 7 +++++++
- arch/arm/boot/dts/r8a7791.dtsi | 7 +++++++
- 2 files changed, 14 insertions(+)
+ 1 file changed, 7 insertions(+)
 
+diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
+index 3ae0c3b..e961352 100644
+--- a/arch/arm/boot/dts/r8a7790.dtsi
++++ b/arch/arm/boot/dts/r8a7790.dtsi
+@@ -872,6 +872,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	jpu: jpeg-codec at fe980000 {
++		compatible = "renesas,jpu-r8a7790";
++		reg = <0 0xfe980000 0 0x10300>;
++		interrupts = <0 272 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&mstp1_clks R8A7790_CLK_JPU>;
++	};
++
+ 	clocks {
+ 		#address-cells = <2>;
+ 		#size-cells = <2>;
 -- 
 2.1.4
