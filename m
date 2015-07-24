@@ -1,74 +1,105 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 24 Jul 2015 21:45:13 +0200
-Subject: [GIT PULL] pxa for v4.3 - v2
-Message-ID: <87si8de3w6.fsf@belgarion.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 24 Jul 2015 13:16:59 -0700
+Subject: [PATCH 1/1] misc: sram: add dev_pm_ops to support module power
+ gate
+In-Reply-To: <1437757979-25889-1-git-send-email-shenwei.wang@freescale.com>
+References: <1437757979-25889-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <55B29D3B.8030402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24/07/15 10:12, Shenwei Wang wrote:
+> When system goes into low power states like SUSPEND_MEM and
+> HIBERNATION, the hardware IP block may be powered off to reduce
+> the power consumption. This power down will lost all the
+> data inside the ram. This patch added the dev_pm_ops and
+> implemented two callbacks: suspend_noirq and resume_noirq, which
+> will save the data in the on-chip-ram right before power down
+> and restore it after system resumes.
+> 
+> A new property string named "can-power-gate" is added to
+> the devicetree bindings too.
+> 
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
 
-Hi Arnd, Kevin, and Olof,
+[snip]
 
-This is the pxa pull request for 4.3 development cycle, the second one after a
-small fix triggered by 0-day kernel builder. It is a quite small one, the main
-work happening on the drivers side, mostly dmaengine centric work.
+> +static int sram_suspend_noirq(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sram_dev *sram = platform_get_drvdata(pdev);
+> +
+> +	if (!sram->power_off_save)
+> +		return 0;
+> +
+> +	/* Save necessary regs */
+> +	clk_enable(sram->clk);
+> +	memcpy(sram->power_off_save, sram->virt_base,gen_pool_size(sram->pool));
+> +	clk_disable(sram->clk);
 
-For the record, the diff from the previous pull request is in [1].
+memcpy_fromio()?
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> +
+> +	return 0;
+> +}
+> +
+> +static int sram_resume_noirq(struct device *dev)
+> +{
+> +	struct platform_device *pdev = to_platform_device(dev);
+> +	struct sram_dev *sram = platform_get_drvdata(pdev);
+> +
+> +	if (!sram->power_off_save)
+> +		return 0;
+> +
+> +	clk_enable(sram->clk);
+> +	memcpy(sram->virt_base, sram->power_off_save, gen_pool_size(sram->pool));
 
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+memcpy_toio()?
 
-are available in the git repository at:
+> +	clk_disable(sram->clk);
+> +
+> +	return 0;
+> +}
+> +
+>  static int sram_probe(struct platform_device *pdev)
+>  {
+>  	struct sram_dev *sram;
+> @@ -203,6 +235,12 @@ static int sram_probe(struct platform_device *pdev)
+>  
+>  	platform_set_drvdata(pdev, sram);
+>  
+> +	if (of_get_property(pdev->dev.of_node, "can-power-gate", NULL))
 
-  https://github.com/rjarzmik/linux.git tags/pxa-for-4.3-v2
+Since this is a boolean you could use of_property_read_bool()
 
-for you to fetch changes up to 6d6db340a7e832dc18a6a95d9f9fc79d03ff959e:
+> +	{
+> +		sram->power_off_save = devm_kzalloc(&pdev->dev,
+> +				gen_pool_size(sram->pool), GFP_KERNEL);
 
-  ARM: pxa: Use setup_timer (2015-07-18 12:16:43 +0200)
+Parenthesis not needed.
 
-----------------------------------------------------------------
-This is the pxa changes for v4.3 cycle.
+This will only work with SRAM sizes which are small enough they can be
+serviced by kzalloc() allocations. The problem is that you might
+actually need direct-mapped memory but what if you have larger SRAMs
+that are several MB? Maybe there should be a check here to prevent that.
 
-There is mostly one evolution on the dma side, to enable cooperation
-of the legacy pxa DMA API, and the new dmaengine API.
-Once all drivers using DMA are converted, the legacy DMA API should
-be removed.
+> +	}
+> +
+>  	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
+>  		gen_pool_size(sram->pool) / 1024, sram->virt_base);
+>  
+> @@ -229,10 +267,16 @@ static const struct of_device_id sram_dt_ids[] = {
+>  };
+>  #endif
+>  
+> +static const struct dev_pm_ops sram_pm_ops = {
+> +	.suspend_noirq = sram_suspend_noirq,
+> +	.resume_noirq = sram_resume_noirq,
+> +};
 
-----------------------------------------------------------------
-Robert Jarzmik (1):
-      ARM: pxa: transition to dmaengine phase 1
-
-Vaishali Thakkar (2):
-      ARM: pxa: Use module_platform_driver
-      ARM: pxa: Use setup_timer
-
- arch/arm/mach-pxa/devices.c          | 37 ++++++++++++++++++++++++++++++++++++
- arch/arm/mach-pxa/pxa25x.c           |  1 +
- arch/arm/mach-pxa/pxa27x.c           |  1 +
- arch/arm/mach-pxa/pxa3xx.c           |  1 +
- arch/arm/mach-pxa/sharpsl_pm.c       |  6 ++----
- arch/arm/mach-pxa/tosa-bt.c          | 15 +--------------
- arch/arm/plat-pxa/dma.c              | 22 ++++++++++-----------
- arch/arm/plat-pxa/include/plat/dma.h | 15 +++++++++++++++
- 8 files changed, 69 insertions(+), 29 deletions(-)
-
-
-Cheers.
-
---
-Robert
-
-[1]
-diff --git a/arch/arm/plat-pxa/include/plat/dma.h b/arch/arm/plat-pxa/include/plat/dma.h
-index 33ac1a9eb523..28848b344e2d 100644
---- a/arch/arm/plat-pxa/include/plat/dma.h
-+++ b/arch/arm/plat-pxa/include/plat/dma.h
-@@ -89,7 +89,7 @@ void pxa_free_dma (int dma_ch);
- #if defined(CONFIG_PXA_DMA)
- extern int pxad_toggle_reserved_channel(int legacy_channel);
- #else
--static inline pxad_toggle_reserved_channel(int legacy_channel)
-+static inline int pxad_toggle_reserved_channel(int legacy_channel)
- {
-        return 0;
- }
+You may have to enclose this within an ifdef CONFIG_PM_SLEEP/endif
+statement not to cause warnings if CONFIG_PM_SLEEP is disabled.
+-- 
+Florian
