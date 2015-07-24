@@ -1,92 +1,169 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Fri, 24 Jul 2015 11:01:59 +0800
-Subject: [PATCH v4 1/7] clk: mediatek: Add fixed clocks support for Mediatek
- SoC.
+Date: Fri, 24 Jul 2015 11:02:02 +0800
+Subject: [PATCH v4 4/7] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for clock controllers
 In-Reply-To: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1437706925-3222-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1437706925-3222-5-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds fixed clocks support by using CCF fixed-rate
-clock implementation.
+This adds the binding documentation for the mmsys, imgsys, vdecsys,
+vencsys and vencltsys controllers found on Mediatek SoCs.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mtk.c | 23 +++++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.h | 19 ++++++++++++++++++-
- 2 files changed, 41 insertions(+), 1 deletion(-)
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencltsys.txt   | 22 ++++++++++++++++++++++
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     | 22 ++++++++++++++++++++++
+ 5 files changed, 110 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
 
-diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-index 18444ae..f8307c3 100644
---- a/drivers/clk/mediatek/clk-mtk.c
-+++ b/drivers/clk/mediatek/clk-mtk.c
-@@ -49,6 +49,29 @@ err_out:
- 	return NULL;
- }
- 
-+void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks, int num,
-+		struct clk_onecell_data *clk_data)
-+{
-+	int i;
-+	struct clk *clk;
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+new file mode 100644
+index 0000000..b1f2ce1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+@@ -0,0 +1,22 @@
++Mediatek imgsys controller
++============================
 +
-+	for (i = 0; i < num; i++) {
-+		const struct mtk_fixed_clk *rc = &clks[i];
++The Mediatek imgsys controller provides various clocks to the system.
 +
-+		clk = clk_register_fixed_rate(NULL, rc->name, rc->parent,
-+				rc->parent ? 0 : CLK_IS_ROOT, rc->rate);
++Required Properties:
 +
-+		if (IS_ERR(clk)) {
-+			pr_err("Failed to register clk %s: %ld\n",
-+					rc->name, PTR_ERR(clk));
-+			continue;
-+		}
++- compatible: Should be:
++	- "mediatek,mt8173-imgsys", "syscon"
++- #clock-cells: Must be 1
 +
-+		if (clk_data)
-+			clk_data->clks[rc->id] = clk;
-+	}
-+}
++The imgsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
 +
- void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
- 		struct clk_onecell_data *clk_data)
- {
-diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index 9dda9d8..f083dfc 100644
---- a/drivers/clk/mediatek/clk-mtk.h
-+++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -25,6 +25,23 @@
- 
- #define MHZ (1000 * 1000)
- 
-+struct mtk_fixed_clk {
-+	int id;
-+	const char *name;
-+	const char *parent;
-+	unsigned long rate;
++Example:
++
++imgsys: clock-controller at 15000000 {
++	compatible = "mediatek,mt8173-imgsys", "syscon";
++	reg = <0 0x15000000 0 0x1000>;
++	#clock-cells = <1>;
 +};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+new file mode 100644
+index 0000000..4385946
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+@@ -0,0 +1,22 @@
++Mediatek mmsys controller
++============================
 +
-+#define FIXED_CLK(_id, _name, _parent, _rate) {		\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent = _parent,			\
-+		.rate = _rate,				\
-+	}
++The Mediatek mmsys controller provides various clocks to the system.
 +
-+void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
-+		int num, struct clk_onecell_data *clk_data);
++Required Properties:
 +
- struct mtk_fixed_factor {
- 	int id;
- 	const char *name;
-@@ -41,7 +58,7 @@ struct mtk_fixed_factor {
- 		.div = _div,				\
- 	}
- 
--extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
-+void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
- 		int num, struct clk_onecell_data *clk_data);
- 
- struct mtk_composite {
++- compatible: Should be:
++	- "mediatek,mt8173-mmsys", "syscon"
++- #clock-cells: Must be 1
++
++The mmsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++mmsys: clock-controller at 14000000 {
++	compatible = "mediatek,mt8173-mmsys", "syscon";
++	reg = <0 0x14000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+new file mode 100644
+index 0000000..1faacf1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vdecsys controller
++============================
++
++The Mediatek vdecsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vdecsys", "syscon"
++- #clock-cells: Must be 1
++
++The vdecsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vdecsys: clock-controller at 16000000 {
++	compatible = "mediatek,mt8173-vdecsys", "syscon";
++	reg = <0 0x16000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+new file mode 100644
+index 0000000..3cc299f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencltsys controller
++============================
++
++The Mediatek vencltsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vencltsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencltsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vencltsys: clock-controller at 19000000 {
++	compatible = "mediatek,mt8173-vencltsys", "syscon";
++	reg = <0 0x19000000 0 0x1000>;
++	#clock-cells = <1>;
++};
+diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+new file mode 100644
+index 0000000..5bb2866
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+@@ -0,0 +1,22 @@
++Mediatek vencsys controller
++============================
++
++The Mediatek vencsys controller provides various clocks to the system.
++
++Required Properties:
++
++- compatible: Should be:
++	- "mediatek,mt8173-vencsys", "syscon"
++- #clock-cells: Must be 1
++
++The vencsys controller uses the common clk binding from
++Documentation/devicetree/bindings/clock/clock-bindings.txt
++The available clocks are defined in dt-bindings/clock/mt*-clk.h.
++
++Example:
++
++vencsys: clock-controller at 18000000 {
++	compatible = "mediatek,mt8173-vencsys", "syscon";
++	reg = <0 0x18000000 0 0x1000>;
++	#clock-cells = <1>;
++};
 -- 
 1.8.1.1.dirty
