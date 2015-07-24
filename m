@@ -1,96 +1,42 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Thu, 23 Jul 2015 17:11:35 -0700
-Subject: [PATCH v2 1/5] clk: remove duplicated code with
- __clk_set_parent_after
-In-Reply-To: <20150722140809.GC13623@shlinux1.ap.freescale.net>
-References: <1431610143-21853-1-git-send-email-aisheng.dong@freescale.com>
- <1431610143-21853-2-git-send-email-aisheng.dong@freescale.com>
- <20150528040919.22384.79189@quantum>
- <20150715122522.GA30570@shlinux1.ap.freescale.net>
- <20150715122955.GB30570@shlinux1.ap.freescale.net>
- <20150722140809.GC13623@shlinux1.ap.freescale.net>
-Message-ID: <20150724001135.642.54711@quantum>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 24 Jul 2015 02:16:06 +0200
+Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
+ Kconfig
+In-Reply-To: <20150723123553.GE7576@n2100.arm.linux.org.uk>
+References: <1437612483-30160-1-git-send-email-sre@kernel.org>
+ <1437612483-30160-4-git-send-email-sre@kernel.org>
+ <20150723123553.GE7576@n2100.arm.linux.org.uk>
+Message-ID: <20150724001605.GA1453@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Dong Aisheng (2015-07-22 07:08:10)
-> Ping...
+Hi Russel,
+
+On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel wrote:
+> > Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
+> > in one option less to think about when configuring the kernel.
 > 
-> On Wed, Jul 15, 2015 at 08:29:56PM +0800, Dong Aisheng wrote:
-> > On Wed, Jul 15, 2015 at 08:25:24PM +0800, Dong Aisheng wrote:
-> > > Hi Mike,
-> > > 
-> > > On Wed, May 27, 2015 at 09:09:19PM -0700, Michael Turquette wrote:
-> > > > Quoting Dong Aisheng (2015-05-14 06:28:59)
-> > > > > __clk_set_parent_after() actually used the second argument then we
-> > > > > could put this duplicate logic in there and call it with a different
-> > > > > order of arguments in the success vs. error paths in this function.
-> > > > > 
-> > > > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > > > Cc: Stephen Boyd <sboyd@codeaurora.org>
-> > > > > Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> > > > > Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
-> > > > 
-> > > > Patch looks good to me.
-> > > > 
-> > > > Also just noticed that the second argument to __clk_set_parent_after is
-> > > > never used :-(
-> > > > 
-> > > 
-> > > Ping...
-> > > 
-> > > I did not see this patch series in your tree for v4.2 rc.
-> > > Is this got missed?
+> > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
+> > +#ifdef CONFIG_ARM_ERRATA_430973
+> >  	teq	r3, #0x00100000			@ only present in r1p*
+> >  	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
+> >  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+> 
+> NAK.  Please read the mailing list history, I'm not repeating myself
+> again on this.  Thanks.
 
-Dong Aisheng,
+It's a bit hard to search the mailing list history without a bit
+more information.
 
-Yes it was missed. My apologies. Can you refresh it and re-send?
+I guess you prefer to just add the !ARCH_MULTIPLATFORM dependency to
+the Kconfig entry without removing the additional check in the code?
 
-Thanks,
-Mike
-
-> > > 
-> > 
-> > Updated Mike's email address.
-> > 
-> > Regards
-> > Dong Aisheng
-> > 
-> > > Regards
-> > > Dong Aisheng
-> > > 
-> > > > Regards,
-> > > > Mike
-> > > > 
-> > > > > ---
-> > > > >  drivers/clk/clk.c | 8 +-------
-> > > > >  1 file changed, 1 insertion(+), 7 deletions(-)
-> > > > > 
-> > > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > > index 659f2b0..0e813ea 100644
-> > > > > --- a/drivers/clk/clk.c
-> > > > > +++ b/drivers/clk/clk.c
-> > > > > @@ -1159,14 +1159,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
-> > > > >                 flags = clk_enable_lock();
-> > > > >                 clk_reparent(core, old_parent);
-> > > > >                 clk_enable_unlock(flags);
-> > > > > +               __clk_set_parent_after(core, old_parent, parent);
-> > > > >  
-> > > > > -               if (core->prepare_count) {
-> > > > > -                       flags = clk_enable_lock();
-> > > > > -                       clk_core_disable(core);
-> > > > > -                       clk_core_disable(parent);
-> > > > > -                       clk_enable_unlock(flags);
-> > > > > -                       clk_core_unprepare(parent);
-> > > > > -               }
-> > > > >                 return ret;
-> > > > >         }
-> > > > >  
-> > > > > -- 
-> > > > > 1.9.1
-> > > > > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/98dc4c4b/attachment.sig>
