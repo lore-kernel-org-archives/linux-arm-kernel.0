@@ -1,75 +1,95 @@
-From: marex@denx.de (Marek Vasut)
-Date: Fri, 24 Jul 2015 10:34:15 +0200
-Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
-In-Reply-To: <CAOMqctREShUrBR=aQM2Vc6MhVezCP9rnNfUNq=m2-GH_gbYxFw@mail.gmail.com>
-References: <cover.1433364398.git.hramrach@gmail.com>
- <CAOMqctRnh2RsUYiRr2-+wucaq5NArTNrzPpqdPs+ETrFe9UrZA@mail.gmail.com>
- <CAOMqctREShUrBR=aQM2Vc6MhVezCP9rnNfUNq=m2-GH_gbYxFw@mail.gmail.com>
-Message-ID: <201507241034.15406.marex@denx.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 24 Jul 2015 11:41:53 +0200
+Subject: [PATCH] arm64/efi: prefer AllocatePages() over efi_low_alloc() for
+ vmlinux
+Message-ID: <1437730913-18077-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, July 23, 2015 at 07:03:47 PM, Michal Suchanek wrote:
+When allocating memory for the kernel image, try the AllocatePages()
+boot service to obtain memory at the preferred offset of
+'dram_base + TEXT_OFFSET', and only revert to efi_low_alloc() if that
+fails. This is the only way to allocate at the base of DRAM if DRAM
+starts at 0x0, since efi_low_alloc() refuses to allocate at 0x0.
 
-Hi!
+Tested-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/efi-stub.c | 47 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 39 insertions(+), 8 deletions(-)
 
-[...]
-
-> >>> It's probably slower to set up DMA for 2-byte commands but it might
-> >>> work nonetheless.
-> >> 
-> >> It is, the overhead will be considerable. It might help the stability
-> >> though. I'm really looking forward to the results!
-> > 
-> > Hello,
-> > 
-> > this does not quite work.
-> > 
-> > My test with spidev:
-> > 
-> > # ./spinor /dev/spidev1.0
-> > Sending 9f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> > Received 00 ff c8 60 16 c8 60 16 c8 60 16 c8 60 16 c8 60
-> > Sending 90 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> > Received 00 ff ff ff ff c8 15 c8 15 c8 15 c8 15 c8 15 c8
-> > Sending 9f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> > Received 00 ff c8 60 16 c8 60 16 c8 60 16 c8 60 16 c8 60
-> > 
-> > I receive correct ID but spi-nor complains it does not know ID 00 c8 60.
-> > IIRC garbage should be sent only at the time command is transferred so
-> > only one byte of garbage should be received. Also the garbage tends to
-> > be the last state of the data output - all 0 or all 1.
-> > So it seems using DMA for all transfers including 1-byte commands
-> > results in (some?) received data getting an extra 00 prefix.
-> > 
-> > 
-> > I also managed to lock up the controller completely since there is
-> > some error passing the SPI speed somewhere :(
-> > 
-> > [ 1352.977530] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max -->
-> > 0 [ 1352.977540] spidev spi1.0: spi mode 0
-> > [ 1352.977576] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max -->
-> > 0 [ 1352.977582] spidev spi1.0: msb first
-> > [ 1352.977614] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max -->
-> > 0 [ 1352.977620] spidev spi1.0: 0 bits per word
-> > [ 1352.977652] spidev spi1.0: setup mode 0, 8 bits/w, 2690588672 Hz max
-> > --> 0 [ 1352.977726] spi_master spi1: s3c64xx_spi_config: clk_from_cmu 1
-> > src_clk sclk_spi1 mode bpw 8
-> > [ 1352.977753] spi_master spi1: spi1.0 s3c64xx_spi_transfer_one: xfer
-> > bpw 8 speed -1604378624
-> > [ 1352.977760] spi_master spi1: s3c64xx_spi_config: clk_from_cmu 1
-> > src_clk sclk_spi1 mode bpw 8
-> > [ 1352.977781] spi_master spi1: spi1.0 s3c64xx_spi_transfer_one: using
-> > dma [ 1352.977797] dma-pl330 121b0000.pdma: setting up request on thread
-> > 1
-> 
-> Hmm, on a second thought it probably works as expected more or less.
-> 
-> The nonsensical value was passed from application and there is no
-> guard against that.
-> 
-> Since I don't do PIO the controller remains locked up indefinitely.
-
-I have to admit, I don't quite understand the above. I also don't quite know
-what your spidev test does. Can you possibly just bind a regular SPI NOR driver 
-and run mtdtests to see if it is stable ?
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index f5374065ad53..c8df74d14368 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -13,7 +13,7 @@
+ #include <asm/efi.h>
+ #include <asm/sections.h>
+ 
+-efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
++efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 					unsigned long *image_addr,
+ 					unsigned long *image_size,
+ 					unsigned long *reserve_addr,
+@@ -23,21 +23,52 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
+ {
+ 	efi_status_t status;
+ 	unsigned long kernel_size, kernel_memsize = 0;
++	unsigned long nr_pages;
+ 
+ 	/* Relocate the image, if required. */
+ 	kernel_size = _edata - _text;
+ 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
+ 		kernel_memsize = kernel_size + (_end - _edata);
+-		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
+-				       SZ_2M, reserve_addr);
++
++		//
++		// First, try a straight allocation at the preferred offset.
++		// This will work around the issue where, if dram_base == 0x0,
++		// efi_low_alloc() refuses to allocate at 0x0 (to prevent the
++		// address of the allocation to be mistaken for a FAIL return
++		// value or a NULL pointer). It will also ensure that, on
++		// platforms where the [dram_base, dram_base + TEXT_OFFSET)
++		// interval is partially occupied by the firmware (like on APM
++		// Mustang), we can still place the kernel at the address
++		// 'dram_base + TEXT_OFFSET'.
++		//
++		*reserve_addr = dram_base + TEXT_OFFSET;
++		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
++			   EFI_PAGE_SIZE;
++		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
++					EFI_LOADER_DATA, nr_pages,
++					(efi_physical_addr_t *)reserve_addr);
++		if (status == EFI_SUCCESS) {
++			memcpy((void *)*reserve_addr, (void *)*image_addr,
++			       kernel_size);
++			*image_addr = *reserve_addr;
++			*reserve_size = kernel_memsize;
++		} else {
++			status = efi_low_alloc(sys_table_arg,
++					       kernel_memsize + TEXT_OFFSET,
++					       SZ_2M, reserve_addr);
++
++			if (status == EFI_SUCCESS) {
++				memcpy((void *)*reserve_addr + TEXT_OFFSET,
++				       (void *)*image_addr,
++				       kernel_size);
++				*image_addr = *reserve_addr + TEXT_OFFSET;
++				*reserve_size = kernel_memsize + TEXT_OFFSET;
++			}
++		}
+ 		if (status != EFI_SUCCESS) {
+-			pr_efi_err(sys_table, "Failed to relocate kernel\n");
++			pr_efi_err(sys_table_arg, "Failed to relocate kernel\n");
+ 			return status;
+ 		}
+-		memcpy((void *)*reserve_addr + TEXT_OFFSET, (void *)*image_addr,
+-		       kernel_size);
+-		*image_addr = *reserve_addr + TEXT_OFFSET;
+-		*reserve_size = kernel_memsize + TEXT_OFFSET;
+ 	}
+ 
+ 
+-- 
+1.9.1
