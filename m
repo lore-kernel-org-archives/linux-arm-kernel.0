@@ -1,61 +1,90 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:29 +0900
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.3
-Message-ID: <cover.1437724902.git.horms+renesas@verge.net.au>
+Date: Fri, 24 Jul 2015 17:41:22 +0900
+Subject: [PATCH 1/9] ARM: shmobile: emev2: add IIC cores to dtsi
+In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
+References: <cover.1437724902.git.horms+renesas@verge.net.au>
+Message-ID: <cd42d042a2e712a7f9880f860075815539ce4baf.1437724902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-Please consider these second round of Renesas ARM based SoC DT updates for v4.3.
+Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/emev2.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-This pull request is based on the previous round of
-such requests, tagged as renesas-dt-for-v4.3,
-which I have already sent a pull-request for.
-
-
-The following changes since commit 7bf46d0be278a3586c78322c65ceff5fd03bb95d:
-
-  ARM: shmobile: r8a7779: Configure IRLM mode via DT (2015-07-06 09:33:41 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.3
-
-for you to fetch changes up to 7fd6e11dca09b21efbe2b9db4eff08c8f4a16125:
-
-  ARM: shmobile: r8a7791: Add Audio MIX support on DTSI (2015-07-22 09:36:49 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM Based SoC DT Updates for v4.3
-
-* Add Audio MIX and CTU support to r8a779[01] SoCs
-* Correct IRQ sense for adv7511 on lager board
-* Add sound label to koelsch and lager boards
-* Add IIC support to emev2 SoC
-
-----------------------------------------------------------------
-Kuninori Morimoto (6):
-      ARM: shmobile: lager: add sound label on DTS
-      ARM: shmobile: koelsch: add sound label on DTS
-      ARM: shmobile: r8a7790: Add Audio CTU support on DTSI
-      ARM: shmobile: r8a7790: Add Audio MIX support on DTSI
-      ARM: shmobile: r8a7791: Add Audio CTU support on DTSI
-      ARM: shmobile: r8a7791: Add Audio MIX support on DTSI
-
-Laurent Pinchart (1):
-      ARM: shmobile: lager: Fix adv7511 IRQ sensing
-
-Wolfram Sang (2):
-      ARM: shmobile: emev2: add IIC cores to dtsi
-      ARM: shmobile: emev2: kzm9d: enable IIC busses
-
- arch/arm/boot/dts/emev2-kzm9d.dts         |  8 ++++++
- arch/arm/boot/dts/emev2.dtsi              | 48 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/r8a7790-lager.dts       |  4 +--
- arch/arm/boot/dts/r8a7790.dtsi            | 23 +++++++++++++++
- arch/arm/boot/dts/r8a7791-koelsch.dts     |  2 +-
- arch/arm/boot/dts/r8a7791.dtsi            | 23 +++++++++++++++
- include/dt-bindings/clock/r8a7790-clock.h |  2 ++
- include/dt-bindings/clock/r8a7791-clock.h |  2 ++
- 8 files changed, 109 insertions(+), 3 deletions(-)
+diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
+index bb45694d91bc..edad0c4eea35 100644
+--- a/arch/arm/boot/dts/emev2.dtsi
++++ b/arch/arm/boot/dts/emev2.dtsi
+@@ -21,6 +21,8 @@
+ 		gpio2 = &gpio2;
+ 		gpio3 = &gpio3;
+ 		gpio4 = &gpio4;
++		i2c0 = &iic0;
++		i2c1 = &iic1;
+ 	};
+ 
+ 	cpus {
+@@ -66,6 +68,30 @@
+ 			clock-frequency = <32768>;
+ 			#clock-cells = <0>;
+ 		};
++		iic0_sclkdiv: iic0_sclkdiv {
++			compatible = "renesas,emev2-smu-clkdiv";
++			reg = <0x624 0>;
++			clocks = <&pll3_fo>;
++			#clock-cells = <0>;
++		};
++		iic0_sclk: iic0_sclk {
++			compatible = "renesas,emev2-smu-gclk";
++			reg = <0x48c 1>;
++			clocks = <&iic0_sclkdiv>;
++			#clock-cells = <0>;
++		};
++		iic1_sclkdiv: iic1_sclkdiv {
++			compatible = "renesas,emev2-smu-clkdiv";
++			reg = <0x624 16>;
++			clocks = <&pll3_fo>;
++			#clock-cells = <0>;
++		};
++		iic1_sclk: iic1_sclk {
++			compatible = "renesas,emev2-smu-gclk";
++			reg = <0x490 1>;
++			clocks = <&iic1_sclkdiv>;
++			#clock-cells = <0>;
++		};
+ 		pll3_fo: pll3_fo {
+ 			compatible = "fixed-factor-clock";
+ 			clocks = <&c32ki>;
+@@ -234,4 +260,26 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
+ 	};
++
++	iic0: i2c at e0070000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,iic-emev2";
++		reg = <0xe0070000 0x28>;
++		interrupts = <0 32 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&iic0_sclk>;
++		clock-names = "sclk";
++		status = "disabled";
++	};
++
++	iic1: i2c at e10a0000 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "renesas,iic-emev2";
++		reg = <0xe10a0000 0x28>;
++		interrupts = <0 33 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&iic1_sclk>;
++		clock-names = "sclk";
++		status = "disabled";
++	};
+ };
+-- 
+2.1.4
