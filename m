@@ -1,94 +1,117 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 24 Jul 2015 10:43:54 +0100
-Subject: [RFC PATCH 08/10] arm64: Emulate ID registers
+Date: Fri, 24 Jul 2015 10:43:57 +0100
+Subject: sample: arm64 cpu feature: Test program
 In-Reply-To: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
 References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1437731037-25795-9-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1437731037-25795-12-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-This patch adds the emulation for the id registers(i,e Op0=0,
-Op1=0, CRn=0, CRm=0).
+Attached is a sample program that fetches all the emulated
+cpu feature registers and traps on accessing an invalid
+id register.
 
-Expose MIDR_EL1 for the current cpu where the 'mrs' instruction
-is executed. The users should be aware that, on a heterogeneous
-system, there is no guarantee that the 'value' read belongs to
-the current CPU where it is executing, as we could get migrated
-to another CPU in between.
 
-MPIDR and REVIDR are not visible and hence contain safe default
-value as per the rules.
-
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/include/asm/cpu.h |    7 +++++++
- arch/arm64/kernel/cpuinfo.c  |   20 ++++++++++++++++++++
- 2 files changed, 27 insertions(+)
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 2df3d81..cb25cb9 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -25,6 +25,10 @@
- #define SYS_REG(op0, op1, crn, crm, op2) \
- 			(sys_reg(op0, op1, crn, crm, op2) >> 5)
- 
-+#define SYS_MIDR_EL1			SYS_REG(3, 0, 0, 0, 0)
-+#define SYS_MPIDR_EL1			SYS_REG(3, 0, 0, 0, 5)
-+#define SYS_REVIDR_EL1			SYS_REG(3, 0, 0, 0, 6)
-+
- #define SYS_ID_PFR0_EL1			SYS_REG(3, 0, 0, 1, 0)
- #define SYS_ID_PFR1_EL1			SYS_REG(3, 0, 0, 1, 1)
- #define SYS_ID_DFR0_EL1			SYS_REG(3, 0, 0, 1, 2)
-@@ -67,6 +71,9 @@
- #define SYSREG_CRm(id)		(((id) >> 3) & 0xf)
- #define SYSREG_Op2(id)		(((id) >> 0) & 0x7)
- 
-+/* Safe value for MPIDR_EL1: Bit31:RES1, Bit30:U:0, Bit24:MT:1 */
-+#define SYS_MPIDR_SAFE_VAL	((1UL<<31)|(1UL<<24))
-+
- enum sys_id {
- 	sys_cntfrq = SYS_CNTFRQ_EL0,
- 	sys_ctr = SYS_CTR_EL0,
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 36e5058..9145eef 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -818,6 +818,23 @@ static int is_emulated(u32 id)
- 	return 1;
- }
- 
-+static int emulate_id_reg(u32 id, u64 *valp)
-+{
-+	switch(id) {
-+	case SYS_MIDR_EL1:
-+		*valp = read_cpuid_id();
-+		return 0;
-+	case SYS_MPIDR_EL1:
-+		*valp = SYS_MPIDR_SAFE_VAL;
-+		return 0;
-+	case SYS_REVIDR_EL1:
-+		*valp = 0;
-+		return 0;
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
- static int emulate_sys_reg(u32 id, u64 *valp)
- {
- 	struct arm64_ftr_reg *regp;
-@@ -825,6 +842,9 @@ static int emulate_sys_reg(u32 id, u64 *valp)
- 	if (!is_emulated(id))
- 		return -EINVAL;
- 
-+	if (SYSREG_CRm(id) == 0)
-+		return emulate_id_reg(id, valp);
-+
- 	regp = get_arm64_sys_reg(id);
- 	if (regp)
- 		*valp = regp->user_val | (regp->sys_val & regp->user_mask);
--- 
-1.7.9.5
+/*
+ * show_sysregs_all: Sample program to retrieve the
+ * CPU feature registers.
+ *
+ * Author: Suzuki K. Poulose <suzuki.poulose@arm.com>
+ *
+ * Copyright (C) 2015 ARM Ltd.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+
+
+#include <stdio.h>
+
+///
+/* Copied from asm/sysreg.h */
+#define sys_reg(op0, op1, crn, crm, op2) \
+        ((((op0)&3)<<19)|((op1)<<16)|((crn)<<12)|((crm)<<8)|((op2)<<5))
+
+asm(
+"       .irp    num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+"       .equ    __reg_num_x\\num, \\num\n"
+"       .endr\n"
+"       .equ    __reg_num_xzr, 31\n"
+"\n"
+"       .macro  mrs_s, rt, sreg\n"
+"       .inst   0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
+"       .endm\n"
+"\n"
+"       .macro  msr_s, sreg, rt\n"
+"       .inst   0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
+"       .endm\n"
+);
+///
+
+#define get_cpu_ftr(id) ({					\
+		unsigned long long __val;			\
+		asm("mrs %0, "#id : "=r" (__val));		\
+		printf("%-20s: 0x%016lx\n", #id, __val);	\
+	})
+#define __get_id_reg(id) ({						\
+		unsigned long long __val;				\
+		asm("mrs_s %0, "#id : "=r" (__val));			\
+		printf("%-20s: 0x%016lx\n", get_id_str(id), __val);	\
+	})
+#define get_id_reg(x) __get_id_reg(x)
+
+#define get_id_range(CRm) \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 0)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 1)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 2)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 3)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 4)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 5)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 6)); \
+	get_id_reg(sys_reg(3, 0, 0, CRm, 7));
+
+#define Op0(id)		(((id) >> 19) & 0x3)
+#define Op1(id)		(((id) >> 16) & 0x7)
+#define CRn(id)		(((id) >> 12) & 0xf)
+#define CRm(id)		(((id) >> 8) & 0xf)
+#define Op2(id)		(((id) >> 5) & 0x7)
+
+char *get_id_str(int id)
+{
+	static char buf[64];
+
+	sprintf(buf, "S%d_%d_%d_%d_%d",
+			Op0(id), Op1(id), CRn(id), CRm(id), Op2(id));
+	return buf;
+}
+
+main()
+{
+	get_id_range(1);
+	get_id_range(2);
+	get_id_range(3);
+	get_id_range(4);
+	get_id_range(5);
+	get_id_range(6);
+	get_id_range(7);
+	get_cpu_ftr(MIDR_EL1);
+	get_cpu_ftr(REVIDR_EL1);
+	get_cpu_ftr(MPIDR_EL1);
+
+	/* Trap */
+	get_id_reg(sys_reg(3, 0, 0, 0, 2));
+	return 0;
+}
