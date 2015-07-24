@@ -1,95 +1,94 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:29 +0900
-Subject: [PATCH 8/9] ARM: shmobile: r8a7791: Add Audio CTU support on DTSI
-In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
-References: <cover.1437724902.git.horms+renesas@verge.net.au>
-Message-ID: <88401702fe395880bb03c9d17720185c1d89b43f.1437724902.git.horms+renesas@verge.net.au>
+Date: Fri, 24 Jul 2015 17:41:47 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC Marzen Board Removal for v4.3
+Message-ID: <cover.1437726584.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7791.dtsi            | 16 ++++++++++++++++
- include/dt-bindings/clock/r8a7791-clock.h |  2 ++
- 2 files changed, 18 insertions(+)
+Please consider these Renesas ARM based SoC marzen board removal for v4.3.
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index 07ea2bebe496..cdd55b82ba4e 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -1311,6 +1311,7 @@
- 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
- 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
- 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
-+				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
- 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>;
- 
- 			#clock-cells = <1>;
-@@ -1320,6 +1321,7 @@
- 				R8A7791_CLK_SSI4 R8A7791_CLK_SSI3 R8A7791_CLK_SSI2 R8A7791_CLK_SSI1 R8A7791_CLK_SSI0
- 				R8A7791_CLK_SCU_ALL
- 				R8A7791_CLK_SCU_DVC1 R8A7791_CLK_SCU_DVC0
-+				R8A7791_CLK_SCU_CTU1_MIX1 R8A7791_CLK_SCU_CTU0_MIX0
- 				R8A7791_CLK_SCU_SRC9 R8A7791_CLK_SCU_SRC8 R8A7791_CLK_SCU_SRC7 R8A7791_CLK_SCU_SRC6 R8A7791_CLK_SCU_SRC5
- 				R8A7791_CLK_SCU_SRC4 R8A7791_CLK_SCU_SRC3 R8A7791_CLK_SCU_SRC2 R8A7791_CLK_SCU_SRC1 R8A7791_CLK_SCU_SRC0
- 			>;
-@@ -1329,6 +1331,7 @@
- 				"ssi4", "ssi3", "ssi2", "ssi1", "ssi0",
- 				"scu-all",
- 				"scu-dvc1", "scu-dvc0",
-+				"scu-ctu1-mix1", "scu-ctu0-mix0",
- 				"scu-src9", "scu-src8", "scu-src7", "scu-src6", "scu-src5",
- 				"scu-src4", "scu-src3", "scu-src2", "scu-src1", "scu-src0";
- 		};
-@@ -1582,6 +1585,7 @@
- 			<&mstp10_clks R8A7791_CLK_SCU_SRC5>, <&mstp10_clks R8A7791_CLK_SCU_SRC4>,
- 			<&mstp10_clks R8A7791_CLK_SCU_SRC3>, <&mstp10_clks R8A7791_CLK_SCU_SRC2>,
- 			<&mstp10_clks R8A7791_CLK_SCU_SRC1>, <&mstp10_clks R8A7791_CLK_SCU_SRC0>,
-+			<&mstp10_clks R8A7791_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7791_CLK_SCU_CTU1_MIX1>,
- 			<&mstp10_clks R8A7791_CLK_SCU_DVC0>, <&mstp10_clks R8A7791_CLK_SCU_DVC1>,
- 			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
- 		clock-names = "ssi-all",
-@@ -1589,6 +1593,7 @@
- 				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
- 				"src.9", "src.8", "src.7", "src.6", "src.5",
- 				"src.4", "src.3", "src.2", "src.1", "src.0",
-+				"ctu.0", "ctu.1",
- 				"dvc.0", "dvc.1",
- 				"clk_a", "clk_b", "clk_c", "clk_i";
- 
-@@ -1605,6 +1610,17 @@
- 			};
- 		};
- 
-+		rcar_sound,ctu {
-+			ctu00: ctu at 0 { };
-+			ctu01: ctu at 1 { };
-+			ctu02: ctu at 2 { };
-+			ctu03: ctu at 3 { };
-+			ctu10: ctu at 4 { };
-+			ctu11: ctu at 5 { };
-+			ctu12: ctu at 6 { };
-+			ctu13: ctu at 7 { };
-+		};
-+
- 		rcar_sound,src {
- 			src0: src at 0 {
- 				interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
-index 402268384b99..dd09b73c4aaf 100644
---- a/include/dt-bindings/clock/r8a7791-clock.h
-+++ b/include/dt-bindings/clock/r8a7791-clock.h
-@@ -141,6 +141,8 @@
- #define R8A7791_CLK_SCU_ALL		17
- #define R8A7791_CLK_SCU_DVC1		18
- #define R8A7791_CLK_SCU_DVC0		19
-+#define R8A7791_CLK_SCU_CTU1_MIX1	20
-+#define R8A7791_CLK_SCU_CTU0_MIX0	21
- #define R8A7791_CLK_SCU_SRC9		22
- #define R8A7791_CLK_SCU_SRC8		23
- #define R8A7791_CLK_SCU_SRC7		24
--- 
-2.1.4
+This series removes legacy r8a7779 SoC and marzen board code.
+It does so in a way that does not introduce feature regressions
+when when booting the r8a7779/marzen board using shmobile_defconfig,
+which provides for booting using multiplatform, a scenario which previously
+used board code to provide some features including SMP.
+
+Because of the above this series modifies SoC and DT files,
+and then removes code. And because of that it was not entirely clear to
+me which branch it should go into, so I have provided it in a stand-alone
+branch.
+
+Unfortunately this branch has a number of minor conflicts with the "Renesas
+ARM Based SoC Cleanup for v4.3", tagged as renesas-cleanup-for-v4.3, which
+you have previously pulled.
+
+A resolution to those conflicts can be found in the
+renesas-next-20150724-v4.2-rc1 tag of the renesas tree.
+
+I would be happy to rebase these patches on top of renesas-cleanup-for-v4.3
+and resubmit a conflict-free pull request if you like.
+
+On a more positive note, I believe this to well over 8000 lines of legacy
+code removed in this cycle :)
+
+
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-marzen-board-removal-for-v4.3
+
+for you to fetch changes up to 3fecc170e5b7b141a2db6c8bc40607fb323c3aa2:
+
+  ARM: shmobile: r8a7779: Remove legacy SoC code (2015-07-17 10:34:51 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC Marzen Board Removal for v4.3
+
+* Remove legacy r8a7779 SoC code
+* Remove legacy marzen board code
+
+3fecc170e5b7 ARM: shmobile: r8a7779: Remove legacy SoC code
+9d35777f2b96 ARM: shmobile: marzen: Remove legacy board code
+8dd80b6d7c5b ARM: multi_v7_defconfig: Remove Marzen
+824fd0fb7daa ARM: shmobile: Remove Marzen from shmobile_defconfig
+a73e4d95da66 ARM: shmobile: r8a7779: Cleanup header file
+d2fb6bdaffc7 ARM: shmobile: marzen-reference: Remove C board code
+719074d8b220 ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
+44ade5edf90c ARM: shmobile: r8a7779: Generic SMP ops
+131c2e0480b0 ARM: shmobile: r8a7779: Generic CCF and timer support
+
+----------------------------------------------------------------
+Magnus Damm (7):
+      ARM: shmobile: r8a7779: Generic CCF and timer support
+      ARM: shmobile: r8a7779: Generic SMP ops
+      ARM: shmobile: marzen-reference: Remove C board code
+      ARM: shmobile: r8a7779: Cleanup header file
+      ARM: shmobile: Remove Marzen from shmobile_defconfig
+      ARM: shmobile: marzen: Remove legacy board code
+      ARM: shmobile: r8a7779: Remove legacy SoC code
+
+Simon Horman (2):
+      ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
+      ARM: multi_v7_defconfig: Remove Marzen
+
+ arch/arm/boot/dts/Makefile                      |   1 -
+ arch/arm/configs/multi_v7_defconfig             |   1 -
+ arch/arm/configs/shmobile_defconfig             |   2 +-
+ arch/arm/mach-shmobile/Kconfig                  |  14 -
+ arch/arm/mach-shmobile/Makefile                 |   6 +-
+ arch/arm/mach-shmobile/Makefile.boot            |   1 -
+ arch/arm/mach-shmobile/board-marzen-reference.c |  56 --
+ arch/arm/mach-shmobile/board-marzen.c           | 347 ------------
+ arch/arm/mach-shmobile/clock-r8a7779.c          | 271 ----------
+ arch/arm/mach-shmobile/r8a7779.h                |  19 -
+ arch/arm/mach-shmobile/setup-r8a7779.c          | 681 +-----------------------
+ arch/arm/mach-shmobile/smp-r8a7779.c            |   9 -
+ 12 files changed, 16 insertions(+), 1392 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/board-marzen-reference.c
+ delete mode 100644 arch/arm/mach-shmobile/board-marzen.c
+ delete mode 100644 arch/arm/mach-shmobile/clock-r8a7779.c
