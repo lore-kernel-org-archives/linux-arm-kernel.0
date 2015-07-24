@@ -1,78 +1,67 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 Jul 2015 11:44:24 -0400 (EDT)
-Subject: [PATCH 3/5] ARM: MCPM: make internal helpers private to the core
- code
-In-Reply-To: <CAGb2v65D7vtuV4kfg0HoM_pp4=UmY29AzpOP=E5WWGM5fPO9XA@mail.gmail.com>
-References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
- <1430496392-15956-4-git-send-email-nicolas.pitre@linaro.org>
- <CAGb2v65D7vtuV4kfg0HoM_pp4=UmY29AzpOP=E5WWGM5fPO9XA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1507241109050.1806@knanqh.ubzr>
+From: emunson@akamai.com (Eric B Munson)
+Date: Fri, 24 Jul 2015 11:53:13 -0400
+Subject: [PATCH V4 2/6] mm: mlock: Add new mlock, munlock, and munlockall
+ system calls
+In-Reply-To: <55B25DDE.8090107@roeck-us.net>
+References: <1437508781-28655-1-git-send-email-emunson@akamai.com>
+ <1437508781-28655-3-git-send-email-emunson@akamai.com>
+ <20150721134441.d69e4e1099bd43e56835b3c5@linux-foundation.org>
+ <1437528316.16792.7.camel@ellerman.id.au>
+ <20150722141501.GA3203@akamai.com>
+ <20150723065830.GA5919@linux-mips.org>
+ <20150724143936.GE9203@akamai.com> <55B25DDE.8090107@roeck-us.net>
+Message-ID: <20150724155313.GF9203@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Jul 2015, Chen-Yu Tsai wrote:
+On Fri, 24 Jul 2015, Guenter Roeck wrote:
 
-> Hi,
-> 
-> On Sat, May 2, 2015 at 12:06 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > This concerns the following helpers:
+> On 07/24/2015 07:39 AM, Eric B Munson wrote:
+> >On Thu, 23 Jul 2015, Ralf Baechle wrote:
 > >
-> >         __mcpm_cpu_going_down()
-> >         __mcpm_cpu_down()
-> >         __mcpm_outbound_enter_critical()
-> >         __mcpm_outbound_leave_critical()
-> >         __mcpm_cluster_state()
+> >>On Wed, Jul 22, 2015 at 10:15:01AM -0400, Eric B Munson wrote:
+> >>
+> >>>>
+> >>>>You haven't wired it up properly on powerpc, but I haven't mentioned it because
+> >>>>I'd rather we did it.
+> >>>>
+> >>>>cheers
+> >>>
+> >>>It looks like I will be spinning a V5, so I will drop all but the x86
+> >>>system calls additions in that version.
+> >>
+> >>The MIPS bits are looking good however, so
+> >>
+> >>Acked-by: Ralf Baechle <ralf@linux-mips.org>
+> >>
+> >>With my ack, will you keep them or maybe carry them as a separate patch?
 > >
-> > They are and should only be used by the core code now.  Therefore their
-> > declarations are removed from mcpm.h and their definitions are made
-> > static, hence the need to move them before their users which accounts
-> > for the bulk of this patch.
+> >I will keep the MIPS additions as a separate patch in the series, though
+> >I have dropped two of the new syscalls after some discussion.  So I will
+> >not include your ack on the new patch.
+> >
+> >Eric
+> >
 > 
-> I'm looking for some advice. On the Allwinner A80, at least on mainline,
-> there is no external PMU or embedded controller in charge of power
-> controls. What this means is that I'm doing power sequencing in the
-> kernel as part of the MCPM calls, specifically powering down cores and
-> clusters in the .wait_for_powerdown callback. (I don't think it's
-> reasonable or even possible to power down stuff in .*_powerdown_prepare)
+> Hi Eric,
+> 
+> next-20150724 still has some failures due to this patch set. Are those
+> being looked at (I know parisc builds fail, but there may be others) ?
+> 
+> Thanks,
+> Guenter
 
-Can you tell me more about the power control knobs at your disposal?  Do 
-power gates become effective immediately or only when WFI is asserted? 
+Guenter,
 
-And can you configure things so a core may be powered up asynchronously 
-from an IRQ?
+Yes, the next respin will drop all new arch syscall entries except
+x86[_64] and MIPS.  I will leave it up to arch maintainers to add the
+entries.
 
-> Previously I was using __mcpm_cluster_state() to check if the last core
-> in a cluster was to be powered off, and thus the whole cluster could be
-> turned off as well.
-> I could also check if the individual power gates or
-> resets are asserted, but if a core was already scheduled to be brought
-> up, and MCPM common framework didn't call .cluster_powerup, there might
-> be a problem.
-
-I fail to see how a core could be scheduled to be brought up without 
-deasserting its reset line somehow though.
-
-> Any suggestions? Maybe export __mcpm_cluster_state() so platform code
-> can know what's going to happen?
-
-The cluster state may change unexpectedly.  There is a special locking 
-sequence and state machine needed to make this information reliable.  
-Simply returning the current state wouldn't be enough to ensure 
-it can be used race free.
-
-As Dave stated, we might have to supplement the MCPM core code with 
-special methods involving a surviving CPU to perform the power-down 
-operation on the dying CPU's behalf.  Doing this in .wait_for_powerdown 
-is just an abuse of the API.
-
-It also brings up the question if MCPM is actually necessary in that 
-case or if you can do without its complexity.  For example, you may look 
-at commit 905cdf9dda5d for such a case.  It mainly depends on whether or 
-not cores (and the cluster) may be awaken asynchronously upon assertion 
-of an IRQ in the context of cpuidle. If the hardware doesn't support 
-that then MCPM doesn't bring you any actual benefit.
-
-So it depends on your hardware capabilities.
-
-
-Nicolas
+Eric
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/10ecb7c6/attachment-0001.sig>
