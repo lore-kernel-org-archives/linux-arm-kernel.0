@@ -1,78 +1,39 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 24 Jul 2015 10:54:30 +0100
-Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
- a Linux page into Xen page
-In-Reply-To: <55B205FB.5080209@citrix.com>
-References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
- <55B205FB.5080209@citrix.com>
-Message-ID: <55B20B56.7020605@citrix.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 24 Jul 2015 10:56:06 +0100
+Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
+In-Reply-To: <20150723220550.GA15032@kroah.com>
+References: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
+ <20150723220550.GA15032@kroah.com>
+Message-ID: <20150724095605.GI10670@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 10:31, David Vrabel wrote:
-> On 09/07/15 21:42, Julien Grall wrote:
->> The Xen interface is always using 4KB page. This means that a Linux page
->> may be split across multiple Xen page when the page granularity is not
->> the same.
->>
->> This helper will break down a Linux page into 4KB chunk and call the
->> helper on each of them.
-> [...]
->> --- a/include/xen/page.h
->> +++ b/include/xen/page.h
->> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
->>  
->>  extern unsigned long xen_released_pages;
->>  
->> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
->> +
->> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
->> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
->> +				    void *data)
+On Thu, Jul 23, 2015 at 03:05:50PM -0700, Greg Kroah-Hartman wrote:
+> On Thu, Jul 09, 2015 at 11:57:12AM +0100, Dave Martin wrote:
+> > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
+> > sufficient to inhibit pl011_int() from being triggered by a local
+> > IRQ and trying to re-take the same lock.  This can lead to
+> > deadlocks.
+> > 
+> > This patch uses the _irq() locking variants instead to ensure that
+> > pl011_int() handling for a given port is deferred until any
+> > pl011_tx_softirq() work for that port is complete.
+> > 
+> > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Tested-by: Robin Murphy <robin.murphy@arm.com>
+> > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > Cc: stable <stable@vger.kernel.org> # 4.1
+> > ---
+> >  drivers/tty/serial/amba-pl011.c |    4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> I think this should be outlined (unless you have measurements that
-> support making it inlined).
+> This doesn't apply at all to 4.2-rc3, so I can't apply it :(
 
-I don't have any performance measurements. Although, when Linux is using
-4KB page granularity, the loop in this helper will be dropped by the
-helper. The code would look like:
+This is applicable to 4.1 stable only, since the code this patch fixes
+was replaced in 4.2-rc1.
 
-unsigned long pfn = xen_page_to_pfn(page);
+Apologies, I didn't make that clear in the text.
 
-ret = fn(page, fn, data);
-if (ret)
-  return ret;
-
-The compiler could even inline the callback (fn). So it drops 2
-functions call.
-
-> 
-> Also perhaps make it
-> 
-> int xen_for_each_gfn(struct page *page,
->                      xen_gfn_fn_t fn, void *data);
-
-gfn standing for Guest Frame Number right?
-
-> or
-> 
-> int xen_for_each_gfn(struct page **page, unsigned int count,
->                      xen_gfn_fn_t fn, void *data);
-
-count being the number of Linux page or Xen page? We have some code (see
-xlate_mmu patch #19) requiring to iter on a specific number of Xen page.
-I was thinking to introduce a separate function for iterating on a
-specific number of Xen PFN.
-
-We don't want to introduce it for everyone as we need to hide this
-complexity from most the caller.
-
-In general case, the 2 suggestions would not be very useful. Most of the
-time we have some actions to do per Linux page (see the balloon code for
-instance).
-
-Regards,
-
--- 
-Julien Grall
+Cheers
+---Dave
