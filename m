@@ -1,51 +1,43 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 24 Jul 2015 15:49:41 -0700
-Subject: [PATCH v2] thermal: consistently use int for temperatures
-In-Reply-To: <20150724221102.GA31517@amd>
-References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
- <20150723120759.GA17690@amd> <20150724062948.GK18700@pengutronix.de>
- <55B244BE.1060203@roeck-us.net> <20150724221102.GA31517@amd>
-Message-ID: <55B2C105.3040600@roeck-us.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 25 Jul 2015 01:09:23 +0200
+Subject: [PATCH v2 1/2] ARM: rockchip: set correct stabilization
+ thresholds in suspend
+In-Reply-To: <4610448.RXXf22Qoxl@diego>
+References: <4610448.RXXf22Qoxl@diego>
+Message-ID: <1460722.2xOTZfOB49@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2015 03:11 PM, Pavel Machek wrote:
-> On Fri 2015-07-24 06:59:26, Guenter Roeck wrote:
->> On 07/23/2015 11:29 PM, Sascha Hauer wrote:
->>> On Thu, Jul 23, 2015 at 02:07:59PM +0200, Pavel Machek wrote:
->>>> On Tue 2015-07-21 09:21:32, Sascha Hauer wrote:
->>>>> The thermal code uses int, long and unsigned long for temperatures
->>>>> in different places.
->>>>>
->>>>> Using an unsigned type limits the thermal framework to positive
->>>>> temperatures without need. Also several drivers currently will report
->>>>> temperatures near UINT_MAX for temperatures below 0?C. This will probably
->>>>> immediately shut the machine down due to overtemperature if started below
->>>>> 0?C.
->>>>>
->>>>> 'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
->>>>> is above the melting point of all known materials.
->>>>
->>>> Can we do something like
->>>>
->>>> typedef millicelsius_t int;
->>>>
->>>> ...to document the units?
->>>
->>> I am not very fond of typedefs and I am not sure this adds any value. I
->>> could change it when more people ask for it, but I just sent the new
->>> version without this.
->>>
->>
->> I thought we are supposed to not introduce new typedefs anyway.
->
-> You are not supposed to typedef struct, but typedef for millicelsius_t
-> would be ok. And it is your only chance if you want people to pay
-> attention. If you make it int, someone will pass it to long or
-> something else..
+Hi Chris,
 
-Seems to me that would be just lazyness. The same person might use 'long'
-even if millicelsius_t is defined. A typedef doesn't preclude people
-from ignoring it.
+Am Donnerstag, 23. Juli 2015, 10:29:34 schrieb Heiko St?bner:
+> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
+> index 892bace..04d3028 100644
+> --- a/arch/arm/mach-rockchip/pm.c
+> +++ b/arch/arm/mach-rockchip/pm.c
+> @@ -145,6 +145,10 @@ static void rk3288_slp_mode_set(int level)
+> 
+>  		mode_set1 |= BIT(PMU_CLR_ALIVE) | BIT(PMU_CLR_BUS) |
+>  			     BIT(PMU_CLR_PERI) | BIT(PMU_CLR_DMA);
+> +
+> +		/* 30ms on a 32kHz clock for osc and pmic stabilization */
+> +		regmap_write(pmu_regmap, RK3288_PMU_OSC_CNT, 32 * 30);
+> +		regmap_write(pmu_regmap, RK3288_PMU_STABL_CNT, 32 * 30);
 
-Guenter
+The deep suspend mode has two bits handling the 32kHz clock switch (PMU_USE_LF 
+and ALIVE_USE_LF). Just for my understanding, are these always supposed to be 
+set to the same value or can there be a case when only one of them is set?
+
+Also when deciding the correct stabilization delays on which of the two are 
+these dependant?
+
+I.e. something like
+
+  stabl_cnt = PMU_PMU_USE_LF ? 32 : 24000
+  osc_cnt = PMU_ALIVE_USE_LF ? 32 : 24000
+
+or are these always to be set similarly?
+
+
+Thanks
+Heiko
