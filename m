@@ -1,202 +1,185 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Fri, 24 Jul 2015 18:17:02 -0300
-Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <55B2A6CA.5090205@vanguardiasur.com.ar>
-References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
- <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
- <55B15AF1.3030509@roeck-us.net> <55B243B3.7050702@vanguardiasur.com.ar>
- <55B245D1.1020208@roeck-us.net> <55B2A6CA.5090205@vanguardiasur.com.ar>
-Message-ID: <55B2AB4E.1060806@vanguardiasur.com.ar>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 24 Jul 2015 16:27:18 -0500
+Subject: [PATCH 1/2] of: base: Allow more args than MAX_PHANDLE_ARGS if
+ required
+In-Reply-To: <20150716110900.GA30130@suse.de>
+References: <1437035444-13867-1-git-send-email-joro@8bytes.org>
+ <1437035444-13867-2-git-send-email-joro@8bytes.org>
+ <20150716102325.GC26390@arm.com> <20150716110900.GA30130@suse.de>
+Message-ID: <55B2ADB6.3040307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-El 24/07/15 a las 17:57, Ariel D'Alessandro escibi?:
-> 
-> 
-> El 24/07/15 a las 11:04, Guenter Roeck escibi?:
->> On 07/24/2015 06:54 AM, Ariel D'Alessandro wrote:
->>>
->>>
->>> El 23/07/15 a las 18:21, Guenter Roeck escibi?:
->>>> On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
->>>>> Hi Guenter,
->>>>>
->>>>> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
->>>>>> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
->>>>>>> This commit adds support for the watchdog timer found in NXP LPC SoCs
->>>>>>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
->>>>>>> share the same watchdog hardware.
->>>>>>>
->>>>>>> Watchdog driver registers a restart handler that will restart the
->>>>>>> system
->>>>>>> by performing an incorrect feed after ensuring the watchdog is
->>>>>>> enabled in
->>>>>>> reset mode.
->>>>>>>
->>>>>>> As watchdog cannot be disabled in hardware, driver's stop routine
->>>>>>> will
->>>>>>> regularly send a keepalive ping using a timer.
->>>>>>>
->>>>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>>>>>
->>>>>> Hi Ariel,
->>>>>>
->>>>>> sorry for the delayed response. Comments below.
->>>>>>
->>>>>> Guenter
->>>>>>
->>>>>>> ---
->>>>>>>     drivers/watchdog/Kconfig       |  11 ++
->>>>>>>     drivers/watchdog/Makefile      |   1 +
->>>>>>>     drivers/watchdog/lpc18xx_wdt.c | 344
->>>>>>> +++++++++++++++++++++++++++++++++++++++++
->>>>>>>     3 files changed, 356 insertions(+)
->>>>>>>     create mode 100644 drivers/watchdog/lpc18xx_wdt.c
->>>>>>>
->>>>>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>>>>>> index 742fbbc..af5e2e3 100644
->>>>>>> --- a/drivers/watchdog/Kconfig
->>>>>>> +++ b/drivers/watchdog/Kconfig
->>>>>>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
->>>>>>>           To compile this driver as a module, choose M here: the
->>>>>>>           module will be called digicolor_wdt.
->>>>>>>
->>>>>>> +config LPC18XX_WATCHDOG
->>>>>>> +    tristate "LPC18xx/43xx Watchdog"
->>>>>>> +    depends on ARCH_LPC18XX || COMPILE_TEST
->>>>>>> +    select WATCHDOG_CORE
->>>>>>> +    help
->>>>>>> +      Say Y here if to include support for the watchdog timer
->>>>>>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
->>>>>>> +      processors.
->>>>>>> +      To compile this driver as a module, choose M here: the
->>>>>>> +      module will be called lpc18xx_wdt.
->>>>>>> +
->>>>>>>     # AVR32 Architecture
->>>>>>>
->>>>>>>     config AT32AP700X_WDT
->>>>>>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
->>>>>>> index 59ea9a1..1b0ef48 100644
->>>>>>> --- a/drivers/watchdog/Makefile
->>>>>>> +++ b/drivers/watchdog/Makefile
->>>>>>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
->>>>>>>     obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
->>>>>>>     obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
->>>>>>>     obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->>>>>>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->>>>>>>
->>>>>>>     # AVR32 Architecture
->>>>>>>     obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
->>>>>>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
->>>>>>> b/drivers/watchdog/lpc18xx_wdt.c
->>>>>>> new file mode 100644
->>>>>>> index 0000000..2b489fc
->>>>>>> --- /dev/null
->>>>>>> +++ b/drivers/watchdog/lpc18xx_wdt.c
->>>>>>> @@ -0,0 +1,344 @@
->>>>>>> +/*
->>>>>>> + * NXP LPC18xx Watchdog Timer (WDT)
->>>>>>> + *
->>>>>>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
->>>>>>> + *
->>>>>>> + * This program is free software; you can redistribute it and/or
->>>>>>> modify it
->>>>>>> + * under the terms of the GNU General Public License version 2 as
->>>>>>> published by
->>>>>>> + * the Free Software Foundation.
->>>>>>> + *
->>>>>>> + * Notes
->>>>>>> + * -----
->>>>>>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
->>>>>>> a 24-bit
->>>>>>> + * counter which decrements on every clock cycle.
->>>>>>> + *
->>>>>>> + */
->>>>>>> +
->>>>>>> +#include <linux/clk.h>
->>>>>>> +#include <linux/io.h>
->>>>>>> +#include <linux/module.h>
->>>>>>> +#include <linux/of.h>
->>>>>>> +#include <linux/platform_device.h>
->>>>>>> +#include <linux/reboot.h>
->>>>>>> +#include <linux/watchdog.h>
->>>>>>> +
->>>>>>> +/* Registers */
->>>>>>> +#define LPC18XX_WDT_MOD            0x00
->>>>>>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
->>>>>>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
->>>>>>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
->>>>>>
->>>>>> Not used.
->>>>>
->>>>> That's right. I'll remove it.
->>>>>
->>>>>>
->>>>>>> +
->>>>>>> +#define LPC18XX_WDT_TC            0x04
->>>>>>> +#define LPC18XX_WDT_TC_MIN        0xff
->>>>>>> +#define LPC18XX_WDT_TC_MAX        0xffffff
->>>>>>> +
->>>>>>> +#define LPC18XX_WDT_FEED        0x08
->>>>>>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
->>>>>>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
->>>>>>> +
->>>>>>> +#define LPC18XX_WDT_TV            0x0c
->>>>>>> +
->>>>>>> +/* Clock pre-scaler */
->>>>>>> +#define LPC18XX_WDT_CLK_DIV        4
->>>>>>> +
->>>>>>> +/* Timeout values in seconds */
->>>>>>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
->>>>>>> +
->>>>>>
->>>>>> This is (still) really low for Linux. Something like min(30,
->>>>>> max_timeout)
->>>>>> might make more sense.
->>>>>
->>>>> Remember that hardware limits timeout to a maximum value of 5.
->>>>>
->>>>> As you said before we could use a soft timer, but I not sure that's a
->>>>> good idea. As Ezequiel said [0], it might be adding bloat and we must
->>>>> consider that this watchdog controller is included in cortex-M MCUs.
->>>>>
->>>>> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
->>>>>
->>>>
->>>> Further down you have
->>>>      lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
->>>>                            LPC18XX_WDT_CLK_DIV) / clk_rate;
->>>>
->>>> which seems to contradict this statement. If the maximum timeout is 5
->>>> seconds,
->>>> why don't you set max_timeout to a fixed value of 5 seconds ?
->>>
->>> Well, I think that's the less hardcoded way. It might allow the driver
->>> to be extended to another HW variant that configures the wdt clk rate.
->>>
->>> I see what's your point. As you proposed, using the same criterion I
->>> should do this:
->>>
->>> #define LPC18XX_WDT_DEF_TIMEOUT         (unsigned int)30
->>>
->>> and further down, in probe function:
->>>
->>> lpc18xx_wdt->wdt_dev.timeout = min(LPC18XX_WDT_DEF_TIMEOUT,
->>>                    lpc18xx_wdt->wdt_dev.max_timeout);
->>>
->>> Is this close enough to your solution?
->>>
->> Yes, but why the typecast for LPC18XX_WDT_DEF_TIMEOUT ?
+On Thu, Jul 16, 2015 at 6:09 AM, Joerg Roedel <jroedel@suse.de> wrote:
+> Hi Will,
+>
+> On Thu, Jul 16, 2015 at 11:23:26AM +0100, Will Deacon wrote:
+>> On Thu, Jul 16, 2015 at 09:30:43AM +0100, Joerg Roedel wrote:
+>> > +struct of_phandle_args *of_alloc_phandle_args(int size)
+>> > +{
+>> > +   struct of_phandle_args *args;
+>> > +   int e = max(0, size - MAX_PHANDLE_ARGS);
+>> > +
+>> > +   args =  kzalloc(sizeof(struct of_phandle_args) + e * sizeof(uint32_t),
+>> > +                   GFP_KERNEL);
 >>
-> 
-> Otherwise the compiler will warn about a comparison of distinct pointer
-> types in expansion of the macro 'min'.
-> 
-> Should it be casted when using it better than in definition?
-> 
-Just realized that a literal suffix would be better.
+>> Should you also update args->args_count to reflect the extended array?
+>
+> The args_count member just tells us how many of the array elements are
+> used and not how many there are. So it doesn't need to be updated here.
+>
+>> That said, extending the fixed-size array member like this feels a bit
+>> fragile. Does GCC not complain about out-of-bounds accesses if you
+>> statically address args->args[MAX_PHANDLE_ARGS]? Admittedly, I can't
+>> think *why* this would be break (things like additional padding will be
+>> harmless), but I'm not intimate with the C standard.
+>
+> Yeah, I agree, it is not the best possible solution. But this way I
+> don't need to update all callers, and thus it works better with our
+> development model.
 
-#define LPC18XX_WDT_DEF_TIMEOUT         30U
+Our development model is not to work-around kernel APIs last time I checked.
+
+> But I am open for suggestions on how to solve this problem better. In
+> fact, my main motivation in sending this was to get the discussion about
+> an upstreamable solution started :)
+>
+> Lets see what the device-tree maintainers have to say.
+
+A good number of callers and all iommu callers loop thru the list of 
+phandles which are just open coded ATM. So we should do loop iterators 
+here. With iterators, we can do the allocation within the iterators. 
+This can be much more efficient as we don't iterate thru the list from 
+the start every time. Normally, the list is not big enough to matter, 
+but in your case it may be.
+
+I'm thinking something like this untested and not yet compiling patch. It 
+still has the abuse of adding onto the end of the of_phandle_args 
+struct which I don't really like. We could do a new struct, but I'd like 
+to keep this code common.
+
+I also need to refactor the existing code to use 
+__of_parse_one_phandle_with_args.
+
+Rob
+
+8<--------------------------------------------------------------------------------------------
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 8b5a187..c1c5a43 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1442,6 +1442,96 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
+ 	printk("\n");
+ }
+ 
++
++static int __of_parse_one_phandle_with_args(const __be32 **list,
++					const char *cells_name,
++					int cell_count,
++					struct of_phandle_args **out_args)
++{
++	struct device_node *node;
++	phandle phandle;
++	struct of_phandle_args *args = *out_args;
++	const __be32 *start_list = *list;
++	u32 i, count = 0;
++	int ret;
++
++	/*
++	 * If phandle is 0, then it is an empty entry with no
++	 * arguments.  Skip forward to the next entry.
++	 */
++	phandle = be32_to_cpup(*list++);
++	if (phandle) {
++		/*
++		 * Find the provider node and parse the #*-cells
++		 * property to determine the argument length.
++		 *
++		 * This is not needed if the cell count is hard-coded
++		 * (i.e. cells_name not set, but cell_count is set),
++		 * except when we're going to return the found node
++		 * below.
++		 */
++		node = of_find_node_by_phandle(phandle);
++		if (!node)
++			return -ENOENT;
++
++		if (cells_name) {
++			ret = of_property_read_u32(node, cells_name, &count);
++			if (ret) {
++				pr_err("could not get %s for %s\n",
++				       cells_name, node->full_name);
++				return ret;
++			}
++		} else {
++			count = cell_count;
++		}
++	}
++
++	if (args && WARN_ON(count > MAX_PHANDLE_ARGS))
++		count = MAX_PHANDLE_ARGS;
++
++	if (!args) {
++		args = kzalloc(sizeof(*args) + (count * sizeof(uint32_t))), GFP_KERNEL);
++		*out_args = args;
++	}
++	if (!args)
++		return -ENOMEM;
++
++	if (!phandle) {
++		memset(args, 0, sizeof(*args));
++		return -ENOENT;
++	}
++
++	args->np = node;
++	args->val = start_list;
++	args->args_count = count;
++	for (i = 0; i < count; i++)
++		args->args[i] = be32_to_cpup(*list++);
++
++	return 0;
++}
++
++of_phandle_args *of_prop_next_phandle_args(struct property *prop,
++						const char *cells_name,
++						int cell_count,
++						struct of_phandle_args *last)
++{
++	struct of_phandle_args *args = NULL;
++	const __be32 *start_list;
++
++	if (!prop)
++		return NULL;
++
++	if (!last) {
++		start_list = prop->value;
++	} else {
++		start_list = last->val;
++		kfree(last);
++	}
++	__of_parse_one_phandle_with_args(list, cells_name, cell_count, &args);
++	return args;
++}
++EXPORT_SYMBOL_GPL(of_prop_next_phandle_args);
++
+ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 					const char *list_name,
+ 					const char *cells_name,
+diff --git a/include/linux/of.h b/include/linux/of.h
+index edc068d..a0f432c 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -879,6 +879,13 @@ static inline int of_property_read_s32(const struct device_node *np,
+ 		s;						\
+ 		s = of_prop_next_string(prop, s))
+ 
++#define of_property_for_each_phandle_with_args(np, propname, cells_name, cell_count, prop, arg)	\
++	for (prop = of_find_property(np, propname, NULL),	\
++		arg = of_prop_next_phandle_args(prop, NULL);	\
++		arg;						\
++		arg = of_prop_next_phandle_args(prop, arg))
++
++
+ #define for_each_node_by_name(dn, name) \
+ 	for (dn = of_find_node_by_name(NULL, name); dn; \
+ 	     dn = of_find_node_by_name(dn, name))
