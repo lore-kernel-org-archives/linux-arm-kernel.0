@@ -1,45 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 24 Jul 2015 15:34:55 +0900
-Subject: [GIT PULL] Non-critical fixes for v4.3
-Message-ID: <1437719695-22340-1-git-send-email-k.kozlowski@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 24 Jul 2015 15:58:28 +0900
+Subject: [PATCH] serial: 8250_uniphier: call clk_disable_unprepare() on
+ failure path
+Message-ID: <1437721108-19037-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
+If serial8250_register_8250_port() fails, disable and unprepare the
+clock before exiting.
 
-Previously you did not picked up the fix for cpufreq memory leak.
-I am sending it again with respective acks from LKML. Also another
-minor improvement in the set.
+Fixes: 1a8d2903cb6a ("serial: 8250_uniphier: add UniPhier serial driver")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Best regards,
-Krzysztof
+ drivers/tty/serial/8250/8250_uniphier.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-
-The following changes since commit 1c4c7159ed2468f3ac4ce5a7f08d79663d381a93:
-
-  Merge tag 'ext4_for_linus_stable' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2015-07-05 16:24:54 -0700)
-
-are available in the git repository at:
-
-
-  https://github.com/krzk/linux.git tags/samsung-fixes-non-critical-v4.3-2
-
-for you to fetch changes up to 434213f727c12fab8657c8db3d23da4b0463365d:
-
-  video: fbdev: s3c-fb: Constify platform_device_id (2015-07-24 15:17:32 +0900)
-
-----------------------------------------------------------------
-Improvements for Exynos boards:
-1. Fix memory leak in cpufreq error path.
-2. Constify platform_device_id in video/fbdev/s3c-fb.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      video: fbdev: s3c-fb: Constify platform_device_id
-
-Shailendra Verma (1):
-      cpufreq: exynos: Fix for memory leak in case SOC name does not match
-
- drivers/cpufreq/exynos-cpufreq.c | 6 ++++--
- drivers/video/fbdev/s3c-fb.c     | 2 +-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+index 7d79425..d11621e 100644
+--- a/drivers/tty/serial/8250/8250_uniphier.c
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -218,6 +218,7 @@ static int uniphier_uart_probe(struct platform_device *pdev)
+ 	ret = serial8250_register_8250_port(&up);
+ 	if (ret < 0) {
+ 		dev_err(dev, "failed to register 8250 port\n");
++		clk_disable_unprepare(priv->clk);
+ 		return ret;
+ 	}
+ 
+-- 
+1.9.1
