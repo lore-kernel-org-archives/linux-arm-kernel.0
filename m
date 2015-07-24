@@ -1,49 +1,28 @@
-From: HenryC.Chen@mediatek.com (Henry Chen)
-Date: Fri, 24 Jul 2015 20:59:58 +0800
-Subject: [PATCH v4 1/2] dt-bindings: regulator: mt6311: Add document for
- mt6311 regulator
-In-Reply-To: <CABxcv=kuUbDyzFR2bU7vcvvsqg_yQuqBn5S20=uaH9iBCL_xBQ@mail.gmail.com>
-References: <1437715481-31528-1-git-send-email-henryc.chen@mediatek.com>
- <1437715481-31528-2-git-send-email-henryc.chen@mediatek.com>
- <CABxcv=kuUbDyzFR2bU7vcvvsqg_yQuqBn5S20=uaH9iBCL_xBQ@mail.gmail.com>
-Message-ID: <1437742798.30329.100.camel@mtksdaap41>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 24 Jul 2015 14:00:18 +0100
+Subject: inquiries on juno
+In-Reply-To: <CAN2waFsDuw4s9AqU=6D5vfgHSK5iDknkxD5UR06yXGe+GGNSrg@mail.gmail.com>
+References: <CAN2waFugZ869RZe_3GbW+8qCZQL-h9fRt5g38JJUPkr8f8VR5A@mail.gmail.com>	<55B20037.2090705@arm.com>
+ <CAN2waFsDuw4s9AqU=6D5vfgHSK5iDknkxD5UR06yXGe+GGNSrg@mail.gmail.com>
+Message-ID: <55B236E2.8050600@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
 
-On Fri, 2015-07-24 at 10:32 +0200, Javier Martinez Canillas wrote:
-> Hello Henry,
-> 
-> I believe Mark asked you to use a subject lines reflecting the style
-> for the subsystem, so the subject should had been something like:
-> 
-> regulators: mt6311: Add DT binding document
-> 
-> On Fri, Jul 24, 2015 at 7:24 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
-> > This patch adds a list of supported regulator names to the devicetree
-> > binding documentation for Mediatek MT6311 PMIC.
-> >
-> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
-> > ---
-> 
-> I know is in your cover letter, but usually is good to also include a
-> history log of the changes for each patch so people know what changed.
-> Everything between the '---' and the diff are omitted by tools like
-> git am so you can add there.  You can use tools like patman that do
-> this automatically for you.
-> 
-Ok, got it, I will follow that.
 
-> Also, I said that you could add my Reviewed-by after the node name
-> change so you should had carried that. So again:
+On 24/07/15 13:17, Zhaoyang Huang wrote:
+> Dear Sudeep,
+> Thanks for your quick feedback. I just use the dtb which I compiled by
+> the upstreaming source code. So you mean I should use the upstreamed
+> binary dtb file instead of the one which I compiled out?
+>
 
-Sorry, did you mean I need to resent again?
+No the one you have compiled should work. Try adding "earlycon" to the
+command line and see if that works. You might have to apply[1] to get
+earlycon working as Juno DTS specifies baud in stdout-path and currently
+earlycon parsing has issues which [1] fixes.
 
-Thanks for advise.
-Henry
+Regards,
+Sudeep
 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Best regards,
-> Javier
+[1] https://lkml.org/lkml/2015/4/8/604
