@@ -1,63 +1,59 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 24 Jul 2015 16:37:44 +0100
-Subject: [PATCH v3 4/9] arm64/debug: More consistent naming for the BRK ESR
- template macro
+Date: Fri, 24 Jul 2015 16:37:45 +0100
+Subject: [PATCH v3 5/9] arm64/debug: Move BRK ESR template macro into
+ <asm/esr.h>
 In-Reply-To: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
 References: <1437752284-14847-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1437752284-14847-5-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1437752284-14847-6-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The naming of DBG_ESR_VAL_BRK is inconsistent with the way other
-similar macros are named.
-
-This patch makes the naming more consistent, and appends "64"
-as a reminder that this ESR pattern only matches from AArch64
-state.
+It makes sense to keep all the architectural exception syndrome
+definitions in the same place.
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/debug-monitors.h |    5 +++--
- arch/arm64/kernel/kgdb.c                |    4 ++--
- 2 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/debug-monitors.h |    7 -------
+ arch/arm64/include/asm/esr.h            |    7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm64/include/asm/debug-monitors.h b/arch/arm64/include/asm/debug-monitors.h
-index ff09058..bb97e9d 100644
+index bb97e9d..e28b1dd 100644
 --- a/arch/arm64/include/asm/debug-monitors.h
 +++ b/arch/arm64/include/asm/debug-monitors.h
-@@ -46,8 +46,9 @@
+@@ -44,13 +44,6 @@
+ #define BREAK_INSTR_SIZE		AARCH64_INSN_SIZE
+ 
  /*
-  * ESR values expected for dynamic and compile time BRK instruction
-  */
--#define DBG_ESR_VAL_BRK(x) \
--	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL | ((x) & 0xffff))
+- * ESR values expected for dynamic and compile time BRK instruction
+- */
+-#define ESR_ELx_VAL_BRK64(imm)					\
+-	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
+-	 ((imm) & 0xffff))
+-
+-/*
+  * #imm16 values used for BRK instruction generation
+  * Allowed values for kgbd are 0x400 - 0x7ff
+  * 0x100: for triggering a fault on purpose (reserved)
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 7052245..1b44cf6 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -99,6 +99,13 @@
+ #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
+ #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
+ 
++/* ESR value templates for specific events */
++
++/* BRK instruction trap from AArch64 state */
 +#define ESR_ELx_VAL_BRK64(imm)					\
 +	((ESR_ELx_EC_BRK64 << ESR_ELx_EC_SHIFT) | ESR_ELx_IL |	\
 +	 ((imm) & 0xffff))
- 
- /*
-  * #imm16 values used for BRK instruction generation
-diff --git a/arch/arm64/kernel/kgdb.c b/arch/arm64/kernel/kgdb.c
-index a0d10c5..a5a838e 100644
---- a/arch/arm64/kernel/kgdb.c
-+++ b/arch/arm64/kernel/kgdb.c
-@@ -235,13 +235,13 @@ static int kgdb_step_brk_fn(struct pt_regs *regs, unsigned int esr)
- 
- static struct break_hook kgdb_brkpt_hook = {
- 	.esr_mask	= 0xffffffff,
--	.esr_val	= DBG_ESR_VAL_BRK(KGDB_DYN_DBG_BRK_IMM),
-+	.esr_val	= ESR_ELx_VAL_BRK64(KGDB_DYN_DBG_BRK_IMM),
- 	.fn		= kgdb_brk_fn
- };
- 
- static struct break_hook kgdb_compiled_brkpt_hook = {
- 	.esr_mask	= 0xffffffff,
--	.esr_val	= DBG_ESR_VAL_BRK(KGDB_COMPILED_DBG_BRK_IMM),
-+	.esr_val	= ESR_ELx_VAL_BRK64(KGDB_COMPILED_DBG_BRK_IMM),
- 	.fn		= kgdb_compiled_brk_fn
- };
++
+ #ifndef __ASSEMBLY__
+ #include <asm/types.h>
  
 -- 
 1.7.10.4
