@@ -1,90 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:22 +0900
-Subject: [PATCH 1/9] ARM: shmobile: emev2: add IIC cores to dtsi
+Date: Fri, 24 Jul 2015 17:41:24 +0900
+Subject: [PATCH 3/9] ARM: shmobile: lager: add sound label on DTS
 In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
 References: <cover.1437724902.git.horms+renesas@verge.net.au>
-Message-ID: <cd42d042a2e712a7f9880f860075815539ce4baf.1437724902.git.horms+renesas@verge.net.au>
+Message-ID: <30be0ba5f92c9a728bf3b3f41dbf3240eb3bbc11.1437724902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+It is easy to modify settings for Test or other purpose if sound has label
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/emev2.dtsi | 48 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+ arch/arm/boot/dts/r8a7790-lager.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/emev2.dtsi b/arch/arm/boot/dts/emev2.dtsi
-index bb45694d91bc..edad0c4eea35 100644
---- a/arch/arm/boot/dts/emev2.dtsi
-+++ b/arch/arm/boot/dts/emev2.dtsi
-@@ -21,6 +21,8 @@
- 		gpio2 = &gpio2;
- 		gpio3 = &gpio3;
- 		gpio4 = &gpio4;
-+		i2c0 = &iic0;
-+		i2c1 = &iic1;
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 2eb8a995ae9f..5ae07a8385c5 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -174,7 +174,7 @@
+ 			  1800000 0>;
  	};
  
- 	cpus {
-@@ -66,6 +68,30 @@
- 			clock-frequency = <32768>;
- 			#clock-cells = <0>;
- 		};
-+		iic0_sclkdiv: iic0_sclkdiv {
-+			compatible = "renesas,emev2-smu-clkdiv";
-+			reg = <0x624 0>;
-+			clocks = <&pll3_fo>;
-+			#clock-cells = <0>;
-+		};
-+		iic0_sclk: iic0_sclk {
-+			compatible = "renesas,emev2-smu-gclk";
-+			reg = <0x48c 1>;
-+			clocks = <&iic0_sclkdiv>;
-+			#clock-cells = <0>;
-+		};
-+		iic1_sclkdiv: iic1_sclkdiv {
-+			compatible = "renesas,emev2-smu-clkdiv";
-+			reg = <0x624 16>;
-+			clocks = <&pll3_fo>;
-+			#clock-cells = <0>;
-+		};
-+		iic1_sclk: iic1_sclk {
-+			compatible = "renesas,emev2-smu-gclk";
-+			reg = <0x490 1>;
-+			clocks = <&iic1_sclkdiv>;
-+			#clock-cells = <0>;
-+		};
- 		pll3_fo: pll3_fo {
- 			compatible = "fixed-factor-clock";
- 			clocks = <&c32ki>;
-@@ -234,4 +260,26 @@
- 		interrupt-controller;
- 		#interrupt-cells = <2>;
- 	};
-+
-+	iic0: i2c at e0070000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,iic-emev2";
-+		reg = <0xe0070000 0x28>;
-+		interrupts = <0 32 IRQ_TYPE_EDGE_RISING>;
-+		clocks = <&iic0_sclk>;
-+		clock-names = "sclk";
-+		status = "disabled";
-+	};
-+
-+	iic1: i2c at e10a0000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "renesas,iic-emev2";
-+		reg = <0xe10a0000 0x28>;
-+		interrupts = <0 33 IRQ_TYPE_EDGE_RISING>;
-+		clocks = <&iic1_sclk>;
-+		clock-names = "sclk";
-+		status = "disabled";
-+	};
- };
+-	sound {
++	rsnd_ak4643: sound {
+ 		compatible = "simple-audio-card";
+ 
+ 		simple-audio-card,format = "left_j";
 -- 
 2.1.4
