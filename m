@@ -1,142 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 24 Jul 2015 13:23:55 +0100
-Subject: [PATCH 3/3] Docs: dt: add PCI IOMMU map bindings
-In-Reply-To: <1437670365-20704-4-git-send-email-mark.rutland@arm.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-4-git-send-email-mark.rutland@arm.com>
-Message-ID: <55B22E5B.7080208@arm.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 24 Jul 2015 17:56:10 +0530
+Subject: [RFC PATCH 3/4] iommu/arm-smmu: Add support for specifying clocks
+In-Reply-To: <20150721150122.GH31095@arm.com>
+References: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
+ <1437152005-25092-4-git-send-email-sricharan@codeaurora.org>
+ <20150721150122.GH31095@arm.com>
+Message-ID: <005e01d0c60b$f1f130c0$d5d39240$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Will,
 
-This looks sane, and lets me describe the thing I have on my desk, so 
-I'm happy. I have a couple of general thoughts below, but I don't intend 
-that they should stand in the way of this proposal as-is.
+> -----Original Message-----
+> From: linux-arm-msm-owner at vger.kernel.org [mailto:linux-arm-msm-
+> owner at vger.kernel.org] On Behalf Of Will Deacon
+> Sent: Tuesday, July 21, 2015 8:31 PM
+> To: Sricharan R
+> Cc: linux-arm-kernel at lists.infradead.org;
+iommu at lists.linux-foundation.org;
+> devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> mitchelh at codeaurora.org
+> Subject: Re: [RFC PATCH 3/4] iommu/arm-smmu: Add support for specifying
+> clocks
+> 
+> On Fri, Jul 17, 2015 at 05:53:24PM +0100, Sricharan R wrote:
+> > From: Mitchel Humpherys <mitchelh@codeaurora.org>
+> >
+> > On some platforms with tight power constraints it is polite to only
+> > leave your clocks on for as long as you absolutely need them.
+> > Currently we assume that all clocks necessary for SMMU register access
+> > are always on.
+> 
+> You've borrowed this commit message from Mitch's previous version of this
+> patch, but now you leave the clocks enabled most of the time so it doesn't
+> make much sense anymore.
+> 
+ Sorry, I should have changed that to make it clear.
 
-On 23/07/15 17:52, Mark Rutland wrote:
-> The existing IOMMU bindings are able to specify the relationship between
-> masters and IOMMUs, but they are insufficient for describing the general
-> case of hotpluggable busses such as PCI where the set of masters is not
-> known until runtime, and the relationship between masters and IOMMUs is
-> a property of the integration of the system.
->
-> This patch adds a generic binding for mapping PCI devices to IOMMUs,
-> using a new iommu-map property (specific to PCI*) which may be used to
-> map devices (identified by their Requester ID) to sideband data for the
-> IOMMU which they master through.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->   .../devicetree/bindings/pci/pci-iommu.txt          | 171 +++++++++++++++++++++
->   1 file changed, 171 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
->
-> diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
-> new file mode 100644
-> index 0000000..56c8296
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
-> @@ -0,0 +1,171 @@
-> +This document describes the generic device tree binding for describing the
-> +relationship between PCI(e) devices and IOMMU(s).
-> +
-> +Each PCI(e) device under a root complex is uniquely identified by its Requester
-> +ID (AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
-> +Function number.
-> +
-> +For the purpose of this document, when treated as a numeric value, a RID is
-> +formatted such that:
-> +
-> +* Bits [15:8] are the Bus number.
-> +* Bits [7:3] are the Device number.
-> +* Bits [2:0] are the Function number.
-> +* Any other bits required for padding must be zero.
-> +
-> +IOMMUs may distinguish PCI devices through sideband data derived from the
-> +Requester ID. While a given PCI device can only master through one IOMMU, a
-> +root complex may split masters across a set of IOMMUs (e.g. with one IOMMU per
-> +bus).
-> +
-> +The generic 'iommus' property is insufficient to describe this relationship,
-> +and a mechanism is required to map from a PCI device to its IOMMU and sideband
-> +data.
-> +
-> +For generic IOMMU bindings, see
-> +Documentation/devicetree/bindings/iommu/iommu.txt.
-> +
-> +
-> +PCI root complex
-> +================
-> +
-> +Optional properties
-> +-------------------
-> +
-> +- iommu-map: Maps a Requester ID to an IOMMU and associated iommu-specifier
-> +  data.
-> +
-> +  The property is an arbitrary number of tuples of
-> +  (rid-base,iommu,iommu-base,length).
-> +
-> +  Any RID r in the interval [rid-base, rid-base + length) is associated with
-> +  the listed IOMMU, with the iommu-specifier (r - rid-base + iommu-base).
+> Anyway, I'm OK with this kind of clock management in the driver, but I
+think
+> that anything more fine-grained needs to be designed into the IOMMU core.
+> 
+  Ok. Tried this to get the right direction.
+ I will  check for the power savings and if there are not much then I would
+use
+ the above approach.
 
-Can we take as a guarantee that the system cannot present any ID at a 
-given IOMMU that is not represented in an appropriate output range (in 
-the sense that we may do things that could blow up horribly if spurious 
-IDs appeared)?
-
-Furthermore, would representing one-to-many mappings by having multiple 
-matches for a given RID be legal? In the general case it's certainly 
-feasible for the IOMMU to see different IDs for e.g. reads vs. writes, 
-where the system munges extra bus lines into the sideband signals - 
-whether anyone would actually integrate a PCI host controller that way 
-is another matter, so I don't think it's something worth really worrying 
-about without a definite need.
-
-> +
-> +- iommu-map-mask: A mask to be applied to each Requester ID prior to being
-> +  mapped to an iommu-specifier per the iommu-map property.
-
-Am I right to assume a mask of 0 would be a valid way to represent 
-"everything" (and if so, should rid-base and length just be ignored, or 
-mandated to be 0 and 1 respectively)? It looks a bit off at first 
-glance, but it does neatly address a genuine use-case.
-
-> +
-> +
-> +Example (1)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	iommu: iommu at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-iommu";
-> +		#iommu-cells = <1>;
-
-Troll question; what do we do when #iommu-cells > 1, where the IOMMU is 
-expecting some extra data associated with each ID (say, memory attributes)?
-
-[ I'm pretty sure the answer here should be "define some additional 
-binding if and when anyone actually cares" ;) ]
-
-
-Robin.
-
-> +	};
-> +
-> +	pci: pci at f {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to the IOMMU is the RID,
-> +		 * identity-mapped.
-> +		 */
-> +		iommu-map = <0x0 &iommu 0x0 0x10000>;
-> +	};
-> +};
+Regards,
+  Sricharan
