@@ -1,46 +1,87 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Fri, 24 Jul 2015 13:29:29 -0700
-Subject: [RFC 1/3] docs: dts: Added documentation for Xilinx Zynq PL Reset
- bindings.
-In-Reply-To: <20150724145027.GY2531@xsjsorenbubuntu>
-References: <1437691862-21312-1-git-send-email-moritz.fischer@ettus.com>
- <1437691862-21312-2-git-send-email-moritz.fischer@ettus.com>
- <55B1C1CB.2050402@xilinx.com>
- <20150724145027.GY2531@xsjsorenbubuntu>
-Message-ID: <CAAtXAHfjTFydjjgHasb2LD-6r+zJL9K34fL3co55iGQo1_7f-w@mail.gmail.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Fri, 24 Jul 2015 20:43:12 +0000
+Subject: [PATCH 1/1] misc: sram: add dev_pm_ops to support module power
+ gate
+In-Reply-To: <55B29D3B.8030402@gmail.com>
+References: <1437757979-25889-1-git-send-email-shenwei.wang@freescale.com>
+ <55B29D3B.8030402@gmail.com>
+Message-ID: <BL2PR03MB370E7898F6A83C726BEF60083810@BL2PR03MB370.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal, S?ren,
 
-On Fri, Jul 24, 2015 at 7:50 AM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Fri, 2015-07-24 at 06:40AM +0200, Michal Simek wrote:
->> On 07/24/2015 12:51 AM, Moritz Fischer wrote:
->> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> > ---
->> >  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->> >  1 file changed, 13 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> > new file mode 100644
->> > index 0000000..ac4499e
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> > @@ -0,0 +1,13 @@
->> > +Xilinx Zynq PL Reset Manager
->>
->> I think there is no reason to be just PL specific.
->
-> That was my first thought too. Why not model all the resets in the SLCR?
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> Sent: 2015?7?24? 15:17
+> To: Wang Shenwei-B38339; gregkh at linuxfoundation.org; arnd at arndb.de
+> Cc: Huang Yongcai-B20788; linux-arm-kernel at lists.infradead.org;
+> computersforpeace at gmail.com
+> Subject: Re: [PATCH 1/1] misc: sram: add dev_pm_ops to support module power
+> > +	/* Save necessary regs */
+> > +	clk_enable(sram->clk);
+> > +	memcpy(sram->power_off_save,
+> sram->virt_base,gen_pool_size(sram->pool));
+> > +	clk_disable(sram->clk);
+> 
+> memcpy_fromio()?
+> 
 
+memcpy is safe to call here, and it should be more efficient.
 
-I only needed the ones for the PL for my fpga-mgr work and reading the
-TRM had a hard time to decide which ones make sense,
-and which ones don't make sense to expose to Linux. I'll look into
-reworking it to support all the resets.
+> > +
+> > +	clk_enable(sram->clk);
+> > +	memcpy(sram->virt_base, sram->power_off_save,
+> > +gen_pool_size(sram->pool));
+> 
+> memcpy_toio()?
+> 
 
->         S?ren
+When system goes to suspend state, it will flush the cache in the end. Memcpy here is 
+more efficient.
 
-Moritz
+> >  	struct sram_dev *sram;
+> > @@ -203,6 +235,12 @@ static int sram_probe(struct platform_device
+> > *pdev)
+> >
+> >  	platform_set_drvdata(pdev, sram);
+> >
+> > +	if (of_get_property(pdev->dev.of_node, "can-power-gate", NULL))
+> 
+> Since this is a boolean you could use of_property_read_bool()
+> 
+
+Yes, of_property_read_bool is better. Will adopt it.
+
+> > +	{
+> > +		sram->power_off_save = devm_kzalloc(&pdev->dev,
+> > +				gen_pool_size(sram->pool), GFP_KERNEL);
+> 
+> Parenthesis not needed.
+
+Will remove it.
+
+> 
+> This will only work with SRAM sizes which are small enough they can be serviced
+> by kzalloc() allocations. The problem is that you might actually need
+> direct-mapped memory but what if you have larger SRAMs that are several MB?
+> Maybe there should be a check here to prevent that.
+> 
+
+Yes, it will be a problem. I think vmalloc should be used here.
+
+> > +static const struct dev_pm_ops sram_pm_ops = {
+> > +	.suspend_noirq = sram_suspend_noirq,
+> > +	.resume_noirq = sram_resume_noirq,
+> > +};
+> 
+> You may have to enclose this within an ifdef CONFIG_PM_SLEEP/endif statement
+> not to cause warnings if CONFIG_PM_SLEEP is disabled.
+> --
+
+The "struct dev_pm_ops *pm" is always a member of device_driver, and it has no
+relation with the CONFIG_PM_XXX.
+
+Thanks,
+Shenwei
+
+> Florian
