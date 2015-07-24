@@ -1,164 +1,181 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Jul 2015 15:31:28 +0200
-Subject: [PATCH] ARM/fb: ep93xx: switch framebuffer to use modedb only
-Message-ID: <1437744688-29915-1-git-send-email-linus.walleij@linaro.org>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Fri, 24 Jul 2015 10:54:59 -0300
+Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <55B15AF1.3030509@roeck-us.net>
+References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
+ <55B15AF1.3030509@roeck-us.net>
+Message-ID: <55B243B3.7050702@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the EP93xx boards exclusively use modedb to look up video
-modes from the command line. Root out the parametrization of
-custom video modes from the platform data and board files
-and simplify the driver.
 
-Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-J-C/Tomi: please ACK this if you're OK with it so I can take
-it through the ARM SoC tree.
----
- arch/arm/mach-ep93xx/edb93xx.c             |  2 --
- arch/arm/mach-ep93xx/simone.c              |  2 --
- arch/arm/mach-ep93xx/snappercl15.c         |  2 --
- arch/arm/mach-ep93xx/vision_ep9307.c       |  2 --
- drivers/video/fbdev/ep93xx-fb.c            | 30 ++++--------------------------
- include/linux/platform_data/video-ep93xx.h |  8 --------
- 6 files changed, 4 insertions(+), 42 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/edb93xx.c b/arch/arm/mach-ep93xx/edb93xx.c
-index 27b14ae92c7e..ad92d9f7e4df 100644
---- a/arch/arm/mach-ep93xx/edb93xx.c
-+++ b/arch/arm/mach-ep93xx/edb93xx.c
-@@ -205,8 +205,6 @@ static void __init edb93xx_register_pwm(void)
-  * EDB93xx framebuffer
-  *************************************************************************/
- static struct ep93xxfb_mach_info __initdata edb93xxfb_info = {
--	.num_modes	= EP93XXFB_USE_MODEDB,
--	.bpp		= 16,
- 	.flags		= 0,
- };
- 
-diff --git a/arch/arm/mach-ep93xx/simone.c b/arch/arm/mach-ep93xx/simone.c
-index d0938a219443..7bb540c421ee 100644
---- a/arch/arm/mach-ep93xx/simone.c
-+++ b/arch/arm/mach-ep93xx/simone.c
-@@ -40,8 +40,6 @@ static struct ep93xx_eth_data __initdata simone_eth_data = {
- };
- 
- static struct ep93xxfb_mach_info __initdata simone_fb_info = {
--	.num_modes	= EP93XXFB_USE_MODEDB,
--	.bpp		= 16,
- 	.flags		= EP93XXFB_USE_SDCSN0 | EP93XXFB_PCLK_FALLING,
- };
- 
-diff --git a/arch/arm/mach-ep93xx/snappercl15.c b/arch/arm/mach-ep93xx/snappercl15.c
-index aa86f86638dd..c4904264256a 100644
---- a/arch/arm/mach-ep93xx/snappercl15.c
-+++ b/arch/arm/mach-ep93xx/snappercl15.c
-@@ -144,8 +144,6 @@ static struct i2c_board_info __initdata snappercl15_i2c_data[] = {
- };
- 
- static struct ep93xxfb_mach_info __initdata snappercl15_fb_info = {
--	.num_modes		= EP93XXFB_USE_MODEDB,
--	.bpp			= 16,
- };
- 
- static struct platform_device snappercl15_audio_device = {
-diff --git a/arch/arm/mach-ep93xx/vision_ep9307.c b/arch/arm/mach-ep93xx/vision_ep9307.c
-index ff22a6a6e2bf..5cced5988498 100644
---- a/arch/arm/mach-ep93xx/vision_ep9307.c
-+++ b/arch/arm/mach-ep93xx/vision_ep9307.c
-@@ -106,8 +106,6 @@ static void vision_lcd_blank(int blank_mode, struct fb_info *info)
- }
- 
- static struct ep93xxfb_mach_info ep93xxfb_info __initdata = {
--	.num_modes	= EP93XXFB_USE_MODEDB,
--	.bpp		= 16,
- 	.flags		= EP93XXFB_USE_SDCSN0 | EP93XXFB_PCLK_FALLING,
- 	.setup		= vision_lcd_setup,
- 	.teardown	= vision_lcd_teardown,
-diff --git a/drivers/video/fbdev/ep93xx-fb.c b/drivers/video/fbdev/ep93xx-fb.c
-index 7ec251cc9c03..5b1081030cbb 100644
---- a/drivers/video/fbdev/ep93xx-fb.c
-+++ b/drivers/video/fbdev/ep93xx-fb.c
-@@ -419,36 +419,15 @@ static struct fb_ops ep93xxfb_ops = {
- 	.fb_mmap	= ep93xxfb_mmap,
- };
- 
--static int ep93xxfb_calc_fbsize(struct ep93xxfb_mach_info *mach_info)
--{
--	int i, fb_size = 0;
--
--	if (mach_info->num_modes == EP93XXFB_USE_MODEDB) {
--		fb_size = EP93XXFB_MAX_XRES * EP93XXFB_MAX_YRES *
--			mach_info->bpp / 8;
--	} else {
--		for (i = 0; i < mach_info->num_modes; i++) {
--			const struct fb_videomode *mode;
--			int size;
--
--			mode = &mach_info->modes[i];
--			size = mode->xres * mode->yres * mach_info->bpp / 8;
--			if (size > fb_size)
--				fb_size = size;
--		}
--	}
--
--	return fb_size;
--}
--
- static int ep93xxfb_alloc_videomem(struct fb_info *info)
- {
--	struct ep93xx_fbi *fbi = info->par;
- 	char __iomem *virt_addr;
- 	dma_addr_t phys_addr;
- 	unsigned int fb_size;
- 
--	fb_size = ep93xxfb_calc_fbsize(fbi->mach_info);
-+	/* Maximum 16bpp -> used memory is maximum x*y*2 bytes */
-+	fb_size = EP93XXFB_MAX_XRES * EP93XXFB_MAX_YRES * 2;
-+
- 	virt_addr = dma_alloc_writecombine(info->dev, fb_size,
- 					   &phys_addr, GFP_KERNEL);
- 	if (!virt_addr)
-@@ -550,8 +529,7 @@ static int ep93xxfb_probe(struct platform_device *pdev)
- 
- 	fb_get_options("ep93xx-fb", &video_mode);
- 	err = fb_find_mode(&info->var, info, video_mode,
--			   fbi->mach_info->modes, fbi->mach_info->num_modes,
--			   fbi->mach_info->default_mode, fbi->mach_info->bpp);
-+			   NULL, 0, NULL, 16);
- 	if (err == 0) {
- 		dev_err(info->dev, "No suitable video mode found\n");
- 		err = -EINVAL;
-diff --git a/include/linux/platform_data/video-ep93xx.h b/include/linux/platform_data/video-ep93xx.h
-index 92fc2b2232e7..699ac4109366 100644
---- a/include/linux/platform_data/video-ep93xx.h
-+++ b/include/linux/platform_data/video-ep93xx.h
-@@ -2,11 +2,8 @@
- #define __VIDEO_EP93XX_H
- 
- struct platform_device;
--struct fb_videomode;
- struct fb_info;
- 
--#define EP93XXFB_USE_MODEDB		0
--
- /* VideoAttributes flags */
- #define EP93XXFB_STATE_MACHINE_ENABLE	(1 << 0)
- #define EP93XXFB_PIXEL_CLOCK_ENABLE	(1 << 1)
-@@ -38,12 +35,7 @@ struct fb_info;
- 					 EP93XXFB_PIXEL_DATA_ENABLE)
- 
- struct ep93xxfb_mach_info {
--	unsigned int			num_modes;
--	const struct fb_videomode	*modes;
--	const struct fb_videomode	*default_mode;
--	int				bpp;
- 	unsigned int			flags;
--
- 	int	(*setup)(struct platform_device *pdev);
- 	void	(*teardown)(struct platform_device *pdev);
- 	void	(*blank)(int blank_mode, struct fb_info *info);
--- 
-2.4.3
+El 23/07/15 a las 18:21, Guenter Roeck escibi?:
+> On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
+>> Hi Guenter,
+>>
+>> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
+>>> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
+>>>> This commit adds support for the watchdog timer found in NXP LPC SoCs
+>>>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
+>>>> share the same watchdog hardware.
+>>>>
+>>>> Watchdog driver registers a restart handler that will restart the
+>>>> system
+>>>> by performing an incorrect feed after ensuring the watchdog is
+>>>> enabled in
+>>>> reset mode.
+>>>>
+>>>> As watchdog cannot be disabled in hardware, driver's stop routine will
+>>>> regularly send a keepalive ping using a timer.
+>>>>
+>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>
+>>> Hi Ariel,
+>>>
+>>> sorry for the delayed response. Comments below.
+>>>
+>>> Guenter
+>>>
+>>>> ---
+>>>>    drivers/watchdog/Kconfig       |  11 ++
+>>>>    drivers/watchdog/Makefile      |   1 +
+>>>>    drivers/watchdog/lpc18xx_wdt.c | 344
+>>>> +++++++++++++++++++++++++++++++++++++++++
+>>>>    3 files changed, 356 insertions(+)
+>>>>    create mode 100644 drivers/watchdog/lpc18xx_wdt.c
+>>>>
+>>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>>>> index 742fbbc..af5e2e3 100644
+>>>> --- a/drivers/watchdog/Kconfig
+>>>> +++ b/drivers/watchdog/Kconfig
+>>>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
+>>>>          To compile this driver as a module, choose M here: the
+>>>>          module will be called digicolor_wdt.
+>>>>
+>>>> +config LPC18XX_WATCHDOG
+>>>> +    tristate "LPC18xx/43xx Watchdog"
+>>>> +    depends on ARCH_LPC18XX || COMPILE_TEST
+>>>> +    select WATCHDOG_CORE
+>>>> +    help
+>>>> +      Say Y here if to include support for the watchdog timer
+>>>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
+>>>> +      processors.
+>>>> +      To compile this driver as a module, choose M here: the
+>>>> +      module will be called lpc18xx_wdt.
+>>>> +
+>>>>    # AVR32 Architecture
+>>>>
+>>>>    config AT32AP700X_WDT
+>>>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+>>>> index 59ea9a1..1b0ef48 100644
+>>>> --- a/drivers/watchdog/Makefile
+>>>> +++ b/drivers/watchdog/Makefile
+>>>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>>>>    obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+>>>>    obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+>>>>    obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
+>>>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
+>>>>
+>>>>    # AVR32 Architecture
+>>>>    obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+>>>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
+>>>> b/drivers/watchdog/lpc18xx_wdt.c
+>>>> new file mode 100644
+>>>> index 0000000..2b489fc
+>>>> --- /dev/null
+>>>> +++ b/drivers/watchdog/lpc18xx_wdt.c
+>>>> @@ -0,0 +1,344 @@
+>>>> +/*
+>>>> + * NXP LPC18xx Watchdog Timer (WDT)
+>>>> + *
+>>>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or
+>>>> modify it
+>>>> + * under the terms of the GNU General Public License version 2 as
+>>>> published by
+>>>> + * the Free Software Foundation.
+>>>> + *
+>>>> + * Notes
+>>>> + * -----
+>>>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
+>>>> a 24-bit
+>>>> + * counter which decrements on every clock cycle.
+>>>> + *
+>>>> + */
+>>>> +
+>>>> +#include <linux/clk.h>
+>>>> +#include <linux/io.h>
+>>>> +#include <linux/module.h>
+>>>> +#include <linux/of.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/reboot.h>
+>>>> +#include <linux/watchdog.h>
+>>>> +
+>>>> +/* Registers */
+>>>> +#define LPC18XX_WDT_MOD            0x00
+>>>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
+>>>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
+>>>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
+>>>
+>>> Not used.
+>>
+>> That's right. I'll remove it.
+>>
+>>>
+>>>> +
+>>>> +#define LPC18XX_WDT_TC            0x04
+>>>> +#define LPC18XX_WDT_TC_MIN        0xff
+>>>> +#define LPC18XX_WDT_TC_MAX        0xffffff
+>>>> +
+>>>> +#define LPC18XX_WDT_FEED        0x08
+>>>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
+>>>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
+>>>> +
+>>>> +#define LPC18XX_WDT_TV            0x0c
+>>>> +
+>>>> +/* Clock pre-scaler */
+>>>> +#define LPC18XX_WDT_CLK_DIV        4
+>>>> +
+>>>> +/* Timeout values in seconds */
+>>>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
+>>>> +
+>>>
+>>> This is (still) really low for Linux. Something like min(30,
+>>> max_timeout)
+>>> might make more sense.
+>>
+>> Remember that hardware limits timeout to a maximum value of 5.
+>>
+>> As you said before we could use a soft timer, but I not sure that's a
+>> good idea. As Ezequiel said [0], it might be adding bloat and we must
+>> consider that this watchdog controller is included in cortex-M MCUs.
+>>
+>> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
+>>
+> 
+> Further down you have
+>     lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
+>                           LPC18XX_WDT_CLK_DIV) / clk_rate;
+> 
+> which seems to contradict this statement. If the maximum timeout is 5
+> seconds,
+> why don't you set max_timeout to a fixed value of 5 seconds ?
+
+Well, I think that's the less hardcoded way. It might allow the driver
+to be extended to another HW variant that configures the wdt clk rate.
+
+I see what's your point. As you proposed, using the same criterion I
+should do this:
+
+#define LPC18XX_WDT_DEF_TIMEOUT         (unsigned int)30
+
+and further down, in probe function:
+
+lpc18xx_wdt->wdt_dev.timeout = min(LPC18XX_WDT_DEF_TIMEOUT,
+				   lpc18xx_wdt->wdt_dev.max_timeout);
+
+Is this close enough to your solution?
