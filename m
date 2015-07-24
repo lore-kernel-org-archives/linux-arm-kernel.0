@@ -1,108 +1,27 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 24 Jul 2015 19:33:59 +0800
-Subject: [PATCH v4 1/7] clk: mediatek: Add fixed clocks support for
- Mediatek SoC.
-In-Reply-To: <1437706925-3222-2-git-send-email-jamesjj.liao@mediatek.com>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
- <1437706925-3222-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <CAGS+omAhnqy7AZ6x7QoEez3Fq8ghkj5_DrNCf18c0AO+aKnoyQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jul 2015 12:38:21 +0100
+Subject: [PATCH v2 07/20] arm64: introduce CONFIG_ARM64_LSE_ATOMICS as
+ fallback to ll/sc atomics
+In-Reply-To: <1437734531-10698-8-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-8-git-send-email-will.deacon@arm.com>
+Message-ID: <20150724113821.GH3550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+On Fri, Jul 24, 2015 at 11:41:58AM +0100, Will Deacon wrote:
+> In order to patch in the new atomic instructions at runtime, we need to
+> generate wrappers around the out-of-line exclusive load/store atomics.
+> 
+> This patch adds a new Kconfig option, CONFIG_ARM64_LSE_ATOMICS. which
+> causes our atomic functions to branch to the out-of-line ll/sc
+> implementations. To avoid the register spill overhead of the PCS, the
+> out-of-line functions are compiled with specific compiler flags to
+> force out-of-line save/restore of any registers that are usually
+> caller-saved.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-On Fri, Jul 24, 2015 at 11:01 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> This patch adds fixed clocks support by using CCF fixed-rate
-> clock implementation.
->
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> ---
->  drivers/clk/mediatek/clk-mtk.c | 23 +++++++++++++++++++++++
->  drivers/clk/mediatek/clk-mtk.h | 19 ++++++++++++++++++-
->  2 files changed, 41 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-> index 18444ae..f8307c3 100644
-> --- a/drivers/clk/mediatek/clk-mtk.c
-> +++ b/drivers/clk/mediatek/clk-mtk.c
-> @@ -49,6 +49,29 @@ err_out:
->         return NULL;
->  }
->
-> +void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks, int num,
-> +               struct clk_onecell_data *clk_data)
+Slightly easier to read now ;).
 
-
-void __init mtk_clk_register_fixed_clks(...
-
-> +{
-> +       int i;
-> +       struct clk *clk;
-> +
-> +       for (i = 0; i < num; i++) {
-> +               const struct mtk_fixed_clk *rc = &clks[i];
-> +
-> +               clk = clk_register_fixed_rate(NULL, rc->name, rc->parent,
-> +                               rc->parent ? 0 : CLK_IS_ROOT, rc->rate);
-> +
-> +               if (IS_ERR(clk)) {
-> +                       pr_err("Failed to register clk %s: %ld\n",
-> +                                       rc->name, PTR_ERR(clk));
-> +                       continue;
-> +               }
-> +
-> +               if (clk_data)
-> +                       clk_data->clks[rc->id] = clk;
-> +       }
-> +}
-> +
->  void mtk_clk_register_factors(const struct mtk_fixed_factor *clks, int num,
->                 struct clk_onecell_data *clk_data)
->  {
-> diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-> index 9dda9d8..f083dfc 100644
-> --- a/drivers/clk/mediatek/clk-mtk.h
-> +++ b/drivers/clk/mediatek/clk-mtk.h
-> @@ -25,6 +25,23 @@
->
->  #define MHZ (1000 * 1000)
->
-> +struct mtk_fixed_clk {
-> +       int id;
-> +       const char *name;
-> +       const char *parent;
-> +       unsigned long rate;
-> +};
-> +
-> +#define FIXED_CLK(_id, _name, _parent, _rate) {                \
-> +               .id = _id,                              \
-> +               .name = _name,                          \
-> +               .parent = _parent,                      \
-> +               .rate = _rate,                          \
-> +       }
-> +
-> +void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
-> +               int num, struct clk_onecell_data *clk_data);
-> +
->  struct mtk_fixed_factor {
->         int id;
->         const char *name;
-> @@ -41,7 +58,7 @@ struct mtk_fixed_factor {
->                 .div = _div,                            \
->         }
->
-> -extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
-> +void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
-
-Technically, this hunk is unrelated and should probably be in its own patch.
-
-Other than these two nits, this one is:
-
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
->                 int num, struct clk_onecell_data *clk_data);
->
->  struct mtk_composite {
-> --
-> 1.8.1.1.dirty
->
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
