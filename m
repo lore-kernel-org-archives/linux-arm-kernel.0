@@ -1,195 +1,141 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Fri, 24 Jul 2015 17:57:46 -0300
-Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
-In-Reply-To: <55B245D1.1020208@roeck-us.net>
-References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
- <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
- <55B15AF1.3030509@roeck-us.net> <55B243B3.7050702@vanguardiasur.com.ar>
- <55B245D1.1020208@roeck-us.net>
-Message-ID: <55B2A6CA.5090205@vanguardiasur.com.ar>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Fri, 24 Jul 2015 16:02:13 -0500
+Subject: [PATCH v2 1/1] misc: sram: add dev_pm_ops to support module power gate
+Message-ID: <1437771733-55446-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When system goes into low power states like SUSPEND_MEM and
+HIBERNATION, the hardware IP block may be powered off to reduce
+the power consumption. This power down will lost all the
+data inside the ram. This patch added the dev_pm_ops and
+implemented two callbacks: suspend_noirq and resume_noirq, which
+will save the data in the on-chip-ram right before power down
+and restore it after system resumes.
 
+A new property string named "can-power-gate" is added to
+the devicetree bindings too.
 
-El 24/07/15 a las 11:04, Guenter Roeck escibi?:
-> On 07/24/2015 06:54 AM, Ariel D'Alessandro wrote:
->>
->>
->> El 23/07/15 a las 18:21, Guenter Roeck escibi?:
->>> On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
->>>> Hi Guenter,
->>>>
->>>> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
->>>>> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
->>>>>> This commit adds support for the watchdog timer found in NXP LPC SoCs
->>>>>> family, which includes LPC18xx/LPC43xx. Other SoCs in that family may
->>>>>> share the same watchdog hardware.
->>>>>>
->>>>>> Watchdog driver registers a restart handler that will restart the
->>>>>> system
->>>>>> by performing an incorrect feed after ensuring the watchdog is
->>>>>> enabled in
->>>>>> reset mode.
->>>>>>
->>>>>> As watchdog cannot be disabled in hardware, driver's stop routine
->>>>>> will
->>>>>> regularly send a keepalive ping using a timer.
->>>>>>
->>>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>>>>
->>>>> Hi Ariel,
->>>>>
->>>>> sorry for the delayed response. Comments below.
->>>>>
->>>>> Guenter
->>>>>
->>>>>> ---
->>>>>>     drivers/watchdog/Kconfig       |  11 ++
->>>>>>     drivers/watchdog/Makefile      |   1 +
->>>>>>     drivers/watchdog/lpc18xx_wdt.c | 344
->>>>>> +++++++++++++++++++++++++++++++++++++++++
->>>>>>     3 files changed, 356 insertions(+)
->>>>>>     create mode 100644 drivers/watchdog/lpc18xx_wdt.c
->>>>>>
->>>>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
->>>>>> index 742fbbc..af5e2e3 100644
->>>>>> --- a/drivers/watchdog/Kconfig
->>>>>> +++ b/drivers/watchdog/Kconfig
->>>>>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
->>>>>>           To compile this driver as a module, choose M here: the
->>>>>>           module will be called digicolor_wdt.
->>>>>>
->>>>>> +config LPC18XX_WATCHDOG
->>>>>> +    tristate "LPC18xx/43xx Watchdog"
->>>>>> +    depends on ARCH_LPC18XX || COMPILE_TEST
->>>>>> +    select WATCHDOG_CORE
->>>>>> +    help
->>>>>> +      Say Y here if to include support for the watchdog timer
->>>>>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
->>>>>> +      processors.
->>>>>> +      To compile this driver as a module, choose M here: the
->>>>>> +      module will be called lpc18xx_wdt.
->>>>>> +
->>>>>>     # AVR32 Architecture
->>>>>>
->>>>>>     config AT32AP700X_WDT
->>>>>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
->>>>>> index 59ea9a1..1b0ef48 100644
->>>>>> --- a/drivers/watchdog/Makefile
->>>>>> +++ b/drivers/watchdog/Makefile
->>>>>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
->>>>>>     obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
->>>>>>     obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
->>>>>>     obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->>>>>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->>>>>>
->>>>>>     # AVR32 Architecture
->>>>>>     obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
->>>>>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
->>>>>> b/drivers/watchdog/lpc18xx_wdt.c
->>>>>> new file mode 100644
->>>>>> index 0000000..2b489fc
->>>>>> --- /dev/null
->>>>>> +++ b/drivers/watchdog/lpc18xx_wdt.c
->>>>>> @@ -0,0 +1,344 @@
->>>>>> +/*
->>>>>> + * NXP LPC18xx Watchdog Timer (WDT)
->>>>>> + *
->>>>>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
->>>>>> + *
->>>>>> + * This program is free software; you can redistribute it and/or
->>>>>> modify it
->>>>>> + * under the terms of the GNU General Public License version 2 as
->>>>>> published by
->>>>>> + * the Free Software Foundation.
->>>>>> + *
->>>>>> + * Notes
->>>>>> + * -----
->>>>>> + * The Watchdog consists of a fixed divide-by-4 clock pre-scaler and
->>>>>> a 24-bit
->>>>>> + * counter which decrements on every clock cycle.
->>>>>> + *
->>>>>> + */
->>>>>> +
->>>>>> +#include <linux/clk.h>
->>>>>> +#include <linux/io.h>
->>>>>> +#include <linux/module.h>
->>>>>> +#include <linux/of.h>
->>>>>> +#include <linux/platform_device.h>
->>>>>> +#include <linux/reboot.h>
->>>>>> +#include <linux/watchdog.h>
->>>>>> +
->>>>>> +/* Registers */
->>>>>> +#define LPC18XX_WDT_MOD            0x00
->>>>>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
->>>>>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
->>>>>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
->>>>>
->>>>> Not used.
->>>>
->>>> That's right. I'll remove it.
->>>>
->>>>>
->>>>>> +
->>>>>> +#define LPC18XX_WDT_TC            0x04
->>>>>> +#define LPC18XX_WDT_TC_MIN        0xff
->>>>>> +#define LPC18XX_WDT_TC_MAX        0xffffff
->>>>>> +
->>>>>> +#define LPC18XX_WDT_FEED        0x08
->>>>>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
->>>>>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
->>>>>> +
->>>>>> +#define LPC18XX_WDT_TV            0x0c
->>>>>> +
->>>>>> +/* Clock pre-scaler */
->>>>>> +#define LPC18XX_WDT_CLK_DIV        4
->>>>>> +
->>>>>> +/* Timeout values in seconds */
->>>>>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
->>>>>> +
->>>>>
->>>>> This is (still) really low for Linux. Something like min(30,
->>>>> max_timeout)
->>>>> might make more sense.
->>>>
->>>> Remember that hardware limits timeout to a maximum value of 5.
->>>>
->>>> As you said before we could use a soft timer, but I not sure that's a
->>>> good idea. As Ezequiel said [0], it might be adding bloat and we must
->>>> consider that this watchdog controller is included in cortex-M MCUs.
->>>>
->>>> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
->>>>
->>>
->>> Further down you have
->>>      lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
->>>                            LPC18XX_WDT_CLK_DIV) / clk_rate;
->>>
->>> which seems to contradict this statement. If the maximum timeout is 5
->>> seconds,
->>> why don't you set max_timeout to a fixed value of 5 seconds ?
->>
->> Well, I think that's the less hardcoded way. It might allow the driver
->> to be extended to another HW variant that configures the wdt clk rate.
->>
->> I see what's your point. As you proposed, using the same criterion I
->> should do this:
->>
->> #define LPC18XX_WDT_DEF_TIMEOUT         (unsigned int)30
->>
->> and further down, in probe function:
->>
->> lpc18xx_wdt->wdt_dev.timeout = min(LPC18XX_WDT_DEF_TIMEOUT,
->>                    lpc18xx_wdt->wdt_dev.max_timeout);
->>
->> Is this close enough to your solution?
->>
-> Yes, but why the typecast for LPC18XX_WDT_DEF_TIMEOUT ?
-> 
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+Signed-off-by: Anson Huang <b20788@freescale.com>
+---
+Change log:
+	v2 Use vmalloc to allocate the SRAM backup memory.
+	Code clean up.
 
-Otherwise the compiler will warn about a comparison of distinct pointer
-types in expansion of the macro 'min'.
+ Documentation/devicetree/bindings/misc/sram.txt |  2 ++
+ drivers/misc/sram.c                             | 46 +++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
-Should it be casted when using it better than in definition?
+diff --git a/Documentation/devicetree/bindings/misc/sram.txt b/Documentation/devicetree/bindings/misc/sram.txt
+index 36cbe5a..1170086 100644
+--- a/Documentation/devicetree/bindings/misc/sram.txt
++++ b/Documentation/devicetree/bindings/misc/sram.txt
+@@ -33,6 +33,8 @@ Optional properties in the area nodes:
+
+ - compatible : standard definition, should contain a vendor specific string
+                in the form <vendor>,[<device>-]<usage>
++- can-power-gate: a property to tell the driver that the sram can support
++		power gate
+
+ Example:
+
+diff --git a/drivers/misc/sram.c b/drivers/misc/sram.c
+index 15c33cc..63ba01d 100644
+--- a/drivers/misc/sram.c
++++ b/drivers/misc/sram.c
+@@ -30,7 +30,9 @@
+
+ struct sram_dev {
+ 	struct device *dev;
++	void *power_off_save;
+ 	void __iomem *virt_base;
++	u32 size;
+
+ 	struct gen_pool *pool;
+ 	struct clk *clk;
+@@ -156,6 +158,37 @@ static int sram_reserve_regions(struct sram_dev *sram, struct resource *res)
+ 	return ret;
+ }
+
++static int sram_suspend_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct sram_dev *sram = platform_get_drvdata(pdev);
++
++	if (!sram->power_off_save)
++		return 0;
++
++	/* Save necessary regs */
++	clk_enable(sram->clk);
++	memcpy(sram->power_off_save, sram->virt_base, sram->size);
++	clk_disable(sram->clk);
++
++	return 0;
++}
++
++static int sram_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct sram_dev *sram = platform_get_drvdata(pdev);
++
++	if (!sram->power_off_save)
++		return 0;
++
++	clk_enable(sram->clk);
++	memcpy(sram->virt_base, sram->power_off_save, sram->size);
++	clk_disable(sram->clk);
++
++	return 0;
++}
++
+ static int sram_probe(struct platform_device *pdev)
+ {
+ 	struct sram_dev *sram;
+@@ -176,6 +209,7 @@ static int sram_probe(struct platform_device *pdev)
+ 	}
+
+ 	size = resource_size(res);
++	sram->size = size;
+
+ 	if (!devm_request_mem_region(sram->dev, res->start, size, pdev->name)) {
+ 		dev_err(sram->dev, "could not request region for resource\n");
+@@ -203,6 +237,9 @@ static int sram_probe(struct platform_device *pdev)
+
+ 	platform_set_drvdata(pdev, sram);
+
++	if (of_property_read_bool(pdev->dev.of_node, "can-power-gate"))
++		sram->power_off_save = vmalloc(size);
++
+ 	dev_dbg(sram->dev, "SRAM pool: %zu KiB @ 0x%p\n",
+ 		gen_pool_size(sram->pool) / 1024, sram->virt_base);
+
+@@ -219,6 +256,9 @@ static int sram_remove(struct platform_device *pdev)
+ 	if (sram->clk)
+ 		clk_disable_unprepare(sram->clk);
+
++	if (sram->power_off_save)
++		vfree(sram->power_off_save);
++
+ 	return 0;
+ }
+
+@@ -229,10 +269,16 @@ static const struct of_device_id sram_dt_ids[] = {
+ };
+ #endif
+
++static const struct dev_pm_ops sram_pm_ops = {
++	.suspend_noirq = sram_suspend_noirq,
++	.resume_noirq = sram_resume_noirq,
++};
++
+ static struct platform_driver sram_driver = {
+ 	.driver = {
+ 		.name = "sram",
+ 		.of_match_table = of_match_ptr(sram_dt_ids),
++		.pm	= &sram_pm_ops,
+ 	},
+ 	.probe = sram_probe,
+ 	.remove = sram_remove,
+--
+2.5.0.rc2
