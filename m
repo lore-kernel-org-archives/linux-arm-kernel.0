@@ -1,69 +1,91 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 24 Jul 2015 15:16:22 +0200
-Subject: [PATCH v7 3/5] mtd: nand: vf610_nfc: add device tree bindings
-In-Reply-To: <1437743784-30163-1-git-send-email-stefan@agner.ch>
-References: <1437743784-30163-1-git-send-email-stefan@agner.ch>
-Message-ID: <1437743784-30163-4-git-send-email-stefan@agner.ch>
+Date: Fri, 24 Jul 2015 15:16:19 +0200
+Subject: [PATCH v7 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
+Message-ID: <1437743784-30163-1-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+This seventh revision simplifies the config symbols somewhat, but
+is otherwise just a rebase version on current l2-mtd/master.
 
-diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-new file mode 100644
-index 0000000..cae5f25
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-@@ -0,0 +1,45 @@
-+Freescale's NAND flash controller (NFC)
-+
-+This variant of the Freescale NAND flash controller (NFC) can be found on
-+Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
-+
-+Required properties:
-+- compatible: Should be set to "fsl,vf610-nfc"
-+- reg: address range of the NFC
-+- interrupts: interrupt of the NFC
-+- nand-bus-width: see nand.txt
-+- nand-ecc-mode: see nand.txt
-+- nand-on-flash-bbt: see nand.txt
-+- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
-+- assigned-clock-rates: The NAND bus timing is derived from this clock
-+    rate and should not exceed maximum timing for any NAND memory chip
-+    in a board stuffing. Typical NAND memory timings derived from this
-+    clock are found in the SoC hardware reference manual. Furthermore,
-+    there might be restrictions on maximum rates when using hardware ECC.
-+
-+- #address-cells, #size-cells : Must be present if the device has sub-nodes
-+  representing partitions.
-+
-+Required properties for hardware ECC:
-+- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
-+- nand-ecc-step-size: step size equals page size, currently only 2k pages are
-+    supported
-+
-+Example:
-+
-+	nfc: nand at 400e0000 {
-+		compatible = "fsl,vf610-nfc";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x400e0000 0x4000>;
-+		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&clks VF610_CLK_NFC>;
-+		clock-names = "nfc";
-+		assigned-clocks = <&clks VF610_CLK_NFC>;
-+		assigned-clock-rates = <33000000>;
-+		nand-bus-width = <8>;
-+		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <32>;
-+		nand-ecc-step-size = <2048>;
-+		nand-on-flash-bbt;
-+	};
+I reran the MTD tests, they still all succeed.
+
+Some more information and the full test log can be found in the
+cover letter of the last revision v6:
+http://thread.gmane.org/gmane.linux.kernel/1979868
+
+Changes since v6:
+- Rebased ontop of l2-mtd/master (v4.2-rc1 based)
+- Removed HAVE_NAND_VF610_NFC and use depends on. This made
+  "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
+
+Changes since v5:
+- Removed fsl,mpc5125-nfc compatible string
+- Removed readl/writel_relaxed
+- Change interface of vf610_nfc_transfer_size to match other accessors
+
+Changes since v4:
+- Rebased ontop of l2-mtd/master (v4.1-rc4 based)
+- Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
+  not support sub-page writes anyway (improves write performance)
+- Support ONFI by enabling READID command with offset and parameter page
+  reads (CMD_PARAM)
+- Change to dedicated read_page/write_page function, enables raw writes
+- Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
+- Eliminated vf610_nfc_probe_dt in favor of common DT init code
+- Use wait_for_completion_timeout
+- Some style fixes (spaces, etc.)
+
+Changes since v3:
+- Make the driver selectable when COMPILE_TEST is set
+- Fix compile error due to superfluous ECC_STATUS configuration in initial
+  patch (without ECC correction ECC_STATUS does not need to be configured)
+- Remove custom BBT pattern and switch to in-band BBT in the initial patch
+- Include two bug fixes, for details see the corresponding U-Boot patches:
+  http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
+
+Changes since v2:
+- Updated binding documentation
+
+Changes since v1:
+- Nest nfc_config struct within the main nfc struct
+- Use assigned clock binding to specify NFC clock
+- Rebased ontop of MSCM IR patchset (driver parts have been merged)
+- Split out arch Kconfig in a separate config
+- Fix module license
+- Updated MAINTAINERS
+
+Changes since RFC (Bill Pringlemeir):
+- Renamed driver from fsl_nfc to vf610_nfc
+- Use readl/writel for all register in accessor functions
+- Optimized field accessor functions
+- Implemented PM (suspend/resume) functions
+- Implemented basic support for ECC strength/ECC step size from dt
+- Improved performance of count_written_bits by using hweight32
+- Support ECC with 60-bytes to correct up to 32 bit errors
+- Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
+  which uses up to 60 bytes on 64 byte OOB
+- Removed custom (downstream) BBT pattern since BBT table won't be
+  compatible anyway (due to the change above)
+
+Stefan Agner (5):
+  mtd: nand: vf610_nfc: Freescale NFC for VF610, MPC5125 and others
+  mtd: nand: vf610_nfc: add hardware BCH-ECC support
+  mtd: nand: vf610_nfc: add device tree bindings
+  ARM: dts: vf610twr: add NAND flash controller peripherial
+  ARM: dts: vf-colibri: enable NAND flash controller
+
+ .../devicetree/bindings/mtd/vf610-nfc.txt          |  45 ++
+ MAINTAINERS                                        |   6 +
+ arch/arm/boot/dts/vf-colibri.dtsi                  |  32 +
+ arch/arm/boot/dts/vf610-twr.dts                    |  44 ++
+ arch/arm/boot/dts/vfxxx.dtsi                       |   8 +
+ drivers/mtd/nand/Kconfig                           |  11 +
+ drivers/mtd/nand/Makefile                          |   1 +
+ drivers/mtd/nand/vf610_nfc.c                       | 839 +++++++++++++++++++++
+ 8 files changed, 986 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+ create mode 100644 drivers/mtd/nand/vf610_nfc.c
+
 -- 
 2.4.5
