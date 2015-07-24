@@ -1,55 +1,119 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 24 Jul 2015 17:46:21 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <20150724151559.GA12324@kroah.com>
-References: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
- <20150723220550.GA15032@kroah.com>
- <20150724095605.GI10670@e103592.cambridge.arm.com>
- <20150724151559.GA12324@kroah.com>
-Message-ID: <20150724164619.GK10670@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 24 Jul 2015 17:53:25 +0100
+Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <1437715466.23932.68.camel@mhfsdcap03>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+ <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
+ <20150721171101.GN31095@arm.com>
+ <1437715466.23932.68.camel@mhfsdcap03>
+Message-ID: <20150724165325.GC21177@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 08:15:59AM -0700, Greg Kroah-Hartman wrote:
-> On Fri, Jul 24, 2015 at 10:56:06AM +0100, Dave Martin wrote:
-> > On Thu, Jul 23, 2015 at 03:05:50PM -0700, Greg Kroah-Hartman wrote:
-> > > On Thu, Jul 09, 2015 at 11:57:12AM +0100, Dave Martin wrote:
-> > > > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-> > > > sufficient to inhibit pl011_int() from being triggered by a local
-> > > > IRQ and trying to re-take the same lock.  This can lead to
-> > > > deadlocks.
-> > > > 
-> > > > This patch uses the _irq() locking variants instead to ensure that
-> > > > pl011_int() handling for a given port is deferred until any
-> > > > pl011_tx_softirq() work for that port is complete.
-> > > > 
-> > > > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > > > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > > > Cc: stable <stable@vger.kernel.org> # 4.1
-> > > > ---
-> > > >  drivers/tty/serial/amba-pl011.c |    4 ++--
-> > > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > > 
-> > > This doesn't apply at all to 4.2-rc3, so I can't apply it :(
-> > 
-> > This is applicable to 4.1 stable only, since the code this patch fixes
-> > was replaced in 4.2-rc1.
-> > 
-> > Apologies, I didn't make that clear in the text.
+On Fri, Jul 24, 2015 at 06:24:26AM +0100, Yong Wu wrote:
+> On Tue, 2015-07-21 at 18:11 +0100, Will Deacon wrote:
+> > On Thu, Jul 16, 2015 at 10:04:32AM +0100, Yong Wu wrote:
+> > > +/* level 2 pagetable */
+> > > +#define ARM_SHORT_PTE_TYPE_LARGE               BIT(0)
+> > > +#define ARM_SHORT_PTE_SMALL_XN                 BIT(0)
+> > > +#define ARM_SHORT_PTE_TYPE_SMALL               BIT(1)
+> > > +#define ARM_SHORT_PTE_B                                BIT(2)
+> > > +#define ARM_SHORT_PTE_C                                BIT(3)
+> > > +#define ARM_SHORT_PTE_SMALL_TEX0               BIT(6)
+> > > +#define ARM_SHORT_PTE_IMPLE                    BIT(9)
+> >
+> > This is AP[2] for small pages.
 > 
-> I can't do anything with a 4.1-only patch, please read
-> Documentation/stable_kernel_rules.txt for how to get a patch into the
-> stable kernel releases.
+> Sorry, In our pagetable bit9 in PGD and PTE is PA[32] that is for  the
+> dram size over 4G. I didn't care it is different in PTE of the standard
+> spec.
+> And I don't use the AP[2] currently, so I only delete this line in next
+> time.
 
-OK, reposted[1] with a clear reference to the equivalent upstream
-commit, and explanation of why this patch is different, which I'm
-guessing is what was missing.
+Is this related to the "special bit". What would be good is a comment
+next to the #define for the quirk describing *exactly* that differs in
+your implementation. Without that, it's very difficult to know what is
+intentional and what is actually broken.
 
-Is that sufficient?
+> > > +static arm_short_iopte
+> > > +__arm_short_pte_prot(struct arm_short_io_pgtable *data, int prot, bool large)
+> > > +{
+> > > +       arm_short_iopte pteprot;
+> > > +
+> > > +       pteprot = ARM_SHORT_PTE_S | ARM_SHORT_PTE_nG;
+> > > +       pteprot |= large ? ARM_SHORT_PTE_TYPE_LARGE :
+> > > +                               ARM_SHORT_PTE_TYPE_SMALL;
+> > > +       if (prot & IOMMU_CACHE)
+> > > +               pteprot |=  ARM_SHORT_PTE_B | ARM_SHORT_PTE_C;
+> > > +       if (prot & IOMMU_WRITE)
+> > > +               pteprot |= large ? ARM_SHORT_PTE_LARGE_TEX0 :
+> > > +                               ARM_SHORT_PTE_SMALL_TEX0;
+> >
+> > This doesn't make any sense. TEX[2:0] is all about memory attributes, not
+> > permissions, so you're making the mapping write-back, write-allocate but
+> > that's not what the IOMMU_* values are about.
+> 
+>      I will delete it.
 
-Cheers
----Dave
+Well, can you not control mapping permissions with the AP bits? The idea
+of the IOMMU flags are:
 
-[1] http://marc.info/?l=linux-serial&m=143775597205041&w=2
+  IOMMU_CACHE : Install a normal, cacheable mapping (you've got this right)
+  IOMMU_READ : Allow read access for the device
+  IOMMU_WRITE : Allow write access for the device
+  IOMMU_NOEXEC : Disallow execute access for the device
+
+so the caller to iommu_map passes in a bitmap of these, which you need to
+encode in the page-table entry.
+
+> > > +static int
+> > > +_arm_short_map(struct arm_short_io_pgtable *data,
+> > > +              unsigned int iova, phys_addr_t paddr,
+> > > +              arm_short_iopte pgdprot, arm_short_iopte pteprot,
+> > > +              bool large)
+> > > +{
+> > > +       const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
+> > > +       arm_short_iopte *pgd = data->pgd, *pte;
+> > > +       void *cookie = data->iop.cookie, *pte_va;
+> > > +       unsigned int ptenr = large ? 16 : 1;
+> > > +       int i, quirk = data->iop.cfg.quirks;
+> > > +       bool ptenew = false;
+> > > +
+> > > +       pgd += ARM_SHORT_PGD_IDX(iova);
+> > > +
+> > > +       if (!pteprot) { /* section or supersection */
+> > > +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK)
+> > > +                       pgdprot &= ~ARM_SHORT_PGD_SECTION_XN;
+> > > +               pte = pgd;
+> > > +               pteprot = pgdprot;
+> > > +       } else {        /* page or largepage */
+> > > +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
+> > > +                       if (large) { /* special Bit */
+> >
+> > This definitely needs a better comment! What exactly are you doing here
+> > and what is that quirk all about?
+> 
+> I use this quirk is for MTK Special Bit as we don't have the XN bit in
+> pagetable.
+
+I'm still not really clear about what this is.
+
+> > > +               if (!(*pgd)) {
+> > > +                       pte_va = kmem_cache_zalloc(data->ptekmem, GFP_ATOMIC);
+> > > +                       if (unlikely(!pte_va))
+> > > +                               return -ENOMEM;
+> > > +                       ptenew = true;
+> > > +                       *pgd = virt_to_phys(pte_va) | pgdprot;
+> > > +                       kmemleak_ignore(pte_va);
+> > > +                       tlb->flush_pgtable(pgd, sizeof(*pgd), cookie);
+> >
+> > I think you need to flush this before it becomes visible to the walker.
+> 
+> I have flushed pgtable here, Do you meaning flush tlb here?
+
+No. afaict, you allocate the pte table using kmem_cache_zalloc but you never
+flush it. However, you update the pgd to point at this table, so the walker
+can potentially see garbage instead of the zeroed entries.
+
+Will
