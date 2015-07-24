@@ -1,84 +1,114 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jul 2015 11:42:05 +0100
-Subject: [PATCH v2 14/20] arm64: cmpxchg: avoid "cc" clobber in ll/sc routines
+Date: Fri, 24 Jul 2015 11:42:02 +0100
+Subject: [PATCH v2 11/20] arm64: xchg: patch in lse instructions when
+ supported by the CPU
 In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
 References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1437734531-10698-15-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-12-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can perform the cmpxchg comparison using eor and cbnz which avoids
-the "cc" clobber for the ll/sc case and consequently for the LSE case
-where we may have to fall-back on the ll/sc code at runtime.
+On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+it makes sense to use them in preference to ll/sc sequences.
+
+This patch introduces runtime patching of our xchg primitives so that
+the LSE swp instruction (yes, you read right!) is used instead.
 
 Reviewed-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 14 ++++++--------
- arch/arm64/include/asm/atomic_lse.h   |  4 ++--
- 2 files changed, 8 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/cmpxchg.h | 38 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 33 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index 77d3aabf52ad..d21091bae901 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -96,14 +96,13 @@ __LL_SC_PREFIX(atomic_cmpxchg(atomic_t *ptr, int old, int new))
+diff --git a/arch/arm64/include/asm/cmpxchg.h b/arch/arm64/include/asm/cmpxchg.h
+index d8c25b7b18fb..d0cce8068902 100644
+--- a/arch/arm64/include/asm/cmpxchg.h
++++ b/arch/arm64/include/asm/cmpxchg.h
+@@ -22,6 +22,7 @@
+ #include <linux/mmdebug.h>
  
- 	asm volatile("// atomic_cmpxchg\n"
- "1:	ldxr	%w1, %2\n"
--"	cmp	%w1, %w3\n"
--"	b.ne	2f\n"
-+"	eor	%w0, %w1, %w3\n"
-+"	cbnz	%w0, 2f\n"
- "	stxr	%w0, %w4, %2\n"
- "	cbnz	%w0, 1b\n"
- "2:"
- 	: "=&r" (tmp), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
-+	: "Lr" (old), "r" (new));
+ #include <asm/barrier.h>
++#include <asm/lse.h>
  
- 	smp_mb();
- 	return oldval;
-@@ -169,14 +168,13 @@ __LL_SC_PREFIX(atomic64_cmpxchg(atomic64_t *ptr, long old, long new))
+ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size)
+ {
+@@ -29,37 +30,65 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
  
- 	asm volatile("// atomic64_cmpxchg\n"
- "1:	ldxr	%1, %2\n"
--"	cmp	%1, %3\n"
--"	b.ne	2f\n"
-+"	eor	%0, %1, %3\n"
-+"	cbnz	%w0, 2f\n"
- "	stxr	%w0, %4, %2\n"
- "	cbnz	%w0, 1b\n"
- "2:"
- 	: "=&r" (res), "=&r" (oldval), "+Q" (ptr->counter)
--	: "Ir" (old), "r" (new)
--	: "cc");
-+	: "Lr" (old), "r" (new));
+ 	switch (size) {
+ 	case 1:
+-		asm volatile("//	__xchg1\n"
++		asm volatile(ARM64_LSE_ATOMIC_INSN(
++		/* LL/SC */
+ 		"1:	ldxrb	%w0, %2\n"
+ 		"	stlxrb	%w1, %w3, %2\n"
+ 		"	cbnz	%w1, 1b\n"
++		"	dmb	ish",
++		/* LSE atomics */
++		"	nop\n"
++		"	swpalb	%w3, %w0, %2\n"
++		"	nop\n"
++		"	nop")
+ 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u8 *)ptr)
+ 			: "r" (x)
+ 			: "memory");
+ 		break;
+ 	case 2:
+-		asm volatile("//	__xchg2\n"
++		asm volatile(ARM64_LSE_ATOMIC_INSN(
++		/* LL/SC */
+ 		"1:	ldxrh	%w0, %2\n"
+ 		"	stlxrh	%w1, %w3, %2\n"
+ 		"	cbnz	%w1, 1b\n"
++		"	dmb	ish",
++		/* LSE atomics */
++		"	nop\n"
++		"	swpalh	%w3, %w0, %2\n"
++		"	nop\n"
++		"	nop")
+ 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u16 *)ptr)
+ 			: "r" (x)
+ 			: "memory");
+ 		break;
+ 	case 4:
+-		asm volatile("//	__xchg4\n"
++		asm volatile(ARM64_LSE_ATOMIC_INSN(
++		/* LL/SC */
+ 		"1:	ldxr	%w0, %2\n"
+ 		"	stlxr	%w1, %w3, %2\n"
+ 		"	cbnz	%w1, 1b\n"
++		"	dmb	ish",
++		/* LSE atomics */
++		"	nop\n"
++		"	swpal	%w3, %w0, %2\n"
++		"	nop\n"
++		"	nop")
+ 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u32 *)ptr)
+ 			: "r" (x)
+ 			: "memory");
+ 		break;
+ 	case 8:
+-		asm volatile("//	__xchg8\n"
++		asm volatile(ARM64_LSE_ATOMIC_INSN(
++		/* LL/SC */
+ 		"1:	ldxr	%0, %2\n"
+ 		"	stlxr	%w1, %3, %2\n"
+ 		"	cbnz	%w1, 1b\n"
++		"	dmb	ish",
++		/* LSE atomics */
++		"	nop\n"
++		"	swpal	%3, %0, %2\n"
++		"	nop\n"
++		"	nop")
+ 			: "=&r" (ret), "=&r" (tmp), "+Q" (*(u64 *)ptr)
+ 			: "r" (x)
+ 			: "memory");
+@@ -68,7 +97,6 @@ static inline unsigned long __xchg(unsigned long x, volatile void *ptr, int size
+ 		BUILD_BUG();
+ 	}
  
- 	smp_mb();
- 	return oldval;
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index db41a63691cd..a03242e143e5 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -113,7 +113,7 @@ static inline int atomic_cmpxchg(atomic_t *ptr, int old, int new)
- 	"	mov	%w[ret], w30")
- 	: [ret] "+r" (x0), [v] "+Q" (ptr->counter)
- 	: [old] "r" (w1), [new] "r" (w2)
--	: "x30", "cc", "memory");
-+	: "x30", "memory");
- 
- 	return x0;
+-	smp_mb();
+ 	return ret;
  }
-@@ -207,7 +207,7 @@ static inline long atomic64_cmpxchg(atomic64_t *ptr, long old, long new)
- 	"	mov	%[ret], x30")
- 	: [ret] "+r" (x0), [v] "+Q" (ptr->counter)
- 	: [old] "r" (x1), [new] "r" (x2)
--	: "x30", "cc", "memory");
-+	: "x30", "memory");
  
- 	return x0;
- }
 -- 
 2.1.4
