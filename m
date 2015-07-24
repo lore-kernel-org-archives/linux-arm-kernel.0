@@ -1,42 +1,94 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 24 Jul 2015 02:16:06 +0200
-Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
- Kconfig
-In-Reply-To: <20150723123553.GE7576@n2100.arm.linux.org.uk>
-References: <1437612483-30160-1-git-send-email-sre@kernel.org>
- <1437612483-30160-4-git-send-email-sre@kernel.org>
- <20150723123553.GE7576@n2100.arm.linux.org.uk>
-Message-ID: <20150724001605.GA1453@earth>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 23 Jul 2015 17:30:05 -0700
+Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+In-Reply-To: <093101d0b8c3$4b5d3ec0$e217bc40$@kernel.org>
+References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
+ <4464631.oZyVO4Z0Ov@amdc1976> <093101d0b8c3$4b5d3ec0$e217bc40$@kernel.org>
+Message-ID: <20150724003005.642.21781@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
-
-On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel wrote:
-> > Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
-> > in one option less to think about when configuring the kernel.
+Quoting Kukjin Kim (2015-07-07 07:43:31)
+> Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> >
+> Hi,
 > 
-> > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
-> > +#ifdef CONFIG_ARM_ERRATA_430973
-> >  	teq	r3, #0x00100000			@ only present in r1p*
-> >  	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
-> >  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+> > On Thursday, July 02, 2015 09:42:38 AM Chanwoo Choi wrote:
+> > > This patchset use cpufreq-dt driver to support Exynos3250 cpufreq and tested it
+> > > on Exynos3250-based Rinato board.
+> > >
+> > > Depends on:
+> > > - next-20150701 tag (master branch) of linux-next kernel tree
+> > > - This patch-set is based on Exynos5250 patch-set[1] because two patch-set
+> > >   modify the 'arch/arm/mach-exynos/exynos.c' to add the compatible string.
+> > >   [1] https://lkml.org/lkml/2015/6/29/361
+> > >   : [PATCH v2 0/4] cpufreq: use generic cpufreq drivers for Exynos5250 platform
+> > >
+> > > Changes from v5:
+> > > (https://lkml.org/lkml/2015/7/1/324)
+> > > - Reorder the cpu dt node in exynos3250-rinato/monk.dts alpabetically.
+> > > - Add reviewed-by tag of Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > >
+> > > Changes from v4:
+> > > (https://lkml.org/lkml/2014/10/20/215)
+> > > - Rebased on latest linux-next git repository.
+> > > - Remove unnecessary divider clock flag from divider of DIV_CPU0/DIV_CPU1 register
+> > >
+> > > Changes from v3:
+> > > - This patchset is based on 3.18-rc1 with new patchset[3] of Thomas Abraham
+> > >   [3] [PATCH v11 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+> > >   - http://www.spinics.net/lists/arm-kernel/msg370412.html
+> > >
+> > > Changes from v2:
+> > > - Rebased on new patchset of Thomas Abraham
+> > >   and for-next branch of samsunc-clk.git of Tomasz Figa
+> > >
+> > > Changes from v1:
+> > > - Rebased on new patchset[1] by Thomas Abraham
+> > >   [1] [PATCH v10 0/6] cpufreq: use generic cpufreq drivers for exynos platforms
+> > >   - http://www.spinics.net/lists/arm-kernel/msg364790.html
+> > > - Modify clk-cpu.c to support Exynos3250
+> > > - Drop documentation patch on previous patchset[2]
+> > >   [2] http://www.spinics.net/lists/cpufreq/msg10265.html
+> > > - Add only operating-points for Exynos3250 without armclk-divider-table
+> > >
+> > > Chanwoo Choi (3):
+> > >   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
+> > >   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+> > >   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
+> > >
+> > >  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+> > >  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+> > >  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+> > >  arch/arm/mach-exynos/exynos.c           |  1 +
+> > >  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
+> > >  include/dt-bindings/clock/exynos3250.h  |  1 +
+> > >  6 files changed, 55 insertions(+), 2 deletions(-)
+> > 
+> > Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> > 
+> > Thank you for working on this.
+> > 
+> +1 Thanks.
 > 
-> NAK.  Please read the mailing list history, I'm not repeating myself
-> again on this.  Thanks.
+> Mike and Sylwester, if you're OK on this series, I'd like to pick up in Samsung
+> tree together. And if you want, I could provide topic branch for clk tree.
 
-It's a bit hard to search the mailing list history without a bit
-more information.
+Kukjin,
 
-I guess you prefer to just add the !ARCH_MULTIPLATFORM dependency to
-the Kconfig entry without removing the additional check in the code?
+A topic branch would be great.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/98dc4c4b/attachment.sig>
+Thanks,
+Mike
+
+> 
+> Thanks,
+> Kukjin
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
