@@ -1,85 +1,101 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Jul 2015 10:56:18 +0100
-Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
-In-Reply-To: <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
-References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
- <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
- <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
-Message-ID: <20150724095618.GB23074@leverpostej>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 24 Jul 2015 18:00:56 +0800
+Subject: [PATCH v2 5/7] acpi: gsi: Add acpi_set_irq_model to initialize
+ the GSI layer
+In-Reply-To: <1437656713-9677-6-git-send-email-marc.zyngier@arm.com>
+References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+ <1437656713-9677-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55B20CD8.60309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 04:56:59AM +0100, yalin wang wrote:
-> 
-> > On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > 
-> > On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
-> >> A little change to patch_map() function,
-> >> use set_fixmap_offset() to make code more clear.
-> >> 
-> >> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-> >> ---
-> >> arch/arm64/kernel/insn.c | 5 ++---
-> >> 1 file changed, 2 insertions(+), 3 deletions(-)
-> >> 
-> >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> >> index dd9671c..7dafd5a 100644
-> >> --- a/arch/arm64/kernel/insn.c
-> >> +++ b/arch/arm64/kernel/insn.c
-> >> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
-> >> 		return addr;
-> >> 
-> >> 	BUG_ON(!page);
-> >> -	set_fixmap(fixmap, page_to_phys(page));
-> >> -
-> >> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> >> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-> >> +			(addr & ~PAGE_MASK));
-> > 
-> > It looks fine. Do you get any compiler warning for the automatic pointer
-> > to long conversion? You may want to add some explicit casts, otherwise:
-> > 
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> i have build it, there is no warning about this change. :)
+On 07/23/2015 09:05 PM, Marc Zyngier wrote:
+> In order to start embrassing irqdomains at the GSI level, introduce
+> a new initializer:
+>
+> void acpi_set_irq_model(enum acpi_irq_model_id model,
+> 			unsigned long domain_token,
+> 			int (*populate)(struct acpi_gsi_descriptor *,
+> 					u32, unsigned int));
+>
+> where:
+> - model is the value assigned to acpi_irq_model
+> - domain_token is the identifier for the irqdomain mapping
+>    GSI interrupts
+> - populate is a function provided by the interrupt controller,
+>    populating a struct acpi_gsi_descriptor based on a GSI and
+>    the interrupt trigger information
+>
+> As nobody calls this code yet, the current code is left in place.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   drivers/acpi/gsi.c   | 32 ++++++++++++++++++++++++++++++++
+>   include/linux/acpi.h |  5 +++++
+>   2 files changed, 37 insertions(+)
+>
+> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
+> index a745880..e6f4a0c 100644
+> --- a/drivers/acpi/gsi.c
+> +++ b/drivers/acpi/gsi.c
+> @@ -16,6 +16,9 @@ enum acpi_irq_model_id acpi_irq_model;
+>
+>   static void *acpi_gsi_domain_token;
+>
+> +static int (*acpi_gsi_descriptor_populate)(struct acpi_gsi_descriptor *data,
+> +					   u32 gsi, unsigned int irq_type);
+> +
+>   static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
+>   {
+>   	switch (polarity) {
+> @@ -71,10 +74,20 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
+>   int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
+>   		      int polarity)
+>   {
+> +	int err;
+>   	unsigned int irq;
+>   	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
+>   	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
+>
+> +	if (acpi_gsi_descriptor_populate) {
+> +		struct acpi_gsi_descriptor data;
+> +		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
+> +		if (err)
+> +			return err;
+> +
+> +		return irq_create_acpi_mapping(d, &data);
+> +	}
+> +
+>   	irq = irq_create_mapping(d, gsi);
+>   	if (!irq)
+>   		return -EINVAL;
+> @@ -99,3 +112,22 @@ void acpi_unregister_gsi(u32 gsi)
+>   	irq_dispose_mapping(irq);
+>   }
+>   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
+> +
+> +/**
+> + * acpi_set_irq_model - Setup the GSI irqdomain information
+> + * @model: the value assigned to acpi_irq_model
+> + * @domain_token: the irq_domain identifier for mapping and looking up
+> + *                GSI interrupts
+> + * @populate: provided by the interrupt controller, populating a
+> + *            struct acpi_gsi_descriptor based on a GSI and
+> + *            the interrupt trigger information
+> + */
+> +void acpi_set_irq_model(enum acpi_irq_model_id model,
+> +			unsigned long domain_token,
+> +			int (*populate)(struct acpi_gsi_descriptor *,
+> +					u32, unsigned int))
+> +{
+> +	acpi_irq_model = model;
+> +	acpi_gsi_domain_token = (void *)domain_token;
 
-I see no warnings with defconfig, but there's an (unrelated) set of warnings if
-CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA are enabled:
+This will work perfectly fine with ARM as it has single GICD and
+one irq domain, I'm not sure x86 is ok with it because x86 has
+multi ioapics and each ioapic has a irqdomain if I understand
+correctly, but x86 don't use functions in this file at all for now,
+I think I'm over worried :)
 
-----
-In file included from ./arch/arm64/include/asm/fixmap.h:85:0,
-                 from arch/arm64/kernel/insn.c:32:
-arch/arm64/kernel/insn.c: In function ?__aarch64_insn_write?:
-include/asm-generic/fixmap.h:73:2: warning: ?addr? may be used uninitialized in this function [-Wmaybe-uninitialized]
-  __set_fixmap(idx, phys, flags);         \
-  ^
-include/asm-generic/fixmap.h:72:16: note: ?addr? was declared here
-  unsigned long addr;          \
-                ^
-include/asm-generic/fixmap.h:79:2: note: in expansion of macro ?__set_fixmap_offset?
-  __set_fixmap_offset(idx, phys, FIXMAP_PAGE_NORMAL)
-  ^
-arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
-  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-                 ^
-----
-
-That seems to be due to the definition of __set_fixmap_offset in
-asm-generic/fixmap.h:
-
-/* Return a pointer with offset calculated */
-#define __set_fixmap_offset(idx, phys, flags)		      \
-({							      \
-	unsigned long addr;				      \
-	__set_fixmap(idx, phys, flags);			      \
-	addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
-	addr;						      \
-})
-
-Where that new addr variable shadows patch_map's addr argument when the call to
-__set_fixmap is expanded.
-
-Which means that this patch currently breaks CONFIG_DEBUG_SET_MODULE_RONX and
-CONFIG_DEBUG_RODATA.
-
-Thanks,
-Mark.
+Thanks
+Hanjun
