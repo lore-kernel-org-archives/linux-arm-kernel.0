@@ -1,26 +1,33 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 24 Jul 2015 15:43:58 +0100
-Subject: [PATCH v2 08/20] arm64: atomics: patch in lse instructions when
- supported by the CPU
-In-Reply-To: <1437734531-10698-9-git-send-email-will.deacon@arm.com>
-References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
- <1437734531-10698-9-git-send-email-will.deacon@arm.com>
-Message-ID: <20150724144358.GI3550@e104818-lin.cambridge.arm.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 24 Jul 2015 07:50:27 -0700
+Subject: [RFC 1/3] docs: dts: Added documentation for Xilinx Zynq PL
+ Reset bindings.
+In-Reply-To: <55B1C1CB.2050402@xilinx.com>
+References: <1437691862-21312-1-git-send-email-moritz.fischer@ettus.com>
+ <1437691862-21312-2-git-send-email-moritz.fischer@ettus.com>
+ <55B1C1CB.2050402@xilinx.com>
+Message-ID: <20150724145027.GY2531@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 11:41:59AM +0100, Will Deacon wrote:
-> On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
-> it makes sense to use them in preference to ll/sc sequences.
+On Fri, 2015-07-24 at 06:40AM +0200, Michal Simek wrote:
+> On 07/24/2015 12:51 AM, Moritz Fischer wrote:
+> > Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> > ---
+> >  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> > new file mode 100644
+> > index 0000000..ac4499e
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> > @@ -0,0 +1,13 @@
+> > +Xilinx Zynq PL Reset Manager
 > 
-> This patch introduces runtime patching of atomic_t and atomic64_t
-> routines so that the call-site for the out-of-line ll/sc sequences is
-> patched with an LSE atomic instruction when we detect that
-> the CPU supports it.
-> 
-> If binutils is not recent enough to assemble the LSE instructions, then
-> the ll/sc sequences are inlined as though CONFIG_ARM64_LSE_ATOMICS=n.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> I think there is no reason to be just PL specific.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+That was my first thought too. Why not model all the resets in the SLCR?
+
+	S?ren
