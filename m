@@ -1,24 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 24 Jul 2015 18:34:46 +0100
-Subject: [PATCH v3 2/4] dt-bindings: ARM: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1437642643-11966-3-git-send-email-leilk.liu@mediatek.com>
-References: <1437642643-11966-1-git-send-email-leilk.liu@mediatek.com>
- <1437642643-11966-3-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <20150724173446.GS11162@sirena.org.uk>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Jul 2015 19:42:28 +0200
+Subject: [PATCH 04/10] OPP: Break _opp_add_dynamic() into smaller functions
+In-Reply-To: <15b69640a8672d983f2233e16e52ca275d36c816.1434369079.git.viresh.kumar@linaro.org>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <15b69640a8672d983f2233e16e52ca275d36c816.1434369079.git.viresh.kumar@linaro.org>
+Message-ID: <1576308.d9Ji59vHD1@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 05:10:41PM +0800, Leilk Liu wrote:
-> Change-Id: I6cadbf2e51d2cc4eacd518a24d5a9a1da93d4db5
-> Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 
-Please don't include noise like Change-Id in upstream commits and please
-use subject lines reflecting the style for the subsystem.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150724/d67c4267/attachment.sig>
+Hi,
+
+On Monday, June 15, 2015 05:27:30 PM Viresh Kumar wrote:
+> Later commits would add support for new OPP bindings and this would be
+> required then. So, lets do it in a separate patch to make it easily
+> reviewable.
+> 
+> Another change worth noticing is INIT_LIST_HEAD(&opp->node). We weren't
+> doing it earlier as we never tried to delete a list node before it is
+> added to list. But this wouldn't be the case anymore. We might try to
+> delete a node (just to reuse the same code paths), without it being
+> getting added to the list.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
