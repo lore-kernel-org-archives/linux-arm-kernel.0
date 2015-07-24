@@ -1,42 +1,66 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Fri, 24 Jul 2015 18:34:12 +0800
-Subject: [PATCH v12 4/6] arm/dts/ls1021a: Add DCU dts node
-In-Reply-To: <1437734054-36163-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1437734054-36163-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1437734054-36163-5-git-send-email-jianwei.wang.chn@gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Fri, 24 Jul 2015 13:04:58 +0200
+Subject: [GIT PULL] Non-critical fixes for v4.3
+In-Reply-To: <1437719695-22340-1-git-send-email-k.kozlowski@samsung.com>
+References: <1437719695-22340-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <359442387.iGIak59Qte@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DCU node, DCU is a display controller of Freescale
-named 2D-ACE.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index c70bb27..6d6e3e2 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -383,6 +383,16 @@
- 				 <&platform_clk 1>;
- 		};
- 
-+		dcu: dcu at 2ce0000 {
-+			compatible = "fsl,ls1021a-dcu";
-+			reg = <0x0 0x2ce0000 0x0 0x10000>;
-+			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 0>;
-+			clock-names = "dcu";
-+			big-endian;
-+			status = "disabled";
-+		};
-+
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
--- 
-2.1.0.27.g96db324
+On Friday, July 24, 2015 03:34:55 PM Krzysztof Kozlowski wrote:
+> Dear Kukjin,
+> 
+> Previously you did not picked up the fix for cpufreq memory leak.
+> I am sending it again with respective acks from LKML. Also another
+> minor improvement in the set.
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 1c4c7159ed2468f3ac4ce5a7f08d79663d381a93:
+> 
+>   Merge tag 'ext4_for_linus_stable' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2015-07-05 16:24:54 -0700)
+> 
+> are available in the git repository at:
+> 
+> 
+>   https://github.com/krzk/linux.git tags/samsung-fixes-non-critical-v4.3-2
+> 
+> for you to fetch changes up to 434213f727c12fab8657c8db3d23da4b0463365d:
+> 
+>   video: fbdev: s3c-fb: Constify platform_device_id (2015-07-24 15:17:32 +0900)
+> 
+> ----------------------------------------------------------------
+> Improvements for Exynos boards:
+> 1. Fix memory leak in cpufreq error path.
+> 2. Constify platform_device_id in video/fbdev/s3c-fb.
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (1):
+>       video: fbdev: s3c-fb: Constify platform_device_id
+> 
+> Shailendra Verma (1):
+>       cpufreq: exynos: Fix for memory leak in case SOC name does not match
+
+I would suggest merging this fix in v4.2 not v4.3:
+
+- it is obvious and touches only error paths
+
+- (hopefully) in v4.3 the exynos-cpufreq driver will be completely
+  replaced by using cpufreq-dt for Exynos platforms (thus there will be
+  no benefits of having this fix in v4.3 but there will be potential
+  risk of merge conflicts due to exynos-cpufreq driver removal)
+
+>  drivers/cpufreq/exynos-cpufreq.c | 6 ++++--
+>  drivers/video/fbdev/s3c-fb.c     | 2 +-
+>  2 files changed, 5 insertions(+), 3 deletions(-)
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
