@@ -1,51 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 24 Jul 2015 11:42:10 +0100
-Subject: [PATCH v2 19/20] arm64: atomic64_dec_if_positive: fix incorrect
- branch condition
+Date: Fri, 24 Jul 2015 11:41:56 +0100
+Subject: [PATCH v2 05/20] arm64: elf: advertise 8.1 atomic instructions as new
+ hwcap
 In-Reply-To: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
 References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1437734531-10698-20-git-send-email-will.deacon@arm.com>
+Message-ID: <1437734531-10698-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we attempt to atomic64_dec_if_positive on INT_MIN, we will underflow
-and incorrectly decide that the original parameter was positive.
-
-This patches fixes the broken condition code so that we handle this
-corner case correctly.
+The ARM v8.1 architecture introduces new atomic instructions to the A64
+instruction set for things like cmpxchg, so advertise their availability
+to userspace using a hwcap.
 
 Reviewed-by: Steve Capper <steve.capper@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
- arch/arm64/include/asm/atomic_lse.h   | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm64/include/uapi/asm/hwcap.h |  1 +
+ arch/arm64/kernel/setup.c           | 14 ++++++++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index cbaedf9afb2f..1a9ae9197a9f 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -149,7 +149,7 @@ __LL_SC_PREFIX(atomic64_dec_if_positive(atomic64_t *v))
- "	prfm	pstl1strm, %2\n"
- "1:	ldxr	%0, %2\n"
- "	subs	%0, %0, #1\n"
--"	b.mi	2f\n"
-+"	b.lt	2f\n"
- "	stlxr	%w1, %0, %2\n"
- "	cbnz	%w1, 1b\n"
- "	dmb	ish\n"
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index b960a547723c..d4b6cb940ee1 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -185,7 +185,7 @@ static inline long atomic64_dec_if_positive(atomic64_t *v)
- 	/* LSE atomics */
- 	"1:	ldr	x30, %[v]\n"
- 	"	subs	%[ret], x30, #1\n"
--	"	b.mi	2f\n"
-+	"	b.lt	2f\n"
- 	"	casal	x30, %[ret], %[v]\n"
- 	"	sub	x30, x30, #1\n"
- 	"	sub	x30, x30, %[ret]\n"
+diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
+index 73cf0f54d57c..361c8a8ef55f 100644
+--- a/arch/arm64/include/uapi/asm/hwcap.h
++++ b/arch/arm64/include/uapi/asm/hwcap.h
+@@ -27,5 +27,6 @@
+ #define HWCAP_SHA1		(1 << 5)
+ #define HWCAP_SHA2		(1 << 6)
+ #define HWCAP_CRC32		(1 << 7)
++#define HWCAP_ATOMICS		(1 << 8)
+ 
+ #endif /* _UAPI__ASM_HWCAP_H */
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index f3067d4d4e35..c7fd2c946374 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -280,6 +280,19 @@ static void __init setup_processor(void)
+ 	if (block && !(block & 0x8))
+ 		elf_hwcap |= HWCAP_CRC32;
+ 
++	block = (features >> 20) & 0xf;
++	if (!(block & 0x8)) {
++		switch (block) {
++		default:
++		case 2:
++			elf_hwcap |= HWCAP_ATOMICS;
++		case 1:
++			/* RESERVED */
++		case 0:
++			break;
++		}
++	}
++
+ #ifdef CONFIG_COMPAT
+ 	/*
+ 	 * ID_ISAR5_EL1 carries similar information as above, but pertaining to
+@@ -456,6 +469,7 @@ static const char *hwcap_str[] = {
+ 	"sha1",
+ 	"sha2",
+ 	"crc32",
++	"atomics",
+ 	NULL
+ };
+ 
 -- 
 2.1.4
