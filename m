@@ -1,139 +1,99 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 24 Jul 2015 11:16:20 +0100
-Subject: [PATCH v6 2/2] mfd: atmel-flexcom: add a driver for Atmel
- Flexible Serial Communication Unit
-In-Reply-To: <55B1195F.4000104@atmel.com>
-References: <cover.1437558598.git.cyrille.pitchen@atmel.com>
- <7639e02fc2b16dc20b19fbe3bbbb986b0f3b9887.1437558598.git.cyrille.pitchen@atmel.com>
- <20150723073217.GT3061@x1> <20150723100101.7290242b@bbrezillon>
- <20150723091311.GX3061@x1> <20150723145007.099d01c2@bbrezillon>
- <55B1195F.4000104@atmel.com>
-Message-ID: <20150724101620.GE3436@x1>
+From: jianwei.wang.chn@gmail.com (Jianwei Wang)
+Date: Fri, 24 Jul 2015 18:12:12 +0800
+Subject: [PATCH v12 0/6] drm/layerscape: Add Freescale DCU DRM driver
+Message-ID: <1437732738-4960-1-git-send-email-jianwei.wang.chn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jul 2015, Cyrille Pitchen wrote:
+This patchset add support for Two Dimensional Animation and Compositing
+Engine (2D-ACE) on the Freescale LS102x SoCs.
 
-> Hi all,
-> 
-> Le 23/07/2015 14:50, Boris Brezillon a ?crit :
-> > On Thu, 23 Jul 2015 10:13:11 +0100
-> > Lee Jones <lee.jones@linaro.org> wrote:
-> > 
-> >> On Thu, 23 Jul 2015, Boris Brezillon wrote:
-> >>
-> >>> Hi Lee,
-> >>>
-> >>> On Thu, 23 Jul 2015 08:32:17 +0100
-> >>> Lee Jones <lee.jones@linaro.org> wrote:
-> >>>
-> >>>> On Wed, 22 Jul 2015, Cyrille Pitchen wrote:
-> >>>>> +	for_each_child_of_node(np, child) {
-> >>>>> +		const char *compatible;
-> >>>>> +		int cplen;
-> >>>>> +
-> >>>>> +		if (!of_device_is_available(child))
-> >>>>> +			continue;
-> >>>>> +
-> >>>>> +		compatible = of_get_property(child, "compatible", &cplen);
-> >>>>> +		if (!compatible || strlen(compatible) > cplen)
-> >>>>> +			continue;
-> >>>>> +
-> >>>>> +		if (strstr(compatible, "-usart")) {
-> >>>>> +			opmode = FLEX_MR_OPMODE_USART;
-> >>>>> +			break;
-> >>>>> +		}
-> >>>>> +
-> >>>>> +		if (strstr(compatible, "-spi")) {
-> >>>>> +			opmode = FLEX_MR_OPMODE_SPI;
-> >>>>> +			break;
-> >>>>> +		}
-> >>>>> +
-> >>>>> +		if (strstr(compatible, "-i2c")) {
-> >>>>> +			opmode = FLEX_MR_OPMODE_TWI;
-> >>>>> +			break;
-> >>>>> +		}
-> >>>>> +	}
-> >>>>
-> >>>> From what I understand Flexcom is a wrapper which can sit above any
-> >>>> number of SPI, I2C and/or UART devices.  Devices which you don't
-> >>>> really have any control over (source code wise).  So wouldn't it be
-> >>>> better to match on the details you do have control over i.e. the node
-> >>>> name, rather than the compatible string?
-> >>>>
-> >>>> I would personally match on of_find_node_by_name() to future-proof
-> >>>> your implementation.
-> >>>
-> >>> Actually, I think using compatible strings is more future-proof than
-> >>> using the node names, because nothing in the DT bindings doc enforce the
-> >>> node name, and usually what we use to attach a node to a specific
-> >>> driver is the compatible string (this one is specified in the bindings
-> >>> doc).
-> >>
-> >> I know what you're saying, but what if someone uses the Flexcom driver
-> >> to wrap a different type of SPI driver where (for instance) the
-> >> compatible string used is "<name>-<newtype>".  Then we'd have to keep
-> >> adding more lines here to accommodate.
-> >>
-> >> Whereas if we used the child node name which only pertains to _this_
-> >> driver, we would then have full control and know that (unless it
-> >> Flexcom is used for a completely different type of serial controller)
-> >> we wouldn't have to keep expanding the code to accommodate.
-> > 
-> > You're right about the complexity implied by the compat string
-> > maintenance, but I still think using node names to detect the mode is
-> > a bad idea.
-> > 
-> > Let's take another example making both solution unsuitable: what if
-> > the flexcom-v2 exposes 2 devices of the same type, they will both have
-> > the same name and the same compatible string, and we'll have no way to
-> > detect the appropriate mode. That's why I think none of our suggestion
-> > is future-proof.
-> > 
-> >>
-> >>> Regarding the implementation itself, I would match the child node with
-> >>> an of_device_id table rather than trying to find a specific substring
-> >>> in the compatible string, but I think that's only a matter of taste.
-> >>
-> >> You mean duplicate each of the supported device's compatible strings
-> >> in this driver, then fetch the attributed of_match_device()->data
-> >> value?
-> >>
-> > 
-> > Yes, and that's definitely not a good idea, but I think Cyrille has
-> > found a better approach (I'll let him explain).
-> 
-> Indeed, what about taking advantage of the "ranges" property?
-> 
-> For the Flexcom:
-> #address-cells = <2>;
-> #size-cells = <1>;
-> ranges = <1 0 0xf8034200 0x200    /* opmode 1: USART */
->           2 0 0xf8034400 0x200    /* opmode 2: SPI */
->           3 0 0xf8034600 0x200>;  /* opmode 3: I2C */
-> 
-> Then for the single available child (for instance the SPI controller):
-> reg = <2 0 0x200>;
-> 
-> So the Operating Mode to be set into the Flexcom Mode Register is read from
-> the very first u32 of the "reg" property of the child.
-> 
-> No need to introduce any new DT property and the mapping remains easy to
-> maintain to follow hardware upgrades.
+Changed in v12
 
-When we do things like this we normally do:
+-Add one patch for MAINTAINER entry for drm/layerscape
+Adviced by Daniel Vetter
+-Add #include <drm/drm_crtc_helper.h> in fsl_dcu_drm_drv.c
 
-    reg <base base_size>, <mode mode_size>;
-    reg-names "base", "mode";
+Changed in V11
+-set regmap_config.cache_type to REGCACHE_FLAT
+Advanced by Alexander Stein
 
-Then use:
+Changed in V10
+-adjust commit log, remove meaningless statement
+-cleanup code for it's format and style.
+-remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
+-remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
+-add vendor prefix for panel pandle
+-make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
+-introduce per-SoC capability structure to avoid check on the OF node's compatible string
+-Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
+-move DCU config sentence to the right place
+-move get resources functions to  ->probe()
+-move fsl,dcu.txt to video/ folder
+-add big-endian describe
+All advaced by Thierry Reding
 
-     platform_get_resource_byname()
+Changed in V9
 
-.... to fetch them.
+put node after calling of_drm_find_panel
+split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
+check regmap_write/regmap_read return return value
+remove useless ".owner    = THIS_MODULE,"
+All advanced by Mark Yao
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Changed in V8
+
+- Remove useless code
+#define DRIVER_NAME     "fsl-dcu-drm"
+MODULE_ALIAS("platform:fsl-dcu-drm");
+Adviced by Paul Bolle
+
+Changed in V7
+
+- Remove redundant functions and replace deprecated hooker
+Adviced by Daniel Vetter
+- Replace drm_platform_init with drm_dev_alloc/register
+Adviced by Daniel Vetter
+
+Changed in V6
+
+- Add NEC nl4827hc19_05b panel to panel-simple.c
+Adviced by Mark Yao
+- Add DRIVER_ATOMIC for driver_features
+Adviced by Mark Yao
+- check fsl_dev if it's NULL at PM suspend/resume
+Adviced by Mark Yao
+
+Changed in V5
+
+- Update commit message
+- Add layer registers initialization
+- Remove unused functions
+- Rename driver folder
+Adviced by Stefan Agner
+- Move pixel clock control functions to fsl_dcu_drm_drv.c
+- remove redundant enable the clock implicitly using regmap
+- Add maintainer message
+
+Changed in V4:
+
+-This version doesn't have functionality changed
+Just a minor adjustment.
+
+Changed in V3:
+
+- Test driver on Vybrid board and add compatible string
+- Remove unused functions
+- set default crtc for encoder
+- replace legacy functions with atomic help functions
+Adviced by Daniel Vetter
+- Set the unique name of the DRM device
+- Implement irq handle function for vblank interrupt
+
+Changed in v2:
+- Add atomic support
+Adviced by Daniel Vetter
+- Modify bindings file
+- Rename node for compatibility
+- Move platform related code out for compatibility
+Adviced by Stefan Agner
