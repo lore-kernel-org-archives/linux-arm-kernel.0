@@ -1,73 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jul 2015 16:55:06 +0100
-Subject: [PATCH v3 08/11] KVM: arm/arm64: vgic: Add vgic_{get,
- set}_phys_irq_active
-In-Reply-To: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
-References: <1437753309-17989-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1437753309-17989-9-git-send-email-marc.zyngier@arm.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Fri, 24 Jul 2015 18:11:47 +0200
+Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
+In-Reply-To: <871tfzif17.fsf@kamboji.qca.qualcomm.com>
+References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
+ <CACna6rzFYpwbzM+s-KzFQmTym4iLVn+Ap+DWgFmAZzhWKTQfJw@mail.gmail.com>
+ <871tfzif17.fsf@kamboji.qca.qualcomm.com>
+Message-ID: <CAGhQ9VyH4yvnU_kPAy3a7Z+80jNV8uNoTr=Nd=eV2D-iz9YVUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to control the active state of an interrupt, introduce
-a pair of accessors allowing the state to be set/queried.
+On 23 July 2015 at 08:06, Kalle Valo <kvalo@codeaurora.org> wrote:
+> Rafa? Mi?ecki <zajec5@gmail.com> writes:
+>
+>>> +       if (bus->host_pdev) {
+>>> +               struct device *dev = &bus->host_pdev->dev;
+>>> +
+>>> +               of_platform_populate(dev->of_node, of_default_bus_match_table,
+>>> +                                    NULL, dev);
+>>> +       }
+>>> +
+>>
+>> This caused a compile error when using bcma as module:
+>> ERROR: "of_default_bus_match_table" [drivers/bcma/bcma.ko] undefined!
 
-This only affects the logical state, and the HW state will only be
-applied at world-switch time.
+I encountered the same problem with my modular memory controller driver.
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/vgic.c    | 24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+>> There are two options I guess:
+>> 1) Export of_default_bus_match_table
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 68212a1..7306b4b 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -357,6 +357,8 @@ int kvm_vgic_vcpu_active_irq(struct kvm_vcpu *vcpu);
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 					   int virt_irq, int irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
-+bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map);
-+void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active);
- 
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 6422b0c..3f7b690 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1778,6 +1778,30 @@ static void vgic_free_phys_irq_map_rcu(struct rcu_head *rcu)
- }
- 
- /**
-+ * kvm_vgic_get_phys_irq_active - Return the active state of a mapped IRQ
-+ *
-+ * Return the logical active state of a mapped interrupt. This doesn't
-+ * necessarily reflects the current HW state.
-+ */
-+bool kvm_vgic_get_phys_irq_active(struct irq_phys_map *map)
-+{
-+	BUG_ON(!map);
-+	return map->active;
-+}
-+
-+/**
-+ * kvm_vgic_set_phys_irq_active - Set the active state of a mapped IRQ
-+ *
-+ * Set the logical active state of a mapped interrupt. This doesn't
-+ * immediately affects the HW state.
-+ */
-+void kvm_vgic_set_phys_irq_active(struct irq_phys_map *map, bool active)
-+{
-+	BUG_ON(!map);
-+	map->active = active;
-+}
-+
-+/**
-  * kvm_vgic_unmap_phys_irq - Remove a virtual to physical IRQ mapping
-  * @vcpu: The VCPU pointer
-  * @map: The pointer to a mapping obtained through kvm_vgic_map_phys_irq
--- 
-2.1.4
+See link below for Rob Herring's take on that.
+http://marc.info/?l=linaro-kernel&m=143766694414121&w=2
+
+
+regards,
+Joachim Eastwood
