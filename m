@@ -1,71 +1,56 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Fri, 24 Jul 2015 15:16:24 +0200
-Subject: [PATCH v7 5/5] ARM: dts: vf-colibri: enable NAND flash controller
-In-Reply-To: <1437743784-30163-1-git-send-email-stefan@agner.ch>
-References: <1437743784-30163-1-git-send-email-stefan@agner.ch>
-Message-ID: <1437743784-30163-6-git-send-email-stefan@agner.ch>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 24 Jul 2015 15:18:27 +0200
+Subject: [PATCH v4 1/2] dt-bindings: regulator: mt6311: Add document for
+ mt6311 regulator
+In-Reply-To: <1437742798.30329.100.camel@mtksdaap41>
+References: <1437715481-31528-1-git-send-email-henryc.chen@mediatek.com>
+ <1437715481-31528-2-git-send-email-henryc.chen@mediatek.com>
+ <CABxcv=kuUbDyzFR2bU7vcvvsqg_yQuqBn5S20=uaH9iBCL_xBQ@mail.gmail.com>
+ <1437742798.30329.100.camel@mtksdaap41>
+Message-ID: <CABxcv=niSnKNL7+pdqQ_BaK6rdK5Myangq04ASr+SREoSCHEAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable NAND access by adding pinmux and NAND flash controller node
-to device tree. The NAND chips currently used on the Colibri VF61
-requires 8-bit ECC per 512 byte page, hence specify 32-bit ECC
-strength per 2k page size.
+Hello Henry,
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/vf-colibri.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+On Fri, Jul 24, 2015 at 2:59 PM, Henry Chen <HenryC.Chen@mediatek.com> wrote:
+> Hi Javier,
+>
+> On Fri, 2015-07-24 at 10:32 +0200, Javier Martinez Canillas wrote:
+>> Hello Henry,
+>>
+>> I believe Mark asked you to use a subject lines reflecting the style
+>> for the subsystem, so the subject should had been something like:
+>>
+>> regulators: mt6311: Add DT binding document
+>>
+>> On Fri, Jul 24, 2015 at 7:24 AM, Henry Chen <henryc.chen@mediatek.com> wrote:
+>> > This patch adds a list of supported regulator names to the devicetree
+>> > binding documentation for Mediatek MT6311 PMIC.
+>> >
+>> > Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+>> > ---
+>>
+>> I know is in your cover letter, but usually is good to also include a
+>> history log of the changes for each patch so people know what changed.
+>> Everything between the '---' and the diff are omitted by tools like
+>> git am so you can add there.  You can use tools like patman that do
+>> this automatically for you.
+>>
+> Ok, got it, I will follow that.
+>
+>> Also, I said that you could add my Reviewed-by after the node name
+>> change so you should had carried that. So again:
+>
+> Sorry, did you mean I need to resent again?
+>
 
-diff --git a/arch/arm/boot/dts/vf-colibri.dtsi b/arch/arm/boot/dts/vf-colibri.dtsi
-index 68ca125..8d7986a 100644
---- a/arch/arm/boot/dts/vf-colibri.dtsi
-+++ b/arch/arm/boot/dts/vf-colibri.dtsi
-@@ -52,6 +52,19 @@
- 	pinctrl-0 = <&pinctrl_i2c0>;
- };
- 
-+&nfc {
-+	assigned-clocks = <&clks VF610_CLK_NFC>;
-+	assigned-clock-rates = <33000000>;
-+	nand-bus-width = <8>;
-+	nand-ecc-mode = "hw";
-+	nand-ecc-step-size = <2048>;
-+	nand-ecc-strength = <32>;
-+	nand-on-flash-bbt;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc_1>;
-+	status = "okay";
-+};
-+
- &pwm0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm0>;
-@@ -156,6 +169,25 @@
- 			>;
- 		};
- 
-+		pinctrl_nfc_1: nfcgrp_1 {
-+			fsl,pins = <
-+				VF610_PAD_PTD23__NF_IO7		0x28df
-+				VF610_PAD_PTD22__NF_IO6		0x28df
-+				VF610_PAD_PTD21__NF_IO5		0x28df
-+				VF610_PAD_PTD20__NF_IO4		0x28df
-+				VF610_PAD_PTD19__NF_IO3		0x28df
-+				VF610_PAD_PTD18__NF_IO2		0x28df
-+				VF610_PAD_PTD17__NF_IO1		0x28df
-+				VF610_PAD_PTD16__NF_IO0		0x28df
-+				VF610_PAD_PTB24__NF_WE_B	0x28c2
-+				VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+				VF610_PAD_PTB27__NF_RE_B	0x28c2
-+				VF610_PAD_PTC26__NF_RB_B	0x283d
-+				VF610_PAD_PTC27__NF_ALE		0x28c2
-+				VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
-+
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1182
--- 
-2.4.5
+Sorry for not being clear. No, it's not necessary to resend. I just
+mentioned for the next time.
+
+> Thanks for advise.
+> Henry
+>
+
+Best regards,
+Javier
