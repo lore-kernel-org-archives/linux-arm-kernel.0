@@ -1,82 +1,70 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Fri, 24 Jul 2015 18:12:15 +0800
-Subject: [PATCH v12 3/6] drm/panel: simple: Add support for NEC NL4827HC19-05B
- 480x272 panel
-In-Reply-To: <1437732738-4960-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1437732738-4960-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1437732738-4960-4-git-send-email-jianwei.wang.chn@gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 24 Jul 2015 11:20:57 +0100
+Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
+ a Linux page into Xen page
+In-Reply-To: <55B20F1F.60902@citrix.com>
+References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
+ <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
+ <55B205FB.5080209@citrix.com> <55B20B56.7020605@citrix.com>
+ <55B20F1F.60902@citrix.com>
+Message-ID: <55B21189.8030901@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the NEC NL4827HC19-05B 480x272 panel to the DRM
-simple panel driver.
+On 24/07/15 11:10, David Vrabel wrote:
+> On 24/07/15 10:54, Julien Grall wrote:
+>> On 24/07/15 10:31, David Vrabel wrote:
+>>> On 09/07/15 21:42, Julien Grall wrote:
+>>>> The Xen interface is always using 4KB page. This means that a Linux page
+>>>> may be split across multiple Xen page when the page granularity is not
+>>>> the same.
+>>>>
+>>>> This helper will break down a Linux page into 4KB chunk and call the
+>>>> helper on each of them.
+>>> [...]
+>>>> --- a/include/xen/page.h
+>>>> +++ b/include/xen/page.h
+>>>> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
+>>>>  
+>>>>  extern unsigned long xen_released_pages;
+>>>>  
+>>>> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
+>>>> +
+>>>> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
+>>>> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
+>>>> +				    void *data)
+>>>
+>>> I think this should be outlined (unless you have measurements that
+>>> support making it inlined).
+>>
+>> I don't have any performance measurements. Although, when Linux is using
+>> 4KB page granularity, the loop in this helper will be dropped by the
+>> helper. The code would look like:
+>>
+>> unsigned long pfn = xen_page_to_pfn(page);
+>>
+>> ret = fn(page, fn, data);
+>> if (ret)
+>>   return ret;
+>>
+>> The compiler could even inline the callback (fn). So it drops 2
+>> functions call.
+> 
+> Ok, keep it inlined.
+> 
+>>> Also perhaps make it
+>>>
+>>> int xen_for_each_gfn(struct page *page,
+>>>                      xen_gfn_fn_t fn, void *data);
+>>
+>> gfn standing for Guest Frame Number right?
+> 
+> Yes.  This suggestion is just changing the name to make it more obvious
+> what it does.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
----
- .../bindings/panel/nec,nl4827hc19_05b.txt          |  7 ++++++
- drivers/gpu/drm/panel/panel-simple.c               | 26 ++++++++++++++++++++++
- 2 files changed, 33 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
+I will change the name.
 
-diff --git a/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
-new file mode 100644
-index 0000000..20e9473
---- /dev/null
-+++ b/Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
-@@ -0,0 +1,7 @@
-+NEC LCD Technologies,Ltd. WQVGA TFT LCD panel
-+
-+Required properties:
-+- compatible: should be "nec,nl4827hc19_05b"
-+
-+This binding is compatible with the simple-panel binding, which is specified
-+in simple-panel.txt in this directory.
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f94201b..db61dd1 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -943,6 +943,29 @@ static const struct panel_desc lg_lp129qe = {
- 	},
- };
- 
-+static const struct drm_display_mode nec_nl4827hc19_05b_mode = {
-+	.clock = 10870,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 2,
-+	.hsync_end = 480 + 2 + 41,
-+	.htotal = 480 + 2 + 41 + 2,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 2,
-+	.vsync_end = 272 + 2 + 4,
-+	.vtotal = 272 + 2 + 4 + 2,
-+	.vrefresh = 74,
-+};
-+
-+static const struct panel_desc nec_nl4827hc19_05b = {
-+	.modes = &nec_nl4827hc19_05b_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 95,
-+		.height = 54,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB888_1X24
-+};
-+
- static const struct drm_display_mode ortustech_com43h4m85ulc_mode  = {
- 	.clock = 25000,
- 	.hdisplay = 480,
-@@ -1113,6 +1136,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "lg,lp129qe",
- 		.data = &lg_lp129qe,
- 	}, {
-+		.compatible = "nec,nl4827hc19_05b",
-+		.data = &nec_nl4827hc19_05b,
-+	}, {
- 		.compatible = "ortustech,com43h4m85ulc",
- 		.data = &ortustech_com43h4m85ulc,
- 	}, {
+Regards,
+
 -- 
-2.1.0.27.g96db324
+Julien Grall
