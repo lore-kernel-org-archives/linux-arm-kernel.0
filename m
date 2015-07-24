@@ -1,112 +1,46 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jul 2015 13:27:02 +0100
-Subject: [PATCH v2 5/7] acpi: gsi: Add acpi_set_irq_model to initialize
- the GSI layer
-In-Reply-To: <55B20CD8.60309@linaro.org>
-References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
- <1437656713-9677-6-git-send-email-marc.zyngier@arm.com>
- <55B20CD8.60309@linaro.org>
-Message-ID: <55B22F16.3040206@arm.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 24 Jul 2015 17:58:20 +0530
+Subject: [RFC PATCH 4/4] iommu/arm-smmu: Add support for specifying
+ regulators
+In-Reply-To: <55AE8CBA.90805@codeaurora.org>
+References: <1437152005-25092-1-git-send-email-sricharan@codeaurora.org>
+ <1437152005-25092-5-git-send-email-sricharan@codeaurora.org>
+ <55AE8CBA.90805@codeaurora.org>
+Message-ID: <006001d0c60c$3d6d39e0$b847ada0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 11:00, Hanjun Guo wrote:
-> On 07/23/2015 09:05 PM, Marc Zyngier wrote:
->> In order to start embrassing irqdomains at the GSI level, introduce
->> a new initializer:
->>
->> void acpi_set_irq_model(enum acpi_irq_model_id model,
->> 			unsigned long domain_token,
->> 			int (*populate)(struct acpi_gsi_descriptor *,
->> 					u32, unsigned int));
->>
->> where:
->> - model is the value assigned to acpi_irq_model
->> - domain_token is the identifier for the irqdomain mapping
->>    GSI interrupts
->> - populate is a function provided by the interrupt controller,
->>    populating a struct acpi_gsi_descriptor based on a GSI and
->>    the interrupt trigger information
->>
->> As nobody calls this code yet, the current code is left in place.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   drivers/acpi/gsi.c   | 32 ++++++++++++++++++++++++++++++++
->>   include/linux/acpi.h |  5 +++++
->>   2 files changed, 37 insertions(+)
->>
->> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
->> index a745880..e6f4a0c 100644
->> --- a/drivers/acpi/gsi.c
->> +++ b/drivers/acpi/gsi.c
->> @@ -16,6 +16,9 @@ enum acpi_irq_model_id acpi_irq_model;
->>
->>   static void *acpi_gsi_domain_token;
->>
->> +static int (*acpi_gsi_descriptor_populate)(struct acpi_gsi_descriptor *data,
->> +					   u32 gsi, unsigned int irq_type);
->> +
->>   static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->>   {
->>   	switch (polarity) {
->> @@ -71,10 +74,20 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->>   int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
->>   		      int polarity)
->>   {
->> +	int err;
->>   	unsigned int irq;
->>   	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
->>   	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
->>
->> +	if (acpi_gsi_descriptor_populate) {
->> +		struct acpi_gsi_descriptor data;
->> +		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
->> +		if (err)
->> +			return err;
->> +
->> +		return irq_create_acpi_mapping(d, &data);
->> +	}
->> +
->>   	irq = irq_create_mapping(d, gsi);
->>   	if (!irq)
->>   		return -EINVAL;
->> @@ -99,3 +112,22 @@ void acpi_unregister_gsi(u32 gsi)
->>   	irq_dispose_mapping(irq);
->>   }
->>   EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
->> +
->> +/**
->> + * acpi_set_irq_model - Setup the GSI irqdomain information
->> + * @model: the value assigned to acpi_irq_model
->> + * @domain_token: the irq_domain identifier for mapping and looking up
->> + *                GSI interrupts
->> + * @populate: provided by the interrupt controller, populating a
->> + *            struct acpi_gsi_descriptor based on a GSI and
->> + *            the interrupt trigger information
->> + */
->> +void acpi_set_irq_model(enum acpi_irq_model_id model,
->> +			unsigned long domain_token,
->> +			int (*populate)(struct acpi_gsi_descriptor *,
->> +					u32, unsigned int))
->> +{
->> +	acpi_irq_model = model;
->> +	acpi_gsi_domain_token = (void *)domain_token;
+Hi Stephen,
+
+> -----Original Message-----
+> From: linux-arm-kernel [mailto:linux-arm-kernel-
+> bounces at lists.infradead.org] On Behalf Of Stephen Boyd
+> Sent: Tuesday, July 21, 2015 11:48 PM
+> To: Sricharan R
+> Cc: devicetree at vger.kernel.org; linux-arm-msm at vger.kernel.org;
+> will.deacon at arm.com; iommu at lists.linux-foundation.org;
+> mitchelh at codeaurora.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC PATCH 4/4] iommu/arm-smmu: Add support for specifying
+> regulators
 > 
-> This will work perfectly fine with ARM as it has single GICD and
-> one irq domain, I'm not sure x86 is ok with it because x86 has
-> multi ioapics and each ioapic has a irqdomain if I understand
-> correctly, but x86 don't use functions in this file at all for now,
-> I think I'm over worried :)
+> On 07/17/2015 09:53 AM, Sricharan R wrote:
+> > From: Mitchel Humpherys <mitchelh@codeaurora.org>
+> >
+> > This adds the support to turn on the regulators required for SMMUs. It
+> > is turned on during the SMMU probe and remains 'on' till the device
+> > exists.
+> 
+> The device always exists. Until the driver is removed perhaps?
+> 
+  Till the device exists.
 
-When (and if) that day comes, we'll have to either contextualize
-acpi_register_gsi to take a domain token, or have a lookup table that
-maps GSI ranges to domain tokens.
+> >
+> > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> 
+> We won't be using regulators. We'll be using power domains instead so
+> please rewrite this patch accordingly.
+> 
+ Ok. Thanks for the direction.
 
-Either way, this doesn't invalidate what is being done here.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Regards,
+ Sricharan
