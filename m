@@ -1,25 +1,25 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 24 Jul 2015 17:19:13 +0530
-Subject: [RESEND][PATCH 2/4] spi: davinci: Choose correct pre-scaler limit
- based on SOC
-In-Reply-To: <1437568344-18889-3-git-send-email-fcooper@ti.com>
+Date: Fri, 24 Jul 2015 17:20:25 +0530
+Subject: [RESEND][PATCH 3/4] ARM: davinci: Set proper SPI prescale limit
+ value
+In-Reply-To: <1437568344-18889-4-git-send-email-fcooper@ti.com>
 References: <1437568344-18889-1-git-send-email-fcooper@ti.com>
- <1437568344-18889-3-git-send-email-fcooper@ti.com>
-Message-ID: <55B22639.9010204@ti.com>
+ <1437568344-18889-4-git-send-email-fcooper@ti.com>
+Message-ID: <55B22681.3060000@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 22 July 2015 06:02 PM, Franklin S Cooper Jr wrote:
-> Currently the pre-scaler limit is incorrect. The value differs slightly
-> for various devices so a single value can't be used. Using the compatible
-> field select the correct pre-scaler limit.
-> 
-> Add new compatible field value for Keystone devices to support their
-> unique pre-scaler limit value.
+> SPI Davinci driver has been updated to allow SOCs to specify their minimum
+> prescale value. Update the various SOCs board files that use this driver with
+> their proper prescaler limit.
 > 
 > Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 
-Reviewed-by: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Sekhar Nori <nsekhar@ti.com>
+
+in case Mark is okay to take it through his tree. It does not clash with
+anything else I have for mach-davinci.
 
 Thanks,
 Sekhar
