@@ -1,46 +1,71 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Fri, 24 Jul 2015 12:39:01 +0100
-Subject: [PATCH] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <20150724113149.GE4348@leverpostej>
-References: <1437496204-5438-1-git-send-email-ian.campbell@citrix.com>
- <20150722084753.GC14923@e106497-lin.cambridge.arm.com>
- <1437558438.8383.72.camel@citrix.com> <20150724113149.GE4348@leverpostej>
-Message-ID: <1437737941.24746.75.camel@citrix.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 24 Jul 2015 20:49:06 +0900
+Subject: [GIT PULL] Non-critical fixes for v4.3
+In-Reply-To: <359442387.iGIak59Qte@amdc1976>
+References: <1437719695-22340-1-git-send-email-k.kozlowski@samsung.com>
+ <359442387.iGIak59Qte@amdc1976>
+Message-ID: <CAJKOXPcEFmOnffViq8X+NxmAB=_wLKj9oLHy28dpYqp4z4QnQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 12:31 +0100, Mark Rutland wrote:
-> On Wed, Jul 22, 2015 at 10:47:18AM +0100, Ian Campbell wrote:
-> > On Wed, 2015-07-22 at 09:47 +0100, Liviu Dudau wrote:
-> > > 
-> > > Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > 
-> > Thanks.
-> > 
-> > > Picking your brains here: would it be worth to have some vendor 
-> > > directories in
-> > > this shared area or we can hope that there will be very few files 
-> > > living here?
-> > 
-> > I'm honestly not sure.
-> > 
-> > I don't expect there will be very many files under here, and I 
-> > would
-> > expect the norm would be that common .dtsi files used by multiple
-> > arches would be things from the same vendor, but I don't think we 
-> > can
-> > guarantee that.
-> 
-> I'm not so sure that this area will remain small. I suspect we'll see
-> a reasonable amount of sharing for arm/arm64 where two SoCs differ 
-> sith
-> s/Cortex-A7/Cortex-A53/, for example.
-> 
-> Perhaps we could wait until the that starts to happen; we managed to
-> survive for a while before moving arm64's dts into subdirs.
+2015-07-24 20:04 GMT+09:00 Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>:
+>
+> Hi,
+>
+> On Friday, July 24, 2015 03:34:55 PM Krzysztof Kozlowski wrote:
+>> Dear Kukjin,
+>>
+>> Previously you did not picked up the fix for cpufreq memory leak.
+>> I am sending it again with respective acks from LKML. Also another
+>> minor improvement in the set.
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit 1c4c7159ed2468f3ac4ce5a7f08d79663d381a93:
+>>
+>>   Merge tag 'ext4_for_linus_stable' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4 (2015-07-05 16:24:54 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>
+>>   https://github.com/krzk/linux.git tags/samsung-fixes-non-critical-v4.3-2
+>>
+>> for you to fetch changes up to 434213f727c12fab8657c8db3d23da4b0463365d:
+>>
+>>   video: fbdev: s3c-fb: Constify platform_device_id (2015-07-24 15:17:32 +0900)
+>>
+>> ----------------------------------------------------------------
+>> Improvements for Exynos boards:
+>> 1. Fix memory leak in cpufreq error path.
+>> 2. Constify platform_device_id in video/fbdev/s3c-fb.
+>>
+>> ----------------------------------------------------------------
+>> Krzysztof Kozlowski (1):
+>>       video: fbdev: s3c-fb: Constify platform_device_id
+>>
+>> Shailendra Verma (1):
+>>       cpufreq: exynos: Fix for memory leak in case SOC name does not match
+>
+> I would suggest merging this fix in v4.2 not v4.3:
+>
+> - it is obvious and touches only error paths
 
-If we think it is inevitable we may as well bite the bullet, plus I've
-already done "git commit --amend" to move it to include/dt-dtsi/arm ;-)
+Indeed, good point, thanks for pointing this. Although these are not
+regressions for issues introduced in current release but they are are
+non-intrusive.
 
-Ian. 
+Kukjin, do you agree? Can you pull them for second round of v4.2 fixes (not 4.3)
+
+>
+> - (hopefully) in v4.3 the exynos-cpufreq driver will be completely
+>   replaced by using cpufreq-dt for Exynos platforms (thus there will be
+>   no benefits of having this fix in v4.3 but there will be potential
+>   risk of merge conflicts due to exynos-cpufreq driver removal)
+>
+
+We'll see... The Exynos 4x12 requires OPP patches. Are these ready for 4.3?
+
+Best regards,
+Krzysztof
