@@ -1,52 +1,95 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 24 Jul 2015 17:41:28 +0900
-Subject: [PATCH 7/9] ARM: shmobile: r8a7790: Add Audio MIX support on DTSI
+Date: Fri, 24 Jul 2015 17:41:29 +0900
+Subject: [PATCH 8/9] ARM: shmobile: r8a7791: Add Audio CTU support on DTSI
 In-Reply-To: <cover.1437724902.git.horms+renesas@verge.net.au>
 References: <cover.1437724902.git.horms+renesas@verge.net.au>
-Message-ID: <fc67bf42fa9a3e7c891e6318475f9c4d81a1d44e.1437724902.git.horms+renesas@verge.net.au>
+Message-ID: <88401702fe395880bb03c9d17720185c1d89b43f.1437724902.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Tested-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7791.dtsi            | 16 ++++++++++++++++
+ include/dt-bindings/clock/r8a7791-clock.h |  2 ++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index 6aa1d759690b..f1cdccc0a8c8 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1540,6 +1540,7 @@
- 			<&mstp10_clks R8A7790_CLK_SCU_SRC3>, <&mstp10_clks R8A7790_CLK_SCU_SRC2>,
- 			<&mstp10_clks R8A7790_CLK_SCU_SRC1>, <&mstp10_clks R8A7790_CLK_SCU_SRC0>,
- 			<&mstp10_clks R8A7790_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7790_CLK_SCU_CTU1_MIX1>,
-+			<&mstp10_clks R8A7790_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7790_CLK_SCU_CTU1_MIX1>,
- 			<&mstp10_clks R8A7790_CLK_SCU_DVC0>, <&mstp10_clks R8A7790_CLK_SCU_DVC1>,
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index 07ea2bebe496..cdd55b82ba4e 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -1311,6 +1311,7 @@
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
++				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>,
+ 				<&mstp10_clks R8A7791_CLK_SCU_ALL>, <&mstp10_clks R8A7791_CLK_SCU_ALL>;
+ 
+ 			#clock-cells = <1>;
+@@ -1320,6 +1321,7 @@
+ 				R8A7791_CLK_SSI4 R8A7791_CLK_SSI3 R8A7791_CLK_SSI2 R8A7791_CLK_SSI1 R8A7791_CLK_SSI0
+ 				R8A7791_CLK_SCU_ALL
+ 				R8A7791_CLK_SCU_DVC1 R8A7791_CLK_SCU_DVC0
++				R8A7791_CLK_SCU_CTU1_MIX1 R8A7791_CLK_SCU_CTU0_MIX0
+ 				R8A7791_CLK_SCU_SRC9 R8A7791_CLK_SCU_SRC8 R8A7791_CLK_SCU_SRC7 R8A7791_CLK_SCU_SRC6 R8A7791_CLK_SCU_SRC5
+ 				R8A7791_CLK_SCU_SRC4 R8A7791_CLK_SCU_SRC3 R8A7791_CLK_SCU_SRC2 R8A7791_CLK_SCU_SRC1 R8A7791_CLK_SCU_SRC0
+ 			>;
+@@ -1329,6 +1331,7 @@
+ 				"ssi4", "ssi3", "ssi2", "ssi1", "ssi0",
+ 				"scu-all",
+ 				"scu-dvc1", "scu-dvc0",
++				"scu-ctu1-mix1", "scu-ctu0-mix0",
+ 				"scu-src9", "scu-src8", "scu-src7", "scu-src6", "scu-src5",
+ 				"scu-src4", "scu-src3", "scu-src2", "scu-src1", "scu-src0";
+ 		};
+@@ -1582,6 +1585,7 @@
+ 			<&mstp10_clks R8A7791_CLK_SCU_SRC5>, <&mstp10_clks R8A7791_CLK_SCU_SRC4>,
+ 			<&mstp10_clks R8A7791_CLK_SCU_SRC3>, <&mstp10_clks R8A7791_CLK_SCU_SRC2>,
+ 			<&mstp10_clks R8A7791_CLK_SCU_SRC1>, <&mstp10_clks R8A7791_CLK_SCU_SRC0>,
++			<&mstp10_clks R8A7791_CLK_SCU_CTU0_MIX0>, <&mstp10_clks R8A7791_CLK_SCU_CTU1_MIX1>,
+ 			<&mstp10_clks R8A7791_CLK_SCU_DVC0>, <&mstp10_clks R8A7791_CLK_SCU_DVC1>,
  			<&audio_clk_a>, <&audio_clk_b>, <&audio_clk_c>, <&m2_clk>;
  		clock-names = "ssi-all",
-@@ -1548,6 +1549,7 @@
+@@ -1589,6 +1593,7 @@
+ 				"ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
  				"src.9", "src.8", "src.7", "src.6", "src.5",
  				"src.4", "src.3", "src.2", "src.1", "src.0",
- 				"ctu.0", "ctu.1",
-+				"mix.0", "mix.1",
++				"ctu.0", "ctu.1",
  				"dvc.0", "dvc.1",
  				"clk_a", "clk_b", "clk_c", "clk_i";
  
-@@ -1564,6 +1566,11 @@
+@@ -1605,6 +1610,17 @@
  			};
  		};
  
-+		rcar_sound,mix {
-+			mix0: mix at 0 { };
-+			mix1: mix at 1 { };
++		rcar_sound,ctu {
++			ctu00: ctu at 0 { };
++			ctu01: ctu at 1 { };
++			ctu02: ctu at 2 { };
++			ctu03: ctu at 3 { };
++			ctu10: ctu at 4 { };
++			ctu11: ctu at 5 { };
++			ctu12: ctu at 6 { };
++			ctu13: ctu at 7 { };
 +		};
 +
- 		rcar_sound,ctu {
- 			ctu00: ctu at 0 { };
- 			ctu01: ctu at 1 { };
+ 		rcar_sound,src {
+ 			src0: src at 0 {
+ 				interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
+diff --git a/include/dt-bindings/clock/r8a7791-clock.h b/include/dt-bindings/clock/r8a7791-clock.h
+index 402268384b99..dd09b73c4aaf 100644
+--- a/include/dt-bindings/clock/r8a7791-clock.h
++++ b/include/dt-bindings/clock/r8a7791-clock.h
+@@ -141,6 +141,8 @@
+ #define R8A7791_CLK_SCU_ALL		17
+ #define R8A7791_CLK_SCU_DVC1		18
+ #define R8A7791_CLK_SCU_DVC0		19
++#define R8A7791_CLK_SCU_CTU1_MIX1	20
++#define R8A7791_CLK_SCU_CTU0_MIX0	21
+ #define R8A7791_CLK_SCU_SRC9		22
+ #define R8A7791_CLK_SCU_SRC8		23
+ #define R8A7791_CLK_SCU_SRC7		24
 -- 
 2.1.4
