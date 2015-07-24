@@ -1,47 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 24 Jul 2015 17:42:15 -0400 (EDT)
-Subject: [PATCH] ARM: asm/unified.h: guard the IT macros against redefinition
- when using LTO
-Message-ID: <alpine.LFD.2.20.1507241739280.1806@knanqh.ubzr>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 25 Jul 2015 00:11:02 +0200
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <55B244BE.1060203@roeck-us.net>
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+ <20150723120759.GA17690@amd>
+ <20150724062948.GK18700@pengutronix.de>
+ <55B244BE.1060203@roeck-us.net>
+Message-ID: <20150724221102.GA31517@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri 2015-07-24 06:59:26, Guenter Roeck wrote:
+> On 07/23/2015 11:29 PM, Sascha Hauer wrote:
+> >On Thu, Jul 23, 2015 at 02:07:59PM +0200, Pavel Machek wrote:
+> >>On Tue 2015-07-21 09:21:32, Sascha Hauer wrote:
+> >>>The thermal code uses int, long and unsigned long for temperatures
+> >>>in different places.
+> >>>
+> >>>Using an unsigned type limits the thermal framework to positive
+> >>>temperatures without need. Also several drivers currently will report
+> >>>temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> >>>immediately shut the machine down due to overtemperature if started below
+> >>>0?C.
+> >>>
+> >>>'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
+> >>>is above the melting point of all known materials.
+> >>
+> >>Can we do something like
+> >>
+> >>typedef millicelsius_t int;
+> >>
+> >>...to document the units?
+> >
+> >I am not very fond of typedefs and I am not sure this adds any value. I
+> >could change it when more people ask for it, but I just sent the new
+> >version without this.
+> >
+> 
+> I thought we are supposed to not introduce new typedefs anyway.
 
-With LTO, the intermediate representation for each .c file contains those
-global assembly macro definitions. When the lot is merged together during
-the final link, we get duplicate definition errors:
-
-[...]
-/tmp/cc48fUMp.s:42352: Error: Macro `it' was already defined
-/tmp/cc48fUMp.s:42354: Error: Macro `itt' was already defined
-/tmp/cc48fUMp.s:42356: Error: Macro `ite' was already defined
-[...]
-
-Guard those against redefinitions.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/include/asm/unified.h b/arch/arm/include/asm/unified.h
-index a91ae49961..ee257a3de7 100644
---- a/arch/arm/include/asm/unified.h
-+++ b/arch/arm/include/asm/unified.h
-@@ -103,6 +103,8 @@
- 	.endm
- #else	/* !__ASSEMBLY__ */
- __asm__(
-+/* the .L_it_macros_defined guards against redefinition in the LTO case */
-+"	.ifndef	.L_it_macros_defined\n"
- "	.macro	it, cond\n"
- "	.endm\n"
- "	.macro	itt, cond\n"
-@@ -132,7 +134,9 @@ __asm__(
- "	.macro	iteet, cond\n"
- "	.endm\n"
- "	.macro	iteee, cond\n"
--"	.endm\n");
-+"	.endm\n"
-+"	.set	.L_it_macros_defined,1\n"
-+"	.endif");
- #endif	/* __ASSEMBLY__ */
- 
- #endif	/* CONFIG_ARM_ASM_UNIFIED */
+You are not supposed to typedef struct, but typedef for millicelsius_t
+would be ok. And it is your only chance if you want people to pay
+attention. If you make it int, someone will pass it to long or
+something else..
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
