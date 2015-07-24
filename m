@@ -1,46 +1,22 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Fri, 24 Jul 2015 08:15:59 -0700
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <20150724095605.GI10670@e103592.cambridge.arm.com>
-References: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
- <20150723220550.GA15032@kroah.com>
- <20150724095605.GI10670@e103592.cambridge.arm.com>
-Message-ID: <20150724151559.GA12324@kroah.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 24 Jul 2015 16:19:01 +0100
+Subject: [PATCH v2 10/20] arm64: bitops: patch in lse instructions when
+ supported by the CPU
+In-Reply-To: <1437734531-10698-11-git-send-email-will.deacon@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-11-git-send-email-will.deacon@arm.com>
+Message-ID: <20150724151900.GK3550@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 10:56:06AM +0100, Dave Martin wrote:
-> On Thu, Jul 23, 2015 at 03:05:50PM -0700, Greg Kroah-Hartman wrote:
-> > On Thu, Jul 09, 2015 at 11:57:12AM +0100, Dave Martin wrote:
-> > > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-> > > sufficient to inhibit pl011_int() from being triggered by a local
-> > > IRQ and trying to re-take the same lock.  This can lead to
-> > > deadlocks.
-> > > 
-> > > This patch uses the _irq() locking variants instead to ensure that
-> > > pl011_int() handling for a given port is deferred until any
-> > > pl011_tx_softirq() work for that port is complete.
-> > > 
-> > > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-> > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > > Cc: stable <stable@vger.kernel.org> # 4.1
-> > > ---
-> > >  drivers/tty/serial/amba-pl011.c |    4 ++--
-> > >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > This doesn't apply at all to 4.2-rc3, so I can't apply it :(
+On Fri, Jul 24, 2015 at 11:42:01AM +0100, Will Deacon wrote:
+> On CPUs which support the LSE atomic instructions introduced in ARMv8.1,
+> it makes sense to use them in preference to ll/sc sequences.
 > 
-> This is applicable to 4.1 stable only, since the code this patch fixes
-> was replaced in 4.2-rc1.
+> This patch introduces runtime patching of our bitops functions so that
+> LSE atomic instructions are used instead.
 > 
-> Apologies, I didn't make that clear in the text.
+> Reviewed-by: Steve Capper <steve.capper@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-I can't do anything with a 4.1-only patch, please read
-Documentation/stable_kernel_rules.txt for how to get a patch into the
-stable kernel releases.
-
-thanks,
-
-greg k-h
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
