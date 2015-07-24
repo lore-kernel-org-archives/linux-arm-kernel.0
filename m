@@ -1,97 +1,142 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jul 2015 13:22:05 +0100
-Subject: [PATCH v2 3/7] genirq: irqdomain: Add irq_create_acpi_mapping
-In-Reply-To: <55B201E4.7060704@linaro.org>
-References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
- <1437656713-9677-4-git-send-email-marc.zyngier@arm.com>
- <55B201E4.7060704@linaro.org>
-Message-ID: <55B22DED.1000505@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 24 Jul 2015 13:23:55 +0100
+Subject: [PATCH 3/3] Docs: dt: add PCI IOMMU map bindings
+In-Reply-To: <1437670365-20704-4-git-send-email-mark.rutland@arm.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <55B22E5B.7080208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 10:14, Hanjun Guo wrote:
-> On 07/23/2015 09:05 PM, Marc Zyngier wrote:
->> In order to help ACPI on arm64 to make use of most of the irqdomain
->> goodies, add a new entry point (irq_create_acpi_mapping) which
->> mimics irq_create_of_mapping, except that it takes a new
->> struct acpi_gsi_descriptor, which is the pendent of of_phandle_args
->> in the OF world.
->>
->> We assume that the way the acpi_gsi_descriptor is populated matches
->> that of of_phandle_args, as the latter is still the building block
->> for interrupt descriptor in the whole kernel.
->>
->> Eventually, these two representations should be merged in a single
->> structure, but that's probably for another day.
-> 
-> ...
-> 
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   include/linux/acpi.h   |  9 +++++++++
->>   kernel/irq/irqdomain.c | 18 ++++++++++++++++++
->>   2 files changed, 27 insertions(+)
->>
->> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
->> index d2445fa..2f23ab0 100644
->> --- a/include/linux/acpi.h
->> +++ b/include/linux/acpi.h
->> @@ -205,6 +205,15 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
->>   int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
->>   int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
->>
->> +#define MAX_GSI_DESC_PARAMS 16
->> +struct acpi_gsi_descriptor {
->> +	int param_count;
->> +	u32 param[MAX_GSI_DESC_PARAMS];
->> +};
->> +
->> +unsigned int irq_create_acpi_mapping(struct irq_domain *d,
->> +				     struct acpi_gsi_descriptor *irq_data);
->> +
->>   #ifdef CONFIG_X86_IO_APIC
->>   extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
->>   #else
->> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
->> index 27f4ec7..542cda3 100644
->> --- a/kernel/irq/irqdomain.c
->> +++ b/kernel/irq/irqdomain.c
->> @@ -1,5 +1,6 @@
->>   #define pr_fmt(fmt)  "irq: " fmt
->>
->> +#include <linux/acpi.h>
->>   #include <linux/debugfs.h>
->>   #include <linux/hardirq.h>
->>   #include <linux/interrupt.h>
->> @@ -557,6 +558,23 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
->>   }
->>   EXPORT_SYMBOL_GPL(irq_create_of_mapping);
->>
->> +#ifdef CONFIG_ACPI
->> +unsigned int irq_create_acpi_mapping(struct irq_domain *d,
->> +				     struct acpi_gsi_descriptor *irq_data)
->> +{
->> +	struct of_phandle_args args;
->> +	int i;
->> +
->> +	for (i = 0; i < min(irq_data->param_count, MAX_PHANDLE_ARGS); i++)
->> +		args.args[i] = irq_data->param[i];
->> +
->> +	args.np = d ? d->domain_token : NULL;
->> +	args.args_count = i;
->> +
->> +	return irq_create_of_mapping(&args);
->> +}
-> 
-> A little bit of hack to me :) , but I agree it's the first step to
-> merge them in a single structure,
+Hi Mark,
 
-If you have a more elegant solution that doesn't end up duplicating most
-of the kernel infrastructure, I'm really all ears.
+This looks sane, and lets me describe the thing I have on my desk, so 
+I'm happy. I have a couple of general thoughts below, but I don't intend 
+that they should stand in the way of this proposal as-is.
 
-Thanks,
+On 23/07/15 17:52, Mark Rutland wrote:
+> The existing IOMMU bindings are able to specify the relationship between
+> masters and IOMMUs, but they are insufficient for describing the general
+> case of hotpluggable busses such as PCI where the set of masters is not
+> known until runtime, and the relationship between masters and IOMMUs is
+> a property of the integration of the system.
+>
+> This patch adds a generic binding for mapping PCI devices to IOMMUs,
+> using a new iommu-map property (specific to PCI*) which may be used to
+> map devices (identified by their Requester ID) to sideband data for the
+> IOMMU which they master through.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>   .../devicetree/bindings/pci/pci-iommu.txt          | 171 +++++++++++++++++++++
+>   1 file changed, 171 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
+>
+> diff --git a/Documentation/devicetree/bindings/pci/pci-iommu.txt b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+> new file mode 100644
+> index 0000000..56c8296
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/pci-iommu.txt
+> @@ -0,0 +1,171 @@
+> +This document describes the generic device tree binding for describing the
+> +relationship between PCI(e) devices and IOMMU(s).
+> +
+> +Each PCI(e) device under a root complex is uniquely identified by its Requester
+> +ID (AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
+> +Function number.
+> +
+> +For the purpose of this document, when treated as a numeric value, a RID is
+> +formatted such that:
+> +
+> +* Bits [15:8] are the Bus number.
+> +* Bits [7:3] are the Device number.
+> +* Bits [2:0] are the Function number.
+> +* Any other bits required for padding must be zero.
+> +
+> +IOMMUs may distinguish PCI devices through sideband data derived from the
+> +Requester ID. While a given PCI device can only master through one IOMMU, a
+> +root complex may split masters across a set of IOMMUs (e.g. with one IOMMU per
+> +bus).
+> +
+> +The generic 'iommus' property is insufficient to describe this relationship,
+> +and a mechanism is required to map from a PCI device to its IOMMU and sideband
+> +data.
+> +
+> +For generic IOMMU bindings, see
+> +Documentation/devicetree/bindings/iommu/iommu.txt.
+> +
+> +
+> +PCI root complex
+> +================
+> +
+> +Optional properties
+> +-------------------
+> +
+> +- iommu-map: Maps a Requester ID to an IOMMU and associated iommu-specifier
+> +  data.
+> +
+> +  The property is an arbitrary number of tuples of
+> +  (rid-base,iommu,iommu-base,length).
+> +
+> +  Any RID r in the interval [rid-base, rid-base + length) is associated with
+> +  the listed IOMMU, with the iommu-specifier (r - rid-base + iommu-base).
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Can we take as a guarantee that the system cannot present any ID at a 
+given IOMMU that is not represented in an appropriate output range (in 
+the sense that we may do things that could blow up horribly if spurious 
+IDs appeared)?
+
+Furthermore, would representing one-to-many mappings by having multiple 
+matches for a given RID be legal? In the general case it's certainly 
+feasible for the IOMMU to see different IDs for e.g. reads vs. writes, 
+where the system munges extra bus lines into the sideband signals - 
+whether anyone would actually integrate a PCI host controller that way 
+is another matter, so I don't think it's something worth really worrying 
+about without a definite need.
+
+> +
+> +- iommu-map-mask: A mask to be applied to each Requester ID prior to being
+> +  mapped to an iommu-specifier per the iommu-map property.
+
+Am I right to assume a mask of 0 would be a valid way to represent 
+"everything" (and if so, should rid-base and length just be ignored, or 
+mandated to be 0 and 1 respectively)? It looks a bit off at first 
+glance, but it does neatly address a genuine use-case.
+
+> +
+> +
+> +Example (1)
+> +===========
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	iommu: iommu at a {
+> +		reg = <0xa 0x1>;
+> +		compatible = "vendor,some-iommu";
+> +		#iommu-cells = <1>;
+
+Troll question; what do we do when #iommu-cells > 1, where the IOMMU is 
+expecting some extra data associated with each ID (say, memory attributes)?
+
+[ I'm pretty sure the answer here should be "define some additional 
+binding if and when anyone actually cares" ;) ]
+
+
+Robin.
+
+> +	};
+> +
+> +	pci: pci at f {
+> +		reg = <0xf 0x1>;
+> +		compatible = "vendor,pcie-root-complex";
+> +		device_type = "pci";
+> +
+> +		/*
+> +		 * The sideband data provided to the IOMMU is the RID,
+> +		 * identity-mapped.
+> +		 */
+> +		iommu-map = <0x0 &iommu 0x0 0x10000>;
+> +	};
+> +};
