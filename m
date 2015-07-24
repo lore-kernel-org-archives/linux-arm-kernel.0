@@ -1,54 +1,60 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Fri, 24 Jul 2015 13:08:27 +0900
-Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
-In-Reply-To: <55B1B3B0.8090106@kernel.org>
-References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
- <4464631.oZyVO4Z0Ov@amdc1976> <093101d0b8c3$4b5d3ec0$e217bc40$@kernel.org>
- <20150724003005.642.21781@quantum> <55B1B3B0.8090106@kernel.org>
-Message-ID: <55B1BA3B.3080906@kernel.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 23 Jul 2015 22:13:27 -0600
+Subject: [PATCH v2 2/4] irqchip: bcm2835: If a parent interrupt is
+ registered, chain from it.
+In-Reply-To: <87bnf4giq7.fsf@eliezer.anholt.net>
+References: <1436837718-956-1-git-send-email-eric@anholt.net>
+ <1436837718-956-3-git-send-email-eric@anholt.net>
+ <55AEFB1D.6090108@wwwdotorg.org> <87bnf4giq7.fsf@eliezer.anholt.net>
+Message-ID: <55B1BB67.1090603@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/15 12:40, Kukjin Kim wrote:
-> On 07/24/15 09:30, Michael Turquette wrote:
->> Quoting Kukjin Kim (2015-07-07 07:43:31)
->>> Bartlomiej Zolnierkiewicz wrote:
+On 07/22/2015 12:17 PM, Eric Anholt wrote:
+> Stephen Warren <swarren@wwwdotorg.org> writes:
 > 
-> [...]
-> 
->>>>> Chanwoo Choi (3):
->>>>>   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
->>>>>   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
->>>>>   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
->>>>>
->>>>>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
->>>>>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
->>>>>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
->>>>>  arch/arm/mach-exynos/exynos.c           |  1 +
->>>>>  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
->>>>>  include/dt-bindings/clock/exynos3250.h  |  1 +
->>>>>  6 files changed, 55 insertions(+), 2 deletions(-)
->>>>
->>>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
->>>>
->>>> Thank you for working on this.
->>>>
->>> +1 Thanks.
+>> On 07/13/2015 07:35 PM, Eric Anholt wrote:
+>>> The BCM2836 (Raspberry Pi 2) uses two levels of interrupt
+>>> handling with the CPU-local interrupts being the root, so we
+>>> need to register ours as chained off of the CPU's local
+>>> interrupt.
+>> 
+>> Sorry for the slow review; laziness after vacation!
+>> 
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+>>> b/Documentation/devicetree/bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+>>
 >>>
->>> Mike and Sylwester, if you're OK on this series, I'd like to pick up in Samsung
->>> tree together. And if you want, I could provide topic branch for clk tree.
->>
->> Kukjin,
->>
->> A topic branch would be great.
->>
-> Sure, BTW it means you did 'ack' on this clk change? If not, please let
-> em know ;-) I'll let you know once the topic branch is ready.
+>>> 
++The BCM2836 contains the same interrupt controller with the same
+>>> +interrupts, but the per-CPU interrupt controller is the root,
+>>> and an +interrupt there indicates that the ARMCTRL has an
+>>> interrupt to handle. + Required properties:
+>>> 
+>>> - compatible : should be "brcm,bcm2835-armctrl-ic"
+>> 
+>> Since there are some differences between the bcm2835 and bcm2836
+>> HW blocks, I'd expect the compatible value to be different for
+>> each. In particular...
 > 
-Mike,
+> Well, there are actually no differences within this block of the HW
+> (HDL is unmodified), it's just where the output interrupt line gets
+> consumed. But it's not much extra to add a new compatible value, so
+> sure.
 
-Done, the topic branch 'v4.3-topic/clk-samsung' in samsung tree is for
-your clk tree.
+Mmm. I suppose that's true indeed.
 
-Thanks,
-Kukjin
+So, I guess either of the following is fine for bcm2836 by me:
+
+compatible = "brcm,bcm2836-armctrl-ic";
+compatible = "brcm,bcm2836-armctrl-ic", "brcm,bcm2835-armctrl-ic";
+
+The 2836 value is always needed since DT should contain the most
+specific compatible value for the implementation. The 2835 value is
+optional based on whether the HW block is 100% backwards-compatible
+with the older HW block; a driver for the old block can run unmodified
+against the new block. It's debatable whether that's true here; the
+interface to this HW block itself is unchanged between
+implementations, yet the way the driver for it integrates into the
+system differs since it either is/isn't a top-level IRQ chip.
