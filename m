@@ -1,39 +1,85 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 24 Jul 2015 10:56:06 +0100
-Subject: [PATCH] serial/amba-pl011: Disable interrupts around TX softirq
-In-Reply-To: <20150723220550.GA15032@kroah.com>
-References: <1436439433-10258-1-git-send-email-Dave.Martin@arm.com>
- <20150723220550.GA15032@kroah.com>
-Message-ID: <20150724095605.GI10670@e103592.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 24 Jul 2015 10:56:18 +0100
+Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
+In-Reply-To: <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
+References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
+ <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
+ <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
+Message-ID: <20150724095618.GB23074@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 03:05:50PM -0700, Greg Kroah-Hartman wrote:
-> On Thu, Jul 09, 2015 at 11:57:12AM +0100, Dave Martin wrote:
-> > pl011_tx_softirq() currently uses spin_{,un}lock(), which are not
-> > sufficient to inhibit pl011_int() from being triggered by a local
-> > IRQ and trying to re-take the same lock.  This can lead to
-> > deadlocks.
-> > 
-> > This patch uses the _irq() locking variants instead to ensure that
-> > pl011_int() handling for a given port is deferred until any
-> > pl011_tx_softirq() work for that port is complete.
-> > 
-> > Fixes: 734745caeb9f serial/amba-pl011: Activate TX IRQ passively
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Tested-by: Robin Murphy <robin.murphy@arm.com>
-> > Tested-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > Cc: stable <stable@vger.kernel.org> # 4.1
-> > ---
-> >  drivers/tty/serial/amba-pl011.c |    4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
+On Fri, Jul 24, 2015 at 04:56:59AM +0100, yalin wang wrote:
 > 
-> This doesn't apply at all to 4.2-rc3, so I can't apply it :(
+> > On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > 
+> > On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
+> >> A little change to patch_map() function,
+> >> use set_fixmap_offset() to make code more clear.
+> >> 
+> >> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> >> ---
+> >> arch/arm64/kernel/insn.c | 5 ++---
+> >> 1 file changed, 2 insertions(+), 3 deletions(-)
+> >> 
+> >> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> >> index dd9671c..7dafd5a 100644
+> >> --- a/arch/arm64/kernel/insn.c
+> >> +++ b/arch/arm64/kernel/insn.c
+> >> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+> >> 		return addr;
+> >> 
+> >> 	BUG_ON(!page);
+> >> -	set_fixmap(fixmap, page_to_phys(page));
+> >> -
+> >> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> >> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+> >> +			(addr & ~PAGE_MASK));
+> > 
+> > It looks fine. Do you get any compiler warning for the automatic pointer
+> > to long conversion? You may want to add some explicit casts, otherwise:
+> > 
+> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> i have build it, there is no warning about this change. :)
 
-This is applicable to 4.1 stable only, since the code this patch fixes
-was replaced in 4.2-rc1.
+I see no warnings with defconfig, but there's an (unrelated) set of warnings if
+CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA are enabled:
 
-Apologies, I didn't make that clear in the text.
+----
+In file included from ./arch/arm64/include/asm/fixmap.h:85:0,
+                 from arch/arm64/kernel/insn.c:32:
+arch/arm64/kernel/insn.c: In function ?__aarch64_insn_write?:
+include/asm-generic/fixmap.h:73:2: warning: ?addr? may be used uninitialized in this function [-Wmaybe-uninitialized]
+  __set_fixmap(idx, phys, flags);         \
+  ^
+include/asm-generic/fixmap.h:72:16: note: ?addr? was declared here
+  unsigned long addr;          \
+                ^
+include/asm-generic/fixmap.h:79:2: note: in expansion of macro ?__set_fixmap_offset?
+  __set_fixmap_offset(idx, phys, FIXMAP_PAGE_NORMAL)
+  ^
+arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
+  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+                 ^
+----
 
-Cheers
----Dave
+That seems to be due to the definition of __set_fixmap_offset in
+asm-generic/fixmap.h:
+
+/* Return a pointer with offset calculated */
+#define __set_fixmap_offset(idx, phys, flags)		      \
+({							      \
+	unsigned long addr;				      \
+	__set_fixmap(idx, phys, flags);			      \
+	addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
+	addr;						      \
+})
+
+Where that new addr variable shadows patch_map's addr argument when the call to
+__set_fixmap is expanded.
+
+Which means that this patch currently breaks CONFIG_DEBUG_SET_MODULE_RONX and
+CONFIG_DEBUG_RODATA.
+
+Thanks,
+Mark.
