@@ -1,36 +1,54 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Fri, 24 Jul 2015 18:11:47 +0200
-Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
-In-Reply-To: <871tfzif17.fsf@kamboji.qca.qualcomm.com>
-References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
- <CACna6rzFYpwbzM+s-KzFQmTym4iLVn+Ap+DWgFmAZzhWKTQfJw@mail.gmail.com>
- <871tfzif17.fsf@kamboji.qca.qualcomm.com>
-Message-ID: <CAGhQ9VyH4yvnU_kPAy3a7Z+80jNV8uNoTr=Nd=eV2D-iz9YVUQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 24 Jul 2015 17:13:02 +0100
+Subject: [PATCH v2 1/2] ARM: PCI: bios32: replace panic with WARN messages on
+ failures
+Message-ID: <1437754383-8162-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 July 2015 at 08:06, Kalle Valo <kvalo@codeaurora.org> wrote:
-> Rafa? Mi?ecki <zajec5@gmail.com> writes:
->
->>> +       if (bus->host_pdev) {
->>> +               struct device *dev = &bus->host_pdev->dev;
->>> +
->>> +               of_platform_populate(dev->of_node, of_default_bus_match_table,
->>> +                                    NULL, dev);
->>> +       }
->>> +
->>
->> This caused a compile error when using bcma as module:
->> ERROR: "of_default_bus_match_table" [drivers/bcma/bcma.ko] undefined!
+In the ARM PCI bios32 layer, failures to dynamically allocate pci_sys_data
+for a PCI bus, or a PCI bus scan failure have to be considered serious
+warnings but they should not trigger a system panic so that at least the
+system is given a chance to be debugged.
 
-I encountered the same problem with my modular memory controller driver.
+This patch replaces the panic statements with WARN() messages to
+improve error reporting in the ARM PCI bios32 layer.
 
->> There are two options I guess:
->> 1) Export of_default_bus_match_table
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kernel/bios32.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-See link below for Rob Herring's take on that.
-http://marc.info/?l=linaro-kernel&m=143766694414121&w=2
-
-
-regards,
-Joachim Eastwood
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index fcbbbb1..a5c782c 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -459,8 +459,8 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 
+ 	for (nr = busnr = 0; nr < hw->nr_controllers; nr++) {
+ 		sys = kzalloc(sizeof(struct pci_sys_data), GFP_KERNEL);
+-		if (!sys)
+-			panic("PCI: unable to allocate sys data!");
++		if (WARN(!sys, "PCI: unable to allocate sys data!"))
++			break;
+ 
+ #ifdef CONFIG_PCI_MSI
+ 		sys->msi_ctrl = hw->msi_ctrl;
+@@ -489,8 +489,10 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+ 				sys->bus = pci_scan_root_bus(parent, sys->busnr,
+ 						hw->ops, sys, &sys->resources);
+ 
+-			if (!sys->bus)
+-				panic("PCI: unable to scan bus!");
++			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
++				kfree(sys);
++				break;
++			}
+ 
+ 			busnr = sys->bus->busn_res.end + 1;
+ 
+-- 
+2.2.1
