@@ -1,65 +1,55 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Fri, 24 Jul 2015 17:00:13 +0800
-Subject: [PATCH v6 1/3] dt-bindings: pwm: add MediaTek display PWM bindings
-In-Reply-To: <8769951.Y5Edyg2WDJ@ubix>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <1437380237-28961-2-git-send-email-yh.huang@mediatek.com>
- <8769951.Y5Edyg2WDJ@ubix>
-Message-ID: <CAGS+omAzhfCAoGArK8XUMhNFuqiErPcvGh0q=+Se1dHeBnJyUg@mail.gmail.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Fri, 24 Jul 2015 14:33:08 +0530
+Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+Message-ID: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 4:40 PM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
-> On Monday, July 20, 2015 04:17:15 PM YH Huang wrote:
->> Document the device-tree binding of MediatTek display PWM.
->> The PWM has one channel to control the backlight brightness for display.
->> It supports MT8173 and MT6595.
->>
->> Signed-off-by: YH Huang <yh.huang@mediatek.com>
->> ---
->>  .../devicetree/bindings/pwm/pwm-mtk-disp.txt       | 42
->> ++++++++++++++++++++++ 1 file changed, 42 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
->> b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt new file mode
->> 100644
->> index 0000000..f8f59ba
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
->> @@ -0,0 +1,42 @@
->> +MediaTek display PWM controller
->> +
->> +Required properties:
->> + - compatible: should be "mediatek,<name>-disp-pwm":
->> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
->> +   - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
->
-> I had another look on the mt6589 datasheet and for me it doesn't look like as
-> if this drivers is compatible to mt6589.
+In current VFIO MSI/MSI-X implementation, linux host kernel
+allocates MSI/MSI-X vectors when userspace requests through vfio ioctls.
+Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
+to the userspace when raised.
+Guest OS will see emulated MSI/MSI-X controller and receives an interrupt
+when kernel notifies the same via irqfd.
 
-Matthias - the compatible is "mt6595", not mt6589 :-).
-Which datasheet did you check?
+Host kernel allocates MSI/MSI-X using standard linux routines
+like pci_enable_msix_range() and pci_enable_msi_range(). 
+These routines along with requset_irq() in host kernel sets up 
+MSI/MSI-X vectors with Physical MSI/MSI-X addresses provided by
+interrupt controller driver in host kernel.
 
--Dan
+This means when a device is assigned with the guest OS, MSI/MSI-X addresses
+present in PCIe EP are the PAs programmed by the host linux kernel.
 
+In x86 MSI/MSI-X physical address range is reserved and iommu is aware
+about these addreses and transalation is bypassed for these address range.
 
->
-> DISP_PWM_CON_0 offset 0x10 maps to interrupt enable register and
-> DISP_PWM_CON_1 offset 0x14 maps to interrupt status register.
->
-> This looks wrong to me, as you use both registers to write clock divider and
-> clock period.
->
-> Regarding that this is v6 of the patch set, I would propose that you just drop
-> the compatible string for mt6589 or you implement the register offset on basis
-> of the compatible string so that mt6589 can you the driver as well.
->
-> Best regards,
-> Matthias
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical address range and
+all the transactions including MSI go through iommu/smmu without bypass.
+This requires extending current vfio MSI layer with additional functionality
+for ARM/ARM64 by
+1. Programing IOVA (referred as a MSI virtual doorbell address)
+   in device's MSI vector as a MSI address.
+   This IOVA will be provided by the userspace based on the
+   MSI/MSI-X addresses reserved for the guest.
+2. Create an IOMMU mapping between this IOVA and
+   Physical address (PA) assigned to the MSI vector.
+
+This RFC is proposing a solution for MSI/MSI-X passthrough for ARM/ARM64.
+
+Pranavkumar Sawargaonkar (2):
+  drivers: vfio: iommu map and unmap device specific memory from
+    kernel.
+  drivers: vfio: pci: Add virtual MSI doorbell support.
+
+ drivers/vfio/pci/vfio_pci.c         |   32 ++++++++++++++++++
+ drivers/vfio/pci/vfio_pci_intrs.c   |   64 +++++++++++++++++++++++++++++++++++
+ drivers/vfio/pci/vfio_pci_private.h |    3 ++
+ drivers/vfio/vfio.c                 |   29 ++++++++++++++++
+ drivers/vfio/vfio_iommu_type1.c     |   60 ++++++++++++++++++++++++++++++++
+ include/linux/vfio.h                |   11 +++++-
+ include/uapi/linux/vfio.h           |   19 +++++++++++
+ 7 files changed, 217 insertions(+), 1 deletion(-)
+
+-- 
+1.7.9.5
