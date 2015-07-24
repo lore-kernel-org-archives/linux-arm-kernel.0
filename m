@@ -1,52 +1,76 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 24 Jul 2015 10:51:58 +0100
-Subject: [Xen-devel] [PATCH v2 01/20] xen: Add Xen specific page definition
-In-Reply-To: <55B209D9.1080602@citrix.com>
+Date: Fri, 24 Jul 2015 10:54:30 +0100
+Subject: [Xen-devel] [PATCH v2 02/20] xen: Introduce a function to split
+ a Linux page into Xen page
+In-Reply-To: <55B205FB.5080209@citrix.com>
 References: <1436474552-31789-1-git-send-email-julien.grall@citrix.com>
- <1436474552-31789-2-git-send-email-julien.grall@citrix.com>
- <55B20540.3020000@citrix.com> <55B207C6.4020300@citrix.com>
- <55B209D9.1080602@citrix.com>
-Message-ID: <55B20ABE.7000609@citrix.com>
+ <1436474552-31789-3-git-send-email-julien.grall@citrix.com>
+ <55B205FB.5080209@citrix.com>
+Message-ID: <55B20B56.7020605@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/07/15 10:48, David Vrabel wrote:
-> On 24/07/15 10:39, Julien Grall wrote:
->> Hi David,
+On 24/07/15 10:31, David Vrabel wrote:
+> On 09/07/15 21:42, Julien Grall wrote:
+>> The Xen interface is always using 4KB page. This means that a Linux page
+>> may be split across multiple Xen page when the page granularity is not
+>> the same.
 >>
->> On 24/07/15 10:28, David Vrabel wrote:
->>> On 09/07/15 21:42, Julien Grall wrote:
->>>> The Xen hypercall interface is always using 4K page granularity on ARM
->>>> and x86 architecture.
->>>>
->>>> With the incoming support of 64K page granularity for ARM64 guest, it
->>>> won't be possible to re-use the Linux page definition in Xen drivers.
->>>>
->>>> Introduce Xen page definition helpers based on the Linux page
->>>> definition. They have exactly the same name but prefixed with
->>>> XEN_/xen_ prefix.
->>>>
->>>> Also modify page_to_pfn to use new Xen page definition.
->>>>
->>>> Signed-off-by: Julien Grall <julien.grall@citrix.com>
->>>> Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>>> Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>>> Cc: David Vrabel <david.vrabel@citrix.com>
->>>> ---
->>>>     I'm wondering if we should drop page_to_pfn has the macro will likely
->>>>     misuse when Linux is using 64KB page granularity.
->>>
->>> I think we want xen_gfn_to_page() and xen_page_to_gfn() and Xen
->>> front/back drivers never deal with PFNs only GFNs.
->>
->> What is xen_gfn_to_page and xen_page_to_gfn? Neither Linux, nor my
->> series have them.
+>> This helper will break down a Linux page into 4KB chunk and call the
+>> helper on each of them.
+> [...]
+>> --- a/include/xen/page.h
+>> +++ b/include/xen/page.h
+>> @@ -39,4 +39,24 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS];
+>>  
+>>  extern unsigned long xen_released_pages;
+>>  
+>> +typedef int (*xen_pfn_fn_t)(struct page *page, unsigned long pfn, void *data);
+>> +
+>> +/* Break down the page in 4KB granularity and call fn foreach xen pfn */
+>> +static inline int xen_apply_to_page(struct page *page, xen_pfn_fn_t fn,
+>> +				    void *data)
 > 
-> I suggesting that you introduce these.
+> I think this should be outlined (unless you have measurements that
+> support making it inlined).
 
-It's still not clear to me what you are suggesting here... Do you
-suggest to rename xen_pfn_to_page and xen_page_to_pfn by xen_gfn_to_page
-and xen_page_to_gfn?
+I don't have any performance measurements. Although, when Linux is using
+4KB page granularity, the loop in this helper will be dropped by the
+helper. The code would look like:
+
+unsigned long pfn = xen_page_to_pfn(page);
+
+ret = fn(page, fn, data);
+if (ret)
+  return ret;
+
+The compiler could even inline the callback (fn). So it drops 2
+functions call.
+
+> 
+> Also perhaps make it
+> 
+> int xen_for_each_gfn(struct page *page,
+>                      xen_gfn_fn_t fn, void *data);
+
+gfn standing for Guest Frame Number right?
+
+> or
+> 
+> int xen_for_each_gfn(struct page **page, unsigned int count,
+>                      xen_gfn_fn_t fn, void *data);
+
+count being the number of Linux page or Xen page? We have some code (see
+xlate_mmu patch #19) requiring to iter on a specific number of Xen page.
+I was thinking to introduce a separate function for iterating on a
+specific number of Xen PFN.
+
+We don't want to introduce it for everyone as we need to hide this
+complexity from most the caller.
+
+In general case, the 2 suggestions would not be very useful. Most of the
+time we have some actions to do per Linux page (see the balloon code for
+instance).
 
 Regards,
 
