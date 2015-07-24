@@ -1,64 +1,91 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 24 Jul 2015 17:10:58 +0800
-Subject: [PATCH v6 0/3] Add MediaTek display PWM driver
-In-Reply-To: <2181696.fQcvS98Cqx@ubix>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <2181696.fQcvS98Cqx@ubix>
-Message-ID: <1437729058.11386.4.camel@mtksdaap41>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 24 Jul 2015 17:14:12 +0800
+Subject: [PATCH v2 3/7] genirq: irqdomain: Add irq_create_acpi_mapping
+In-Reply-To: <1437656713-9677-4-git-send-email-marc.zyngier@arm.com>
+References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+ <1437656713-9677-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55B201E4.7060704@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 10:42 +0200, Matthias Brugger wrote:
-> On Monday, July 20, 2015 04:17:14 PM YH Huang wrote:
-> > This patch series add the use of display PWM driver, documentation
-> > and device tree for Mediatek SoCs. The driver is used to support
-> > the backlight of the panel. This is based on v4.2-rc1.
-> > 
-> > The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
-> > clk: mediatek: Add subsystem clocks of MT8173
-> > 
-> > Change in v6:
-> > 1. Enable clocks in the pwm_enable function
-> > 2. Remove suspend/resume code since pwm-backlight driver has done the same
-> > things 3. Revise some code to make it easier to read
-> > 
-> 
-> Can you please provide the whole change log for all versions the next time.
-> It's easier this way to understand the evolution of the series.
+On 07/23/2015 09:05 PM, Marc Zyngier wrote:
+> In order to help ACPI on arm64 to make use of most of the irqdomain
+> goodies, add a new entry point (irq_create_acpi_mapping) which
+> mimics irq_create_of_mapping, except that it takes a new
+> struct acpi_gsi_descriptor, which is the pendent of of_phandle_args
+> in the OF world.
+>
+> We assume that the way the acpi_gsi_descriptor is populated matches
+> that of of_phandle_args, as the latter is still the building block
+> for interrupt descriptor in the whole kernel.
+>
+> Eventually, these two representations should be merged in a single
+> structure, but that's probably for another day.
 
-Change in v6:
-1. Enable clocks in the pwm_enable function.
-2. Remove suspend/resume code since pwm-backlight driver has done the
-same things.
-3. Revise some code to make it easier to read.
+...
 
-Change in v5:
-1. Configure PWM output via pinctrl.
-2. Fix the parameter name in dtsi.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   include/linux/acpi.h   |  9 +++++++++
+>   kernel/irq/irqdomain.c | 18 ++++++++++++++++++
+>   2 files changed, 27 insertions(+)
+>
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index d2445fa..2f23ab0 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -205,6 +205,15 @@ int acpi_register_gsi (struct device *dev, u32 gsi, int triggering, int polarity
+>   int acpi_gsi_to_irq (u32 gsi, unsigned int *irq);
+>   int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 *gsi);
+>
+> +#define MAX_GSI_DESC_PARAMS 16
+> +struct acpi_gsi_descriptor {
+> +	int param_count;
+> +	u32 param[MAX_GSI_DESC_PARAMS];
+> +};
+> +
+> +unsigned int irq_create_acpi_mapping(struct irq_domain *d,
+> +				     struct acpi_gsi_descriptor *irq_data);
+> +
+>   #ifdef CONFIG_X86_IO_APIC
+>   extern int acpi_get_override_irq(u32 gsi, int *trigger, int *polarity);
+>   #else
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 27f4ec7..542cda3 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -1,5 +1,6 @@
+>   #define pr_fmt(fmt)  "irq: " fmt
+>
+> +#include <linux/acpi.h>
+>   #include <linux/debugfs.h>
+>   #include <linux/hardirq.h>
+>   #include <linux/interrupt.h>
+> @@ -557,6 +558,23 @@ unsigned int irq_create_of_mapping(struct of_phandle_args *irq_data)
+>   }
+>   EXPORT_SYMBOL_GPL(irq_create_of_mapping);
+>
+> +#ifdef CONFIG_ACPI
+> +unsigned int irq_create_acpi_mapping(struct irq_domain *d,
+> +				     struct acpi_gsi_descriptor *irq_data)
+> +{
+> +	struct of_phandle_args args;
+> +	int i;
+> +
+> +	for (i = 0; i < min(irq_data->param_count, MAX_PHANDLE_ARGS); i++)
+> +		args.args[i] = irq_data->param[i];
+> +
+> +	args.np = d ? d->domain_token : NULL;
+> +	args.args_count = i;
+> +
+> +	return irq_create_of_mapping(&args);
+> +}
 
-Change in v4:
-1. Codebase is on v4.2-rc1.
-2. Add the PWM node in dtsi.
-3. Change the dependency in Kconfig.
-4. Rewrite some code for readability.
+A little bit of hack to me :) , but I agree it's the first step to
+merge them in a single structure,
 
-Change in v3:
-1. Add suspend/resume function.
-2. Fix the formula for high_width calculation.
-3. Rewrite some code to make it easier to read.
-4. Add more information in the commit message.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
-Change in v2:
-1. Rewrite descriptions for driver in kconfig to make it much clear.
-2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
-3. Disable clocks in the error path.
-4. Change the shift values in decimal instead of hex.
-5. Rename and add some variables or function name for consistency and
-readability.
-6. Drop unnecessary parentheses, spaces, variables and add newlines to
-make the code easiler to read.
-
-Thanks for your suggestion.
-
-Regards,
-YH Huang
+Thanks
+Hanjun
