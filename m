@@ -1,206 +1,50 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Fri, 24 Jul 2015 16:18:22 +0800
-Subject: [PATCH v11 1/5] drm/layerscape: Add Freescale DCU DRM driver
-In-Reply-To: <20150724074859.GJ16722@phenom.ffwll.local>
-References: <1437386042-34825-1-git-send-email-jianwei.wang.chn@gmail.com>
- <CANk3uyCOCALEjH7Sk4pJtvowyL4qnAiPmUzcrFha3GbuCTAP9Q@mail.gmail.com>
- <20150724074859.GJ16722@phenom.ffwll.local>
-Message-ID: <CANk3uyDVj-UHpxpEkvtC+DrKERS5MsLbxdBCCJGPiA+VQoP0Tw@mail.gmail.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Fri, 24 Jul 2015 16:27:52 +0800
+Subject: [PATCH v2 0/7] Making the generic ACPI GSI layer irqdomain aware
+In-Reply-To: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <55B1F708.3010804@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 3:48 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Fri, Jul 24, 2015 at 11:21:57AM +0800, jianwei wang wrote:
->> Hi Dave,
->>
->> I think Freescale DCU DRM driver is ready now, can it land?
->>
->> I have worked on this driver for about nine month. Daniel Vetter,
->> Thierry Reding, Mark yao,
->> Alexander Stein, Paul Bolle, Alison Wang, Stefan Agner reviewed this
->> pathset. The latest
->> version v11 has been send out about an week, and no more comments any more.
->
-> On a quick look about overall process there's a few bits missing still:
-> - review from dt maintainer for the device-tree pieces (review from an
->   original author like Alice Wang doesn't count).
-> - needs one patch for MAINTAINER entry for drm/layerscape.
-> - just send a pull request to Dave once you have this all.
->
-> Cheers, Daniel
+Hi Marc,
 
-Okay, Thanks!
-
-BR.
-Jianwei
-
->>
->> BR.
->> Jianwei
->>
->> On Mon, Jul 20, 2015 at 5:53 PM, Jianwei Wang
->> <jianwei.wang.chn@gmail.com> wrote:
->> > This patch add support for Two Dimensional Animation and Compositing
->> > Engine (2D-ACE) on the Freescale SoCs.
->> >
->> > 2D-ACE is a Freescale display controller. 2D-ACE describes
->> > the functionality of the module extremely well its name is a value
->> > that cannot be used as a token in programming languages.
->> > Instead the valid token "DCU" is used to tag the register names and
->> > function names.
->> >
->> > The Display Controller Unit (DCU) module is a system master that
->> > fetches graphics stored in internal or external memory and displays
->> > them on a TFT LCD panel. A wide range of panel sizes is supported
->> > and the timing of the interface signals is highly configurable.
->> > Graphics are read directly from memory and then blended in real-time,
->> > which allows for dynamic content creation with minimal CPU
->> > intervention.
->> >
->> > The features:
->> > (1) Full RGB888 output to TFT LCD panel.
->> > (2) Blending of each pixel using up to 4 source layers
->> > dependent
->> > on size of panel.
->> > (3) Each graphic layer can be placed with one pixel resolution
->> > in either axis.
->> > (4) Each graphic layer support RGB565 and RGB888 direct colors
->> > without alpha channel and BGRA8888 BGRA4444 ARGB1555 direct
->> > colors
->> > with an alpha channel and YUV422 format.
->> > (5) Each graphic layer support alpha blending with 8-bit
->> > resolution.
->> >
->> > This is a simplified version, only one primary plane, one
->> > framebuffer, one crtc, one connector and one encoder for TFT
->> > LCD panel.
->> >
->> > Signed-off-by: Alison Wang <b18965@freescale.com>
->> > Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
->> > Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
->> > Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
->> > Reviewed-by: Alison Wang <alison.wang@freescale.com>
->> > ---
->> >
->> >
->> > Changed in V11
->> > -set regmap_config.cache_type to REGCACHE_FLAT
->> > Advanced by Alexander Stein
->> >
->> > Changed in V10
->> > -adjust commit log, remove meaningless statement
->> > -cleanup code for it's format and style.
->> > -remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
->> > -remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
->> > -add vendor prefix for panel pandle
->> > -make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
->> > -introduce per-SoC capability structure to avoid check on the OF node's compatible string
->> > -Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
->> > -move DCU config sentence to the right place
->> > -move get resources functions to  ->probe()
->> > -move fsl,dcu.txt to video/ folder
->> > -add big-endian describe
->> > All advaced by Thierry Reding
->> >
->> > Changed in V9
->> >
->> > -put node after calling of_drm_find_panel
->> > -split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
->> > -check regmap_write/regmap_read return return value
->> > -remove useless ".owner    = THIS_MODULE,"
->> > All advanced by Mark Yao
->> >
->> > Changed in V8
->> >
->> > - Remove useless code
->> >  #define DRIVER_NAME     "fsl-dcu-drm"
->> >  MODULE_ALIAS("platform:fsl-dcu-drm");
->> > Adviced by Paul Bolle
->> >
->> > Changed in V7
->> >
->> > - Remove redundant functions and replace deprecated hooker
->> > Adviced by Daniel Vetter
->> > - Replace drm_platform_init with drm_dev_alloc/register
->> > Adviced by Daniel Vetter
->> >
->> > Changed in V6
->> >
->> > - Add NEC nl4827hc19_05b panel to panel-simple.c
->> > Adviced by Mark Yao
->> > - Add DRIVER_ATOMIC for driver_features
->> > Adviced by Mark Yao
->> > - check fsl_dev if it's NULL at PM suspend/resume
->> > Adviced by Mark Yao
->> >
->> > Changed in V5
->> >
->> > - Update commit message
->> > - Add layer registers initialization
->> > - Remove unused functions
->> > - Rename driver folder
->> > Adviced by Stefan Agner
->> > - Move pixel clock control functions to fsl_dcu_drm_drv.c
->> > - remove redundant enable the clock implicitly using regmap
->> > - Add maintainer message
->> >
->> > Changed in V4:
->> >
->> > -This version doesn't have functionality changed
->> > Just a minor adjustment.
->> >
->> > Changed in V3:
->> >
->> > - Test driver on Vybrid board and add compatible string
->> > - Remove unused functions
->> > - set default crtc for encoder
->> > - replace legacy functions with atomic help functions
->> > Adviced by Daniel Vetter
->> > - Set the unique name of the DRM device
->> > - Implement irq handle function for vblank interrupt
->> >
->> > Changed in v2:
->> > - Add atomic support
->> > Adviced by Daniel Vetter
->> > - Modify bindings file
->> > - Rename node for compatibility
->> > - Move platform related code out for compatibility
->> > Adviced by Stefan Agner
->> >
->> >
->> >  .../devicetree/bindings/video/fsl,dcu.txt          |  22 ++
->> >  MAINTAINERS                                        |   8 +
->> >  drivers/gpu/drm/Kconfig                            |   2 +
->> >  drivers/gpu/drm/Makefile                           |   1 +
->> >  drivers/gpu/drm/fsl-dcu/Kconfig                    |  18 +
->> >  drivers/gpu/drm/fsl-dcu/Makefile                   |   7 +
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         | 208 +++++++++++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h         |  19 +
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          | 403 +++++++++++++++++++++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          | 197 ++++++++++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c        |  23 ++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  43 +++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  33 ++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c        | 261 +++++++++++++
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h        |  17 +
->> >  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          | 182 ++++++++++
->> >  16 files changed, 1444 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/video/fsl,dcu.txt
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/Kconfig
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/Makefile
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h
->> >  create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
->> >
+On 07/23/2015 09:05 PM, Marc Zyngier wrote:
+> The irqdomain code is not entierely really ACPI friendly, as it has
+> some built-in knowledge of the device-tree. Nothing too harmful, but
+> enough to scare the ARM ACPI developpers which end up with their own
+> version of the square wheel.
 >
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+> This small patch series adapt the irqdomain code to remove the hurdles
+> that prevent the full blown irqdomain subsystem to be used on ACPI,
+> creates an interface between the GSI layer and the irqdomain, and as
+> an example, convert the ARM GIC ACPI support to use irqdomains as
+> originally intended.
+>
+> Overall, this gives us a way to use irqdomains on both DT and ACPI
+> enabled platforms, having very little changes made to the actual
+> drivers (other than the probing infrastructure). Because we keep the
+> flow of information between the various layers identical between ACPI
+> and DT, we immediately benefit from the existing infrastructure.
+>
+> I'd really like to hear what people think of that approach, as it
+> looks to me a lot simpler than the other approaches currently put on
+> the list. The "convert the GSI information to be DT friendly" is
+> admitedly not very pretty, but I see it as a stepping stone towards
+> unifying the two structures.
+>
+> This has been test-booted on Juno, is based on my irq/ncpi-msi-v3
+> branch, and available at:
+>
+> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gsi-irq-domain-v2
+
+Pulled and rebased my self-probing and GICv3 ACPI support patches on
+top of it, tested on FVP and QEMU, booted OK, for this patch set,
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
+
+I will sync with Suravee to prepare a single patch for
+ACPI self-probing, GICv2m and GICv3 support.
+
+Thank you for putting thing together!
+Hanjun
