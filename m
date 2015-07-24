@@ -1,79 +1,76 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Fri, 24 Jul 2015 10:43:49 +0100
-Subject: [RFC PATCH 03/10] arm64: Delay ELF HWCAP initialisation until all
- CPUs are up
+Date: Fri, 24 Jul 2015 10:43:52 +0100
+Subject: [RFC PATCH 06/10] arm64: Add helper to decode register from
+ instruction
 In-Reply-To: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
 References: <1437731037-25795-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1437731037-25795-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1437731037-25795-7-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "Suzuki K. Poulose" <suzuki.poulose@arm.com>
 
-Delay the ELF HWCAP initialisation untill all the CPUs are up.
-This is in preparation for detecting the common features across
-the CPUS and creating a consistent ELF HWCAP for the system.
+Add a helper to extract the register field from a given
+instruction.
 
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- arch/arm64/kernel/setup.c |   19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/insn.h |    2 ++
+ arch/arm64/kernel/insn.c      |   29 +++++++++++++++++++++++++++++
+ 2 files changed, 31 insertions(+)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index a30cf1d..2a36d27 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -103,6 +103,8 @@ static struct resource mem_res[] = {
- 	}
- };
- 
-+static void setup_processor_features(void);
-+
- #define kernel_code mem_res[0]
- #define kernel_data mem_res[1]
- 
-@@ -212,6 +214,7 @@ static void __init hyp_mode_check(void)
- 
- void __init do_post_cpus_up_work(void)
- {
-+	setup_processor_features();
- 	hyp_mode_check();
- 	apply_alternatives_all();
- }
-@@ -223,19 +226,12 @@ void __init up_late_init(void)
- }
- #endif /* CONFIG_UP_LATE_INIT */
- 
--static void __init setup_processor(void)
-+static void __init setup_processor_features(void)
- {
- 	u64 features, block;
- 	u32 cwg;
- 	int cls;
- 
--	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
--
--	sprintf(init_utsname()->machine, ELF_PLATFORM);
--	elf_hwcap = 0;
--
--	cpuinfo_store_boot_cpu();
--
- 	/*
- 	 * Check for sane CTR_EL0.CWG value.
- 	 */
-@@ -312,6 +308,13 @@ static void __init setup_processor(void)
- #endif
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 30e50eb..6dea3bc 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -289,6 +289,8 @@ enum aarch64_insn_encoding_class aarch64_get_insn_class(u32 insn);
+ u64 aarch64_insn_decode_immediate(enum aarch64_insn_imm_type type, u32 insn);
+ u32 aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 				  u32 insn, u64 imm);
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					 u32 insn);
+ u32 aarch64_insn_gen_branch_imm(unsigned long pc, unsigned long addr,
+ 				enum aarch64_insn_branch_type type);
+ u32 aarch64_insn_gen_comp_branch_imm(unsigned long pc, unsigned long addr,
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index dd9671c..d44aa04 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -389,6 +389,35 @@ u32 __kprobes aarch64_insn_encode_immediate(enum aarch64_insn_imm_type type,
+ 	return insn;
  }
  
-+static void __init setup_processor(void)
++u32 aarch64_insn_decode_register(enum aarch64_insn_register_type type,
++					u32 insn)
 +{
-+	pr_info("Boot CPU: AArch64 Processor [%08x]\n", read_cpuid_id());
-+	sprintf(init_utsname()->machine, ELF_PLATFORM);
-+	cpuinfo_store_boot_cpu();
++	int shift;
++
++	switch (type) {
++	case AARCH64_INSN_REGTYPE_RT:
++	case AARCH64_INSN_REGTYPE_RD:
++		shift = 0;
++		break;
++	case AARCH64_INSN_REGTYPE_RN:
++		shift = 5;
++		break;
++	case AARCH64_INSN_REGTYPE_RT2:
++	case AARCH64_INSN_REGTYPE_RA:
++		shift = 10;
++		break;
++	case AARCH64_INSN_REGTYPE_RM:
++		shift = 16;
++		break;
++	default:
++		pr_err("%s: unknown register type encoding %d\n", __func__,
++		       type);
++		return 0;
++	}
++
++	return (insn >> shift) & GENMASK(4, 0);
 +}
 +
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
- 	void *dt_virt = fixmap_remap_fdt(dt_phys);
+ static u32 aarch64_insn_encode_register(enum aarch64_insn_register_type type,
+ 					u32 insn,
+ 					enum aarch64_insn_register reg)
 -- 
 1.7.9.5
