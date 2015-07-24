@@ -1,185 +1,255 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 24 Jul 2015 16:27:18 -0500
-Subject: [PATCH 1/2] of: base: Allow more args than MAX_PHANDLE_ARGS if
- required
-In-Reply-To: <20150716110900.GA30130@suse.de>
-References: <1437035444-13867-1-git-send-email-joro@8bytes.org>
- <1437035444-13867-2-git-send-email-joro@8bytes.org>
- <20150716102325.GC26390@arm.com> <20150716110900.GA30130@suse.de>
-Message-ID: <55B2ADB6.3040307@gmail.com>
+From: emunson@akamai.com (Eric B Munson)
+Date: Fri, 24 Jul 2015 17:28:40 -0400
+Subject: [PATCH V5 2/7] mm: mlock: Add new mlock system call
+In-Reply-To: <1437773325-8623-1-git-send-email-emunson@akamai.com>
+References: <1437773325-8623-1-git-send-email-emunson@akamai.com>
+Message-ID: <1437773325-8623-3-git-send-email-emunson@akamai.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 6:09 AM, Joerg Roedel <jroedel@suse.de> wrote:
-> Hi Will,
->
-> On Thu, Jul 16, 2015 at 11:23:26AM +0100, Will Deacon wrote:
->> On Thu, Jul 16, 2015 at 09:30:43AM +0100, Joerg Roedel wrote:
->> > +struct of_phandle_args *of_alloc_phandle_args(int size)
->> > +{
->> > +   struct of_phandle_args *args;
->> > +   int e = max(0, size - MAX_PHANDLE_ARGS);
->> > +
->> > +   args =  kzalloc(sizeof(struct of_phandle_args) + e * sizeof(uint32_t),
->> > +                   GFP_KERNEL);
->>
->> Should you also update args->args_count to reflect the extended array?
->
-> The args_count member just tells us how many of the array elements are
-> used and not how many there are. So it doesn't need to be updated here.
->
->> That said, extending the fixed-size array member like this feels a bit
->> fragile. Does GCC not complain about out-of-bounds accesses if you
->> statically address args->args[MAX_PHANDLE_ARGS]? Admittedly, I can't
->> think *why* this would be break (things like additional padding will be
->> harmless), but I'm not intimate with the C standard.
->
-> Yeah, I agree, it is not the best possible solution. But this way I
-> don't need to update all callers, and thus it works better with our
-> development model.
+With the refactored mlock code, introduce a new system call for mlock.
+The new call will allow the user to specify what lock states are being
+added.  mlock2 is trivial at the moment, but a follow on patch will add
+a new mlock state making it useful.
 
-Our development model is not to work-around kernel APIs last time I checked.
+Signed-off-by: Eric B Munson <emunson@akamai.com>
+Cc: Michal Hocko <mhocko@suse.cz>
+Cc: Vlastimil Babka <vbabka@suse.cz>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: linux-alpha at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: adi-buildroot-devel at lists.sourceforge.net
+Cc: linux-cris-kernel at axis.com
+Cc: linux-ia64 at vger.kernel.org
+Cc: linux-m68k at lists.linux-m68k.org
+Cc: linux-am33-list at redhat.com
+Cc: linux-parisc at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-s390 at vger.kernel.org
+Cc: linux-sh at vger.kernel.org
+Cc: sparclinux at vger.kernel.org
+Cc: linux-xtensa at linux-xtensa.org
+Cc: linux-api at vger.kernel.org
+Cc: linux-arch at vger.kernel.org
+Cc: linux-mm at kvack.org
+---
+Changes from V4:
+* Drop all architectures except x86[_64] from this patch, MIPS is added
+  later in the series.  All others will be left to their maintainers.
 
-> But I am open for suggestions on how to solve this problem better. In
-> fact, my main motivation in sending this was to get the discussion about
-> an upstreamable solution started :)
->
-> Lets see what the device-tree maintainers have to say.
+Changes from V3:
+* Do a (hopefully) complete job of adding the new system calls
+ arch/alpha/include/uapi/asm/mman.h     | 2 ++
+ arch/mips/include/uapi/asm/mman.h      | 5 +++++
+ arch/parisc/include/uapi/asm/mman.h    | 2 ++
+ arch/powerpc/include/uapi/asm/mman.h   | 2 ++
+ arch/sparc/include/uapi/asm/mman.h     | 2 ++
+ arch/tile/include/uapi/asm/mman.h      | 5 +++++
+ arch/x86/entry/syscalls/syscall_32.tbl | 1 +
+ arch/x86/entry/syscalls/syscall_64.tbl | 1 +
+ arch/xtensa/include/uapi/asm/mman.h    | 5 +++++
+ include/linux/syscalls.h               | 2 ++
+ include/uapi/asm-generic/mman.h        | 2 ++
+ include/uapi/asm-generic/unistd.h      | 4 +++-
+ kernel/sys_ni.c                        | 1 +
+ mm/mlock.c                             | 9 +++++++++
+ 14 files changed, 42 insertions(+), 1 deletion(-)
 
-A good number of callers and all iommu callers loop thru the list of 
-phandles which are just open coded ATM. So we should do loop iterators 
-here. With iterators, we can do the allocation within the iterators. 
-This can be much more efficient as we don't iterate thru the list from 
-the start every time. Normally, the list is not big enough to matter, 
-but in your case it may be.
-
-I'm thinking something like this untested and not yet compiling patch. It 
-still has the abuse of adding onto the end of the of_phandle_args 
-struct which I don't really like. We could do a new struct, but I'd like 
-to keep this code common.
-
-I also need to refactor the existing code to use 
-__of_parse_one_phandle_with_args.
-
-Rob
-
-8<--------------------------------------------------------------------------------------------
-diff --git a/drivers/of/base.c b/drivers/of/base.c
-index 8b5a187..c1c5a43 100644
---- a/drivers/of/base.c
-+++ b/drivers/of/base.c
-@@ -1442,6 +1442,96 @@ void of_print_phandle_args(const char *msg, const struct of_phandle_args *args)
- 	printk("\n");
+diff --git a/arch/alpha/include/uapi/asm/mman.h b/arch/alpha/include/uapi/asm/mman.h
+index 0086b47..ec72436 100644
+--- a/arch/alpha/include/uapi/asm/mman.h
++++ b/arch/alpha/include/uapi/asm/mman.h
+@@ -38,6 +38,8 @@
+ #define MCL_CURRENT	 8192		/* lock all currently mapped pages */
+ #define MCL_FUTURE	16384		/* lock all additions to address space */
+ 
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MADV_NORMAL	0		/* no further special treatment */
+ #define MADV_RANDOM	1		/* expect random page references */
+ #define MADV_SEQUENTIAL	2		/* expect sequential page references */
+diff --git a/arch/mips/include/uapi/asm/mman.h b/arch/mips/include/uapi/asm/mman.h
+index cfcb876..67c1cdf 100644
+--- a/arch/mips/include/uapi/asm/mman.h
++++ b/arch/mips/include/uapi/asm/mman.h
+@@ -62,6 +62,11 @@
+ #define MCL_CURRENT	1		/* lock all current mappings */
+ #define MCL_FUTURE	2		/* lock all future mappings */
+ 
++/*
++ * Flags for mlock
++ */
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MADV_NORMAL	0		/* no further special treatment */
+ #define MADV_RANDOM	1		/* expect random page references */
+ #define MADV_SEQUENTIAL 2		/* expect sequential page references */
+diff --git a/arch/parisc/include/uapi/asm/mman.h b/arch/parisc/include/uapi/asm/mman.h
+index 294d251..daab994 100644
+--- a/arch/parisc/include/uapi/asm/mman.h
++++ b/arch/parisc/include/uapi/asm/mman.h
+@@ -32,6 +32,8 @@
+ #define MCL_CURRENT	1		/* lock all current mappings */
+ #define MCL_FUTURE	2		/* lock all future mappings */
+ 
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MADV_NORMAL     0               /* no further special treatment */
+ #define MADV_RANDOM     1               /* expect random page references */
+ #define MADV_SEQUENTIAL 2               /* expect sequential page references */
+diff --git a/arch/powerpc/include/uapi/asm/mman.h b/arch/powerpc/include/uapi/asm/mman.h
+index 6ea26df..189e85f 100644
+--- a/arch/powerpc/include/uapi/asm/mman.h
++++ b/arch/powerpc/include/uapi/asm/mman.h
+@@ -23,6 +23,8 @@
+ #define MCL_CURRENT     0x2000          /* lock all currently mapped pages */
+ #define MCL_FUTURE      0x4000          /* lock all additions to address space */
+ 
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MAP_POPULATE	0x8000		/* populate (prefault) pagetables */
+ #define MAP_NONBLOCK	0x10000		/* do not block on IO */
+ #define MAP_STACK	0x20000		/* give out an address that is best suited for process/thread stacks */
+diff --git a/arch/sparc/include/uapi/asm/mman.h b/arch/sparc/include/uapi/asm/mman.h
+index 0b14df3..13d51be 100644
+--- a/arch/sparc/include/uapi/asm/mman.h
++++ b/arch/sparc/include/uapi/asm/mman.h
+@@ -18,6 +18,8 @@
+ #define MCL_CURRENT     0x2000          /* lock all currently mapped pages */
+ #define MCL_FUTURE      0x4000          /* lock all additions to address space */
+ 
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MAP_POPULATE	0x8000		/* populate (prefault) pagetables */
+ #define MAP_NONBLOCK	0x10000		/* do not block on IO */
+ #define MAP_STACK	0x20000		/* give out an address that is best suited for process/thread stacks */
+diff --git a/arch/tile/include/uapi/asm/mman.h b/arch/tile/include/uapi/asm/mman.h
+index 81b8fc3..f69ce48 100644
+--- a/arch/tile/include/uapi/asm/mman.h
++++ b/arch/tile/include/uapi/asm/mman.h
+@@ -37,5 +37,10 @@
+ #define MCL_CURRENT	1		/* lock all current mappings */
+ #define MCL_FUTURE	2		/* lock all future mappings */
+ 
++/*
++ * Flags for mlock
++ */
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ 
+ #endif /* _ASM_TILE_MMAN_H */
+diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
+index ef8187f..839d5df 100644
+--- a/arch/x86/entry/syscalls/syscall_32.tbl
++++ b/arch/x86/entry/syscalls/syscall_32.tbl
+@@ -365,3 +365,4 @@
+ 356	i386	memfd_create		sys_memfd_create
+ 357	i386	bpf			sys_bpf
+ 358	i386	execveat		sys_execveat			stub32_execveat
++359	i386	mlock2			sys_mlock2
+diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
+index 9ef32d5..ad36769 100644
+--- a/arch/x86/entry/syscalls/syscall_64.tbl
++++ b/arch/x86/entry/syscalls/syscall_64.tbl
+@@ -329,6 +329,7 @@
+ 320	common	kexec_file_load		sys_kexec_file_load
+ 321	common	bpf			sys_bpf
+ 322	64	execveat		stub_execveat
++323	common	mlock2			sys_mlock2
+ 
+ #
+ # x32-specific system call numbers start at 512 to avoid cache impact
+diff --git a/arch/xtensa/include/uapi/asm/mman.h b/arch/xtensa/include/uapi/asm/mman.h
+index 201aec0..11f354f 100644
+--- a/arch/xtensa/include/uapi/asm/mman.h
++++ b/arch/xtensa/include/uapi/asm/mman.h
+@@ -75,6 +75,11 @@
+ #define MCL_CURRENT	1		/* lock all current mappings */
+ #define MCL_FUTURE	2		/* lock all future mappings */
+ 
++/*
++ * Flags for mlock
++ */
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #define MADV_NORMAL	0		/* no further special treatment */
+ #define MADV_RANDOM	1		/* expect random page references */
+ #define MADV_SEQUENTIAL	2		/* expect sequential page references */
+diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
+index b45c45b..56a3d59 100644
+--- a/include/linux/syscalls.h
++++ b/include/linux/syscalls.h
+@@ -884,4 +884,6 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
+ 			const char __user *const __user *argv,
+ 			const char __user *const __user *envp, int flags);
+ 
++asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
++
+ #endif
+diff --git a/include/uapi/asm-generic/mman.h b/include/uapi/asm-generic/mman.h
+index e9fe6fd..242436b 100644
+--- a/include/uapi/asm-generic/mman.h
++++ b/include/uapi/asm-generic/mman.h
+@@ -18,4 +18,6 @@
+ #define MCL_CURRENT	1		/* lock all current mappings */
+ #define MCL_FUTURE	2		/* lock all future mappings */
+ 
++#define MLOCK_LOCKED	0x01		/* Lock and populate the specified range */
++
+ #endif /* __ASM_GENERIC_MMAN_H */
+diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
+index e016bd9..14a6013 100644
+--- a/include/uapi/asm-generic/unistd.h
++++ b/include/uapi/asm-generic/unistd.h
+@@ -709,9 +709,11 @@ __SYSCALL(__NR_memfd_create, sys_memfd_create)
+ __SYSCALL(__NR_bpf, sys_bpf)
+ #define __NR_execveat 281
+ __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
++#define __NR_mlock2 282
++__SYSCALL(__NR_mlock2, sys_mlock2)
+ 
+ #undef __NR_syscalls
+-#define __NR_syscalls 282
++#define __NR_syscalls 283
+ 
+ /*
+  * All syscalls below here should go away really,
+diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
+index 7995ef5..4818b71 100644
+--- a/kernel/sys_ni.c
++++ b/kernel/sys_ni.c
+@@ -193,6 +193,7 @@ cond_syscall(sys_mlock);
+ cond_syscall(sys_munlock);
+ cond_syscall(sys_mlockall);
+ cond_syscall(sys_munlockall);
++cond_syscall(sys_mlock2);
+ cond_syscall(sys_mincore);
+ cond_syscall(sys_madvise);
+ cond_syscall(sys_mremap);
+diff --git a/mm/mlock.c b/mm/mlock.c
+index 1585cca..c9c6a0f 100644
+--- a/mm/mlock.c
++++ b/mm/mlock.c
+@@ -642,6 +642,15 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
+ 	return do_mlock(start, len, VM_LOCKED);
  }
  
-+
-+static int __of_parse_one_phandle_with_args(const __be32 **list,
-+					const char *cells_name,
-+					int cell_count,
-+					struct of_phandle_args **out_args)
++SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
 +{
-+	struct device_node *node;
-+	phandle phandle;
-+	struct of_phandle_args *args = *out_args;
-+	const __be32 *start_list = *list;
-+	u32 i, count = 0;
-+	int ret;
++	vm_flags_t vm_flags = VM_LOCKED;
++	if (!flags || (flags & ~(MLOCK_LOCKED)))
++		return -EINVAL;
 +
-+	/*
-+	 * If phandle is 0, then it is an empty entry with no
-+	 * arguments.  Skip forward to the next entry.
-+	 */
-+	phandle = be32_to_cpup(*list++);
-+	if (phandle) {
-+		/*
-+		 * Find the provider node and parse the #*-cells
-+		 * property to determine the argument length.
-+		 *
-+		 * This is not needed if the cell count is hard-coded
-+		 * (i.e. cells_name not set, but cell_count is set),
-+		 * except when we're going to return the found node
-+		 * below.
-+		 */
-+		node = of_find_node_by_phandle(phandle);
-+		if (!node)
-+			return -ENOENT;
-+
-+		if (cells_name) {
-+			ret = of_property_read_u32(node, cells_name, &count);
-+			if (ret) {
-+				pr_err("could not get %s for %s\n",
-+				       cells_name, node->full_name);
-+				return ret;
-+			}
-+		} else {
-+			count = cell_count;
-+		}
-+	}
-+
-+	if (args && WARN_ON(count > MAX_PHANDLE_ARGS))
-+		count = MAX_PHANDLE_ARGS;
-+
-+	if (!args) {
-+		args = kzalloc(sizeof(*args) + (count * sizeof(uint32_t))), GFP_KERNEL);
-+		*out_args = args;
-+	}
-+	if (!args)
-+		return -ENOMEM;
-+
-+	if (!phandle) {
-+		memset(args, 0, sizeof(*args));
-+		return -ENOENT;
-+	}
-+
-+	args->np = node;
-+	args->val = start_list;
-+	args->args_count = count;
-+	for (i = 0; i < count; i++)
-+		args->args[i] = be32_to_cpup(*list++);
-+
-+	return 0;
++	return do_mlock(start, len, vm_flags);
 +}
 +
-+of_phandle_args *of_prop_next_phandle_args(struct property *prop,
-+						const char *cells_name,
-+						int cell_count,
-+						struct of_phandle_args *last)
-+{
-+	struct of_phandle_args *args = NULL;
-+	const __be32 *start_list;
-+
-+	if (!prop)
-+		return NULL;
-+
-+	if (!last) {
-+		start_list = prop->value;
-+	} else {
-+		start_list = last->val;
-+		kfree(last);
-+	}
-+	__of_parse_one_phandle_with_args(list, cells_name, cell_count, &args);
-+	return args;
-+}
-+EXPORT_SYMBOL_GPL(of_prop_next_phandle_args);
-+
- static int __of_parse_phandle_with_args(const struct device_node *np,
- 					const char *list_name,
- 					const char *cells_name,
-diff --git a/include/linux/of.h b/include/linux/of.h
-index edc068d..a0f432c 100644
---- a/include/linux/of.h
-+++ b/include/linux/of.h
-@@ -879,6 +879,13 @@ static inline int of_property_read_s32(const struct device_node *np,
- 		s;						\
- 		s = of_prop_next_string(prop, s))
- 
-+#define of_property_for_each_phandle_with_args(np, propname, cells_name, cell_count, prop, arg)	\
-+	for (prop = of_find_property(np, propname, NULL),	\
-+		arg = of_prop_next_phandle_args(prop, NULL);	\
-+		arg;						\
-+		arg = of_prop_next_phandle_args(prop, arg))
-+
-+
- #define for_each_node_by_name(dn, name) \
- 	for (dn = of_find_node_by_name(NULL, name); dn; \
- 	     dn = of_find_node_by_name(dn, name))
+ SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
+ {
+ 	int ret;
+-- 
+1.9.1
