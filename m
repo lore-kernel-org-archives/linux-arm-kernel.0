@@ -1,90 +1,116 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 23 Jul 2015 17:37:22 -0700
-Subject: [PATCH 1/1] Serial: imx: add dev_pm_ops to support suspend to
- ram/disk
-In-Reply-To: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
-References: <1437165018-56026-1-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150724003722.GA14027@kroah.com>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 23 Jul 2015 17:39:18 -0700
+Subject: [PATCH v3 1/4] clk: samsung: exynos5250: add cpu clock
+ configuration data and instantiate cpu clock
+In-Reply-To: <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1435756238-845-1-git-send-email-b.zolnierkie@samsung.com>
+ <1435756238-845-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150724003918.642.78653@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 03:30:18PM -0500, Shenwei Wang wrote:
-> When system goes into low power states like SUSPEND_MEM and
-> HIBERNATION, the hardware IP block may be powered off to reduce
-> the power consumption. This power down may cause problems on
-> some imx platforms, because the hardware settings are reset to
-> its power on default values which may differ from the ones when
-> it power off. This patch added the dev_pm_ops and implemented
-> two callbacks: suspend_noirq and resume_noirq, which will save
-> the necessory hardware parameters right before power down and
-> recover them before system uses the hardware.
+Quoting Bartlomiej Zolnierkiewicz (2015-07-01 06:10:35)
+> From: Thomas Abraham <thomas.ab@samsung.com>
 > 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> With the addition of the new Samsung specific cpu-clock type, the
+> arm clock can be represented as a cpu-clock type. Add the CPU clock
+> configuration data and instantiate the CPU clock type for Exynos5250.
+> 
+> Changes by Bartlomiej:
+> - split Exynos5250 support from the original patch
+> - moved E5250_CPU_DIV[0,1]() macros to clk-exynos5250.c
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+
+Acked-by: Michael Turquette <mturquette@baylibre.com>
+
+If Kukjin wants to merge this through the samsung tree then an immutable
+branch would be much appreciated.
+
+Regards,
+Mike
+
 > ---
->  drivers/tty/serial/imx.c | 54 ++++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 54 insertions(+)
+>  drivers/clk/samsung/clk-exynos5250.c   | 31 +++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/exynos5250.h |  1 +
+>  2 files changed, 32 insertions(+)
 > 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index c8cfa06..acaaa68 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -216,6 +216,7 @@ struct imx_port {
->  	unsigned int		tx_bytes;
->  	unsigned int		dma_tx_nents;
->  	wait_queue_head_t	dma_wait;
-> +	unsigned int            saved_reg[10];
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index 70ec3d2..d87f34d 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/syscore_ops.h>
+>  
+>  #include "clk.h"
+> +#include "clk-cpu.h"
+>  
+>  #define APLL_LOCK              0x0
+>  #define APLL_CON0              0x100
+> @@ -748,6 +749,32 @@ static struct samsung_pll_clock exynos5250_plls[nr_plls] __initdata = {
+>                 VPLL_LOCK, VPLL_CON0, NULL),
 >  };
 >  
->  struct imx_port_ucrs {
-> @@ -1986,6 +1987,58 @@ static int serial_imx_remove(struct platform_device *pdev)
->  	return uart_remove_one_port(&imx_reg, &sport->port);
->  }
+> +#define E5250_CPU_DIV0(apll, pclk_dbg, atb, periph, acp, cpud)         \
+> +               ((((apll) << 24) | ((pclk_dbg) << 20) | ((atb) << 16) | \
+> +                ((periph) << 12) | ((acp) << 8) | ((cpud) << 4)))
+> +#define E5250_CPU_DIV1(hpm, copy)                                      \
+> +               (((hpm) << 4) | (copy))
+> +
+> +static const struct exynos_cpuclk_cfg_data exynos5250_armclk_d[] __initconst = {
+> +       { 1700000, E5250_CPU_DIV0(5, 3, 7, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
+> +       { 1600000, E5250_CPU_DIV0(4, 1, 7, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
+> +       { 1500000, E5250_CPU_DIV0(4, 1, 7, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
+> +       { 1400000, E5250_CPU_DIV0(4, 1, 6, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
+> +       { 1300000, E5250_CPU_DIV0(3, 1, 6, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
+> +       { 1200000, E5250_CPU_DIV0(3, 1, 5, 7, 7, 2), E5250_CPU_DIV1(2, 0), },
+> +       { 1100000, E5250_CPU_DIV0(3, 1, 5, 7, 7, 3), E5250_CPU_DIV1(2, 0), },
+> +       { 1000000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  900000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  800000, E5250_CPU_DIV0(2, 1, 4, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  700000, E5250_CPU_DIV0(1, 1, 3, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  600000, E5250_CPU_DIV0(1, 1, 3, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  500000, E5250_CPU_DIV0(1, 1, 2, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  400000, E5250_CPU_DIV0(1, 1, 2, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  300000, E5250_CPU_DIV0(1, 1, 1, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  200000, E5250_CPU_DIV0(1, 1, 1, 7, 7, 1), E5250_CPU_DIV1(2, 0), },
+> +       {  0 },
+> +};
+> +
+>  static const struct of_device_id ext_clk_match[] __initconst = {
+>         { .compatible = "samsung,clock-xxti", .data = (void *)0, },
+>         { },
+> @@ -797,6 +824,10 @@ static void __init exynos5250_clk_init(struct device_node *np)
+>                         ARRAY_SIZE(exynos5250_div_clks));
+>         samsung_clk_register_gate(ctx, exynos5250_gate_clks,
+>                         ARRAY_SIZE(exynos5250_gate_clks));
+> +       exynos_register_cpu_clock(ctx, CLK_ARM_CLK, "armclk",
+> +                       mout_cpu_p[0], mout_cpu_p[1], 0x200,
+> +                       exynos5250_armclk_d, ARRAY_SIZE(exynos5250_armclk_d),
+> +                       CLK_CPU_HAS_DIV1);
 >  
-> +static int imx_serial_port_suspend_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct imx_port *sport = platform_get_drvdata(pdev);
-> +
-> +	/* Save necessary regs */
-> +	clk_enable(sport->clk_ipg);
-> +	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
-> +	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
-> +	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
-> +	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
-> +	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
-> +	sport->saved_reg[5] = readl(sport->port.membase + UESC);
-> +	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
-> +	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
-> +	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
-> +	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
-> +	clk_disable(sport->clk_ipg);
-> +
-> +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
-
-You have a struct device, please use dev_dbg() instead.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx_serial_port_resume_noirq(struct device *dev)
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct imx_port *sport = platform_get_drvdata(pdev);
-> +
-> +	clk_enable(sport->clk_ipg);
-> +	writel(sport->saved_reg[4], sport->port.membase + UFCR);
-> +	writel(sport->saved_reg[5], sport->port.membase + UESC);
-> +	writel(sport->saved_reg[6], sport->port.membase + UTIM);
-> +	writel(sport->saved_reg[7], sport->port.membase + UBIR);
-> +	writel(sport->saved_reg[8], sport->port.membase + UBMR);
-> +	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
-> +	writel(sport->saved_reg[0], sport->port.membase + UCR1);
-> +	writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
-> +	writel(sport->saved_reg[2], sport->port.membase + UCR3);
-> +	writel(sport->saved_reg[3], sport->port.membase + UCR4);
-> +	clk_disable(sport->clk_ipg);
-> +
-> +	pr_debug("0x%p (%d)\r\n", sport->port.membase, sport->port.line);
-
-Same here, please use dev_dbg()
+>         /*
+>          * Enable arm clock down (in idle) and set arm divider
+> diff --git a/include/dt-bindings/clock/exynos5250.h b/include/dt-bindings/clock/exynos5250.h
+> index 4273891d..8183d1c 100644
+> --- a/include/dt-bindings/clock/exynos5250.h
+> +++ b/include/dt-bindings/clock/exynos5250.h
+> @@ -21,6 +21,7 @@
+>  #define CLK_FOUT_CPLL          6
+>  #define CLK_FOUT_EPLL          7
+>  #define CLK_FOUT_VPLL          8
+> +#define CLK_ARM_CLK            9
+>  
+>  /* gate for special clocks (sclk) */
+>  #define CLK_SCLK_CAM_BAYER     128
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
