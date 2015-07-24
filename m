@@ -1,93 +1,116 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Fri, 24 Jul 2015 19:53:14 +0800
-Subject: [RFC] arm64:use set_fixmap_offset to make it more clear
-In-Reply-To: <20150724100724.GA4348@leverpostej>
-References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
- <20150723130344.GC27052@e104818-lin.cambridge.arm.com>
- <9E910A45-D4AB-44F6-878F-3CB2372B3660@gmail.com>
- <20150724095618.GB23074@leverpostej> <20150724100724.GA4348@leverpostej>
-Message-ID: <11F09FCC-E973-44E9-BDBF-88F8F27D4601@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 24 Jul 2015 05:06:10 -0700
+Subject: [GIT PULL 1/2] omap soc changes for v4.3
+Message-ID: <pull-1437718313-185670>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The following changes since commit bc0195aad0daa2ad5b0d76cce22b167bc3435590:
 
-> ? 2015?7?24??18:07?Mark Rutland <mark.rutland@arm.com> ???
-> 
-> On Fri, Jul 24, 2015 at 10:56:18AM +0100, Mark Rutland wrote:
->> On Fri, Jul 24, 2015 at 04:56:59AM +0100, yalin wang wrote:
->>> 
->>>> On Jul 23, 2015, at 21:03, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>>> 
->>>> On Thu, Jul 23, 2015 at 07:45:53PM +0800, yalin wang wrote:
->>>>> A little change to patch_map() function,
->>>>> use set_fixmap_offset() to make code more clear.
->>>>> 
->>>>> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
->>>>> ---
->>>>> arch/arm64/kernel/insn.c | 5 ++---
->>>>> 1 file changed, 2 insertions(+), 3 deletions(-)
->>>>> 
->>>>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->>>>> index dd9671c..7dafd5a 100644
->>>>> --- a/arch/arm64/kernel/insn.c
->>>>> +++ b/arch/arm64/kernel/insn.c
->>>>> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
->>>>> 		return addr;
->>>>> 
->>>>> 	BUG_ON(!page);
->>>>> -	set_fixmap(fixmap, page_to_phys(page));
->>>>> -
->>>>> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
->>>>> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
->>>>> +			(addr & ~PAGE_MASK));
->>>> 
->>>> It looks fine. Do you get any compiler warning for the automatic pointer
->>>> to long conversion? You may want to add some explicit casts, otherwise:
->>>> 
->>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>> i have build it, there is no warning about this change. :)
->> 
->> I see no warnings with defconfig, but there's an (unrelated) set of warnings if
->> CONFIG_DEBUG_SET_MODULE_RONX or CONFIG_DEBUG_RODATA are enabled:
-> 
-> Actually they aren't unrelated after all. the unsigned long addr in
-> __set_fixmap_offset shadows the void* addr from patch_map making the
-> types match.
-> 
-> With a few underscores addrd to __set_fixmap_offset's addr, I get the
-> following regarding patch_map:
-> 
-> ----
-> In file included from ./arch/arm64/include/asm/fixmap.h:85:0,
->                 from arch/arm64/kernel/insn.c:32:
-> arch/arm64/kernel/insn.c: In function ?patch_map?:
-> arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
->    (addr & ~PAGE_MASK));
->          ^
-> include/asm-generic/fixmap.h:73:20: note: in definition of macro ?__set_fixmap_offset?
->  __set_fixmap(idx, phys, flags);         \
->                    ^
-> arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
->  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
->                 ^
-> arch/arm64/kernel/insn.c:105:10: error: invalid operands to binary & (have ?void *? and ?long unsigned int?)
->    (addr & ~PAGE_MASK));
->          ^
-> include/asm-generic/fixmap.h:74:32: note: in definition of macro ?__set_fixmap_offset?
->  __addr = fix_to_virt(idx) + ((phys) & (PAGE_SIZE - 1)); \
->                                ^
-> arch/arm64/kernel/insn.c:104:17: note: in expansion of macro ?set_fixmap_offset?
->  return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
->                 ^
-> make[1]: *** [arch/arm64/kernel/insn.o] Error 1
-> make: *** [arch/arm64/kernel/insn.o] Error 2
-> ----
-> 
-> we need both the cast in patch_map, and an update to __set_fixmap_offset to
-> prevent the name clash.
-> 
-> Thanks,
-> Mark.
-i see, i will send V2 to solve this.
+  Linux 4.2-rc2 (2015-07-12 15:10:30 -0700)
 
-Thanks
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/soc-signed
+
+for you to fetch changes up to 24da741c678f865de3182194604dbddcc7fc7f3c:
+
+  Merge branch 'dm814x-soc' into omap-for-v4.3/soc (2015-07-23 21:59:18 -0700)
+
+----------------------------------------------------------------
+SoC changes for omaps for v4.3 merge window:
+
+- Clean-up omap4_local_timer_init to drop deal legacy code
+
+- Provide proper IO map table for dra7
+
+- Clean-up IOMMU layer init code as it now uses IOMMU framework
+
+- A series of changes to fix up dm814x support that's been in a broken
+  half-merged state for quite some time
+
+- A series of PRCM and hwmod changes via Paul Walmsley <paul@pwsan.com>:
+
+  - I/O wakeup support for AM43xx
+  - register lock and unlock support to the hwmod code (needed for the RTC
+    IP blocks on some chips)
+  - several fixes for sparse warnings and an unnecessary null pointer test
+  - a DRA7xx clockdomain configuration workaround, to deal with some hardware
+    bugs
+
+----------------------------------------------------------------
+Keerthy (6):
+      ARM: OMAP4: PRM: Remove hardcoding of PRM_IO_PMCTRL_OFFSET register
+      ARM: AM43xx: Add the PRM IRQ register offsets
+      ARM: dts: AM4372: Add PRCM IRQ entry
+      ARM: OMAP: PRM: Remove hardcoding of IRQENABLE_MPU_2 and IRQSTATUS_MPU_2 register offsets
+      ARM: OMAP4+: PRM: Add AM437x specific data
+      ARM: PRM: AM437x: Enable IO wakeup feature
+
+Lokesh Vutla (1):
+      ARM: OMAP2+: hwmod: add support for lock and unlock hooks
+
+Markus Elfring (1):
+      ARM: OMAP2: Delete an unnecessary check
+
+Nishanth Menon (1):
+      ARM: DRA7: Provide proper IO map table
+
+Paul Walmsley (1):
+      Merge branch 'prcm-a-for-v4.3' into hwmod-prcm-for-v4.3
+
+Sekhar Nori (2):
+      ARM: OMAP2+: sparse: add missing static declaration
+      ARM: OMAP2+: sparse: add missing function declarations
+
+Suman Anna (1):
+      ARM: OMAP2+: Remove module references from IOMMU machine layer
+
+Tony Lindgren (10):
+      ARM: OMAP2+: Clean up omap4_local_timer_init
+      ARM: OMAP2+: Fix dm814x DT_MACHINE_START
+      ARM: OMAP2+: Fix scm compatible for dm814x
+      ARM: OMAP2+: Add minimal clockdomains for dm814x
+      ARM: OMAP2+: Add custom prwdm_operations for 81xx to support dm814x
+      ARM: OMAP2+: Add support for initializing dm814x clocks
+      Merge tag 'for-v4.3/omap-hwmod-prcm-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.3/soc
+      ARM: OMAP2+: Prepare dm81xx hwmod code for adding minimal dm814x support
+      ARM: OMAP2: Add minimal dm814x hwmod support
+      Merge branch 'dm814x-soc' into omap-for-v4.3/soc
+
+Vignesh R (1):
+      ARM: OMAP2+: DRA7: clockdomain: change l4per2_7xx_clkdm to SW_WKUP
+
+ arch/arm/boot/dts/am4372.dtsi                      |   1 +
+ arch/arm/mach-omap2/Makefile                       |   3 +-
+ arch/arm/mach-omap2/board-generic.c                |   6 +-
+ arch/arm/mach-omap2/clockdomain.h                  |   3 +-
+ arch/arm/mach-omap2/clockdomains7xx_data.c         |   2 +-
+ arch/arm/mach-omap2/clockdomains81xx_data.c        |  23 +-
+ arch/arm/mach-omap2/common.h                       |   1 +
+ arch/arm/mach-omap2/control.c                      |   1 +
+ arch/arm/mach-omap2/io.c                           |  70 ++-
+ arch/arm/mach-omap2/iomap.h                        |  63 +++
+ arch/arm/mach-omap2/omap-iommu.c                   |  13 +-
+ arch/arm/mach-omap2/omap-mpuss-lowpower.c          |   2 +-
+ arch/arm/mach-omap2/omap3-restart.c                |   1 +
+ arch/arm/mach-omap2/omap4-restart.c                |   1 +
+ arch/arm/mach-omap2/omap54xx.h                     |   8 +
+ arch/arm/mach-omap2/omap_hwmod.c                   |  16 +-
+ arch/arm/mach-omap2/omap_hwmod.h                   |   7 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_43xx_data.c         |   2 +-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         | 571 ++++++++++++++-------
+ arch/arm/mach-omap2/pdata-quirks.c                 |   6 +-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c        | 122 ++++-
+ arch/arm/mach-omap2/prcm-common.h                  |   8 +
+ arch/arm/mach-omap2/prcm43xx.h                     |   7 +
+ arch/arm/mach-omap2/prm44xx.c                      |  61 ++-
+ arch/arm/mach-omap2/prm_common.c                   |   1 +
+ arch/arm/mach-omap2/timer.c                        |  18 +-
+ drivers/clk/ti/Makefile                            |   2 +-
+ drivers/clk/ti/clk-814x.c                          |  31 ++
+ drivers/clk/ti/clk-816x.c                          |   2 +-
+ include/linux/clk/ti.h                             |   3 +-
+ 31 files changed, 778 insertions(+), 279 deletions(-)
+ create mode 100644 drivers/clk/ti/clk-814x.c
