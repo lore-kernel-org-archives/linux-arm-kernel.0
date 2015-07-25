@@ -1,42 +1,66 @@
 From: lho@apm.com (Loc Ho)
-Date: Sat, 25 Jul 2015 01:07:43 -0600
-Subject: [PATCH v2 3/3] arm64: Add L3/SoC DT subnodes to the APM X-Gene SoC
- EDAC node
-In-Reply-To: <1437808063-17592-3-git-send-email-lho@apm.com>
+Date: Sat, 25 Jul 2015 01:07:41 -0600
+Subject: [PATCH v2 1/3] Documentation: Update the APM X-Gene SoC EDAC DTS
+ binding for L3/SoC subnodes
+In-Reply-To: <1437808063-17592-1-git-send-email-lho@apm.com>
 References: <1437808063-17592-1-git-send-email-lho@apm.com>
- <1437808063-17592-2-git-send-email-lho@apm.com>
- <1437808063-17592-3-git-send-email-lho@apm.com>
-Message-ID: <1437808063-17592-4-git-send-email-lho@apm.com>
+Message-ID: <1437808063-17592-2-git-send-email-lho@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds L3/SoC DT subnodes to the APM X-Gene SoC EDAC node.
+This patch updates documentation for the APM X-Gene SoC EDAC DTS binding
+for L3/SoC subnodes.
 
 Signed-off-by: Loc Ho <lho@apm.com>
 ---
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/edac/apm-xgene-edac.txt    |   23 ++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 0689c3f..c89df5c 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -477,6 +477,16 @@
- 				reg = <0x0 0x7c600000 0x0 0x200000>;
- 				pmd-controller = <3>;
- 			};
-+
-+			edacl3 at 7e600000 {
-+				compatible = "apm,xgene-edac-l3";
-+				reg = <0x0 0x7e600000 0x0 0x1000>;
-+			};
-+
-+			edacsoc at 7e930000 {
-+				compatible = "apm,xgene-edac-soc-v1";
-+				reg = <0x0 0x7e930000 0x0 0x1000>;
-+			};
- 		};
+diff --git a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+index 78edb80..78e2a31 100644
+--- a/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
++++ b/Documentation/devicetree/bindings/edac/apm-xgene-edac.txt
+@@ -5,6 +5,8 @@ The follow error types are supported:
  
- 		pcie0: pcie at 1f2b0000 {
+   memory controller	- Memory controller
+   PMD (L1/L2)		- Processor module unit (PMD) L1/L2 cache
++  L3			- L3 cache controller
++  SoC			- SoC IP's such as Ethernet, SATA, and etc
+ 
+ The following section describes the EDAC DT node binding.
+ 
+@@ -30,6 +32,17 @@ Required properties for PMD subnode:
+ - reg			: First resource shall be the PMD resource.
+ - pmd-controller	: Instance number of the PMD controller.
+ 
++Required properties for L3 subnode:
++- compatible		: Shall be "apm,xgene-edac-l3" or
++                          "apm,xgene-edac-l3-v2".
++- reg			: First resource shall be the L3 EDAC resource.
++
++Required properties for SoC subnode:
++- compatible		: Shall be "apm,xgene-edac-soc-v1" for revision 1 or
++                          "apm,xgene-edac-l3-soc" for general value reporting
++                          only.
++- reg			: First resource shall be the SoC EDAC resource.
++
+ Example:
+ 	csw: csw at 7e200000 {
+ 		compatible = "apm,xgene-csw", "syscon";
+@@ -76,4 +89,14 @@ Example:
+ 			reg = <0x0 0x7c000000 0x0 0x200000>;
+ 			pmd-controller = <0>;
+ 		};
++
++		edacl3 at 7e600000 {
++			compatible = "apm,xgene-edac-l3";
++			reg = <0x0 0x7e600000 0x0 0x1000>;
++		};
++
++		edacsoc at 7e930000 {
++			compatible = "apm,xgene-edac-soc-v1";
++			reg = <0x0 0x7e930000 0x0 0x1000>;
++		};
+ 	};
 -- 
 1.7.1
