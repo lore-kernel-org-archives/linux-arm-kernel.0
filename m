@@ -1,132 +1,108 @@
-From: r.baldyga@hackerion.com (Robert Baldyga)
-Date: Sat, 25 Jul 2015 20:08:23 +0200
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <87fv4cdv7v.fsf@belgarion.home>
-References: <Pine.LNX.4.44L0.1507251117020.31041-100000@netrider.rowland.org>
- <87fv4cdv7v.fsf@belgarion.home>
-Message-ID: <55B3D097.7090201@hackerion.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Sat, 25 Jul 2015 11:34:42 -0700
+Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
+ device nodes for APM X-Gene platform
+In-Reply-To: <CAOesGMimzcUDW4e1etxZNerEusWmEtT_um8XZoT0MkFpCnTf5w@mail.gmail.com>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <20150714084004.GA14593@localhost>
+ <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
+ <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
+ <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
+ <CAOesGMimzcUDW4e1etxZNerEusWmEtT_um8XZoT0MkFpCnTf5w@mail.gmail.com>
+Message-ID: <CADaLNDmPqb73UrOaVphkywZh8mfd4sPdA6i25USLt53sZ3hFuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof,
 
-On 07/25/2015 07:04 PM, Robert Jarzmik wrote:
-> Alan Stern <stern@rowland.harvard.edu> writes:
->
-> Hi Alan,
->
->> On Sat, 25 Jul 2015, Robert Jarzmik wrote:
+On Wed, Jul 22, 2015 at 11:20 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Wed, Jul 22, 2015 at 11:10 AM, Loc Ho <lho@apm.com> wrote:
+>> Hi Olof,,
 >>
->>> Petr Cvek <petr.cvek@tul.cz> writes:
->>>
->>>> On 23.7.2015 21:46, Alan Stern wrote:
->>>>>> It seems that it allows using a BULK endpoint for requested INT
->>>>>> endpoint. For my PXA27x machine the original code returns BULK EP
->>>>>> even with valid INT endpoint definition (because BULK EPs are defined
->>>>>> earlier than INT EPs).
+>>>>
+>>>>>> This patch set adds syscon reboot/poweroff device nodes to support reboot and
+>>>>>> poweroff features on X-Gene platform.
+>>>>>>
+>>>>>> Tai Nguyen (2):
+>>>>>>   power: reset: Add syscon reboot device node for APM X-Gene platform
+>>>>>>   power: reset: Add syscon poweroff device node for APM X-Gene Mustang platform
+>>>>>>
+>>>>>>  arch/arm64/boot/dts/apm/apm-mustang.dts |   12 ++++++++++++
+>>>>>>  arch/arm64/boot/dts/apm/apm-storm.dtsi  |   12 ++++++++++++
+>>>>>>  2 files changed, 24 insertions(+)
 >>>>>
->>>>> Yes, it does allow a bulk endpoint to be used when an interrupt
->>>>> endpoint was requested.  However, it won't return a bulk endpoint if
->>>>> all the bulk endpoints are already in use.
->>> This cannot work for pxa27x.
->>
->> Do you mean that on pxa27x, a bulk endpoint cannot be used as an
->> interrupt endpoint?  Why not?  From the device controller's point of
->> view, there is no difference between bulk and interrupt (except
->> possibly for the maxpacket sizes and high-bandwidth usage when running
->> at high speed).
-> That's the point, maxpacket size and priority.
->
-> As you said, it's not that it won't work, it won't work with the priority
-> expected by the software stack, ie. higher priority for ISO endpoint.
-
-Priority is not dependent on UDC hardware capabilities. Only USB host 
-decides about priority, so there is no problem from UDC point of view.
-
->>> The pxa27x IP has a hardware limitation which prevents an endpoint from changing
->>> its type once the UDC is enabled (see the comment at the beginning of
->>> pxa27x_udc.c).
+>>>>> Hi,
+>>>>>
+>>>>> It's unclear to me what you want to happen to these patches. They are
+>>>>> sent to a long list of to-recipients, one of which is arm at kernel.org. In
+>>>>> general, specify the person you want to take action on the patch in to
+>>>>> with the rest on cc.
+>>>>
+>>>> Is there an owner for all DT node files? Is that Catalina as he is
+>>>> owner for ARM64 arch folder?
 >>>
->>> If that patchset implies that for a requested INT endpoint a BULK endpoint can
->>> be returned, that won't work. Felipe and Robert, is that what this patchset
->>> implies ?
+>>> The ARM64 DT changes get merged through arm-soc, i.e. they get sent to
+>>> arm at kernel.org by the platform maintainers and picked up by us from
+>>> there (Arnd, Kevin or myself).
+>>>
+>>>>> We generally ask that patches first go to the subarch maintainers,
+>>>>> and they in turn send it on to us (either through a pull request or
+>>>>> by sending the patches to be applied). In the case of X-Gene, there is
+>>>>> no general platform maintainer so we keep getting patches from various
+>>>>> engineers at APM and it's unclear to us what your intentions are.
+>>>>>
+>>>>> I'd prefer to see one (to start with) person in charge of these (i.e. one
+>>>>> maintainer from the APM side). Please add that person to the MAINTAINERS
+>>>>> file as well.
+>>>>
+>>>> Are you suggesting that we have one person to start an GIT with
+>>>> kernel.org to keep all these misc ack'ed patches for X-Gene (APM) that
+>>>> don't seems to have an maintainer/home. Then request an pull by you?
+>>>
+>>> Pull requests are convenient for us, but if it's just a patch or two,
+>>> sending them directly in email is fine as well.
 >>
->> Sort of.  The matching code has always behaved that way and this
->> patchset does not change the behavior.
-> Then all is fine I suppose, if it was working before and nothing changes, it
-> will continue to work, won't it ?
+>> If there is an chance in pulling this power off/reset patches for
+>> 4.2-rc4, can you pull in as patches? Otherwise, we will go the GIT
+>> pull request.
 >
->>>> A default PXA27x configuration returns BULK for requested INT. Which is
->>>> unfortunate, because PXA27x supports INT endpoints and has one predefined, but
->>>> this function find BULK first (one BULK is allocated and INT is never used).
->>> See above.
+> We can definitely pick them up and queue them for 4.3 (see below). We
+> normally want the bulk of patches before -rc4/5, but we take smaller
+> updates closer to the merge window as well.
+>
+>>> What I want to avoid is a large number of people sending us patches
+>>> directly, which is why we ask for platform maintainers to coordinate
+>>> and aggregate patches to send on to us. That way we have one person
+>>> down the chain that we knows how we want the code delivered, and that
+>>> can do a round of reviews before we get it.
 >>
->> See response above.
->>
->> Besides, let's say the pxa27x has one bulk and one interrupt endpoint.
->> Now suppose the gadget driver requests a bulk endpoint first.  The
->> matching code will allocate the single bulk endpoint.  Then the gadget
->> driver requests an interrupt endpoint.  The matching code cannot
->> allocate the bulk endpoint, because that endpoint is already allocated.
->> So it will allocate the interrupt endpoint.
->>
->> Thus, as you can see, under the right conditions everything will work
->> as desired.
+>> We will get an GIT setup up for this and Duc Dang will contact you for
+>> pull request when ready.
+
+We are debating whether we should setup a company server (where we can
+have full control about storage, user permissions, backup, ...) or
+just use github.com to host our X-Gene kernel tree.
+
+Github seems already provide everything we need for a public source
+tree. Per your experience, what is your (and probably other
+maintainers) reference in git hosting server? Is there any
+inconvenience or difficulty for the maintainers to pull/merge code
+from Github versus from a company server?
+
+Thanks!
 >
-> Let me give you another example :
->   - pxa27x_udc offers 3 endpoints : ep-in, ep-out, ep-iso-in
->   - a gadget driver does :
->     - request an ep-in
->     - request an ep-out
->     - request an ep-in
->     - request an ep-iso-in
-> In that case, the ep-iso-in request will fail, right ? Yet I would have expected
-> the second ep-in request to fail, as that's the one which cannot be serviced.
-
-Gadget driver cannot simply request ep-in. Endpoints are matched with ep 
-descriptors containing complete information about direction, type, 
-maxpacketsize etc. of requested endpoint. So described situation can 
-never take a place.
-
-However if gadget driver requests more endpoints than UDC driver 
-supplies it will do fail ;)
-
-Current matching mechanism is very simple and surely will not always 
-return optimal endpont set. Maybe we should try to develop something 
-more sophisticated.
-
+> Ok, sounds good. If you have people in the bay area that need PGP keys
+> signed for this, I'd be happy to help.
 >
-> Of course, this hypothetical case implies that pxa27x_udc is not compatible with
-> this gadget driver, so it's not really relevant, is it ...
+> As far as the current DT patches, there's been several sent by
+> different people. Please aggregate them into one patch series and send
+> that (as git send-email is fine) to us to queue for 4.3.
 >
->>>> Because if they do, the ep_matches() function works poorly. It returns a BULK
->>>> for device (gadget) side, but host side (PC) thinks that this endpoint is an INT
->>>> and handles it in this way. But the PXA27x thinks the endpoint is a BULK and
->>>> handles it in its way (according to datasheet, settings for a BULK and an INT
->>>> transfers are not 100% compatible).
->>
->> How do they differ?
-> One example I have in mind is chapter 12.4.2 of pxa27x developer manual
-> "Endpoint Memory Configuration", quote follows :
->            If the USB host controller transmits more OUT data than the maximum
->            size packet for a bulk or interrupt endpoint, the UDC does not send
->            any handshake to the host controller causing the host controller to
->            time-out. If the USB host controller transmits more OUT data than the
->            maximum size packet for an isochronous endpoint, the UDC sets the data
->            packet error (DPE) bit in the Endpoint Control/Status register,
->            UDCCSRx[DPE].
 >
->> Perhaps you could submit a patch that adds a "do not allocate a bulk
->> endpoint when an interrupt endpoint is requested" quirk flag to the
->> usb_gadget structure, and modify the matching code to take the new flag
->> into account.
-> Well, if it was working that way already in the past, I don't see overloading
-> the code with a quirk a necessity. My only need is that it continues to work.
+> Thanks!
+>
+>
+> -Olof
 
-In this patchset I'm adding 'ep_match' callback to usb_gadget_ops, which 
-can be used to supply non-standard matching algorithm, so there is no 
-need for new quirk.
-
-Cheers,
-Robert
+-- 
+Duc Dang.
