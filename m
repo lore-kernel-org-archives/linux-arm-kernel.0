@@ -1,114 +1,61 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sat, 25 Jul 2015 14:57:12 +0800
-Subject: [PATCH v2 5/7] acpi: gsi: Add acpi_set_irq_model to initialize
- the GSI layer
-In-Reply-To: <55B22F16.3040206@arm.com>
-References: <1437656713-9677-1-git-send-email-marc.zyngier@arm.com>
- <1437656713-9677-6-git-send-email-marc.zyngier@arm.com>
- <55B20CD8.60309@linaro.org> <55B22F16.3040206@arm.com>
-Message-ID: <55B33348.2040402@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 25 Jul 2015 09:01:32 +0200
+Subject: [PATCH v2] thermal: consistently use int for temperatures
+In-Reply-To: <55B2C105.3040600@roeck-us.net>
+References: <1437463292-24844-1-git-send-email-s.hauer@pengutronix.de>
+ <20150723120759.GA17690@amd>
+ <20150724062948.GK18700@pengutronix.de>
+ <55B244BE.1060203@roeck-us.net> <20150724221102.GA31517@amd>
+ <55B2C105.3040600@roeck-us.net>
+Message-ID: <20150725070132.GA18328@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2015 08:27 PM, Marc Zyngier wrote:
-> On 24/07/15 11:00, Hanjun Guo wrote:
->> On 07/23/2015 09:05 PM, Marc Zyngier wrote:
->>> In order to start embrassing irqdomains at the GSI level, introduce
->>> a new initializer:
->>>
->>> void acpi_set_irq_model(enum acpi_irq_model_id model,
->>> 			unsigned long domain_token,
->>> 			int (*populate)(struct acpi_gsi_descriptor *,
->>> 					u32, unsigned int));
->>>
->>> where:
->>> - model is the value assigned to acpi_irq_model
->>> - domain_token is the identifier for the irqdomain mapping
->>>     GSI interrupts
->>> - populate is a function provided by the interrupt controller,
->>>     populating a struct acpi_gsi_descriptor based on a GSI and
->>>     the interrupt trigger information
->>>
->>> As nobody calls this code yet, the current code is left in place.
->>>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>    drivers/acpi/gsi.c   | 32 ++++++++++++++++++++++++++++++++
->>>    include/linux/acpi.h |  5 +++++
->>>    2 files changed, 37 insertions(+)
->>>
->>> diff --git a/drivers/acpi/gsi.c b/drivers/acpi/gsi.c
->>> index a745880..e6f4a0c 100644
->>> --- a/drivers/acpi/gsi.c
->>> +++ b/drivers/acpi/gsi.c
->>> @@ -16,6 +16,9 @@ enum acpi_irq_model_id acpi_irq_model;
->>>
->>>    static void *acpi_gsi_domain_token;
->>>
->>> +static int (*acpi_gsi_descriptor_populate)(struct acpi_gsi_descriptor *data,
->>> +					   u32 gsi, unsigned int irq_type);
->>> +
->>>    static unsigned int acpi_gsi_get_irq_type(int trigger, int polarity)
->>>    {
->>>    	switch (polarity) {
->>> @@ -71,10 +74,20 @@ EXPORT_SYMBOL_GPL(acpi_gsi_to_irq);
->>>    int acpi_register_gsi(struct device *dev, u32 gsi, int trigger,
->>>    		      int polarity)
->>>    {
->>> +	int err;
->>>    	unsigned int irq;
->>>    	unsigned int irq_type = acpi_gsi_get_irq_type(trigger, polarity);
->>>    	struct irq_domain *d = irq_find_host(acpi_gsi_domain_token);
->>>
->>> +	if (acpi_gsi_descriptor_populate) {
->>> +		struct acpi_gsi_descriptor data;
->>> +		err = acpi_gsi_descriptor_populate(&data, gsi, irq_type);
->>> +		if (err)
->>> +			return err;
->>> +
->>> +		return irq_create_acpi_mapping(d, &data);
->>> +	}
->>> +
->>>    	irq = irq_create_mapping(d, gsi);
->>>    	if (!irq)
->>>    		return -EINVAL;
->>> @@ -99,3 +112,22 @@ void acpi_unregister_gsi(u32 gsi)
->>>    	irq_dispose_mapping(irq);
->>>    }
->>>    EXPORT_SYMBOL_GPL(acpi_unregister_gsi);
->>> +
->>> +/**
->>> + * acpi_set_irq_model - Setup the GSI irqdomain information
->>> + * @model: the value assigned to acpi_irq_model
->>> + * @domain_token: the irq_domain identifier for mapping and looking up
->>> + *                GSI interrupts
->>> + * @populate: provided by the interrupt controller, populating a
->>> + *            struct acpi_gsi_descriptor based on a GSI and
->>> + *            the interrupt trigger information
->>> + */
->>> +void acpi_set_irq_model(enum acpi_irq_model_id model,
->>> +			unsigned long domain_token,
->>> +			int (*populate)(struct acpi_gsi_descriptor *,
->>> +					u32, unsigned int))
->>> +{
->>> +	acpi_irq_model = model;
->>> +	acpi_gsi_domain_token = (void *)domain_token;
->>
->> This will work perfectly fine with ARM as it has single GICD and
->> one irq domain, I'm not sure x86 is ok with it because x86 has
->> multi ioapics and each ioapic has a irqdomain if I understand
->> correctly, but x86 don't use functions in this file at all for now,
->> I think I'm over worried :)
->
-> When (and if) that day comes, we'll have to either contextualize
-> acpi_register_gsi to take a domain token, or have a lookup table that
-> maps GSI ranges to domain tokens.
->
-> Either way, this doesn't invalidate what is being done here.
+On Fri 2015-07-24 15:49:41, Guenter Roeck wrote:
+> On 07/24/2015 03:11 PM, Pavel Machek wrote:
+> >On Fri 2015-07-24 06:59:26, Guenter Roeck wrote:
+> >>On 07/23/2015 11:29 PM, Sascha Hauer wrote:
+> >>>On Thu, Jul 23, 2015 at 02:07:59PM +0200, Pavel Machek wrote:
+> >>>>On Tue 2015-07-21 09:21:32, Sascha Hauer wrote:
+> >>>>>The thermal code uses int, long and unsigned long for temperatures
+> >>>>>in different places.
+> >>>>>
+> >>>>>Using an unsigned type limits the thermal framework to positive
+> >>>>>temperatures without need. Also several drivers currently will report
+> >>>>>temperatures near UINT_MAX for temperatures below 0?C. This will probably
+> >>>>>immediately shut the machine down due to overtemperature if started below
+> >>>>>0?C.
+> >>>>>
+> >>>>>'long' is 64bit on several architectures. This is not needed since INT_MAX ?mC
+> >>>>>is above the melting point of all known materials.
+> >>>>
+> >>>>Can we do something like
+> >>>>
+> >>>>typedef millicelsius_t int;
+> >>>>
+> >>>>...to document the units?
+> >>>
+> >>>I am not very fond of typedefs and I am not sure this adds any value. I
+> >>>could change it when more people ask for it, but I just sent the new
+> >>>version without this.
+> >>>
+> >>
+> >>I thought we are supposed to not introduce new typedefs anyway.
+> >
+> >You are not supposed to typedef struct, but typedef for millicelsius_t
+> >would be ok. And it is your only chance if you want people to pay
+> >attention. If you make it int, someone will pass it to long or
+> >something else..
+> 
+> Seems to me that would be just lazyness. The same person might use 'long'
+> even if millicelsius_t is defined. A typedef doesn't preclude people
+> from ignoring it.
 
-Agreed,
-
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-
-Thanks
-Hanjun
+Well,  millicelsius_t will tell people that this is temperature, and
+being "special" type, they'll try to preserve it. (And you could check
+with sparse if you really wanted). int and long are common enough so
+that people will not notice...
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
