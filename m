@@ -1,33 +1,47 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 25 Jul 2015 17:17:48 +0200
-Subject: [PATCHv2 0/8] ARM: mvebu: add suspend to RAM support for Armada
- 38x
-In-Reply-To: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1436367757-14202-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <55B3A89C.4050803@free-electrons.com>
+Date: Sat, 25 Jul 2015 17:20:07 +0200
+Subject: [PATCH v2 0/4] Add standby support for the recent mvebu SoCs
+In-Reply-To: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <55B3A927.6070906@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hi,
 
-On 08/07/2015 17:02, Thomas Petazzoni wrote:
-> Hello,
+On 30/06/2015 19:18, Gregory CLEMENT wrote:
+> Hi,
 > 
-> This is the v2 of the patch series adding suspend to RAM support for
-> Armada 38x.
+> Until now only few mvebu v7 based board supported suspend to ram. This
+> suspend to ram mode was unusual because it involved shutting down the
+> SoC and relied on a PIC to wake up the system.
 > 
-> Since v1 (posted June 16th) :
+> However, most of the recent mvebu SoCs can support the standby
+> mode. Unlike for the suspend to ram, nothing special have to be done
+> for these SoCs. In this mode the SoCs go in idle mode (but they remain
+> powered up) and the devices enter in suspend mode. The support itself
+> was added in the patch 2.
 > 
->  - Rebased on top of v4.2-rc1, so dropped the patch "ARM: mvebu: fix
->    suspend to RAM on big-endian configurations" which was merged.
+> In order to wake-up the interrupt controller driver have been
+> updated. As in standby mode the interrupt controller is not shutdown,
+> any interrupt can be a wake-up source. So the GIC (patch 3) now used
+> the flags IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND.
 > 
->  - Added Acked-by from Gregory Clement on the relevant patches.
+> A wake up source is supposed to work in suspend _and_ in standby mode
+> but for the mvebu SoCs, no interrupt can wake up the system. The last
+> patch warns the user about it.
 > 
->  - Fixed the Armada 388 GP board name in the "model" property of the
->    DT, as suggested by Gregory Clement.
+> The first patch is a clean-up found while working on this series
+> 
+> This series was applied on top of Thomas' series "ARM: mvebu: add
+> suspend to RAM support for Armada 38x":
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/420458
+> 
+> It has been either using rtcwake or by setting the serial line as a
+> wake-up source through the sysfs interface.
 
 
-patch 1 to 4 applied on mvebu/soc
+I applied the series on mvebu/soc
 
 Thanks,
 
@@ -36,31 +50,21 @@ Gregory
 > 
 > Thanks,
 > 
-> Thomas
+> Gregory
 > 
-> Nadav Haklai (1):
->   ARM: mvebu: prepare set_cpu_coherent() for future extension
 > 
-> Thomas Petazzoni (7):
->   ARM: mvebu: do not check machine in mvebu_pm_init()
->   ARM: mvebu: prepare mvebu_pm_store_bootinfo() to support multiple SoCs
->   ARM: mvebu: prepare pm-board.c for the introduction of Armada 38x
->     support
->   ARM: mvebu: add suspend/resume support for Armada 38x
->   ARM: mvebu: add suspend/resume related definitions in Armada 38x
->     Device Tree
->   ARM: mvebu: add suspend/resume DT information for Armada 388 GP
->   ARM: mvebu: adjust board name and compatible for Armada 388 GP
+> Gregory CLEMENT (4):
+>   ARM: mvebu: Use __init for the PM initialization functions
+>   ARM: mvebu: Add standby support
+>   ARM: mvebu: Allow using the GIC for wakeup in standby mode
+>   ARM: mvebu: Warn about the wake-up sources not taken into account in
+>     suspend
 > 
->  arch/arm/boot/dts/armada-388-gp.dts | 20 +++++++++--
->  arch/arm/boot/dts/armada-38x.dtsi   |  7 +++-
->  arch/arm/mach-mvebu/board-v7.c      |  1 +
->  arch/arm/mach-mvebu/coherency.c     | 33 +++++++++++-------
->  arch/arm/mach-mvebu/pm-board.c      | 25 +++++++-------
->  arch/arm/mach-mvebu/pm.c            | 69 +++++++++++++++++++++++++++++++++----
->  arch/arm/mach-mvebu/pmsu.h          |  1 +
->  arch/arm/mach-mvebu/pmsu_ll.S       | 43 +++++++++++++++++++++++
->  8 files changed, 165 insertions(+), 34 deletions(-)
+>  arch/arm/mach-mvebu/board-v7.c |  7 +++++
+>  arch/arm/mach-mvebu/common.h   |  5 ++--
+>  arch/arm/mach-mvebu/pm-board.c | 19 +++++++++-----
+>  arch/arm/mach-mvebu/pm.c       | 58 +++++++++++++++++++++++++++++++++++++-----
+>  4 files changed, 73 insertions(+), 16 deletions(-)
 > 
 
 
