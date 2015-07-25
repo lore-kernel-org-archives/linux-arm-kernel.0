@@ -1,75 +1,58 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 25 Jul 2015 11:07:30 +0900
-Subject: [GIT PULL] ARM: defconfig: Improvements for 4.3
-In-Reply-To: <CAJKOXPc0h=U_XyQ+HkP6vHmAdm6jjg4iHComktP3339VWhYALw@mail.gmail.com>
-References: <1437115877-22010-1-git-send-email-k.kozlowski@samsung.com>
- <CAJKOXPc0h=U_XyQ+HkP6vHmAdm6jjg4iHComktP3339VWhYALw@mail.gmail.com>
-Message-ID: <05b001d0c67e$a9cdf350$fd69d9f0$@kernel.org>
+Date: Sat, 25 Jul 2015 11:11:32 +0900
+Subject: [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+In-Reply-To: <55B1D9A3.8060301@samsung.com>
+References: <1435797761-3339-1-git-send-email-cw00.choi@samsung.com>
+ <4464631.oZyVO4Z0Ov@amdc1976> <093101d0b8c3$4b5d3ec0$e217bc40$@kernel.org>
+ <20150724003005.642.21781@quantum> <55B1B3B0.8090106@kernel.org>
+ <55B1D9A3.8060301@samsung.com>
+Message-ID: <060201d0c67f$3a0cfba0$ae26f2e0$@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Krzysztof Kozlowski
+Krzysztof Kozlowski wrote:
 > 
-> 2015-07-17 15:51 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
-> > Dear Kukjin,
+> On 24.07.2015 12:40, Kukjin Kim wrote:
+> > On 07/24/15 09:30, Michael Turquette wrote:
+> >> Quoting Kukjin Kim (2015-07-07 07:43:31)
+> >>> Bartlomiej Zolnierkiewicz wrote:
 > >
-> > Few defconfig related changes.
+> > [...]
 > >
-> > Description along with a tag.
-> > You can find them also on the lists with my reviewed-by.
-> >
-> > Best regards,
-> > Krzysztof
+> >>>>> Chanwoo Choi (3):
+> >>>>>   clk: samsung: exynos3250: Add cpu clock configuration data and instaniate cpu clock
+> >>>>>   ARM: dts: Add CPU OPP and regulator supply property for Exynos3250
+> >>>>>   ARM: exynos: Add exynos3250 compatible to use generic cpufreq driver
+> >>>>>
+> >>>>>  arch/arm/boot/dts/exynos3250-monk.dts   |  4 ++++
+> >>>>>  arch/arm/boot/dts/exynos3250-rinato.dts |  4 ++++
+> >>>>>  arch/arm/boot/dts/exynos3250.dtsi       | 15 +++++++++++++++
+> >>>>>  arch/arm/mach-exynos/exynos.c           |  1 +
+> >>>>>  drivers/clk/samsung/clk-exynos3250.c    | 32 ++++++++++++++++++++++++++++++--
+> >>>>>  include/dt-bindings/clock/exynos3250.h  |  1 +
+> >>>>>  6 files changed, 55 insertions(+), 2 deletions(-)
+> >>>>
+> >>>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> >>>>
+> >>>> Thank you for working on this.
+> >>>>
+> >>> +1 Thanks.
+> >>>
+> >>> Mike and Sylwester, if you're OK on this series, I'd like to pick up in Samsung
+> >>> tree together. And if you want, I could provide topic branch for clk tree.
+> >>
+> >> Kukjin,
+> >>
+> >> A topic branch would be great.
+> >>
+> > Sure, BTW it means you did 'ack' on this clk change? If not, please let
+> > em know ;-) I'll let you know once the topic branch is ready.
 > 
-> Any comments on this pull request?
+> Dear Kukjin,
 > 
-Will pick them up, thanks.
-
-> Best regards,
-> Krzysztof
+> Will you handle this patchset and dependants (ARM: dts: Add CPU cooling
+> binding for Exynos3250-based Rinato/Monk board) for v4.3?
 > 
-> 
-> >
-> >
-> > The following changes since commit 1c4c7159ed2468f3ac4ce5a7f08d79663d381a93:
-> >
-> >   Merge tag 'ext4_for_linus_stable' of git://git.kernel.org/pub/scm/linux/kernel/git/tytso/ext4
-> (2015-07-05 16:24:54 -0700)
-
-Please don't make a branch based on some random commit, just use 'rc' as a
-basis. Note that usually '-rc1' is used if there is no reason to use another
-'rc' because of dependency.
+You mean Chanwoo's patch. Yes, I'll. Thanks for your gentle reminder.
 
 - Kukjin
-
-> >
-> > are available in the git repository at:
-> >
-> >
-> >   https://github.com/krzk/linux.git tags/samsung-defconfig-4.3
-> >
-> > for you to fetch changes up to 5efedc7617df7add295702f21f11dd7e7a67b76e:
-> >
-> >   ARM: multi_v7_defconfig: Enable max77802 regulator (2015-07-16 15:57:31 +0900)
-> >
-> > ----------------------------------------------------------------
-> > Defconfig changes around Exynos based boards:
-> > 1. Enable sound on Odroid XU3 on exynos defconfig.
-> > 2. Enable NTC thermistors for Chromebooks on exynos and multi_v7.
-> > 3. Enable main PMIC regulator for Chromebooks on multi_v7.
-> > 4. Clean up in multi_v7 - remove old (non-existing) configs.
-> >
-> > ----------------------------------------------------------------
-> > Anand Moon (1):
-> >       ARM: exynos_defconfig: Enable CONFIG_SND_SOC_ODROIDX2 for Odroid-XU3
-> >
-> > Javier Martinez Canillas (4):
-> >       ARM: multi_v7_defconfig: Remove old Samsung USB PHY configs
-> >       ARM: multi_v7_defconfig: Enable NTC Thermistors support
-> >       ARM: exynos_defconfig: Enable NTC Thermistors support
-> >       ARM: multi_v7_defconfig: Enable max77802 regulator
-> >
-> >  arch/arm/configs/exynos_defconfig   | 3 +++
-> >  arch/arm/configs/multi_v7_defconfig | 5 +++--
-> >  2 files changed, 6 insertions(+), 2 deletions(-)
-> > --
