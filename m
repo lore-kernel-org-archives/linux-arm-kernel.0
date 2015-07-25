@@ -1,69 +1,63 @@
-From: r.baldyga@hackerion.com (Robert Baldyga)
-Date: Sat, 25 Jul 2015 11:34:29 +0200
-Subject: [PATCH v3 26/46] usb: gadget: pch_ud: add ep capabilities support
-In-Reply-To: <55AD0EDD.70201@samsung.com>
-References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
- <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
- <55AD0EDD.70201@samsung.com>
-Message-ID: <55B35825.7010607@hackerion.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 25 Jul 2015 13:04:51 +0200
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <55B31FC9.1000407@tul.cz> (Petr Cvek's message of "Sat, 25 Jul
+ 2015 07:34:01 +0200")
+References: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
+ <55B31FC9.1000407@tul.cz>
+Message-ID: <87oaj0ebvw.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Petr Cvek <petr.cvek@tul.cz> writes:
 
-On 07/20/2015 05:08 PM, Krzysztof Opasiak wrote:
->
->
-> On 07/15/2015 08:32 AM, Robert Baldyga wrote:
->> Convert endpoint configuration to new capabilities model.
->>
->> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
->> ---
->>   drivers/usb/gadget/udc/pch_udc.c | 14 ++++++++++++--
->>   1 file changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/udc/pch_udc.c
->> b/drivers/usb/gadget/udc/pch_udc.c
->> index 613547f..cc8fb3c 100644
->> --- a/drivers/usb/gadget/udc/pch_udc.c
->> +++ b/drivers/usb/gadget/udc/pch_udc.c
->> @@ -2895,11 +2895,21 @@ static void pch_udc_pcd_reinit(struct
->> pch_udc_dev *dev)
->>           ep->in = ~i & 1;
->>           ep->ep.name = ep_string[i];
->>           ep->ep.ops = &pch_udc_ep_ops;
->> -        if (ep->in)
->> +        if (ep->in) {
->>               ep->offset_addr = ep->num * UDC_EP_REG_SHIFT;
->> -        else
->> +            ep->ep.caps.dir_in = true;
->> +        } else {
->>               ep->offset_addr = (UDC_EPINT_OUT_SHIFT + ep->num) *
->>                         UDC_EP_REG_SHIFT;
->> +            ep->ep.caps.dir_out = true;
->> +        }
->> +        if (i == UDC_EP0IN_IDX || i == UDC_EP0OUT_IDX) {
->> +            ep->ep.caps.type_control = true;
->
-> In all previous patches you set both dir_in and dir_out to true for ep0
-> but in this patch you don't do this. Is there some reason for this or
-> it's just a mistake?
->
+> On 23.7.2015 21:46, Alan Stern wrote:
+>>> It seems that it allows using a BULK endpoint for requested INT
+>>> endpoint. For my PXA27x machine the original code returns BULK EP
+>>> even with valid INT endpoint definition (because BULK EPs are defined
+>>> earlier than INT EPs).
+>> 
+>> Yes, it does allow a bulk endpoint to be used when an interrupt 
+>> endpoint was requested.  However, it won't return a bulk endpoint if 
+>> all the bulk endpoints are already in use.
+This cannot work for pxa27x.
 
-Most of UDC drivers we have single instance of ep0 for both directions, 
-but this one has two separate unidirectional ep0in and ep0out.
+The pxa27x IP has a hardware limitation which prevents an endpoint from changing
+its type once the UDC is enabled (see the comment at the beginning of
+pxa27x_udc.c).
 
->> +        } else {
->> +            ep->ep.caps.type_iso = true;
->> +            ep->ep.caps.type_bulk = true;
->> +            ep->ep.caps.type_int = true;
->> +        }
->>           /* need to set ep->ep.maxpacket and set Default
->> Configuration?*/
->>           usb_ep_set_maxpacket_limit(&ep->ep, UDC_BULK_MAX_PKT_SIZE);
->>           list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
->>
+If that patchset implies that for a requested INT endpoint a BULK endpoint can
+be returned, that won't work. Felipe and Robert, is that what this patchset
+implies ?
+
+> A default PXA27x configuration returns BULK for requested INT. Which is
+> unfortunate, because PXA27x supports INT endpoints and has one predefined, but
+> this function find BULK first (one BULK is allocated and INT is never used).
+See above.
+
+> Because if they do, the ep_matches() function works poorly. It returns a BULK
+> for device (gadget) side, but host side (PC) thinks that this endpoint is an INT
+> and handles it in this way. But the PXA27x thinks the endpoint is a BULK and
+> handles it in its way (according to datasheet, settings for a BULK and an INT
+> transfers are not 100% compatible).
 >
+> I cannot test "INT as BULK" behavior for the gadget functions, because all
+> gadgets which works on PXA27x does not use INT endpoints (some allocate the
+> endpoint but never use it).
+Ah a bit of history here.
 
-Thanks,
-Robert Baldyga
+At least gadget zero does, and it's my main testing point for pxa27x_udc.
+Then there should be g_serial (no acm nor obex), but that's something I have not
+tried since 2009 ...
+
+For history also, there was already an attempt a long time ago for epautoconf
+revamping, done by Rodolfo Giometti IIRC.
+
+Anyway, I need pxa27x_udc to remain functional, so I'd like to understand if
+something will stop working, Robert B.
+
+Cheers.
+
+-- 
+Robert
