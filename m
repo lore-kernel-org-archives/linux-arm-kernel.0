@@ -1,57 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 25 Jul 2015 11:23:12 +0200
-Subject: [PATCH] pinctrl: nomadik: split stn8815 UART0 pin groups
-Message-ID: <1437816192-7796-1-git-send-email-linus.walleij@linaro.org>
+From: r.baldyga@hackerion.com (Robert Baldyga)
+Date: Sat, 25 Jul 2015 11:34:29 +0200
+Subject: [PATCH v3 26/46] usb: gadget: pch_ud: add ep capabilities support
+In-Reply-To: <55AD0EDD.70201@samsung.com>
+References: <1436941953-1327-1-git-send-email-r.baldyga@samsung.com>
+ <1436941953-1327-27-git-send-email-r.baldyga@samsung.com>
+ <55AD0EDD.70201@samsung.com>
+Message-ID: <55B35825.7010607@hackerion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split the UART pin groups so we can activate RX/TX, CTS/RTS and
-the modem pins (DCD, DSR, RI, DTR) as three different groups
-with function u0.
+Hi,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+On 07/20/2015 05:08 PM, Krzysztof Opasiak wrote:
+>
+>
+> On 07/15/2015 08:32 AM, Robert Baldyga wrote:
+>> Convert endpoint configuration to new capabilities model.
+>>
+>> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+>> ---
+>>   drivers/usb/gadget/udc/pch_udc.c | 14 ++++++++++++--
+>>   1 file changed, 12 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/pch_udc.c
+>> b/drivers/usb/gadget/udc/pch_udc.c
+>> index 613547f..cc8fb3c 100644
+>> --- a/drivers/usb/gadget/udc/pch_udc.c
+>> +++ b/drivers/usb/gadget/udc/pch_udc.c
+>> @@ -2895,11 +2895,21 @@ static void pch_udc_pcd_reinit(struct
+>> pch_udc_dev *dev)
+>>           ep->in = ~i & 1;
+>>           ep->ep.name = ep_string[i];
+>>           ep->ep.ops = &pch_udc_ep_ops;
+>> -        if (ep->in)
+>> +        if (ep->in) {
+>>               ep->offset_addr = ep->num * UDC_EP_REG_SHIFT;
+>> -        else
+>> +            ep->ep.caps.dir_in = true;
+>> +        } else {
+>>               ep->offset_addr = (UDC_EPINT_OUT_SHIFT + ep->num) *
+>>                         UDC_EP_REG_SHIFT;
+>> +            ep->ep.caps.dir_out = true;
+>> +        }
+>> +        if (i == UDC_EP0IN_IDX || i == UDC_EP0OUT_IDX) {
+>> +            ep->ep.caps.type_control = true;
+>
+> In all previous patches you set both dir_in and dir_out to true for ep0
+> but in this patch you don't do this. Is there some reason for this or
+> it's just a mistake?
+>
 
-diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-index a2de3b7a57a0..587b222f12f3 100644
---- a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-+++ b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
-@@ -271,9 +271,11 @@ static const struct pinctrl_pin_desc nmk_stn8815_pins[] = {
-  */
- 
- /* Altfunction A */
--static const unsigned u0_a_1_pins[] = { STN8815_PIN_B4, STN8815_PIN_D5,
--	STN8815_PIN_C5, STN8815_PIN_A4, STN8815_PIN_B5, STN8815_PIN_D6,
--	STN8815_PIN_C6, STN8815_PIN_B6 };
-+static const unsigned u0txrx_a_1_pins[] = { STN8815_PIN_B4, STN8815_PIN_D5 };
-+static const unsigned u0ctsrts_a_1_pins[] = { STN8815_PIN_C5, STN8815_PIN_B6 };
-+/* Modem pins: DCD, DSR, RI, DTR */
-+static const unsigned u0modem_a_1_pins[] = { STN8815_PIN_A4, STN8815_PIN_B5,
-+	STN8815_PIN_D6, STN8815_PIN_C6 };
- static const unsigned mmcsd_a_1_pins[] = { STN8815_PIN_B10, STN8815_PIN_A10,
- 	STN8815_PIN_C11, STN8815_PIN_B11, STN8815_PIN_A11, STN8815_PIN_C12,
- 	STN8815_PIN_B12, STN8815_PIN_A12, STN8815_PIN_C13, STN8815_PIN_C15 };
-@@ -290,7 +292,9 @@ static const unsigned i2cusb_b_1_pins[] = { STN8815_PIN_C21, STN8815_PIN_C20 };
- 			.npins = ARRAY_SIZE(a##_pins), .altsetting = b }
- 
- static const struct nmk_pingroup nmk_stn8815_groups[] = {
--	STN8815_PIN_GROUP(u0_a_1, NMK_GPIO_ALT_A),
-+	STN8815_PIN_GROUP(u0txrx_a_1, NMK_GPIO_ALT_A),
-+	STN8815_PIN_GROUP(u0ctsrts_a_1, NMK_GPIO_ALT_A),
-+	STN8815_PIN_GROUP(u0modem_a_1, NMK_GPIO_ALT_A),
- 	STN8815_PIN_GROUP(mmcsd_a_1, NMK_GPIO_ALT_A),
- 	STN8815_PIN_GROUP(mmcsd_b_1, NMK_GPIO_ALT_B),
- 	STN8815_PIN_GROUP(u1_a_1, NMK_GPIO_ALT_A),
-@@ -304,7 +308,7 @@ static const struct nmk_pingroup nmk_stn8815_groups[] = {
- #define STN8815_FUNC_GROUPS(a, b...)	   \
- static const char * const a##_groups[] = { b };
- 
--STN8815_FUNC_GROUPS(u0, "u0_a_1");
-+STN8815_FUNC_GROUPS(u0, "u0txrx_a_1", "u0ctsrts_a_1", "u0modem_a_1");
- STN8815_FUNC_GROUPS(mmcsd, "mmcsd_a_1", "mmcsd_b_1");
- STN8815_FUNC_GROUPS(u1, "u1_a_1", "u1_b_1");
- STN8815_FUNC_GROUPS(i2c1, "i2c1_a_1");
--- 
-2.4.3
+Most of UDC drivers we have single instance of ep0 for both directions, 
+but this one has two separate unidirectional ep0in and ep0out.
+
+>> +        } else {
+>> +            ep->ep.caps.type_iso = true;
+>> +            ep->ep.caps.type_bulk = true;
+>> +            ep->ep.caps.type_int = true;
+>> +        }
+>>           /* need to set ep->ep.maxpacket and set Default
+>> Configuration?*/
+>>           usb_ep_set_maxpacket_limit(&ep->ep, UDC_BULK_MAX_PKT_SIZE);
+>>           list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
+>>
+>
+
+Thanks,
+Robert Baldyga
