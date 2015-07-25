@@ -1,32 +1,63 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Sat, 25 Jul 2015 21:41:32 +0200
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <87oaj0ebvw.fsf@belgarion.home>
-References: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
- <55B31FC9.1000407@tul.cz> <87oaj0ebvw.fsf@belgarion.home>
-Message-ID: <55B3E66C.2030603@tul.cz>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sat, 25 Jul 2015 22:17:23 +0200
+Subject: [PATCH 0/7] Another posting of the Dove PMU series
+In-Reply-To: <20150715185859.GC7557@n2100.arm.linux.org.uk>
+References: <20150715185859.GC7557@n2100.arm.linux.org.uk>
+Message-ID: <20150725201723.GD604@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.7.2015 13:04, Robert Jarzmik wrote:
-> Petr Cvek <petr.cvek@tul.cz> writes:
-> 
->> On 23.7.2015 21:46, Alan Stern wrote:
->>>> It seems that it allows using a BULK endpoint for requested INT
->>>> endpoint. For my PXA27x machine the original code returns BULK EP
->>>> even with valid INT endpoint definition (because BULK EPs are defined
->>>> earlier than INT EPs).
->>>
->>> Yes, it does allow a bulk endpoint to be used when an interrupt 
->>> endpoint was requested.  However, it won't return a bulk endpoint if 
->>> all the bulk endpoints are already in use.
-> This cannot work for pxa27x.
-> 
-> The pxa27x IP has a hardware limitation which prevents an endpoint from changing
-> its type once the UDC is enabled (see the comment at the beginning of
-> pxa27x_udc.c).
+On Wed, Jul 15, 2015 at 07:58:59PM +0100, Russell King - ARM Linux wrote:
+> What it says in the subject.  Not hopeful of a successful outcome, so I'm
+> not going to bother wasting time writing stuff here.
 
-Just crazy idea (based on how much I have to recompile kernel, when switching between testing gadgets), how much possible (EP allocation, no resource errors return, configuration/interface settings change) it would be to generate an EP configuration on the fly and only enabling the PXA27x when a set_configuration usb request is received?
+Hi Gregory
 
-Petr
+I took at look at Russell's patches. I rebased them onto -rc1. There
+were a few minor merge problems, all easy to fix. I added
+Signed-off-by: since i did make changes, but 99.9% of the credit for
+these patches is definitely to Russell.
+
+The last patch, which is converting mach-dove to use the new PMU
+driver however does not build. With mvebu_v7_defconfig i get:
+
+  CC      drivers/soc/dove/pmu.o
+drivers/soc/dove/pmu.c: In function dove_init_pmu_legacy?:
+drivers/soc/dove/pmu.c:400:46: error: IRQ_DOVE_PMU_START undeclared (first use in this function)
+   irq_domain_associate_many(pmu->irq_domain, IRQ_DOVE_PMU_START,
+                                              ^
+drivers/soc/dove/pmu.c:400:46: note: each undeclared identifier is reported only once for each function it appears in
+
+and dove_defconfig:
+
+  CC      arch/arm/mach-dove/common.o
+arch/arm/mach-dove/common.c:381:15: error: PWR_VPU_PWR_DWN_MASK undeclared here (not in a function)
+   .pwr_mask = PMU_PWR_VPU_PWR_DWN_MASK,
+               ^
+arch/arm/mach-dove/common.c:382:15: error: PMU_SW_RST_VIDEO_MASK undeclared here (not in a function)
+   .rst_mask = PMU_SW_RST_VIDEO_MASK,
+               ^
+arch/arm/mach-dove/common.c:383:15: error: PMU_ISO_VIDEO_MASK undeclared here (not in a function)
+   .iso_mask = PMU_ISO_VIDEO_MASK,
+               ^
+arch/arm/mach-dove/common.c:386:15: error: PMU_PWR_GPU_PWR_DWN_MASK undeclared here (not in a function)
+   .pwr_mask = PMU_PWR_GPU_PWR_DWN_MASK,
+               ^
+arch/arm/mach-dove/common.c:387:15: error: PMU_SW_RST_GPU_MASK undeclared here (not in a function)
+   .rst_mask = PMU_SW_RST_GPU_MASK,
+               ^
+arch/arm/mach-dove/common.c:388:15: error: PMU_ISO_GPU_MASK undeclared here (not in a function)
+   .iso_mask = PMU_ISO_GPU_MASK,
+
+So i've dropped the last patch.
+
+I boot tested mvebu_v7_defconfig with these patches, and ran the
+rtctest, which shows the RTC interrupt it working. The vpu and gpu
+power domains are in /sys, but i don't have anything connected to the
+HDMI port in order to test them.
+
+You can find the patches here:
+
+https://github.com/lunn/linux.git v4.2-rc1-dove-pmu
+
+	  Andrew
