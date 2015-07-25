@@ -1,86 +1,81 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 25 Jul 2015 09:39:25 +0200
-Subject: [PATCH v2 1/7] clk: Add a basic factor clock
-In-Reply-To: <20150724182619.642.11590@quantum>
-References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
- <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
- <20150523074930.GI8557@lukather> <20150724000001.642.84690@quantum>
- <20150724065017.GJ2373@lukather> <20150724182619.642.11590@quantum>
-Message-ID: <20150725073925.GK2564@lukather>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Sat, 25 Jul 2015 09:42:18 +0200
+Subject: [PATCH v2] clk: exynos4: Fix wrong clock for Exynos4x12 ADC
+In-Reply-To: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
+References: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <55B33DDA.9020605@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Fri, Jul 24, 2015 at 11:26:19AM -0700, Michael Turquette wrote:
-> > What are the issues with maintaining them? The only drawback I'm
-> > seeing with introducing such a driver is that you can't really have a
-> > clock that is both a divider and a multiplier, but that can be solved
-> > by splitting it into two sub-clocks.
+On 12/06/15 03:53, Krzysztof Kozlowski wrote:
+> The TSADC gate clock was used in Exynos4x12 DTSI for exynos-adc driver.
+> However TSADC is present only on Exynos4210 so on Trats2 board (with
+> Exynos4412 SoC) the exynos-adc driver could not be probed:
+>    ERROR: could not get clock /adc at 126C0000:adc(0)
+>    exynos-adc 126c0000.adc: failed getting clock, err = -2
+>    exynos-adc: probe of 126c0000.adc failed with error -2
 > 
-> There are a bunch of problems with the basic clock types. First is that
-> there is some feature creep every merge window that subtly breaks an
-> existing user (e.g. the round_rate stuff in clk-divider.c), and then
-> there are the growing number of flags to handle corner cases that are
-> one-off quirks for a single chip.
+> Instead on Exynos4x12 SoCs the main clock used by Analog to Digital
+> Converter is located in different register and it is named in datasheet
+> as PCLK_ADC. Regardless of the name the purpose of this PCLK_ADC clock
+> is the same as purpose of TSADC from Exynos4210.
 > 
-> These make it harder to maintain, but it is possible.
-
-Ok. It's the downside of having common code I guess, everyone wants to
-use it, and the clocks are just more subject to it than other drivers :/
-
-> The real problem with these basic clock types is that they are an
-> abstraction layer at the wrong level. Each clock type implements both
-> the policy of a given clock, as well as the machine-specific details.
-> For example clk-divider.c has made some assumptions in the past about
-> rounding the rate, or how to calculate the best divider; this is a
-> matter of policy and is useful on its own. But additionally that same
-> policy is glued to a specific implementation: memory-mapped register
-> controls for a clock divider.
+> The patch adds gate clock for Exynos4x12 using the proper register so
+> backward compatibility is preserved. This fixes the probe of exynos-adc
+> driver on Exynos4x12 boards and allows accessing sensors connected to it
+> on Trats2 board (ntc,ncp15wb473 AP and battery thermistors).
 > 
-> The I/O accessor stuff needs to be addressed at some point.  Currently
-> the basic clock types assume specific patterns of access to
-> memory-mapped clock registers. There are lots of other clock controls
-> out there that talk to firmware, or over i2c, or whatever. The amount of
-> code that has to be copy/pasted for each different type of access is
-> 100%; i.e. we do not have abstractions at the right level such as
-> .get_best_div(struct clk_hw *hw, unsigned long rate).
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: <stable@vger.kernel.org>
+> Fixes: c63c57433003 ("ARM: dts: Add ADC's dt data to read raw data for exynos4x12")
+> Link: https://lkml.org/lkml/2015/6/11/85
+
+Mike, could you apply this patch directly? I can't seem to find any
+more independent patches for clk/samsung pull request.
+Alternatively here is a branch you could cherry-pick it from with
+all Acked/Reviewed tags:
+
+git://linuxtv.org/snawrocki/samsung.git for-v4.2/clk/fixes-1
+
+--
+Regards,
+Sylwester
+
+> Changes since v1:
+> 1. After discussion on LKML this solution was chosen because it smaller,
+>    simpler, self-contained (one patch to fix issue) and maintains backward
+>    compatibility. Thanks to Javier Martinez Canillas and Tomasz Figa for
+>    valuable comments.
+> 2. Dropped patch 2/2 because now it is not needed. The clock id "TSADC"
+>    will be used on all Exynos4 boards.
+> 3. Added CC-stable.
+> ---
+>  drivers/clk/samsung/clk-exynos4.c | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> What I would like to see in time is a re-usable layer for clock policy
-> (e.g. common rules for how dividers or multipliers should behave), and
-> then have that sit on top of the machine-specific callbacks that
-> directly touch the hardware, such as the .get_best_div callback above.
+> diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+> index 714d6ba782c8..f7890bf652e6 100644
+> --- a/drivers/clk/samsung/clk-exynos4.c
+> +++ b/drivers/clk/samsung/clk-exynos4.c
+> @@ -85,6 +85,7 @@
+>  #define DIV_PERIL4		0xc560
+>  #define DIV_PERIL5		0xc564
+>  #define E4X12_DIV_CAM1		0xc568
+> +#define E4X12_GATE_BUS_FSYS1	0xc744
+>  #define GATE_SCLK_CAM		0xc820
+>  #define GATE_IP_CAM		0xc920
+>  #define GATE_IP_TV		0xc924
+> @@ -1095,6 +1096,7 @@ static struct samsung_gate_clock exynos4x12_gate_clks[] __initdata = {
+>  		0),
+>  	GATE(CLK_PPMUIMAGE, "ppmuimage", "aclk200", E4X12_GATE_IP_IMAGE, 9, 0,
+>  		0),
+> +	GATE(CLK_TSADC, "tsadc", "aclk133", E4X12_GATE_BUS_FSYS1, 16, 0, 0),
+>  	GATE(CLK_MIPI_HSI, "mipi_hsi", "aclk133", GATE_IP_FSYS, 10, 0, 0),
+>  	GATE(CLK_CHIPID, "chipid", "aclk100", E4X12_GATE_IP_PERIR, 0, 0, 0),
+>  	GATE(CLK_SYSREG, "sysreg", "aclk100", E4X12_GATE_IP_PERIR, 1,
+> 
 
-Can't that be solved by moving to regmap using Matthias' patches, or
-at least the IO method abstraction?
-
-We would then have to only provide an additional callback then for
-providers that have specific requirements about the divider
-calculation.
-
-So far, I haven't had any usecase where I needed anything but having
-the as-close-as-possible rate, so I would expect to not provide
-anything beside whether I'd like to round down or round up, but I do
-understand that some other might have different requirements.
-
-> For this reason I like to limit the number of new basic clock types. If
-> there is a single user then I'm inclined to have the author put it with
-> the machine-specific code. But in this case since there are two users, I
-> see the value in making a new basic clock type.
-
-That makes sense.
-
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150725/5ac50816/attachment.sig>
+Sylwester Nawrocki
+Samsung R&D Institute Poland
