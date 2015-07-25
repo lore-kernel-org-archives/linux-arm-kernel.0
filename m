@@ -1,326 +1,86 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 25 Jul 2015 16:23:23 +0900
-Subject: [PATCH 2/3] ARM: dts: UniPhier: add UART and USB pinmux nodes
-In-Reply-To: <1437809004-16806-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1437809004-16806-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1437809004-16806-3-git-send-email-yamada.masahiro@socionext.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 25 Jul 2015 09:39:25 +0200
+Subject: [PATCH v2 1/7] clk: Add a basic factor clock
+In-Reply-To: <20150724182619.642.11590@quantum>
+References: <1432241646-9511-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1432241646-9511-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v64rqRC24wPWz5xYZv=w2QAtsCb-pd76Qynkb5NBCptXhQ@mail.gmail.com>
+ <20150523074930.GI8557@lukather> <20150724000001.642.84690@quantum>
+ <20150724065017.GJ2373@lukather> <20150724182619.642.11590@quantum>
+Message-ID: <20150725073925.GK2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT nodes in uniphier-pinctrl.dtsi provide the default pinctrl
-settings that would be suitable for most boards.  You can still
-override them in your board DTS file if necessary.
+Hi Mike,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On Fri, Jul 24, 2015 at 11:26:19AM -0700, Michael Turquette wrote:
+> > What are the issues with maintaining them? The only drawback I'm
+> > seeing with introducing such a driver is that you can't really have a
+> > clock that is both a divider and a multiplier, but that can be solved
+> > by splitting it into two sub-clocks.
+> 
+> There are a bunch of problems with the basic clock types. First is that
+> there is some feature creep every merge window that subtly breaks an
+> existing user (e.g. the round_rate stuff in clk-divider.c), and then
+> there are the growing number of flags to handle corner cases that are
+> one-off quirks for a single chip.
+> 
+> These make it harder to maintain, but it is possible.
 
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi  | 16 ++++++
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi | 14 ++++++
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi | 16 ++++++
- arch/arm/boot/dts/uniphier-pinctrl.dtsi  | 85 ++++++++++++++++++++++++++++++++
- 4 files changed, 131 insertions(+)
- create mode 100644 arch/arm/boot/dts/uniphier-pinctrl.dtsi
+Ok. It's the downside of having common code I guess, everyone wants to
+use it, and the clocks are just more subject to it than other drivers :/
 
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-index 518eab7..4add90b 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-@@ -89,6 +89,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006800 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart0>;
- 			interrupts = <0 33 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -98,6 +100,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006900 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart1>;
- 			interrupts = <0 35 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -107,6 +111,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006a00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart2>;
- 			interrupts = <0 37 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -116,6 +122,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006b00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart3>;
- 			interrupts = <0 29 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -131,6 +139,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a800100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb0>;
- 			interrupts = <0 80 4>;
- 		};
- 
-@@ -138,6 +148,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a810100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb1>;
- 			interrupts = <0 81 4>;
- 		};
- 
-@@ -145,6 +157,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a820100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb2>;
- 			interrupts = <0 82 4>;
- 		};
- 
-@@ -177,3 +191,5 @@
- 		};
- 	};
- };
-+
-+/include/ "uniphier-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-index 789bd48..d0ca4c8 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -96,6 +96,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006800 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart0>;
- 			interrupts = <0 33 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -105,6 +107,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006900 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart1>;
- 			interrupts = <0 35 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -114,6 +118,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006a00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart2>;
- 			interrupts = <0 37 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -123,6 +129,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006b00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart3>;
- 			interrupts = <0 29 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -138,6 +146,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a800100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb2>;
- 			interrupts = <0 80 4>;
- 		};
- 
-@@ -145,6 +155,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a810100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb3>;
- 			interrupts = <0 81 4>;
- 		};
- 
-@@ -177,3 +189,5 @@
- 		};
- 	};
- };
-+
-+/include/ "uniphier-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-index 8dff3c4..3ead910 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -89,6 +89,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006800 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart0>;
- 			interrupts = <0 33 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -98,6 +100,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006900 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart1>;
- 			interrupts = <0 35 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -107,6 +111,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006a00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart2>;
- 			interrupts = <0 37 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -116,6 +122,8 @@
- 			compatible = "socionext,uniphier-uart";
- 			status = "disabled";
- 			reg = <0x54006b00 0x40>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_uart3>;
- 			interrupts = <0 29 4>;
- 			clocks = <&uart_clk>;
- 			fifo-size = <64>;
-@@ -131,6 +139,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a800100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb0>;
- 			interrupts = <0 80 4>;
- 		};
- 
-@@ -138,6 +148,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a810100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb1>;
- 			interrupts = <0 81 4>;
- 		};
- 
-@@ -145,6 +157,8 @@
- 			compatible = "socionext,uniphier-ehci", "generic-ehci";
- 			status = "disabled";
- 			reg = <0x5a820100 0x100>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb2>;
- 			interrupts = <0 82 4>;
- 		};
- 
-@@ -177,3 +191,5 @@
- 		};
- 	};
- };
-+
-+/include/ "uniphier-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/uniphier-pinctrl.dtsi b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-new file mode 100644
-index 0000000..1b5b4fe
---- /dev/null
-+++ b/arch/arm/boot/dts/uniphier-pinctrl.dtsi
-@@ -0,0 +1,85 @@
-+/*
-+ * Device Tree Source for UniPhier SoCs default pinctrl settings
-+ *
-+ * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+&pinctrl {
-+	pinctrl_uart0: uart0_grp {
-+		groups = "uart0";
-+		function = "uart0";
-+	};
-+
-+	pinctrl_uart1: uart1_grp {
-+		groups = "uart1";
-+		function = "uart1";
-+	};
-+
-+	pinctrl_uart2: uart2_grp {
-+		groups = "uart2";
-+		function = "uart2";
-+	};
-+
-+	pinctrl_uart3: uart3_grp {
-+		groups = "uart3";
-+		function = "uart3";
-+	};
-+
-+	pinctrl_usb0: usb0_grp {
-+		groups = "usb0";
-+		function = "usb0";
-+	};
-+
-+	pinctrl_usb1: usb1_grp {
-+		groups = "usb1";
-+		function = "usb1";
-+	};
-+
-+	pinctrl_usb2: usb2_grp {
-+		groups = "usb2";
-+		function = "usb2";
-+	};
-+
-+	pinctrl_usb3: usb3_grp {
-+		groups = "usb3";
-+		function = "usb3";
-+	};
-+};
+> The real problem with these basic clock types is that they are an
+> abstraction layer at the wrong level. Each clock type implements both
+> the policy of a given clock, as well as the machine-specific details.
+> For example clk-divider.c has made some assumptions in the past about
+> rounding the rate, or how to calculate the best divider; this is a
+> matter of policy and is useful on its own. But additionally that same
+> policy is glued to a specific implementation: memory-mapped register
+> controls for a clock divider.
+> 
+> The I/O accessor stuff needs to be addressed at some point.  Currently
+> the basic clock types assume specific patterns of access to
+> memory-mapped clock registers. There are lots of other clock controls
+> out there that talk to firmware, or over i2c, or whatever. The amount of
+> code that has to be copy/pasted for each different type of access is
+> 100%; i.e. we do not have abstractions at the right level such as
+> .get_best_div(struct clk_hw *hw, unsigned long rate).
+> 
+> What I would like to see in time is a re-usable layer for clock policy
+> (e.g. common rules for how dividers or multipliers should behave), and
+> then have that sit on top of the machine-specific callbacks that
+> directly touch the hardware, such as the .get_best_div callback above.
+
+Can't that be solved by moving to regmap using Matthias' patches, or
+at least the IO method abstraction?
+
+We would then have to only provide an additional callback then for
+providers that have specific requirements about the divider
+calculation.
+
+So far, I haven't had any usecase where I needed anything but having
+the as-close-as-possible rate, so I would expect to not provide
+anything beside whether I'd like to round down or round up, but I do
+understand that some other might have different requirements.
+
+> For this reason I like to limit the number of new basic clock types. If
+> there is a single user then I'm inclined to have the author put it with
+> the machine-specific code. But in this case since there are two users, I
+> see the value in making a new basic clock type.
+
+That makes sense.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150725/5ac50816/attachment.sig>
