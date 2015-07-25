@@ -1,35 +1,38 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sat, 25 Jul 2015 23:39:36 +0200
-Subject: [PATCH 3/5] ARM: berlin: add a PWM node on the BG2Q
-In-Reply-To: <1437860378-9556-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1437860378-9556-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1437860378-9556-4-git-send-email-antoine.tenart@free-electrons.com>
+Date: Sat, 25 Jul 2015 23:39:33 +0200
+Subject: [PATCH 0/5] ARM: berlin: PWM support
+Message-ID: <1437860378-9556-1-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PWM node in the Berlin BG2Q device tree, using the
-newly added Berlin PWM driver.
+Hi all,
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2q.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+This series adds a driver for the Marvell Berlin PWM controller, which
+has 4 channels.
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 63a48490e2f9..41491a6bfcd0 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -609,5 +609,11 @@
- 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 		};
-+
-+		pwm: pwm at f20000 {
-+			compatible = "marvell,berlin-pwm";
-+			reg = <0xf20000 0x40>;
-+			#pwm-cells = <3>;
-+		};
- 	};
- };
+This has been tested on a BG2Q DMP.
+
+Thanks,
+
+Antoine
+
+Antoine Tenart (5):
+  pwm: add the Berlin pwm controller driver
+  Documentation: bindings: document the Berlin PWM driver
+  ARM: berlin: add a PWM node on the BG2Q
+  ARM: berlin: add a PWM node on the BG2
+  ARM: berlin: add a PWM node on the BG2CD
+
+ .../devicetree/bindings/pwm/pwm-berlin.txt         |  15 ++
+ arch/arm/boot/dts/berlin2.dtsi                     |   6 +
+ arch/arm/boot/dts/berlin2cd.dtsi                   |   6 +
+ arch/arm/boot/dts/berlin2q.dtsi                    |   6 +
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-berlin.c                           | 206 +++++++++++++++++++++
+ 7 files changed, 249 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+ create mode 100644 drivers/pwm/pwm-berlin.c
+
 -- 
 2.4.6
