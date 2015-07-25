@@ -1,163 +1,46 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 25 Jul 2015 16:42:15 +0200
-Subject: [PATCH v2 2/4] ARM: Kirkwood: add modes-map property to ns2-leds
- nodes
-In-Reply-To: <1435859803-19583-3-git-send-email-simon.guinot@sequanux.org>
-References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
- <1435859803-19583-3-git-send-email-simon.guinot@sequanux.org>
-Message-ID: <55B3A047.70905@free-electrons.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 25 Jul 2015 15:42:29 +0100
+Subject: [PATCH 1/3] nmi: create generic NMI backtrace implementation
+In-Reply-To: <55A77E9D.2030509@linaro.org>
+References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
+ <E1ZFTSm-0006uz-3s@rmk-PC.arm.linux.org.uk>
+ <55A7753C.9020708@linaro.org>
+ <20150716093744.GI7557@n2100.arm.linux.org.uk>
+ <55A77E9D.2030509@linaro.org>
+Message-ID: <20150725144229.GZ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon, Jacek, Bryan, Richard,
-
-On 02/07/2015 19:56, Simon Guinot wrote:
-> From: Vincent Donnefort <vdonnefort@gmail.com>
+On Thu, Jul 16, 2015 at 10:51:25AM +0100, Daniel Thompson wrote:
+> On 16/07/15 10:37, Russell King - ARM Linux wrote:
+> >That can be implemented in the arch raise() method if needed - most
+> >architectures shouldn't need it as if they are properly raising a NMI
+> >which is, by definition, deliverable with normal IRQs disabled.
 > 
-> Since the LED modes mapping is no longer hardcoded inside the leds-ns2
-> driver, then it must be provided through the modes-map property in the
-> ns2-leds nodes.
+> Agreed. The bug certainly could be fixed in the ARM raise() function.
 > 
-> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> However I'm still curious whether there is any architecture that benefits
+> from forcing the current CPU into an NMI handler? Why doesn't the
+> don't-run-unnecessary-code argument apply here as well?
 
-As the other patch of the series seem to be merged in the led branch,
-then I can apply this patch on mvebu/dt.
+The benefit is that we get a consistent way of invoking the backtrace,
+since causing the NMI exception gives us a 'struct pt_regs' to work
+with, which we wouldn't otherwise have if we tried to call it "inline".
 
-It is OK for being in linux-next, however this patch depend on "leds:
-leds-ns2: move LED modes mapping outside of the driver", so I will need
-to find a way to express this dependency when I will do the pull request
-to arm-soc.
+The NMI backtrace includes dumping the register state of the NMI-
+receiving CPUs, which needs a 'struct pt_regs' and generating a that in
+arch-independent code wouldn't be nice.
 
+In any case, if this area needs changing in the generic code, it should
+be done as a separate change so that it can be properly assessed and
+validated on x86.
 
-Thanks,
+In the mean time, I will action Thomas' request to put it into my tree
+so that we can get some reasonable linux-next time with it, and hopefully
+have some progress towards FIQ-based backtracing for ARM.
 
-Gregory
-
-
-> ---
->  arch/arm/boot/dts/kirkwood-d2net.dts   | 5 +++++
->  arch/arm/boot/dts/kirkwood-is2.dts     | 5 +++++
->  arch/arm/boot/dts/kirkwood-ns2.dts     | 5 +++++
->  arch/arm/boot/dts/kirkwood-ns2max.dts  | 5 +++++
->  arch/arm/boot/dts/kirkwood-ns2mini.dts | 5 +++++
->  5 files changed, 25 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/kirkwood-d2net.dts b/arch/arm/boot/dts/kirkwood-d2net.dts
-> index 6b7856025001..e1c25c35e9ce 100644
-> --- a/arch/arm/boot/dts/kirkwood-d2net.dts
-> +++ b/arch/arm/boot/dts/kirkwood-d2net.dts
-> @@ -10,6 +10,7 @@
->  
->  /dts-v1/;
->  
-> +#include <dt-bindings/leds/leds-ns2.h>
->  #include "kirkwood-netxbig.dtsi"
->  
->  / {
-> @@ -28,6 +29,10 @@
->  			label = "d2net_v2:blue:sata";
->  			slow-gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
->  			cmd-gpio = <&gpio0 30 GPIO_ACTIVE_HIGH>;
-> +			modes-map = <NS_V2_LED_OFF  1 0
-> +				     NS_V2_LED_ON   0 1
-> +				     NS_V2_LED_ON   1 1
-> +				     NS_V2_LED_SATA 0 0>;
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
-> index da674bbd49a8..4121674abd1c 100644
-> --- a/arch/arm/boot/dts/kirkwood-is2.dts
-> +++ b/arch/arm/boot/dts/kirkwood-is2.dts
-> @@ -1,5 +1,6 @@
->  /dts-v1/;
->  
-> +#include <dt-bindings/leds/leds-ns2.h>
->  #include "kirkwood-ns2-common.dtsi"
->  
->  / {
-> @@ -27,6 +28,10 @@
->  			label = "ns2:blue:sata";
->  			slow-gpio = <&gpio0 29 0>;
->  			cmd-gpio = <&gpio0 30 0>;
-> +			modes-map = <NS_V2_LED_OFF  1 0
-> +				     NS_V2_LED_ON   0 1
-> +				     NS_V2_LED_ON   1 1
-> +				     NS_V2_LED_SATA 0 0>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
-> index 53368d1022cc..190189d235e6 100644
-> --- a/arch/arm/boot/dts/kirkwood-ns2.dts
-> +++ b/arch/arm/boot/dts/kirkwood-ns2.dts
-> @@ -1,5 +1,6 @@
->  /dts-v1/;
->  
-> +#include <dt-bindings/leds/leds-ns2.h>
->  #include "kirkwood-ns2-common.dtsi"
->  
->  / {
-> @@ -27,6 +28,10 @@
->  			label = "ns2:blue:sata";
->  			slow-gpio = <&gpio0 29 0>;
->  			cmd-gpio = <&gpio0 30 0>;
-> +			modes-map = <NS_V2_LED_OFF  1 0
-> +				     NS_V2_LED_ON   0 1
-> +				     NS_V2_LED_ON   1 1
-> +				     NS_V2_LED_SATA 0 0>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
-> index 72c78d0b1116..55cc41d9c80c 100644
-> --- a/arch/arm/boot/dts/kirkwood-ns2max.dts
-> +++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
-> @@ -1,5 +1,6 @@
->  /dts-v1/;
->  
-> +#include <dt-bindings/leds/leds-ns2.h>
->  #include "kirkwood-ns2-common.dtsi"
->  
->  / {
-> @@ -46,6 +47,10 @@
->  			label = "ns2:blue:sata";
->  			slow-gpio = <&gpio0 29 0>;
->  			cmd-gpio = <&gpio0 30 0>;
-> +			modes-map = <NS_V2_LED_OFF  1 0
-> +				     NS_V2_LED_ON   0 1
-> +				     NS_V2_LED_ON   1 1
-> +				     NS_V2_LED_SATA 0 0>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-> index c441bf62c09f..9935f3ec29b4 100644
-> --- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
-> +++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
-> @@ -1,5 +1,6 @@
->  /dts-v1/;
->  
-> +#include <dt-bindings/leds/leds-ns2.h>
->  #include "kirkwood-ns2-common.dtsi"
->  
->  / {
-> @@ -47,6 +48,10 @@
->  			label = "ns2:blue:sata";
->  			slow-gpio = <&gpio0 29 0>;
->  			cmd-gpio = <&gpio0 30 0>;
-> +			modes-map = <NS_V2_LED_OFF  1 0
-> +				     NS_V2_LED_ON   0 1
-> +				     NS_V2_LED_ON   1 1
-> +				     NS_V2_LED_SATA 0 0>;
->  		};
->  	};
->  };
-> 
-
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
