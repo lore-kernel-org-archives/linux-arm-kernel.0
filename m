@@ -1,84 +1,32 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Sat, 25 Jul 2015 21:36:22 +0200
-Subject: [PATCH v2 0/3] Add DT support for netxbig LEDs
-In-Reply-To: <55B3A32C.1010305@free-electrons.com>
-References: <1434628373-11834-1-git-send-email-simon.guinot@sequanux.org>
- <55B3A32C.1010305@free-electrons.com>
-Message-ID: <55B3E536.5010107@gmail.com>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sat, 25 Jul 2015 21:41:32 +0200
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <87oaj0ebvw.fsf@belgarion.home>
+References: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
+ <55B31FC9.1000407@tul.cz> <87oaj0ebvw.fsf@belgarion.home>
+Message-ID: <55B3E66C.2030603@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On 25.7.2015 13:04, Robert Jarzmik wrote:
+> Petr Cvek <petr.cvek@tul.cz> writes:
+> 
+>> On 23.7.2015 21:46, Alan Stern wrote:
+>>>> It seems that it allows using a BULK endpoint for requested INT
+>>>> endpoint. For my PXA27x machine the original code returns BULK EP
+>>>> even with valid INT endpoint definition (because BULK EPs are defined
+>>>> earlier than INT EPs).
+>>>
+>>> Yes, it does allow a bulk endpoint to be used when an interrupt 
+>>> endpoint was requested.  However, it won't return a bulk endpoint if 
+>>> all the bulk endpoints are already in use.
+> This cannot work for pxa27x.
+> 
+> The pxa27x IP has a hardware limitation which prevents an endpoint from changing
+> its type once the UDC is enabled (see the comment at the beginning of
+> pxa27x_udc.c).
 
-On 25.07.2015 16:54, Gregory CLEMENT wrote:
-> Hi Simon, Bryan, Richard,
->
-> On 18/06/2015 13:52, Simon Guinot wrote:
->> Hello,
->>
->> This patch series adds DT support for the LEDs found on the Kirkwood-based
->> LaCie boards 2Big and 5Big Network v2.
->
-> I saw that some led related patch on kirkwood based board have been merged.
-> What is the status of this series?
+Just crazy idea (based on how much I have to recompile kernel, when switching between testing gadgets), how much possible (EP allocation, no resource errors return, configuration/interface settings change) it would be to generate an EP configuration on the fly and only enabling the PXA27x when a set_configuration usb request is received?
 
-LED subsystem part has been merged to linux-next, since DTS files
-are not required for the compilation to succeed. We've been waiting
-for ARM/Marvell Kirkwood maintainer opinion to decide on how to proceed
-regarding patch 2/4.
-
-> I still have the patch 2 and 3 in my inbox waiting for being applied.
-
-Patch 3 affects only drivers/leds/leds-ns2.c, you were probably
-thinking of patch 1 which modifies the out of LED tree file
-include/linux/platform_data/leds-kirkwood-ns2.h.
-
-IMO it would be best if the whole series went through the
-LED tree.
-
-> Thanks,
->
-> Gregory
->
->
->>
->> Changes since v1:
->> - Check timer mode value retrieved from DT.
->> - In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
->>    timer delay values from DT with function of_property_read_u32_index.
->>    Instead, use a temporary u32 variable. This allows to silence a static
->>    checker warning.
->> - Make timer property optional in the binding documentation. It is now
->>    aligned with the driver code.
->>
->> Simon
->>
->> Simon Guinot (3):
->>    leds: netxbig: add device tree binding
->>    ARM: Kirkwood: add LED DT entries for netxbig boards
->>    ARM: mvebu: remove static LED setup for netxbig boards
->>
->>   .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
->>   .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++++
->>   arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
->>   arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
->>   arch/arm/mach-mvebu/Kconfig                        |   7 -
->>   arch/arm/mach-mvebu/Makefile                       |   1 -
->>   arch/arm/mach-mvebu/board.h                        |  21 --
->>   arch/arm/mach-mvebu/kirkwood.c                     |   4 -
->>   arch/arm/mach-mvebu/netxbig.c                      | 191 ----------------
->>   drivers/leds/leds-netxbig.c                        | 250 +++++++++++++++++++--
->>   include/dt-bindings/leds/leds-netxbig.h            |  18 ++
->>   11 files changed, 501 insertions(+), 245 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
->>   create mode 100644 Documentation/devicetree/bindings/leds/leds-netxbig.txt
->>   delete mode 100644 arch/arm/mach-mvebu/board.h
->>   delete mode 100644 arch/arm/mach-mvebu/netxbig.c
->>   create mode 100644 include/dt-bindings/leds/leds-netxbig.h
->>
->
->
-
--- 
-Best Regards,
-Jacek Anaszewski
+Petr
