@@ -1,38 +1,60 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 24 Jul 2015 22:31:55 -0700 (PDT)
-Subject: [PATCH V2 net-next 0/3] ARM BPF JIT features
-In-Reply-To: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
-References: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20150724.223155.121697079062172205.davem@davemloft.net>
+From: petr.cvek@tul.cz (Petr Cvek)
+Date: Sat, 25 Jul 2015 07:29:54 +0200
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <20150723143635.GB21984@saruman.tx.rr.com>
+References: <55B07048.3000609@tul.cz>
+ <20150723143635.GB21984@saruman.tx.rr.com>
+Message-ID: <55B31ED2.6020106@tul.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Schichan <nschichan@freebox.fr>
-Date: Tue, 21 Jul 2015 14:16:37 +0200
-
-> This serie adds support for more instructions to the ARM BPF JIT
-
-"series"
-
-> namely skb netdevice type retrieval, skb payload offset retrieval, and
-> skb packet type retrieval.
+On 23.7.2015 16:36, Felipe Balbi wrote:
+> Hi,
 > 
-> This allows 35 tests to use the JIT instead of 29 before.
+> On Thu, Jul 23, 2015 at 06:40:40AM +0200, Petr Cvek wrote:
+>> Hello,
+>>
+>> Is this:
+>>
+>> 	case USB_ENDPOINT_XFER_INT:
+>> 		/* Bulk endpoints handle interrupt transfers,
+>> 		 * except the toggle-quirky iso-synch kind
+>> 		 */
+>> 		if (!ep->caps.type_int && !ep->caps.type_bulk)
+>> 			return 0;
+>>
+>> ... or original:
+>>
+>> 			switch (type) {
+>> 			case USB_ENDPOINT_XFER_INT:
+>> 				/* bulk endpoints handle interrupt transfers,
+>> 				 * except the toggle-quirky iso-synch kind
+>> 				 */
+>> 				if ('s' == tmp[2])	{// == "-iso"
+>> 					return 0;
+>>
+>> code still valid? 
+>>
+>> It seems that it allows using a BULK endpoint for requested INT
+>> endpoint. For my PXA27x machine the original code returns BULK EP even
+>> with valid INT endpoint definition (because BULK EPs are defined
+>> earlier than INT EPs).
+>>
+>> This part of the code is from pre git era
+>>
+>> 	1da177e4c3f41524e886b7f1b8a0c1fc7321cac2
+>>
+>> before pxa27x driver was written and only few chips was supported.
+>> Does anyone know if the INT endpoints works now?
 > 
-> This serie depends on the "BPF JIT fixes for ARM" serie sent earlier.
+> it's very difficult to read your reply when you remove all context.
+> 
 
-"series"
+Ah sorry, I was hacking around PXA UDC and found possible bug in one ep_matches() function:
 
-But even with that series applied these patches do not apply properly
-at all.
+	http://lxr.free-electrons.com/source/drivers/usb/gadget/epautoconf.c#L75
 
-davem at greenl8ke:~/src/GIT/net-next$ git am --signoff bundle-8569-arm-bpf-next.mbox 
-Applying: ARM: net: add support for BPF_ANC | SKF_AD_PKTTYPE in ARM JIT.
-error: patch failed: arch/arm/net/bpf_jit_32.c:864
-error: arch/arm/net/bpf_jit_32.c: patch does not apply
-Patch failed at 0001 ARM: net: add support for BPF_ANC | SKF_AD_PKTTYPE in ARM JIT.
-When you have resolved this problem run "git am --resolved".
-If you would prefer to skip this patch, instead run "git am --skip".
-To restore the original branch and stop patching run "git am --abort".
+when searching for origin of this bug I have found about this new patch series (someone could know how that part of code was created).
 
-Please respin against net-next, thanks.
+Petr Cvek
