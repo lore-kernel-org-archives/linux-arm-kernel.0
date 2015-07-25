@@ -1,62 +1,57 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 25 Jul 2015 11:22:03 +0200
-Subject: [PATCH] ARM: nomadik: disable UART0 on Nomadik boards
-Message-ID: <1437816123-7692-1-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 25 Jul 2015 11:23:12 +0200
+Subject: [PATCH] pinctrl: nomadik: split stn8815 UART0 pin groups
+Message-ID: <1437816192-7796-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART0 is not used on these boards, yet active and blocking
-other use. Fix this by disabling UART0 and setting port aliases
-to maintain port enumeration to userspace.
+Split the UART pin groups so we can activate RX/TX, CTS/RTS and
+the modem pins (DCD, DSR, RI, DTR) as three different groups
+with function u0.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-ARM SoC folks: please apply this directly to fixes if you're
-OK with it.
----
- arch/arm/boot/dts/ste-nomadik-nhk15.dts    | 1 +
- arch/arm/boot/dts/ste-nomadik-s8815.dts    | 4 ++++
- arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 1 +
- 3 files changed, 6 insertions(+)
+ drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-nomadik-nhk15.dts b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-index 3d0b8755caee..3d25dba143a5 100644
---- a/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-nhk15.dts
-@@ -17,6 +17,7 @@
- 	};
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
+index a2de3b7a57a0..587b222f12f3 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik-stn8815.c
+@@ -271,9 +271,11 @@ static const struct pinctrl_pin_desc nmk_stn8815_pins[] = {
+  */
  
- 	aliases {
-+		serial1 = &uart1;
- 		stmpe-i2c0 = &stmpe0;
- 		stmpe-i2c1 = &stmpe1;
- 	};
-diff --git a/arch/arm/boot/dts/ste-nomadik-s8815.dts b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-index 85d3b95dfdba..3c140d05f796 100644
---- a/arch/arm/boot/dts/ste-nomadik-s8815.dts
-+++ b/arch/arm/boot/dts/ste-nomadik-s8815.dts
-@@ -15,6 +15,10 @@
- 		bootargs = "root=/dev/ram0 console=ttyAMA1,115200n8 earlyprintk";
- 	};
+ /* Altfunction A */
+-static const unsigned u0_a_1_pins[] = { STN8815_PIN_B4, STN8815_PIN_D5,
+-	STN8815_PIN_C5, STN8815_PIN_A4, STN8815_PIN_B5, STN8815_PIN_D6,
+-	STN8815_PIN_C6, STN8815_PIN_B6 };
++static const unsigned u0txrx_a_1_pins[] = { STN8815_PIN_B4, STN8815_PIN_D5 };
++static const unsigned u0ctsrts_a_1_pins[] = { STN8815_PIN_C5, STN8815_PIN_B6 };
++/* Modem pins: DCD, DSR, RI, DTR */
++static const unsigned u0modem_a_1_pins[] = { STN8815_PIN_A4, STN8815_PIN_B5,
++	STN8815_PIN_D6, STN8815_PIN_C6 };
+ static const unsigned mmcsd_a_1_pins[] = { STN8815_PIN_B10, STN8815_PIN_A10,
+ 	STN8815_PIN_C11, STN8815_PIN_B11, STN8815_PIN_A11, STN8815_PIN_C12,
+ 	STN8815_PIN_B12, STN8815_PIN_A12, STN8815_PIN_C13, STN8815_PIN_C15 };
+@@ -290,7 +292,9 @@ static const unsigned i2cusb_b_1_pins[] = { STN8815_PIN_C21, STN8815_PIN_C20 };
+ 			.npins = ARRAY_SIZE(a##_pins), .altsetting = b }
  
-+	aliases {
-+		serial1 = &uart1;
-+	};
-+
- 	src at 101e0000 {
- 		/* These chrystal drivers are not used on this board */
- 		disable-sxtalo;
-diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-index 6846e3eb027d..8e601d02ca8c 100644
---- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-+++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
-@@ -763,6 +763,7 @@
- 			clock-names = "uartclk", "apb_pclk";
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_default_mux>;
-+			status = "disabled";
- 		};
+ static const struct nmk_pingroup nmk_stn8815_groups[] = {
+-	STN8815_PIN_GROUP(u0_a_1, NMK_GPIO_ALT_A),
++	STN8815_PIN_GROUP(u0txrx_a_1, NMK_GPIO_ALT_A),
++	STN8815_PIN_GROUP(u0ctsrts_a_1, NMK_GPIO_ALT_A),
++	STN8815_PIN_GROUP(u0modem_a_1, NMK_GPIO_ALT_A),
+ 	STN8815_PIN_GROUP(mmcsd_a_1, NMK_GPIO_ALT_A),
+ 	STN8815_PIN_GROUP(mmcsd_b_1, NMK_GPIO_ALT_B),
+ 	STN8815_PIN_GROUP(u1_a_1, NMK_GPIO_ALT_A),
+@@ -304,7 +308,7 @@ static const struct nmk_pingroup nmk_stn8815_groups[] = {
+ #define STN8815_FUNC_GROUPS(a, b...)	   \
+ static const char * const a##_groups[] = { b };
  
- 		uart1: uart at 101fb000 {
+-STN8815_FUNC_GROUPS(u0, "u0_a_1");
++STN8815_FUNC_GROUPS(u0, "u0txrx_a_1", "u0ctsrts_a_1", "u0modem_a_1");
+ STN8815_FUNC_GROUPS(mmcsd, "mmcsd_a_1", "mmcsd_b_1");
+ STN8815_FUNC_GROUPS(u1, "u1_a_1", "u1_b_1");
+ STN8815_FUNC_GROUPS(i2c1, "i2c1_a_1");
 -- 
 2.4.3
