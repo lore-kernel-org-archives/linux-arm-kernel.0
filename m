@@ -1,75 +1,87 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Sat, 25 Jul 2015 17:20:07 +0200
-Subject: [PATCH v2 0/4] Add standby support for the recent mvebu SoCs
-In-Reply-To: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55B3A927.6070906@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 25 Jul 2015 11:30:36 -0400 (EDT)
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <87oaj0ebvw.fsf@belgarion.home>
+Message-ID: <Pine.LNX.4.44L0.1507251117020.31041-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 25 Jul 2015, Robert Jarzmik wrote:
 
-On 30/06/2015 19:18, Gregory CLEMENT wrote:
-> Hi,
+> Petr Cvek <petr.cvek@tul.cz> writes:
 > 
-> Until now only few mvebu v7 based board supported suspend to ram. This
-> suspend to ram mode was unusual because it involved shutting down the
-> SoC and relied on a PIC to wake up the system.
-> 
-> However, most of the recent mvebu SoCs can support the standby
-> mode. Unlike for the suspend to ram, nothing special have to be done
-> for these SoCs. In this mode the SoCs go in idle mode (but they remain
-> powered up) and the devices enter in suspend mode. The support itself
-> was added in the patch 2.
-> 
-> In order to wake-up the interrupt controller driver have been
-> updated. As in standby mode the interrupt controller is not shutdown,
-> any interrupt can be a wake-up source. So the GIC (patch 3) now used
-> the flags IRQCHIP_SKIP_SET_WAKE and IRQCHIP_MASK_ON_SUSPEND.
-> 
-> A wake up source is supposed to work in suspend _and_ in standby mode
-> but for the mvebu SoCs, no interrupt can wake up the system. The last
-> patch warns the user about it.
-> 
-> The first patch is a clean-up found while working on this series
-> 
-> This series was applied on top of Thomas' series "ARM: mvebu: add
-> suspend to RAM support for Armada 38x":
-> http://thread.gmane.org/gmane.linux.ports.arm.kernel/420458
-> 
-> It has been either using rtcwake or by setting the serial line as a
-> wake-up source through the sysfs interface.
+> > On 23.7.2015 21:46, Alan Stern wrote:
+> >>> It seems that it allows using a BULK endpoint for requested INT
+> >>> endpoint. For my PXA27x machine the original code returns BULK EP
+> >>> even with valid INT endpoint definition (because BULK EPs are defined
+> >>> earlier than INT EPs).
+> >> 
+> >> Yes, it does allow a bulk endpoint to be used when an interrupt 
+> >> endpoint was requested.  However, it won't return a bulk endpoint if 
+> >> all the bulk endpoints are already in use.
+> This cannot work for pxa27x.
 
+Do you mean that on pxa27x, a bulk endpoint cannot be used as an
+interrupt endpoint?  Why not?  From the device controller's point of
+view, there is no difference between bulk and interrupt (except
+possibly for the maxpacket sizes and high-bandwidth usage when running
+at high speed).
 
-I applied the series on mvebu/soc
+> The pxa27x IP has a hardware limitation which prevents an endpoint from changing
+> its type once the UDC is enabled (see the comment at the beginning of
+> pxa27x_udc.c).
+> 
+> If that patchset implies that for a requested INT endpoint a BULK endpoint can
+> be returned, that won't work. Felipe and Robert, is that what this patchset
+> implies ?
 
-Thanks,
+Sort of.  The matching code has always behaved that way and this
+patchset does not change the behavior.
 
-Gregory
+> > A default PXA27x configuration returns BULK for requested INT. Which is
+> > unfortunate, because PXA27x supports INT endpoints and has one predefined, but
+> > this function find BULK first (one BULK is allocated and INT is never used).
+> See above.
 
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> 
-> Gregory CLEMENT (4):
->   ARM: mvebu: Use __init for the PM initialization functions
->   ARM: mvebu: Add standby support
->   ARM: mvebu: Allow using the GIC for wakeup in standby mode
->   ARM: mvebu: Warn about the wake-up sources not taken into account in
->     suspend
-> 
->  arch/arm/mach-mvebu/board-v7.c |  7 +++++
->  arch/arm/mach-mvebu/common.h   |  5 ++--
->  arch/arm/mach-mvebu/pm-board.c | 19 +++++++++-----
->  arch/arm/mach-mvebu/pm.c       | 58 +++++++++++++++++++++++++++++++++++++-----
->  4 files changed, 73 insertions(+), 16 deletions(-)
-> 
+See response above.
 
+Besides, let's say the pxa27x has one bulk and one interrupt endpoint.  
+Now suppose the gadget driver requests a bulk endpoint first.  The 
+matching code will allocate the single bulk endpoint.  Then the gadget 
+driver requests an interrupt endpoint.  The matching code cannot 
+allocate the bulk endpoint, because that endpoint is already allocated.  
+So it will allocate the interrupt endpoint.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Thus, as you can see, under the right conditions everything will work 
+as desired.
+
+> > Because if they do, the ep_matches() function works poorly. It returns a BULK
+> > for device (gadget) side, but host side (PC) thinks that this endpoint is an INT
+> > and handles it in this way. But the PXA27x thinks the endpoint is a BULK and
+> > handles it in its way (according to datasheet, settings for a BULK and an INT
+> > transfers are not 100% compatible).
+
+How do they differ?
+
+> > I cannot test "INT as BULK" behavior for the gadget functions, because all
+> > gadgets which works on PXA27x does not use INT endpoints (some allocate the
+> > endpoint but never use it).
+> Ah a bit of history here.
+> 
+> At least gadget zero does, and it's my main testing point for pxa27x_udc.
+> Then there should be g_serial (no acm nor obex), but that's something I have not
+> tried since 2009 ...
+> 
+> For history also, there was already an attempt a long time ago for epautoconf
+> revamping, done by Rodolfo Giometti IIRC.
+> 
+> Anyway, I need pxa27x_udc to remain functional, so I'd like to understand if
+> something will stop working, Robert B.
+
+Perhaps you could submit a patch that adds a "do not allocate a bulk 
+endpoint when an interrupt endpoint is requested" quirk flag to the 
+usb_gadget structure, and modify the matching code to take the new flag 
+into account.
+
+Alan Stern
