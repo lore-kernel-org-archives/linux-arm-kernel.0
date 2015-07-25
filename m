@@ -1,36 +1,72 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 25 Jul 2015 08:33:04 +0200
-Subject: [PATCH] drivers/reset: appropriate __init annotation for const
- data
-In-Reply-To: <alpine.LFD.2.20.1507241531370.1806@knanqh.ubzr>
-References: <alpine.LFD.2.20.1507241531370.1806@knanqh.ubzr>
-Message-ID: <20150725063304.GJ2564@lukather>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Sat, 25 Jul 2015 08:36:57 +0200
+Subject: [PATCH v2 00/10] pwm: add support for atomic update
+In-Reply-To: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1437406327-6207-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20150725083657.6111ff59@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Thierry,
 
-On Fri, Jul 24, 2015 at 03:34:11PM -0400, Nicolas Pitre wrote:
+Should I resend a new version rebased on Mark's pwm topic branch or
+would you like to review this one first ?
+
+Best Regards,
+
+Boris
+
+On Mon, 20 Jul 2015 17:31:57 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+
+> Hello Thierry,
 > 
-> Init data marked const should be annotated with __initconst for
-> correctness and not __initdata.  This also fixes LTO builds that
-> otherwise fail with section mismatch errors.
+> This series adds support for atomic PWM update, or IOW, the capability
+> to update all the parameters of a PWM device (enabled/disabled, period,
+> duty and polarity) in one go.
 > 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> Best Regards,
+> 
+> Boris
+> 
+> Changes since v1:
+> - dropped applied patches
+> - squashed Heiko's fixes into the rockchip driver changes
+> - made a few cosmetic changes
+> - added kerneldoc comments
+> - added Heiko's patch to display more information in debugfs
+> - dropped pwm-regulator patches (should be submitted separately)
+> 
+> Boris Brezillon (9):
+>   pwm: introduce default period and polarity concepts
+>   pwm: define a new pwm_state struct
+>   pwm: move the enabled/disabled info to pwm_state struct
+>   backlight: pwm_bl: remove useless call to pwm_set_period
+>   pwm: declare a default PWM state
+>   pwm: add the PWM initial state retrieval infra
+>   pwm: add the core infrastructure to allow atomic update
+>   pwm: rockchip: add initial state retrieval
+>   pwm: rockchip: add support for atomic update
+> 
+> Heiko St?bner (1):
+>   pwm: add information about polarity, duty cycle and period to debugfs
+> 
+>  drivers/leds/leds-pwm.c              |   2 +-
+>  drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
+>  drivers/pwm/pwm-pxa.c                |   2 +-
+>  drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
+>  drivers/pwm/pwm-sun4i.c              |   3 +-
+>  drivers/regulator/pwm-regulator.c    |   2 +-
+>  drivers/video/backlight/lm3630a_bl.c |   4 +-
+>  drivers/video/backlight/pwm_bl.c     |  10 ++-
+>  drivers/video/fbdev/ssd1307fb.c      |   2 +-
+>  include/linux/pwm.h                  |  86 +++++++++++++++---
+>  10 files changed, 336 insertions(+), 63 deletions(-)
+> 
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150725/2a99ea65/attachment.sig>
