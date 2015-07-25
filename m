@@ -1,63 +1,81 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 25 Jul 2015 13:04:51 +0200
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <55B31FC9.1000407@tul.cz> (Petr Cvek's message of "Sat, 25 Jul
- 2015 07:34:01 +0200")
-References: <Pine.LNX.4.44L0.1507231542520.25082-100000@netrider.rowland.org>
- <55B31FC9.1000407@tul.cz>
-Message-ID: <87oaj0ebvw.fsf@belgarion.home>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Sat, 25 Jul 2015 15:34:03 +0200
+Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
+In-Reply-To: <1436711211-18223-7-git-send-email-robh@kernel.org>
+References: <1436711211-18223-1-git-send-email-robh@kernel.org>
+ <1436711211-18223-7-git-send-email-robh@kernel.org>
+Message-ID: <55B3904B.3050408@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Petr Cvek <petr.cvek@tul.cz> writes:
+Hi Rob,
 
-> On 23.7.2015 21:46, Alan Stern wrote:
->>> It seems that it allows using a BULK endpoint for requested INT
->>> endpoint. For my PXA27x machine the original code returns BULK EP
->>> even with valid INT endpoint definition (because BULK EPs are defined
->>> earlier than INT EPs).
->> 
->> Yes, it does allow a bulk endpoint to be used when an interrupt 
->> endpoint was requested.  However, it won't return a bulk endpoint if 
->> all the bulk endpoints are already in use.
-This cannot work for pxa27x.
+On 12/07/2015 16:26, Rob Herring wrote:
+> set_irq_flags is ARM specific with custom flags which have genirq
+> equivalents. Convert drivers to use the genirq interfaces directly, so we
+> can kill off set_irq_flags. The translation of flags is as follows:
+> 
+> IRQF_VALID -> !IRQ_NOREQUEST
+> IRQF_PROBE -> !IRQ_NOPROBE
+> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+> 
+> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+> and setting IRQ_NOREQUEST already, so there is no need to do this in
+> .map() functions and we can simply remove the set_irq_flags calls. Some
+> users also set IRQ_NOPROBE and this has been maintained although it is not
+> clear that is really needed. There appears to be a great deal of blind
+> copy and paste of this code.
+> 
+> Signed-off-by: Rob Herring <robh@kernel.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Alexander Shiyan <shc_work@mail.ru>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-rpi-kernel at lists.infradead.org
+> ---
+> v2:
+> - Fix build error on clps711x
+> 
+[...]
 
-The pxa27x IP has a hardware limitation which prevents an endpoint from changing
-its type once the UDC is enabled (see the comment at the beginning of
-pxa27x_udc.c).
+> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+> index 0d3b0fe..b8bf8b0 100644
+> --- a/drivers/irqchip/irq-armada-370-xp.c
+> +++ b/drivers/irqchip/irq-armada-370-xp.c
+> @@ -201,7 +201,6 @@ static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
+>  {
+>  	irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
+>  				 handle_simple_irq);
+> -	set_irq_flags(virq, IRQF_VALID);
 
-If that patchset implies that for a requested INT endpoint a BULK endpoint can
-be returned, that won't work. Felipe and Robert, is that what this patchset
-implies ?
+OK
 
-> A default PXA27x configuration returns BULK for requested INT. Which is
-> unfortunate, because PXA27x supports INT endpoints and has one predefined, but
-> this function find BULK first (one BULK is allocated and INT is never used).
-See above.
+> 
+>  	return 0;
+>  }
+> @@ -318,7 +317,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+>  		irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+>  					handle_level_irq);
+>  	}
+> -	set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+> +	irq_set_noprobe(virq);
 
-> Because if they do, the ep_matches() function works poorly. It returns a BULK
-> for device (gadget) side, but host side (PC) thinks that this endpoint is an INT
-> and handles it in this way. But the PXA27x thinks the endpoint is a BULK and
-> handles it in its way (according to datasheet, settings for a BULK and an INT
-> transfers are not 100% compatible).
->
-> I cannot test "INT as BULK" behavior for the gadget functions, because all
-> gadgets which works on PXA27x does not use INT endpoints (some allocate the
-> endpoint but never use it).
-Ah a bit of history here.
+I think it should be irq_set_probe(virq), I don't see why you inverted the probe flag.
 
-At least gadget zero does, and it's my main testing point for pxa27x_udc.
-Then there should be g_serial (no acm nor obex), but that's something I have not
-tried since 2009 ...
 
-For history also, there was already an attempt a long time ago for epautoconf
-revamping, done by Rodolfo Giometti IIRC.
+Thanks,
 
-Anyway, I need pxa27x_udc to remain functional, so I'd like to understand if
-something will stop working, Robert B.
+Gregory
 
-Cheers.
 
 -- 
-Robert
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
