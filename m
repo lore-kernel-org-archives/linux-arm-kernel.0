@@ -1,53 +1,110 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 25 Jul 2015 11:27:47 +0800
-Subject: [PATCH v12 4/6] arm/dts/ls1021a: Add DCU dts node
-In-Reply-To: <1437734054-36163-5-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1437734054-36163-1-git-send-email-jianwei.wang.chn@gmail.com>
- <1437734054-36163-5-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <20150725032747.GH12927@tiger>
+Date: Sat, 25 Jul 2015 11:30:36 +0800
+Subject: [PATCH v7 4/5] ARM: dts: vf610twr: add NAND flash controller
+ peripherial
+In-Reply-To: <1437743784-30163-5-git-send-email-stefan@agner.ch>
+References: <1437743784-30163-1-git-send-email-stefan@agner.ch>
+ <1437743784-30163-5-git-send-email-stefan@agner.ch>
+Message-ID: <20150725033036.GI12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 06:34:12PM +0800, Jianwei Wang wrote:
-> Add DCU node, DCU is a display controller of Freescale
-> named 2D-ACE.
+On Fri, Jul 24, 2015 at 03:16:23PM +0200, Stefan Agner wrote:
+> This adds the NAND flash controller (NFC) peripherial. The driver
+> supports the SLC NAND chips found on Freescale's Vybrid Tower System
+> Module. The Micron NAND chip on the module needs 4-bit ECC per 512
+> byte page. Use 24-bit ECC per 2k page, which is supported by the
+> driver.
 > 
-> Signed-off-by: Alison Wang <b18965@freescale.com>
-> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
+> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/vf610-twr.dts | 44 +++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/vfxxx.dtsi    |  8 ++++++++
+>  2 files changed, 52 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
+> index 375ab23..0b2b932 100644
+> --- a/arch/arm/boot/dts/vf610-twr.dts
+> +++ b/arch/arm/boot/dts/vf610-twr.dts
+> @@ -287,6 +287,50 @@
+>  	status = "okay";
+>  };
+>  
+> +&iomuxc {
+> +	vf610-twr {
+> +		pinctrl_nfc_1: nfcgrp_1 {
 
-For dts patches sent to me, please use prefix like "ARM: dts: ls1021a:
-..." in the subject.
+The suffix "_1" is meaningless.  Please drop it here as well as patch
+#5.
 
 Shawn
 
-> ---
->  arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
->  1 file changed, 10 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index c70bb27..6d6e3e2 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -383,6 +383,16 @@
->  				 <&platform_clk 1>;
->  		};
->  
-> +		dcu: dcu at 2ce0000 {
-> +			compatible = "fsl,ls1021a-dcu";
-> +			reg = <0x0 0x2ce0000 0x0 0x10000>;
-> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&platform_clk 0>;
-> +			clock-names = "dcu";
-> +			big-endian;
-> +			status = "disabled";
+> +			fsl,pins = <
+> +			VF610_PAD_PTD31__NF_IO15	0x28df
+> +			VF610_PAD_PTD30__NF_IO14	0x28df
+> +			VF610_PAD_PTD29__NF_IO13	0x28df
+> +			VF610_PAD_PTD28__NF_IO12	0x28df
+> +			VF610_PAD_PTD27__NF_IO11	0x28df
+> +			VF610_PAD_PTD26__NF_IO10	0x28df
+> +			VF610_PAD_PTD25__NF_IO9		0x28df
+> +			VF610_PAD_PTD24__NF_IO8		0x28df
+> +			VF610_PAD_PTD23__NF_IO7		0x28df
+> +			VF610_PAD_PTD22__NF_IO6		0x28df
+> +			VF610_PAD_PTD21__NF_IO5		0x28df
+> +			VF610_PAD_PTD20__NF_IO4		0x28df
+> +			VF610_PAD_PTD19__NF_IO3		0x28df
+> +			VF610_PAD_PTD18__NF_IO2		0x28df
+> +			VF610_PAD_PTD17__NF_IO1		0x28df
+> +			VF610_PAD_PTD16__NF_IO0		0x28df
+> +			VF610_PAD_PTB24__NF_WE_B	0x28c2
+> +			VF610_PAD_PTB25__NF_CE0_B	0x28c2
+> +			VF610_PAD_PTB27__NF_RE_B	0x28c2
+> +			VF610_PAD_PTC26__NF_RB_B	0x283d
+> +			VF610_PAD_PTC27__NF_ALE		0x28c2
+> +			VF610_PAD_PTC28__NF_CLE		0x28c2
+> +			>;
 > +		};
+> +	};
+> +};
 > +
->  		mdio0: mdio at 2d24000 {
->  			compatible = "gianfar";
->  			device_type = "mdio";
+> +&nfc {
+> +	assigned-clocks = <&clks VF610_CLK_NFC>;
+> +	assigned-clock-rates = <33000000>;
+> +	nand-bus-width = <16>;
+> +	nand-ecc-mode = "hw";
+> +	nand-ecc-step-size = <2048>;
+> +	nand-ecc-strength = <24>;
+> +	nand-on-flash-bbt;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_nfc_1>;
+> +	status = "okay";
+> +};
+> +
+>  &uart1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart1>;
+> diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
+> index 4aa3351..2f4b04d 100644
+> --- a/arch/arm/boot/dts/vfxxx.dtsi
+> +++ b/arch/arm/boot/dts/vfxxx.dtsi
+> @@ -520,6 +520,14 @@
+>  				status = "disabled";
+>  			};
+>  
+> +			nfc: nand at 400e0000 {
+> +				compatible = "fsl,vf610-nfc";
+> +				reg = <0x400e0000 0x4000>;
+> +				interrupts = <83 IRQ_TYPE_LEVEL_HIGH>;
+> +				clocks = <&clks VF610_CLK_NFC>;
+> +				clock-names = "nfc";
+> +				status = "disabled";
+> +			};
+>  		};
+>  	};
+>  };
 > -- 
-> 2.1.0.27.g96db324
+> 2.4.5
 > 
 > 
 > _______________________________________________
