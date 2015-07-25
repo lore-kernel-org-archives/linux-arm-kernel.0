@@ -1,20 +1,38 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 25 Jul 2015 11:38:52 +0800
-Subject: [PATCH v2] ARM: dts: i.MX35: Fix can support.
-In-Reply-To: <1437640272-5054-1-git-send-email-denis@eukrea.com>
-References: <20150722180434.GA745@pengutronix.de>
- <1437640272-5054-1-git-send-email-denis@eukrea.com>
-Message-ID: <20150725033852.GJ12927@tiger>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 24 Jul 2015 22:31:55 -0700 (PDT)
+Subject: [PATCH V2 net-next 0/3] ARM BPF JIT features
+In-Reply-To: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
+References: <1437481000-22835-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <20150724.223155.121697079062172205.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 10:31:12AM +0200, Denis Carikli wrote:
-> Since commit 3d42a379b6fa5b46058e3302b1802b29f64865bb
-> ("can: flexcan: add 2nd clock to support imx53 and newer")
-> the can driver requires a dt nodes to have a second clock.
-> Add them to imx35 to fix probing the flex can driver on the
-> respective platforms.
-> 
-> Signed-off-by: Denis Carikli <denis@eukrea.com>
+From: Nicolas Schichan <nschichan@freebox.fr>
+Date: Tue, 21 Jul 2015 14:16:37 +0200
 
-Applied, thanks.
+> This serie adds support for more instructions to the ARM BPF JIT
+
+"series"
+
+> namely skb netdevice type retrieval, skb payload offset retrieval, and
+> skb packet type retrieval.
+> 
+> This allows 35 tests to use the JIT instead of 29 before.
+> 
+> This serie depends on the "BPF JIT fixes for ARM" serie sent earlier.
+
+"series"
+
+But even with that series applied these patches do not apply properly
+at all.
+
+davem at greenl8ke:~/src/GIT/net-next$ git am --signoff bundle-8569-arm-bpf-next.mbox 
+Applying: ARM: net: add support for BPF_ANC | SKF_AD_PKTTYPE in ARM JIT.
+error: patch failed: arch/arm/net/bpf_jit_32.c:864
+error: arch/arm/net/bpf_jit_32.c: patch does not apply
+Patch failed at 0001 ARM: net: add support for BPF_ANC | SKF_AD_PKTTYPE in ARM JIT.
+When you have resolved this problem run "git am --resolved".
+If you would prefer to skip this patch, instead run "git am --skip".
+To restore the original branch and stop patching run "git am --abort".
+
+Please respin against net-next, thanks.
