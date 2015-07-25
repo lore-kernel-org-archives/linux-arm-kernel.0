@@ -1,135 +1,132 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Sat, 25 Jul 2015 18:34:24 +0100
-Subject: [PATCH] xen/events: Support event channel rebind on ARM
-Message-ID: <1437845664-32098-1-git-send-email-julien.grall@citrix.com>
+From: r.baldyga@hackerion.com (Robert Baldyga)
+Date: Sat, 25 Jul 2015 20:08:23 +0200
+Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
+ to udc-core
+In-Reply-To: <87fv4cdv7v.fsf@belgarion.home>
+References: <Pine.LNX.4.44L0.1507251117020.31041-100000@netrider.rowland.org>
+ <87fv4cdv7v.fsf@belgarion.home>
+Message-ID: <55B3D097.7090201@hackerion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the event channel rebind code is gated with the presence of
-the vector callback.
+Hi,
 
-The virtual interrupt controller on ARM has the concept of per-CPU
-interrupt (PPI) which allow us to support per-VCPU event channel.
-Therefore there is no need of vector callback for ARM.
+On 07/25/2015 07:04 PM, Robert Jarzmik wrote:
+> Alan Stern <stern@rowland.harvard.edu> writes:
+>
+> Hi Alan,
+>
+>> On Sat, 25 Jul 2015, Robert Jarzmik wrote:
+>>
+>>> Petr Cvek <petr.cvek@tul.cz> writes:
+>>>
+>>>> On 23.7.2015 21:46, Alan Stern wrote:
+>>>>>> It seems that it allows using a BULK endpoint for requested INT
+>>>>>> endpoint. For my PXA27x machine the original code returns BULK EP
+>>>>>> even with valid INT endpoint definition (because BULK EPs are defined
+>>>>>> earlier than INT EPs).
+>>>>>
+>>>>> Yes, it does allow a bulk endpoint to be used when an interrupt
+>>>>> endpoint was requested.  However, it won't return a bulk endpoint if
+>>>>> all the bulk endpoints are already in use.
+>>> This cannot work for pxa27x.
+>>
+>> Do you mean that on pxa27x, a bulk endpoint cannot be used as an
+>> interrupt endpoint?  Why not?  From the device controller's point of
+>> view, there is no difference between bulk and interrupt (except
+>> possibly for the maxpacket sizes and high-bandwidth usage when running
+>> at high speed).
+> That's the point, maxpacket size and priority.
+>
+> As you said, it's not that it won't work, it won't work with the priority
+> expected by the software stack, ie. higher priority for ISO endpoint.
 
-Xen is already using a free PPI to notify the guest VCPU of an event.
-Furthermore, the xen code initialization in Linux (see
-arch/arm/xen/enlighten.c) is requesting correctly a per-CPU IRQ.
+Priority is not dependent on UDC hardware capabilities. Only USB host 
+decides about priority, so there is no problem from UDC point of view.
 
-Introduce new macro xen_support_evtchn_rebind to allow architecture
-decide whether rebind an event is support or not. It will always return
-1 on ARM and keep the same behavior on x86.
+>>> The pxa27x IP has a hardware limitation which prevents an endpoint from changing
+>>> its type once the UDC is enabled (see the comment at the beginning of
+>>> pxa27x_udc.c).
+>>>
+>>> If that patchset implies that for a requested INT endpoint a BULK endpoint can
+>>> be returned, that won't work. Felipe and Robert, is that what this patchset
+>>> implies ?
+>>
+>> Sort of.  The matching code has always behaved that way and this
+>> patchset does not change the behavior.
+> Then all is fine I suppose, if it was working before and nothing changes, it
+> will continue to work, won't it ?
+>
+>>>> A default PXA27x configuration returns BULK for requested INT. Which is
+>>>> unfortunate, because PXA27x supports INT endpoints and has one predefined, but
+>>>> this function find BULK first (one BULK is allocated and INT is never used).
+>>> See above.
+>>
+>> See response above.
+>>
+>> Besides, let's say the pxa27x has one bulk and one interrupt endpoint.
+>> Now suppose the gadget driver requests a bulk endpoint first.  The
+>> matching code will allocate the single bulk endpoint.  Then the gadget
+>> driver requests an interrupt endpoint.  The matching code cannot
+>> allocate the bulk endpoint, because that endpoint is already allocated.
+>> So it will allocate the interrupt endpoint.
+>>
+>> Thus, as you can see, under the right conditions everything will work
+>> as desired.
+>
+> Let me give you another example :
+>   - pxa27x_udc offers 3 endpoints : ep-in, ep-out, ep-iso-in
+>   - a gadget driver does :
+>     - request an ep-in
+>     - request an ep-out
+>     - request an ep-in
+>     - request an ep-iso-in
+> In that case, the ep-iso-in request will fail, right ? Yet I would have expected
+> the second ep-in request to fail, as that's the one which cannot be serviced.
 
-This is also allow us to drop the usage of xen_have_vector_callback
-entirely in the ARM code.
+Gadget driver cannot simply request ep-in. Endpoints are matched with ep 
+descriptors containing complete information about direction, type, 
+maxpacketsize etc. of requested endpoint. So described situation can 
+never take a place.
 
-Signed-off-by: Julien Grall <julien.grall@citrix.com>
-Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
----
-    Tested by setting the affinity manually via /proc on dom0 ARM64
----
- arch/arm/include/asm/xen/events.h   | 3 +++
- arch/arm/xen/enlighten.c            | 4 ----
- arch/arm64/include/asm/xen/events.h | 3 +++
- arch/x86/include/asm/xen/events.h   | 9 +++++++++
- drivers/xen/events/events_base.c    | 6 +-----
- include/xen/events.h                | 1 -
- 6 files changed, 16 insertions(+), 10 deletions(-)
+However if gadget driver requests more endpoints than UDC driver 
+supplies it will do fail ;)
 
-diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
-index 8b1f37b..72d467f 100644
---- a/arch/arm/include/asm/xen/events.h
-+++ b/arch/arm/include/asm/xen/events.h
-@@ -20,4 +20,7 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 							    atomic64_t,	\
- 							    counter), (val))
- 
-+/* Rebind event channel is supported by default */
-+#define xen_support_evtchn_rebind()	(1)
-+
- #endif /* _ASM_ARM_XEN_EVENTS_H */
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 9055c92..c50c8d3 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -45,10 +45,6 @@ static struct vcpu_info __percpu *xen_vcpu_info;
- unsigned long xen_released_pages;
- struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
- 
--/* TODO: to be removed */
--__read_mostly int xen_have_vector_callback;
--EXPORT_SYMBOL_GPL(xen_have_vector_callback);
--
- static __read_mostly unsigned int xen_events_irq;
- 
- static __initdata struct device_node *xen_node;
-diff --git a/arch/arm64/include/asm/xen/events.h b/arch/arm64/include/asm/xen/events.h
-index 8655321..259eef0 100644
---- a/arch/arm64/include/asm/xen/events.h
-+++ b/arch/arm64/include/asm/xen/events.h
-@@ -18,4 +18,7 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- 
- #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
- 
-+/* Rebind event channel is supported by default */
-+#define xen_support_evtchn_rebind()	(1)
-+
- #endif /* _ASM_ARM64_XEN_EVENTS_H */
-diff --git a/arch/x86/include/asm/xen/events.h b/arch/x86/include/asm/xen/events.h
-index 608a79d..e8ed478 100644
---- a/arch/x86/include/asm/xen/events.h
-+++ b/arch/x86/include/asm/xen/events.h
-@@ -20,4 +20,13 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
- /* No need for a barrier -- XCHG is a barrier on x86. */
- #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
- 
-+/*
-+ * Events delivered via platform PCI interrupts are always
-+ * routed to vcpu 0 and hence cannot be rebound.
-+ */
-+#define xen_support_evtchn_rebind()	\
-+	(!xen_hvm_domain() || xen_have_vector_callback)
-+
-+extern int xen_have_vector_callback;
-+
- #endif /* _ASM_X86_XEN_EVENTS_H */
-diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
-index 96093ae..ed620e5 100644
---- a/drivers/xen/events/events_base.c
-+++ b/drivers/xen/events/events_base.c
-@@ -1301,11 +1301,7 @@ static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
- 	if (!VALID_EVTCHN(evtchn))
- 		return -1;
- 
--	/*
--	 * Events delivered via platform PCI interrupts are always
--	 * routed to vcpu 0 and hence cannot be rebound.
--	 */
--	if (xen_hvm_domain() && !xen_have_vector_callback)
-+	if (!xen_support_evtchn_rebind())
- 		return -1;
- 
- 	/* Send future instances of this interrupt to other vcpu. */
-diff --git a/include/xen/events.h b/include/xen/events.h
-index 7d95fdf..88da2ab 100644
---- a/include/xen/events.h
-+++ b/include/xen/events.h
-@@ -92,7 +92,6 @@ void xen_hvm_callback_vector(void);
- #ifdef CONFIG_TRACING
- #define trace_xen_hvm_callback_vector xen_hvm_callback_vector
- #endif
--extern int xen_have_vector_callback;
- int xen_set_callback_via(uint64_t via);
- void xen_evtchn_do_upcall(struct pt_regs *regs);
- void xen_hvm_evtchn_do_upcall(void);
--- 
-2.1.4
+Current matching mechanism is very simple and surely will not always 
+return optimal endpont set. Maybe we should try to develop something 
+more sophisticated.
+
+>
+> Of course, this hypothetical case implies that pxa27x_udc is not compatible with
+> this gadget driver, so it's not really relevant, is it ...
+>
+>>>> Because if they do, the ep_matches() function works poorly. It returns a BULK
+>>>> for device (gadget) side, but host side (PC) thinks that this endpoint is an INT
+>>>> and handles it in this way. But the PXA27x thinks the endpoint is a BULK and
+>>>> handles it in its way (according to datasheet, settings for a BULK and an INT
+>>>> transfers are not 100% compatible).
+>>
+>> How do they differ?
+> One example I have in mind is chapter 12.4.2 of pxa27x developer manual
+> "Endpoint Memory Configuration", quote follows :
+>            If the USB host controller transmits more OUT data than the maximum
+>            size packet for a bulk or interrupt endpoint, the UDC does not send
+>            any handshake to the host controller causing the host controller to
+>            time-out. If the USB host controller transmits more OUT data than the
+>            maximum size packet for an isochronous endpoint, the UDC sets the data
+>            packet error (DPE) bit in the Endpoint Control/Status register,
+>            UDCCSRx[DPE].
+>
+>> Perhaps you could submit a patch that adds a "do not allocate a bulk
+>> endpoint when an interrupt endpoint is requested" quirk flag to the
+>> usb_gadget structure, and modify the matching code to take the new flag
+>> into account.
+> Well, if it was working that way already in the past, I don't see overloading
+> the code with a quirk a necessity. My only need is that it continues to work.
+
+In this patchset I'm adding 'ep_match' callback to usb_gadget_ops, which 
+can be used to supply non-standard matching algorithm, so there is no 
+need for new quirk.
+
+Cheers,
+Robert
