@@ -1,92 +1,108 @@
 From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 24 Jul 2015 22:39:33 -0400
-Subject: [PATCH v2 17/25] intel-iommu: switch from ioremap_cache to memremap
+Date: Fri, 24 Jul 2015 22:40:01 -0400
+Subject: [PATCH v2 22/25] pmem: switch from ioremap_wt to memremap
 In-Reply-To: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
 References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150725023933.8664.85856.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150725024001.8664.13362.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for deprecating ioremap_cache() convert its usage in
-intel-iommu to memremap.  This also eliminates the mishandling of the
-__iomem annotation in the implementation.
+In preparation for deprecating ioremap_wt() convert its usage in
+the PMEM API to memremap.
 
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Ross Zwisler <ross.zwisler@linux.intel.com>
 Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- drivers/iommu/intel-iommu.c         |   10 ++++++----
- drivers/iommu/intel_irq_remapping.c |    4 ++--
- 2 files changed, 8 insertions(+), 6 deletions(-)
+ include/linux/pmem.h              |    2 +-
+ tools/testing/nvdimm/Kbuild       |    4 ++--
+ tools/testing/nvdimm/test/iomap.c |   34 +++++++++++++++++++++++++---------
+ 3 files changed, 28 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index a98a7b27aca1..028ad0ff6abb 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -34,6 +34,7 @@
- #include <linux/mempool.h>
- #include <linux/memory.h>
- #include <linux/timer.h>
-+#include <linux/io.h>
- #include <linux/iova.h>
- #include <linux/iommu.h>
- #include <linux/intel-iommu.h>
-@@ -2871,7 +2872,8 @@ static int copy_context_table(struct intel_iommu *iommu,
- 			}
- 
- 			ret = -ENOMEM;
--			old_ce = ioremap_cache(old_ce_phys, PAGE_SIZE);
-+			old_ce = memremap(old_ce_phys, PAGE_SIZE,
-+					MEMREMAP_CACHE);
- 			if (!old_ce)
- 				goto out;
- 
-@@ -2919,7 +2921,7 @@ static int copy_context_table(struct intel_iommu *iommu,
- 	__iommu_flush_cache(iommu, new_ce, VTD_PAGE_SIZE);
- 
- out_unmap:
--	iounmap(old_ce);
-+	memunmap(old_ce);
- 
- out:
- 	return ret;
-@@ -2953,7 +2955,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
- 	if (!old_rt_phys)
- 		return -EINVAL;
- 
--	old_rt = ioremap_cache(old_rt_phys, PAGE_SIZE);
-+	old_rt = memremap(old_rt_phys, PAGE_SIZE, MEMREMAP_CACHE);
- 	if (!old_rt)
- 		return -ENOMEM;
- 
-@@ -3002,7 +3004,7 @@ static int copy_translation_tables(struct intel_iommu *iommu)
- 	ret = 0;
- 
- out_unmap:
--	iounmap(old_rt);
-+	memunmap(old_rt);
- 
- 	return ret;
+diff --git a/include/linux/pmem.h b/include/linux/pmem.h
+index d2114045a6c4..1bf74c735fa0 100644
+--- a/include/linux/pmem.h
++++ b/include/linux/pmem.h
+@@ -94,7 +94,7 @@ static void default_memcpy_to_pmem(void __pmem *dst, const void *src,
+ static void __pmem *default_memremap_pmem(resource_size_t offset,
+ 		unsigned long size)
+ {
+-	return (void __pmem __force *)ioremap_wt(offset, size);
++	return (void __pmem *) memremap(offset, size, MEMREMAP_WT);
  }
-diff --git a/drivers/iommu/intel_irq_remapping.c b/drivers/iommu/intel_irq_remapping.c
-index 27cdfa84ec5b..1da158d3b3ce 100644
---- a/drivers/iommu/intel_irq_remapping.c
-+++ b/drivers/iommu/intel_irq_remapping.c
-@@ -408,7 +408,7 @@ static int iommu_load_old_irte(struct intel_iommu *iommu)
- 	size     = INTR_REMAP_TABLE_ENTRIES*sizeof(struct irte);
  
- 	/* Map the old IR table */
--	old_ir_table = ioremap_cache(irt_phys, size);
-+	old_ir_table = memremap(irt_phys, size, MEMREMAP_CACHE);
- 	if (!old_ir_table)
- 		return -ENOMEM;
- 
-@@ -426,7 +426,7 @@ static int iommu_load_old_irte(struct intel_iommu *iommu)
- 			bitmap_set(iommu->ir_table->bitmap, i, 1);
- 	}
- 
--	iounmap(old_ir_table);
-+	memunmap(old_ir_table);
- 
- 	return 0;
+ /**
+diff --git a/tools/testing/nvdimm/Kbuild b/tools/testing/nvdimm/Kbuild
+index de2912ea78e8..8032a49f7873 100644
+--- a/tools/testing/nvdimm/Kbuild
++++ b/tools/testing/nvdimm/Kbuild
+@@ -1,7 +1,7 @@
+-ldflags-y += --wrap=ioremap_wt
+ ldflags-y += --wrap=ioremap_wc
+ ldflags-y += --wrap=devm_ioremap_nocache
+-ldflags-y += --wrap=arch_memremap_pmem
++ldflags-y += --wrap=memremap
++ldflags-y += --wrap=memunmap
+ ldflags-y += --wrap=ioremap_nocache
+ ldflags-y += --wrap=iounmap
+ ldflags-y += --wrap=__request_region
+diff --git a/tools/testing/nvdimm/test/iomap.c b/tools/testing/nvdimm/test/iomap.c
+index f8486f98f860..21288f34a5ca 100644
+--- a/tools/testing/nvdimm/test/iomap.c
++++ b/tools/testing/nvdimm/test/iomap.c
+@@ -80,11 +80,20 @@ void __iomem *__wrap_devm_ioremap_nocache(struct device *dev,
  }
+ EXPORT_SYMBOL(__wrap_devm_ioremap_nocache);
+ 
+-void *__wrap_arch_memremap_pmem(resource_size_t offset, size_t size)
++void *__wrap_memremap(resource_size_t offset, size_t size,
++		unsigned long flags)
+ {
+-	return __nfit_test_ioremap(offset, size, arch_memremap_pmem);
++	struct nfit_test_resource *nfit_res;
++
++	rcu_read_lock();
++	nfit_res = get_nfit_res(offset);
++	rcu_read_unlock();
++	if (nfit_res)
++		return (void __iomem *) nfit_res->buf + offset
++			- nfit_res->res->start;
++	return memremap(offset, size, flags);
+ }
+-EXPORT_SYMBOL(__wrap_arch_memremap_pmem);
++EXPORT_SYMBOL(__wrap_memremap);
+ 
+ void __iomem *__wrap_ioremap_nocache(resource_size_t offset, unsigned long size)
+ {
+@@ -92,12 +101,6 @@ void __iomem *__wrap_ioremap_nocache(resource_size_t offset, unsigned long size)
+ }
+ EXPORT_SYMBOL(__wrap_ioremap_nocache);
+ 
+-void __iomem *__wrap_ioremap_wt(resource_size_t offset, unsigned long size)
+-{
+-	return __nfit_test_ioremap(offset, size, ioremap_wt);
+-}
+-EXPORT_SYMBOL(__wrap_ioremap_wt);
+-
+ void __iomem *__wrap_ioremap_wc(resource_size_t offset, unsigned long size)
+ {
+ 	return __nfit_test_ioremap(offset, size, ioremap_wc);
+@@ -117,6 +120,19 @@ void __wrap_iounmap(volatile void __iomem *addr)
+ }
+ EXPORT_SYMBOL(__wrap_iounmap);
+ 
++void __wrap_memunmap(void *addr)
++{
++	struct nfit_test_resource *nfit_res;
++
++	rcu_read_lock();
++	nfit_res = get_nfit_res((unsigned long) addr);
++	rcu_read_unlock();
++	if (nfit_res)
++		return;
++	return memunmap(addr);
++}
++EXPORT_SYMBOL(__wrap_memunmap);
++
+ struct resource *__wrap___request_region(struct resource *parent,
+ 		resource_size_t start, resource_size_t n, const char *name,
+ 		int flags)
