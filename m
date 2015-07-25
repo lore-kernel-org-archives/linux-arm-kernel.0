@@ -1,271 +1,78 @@
-From: Tirumalesh.Chalamarla@caviumnetworks.com (Chalamarla, Tirumalesh)
-Date: Fri, 24 Jul 2015 23:27:17 +0000
-Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
-In-Reply-To: <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
-References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
- <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <FD9C4916-6BDC-40F2-A273-91BFBD3B0075@caviumnetworks.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 24 Jul 2015 17:05:19 -0700
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+In-Reply-To: <20150724224258.GA23990@google.com>
+References: <20150724224258.GA23990@google.com>
+Message-ID: <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-looks good. possible to describe the chip we have.
-> On Jul 23, 2015, at 9:52 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> 
-> Currently msi-parent is used by a few bindings to describe the
-> relationship between a PCI root complex and a single MSI controller, but
-> this property does not have a generic binding document.
-> 
-> Additionally, msi-parent is insufficient to describe more complex
-> relationships between MSI controllers and devices under a root complex,
-> where devices may be able to target multiple MSI controllers, or where
-> MSI controllers use (non-probeable) sideband information to distinguish
-> devices.
-> 
-> This patch adds a generic binding for mapping PCI devices to MSI
-> controllers. This document covers msi-parent, and a new msi-map property
-> (specific to PCI*) which may be used to map devices (identified by their
-> Requester ID) to sideband data for each MSI controller that they may
-> target.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Documentation/devicetree/bindings/pci/pci-msi.txt | 220 ++++++++++++++++++++++
-> 1 file changed, 220 insertions(+)
-> create mode 100644 Documentation/devicetree/bindings/pci/pci-msi.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/pci-msi.txt b/Documentation/devicetree/bindings/pci/pci-msi.txt
-> new file mode 100644
-> index 0000000..9b3cc81
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/pci-msi.txt
-> @@ -0,0 +1,220 @@
-> +This document describes the generic device tree binding for describing the
-> +relationship between PCI devices and MSI controllers.
-> +
-> +Each PCI device under a root complex is uniquely identified by its Requester ID
-> +(AKA RID). A Requester ID is a triplet of a Bus number, Device number, and
-> +Function number.
-> +
-> +For the purpose of this document, when treated as a numeric value, a RID is
-> +formatted such that:
-> +
-> +* Bits [15:8] are the Bus number.
-> +* Bits [7:3] are the Device number.
-> +* Bits [2:0] are the Function number.
-> +* Any other bits required for padding must be zero.
-> +
-> +MSIs may be distinguished in part through the use of sideband data accompanying
-> +writes. In the case of PCI devices, this sideband data may be derived from the
-> +Requester ID. A mechanism is required to associate a device with both the MSI
-> +controllers it can address, and the sideband data that will be associated with
-> +its writes to those controllers.
-> +
-> +For generic MSI bindings, see
-> +Documentation/devicetree/bindings/interrupt-controller/msi.txt.
-> +
-> +
-> +PCI root complex
-> +================
-> +
-> +Optional properties
-> +-------------------
-> +
-> +- msi-map: Maps a Requester ID to an MSI controller and associated
-> +  msi-specifier data. The property is an arbitrary number of tuples of
-> +  (rid-base,msi-controller,msi-base,length), where:
-> +
-> +  * rid-base is a single cell describing the first RID matched by the entry.
-> +
-> +  * msi-controller is a single phandle to an MSI controller
-> +
-> +  * msi-base is an msi-specifier describing the msi-specifier produced for the
-> +    first RID matched by the entry.
-> +
-> +  * length is a single cell describing how many consecutive RIDs are matched
-> +    following the rid-base.
-> +
-> +  Any RID r in the interval [rid-base, rid-base + length) is associated with
-> +  the listed msi-controller, with the msi-specifier (r - rid-base + msi-base).
-> +
-> +- msi-map-mask: A mask to be applied to each Requester ID prior to being mapped
-> +  to an msi-specifier per the msi-map property.
-> +
-> +- msi-parent: Describes the MSI parent of the root complex itself. Where
-> +  the root complex and MSI controller do not pass sideband data with MSI
-> +  writes, this property may be used to describe the MSI controller(s)
-> +  used by PCI devices under the root complex, if defined as such in the
-> +  binding for the root complex.
-> +
-> +
-> +Example (1)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi: msi-controller at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	pci: pci at f {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to the MSI controller is
-> +		 * the RID, identity-mapped.
-> +		 */
-> +		msi-map = <0x0 &msi_a 0x0 0x10000>,
-> +	};
-> +};
-> +
-> +
-> +Example (2)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi: msi-controller at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	pci: pci at f {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to the MSI controller is
-> +		 * the RID, masked to only the device and function bits.
-> +		 */
-> +		msi-map = <0x0 &msi_a 0x0 0x100>,
-> +		msi-map-mask = <0xff>
-> +	};
-> +};
-> +
-> +
-> +Example (3)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi: msi-controller at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	pci: pci at f {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to the MSI controller is
-> +		 * the RID, but the high bit of the bus number is
-> +		 * ignored.
-> +		 */
-> +		msi-map = <0x0000 &msi 0x0000 0x8000>,
-> +			  <0x8000 &msi 0x0000 0x8000>;
-> +	};
-> +};
-> +
-> +
-> +Example (4)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi: msi-controller at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	pci: pci at f {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to the MSI controller is
-> +		 * the RID, but the high bit of the bus number is
-> +		 * negated.
-> +		 */
-> +		msi-map = <0x0000 &msi 0x8000 0x8000>,
-> +			  <0x8000 &msi 0x0000 0x8000>;
-> +	};
-> +};
-> +
-> +
-> +Example (5)
-> +===========
-> +
-> +/ {
-> +	#address-cells = <1>;
-> +	#size-cells = <1>;
-> +
-> +	msi_a: msi-controller at a {
-> +		reg = <0xa 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	msi_b: msi-controller at b {
-> +		reg = <0xb 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	msi_c: msi-controller at c {
-> +		reg = <0xc 0x1>;
-> +		compatible = "vendor,some-controller";
-> +		msi-controller;
-> +		#msi-cells = <1>;
-> +	};
-> +
-> +	pci: pci at c {
-> +		reg = <0xf 0x1>;
-> +		compatible = "vendor,pcie-root-complex";
-> +		device_type = "pci";
-> +
-> +		/*
-> +		 * The sideband data provided to MSI controller a is the
-> +		 * RID, but the high bit of the bus number is negated.
-> +		 * The sideband data provided to MSI controller b is the
-> +		 * RID, identity-mapped.
-> +		 * MSI controller c is not addressable.
-> +		 */
-> +		msi-map = <0x0000 &msi_a 0x8000 0x08000>,
-> +			  <0x8000 &msi_a 0x0000 0x08000>,
-> +			  <0x0000 &msi_b 0x0000 0x10000>;
-> +	};
+Hi Bjorn,
 
-they can be identical right? like
-	<0x8000 &msi_a 0x0000 0x08000>,
- 	<0x8000 &msi_b 0x0000 0x08000>;
+On Fri, Jul 24, 2015 at 3:42 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>
+> I regularly see faults like this on an APM X-Gene:
+>
+>   U-Boot 2013.04-mustang_sw_1.14.14 (Dec 16 2014 - 15:59:33)
+>   CPU0: APM ARM 64-bit Potenza Rev B0 2400MHz PCP 2400MHz
+>        32 KB ICACHE, 32 KB DCACHE
+>        SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+>   ...
+>   Unhandled fault: synchronous external abort (0x96000010) at 0xffffff8000110034
+>   Internal error: : 96000010 [#1] SMP
+>   Modules linked in:
+>   CPU: 0 PID: 3723 Comm: ... 4.1.0-smp-DEV #3
+>   Hardware name: APM X-Gene Mustang board (DT)
+>   task: ffffffc7dc1a4140 ti: ffffffc7dc118000 task.ti: ffffffc7dc118000
+>   PC is at pci_generic_config_read32+0x4c/0xb8
+>   LR is at pci_generic_config_read32+0x40/0xb8
+>   pc : [<ffffffc00033b90c>] lr : [<ffffffc00033b900>] pstate: 600001c5
+>   ...
+>   Call trace:
+>   [<ffffffc00033b90c>] pci_generic_config_read32+0x4c/0xb8
+>   [<ffffffc00033bf58>] pci_user_read_config_byte+0x60/0xc4
+>   [<ffffffc0003496a8>] pci_read_config+0x15c/0x238
+>   [<ffffffc0002393b4>] sysfs_kf_bin_read+0x68/0xa0
+>   [<ffffffc00023896c>] kernfs_fop_read+0x9c/0x1ac
+>   [<ffffffc0001c361c>] __vfs_read+0x44/0x128
+>   [<ffffffc0001c3e28>] vfs_read+0x84/0x144
+>   [<ffffffc0001c4764>] SyS_read+0x50/0xb0
 
-Thanks,
-Tirumalesh.
-> +};
-> -- 
-> 1.9.1
-> 
+The log shows kernel gets an exception when trying to access Mellanox
+card configuration space. This is usually due to suboptimal PCIe
+SerDes parameters are using in your board, which will cause bad link
+quality.
+The PCIe SerDes programming is done in U-Boot, so I suggest you do a
+U-Boot upgrade to our latest X-Gene U-Boot release.
+
+In order to access latest X-Gene U-Boot release, please use APM
+official support channel:
+https://myapm.apm.com
+
+Please register an account at myapm.apm.com if you don't have one
+using following link:
+https://myapm.apm.com/user/register
+
+>
+>   # lspci
+>   00:00.0 PCI bridge: Applied Micro Circuits Corp. Device e004 (rev 04)
+>   01:00.0 Ethernet controller: Mellanox Technologies MT27520 Family
+>
+> I first saw this on an ancient kernel and thought it was likely specific to
+> my environment, but I'm now using an almost unmodified v4.1 kernel and
+> still seeing it.  Does anybody else see this?  The box does have a PCI card
+> installed, but I haven't yet worked out what device's config space we're
+> trying to read.
+>
+> Is there anything I can do to debug this?  I'm not an arm64 guy, but my
+> impression is that this is a page fault, and the address seems to be in the
+> "cfg" area ioremapped by xgene_pcie_map_reg(), so I'm not sure this is
+> really a PCI issue -- maybe that page mapping got trashed by somebody else?
+>
+> Bjorn
+
+
+-- 
+Regards,
+Duc Dang.
