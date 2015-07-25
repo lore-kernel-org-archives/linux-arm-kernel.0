@@ -1,104 +1,50 @@
-From: jacek.anaszewski@gmail.com (Jacek Anaszewski)
-Date: Sat, 25 Jul 2015 22:45:52 +0200
-Subject: [PATCH v2 0/3] Add DT support for netxbig LEDs
-In-Reply-To: <55B3E536.5010107@gmail.com>
-References: <1434628373-11834-1-git-send-email-simon.guinot@sequanux.org>
- <55B3A32C.1010305@free-electrons.com> <55B3E536.5010107@gmail.com>
-Message-ID: <55B3F580.2040207@gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Sat, 25 Jul 2015 23:00:35 +0200
+Subject: [PATCH] bcma: populate bus DT subnodes as platform_device-s
+In-Reply-To: <55B3DB9A.9060209@hauke-m.de>
+References: <1435504633-20831-1-git-send-email-zajec5@gmail.com>
+ <CACna6rzFYpwbzM+s-KzFQmTym4iLVn+Ap+DWgFmAZzhWKTQfJw@mail.gmail.com>
+ <871tfzif17.fsf@kamboji.qca.qualcomm.com>
+ <CAGhQ9VyH4yvnU_kPAy3a7Z+80jNV8uNoTr=Nd=eV2D-iz9YVUQ@mail.gmail.com>
+ <55B3DB9A.9060209@hauke-m.de>
+Message-ID: <CAGhQ9VyV2LuDUEjtOYgTZg3kEDr5XJs8FqjXpV7wLC2U2CBd-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I confused two patch sets. Everything I wrote in the reply
-below was related to leds-ns2 [1] patch set.
-When it is related to leds-netxbig driver - there was already
-version 3 posted [2], but it is not the final one, we are waiting
-for the update.
+On 25 July 2015 at 20:55, Hauke Mehrtens <hauke@hauke-m.de> wrote:
+> On 07/24/2015 06:11 PM, Joachim Eastwood wrote:
+>> On 23 July 2015 at 08:06, Kalle Valo <kvalo@codeaurora.org> wrote:
+>>> Rafa? Mi?ecki <zajec5@gmail.com> writes:
+>>>
+>>>>> +       if (bus->host_pdev) {
+>>>>> +               struct device *dev = &bus->host_pdev->dev;
+>>>>> +
+>>>>> +               of_platform_populate(dev->of_node, of_default_bus_match_table,
+>>>>> +                                    NULL, dev);
+>>>>> +       }
+>>>>> +
+>>>>
+>>>> This caused a compile error when using bcma as module:
+>>>> ERROR: "of_default_bus_match_table" [drivers/bcma/bcma.ko] undefined!
+>>
+>> I encountered the same problem with my modular memory controller driver.
+>>
+>>>> There are two options I guess:
+>>>> 1) Export of_default_bus_match_table
+>>
+>> See link below for Rob Herring's take on that.
+>> http://marc.info/?l=linaro-kernel&m=143766694414121&w=2
+>>
+>>
+>> regards,
+>> Joachim Eastwood
+>>
+> Hi Joachim,
+>
+> are you working on a patch which exports "of_default_bus_match_table"
+> or provides a wrapper function? If not then I will look into this.
 
-On 25.07.2015 21:36, Jacek Anaszewski wrote:
-> Hi Gregory,
->
-> On 25.07.2015 16:54, Gregory CLEMENT wrote:
->> Hi Simon, Bryan, Richard,
->>
->> On 18/06/2015 13:52, Simon Guinot wrote:
->>> Hello,
->>>
->>> This patch series adds DT support for the LEDs found on the
->>> Kirkwood-based
->>> LaCie boards 2Big and 5Big Network v2.
->>
->> I saw that some led related patch on kirkwood based board have been
->> merged.
->> What is the status of this series?
->
-> LED subsystem part has been merged to linux-next, since DTS files
-> are not required for the compilation to succeed. We've been waiting
-> for ARM/Marvell Kirkwood maintainer opinion to decide on how to proceed
-> regarding patch 2/4.
->
->> I still have the patch 2 and 3 in my inbox waiting for being applied.
->
-> Patch 3 affects only drivers/leds/leds-ns2.c, you were probably
-> thinking of patch 1 which modifies the out of LED tree file
-> include/linux/platform_data/leds-kirkwood-ns2.h.
->
-> IMO it would be best if the whole series went through the
-> LED tree.
->
->> Thanks,
->>
->> Gregory
->>
->>
->>>
->>> Changes since v1:
->>> - Check timer mode value retrieved from DT.
->>> - In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
->>>    timer delay values from DT with function of_property_read_u32_index.
->>>    Instead, use a temporary u32 variable. This allows to silence a
->>> static
->>>    checker warning.
->>> - Make timer property optional in the binding documentation. It is now
->>>    aligned with the driver code.
->>>
->>> Simon
->>>
->>> Simon Guinot (3):
->>>    leds: netxbig: add device tree binding
->>>    ARM: Kirkwood: add LED DT entries for netxbig boards
->>>    ARM: mvebu: remove static LED setup for netxbig boards
->>>
->>>   .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
->>>   .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++++
->>>   arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
->>>   arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
->>>   arch/arm/mach-mvebu/Kconfig                        |   7 -
->>>   arch/arm/mach-mvebu/Makefile                       |   1 -
->>>   arch/arm/mach-mvebu/board.h                        |  21 --
->>>   arch/arm/mach-mvebu/kirkwood.c                     |   4 -
->>>   arch/arm/mach-mvebu/netxbig.c                      | 191
->>> ----------------
->>>   drivers/leds/leds-netxbig.c                        | 250
->>> +++++++++++++++++++--
->>>   include/dt-bindings/leds/leds-netxbig.h            |  18 ++
->>>   11 files changed, 501 insertions(+), 245 deletions(-)
->>>   create mode 100644
->>> Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
->>>   create mode 100644
->>> Documentation/devicetree/bindings/leds/leds-netxbig.txt
->>>   delete mode 100644 arch/arm/mach-mvebu/board.h
->>>   delete mode 100644 arch/arm/mach-mvebu/netxbig.c
->>>   create mode 100644 include/dt-bindings/leds/leds-netxbig.h
->>>
->>
->>
->
+Not really, so if you could take it that would be great. Thanks.
 
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353807.html
-[2] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351486.html
-
--- 
-Best Regards,
-Jacek Anaszewski
+regards,
+Joachim Eastwood
