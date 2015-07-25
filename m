@@ -1,32 +1,57 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Fri, 24 Jul 2015 22:18:46 -0500
-Subject: [PATCH] ARM: socfpga: dts: add osc1 as a possible parent for
- dbg_base_clk
-Message-ID: <1437794326-26317-1-git-send-email-dinguyen@opensource.altera.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 25 Jul 2015 11:27:47 +0800
+Subject: [PATCH v12 4/6] arm/dts/ls1021a: Add DCU dts node
+In-Reply-To: <1437734054-36163-5-git-send-email-jianwei.wang.chn@gmail.com>
+References: <1437734054-36163-1-git-send-email-jianwei.wang.chn@gmail.com>
+ <1437734054-36163-5-git-send-email-jianwei.wang.chn@gmail.com>
+Message-ID: <20150725032747.GH12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@opensource.altera.com>
+On Fri, Jul 24, 2015 at 06:34:12PM +0800, Jianwei Wang wrote:
+> Add DCU node, DCU is a display controller of Freescale
+> named 2D-ACE.
+> 
+> Signed-off-by: Alison Wang <b18965@freescale.com>
+> Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
+> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
 
-The dbg_base_clk can also have osc1 has a parent.
+For dts patches sent to me, please use prefix like "ARM: dts: ls1021a:
+..." in the subject.
 
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Shawn
 
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 86e0fb6..01bdaaa 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -164,7 +164,7 @@
- 						dbg_base_clk: dbg_base_clk {
- 							#clock-cells = <0>;
- 							compatible = "altr,socfpga-perip-clk";
--							clocks = <&main_pll>;
-+							clocks = <&main_pll>, <&osc1>;
- 							div-reg = <0xe8 0 9>;
- 							reg = <0x50>;
- 						};
--- 
-2.4.5
+> ---
+>  arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+> index c70bb27..6d6e3e2 100644
+> --- a/arch/arm/boot/dts/ls1021a.dtsi
+> +++ b/arch/arm/boot/dts/ls1021a.dtsi
+> @@ -383,6 +383,16 @@
+>  				 <&platform_clk 1>;
+>  		};
+>  
+> +		dcu: dcu at 2ce0000 {
+> +			compatible = "fsl,ls1021a-dcu";
+> +			reg = <0x0 0x2ce0000 0x0 0x10000>;
+> +			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&platform_clk 0>;
+> +			clock-names = "dcu";
+> +			big-endian;
+> +			status = "disabled";
+> +		};
+> +
+>  		mdio0: mdio at 2d24000 {
+>  			compatible = "gianfar";
+>  			device_type = "mdio";
+> -- 
+> 2.1.0.27.g96db324
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
