@@ -1,35 +1,56 @@
-From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Sat, 25 Jul 2015 23:39:38 +0200
-Subject: [PATCH 5/5] ARM: berlin: add a PWM node on the BG2CD
-In-Reply-To: <1437860378-9556-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1437860378-9556-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1437860378-9556-6-git-send-email-antoine.tenart@free-electrons.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 26 Jul 2015 01:02:32 +0300
+Subject: [PATCH v2 15/25] memconsole: fix __iomem mishandling, switch to
+ memremap
+In-Reply-To: <20150725023923.8664.66965.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023923.8664.66965.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <55B40778.4010909@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PWM node in the Berlin BG2CD device tree, using the
-newly added Berlin PWM driver.
+Hello.
 
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
----
- arch/arm/boot/dts/berlin2cd.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 07/25/2015 05:39 AM, Dan Williams wrote:
 
-diff --git a/arch/arm/boot/dts/berlin2cd.dtsi b/arch/arm/boot/dts/berlin2cd.dtsi
-index 900213d78a32..0503ca095acb 100644
---- a/arch/arm/boot/dts/berlin2cd.dtsi
-+++ b/arch/arm/boot/dts/berlin2cd.dtsi
-@@ -446,5 +446,11 @@
- 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 		};
-+
-+		pwm: pwm at f20000 {
-+			compatible = "marvell,berlin-pwm";
-+			reg = <0xf20000 0x40>;
-+			#pwm-cells = <3>;
-+		};
- 	};
- };
--- 
-2.4.6
+> The memconsole driver is not using proper accessors for __iomem.  Switch
+> to memremap to fix this issue, and this also prepares the driver for the
+> removal of ioremap_cache.
+
+> Cc: Mike Waychison <mikew@google.com>
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>   drivers/firmware/google/memconsole.c |    7 ++++---
+>   1 file changed, 4 insertions(+), 3 deletions(-)
+
+> diff --git a/drivers/firmware/google/memconsole.c b/drivers/firmware/google/memconsole.c
+> index 2f569aaed4c7..1b25fba84f32 100644
+> --- a/drivers/firmware/google/memconsole.c
+> +++ b/drivers/firmware/google/memconsole.c
+> @@ -52,14 +52,15 @@ static ssize_t memconsole_read(struct file *filp, struct kobject *kobp,
+>   	char *memconsole;
+>   	ssize_t ret;
+>
+> -	memconsole = ioremap_cache(memconsole_baseaddr, memconsole_length);
+> +	memconsole = memremap(memconsole_baseaddr, memconsole_length,
+> +			MEMREMAP_CACHE);
+
+    Could you maintain the existing style of the broken line alignment in this 
+file?
+
+>   	if (!memconsole) {
+> -		pr_err("memconsole: ioremap_cache failed\n");
+> +		pr_err("memconsole: memremap failed\n");
+>   		return -ENOMEM;
+>   	}
+>   	ret = memory_read_from_buffer(buf, count, &pos, memconsole,
+>   				      memconsole_length);
+
+    Here's an example...
+
+> -	iounmap(memconsole);
+> +	memunmap(memconsole);
+>   	return ret;
+>   }
+
+MBR, Sergei
