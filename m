@@ -1,120 +1,58 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sun, 26 Jul 2015 23:37:50 +0200
-Subject: [PATCH v5 3/6] rtc: mxc: use a second rtc clock
+Date: Sun, 26 Jul 2015 23:37:51 +0200
+Subject: [PATCH v5 4/6] dt-binding: document the binding for mxc rtc
 In-Reply-To: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
 References: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1437946673-7402-4-git-send-email-tremyfr@gmail.com>
+Message-ID: <1437946673-7402-5-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxc RTC needs two clocks, one for the input
-reference, and one for the IP. But this driver
-was only using one clock (for the reference).
-This patch add the second clock (for the IP).
+This adds documentation of device tree bindings for the
+mxc rtc.
 
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Pawel Moll <pawel.moll@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+Cc: Kumar Gala <galak@codeaurora.org>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- drivers/rtc/rtc-mxc.c |   41 ++++++++++++++++++++++++++++-------------
- 1 files changed, 28 insertions(+), 13 deletions(-)
+ Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   26 +++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
 
-diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
-index 5fc292c..880d485 100644
---- a/drivers/rtc/rtc-mxc.c
-+++ b/drivers/rtc/rtc-mxc.c
-@@ -79,7 +79,8 @@ struct rtc_plat_data {
- 	struct rtc_device *rtc;
- 	void __iomem *ioaddr;
- 	int irq;
--	struct clk *clk;
-+	struct clk *clk_ref;
-+	struct clk *clk_ipg;
- 	struct rtc_time g_rtc_alarm;
- 	enum imx_rtc_type devtype;
- };
-@@ -373,17 +374,28 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	if (IS_ERR(pdata->ioaddr))
- 		return PTR_ERR(pdata->ioaddr);
- 
--	pdata->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(pdata->clk)) {
--		dev_err(&pdev->dev, "unable to get clock!\n");
--		return PTR_ERR(pdata->clk);
-+	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
-+	if (IS_ERR(pdata->clk_ipg)) {
-+		dev_err(&pdev->dev, "unable to get ipg clock!\n");
-+		return PTR_ERR(pdata->clk_ipg);
- 	}
- 
--	ret = clk_prepare_enable(pdata->clk);
-+	ret = clk_prepare_enable(pdata->clk_ipg);
- 	if (ret)
- 		return ret;
- 
--	rate = clk_get_rate(pdata->clk);
-+	pdata->clk_ref = devm_clk_get(&pdev->dev, "ref");
-+	if (IS_ERR(pdata->clk_ref)) {
-+		dev_err(&pdev->dev, "unable to get ref clock!\n");
-+		ret = PTR_ERR(pdata->clk_ref);
-+		goto exit_put_clk_ipg;
-+	}
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+new file mode 100644
+index 0000000..49aa550
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+@@ -0,0 +1,26 @@
++* Real Time Clock of the i.MX SoCs
 +
-+	ret = clk_prepare_enable(pdata->clk_ref);
-+	if (ret)
-+		goto exit_put_clk_ipg;
++RTC controller for the i.MX SoCs
 +
-+	rate = clk_get_rate(pdata->clk_ref);
- 
- 	if (rate == 32768)
- 		reg = RTC_INPUT_CLK_32768HZ;
-@@ -394,7 +406,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	else {
- 		dev_err(&pdev->dev, "rtc clock is not valid (%lu)\n", rate);
- 		ret = -EINVAL;
--		goto exit_put_clk;
-+		goto exit_put_clk_ref;
- 	}
- 
- 	reg |= RTC_ENABLE_BIT;
-@@ -402,7 +414,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 	if (((readw(pdata->ioaddr + RTC_RTCCTL)) & RTC_ENABLE_BIT) == 0) {
- 		dev_err(&pdev->dev, "hardware module can't be enabled!\n");
- 		ret = -EIO;
--		goto exit_put_clk;
-+		goto exit_put_clk_ref;
- 	}
- 
- 	platform_set_drvdata(pdev, pdata);
-@@ -424,15 +436,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
- 				  THIS_MODULE);
- 	if (IS_ERR(rtc)) {
- 		ret = PTR_ERR(rtc);
--		goto exit_put_clk;
-+		goto exit_put_clk_ref;
- 	}
- 
- 	pdata->rtc = rtc;
- 
- 	return 0;
- 
--exit_put_clk:
--	clk_disable_unprepare(pdata->clk);
-+exit_put_clk_ref:
-+	clk_disable_unprepare(pdata->clk_ref);
-+exit_put_clk_ipg:
-+	clk_disable_unprepare(pdata->clk_ipg);
- 
- 	return ret;
- }
-@@ -441,7 +455,8 @@ static int mxc_rtc_remove(struct platform_device *pdev)
- {
- 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
- 
--	clk_disable_unprepare(pdata->clk);
-+	clk_disable_unprepare(pdata->clk_ref);
-+	clk_disable_unprepare(pdata->clk_ipg);
- 
- 	return 0;
- }
++Required properties:
++- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- interrupts: IRQ line for the RTC.
++- clocks: should contain two entries:
++  * one for the input reference
++  * one for the the SoC RTC
++- clock-names: should contain:
++  * "ref" for the input reference clock
++  * "ipg" for the SoC RTC clock
++
++Example:
++
++rtc at 10007000 {
++	compatible = "fsl,imx21-rtc";
++	reg = <0x10007000 0x1000>;
++	interrupts = <22>;
++	clocks = <&clks IMX27_CLK_CKIL>,
++	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
++	clock-names = "ref", "ipg";
++};
 -- 
 1.7.4.4
