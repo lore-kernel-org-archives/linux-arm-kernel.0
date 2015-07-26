@@ -1,43 +1,21 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 27 Jul 2015 17:46:40 +0530
-Subject: [PATCH 3/4] ARM: dts: OMAP5: Fix broken pbias device creation
-In-Reply-To: <1437999401-3519-1-git-send-email-kishon@ti.com>
-References: <1437999401-3519-1-git-send-email-kishon@ti.com>
-Message-ID: <1437999401-3519-4-git-send-email-kishon@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 26 Jul 2015 21:39:50 +0200
+Subject: [PATCH] ARM: appropriate __init annotation for const data
+In-Reply-To: <alpine.LFD.2.20.1507241440550.1806@knanqh.ubzr>
+References: <alpine.LFD.2.20.1507241440550.1806@knanqh.ubzr>
+Message-ID: <20150726193950.GA494@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit <ed8509edddeb> ("ARM: dts: omap5: add minimal l4 bus
-layout with control module support") moved pbias_regulator dt node
-from being a child node of ocp to be the child node of
-omap5_padconf_global. After this device for pbias_regulator is
-not created.
+On Fri, Jul 24, 2015 at 02:54:04PM -0400, Nicolas Pitre wrote:
+> 
+> Init data marked const should be annotated with __initconst for
+> correctness and not __initdata.  This also fixes LTO builds that
+> otherwise fails with section mismatch errors.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-Fix it by adding "simple-bus" compatible property to
-omap5_padconf_global dt node.
+Applied, thanks.
 
-Fixes: ed8509edddeb ("ARM: dts: omap5: add minimal l4 bus
-layout with control module support")
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/omap5.dtsi |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index c8fd648..b1a1263 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -180,7 +180,8 @@
- 				};
- 
- 				omap5_padconf_global: omap5_padconf_global at 5a0 {
--					compatible = "syscon";
-+					compatible = "syscon",
-+						     "simple-bus";
- 					reg = <0x5a0 0xec>;
- 					#address-cells = <1>;
- 					#size-cells = <1>;
--- 
-1.7.9.5
+-Olof
