@@ -1,50 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 26 Jul 2015 23:51:45 +0100
-Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
- Kconfig
-In-Reply-To: <20150724001605.GA1453@earth>
-References: <1437612483-30160-1-git-send-email-sre@kernel.org>
- <1437612483-30160-4-git-send-email-sre@kernel.org>
- <20150723123553.GE7576@n2100.arm.linux.org.uk>
- <20150724001605.GA1453@earth>
-Message-ID: <20150726225145.GF7576@n2100.arm.linux.org.uk>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 27 Jul 2015 09:27:19 +1000
+Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
+Message-ID: <20150727092719.22e43573@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 02:16:06AM +0200, Sebastian Reichel wrote:
-> Hi Russel,
-> 
-> On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel wrote:
-> > > Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
-> > > in one option less to think about when configuring the kernel.
-> > 
-> > > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
-> > > +#ifdef CONFIG_ARM_ERRATA_430973
-> > >  	teq	r3, #0x00100000			@ only present in r1p*
-> > >  	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
-> > >  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
-> > 
-> > NAK.  Please read the mailing list history, I'm not repeating myself
-> > again on this.  Thanks.
-> 
-> It's a bit hard to search the mailing list history without a bit
-> more information.
+Hi Simon,
 
-You were Cc'd on the previous round of review...
+Today's linux-next merge of the renesas tree got a conflict in:
 
-> I guess you prefer to just add the !ARCH_MULTIPLATFORM dependency to
-> the Kconfig entry without removing the additional check in the code?
+  arch/arm/mach-shmobile/setup-r8a7779.c
 
-I was referring to the above change.
+between commit:
 
-However, having discussed with Will Deacon and checked the manuals, I
-think the change is okay after all: the auxillary control register is
-banked on secure parts, and the bit we'll be trying to change will be
-read-only in non-secure mode - and importantly won't fault.
+  3017a8804ada ("ARM: appropriate __init annotation for const data")
 
-So, the change is fine, thanks.
+from the arm-soc tree and commit:
+
+  131c2e0480b0 ("ARM: shmobile: r8a7779: Generic CCF and timer suppor")
+
+from the renesas tree.
+
+I fixed it up (see below) and can carry the fix as necessary (no action
+is required).
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+
+diff --cc arch/arm/mach-shmobile/setup-r8a7779.c
+index 2321c9de2274,c18d85a96c67..000000000000
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@@ -756,7 -96,13 +96,13 @@@ static u32 __init r8a7779_read_mode_pin
+  	return mode;
+  }
+  
++ static void __init r8a7779_init_time(void)
++ {
++ 	r8a7779_clocks_init(r8a7779_read_mode_pins());
++ 	clocksource_of_init();
++ }
++ 
+ -static const char *r8a7779_compat_dt[] __initdata = {
+ +static const char *r8a7779_compat_dt[] __initconst = {
+  	"renesas,r8a7779",
+  	NULL,
+  };
