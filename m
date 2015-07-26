@@ -1,285 +1,223 @@
-From: pawelo@king.net.pl (Paul Osmialowski)
-Date: Sun, 26 Jul 2015 22:24:08 +0200 (CEST)
-Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
-In-Reply-To: <20150724034229.642.88156@quantum>
-References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
- <alpine.LNX.2.00.1507022338070.28322@localhost.localdomain>
- <alpine.DEB.2.11.1507030006280.3916@nanos> <2009463.YLtdMegFel@wuerfel>
- <alpine.LNX.2.00.1507042327490.1296@localhost.localdomain>
- <20150724034229.642.88156@quantum>
-Message-ID: <alpine.LNX.2.00.1507262211470.28341@localhost.localdomain>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Sun, 26 Jul 2015 17:49:36 -0300
+Subject: [PATCH v3 1/2] watchdog: NXP LPC18xx Watchdog Timer Driver
+In-Reply-To: <55B2BFFE.3090308@roeck-us.net>
+References: <1436921445-11138-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1436921445-11138-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <55AEE8F5.3020700@roeck-us.net> <55B150B0.9020100@vanguardiasur.com.ar>
+ <55B15AF1.3030509@roeck-us.net> <55B243B3.7050702@vanguardiasur.com.ar>
+ <55B245D1.1020208@roeck-us.net> <55B2A6CA.5090205@vanguardiasur.com.ar>
+ <55B2BFFE.3090308@roeck-us.net>
+Message-ID: <55B547E0.5060501@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Guenter,
 
-Thank you for spending time on this and pointing me into the right 
-direction. I'm wondering about going even further with it. Assuming that I 
-know everything about my board, I can skip run-time discovery phase (note 
-that the original driver was designed for other Kinetis-based boards too) 
-and move everything into DTS, somewhat like this:
+El 24/07/15 a las 19:45, Guenter Roeck escibi?:
+> On 07/24/2015 01:57 PM, Ariel D'Alessandro wrote:
+>>
+>>
+>> El 24/07/15 a las 11:04, Guenter Roeck escibi?:
+>>> On 07/24/2015 06:54 AM, Ariel D'Alessandro wrote:
+>>>>
+>>>>
+>>>> El 23/07/15 a las 18:21, Guenter Roeck escibi?:
+>>>>> On 07/23/2015 01:38 PM, Ariel D'Alessandro wrote:
+>>>>>> Hi Guenter,
+>>>>>>
+>>>>>> El 21/07/15 a las 21:51, Guenter Roeck escibi?:
+>>>>>>> On 07/14/2015 05:50 PM, Ariel D'Alessandro wrote:
+>>>>>>>> This commit adds support for the watchdog timer found in NXP LPC
+>>>>>>>> SoCs
+>>>>>>>> family, which includes LPC18xx/LPC43xx. Other SoCs in that
+>>>>>>>> family may
+>>>>>>>> share the same watchdog hardware.
+>>>>>>>>
+>>>>>>>> Watchdog driver registers a restart handler that will restart the
+>>>>>>>> system
+>>>>>>>> by performing an incorrect feed after ensuring the watchdog is
+>>>>>>>> enabled in
+>>>>>>>> reset mode.
+>>>>>>>>
+>>>>>>>> As watchdog cannot be disabled in hardware, driver's stop routine
+>>>>>>>> will
+>>>>>>>> regularly send a keepalive ping using a timer.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>>>>>
+>>>>>>> Hi Ariel,
+>>>>>>>
+>>>>>>> sorry for the delayed response. Comments below.
+>>>>>>>
+>>>>>>> Guenter
+>>>>>>>
+>>>>>>>> ---
+>>>>>>>>      drivers/watchdog/Kconfig       |  11 ++
+>>>>>>>>      drivers/watchdog/Makefile      |   1 +
+>>>>>>>>      drivers/watchdog/lpc18xx_wdt.c | 344
+>>>>>>>> +++++++++++++++++++++++++++++++++++++++++
+>>>>>>>>      3 files changed, 356 insertions(+)
+>>>>>>>>      create mode 100644 drivers/watchdog/lpc18xx_wdt.c
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+>>>>>>>> index 742fbbc..af5e2e3 100644
+>>>>>>>> --- a/drivers/watchdog/Kconfig
+>>>>>>>> +++ b/drivers/watchdog/Kconfig
+>>>>>>>> @@ -547,6 +547,17 @@ config DIGICOLOR_WATCHDOG
+>>>>>>>>            To compile this driver as a module, choose M here: the
+>>>>>>>>            module will be called digicolor_wdt.
+>>>>>>>>
+>>>>>>>> +config LPC18XX_WATCHDOG
+>>>>>>>> +    tristate "LPC18xx/43xx Watchdog"
+>>>>>>>> +    depends on ARCH_LPC18XX || COMPILE_TEST
+>>>>>>>> +    select WATCHDOG_CORE
+>>>>>>>> +    help
+>>>>>>>> +      Say Y here if to include support for the watchdog timer
+>>>>>>>> +      in NXP LPC SoCs family, which includes LPC18xx/LPC43xx
+>>>>>>>> +      processors.
+>>>>>>>> +      To compile this driver as a module, choose M here: the
+>>>>>>>> +      module will be called lpc18xx_wdt.
+>>>>>>>> +
+>>>>>>>>      # AVR32 Architecture
+>>>>>>>>
+>>>>>>>>      config AT32AP700X_WDT
+>>>>>>>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+>>>>>>>> index 59ea9a1..1b0ef48 100644
+>>>>>>>> --- a/drivers/watchdog/Makefile
+>>>>>>>> +++ b/drivers/watchdog/Makefile
+>>>>>>>> @@ -66,6 +66,7 @@ obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>>>>>>>>      obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+>>>>>>>>      obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+>>>>>>>>      obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
+>>>>>>>> +obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
+>>>>>>>>
+>>>>>>>>      # AVR32 Architecture
+>>>>>>>>      obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+>>>>>>>> diff --git a/drivers/watchdog/lpc18xx_wdt.c
+>>>>>>>> b/drivers/watchdog/lpc18xx_wdt.c
+>>>>>>>> new file mode 100644
+>>>>>>>> index 0000000..2b489fc
+>>>>>>>> --- /dev/null
+>>>>>>>> +++ b/drivers/watchdog/lpc18xx_wdt.c
+>>>>>>>> @@ -0,0 +1,344 @@
+>>>>>>>> +/*
+>>>>>>>> + * NXP LPC18xx Watchdog Timer (WDT)
+>>>>>>>> + *
+>>>>>>>> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
+>>>>>>>> + *
+>>>>>>>> + * This program is free software; you can redistribute it and/or
+>>>>>>>> modify it
+>>>>>>>> + * under the terms of the GNU General Public License version 2 as
+>>>>>>>> published by
+>>>>>>>> + * the Free Software Foundation.
+>>>>>>>> + *
+>>>>>>>> + * Notes
+>>>>>>>> + * -----
+>>>>>>>> + * The Watchdog consists of a fixed divide-by-4 clock
+>>>>>>>> pre-scaler and
+>>>>>>>> a 24-bit
+>>>>>>>> + * counter which decrements on every clock cycle.
+>>>>>>>> + *
+>>>>>>>> + */
+>>>>>>>> +
+>>>>>>>> +#include <linux/clk.h>
+>>>>>>>> +#include <linux/io.h>
+>>>>>>>> +#include <linux/module.h>
+>>>>>>>> +#include <linux/of.h>
+>>>>>>>> +#include <linux/platform_device.h>
+>>>>>>>> +#include <linux/reboot.h>
+>>>>>>>> +#include <linux/watchdog.h>
+>>>>>>>> +
+>>>>>>>> +/* Registers */
+>>>>>>>> +#define LPC18XX_WDT_MOD            0x00
+>>>>>>>> +#define LPC18XX_WDT_MOD_WDEN        BIT(0)
+>>>>>>>> +#define LPC18XX_WDT_MOD_WDRESET        BIT(1)
+>>>>>>>> +#define LPC18XX_WDT_MOD_WDTOF_MASK    0x04
+>>>>>>>
+>>>>>>> Not used.
+>>>>>>
+>>>>>> That's right. I'll remove it.
+>>>>>>
+>>>>>>>
+>>>>>>>> +
+>>>>>>>> +#define LPC18XX_WDT_TC            0x04
+>>>>>>>> +#define LPC18XX_WDT_TC_MIN        0xff
+>>>>>>>> +#define LPC18XX_WDT_TC_MAX        0xffffff
+>>>>>>>> +
+>>>>>>>> +#define LPC18XX_WDT_FEED        0x08
+>>>>>>>> +#define LPC18XX_WDT_FEED_MAGIC1        0xaa
+>>>>>>>> +#define LPC18XX_WDT_FEED_MAGIC2        0x55
+>>>>>>>> +
+>>>>>>>> +#define LPC18XX_WDT_TV            0x0c
+>>>>>>>> +
+>>>>>>>> +/* Clock pre-scaler */
+>>>>>>>> +#define LPC18XX_WDT_CLK_DIV        4
+>>>>>>>> +
+>>>>>>>> +/* Timeout values in seconds */
+>>>>>>>> +#define LPC18XX_WDT_DEF_TIMEOUT        5
+>>>>>>>> +
+>>>>>>>
+>>>>>>> This is (still) really low for Linux. Something like min(30,
+>>>>>>> max_timeout)
+>>>>>>> might make more sense.
+>>>>>>
+>>>>>> Remember that hardware limits timeout to a maximum value of 5.
+>>>>>>
+>>>>>> As you said before we could use a soft timer, but I not sure that's a
+>>>>>> good idea. As Ezequiel said [0], it might be adding bloat and we must
+>>>>>> consider that this watchdog controller is included in cortex-M MCUs.
+>>>>>>
+>>>>>> [0] http://www.spinics.net/lists/linux-watchdog/msg06904.html
+>>>>>>
+>>>>>
+>>>>> Further down you have
+>>>>>       lpc18xx_wdt->wdt_dev.max_timeout = (LPC18XX_WDT_TC_MAX *
+>>>>>                             LPC18XX_WDT_CLK_DIV) / clk_rate;
+>>>>>
+>>>>> which seems to contradict this statement. If the maximum timeout is 5
+>>>>> seconds,
+>>>>> why don't you set max_timeout to a fixed value of 5 seconds ?
+>>>>
+>>>> Well, I think that's the less hardcoded way. It might allow the driver
+>>>> to be extended to another HW variant that configures the wdt clk rate.
+>>>>
+>>>> I see what's your point. As you proposed, using the same criterion I
+>>>> should do this:
+>>>>
+>>>> #define LPC18XX_WDT_DEF_TIMEOUT         (unsigned int)30
+>>>>
+>>>> and further down, in probe function:
+>>>>
+>>>> lpc18xx_wdt->wdt_dev.timeout = min(LPC18XX_WDT_DEF_TIMEOUT,
+>>>>                     lpc18xx_wdt->wdt_dev.max_timeout);
+>>>>
+>>>> Is this close enough to your solution?
+>>>>
+>>> Yes, but why the typecast for LPC18XX_WDT_DEF_TIMEOUT ?
+>>>
+>>
+>> Otherwise the compiler will warn about a comparison of distinct pointer
+>> types in expansion of the macro 'min'.
+>>
+>> Should it be casted when using it better than in definition?
+>>
+> Pointer types sounds odd. What exactly is the message ?
 
-/ {
-	osc0: clock {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <50000000>;
-	};
+drivers/watchdog/lpc18xx_wdt.c: In function 'lpc18xx_wdt_probe':
+include/linux/kernel.h:721:17: warning: comparison of distinct pointer
+types lacks a cast [enabled by default]
+  (void) (&_min1 == &_min2);  \
+                 ^
+drivers/watchdog/lpc18xx_wdt.c:262:33: note: in expansion of macro 'min'
+  lpc18xx_wdt->wdt_dev.timeout = min(lpc18xx_wdt->wdt_dev.max_timeout,
+                                 ^
 
-	osc1: clock {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <12000000>;
-	};
+> 
+> How about using the following ?
+> 
+>     #define LPC18XX_WDT_DEF_TIMEOUT        30U
 
-	rtc: clock {
-		compatible = "fixed-clock";
-		#clock-cells = <0>;
-		clock-frequency = <32768>;
-	};
-
-	mcgout: clock {
-		compatible = "fixed-factor-clock";
-		#clock-cells = <0>;
-		clocks = <&osc0>;
-		clock-mult = <12>;
-		clock-div = <5>;
-	};
-
-	core: clock {
-		compatible = "fixed-factor-clock";
-		#clock-cells = <0>;
-		clocks = <&mcgout>;
-		clock-mult = <1>;
-		clock-div = <1>;
-	};
-
-	bus: clock {
-		compatible = "fixed-factor-clock";
-		#clock-cells = <0>;
-		clocks = <&mcgout>;
-		clock-mult = <1>;
-		clock-div = <2>;
-	};
-
-	soc {
-		cmu at 0x40047000 {
-			compatible = "fsl,kinetis-gate-clock";
-			reg = <0x40047000 0x1100>;
-
-			mcg_core_gate: clock-gate {
-				clocks = <&core>;
-				#clock-cells = <2>;
-			};
-
-			mcg_bus_gate: clock-gate {
-				clocks = <&bus>;
-				#clock-cells = <2>;
-			};
-
-			osc0_erclk_gate: clock-gate {
-				clocks = <&osc0>;
-				#clock-cells = <2>;
-			};
-		};
-
-		uart0: serial at 4006a000 {
-			compatible = "fsl,kinetis-lpuart";
-			reg = <0x4006a000 0x1000>;
-			interrupts = <45>, <46>;
-			interrupt-names = "uart-stat", "uart-err";
-			clocks = <&mcg_core_gate 3 10>;
-			clock-names = "ipg";
-			dmas = <&edma 0 2>;
-			dma-names = "rx";
-			status = "disabled";
-		};
-	};
-};
-
-As you can see, mcg part is not required anymore.
-
-I guess that the approach above would require split into soc-specific and 
-board-specific part (as I said, dividers arrangement is something board 
-specific), but I wonder what you thing about this proposal.
-
-Thanks,
-Paul
-
-On Thu, 23 Jul 2015, Michael Turquette wrote:
-
-> Quoting Paul Osmialowski (2015-07-04 14:50:03)
-> > Hi Arnd,
-> > 
-> > I'm attaching excerpt from Kinetis reference manual that may make 
-> > situation clearer.
-> 
-> Hi Paul,
-> 
-> Can you please post the patch in the body of the email instead of an
-> attachment? It makes it easier to review. Another small nitpick is that
-> the $SUBJECT for this patch might be better off as something like:
-> 
-> clk: mcg and sim clock drivers for twr-k70f120m Kinetis SoC
-> 
-> At least it helps me find the patch I care about when skimming the
-> series ;-)
-> 
-> > 
-> > These MCG and SIM registers are used only to determine configuration 
-> > (clock fixed rates and clock signal origins) at run time.
-> > 
-> > Namely, the real MCGOUTCLK source (in the middle) which is the parent for 
-> > core clock (CCLK) and peripheral clock (PCLK) is determined at run time by 
-> > reading MCG registers, let me quote commit message from Emcraft git repo:
-> > 
-> >       * Determine in run-time what oscillator module (OSC0 or OSC1) is used
-> >      as clock source for the main PLL.
-> 
-> According to [0] there are three options: a 32k RTC osc clock and osc0
-> both feed into a mux. You should model this 32k clock with the
-> fixed-rate binding.
-> 
-> >       * When OSC1 is selected, assume its frequency to be 12 MHz on all
-> >      boards (there is a 12 MHz oscillator on XTAL1/EXTAL1 on K70-SOM and
-> >      TWR-K70F120M boards).
-> > 
-> > In my .dts I'm trying to possibly follow real clock hierarchy, but to go 
-> > anywhere behind MCGOUTCLK would require ability to rewrite .dtb e.g. by 
-> > U-boot. But that's too demanding for any potential users of this BSP. So 
-> > let's asume that MCGOUTCLK is the root clock and a parent for CCLK and 
-> > PCLK.
-> 
-> I'm confused. The point of device tree is to solve problems like this;
-> i.e. board-specific differences such as different oscillator
-> frequencies.
-> 
-> OSC0 and OSC1 should each be a fixed-rate clock in your board-specific
-> TWR-K70F120M DTS (not a chip-specific file). They do not belong in the
-> cmu node, and they should use the "fixed-clock" binding. The 32k RTC osc
-> can probably go in your chip-specific .dtsi as a fixed-rate clock since
-> it appears to mandated in the reference manual[0].
-> 
-> These three fixed-rate clocks are your root clock nodes. Customers only
-> need to worry about this if they spin a board, and then they will need
-> to populate the frequencies of OSC0 and OSC1 in their board-specific
-> .dts.
-> 
-> Please break clk-kinetis.c into two files:
-> drivers/clk/kinetis/clk-mcg.c
-> drivers/clk/kinetis/clk-sim.c
-> 
-> Below is what your binding/dts should look like:
-> 
-> {
-> 	osc0: clock {
-> 		compatible = "fixed-clock";
-> 		#clock-cells = <0>;
-> 		clock-frequency = <50000000>;
-> 	};
-> 
-> 	osc1: clock {
-> 		compatible = "fixed-clock";
-> 		#clock-cells = <0>;
-> 		clock-frequency = <12000000>;
-> 	};
-> 
-> 	rtc: clock {
-> 		compatible = "fixed-clock";
-> 		#clock-cells = <0>;
-> 		clock-frequency = <32768>;
-> 	};
-> 
-> 	soc: soc {
-> 		mcg: clock-controller at 40064000 {
-> 			compatible = "fsl,kinetis-mcg";
-> 			clock-cells = <1>;
-> 			reg = <0x40064000 0x14>;
-> 			clocks = <&osc0>, <&osc1>, <&rtc>;
-> 			clock-names = "osc0", "osc1", "rtc";
-> 		};
-> 
-> 		sim: clock-controller at 40047000 {
-> 			compatible = "fsl,kinetis-sim";
-> 			clock-cells = <1>;
-> 			reg = <0x40047000 0x1100>;
-> 			clocks = <&mcg MCG_MCGOUTCLK_DIV1>, <&mcg MCG_MCGOUTCLK_DIV2>, <&mcg MCG_MCGOUTCLK_DIV3> <&mcg MCG_MCGOUTCLK_DIV4>;
-> 			clock-names = "core", "bus", "flexbus", "flash";
-> 		};
-> 	};
-> 
-> 	uart0: serial at 4006a000 {
-> 		compatible = "fsl,kinetis-lpuart";
-> 		reg = <0x4006a000 0x1000>;
-> 		clocks = <&sim SIM_SCGC4_UART1_CLK>;
-> 		clock-names = "gate";
-> 	};
-> 
-> I removed the interrupts and dma stuff from the uart0 node for clarity.
-> The above is the only style of binding that I have been accepting for
-> some time; first declare the clock controller and establish its register
-> space, and then consumers can consume clocks by providing the phandle to
-> the controller plus an offset corresponding to a unique clock. The
-> clock-names property makes it really easy to use with the clkdev stuff
-> (e.g. clk_get()).
-> 
-> I've covered this before on the mailing list so here is a link
-> describing how the qcom bindings do it in detail:
-> 
-> http://lkml.kernel.org/r/<20150416192014.19585.9663@quantum>
-> 
-> Technically you could encode the same bits as sub-nodes of the mcg and
-> sim nodes, but the shared header is how the magic happens with the
-> driver so it's best to keep the clock controller binding small and
-> light.
-> 
-> I think this means you can also get rid of kinetis_of_clk_get_name and
-> kinetis_clk_gate_get but my brain is tired so I'll leave that as an
-> exercise to the reader.
-> 
-> [0] http://cache.freescale.com/files/microcontrollers/doc/ref_manual/K70P256M150SF3RM.pdf
-> 
-> Regards,
-> Mike
-> 
-> > 
-> > In my most recent version I added OSC0ERCLK explicitly as one more root 
-> > clock, since it is also used directly (through CG reg. 1 bit 0) by 
-> > Freescale fec network device whose in-tree driver I'm trying to make 
-> > usable for Kinetis.
-> > 
-> > On Sat, 4 Jul 2015, Arnd Bergmann wrote:
-> > 
-> > > On Friday 03 July 2015 00:08:27 Thomas Gleixner wrote:
-> > >> On Thu, 2 Jul 2015, Paul Osmialowski wrote:
-> > >>> On Thu, 2 Jul 2015, Arnd Bergmann wrote:
-> > >>>
-> > >>>> I wonder if you could move out the fixed rate clocks into their own
-> > >>>> nodes. Are they actually controlled by the same block? If they are
-> > >>>> just fixed, you can use the normal binding for fixed rate clocks
-> > >>>> and only describe the clocks that are related to the driver.
-> > >>>
-> > >>> In my view having these clocks grouped together looks more convincing. After
-> > >>> all, they all share the same I/O regs in order to read configuration.
-> > >>
-> > >> The fact that they share a register is not making them a group. That's
-> > >> just a HW design decision and you need to deal with that by protecting
-> > >> the register access, but not by trying to group them artificially at
-> > >> the functional level.
-> > >
-> > > I'd disagree with that: The clock controller is the device that owns the
-> > > registers and that should be one node in DT, as Paul's first version does.
-> > >
-> > > The part I'm still struggling with is understanding how the fixed-rate
-> > > clocks are controlled through those registers. If they are indeed configured
-> > > through the registers, the name is probably wrong and should be changed
-> > > to whatever kind of non-fixed clock this is.
-> > >
-> > >       Arnd
-> > >
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Yes, that's what I responded in another mail. Thanks for your
+suggestions, I'm submitting v4 now with all the modifications you've
+pointed out.
