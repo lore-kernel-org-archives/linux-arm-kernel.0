@@ -1,172 +1,135 @@
-From: petr.cvek@tul.cz (Petr Cvek)
-Date: Sun, 26 Jul 2015 20:58:37 +0200
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <Pine.LNX.4.44L0.1507261053500.1012-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1507261053500.1012-100000@netrider.rowland.org>
-Message-ID: <55B52DDD.8000300@tul.cz>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Sun, 26 Jul 2015 20:00:03 +0100
+Subject: [PATCH v2 2/2] ARM: pci: kill pcibios_msi_controller
+In-Reply-To: <20150726184345.GA27049@jayachandranc.netlogicmicro.com>
+References: <1437754383-8162-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1437754383-8162-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20150726152528.GB2357@jayachandranc.netlogicmicro.com>
+ <20150726181646.GA9584@red-moon>
+ <20150726184345.GA27049@jayachandranc.netlogicmicro.com>
+Message-ID: <20150726190003.GA9733@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.7.2015 17:14, Alan Stern wrote:
-> On Sun, 26 Jul 2015, Petr Cvek wrote:
+On Sun, Jul 26, 2015 at 07:43:46PM +0100, Jayachandran C. wrote:
+> On Sun, Jul 26, 2015 at 07:16:46PM +0100, Lorenzo Pieralisi wrote:
+> > On Sun, Jul 26, 2015 at 04:25:29PM +0100, Jayachandran C. wrote:
+> > > On Fri, Jul 24, 2015 at 05:13:03PM +0100, Lorenzo Pieralisi wrote:
+> > > > On ARM PCI systems relying on the pcibios API to initialize PCI host
+> > > > controllers, the pcibios_msi_controller weak callback is used to look-up
+> > > > the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
+> > > > 
+> > > > pci_sys_data is an ARM specific structure, which prevents using the
+> > > > same mechanism (so same PCI host controller drivers) on ARM64 systems.
+> > > > 
+> > > > Since the struct pci_bus already contains an msi_controller pointer and
+> > > > the kernel already uses it to look-up the msi controller,
+> > > > this patch converts ARM host controller and related pcibios/host bridges
+> > > > initialization routines so that the msi_controller pointer look-up can be
+> > > > carried out by PCI core code through the struct pci_bus msi pointer,
+> > > > removing the need for the arch specific pcibios_msi_controller callback
+> > > > and the related pci_sys_data msi_ctrl pointer.
+> > > > 
+> > > > ARM is the only arch relying on the pcibios_msi_controller() weak
+> > > > function, hence this patch removes the default weak implementation
+> > > > from PCI core code since it becomes of no use.
+> > > > 
+> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > > Cc: Pratyush Anand <pratyush.anand@gmail.com>
+> > > > Cc: Arnd Bergmann <arnd@arndb.de>
+> > > > Cc: Jingoo Han <jingoohan1@gmail.com>
+> > > > Cc: Bjorn Helgaas <bhelgaas@google.com>
+> > > > Cc: Simon Horman <horms@verge.net.au>
+> > > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > > Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> > > > Cc: Thierry Reding <thierry.reding@gmail.com>
+> > > > Cc: Michal Simek <michal.simek@xilinx.com>
+> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > > ---
+> > > > v1->v2
+> > > > 
+> > > > - Added patch to replace panic statements with WARN
+> > > > - Removed unused pcibios_msi_controller() and pci_msi_controller() from
+> > > >   core code
+> > > > - Dropped RFT status
+> > > > 
+> > > > v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356028.html
+> > > > 
+> > > >  arch/arm/include/asm/mach/pci.h    |  3 ---
+> > > >  arch/arm/kernel/bios32.c           | 29 +++++++++++++----------------
+> > > >  drivers/pci/host/pcie-designware.c |  9 +++++++--
+> > > >  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
+> > > >  drivers/pci/msi.c                  | 17 +----------------
+> > > >  5 files changed, 31 insertions(+), 39 deletions(-)
+> > > > 
+> > > [...]
+> > > > diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> > > > index f66be86..0d20142 100644
+> > > > --- a/drivers/pci/msi.c
+> > > > +++ b/drivers/pci/msi.c
+> > > > @@ -77,24 +77,9 @@ static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
+> > > >  
+> > > >  /* Arch hooks */
+> > > >  
+> > > > -struct msi_controller * __weak pcibios_msi_controller(struct pci_dev *dev)
+> > > > -{
+> > > > -	return NULL;
+> > > > -}
+> > > > -
+> > > > -static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
+> > > > -{
+> > > > -	struct msi_controller *msi_ctrl = dev->bus->msi;
+> > > > -
+> > > > -	if (msi_ctrl)
+> > > > -		return msi_ctrl;
+> > > > -
+> > > > -	return pcibios_msi_controller(dev);
+> > > > -}
+> > > > -
+> > > >  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+> > > >  {
+> > > > -	struct msi_controller *chip = pci_msi_controller(dev);
+> > > > +	struct msi_controller *chip = dev->bus->msi;
+> > > >  	int err;
+> > > >  
+> > > >  	if (!chip || !chip->setup_irq)
+> > > 
+> > > Don't you have to go to the top level bus and get the ->msi pointer? Something
+> > > like:
+> > > 
+> > > 	for (bus = dev->bus; bus != NULL; bus = bus->parent)
+> > > 		if (bus->msi)
+> > > 			return bus->msi;
+> > > 
+> > > I have not been following this closely, so I may have missed some patches.
+> > 
+> > The msi pointer is initialized from parent to child in
+> > pci_alloc_child_bus(), so PCI core does that for us,
+> > that's my understanding.
+> > 
+> > It works the same as sysdata pointer, which is why
+> > pcibios_msi_controller works in the current kernel.
 > 
->> What about higher speeds (not relevant on PXA, but ep_matches() is
->> called from usb_ep_autoconfig_ss() )? According to
->>
->> 	http://wiki.osdev.org/Universal_Serial_Bus#Maximum_Data_Payload_Size_2
->>
->> High speed INT endpoint has a maximum data payload 1024 B and BULK
->> only 512 B (are other attributes of the data phase similar?). What
->> about superspeed?
+> Thanks.
 > 
-> It's true that high speed interrupt endpoints can have higher maxpacket
-> values than bulk endpoints.  But this is okay, since ep_matches()  
-> checks that the hardware maxpacket value is at least as large as the
-> value in the descriptor:
+> > On a side note, are you able to prepare a new version
+> > of your set to enable the PCI generic host on ARM64
+> > (and remove pci_sys_data and related ifdef CONFIG_ARM
+> > from it) ?
+> > 
+> > We are not far from removing the pci_sys_data dependency,
+> > if you can't prepare a new version of your series let me
+> > know I can do it on your behalf.
 > 
-> 		if (ep->maxpacket_limit < max)
-> 			return 0;
+> I will post an updated patch with a minor fix. I will also
+> add a patch for parsing msi-parent and setting ->msi on
+> the root bus.
 
-OK 
+There is no need for any msi parsing in the PCI generic host,
+Marc implemented mechanism for us in core code:
 
->  
->>>> * modprobe g_serial use_acm=1 n_ports=1
->>>> * original version of ep_matches() (returns bulk and int)
->>>> * compatible EP configuration/definition for UDC side http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/pxa27x_udc.c#L2352
->>>> 	USB_EP_CTRL,
->>>> 	USB_EP_OUT_BULK(1),
->>>> 	USB_EP_IN_BULK(2),
->>>> 	USB_EP_IN_ISO(3),
->>>> 	USB_EP_OUT_ISO(4),
->>>> 	USB_EP_IN_INT(5),
->>>> * modified EP configuration for UDC side (just changed EP3 ISO to BULK, so there is one free BULK)
->>>> 	USB_EP_CTRL,
->>>> 	USB_EP_OUT_BULK(1),
->>>> 	USB_EP_IN_BULK(2),
->>>> 	USB_EP_IN_BULK(3),	//change
->>>> 	USB_EP_OUT_ISO(4),
->>>> 	USB_EP_IN_INT(5),
->>>>
->>>> ===results===
->>>> * original configuration is OK, all endpoints are found (in order ep2in-bulk, ep1out-bulk, ep3in-int), INT notification seems to work
->>>
->>> I don't understand.  Above you said that the EP definition in the UDC 
->>> is USB_EP_IN_ISO(3).  So how can you end up with ep3in-int?  int != ISO.
->>> You should have ended up with the third endpoint being ep5in-int, 
->>> because ep_matches() doesn't allow an isochronous to match a request 
->>> for an interrupt endpoint.
->>
->> I have changed definition of ISO to BULK only to accomplish minimal
->> change of driver code (for my demonstration free BULK must be defined
->> before INT - inserting new EP would require to reindex all next EPs
->> and modifying links from PXA side endpoints). The USB_EP_IN_ISO(3) is
->> just "unused" endpoint.
-> 
-> This doesn't answer my question.  I was asking about the original 
-> configuration, not your changed configuration.  You wrote:
-> 
->> * original configuration is OK, all endpoints are found (in order
->> ep2in-bulk, ep1out-bulk, ep3in-int), INT notification seems to work
-> 
-> But that isn't possible, because in the original configuration ep3in is
-> iso, not int.  Did you intend to write "ep5in-int" rather than
-> "ep3in-int"?
-> 
+https://lkml.org/lkml/2015/7/7/724
 
-Oh my bad, It seems I got confused by my debug printks (warning about bulk as int and end of search). It should be:
-
-original:
-	ep2in-bulk
-	ep1out-bulk
-	ep5in-int
-
-modified (free bulk before int):
-	ep2in-bulk
-	ep1out-bulk
-	ep3in-bulk
-	...
-	pxa27x-udc pxa27x-udc: ep15:pxa_ep_enable: type mismatch
-	...
-	g_serial gadget: acm ttyGS0 can't notify serial state, -22
-
->>>> * modified configuration fails:
->>>>
->>>> 	[ 4259.609088] pxa27x-udc pxa27x-udc: ep15:pxa_ep_enable: type mismatch
->>>>
->>>> by this condition: 
->>>>
->>>> 	http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/pxa27x_udc.c#L1416
->>>>
->>>> because ep_matches() returns BULK.
->>>
->>> Okay, that's a problem in pxa27x-udc.  Why does it insist on an exact 
->>> match between the hardware endpoint type and the type contained in the 
->>> descriptor?  It should accept an interrupt descriptor if the hardware 
->>> type is bulk.
->>
->> Hmm, making BULK EP equivalent with INT EP (when INT is requested)
->> would made debugging (there is special bitfield in the config
->> registers) and configuration preset (not anymore unordered set, but
->> definition in the specific sequence) hell. But in other ways it can
->> be OK (specification does not say that using EP marked INT as BULK
->> will fail).
-> 
-> This business about using bulk endpoints in place of interrupt
-> endpoints goes back to the days when most UDCs had a very limited
-> selection of endpoints.  The idea was that a gadget could work even if
-> there weren't enough interrupt endpoints in the hardware, provided
-> there were extra bulk endpoints.
-> 
-I thought so, but on the PXA27x you can configure any endpoint for any type and at the same time you must configure them for the exact matching order.
-
-Maybe matching with BULK as INT functionality could work if all predefined INT was first in the array (.udc_usb_ep). This would prioritize predefined INT endpoints and use BULK only after INT exhaustion.
-
-(ideal way would be resetting UDC and generating EP configuration for every set_configuration/interface, but I don't know if possible).
-
->> I think optimal idea is custom matcher function. It would eliminate
->> codes for superspeed checking on SoC which known only fullspeed ;-).
-> 
-> Wuldn't it also mean duplicating a lot of code?  Each custom matcher 
-> function would essentially have to include most of ep_matches().
-> 
-There can be global generic matching function (striped of quirks) which can be called even from custom matcher (only quirks).
-
->> P.S. I did a basic research where UDCs differ between BULK and INT
->> handling (just searching for usb_endpoint_type(), USB_ENDPOINT_XFER_*
->> and usb_endpoint_xfer_*() so it returned BULK on a software side -
->> irrelevant):
->> 	r8a66597-udc.c (using different constants, dedicated structure entries)
->> 	m66592-udc.c (same as r8a66597-udc.c)
->> 	dummy_hcd.c (well it is only dummy, says "bulk is OK" for INT, but has different matching rules for HS BULK and INT)
->> 	atmel_usba_udc.c (only by write of some flag)
->> 	net2272.c (fails with BULK, USB_SPEED_HIGH and maxpacket != 512)
->> 	at91_udc.c (only BULK is only OK with 8,16,32,64 values)
->> 	pxa25x_udc.c (setting one flag when hw (?) endpoint is BULK and another if nonBULK, INT FIFO size defined as 8, BULK FIFO as 64)
->> 	net2280.c (INT path has erratum, different maxpacket matching)
->> 	pxa27x_udc.h (INT_FIFO_SIZE defined as 16B, BULK_FIFO_SIZE defined as 64B)
->> 	mv_udc_core.c (different codepath)
->> 	gr_udc.c (using mode of endpoint to print messages and register setting)
->> 	fsl_qe_udc.c (different maxpacket sizes for highspeed)
->> 	udc-xilinx.c (maching of different maxpacket sizes)
->> 	omap_udc.c (maxpacket size definitions)
-> 
-> The fact that bulk and interrupt are handled differently doesn't mean 
-> that you aren't allowed to allocate a bulk endpoint when the gadget 
-> driver quested an interrupt endpoint.
-
-Yeah, I was just curious, although PXA25x have endpoint HW handling really different. It has exception in ep_matches() and it cannot use INT endpoint but only BULK endpoint for INT communication. As PXA25x was one of few UDCs at the time of using "BULK as INT". I thought that newer UDCs does not have these problems anymore (like not enough INT endpoints).
-
-> 
-> On the other hand, it certainly would be better to do this only when no 
-> interrupt endpoints remain available.  As it stands now, 
-> usb_ep_autoconfig_ss() uses the first match it finds even if there is a 
-> better match later on.
-
-There could be two passes, one for INT and second for BULK. But it would require ep_matches() to return only INT for INT request. ;-)
-
-> 
-> Alan Stern
-> 
-
-Petr Cvek
+Thanks,
+Lorenzo
