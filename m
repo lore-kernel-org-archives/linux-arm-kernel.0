@@ -1,29 +1,28 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 26 Jul 2015 11:52:52 +0200 (CEST)
-Subject: [PATCH v2 4/4] irqchip: Add bcm2836 interrupt controller for
- Raspberry Pi 2.
-In-Reply-To: <1436837718-956-5-git-send-email-eric@anholt.net>
-References: <1436837718-956-1-git-send-email-eric@anholt.net>
- <1436837718-956-5-git-send-email-eric@anholt.net>
-Message-ID: <alpine.DEB.2.11.1507261150500.18576@nanos>
+Date: Sun, 26 Jul 2015 13:48:03 +0200 (CEST)
+Subject: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <alpine.DEB.2.11.1507261346250.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jul 2015, Eric Anholt wrote:
-> +static void
-> +bcm2836_arm_irqchip_smp_init(void)
+On Wed, 22 Jul 2015, Shenwei Wang wrote:
+> +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
 > +{
-> +#ifdef CONFIG_SMP
-> +	int i;
+> +	struct imx_gpcv2_irq *cd = d->chip_data;
+> +	unsigned int idx = d->hwirq / 32;
+> +	unsigned long flags;
+> +	void __iomem *reg;
+> +	u32 mask, val;
 > +
-> +	/* unmask IPIs */
-> +	for_each_possible_cpu(i) {
-> +		bcm2836_arm_irqchip_unmask_per_cpu_irq(
-> +			LOCAL_MAILBOX_INT_CONTROL0, 0, i);
+> +	raw_spin_lock_irqsave(&cd->lock.rlock, flags);
 
-Do you really want to enable these interrupts on all possible cpus? Why so?
-
-Shouldn't that be done at the point where a hotplugged CPU is starting ?
+Oh no. You need to make cd->lock a raw_spinlock and then use
+raw_spin_lock_irqsave() on it. How on earth did you come up with this
+hackery?
 
 Thanks,
 
