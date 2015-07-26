@@ -1,29 +1,33 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 26 Jul 2015 13:48:03 +0200 (CEST)
-Subject: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <alpine.DEB.2.11.1507261346250.18576@nanos>
+From: kvalo@codeaurora.org (Kalle Valo)
+Date: Sun, 26 Jul 2015 14:56:31 +0300
+Subject: [PATCH] bcma: fix build error when build as module
+In-Reply-To: <1437851427-7485-1-git-send-email-hauke@hauke-m.de> (Hauke
+ Mehrtens's message of "Sat, 25 Jul 2015 21:10:27 +0200")
+References: <1437851427-7485-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <87lhe3b09c.fsf@kamboji.qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 22 Jul 2015, Shenwei Wang wrote:
-> +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int on)
-> +{
-> +	struct imx_gpcv2_irq *cd = d->chip_data;
-> +	unsigned int idx = d->hwirq / 32;
-> +	unsigned long flags;
-> +	void __iomem *reg;
-> +	u32 mask, val;
-> +
-> +	raw_spin_lock_irqsave(&cd->lock.rlock, flags);
+Hauke Mehrtens <hauke@hauke-m.de> writes:
 
-Oh no. You need to make cd->lock a raw_spinlock and then use
-raw_spin_lock_irqsave() on it. How on earth did you come up with this
-hackery?
+> Currently of_default_bus_match_table is not exported so we can only use
+> this feature when bcma is build into the kernel. This patch removes
+> support for child buses when bcma is build as a module as a temporary
+> fix for a build problem introduces in this commit:
+>
+> commit cae761b5a6bdc597ba476a040fdcd5b4bc559b85
+> Author: Rafa? Mi?ecki <zajec5@gmail.com>
+> Date:   Sun Jun 28 17:17:13 2015 +0200
+>
+>     bcma: populate bus DT subnodes as platform_device-s
+>
+> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 
-Thanks,
+Thanks, manually applied to wireless-drivers-next.git. (Still
+patchwork.kernel.org has buggy utf-8 support, sigh.) I just added
+Reported-by and Fixes lines to the commit log.
 
-	tglx
+I wrote a similar patch but I'll drop that as your has better comments :)
+
+-- 
+Kalle Valo
