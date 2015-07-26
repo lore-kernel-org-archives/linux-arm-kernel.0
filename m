@@ -1,61 +1,30 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 26 Jul 2015 11:26:15 +0200
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150701103421.GV4156@atomide.com>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
- <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
- <20150701095954.GD7969@amd> <20150701103421.GV4156@atomide.com>
-Message-ID: <20150726092615.GA6824@amd>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Sun, 26 Jul 2015 11:52:52 +0200 (CEST)
+Subject: [PATCH v2 4/4] irqchip: Add bcm2836 interrupt controller for
+ Raspberry Pi 2.
+In-Reply-To: <1436837718-956-5-git-send-email-eric@anholt.net>
+References: <1436837718-956-1-git-send-email-eric@anholt.net>
+ <1436837718-956-5-git-send-email-eric@anholt.net>
+Message-ID: <alpine.DEB.2.11.1507261150500.18576@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Mon, 13 Jul 2015, Eric Anholt wrote:
+> +static void
+> +bcm2836_arm_irqchip_smp_init(void)
+> +{
+> +#ifdef CONFIG_SMP
+> +	int i;
+> +
+> +	/* unmask IPIs */
+> +	for_each_possible_cpu(i) {
+> +		bcm2836_arm_irqchip_unmask_per_cpu_irq(
+> +			LOCAL_MAILBOX_INT_CONTROL0, 0, i);
 
-> > > So, Pavel can you re-test? Maybe there can be problem with some driver
-> > > which Tony did not compiled into zImage? Just speculation...
-> > 
-> > I re-tested with today's git, and it seems to boot. Thanks for help...
-> 
-> OK good to hear.
->  
-> > Now. "echo mem > /sys/power/state" is broken, as in "returns
-> > immediately in about 50% cases". The messages are
-> > 
-> > Powerdomain (per_pwrdm) didn't enter target state 1
-> > Powerdomain (core_pwerdm) didn't enter target state 1
-> > 
-> > Any ideas? Thanks,
-> 
-> Works for me after enabling the idle timeouts with the following
-> script and blanking the screen and disconnecting USB:
-> 
-> Also both keyboard LEDs should start blinking after the idle
-> timeout with screen blanked and USB disconnected. If not, you
-> have some module loaded that blocks the deeper idle states.
+Do you really want to enable these interrupts on all possible cpus? Why so?
 
-Ok, tried that, I had to do:
-
- cd /sys/class/gpio
- echo 162 > export
- cd gpio162
- echo out > direction
- echo 1 > value
-
-to get the debug lights to work. But I could not get those leds to
-blink.
-
-> modprobe leds-gpio
-> modprobe ledtrig-default-on
-
-Is this actually neccessary/relevant?
-
-> echo 255 > /sys/class/backlight/acx565akm/brightness
-
-And this?
+Shouldn't that be done at the point where a hotplugged CPU is starting ?
 
 Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+
+	tglx
