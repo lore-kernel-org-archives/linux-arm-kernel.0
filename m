@@ -1,138 +1,285 @@
-From: r.baldyga@hackerion.com (Robert Baldyga)
-Date: Sun, 26 Jul 2015 21:43:25 +0200
-Subject: [PATCH v3 42/46] usb: gadget: move ep_matches() from epautoconf
- to udc-core
-In-Reply-To: <Pine.LNX.4.44L0.1507261053500.1012-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1507261053500.1012-100000@netrider.rowland.org>
-Message-ID: <55B5385D.9030707@hackerion.com>
+From: pawelo@king.net.pl (Paul Osmialowski)
+Date: Sun, 26 Jul 2015 22:24:08 +0200 (CEST)
+Subject: [PATCH v2 3/9] arm: twr-k70f120m: clock driver for Kinetis SoC
+In-Reply-To: <20150724034229.642.88156@quantum>
+References: <1435667250-28299-1-git-send-email-pawelo@king.net.pl>
+ <alpine.LNX.2.00.1507022338070.28322@localhost.localdomain>
+ <alpine.DEB.2.11.1507030006280.3916@nanos> <2009463.YLtdMegFel@wuerfel>
+ <alpine.LNX.2.00.1507042327490.1296@localhost.localdomain>
+ <20150724034229.642.88156@quantum>
+Message-ID: <alpine.LNX.2.00.1507262211470.28341@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26/2015 05:14 PM, Alan Stern wrote:
-> On Sun, 26 Jul 2015, Petr Cvek wrote:
->
->> What about higher speeds (not relevant on PXA, but ep_matches() is
->> called from usb_ep_autoconfig_ss() )? According to
->>
->> 	http://wiki.osdev.org/Universal_Serial_Bus#Maximum_Data_Payload_Size_2
->>
->> High speed INT endpoint has a maximum data payload 1024 B and BULK
->> only 512 B (are other attributes of the data phase similar?). What
->> about superspeed?
->
-> It's true that high speed interrupt endpoints can have higher maxpacket
-> values than bulk endpoints.  But this is okay, since ep_matches()
-> checks that the hardware maxpacket value is at least as large as the
-> value in the descriptor:
->
-> 		if (ep->maxpacket_limit < max)
-> 			return 0;
->
->>>> * modprobe g_serial use_acm=1 n_ports=1
->>>> * original version of ep_matches() (returns bulk and int)
->>>> * compatible EP configuration/definition for UDC side http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/pxa27x_udc.c#L2352
->>>> 	USB_EP_CTRL,
->>>> 	USB_EP_OUT_BULK(1),
->>>> 	USB_EP_IN_BULK(2),
->>>> 	USB_EP_IN_ISO(3),
->>>> 	USB_EP_OUT_ISO(4),
->>>> 	USB_EP_IN_INT(5),
->>>> * modified EP configuration for UDC side (just changed EP3 ISO to BULK, so there is one free BULK)
->>>> 	USB_EP_CTRL,
->>>> 	USB_EP_OUT_BULK(1),
->>>> 	USB_EP_IN_BULK(2),
->>>> 	USB_EP_IN_BULK(3),	//change
->>>> 	USB_EP_OUT_ISO(4),
->>>> 	USB_EP_IN_INT(5),
->>>>
->>>> ===results===
->>>> * original configuration is OK, all endpoints are found (in order ep2in-bulk, ep1out-bulk, ep3in-int), INT notification seems to work
->>>
->>> I don't understand.  Above you said that the EP definition in the UDC
->>> is USB_EP_IN_ISO(3).  So how can you end up with ep3in-int?  int != ISO.
->>> You should have ended up with the third endpoint being ep5in-int,
->>> because ep_matches() doesn't allow an isochronous to match a request
->>> for an interrupt endpoint.
->>
->> I have changed definition of ISO to BULK only to accomplish minimal
->> change of driver code (for my demonstration free BULK must be defined
->> before INT - inserting new EP would require to reindex all next EPs
->> and modifying links from PXA side endpoints). The USB_EP_IN_ISO(3) is
->> just "unused" endpoint.
->
-> This doesn't answer my question.  I was asking about the original
-> configuration, not your changed configuration.  You wrote:
->
->> * original configuration is OK, all endpoints are found (in order
->> ep2in-bulk, ep1out-bulk, ep3in-int), INT notification seems to work
->
-> But that isn't possible, because in the original configuration ep3in is
-> iso, not int.  Did you intend to write "ep5in-int" rather than
-> "ep3in-int"?
->
->>>> * modified configuration fails:
->>>>
->>>> 	[ 4259.609088] pxa27x-udc pxa27x-udc: ep15:pxa_ep_enable: type mismatch
->>>>
->>>> by this condition:
->>>>
->>>> 	http://lxr.free-electrons.com/source/drivers/usb/gadget/udc/pxa27x_udc.c#L1416
->>>>
->>>> because ep_matches() returns BULK.
->>>
->>> Okay, that's a problem in pxa27x-udc.  Why does it insist on an exact
->>> match between the hardware endpoint type and the type contained in the
->>> descriptor?  It should accept an interrupt descriptor if the hardware
->>> type is bulk.
->>
->> Hmm, making BULK EP equivalent with INT EP (when INT is requested)
->> would made debugging (there is special bitfield in the config
->> registers) and configuration preset (not anymore unordered set, but
->> definition in the specific sequence) hell. But in other ways it can
->> be OK (specification does not say that using EP marked INT as BULK
->> will fail).
->
-> This business about using bulk endpoints in place of interrupt
-> endpoints goes back to the days when most UDCs had a very limited
-> selection of endpoints.  The idea was that a gadget could work even if
-> there weren't enough interrupt endpoints in the hardware, provided
-> there were extra bulk endpoints.
->
->> I think optimal idea is custom matcher function. It would eliminate
->> codes for superspeed checking on SoC which known only fullspeed ;-).
->
-> Wuldn't it also mean duplicating a lot of code?  Each custom matcher
-> function would essentially have to include most of ep_matches().
+Hi Mike,
 
-I have solved this problem making ep_matches() public helper function, 
-so we can avoid duplicated code. BTW this entire discussion is in reply 
-to my patch doing this :)
+Thank you for spending time on this and pointing me into the right 
+direction. I'm wondering about going even further with it. Assuming that I 
+know everything about my board, I can skip run-time discovery phase (note 
+that the original driver was designed for other Kinetis-based boards too) 
+and move everything into DTS, somewhat like this:
 
->
->> P.S. I did a basic research where UDCs differ between BULK and INT
->> handling (just searching for usb_endpoint_type(), USB_ENDPOINT_XFER_*
->> and usb_endpoint_xfer_*() so it returned BULK on a software side -
->> irrelevant):
->> 	r8a66597-udc.c (using different constants, dedicated structure entries)
->> 	m66592-udc.c (same as r8a66597-udc.c)
->> 	dummy_hcd.c (well it is only dummy, says "bulk is OK" for INT, but has different matching rules for HS BULK and INT)
->> 	atmel_usba_udc.c (only by write of some flag)
->> 	net2272.c (fails with BULK, USB_SPEED_HIGH and maxpacket != 512)
->> 	at91_udc.c (only BULK is only OK with 8,16,32,64 values)
->> 	pxa25x_udc.c (setting one flag when hw (?) endpoint is BULK and another if nonBULK, INT FIFO size defined as 8, BULK FIFO as 64)
->> 	net2280.c (INT path has erratum, different maxpacket matching)
->> 	pxa27x_udc.h (INT_FIFO_SIZE defined as 16B, BULK_FIFO_SIZE defined as 64B)
->> 	mv_udc_core.c (different codepath)
->> 	gr_udc.c (using mode of endpoint to print messages and register setting)
->> 	fsl_qe_udc.c (different maxpacket sizes for highspeed)
->> 	udc-xilinx.c (maching of different maxpacket sizes)
->> 	omap_udc.c (maxpacket size definitions)
->
-> The fact that bulk and interrupt are handled differently doesn't mean
-> that you aren't allowed to allocate a bulk endpoint when the gadget
-> driver quested an interrupt endpoint.
->
-> On the other hand, it certainly would be better to do this only when no
-> interrupt endpoints remain available.  As it stands now,
-> usb_ep_autoconfig_ss() uses the first match it finds even if there is a
-> better match later on.
+/ {
+	osc0: clock {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <50000000>;
+	};
+
+	osc1: clock {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <12000000>;
+	};
+
+	rtc: clock {
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <32768>;
+	};
+
+	mcgout: clock {
+		compatible = "fixed-factor-clock";
+		#clock-cells = <0>;
+		clocks = <&osc0>;
+		clock-mult = <12>;
+		clock-div = <5>;
+	};
+
+	core: clock {
+		compatible = "fixed-factor-clock";
+		#clock-cells = <0>;
+		clocks = <&mcgout>;
+		clock-mult = <1>;
+		clock-div = <1>;
+	};
+
+	bus: clock {
+		compatible = "fixed-factor-clock";
+		#clock-cells = <0>;
+		clocks = <&mcgout>;
+		clock-mult = <1>;
+		clock-div = <2>;
+	};
+
+	soc {
+		cmu at 0x40047000 {
+			compatible = "fsl,kinetis-gate-clock";
+			reg = <0x40047000 0x1100>;
+
+			mcg_core_gate: clock-gate {
+				clocks = <&core>;
+				#clock-cells = <2>;
+			};
+
+			mcg_bus_gate: clock-gate {
+				clocks = <&bus>;
+				#clock-cells = <2>;
+			};
+
+			osc0_erclk_gate: clock-gate {
+				clocks = <&osc0>;
+				#clock-cells = <2>;
+			};
+		};
+
+		uart0: serial at 4006a000 {
+			compatible = "fsl,kinetis-lpuart";
+			reg = <0x4006a000 0x1000>;
+			interrupts = <45>, <46>;
+			interrupt-names = "uart-stat", "uart-err";
+			clocks = <&mcg_core_gate 3 10>;
+			clock-names = "ipg";
+			dmas = <&edma 0 2>;
+			dma-names = "rx";
+			status = "disabled";
+		};
+	};
+};
+
+As you can see, mcg part is not required anymore.
+
+I guess that the approach above would require split into soc-specific and 
+board-specific part (as I said, dividers arrangement is something board 
+specific), but I wonder what you thing about this proposal.
+
+Thanks,
+Paul
+
+On Thu, 23 Jul 2015, Michael Turquette wrote:
+
+> Quoting Paul Osmialowski (2015-07-04 14:50:03)
+> > Hi Arnd,
+> > 
+> > I'm attaching excerpt from Kinetis reference manual that may make 
+> > situation clearer.
+> 
+> Hi Paul,
+> 
+> Can you please post the patch in the body of the email instead of an
+> attachment? It makes it easier to review. Another small nitpick is that
+> the $SUBJECT for this patch might be better off as something like:
+> 
+> clk: mcg and sim clock drivers for twr-k70f120m Kinetis SoC
+> 
+> At least it helps me find the patch I care about when skimming the
+> series ;-)
+> 
+> > 
+> > These MCG and SIM registers are used only to determine configuration 
+> > (clock fixed rates and clock signal origins) at run time.
+> > 
+> > Namely, the real MCGOUTCLK source (in the middle) which is the parent for 
+> > core clock (CCLK) and peripheral clock (PCLK) is determined at run time by 
+> > reading MCG registers, let me quote commit message from Emcraft git repo:
+> > 
+> >       * Determine in run-time what oscillator module (OSC0 or OSC1) is used
+> >      as clock source for the main PLL.
+> 
+> According to [0] there are three options: a 32k RTC osc clock and osc0
+> both feed into a mux. You should model this 32k clock with the
+> fixed-rate binding.
+> 
+> >       * When OSC1 is selected, assume its frequency to be 12 MHz on all
+> >      boards (there is a 12 MHz oscillator on XTAL1/EXTAL1 on K70-SOM and
+> >      TWR-K70F120M boards).
+> > 
+> > In my .dts I'm trying to possibly follow real clock hierarchy, but to go 
+> > anywhere behind MCGOUTCLK would require ability to rewrite .dtb e.g. by 
+> > U-boot. But that's too demanding for any potential users of this BSP. So 
+> > let's asume that MCGOUTCLK is the root clock and a parent for CCLK and 
+> > PCLK.
+> 
+> I'm confused. The point of device tree is to solve problems like this;
+> i.e. board-specific differences such as different oscillator
+> frequencies.
+> 
+> OSC0 and OSC1 should each be a fixed-rate clock in your board-specific
+> TWR-K70F120M DTS (not a chip-specific file). They do not belong in the
+> cmu node, and they should use the "fixed-clock" binding. The 32k RTC osc
+> can probably go in your chip-specific .dtsi as a fixed-rate clock since
+> it appears to mandated in the reference manual[0].
+> 
+> These three fixed-rate clocks are your root clock nodes. Customers only
+> need to worry about this if they spin a board, and then they will need
+> to populate the frequencies of OSC0 and OSC1 in their board-specific
+> .dts.
+> 
+> Please break clk-kinetis.c into two files:
+> drivers/clk/kinetis/clk-mcg.c
+> drivers/clk/kinetis/clk-sim.c
+> 
+> Below is what your binding/dts should look like:
+> 
+> {
+> 	osc0: clock {
+> 		compatible = "fixed-clock";
+> 		#clock-cells = <0>;
+> 		clock-frequency = <50000000>;
+> 	};
+> 
+> 	osc1: clock {
+> 		compatible = "fixed-clock";
+> 		#clock-cells = <0>;
+> 		clock-frequency = <12000000>;
+> 	};
+> 
+> 	rtc: clock {
+> 		compatible = "fixed-clock";
+> 		#clock-cells = <0>;
+> 		clock-frequency = <32768>;
+> 	};
+> 
+> 	soc: soc {
+> 		mcg: clock-controller at 40064000 {
+> 			compatible = "fsl,kinetis-mcg";
+> 			clock-cells = <1>;
+> 			reg = <0x40064000 0x14>;
+> 			clocks = <&osc0>, <&osc1>, <&rtc>;
+> 			clock-names = "osc0", "osc1", "rtc";
+> 		};
+> 
+> 		sim: clock-controller at 40047000 {
+> 			compatible = "fsl,kinetis-sim";
+> 			clock-cells = <1>;
+> 			reg = <0x40047000 0x1100>;
+> 			clocks = <&mcg MCG_MCGOUTCLK_DIV1>, <&mcg MCG_MCGOUTCLK_DIV2>, <&mcg MCG_MCGOUTCLK_DIV3> <&mcg MCG_MCGOUTCLK_DIV4>;
+> 			clock-names = "core", "bus", "flexbus", "flash";
+> 		};
+> 	};
+> 
+> 	uart0: serial at 4006a000 {
+> 		compatible = "fsl,kinetis-lpuart";
+> 		reg = <0x4006a000 0x1000>;
+> 		clocks = <&sim SIM_SCGC4_UART1_CLK>;
+> 		clock-names = "gate";
+> 	};
+> 
+> I removed the interrupts and dma stuff from the uart0 node for clarity.
+> The above is the only style of binding that I have been accepting for
+> some time; first declare the clock controller and establish its register
+> space, and then consumers can consume clocks by providing the phandle to
+> the controller plus an offset corresponding to a unique clock. The
+> clock-names property makes it really easy to use with the clkdev stuff
+> (e.g. clk_get()).
+> 
+> I've covered this before on the mailing list so here is a link
+> describing how the qcom bindings do it in detail:
+> 
+> http://lkml.kernel.org/r/<20150416192014.19585.9663@quantum>
+> 
+> Technically you could encode the same bits as sub-nodes of the mcg and
+> sim nodes, but the shared header is how the magic happens with the
+> driver so it's best to keep the clock controller binding small and
+> light.
+> 
+> I think this means you can also get rid of kinetis_of_clk_get_name and
+> kinetis_clk_gate_get but my brain is tired so I'll leave that as an
+> exercise to the reader.
+> 
+> [0] http://cache.freescale.com/files/microcontrollers/doc/ref_manual/K70P256M150SF3RM.pdf
+> 
+> Regards,
+> Mike
+> 
+> > 
+> > In my most recent version I added OSC0ERCLK explicitly as one more root 
+> > clock, since it is also used directly (through CG reg. 1 bit 0) by 
+> > Freescale fec network device whose in-tree driver I'm trying to make 
+> > usable for Kinetis.
+> > 
+> > On Sat, 4 Jul 2015, Arnd Bergmann wrote:
+> > 
+> > > On Friday 03 July 2015 00:08:27 Thomas Gleixner wrote:
+> > >> On Thu, 2 Jul 2015, Paul Osmialowski wrote:
+> > >>> On Thu, 2 Jul 2015, Arnd Bergmann wrote:
+> > >>>
+> > >>>> I wonder if you could move out the fixed rate clocks into their own
+> > >>>> nodes. Are they actually controlled by the same block? If they are
+> > >>>> just fixed, you can use the normal binding for fixed rate clocks
+> > >>>> and only describe the clocks that are related to the driver.
+> > >>>
+> > >>> In my view having these clocks grouped together looks more convincing. After
+> > >>> all, they all share the same I/O regs in order to read configuration.
+> > >>
+> > >> The fact that they share a register is not making them a group. That's
+> > >> just a HW design decision and you need to deal with that by protecting
+> > >> the register access, but not by trying to group them artificially at
+> > >> the functional level.
+> > >
+> > > I'd disagree with that: The clock controller is the device that owns the
+> > > registers and that should be one node in DT, as Paul's first version does.
+> > >
+> > > The part I'm still struggling with is understanding how the fixed-rate
+> > > clocks are controlled through those registers. If they are indeed configured
+> > > through the registers, the name is probably wrong and should be changed
+> > > to whatever kind of non-fixed clock this is.
+> > >
+> > >       Arnd
+> > >
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
