@@ -1,34 +1,120 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sun, 26 Jul 2015 23:37:48 +0200
-Subject: [PATCH v5 1/6] imx31: add a second rtc clock
+Date: Sun, 26 Jul 2015 23:37:50 +0200
+Subject: [PATCH v5 3/6] rtc: mxc: use a second rtc clock
 In-Reply-To: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
 References: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1437946673-7402-2-git-send-email-tremyfr@gmail.com>
+Message-ID: <1437946673-7402-4-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mxc rtc driver needs two clock.
-It was defined only one clock, so we
-define the second clock.
+The mxc RTC needs two clocks, one for the input
+reference, and one for the IP. But this driver
+was only using one clock (for the reference).
+This patch add the second clock (for the IP).
 
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- drivers/clk/imx/clk-imx31.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ drivers/rtc/rtc-mxc.c |   41 ++++++++++++++++++++++++++++-------------
+ 1 files changed, 28 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx31.c b/drivers/clk/imx/clk-imx31.c
-index fe66c40..1f83834 100644
---- a/drivers/clk/imx/clk-imx31.c
-+++ b/drivers/clk/imx/clk-imx31.c
-@@ -147,7 +147,8 @@ int __init mx31_clocks_init(unsigned long fref)
- 	clk_register_clkdev(clk[cspi3_gate], NULL, "imx31-cspi.2");
- 	clk_register_clkdev(clk[pwm_gate], "pwm", NULL);
- 	clk_register_clkdev(clk[wdog_gate], NULL, "imx2-wdt.0");
--	clk_register_clkdev(clk[rtc_gate], NULL, "imx21-rtc");
-+	clk_register_clkdev(clk[ckil], "ref", "imx21-rtc");
-+	clk_register_clkdev(clk[rtc_gate], "ipg", "imx21-rtc");
- 	clk_register_clkdev(clk[epit1_gate], "epit", NULL);
- 	clk_register_clkdev(clk[epit2_gate], "epit", NULL);
- 	clk_register_clkdev(clk[nfc], NULL, "imx27-nand.0");
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index 5fc292c..880d485 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -79,7 +79,8 @@ struct rtc_plat_data {
+ 	struct rtc_device *rtc;
+ 	void __iomem *ioaddr;
+ 	int irq;
+-	struct clk *clk;
++	struct clk *clk_ref;
++	struct clk *clk_ipg;
+ 	struct rtc_time g_rtc_alarm;
+ 	enum imx_rtc_type devtype;
+ };
+@@ -373,17 +374,28 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pdata->ioaddr))
+ 		return PTR_ERR(pdata->ioaddr);
+ 
+-	pdata->clk = devm_clk_get(&pdev->dev, NULL);
+-	if (IS_ERR(pdata->clk)) {
+-		dev_err(&pdev->dev, "unable to get clock!\n");
+-		return PTR_ERR(pdata->clk);
++	pdata->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
++	if (IS_ERR(pdata->clk_ipg)) {
++		dev_err(&pdev->dev, "unable to get ipg clock!\n");
++		return PTR_ERR(pdata->clk_ipg);
+ 	}
+ 
+-	ret = clk_prepare_enable(pdata->clk);
++	ret = clk_prepare_enable(pdata->clk_ipg);
+ 	if (ret)
+ 		return ret;
+ 
+-	rate = clk_get_rate(pdata->clk);
++	pdata->clk_ref = devm_clk_get(&pdev->dev, "ref");
++	if (IS_ERR(pdata->clk_ref)) {
++		dev_err(&pdev->dev, "unable to get ref clock!\n");
++		ret = PTR_ERR(pdata->clk_ref);
++		goto exit_put_clk_ipg;
++	}
++
++	ret = clk_prepare_enable(pdata->clk_ref);
++	if (ret)
++		goto exit_put_clk_ipg;
++
++	rate = clk_get_rate(pdata->clk_ref);
+ 
+ 	if (rate == 32768)
+ 		reg = RTC_INPUT_CLK_32768HZ;
+@@ -394,7 +406,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	else {
+ 		dev_err(&pdev->dev, "rtc clock is not valid (%lu)\n", rate);
+ 		ret = -EINVAL;
+-		goto exit_put_clk;
++		goto exit_put_clk_ref;
+ 	}
+ 
+ 	reg |= RTC_ENABLE_BIT;
+@@ -402,7 +414,7 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	if (((readw(pdata->ioaddr + RTC_RTCCTL)) & RTC_ENABLE_BIT) == 0) {
+ 		dev_err(&pdev->dev, "hardware module can't be enabled!\n");
+ 		ret = -EIO;
+-		goto exit_put_clk;
++		goto exit_put_clk_ref;
+ 	}
+ 
+ 	platform_set_drvdata(pdev, pdata);
+@@ -424,15 +436,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 				  THIS_MODULE);
+ 	if (IS_ERR(rtc)) {
+ 		ret = PTR_ERR(rtc);
+-		goto exit_put_clk;
++		goto exit_put_clk_ref;
+ 	}
+ 
+ 	pdata->rtc = rtc;
+ 
+ 	return 0;
+ 
+-exit_put_clk:
+-	clk_disable_unprepare(pdata->clk);
++exit_put_clk_ref:
++	clk_disable_unprepare(pdata->clk_ref);
++exit_put_clk_ipg:
++	clk_disable_unprepare(pdata->clk_ipg);
+ 
+ 	return ret;
+ }
+@@ -441,7 +455,8 @@ static int mxc_rtc_remove(struct platform_device *pdev)
+ {
+ 	struct rtc_plat_data *pdata = platform_get_drvdata(pdev);
+ 
+-	clk_disable_unprepare(pdata->clk);
++	clk_disable_unprepare(pdata->clk_ref);
++	clk_disable_unprepare(pdata->clk_ipg);
+ 
+ 	return 0;
+ }
 -- 
 1.7.4.4
