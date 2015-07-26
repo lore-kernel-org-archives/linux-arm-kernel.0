@@ -1,58 +1,51 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sun, 26 Jul 2015 23:37:51 +0200
-Subject: [PATCH v5 4/6] dt-binding: document the binding for mxc rtc
+Date: Sun, 26 Jul 2015 23:37:49 +0200
+Subject: [PATCH v5 2/6] imx35: define two clocks for rtc
 In-Reply-To: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
 References: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1437946673-7402-5-git-send-email-tremyfr@gmail.com>
+Message-ID: <1437946673-7402-3-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds documentation of device tree bindings for the
-mxc rtc.
+The imx35 don't define clocks for rtc.
+This patch add two clocks, as needed
+by the mxc rtc driver.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: devicetree at vger.kernel.org
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   26 +++++++++++++++++++++
- 1 files changed, 26 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
+ drivers/clk/imx/clk-imx35.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-new file mode 100644
-index 0000000..49aa550
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-@@ -0,0 +1,26 @@
-+* Real Time Clock of the i.MX SoCs
-+
-+RTC controller for the i.MX SoCs
-+
-+Required properties:
-+- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- interrupts: IRQ line for the RTC.
-+- clocks: should contain two entries:
-+  * one for the input reference
-+  * one for the the SoC RTC
-+- clock-names: should contain:
-+  * "ref" for the input reference clock
-+  * "ipg" for the SoC RTC clock
-+
-+Example:
-+
-+rtc at 10007000 {
-+	compatible = "fsl,imx21-rtc";
-+	reg = <0x10007000 0x1000>;
-+	interrupts = <22>;
-+	clocks = <&clks IMX27_CLK_CKIL>,
-+	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
-+	clock-names = "ref", "ipg";
-+};
+diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
+index 69138ba..8623cd4 100644
+--- a/drivers/clk/imx/clk-imx35.c
++++ b/drivers/clk/imx/clk-imx35.c
+@@ -66,7 +66,7 @@ static const char *std_sel[] = {"ppll", "arm"};
+ static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
+ 
+ enum mx35_clks {
+-	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
++	ckih, ckil, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
+ 	arm_per_div, ahb_per_div, ipg_per, uart_sel, uart_div, esdhc_sel,
+ 	esdhc1_div, esdhc2_div, esdhc3_div, spdif_sel, spdif_div_pre,
+ 	spdif_div_post, ssi_sel, ssi1_div_pre, ssi1_div_post, ssi2_div_pre,
+@@ -107,6 +107,7 @@ int __init mx35_clocks_init(void)
+ 	}
+ 
+ 	clk[ckih] = imx_clk_fixed("ckih", 24000000);
++	clk[ckil] = imx_clk_fixed("ckih", 32768);
+ 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "mpll", "ckih", base + MX35_CCM_MPCTL);
+ 	clk[ppll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "ppll", "ckih", base + MX35_CCM_PPCTL);
+ 
+@@ -258,6 +259,9 @@ int __init mx35_clocks_init(void)
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.1");
+ 	clk_register_clkdev(clk[uart3_gate], "per", "imx21-uart.2");
+ 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.2");
++	/* i.mx35 has the i.mx21 type rtc */
++	clk_register_clkdev(clk[ckil], "ref", "imx21-rtc");
++	clk_register_clkdev(clk[rtc_gate], "ipg", "imx21-rtc");
+ 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.0");
+ 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.0");
 -- 
 1.7.4.4
