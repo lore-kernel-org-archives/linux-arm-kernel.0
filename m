@@ -1,22 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sun, 26 Jul 2015 10:51:04 +0200 (CEST)
-Subject: [PATCH] xen/events: Support event channel rebind on ARM
-In-Reply-To: <1437845664-32098-1-git-send-email-julien.grall@citrix.com>
-References: <1437845664-32098-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <alpine.DEB.2.11.1507261049540.18576@nanos>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 26 Jul 2015 11:26:15 +0200
+Subject: n900 in 4.2-rc0: repeating oopses
+In-Reply-To: <20150701103421.GV4156@atomide.com>
+References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
+ <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
+ <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
+ <20150701095954.GD7969@amd> <20150701103421.GV4156@atomide.com>
+Message-ID: <20150726092615.GA6824@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Jul 2015, Julien Grall wrote:
-> +/*
-> + * Events delivered via platform PCI interrupts are always
-> + * routed to vcpu 0 and hence cannot be rebound.
-> + */
-> +#define xen_support_evtchn_rebind()	\
-> +	(!xen_hvm_domain() || xen_have_vector_callback)
+Hi!
 
-Make this an inline please.
+> > > So, Pavel can you re-test? Maybe there can be problem with some driver
+> > > which Tony did not compiled into zImage? Just speculation...
+> > 
+> > I re-tested with today's git, and it seems to boot. Thanks for help...
+> 
+> OK good to hear.
+>  
+> > Now. "echo mem > /sys/power/state" is broken, as in "returns
+> > immediately in about 50% cases". The messages are
+> > 
+> > Powerdomain (per_pwrdm) didn't enter target state 1
+> > Powerdomain (core_pwerdm) didn't enter target state 1
+> > 
+> > Any ideas? Thanks,
+> 
+> Works for me after enabling the idle timeouts with the following
+> script and blanking the screen and disconnecting USB:
+> 
+> Also both keyboard LEDs should start blinking after the idle
+> timeout with screen blanked and USB disconnected. If not, you
+> have some module loaded that blocks the deeper idle states.
+
+Ok, tried that, I had to do:
+
+ cd /sys/class/gpio
+ echo 162 > export
+ cd gpio162
+ echo out > direction
+ echo 1 > value
+
+to get the debug lights to work. But I could not get those leds to
+blink.
+
+> modprobe leds-gpio
+> modprobe ledtrig-default-on
+
+Is this actually neccessary/relevant?
+
+> echo 255 > /sys/class/backlight/acx565akm/brightness
+
+And this?
 
 Thanks,
-
-	tglx
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
