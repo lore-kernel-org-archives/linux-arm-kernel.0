@@ -1,39 +1,37 @@
 From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 27 Jul 2015 00:18:22 +0300
-Subject: [PATCH 0/8] misc: remove boundary checks from bin attr users
-Message-ID: <1437945502-27944-1-git-send-email-vz@mleia.com>
+Date: Mon, 27 Jul 2015 00:18:53 +0300
+Subject: [PATCH 8/8] misc: eeprom: sunxi_sid: clean up sid_read()
+In-Reply-To: <1437945502-27944-1-git-send-email-vz@mleia.com>
+References: <1437945502-27944-1-git-send-email-vz@mleia.com>
+Message-ID: <1437945533-27996-8-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change removes a number of redundant checks on bin attribute
-client's side, the same checks are done by sysfs_kf_bin_read() or
-sysfs_kf_bin_write() caller from fs/sysfs/file.c.
+The change removes redundant sysfs binary file boundary checks, since
+this task is already done on caller side in fs/sysfs/file.c
 
-Note, drivers/misc/pch_phub.c and drivers/misc/c2port/core.c may be
-updated in a similar way, however this task is not done due to more
-complicated read()/write() callbacks.
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/misc/eeprom/sunxi_sid.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-No functional change, hopefully.
-
-Vladimir Zapolskiy (8):
-  misc: cxl: clean up afu_read_config()
-  misc: ds1682: clean up ds1682_eeprom_read() and ds1682_eeprom_write()
-  misc: eeprom: 93xx46: clean up eeprom_93xx46_bin_read/write
-  misc: eeprom: clean up eeprom_read()
-  misc: eeprom: max6875: clean up max6875_read()
-  misc: eeprom: at24: clean up at24_bin_write()
-  misc: eeprom: at25: move eeprom boundary checks to mem_read/mem_write
-  misc: eeprom: sunxi_sid: clean up sid_read()
-
- drivers/misc/cxl/sysfs.c            |  7 +------
- drivers/misc/ds1682.c               | 12 ------------
- drivers/misc/eeprom/at24.c          |  3 ---
- drivers/misc/eeprom/at25.c          | 28 ++++++++++++++--------------
- drivers/misc/eeprom/eeprom.c        |  5 -----
- drivers/misc/eeprom/eeprom_93xx46.c | 14 --------------
- drivers/misc/eeprom/max6875.c       |  6 ------
- drivers/misc/eeprom/sunxi_sid.c     |  5 -----
- 8 files changed, 15 insertions(+), 65 deletions(-)
-
+diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
+index 8385177..26ce99d 100644
+--- a/drivers/misc/eeprom/sunxi_sid.c
++++ b/drivers/misc/eeprom/sunxi_sid.c
+@@ -70,11 +70,6 @@ static ssize_t sid_read(struct file *fd, struct kobject *kobj,
+ 	pdev = to_platform_device(kobj_to_dev(kobj));
+ 	sid_data = platform_get_drvdata(pdev);
+ 
+-	if (pos < 0 || pos >= sid_data->keysize)
+-		return 0;
+-	if (size > sid_data->keysize - pos)
+-		size = sid_data->keysize - pos;
+-
+ 	for (i = 0; i < size; i++)
+ 		buf[i] = sunxi_sid_read_byte(sid_data, pos + i);
+ 
 -- 
 2.1.4
