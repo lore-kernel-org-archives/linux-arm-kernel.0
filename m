@@ -1,47 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 26 Jul 2015 23:14:23 +0200
-Subject: [PATCH 0/7] ARM: sunxi: Switch to clock indices
-Message-ID: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun, 26 Jul 2015 23:14:29 +0200
+Subject: [PATCH 6/7] ARM: sun9i: Add clock indices
+In-Reply-To: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1437945270-32014-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The A80 gates have a non continuous set of clock IDs that are valid. Add
+the clock-indices property to the DT to express this.
 
-We currently have in our clock driver a logic very similar to the one
-that clock-indices is supposed to cover.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun9i-a80.dtsi | 32 ++++++++++++++++++++++----------
+ 1 file changed, 22 insertions(+), 10 deletions(-)
 
-Using this property, we can create a new driver generic for all gates
-that will get the valid indices directly from the device tree, instead
-of storing that in the driver itself.
-
-While we're at it, we also move to using CLK_OF_DECLARE for that new
-driver, which should ease the orphan clocks breakage we saw.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (7):
-  ARM: sun4i: Add clock indices
-  ARM: sun5i: Add clock indices
-  ARM: sun6i: Add clock indices
-  ARM: sun7i: Add clock indices
-  ARM: sun8i: Add clock indices
-  ARM: sun9i: Add clock indices
-  clk: sunxi: Add a simple gates driver
-
- arch/arm/boot/dts/sun4i-a10.dtsi     |  69 ++++++++++----
- arch/arm/boot/dts/sun5i-a10s.dtsi    |  23 ++++-
- arch/arm/boot/dts/sun5i-a13.dtsi     |  18 +++-
- arch/arm/boot/dts/sun5i.dtsi         |   1 +
- arch/arm/boot/dts/sun6i-a31.dtsi     |  24 +++++
- arch/arm/boot/dts/sun7i-a20.dtsi     |  23 +++++
- arch/arm/boot/dts/sun8i-a23-a33.dtsi |  15 +++
- arch/arm/boot/dts/sun9i-a80.dtsi     |  32 +++++--
- drivers/clk/sunxi/Makefile           |   1 +
- drivers/clk/sunxi/clk-simple-gates.c | 159 +++++++++++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c        | 177 -----------------------------------
- 11 files changed, 335 insertions(+), 207 deletions(-)
- create mode 100644 drivers/clk/sunxi/clk-simple-gates.c
-
+diff --git a/arch/arm/boot/dts/sun9i-a80.dtsi b/arch/arm/boot/dts/sun9i-a80.dtsi
+index a43ad779ee2f..5908e3dcf965 100644
+--- a/arch/arm/boot/dts/sun9i-a80.dtsi
++++ b/arch/arm/boot/dts/sun9i-a80.dtsi
+@@ -277,9 +277,12 @@
+ 			compatible = "allwinner,sun9i-a80-ahb0-gates-clk";
+ 			reg = <0x06000580 0x4>;
+ 			clocks = <&ahb0>;
+-			clock-indices = <0>, <1>, <3>, <5>, <8>, <12>, <13>,
+-					<14>, <15>, <16>, <18>, <20>, <21>,
+-					<22>, <23>;
++			clock-indices = <0>, <1>, <3>,
++					<5>, <8>, <12>,
++					<13>, <14>,
++					<15>, <16>, <18>,
++					<20>, <21>, <22>,
++					<23>;
+ 			clock-output-names = "ahb0_fd", "ahb0_ve", "ahb0_gpu",
+ 					"ahb0_ss", "ahb0_sd", "ahb0_nand1",
+ 					"ahb0_nand0", "ahb0_sdram",
+@@ -293,7 +296,10 @@
+ 			compatible = "allwinner,sun9i-a80-ahb1-gates-clk";
+ 			reg = <0x06000584 0x4>;
+ 			clocks = <&ahb1>;
+-			clock-indices = <0>, <1>, <17>, <21>, <22>, <23>, <24>;
++			clock-indices = <0>, <1>,
++					<17>, <21>,
++					<22>, <23>,
++					<24>;
+ 			clock-output-names = "ahb1_usbotg", "ahb1_usbhci",
+ 					"ahb1_gmac", "ahb1_msgbox",
+ 					"ahb1_spinlock", "ahb1_hstimer",
+@@ -305,8 +311,9 @@
+ 			compatible = "allwinner,sun9i-a80-ahb2-gates-clk";
+ 			reg = <0x06000588 0x4>;
+ 			clocks = <&ahb2>;
+-			clock-indices = <0>, <1>, <2>, <4>, <5>, <7>, <8>,
+-					<11>;
++			clock-indices = <0>, <1>,
++					<2>, <4>, <5>,
++					<7>, <8>, <11>;
+ 			clock-output-names = "ahb2_lcd0", "ahb2_lcd1",
+ 					"ahb2_edp", "ahb2_csi", "ahb2_hdmi",
+ 					"ahb2_de", "ahb2_mp", "ahb2_mipi_dsi";
+@@ -317,8 +324,10 @@
+ 			compatible = "allwinner,sun9i-a80-apb0-gates-clk";
+ 			reg = <0x06000590 0x4>;
+ 			clocks = <&apb0>;
+-			clock-indices = <1>, <5>, <11>, <12>, <13>, <15>,
+-					<17>, <18>, <19>;
++			clock-indices = <1>, <5>,
++					<11>, <12>, <13>,
++					<15>, <17>, <18>,
++					<19>;
+ 			clock-output-names = "apb0_spdif", "apb0_pio",
+ 					"apb0_ac97", "apb0_i2s0", "apb0_i2s1",
+ 					"apb0_lradc", "apb0_gpadc", "apb0_twd",
+@@ -330,8 +339,11 @@
+ 			compatible = "allwinner,sun9i-a80-apb1-gates-clk";
+ 			reg = <0x06000594 0x4>;
+ 			clocks = <&apb1>;
+-			clock-indices = <0>, <1>, <2>, <3>, <4>,
+-					<16>, <17>, <18>, <19>, <20>, <21>;
++			clock-indices = <0>, <1>,
++					<2>, <3>, <4>,
++					<16>, <17>,
++					<18>, <19>,
++					<20>, <21>;
+ 			clock-output-names = "apb1_i2c0", "apb1_i2c1",
+ 					"apb1_i2c2", "apb1_i2c3", "apb1_i2c4",
+ 					"apb1_uart0", "apb1_uart1",
 -- 
 2.4.6
