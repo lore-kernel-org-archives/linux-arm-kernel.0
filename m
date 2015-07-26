@@ -1,101 +1,24 @@
-From: jchandra@broadcom.com (Jayachandran C.)
-Date: Sun, 26 Jul 2015 20:55:29 +0530
-Subject: [PATCH v2 2/2] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <1437754383-8162-2-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1437754383-8162-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437754383-8162-2-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20150726152528.GB2357@jayachandranc.netlogicmicro.com>
+From: hch@lst.de (Christoph Hellwig)
+Date: Sun, 26 Jul 2015 19:25:27 +0200
+Subject: [PATCH v2 08/25] arch: introduce memremap()
+In-Reply-To: <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150726172527.GA29513@lst.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 05:13:03PM +0100, Lorenzo Pieralisi wrote:
-> On ARM PCI systems relying on the pcibios API to initialize PCI host
-> controllers, the pcibios_msi_controller weak callback is used to look-up
-> the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
-> 
-> pci_sys_data is an ARM specific structure, which prevents using the
-> same mechanism (so same PCI host controller drivers) on ARM64 systems.
-> 
-> Since the struct pci_bus already contains an msi_controller pointer and
-> the kernel already uses it to look-up the msi controller,
-> this patch converts ARM host controller and related pcibios/host bridges
-> initialization routines so that the msi_controller pointer look-up can be
-> carried out by PCI core code through the struct pci_bus msi pointer,
-> removing the need for the arch specific pcibios_msi_controller callback
-> and the related pci_sys_data msi_ctrl pointer.
-> 
-> ARM is the only arch relying on the pcibios_msi_controller() weak
-> function, hence this patch removes the default weak implementation
-> from PCI core code since it becomes of no use.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Pratyush Anand <pratyush.anand@gmail.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Jingoo Han <jingoohan1@gmail.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Simon Horman <horms@verge.net.au>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-> v1->v2
-> 
-> - Added patch to replace panic statements with WARN
-> - Removed unused pcibios_msi_controller() and pci_msi_controller() from
->   core code
-> - Dropped RFT status
-> 
-> v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356028.html
-> 
->  arch/arm/include/asm/mach/pci.h    |  3 ---
->  arch/arm/kernel/bios32.c           | 29 +++++++++++++----------------
->  drivers/pci/host/pcie-designware.c |  9 +++++++--
->  drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
->  drivers/pci/msi.c                  | 17 +----------------
->  5 files changed, 31 insertions(+), 39 deletions(-)
-> 
-[...]
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index f66be86..0d20142 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -77,24 +77,9 @@ static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
->  
->  /* Arch hooks */
->  
-> -struct msi_controller * __weak pcibios_msi_controller(struct pci_dev *dev)
-> -{
-> -	return NULL;
-> -}
-> -
-> -static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
-> -{
-> -	struct msi_controller *msi_ctrl = dev->bus->msi;
-> -
-> -	if (msi_ctrl)
-> -		return msi_ctrl;
-> -
-> -	return pcibios_msi_controller(dev);
-> -}
-> -
->  int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
->  {
-> -	struct msi_controller *chip = pci_msi_controller(dev);
-> +	struct msi_controller *chip = dev->bus->msi;
->  	int err;
->  
->  	if (!chip || !chip->setup_irq)
+On Fri, Jul 24, 2015 at 10:38:42PM -0400, Dan Williams wrote:
+> The behavior change to return NULL on an unsupported request is reserved
+> for a later patch.
 
-Don't you have to go to the top level bus and get the ->msi pointer? Something
-like:
+Why?
 
-	for (bus = dev->bus; bus != NULL; bus = bus->parent)
-		if (bus->msi)
-			return bus->msi;
+> +enum {
+> +	MEMREMAP_WB = 1 << 0,
+> +	MEMREMAP_WT = 1 << 1,
+> +	MEMREMAP_CACHE = MEMREMAP_WB,
 
-I have not been following this closely, so I may have missed some patches.
+What's the point of having this MEMREMAP_CACHE alias?
 
-JC.
+Also please document the meaning of the flags for the poor users.
