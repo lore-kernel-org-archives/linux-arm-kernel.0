@@ -1,51 +1,75 @@
 From: tremyfr@gmail.com (Philippe Reynes)
-Date: Sun, 26 Jul 2015 23:37:49 +0200
-Subject: [PATCH v5 2/6] imx35: define two clocks for rtc
+Date: Sun, 26 Jul 2015 23:37:52 +0200
+Subject: [PATCH v5 5/6] rtc: mxc: add support of device tree
 In-Reply-To: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
 References: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
-Message-ID: <1437946673-7402-3-git-send-email-tremyfr@gmail.com>
+Message-ID: <1437946673-7402-6-git-send-email-tremyfr@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The imx35 don't define clocks for rtc.
-This patch add two clocks, as needed
-by the mxc rtc driver.
+Add device tree support for the mxc rtc driver.
 
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
 ---
- drivers/clk/imx/clk-imx35.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
+ drivers/rtc/rtc-mxc.c |   19 ++++++++++++++++++-
+ 1 files changed, 18 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx35.c b/drivers/clk/imx/clk-imx35.c
-index 69138ba..8623cd4 100644
---- a/drivers/clk/imx/clk-imx35.c
-+++ b/drivers/clk/imx/clk-imx35.c
-@@ -66,7 +66,7 @@ static const char *std_sel[] = {"ppll", "arm"};
- static const char *ipg_per_sel[] = {"ahb_per_div", "arm_per_div"};
+diff --git a/drivers/rtc/rtc-mxc.c b/drivers/rtc/rtc-mxc.c
+index 880d485..7bd89d9 100644
+--- a/drivers/rtc/rtc-mxc.c
++++ b/drivers/rtc/rtc-mxc.c
+@@ -16,6 +16,8 @@
+ #include <linux/interrupt.h>
+ #include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
  
- enum mx35_clks {
--	ckih, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
-+	ckih, ckil, mpll, ppll, mpll_075, arm, hsp, hsp_div, hsp_sel, ahb, ipg,
- 	arm_per_div, ahb_per_div, ipg_per, uart_sel, uart_div, esdhc_sel,
- 	esdhc1_div, esdhc2_div, esdhc3_div, spdif_sel, spdif_div_pre,
- 	spdif_div_post, ssi_sel, ssi1_div_pre, ssi1_div_post, ssi2_div_pre,
-@@ -107,6 +107,7 @@ int __init mx35_clocks_init(void)
- 	}
+ #define RTC_INPUT_CLK_32768HZ	(0x00 << 5)
+ #define RTC_INPUT_CLK_32000HZ	(0x01 << 5)
+@@ -98,6 +100,15 @@ static const struct platform_device_id imx_rtc_devtype[] = {
+ };
+ MODULE_DEVICE_TABLE(platform, imx_rtc_devtype);
  
- 	clk[ckih] = imx_clk_fixed("ckih", 24000000);
-+	clk[ckil] = imx_clk_fixed("ckih", 32768);
- 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "mpll", "ckih", base + MX35_CCM_MPCTL);
- 	clk[ppll] = imx_clk_pllv1(IMX_PLLV1_IMX35, "ppll", "ckih", base + MX35_CCM_PPCTL);
++#ifdef CONFIG_OF
++static const struct of_device_id imx_rtc_dt_ids[] = {
++	{ .compatible = "fsl,imx1-rtc", .data = (const void *)IMX1_RTC },
++	{ .compatible = "fsl,imx21-rtc", .data = (const void *)IMX21_RTC },
++	{}
++};
++MODULE_DEVICE_TABLE(of, imx_rtc_dt_ids);
++#endif
++
+ static inline int is_imx1_rtc(struct rtc_plat_data *data)
+ {
+ 	return data->devtype == IMX1_RTC;
+@@ -362,12 +373,17 @@ static int mxc_rtc_probe(struct platform_device *pdev)
+ 	u32 reg;
+ 	unsigned long rate;
+ 	int ret;
++	const struct of_device_id *of_id;
  
-@@ -258,6 +259,9 @@ int __init mx35_clocks_init(void)
- 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.1");
- 	clk_register_clkdev(clk[uart3_gate], "per", "imx21-uart.2");
- 	clk_register_clkdev(clk[ipg], "ipg", "imx21-uart.2");
-+	/* i.mx35 has the i.mx21 type rtc */
-+	clk_register_clkdev(clk[ckil], "ref", "imx21-rtc");
-+	clk_register_clkdev(clk[rtc_gate], "ipg", "imx21-rtc");
- 	clk_register_clkdev(clk[usb_div], "per", "mxc-ehci.0");
- 	clk_register_clkdev(clk[ipg], "ipg", "mxc-ehci.0");
- 	clk_register_clkdev(clk[usbotg_gate], "ahb", "mxc-ehci.0");
+ 	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
+ 	if (!pdata)
+ 		return -ENOMEM;
+ 
+-	pdata->devtype = pdev->id_entry->driver_data;
++	of_id = of_match_device(imx_rtc_dt_ids, &pdev->dev);
++	if (of_id)
++		pdata->devtype = (enum imx_rtc_type)of_id->data;
++	else
++		pdata->devtype = pdev->id_entry->driver_data;
+ 
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pdata->ioaddr = devm_ioremap_resource(&pdev->dev, res);
+@@ -488,6 +504,7 @@ static SIMPLE_DEV_PM_OPS(mxc_rtc_pm_ops, mxc_rtc_suspend, mxc_rtc_resume);
+ static struct platform_driver mxc_rtc_driver = {
+ 	.driver = {
+ 		   .name	= "mxc_rtc",
++		   .of_match_table = of_match_ptr(imx_rtc_dt_ids),
+ 		   .pm		= &mxc_rtc_pm_ops,
+ 	},
+ 	.id_table = imx_rtc_devtype,
 -- 
 1.7.4.4
