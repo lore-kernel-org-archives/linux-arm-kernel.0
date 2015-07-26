@@ -1,33 +1,50 @@
-From: kvalo@codeaurora.org (Kalle Valo)
-Date: Sun, 26 Jul 2015 14:56:31 +0300
-Subject: [PATCH] bcma: fix build error when build as module
-In-Reply-To: <1437851427-7485-1-git-send-email-hauke@hauke-m.de> (Hauke
- Mehrtens's message of "Sat, 25 Jul 2015 21:10:27 +0200")
-References: <1437851427-7485-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <87lhe3b09c.fsf@kamboji.qca.qualcomm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 26 Jul 2015 14:59:00 +0200
+Subject: [PATCH] arm64/efi: map the entire UEFI vendor string before reading it
+Message-ID: <1437915540-7553-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hauke Mehrtens <hauke@hauke-m.de> writes:
+At boot, the UTF-16 UEFI vendor string is copied from the system
+table into a char array with a size of 100 bytes. However, this
+size of 100 bytes is also used for memremapping() the source,
+which may not be sufficient if the vendor string exceeds 50
+UTF-16 characters, and the placement of the vendor string inside
+a 4 KB page happens to leave the end unmapped.
 
-> Currently of_default_bus_match_table is not exported so we can only use
-> this feature when bcma is build into the kernel. This patch removes
-> support for child buses when bcma is build as a module as a temporary
-> fix for a build problem introduces in this commit:
->
-> commit cae761b5a6bdc597ba476a040fdcd5b4bc559b85
-> Author: Rafa? Mi?ecki <zajec5@gmail.com>
-> Date:   Sun Jun 28 17:17:13 2015 +0200
->
->     bcma: populate bus DT subnodes as platform_device-s
->
-> Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+So use the correct '100 * sizeof(efi_char16_t)' for the size of
+the mapping.
 
-Thanks, manually applied to wireless-drivers-next.git. (Still
-patchwork.kernel.org has buggy utf-8 support, sigh.) I just added
-Reported-by and Fixes lines to the commit log.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+Hello Catalin,
 
-I wrote a similar patch but I'll drop that as your has better comments :)
+I think this should go into v4.2 with a cc: stable.
 
+Thanks,
+Ard.
+
+ arch/arm64/kernel/efi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index 9d4aa18f2a82..e8ca6eaedd02 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -122,12 +122,12 @@ static int __init uefi_init(void)
+ 
+ 	/* Show what we know for posterity */
+ 	c16 = early_memremap(efi_to_phys(efi.systab->fw_vendor),
+-			     sizeof(vendor));
++			     sizeof(vendor) * sizeof(efi_char16_t));
+ 	if (c16) {
+ 		for (i = 0; i < (int) sizeof(vendor) - 1 && *c16; ++i)
+ 			vendor[i] = c16[i];
+ 		vendor[i] = '\0';
+-		early_memunmap(c16, sizeof(vendor));
++		early_memunmap(c16, sizeof(vendor) * sizeof(efi_char16_t));
+ 	}
+ 
+ 	pr_info("EFI v%u.%.02u by %s\n",
 -- 
-Kalle Valo
+1.9.1
