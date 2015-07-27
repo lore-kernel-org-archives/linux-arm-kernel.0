@@ -1,75 +1,108 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 27 Jul 2015 22:03:33 +0800
-Subject: [PATCH v5 4/6] dt-binding: document the binding for mxc rtc
-In-Reply-To: <1437946673-7402-5-git-send-email-tremyfr@gmail.com>
-References: <1437946673-7402-1-git-send-email-tremyfr@gmail.com>
- <1437946673-7402-5-git-send-email-tremyfr@gmail.com>
-Message-ID: <20150727140333.GN12927@tiger>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 27 Jul 2015 15:05:38 +0100
+Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <1437970868.25925.20.camel@mhfsdcap03>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>	
+ <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>	
+ <20150721171101.GN31095@arm.com> <1437715466.23932.68.camel@mhfsdcap03>	
+ <20150724165325.GC21177@arm.com> <1437970868.25925.20.camel@mhfsdcap03>
+Message-ID: <55B63AB2.4050006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 26, 2015 at 11:37:51PM +0200, Philippe Reynes wrote:
-> This adds documentation of device tree bindings for the
-> mxc rtc.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
-> Cc: Kumar Gala <galak@codeaurora.org>
+On 27/07/15 05:21, Yong Wu wrote:
+[...]
+>>>>> +static arm_short_iopte
+>>>>> +__arm_short_pte_prot(struct arm_short_io_pgtable *data, int prot, bool large)
+>>>>> +{
+>>>>> +       arm_short_iopte pteprot;
+>>>>> +
+>>>>> +       pteprot = ARM_SHORT_PTE_S | ARM_SHORT_PTE_nG;
+>>>>> +       pteprot |= large ? ARM_SHORT_PTE_TYPE_LARGE :
+>>>>> +                               ARM_SHORT_PTE_TYPE_SMALL;
+>>>>> +       if (prot & IOMMU_CACHE)
+>>>>> +               pteprot |=  ARM_SHORT_PTE_B | ARM_SHORT_PTE_C;
+>>>>> +       if (prot & IOMMU_WRITE)
+>>>>> +               pteprot |= large ? ARM_SHORT_PTE_LARGE_TEX0 :
+>>>>> +                               ARM_SHORT_PTE_SMALL_TEX0;
+>>>>
+>>>> This doesn't make any sense. TEX[2:0] is all about memory attributes, not
+>>>> permissions, so you're making the mapping write-back, write-allocate but
+>>>> that's not what the IOMMU_* values are about.
+>>>
+>>>       I will delete it.
+>>
+>> Well, can you not control mapping permissions with the AP bits? The idea
+>> of the IOMMU flags are:
+>>
+>>    IOMMU_CACHE : Install a normal, cacheable mapping (you've got this right)
+>>    IOMMU_READ : Allow read access for the device
+>>    IOMMU_WRITE : Allow write access for the device
+>>    IOMMU_NOEXEC : Disallow execute access for the device
+>>
+>> so the caller to iommu_map passes in a bitmap of these, which you need to
+>> encode in the page-table entry.
+>
+>  From the spec, AP[2] differentiate the read/write and readonly.
+> How about this?:
+> //===============
+>    #define ARM_SHORT_PGD_FULL_ACCESS  (3 << 10)
+>    #define ARM_SHORT_PGD_RDONLY       BIT(15)
+>
+>    pgdprot |= ARM_SHORT_PGD_FULL_ACCESS;/* or other names? */
+>    if(!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
+>       pgdprot |= ARM_SHORT_PGD_RDONLY;
+> //===============
+> pte is the same.
+>
+> Sorry, Our HW don't meet the standard spec fully. it don't implement the
+> AP bits.
+>
+>>
+>>>>> +static int
+>>>>> +_arm_short_map(struct arm_short_io_pgtable *data,
+>>>>> +              unsigned int iova, phys_addr_t paddr,
+>>>>> +              arm_short_iopte pgdprot, arm_short_iopte pteprot,
+>>>>> +              bool large)
+>>>>> +{
+>>>>> +       const struct iommu_gather_ops *tlb = data->iop.cfg.tlb;
+>>>>> +       arm_short_iopte *pgd = data->pgd, *pte;
+>>>>> +       void *cookie = data->iop.cookie, *pte_va;
+>>>>> +       unsigned int ptenr = large ? 16 : 1;
+>>>>> +       int i, quirk = data->iop.cfg.quirks;
+>>>>> +       bool ptenew = false;
+>>>>> +
+>>>>> +       pgd += ARM_SHORT_PGD_IDX(iova);
+>>>>> +
+>>>>> +       if (!pteprot) { /* section or supersection */
+>>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK)
+>>>>> +                       pgdprot &= ~ARM_SHORT_PGD_SECTION_XN;
+>>>>> +               pte = pgd;
+>>>>> +               pteprot = pgdprot;
+>>>>> +       } else {        /* page or largepage */
+>>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
+>>>>> +                       if (large) { /* special Bit */
+>>>>
+>>>> This definitely needs a better comment! What exactly are you doing here
+>>>> and what is that quirk all about?
+>>>
+>>> I use this quirk is for MTK Special Bit as we don't have the XN bit in
+>>> pagetable.
+>>
+>> I'm still not really clear about what this is.
+>
+> There is some difference between the standard spec and MTK HW,
+> Our hw don't implement some bits, like XN and AP.
+> So I add a quirk for MTK special.
 
-DT maintainers,
+When you say it doesn't implement these bits, do you mean that having 
+them set will lead to Bad Things happening in the hardware, or that it 
+will simply ignore them and not enforce any of the protections they 
+imply? The former case would definitely want clearly documenting 
+somewhere, whereas for the latter case I'm not sure it's even worth the 
+complication of having a quirk - if the value doesn't matter there seems 
+little point in doing a special dance just for the sake of semantic 
+correctness of the in-memory PTEs, in my opinion.
 
-Any comments on the bindings?  Otherwise, I will queue the whole patch
-series on IMX tree for 4.3.
-
-Shawn
-
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Philippe Reynes <tremyfr@gmail.com>
-> ---
->  Documentation/devicetree/bindings/rtc/rtc-mxc.txt |   26 +++++++++++++++++++++
->  1 files changed, 26 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-> new file mode 100644
-> index 0000000..49aa550
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc.txt
-> @@ -0,0 +1,26 @@
-> +* Real Time Clock of the i.MX SoCs
-> +
-> +RTC controller for the i.MX SoCs
-> +
-> +Required properties:
-> +- compatible: Should be "fsl,imx1-rtc" or "fsl,imx21-rtc".
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: IRQ line for the RTC.
-> +- clocks: should contain two entries:
-> +  * one for the input reference
-> +  * one for the the SoC RTC
-> +- clock-names: should contain:
-> +  * "ref" for the input reference clock
-> +  * "ipg" for the SoC RTC clock
-> +
-> +Example:
-> +
-> +rtc at 10007000 {
-> +	compatible = "fsl,imx21-rtc";
-> +	reg = <0x10007000 0x1000>;
-> +	interrupts = <22>;
-> +	clocks = <&clks IMX27_CLK_CKIL>,
-> +	       	 <&clks IMX27_CLK_RTC_IPG_GATE>;
-> +	clock-names = "ref", "ipg";
-> +};
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Robin.
