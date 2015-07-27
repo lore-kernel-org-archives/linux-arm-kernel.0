@@ -1,265 +1,79 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 27 Jul 2015 22:28:16 +0800
-Subject: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
- eTSEC2
-In-Reply-To: <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
-References: <20150713133138.GO23464@tiger>
- <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
-Message-ID: <20150727142816.GP12927@tiger>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 27 Jul 2015 16:31:42 +0200
+Subject: [PATCH 00/18] Clean up exposure of arch-internal code
+In-Reply-To: <20150727141654.GI7557@n2100.arm.linux.org.uk>
+References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+ <20150727140905.GA16858@ulmo.nvidia.com>
+ <20150727141654.GI7557@n2100.arm.linux.org.uk>
+Message-ID: <20150727143141.GA4774@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 14, 2015 at 06:46:17PM +0300, Claudiu Manoil wrote:
-> This patch adds generic dts nodes for eTSEC0, eTSEC1 and eTSEC2.
+On Mon, Jul 27, 2015 at 03:16:54PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jul 27, 2015 at 04:09:06PM +0200, Thierry Reding wrote:
+> > On Mon, Jul 27, 2015 at 01:28:24PM +0100, Russell King - ARM Linux wrote:
+> > > This series of patches attempts to clean up the use of architecture
+> > > internal functions in drivers, and removes some functions from view
+> > > in the asm/ headers.  I'm also considering whether we need to add
+> > > some linker magic to hide symbols when building the built-in.o files.
+> > > 
+> > > This was triggered by 3rd party drivers "going under the covers" of
+> > > the DMA API and calling the dmac_*() functions directly, a practice
+> > > which I have always refused to allow.  This also breaks module
+> > > building (which is the big hint that they're doing something wrong.)
+> > > 
+> > > However, it also came to light that various drivers are using
+> > > __cpuc_* functions directly, which are non-portable, and is another
+> > > instance of "going under the covers" and tinkering with what should
+> > > be kept as architecture implementation details.
+> > > 
+> > > This series addresses some of these points.  It:
+> > > 
+> > > (a) moves dmac_map_area() and dmac_unmap_area() prototypes out of
+> > >     asm/cacheflush.h and into arch/arm/mm.
+> > > (b) provide a secure_flush() call for the Qualcomm secure monitor
+> > >     code.
+> > > (c) stop tegra smmu driver(s) from using __cpuc_flush_dcache_area,
+> > >     something which necessitates additional complexity to deal with
+> > >     the ARM vs ARM64 differences.  It should be using the DMA API.
+> > >     However, the Tegra SMMU driver is in really bad shape, and this
+> > >     isn't a simple conversion - it requires a lot of additional
+> > >     fixes to bring the code up to scratch.
+> > 
+> > Out of curiosity, did you have any hardware to test this on?
 > 
-> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> Nope - it only got build-tested, and it's partly why there's soo many
+> incremental small patches.
 
-SoBs should be put together.
+All the more impressive. =)
 
+> > > It leaves the Rockchip IOMMU driver for the time being, but that is also
+> > > something which needs cleaning up in the same way as the Tegra SMMU
+> > > driver.
+> > 
+> > From a cursory look, MSM, OMAP and Exynos are in the same boat as well.
 > 
-> Enable support for the second interrupt group register block
-> and the corresponding Rx/Tx/Err interrupt sources, for each
-> eTSEC node.  DT binding documentation updates.
+> Yes.  There is a question here though:
 > 
-> Signed-off-by: Claudiu Manoil <claudiu.manoil@freescale.com>
+> Is it a good idea to use normal cacheable memory for the IOMMU page table
+> entries, or would DMA coherent memory be better?
 
-Please use "ARM: dts: ls1021a: ..." as subject prefix.
+Currently I think coherent memory would do just as well as cacheable
+memory, maybe even better given that we wouldn't need the cache
+maintenance. However, I think cacheable memory might come in handy if
+ever the ->map_sg() callback gets implemented, because it would allow us
+to batch up a bunch of PTE writes and flush whole pages in one go.
 
-> ---
-> v2:
->  - register block size is 0x1000 (4kB memory page), not 0x8000;
->  - reg property has 2 "address" and resp. 2 "size" cells;
->  - remove optional/ obsoleted properties;
->  - use register block address as queue-group id for consistency;
->  - binding documentation updates for missing vendor properties;
-> 
-> 
->  .../devicetree/bindings/net/fsl-tsec-phy.txt       |  6 +-
+Unfortunately I don't have the tools handy to provide any numbers, so
+the above is really just guesswork. Cc'ing Rob Clark who, I think, did
+performance measurements a while ago. Not sure if those included
+coherent vs. cacheable memory, though.
 
-Bindings doc should be a separate patch reviewed by device tree
-maintainers.
-
->  arch/arm/boot/dts/ls1021a-qds.dts                  | 20 +++++
->  arch/arm/boot/dts/ls1021a-twr.dts                  | 20 +++++
->  arch/arm/boot/dts/ls1021a.dtsi                     | 92 ++++++++++++++++++++++
-
-Please separate soc level dts changes from board level changes.
-
->  4 files changed, 137 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt b/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-> index 1e97532..b3291c7 100644
-> --- a/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-> +++ b/Documentation/devicetree/bindings/net/fsl-tsec-phy.txt
-> @@ -45,7 +45,7 @@ Properties:
->  
->    - device_type : Should be "network"
->    - model : Model of the device.  Can be "TSEC", "eTSEC", or "FEC"
-> -  - compatible : Should be "gianfar"
-> +  - compatible : "gianfar", "fsl-etsec2"
-
-You meant "fsl,etsec2", which is what I see from dts changes?
-
->    - reg : Offset and length of the register set for the device
->    - interrupts : For FEC devices, the first interrupt is the device's
->      interrupt.  For TSEC and eTSEC devices, the first interrupt is
-> @@ -57,6 +57,10 @@ Properties:
->      "rgmii-id", as all other connection types are detected by hardware.
->    - fsl,magic-packet : If present, indicates that the hardware supports
->      waking up via magic packet.
-> +  - fsl,wake-on-filer: Indicates that the device can wake up the system
-> +    by generating a filer interrupt. Depending on the wake-on-lan mode
-> +    set for this device, the filer interrupt can be triggered by certain
-> +    user-defined ethernet packets (usually ARP or L2 unicast packets).
->    - bd-stash : If present, indicates that the hardware supports stashing
->      buffer descriptors in the L2.
->    - rx-stash-len : Denotes the number of bytes of a received buffer to stash
-> diff --git a/arch/arm/boot/dts/ls1021a-qds.dts b/arch/arm/boot/dts/ls1021a-qds.dts
-> index 9c5e16b..f16a061 100644
-> --- a/arch/arm/boot/dts/ls1021a-qds.dts
-> +++ b/arch/arm/boot/dts/ls1021a-qds.dts
-> @@ -75,6 +75,26 @@
->  	};
->  };
->  
-> +&enet0 {
-> +	tbi-handle = <&tbi0>;
-
-tbi-handle is undocumented.
-
-> +	phy-handle = <&sgmii_phy1c>;
-> +	phy-connection-type = "sgmii";
-> +	status = "okay";
-> +};
-> +
-> +&enet1 {
-> +	tbi-handle = <&tbi0>;
-> +	phy-handle = <&sgmii_phy1d>;
-> +	phy-connection-type = "sgmii";
-> +	status = "okay";
-> +};
-> +
-> +&enet2 {
-> +	phy-handle = <&rgmii_phy3>;
-> +	phy-connection-type = "rgmii-id";
-> +	status = "okay";
-> +};
-> +
->  &i2c0 {
->  	status = "okay";
->  
-> diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-> index a2c591e..4b61766 100644
-> --- a/arch/arm/boot/dts/ls1021a-twr.dts
-> +++ b/arch/arm/boot/dts/ls1021a-twr.dts
-> @@ -73,6 +73,26 @@
->  	};
->  };
->  
-> +&enet0 {
-> +	tbi-handle = <&tbi1>;
-> +	phy-handle = <&sgmii_phy2>;
-> +	phy-connection-type = "sgmii";
-> +	status = "okay";
-> +};
-> +
-> +&enet1 {
-> +	tbi-handle = <&tbi1>;
-> +	phy-handle = <&sgmii_phy0>;
-> +	phy-connection-type = "sgmii";
-> +	status = "okay";
-> +};
-> +
-> +&enet2 {
-> +	phy-handle = <&rgmii_phy1>;
-> +	phy-connection-type = "rgmii-id";
-> +	status = "okay";
-> +};
-> +
->  &i2c0 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-> index c70bb27..cc48d56 100644
-> --- a/arch/arm/boot/dts/ls1021a.dtsi
-> +++ b/arch/arm/boot/dts/ls1021a.dtsi
-> @@ -59,6 +59,9 @@
->  		serial3 = &lpuart3;
->  		serial4 = &lpuart4;
->  		serial5 = &lpuart5;
-> +		ethernet0 = &enet0;
-> +		ethernet1 = &enet1;
-> +		ethernet2 = &enet2;
->  		sysclk = &sysclk;
->  	};
->  
-> @@ -391,6 +394,95 @@
->  			reg = <0x0 0x2d24000 0x0 0x4000>;
->  		};
->  
-> +		enet0: ethernet at 2d10000 {
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			fsl,magic-packet;
-> +			fsl,wake-on-filer;
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-
-What is this all zero local-mac-address used for?
-
-Shawn
-
-> +			ranges;
-> +
-> +			queue-group at 2d10000 {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d10000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 144 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 145 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			queue-group at 2d14000  {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d14000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +
-> +		enet1: ethernet at 2d50000 {
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-> +			ranges;
-> +
-> +			queue-group at 2d50000  {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d50000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			queue-group at 2d54000  {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d54000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 156 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +
-> +		enet2: ethernet at 2d90000 {
-> +			compatible = "fsl,etsec2";
-> +			device_type = "network";
-> +			#address-cells = <2>;
-> +			#size-cells = <2>;
-> +			interrupt-parent = <&gic>;
-> +			model = "eTSEC";
-> +			local-mac-address = [ 00 00 00 00 00 00 ];
-> +			ranges;
-> +
-> +			queue-group at 2d90000  {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d90000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 158 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 159 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +
-> +			queue-group at 2d94000  {
-> +				#address-cells = <2>;
-> +				#size-cells = <2>;
-> +				reg = <0x0 0x2d94000 0x0 0x1000>;
-> +				interrupts = <GIC_SPI 160 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>,
-> +					<GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
-> +			};
-> +		};
-> +
->  		usb at 8600000 {
->  			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
->  			reg = <0x0 0x8600000 0x0 0x1000>;
-> -- 
-> 1.7.11.7
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/3cbb9673/attachment.sig>
