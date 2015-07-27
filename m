@@ -1,47 +1,45 @@
 From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Mon, 27 Jul 2015 02:04:51 -0300
-Subject: [PATCH v4 0/2] Add support for NXP LPC18xx Watchdog timer
-Message-ID: <1437973493-26872-1-git-send-email-ariel@vanguardiasur.com.ar>
+Date: Mon, 27 Jul 2015 02:04:53 -0300
+Subject: [PATCH v4 2/2] DT: watchdog: Add NXP LPC18xx Watchdog Timer binding
+ documentation
+In-Reply-To: <1437973493-26872-1-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1437973493-26872-1-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <1437973493-26872-3-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for the watchdog timer found in NXP LPC
-SoCs family which includes LPC18xx/LPC43xx. Other SoCs in that family may
-share the same watchdog hardware.
+Add the devicetree binding document for NXP LPC18xx Watchdog Timer.
 
-Patchset is based on tag next-20150624 of the linux-next repository.
-It has been successfully tested on a Hitex LPC4350 Evaluation Board and
-on a CIAA NXP LPC4337 Board.
-
-Changes since v3:
-* Changed default timeout to 30.
-* Minor changes.
-
-Changes since v2:
-* Changed config tristate to "LPC18xx/43xx".
-* Added COMPILE_TEST as a dependency.
-* Replaced raw_local_irq* calls by spinlock.
-* Changed dt compatible string to "nxp,lpc1850-wwdt".
-
-Changes since v1:
-* Dropped "Windowed" term in Watchdog's name.
-* Changed default timeout value from 1 to 5 because it was too tight.
-* Fixed module remove function, since it was keeping the timer enabled. Warning
-  message was added.
-* Changed dt compatible string to "nxp,lpc1850-wdt".
-* Renamed clocks matching most of the other lpc18xx drivers.
-
-Ariel D'Alessandro (2):
-  watchdog: NXP LPC18xx Watchdog Timer Driver
-  DT: watchdog: Add NXP LPC18xx Watchdog Timer binding documentation
-
- .../devicetree/bindings/watchdog/lpc18xx-wdt.txt   |  19 ++
- drivers/watchdog/Kconfig                           |  11 +
- drivers/watchdog/Makefile                          |   1 +
- drivers/watchdog/lpc18xx_wdt.c                     | 342 +++++++++++++++++++++
- 4 files changed, 373 insertions(+)
+Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+---
+ .../devicetree/bindings/watchdog/lpc18xx-wdt.txt      | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
- create mode 100644 drivers/watchdog/lpc18xx_wdt.c
 
+diff --git a/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt b/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
+new file mode 100644
+index 0000000..09f6b24
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
+@@ -0,0 +1,19 @@
++* NXP LPC18xx Watchdog Timer (WDT)
++
++Required properties:
++- compatible: Should be "nxp,lpc1850-wwdt"
++- reg: Should contain WDT registers location and length
++- clocks: Must contain an entry for each entry in clock-names.
++- clock-names: Should contain "wdtclk" and "reg"; the watchdog counter
++               clock and register interface clock respectively.
++- interrupts: Should contain WDT interrupt
++
++Examples:
++
++watchdog at 40080000 {
++	compatible = "nxp,lpc1850-wwdt";
++	reg = <0x40080000 0x24>;
++	clocks = <&cgu BASE_SAFE_CLK>, <&ccu1 CLK_CPU_WWDT>;
++	clock-names = "wdtclk", "reg";
++	interrupts = <49>;
++};
 -- 
 1.9.1
