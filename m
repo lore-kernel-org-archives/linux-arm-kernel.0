@@ -1,54 +1,66 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jul 2015 13:28:24 +0100
-Subject: [PATCH 00/18] Clean up exposure of arch-internal code
-Message-ID: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 27 Jul 2015 13:28:55 +0100
+Subject: [PATCH 02/18] firmware: qcom_scm-32: replace open-coded call to
+ __cpuc_flush_dcache_area()
+In-Reply-To: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+Message-ID: <E1ZJhWZ-00043Z-Ft@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series of patches attempts to clean up the use of architecture
-internal functions in drivers, and removes some functions from view
-in the asm/ headers.  I'm also considering whether we need to add
-some linker magic to hide symbols when building the built-in.o files.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/include/asm/cacheflush.h | 17 +++++++++++++++++
+ drivers/firmware/qcom_scm-32.c    |  4 +---
+ 2 files changed, 18 insertions(+), 3 deletions(-)
 
-This was triggered by 3rd party drivers "going under the covers" of
-the DMA API and calling the dmac_*() functions directly, a practice
-which I have always refused to allow.  This also breaks module
-building (which is the big hint that they're doing something wrong.)
-
-However, it also came to light that various drivers are using
-__cpuc_* functions directly, which are non-portable, and is another
-instance of "going under the covers" and tinkering with what should
-be kept as architecture implementation details.
-
-This series addresses some of these points.  It:
-
-(a) moves dmac_map_area() and dmac_unmap_area() prototypes out of
-    asm/cacheflush.h and into arch/arm/mm.
-(b) provide a secure_flush() call for the Qualcomm secure monitor
-    code.
-(c) stop tegra smmu driver(s) from using __cpuc_flush_dcache_area,
-    something which necessitates additional complexity to deal with
-    the ARM vs ARM64 differences.  It should be using the DMA API.
-    However, the Tegra SMMU driver is in really bad shape, and this
-    isn't a simple conversion - it requires a lot of additional
-    fixes to bring the code up to scratch.
-
-It leaves the Rockchip IOMMU driver for the time being, but that is also
-something which needs cleaning up in the same way as the Tegra SMMU
-driver.
-
- arch/arm/include/asm/cacheflush.h |  21 ++-
- arch/arm/include/asm/glue-cache.h |   2 -
- arch/arm/mm/dma-mapping.c         |   1 +
- arch/arm/mm/dma.h                 |  32 ++++
- drivers/firmware/qcom_scm-32.c    |   4 +-
- drivers/iommu/tegra-smmu.c        | 297 ++++++++++++++++++++++++--------------
- drivers/memory/tegra/tegra114.c   |  17 ---
- drivers/memory/tegra/tegra124.c   |  30 ----
- drivers/memory/tegra/tegra30.c    |  17 ---
- include/soc/tegra/mc.h            |   7 -
- 10 files changed, 242 insertions(+), 186 deletions(-)
-
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index c5230a44eeca..d5525bfc7e3e 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -502,4 +502,21 @@ static inline void set_kernel_text_ro(void) { }
+ void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
+ 			     void *kaddr, unsigned long len);
+ 
++/**
++ * secure_flush_area - ensure coherency across the secure boundary
++ * @addr: virtual address
++ * @size: size of region
++ *
++ * Ensure that the specified area of memory is coherent across the secure
++ * boundary from the non-secure side.  This is used when calling secure
++ * firmware where the secure firmware does not ensure coherency.
++ */
++static inline void secure_flush_area(const void *addr, size_t size)
++{
++	phys_addr_t phys = __pa(addr);
++
++	__cpuc_flush_dcache_area((void *)addr, size);
++	outer_flush_range(phys, phys + size);
++}
++
+ #endif
+diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
+index 1bd6f9c34331..29e6850665eb 100644
+--- a/drivers/firmware/qcom_scm-32.c
++++ b/drivers/firmware/qcom_scm-32.c
+@@ -24,7 +24,6 @@
+ #include <linux/err.h>
+ #include <linux/qcom_scm.h>
+ 
+-#include <asm/outercache.h>
+ #include <asm/cacheflush.h>
+ 
+ #include "qcom_scm.h"
+@@ -219,8 +218,7 @@ static int __qcom_scm_call(const struct qcom_scm_command *cmd)
+ 	 * Flush the command buffer so that the secure world sees
+ 	 * the correct data.
+ 	 */
+-	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
+-	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
++	secure_flush_area(cmd, cmd->len);
+ 
+ 	ret = smc(cmd_addr);
+ 	if (ret < 0)
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
