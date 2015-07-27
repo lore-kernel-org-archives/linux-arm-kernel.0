@@ -1,81 +1,38 @@
 From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 27 Jul 2015 15:06:51 +0200
-Subject: [PATCH V3 net-next 3/3] ARM: net: add support for BPF_ANC |
- SKF_AD_HATYPE in ARM JIT.
-In-Reply-To: <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
+Date: Mon, 27 Jul 2015 15:06:48 +0200
+Subject: [PATCH V3 net-next 0/3] ARM BPF JIT features
+In-Reply-To: <20150724.223155.121697079062172205.davem@davemloft.net>
 References: <20150724.223155.121697079062172205.davem@davemloft.net>
- <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1438002411-8709-4-git-send-email-nschichan@freebox.fr>
+Message-ID: <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 22 ++++++++++++++++++++--
- arch/arm/net/bpf_jit_32.h |  3 +++
- 2 files changed, 23 insertions(+), 2 deletions(-)
+Hello,
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 3c73caf..876060b 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -857,7 +857,9 @@ b_epilogue:
- 			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
- 			break;
- 		case BPF_ANC | SKF_AD_IFINDEX:
-+		case BPF_ANC | SKF_AD_HATYPE:
- 			/* A = skb->dev->ifindex */
-+			/* A = skb->dev->type */
- 			ctx->seen |= SEEN_SKB;
- 			off = offsetof(struct sk_buff, dev);
- 			emit(ARM_LDR_I(r_scratch, r_skb, off), ctx);
-@@ -867,8 +869,24 @@ b_epilogue:
- 
- 			BUILD_BUG_ON(FIELD_SIZEOF(struct net_device,
- 						  ifindex) != 4);
--			off = offsetof(struct net_device, ifindex);
--			emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
-+			BUILD_BUG_ON(FIELD_SIZEOF(struct net_device,
-+						  type) != 2);
-+
-+			if (code == (BPF_ANC | SKF_AD_IFINDEX)) {
-+				off = offsetof(struct net_device, ifindex);
-+				emit(ARM_LDR_I(r_A, r_scratch, off), ctx);
-+			} else {
-+				/*
-+				 * offset of field "type" in "struct
-+				 * net_device" is above what can be
-+				 * used in the ldrh rd, [rn, #imm]
-+				 * instruction, so load the offset in
-+				 * a register and use ldrh rd, [rn, rm]
-+				 */
-+				off = offsetof(struct net_device, type);
-+				emit_mov_i(ARM_R3, off, ctx);
-+				emit(ARM_LDRH_R(r_A, r_scratch, ARM_R3), ctx);
-+			}
- 			break;
- 		case BPF_ANC | SKF_AD_MARK:
- 			ctx->seen |= SEEN_SKB;
-diff --git a/arch/arm/net/bpf_jit_32.h b/arch/arm/net/bpf_jit_32.h
-index b2d7d92..4b17d5ab 100644
---- a/arch/arm/net/bpf_jit_32.h
-+++ b/arch/arm/net/bpf_jit_32.h
-@@ -74,6 +74,7 @@
- #define ARM_INST_LDRB_I		0x05d00000
- #define ARM_INST_LDRB_R		0x07d00000
- #define ARM_INST_LDRH_I		0x01d000b0
-+#define ARM_INST_LDRH_R		0x019000b0
- #define ARM_INST_LDR_I		0x05900000
- 
- #define ARM_INST_LDM		0x08900000
-@@ -160,6 +161,8 @@
- 				 | (rm))
- #define ARM_LDRH_I(rt, rn, off)	(ARM_INST_LDRH_I | (rt) << 12 | (rn) << 16 \
- 				 | (((off) & 0xf0) << 4) | ((off) & 0xf))
-+#define ARM_LDRH_R(rt, rn, rm)	(ARM_INST_LDRH_R | (rt) << 12 | (rn) << 16 \
-+				 | (rm))
- 
- #define ARM_LDM(rn, regs)	(ARM_INST_LDM | (rn) << 16 | (regs))
- 
+This series adds support for more instructions to the ARM BPF JIT
+namely skb netdevice type retrieval, skb payload offset retrieval, and
+skb packet type retrieval.
+
+This allows 35 tests to use the JIT instead of 29 before.
+
+This series depends on the "BPF JIT fixes for ARM" serie sent earlier.
+
+Regards,
+
+Changes from V1 to V2:
+* split fixes and features in separate patch series.
+
+Changes from V2 to V3:
+* respin against latest net-next.
+
+Nicolas Schichan (3):
+  ARM: net: add support for BPF_ANC | SKF_AD_PKTTYPE in ARM JIT.
+  ARM: net: add support for BPF_ANC | SKF_AD_PAY_OFFSET in ARM JIT.
+  ARM: net: add support for BPF_ANC | SKF_AD_HATYPE in ARM JIT.
+
+ arch/arm/net/bpf_jit_32.c | 41 +++++++++++++++++++++++++++++++++++++++--
+ arch/arm/net/bpf_jit_32.h |  3 +++
+ 2 files changed, 42 insertions(+), 2 deletions(-)
+
 -- 
 1.9.1
