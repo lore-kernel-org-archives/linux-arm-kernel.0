@@ -1,117 +1,59 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 27 Jul 2015 11:42:12 -0700
-Subject: [PATCH] irq-bcm2836: Move SMP boot to the irqchip code.
-In-Reply-To: <alpine.DEB.2.11.1507261150500.18576@nanos>
-References: <alpine.DEB.2.11.1507261150500.18576@nanos>
-Message-ID: <1438022532-14576-1-git-send-email-eric@anholt.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Jul 2015 20:35:06 +0200
+Subject: [PATCH v4 3/4] arm64: Add Broadcom iProc family support
+In-Reply-To: <55B25CF7.4070403@broadcom.com>
+References: <1437528583-855-1-git-send-email-rjui@broadcom.com>
+ <1437528583-855-4-git-send-email-rjui@broadcom.com>
+ <20150724085103.GA30410@arm.com> <55B25CF7.4070403@broadcom.com>
+Message-ID: <CAOesGMgM1_F3JRKmS3mYJJZUYUTHYLbYjCD1oOh0PNREMa3FKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
+On Fri, Jul 24, 2015 at 5:42 PM, Ray Jui <rjui@broadcom.com> wrote:
+> Hi Will,
+>
+> On 7/24/2015 1:51 AM, Will Deacon wrote:
+>> (adding Olof)
+>>
+>> On Wed, Jul 22, 2015 at 02:29:42AM +0100, Ray Jui wrote:
+>>> This patch adds support to Broadcom's iProc family of arm64 based SoCs
+>>> in the arm64 Kconfig and defconfig files
+>>>
+>>> Signed-off-by: Ray Jui <rjui@broadcom.com>
+>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+>>> ---
+>>>  arch/arm64/Kconfig           |    5 +++++
+>>>  arch/arm64/configs/defconfig |    2 ++
+>>>  2 files changed, 7 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 318175f..969ef4a 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -162,6 +162,11 @@ source "kernel/Kconfig.freezer"
+>>>
+>>>  menu "Platform selection"
+>>>
+>>> +config ARCH_BCM_IPROC
+>>> +    bool "Broadcom iProc SoC Family"
+>>> +    help
+>>> +      This enables support for Broadcom iProc based SoCs
+>>> +
+>>
+>> The arm-soc guys have a patch moving the platform-related config options
+>> out into Kconfig.platforms, so I think you need to co-ordinate with them.
+>>
+>
+> Thanks for letting me know. I see that those patches are already merged
+> into for-next under arm-soc. I guess I should generate a new patch
+> series based on for-next and move this config option to Kconfig.platform?
+>
+> Olof, any comment?
 
-Thomas: The problem with delaying IPI unmasking until secondary boot
-is that it means we need the secondary boot process to integrate with
-the irqchip code, which seems unusual given the dearth of includes I
-could find between arch/arm/mach-* SMP boot code and drivers/irqchip/
-to get function prototypes.  However, since the irqchip is most of
-this register space already, it might make sense to just have the SMP
-boot live in drivers/irqchip/.  Here's a patch that would do that,
-that could be squashed into my change.
+Yeah, please do that and send that series with arm at kernel.org on cc,
+we'll apply it from there!
 
- drivers/irqchip/irq-bcm2836.c | 57 +++++++++++++++++++++++++++++++++++++------
- 1 file changed, 50 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-index 87340b0..5f2a40e 100644
---- a/drivers/irqchip/irq-bcm2836.c
-+++ b/drivers/irqchip/irq-bcm2836.c
-@@ -49,14 +49,16 @@
- /* Same status bits as above, but for FIQ. */
- #define LOCAL_FIQ_PENDING0		0x070
- /*
-- * Mailbox0 write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
-+ * Mailbox write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
-  * these bits are organized by mailbox number and then CPU number.  We
-  * use mailbox 0 for IPIs.  The mailbox's interrupt is raised while
-  * any bit is set.
-  */
- #define LOCAL_MAILBOX0_SET0		0x080
-+#define LOCAL_MAILBOX3_SET0		0x08c
- /* Mailbox0 write-to-clear bits. */
- #define LOCAL_MAILBOX0_CLR0		0x0c0
-+#define LOCAL_MAILBOX3_CLR0		0x0cc
- 
- #define LOCAL_IRQ_CNTPSIRQ	0
- #define LOCAL_IRQ_CNTPNSIRQ	1
-@@ -195,6 +197,46 @@ static void bcm2836_arm_irqchip_send_ipi(const struct cpumask *mask,
- 		writel(1 << ipi, mailbox0_base + 16 * cpu);
- 	}
- }
-+
-+/* Requests boot of a secondary CPU.
-+ *
-+ * The Raspberry Pi firmware has already started up the CPU and set it
-+ * spinning in a loop in low memory waiting for a value in mailbox 3
-+ * indicating what OS code it should jump to.
-+ */
-+int __init bcm2836_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	int timeout = 20;
-+	void __iomem *mailbox3_set_base = intc.base + LOCAL_MAILBOX3_SET0;
-+	void __iomem *mailbox3_clr_base = intc.base + LOCAL_MAILBOX3_CLR0;
-+	unsigned long secondary_startup_phys =
-+		(unsigned long) virt_to_phys((void *)secondary_startup);
-+
-+	/* Unmask IPIs to the target cpu. */
-+	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
-+					       cpu);
-+
-+	dsb();
-+
-+	writel(secondary_startup_phys, mailbox3_set_base + 16 * cpu);
-+
-+	while (true) {
-+		int val = readl(mailbox3_clr_base + 16 * cpu);
-+
-+		if (val == 0)
-+			return 0;
-+		if (timeout-- == 0)
-+			return -ETIMEDOUT;
-+		cpu_relax();
-+	}
-+
-+	return 0;
-+}
-+
-+static struct smp_operations bcm2836_smp_ops __initdata = {
-+	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
-+};
-+
- #endif
- 
- static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
-@@ -205,14 +247,15 @@ static void
- bcm2836_arm_irqchip_smp_init(void)
- {
- #ifdef CONFIG_SMP
--	int i;
-+	/* Unmask IPIs to the boot CPU. Other CPUs will be unmasked as
-+	 * they're brought up.
-+	 */
-+	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
-+					       smp_processor_id());
- 
--	/* unmask IPIs */
--	for_each_possible_cpu(i) {
--		bcm2836_arm_irqchip_unmask_per_cpu_irq(
--			LOCAL_MAILBOX_INT_CONTROL0, 0, i);
--	}
- 	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
-+
-+	smp_set_ops(&bcm2836_smp_ops);
- #endif
- }
- 
--- 
-2.1.4
+Thanks,
+
+-Olof
