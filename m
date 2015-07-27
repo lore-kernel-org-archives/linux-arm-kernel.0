@@ -1,31 +1,24 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 27 Jul 2015 18:50:38 +0200
-Subject: [PATCH V2 11/11] cpufreq-dt: Add support for operating-points-v2
- bindings
-In-Reply-To: <1fb2b7a67ac2a7fb6390401eef529bd14eec8f43.1437972635.git.viresh.kumar@linaro.org>
-References: <cover.1437972635.git.viresh.kumar@linaro.org>
- <1fb2b7a67ac2a7fb6390401eef529bd14eec8f43.1437972635.git.viresh.kumar@linaro.org>
-Message-ID: <2884444.cGlkETteRY@amdc1976>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jul 2015 17:57:50 +0100
+Subject: [PATCH v4 7/7] x86/kasan: switch to generic
+ kasan_populate_zero_shadow()
+In-Reply-To: <1437756119-12817-8-git-send-email-a.ryabinin@samsung.com>
+References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
+ <1437756119-12817-8-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150727165749.GD350@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-On Monday, July 27, 2015 10:32:41 AM Viresh Kumar wrote:
-> Support for parsing operating-points-v2 bindings is in place now, lets
-> modify cpufreq-dt driver to use them.
+On Fri, Jul 24, 2015 at 07:41:59PM +0300, Andrey Ryabinin wrote:
+> Now when we have generic kasan_populate_zero_shadow() we could
+> use it for x86.
 > 
-> For backward compatibility we will continue to support earlier bindings.
-> Special handling for that is required, to make sure OPPs are initialized
-> for all the CPUs.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Andrey Ryabinin <a.ryabinin@samsung.com>
 
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+In the interest of facilitating the upstreaming of these patches (when
+ready ;), can you merge this patch with 2/7? The second patch is already
+touching x86, so just call it something like "x86/kasan: Generalise
+kasan shadow mapping initialisation".
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+-- 
+Catalin
