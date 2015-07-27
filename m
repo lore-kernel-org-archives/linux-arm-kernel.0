@@ -1,133 +1,47 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 10:32:41 +0530
-Subject: [PATCH V2 11/11] cpufreq-dt: Add support for operating-points-v2
- bindings
-In-Reply-To: <cover.1437972635.git.viresh.kumar@linaro.org>
-References: <cover.1437972635.git.viresh.kumar@linaro.org>
-Message-ID: <1fb2b7a67ac2a7fb6390401eef529bd14eec8f43.1437972635.git.viresh.kumar@linaro.org>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 27 Jul 2015 02:04:51 -0300
+Subject: [PATCH v4 0/2] Add support for NXP LPC18xx Watchdog timer
+Message-ID: <1437973493-26872-1-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for parsing operating-points-v2 bindings is in place now, lets
-modify cpufreq-dt driver to use them.
+This patch series adds support for the watchdog timer found in NXP LPC
+SoCs family which includes LPC18xx/LPC43xx. Other SoCs in that family may
+share the same watchdog hardware.
 
-For backward compatibility we will continue to support earlier bindings.
-Special handling for that is required, to make sure OPPs are initialized
-for all the CPUs.
+Patchset is based on tag next-20150624 of the linux-next repository.
+It has been successfully tested on a Hitex LPC4350 Evaluation Board and
+on a CIAA NXP LPC4337 Board.
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq-dt.c | 56 ++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 46 insertions(+), 10 deletions(-)
+Changes since v3:
+* Changed default timeout to 30.
+* Minor changes.
 
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index 528a82bf5038..c6e7033076de 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -184,7 +184,6 @@ static int allocate_resources(int cpu, struct device **cdev,
- 
- static int cpufreq_init(struct cpufreq_policy *policy)
- {
--	struct cpufreq_dt_platform_data *pd;
- 	struct cpufreq_frequency_table *freq_table;
- 	struct device_node *np;
- 	struct private_data *priv;
-@@ -193,6 +192,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 	struct clk *cpu_clk;
- 	unsigned long min_uV = ~0, max_uV = 0;
- 	unsigned int transition_latency;
-+	bool need_update = false;
- 	int ret;
- 
- 	ret = allocate_resources(policy->cpu, &cpu_dev, &cpu_reg, &cpu_clk);
-@@ -208,8 +208,47 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 		goto out_put_reg_clk;
- 	}
- 
--	/* OPPs might be populated at runtime, don't check for error here */
--	of_init_opp_table(cpu_dev);
-+	/* Get OPP-sharing information from "operating-points-v2" bindings */
-+	ret = of_get_cpus_sharing_opps(cpu_dev, policy->cpus);
-+	if (ret) {
-+		/*
-+		 * operating-points-v2 not supported, fallback to old method of
-+		 * finding shared-OPPs for backward compatibility.
-+		 */
-+		if (ret == -ENOENT)
-+			need_update = true;
-+		else
-+			goto out_node_put;
-+	}
-+
-+	/*
-+	 * Initialize OPP tables for all policy->cpus. They will be shared by
-+	 * all CPUs which have marked their CPUs shared with OPP bindings.
-+	 *
-+	 * For platforms not using operating-points-v2 bindings, we do this
-+	 * before updating policy->cpus. Otherwise, we will end up creating
-+	 * duplicate OPPs for policy->cpus.
-+	 *
-+	 * OPPs might be populated at runtime, don't check for error here
-+	 */
-+	of_cpumask_init_opp_table(policy->cpus);
-+
-+	if (need_update) {
-+		struct cpufreq_dt_platform_data *pd = cpufreq_get_driver_data();
-+
-+		if (!pd || !pd->independent_clocks)
-+			cpumask_setall(policy->cpus);
-+
-+		/*
-+		 * OPP tables are initialized only for policy->cpu, do it for
-+		 * others as well.
-+		 */
-+		set_cpus_sharing_opps(cpu_dev, policy->cpus);
-+
-+		of_property_read_u32(np, "clock-latency", &transition_latency);
-+	} else {
-+		transition_latency = dev_pm_opp_get_max_clock_latency(cpu_dev);
-+	}
- 
- 	/*
- 	 * But we need OPP table to function so if it is not there let's
-@@ -230,7 +269,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 
- 	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
- 
--	if (of_property_read_u32(np, "clock-latency", &transition_latency))
-+	if (!transition_latency)
- 		transition_latency = CPUFREQ_ETERNAL;
- 
- 	if (!IS_ERR(cpu_reg)) {
-@@ -293,10 +332,6 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 
- 	policy->cpuinfo.transition_latency = transition_latency;
- 
--	pd = cpufreq_get_driver_data();
--	if (!pd || !pd->independent_clocks)
--		cpumask_setall(policy->cpus);
--
- 	of_node_put(np);
- 
- 	return 0;
-@@ -306,7 +341,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- out_free_priv:
- 	kfree(priv);
- out_free_opp:
--	of_free_opp_table(cpu_dev);
-+	of_cpumask_free_opp_table(policy->cpus);
-+out_node_put:
- 	of_node_put(np);
- out_put_reg_clk:
- 	clk_put(cpu_clk);
-@@ -322,7 +358,7 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
- 
- 	cpufreq_cooling_unregister(priv->cdev);
- 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
--	of_free_opp_table(priv->cpu_dev);
-+	of_cpumask_free_opp_table(policy->related_cpus);
- 	clk_put(policy->clk);
- 	if (!IS_ERR(priv->cpu_reg))
- 		regulator_put(priv->cpu_reg);
+Changes since v2:
+* Changed config tristate to "LPC18xx/43xx".
+* Added COMPILE_TEST as a dependency.
+* Replaced raw_local_irq* calls by spinlock.
+* Changed dt compatible string to "nxp,lpc1850-wwdt".
+
+Changes since v1:
+* Dropped "Windowed" term in Watchdog's name.
+* Changed default timeout value from 1 to 5 because it was too tight.
+* Fixed module remove function, since it was keeping the timer enabled. Warning
+  message was added.
+* Changed dt compatible string to "nxp,lpc1850-wdt".
+* Renamed clocks matching most of the other lpc18xx drivers.
+
+Ariel D'Alessandro (2):
+  watchdog: NXP LPC18xx Watchdog Timer Driver
+  DT: watchdog: Add NXP LPC18xx Watchdog Timer binding documentation
+
+ .../devicetree/bindings/watchdog/lpc18xx-wdt.txt   |  19 ++
+ drivers/watchdog/Kconfig                           |  11 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/lpc18xx_wdt.c                     | 342 +++++++++++++++++++++
+ 4 files changed, 373 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/lpc18xx-wdt.txt
+ create mode 100644 drivers/watchdog/lpc18xx_wdt.c
+
 -- 
-2.4.0
+1.9.1
