@@ -1,186 +1,145 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 27 Jul 2015 20:43:01 +0300
-Subject: [PATCH] driver core: correct device's shutdown order
-Message-ID: <1438018981-13893-1-git-send-email-grygorii.strashko@ti.com>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 27 Jul 2015 19:43:32 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <CAOMqctTsA5ZxBWFTzirqhQBoR2sO6B+uMFXWMHuSVb_EygCDvw@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507241034.15406.marex@denx.de>
+ <CAOMqctTsA5ZxBWFTzirqhQBoR2sO6B+uMFXWMHuSVb_EygCDvw@mail.gmail.com>
+Message-ID: <201507271943.32453.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now device's shutdown sequence is performed in reverse order of their
-registration in devices_kset list and this sequence corresponds to the
-reverse device's creation order. So, devices_kset data tracks
-"parent<-child" device's dependencies only.
+On Monday, July 27, 2015 at 11:46:25 AM, Michal Suchanek wrote:
+> On 24 July 2015 at 10:34, Marek Vasut <marex@denx.de> wrote:
+> > On Thursday, July 23, 2015 at 07:03:47 PM, Michal Suchanek wrote:
+> > 
+> > Hi!
+> > 
+> > [...]
+> > 
+> >> >>> It's probably slower to set up DMA for 2-byte commands but it might
+> >> >>> work nonetheless.
+> >> >> 
+> >> >> It is, the overhead will be considerable. It might help the stability
+> >> >> though. I'm really looking forward to the results!
+> >> > 
+> >> > Hello,
+> >> > 
+> >> > this does not quite work.
+> >> > 
+> >> > My test with spidev:
+> >> > 
+> >> > # ./spinor /dev/spidev1.0
+> >> > Sending 9f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> >> > Received 00 ff c8 60 16 c8 60 16 c8 60 16 c8 60 16 c8 60
+> >> > Sending 90 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> >> > Received 00 ff ff ff ff c8 15 c8 15 c8 15 c8 15 c8 15 c8
+> >> > Sending 9f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+> >> > Received 00 ff c8 60 16 c8 60 16 c8 60 16 c8 60 16 c8 60
+> >> > 
+> >> > I receive correct ID but spi-nor complains it does not know ID 00 c8
+> >> > 60. IIRC garbage should be sent only at the time command is
+> >> > transferred so only one byte of garbage should be received. Also the
+> >> > garbage tends to be the last state of the data output - all 0 or all
+> >> > 1.
+> >> > So it seems using DMA for all transfers including 1-byte commands
+> >> > results in (some?) received data getting an extra 00 prefix.
+> >> > 
+> >> > 
+> >> > I also managed to lock up the controller completely since there is
+> >> > some error passing the SPI speed somewhere :(
+> >> > 
+> >> > [ 1352.977530] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max
+> >> > --> 0 [ 1352.977540] spidev spi1.0: spi mode 0
+> >> > [ 1352.977576] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max
+> >> > --> 0 [ 1352.977582] spidev spi1.0: msb first
+> >> > [ 1352.977614] spidev spi1.0: setup mode 0, 8 bits/w, 80000000 Hz max
+> >> > --> 0 [ 1352.977620] spidev spi1.0: 0 bits per word
+> >> > [ 1352.977652] spidev spi1.0: setup mode 0, 8 bits/w, 2690588672 Hz
+> >> > max --> 0 [ 1352.977726] spi_master spi1: s3c64xx_spi_config:
+> >> > clk_from_cmu 1 src_clk sclk_spi1 mode bpw 8
+> >> > [ 1352.977753] spi_master spi1: spi1.0 s3c64xx_spi_transfer_one: xfer
+> >> > bpw 8 speed -1604378624
+> >> > [ 1352.977760] spi_master spi1: s3c64xx_spi_config: clk_from_cmu 1
+> >> > src_clk sclk_spi1 mode bpw 8
+> >> > [ 1352.977781] spi_master spi1: spi1.0 s3c64xx_spi_transfer_one: using
+> >> > dma [ 1352.977797] dma-pl330 121b0000.pdma: setting up request on
+> >> > thread 1
+> >> 
+> >> Hmm, on a second thought it probably works as expected more or less.
+> >> 
+> >> The nonsensical value was passed from application and there is no
+> >> guard against that.
+> >> 
+> >> Since I don't do PIO the controller remains locked up indefinitely.
+> > 
+> > I have to admit, I don't quite understand the above. I also don't quite
+> > know what your spidev test does. Can you possibly just bind a regular
+> > SPI NOR driver and run mtdtests to see if it is stable ?
+> 
+> Ok, so here is some summary.
+> 
+> I have a NOR flash attached to a s3c64xx SPI controller with 64byte
+> fifo and a pl330 dma controller.
+> 
+> Normally DMA controller is used for transfers that do not fit into the
+> FIFO.
+> 
+> I tried adding the flash memory ID to the spi-nor driver table and
+> adding a DT node for it.
+> 
+> The flash is rated at 120MHz so I used that speed but the ID was
+> bit-shifted and identification failed. There is DT property
+> samsung,spi-feedback-delay for addressing this and at 120MHz it must
+> be 2 or 3 on this board. 40MHz works with default value 0.
+> 
+> The next step after identification worked was to try reading the flash
+> content. For this the DMA controller is used because data is
+> transferred in blocks larger than 64 bytes. When reading the whole 4MB
+> flash the transfer failed silently. I got a 4MB file of all ones or
+> all zeroes.
+> 
+> It turns out that
+> 
+>  - the pl330 locks up when transfering large amount of data.
+> Specifically, the maximum power of 2 sized transfer at 120MHz is 128
+> bytes and 64k at 40MHz. Transferring more than this results in the
+> pl330 locking up and never signalling completion of the transfer.
 
-Unfortunately, that's not enough and causes problems in case of
-implementing board's specific shutdown procedures. For example [1]:
-"DRA7XX_evm uses PCF8575 and one of the PCF output lines feeds to
-MMC/SD and this line should be driven high in order for the MMC/SD to
-be detected. This line is modelled as regulator and the hsmmc driver
-takes care of enabling and disabling it. In the case of 'reboot',
-during shutdown path as part of it's cleanup process the hsmmc driver
-disables this regulator. This makes MMC boot not functional."
+Hypothesis:
+I think this might just be that the controller didn't catch all the
+inbound clock ticks and thus counted less inbound data than it was
+set up to receive. The controller thus waits for more data.
 
-To handle this issue the .shutdown() callback could be implemented
-for PCF8575 device where corresponding GPIO pins will be configured to
-states, required for correct warm/cold reset. This can be achieved
-only when all .shutdown() callbacks have been called already for all
-PCF8575's consumers. But devices_kset is not filled correctly now:
+> Data
+> is left in FIFO which causes subsequent commands to fail since garbage
+> is returned instead of command reply. Also subsequent read may cause
+> I/O error or or return an empty page depending on the garbage around.
 
-devices_kset: Device61 4e000000.dmm
-devices_kset: Device62 48070000.i2c
-devices_kset: Device63 48072000.i2c
-devices_kset: Device64 48060000.i2c
-devices_kset: Device65 4809c000.mmc
-...
-devices_kset: Device102 fixedregulator-sd
-...
-devices_kset: Device181 0-0020 // PCF8575
-devices_kset: Device182 gpiochip496
-devices_kset: Device183 0-0021 // PCF8575
-devices_kset: Device184 gpiochip480
+So the driver for the DMA controller might need to be augmented to handle
+this case -- add a timeout and in case DMA times out, drain the FIFO to
+make sure subsequent transfers do not fail.
 
-As can be seen from above .shutdown() callback for PCF8575 will be called
-before its consumers, which, in turn means, that any changes of PCF8575
-GPIO's pins will be or unsafe or overwritten later by GPIO's consumers.
-The problem can be solved if devices_kset list will be filled not only
-according device creation order, but also according device's probing
-order to track "supplier<-consumer" dependencies also.
+> - the I/O errors are not checked in spi-nor at all which leads to
+> silent data corruption.
+> 
+> On a suggestion that this may improve reliability I changed the
+> s3c64xx driver to use DMA for all transfers. This caused
+> identification to fail in spin-nor because the ID was prefixed with
+> extra 00  byte. Testing with spidev confirmed that everything is
+> prefixed with extra 00.
 
-Hence, as a fix, lets add devices_kset_move_last(),
-devices_kset_move_before(), devices_kset_move_after() and call them
-from device_move() and also add call of devices_kset_move_last() in
-really_probe(). After this change all entries in devices_kset will
-be sorted according to device's creation ("parent<-child") and
-probing ("supplier<-consumer") order.
+The determinism of this is in fact excellent news.
 
-devices_kset after:
-devices_kset: Device121 48070000.i2c
-devices_kset: Device122 i2c-0
-...
-devices_kset: Device147 regulator.24
-devices_kset: Device148 0-0020
-devices_kset: Device149 gpiochip496
-devices_kset: Device150 0-0021
-devices_kset: Device151 gpiochip480
-devices_kset: Device152 0-0019
-...
-devices_kset: Device372 fixedregulator-sd
-devices_kset: Device373 regulator.29
-devices_kset: Device374 4809c000.mmc
-devices_kset: Device375 mmc0
+> Also when the DMA controller locked up no
+> transfers were possible anymore. When DMA was not used for sending
+> commands the controller would recover on next command. I made the
+> option to always use DMA configurable and it turns out that the
+> returned data is prefixed with 00 only when no transfer without DMA
+> was ever made. Loading the spi-nor driver with the dma-only option off
+> and then with dma-only option on results in correct operation. Only
+> loading the dma-only driver first causes the 00 prefix.
 
-[1] http://www.spinics.net/lists/linux-mmc/msg29825.html
-
-Cc: Sekhar Nori <nsekhar@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/base/base.h |  1 +
- drivers/base/core.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++++
- drivers/base/dd.c   |  8 ++++++++
- 3 files changed, 58 insertions(+)
-
-diff --git a/drivers/base/base.h b/drivers/base/base.h
-index fd3347d..8c5eb73 100644
---- a/drivers/base/base.h
-+++ b/drivers/base/base.h
-@@ -134,6 +134,7 @@ extern int devres_release_all(struct device *dev);
- 
- /* /sys/devices directory */
- extern struct kset *devices_kset;
-+extern void devices_kset_move_last(struct device *dev);
- 
- #if defined(CONFIG_MODULES) && defined(CONFIG_SYSFS)
- extern void module_add_driver(struct module *mod, struct device_driver *drv);
-diff --git a/drivers/base/core.c b/drivers/base/core.c
-index dafae6d..fc5a558 100644
---- a/drivers/base/core.c
-+++ b/drivers/base/core.c
-@@ -534,6 +534,52 @@ static DEVICE_ATTR_RO(dev);
- struct kset *devices_kset;
- 
- /**
-+ * devices_kset_move_before - Move device in the devices_kset's list.
-+ * @deva: Device to move.
-+ * @devb: Device @deva should come before.
-+ */
-+static void devices_kset_move_before(struct device *deva, struct device *devb)
-+{
-+	if (!devices_kset)
-+		return;
-+	pr_debug("devices_kset: Moving %s before %s\n",
-+		 dev_name(deva), dev_name(devb));
-+	spin_lock(&devices_kset->list_lock);
-+	list_move_tail(&deva->kobj.entry, &devb->kobj.entry);
-+	spin_unlock(&devices_kset->list_lock);
-+}
-+
-+/**
-+ * devices_kset_move_after - Move device in the devices_kset's list.
-+ * @deva: Device to move
-+ * @devb: Device @deva should come after.
-+ */
-+static void devices_kset_move_after(struct device *deva, struct device *devb)
-+{
-+	if (!devices_kset)
-+		return;
-+	pr_debug("devices_kset: Moving %s after %s\n",
-+		 dev_name(deva), dev_name(devb));
-+	spin_lock(&devices_kset->list_lock);
-+	list_move(&deva->kobj.entry, &devb->kobj.entry);
-+	spin_unlock(&devices_kset->list_lock);
-+}
-+
-+/**
-+ * devices_kset_move_last - move the device to the end of devices_kset's list.
-+ * @dev: device to move
-+ */
-+void devices_kset_move_last(struct device *dev)
-+{
-+	if (!devices_kset)
-+		return;
-+	pr_debug("devices_kset: Moving %s to end of list\n", dev_name(dev));
-+	spin_lock(&devices_kset->list_lock);
-+	list_move_tail(&dev->kobj.entry, &devices_kset->list);
-+	spin_unlock(&devices_kset->list_lock);
-+}
-+
-+/**
-  * device_create_file - create sysfs attribute file for device.
-  * @dev: device.
-  * @attr: device attribute descriptor.
-@@ -1923,12 +1969,15 @@ int device_move(struct device *dev, struct device *new_parent,
- 		break;
- 	case DPM_ORDER_DEV_AFTER_PARENT:
- 		device_pm_move_after(dev, new_parent);
-+		devices_kset_move_after(dev, new_parent);
- 		break;
- 	case DPM_ORDER_PARENT_BEFORE_DEV:
- 		device_pm_move_before(new_parent, dev);
-+		devices_kset_move_before(new_parent, dev);
- 		break;
- 	case DPM_ORDER_DEV_LAST:
- 		device_pm_move_last(dev);
-+		devices_kset_move_last(dev);
- 		break;
- 	}
- 
-diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-index a638bbb..cc2b1d4 100644
---- a/drivers/base/dd.c
-+++ b/drivers/base/dd.c
-@@ -304,6 +304,14 @@ static int really_probe(struct device *dev, struct device_driver *drv)
- 			goto probe_failed;
- 	}
- 
-+	/*
-+	 * Ensure devices are listed in devices_kset in correct order
-+	 * It's important to move Dev to the end of devices_kset before
-+	 * calling .probe, because it could be recursive and parent Dev
-+	 * should always go first
-+	 */
-+	devices_kset_move_last(dev);
-+
- 	if (dev->bus->probe) {
- 		ret = dev->bus->probe(dev);
- 		if (ret)
--- 
-2.4.6
+Can we conclude that the PIO codepath somehow programs a register somewhere
+which gets rid of this 0x00 prefix ? If so, this should then also be part
+of the DMA codepath, or even better, this should be set in probe() somewhere.
