@@ -1,48 +1,44 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 27 Jul 2015 10:03:48 +0200
-Subject: [PATCH v2 24/25] arch: remove ioremap_wt, replace with
- arch_memremap
-In-Reply-To: <20150725024015.8664.42950.stgit@dwillia2-desk3.amr.corp.intel.com>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725024015.8664.42950.stgit@dwillia2-desk3.amr.corp.intel.com>
-Message-ID: <20150727080347.GA18599@lst.de>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Mon, 27 Jul 2015 16:04:09 +0800
+Subject: [PATCH] mmc: sdhci-of-arasan: Get quirks from device tree
+Message-ID: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +++ b/arch/frv/include/asm/io.h
-> @@ -17,8 +17,6 @@
->  
->  #ifdef __KERNEL__
->  
-> -#define ARCH_HAS_IOREMAP_WT
-> -
->  #include <linux/types.h>
->  #include <asm/virtconvert.h>
->  #include <asm/string.h>
-> @@ -267,20 +265,17 @@ static inline void __iomem *ioremap_nocache(unsigned long physaddr, unsigned lon
->  	return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
->  }
->  
-> -static inline void __iomem *ioremap_wt(unsigned long physaddr, unsigned long size)
-> -{
-> -	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
-> -}
-> -
-> -static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned long size)
-> -{
-> -	return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
-> -}
+This patch adds the interface to get quirks from dts, and
+there is no need to assign different quirks by condition statement
+of arasan IP version.
 
+Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+---
 
-> +void *arch_memremap(resource_size_t offset, size_t size, unsigned long flags)
-> +{
-> +	return (void *) offset;
-> +}
-> +EXPORT_SYMBOL(arch_memremap);
+ drivers/mmc/host/sdhci-of-arasan.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-This doesn't look like a correct replacement.
-
-Also shouldn't the replacements of ioremap_fullcache or ioremap_wc be
-in the previous patch?
-
-A few more similar issues pop up for other architectures as well.
+diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+index ef5a7d2..db07788 100644
+--- a/drivers/mmc/host/sdhci-of-arasan.c
++++ b/drivers/mmc/host/sdhci-of-arasan.c
+@@ -132,6 +132,7 @@ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+ static int sdhci_arasan_probe(struct platform_device *pdev)
+ {
+ 	int ret;
++	u32 quirktab[2];
+ 	struct clk *clk_xin;
+ 	struct sdhci_host *host;
+ 	struct sdhci_pltfm_host *pltfm_host;
+@@ -172,6 +173,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+ 		goto clk_disable_all;
+ 	}
+ 
++	if (of_property_read_u32_array(pdev->dev.of_node,
++				       "arasan,quirks", &quirktab[0], 2)) {
++		host->quirks |= quirktab[0];
++		host->quirks2 |= quirktab[1];
++	}
++
+ 	if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
+ 		host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+ 		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+-- 
+2.3.7
