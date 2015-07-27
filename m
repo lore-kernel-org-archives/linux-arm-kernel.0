@@ -1,33 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Jul 2015 14:57:01 +0200
-Subject: [PATCH v2 1/2] pinctrl: sunxi: Add custom irq_domain_ops
-In-Reply-To: <1438000918-9026-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1438000918-9026-1-git-send-email-maxime.ripard@free-electrons.com>
- <1438000918-9026-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkda+pUGw=dDA4quMgFW7YJGCKF0ApqXi8Y7ZoYxPQWSZCQ@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Jul 2015 14:55:41 +0200
+Subject: [PATCH 0/3] ARM: UniPhier: update DTS and MAINTAINERS
+In-Reply-To: <1437809004-16806-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1437809004-16806-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20150727125541.GA19768@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 2:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Sat, Jul 25, 2015 at 04:23:21PM +0900, Masahiro Yamada wrote:
+> Hi Arnd and Olof,
+> 
+> The pinctrl drivers for UniPhier SoCs were accepted by Linus Walleij
+> into the linux-pinctrl subsystem.
+> 
+> Here is a small series I'd like you to merge into the ARM-SOC subsystem
+> to use my pinctrl drivers.
+> 
 
-> The current interrupt parsing code was working by accident, because the
-> default was actually parsing the first node of interrupts.
->
-> While that was mostly working (and the flags were actually ignored), this
-> binding has never been documented, and doesn't work with SoCs that have
-> multiple interrupt banks anyway.
->
-> Add a proper interrupt xlate function, that uses the same description than
-> the GPIOs (<bank> <pin> <flags>), that will make things less confusing.
->
-> The EINT number will still be used as the hwirq number, but won't be
-> exposed through the DT.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Thanks, applied 1 and 2 to next/dt, the third I added to next/soc.
 
-Patch applied.
 
-Yours,
-Linus Walleij
+-Olof
