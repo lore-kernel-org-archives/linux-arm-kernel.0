@@ -1,29 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jul 2015 11:43:41 +0100
-Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
- Kconfig
-In-Reply-To: <55B6011C.9070906@codethink.co.uk>
-References: <1437612483-30160-1-git-send-email-sre@kernel.org>
- <1437612483-30160-4-git-send-email-sre@kernel.org>
- <20150723123553.GE7576@n2100.arm.linux.org.uk>
- <20150724001605.GA1453@earth>
- <20150726225145.GF7576@n2100.arm.linux.org.uk>
- <20150727011447.GA23087@earth> <55B6011C.9070906@codethink.co.uk>
-Message-ID: <20150727104341.GG7576@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 27 Jul 2015 12:44:05 +0200
+Subject: [PATCHv4 3/6] dmaengine: mv_xor: remove support for dmacap,* DT
+ properties
+In-Reply-To: <20150722051653.GR23525@localhost>
+References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1436365699-6862-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150722051653.GR23525@localhost>
+Message-ID: <20150727124405.53752fe2@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 10:59:56AM +0100, Ben Dooks wrote:
-> This isn't the only place ARM_ERRATA_430973 is used, and if
-> you make it configurable on !ARCH_MULTIPLATFORM then it makes
-> it impossible to use a ARCH_MULTIPLATFORM kernel on something
-> that is an Cortex-A8.
+Vinod,
+
+On Wed, 22 Jul 2015 10:46:53 +0530, Vinod Koul wrote:
+
+> >  	xor01 {
+> >  	      interrupts = <52>;
+> > -	      dmacap,memcpy;
+> > -	      dmacap,xor;
+> > -	      dmacap,memset;
+> I maybe wrong but there was an assumption that DT properties, even if bad
+> are always there as they need to be treated as kernel ABI.
 > 
-> See arch/arm/mm/proc-v7-2level.S
+> How will it work if someone has older DT implementation or older driver?
 
-That has been fixed so that the BTAC/BTB always gets flushed on each
-context switch for all Cortex-A8 CPUs, but none of the other v7 CPUs.
+Supporting a new DT with an old kernel has never been part of the
+requirements of the DT ABI stability.
 
+Supporting an old DT with a new kernel is the actual requirement. And
+the patch I'm proposing does not break this at all: a new kernel will
+simply ignore those dmacap,* properties from an old DT, and the driver
+automatically knows by itself what are the capabilities of the
+different XOR engines.
+
+Therefore, there is no backward compatibility issue introduced by this
+patch.
+
+Thanks,
+
+Thomas
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
