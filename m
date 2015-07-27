@@ -1,49 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jul 2015 10:45:07 +0100
-Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <20150727091602.GA10308@red-moon>
-References: <20150714103421.GU7557@n2100.arm.linux.org.uk>
- <20150714110302.GA334@red-moon>
- <20150714122904.GV7557@n2100.arm.linux.org.uk>
- <20150714145546.GA14556@red-moon>
- <20150714204138.GW7557@n2100.arm.linux.org.uk>
- <20150715134603.GA14862@red-moon>
- <20150715144507.GZ7557@n2100.arm.linux.org.uk>
- <20150715154056.GA10418@red-moon>
- <20150726214554.GC7557@n2100.arm.linux.org.uk>
- <20150727091602.GA10308@red-moon>
-Message-ID: <20150727094507.GD7557@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 27 Jul 2015 10:44:30 +0100
+Subject: [PATCH v2 4/6] ARM: STi: stih407-family: Add nodes for Mailbox
+In-Reply-To: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1437990272-23111-5-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 10:16:02AM +0100, Lorenzo Pieralisi wrote:
-> Yes, I would only ask you, if the plan above (which can be implemented
-> in two steps) makes sense to you please consider accepting Mark's change
-> to consolidate PSCI code into drivers/firmware/psci, it is a stepping stone
-> without which the changes above can't happen, I will take charge of completing
-> the move of CPUidle code and create the required shim layer into
-> drivers to make this happen.
+This patch supplies the Mailbox Controller nodes.  In order to
+request channels, these nodes will be referenced by Mailbox
+Client nodes.
 
-Why can't Jisheng Zhang base his patches on top of Mark's changes and
-place the new file directly under drivers/ ?
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih407-family.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-Why do it as a two-step process with it first appearing in arch/arm,
-and then having to generate another patch at a later date to move it
-elsewhere.  That just creates more noise, and we should be avoiding
-generating noise in arch/arm.
-
-This is what Linus has said in his -rc4 release notes yesterday:
-
-   Other than that issue, it's mostly drivers and networking.  USB, gpu,
-   mmc, network drivers, sound. With some ARM noise (but even that is
-   mostly driver-related: dts updates due to MMC fixes). And a few small
-   filesystem fixes.
-
-and we can infer from the phrase "ARM noise" that Linus' opinion of
-arch/arm is still fairly low, and still doesn't regard the "churn" in
-arch/arm as being useful.
-
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 838b812..c061d11 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -11,6 +11,7 @@
+ #include <dt-bindings/phy/phy.h>
+ #include <dt-bindings/reset-controller/stih407-resets.h>
+ #include <dt-bindings/interrupt-controller/irq-st.h>
++#include <dt-bindings/mailbox/mailbox.h>
+ / {
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+@@ -565,5 +566,38 @@
+ 						  <&phy_port2 PHY_TYPE_USB3>;
+ 			};
+ 		};
++
++		mailbox0: mailbox at 0  {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f00000 0x1000>;
++			interrupts	= <GIC_SPI 1 IRQ_TYPE_NONE>;
++			#mbox-cells	= <3>;
++			mbox-name	= "a9";
++			status		= "okay";
++		};
++
++		mailbox1: mailbox at 1 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f01000 0x1000>;
++			#mbox-cells	= <3>;
++			mbox-name	= "st231_gp_1";
++			status		= "okay";
++		};
++
++		mailbox2: mailbox at 2 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f02000 0x1000>;
++			#mbox-cells	= <3>;
++			mbox-name	= "st231_gp_0";
++			status		= "okay";
++		};
++
++		mailbox3: mailbox at 3 {
++			compatible	= "st,stih407-mailbox";
++			reg		= <0x8f03000 0x1000>;
++			#mbox-cells	= <3>;
++			mbox-name	= "st231_audio_video";
++			status		= "okay";
++		};
+ 	};
+ };
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
