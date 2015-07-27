@@ -1,102 +1,69 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 27 Jul 2015 18:42:44 +0200
-Subject: [PATCH v8 4/5] ARM: dts: vf610twr: add NAND flash controller
- peripherial
+Date: Mon, 27 Jul 2015 18:42:43 +0200
+Subject: [PATCH v8 3/5] mtd: nand: vf610_nfc: add device tree bindings
 In-Reply-To: <1438015365-15685-1-git-send-email-stefan@agner.ch>
 References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
-Message-ID: <1438015365-15685-5-git-send-email-stefan@agner.ch>
+Message-ID: <1438015365-15685-4-git-send-email-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-This adds the NAND flash controller (NFC) peripherial. The driver
-supports the SLC NAND chips found on Freescale's Vybrid Tower System
-Module. The Micron NAND chip on the module needs 4-bit ECC per 512
-byte page. Use 24-bit ECC per 2k page, which is supported by the
-driver.
 
 Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/vf610-twr.dts | 40 ++++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vfxxx.dtsi    |  8 ++++++++
- 2 files changed, 48 insertions(+)
+ .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
 
-diff --git a/arch/arm/boot/dts/vf610-twr.dts b/arch/arm/boot/dts/vf610-twr.dts
-index 375ab23..2a278a2 100644
---- a/arch/arm/boot/dts/vf610-twr.dts
-+++ b/arch/arm/boot/dts/vf610-twr.dts
-@@ -237,6 +237,33 @@
- 			>;
- 		};
- 
-+		pinctrl_nfc: nfcgrp {
-+			fsl,pins = <
-+			VF610_PAD_PTD31__NF_IO15	0x28df
-+			VF610_PAD_PTD30__NF_IO14	0x28df
-+			VF610_PAD_PTD29__NF_IO13	0x28df
-+			VF610_PAD_PTD28__NF_IO12	0x28df
-+			VF610_PAD_PTD27__NF_IO11	0x28df
-+			VF610_PAD_PTD26__NF_IO10	0x28df
-+			VF610_PAD_PTD25__NF_IO9		0x28df
-+			VF610_PAD_PTD24__NF_IO8		0x28df
-+			VF610_PAD_PTD23__NF_IO7		0x28df
-+			VF610_PAD_PTD22__NF_IO6		0x28df
-+			VF610_PAD_PTD21__NF_IO5		0x28df
-+			VF610_PAD_PTD20__NF_IO4		0x28df
-+			VF610_PAD_PTD19__NF_IO3		0x28df
-+			VF610_PAD_PTD18__NF_IO2		0x28df
-+			VF610_PAD_PTD17__NF_IO1		0x28df
-+			VF610_PAD_PTD16__NF_IO0		0x28df
-+			VF610_PAD_PTB24__NF_WE_B	0x28c2
-+			VF610_PAD_PTB25__NF_CE0_B	0x28c2
-+			VF610_PAD_PTB27__NF_RE_B	0x28c2
-+			VF610_PAD_PTC26__NF_RB_B	0x283d
-+			VF610_PAD_PTC27__NF_ALE		0x28c2
-+			VF610_PAD_PTC28__NF_CLE		0x28c2
-+			>;
-+		};
+diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+new file mode 100644
+index 0000000..cae5f25
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+@@ -0,0 +1,45 @@
++Freescale's NAND flash controller (NFC)
 +
- 		pinctrl_pwm0: pwm0grp {
- 			fsl,pins = <
- 				VF610_PAD_PTB0__FTM0_CH0		0x1582
-@@ -274,6 +301,19 @@
- 	};
- };
- 
-+&nfc {
-+	assigned-clocks = <&clks VF610_CLK_NFC>;
-+	assigned-clock-rates = <33000000>;
-+	nand-bus-width = <16>;
-+	nand-ecc-mode = "hw";
-+	nand-ecc-step-size = <2048>;
-+	nand-ecc-strength = <24>;
-+	nand-on-flash-bbt;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_nfc>;
-+	status = "okay";
-+};
++This variant of the Freescale NAND flash controller (NFC) can be found on
++Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
 +
- &pwm0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_pwm0>;
-diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 4aa3351..2f4b04d 100644
---- a/arch/arm/boot/dts/vfxxx.dtsi
-+++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -520,6 +520,14 @@
- 				status = "disabled";
- 			};
- 
-+			nfc: nand at 400e0000 {
-+				compatible = "fsl,vf610-nfc";
-+				reg = <0x400e0000 0x4000>;
-+				interrupts = <83 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks VF610_CLK_NFC>;
-+				clock-names = "nfc";
-+				status = "disabled";
-+			};
- 		};
- 	};
- };
++Required properties:
++- compatible: Should be set to "fsl,vf610-nfc"
++- reg: address range of the NFC
++- interrupts: interrupt of the NFC
++- nand-bus-width: see nand.txt
++- nand-ecc-mode: see nand.txt
++- nand-on-flash-bbt: see nand.txt
++- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
++- assigned-clock-rates: The NAND bus timing is derived from this clock
++    rate and should not exceed maximum timing for any NAND memory chip
++    in a board stuffing. Typical NAND memory timings derived from this
++    clock are found in the SoC hardware reference manual. Furthermore,
++    there might be restrictions on maximum rates when using hardware ECC.
++
++- #address-cells, #size-cells : Must be present if the device has sub-nodes
++  representing partitions.
++
++Required properties for hardware ECC:
++- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
++- nand-ecc-step-size: step size equals page size, currently only 2k pages are
++    supported
++
++Example:
++
++	nfc: nand at 400e0000 {
++		compatible = "fsl,vf610-nfc";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		reg = <0x400e0000 0x4000>;
++		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&clks VF610_CLK_NFC>;
++		clock-names = "nfc";
++		assigned-clocks = <&clks VF610_CLK_NFC>;
++		assigned-clock-rates = <33000000>;
++		nand-bus-width = <8>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <32>;
++		nand-ecc-step-size = <2048>;
++		nand-on-flash-bbt;
++	};
 -- 
 2.4.5
