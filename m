@@ -1,22 +1,211 @@
-From: hch@lst.de (Christoph Hellwig)
-Date: Mon, 27 Jul 2015 07:14:13 +0200
-Subject: [PATCH v2 25/25] pmem: convert to generic memremap
-In-Reply-To: <CAPcyv4jsnQ1CzgXkkpzJnfjnKMmxiwyhQ_3osgo9vmjceP+rZA@mail.gmail.com>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725024020.8664.52581.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150726173317.GD29513@lst.de>
- <CAPcyv4jsnQ1CzgXkkpzJnfjnKMmxiwyhQ_3osgo9vmjceP+rZA@mail.gmail.com>
-Message-ID: <20150727051413.GC15836@lst.de>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 27 Jul 2015 07:14:46 +0200
+Subject: [RFCv2 3/3] reset: reset-zynq: Adding support for Xilinx Zynq
+ reset controller.
+In-Reply-To: <1437783682-13632-4-git-send-email-moritz.fischer@ettus.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-4-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <55B5BE46.3080703@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 26, 2015 at 11:11:44AM -0700, Dan Williams wrote:
-> I don't follow.  We have __iomem for the cpu mapping of a resource and
-> dma_map() for a PCI device.  __pmem works the same and is there to
-> make sure someone doesn't simply de-reference a pointer to pmem and
-> hope that the write is persistent.
+On 07/25/2015 02:21 AM, Moritz Fischer wrote:
+> This adds a reset controller driver to control the Xilinx Zynq
+> SoC's various resets.
+> 
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  drivers/reset/Makefile     |   1 +
+>  drivers/reset/reset-zynq.c | 142 +++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 143 insertions(+)
+>  create mode 100644 drivers/reset/reset-zynq.c
+> 
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 157d421..3fe50e7 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -3,3 +3,4 @@ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+>  obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+>  obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_ARCH_STI) += sti/
+> +obj-$(CONFIG_ARCH_ZYNQ) += reset-zynq.o
+> diff --git a/drivers/reset/reset-zynq.c b/drivers/reset/reset-zynq.c
+> new file mode 100644
+> index 0000000..05e37f8
+> --- /dev/null
+> +++ b/drivers/reset/reset-zynq.c
+> @@ -0,0 +1,142 @@
+> +/*
+> + * Copyright (c) 2015, National Instruments Corp.
+> + *
+> + * Xilinx Zynq Reset controller driver
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; version 2 of the License.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/module.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/regmap.h>
+> +#include <linux/types.h>
+> +
+> +/* Offsets into SLCR regmap */
+> +#define SLCR_RST_CTRL_OFFSET	0x200 /* FPGA Software Reset Control */
 
-But no deference of a kernel pointer is magily persistent, so I'm
-not really worried about that.  It just means whenever we want to
-pass it to anything we'll need to cast.  And anything that does
-I/O falls into that category.
+incorrect comment.
+
+> +
+> +#define NBANKS	18
+> +
+> +struct zynq_reset_data {
+> +	struct regmap *slcr;
+> +	struct reset_controller_dev rcdev;
+> +};
+> +
+> +#define to_zynq_reset_data(p)		\
+> +	container_of((p), struct zynq_reset_data, rcdev)
+> +
+> +static int zynq_reset_assert(struct reset_controller_dev *rcdev,
+> +			     unsigned long id)
+> +{
+> +	struct zynq_reset_data *priv = to_zynq_reset_data(rcdev);
+> +
+> +	int bank = id / BITS_PER_LONG;
+> +	int offset = id % BITS_PER_LONG;
+> +
+> +	regmap_update_bits(priv->slcr,
+> +			   SLCR_RST_CTRL_OFFSET + (bank * 4),
+> +			   BIT(offset),
+> +			   BIT(offset));
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynq_reset_deassert(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
+> +{
+> +	struct zynq_reset_data *priv = to_zynq_reset_data(rcdev);
+> +
+> +	int bank = id / BITS_PER_LONG;
+> +	int offset = id % BITS_PER_LONG;
+> +
+> +	regmap_update_bits(priv->slcr,
+> +			   SLCR_RST_CTRL_OFFSET + (bank * 4),
+> +			   BIT(offset),
+> +			   ~BIT(offset));
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynq_reset_status(struct reset_controller_dev *rcdev,
+> +			     unsigned long id)
+> +{
+> +	struct zynq_reset_data *priv = to_zynq_reset_data(rcdev);
+> +
+> +	int bank = id / BITS_PER_LONG;
+> +	int offset = id % BITS_PER_LONG;
+> +	u32 reg;
+> +
+> +	regmap_read(priv->slcr, SLCR_RST_CTRL_OFFSET + (bank * 4), &reg);
+> +
+> +	return !(reg & BIT(offset));
+> +}
+> +
+> +static const struct reset_control_ops zynq_reset_ops = {
+> +	.assert		= zynq_reset_assert,
+> +	.deassert	= zynq_reset_deassert,
+> +	.status		= zynq_reset_status,
+> +};
+> +
+> +static int zynq_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct zynq_reset_data *priv;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	priv->slcr = syscon_regmap_lookup_by_phandle(pdev->dev.of_node,
+> +		"syscon");
+
+NIT - incorrect indentation.
+
+> +	if (IS_ERR(priv->slcr)) {
+> +		dev_err(&pdev->dev, "unable to get zynq-slcr regmap");
+> +		return PTR_ERR(priv->slcr);
+> +	}
+> +
+> +	priv->rcdev.owner = THIS_MODULE;
+> +	priv->rcdev.nr_resets = NBANKS * BITS_PER_LONG;
+> +	priv->rcdev.ops = &zynq_reset_ops;
+> +	priv->rcdev.of_node = pdev->dev.of_node;
+> +	reset_controller_register(&priv->rcdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynq_reset_remove(struct platform_device *pdev)
+> +{
+> +	struct zynq_reset_data *priv = platform_get_drvdata(pdev);
+> +
+> +	reset_controller_unregister(&priv->rcdev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zynq_reset_dt_ids[] = {
+> +	{ .compatible = "xlnx,zynq-reset", },
+> +	{ /* sentinel */ },
+> +};
+> +
+> +static struct platform_driver zynq_reset_driver = {
+> +	.probe	= zynq_reset_probe,
+> +	.remove	= zynq_reset_remove,
+> +	.driver = {
+> +		.name		= "zynq-pl-reset",
+
+PL in name.
+BTW: Don't you want to use KBUILD_MODNAME here?
+
+> +		.of_match_table	= zynq_reset_dt_ids,
+> +	},
+> +};
+> +module_platform_driver(zynq_reset_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR("Moritz Fischer <moritz.fischer@ettus.com>");
+> +MODULE_DESCRIPTION("Zynq Reset Controller Driver");
+> 
+
+The rest looks good - will test it.
+
+Thanks,
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/4c079041/attachment-0001.sig>
