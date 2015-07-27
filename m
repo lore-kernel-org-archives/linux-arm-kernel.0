@@ -1,89 +1,100 @@
-From: anurup.m@huawei.com (Anurup M)
-Date: Mon, 27 Jul 2015 11:03:22 +0530
-Subject: kexec crash kernel boot failure on arm64
-In-Reply-To: <20150724092934.GA23074@leverpostej>
-References: <D2393EB95A9993478029A6FE6A290A9F81D90EF8@szxeml510-mbx.china.huawei.com>
- <20150724092934.GA23074@leverpostej>
-Message-ID: <55B5C2A2.6040100@huawei.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 27 Jul 2015 07:52:32 +0200
+Subject: [PATCH v4 2/7] clk: mediatek: Fix rate and dependency of MT8173
+ clocks
+In-Reply-To: <CAGS+omC=84oWFcv1Eumsj6FHzSQc+Ba9zVOn6USS9ymQS3mTSQ@mail.gmail.com>
+References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1437706925-3222-3-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omC=84oWFcv1Eumsj6FHzSQc+Ba9zVOn6USS9ymQS3mTSQ@mail.gmail.com>
+Message-ID: <20150727055232.GW18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-Sorry that I missed the details.
-please find it inline
-
-
-On 7/24/2015 2:59 PM, Mark Rutland wrote:
-> On Fri, Jul 24, 2015 at 03:07:24AM +0100, Anurup m wrote:
->> Hi All,
->>
->> There is a problem observed with crash kernel boot in kdump on arm64.
+On Fri, Jul 24, 2015 at 07:10:14PM +0800, Daniel Kurtz wrote:
+> On Fri, Jul 24, 2015 at 11:02 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
+> > Remove the dependency from clk_null, and give all root clocks a
+> > typical rate, include clkph_mck_o, usb_syspll_125m and hdmitx_dig_cts.
+> >
+> > dpi_ck was removed due to no clock reference to it.
+> >
+> > Replace parent clock of infra_cpum with cpum_ck, which is an external
+> > clock and can be defined in the deivce tree.
+> >
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> > ---
+> >  drivers/clk/mediatek/clk-mt8173.c      | 13 ++++++-------
+> >  include/dt-bindings/clock/mt8173-clk.h |  1 -
+> >  2 files changed, 6 insertions(+), 8 deletions(-)
+> >
+> > diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> > index 4b9e04c..50b3266 100644
+> > --- a/drivers/clk/mediatek/clk-mt8173.c
+> > +++ b/drivers/clk/mediatek/clk-mt8173.c
+> > @@ -24,11 +24,9 @@
+> >
+> >  static DEFINE_SPINLOCK(mt8173_clk_lock);
+> >
+> > -static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+> > -       FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> > -       FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+> > -       FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+> > -       FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+> > +static const struct mtk_fixed_clk fixed_clks[] __initconst = {
+> > +       FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 * MHZ),
+> > +       FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk26m", 125 * MHZ),
+> >  };
+> >
+> >  static const struct mtk_fixed_factor top_divs[] __initconst = {
+> > @@ -53,6 +51,7 @@ static const struct mtk_fixed_factor top_divs[] __initconst = {
+> >         FACTOR(CLK_TOP_CLKRTC_INT, "clkrtc_int", "clk26m", 1, 793),
+> >         FACTOR(CLK_TOP_FPC, "fpc_ck", "clk26m", 1, 1),
+> >
+> > +       FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "tvdpll_445p5m", 1, 3),
+> >         FACTOR(CLK_TOP_HDMITXPLL_D2, "hdmitxpll_d2", "hdmitx_dig_cts", 1, 2),
+> >         FACTOR(CLK_TOP_HDMITXPLL_D3, "hdmitxpll_d3", "hdmitx_dig_cts", 1, 3),
+> >
+> > @@ -611,7 +610,7 @@ static const struct mtk_gate infra_clks[] __initconst = {
+> >         GATE_ICG(CLK_INFRA_GCE, "infra_gce", "axi_sel", 6),
+> >         GATE_ICG(CLK_INFRA_L2C_SRAM, "infra_l2c_sram", "axi_sel", 7),
+> >         GATE_ICG(CLK_INFRA_M4U, "infra_m4u", "mem_sel", 8),
+> > -       GATE_ICG(CLK_INFRA_CPUM, "infra_cpum", "clk_null", 15),
+> > +       GATE_ICG(CLK_INFRA_CPUM, "infra_cpum", "cpum_ck", 15),
+> >         GATE_ICG(CLK_INFRA_KP, "infra_kp", "axi_sel", 16),
+> >         GATE_ICG(CLK_INFRA_CEC, "infra_cec", "clk26m", 18),
+> >         GATE_ICG(CLK_INFRA_PMICSPI, "infra_pmicspi", "pmicspi_sel", 22),
+> > @@ -714,7 +713,7 @@ static void __init mtk_topckgen_init(struct device_node *node)
+> >
+> >         clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
+> >
+> > -       mtk_clk_register_factors(root_clk_alias, ARRAY_SIZE(root_clk_alias), clk_data);
+> > +       mtk_clk_register_fixed_clks(fixed_clks, ARRAY_SIZE(fixed_clks), clk_data);
+> >         mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs), clk_data);
+> >         mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes), base,
+> >                         &mt8173_clk_lock, clk_data);
+> > diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+> > index 4ad76ed..7230c38 100644
+> > --- a/include/dt-bindings/clock/mt8173-clk.h
+> > +++ b/include/dt-bindings/clock/mt8173-clk.h
+> > @@ -18,7 +18,6 @@
+> >  /* TOPCKGEN */
+> >
+> >  #define CLK_TOP_CLKPH_MCK_O            1
+> > -#define CLK_TOP_DPI                    2
+> >  #define CLK_TOP_USB_SYSPLL_125M                3
 > 
-> With which kernel? Mainline doesn't have kexec or kdump support for
-> arm64.
-> 
+> I think we should renumber the rest of the CLK_TOP_*
 
-I use 3.19 kernel + kexec+kdump patches applied from
-https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git/commit/?h=kexec-4.0-stable
+They shouldn't be renumbered at all as this makes all binary device
+trees out there useless. That may not be a big issue with the MT8173
+at the moment as there are hardly any binary device trees with the
+mainline device trees shipped, but still we should get used to not
+break existing device trees without need.
 
->> On arm64 hardware board, when I enable the purgatory segment, the crash kernel doesnot boot.
->> When checked with trace32, it is observed that the control comes to purgatory_start routine, 
->> but the instructions are seen as UNDEF and the boot hangs. But when I took the memory dump, the
->> contents were seen as proper(matching with the purgatory_start code).
->>
->> I did some experiments to analyze this issue. Tried changing the Load order of kexec segments and
->> observed results as below
->> ------------------------------------------------------------------------------
->>     Segments Load order						crash kernel boot status
->>     --------------------			            -------------------------
->> 1) crash kernel, initrd, dtb. Elfcorehdr		-	 Boot Success - without purgatory
->> 2) crash kernel, initrd, dtb. Purgatory, elfcorehdr -  HUNG as control does not reach purgatory segment.
->> 3) crash kernel, elfcorehdr, purgatory, dtb, initrd -	 Boot Success
->> 4) crash kernel, initrd, dtb, purgatory, elfcorehdr, - Boot Success
->>    an extra segment(~20M)).
->>
->> From this I could infer that If I load a larger segment after purgatory (in the load order), the crash
->> Kernel boots. i.e. memory sync is taking some time.
->>
->> So to clarify if memory sync is the Issue, I tried flush the data cache after writing the kexec segments.
->>
->> kernel/kexec.c | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/kernel/kexec.c b/kernel/kexec.c index 7bb25f0..ca36aa0 100644
->> --- a/kernel/kexec.c
->> +++ b/kernel/kexec.c
->> @@ -1176,6 +1176,10 @@ static int kimage_load_crash_segment(struct kimage *image,
->>  		else
->>  			result = copy_from_user(ptr, buf, uchunk);
->>  		kexec_flush_icache_page(page);
->> +		/* Flush Dcache to make sure it is push to DRAM
->> +		 * This is added as workaround for crash kernel
->> +		 * boot failure */
->> +		__flush_dcache_area((__force void *)ptr, uchunk);
->>  		kunmap(page);
->>  		if (result) {
->>  			result = -EFAULT;
->>
->> With the above change, control could reach purgatory_start, but this time it loops due to sha256_digest
->> Verify failure. It is able to boot to crash kernel (after comment verify_sha256_digest)
->>
->> What could be the possible reasons for this issue? Please share your comments.
-> 
-> The only verify_sha256_digest I can see in the kernel tree is under
-> arch/x86. Without knowing what kernel you're running, it's not possible
-> to answer your question.
-> 
-  The verify_sha256_digest is done by purgatory module in kexec-tools(purgatory is the intermediate code executed between first and second kernel
-).
+Sascha
 
-The kexec-tools used is taken from
-https://git.linaro.org/people/takahiro.akashi/kexec-tools.git/shortlog/refs/heads/kdump/v0.12
 
--Anurup
-
-> Mark.
-> 
-> .
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
