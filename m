@@ -1,45 +1,49 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Mon, 27 Jul 2015 19:26:46 +0800
-Subject: [PATCH 4/5] ARM: dts: imx6ul.dtsi: add TSC support
-In-Reply-To: <1437996407-27266-1-git-send-email-haibo.chen@freescale.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jul 2015 12:25:47 +0100
+Subject: [PATCH 2/5] Documentation: Detail permitted DT properties for
+ the imx6ul_tsc
+In-Reply-To: <1437996407-27266-3-git-send-email-haibo.chen@freescale.com>
 References: <1437996407-27266-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1437996407-27266-5-git-send-email-haibo.chen@freescale.com>
+ <1437996407-27266-3-git-send-email-haibo.chen@freescale.com>
+Message-ID: <20150727112547.GE9169@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add imx6ul touchscreen controller support.
+On Mon, Jul 27, 2015 at 12:26:44PM +0100, Haibo Chen wrote:
+> Here we apply required documentation for the imx6ul touch screen
+> controller driver which describe available properties and how to
+> use them.
+> 
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+> ---
+>  .../devicetree/bindings/input/touchscreen/imx6ul_tsc.txt   | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> new file mode 100644
+> index 0000000..e34d752
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+> @@ -0,0 +1,14 @@
+> +* Freescale i.MX6UL Touch Controller
+> +
+> +Required properties:
+> +- compatible: must be "fsl,imx6ul-tsc"
+> +
 
-TSC module need ADC2 module to measure the touchscreen
-coordinate value. This patch put TSC and ADC2 together,
-make ADC2 module only be used for TSC, can't be used as
-a normal ADC.
+What about all the other properties in the example?
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- arch/arm/boot/dts/imx6ul.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+> +Example:
+> +	&tsc {
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_tsc>;
+> +		status = "okay";
+> +		xnur-gpio = <&gpio1 3 GPIO_ACTIVE_HIGH>;
+> +		measure_delay_time = <0xfff>;
+> +		pre_charge_time = <0xffff>;
 
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index dc0f5b4..33aac1f 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -484,6 +484,17 @@
- 			reg = <0x02100000 0x100000>;
- 			ranges;
- 
-+			tsc: tsc at 02040000 {
-+				compatible = "fsl,imx6ul-tsc";
-+				reg = <0x02040000 0x4000>, <0x0219c000 0x4000>;
-+				interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
-+					     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+				clocks = <&clks IMX6UL_CLK_IPG>,
-+					 <&clks IMX6UL_CLK_ADC2>;
-+				clock-names = "tsc", "adc";
-+				status = "disabled";
-+			};
-+
- 			usdhc1: usdhc at 02190000 {
- 				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
- 				reg = <0x02190000 0x4000>;
--- 
-1.9.1
+Thiose underscores should be dashes, and all the properties should be
+documented.
+
+Mark.
