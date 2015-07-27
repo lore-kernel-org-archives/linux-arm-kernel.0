@@ -1,97 +1,73 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Jul 2015 09:25:49 +0200
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 27 Jul 2015 08:31:49 +0100
+Subject: [PATCH v7 5/5] clk: dt: Introduce binding for critical clock
+ support
+In-Reply-To: <20150727071013.GO2564@lukather>
 References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
-Message-ID: <20150727072549.GP2564@lukather>
+ <1437570255-21049-6-git-send-email-lee.jones@linaro.org>
+ <20150727071013.GO2564@lukather>
+Message-ID: <20150727073149.GV3436@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 02:04:13PM +0100, Lee Jones wrote:
-> These new API calls will firstly provide a mechanisms to tag a clock as
-> critical and secondly allow any knowledgeable driver to (un)gate clocks,
-> even if they are marked as critical.
+On Mon, 27 Jul 2015, Maxime Ripard wrote:
+
+> Hi Lee,
 > 
-> Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/clk-provider.h |  2 ++
->  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
->  3 files changed, 77 insertions(+)
+> On Wed, Jul 22, 2015 at 02:04:15PM +0100, Lee Jones wrote:
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  .../devicetree/bindings/clock/clock-bindings.txt   | 39 ++++++++++++++++++++++
+> >  1 file changed, 39 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > index 06fc6d5..4137034 100644
+> > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > @@ -44,6 +44,45 @@ For example:
+> >    clocks by index. The names should reflect the clock output signal
+> >    names for the device.
+> >  
+> > +critical-clock:	Some hardware contains bunches of clocks which, in normal
+> > +		circumstances, must never be turned off.  If drivers a) fail to
+> > +		obtain a reference to any of these or b) give up a previously
+> > +		obtained reference during suspend, it is possible that some
+> > +		Operating Systems might attempt to disable them to save power.
+> > +		If this happens a platform can fail irrecoverably as a result.
+> > +		Usually the only way to recover from these failures is to
+> > +		reboot.
+> > +
+> > +		To avoid either of these two scenarios from catastrophically
+> > +		disabling an otherwise perfectly healthy running system,
+> > +		clocks can be identified as 'critical' using this property from
+> > +		inside a clocksource's node.
+> > +
+> > +		This property is not to be abused.  It is only to be used to
+> > +		protect platforms from being crippled by gated clocks, NOT as a
+> > +		convenience function to avoid using the framework correctly
+> > +		inside device drivers.
+> > +
+> > +		Expected values are hardware clock indices.  If the
+> > +		clock-indices property (see below) is used, then supplied
+> > +		values must correspond to one of the listed identifiers.
+> > +		Using the clock-indices example below, hardware clock <2>
+> > +		is missing, therefore it is considered invalid to then
+> > +		list clock <2> as a critical clock.
 > 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 61c3fc5..486b1da 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
->  
->  /***    private data structures    ***/
->  
-> +/**
-> + * struct critical -	Provides 'play' over critical clocks.  A clock can be
-> + *			marked as critical, meaning that it should not be
-> + *			disabled.  However, if a driver which is aware of the
-> + *			critical behaviour wants to control it, it can do so
-> + *			using clk_enable_critical() and clk_disable_critical().
-> + *
-> + * @enabled	Is clock critical?  Once set, doesn't change
-> + * @leave_on	Self explanatory.  Can be disabled by knowledgeable drivers
-> + */
-> +struct critical {
-> +	bool enabled;
-> +	bool leave_on;
-> +};
-> +
->  struct clk_core {
->  	const char		*name;
->  	const struct clk_ops	*ops;
-> @@ -75,6 +90,7 @@ struct clk_core {
->  	struct dentry		*dentry;
->  #endif
->  	struct kref		ref;
-> +	struct critical		critical;
->  };
->  
->  struct clk {
-> @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
->  	if (WARN_ON(clk->enable_count == 0))
->  		return;
->  
-> +	/* Refuse to turn off a critical clock */
-> +	if (clk->enable_count == 1 && clk->critical.leave_on)
-> +		return;
-> +
+> I think we should also consider having it simply as a boolean. Using
+> indices for clocks that don't have any (for example because it only
+> provides a single clock) seem to not really make much sense.
 
-I think it should be handled by a separate counting. Otherwise, if you
-have two users that marked the clock as critical, and then one of them
-disable it...
+Then how would you distinguish between the clocks if the provider
+provides more than a single clock?
 
->  	if (--clk->enable_count > 0)
->  		return;
->  
-> @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
->  }
->  EXPORT_SYMBOL_GPL(clk_disable);
->  
-> +void clk_disable_critical(struct clk *clk)
-> +{
-> +	clk->core->critical.leave_on = false;
+> Also, since you can have a bunch of them, using critical-clocks seem
+> more appropriate.
 
-.. you just lost the fact that it was critical in the first place.
-
-Maxime
+I can change the name to critical-clocks, no problem.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/ee6145cd/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
