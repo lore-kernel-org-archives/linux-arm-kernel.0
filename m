@@ -1,56 +1,62 @@
-From: mporter@konsulko.com (Matt Porter)
-Date: Mon, 27 Jul 2015 10:09:11 -0400
-Subject: [PATCH-v5 1/5] Documentation: binding: add new property
- 'disable_after_xfer' to i2c-pxa
-In-Reply-To: <1437482466-16126-2-git-send-email-vaibhav.hiremath@linaro.org>
-References: <1437482466-16126-1-git-send-email-vaibhav.hiremath@linaro.org>
- <1437482466-16126-2-git-send-email-vaibhav.hiremath@linaro.org>
-Message-ID: <20150727140911.GB15004@beef>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 27 Jul 2015 16:09:06 +0200
+Subject: [PATCH 00/18] Clean up exposure of arch-internal code
+In-Reply-To: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
+Message-ID: <20150727140905.GA16858@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 21, 2015 at 06:11:02PM +0530, Vaibhav Hiremath wrote:
-> Driver will now supports enable/disable across msg xfer, which user
-> can control it by new DT property -
+On Mon, Jul 27, 2015 at 01:28:24PM +0100, Russell King - ARM Linux wrote:
+> This series of patches attempts to clean up the use of architecture
+> internal functions in drivers, and removes some functions from view
+> in the asm/ headers.  I'm also considering whether we need to add
+> some linker magic to hide symbols when building the built-in.o files.
 > 
-> i2c-disable-after-xfer : If set, driver will disable I2C module after msg
->  xfer and enable it back before xfer.
-
-If this is a new property specific to this Marvell part, it needs
-the vendor prefix as in mrvl,i2c-disable-after-xfer
-
-Or, it couldn't hurt to start an i2c.txt for generic i2c bindings
-and store it there as this and others later in this series would
-reasonably apply to other controllers.
-
--Matt
-
-> Signed-off-by: Vaibhav Hiremath <vaibhav.hiremath@linaro.org>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-pxa.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+> This was triggered by 3rd party drivers "going under the covers" of
+> the DMA API and calling the dmac_*() functions directly, a practice
+> which I have always refused to allow.  This also breaks module
+> building (which is the big hint that they're doing something wrong.)
 > 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> index 12b78ac..9657db5 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-pxa.txt
-> @@ -18,6 +18,11 @@ Recommended properties :
->     status register of i2c controller instead.
->   - mrvl,i2c-fast-mode : Enable fast mode of i2c controller.
->  
-> +Optional properties :
-> +
-> + - i2c-disable-after-xfer : If set, driver will disable I2C module
-> +   after msg xfer and enable it again before xfer.
-> +
->  Examples:
->  	twsi1: i2c at d4011000 {
->  		compatible = "mrvl,mmp-twsi";
-> -- 
-> 1.9.1
+> However, it also came to light that various drivers are using
+> __cpuc_* functions directly, which are non-portable, and is another
+> instance of "going under the covers" and tinkering with what should
+> be kept as architecture implementation details.
 > 
+> This series addresses some of these points.  It:
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> (a) moves dmac_map_area() and dmac_unmap_area() prototypes out of
+>     asm/cacheflush.h and into arch/arm/mm.
+> (b) provide a secure_flush() call for the Qualcomm secure monitor
+>     code.
+> (c) stop tegra smmu driver(s) from using __cpuc_flush_dcache_area,
+>     something which necessitates additional complexity to deal with
+>     the ARM vs ARM64 differences.  It should be using the DMA API.
+>     However, the Tegra SMMU driver is in really bad shape, and this
+>     isn't a simple conversion - it requires a lot of additional
+>     fixes to bring the code up to scratch.
+
+Out of curiosity, did you have any hardware to test this on? I've given
+it a quick spin and haven't seen anything out of the ordinary. I have a
+couple of nitpicks towards the end of the series, but other than that,
+very nice work.
+
+What's the plan for merging this? Should it all go in through Joerg's
+tree so that potentially other driver conversions can go in on top of
+this, or would you prefer to take it through the ARM tree?
+
+> It leaves the Rockchip IOMMU driver for the time being, but that is also
+> something which needs cleaning up in the same way as the Tegra SMMU
+> driver.
+
+>From a cursory look, MSM, OMAP and Exynos are in the same boat as well.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/e1d4912f/attachment-0001.sig>
