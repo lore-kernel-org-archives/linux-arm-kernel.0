@@ -1,41 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Jul 2015 14:58:29 +0200
-Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert users to the PIO
- interrupts binding
-In-Reply-To: <1438000918-9026-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1438000918-9026-1-git-send-email-maxime.ripard@free-electrons.com>
- <1438000918-9026-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACRpkdYT0gsrZZcWrkES4EdF0G1oY_t0isOTbJtbCGx2KP2HTw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Jul 2015 14:00:53 +0100
+Subject: [PATCH v2 02/20] documentation: Clarify failed cmpxchg memory
+ ordering semantics
+In-Reply-To: <20150727120201.GW19282@twins.programming.kicks-ass.net>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-3-git-send-email-will.deacon@arm.com>
+ <20150727115822.GH3358@arm.com>
+ <20150727120201.GW19282@twins.programming.kicks-ass.net>
+Message-ID: <20150727130053.GI3358@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 2:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Mon, Jul 27, 2015 at 01:02:01PM +0100, Peter Zijlstra wrote:
+> On Mon, Jul 27, 2015 at 12:58:22PM +0100, Will Deacon wrote:
+> > On Fri, Jul 24, 2015 at 11:41:53AM +0100, Will Deacon wrote:
+> > > A failed cmpxchg does not provide any memory ordering guarantees, a
+> > > property that is used to optimise the cmpxchg implementations on Alpha,
+> > > PowerPC and arm64.
+> > > 
+> > > This patch updates atomic_ops.txt and memory-barriers.txt to reflect
+> > > this.
+> > > 
+> > > Cc: Peter Zijlstra <peterz@infradead.org>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  Documentation/atomic_ops.txt      | 4 +++-
+> > >  Documentation/memory-barriers.txt | 6 +++---
+> > >  2 files changed, 6 insertions(+), 4 deletions(-)
+> > 
+> > Peter: are you ok with me taking this via the arm64 tree (along with the
+> > rest of the series), or would you prefer this patch routed through -tip?
+> 
+> So I have this one queued, and typically these changes go through tip
+> because the RCU tree also ends up there, and Paul is the typical source
+> of patches there.
+> 
+> So to minimize collisions on memory-barriers.txt i'd like to keep it if
+> its not too much hassle.
 
-> The current DTs were setting the cell size to 2, but used the default xlate
-> function that was assuming an interrupt cell size of 1, leading to the
-> second part of the cell (the flags) being ignored, while we were having an
-> inconsistent binding between the interrupts and gpio (that could also be
-> used as interrupts).
->
-> That "binding" doesn't work either with newer SoCs that have multiple irq
-> banks.
->
-> Now that we fixed the pinctrl driver to handle this like it should always
-> have been handled, convert the DT users, and while we're at it, remove the
-> size-cells property of PIO that is completely useless.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+No problem at all, just didn't want it to get dropped. Minimising conflicts
+in memory-barriers.txt is definitely a good idea ;)
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Thanks!
 
-I guess this will be merged through ARM SoC?
-
-If you want me to carry it in pinctrl and you're *certain* it
-will not collide with something else coming in from ARM SoC
-then tell me ... prefer to even have ARM SoC maintainers
-ACK on this actually.
-
-Yours,
-Linus Walleij
+Will
