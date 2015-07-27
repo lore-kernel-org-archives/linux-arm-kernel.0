@@ -1,50 +1,65 @@
-From: anurup.m@huawei.com (Anurup M)
-Date: Mon, 27 Jul 2015 11:54:38 +0530
-Subject: kexec crash kernel boot failure on arm64
-In-Reply-To: <20150727051835.GF31919@dhcppc13.redhat.com>
-References: <D2393EB95A9993478029A6FE6A290A9F81D90EF8@szxeml510-mbx.china.huawei.com>
- <20150724092934.GA23074@leverpostej>
- <20150727051835.GF31919@dhcppc13.redhat.com>
-Message-ID: <55B5CEA6.4050000@huawei.com>
+From: kirill@shutemov.name (Kirill A. Shutemov)
+Date: Mon, 27 Jul 2015 09:43:00 +0300
+Subject: [PATCH V5 2/7] mm: mlock: Add new mlock system call
+In-Reply-To: <1437773325-8623-3-git-send-email-emunson@akamai.com>
+References: <1437773325-8623-1-git-send-email-emunson@akamai.com>
+ <1437773325-8623-3-git-send-email-emunson@akamai.com>
+Message-ID: <20150727064300.GB11657@node.dhcp.inet.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 24, 2015 at 05:28:40PM -0400, Eric B Munson wrote:
+> With the refactored mlock code, introduce a new system call for mlock.
+> The new call will allow the user to specify what lock states are being
+> added.  mlock2 is trivial at the moment, but a follow on patch will add
+> a new mlock state making it useful.
+> 
+> Signed-off-by: Eric B Munson <emunson@akamai.com>
+> Cc: Michal Hocko <mhocko@suse.cz>
+> Cc: Vlastimil Babka <vbabka@suse.cz>
+> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+> Cc: Geert Uytterhoeven <geert@linux-m68k.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Stephen Rothwell <sfr@canb.auug.org.au>
+> Cc: Guenter Roeck <linux@roeck-us.net>
+> Cc: linux-alpha at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: adi-buildroot-devel at lists.sourceforge.net
+> Cc: linux-cris-kernel at axis.com
+> Cc: linux-ia64 at vger.kernel.org
+> Cc: linux-m68k at lists.linux-m68k.org
+> Cc: linux-am33-list at redhat.com
+> Cc: linux-parisc at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: linux-s390 at vger.kernel.org
+> Cc: linux-sh at vger.kernel.org
+> Cc: sparclinux at vger.kernel.org
+> Cc: linux-xtensa at linux-xtensa.org
+> Cc: linux-api at vger.kernel.org
+> Cc: linux-arch at vger.kernel.org
+> Cc: linux-mm at kvack.org
+> ---
+> Changes from V4:
+> * Drop all architectures except x86[_64] from this patch, MIPS is added
+>   later in the series.  All others will be left to their maintainers.
+> 
+> Changes from V3:
+> * Do a (hopefully) complete job of adding the new system calls
+>  arch/alpha/include/uapi/asm/mman.h     | 2 ++
+>  arch/mips/include/uapi/asm/mman.h      | 5 +++++
+>  arch/parisc/include/uapi/asm/mman.h    | 2 ++
+>  arch/powerpc/include/uapi/asm/mman.h   | 2 ++
+>  arch/sparc/include/uapi/asm/mman.h     | 2 ++
+>  arch/tile/include/uapi/asm/mman.h      | 5 +++++
+>  arch/x86/entry/syscalls/syscall_32.tbl | 1 +
+>  arch/x86/entry/syscalls/syscall_64.tbl | 1 +
+>  arch/xtensa/include/uapi/asm/mman.h    | 5 +++++
 
+Define MLOCK_LOCKED in include/uapi/asm-generic/mman-common.h.
+This way you can drop changes in powerpc, sparc and tile.
 
-On 7/27/2015 10:48 AM, Pratyush Anand wrote:
-> On 24/07/2015:10:29:34 AM, Mark Rutland wrote:
->> On Fri, Jul 24, 2015 at 03:07:24AM +0100, Anurup m wrote:
->>> Hi All,
->>>
->>> There is a problem observed with crash kernel boot in kdump on arm64.
->>
->> With which kernel? Mainline doesn't have kexec or kdump support for
->> arm64.
->>
->>> On arm64 hardware board, when I enable the purgatory segment, the crash kernel doesnot boot.
->>> When checked with trace32, it is observed that the control comes to purgatory_start routine, 
->>> but the instructions are seen as UNDEF and the boot hangs. But when I took the memory dump, the
->>> contents were seen as proper(matching with the purgatory_start code).
->>>
->>> I did some experiments to analyze this issue. Tried changing the Load order of kexec segments and
->>> observed results as below
-> 
-> As Mark asked, its important to know, which kernel and which
-> kexec-tools you are using. I guess, you would be using either Geoff's
-> [1] master branch or Akashi's [2] kdump/v0.12 branch for kexec-tools.
-> Can you try to increase your crashkernel(=xM) size and use mem=
-> parameter appropriately for the primary kernel commandline and see if
-> it improves.
-> 
+Otherwise looks good.
 
-Thanks you for the reply. I shall try and let you know.
-
-> ~Pratyush
-> 
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
-> [2] https://git.linaro.org/people/takahiro.akashi/kexec-tools.git
-> 
-> 
-> 
-> .
-> 
+-- 
+ Kirill A. Shutemov
