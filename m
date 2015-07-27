@@ -1,702 +1,119 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 27 Jul 2015 00:39:34 -0400
-Subject: [PATCH v2 2/2] Consolidate redundant register/stack access code
-In-Reply-To: <1437971974-2434-1-git-send-email-dave.long@linaro.org>
-References: <1437971974-2434-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1437971974-2434-3-git-send-email-dave.long@linaro.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 27 Jul 2015 00:43:28 -0400 (EDT)
+Subject: [PATCH 3/5] ARM: MCPM: make internal helpers private to the core
+ code
+In-Reply-To: <CAGb2v64KiT93nzbn04YXh8djHFpWgf0LOikScmKdou+EwimKFg@mail.gmail.com>
+References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
+ <1430496392-15956-4-git-send-email-nicolas.pitre@linaro.org>
+ <CAGb2v65D7vtuV4kfg0HoM_pp4=UmY29AzpOP=E5WWGM5fPO9XA@mail.gmail.com>
+ <alpine.LFD.2.20.1507241109050.1806@knanqh.ubzr>
+ <CAGb2v64KiT93nzbn04YXh8djHFpWgf0LOikScmKdou+EwimKFg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.20.1507270004440.1806@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "David A. Long" <dave.long@linaro.org>
+On Sat, 25 Jul 2015, Chen-Yu Tsai wrote:
 
-Several architectures have identical or functionally equivalent code
-implementing parts of the HAVE_REGS_AND_STACK_ACCESS_API feature.  Move
-that code out of the architecture directories.
+> On Fri, Jul 24, 2015 at 11:44 PM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > On Fri, 24 Jul 2015, Chen-Yu Tsai wrote:
+> >
+> >> Hi,
+> >>
+> >> On Sat, May 2, 2015 at 12:06 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> >> > This concerns the following helpers:
+> >> >
+> >> >         __mcpm_cpu_going_down()
+> >> >         __mcpm_cpu_down()
+> >> >         __mcpm_outbound_enter_critical()
+> >> >         __mcpm_outbound_leave_critical()
+> >> >         __mcpm_cluster_state()
+> >> >
+> >> > They are and should only be used by the core code now.  Therefore their
+> >> > declarations are removed from mcpm.h and their definitions are made
+> >> > static, hence the need to move them before their users which accounts
+> >> > for the bulk of this patch.
+> >>
+> >> I'm looking for some advice. On the Allwinner A80, at least on mainline,
+> >> there is no external PMU or embedded controller in charge of power
+> >> controls. What this means is that I'm doing power sequencing in the
+> >> kernel as part of the MCPM calls, specifically powering down cores and
+> >> clusters in the .wait_for_powerdown callback. (I don't think it's
+> >> reasonable or even possible to power down stuff in .*_powerdown_prepare)
+> >
+> > Can you tell me more about the power control knobs at your disposal?  Do
+> > power gates become effective immediately or only when WFI is asserted?
+> >
+> > And can you configure things so a core may be powered up asynchronously
+> > from an IRQ?
+> 
+> The above probably wasn't clear enough. Power gates, reset controls and
+> SMP/WFI/WFE status are mapped to various mmio registers. The controls
+> are effective immediately.
+> 
+> The power gates and reset controls can only be manually controlled.
+> There is no mainline support for the embedded controller yet, and I
+> doubt Allwinner's firmware supports it either, as their kernel also
+> does power sequencing itself. In a nutshell, the kernel is on its
+> own, we do not support wakeups with IRQs.
+> 
+> >> Previously I was using __mcpm_cluster_state() to check if the last core
+> >> in a cluster was to be powered off, and thus the whole cluster could be
+> >> turned off as well.
+> >> I could also check if the individual power gates or
+> >> resets are asserted, but if a core was already scheduled to be brought
+> >> up, and MCPM common framework didn't call .cluster_powerup, there might
+> >> be a problem.
+> >
+> > I fail to see how a core could be scheduled to be brought up without
+> > deasserting its reset line somehow though.
+> 
+> My point is could there be a race condition in the sequence of events?
+> Say .*_powerup() deasserted the reset lines _after_ we checked them
+> in .wait_for_powerdown(). As Dave mentioned, .wait_for_powerdown() is
+> not called with the MCPM lock held.
 
-Signed-off-by: David A. Long <dave.long@linaro.org>
----
- arch/arm/include/asm/ptrace.h          |  6 ---
- arch/arm/kernel/ptrace.c               | 67 +--------------------------------
- arch/hexagon/include/uapi/asm/ptrace.h |  3 --
- arch/powerpc/include/asm/ptrace.h      | 38 -------------------
- arch/powerpc/kernel/ptrace.c           | 34 +----------------
- arch/s390/include/asm/ptrace.h         |  3 --
- arch/s390/kernel/ptrace.c              | 69 ++++++++++------------------------
- arch/sh/include/asm/ptrace.h           | 39 -------------------
- arch/sh/kernel/Makefile                |  2 +-
- arch/sh/kernel/ptrace.c                | 33 ----------------
- arch/sh/kernel/ptrace_32.c             |  2 +-
- arch/sh/kernel/ptrace_64.c             |  2 +-
- arch/x86/include/asm/ptrace.h          | 37 ------------------
- arch/x86/kernel/ptrace.c               | 34 +----------------
- include/linux/ptrace.h                 | 42 +++++++++++++++++++++
- kernel/ptrace.c                        | 38 +++++++++++++++++++
- 16 files changed, 106 insertions(+), 343 deletions(-)
- delete mode 100644 arch/sh/kernel/ptrace.c
+In theory this should never happen.  Even if .wait_for_powerdown() was 
+prevented from running concurrently with .*_powerup(), nothing would 
+prevent .*_powerup() from running the moment .wait_for_powerdown() 
+has returned.  So it is up to the higher level not to power up a CPU and 
+wait for it to be down at the same time since this simply makes no 
+sense... unless it really wants the CPU back right away.
 
-diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
-index 51622ba..84a0ea4 100644
---- a/arch/arm/include/asm/ptrace.h
-+++ b/arch/arm/include/asm/ptrace.h
-@@ -120,12 +120,6 @@ extern unsigned long profile_pc(struct pt_regs *regs);
- #include <linux/types.h>
- #define MAX_REG_OFFSET (offsetof(struct pt_regs, ARM_ORIG_r0))
- 
--extern int regs_query_register_offset(const char *name);
--extern const char *regs_query_register_name(unsigned int offset);
--extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
--extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
--					       unsigned int n);
--
- /**
-  * regs_get_register() - get register value from its offset
-  * @regs:	   pt_regs from which register value is gotten
-diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
-index 3b5a2ba..f26e23b 100644
---- a/arch/arm/kernel/ptrace.c
-+++ b/arch/arm/kernel/ptrace.c
-@@ -63,7 +63,7 @@
- #define REG_OFFSET_NAME(r) \
- 	{.name = #r, .offset = offsetof(struct pt_regs, ARM_##r)}
- 
--static const struct pt_regs_offset regoffset_table[] = {
-+const struct pt_regs_offset regs_offset_table[] = {
- 	REG_OFFSET_NAME(r0),
- 	REG_OFFSET_NAME(r1),
- 	REG_OFFSET_NAME(r2),
-@@ -85,71 +85,6 @@ static const struct pt_regs_offset regoffset_table[] = {
- 	REGS_OFFSET_END,
- };
- 
--/**
-- * regs_query_register_offset() - query register offset from its name
-- * @name:	the name of a register
-- *
-- * regs_query_register_offset() returns the offset of a register in struct
-- * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-- */
--int regs_query_register_offset(const char *name)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (!strcmp(roff->name, name))
--			return roff->offset;
--	return -EINVAL;
--}
--
--/**
-- * regs_query_register_name() - query register name from its offset
-- * @offset:	the offset of a register in struct pt_regs.
-- *
-- * regs_query_register_name() returns the name of a register from its
-- * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-- */
--const char *regs_query_register_name(unsigned int offset)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (roff->offset == offset)
--			return roff->name;
--	return NULL;
--}
--
--/**
-- * regs_within_kernel_stack() - check the address in the stack
-- * @regs:      pt_regs which contains kernel stack pointer.
-- * @addr:      address which is checked.
-- *
-- * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-- * If @addr is within the kernel stack, it returns true. If not, returns false.
-- */
--bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
--{
--	return ((addr & ~(THREAD_SIZE - 1))  ==
--		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
--}
--
--/**
-- * regs_get_kernel_stack_nth() - get Nth entry of the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @n:		stack entry number.
-- *
-- * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-- * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-- * this returns 0.
-- */
--unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
--{
--	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
--	addr += n;
--	if (regs_within_kernel_stack(regs, (unsigned long)addr))
--		return *addr;
--	else
--		return 0;
--}
--
- /*
-  * this routine will get a word off of the processes privileged stack.
-  * the offset is how far from the base addr as stored in the THREAD.
-diff --git a/arch/hexagon/include/uapi/asm/ptrace.h b/arch/hexagon/include/uapi/asm/ptrace.h
-index 065e5b3..0afb664 100644
---- a/arch/hexagon/include/uapi/asm/ptrace.h
-+++ b/arch/hexagon/include/uapi/asm/ptrace.h
-@@ -29,9 +29,6 @@
- #define profile_pc(regs) instruction_pointer(regs)
- 
- /* kprobe-based event tracer support */
--extern int regs_query_register_offset(const char *name);
--extern const char *regs_query_register_name(unsigned int offset);
--
- #define current_pt_regs() \
- 	((struct pt_regs *) \
- 	 ((unsigned long)current_thread_info() + THREAD_SIZE) - 1)
-diff --git a/arch/powerpc/include/asm/ptrace.h b/arch/powerpc/include/asm/ptrace.h
-index c0c61fa..64b9b3d 100644
---- a/arch/powerpc/include/asm/ptrace.h
-+++ b/arch/powerpc/include/asm/ptrace.h
-@@ -156,8 +156,6 @@ do {									      \
- 
- #include <linux/stddef.h>
- #include <linux/thread_info.h>
--extern int regs_query_register_offset(const char *name);
--extern const char *regs_query_register_name(unsigned int offset);
- #define MAX_REG_OFFSET (offsetof(struct pt_regs, dsisr))
- 
- /**
-@@ -177,42 +175,6 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
- 	return *(unsigned long *)((unsigned long)regs + offset);
- }
- 
--/**
-- * regs_within_kernel_stack() - check the address in the stack
-- * @regs:      pt_regs which contains kernel stack pointer.
-- * @addr:      address which is checked.
-- *
-- * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-- * If @addr is within the kernel stack, it returns true. If not, returns false.
-- */
--
--static inline bool regs_within_kernel_stack(struct pt_regs *regs,
--						unsigned long addr)
--{
--	return ((addr & ~(THREAD_SIZE - 1))  ==
--		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
--}
--
--/**
-- * regs_get_kernel_stack_nth() - get Nth entry of the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @n:		stack entry number.
-- *
-- * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-- * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-- * this returns 0.
-- */
--static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
--						      unsigned int n)
--{
--	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
--	addr += n;
--	if (regs_within_kernel_stack(regs, (unsigned long)addr))
--		return *addr;
--	else
--		return 0;
--}
--
- #endif /* __ASSEMBLY__ */
- 
- #ifndef __powerpc64__
-diff --git a/arch/powerpc/kernel/ptrace.c b/arch/powerpc/kernel/ptrace.c
-index b8f054c..47d28f4 100644
---- a/arch/powerpc/kernel/ptrace.c
-+++ b/arch/powerpc/kernel/ptrace.c
-@@ -56,7 +56,7 @@
- #define GPR_OFFSET_NAME(num)	\
- 	{.name = STR(gpr##num), .offset = offsetof(struct pt_regs, gpr[num])}
- 
--static const struct pt_regs_offset regoffset_table[] = {
-+const struct pt_regs_offset regs_offset_table[] = {
- 	GPR_OFFSET_NAME(0),
- 	GPR_OFFSET_NAME(1),
- 	GPR_OFFSET_NAME(2),
-@@ -106,38 +106,6 @@ static const struct pt_regs_offset regoffset_table[] = {
- 	REGS_OFFSET_END,
- };
- 
--/**
-- * regs_query_register_offset() - query register offset from its name
-- * @name:	the name of a register
-- *
-- * regs_query_register_offset() returns the offset of a register in struct
-- * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-- */
--int regs_query_register_offset(const char *name)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (!strcmp(roff->name, name))
--			return roff->offset;
--	return -EINVAL;
--}
--
--/**
-- * regs_query_register_name() - query register name from its offset
-- * @offset:	the offset of a register in struct pt_regs.
-- *
-- * regs_query_register_name() returns the name of a register from its
-- * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-- */
--const char *regs_query_register_name(unsigned int offset)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (roff->offset == offset)
--			return roff->name;
--	return NULL;
--}
--
- /*
-  * does not yet catch signals sent when the child dies.
-  * in exit.c or in signal.c.
-diff --git a/arch/s390/include/asm/ptrace.h b/arch/s390/include/asm/ptrace.h
-index 6feda25..d4f9ad3 100644
---- a/arch/s390/include/asm/ptrace.h
-+++ b/arch/s390/include/asm/ptrace.h
-@@ -163,10 +163,7 @@ static inline void instruction_pointer_set(struct pt_regs *regs,
- 	regs->psw.addr = val | PSW_ADDR_AMODE;
- }
- 
--int regs_query_register_offset(const char *name);
--const char *regs_query_register_name(unsigned int offset);
- unsigned long regs_get_register(struct pt_regs *regs, unsigned int offset);
--unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n);
- 
- static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
- {
-diff --git a/arch/s390/kernel/ptrace.c b/arch/s390/kernel/ptrace.c
-index d363c9c..54d1ec3 100644
---- a/arch/s390/kernel/ptrace.c
-+++ b/arch/s390/kernel/ptrace.c
-@@ -1474,9 +1474,26 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- 	return &user_s390_view;
- }
- 
--static const char *gpr_names[NUM_GPRS] = {
--	"r0", "r1",  "r2",  "r3",  "r4",  "r5",  "r6",  "r7",
--	"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15",
-+#define REG_OFFSET_NAME(r) {.name = "r" #r, .offset = r}
-+
-+const struct pt_regs_offset regs_offset_table[NUM_GPRS+1] = {
-+	REG_OFFSET_NAME(0),
-+	REG_OFFSET_NAME(1),
-+	REG_OFFSET_NAME(2),
-+	REG_OFFSET_NAME(3),
-+	REG_OFFSET_NAME(4),
-+	REG_OFFSET_NAME(5),
-+	REG_OFFSET_NAME(6),
-+	REG_OFFSET_NAME(7),
-+	REG_OFFSET_NAME(8),
-+	REG_OFFSET_NAME(9),
-+	REG_OFFSET_NAME(10),
-+	REG_OFFSET_NAME(11),
-+	REG_OFFSET_NAME(12),
-+	REG_OFFSET_NAME(13),
-+	REG_OFFSET_NAME(14),
-+	REG_OFFSET_NAME(15),
-+	REGS_OFFSET_END
- };
- 
- unsigned long regs_get_register(struct pt_regs *regs, unsigned int offset)
-@@ -1485,49 +1502,3 @@ unsigned long regs_get_register(struct pt_regs *regs, unsigned int offset)
- 		return 0;
- 	return regs->gprs[offset];
- }
--
--int regs_query_register_offset(const char *name)
--{
--	unsigned long offset;
--
--	if (!name || *name != 'r')
--		return -EINVAL;
--	if (kstrtoul(name + 1, 10, &offset))
--		return -EINVAL;
--	if (offset >= NUM_GPRS)
--		return -EINVAL;
--	return offset;
--}
--
--const char *regs_query_register_name(unsigned int offset)
--{
--	if (offset >= NUM_GPRS)
--		return NULL;
--	return gpr_names[offset];
--}
--
--static int regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
--{
--	unsigned long ksp = kernel_stack_pointer(regs);
--
--	return (addr & ~(THREAD_SIZE - 1)) == (ksp & ~(THREAD_SIZE - 1));
--}
--
--/**
-- * regs_get_kernel_stack_nth() - get Nth entry of the stack
-- * @regs:pt_regs which contains kernel stack pointer.
-- * @n:stack entry number.
-- *
-- * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-- * is specifined by @regs. If the @n th entry is NOT in the kernel stack,
-- * this returns 0.
-- */
--unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
--{
--	unsigned long addr;
--
--	addr = kernel_stack_pointer(regs) + n * sizeof(long);
--	if (!regs_within_kernel_stack(regs, addr))
--		return 0;
--	return *(unsigned long *)addr;
--}
-diff --git a/arch/sh/include/asm/ptrace.h b/arch/sh/include/asm/ptrace.h
-index 523955f..8045eb4 100644
---- a/arch/sh/include/asm/ptrace.h
-+++ b/arch/sh/include/asm/ptrace.h
-@@ -29,10 +29,6 @@
- 	{.name = __stringify(tr##num), .offset = offsetof(struct pt_regs, tregs[num])}
- 
- /* Query offset/name of register from its name/offset */
--extern int regs_query_register_offset(const char *name);
--extern const char *regs_query_register_name(unsigned int offset);
--
--extern const struct pt_regs_offset regoffset_table[];
- 
- /**
-  * regs_get_register() - get register value from its offset
-@@ -51,41 +47,6 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
- 	return *(unsigned long *)((unsigned long)regs + offset);
- }
- 
--/**
-- * regs_within_kernel_stack() - check the address in the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @addr:	address which is checked.
-- *
-- * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-- * If @addr is within the kernel stack, it returns true. If not, returns false.
-- */
--static inline int regs_within_kernel_stack(struct pt_regs *regs,
--					   unsigned long addr)
--{
--	return ((addr & ~(THREAD_SIZE - 1))  ==
--		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
--}
--
--/**
-- * regs_get_kernel_stack_nth() - get Nth entry of the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @n:		stack entry number.
-- *
-- * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-- * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-- * this returns 0.
-- */
--static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
--						      unsigned int n)
--{
--	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
--	addr += n;
--	if (regs_within_kernel_stack(regs, (unsigned long)addr))
--		return *addr;
--	else
--		return 0;
--}
--
- struct perf_event;
- struct perf_sample_data;
- 
-diff --git a/arch/sh/kernel/Makefile b/arch/sh/kernel/Makefile
-index 2ccf36c..4ae9a11 100644
---- a/arch/sh/kernel/Makefile
-+++ b/arch/sh/kernel/Makefile
-@@ -14,7 +14,7 @@ CFLAGS_REMOVE_return_address.o = -pg
- obj-y	:= debugtraps.o dma-nommu.o dumpstack.o 		\
- 	   idle.o io.o irq.o irq_$(BITS).o kdebugfs.o			\
- 	   machvec.o nmi_debug.o process.o				\
--	   process_$(BITS).o ptrace.o ptrace_$(BITS).o			\
-+	   process_$(BITS).o ptrace_$(BITS).o				\
- 	   reboot.o return_address.o					\
- 	   setup.o signal_$(BITS).o sys_sh.o 				\
- 	   syscalls_$(BITS).o time.o topology.o traps.o			\
-diff --git a/arch/sh/kernel/ptrace.c b/arch/sh/kernel/ptrace.c
-deleted file mode 100644
-index 0a05983..0000000
---- a/arch/sh/kernel/ptrace.c
-+++ /dev/null
-@@ -1,33 +0,0 @@
--#include <linux/ptrace.h>
--
--/**
-- * regs_query_register_offset() - query register offset from its name
-- * @name:	the name of a register
-- *
-- * regs_query_register_offset() returns the offset of a register in struct
-- * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-- */
--int regs_query_register_offset(const char *name)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (!strcmp(roff->name, name))
--			return roff->offset;
--	return -EINVAL;
--}
--
--/**
-- * regs_query_register_name() - query register name from its offset
-- * @offset:	the offset of a register in struct pt_regs.
-- *
-- * regs_query_register_name() returns the name of a register from its
-- * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-- */
--const char *regs_query_register_name(unsigned int offset)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (roff->offset == offset)
--			return roff->name;
--	return NULL;
--}
-diff --git a/arch/sh/kernel/ptrace_32.c b/arch/sh/kernel/ptrace_32.c
-index e6fe4f4..c5c385c 100644
---- a/arch/sh/kernel/ptrace_32.c
-+++ b/arch/sh/kernel/ptrace_32.c
-@@ -276,7 +276,7 @@ static int dspregs_active(struct task_struct *target,
- }
- #endif
- 
--const struct pt_regs_offset regoffset_table[] = {
-+const struct pt_regs_offset regs_offset_table[] = {
- 	REG_OFFSET_NAME(0),
- 	REG_OFFSET_NAME(1),
- 	REG_OFFSET_NAME(2),
-diff --git a/arch/sh/kernel/ptrace_64.c b/arch/sh/kernel/ptrace_64.c
-index af55bb6..565227ef 100644
---- a/arch/sh/kernel/ptrace_64.c
-+++ b/arch/sh/kernel/ptrace_64.c
-@@ -252,7 +252,7 @@ static int fpregs_active(struct task_struct *target,
- }
- #endif
- 
--const struct pt_regs_offset regoffset_table[] = {
-+const struct pt_regs_offset regs_offset_table[] = {
- 	REGS_OFFSET_NAME(pc),
- 	REGS_OFFSET_NAME(sr),
- 	REGS_OFFSET_NAME(syscall_nr),
-diff --git a/arch/x86/include/asm/ptrace.h b/arch/x86/include/asm/ptrace.h
-index 5fabf13..c01247c 100644
---- a/arch/x86/include/asm/ptrace.h
-+++ b/arch/x86/include/asm/ptrace.h
-@@ -157,8 +157,6 @@ static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
- #include <asm-generic/ptrace.h>
- 
- /* Query offset/name of register from its name/offset */
--extern int regs_query_register_offset(const char *name);
--extern const char *regs_query_register_name(unsigned int offset);
- #define MAX_REG_OFFSET (offsetof(struct pt_regs, ss))
- 
- /**
-@@ -187,41 +185,6 @@ static inline unsigned long regs_get_register(struct pt_regs *regs,
- 	return *(unsigned long *)((unsigned long)regs + offset);
- }
- 
--/**
-- * regs_within_kernel_stack() - check the address in the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @addr:	address which is checked.
-- *
-- * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-- * If @addr is within the kernel stack, it returns true. If not, returns false.
-- */
--static inline int regs_within_kernel_stack(struct pt_regs *regs,
--					   unsigned long addr)
--{
--	return ((addr & ~(THREAD_SIZE - 1))  ==
--		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
--}
--
--/**
-- * regs_get_kernel_stack_nth() - get Nth entry of the stack
-- * @regs:	pt_regs which contains kernel stack pointer.
-- * @n:		stack entry number.
-- *
-- * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-- * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-- * this returns 0.
-- */
--static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
--						      unsigned int n)
--{
--	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
--	addr += n;
--	if (regs_within_kernel_stack(regs, (unsigned long)addr))
--		return *addr;
--	else
--		return 0;
--}
--
- #define arch_has_single_step()	(1)
- #ifdef CONFIG_X86_DEBUGCTLMSR
- #define arch_has_block_step()	(1)
-diff --git a/arch/x86/kernel/ptrace.c b/arch/x86/kernel/ptrace.c
-index 2efc6aa..0ddabd5 100644
---- a/arch/x86/kernel/ptrace.c
-+++ b/arch/x86/kernel/ptrace.c
-@@ -54,7 +54,7 @@ enum x86_regset {
- };
- 
- 
--static const struct pt_regs_offset regoffset_table[] = {
-+const struct pt_regs_offset regs_offset_table[] = {
- #ifdef CONFIG_X86_64
- 	REGS_OFFSET_NAME(r15),
- 	REGS_OFFSET_NAME(r14),
-@@ -87,38 +87,6 @@ static const struct pt_regs_offset regoffset_table[] = {
- 	REGS_OFFSET_END,
- };
- 
--/**
-- * regs_query_register_offset() - query register offset from its name
-- * @name:	the name of a register
-- *
-- * regs_query_register_offset() returns the offset of a register in struct
-- * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-- */
--int regs_query_register_offset(const char *name)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (!strcmp(roff->name, name))
--			return roff->offset;
--	return -EINVAL;
--}
--
--/**
-- * regs_query_register_name() - query register name from its offset
-- * @offset:	the offset of a register in struct pt_regs.
-- *
-- * regs_query_register_name() returns the name of a register from its
-- * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-- */
--const char *regs_query_register_name(unsigned int offset)
--{
--	const struct pt_regs_offset *roff;
--	for (roff = regoffset_table; roff->name != NULL; roff++)
--		if (roff->offset == offset)
--			return roff->name;
--	return NULL;
--}
--
- static const int arg_offs_table[] = {
- #ifdef CONFIG_X86_32
- 	[0] = offsetof(struct pt_regs, ax),
-diff --git a/include/linux/ptrace.h b/include/linux/ptrace.h
-index dbb8df1..f3afbf8 100644
---- a/include/linux/ptrace.h
-+++ b/include/linux/ptrace.h
-@@ -393,6 +393,48 @@ struct pt_regs_offset {
- 	int offset;
- };
- 
-+extern const struct pt_regs_offset regs_offset_table[];
-+
-+extern int regs_query_register_offset(const char *name);
-+extern const char *regs_query_register_name(unsigned int offset);
-+
-+/**
-+ * regs_within_kernel_stack() - check the address in the stack
-+ * @regs:      pt_regs which contains kernel stack pointer.
-+ * @addr:      address which is checked.
-+ *
-+ * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-+ * If @addr is within the kernel stack, it returns true. If not, returns false.
-+ */
-+
-+static inline bool regs_within_kernel_stack(struct pt_regs *regs,
-+						unsigned long addr)
-+{
-+	return ((addr & ~(THREAD_SIZE - 1))  ==
-+		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1)));
-+}
-+
-+/**
-+ * regs_get_kernel_stack_nth() - get Nth entry of the stack
-+ * @regs:	pt_regs which contains kernel stack pointer.
-+ * @n:		stack entry number.
-+ *
-+ * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-+ * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-+ * this returns 0.
-+ */
-+static inline unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
-+						      unsigned int n)
-+{
-+	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
-+
-+	addr += n;
-+	if (regs_within_kernel_stack(regs, (unsigned long)addr))
-+		return *addr;
-+	else
-+		return 0;
-+}
-+
- #endif	/* CONFIG_HAVE_REGS_AND_STACK_ACCESS_API */
- 
- #endif
-diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-index c8e0e05..20c08d9 100644
---- a/kernel/ptrace.c
-+++ b/kernel/ptrace.c
-@@ -1217,3 +1217,41 @@ COMPAT_SYSCALL_DEFINE4(ptrace, compat_long_t, request, compat_long_t, pid,
- 	return ret;
- }
- #endif	/* CONFIG_COMPAT */
-+
-+#ifdef CONFIG_HAVE_REGS_AND_STACK_ACCESS_API
-+
-+/**
-+ * regs_query_register_offset() - query register offset from its name
-+ * @name:	the name of a register
-+ *
-+ * regs_query_register_offset() returns the offset of a register in struct
-+ * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-+ */
-+int regs_query_register_offset(const char *name)
-+{
-+	const struct pt_regs_offset *roff;
-+
-+	for (roff = regs_offset_table; roff->name != NULL; roff++)
-+		if (!strcmp(roff->name, name))
-+			return roff->offset;
-+	return -EINVAL;
-+}
-+
-+/**
-+ * regs_query_register_name() - query register name from its offset
-+ * @offset:	the offset of a register in struct pt_regs.
-+ *
-+ * regs_query_register_name() returns the name of a register from its
-+ * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-+ */
-+const char *regs_query_register_name(unsigned int offset)
-+{
-+	const struct pt_regs_offset *roff;
-+
-+	for (roff = regs_offset_table; roff->name != NULL; roff++)
-+		if (roff->offset == offset)
-+			return roff->name;
-+	return NULL;
-+}
-+
-+#endif /* CONFIG_HAVE_REGS_AND_STACK_ACCESS_API */
--- 
-1.8.1.2
+> But I've resolved to waiting for L2 WFI before powering off clusters.
+> 
+> >> Any suggestions? Maybe export __mcpm_cluster_state() so platform code
+> >> can know what's going to happen?
+> >
+> > The cluster state may change unexpectedly.  There is a special locking
+> > sequence and state machine needed to make this information reliable.
+> > Simply returning the current state wouldn't be enough to ensure
+> > it can be used race free.
+> 
+> I see.
+> 
+> > As Dave stated, we might have to supplement the MCPM core code with
+> > special methods involving a surviving CPU to perform the power-down
+> > operation on the dying CPU's behalf.  Doing this in .wait_for_powerdown
+> > is just an abuse of the API.
+> 
+> The other users I looked at all had other pieces of hardware taking care
+> of this, so I couldn't really understand where I could put this.
+
+I think what should be done in this case is simply to put the task of 
+killing the CPU power on a work queue that gets executed by another CPU. 
+Queueing the necessary work could be done from the MCPM core code the 
+moment a special method exists in the machine backend structure. The 
+work callback would take the MCPM lock, make sure the CPU/cluster state 
+is "DOWN" and call that special method.
+
+A call to .wait_for_powerdown() should not be responsible for the actual 
+power down. It should remain optional.
+
+> If adding another callback to handle this is acceptable, then I can
+> look into it.
+
+Please be my guest.
+
+
+Nicolas
