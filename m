@@ -1,42 +1,38 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 27 Jul 2015 17:42:08 -0400 (EDT)
-Subject: [PATCH v2] ARM: appropriate __init annotation for const data
-In-Reply-To: <CAOMZO5DAMNh=Wfr=BzxMsRGiHofUBVUemUD2sfO3MEx7LkJRAQ@mail.gmail.com>
-References: <alpine.LFD.2.20.1507271659350.1806@knanqh.ubzr>
- <CAOMZO5DAMNh=Wfr=BzxMsRGiHofUBVUemUD2sfO3MEx7LkJRAQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1507271740030.1806@knanqh.ubzr>
+From: claudiu.manoil@freescale.com (Manoil Claudiu)
+Date: Mon, 27 Jul 2015 16:09:26 +0000
+Subject: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
+ eTSEC2
+In-Reply-To: <20150727142816.GP12927@tiger>
+References: <20150713133138.GO23464@tiger>
+ <1436888777-29742-1-git-send-email-claudiu.manoil@freescale.com>
+ <20150727142816.GP12927@tiger>
+Message-ID: <BY2PR0301MB07278CDB98082971F6094FD19C8E0@BY2PR0301MB0727.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jul 2015, Fabio Estevam wrote:
-
-> On Mon, Jul 27, 2015 at 6:15 PM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> >
-> > Init data marked const should be annotated with __initconst for
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: Monday, July 27, 2015 5:28 PM
+> To: Manoil Claudiu-B08782
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; shawn.guo at linaro.org; Wang Huan-B18965
+> Subject: Re: [PATCH v2] dts: ls1021a: Add dts nodes for eTSEC0, eTSEC1 and
+> eTSEC2
 > 
-> > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> > index 2e7cec86e5..1063af930d 100644
-> > --- a/arch/arm/mach-mxs/mach-mxs.c
-> > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> > @@ -282,7 +282,7 @@ static void __init apx4devkit_init(void)
-> >  #define TX28_FEC_PHY_RESET     MXS_GPIO_NR(4, 13)
-> >  #define TX28_FEC_nINT          MXS_GPIO_NR(4, 5)
+[...]
 > >
-> > -static const struct gpio tx28_gpios[] __initconst = {
-> > +static const struct gpio const tx28_gpios[] __initconst = {
-> >         { ENET0_MDC__GPIO_4_0, GPIOF_OUT_INIT_LOW, "GPIO_4_0" },
-> >         { ENET0_MDIO__GPIO_4_1, GPIOF_OUT_INIT_LOW, "GPIO_4_1" },
-> >         { ENET0_RX_EN__GPIO_4_2, GPIOF_OUT_INIT_LOW, "GPIO_4_2" },
-> > @@ -528,7 +528,7 @@ static void mxs_restart(enum reboot_mode mode, const char *cmd)
-> >         soft_restart(0);
-> >  }
-> >
-> > -static const char *mxs_dt_compat[] __initdata = {
-> > +static const char *mxs_dt_compat[] __initconst = {
+> >  .../devicetree/bindings/net/fsl-tsec-phy.txt       |  6 +-
+> 
+> Bindings doc should be a separate patch reviewed by device tree
+> maintainers.
+> 
+> >  arch/arm/boot/dts/ls1021a-qds.dts                  | 20 +++++
+> >  arch/arm/boot/dts/ls1021a-twr.dts                  | 20 +++++
+> >  arch/arm/boot/dts/ls1021a.dtsi                     | 92
+> ++++++++++++++++++++++
+> 
+> Please separate soc level dts changes from board level changes.
+> 
 
-                        ^
-A "const" is still missing here.
-Argh...
-
-
-Nicolas
+Ok, will break this in 3 patches (soc, boards, bindings), trimmed down as much as possible,
+with remaining findings addressed.  Thanks.
