@@ -1,81 +1,109 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 27 Jul 2015 03:14:47 +0200
-Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
- Kconfig
-In-Reply-To: <20150726225145.GF7576@n2100.arm.linux.org.uk>
-References: <1437612483-30160-1-git-send-email-sre@kernel.org>
- <1437612483-30160-4-git-send-email-sre@kernel.org>
- <20150723123553.GE7576@n2100.arm.linux.org.uk>
- <20150724001605.GA1453@earth>
- <20150726225145.GF7576@n2100.arm.linux.org.uk>
-Message-ID: <20150727011447.GA23087@earth>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Mon, 27 Jul 2015 03:28:06 +0200
+Subject: [RFC] ARM: dts: sunxi: Add regulators and board-specific operating
+ points for LeMaker BananaPi
+Message-ID: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+sun7i-a20-bananapi.dts doesn't contain regulator nodes for the AXP209 PMU
+driver, so add them to allow for voltage-scaling with cpufreq-dt. With the
+regulators enabled, we can define board-specific operating points. The defined
+CPU voltages are more conservative (based on the values used by the vendor),
+so they should be more failsafe across all boards of this kind out there.
 
-On Sun, Jul 26, 2015 at 11:51:45PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 24, 2015 at 02:16:06AM +0200, Sebastian Reichel wrote:
-> > On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel wrote:
-> > > > Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
-> > > > in one option less to think about when configuring the kernel.
-> > > 
-> > > > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
-> > > > +#ifdef CONFIG_ARM_ERRATA_430973
-> > > >  	teq	r3, #0x00100000			@ only present in r1p*
-> > > >  	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
-> > > >  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
-> > > 
-> > > NAK.  Please read the mailing list history, I'm not repeating myself
-> > > again on this.  Thanks.
-> > 
-> > It's a bit hard to search the mailing list history without a bit
-> > more information.
-> 
-> You were Cc'd on the previous round of review...
+I'm posting this as RFC as I would like to make a few more remarks and raise
+questions along the way (plus, I'm anything but an experienced developer, so a
+a critical review might help).
 
-But that discussion was about removing the check alltogether iirc.
-This patch does not remove the !ARCH_MULTIPLATFORM check. It just
-*moves* it from the sourcecode to the errata's Kconfig entry.
+I checked the regulator definitions against the schematics released by LeMaker.
+I also compared that to the DT and schematics of Cubiboard 2 and Cubietruck. Of
+course, I also tested the patch on the actual hardware and it works fine for me.
+The CPU voltages are slightly higher than those set in sun7i-a20.dtsi and even
+though they work well for me, I thought it might be safer to use the more
+conservative values used by LeMaker in their old fex file. Would you agree?
+Besides, it it ok to have this in one patch or should it be splitted in two
+(one for the regulators and one for the opp)? Did I miss something important?
 
-The intention was to hide the Kconfig option on multiplatform
-kernels, since it's completely useless there after the N900
-boardcode has been changed (PATCH 1/3).
+Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi.dts | 47 +++++++++++++++++++++++++++++---
+ 1 file changed, 43 insertions(+), 4 deletions(-)
 
-> > I guess you prefer to just add the !ARCH_MULTIPLATFORM dependency to
-> > the Kconfig entry without removing the additional check in the code?
-> 
-> I was referring to the above change.
->
-> However, having discussed with Will Deacon and checked the manuals, I
-> think the change is okay after all: the auxillary control register is
-> banked on secure parts, and the bit we'll be trying to change will be
-> read-only in non-secure mode - and importantly won't fault.
->
-> So, the change is fine, thanks.
-
-I think you missed the part adding the !ARCH_MULTIPLATFORM
-dependency in Kconfig for ARM_ERRATA_430973. I only removed
-the check in the sourcecode, since it is no longer required
-with the dependency being in Kconfig.
-
-So I guess there are 3 options now:
-
- 1. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
-    keep extra check in the sourcecode
- 2. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
-    remove extra check in the sourcecode
- 3. Remove !ARCH_MULTIPLATFORM dependency alltogether
-
-I will send an appropriate patch, if you tell me your preferred
-option.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/a8b16f11/attachment.sig>
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi.dts b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+index 9f7b472..2bcbb0e 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi.dts
+@@ -92,6 +92,22 @@
+ 	status = "okay";
+ };
+ 
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++	operating-points = <
++		/* kHz	  uV */
++		1008000	1450000
++		960000	1425000
++		912000	1425000
++		864000	1350000
++		720000	1250000
++		528000	1150000
++		312000	1100000
++		144000	1050000
++		>;
++	cooling-max-level = <7>;
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -119,13 +135,9 @@
+ 	status = "okay";
+ 
+ 	axp209: pmic at 34 {
+-		compatible = "x-powers,axp209";
+ 		reg = <0x34>;
+ 		interrupt-parent = <&nmi_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-
+-		interrupt-controller;
+-		#interrupt-cells = <1>;
+ 	};
+ };
+ 
+@@ -182,6 +194,33 @@
+ 	};
+ };
+ 
++#include "axp209.dtsi"
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1050000>;
++	regulator-max-microvolt = <1450000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-int-dll";
++};
++
++&reg_ldo1 {
++	regulator-name = "vdd-rtc";
++};
++
++&reg_ldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "avcc";
++};
++
+ &reg_usb1_vbus {
+ 	status = "okay";
+ };
+-- 
+2.1.4
