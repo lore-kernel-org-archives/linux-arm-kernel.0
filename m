@@ -1,44 +1,33 @@
 From: mark.yao@rock-chips.com (Mark Yao)
-Date: Mon, 27 Jul 2015 10:06:00 +0800
-Subject: [PATCH v4 4/6] drm/rockchip: vop: Default enable win2/3 area0 bit
+Date: Mon, 27 Jul 2015 10:08:27 +0800
+Subject: [PATCH v4 5/6] drm/rockchip: vop: restore vop registers when resume
 In-Reply-To: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
 References: <1437962762-19157-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <1437962762-19157-5-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1437962907-19229-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Win2/3 support multiple area function, but we haven't found
-a suitable way to use it yet, so let's just use them as other windows
-with only area 0 enabled.
+The registers will be reset to default values when whole
+power domain off, so restore registers from regsbak.
 
 Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
 Changes in v4: None
 
-Changes in v3:
-Adviced by Tomasz Figa
-- fix patch comments.
-Changes in v2: None
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index c1264d5..4a2923b 100644
+index 4a2923b..16b7d98 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -279,6 +279,12 @@ static const struct vop_reg_data vop_init_reg_table[] = {
- 	{DSP_CTRL0, 0x00000000},
- 	{WIN0_CTRL0, 0x00000080},
- 	{WIN1_CTRL0, 0x00000080},
-+	/* TODO: Win2/3 support multiple area function, but we haven't found
-+	 * a suitable way to use it yet, so let's just use them as other windows
-+	 * with only area 0 enabled.
-+	 */
-+	{WIN2_CTRL0, 0x00000010},
-+	{WIN3_CTRL0, 0x00000010},
- };
+@@ -496,6 +496,7 @@ static void vop_enable(struct drm_crtc *crtc)
+ 		goto err_disable_aclk;
+ 	}
  
- /*
++	memcpy(vop->regs, vop->regsbak, vop->len);
+ 	/*
+ 	 * At here, vop clock & iommu is enable, R/W vop regs would be safe.
+ 	 */
 -- 
 1.7.9.5
