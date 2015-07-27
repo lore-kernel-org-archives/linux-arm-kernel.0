@@ -1,74 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 27 Jul 2015 12:58:22 +0100
-Subject: [PATCH v2 02/20] documentation: Clarify failed cmpxchg memory
- ordering semantics
-In-Reply-To: <1437734531-10698-3-git-send-email-will.deacon@arm.com>
-References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
- <1437734531-10698-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20150727115822.GH3358@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Jul 2015 13:58:09 +0200
+Subject: [PATCH v2 3/7] cpufreq-dt: add turbo modes support
+In-Reply-To: <20150727113340.GA10181@linux>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <15810554.2OjPyuYJBt@amdc1976> <20150727113340.GA10181@linux>
+Message-ID: <2522396.6jWphaZxGp@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 11:41:53AM +0100, Will Deacon wrote:
-> A failed cmpxchg does not provide any memory ordering guarantees, a
-> property that is used to optimise the cmpxchg implementations on Alpha,
-> PowerPC and arm64.
+On Monday, July 27, 2015 05:03:40 PM Viresh Kumar wrote:
+> On 27-07-15, 13:01, Bartlomiej Zolnierkiewicz wrote:
 > 
-> This patch updates atomic_ops.txt and memory-barriers.txt to reflect
-> this.
+> First of all, please don't be angry :).. We can discuss and get things
+> sorted out ...
+
+OK :)
+
+> > This change was in the original patch posted in April:
+> > https://lkml.org/lkml/2015/4/10/646
 > 
-> Cc: Peter Zijlstra <peterz@infradead.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  Documentation/atomic_ops.txt      | 4 +++-
->  Documentation/memory-barriers.txt | 6 +++---
->  2 files changed, 6 insertions(+), 4 deletions(-)
-
-Peter: are you ok with me taking this via the arm64 tree (along with the
-rest of the series), or would you prefer this patch routed through -tip?
-
-Will
-
-> diff --git a/Documentation/atomic_ops.txt b/Documentation/atomic_ops.txt
-> index dab6da3382d9..b19fc34efdb1 100644
-> --- a/Documentation/atomic_ops.txt
-> +++ b/Documentation/atomic_ops.txt
-> @@ -266,7 +266,9 @@ with the given old and new values. Like all atomic_xxx operations,
->  atomic_cmpxchg will only satisfy its atomicity semantics as long as all
->  other accesses of *v are performed through atomic_xxx operations.
->  
-> -atomic_cmpxchg must provide explicit memory barriers around the operation.
-> +atomic_cmpxchg must provide explicit memory barriers around the operation,
-> +although if the comparison fails then no memory ordering guarantees are
-> +required.
->  
->  The semantics for atomic_cmpxchg are the same as those defined for 'cas'
->  below.
-> diff --git a/Documentation/memory-barriers.txt b/Documentation/memory-barriers.txt
-> index 13feb697271f..18fc860df1be 100644
-> --- a/Documentation/memory-barriers.txt
-> +++ b/Documentation/memory-barriers.txt
-> @@ -2383,9 +2383,7 @@ about the state (old or new) implies an SMP-conditional general memory barrier
->  explicit lock operations, described later).  These include:
->  
->  	xchg();
-> -	cmpxchg();
->  	atomic_xchg();			atomic_long_xchg();
-> -	atomic_cmpxchg();		atomic_long_cmpxchg();
->  	atomic_inc_return();		atomic_long_inc_return();
->  	atomic_dec_return();		atomic_long_dec_return();
->  	atomic_add_return();		atomic_long_add_return();
-> @@ -2398,7 +2396,9 @@ explicit lock operations, described later).  These include:
->  	test_and_clear_bit();
->  	test_and_change_bit();
->  
-> -	/* when succeeds (returns 1) */
-> +	/* when succeeds */
-> +	cmpxchg();
-> +	atomic_cmpxchg();		atomic_long_cmpxchg();
->  	atomic_add_unless();		atomic_long_add_unless();
->  
->  These are used for such things as implementing ACQUIRE-class and RELEASE-class
-> -- 
-> 2.1.4
+> Yeah, and I already apologized for missing the request :)
 > 
+> > your review from a month ago didn't contain this request:
+> > https://lkml.org/lkml/2015/6/22/667
+> 
+> Your patch inserted almost 116 lines and most of the stuff was around
+> adding new bindings to get things working with cpufreq-dt driver.
+> 
+> And so I replied to the most important stuff, i.e. don't add new
+> bindings, we will sort it out with opp-v2.
+> 
+> And frankly that wasn't the time where we could have discussed how
+> exactly we are going to use it. Ofcourse we should get it via DT,
+> platform data is just not required.
+> 
+> So, me not NAK ing this approach was fine as it wasn't about keeping
+> this data in the platform data part.
+> 
+> > and now (after nearly 4 months) you are telling me that
+> 
+> I will say a month, as we discarded most of that patch recently :)
+> 
+> > I should change this because you are planning to do some
+> > more changes in the future.
+> 
+> Its not about me doing some changes. But the whole point of doing the
+> opp-v2 thing was to get rid of such platform data things..
+> 
+> Just that your work is competing with opp-v2 code :)
+> 
+> > Could we please keep it as it is for now and change it
+> > later (after independent_clocks configuration will get
+> > ported to use device tree)?
+> 
+> I thought we can get your work to a better shape, with all credit to
+> you. But if you have some dependency on this for 4.3, then I don't
+> mind killing this structure after you have polluted it a bit more :)
+
+Thank you.  This is exactly the case here (I would like to get
+Exynos4x12 conversion to use cpufreq-dt + exynos-cpufreq removal
+in v4.3 if possible and adding new DT bindings will most likely
+slow down the process considerably).
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
