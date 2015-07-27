@@ -1,48 +1,60 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Mon, 27 Jul 2015 23:24:54 +0200
-Subject: [PATCH v2] ARM: dts: Add SPI CS on exynos5250-snow
-In-Reply-To: <a5054dfad3d48c582b062b0536125c9bcff41f31.1438027526.git.hramrach@gmail.com>
-References: <a5054dfad3d48c582b062b0536125c9bcff41f31.1438027526.git.hramrach@gmail.com>
-Message-ID: <CABxcv=kHgvXgVSzLj=bABqO26r3w7T7ezAUfdh0n4S_N3ZM-Mw@mail.gmail.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Tue, 28 Jul 2015 00:28:27 +0300
+Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
+ counter from coprocessor
+Message-ID: <1438032507.17734.46.camel@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Michal,
+Hi all,
 
-The patch looks good to me, just one small comment below.
+year(s) ago it was discovered that MCT timer and ARM architectured
+timer
+are the same hardware with different interface. Here [1].
 
-On Mon, Jul 27, 2015 at 10:11 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> Although there is only one choice of chipselect it is necessary to
-> specify it. The driver cannot claim the gpio otherwise.
->
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->
-> --
-> v2
->  - don't move unrelated line
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index b7f4122..62be08a 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -688,6 +688,7 @@
->         status = "okay";
->         samsung,spi-src-clk = <0>;
->         num-cs = <1>;
-> +       cs-gpios = <&gpa2 5 0>;
+I followed mail-list discussions about removing MCT and using arch
+timer for Exynos5-based SoCs but things aren't moving at least latest
+upstream kernel on odroid-xu3 will use MCT as default timers.
+Maybe the reason are some power-management related things that very
+specific to Samsung. I don't know.
 
-NIT: this should be GPIO_ACTIVE_HIGH instead of 0 but maybe Kukjin or
-Krzysztof can fixup when applying it?
 
->  };
->
->  &usbdrd_dwc3 {
-> --
+Idea of this draft patchset comes from Doug patches when he tried to
+optimize read of 64-bit counter located in mmio. [2]
+Why not using cp15 counter instead if possible?
 
-Acked-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Previous numbers for 1000000 gettimeofday() calls from userspace
+are about 1 ms. With this patches we have 0.5 ms or even better.
+So twice as fast.
+
+Just as matter of interest i tried to perform 2000000 sched_yield()
+calls from userspace. I see around 20% speedup with patches applied.
+
+I tried to use hackbench but it's hard to feel the difference, maybe
+speedup is 0.5% but with bad fluctuation.
+
+Everything is tested on odroid-xu3.
+Looks like Cortex-A9 based Samsung SoCs (odroid-u2, odroid-x) don't
+have arch timer.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014
+-May/256943.html
+[2] https://lkml.org/lkml/2014/6/20/431
+
+
+
+Current code created with such assumptions: 
+-- don't want to insert huge refactoring in MCT code;
+-- target platform only ARMv7 Exynos5-based SoC that works in 32-bit
+mode so i don't want to build described functionality on ARM64.
+Currently i'm trying to patch odroid-xu3 DT only.
+-- firmware on odroid-xu3 is broken and secondary cores start
+in SVC mode instead of HYP mode. Maybe i can remove check for hyp mode;
+-- in addition instead of DT property I may parse PFR regs and find
+Generic Timer Extension there.
+
+I hope you are not getting bored reading to me. Current code is a
+little bit draft so comments and ideas are welcome.
 
 Best regards,
-Javier
+Alexey Klimov
