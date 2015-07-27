@@ -1,66 +1,108 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:38 +0200
-Subject: [PATCH v4 28/46] usb: gadget: pxa27x_udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:56 +0200
+Subject: [PATCH v4 46/46] usb: musb: gadget: add musb_match_ep() function
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-29-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-47-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
+process. Function does the same that was done by chip-specific code inside
+of epautoconf. Now this code can be removed from there to separate generic code
+from platform specific logic.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/pxa27x_udc.h | 33 ++++++++++++++++++---------------
- 1 file changed, 18 insertions(+), 15 deletions(-)
+ drivers/usb/gadget/epautoconf.c | 23 -----------------------
+ drivers/usb/musb/musb_gadget.c  | 34 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 34 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.h b/drivers/usb/gadget/udc/pxa27x_udc.h
-index 11e1423..ded058c 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.h
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.h
-@@ -234,25 +234,28 @@
- /*
-  * Endpoint definition helpers
-  */
--#define USB_EP_DEF(addr, bname, dir, type, maxpkt) \
--{ .usb_ep = { .name = bname, .ops = &pxa_ep_ops, .maxpacket = maxpkt, }, \
-+#define USB_EP_DEF(addr, bname, dir, type, maxpkt, ctype, cdir) \
-+{ .usb_ep = {	.name = bname, .ops = &pxa_ep_ops, .maxpacket = maxpkt, \
-+		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## ctype, \
-+				    USB_EP_CAPS_DIR_ ## cdir), }, \
-   .desc = {	.bEndpointAddress = addr | (dir ? USB_DIR_IN : 0), \
--		.bmAttributes = type, \
-+		.bmAttributes = USB_ENDPOINT_XFER_ ## type, \
- 		.wMaxPacketSize = maxpkt, }, \
-   .dev = &memory \
- }
--#define USB_EP_BULK(addr, bname, dir) \
--  USB_EP_DEF(addr, bname, dir, USB_ENDPOINT_XFER_BULK, BULK_FIFO_SIZE)
--#define USB_EP_ISO(addr, bname, dir) \
--  USB_EP_DEF(addr, bname, dir, USB_ENDPOINT_XFER_ISOC, ISO_FIFO_SIZE)
--#define USB_EP_INT(addr, bname, dir) \
--  USB_EP_DEF(addr, bname, dir, USB_ENDPOINT_XFER_INT, INT_FIFO_SIZE)
--#define USB_EP_IN_BULK(n)	USB_EP_BULK(n, "ep" #n "in-bulk", 1)
--#define USB_EP_OUT_BULK(n)	USB_EP_BULK(n, "ep" #n "out-bulk", 0)
--#define USB_EP_IN_ISO(n)	USB_EP_ISO(n,  "ep" #n "in-iso", 1)
--#define USB_EP_OUT_ISO(n)	USB_EP_ISO(n,  "ep" #n "out-iso", 0)
--#define USB_EP_IN_INT(n)	USB_EP_INT(n,  "ep" #n "in-int", 1)
--#define USB_EP_CTRL		USB_EP_DEF(0,  "ep0", 0, 0, EP0_FIFO_SIZE)
-+#define USB_EP_BULK(addr, bname, dir, cdir) \
-+	USB_EP_DEF(addr, bname, dir, BULK, BULK_FIFO_SIZE, BULK, cdir)
-+#define USB_EP_ISO(addr, bname, dir, cdir) \
-+	USB_EP_DEF(addr, bname, dir, ISOC, ISO_FIFO_SIZE, ISO, cdir)
-+#define USB_EP_INT(addr, bname, dir, cdir) \
-+	USB_EP_DEF(addr, bname, dir, INT, INT_FIFO_SIZE, INT, cdir)
-+#define USB_EP_IN_BULK(n)	USB_EP_BULK(n, "ep" #n "in-bulk", 1, IN)
-+#define USB_EP_OUT_BULK(n)	USB_EP_BULK(n, "ep" #n "out-bulk", 0, OUT)
-+#define USB_EP_IN_ISO(n)	USB_EP_ISO(n,  "ep" #n "in-iso", 1, IN)
-+#define USB_EP_OUT_ISO(n)	USB_EP_ISO(n,  "ep" #n "out-iso", 0, OUT)
-+#define USB_EP_IN_INT(n)	USB_EP_INT(n,  "ep" #n "in-int", 1, IN)
-+#define USB_EP_CTRL		USB_EP_DEF(0,  "ep0", 0, CONTROL, \
-+					   EP0_FIFO_SIZE, CONTROL, ALL)
+diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+index da45371..254ece7 100644
+--- a/drivers/usb/gadget/epautoconf.c
++++ b/drivers/usb/gadget/epautoconf.c
+@@ -83,29 +83,6 @@ struct usb_ep *usb_ep_autoconfig_ss(
+ 			goto found_ep;
+ 	}
  
- #define PXA_EP_DEF(_idx, _addr, dir, _type, maxpkt, _config, iface, altset) \
- { \
+-	/* First, apply chip-specific "best usage" knowledge.
+-	 * This might make a good usb_gadget_ops hook ...
+-	 */
+-#ifdef CONFIG_BLACKFIN
+-	if (gadget_is_musbhdrc(gadget)) {
+-		if ((USB_ENDPOINT_XFER_BULK == type) ||
+-		    (USB_ENDPOINT_XFER_ISOC == type)) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = gadget_find_ep_by_name(gadget, "ep5in");
+-			else
+-				ep = gadget_find_ep_by_name(gadget, "ep6out");
+-		} else if (USB_ENDPOINT_XFER_INT == type) {
+-			if (USB_DIR_IN & desc->bEndpointAddress)
+-				ep = gadget_find_ep_by_name(gadget, "ep1in");
+-			else
+-				ep = gadget_find_ep_by_name(gadget, "ep2out");
+-		} else
+-			ep = NULL;
+-		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
+-			goto found_ep;
+-	}
+-#endif
+-
+ 	/* Second, look at endpoints until an unclaimed one looks usable */
+ 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
+ 		if (usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
+diff --git a/drivers/usb/musb/musb_gadget.c b/drivers/usb/musb/musb_gadget.c
+index 043248a..3a64cf2 100644
+--- a/drivers/usb/musb/musb_gadget.c
++++ b/drivers/usb/musb/musb_gadget.c
+@@ -1684,6 +1684,39 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_BLACKFIN
++static struct usb_ep *musb_match_ep(struct usb_gadget *g,
++		struct usb_endpoint_descriptor *desc,
++		struct usb_ss_ep_comp_descriptor *ep_comp)
++{
++	struct usb_ep *ep = NULL;
++	u8 type = usb_endpoint_type(desc);
++
++	switch(type) {
++	case USB_ENDPOINT_XFER_ISOC:
++	case USB_ENDPOINT_XFER_BULK:
++		if (usb_endpoint_dir_in(desc))
++			ep = gadget_find_ep_by_name(g, "ep5in");
++		else
++			ep = gadget_find_ep_by_name(g, "ep6out");
++		break;
++	case USB_ENDPOINT_XFER_INT:
++		if (usb_endpoint_dir_in(desc))
++			ep = gadget_find_ep_by_name(g, "ep1in");
++		else
++			ep = gadget_find_ep_by_name(g, "ep2out");
++	default:
++	}
++
++	if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
++		return ep;
++
++	return NULL;
++}
++#else
++#define musb_match_ep NULL
++#endif
++
+ static int musb_gadget_start(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver);
+ static int musb_gadget_stop(struct usb_gadget *g);
+@@ -1697,6 +1730,7 @@ static const struct usb_gadget_ops musb_gadget_operations = {
+ 	.pullup			= musb_gadget_pullup,
+ 	.udc_start		= musb_gadget_start,
+ 	.udc_stop		= musb_gadget_stop,
++	.match_ep		= musb_match_ep,
+ };
+ 
+ /* ----------------------------------------------------------------------- */
 -- 
 1.9.1
