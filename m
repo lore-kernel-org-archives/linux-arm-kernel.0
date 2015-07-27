@@ -1,80 +1,117 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 27 Jul 2015 13:39:05 -0500
-Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
-In-Reply-To: <55B3904B.3050408@free-electrons.com>
-References: <1436711211-18223-1-git-send-email-robh@kernel.org>
- <1436711211-18223-7-git-send-email-robh@kernel.org>
- <55B3904B.3050408@free-electrons.com>
-Message-ID: <CAL_JsqKJgYYEghd3PHZawkHnrqBp1+ok0Fj45a8roipMDmCQjw@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 27 Jul 2015 11:42:12 -0700
+Subject: [PATCH] irq-bcm2836: Move SMP boot to the irqchip code.
+In-Reply-To: <alpine.DEB.2.11.1507261150500.18576@nanos>
+References: <alpine.DEB.2.11.1507261150500.18576@nanos>
+Message-ID: <1438022532-14576-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 25, 2015 at 8:34 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Rob,
->
-> On 12/07/2015 16:26, Rob Herring wrote:
->> set_irq_flags is ARM specific with custom flags which have genirq
->> equivalents. Convert drivers to use the genirq interfaces directly, so we
->> can kill off set_irq_flags. The translation of flags is as follows:
->>
->> IRQF_VALID -> !IRQ_NOREQUEST
->> IRQF_PROBE -> !IRQ_NOPROBE
->> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
->>
->> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
->> and setting IRQ_NOREQUEST already, so there is no need to do this in
->> .map() functions and we can simply remove the set_irq_flags calls. Some
->> users also set IRQ_NOPROBE and this has been maintained although it is not
->> clear that is really needed. There appears to be a great deal of blind
->> copy and paste of this code.
->>
->> Signed-off-by: Rob Herring <robh@kernel.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Kukjin Kim <kgene@kernel.org>
->> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Lee Jones <lee@kernel.org>
->> Cc: Alexander Shiyan <shc_work@mail.ru>
->> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-samsung-soc at vger.kernel.org
->> Cc: linux-rpi-kernel at lists.infradead.org
->> ---
->> v2:
->> - Fix build error on clps711x
->>
-> [...]
->
->> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
->> index 0d3b0fe..b8bf8b0 100644
->> --- a/drivers/irqchip/irq-armada-370-xp.c
->> +++ b/drivers/irqchip/irq-armada-370-xp.c
->> @@ -201,7 +201,6 @@ static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
->>  {
->>       irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
->>                                handle_simple_irq);
->> -     set_irq_flags(virq, IRQF_VALID);
->
-> OK
->
->>
->>       return 0;
->>  }
->> @@ -318,7 +317,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
->>               irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
->>                                       handle_level_irq);
->>       }
->> -     set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
->> +     irq_set_noprobe(virq);
->
-> I think it should be irq_set_probe(virq), I don't see why you inverted the probe flag.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
 
-Yes, this translation and similar ones are messed up. I've gone back
-thru and fixed these.
+Thomas: The problem with delaying IPI unmasking until secondary boot
+is that it means we need the secondary boot process to integrate with
+the irqchip code, which seems unusual given the dearth of includes I
+could find between arch/arm/mach-* SMP boot code and drivers/irqchip/
+to get function prototypes.  However, since the irqchip is most of
+this register space already, it might make sense to just have the SMP
+boot live in drivers/irqchip/.  Here's a patch that would do that,
+that could be squashed into my change.
 
-However, it is questionable whether you really want to enable probing
-on these lines or care either way.
+ drivers/irqchip/irq-bcm2836.c | 57 +++++++++++++++++++++++++++++++++++++------
+ 1 file changed, 50 insertions(+), 7 deletions(-)
 
-Rob
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index 87340b0..5f2a40e 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -49,14 +49,16 @@
+ /* Same status bits as above, but for FIQ. */
+ #define LOCAL_FIQ_PENDING0		0x070
+ /*
+- * Mailbox0 write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
++ * Mailbox write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
+  * these bits are organized by mailbox number and then CPU number.  We
+  * use mailbox 0 for IPIs.  The mailbox's interrupt is raised while
+  * any bit is set.
+  */
+ #define LOCAL_MAILBOX0_SET0		0x080
++#define LOCAL_MAILBOX3_SET0		0x08c
+ /* Mailbox0 write-to-clear bits. */
+ #define LOCAL_MAILBOX0_CLR0		0x0c0
++#define LOCAL_MAILBOX3_CLR0		0x0cc
+ 
+ #define LOCAL_IRQ_CNTPSIRQ	0
+ #define LOCAL_IRQ_CNTPNSIRQ	1
+@@ -195,6 +197,46 @@ static void bcm2836_arm_irqchip_send_ipi(const struct cpumask *mask,
+ 		writel(1 << ipi, mailbox0_base + 16 * cpu);
+ 	}
+ }
++
++/* Requests boot of a secondary CPU.
++ *
++ * The Raspberry Pi firmware has already started up the CPU and set it
++ * spinning in a loop in low memory waiting for a value in mailbox 3
++ * indicating what OS code it should jump to.
++ */
++int __init bcm2836_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	int timeout = 20;
++	void __iomem *mailbox3_set_base = intc.base + LOCAL_MAILBOX3_SET0;
++	void __iomem *mailbox3_clr_base = intc.base + LOCAL_MAILBOX3_CLR0;
++	unsigned long secondary_startup_phys =
++		(unsigned long) virt_to_phys((void *)secondary_startup);
++
++	/* Unmask IPIs to the target cpu. */
++	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
++					       cpu);
++
++	dsb();
++
++	writel(secondary_startup_phys, mailbox3_set_base + 16 * cpu);
++
++	while (true) {
++		int val = readl(mailbox3_clr_base + 16 * cpu);
++
++		if (val == 0)
++			return 0;
++		if (timeout-- == 0)
++			return -ETIMEDOUT;
++		cpu_relax();
++	}
++
++	return 0;
++}
++
++static struct smp_operations bcm2836_smp_ops __initdata = {
++	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
++};
++
+ #endif
+ 
+ static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
+@@ -205,14 +247,15 @@ static void
+ bcm2836_arm_irqchip_smp_init(void)
+ {
+ #ifdef CONFIG_SMP
+-	int i;
++	/* Unmask IPIs to the boot CPU. Other CPUs will be unmasked as
++	 * they're brought up.
++	 */
++	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
++					       smp_processor_id());
+ 
+-	/* unmask IPIs */
+-	for_each_possible_cpu(i) {
+-		bcm2836_arm_irqchip_unmask_per_cpu_irq(
+-			LOCAL_MAILBOX_INT_CONTROL0, 0, i);
+-	}
+ 	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
++
++	smp_set_ops(&bcm2836_smp_ops);
+ #endif
+ }
+ 
+-- 
+2.1.4
