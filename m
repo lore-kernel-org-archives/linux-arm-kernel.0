@@ -1,73 +1,99 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 27 Jul 2015 07:09:28 +0200
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <55B5BD08.60802@monstr.eu>
+From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
+Date: Mon, 27 Jul 2015 10:40:29 +0530
+Subject: [PATCH] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20150724144103.GC12569@arm.com>
+References: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20150724144103.GC12569@arm.com>
+Message-ID: <20150727051025.GA5310@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/25/2015 02:21 AM, Moritz Fischer wrote:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+On Fri, Jul 24, 2015 at 03:41:03PM +0100, Will Deacon wrote:
+> On Fri, Jul 24, 2015 at 06:54:23AM +0100, Jerin Jacob wrote:
+> > certain X11 servers and user space network drivers frameworks
+> > need PCI mmaped /sys/bus/pci/devices/B:D:F/resourceX file to access PCI bar
+> > address space from user space.
+> > 
+> > Signed-off-by: Jerin Jacob <jerin.jacob@caviumnetworks.com>
+> > ---
+> >  arch/arm64/include/asm/pci.h |  6 ++++++
+> >  arch/arm64/kernel/pci.c      | 20 ++++++++++++++++++++
+> >  2 files changed, 26 insertions(+)
+> > 
+> > diff --git a/arch/arm64/include/asm/pci.h b/arch/arm64/include/asm/pci.h
+> > index b008a72..e7afe8d 100644
+> > --- a/arch/arm64/include/asm/pci.h
+> > +++ b/arch/arm64/include/asm/pci.h
+> > @@ -39,5 +39,11 @@ static inline int pci_proc_domain(struct pci_bus *bus)
+> >  }
+> >  #endif  /* CONFIG_PCI */
+> >  
+> > +#define HAVE_PCI_MMAP
+> > +
+> > +extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > +	enum pci_mmap_state mmap_state, int write_combine);
+> > +
+> > +
+> >  #endif  /* __KERNEL__ */
+> >  #endif  /* __ASM_PCI_H */
+> > diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> > index 4095379..94b04c7 100644
+> > --- a/arch/arm64/kernel/pci.c
+> > +++ b/arch/arm64/kernel/pci.c
+> > @@ -71,3 +71,23 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+> >  	return NULL;
+> >  }
+> >  #endif
+> > +
+> > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > +		enum pci_mmap_state mmap_state, int write_combine)
+> > +{
+> > +	/*
+> > +	* I/O space can be accessed via normal processor loads and stores on
+> > +	* this platform but for now we elect not to do this and portable
+> > +	* drivers should not do this anyway.
+> > +	*/
+> > +	if (mmap_state == pci_mmap_io)
+> > +		return -EINVAL;
+> > +
+> > +	if (write_combine)
+> > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> > +	else
+> > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> > +
+> > +	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+> > +	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
+> > +}
 > 
-> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> new file mode 100644
-> index 0000000..ac4499e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> @@ -0,0 +1,13 @@
-> +Xilinx Zynq PL Reset Manager
-
-here
-
-> +
-> +Required properties:
-> +- compatible: "xlnx,zynq-reset-pl"
-
-Currently it is not just PL reset controller.
-
-> +- syscon <&slcr>;
-
-
-missing : and please be more descriptive here.
-
-> +- #reset-cells: 1
-> +
-> +Example:
-> +	rstc: rstc at 240 {
-> +		#reset-cells = <1>;
-> +		compatible = "xlnx,zynq-reset-pl";
-
-Compatible property should go first.
-
-I am missing that reg property
-
-> +		syscon = <&slcr>;
-> +	};
+> So pci_iomap_range chooses the memory attributes based on the BAR flags
+> (and even then it looks weird -- CACHEABLE => ioremap, else ioremap_nocache,
+> which is just the same as ioremap on arm64).
 > 
+> It would be good to understand (a) why this is different and (b) what
 
-Thanks,
-Michal
+AFAIU, pci_iomap_range is the generic implementation and chooses to
+use only minimal attributes that works on all the architectures.
+The primary consumer of pci_iomap_range is virtio_pci driver,Which
+doesn't care about HW PCI memory attributes like Prefetchable.
 
+> the consistent set of attributes should be.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+PCI perspective, memory attributes are Prefetchable and non-Prefetchable
+for a given BAR.
 
+Former one does have read side-effects or supports write
+merging(typically used
+by graphics memory) and latter one has read side effects and does not
+support write merging(typically used by register files)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/8592d125/attachment.sig>
+IMO, In armv8 nomenclature, MT_NORMAL_NC and MT_DEVICE_nGnRnE map
+correctly to above PCI memory attribute definitions.
+
+and pci-sysfs.c(consumer of pci_mmap_page_range)
+creates the /sys/bus/pci/devices/B:D:F/resource[_wc]X file based
+on BAR flag(Prefetchable or non-Prefetchable) and expose to userspace.
+
+Jerin
+
+> 
+> Will
