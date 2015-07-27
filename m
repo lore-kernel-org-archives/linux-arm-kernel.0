@@ -1,37 +1,41 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 08:32:39 +0530
+Date: Mon, 27 Jul 2015 08:44:07 +0530
 Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
  bindings
-In-Reply-To: <2910042.ys2zsBBKt2@amdc1976>
+In-Reply-To: <9723014.v9tt0Yn4CZ@amdc1976>
 References: <cover.1434369079.git.viresh.kumar@linaro.org>
- <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
- <2910042.ys2zsBBKt2@amdc1976>
-Message-ID: <20150727030239.GG19944@linux>
+ <2910042.ys2zsBBKt2@amdc1976> <20150709051845.GM1805@linux>
+ <9723014.v9tt0Yn4CZ@amdc1976>
+Message-ID: <20150727031407.GH19944@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08-07-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
-> Isn't using u32 for storing frequency (in Hz) too small by today's
-> standards?
+On 24-07-15, 20:02, Bartlomiej Zolnierkiewicz wrote:
+> There is also a minor issue with of_init_opp_table() documentation
+> (the function can now return -EINVAL in some cases).  Except these
+> two things the patch looks fine and once it is fixed you can add:
 > 
-> [ Please note that the old v1 binding uses kHz not Hz. ]
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
-I have thought about this a bit more and I am somewhat confused. Yes I
-agree that u32 isn't big enough for frequencies in Hz, i.e. Max value
-of 4294967295 ~ 4.29 GHz.
+Fixed the documentation issue as:
 
-But the bigger problem lies with the clk API that we have today. It
-declares clk-rate as a unsigned-long which is 32 bits on a 32 bit
-machine and 64 bits on a 64 bit machine. And every single piece of
-code reading "clock-frequency" DT property, reads it as a 32 bit value
-as we reserve only a single cell for it.
+diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
+index c4ca176061b8..3ad93a7e76e5 100644
+--- a/drivers/base/power/opp.c
++++ b/drivers/base/power/opp.c
+@@ -1144,6 +1144,7 @@ static int _of_init_opp_table_v1(struct device *dev)
+  * -ENODEV     when 'operating-points' property is not found or is invalid data
+  *             in device node.
+  * -ENODATA    when empty 'operating-points' property is found
++ * -EINVAL     when invalid entries are found in opp-v2 table
+  */
+ int of_init_opp_table(struct device *dev)
+ {
 
-Now, if we wanna change that, we need to start changing from the
-clk-API itself and that's not gonna be a small task and I would leave
-it to Mike/Stephen for obvious reasons :)
 
-So, I will keep this code in sync with rest of the kernel and lets see
-what Mike has to say.
+Please give your reviewed-by again as I wouldn't be fixing the u32
+type issue for now and wasn't sure if you will give your RBY without
+that :)
 
 -- 
 viresh
