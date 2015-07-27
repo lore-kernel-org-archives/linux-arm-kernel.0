@@ -1,31 +1,81 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 27 Jul 2015 09:32:12 +1000
-Subject: linux-next: manual merge of the renesas tree with the arm-soc tree
-Message-ID: <20150727093212.6556dbcb@canb.auug.org.au>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 27 Jul 2015 03:14:47 +0200
+Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
+ Kconfig
+In-Reply-To: <20150726225145.GF7576@n2100.arm.linux.org.uk>
+References: <1437612483-30160-1-git-send-email-sre@kernel.org>
+ <1437612483-30160-4-git-send-email-sre@kernel.org>
+ <20150723123553.GE7576@n2100.arm.linux.org.uk>
+ <20150724001605.GA1453@earth>
+ <20150726225145.GF7576@n2100.arm.linux.org.uk>
+Message-ID: <20150727011447.GA23087@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-Today's linux-next merge of the renesas tree got conflicts in:
+On Sun, Jul 26, 2015 at 11:51:45PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jul 24, 2015 at 02:16:06AM +0200, Sebastian Reichel wrote:
+> > On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM Linux wrote:
+> > > On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel wrote:
+> > > > Having the !ARCH_MULTIPLATFORM dependency in the Kconfig file results
+> > > > in one option less to think about when configuring the kernel.
+> > > 
+> > > > -#if defined(CONFIG_ARM_ERRATA_430973) && !defined(CONFIG_ARCH_MULTIPLATFORM)
+> > > > +#ifdef CONFIG_ARM_ERRATA_430973
+> > > >  	teq	r3, #0x00100000			@ only present in r1p*
+> > > >  	mrceq	p15, 0, r0, c1, c0, 1		@ read aux control register
+> > > >  	orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+> > > 
+> > > NAK.  Please read the mailing list history, I'm not repeating myself
+> > > again on this.  Thanks.
+> > 
+> > It's a bit hard to search the mailing list history without a bit
+> > more information.
+> 
+> You were Cc'd on the previous round of review...
 
-  arch/arm/mach-shmobile/board-marzen-reference.c and
-  arch/arm/mach-shmobile/board-marzen.c
+But that discussion was about removing the check alltogether iirc.
+This patch does not remove the !ARCH_MULTIPLATFORM check. It just
+*moves* it from the sourcecode to the errata's Kconfig entry.
 
-between commit:
+The intention was to hide the Kconfig option on multiplatform
+kernels, since it's completely useless there after the N900
+boardcode has been changed (PATCH 1/3).
 
-  3017a8804ada ("ARM: appropriate __init annotation for const data")
+> > I guess you prefer to just add the !ARCH_MULTIPLATFORM dependency to
+> > the Kconfig entry without removing the additional check in the code?
+> 
+> I was referring to the above change.
+>
+> However, having discussed with Will Deacon and checked the manuals, I
+> think the change is okay after all: the auxillary control register is
+> banked on secure parts, and the bit we'll be trying to change will be
+> read-only in non-secure mode - and importantly won't fault.
+>
+> So, the change is fine, thanks.
 
-from the arm-soc tree and commits:
+I think you missed the part adding the !ARCH_MULTIPLATFORM
+dependency in Kconfig for ARM_ERRATA_430973. I only removed
+the check in the sourcecode, since it is no longer required
+with the dependency being in Kconfig.
 
-  d2fb6bdaffc7 ("ARM: shmobile: marzen-reference: Remove C board code")
-  9d35777f2b96 ("ARM: shmobile: marzen: Remove legacy board code")
+So I guess there are 3 options now:
 
-from the renesas tree.
+ 1. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
+    keep extra check in the sourcecode
+ 2. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
+    remove extra check in the sourcecode
+ 3. Remove !ARCH_MULTIPLATFORM dependency alltogether
 
-I fixed it up (I just removed the 2 files) and can carry the fix as
-necessary (no action is required).
+I will send an appropriate patch, if you tell me your preferred
+option.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/a8b16f11/attachment.sig>
