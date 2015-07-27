@@ -1,107 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 27 Jul 2015 09:53:38 +0100
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150727072549.GP2564@lukather>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150727072549.GP2564@lukather>
-Message-ID: <20150727085338.GW3436@x1>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 27 Jul 2015 10:57:33 +0200
+Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
+In-Reply-To: <20150508100247.GQ11057@lukather>
+References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
+ <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
+Message-ID: <4099394.C7vEjTFs8V@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Jul 2015, Maxime Ripard wrote:
+Hi Maxime, Stephen,
 
-> On Wed, Jul 22, 2015 at 02:04:13PM +0100, Lee Jones wrote:
-> > These new API calls will firstly provide a mechanisms to tag a clock as
-> > critical and secondly allow any knowledgeable driver to (un)gate clocks,
-> > even if they are marked as critical.
+Am Freitag, 8. Mai 2015, 12:02:47 schrieb Maxime Ripard:
+> On Thu, May 07, 2015 at 02:03:57PM -0700, Stephen Boyd wrote:
+> > On 05/07/15 08:17, Kevin Hilman wrote:
+> > > On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> 
+wrote:
+> > >> On 05/01/15 15:07, Heiko St?bner wrote:
+> > >>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
+> > >>>>> Instead I guess we could hook it less deep into clk_get_sys, like in
+> > >>>>> the
+> > >>>>> following patch?
+> > >>>> 
+> > >>>> It looks like it will work at least, but still I'd prefer to keep the
+> > >>>> orphan check contained to clk.c. How about this compile tested only
+> > >>>> patch?
+> > >>> 
+> > >>> I gave this a spin on my rk3288-firefly board. It still boots, the
+> > >>> clock tree looks the same and it also still defers nicely in the
+> > >>> scenario I needed it for. The implementation also looks nice - and of
+> > >>> course much more compact than my check in two places :-) . I don't
+> > >>> know if you want to put this as follow-up on top or fold it into the
+> > >>> original orphan-check, so in any case
+> > >>> 
+> > >>> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> > >>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> > >> 
+> > >> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it
+> > >> with
+> > >> my patch and a note that it's based on an earlier patch from you.
+> > > 
+> > > It appears this has landed in linux-next in the form of 882667c1fcf1
+> > > clk: prevent orphan clocks from being used.  A bunch of boot failures
+> > > for sunxi in today's linux-next[1] were bisected down to that patch.
+> > > 
+> > > I confirmed that reverting that commit on top of next/master gets
+> > > sunxi booting again.
 > > 
-> > Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
-> >  include/linux/clk-provider.h |  2 ++
-> >  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
-> >  3 files changed, 77 insertions(+)
-> > 
-> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > index 61c3fc5..486b1da 100644
-> > --- a/drivers/clk/clk.c
-> > +++ b/drivers/clk/clk.c
-> > @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
-> >  
-> >  /***    private data structures    ***/
-> >  
-> > +/**
-> > + * struct critical -	Provides 'play' over critical clocks.  A clock can be
-> > + *			marked as critical, meaning that it should not be
-> > + *			disabled.  However, if a driver which is aware of the
-> > + *			critical behaviour wants to control it, it can do so
-> > + *			using clk_enable_critical() and clk_disable_critical().
-> > + *
-> > + * @enabled	Is clock critical?  Once set, doesn't change
-> > + * @leave_on	Self explanatory.  Can be disabled by knowledgeable drivers
-> > + */
-> > +struct critical {
-> > +	bool enabled;
-> > +	bool leave_on;
-> > +};
-> > +
-> >  struct clk_core {
-> >  	const char		*name;
-> >  	const struct clk_ops	*ops;
-> > @@ -75,6 +90,7 @@ struct clk_core {
-> >  	struct dentry		*dentry;
-> >  #endif
-> >  	struct kref		ref;
-> > +	struct critical		critical;
-> >  };
-> >  
-> >  struct clk {
-> > @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
-> >  	if (WARN_ON(clk->enable_count == 0))
-> >  		return;
-> >  
-> > +	/* Refuse to turn off a critical clock */
-> > +	if (clk->enable_count == 1 && clk->critical.leave_on)
-> > +		return;
-> > +
+> > Thanks for the report. I've removed the two clk orphan patches from
+> > clk-next. Would it be possible to try with next-20150507 and
+> > clk_ignore_unused on the command line?
 > 
-> I think it should be handled by a separate counting. Otherwise, if you
-> have two users that marked the clock as critical, and then one of them
-> disable it...
+> This makes it work, but it's not really an option.
 > 
-> >  	if (--clk->enable_count > 0)
-> >  		return;
-> >  
-> > @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
-> >  }
-> >  EXPORT_SYMBOL_GPL(clk_disable);
-> >  
-> > +void clk_disable_critical(struct clk *clk)
-> > +{
-> > +	clk->core->critical.leave_on = false;
+> > Also we can try to see if critical clocks aren't being forced on by
+> > applying this patch and looking for clk_get() failures
 > 
-> .. you just lost the fact that it was critical in the first place.
+> And that shows that the CPU and DDR clocks are not protected, which
+> obviously is pretty mad.
+> 
+> I've mass converted all our probing code to use OF_CLK_DECLARE, and
+> make things work again.
+> 
+> http://code.bulix.org/5goa5j-88345?raw
+> 
+> Is this an acceptable solution?
+> 
+> We were already moving to this, I'm not really fond of doing this like
+> that, but I guess this whole debacle makes it necessary.
 
-I thought about both of these points, which is why I came up with this
-strategy.
 
-Any device which uses the *_critical() API should a) have knowledge of
-what happens when a particular critical clock is gated and b) have
-thought about the consequences.  I don't think we can use reference
-counting, because we'd need as many critical clock owners as there are
-critical clocks.  Cast your mind back to the reasons for this critical
-clock API.  One of the most important intentions of this API is the
-requirement mitigation for each of the critical clocks to have an owner
-(driver).
+did this lead anywhere meanwhile.
 
-With regards to your second point, that's what 'critical.enabled'
-is for.  Take a look at clk_enable_critical().
+Last I remember the change to orphan handling made sunxi fail, but I'm still 
+hoping to get this usable at some point :-)
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+Thanks
+Heiko
