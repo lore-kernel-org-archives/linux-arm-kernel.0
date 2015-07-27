@@ -1,36 +1,21 @@
-From: long.wanglong@huawei.com (Wang Long)
-Date: Mon, 27 Jul 2015 02:32:53 +0000
-Subject: [PATCH] arm64: mm: add __init section marker to free_initrd_mem
-Message-ID: <1437964373-232164-1-git-send-email-long.wanglong@huawei.com>
+From: leilk.liu@mediatek.com (leilk liu)
+Date: Mon, 27 Jul 2015 10:38:49 +0800
+Subject: [PATCH v3 2/4] dt-bindings: ARM: Mediatek: Document devicetree
+ bindings for spi bus
+In-Reply-To: <20150724173446.GS11162@sirena.org.uk>
+References: <1437642643-11966-1-git-send-email-leilk.liu@mediatek.com>
+ <1437642643-11966-3-git-send-email-leilk.liu@mediatek.com>
+ <20150724173446.GS11162@sirena.org.uk>
+Message-ID: <1437964729.24722.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not needed after booting, this patch moves the
-free_initrd_mem() function to the __init section.
+On Fri, 2015-07-24 at 18:34 +0100, Mark Brown wrote:
+> On Thu, Jul 23, 2015 at 05:10:41PM +0800, Leilk Liu wrote:
+> > Change-Id: I6cadbf2e51d2cc4eacd518a24d5a9a1da93d4db5
+> > Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+> 
+> Please don't include noise like Change-Id in upstream commits and please
+> use subject lines reflecting the style for the subsystem.
 
-This patch also make keep_initrd __initdata, to reduce kernel
-size.
-
-Signed-off-by: Wang Long <long.wanglong@huawei.com>
----
- arch/arm64/mm/init.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index ad87ce8..f5c0680 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -358,9 +358,9 @@ void free_initmem(void)
- 
- #ifdef CONFIG_BLK_DEV_INITRD
- 
--static int keep_initrd;
-+static int keep_initrd __initdata;
- 
--void free_initrd_mem(unsigned long start, unsigned long end)
-+void __init free_initrd_mem(unsigned long start, unsigned long end)
- {
- 	if (!keep_initrd)
- 		free_reserved_area((void *)start, (void *)end, 0, "initrd");
--- 
-1.8.3.4
+OK, I'll fix it.
