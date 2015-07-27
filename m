@@ -1,70 +1,89 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 27 Jul 2015 11:48:10 +0200
-Subject: [PATCH 2/7] ARM64: zynqmp: Add CANs node for platform
-In-Reply-To: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
-References: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
-Message-ID: <f2905b624dfc90336f67801ce29bee7a45a9f657.1437990464.git.michal.simek@xilinx.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Mon, 27 Jul 2015 10:59:56 +0100
+Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
+ Kconfig
+In-Reply-To: <20150727011447.GA23087@earth>
+References: <1437612483-30160-1-git-send-email-sre@kernel.org>
+ <1437612483-30160-4-git-send-email-sre@kernel.org>
+ <20150723123553.GE7576@n2100.arm.linux.org.uk> <20150724001605.GA1453@earth>
+ <20150726225145.GF7576@n2100.arm.linux.org.uk> <20150727011447.GA23087@earth>
+Message-ID: <55B6011C.9070906@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also enable can0 for ep108.
+On 27/07/15 02:14, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Sun, Jul 26, 2015 at 11:51:45PM +0100, Russell King - ARM Linux 
+> wrote:
+>> On Fri, Jul 24, 2015 at 02:16:06AM +0200, Sebastian Reichel 
+>> wrote:
+>>> On Thu, Jul 23, 2015 at 01:35:53PM +0100, Russell King - ARM 
+>>> Linux wrote:
+>>>> On Thu, Jul 23, 2015 at 02:48:03AM +0200, Sebastian Reichel 
+>>>> wrote:
+>>>>> Having the !ARCH_MULTIPLATFORM dependency in the Kconfig 
+>>>>> file results in one option less to think about when 
+>>>>> configuring the kernel.
+>>>> 
+>>>>> -#if defined(CONFIG_ARM_ERRATA_430973) && 
+>>>>> !defined(CONFIG_ARCH_MULTIPLATFORM) +#ifdef 
+>>>>> CONFIG_ARM_ERRATA_430973 teq	r3, #0x00100000			@ only 
+>>>>> present in r1p* mrceq	p15, 0, r0, c1, c0, 1		@ read aux 
+>>>>> control register orreq	r0, r0, #(1 << 6)		@ set IBE to 1
+>>>> 
+>>>> NAK.  Please read the mailing list history, I'm not
+>>>> repeating myself again on this.  Thanks.
+>>> 
+>>> It's a bit hard to search the mailing list history without a 
+>>> bit more information.
+>> 
+>> You were Cc'd on the previous round of review...
+> 
+> But that discussion was about removing the check alltogether iirc.
+>  This patch does not remove the !ARCH_MULTIPLATFORM check. It just
+>  *moves* it from the sourcecode to the errata's Kconfig entry.
+> 
+> The intention was to hide the Kconfig option on multiplatform 
+> kernels, since it's completely useless there after the N900 
+> boardcode has been changed (PATCH 1/3).
+> 
+>>> I guess you prefer to just add the !ARCH_MULTIPLATFORM 
+>>> dependency to the Kconfig entry without removing the
+>>> additional check in the code?
+>> 
+>> I was referring to the above change.
+>> 
+>> However, having discussed with Will Deacon and checked the 
+>> manuals, I think the change is okay after all: the auxillary 
+>> control register is banked on secure parts, and the bit we'll be 
+>> trying to change will be read-only in non-secure mode - and 
+>> importantly won't fault.
+>> 
+>> So, the change is fine, thanks.
+> 
+> I think you missed the part adding the !ARCH_MULTIPLATFORM 
+> dependency in Kconfig for ARM_ERRATA_430973. I only removed the 
+> check in the sourcecode, since it is no longer required with the 
+> dependency being in Kconfig.
+> 
+> So I guess there are 3 options now:
+> 
+> 1. Add !ARCH_MULTIPLATFORM dependency to Kconfig, keep extra check 
+> in the sourcecode 2. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
+> remove extra check in the sourcecode 3. Remove !ARCH_MULTIPLATFORM
+> dependency alltogether
+> 
+> I will send an appropriate patch, if you tell me your preferred 
+> option.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+This isn't the only place ARM_ERRATA_430973 is used, and if
+you make it configurable on !ARCH_MULTIPLATFORM then it makes
+it impossible to use a ARCH_MULTIPLATFORM kernel on something
+that is an Cortex-A8.
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |  4 ++++
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 24 ++++++++++++++++++++++++
- 2 files changed, 28 insertions(+)
+See arch/arm/mm/proc-v7-2level.S
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index 82deb24dddeb..3aebc3f5d02a 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -32,6 +32,10 @@
- 	};
- };
- 
-+&can0 {
-+	status = "okay";
-+};
-+
- &gem0 {
- 	status = "okay";
- 	phy-handle = <&phy0>;
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index bd9ba0cab504..d58c9689c82a 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -96,6 +96,30 @@
- 		#size-cells = <1>;
- 		ranges;
- 
-+		can0: can at ff060000 {
-+			compatible = "xlnx,zynq-can-1.0";
-+			status = "disabled";
-+			clocks = <&misc_clk &misc_clk>;
-+			clock-names = "can_clk", "pclk";
-+			reg = <0x0 0xff060000 0x1000>;
-+			interrupts = <0 23 4>;
-+			interrupt-parent = <&gic>;
-+			tx-fifo-depth = <0x40>;
-+			rx-fifo-depth = <0x40>;
-+		};
-+
-+		can1: can at ff070000 {
-+			compatible = "xlnx,zynq-can-1.0";
-+			status = "disabled";
-+			clocks = <&misc_clk &misc_clk>;
-+			clock-names = "can_clk", "pclk";
-+			reg = <0x0 0xff070000 0x1000>;
-+			interrupts = <0 24 4>;
-+			interrupt-parent = <&gic>;
-+			tx-fifo-depth = <0x40>;
-+			rx-fifo-depth = <0x40>;
-+		};
-+
- 		misc_clk: misc_clk {
- 			compatible = "fixed-clock";
- 			#clock-cells = <0>;
 -- 
-2.3.5
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
