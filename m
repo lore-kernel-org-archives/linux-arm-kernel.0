@@ -1,58 +1,105 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:51 +0200
-Subject: [PATCH v4 41/46] usb: gadget: add 'ep_match' callback to
- usb_gadget_ops
+Date: Mon, 27 Jul 2015 11:16:55 +0200
+Subject: [PATCH v4 45/46] usb: gadget: goku_udc: add goku_match_ep() function
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-42-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-46-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add callback that is called by epautoconf to allow UDC driver match the
-best endpoint for specific descriptor. It's intended to supply mechanism
-which allows to get rid of chip-specific endpoint matching code from
-epautoconf.
-
-If gadget has set 'ep_match' callback we prefer to call it first, and
-if it fails to find matching endpoint, then we try to use default matching
-algorithm.
+Add 'match_ep' callback to utilize chip-specific knowledge in endpoint matching
+process. Function does the same that was done by chip-specific code inside
+of epautoconf. Now this code can be removed from there to separate generic code
+from platform specific logic.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/epautoconf.c | 6 ++++++
- include/linux/usb/gadget.h      | 3 +++
- 2 files changed, 9 insertions(+)
+ drivers/usb/gadget/epautoconf.c   | 20 ++------------------
+ drivers/usb/gadget/udc/goku_udc.c | 25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+), 18 deletions(-)
 
 diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 4fa6f5d..1b1fee0 100644
+index d41fd82..da45371 100644
 --- a/drivers/usb/gadget/epautoconf.c
 +++ b/drivers/usb/gadget/epautoconf.c
-@@ -165,6 +165,12 @@ struct usb_ep *usb_ep_autoconfig_ss(
- 
- 	type = desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK;
- 
-+	if (gadget->ops->match_ep) {
-+		ep = gadget->ops->match_ep(gadget, desc, ep_comp);
-+		if (ep)
-+			goto found_ep;
-+	}
-+
+@@ -86,24 +86,8 @@ struct usb_ep *usb_ep_autoconfig_ss(
  	/* First, apply chip-specific "best usage" knowledge.
  	 * This might make a good usb_gadget_ops hook ...
  	 */
-diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index c71b1de..6de3688 100644
---- a/include/linux/usb/gadget.h
-+++ b/include/linux/usb/gadget.h
-@@ -534,6 +534,9 @@ struct usb_gadget_ops {
- 	int	(*udc_start)(struct usb_gadget *,
- 			struct usb_gadget_driver *);
- 	int	(*udc_stop)(struct usb_gadget *);
-+	struct usb_ep *(*match_ep)(struct usb_gadget *,
-+			struct usb_endpoint_descriptor *,
-+			struct usb_ss_ep_comp_descriptor *);
- };
+-	if (gadget_is_goku (gadget)) {
+-		if (USB_ENDPOINT_XFER_INT == type) {
+-			/* single buffering is enough */
+-			ep = gadget_find_ep_by_name(gadget, "ep3-bulk");
+-			if (ep && usb_gadget_ep_match_desc(gadget,
+-					ep, desc, ep_comp))
+-				goto found_ep;
+-		} else if (USB_ENDPOINT_XFER_BULK == type
+-				&& (USB_DIR_IN & desc->bEndpointAddress)) {
+-			/* DMA may be available */
+-			ep = gadget_find_ep_by_name(gadget, "ep2-bulk");
+-			if (ep && usb_gadget_ep_match_desc(gadget,
+-					ep, desc, ep_comp))
+-				goto found_ep;
+-		}
+-
+ #ifdef CONFIG_BLACKFIN
+-	} else if (gadget_is_musbhdrc(gadget)) {
++	if (gadget_is_musbhdrc(gadget)) {
+ 		if ((USB_ENDPOINT_XFER_BULK == type) ||
+ 		    (USB_ENDPOINT_XFER_ISOC == type)) {
+ 			if (USB_DIR_IN & desc->bEndpointAddress)
+@@ -119,8 +103,8 @@ struct usb_ep *usb_ep_autoconfig_ss(
+ 			ep = NULL;
+ 		if (ep && usb_gadget_ep_match_desc(gadget, ep, desc, ep_comp))
+ 			goto found_ep;
+-#endif
+ 	}
++#endif
  
- /**
+ 	/* Second, look at endpoints until an unclaimed one looks usable */
+ 	list_for_each_entry (ep, &gadget->ep_list, ep_list) {
+diff --git a/drivers/usb/gadget/udc/goku_udc.c b/drivers/usb/gadget/udc/goku_udc.c
+index 46b8d14..d5a93ea 100644
+--- a/drivers/usb/gadget/udc/goku_udc.c
++++ b/drivers/usb/gadget/udc/goku_udc.c
+@@ -990,6 +990,30 @@ static int goku_get_frame(struct usb_gadget *_gadget)
+ 	return -EOPNOTSUPP;
+ }
+ 
++static struct usb_ep *goku_match_ep(struct usb_gadget *g,
++		struct usb_endpoint_descriptor *desc,
++		struct usb_ss_ep_comp_descriptor *ep_comp)
++{
++	struct goku_udc	*dev = to_goku_udc(g);
++	struct usb_ep *ep;
++	u8 type = usb_endpoint_type(desc);
++
++	if (type == USB_ENDPOINT_XFER_INT) {
++		/* single buffering is enough */
++		ep = &dev->ep[3].ep;
++		if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
++			return ep;
++	} else if (type == USB_ENDPOINT_XFER_BULK
++			&& usb_endpoint_dir_in(desc)) {
++		/* DMA may be available */
++		ep = &dev->ep[2].ep;
++		if (ep && usb_gadget_ep_match_desc(g, ep, desc, ep_comp))
++			return ep;
++	}
++
++	return NULL;
++}
++
+ static int goku_udc_start(struct usb_gadget *g,
+ 		struct usb_gadget_driver *driver);
+ static int goku_udc_stop(struct usb_gadget *g);
+@@ -998,6 +1022,7 @@ static const struct usb_gadget_ops goku_ops = {
+ 	.get_frame	= goku_get_frame,
+ 	.udc_start	= goku_udc_start,
+ 	.udc_stop	= goku_udc_stop,
++	.match_ep	= goku_match_ep,
+ 	// no remote wakeup
+ 	// not selfpowered
+ };
 -- 
 1.9.1
