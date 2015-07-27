@@ -1,44 +1,44 @@
-From: public_timo.s@silentcreek.de (public_timo.s at silentcreek.de)
-Date: Mon, 27 Jul 2015 14:09:18 +0200 (CEST)
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <55B5E6DB.8020009@redhat.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de><55B5E6DB.8020009@redhat.com>
-Message-ID: <20150727120918.191F76C82FB4@dd34104.kasserver.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 27 Jul 2015 14:12:09 +0200
+Subject: [RESEND PATCH 1/2] pinctrl: change function behavior for per pin
+ muxing controllers
+In-Reply-To: <CACRpkdZOeMqT0cZWYPOrtKGL2FdAy4=19JZMmF8KuU7pYZYuMQ@mail.gmail.com>
+References: <1433948699-19800-1-git-send-email-ludovic.desroches@atmel.com>
+ <1433948699-19800-2-git-send-email-ludovic.desroches@atmel.com>
+ <557EF60D.8020007@wwwdotorg.org>
+ <20150617123816.GB12295@odux.rfo.atmel.com>
+ <5581988C.50000@wwwdotorg.org>
+ <20150618123348.GB20227@odux.rfo.atmel.com>
+ <20150714055749.GB5161@pengutronix.de>
+ <20150715074642.GA14886@odux.rfo.atmel.com>
+ <CACRpkdZOeMqT0cZWYPOrtKGL2FdAy4=19JZMmF8KuU7pYZYuMQ@mail.gmail.com>
+Message-ID: <20150727121209.GE15112@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Hans de Goede schrieb am 27.07.2015 10:07:
-
-> I've a simular patch here:
+On Mon, Jul 27, 2015 at 11:43:52AM +0200, Linus Walleij wrote:
+> On Wed, Jul 15, 2015 at 9:46 AM, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > On Tue, Jul 14, 2015 at 07:57:49AM +0200, Sascha Hauer wrote:
+> >>
+> >> Note that in the recently introduced Mediatek pinctrl driver we used
+> >> 'pinmux' for the property that you name 'pins' here. We probably want to
+> >> use the same name.
+> >
+> > This driver fits most of my needs but I didn't do it in this way for the
+> > two previous reasons. If it is not an issue to add a new
+> > dt_node_to_map() implementation which should be quite close to the
+> > mediatek one, let's do it.
 > 
-> https://github.com/jwrdegoede/linux-sunxi/commit/6a30b7d5be6012b81e5e1439a444e41c0ac1afc1
+> OK if you can do that so we have some order and obtain Sascha's
+> ACK I'm in for the patch.
 > 
-> I did not submit this upstream yet as it is part of a series to enable the otg
-> controller on the bananapi which needs axp-usb-power-supply support for which
-> the actual powersupply driver changes are still pending.
-Oops, I see. Are you planning to submit this for 4.3 or later?
+> Maybe there is something like that further up in my mailbox, need
+> to browse :)
 
-> As you can see other then you adding the cpu operating points are patches are
-> identical, which is good :)
-Yep, that and you chose a slightly higher maximum voltage for the CPU.
+I am doing the changes and merging my gpio driver into it. I'll send a
+new version probably this week.
 
-> IMHO we should just stick with the standard operating points unless we know
-> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
-> Lime).
-I'd be fine with that as I don't have any stability issues with the lower
-voltages. What about the 1008MHz operating point that I "reintroduced"? It was
-dropped here [1] because there was no regulator support. Can this be reenabled
-on board level (which means overriding the defaults inherited from
-sun7i-a20.dtsi) or should this be done at SOC level for all boards (which
-means we have to add regulator nodes for all boards in the first place)?
+Regards
 
-
-Regards,
-
-Timo
-
-
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=370a9b5fb04a0d5cc7b7699c788616d6976f4476
+Ludovic
