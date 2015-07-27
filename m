@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:26 +0200
-Subject: [PATCH v4 16/46] usb: gadget: fusb300_udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:17 +0200
+Subject: [PATCH v4 07/46] usb: dwc3: gadget: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-17-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-8-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,32 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/fusb300_udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/dwc3/gadget.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/fusb300_udc.c b/drivers/usb/gadget/udc/fusb300_udc.c
-index 3970f45..948845c 100644
---- a/drivers/usb/gadget/udc/fusb300_udc.c
-+++ b/drivers/usb/gadget/udc/fusb300_udc.c
-@@ -1450,6 +1450,17 @@ static int fusb300_probe(struct platform_device *pdev)
- 		ep->ep.name = fusb300_ep_name[i];
- 		ep->ep.ops = &fusb300_ep_ops;
- 		usb_ep_set_maxpacket_limit(&ep->ep, HS_BULK_MAX_PACKET_SIZE);
-+
-+		if (i == 0) {
-+			ep->ep.caps.type_control = true;
+diff --git a/drivers/usb/dwc3/gadget.c b/drivers/usb/dwc3/gadget.c
+index d97fcfa..65fd959 100644
+--- a/drivers/usb/dwc3/gadget.c
++++ b/drivers/usb/dwc3/gadget.c
+@@ -1715,6 +1715,19 @@ static int dwc3_gadget_init_hw_endpoints(struct dwc3 *dwc,
+ 				return ret;
+ 		}
+ 
++		if (epnum == 0 || epnum == 1) {
++			dep->endpoint.caps.type_control = true;
 +		} else {
-+			ep->ep.caps.type_iso = true;
-+			ep->ep.caps.type_bulk = true;
-+			ep->ep.caps.type_int = true;
++			dep->endpoint.caps.type_iso = true;
++			dep->endpoint.caps.type_bulk = true;
++			dep->endpoint.caps.type_int = true;
 +		}
 +
-+		ep->ep.caps.dir_in = true;
-+		ep->ep.caps.dir_out = true;
++		if (direction)
++			dep->endpoint.caps.dir_in = true;
++		else
++			dep->endpoint.caps.dir_out = true;
++
+ 		INIT_LIST_HEAD(&dep->request_list);
+ 		INIT_LIST_HEAD(&dep->req_queued);
  	}
- 	usb_ep_set_maxpacket_limit(&fusb300->ep[0]->ep, HS_CTL_MAX_PACKET_SIZE);
- 	fusb300->ep[0]->epnum = 0;
 -- 
 1.9.1
