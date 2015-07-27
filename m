@@ -1,47 +1,141 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:43 +0200
-Subject: [PATCH v4 33/46] usb: isp1760: udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:50 +0200
+Subject: [PATCH v4 40/46] usb: gadget: epautoconf: rework ep_matches() function
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-34-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-41-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert endpoint configuration to new capabilities model.
+Rework ep_matches() function to make it shorter and more readable.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/isp1760/isp1760-udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/gadget/epautoconf.c | 87 +++++++++++++++++------------------------
+ 1 file changed, 35 insertions(+), 52 deletions(-)
 
-diff --git a/drivers/usb/isp1760/isp1760-udc.c b/drivers/usb/isp1760/isp1760-udc.c
-index 3699962..1c3d0fd 100644
---- a/drivers/usb/isp1760/isp1760-udc.c
-+++ b/drivers/usb/isp1760/isp1760-udc.c
-@@ -1383,13 +1383,24 @@ static void isp1760_udc_init_eps(struct isp1760_udc *udc)
- 		 */
- 		if (ep_num == 0) {
- 			usb_ep_set_maxpacket_limit(&ep->ep, 64);
-+			ep->ep.caps.type_control = true;
-+			ep->ep.caps.dir_in = true;
-+			ep->ep.caps.dir_out = true;
- 			ep->maxpacket = 64;
- 			udc->gadget.ep0 = &ep->ep;
- 		} else {
- 			usb_ep_set_maxpacket_limit(&ep->ep, 512);
-+			ep->ep.caps.type_iso = true;
-+			ep->ep.caps.type_bulk = true;
-+			ep->ep.caps.type_int = true;
- 			ep->maxpacket = 0;
- 			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
- 		}
+diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
+index 7bb28f1..4fa6f5d 100644
+--- a/drivers/usb/gadget/epautoconf.c
++++ b/drivers/usb/gadget/epautoconf.c
+@@ -30,16 +30,29 @@ ep_matches (
+ 	struct usb_ss_ep_comp_descriptor *ep_comp
+ )
+ {
+-	u8		type;
+-	u16		max;
+-
+-	int		num_req_streams = 0;
++	u8              type;
++	u16             max;
++	int             num_req_streams = 0;
+ 
+ 	/* endpoint already claimed? */
+ 	if (ep->claimed)
+ 		return 0;
+ 
+ 	type = usb_endpoint_type(desc);
++	max = 0x7ff & usb_endpoint_maxp(desc);
 +
-+		if (is_in)
-+			ep->ep.caps.dir_in = true;
-+		else
-+			ep->ep.caps.dir_out = true;
++	if (usb_endpoint_dir_in(desc) && !ep->caps.dir_in)
++		return 0;
++	else if (!ep->caps.dir_out)
++		return 0;
++
++	if (max > ep->maxpacket_limit)
++		return 0;
++
++	/* "high bandwidth" works only at high speed */
++	if (!gadget_is_dualspeed(gadget) && usb_endpoint_maxp(desc) & (3<<11))
++		return 0;
++
+ 	switch (type) {
+ 	case USB_ENDPOINT_XFER_CONTROL:
+ 		/* only support ep0 for portable CONTROL traffic */
+@@ -47,66 +60,36 @@ ep_matches (
+ 	case USB_ENDPOINT_XFER_ISOC:
+ 		if (!ep->caps.type_iso)
+ 			return 0;
++		/* ISO:  limit 1023 bytes full speed,
++		 * 1024 high/super speed
++		 */
++		if (!gadget_is_dualspeed(gadget) && max > 1023)
++			return 0;
+ 		break;
+ 	case USB_ENDPOINT_XFER_BULK:
+ 		if (!ep->caps.type_bulk)
+ 			return 0;
++		if (ep_comp && gadget_is_superspeed(gadget)) {
++			/* Get the number of required streams from the
++			 * EP companion descriptor and see if the EP
++			 * matches it
++			 */
++			num_req_streams = ep_comp->bmAttributes & 0x1f;
++			if (num_req_streams > ep->max_streams)
++				return 0;
++		}
+ 		break;
+ 	case USB_ENDPOINT_XFER_INT:
+-		/* bulk endpoints handle interrupt transfers,
++		/* Bulk endpoints handle interrupt transfers,
+ 		 * except the toggle-quirky iso-synch kind
+ 		 */
+ 		if (!ep->caps.type_int && !ep->caps.type_bulk)
+ 			return 0;
+-		break;
+-	}
+-
+-	if (usb_endpoint_dir_in(desc)) {
+-		if (!ep->caps.dir_in)
+-			return 0;
+-	} else {
+-		if (!ep->caps.dir_out)
+-			return 0;
+-	}
+-
+-	/*
+-	 * Get the number of required streams from the EP companion
+-	 * descriptor and see if the EP matches it
+-	 */
+-	if (usb_endpoint_xfer_bulk(desc)) {
+-		if (ep_comp && gadget->max_speed >= USB_SPEED_SUPER) {
+-			num_req_streams = ep_comp->bmAttributes & 0x1f;
+-			if (num_req_streams > ep->max_streams)
+-				return 0;
+-		}
+-
+-	}
+-
+-	/* endpoint maxpacket size is an input parameter, except for bulk
+-	 * where it's an output parameter representing the full speed limit.
+-	 * the usb spec fixes high speed bulk maxpacket at 512 bytes.
+-	 */
+-	max = 0x7ff & usb_endpoint_maxp(desc);
+-	switch (type) {
+-	case USB_ENDPOINT_XFER_INT:
+-		/* INT:  limit 64 bytes full speed, 1024 high/super speed */
++		/* INT:  limit 64 bytes full speed,
++		 * 1024 high/super speed
++		 */
+ 		if (!gadget_is_dualspeed(gadget) && max > 64)
+ 			return 0;
+-		/* FALLTHROUGH */
+-
+-	case USB_ENDPOINT_XFER_ISOC:
+-		/* ISO:  limit 1023 bytes full speed, 1024 high/super speed */
+-		if (ep->maxpacket_limit < max)
+-			return 0;
+-		if (!gadget_is_dualspeed(gadget) && max > 1023)
+-			return 0;
+-
+-		/* BOTH:  "high bandwidth" works only at high speed */
+-		if ((desc->wMaxPacketSize & cpu_to_le16(3<<11))) {
+-			if (!gadget_is_dualspeed(gadget))
+-				return 0;
+-			/* configure your hardware with enough buffering!! */
+-		}
+ 		break;
  	}
- }
  
 -- 
 1.9.1
