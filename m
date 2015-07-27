@@ -1,149 +1,101 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 27 Jul 2015 11:35:43 +0100
-Subject: [PATCH v2] dtb: Create a common home for cross-architecture dtsi
- files.
-Message-ID: <1437993343-9542-1-git-send-email-ian.campbell@citrix.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 27 Jul 2015 18:45:19 +0800
+Subject: [PATCH v5] PCI: Store PCIe bus address in struct of_pci_range
+Message-ID: <1437993919-99241-1-git-send-email-gabriele.paoloni@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
-LogicTile Express 20MG" added a new dts file to arch/arm64 which
-included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-.dtsi supplied by arch/arm.
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-Unfortunately this causes some issues for the split device tree
-repository[0], since things get moved around there. In that context
-the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-while the include is at src/arm/vexpress-v2m-rs1.dtsi.
+    This patch is needed port PCIe designware to new DT parsing API
+    As discussed in
+    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
+    in designware we have a problem as the PCI addresses in the PCIe controller
+    address space are required in order to perform correct HW operation.
 
-The sharing of the .dtsi is legitimate since the baseboard is the same
-for various vexpress systems whatever processor they use.
+    In order to solve this problem commit f4c55c5a3 "PCI: designware:
+    Program ATU with untranslated address" added code to read the PCIe
+    controller start address directly from the DT ranges.
 
-Rather than using ../../ tricks to pickup .dtsi files from another
-arch this patch creates a new directory include/dt-dtsi as a
-home for such cross-arch .dtsi files, arranges for it to be in the
-include path when the .dts files are processed by cpp and switches the
-.dts files to use cpp #include instead of /include/. The dtsi file
-itself is moved into a vendor subdir in this case "arm" (the vendor,
-not the ARCH=).
+    In the new DT parsing API of_pci_get_host_bridge_resources() hides the
+    DT parser from the host controller drivers, so it is not possible
+    for drivers to parse values directly from the DT.
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+    In http://www.spinics.net/lists/linux-pci/msg42540.html we already tried
+    to use the new DT parsing API but there is a bug (obviously) in setting
+    the <*>_mod_base addresses
+    Applying this patch we can easily set "<*>_mod_base = win->__res.start"
 
-Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Kumar Gala <galak@codeaurora.org>
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Kristina Martsenko <kristina.martsenko@arm.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: devicetree at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kbuild at vger.kernel.org
+    This patch adds a new field in "struct of_pci_range" to store the
+    pci bus start address; it fills the field in of_pci_range_parser_one();
+    in of_pci_get_host_bridge_resources() it retrieves the resource entry
+    after it is created and added to the resource list and uses
+    entry->__res.start to store the pci controller address
+
+    the patch is based on 4.2-rc1
+
+    Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+    Acked-by: Liviu Dudai <Liviu.Dudau@arm.com>
+    Acked-by: Rob Herring <robh@kernel.org>
 ---
-v2: Move to include/dt-dtsi and introduce a per-vendor subdirectory.
----
- Documentation/devicetree/bindings/arm/vexpress.txt               | 4 ++--
- arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts                      | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts                       | 2 +-
- arch/arm/boot/dts/vexpress-v2p-ca5s.dts                          | 2 +-
- arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts             | 2 +-
- {arch/arm/boot/dts => include/dt-dtsi/arm}/vexpress-v2m-rs1.dtsi | 0
- scripts/Makefile.lib                                             | 1 +
- 7 files changed, 7 insertions(+), 6 deletions(-)
- rename {arch/arm/boot/dts => include/dt-dtsi/arm}/vexpress-v2m-rs1.dtsi (100%)
+ drivers/of/address.c       | 2 ++
+ drivers/of/of_pci.c        | 4 ++++
+ include/linux/of_address.h | 1 +
+ 3 files changed, 7 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/vexpress.txt b/Documentation/devicetree/bindings/arm/vexpress.txt
-index 39844cd..dccf570 100644
---- a/Documentation/devicetree/bindings/arm/vexpress.txt
-+++ b/Documentation/devicetree/bindings/arm/vexpress.txt
-@@ -7,7 +7,7 @@ peripherals. Processor and RAM "live" on the tiles.
+diff --git a/drivers/of/address.c b/drivers/of/address.c
+index 8bfda6a..23a5793 100644
+--- a/drivers/of/address.c
++++ b/drivers/of/address.c
+@@ -253,6 +253,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
+ 						struct of_pci_range *range)
+ {
+ 	const int na = 3, ns = 2;
++	const int p_ns = of_n_size_cells(parser->node);
  
- The motherboard and each core tile should be described by a separate
- Device Tree source file, with the tile's description including
--the motherboard file using a /include/ directive. As the motherboard
-+the motherboard file using a #include directive. As the motherboard
- can be initialized in one of two different configurations ("memory
- maps"), care must be taken to include the correct one.
+ 	if (!range)
+ 		return NULL;
+@@ -265,6 +266,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
+ 	range->pci_addr = of_read_number(parser->range + 1, ns);
+ 	range->cpu_addr = of_translate_address(parser->node,
+ 				parser->range + na);
++	range->bus_addr = of_read_number(parser->range + na, p_ns);
+ 	range->size = of_read_number(parser->range + parser->pna + na, ns);
  
-@@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
- 		/* Active high IRQ 0 is connected to GIC's SPI0 */
- 		interrupt-map = <0 0 0 &gic 0 0 4>;
+ 	parser->range += parser->np;
+diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
+index 5751dc5..fe57030 100644
+--- a/drivers/of/of_pci.c
++++ b/drivers/of/of_pci.c
+@@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
  
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <arm/vexpress-v2m-rs1.dtsi>
- 	};
+ 	pr_debug("Parsing ranges property...\n");
+ 	for_each_of_pci_range(&parser, &range) {
++		struct resource_entry *entry;
+ 		/* Read next ranges element */
+ 		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
+ 			snprintf(range_type, 4, " IO");
+@@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
+ 		}
+ 
+ 		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
++		entry = list_last_entry(resources, struct resource_entry, node);
++		/* we are using __res for storing the PCI controller address */
++		entry->__res.start = range.bus_addr;
+ 	}
+ 
+ 	return 0;
+diff --git a/include/linux/of_address.h b/include/linux/of_address.h
+index d88e81b..865f96e 100644
+--- a/include/linux/of_address.h
++++ b/include/linux/of_address.h
+@@ -16,6 +16,7 @@ struct of_pci_range {
+ 	u32 pci_space;
+ 	u64 pci_addr;
+ 	u64 cpu_addr;
++	u64 bus_addr;
+ 	u64 size;
+ 	u32 flags;
  };
- 
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-index 9420053..7ea7054 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dts
-@@ -278,6 +278,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <arm/vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-index 17f63f7..afe997a4 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca15_a7.dts
-@@ -636,6 +636,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <arm/vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-index d2709b7..498181c 100644
---- a/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-+++ b/arch/arm/boot/dts/vexpress-v2p-ca5s.dts
-@@ -248,6 +248,6 @@
- 				<0 0 41 &gic 0 41 4>,
- 				<0 0 42 &gic 0 42 4>;
- 
--		/include/ "vexpress-v2m-rs1.dtsi"
-+		#include <arm/vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-index 5b1d018..b86c5a8 100644
---- a/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-+++ b/arch/arm64/boot/dts/arm/vexpress-v2f-1xv7-ca53x2.dts
-@@ -186,6 +186,6 @@
- 				<0 0 41 &gic GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
- 				<0 0 42 &gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>;
- 
--		/include/ "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi"
-+		#include <arm/vexpress-v2m-rs1.dtsi>
- 	};
- };
-diff --git a/arch/arm/boot/dts/vexpress-v2m-rs1.dtsi b/include/dt-dtsi/arm/vexpress-v2m-rs1.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/vexpress-v2m-rs1.dtsi
-rename to include/dt-dtsi/arm/vexpress-v2m-rs1.dtsi
-diff --git a/scripts/Makefile.lib b/scripts/Makefile.lib
-index 79e8661..0d948d4 100644
---- a/scripts/Makefile.lib
-+++ b/scripts/Makefile.lib
-@@ -163,6 +163,7 @@ dtc_cpp_flags  = -Wp,-MD,$(depfile).pre.tmp -nostdinc                    \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts                   \
- 		 -I$(srctree)/arch/$(SRCARCH)/boot/dts/include           \
- 		 -I$(srctree)/drivers/of/testcase-data                   \
-+		 -I$(srctree)/include/dt-dtsi                            \
- 		 -undef -D__DTS__
- 
- # Finds the multi-part object the current object will be linked into
 -- 
-2.1.4
+1.9.1
