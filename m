@@ -1,30 +1,49 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 27 Jul 2015 16:36:42 +0900
-Subject: [PATCH] clk: zynq: remove redundant $(CONFIG_ARCH_ZYNQ) in Makefile
-Message-ID: <1437982602-26886-1-git-send-email-yamada.masahiro@socionext.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Mon, 27 Jul 2015 09:50:50 +0200
+Subject: [Intel-gfx] [PATCH v2 12/25] i915: switch from acpi_os_ioremap
+ to ioremap
+In-Reply-To: <20150725023904.8664.84461.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023904.8664.84461.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150727075050.GK16722@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kbuild descends into drivers/clk/zynq/ only when CONFIG_ARCH_ZYNQ
-is enabled.  (see drivers/clk/Makefile)
+On Fri, Jul 24, 2015 at 10:39:04PM -0400, Dan Williams wrote:
+> acpi_os_ioremap uses cached mappings, however it appears that i915
+> wants to read dynamic platform state.  Switch to ioremap() to prevent it
+> reading stale state from cache.
+> 
+> Cc: Daniel Vetter <daniel.vetter@intel.com>
+> Cc: Jani Nikula <jani.nikula@linux.intel.com>
+> Cc: intel-gfx at lists.freedesktop.org
+> Cc: David Airlie <airlied@linux.ie>
+> Cc: dri-devel at lists.freedesktop.org
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  drivers/gpu/drm/i915/intel_opregion.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/i915/intel_opregion.c b/drivers/gpu/drm/i915/intel_opregion.c
+> index 481337436f72..16ba7c67410d 100644
+> --- a/drivers/gpu/drm/i915/intel_opregion.c
+> +++ b/drivers/gpu/drm/i915/intel_opregion.c
+> @@ -863,7 +863,7 @@ int intel_opregion_setup(struct drm_device *dev)
+>  	INIT_WORK(&opregion->asle_work, asle_work);
+>  #endif
+>  
+> -	base = acpi_os_ioremap(asls, OPREGION_SIZE);
+> +	base = ioremap(asls, OPREGION_SIZE);
 
-$(CONFIG_ARCH_ZYNQ) in drivers/clk/zynq/Makefile always evaluates
-to 'y'.
+OpRegion is cached memory shared with the firmware afaik, we probably want
+a memremap here and switch away from the ioread/write stuff. We have a
+similar confusion going on for the vbt parsing (which on anything but
+really old machines is also just normal memory).
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/clk/zynq/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clk/zynq/Makefile b/drivers/clk/zynq/Makefile
-index 156d923..0afc2e7 100644
---- a/drivers/clk/zynq/Makefile
-+++ b/drivers/clk/zynq/Makefile
-@@ -1,3 +1,3 @@
- # Zynq clock specific Makefile
- 
--obj-$(CONFIG_ARCH_ZYNQ)	+= clkc.o pll.o
-+obj-y	+= clkc.o pll.o
+Same holds for gma500, which is just a copy of i915 for some special
+platforms.
+-Daniel
 -- 
-1.9.1
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
