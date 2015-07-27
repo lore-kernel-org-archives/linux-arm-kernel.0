@@ -1,76 +1,112 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 27 Jul 2015 13:29:41 +0100
-Subject: [PATCH 11/18] iommu: tegra-smmu: split smmu_flush_ptc()
+Date: Mon, 27 Jul 2015 13:28:50 +0100
+Subject: [PATCH 01/18] ARM: reduce visibility of dmac_* functions
 In-Reply-To: <20150727122824.GH7557@n2100.arm.linux.org.uk>
 References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZJhXJ-000483-Mk@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZJhWU-00043T-AR@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-smmu_flush_ptc() is used in two modes: one is to flush an individual
-entry, the other is to flush all entries.  We know at the call site
-which we require.  Split the function into smmu_flush_ptc_all() and
-smmu_flush_ptc().
+The dmac_* functions are private to the ARM DMA API implementation, and
+should not be used by drivers.  In order to discourage their use, remove
+their prototypes and macros from asm/*.h.
+
+We have to leave dmac_flush_range() behind as Exynos and MSM IOMMU code
+use these; once these sites are fixed, this can be moved also.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/iommu/tegra-smmu.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ arch/arm/include/asm/cacheflush.h |  4 ----
+ arch/arm/include/asm/glue-cache.h |  2 --
+ arch/arm/mm/dma-mapping.c         |  1 +
+ arch/arm/mm/dma.h                 | 32 ++++++++++++++++++++++++++++++++
+ 4 files changed, 33 insertions(+), 6 deletions(-)
+ create mode 100644 arch/arm/mm/dma.h
 
-diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
-index fa26b76017cf..89e7961f4848 100644
---- a/drivers/iommu/tegra-smmu.c
-+++ b/drivers/iommu/tegra-smmu.c
-@@ -159,29 +159,29 @@ static void smmu_flush_dcache(struct page *page, unsigned long offset,
- #endif
- }
+diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
+index 4812cda8fd17..c5230a44eeca 100644
+--- a/arch/arm/include/asm/cacheflush.h
++++ b/arch/arm/include/asm/cacheflush.h
+@@ -140,8 +140,6 @@ extern struct cpu_cache_fns cpu_cache;
+  * is visible to DMA, or data written by DMA to system memory is
+  * visible to the CPU.
+  */
+-#define dmac_map_area			cpu_cache.dma_map_area
+-#define dmac_unmap_area			cpu_cache.dma_unmap_area
+ #define dmac_flush_range		cpu_cache.dma_flush_range
  
-+static void smmu_flush_ptc_all(struct tegra_smmu *smmu)
-+{
-+	smmu_writel(smmu, SMMU_PTC_FLUSH_TYPE_ALL, SMMU_PTC_FLUSH);
-+}
-+
- static inline void smmu_flush_ptc(struct tegra_smmu *smmu, struct page *page,
- 				  unsigned long offset)
- {
--	phys_addr_t phys = page ? page_to_phys(page) : 0;
-+	phys_addr_t phys = page_to_phys(page);
- 	u32 value;
- 
--	if (page) {
--		offset &= ~(smmu->mc->soc->atom_size - 1);
-+	offset &= ~(smmu->mc->soc->atom_size - 1);
- 
--		if (smmu->mc->soc->num_address_bits > 32) {
-+	if (smmu->mc->soc->num_address_bits > 32) {
- #ifdef CONFIG_PHYS_ADDR_T_64BIT
--			value = (phys >> 32) & SMMU_PTC_FLUSH_HI_MASK;
-+		value = (phys >> 32) & SMMU_PTC_FLUSH_HI_MASK;
  #else
--			value = 0;
-+		value = 0;
+@@ -161,8 +159,6 @@ extern void __cpuc_flush_dcache_area(void *, size_t);
+  * is visible to DMA, or data written by DMA to system memory is
+  * visible to the CPU.
+  */
+-extern void dmac_map_area(const void *, size_t, int);
+-extern void dmac_unmap_area(const void *, size_t, int);
+ extern void dmac_flush_range(const void *, const void *);
+ 
  #endif
--			smmu_writel(smmu, value, SMMU_PTC_FLUSH_HI);
--		}
--
--		value = (phys + offset) | SMMU_PTC_FLUSH_TYPE_ADR;
--	} else {
--		value = SMMU_PTC_FLUSH_TYPE_ALL;
-+		smmu_writel(smmu, value, SMMU_PTC_FLUSH_HI);
- 	}
+diff --git a/arch/arm/include/asm/glue-cache.h b/arch/arm/include/asm/glue-cache.h
+index a3c24cd5b7c8..cab07f69382d 100644
+--- a/arch/arm/include/asm/glue-cache.h
++++ b/arch/arm/include/asm/glue-cache.h
+@@ -158,8 +158,6 @@ static inline void nop_dma_unmap_area(const void *s, size_t l, int f) { }
+ #define __cpuc_coherent_user_range	__glue(_CACHE,_coherent_user_range)
+ #define __cpuc_flush_dcache_area	__glue(_CACHE,_flush_kern_dcache_area)
  
-+	value = (phys + offset) | SMMU_PTC_FLUSH_TYPE_ADR;
- 	smmu_writel(smmu, value, SMMU_PTC_FLUSH);
- }
+-#define dmac_map_area			__glue(_CACHE,_dma_map_area)
+-#define dmac_unmap_area			__glue(_CACHE,_dma_unmap_area)
+ #define dmac_flush_range		__glue(_CACHE,_dma_flush_range)
+ #endif
  
-@@ -888,7 +888,7 @@ struct tegra_smmu *tegra_smmu_probe(struct device *dev,
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index cba12f34ff77..b7998df043ef 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -39,6 +39,7 @@
+ #include <asm/system_info.h>
+ #include <asm/dma-contiguous.h>
  
- 	smmu_writel(smmu, value, SMMU_TLB_CONFIG);
++#include "dma.h"
+ #include "mm.h"
  
--	smmu_flush_ptc(smmu, NULL, 0);
-+	smmu_flush_ptc_all(smmu);
- 	smmu_flush_tlb(smmu);
- 	smmu_writel(smmu, SMMU_CONFIG_ENABLE, SMMU_CONFIG);
- 	smmu_flush(smmu);
+ /*
+diff --git a/arch/arm/mm/dma.h b/arch/arm/mm/dma.h
+new file mode 100644
+index 000000000000..70ea6852f94e
+--- /dev/null
++++ b/arch/arm/mm/dma.h
+@@ -0,0 +1,32 @@
++#ifndef DMA_H
++#define DMA_H
++
++#include <asm/glue-cache.h>
++
++#ifndef MULTI_CACHE
++#define dmac_map_area			__glue(_CACHE,_dma_map_area)
++#define dmac_unmap_area 		__glue(_CACHE,_dma_unmap_area)
++
++/*
++ * These are private to the dma-mapping API.  Do not use directly.
++ * Their sole purpose is to ensure that data held in the cache
++ * is visible to DMA, or data written by DMA to system memory is
++ * visible to the CPU.
++ */
++extern void dmac_map_area(const void *, size_t, int);
++extern void dmac_unmap_area(const void *, size_t, int);
++
++#else
++
++/*
++ * These are private to the dma-mapping API.  Do not use directly.
++ * Their sole purpose is to ensure that data held in the cache
++ * is visible to DMA, or data written by DMA to system memory is
++ * visible to the CPU.
++ */
++#define dmac_map_area			cpu_cache.dma_map_area
++#define dmac_unmap_area 		cpu_cache.dma_unmap_area
++
++#endif
++
++#endif
 -- 
 2.1.0
