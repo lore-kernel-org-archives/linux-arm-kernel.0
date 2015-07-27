@@ -1,42 +1,39 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Mon, 27 Jul 2015 13:58:17 +0000
-Subject: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <alpine.DEB.2.11.1507261346250.18576@nanos>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
- <alpine.DEB.2.11.1507261346250.18576@nanos>
-Message-ID: <CY1PR0301MB08438E910102580D0C0ECEBD838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Jul 2015 14:59:16 +0100
+Subject: [PATCH v2 0/2] spi: dw: Reintroduce optional 16 bit data
+ register I/O
+In-Reply-To: <CCC70BC0-E1D0-4C27-A44D-2D16ED9B3049@smart-africa.com>
+References: <1434703435-25198-1-git-send-email-michael@smart-africa.com>
+ <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+ <1437751812.29746.74.camel@linux.intel.com>
+ <20150724153704.GM11162@sirena.org.uk>
+ <1437994691.29746.80.camel@linux.intel.com>
+ <20150727111944.GW11162@sirena.org.uk>
+ <CCC70BC0-E1D0-4C27-A44D-2D16ED9B3049@smart-africa.com>
+Message-ID: <20150727135915.GY11162@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Thomas Gleixner [mailto:tglx at linutronix.de]
-> Sent: 2015?7?26? 6:48
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; jason at lakedaemon.net;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Huang
-> Yongcai-B20788
-> Subject: Re: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
-> 
-> On Wed, 22 Jul 2015, Shenwei Wang wrote:
-> > +static int imx_gpcv2_irq_set_wake(struct irq_data *d, unsigned int
-> > +on) {
-> > +	struct imx_gpcv2_irq *cd = d->chip_data;
-> > +	unsigned int idx = d->hwirq / 32;
-> > +	unsigned long flags;
-> > +	void __iomem *reg;
-> > +	u32 mask, val;
-> > +
-> > +	raw_spin_lock_irqsave(&cd->lock.rlock, flags);
-> 
-> Oh no. You need to make cd->lock a raw_spinlock and then use
-> raw_spin_lock_irqsave() on it. How on earth did you come up with this hackery?
+On Mon, Jul 27, 2015 at 01:38:57PM +0200, Michael van der Westhuizen wrote:
 
-I was thinking to use one spin_lock between the current two modules. But it should be 
-okay to use a dedicate one for irqchip.
+> > It's possible there was some discussion of the patch that made
+> > it look it needed a resubmit, or that it was buried as reply in the
+> > middle of discussion of some other patches (eg, a previous version).
+> > Either way to repeat what I said if you want me to review a patch please
+> > send me the patch.
 
-> Thanks,
-> 
-> 	tglx
+> I?ve just resent the series.
+
+You've sent them as a reply in the middle of another thread which is
+something I just indicated above was a bad idea in the message you're
+replying to here (it's a great way to either make it hard to figure out
+what the current version of the code is or get your message deleted
+along with the rest of the thread) and you've decided to label them as
+[RESEND instead of [PATCH :(
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/b2e3ca89/attachment-0001.sig>
