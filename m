@@ -1,40 +1,34 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 27 Jul 2015 03:21:01 -0700 (PDT)
-Subject: [PATCH v4 7/7] arm64: dts: mt8173: Add subsystem clock controller
- device nodes
-In-Reply-To: <1437965782.5614.4.camel@mtksdaap41>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omAUAHZUJQMnWJbH7NXB_Etp=OF3dWyMB7Ri1+rAyzyPBg@mail.gmail.com>
- <1437965782.5614.4.camel@mtksdaap41>
-Message-ID: <24796517.2pfRdOOmRJ@ubix>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Mon, 27 Jul 2015 11:02:03 +0100
+Subject: [Xen-devel] [PATCH] xen/events: Support event channel rebind
+ on ARM
+In-Reply-To: <1437845664-32098-1-git-send-email-julien.grall@citrix.com>
+References: <1437845664-32098-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <55B6019B.20903@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, July 27, 2015 10:56:22 AM James Liao wrote:
-> Hi Daniel,
+On 25/07/15 18:34, Julien Grall wrote:
+> Currently, the event channel rebind code is gated with the presence of
+> the vector callback.
 > 
-> On Fri, 2015-07-24 at 19:32 +0800, Daniel Kurtz wrote:
-> > > @@ -88,6 +88,13 @@
-> > > 
-> > >                 #clock-cells = <0>;
-> > >         
-> > >         };
-> > > 
-> > > +       cpum_ck: dummy_clk {
-> > 
-> > I'm not a big fan of this "dummy_clk".
-> > The 'name' part of the devicetree node is supposed to be generic.
-> > So, perhaps just oscillator at 2, and move it down below clk32k:
-> > oscillator at 1.
+> The virtual interrupt controller on ARM has the concept of per-CPU
+> interrupt (PPI) which allow us to support per-VCPU event channel.
+> Therefore there is no need of vector callback for ARM.
 > 
-> > Otherwise:
-> cpum_ck is a test clock which only available in IC test. It's empty on
-> MT8173 evaluation or production boards. Should we name this kind of
-> empty clock as an oscillator? Or is there a better name for it?
+> Xen is already using a free PPI to notify the guest VCPU of an event.
+> Furthermore, the xen code initialization in Linux (see
+> arch/arm/xen/enlighten.c) is requesting correctly a per-CPU IRQ.
 > 
+> Introduce new macro xen_support_evtchn_rebind to allow architecture
+> decide whether rebind an event is support or not. It will always return
+> 1 on ARM and keep the same behavior on x86.
+> 
+> This is also allow us to drop the usage of xen_have_vector_callback
+> entirely in the ARM code.
 
-So if it will never be part of any available boards, why do you want to add 
-it?
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
 
-Regards,
-Matthias
+Provided you make xen_support_evtchn_rebind() an inline function.
+
+David
