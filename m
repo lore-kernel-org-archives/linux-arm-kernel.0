@@ -1,53 +1,30 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Mon, 27 Jul 2015 13:35:20 +0100
-Subject: [PATCH v2] xen/events: Support event channel rebind on ARM
-In-Reply-To: <1437996911-18985-1-git-send-email-julien.grall@citrix.com>
-References: <1437996911-18985-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <55B62588.3050502@citrix.com>
+From: public_timo.s@silentcreek.de (public_timo.s at silentcreek.de)
+Date: Mon, 27 Jul 2015 14:36:53 +0200 (CEST)
+Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
+ board-specific operating points for LeMaker BananaPi
+In-Reply-To: <55B5E6DB.8020009@redhat.com>
+References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de><55B5E6DB.8020009@redhat.com>
+Message-ID: <20150727123653.36C046C8007E@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/15 12:35, Julien Grall wrote:
-> Currently, the event channel rebind code is gated with the presence of
-> the vector callback.
-> 
-> The virtual interrupt controller on ARM has the concept of per-CPU
-> interrupt (PPI) which allow us to support per-VCPU event channel.
-> Therefore there is no need of vector callback for ARM.
-> 
-> Xen is already using a free PPI to notify the guest VCPU of an event.
-> Furthermore, the xen code initialization in Linux (see
-> arch/arm/xen/enlighten.c) is requesting correctly a per-CPU IRQ.
-> 
-> Introduce new helper xen_support_evtchn_rebind to allow architecture
-> decide whether rebind an event is support or not. It will always return
-> 1 on ARM and keep the same behavior on x86.
-> 
-> This is also allow us to drop the usage of xen_have_vector_callback
-> entirely in the ARM code.
+Hi again,
 
-This did not apply cleanly.  Please always base patches on Linus's
-master branch.
+one more thing...
 
-This also breaks the x86 build.
+Hans de Goede schrieb am 27.07.2015 10:07:
+> IMHO we should just stick with the standard operating points unless we know
+> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
+> Lime).
 
-/local/davidvr/work/k.org/tip/arch/x86/include/asm/xen/events.h: In
-function ?xen_support_evtchn_rebind?:
-/local/davidvr/work/k.org/tip/arch/x86/include/asm/xen/events.h:29:85:
-error: ?xen_have_vector_callback? undeclared (first use in this function)
-  return (!xen_hvm_domain() || xen_have_vector_callback);
+If we stick to the standard operating points, shouldn't we honor their voltages
+as well? If we set the minimum voltage for dcdc2 to 1.0V (as you did) or 1.05V
+(as I did), this means that the lowest operating point of 144MHz at 0.9V defined
+in sun7i-a20.dtsi (and with my definition the 312MHz opp as well) will not be
+available because cpufreq-dt simply ignores operating points that aren't within
+the set voltage range for that regulator.
 
-> --- a/arch/arm/include/asm/xen/events.h
-> +++ b/arch/arm/include/asm/xen/events.h
-> @@ -20,4 +20,10 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
->  							    atomic64_t,	\
->  							    counter), (val))
->  
-> +/* Rebind event channel is supported by default */
-> +static inline bool xen_support_evtchn_rebind(void)
-> +{
-> +	return 1;
 
-This should be true (similarly for arm64).
+Regards,
 
-David
+Timo
