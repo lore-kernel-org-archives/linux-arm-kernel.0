@@ -1,66 +1,40 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 27 Jul 2015 13:28:55 +0100
-Subject: [PATCH 02/18] firmware: qcom_scm-32: replace open-coded call to
- __cpuc_flush_dcache_area()
+Date: Mon, 27 Jul 2015 13:29:00 +0100
+Subject: [PATCH 03/18] iommu: tegra-smmu: fix iova_to_phys() method
 In-Reply-To: <20150727122824.GH7557@n2100.arm.linux.org.uk>
 References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <E1ZJhWZ-00043Z-Ft@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1ZJhWe-00043f-KS@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+iova_to_phys() has several problems:
+(a) iova_to_phys() is supposed to return 0 if there is no entry present
+    for the iova.
+(b) if as_get_pte() fails, we oops the kernel by dereferencing a NULL
+    pointer.  Really, we should not even be trying to allocate a page
+    table at all, but should only be returning the presence of the 2nd
+    level page table.  This will be fixed in a subsequent patch.
+
+Treat both of these conditions as "no mapping" conditions.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/cacheflush.h | 17 +++++++++++++++++
- drivers/firmware/qcom_scm-32.c    |  4 +---
- 2 files changed, 18 insertions(+), 3 deletions(-)
+ drivers/iommu/tegra-smmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index c5230a44eeca..d5525bfc7e3e 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -502,4 +502,21 @@ static inline void set_kernel_text_ro(void) { }
- void flush_uprobe_xol_access(struct page *page, unsigned long uaddr,
- 			     void *kaddr, unsigned long len);
+diff --git a/drivers/iommu/tegra-smmu.c b/drivers/iommu/tegra-smmu.c
+index c1f2e521dc52..083354903a1a 100644
+--- a/drivers/iommu/tegra-smmu.c
++++ b/drivers/iommu/tegra-smmu.c
+@@ -592,6 +592,9 @@ static phys_addr_t tegra_smmu_iova_to_phys(struct iommu_domain *domain,
+ 	u32 *pte;
  
-+/**
-+ * secure_flush_area - ensure coherency across the secure boundary
-+ * @addr: virtual address
-+ * @size: size of region
-+ *
-+ * Ensure that the specified area of memory is coherent across the secure
-+ * boundary from the non-secure side.  This is used when calling secure
-+ * firmware where the secure firmware does not ensure coherency.
-+ */
-+static inline void secure_flush_area(const void *addr, size_t size)
-+{
-+	phys_addr_t phys = __pa(addr);
+ 	pte = as_get_pte(as, iova, &page);
++	if (!pte || !*pte)
++		return 0;
 +
-+	__cpuc_flush_dcache_area((void *)addr, size);
-+	outer_flush_range(phys, phys + size);
-+}
-+
- #endif
-diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
-index 1bd6f9c34331..29e6850665eb 100644
---- a/drivers/firmware/qcom_scm-32.c
-+++ b/drivers/firmware/qcom_scm-32.c
-@@ -24,7 +24,6 @@
- #include <linux/err.h>
- #include <linux/qcom_scm.h>
+ 	pfn = *pte & as->smmu->pfn_mask;
  
--#include <asm/outercache.h>
- #include <asm/cacheflush.h>
- 
- #include "qcom_scm.h"
-@@ -219,8 +218,7 @@ static int __qcom_scm_call(const struct qcom_scm_command *cmd)
- 	 * Flush the command buffer so that the secure world sees
- 	 * the correct data.
- 	 */
--	__cpuc_flush_dcache_area((void *)cmd, cmd->len);
--	outer_flush_range(cmd_addr, cmd_addr + cmd->len);
-+	secure_flush_area(cmd, cmd->len);
- 
- 	ret = smc(cmd_addr);
- 	if (ret < 0)
+ 	return PFN_PHYS(pfn);
 -- 
 2.1.0
