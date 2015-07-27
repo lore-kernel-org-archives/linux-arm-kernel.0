@@ -1,42 +1,42 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 27 Jul 2015 17:46:38 +0530
-Subject: [RFT PATCH 1/4] ARM: dts: omap24xx: Fix broken pbias device creation
+Date: Mon, 27 Jul 2015 17:46:39 +0530
+Subject: [PATCH 2/4] ARM: dts: OMAP4: Fix broken pbias device creation
 In-Reply-To: <1437999401-3519-1-git-send-email-kishon@ti.com>
 References: <1437999401-3519-1-git-send-email-kishon@ti.com>
-Message-ID: <1437999401-3519-2-git-send-email-kishon@ti.com>
+Message-ID: <1437999401-3519-3-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit <72b10ac00eb1> ("ARM: dts: omap24xx: add minimal l4 bus
-layout with control module support") moved pbias_regulator dt node
+commit <7415b0b4c645> ("ARM: dts: omap4: add minimal l4 bus layout
+with control module support") moved pbias_regulator dt node
 from being a child node of ocp to be the child node of
-scm_conf. After this device for pbias_regulator is
-not created.
+omap4_padconf_global. After this device for pbias_regulator
+is not created.
 
 Fix it by adding "simple-bus" compatible property to
-scm_conf dt node.
+omap4_padconf_global dt node.
 
-Fixes: 72b10ac00eb1 ("ARM: dts: omap24xx: add minimal l4 bus
-layout with control module support")
+Fixes: 7415b0b4c645 ("ARM: dts: omap4: add minimal l4 bus layout
+with control module support")
 
 Cc: <stable@vger.kernel.org>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/boot/dts/omap2430.dtsi |    3 ++-
+ arch/arm/boot/dts/omap4.dtsi |    3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index 11a7963..2390f38 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -51,7 +51,8 @@
+diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
+index 7d31c6f..abc4473 100644
+--- a/arch/arm/boot/dts/omap4.dtsi
++++ b/arch/arm/boot/dts/omap4.dtsi
+@@ -191,7 +191,8 @@
  				};
  
- 				scm_conf: scm_conf at 270 {
+ 				omap4_padconf_global: omap4_padconf_global at 5a0 {
 -					compatible = "syscon";
 +					compatible = "syscon",
 +						     "simple-bus";
- 					reg = <0x270 0x240>;
+ 					reg = <0x5a0 0x170>;
  					#address-cells = <1>;
  					#size-cells = <1>;
 -- 
