@@ -1,45 +1,47 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 27 Jul 2015 12:24:31 +0800
-Subject: [PATCH v3 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20150724165509.GD21177@arm.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
- <20150721145910.GG31095@arm.com> <1437716593.23932.73.camel@mhfsdcap03>
- <20150724165509.GD21177@arm.com>
-Message-ID: <1437971071.25925.24.camel@mhfsdcap03>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 27 Jul 2015 00:39:32 -0400
+Subject: [PATCH v2 0/2] Consolidate redundant register/stack access code
+Message-ID: <1437971974-2434-1-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 17:55 +0100, Will Deacon wrote:
-> On Fri, Jul 24, 2015 at 06:43:13AM +0100, Yong Wu wrote:
-> > On Tue, 2015-07-21 at 15:59 +0100, Will Deacon wrote:
-> > > On Thu, Jul 16, 2015 at 10:04:34AM +0100, Yong Wu wrote:
-> > > > +static void mtk_iommu_tlb_flush_all(void *cookie)
-> > > > +{
-> > > > +       struct mtk_iommu_domain *domain = cookie;
-> > > > +       void __iomem *base;
-> > > > +
-> > > > +       base = domain->data->base;
-> > > > +       writel(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
-> > > > +       writel(F_ALL_INVLD, base + REG_MMU_INVALIDATE);
-> > > 
-> > > This needs to be synchronous, so you probably want to call
-> > > mtk_iommu_tlb_sync at the end.
-> > 
-> > From our spec, we have to wait until HW done after tlb flush range.
-> > But it don't need wait after tlb flush all.
-> > so It isn't necessary to add mtk_iommu_tlb_sync in tlb_flush_all here.
-> 
-> Okey doke, but I'm surprised you don't need a subsequent DSB or read-back.
-> What if the writel is buffered on the way to the IOMMU?
+From: "David A. Long" <dave.long@linaro.org>
 
-Then I change to this:
- //==========
-    writel_relaxed(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
-    writel_relaxed(F_ALL_INVLD, base + REG_MMU_INVALIDATE);    
-    dsb(ishst);
-//===========
-    dsb or mb(). which one is better here?
+Move duplicate and functionally equivalent code for accessing registers
+and stack (CONFIG_HAVE_REGS_AND_STACK_ACCESS_API) from arch subdirs into
+common kernel files.
 
-> 
-> Will
+Changes since v1:
+    Move the REG_OFFSET_NAME and REG_OFFSET_END macros to architecture-
+    independent include file. Change their name from REG_* to REGS_* for
+    consistency.
+
+Note: Help regression testing s390, hexagon, and sh would be appreciated.
+      Powerpc builds but I have not verified the functionality.
+
+David A. Long (2):
+  Move the pt_regs_offset struct definition from arch to common include
+    file
+  Consolidate redundant register/stack access code
+
+ arch/arm/include/asm/ptrace.h          |   6 --
+ arch/arm/kernel/ptrace.c               |  74 +---------------
+ arch/hexagon/include/uapi/asm/ptrace.h |   3 -
+ arch/powerpc/include/asm/ptrace.h      |  38 --------
+ arch/powerpc/kernel/ptrace.c           |  65 +++-----------
+ arch/s390/include/asm/ptrace.h         |   3 -
+ arch/s390/kernel/ptrace.c              |  69 +++++----------
+ arch/sh/include/asm/ptrace.h           |  48 +---------
+ arch/sh/kernel/Makefile                |   2 +-
+ arch/sh/kernel/ptrace.c                |  33 -------
+ arch/sh/kernel/ptrace_32.c             |  50 +++++------
+ arch/sh/kernel/ptrace_64.c             | 154 ++++++++++++++++-----------------
+ arch/x86/include/asm/ptrace.h          |  37 --------
+ arch/x86/kernel/ptrace.c               |  93 ++++++--------------
+ include/linux/ptrace.h                 |  54 ++++++++++++
+ kernel/ptrace.c                        |  38 ++++++++
+ 16 files changed, 258 insertions(+), 509 deletions(-)
+ delete mode 100644 arch/sh/kernel/ptrace.c
+
+-- 
+1.8.1.2
