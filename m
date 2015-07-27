@@ -1,52 +1,70 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 27 Jul 2015 11:48:09 +0200
-Subject: [PATCH 1/7] ARM64: zynqmp: Use zynqmp specific compatible string for
- gpio
-Message-ID: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
+Date: Mon, 27 Jul 2015 11:48:10 +0200
+Subject: [PATCH 2/7] ARM64: zynqmp: Add CANs node for platform
+In-Reply-To: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
+References: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
+Message-ID: <f2905b624dfc90336f67801ce29bee7a45a9f657.1437990464.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch:
-"gpio: Added support to Zynq Ultrascale+ MPSoC"
-(sha1: bdf7a4ae371894b4dc10b5820006b0a82d484929)
-added zynqmp specific features. This patch is switching the driver to
-use the zynqmp compatible string.
-Also enable the driver for ep108 platform.
+Also enable can0 for ep108.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++++
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 2 +-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts |  4 ++++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 24 ++++++++++++++++++++++++
+ 2 files changed, 28 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index 02b5d76c33f7..82deb24dddeb 100644
+index 82deb24dddeb..3aebc3f5d02a 100644
 --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
 +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -42,6 +42,10 @@
+@@ -32,6 +32,10 @@
  	};
  };
  
-+&gpio {
++&can0 {
 +	status = "okay";
 +};
 +
- &sata0 {
+ &gem0 {
  	status = "okay";
- 	ceva,broken-gen2;
+ 	phy-handle = <&phy0>;
 diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index e7545edf6179..bd9ba0cab504 100644
+index bd9ba0cab504..d58c9689c82a 100644
 --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
 +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -163,7 +163,7 @@
- 		};
+@@ -96,6 +96,30 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- 		gpio: gpio at ff0a0000 {
--			compatible = "xlnx,zynq-gpio-1.0";
-+			compatible = "xlnx,zynqmp-gpio-1.0";
- 			status = "disabled";
- 			#gpio-cells = <0x2>;
- 			clocks = <&misc_clk>;
++		can0: can at ff060000 {
++			compatible = "xlnx,zynq-can-1.0";
++			status = "disabled";
++			clocks = <&misc_clk &misc_clk>;
++			clock-names = "can_clk", "pclk";
++			reg = <0x0 0xff060000 0x1000>;
++			interrupts = <0 23 4>;
++			interrupt-parent = <&gic>;
++			tx-fifo-depth = <0x40>;
++			rx-fifo-depth = <0x40>;
++		};
++
++		can1: can at ff070000 {
++			compatible = "xlnx,zynq-can-1.0";
++			status = "disabled";
++			clocks = <&misc_clk &misc_clk>;
++			clock-names = "can_clk", "pclk";
++			reg = <0x0 0xff070000 0x1000>;
++			interrupts = <0 24 4>;
++			interrupt-parent = <&gic>;
++			tx-fifo-depth = <0x40>;
++			rx-fifo-depth = <0x40>;
++		};
++
+ 		misc_clk: misc_clk {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
 -- 
 2.3.5
