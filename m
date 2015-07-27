@@ -1,62 +1,51 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 27 Jul 2015 16:09:06 +0200
-Subject: [PATCH 00/18] Clean up exposure of arch-internal code
-In-Reply-To: <20150727122824.GH7557@n2100.arm.linux.org.uk>
-References: <20150727122824.GH7557@n2100.arm.linux.org.uk>
-Message-ID: <20150727140905.GA16858@ulmo.nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Jul 2015 15:11:02 +0100
+Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <55B63AB2.4050006@arm.com>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+ <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
+ <20150721171101.GN31095@arm.com>
+ <1437715466.23932.68.camel@mhfsdcap03>
+ <20150724165325.GC21177@arm.com>
+ <1437970868.25925.20.camel@mhfsdcap03> <55B63AB2.4050006@arm.com>
+Message-ID: <20150727141102.GJ3358@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 01:28:24PM +0100, Russell King - ARM Linux wrote:
-> This series of patches attempts to clean up the use of architecture
-> internal functions in drivers, and removes some functions from view
-> in the asm/ headers.  I'm also considering whether we need to add
-> some linker magic to hide symbols when building the built-in.o files.
+On Mon, Jul 27, 2015 at 03:05:38PM +0100, Robin Murphy wrote:
+> On 27/07/15 05:21, Yong Wu wrote:
+> >>>>> +       } else {        /* page or largepage */
+> >>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
+> >>>>> +                       if (large) { /* special Bit */
+> >>>>
+> >>>> This definitely needs a better comment! What exactly are you doing here
+> >>>> and what is that quirk all about?
+> >>>
+> >>> I use this quirk is for MTK Special Bit as we don't have the XN bit in
+> >>> pagetable.
+> >>
+> >> I'm still not really clear about what this is.
+> >
+> > There is some difference between the standard spec and MTK HW,
+> > Our hw don't implement some bits, like XN and AP.
+> > So I add a quirk for MTK special.
 > 
-> This was triggered by 3rd party drivers "going under the covers" of
-> the DMA API and calling the dmac_*() functions directly, a practice
-> which I have always refused to allow.  This also breaks module
-> building (which is the big hint that they're doing something wrong.)
-> 
-> However, it also came to light that various drivers are using
-> __cpuc_* functions directly, which are non-portable, and is another
-> instance of "going under the covers" and tinkering with what should
-> be kept as architecture implementation details.
-> 
-> This series addresses some of these points.  It:
-> 
-> (a) moves dmac_map_area() and dmac_unmap_area() prototypes out of
->     asm/cacheflush.h and into arch/arm/mm.
-> (b) provide a secure_flush() call for the Qualcomm secure monitor
->     code.
-> (c) stop tegra smmu driver(s) from using __cpuc_flush_dcache_area,
->     something which necessitates additional complexity to deal with
->     the ARM vs ARM64 differences.  It should be using the DMA API.
->     However, the Tegra SMMU driver is in really bad shape, and this
->     isn't a simple conversion - it requires a lot of additional
->     fixes to bring the code up to scratch.
+> When you say it doesn't implement these bits, do you mean that having 
+> them set will lead to Bad Things happening in the hardware, or that it 
+> will simply ignore them and not enforce any of the protections they 
+> imply? The former case would definitely want clearly documenting 
+> somewhere, whereas for the latter case I'm not sure it's even worth the 
+> complication of having a quirk - if the value doesn't matter there seems 
+> little point in doing a special dance just for the sake of semantic 
+> correctness of the in-memory PTEs, in my opinion.
 
-Out of curiosity, did you have any hardware to test this on? I've given
-it a quick spin and haven't seen anything out of the ordinary. I have a
-couple of nitpicks towards the end of the series, but other than that,
-very nice work.
+Agreed. We should only use quirks if the current (architecturally
+compliant) code causes real issues with the hardware. Then the quirk can
+be used to either avoid the problematic routines or to take extra steps
+to make things work as the architecture intended.
 
-What's the plan for merging this? Should it all go in through Joerg's
-tree so that potentially other driver conversions can go in on top of
-this, or would you prefer to take it through the ARM tree?
+I've asked how this IOMMU differs from the architecture on a number of
+occasions, but I'm still yet to receive a response other than "it's special".
 
-> It leaves the Rockchip IOMMU driver for the time being, but that is also
-> something which needs cleaning up in the same way as the Tegra SMMU
-> driver.
-
->From a cursory look, MSM, OMAP and Exynos are in the same boat as well.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/e1d4912f/attachment-0001.sig>
+Will
