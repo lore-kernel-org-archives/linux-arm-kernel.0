@@ -1,51 +1,43 @@
 From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Mon, 27 Jul 2015 13:37:13 +0200
-Subject: [RESEND PATCH v2 0/2] spi: dw: Reintroduce optional 16 bit data
- register I/O
-In-Reply-To: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+Date: Mon, 27 Jul 2015 13:37:14 +0200
+Subject: [RESEND PATCH v2 1/2] dt: snps,
+ dw-apb-ssi: Document new I/O data register width property
+In-Reply-To: <1437997035-3046-1-git-send-email-michael@smart-africa.com>
 References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
-Message-ID: <1437997035-3046-1-git-send-email-michael@smart-africa.com>
+ <1437997035-3046-1-git-send-email-michael@smart-africa.com>
+Message-ID: <1437997035-3046-2-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-accesses") globally changed all register access in the dw_apb_ssi driver
-to 32 bit access, which breaks data register (FIFO) access on picoXcell
+This change documents a new property for the snps,dw-apb-ssi device,
+allowing an implementer to specify either four byte or two bytes
+access to the SPI controller data register.
+
+This supports a change that unbreaks this driver on picoXcell
 platforms.
 
-This series introduces a boolean to the core spi-dw driver to indicate
-to the core that 16 bit data register access is appropriate, implements
-the code that respects that flag and updates the dw-spi-mmio driver to
-allow setting this boolean from the device tree.
-
-A binding documentation fix is included in this series.
-
-Prior to applying this change the following error presents on
-a picoCell pc3x3 platform:
-  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
-  m25p80 spi32766.0: error -5 reading 9f
-  m25p80: probe of spi32766.0 failed with error -5
-
-With this series applied:
-  m25p80 spi32766.0: m25p40 (512 Kbytes)
-
-(Resend requested by Mark Brown)
+Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+---
 
 Changes in v2:
   - Incorporate review feedback from Andy Shevchenko, reworking the
-    bindings to reflect common practice and adjusting the driver
-    to suit.
-  - Add a wrapper inline function for accessing the data register
-    using the configured with.
+    bindings to reflect common practice.
 
-Michael van der Westhuizen (2):
-  dt: snps,dw-apb-ssi: Document new I/O data register width property
-  spi: dw: Allow interface drivers to limit data I/O to word sizes
+ Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/spi/spi-dw-mmio.c |  4 ++++
- drivers/spi/spi-dw.c      |  4 ++--
- drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
- 3 files changed, 41 insertions(+), 2 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+index bd99193..b4f1086 100644
+--- a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
++++ b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+@@ -10,6 +10,8 @@ Required properties:
+ Optional properties:
+ - cs-gpios : Specifies the gpio pis to be used for chipselects.
+ - num-cs : The number of chipselects. If omitted, this will default to 4.
++- snps,reg-io-width : The I/O register width (in bytes) implemented by
++  this device.  Supported values are 2 or 4 (the default).
+ 
+ Child nodes as per the generic SPI binding.
+ 
 -- 
 2.1.4
