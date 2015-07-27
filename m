@@ -1,30 +1,33 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Jul 2015 14:26:09 +0200
-Subject: [GIT PULL] STM32 DT changes for v4.3 v2
-In-Reply-To: <55B07A70.4050902@gmail.com>
-References: <55B07A70.4050902@gmail.com>
-Message-ID: <20150727122609.GD14224@localhost>
+Date: Mon, 27 Jul 2015 14:27:27 +0200
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.3
+In-Reply-To: <cover.1437725206.git.horms+renesas@verge.net.au>
+References: <cover.1437725206.git.horms+renesas@verge.net.au>
+Message-ID: <20150727122727.GE14224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 23, 2015 at 07:24:00AM +0200, Maxime Coquelin wrote:
-> Hi Olof, Arnd and Kevin,
+On Fri, Jul 24, 2015 at 05:41:15PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> Please consider this first round of STM32 DT updates for v4.3 (version 2):
+> Please consider these second round of Renesas ARM based SoC cleanup for v4.3.
 > 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-cleanup-for-v4.3,
+> which I have already sent a pull-request for.
 > 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> The following changes since commit 20834a406ee20b57c796f9911f06600b71c75788:
+> 
+>   ARM: shmobile: timer: r8a73a4 and r8a7790 are multi-platform only (2015-07-06 09:29:46 +0900)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/stm32.git
-> tags/stm32-dt-for-v4.3-1b
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v4.3
 > 
-> for you to fetch changes up to 2303553f3f32cb508c7818ebfda78a13d3c10d37:
+> for you to fetch changes up to 151dd346a2dadaa151d5110553e3fb08774c888e:
 > 
->   ARM: dts: Use stdout-path in STM32F429 Discovery board (2015-07-23
-> 07:07:12 +0200)
+>   ARM: shmobile: apmu: silence build warnings (2015-07-14 16:35:24 +0900)
 
 Thanks, merged.
 
