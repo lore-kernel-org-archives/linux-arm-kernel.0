@@ -1,10 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:25 +0200
-Subject: [PATCH v4 15/46] usb: gadget: fsl_udc_core: add ep capabilities
- support
+Date: Mon, 27 Jul 2015 11:16:24 +0200
+Subject: [PATCH v4 14/46] usb: gadget: fsl_qe_udc: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-16-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-15-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,18 +11,18 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/fsl_udc_core.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/usb/gadget/udc/fsl_qe_udc.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/fsl_udc_core.c b/drivers/usb/gadget/udc/fsl_udc_core.c
-index c60022b..aab5221 100644
---- a/drivers/usb/gadget/udc/fsl_udc_core.c
-+++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-@@ -2313,6 +2313,19 @@ static int struct_ep_setup(struct fsl_udc *udc, unsigned char index,
- 	ep->ep.ops = &fsl_ep_ops;
- 	ep->stopped = 0;
+diff --git a/drivers/usb/gadget/udc/fsl_qe_udc.c b/drivers/usb/gadget/udc/fsl_qe_udc.c
+index e0822f1..5fb6f8b 100644
+--- a/drivers/usb/gadget/udc/fsl_qe_udc.c
++++ b/drivers/usb/gadget/udc/fsl_qe_udc.c
+@@ -2417,6 +2417,17 @@ static int qe_ep_config(struct qe_udc *udc, unsigned char pipe_num)
+ 	strcpy(ep->name, ep_name[pipe_num]);
+ 	ep->ep.name = ep_name[pipe_num];
  
-+	if (index == 0) {
++	if (pipe_num == 0) {
 +		ep->ep.caps.type_control = true;
 +	} else {
 +		ep->ep.caps.type_iso = true;
@@ -31,13 +30,11 @@ index c60022b..aab5221 100644
 +		ep->ep.caps.type_int = true;
 +	}
 +
-+	if (index & 1)
-+		ep->ep.caps.dir_in = true;
-+	else
-+		ep->ep.caps.dir_out = true;
++	ep->ep.caps.dir_in = true;
++	ep->ep.caps.dir_out = true;
 +
- 	/* for ep0: maxP defined in desc
- 	 * for other eps, maxP is set by epautoconfig() called by gadget layer
- 	 */
+ 	ep->ep.ops = &qe_ep_ops;
+ 	ep->stopped = 1;
+ 	usb_ep_set_maxpacket_limit(&ep->ep, (unsigned short) ~0);
 -- 
 1.9.1
