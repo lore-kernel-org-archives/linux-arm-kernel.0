@@ -1,45 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 27 Jul 2015 16:49:30 +0100
-Subject: [PATCH v3 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20150727153148.GJ7557@n2100.arm.linux.org.uk>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
- <55B630CE.4050803@arm.com> <20150727153148.GJ7557@n2100.arm.linux.org.uk>
-Message-ID: <55B6530A.9050903@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 27 Jul 2015 16:59:23 +0100
+Subject: [PATCH v4 5/7] arm64: add KASAN support
+In-Reply-To: <1437756119-12817-6-git-send-email-a.ryabinin@samsung.com>
+References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
+ <1437756119-12817-6-git-send-email-a.ryabinin@samsung.com>
+Message-ID: <20150727155922.GB350@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/15 16:31, Russell King - ARM Linux wrote:
-> On Mon, Jul 27, 2015 at 02:23:26PM +0100, Robin Murphy wrote:
->> On 16/07/15 10:04, Yong Wu wrote:
->>> This patch adds support for mediatek m4u (MultiMedia Memory Management
->>> Unit).
->>>
->>> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
->> [...]
->>> +static void mtk_iommu_flush_pgtable(void *ptr, size_t size, void *cookie)
->>> +{
->>> +       struct mtk_iommu_domain *domain = cookie;
->>> +       unsigned long offset = (unsigned long)ptr & ~PAGE_MASK;
->>> +
->>> +       dma_map_page(domain->data->dev, virt_to_page(ptr), offset,
->>> +                    size, DMA_TO_DEVICE);
->>
->> Nit: this looks like it may as well be dma_map_single.
->>
->> It would probably be worth following it with a matching unmap too, just to
->> avoid any possible leakage bugs (especially if this M4U ever appears in a
->> SoC supporting RAM above the 32-bit boundary).
->
-> Why not do the job properly?  Take a look at how I implemented the
-> streaming DMA API on Tegra SMMU (patch set recently sent out earlier
-> today).
->
-> There's no need for hacks like dma_map_page() (and discarding it's
-> return value) or dma_map_page() followed by dma_unmap_page().
+On Fri, Jul 24, 2015 at 07:41:57PM +0300, Andrey Ryabinin wrote:
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 4d2a925..2cacf55 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -40,6 +40,12 @@ else
+>  TEXT_OFFSET := 0x00080000
+>  endif
+>  
+> +# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
+> +KASAN_SHADOW_OFFSET := $(shell printf "0x%x\n" $$(( \
+> +			(-1 << $(CONFIG_ARM64_VA_BITS)) \
+> +			+ (1 << ($(CONFIG_ARM64_VA_BITS) - 3)) \
+> +			- (1 << (64 - 3)) )) )
 
-Indeed, as it happens I do have a branch where I prototyped that for the 
-long-descriptor io-pgtable-arm code a while ago; this discussion has 
-prompted me to dig it up again. Stay tuned, folks...
+Does this work with any POSIX shell? Do we always have a 64-bit type?
+As I wasn't sure about this, I suggested awk (or perl).
 
-Robin.
+> +static void __init clear_pgds(unsigned long start,
+> +			unsigned long end)
+> +{
+> +	/*
+> +	 * Remove references to kasan page tables from
+> +	 * swapper_pg_dir. pgd_clear() can't be used
+> +	 * here because it's nop on 2,3-level pagetable setups
+> +	 */
+> +	for (; start && start < end; start += PGDIR_SIZE)
+> +		set_pgd(pgd_offset_k(start), __pgd(0));
+> +}
+
+I don't think we need the "start" check, just "start < end". Do you
+expect a start == 0 (or overflow)?
+
+-- 
+Catalin
