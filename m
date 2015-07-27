@@ -1,58 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Jul 2015 08:48:04 +0200
-Subject: [PATCH v2 1/2] dmaengine: Add an enum for the dmaengine
- alignment constraints
-In-Reply-To: <20150720110325.502af335@free-electrons.com>
-References: <1437381693-18948-1-git-send-email-maxime.ripard@free-electrons.com>
- <20150720110325.502af335@free-electrons.com>
-Message-ID: <20150727064804.GN2564@lukather>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 27 Jul 2015 08:56:45 +0200
+Subject: [RFCv2 2/3] dts: zynq: Add devicetree entry for Xilinx Zynq reset
+ controller.
+In-Reply-To: <1437783682-13632-3-git-send-email-moritz.fischer@ettus.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-3-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <55B5D62D.4010407@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 20, 2015 at 11:03:25AM +0200, Thomas Petazzoni wrote:
-> Maxime,
-> 
-> On Mon, 20 Jul 2015 10:41:32 +0200, Maxime Ripard wrote:
-> 
-> >  /**
-> > + * enum dmaengine_alignment - defines alignment of the DMA async tx
-> > + * buffers
-> > + */
-> > +enum dmaengine_alignment {
-> > +	DMAENGINE_ALIGN_1_BYTE = 0,
-> > +	DMAENGINE_ALIGN_2_BYTES = 1,
-> > +	DMAENGINE_ALIGN_4_BYTES = 2,
-> > +	DMAENGINE_ALIGN_8_BYTES = 3,
-> > +	DMAENGINE_ALIGN_16_BYTES = 4,
-> > +	DMAENGINE_ALIGN_32_BYTES = 5,
-> > +	DMAENGINE_ALIGN_64_BYTES = 6,
-> > +};
-> 
-> Sorry I didn't think about this during the first iteration, but this
-> define is just the log2 of the values, no? So maybe you could simply do
-> something like:
-> 
-> static inline unsigned int dmaengine_alignment(size_t bytes)
-> {
-> 	return ilog2(bytes);
-> }
+Hi Moritz,
 
-I could, but all the rest of the other similar case so far in
-dmaengine are made through enum, so I guess it's still better for
-consistency. And we also provide a comprehensive list of the valid
-values this way, something a function would not provide (or at least
-not at compilation time)
+On 07/25/2015 02:21 AM, Moritz Fischer wrote:
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  arch/arm/boot/dts/zynq-7000.dtsi            | 43 ++++++++++++-
 
-Maxime
+This patch is nice in general but every change in binding should be
+discussed separately. There is also necessary to wire them up in the
+driver to do action. That's why I think that will be the best just to
+add the code to slcr and keep others untouched.
+
+For example MACB/GEM is one example. Adding names to this node and
+extending driver to work properly with reset means that all others MACB
+users will be affected. Definitely this patch should be ACKed by Nicolas.
+
+Thanks,
+Michal
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/399ba21f/attachment.sig>
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/c4d0b8c1/attachment.sig>
