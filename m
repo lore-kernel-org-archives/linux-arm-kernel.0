@@ -1,42 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jul 2015 16:31:48 +0100
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 27 Jul 2015 16:48:31 +0100
 Subject: [PATCH v3 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <55B630CE.4050803@arm.com>
+In-Reply-To: <1437971071.25925.24.camel@mhfsdcap03>
 References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
  <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
- <55B630CE.4050803@arm.com>
-Message-ID: <20150727153148.GJ7557@n2100.arm.linux.org.uk>
+ <20150721145910.GG31095@arm.com>
+ <1437716593.23932.73.camel@mhfsdcap03>
+ <20150724165509.GD21177@arm.com>
+ <1437971071.25925.24.camel@mhfsdcap03>
+Message-ID: <20150727154830.GK3358@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 02:23:26PM +0100, Robin Murphy wrote:
-> On 16/07/15 10:04, Yong Wu wrote:
-> >This patch adds support for mediatek m4u (MultiMedia Memory Management
-> >Unit).
-> >
-> >Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> [...]
-> >+static void mtk_iommu_flush_pgtable(void *ptr, size_t size, void *cookie)
-> >+{
-> >+       struct mtk_iommu_domain *domain = cookie;
-> >+       unsigned long offset = (unsigned long)ptr & ~PAGE_MASK;
-> >+
-> >+       dma_map_page(domain->data->dev, virt_to_page(ptr), offset,
-> >+                    size, DMA_TO_DEVICE);
+On Mon, Jul 27, 2015 at 05:24:31AM +0100, Yong Wu wrote:
+> On Fri, 2015-07-24 at 17:55 +0100, Will Deacon wrote:
+> > On Fri, Jul 24, 2015 at 06:43:13AM +0100, Yong Wu wrote:
+> > > On Tue, 2015-07-21 at 15:59 +0100, Will Deacon wrote:
+> > > > On Thu, Jul 16, 2015 at 10:04:34AM +0100, Yong Wu wrote:
+> > > > > +static void mtk_iommu_tlb_flush_all(void *cookie)
+> > > > > +{
+> > > > > +       struct mtk_iommu_domain *domain = cookie;
+> > > > > +       void __iomem *base;
+> > > > > +
+> > > > > +       base = domain->data->base;
+> > > > > +       writel(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
+> > > > > +       writel(F_ALL_INVLD, base + REG_MMU_INVALIDATE);
+> > > > 
+> > > > This needs to be synchronous, so you probably want to call
+> > > > mtk_iommu_tlb_sync at the end.
+> > > 
+> > > From our spec, we have to wait until HW done after tlb flush range.
+> > > But it don't need wait after tlb flush all.
+> > > so It isn't necessary to add mtk_iommu_tlb_sync in tlb_flush_all here.
+> > 
+> > Okey doke, but I'm surprised you don't need a subsequent DSB or read-back.
+> > What if the writel is buffered on the way to the IOMMU?
 > 
-> Nit: this looks like it may as well be dma_map_single.
-> 
-> It would probably be worth following it with a matching unmap too, just to
-> avoid any possible leakage bugs (especially if this M4U ever appears in a
-> SoC supporting RAM above the 32-bit boundary).
+> Then I change to this:
+>  //==========
+>     writel_relaxed(F_INVLD_EN1 | F_INVLD_EN0, base + REG_MMU_INV_SEL);
+>     writel_relaxed(F_ALL_INVLD, base + REG_MMU_INVALIDATE);    
+>     dsb(ishst);
+> //===========
+>     dsb or mb(). which one is better here?
 
-Why not do the job properly?  Take a look at how I implemented the
-streaming DMA API on Tegra SMMU (patch set recently sent out earlier
-today).
+I think you should use mb();
 
-There's no need for hacks like dma_map_page() (and discarding it's
-return value) or dma_map_page() followed by dma_unmap_page().
-
--- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Will
