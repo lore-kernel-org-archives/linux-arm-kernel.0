@@ -1,44 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Jul 2015 14:49:32 +0200
-Subject: [GIT PULL] pxa for v4.3 - v2
-In-Reply-To: <87si8de3w6.fsf@belgarion.home>
-References: <87si8de3w6.fsf@belgarion.home>
-Message-ID: <20150727124932.GK14224@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Jul 2015 14:57:01 +0200
+Subject: [PATCH v2 1/2] pinctrl: sunxi: Add custom irq_domain_ops
+In-Reply-To: <1438000918-9026-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1438000918-9026-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1438000918-9026-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACRpkda+pUGw=dDA4quMgFW7YJGCKF0ApqXi8Y7ZoYxPQWSZCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 09:45:13PM +0200, Robert Jarzmik wrote:
-> 
-> Hi Arnd, Kevin, and Olof,
-> 
-> This is the pxa pull request for 4.3 development cycle, the second one after a
-> small fix triggered by 0-day kernel builder. It is a quite small one, the main
-> work happening on the drivers side, mostly dmaengine centric work.
-> 
-> For the record, the diff from the previous pull request is in [1].
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/rjarzmik/linux.git tags/pxa-for-4.3-v2
-> 
-> for you to fetch changes up to 6d6db340a7e832dc18a6a95d9f9fc79d03ff959e:
-> 
->   ARM: pxa: Use setup_timer (2015-07-18 12:16:43 +0200)
-> 
-> ----------------------------------------------------------------
-> This is the pxa changes for v4.3 cycle.
-> 
-> There is mostly one evolution on the dma side, to enable cooperation
-> of the legacy pxa DMA API, and the new dmaengine API.
-> Once all drivers using DMA are converted, the legacy DMA API should
-> be removed.
+On Mon, Jul 27, 2015 at 2:41 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
+> The current interrupt parsing code was working by accident, because the
+> default was actually parsing the first node of interrupts.
+>
+> While that was mostly working (and the flags were actually ignored), this
+> binding has never been documented, and doesn't work with SoCs that have
+> multiple interrupt banks anyway.
+>
+> Add a proper interrupt xlate function, that uses the same description than
+> the GPIOs (<bank> <pin> <flags>), that will make things less confusing.
+>
+> The EINT number will still be used as the hwirq number, but won't be
+> exposed through the DT.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
 
-Merged into next/soc. Thanks!
+Patch applied.
 
-
--Olof
+Yours,
+Linus Walleij
