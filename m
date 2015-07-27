@@ -1,71 +1,59 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 27 Jul 2015 16:48:59 +0200
-Subject: [PATCH V2 08/11] opp: Add OPP sharing information to OPP library
-In-Reply-To: <f92bd33dcaa2094dfc99aa9656487c6f08f160fe.1437972635.git.viresh.kumar@linaro.org>
-References: <cover.1437972635.git.viresh.kumar@linaro.org>
- <f92bd33dcaa2094dfc99aa9656487c6f08f160fe.1437972635.git.viresh.kumar@linaro.org>
-Message-ID: <1564699.gQjhqzf5VE@amdc1976>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Mon, 27 Jul 2015 14:50:15 +0000
+Subject: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <20150727143515.GQ12927@tiger>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-2-git-send-email-shenwei.wang@freescale.com>
+ <20150727134058.GL12927@tiger>
+ <CY1PR0301MB084352861E63DA2DE286CC77838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150727143515.GQ12927@tiger>
+Message-ID: <CY1PR0301MB084351380311261C292872AB838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Two very minor nits:
-
-On Monday, July 27, 2015 10:32:38 AM Viresh Kumar wrote:
-> An opp can be shared by multiple devices, for example its very common
-> for CPUs to share the OPPs, i.e. when they share clock/voltage rails.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2015?7?27? 9:35
+> To: Wang Shenwei-B38339
+> Cc: jason at lakedaemon.net; Huang Yongcai-B20788;
+> linux-kernel at vger.kernel.org; tglx at linutronix.de; shawn.guo at linaro.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v6 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
+> > > On Wed, Jul 22, 2015 at 12:07:38PM -0500, Shenwei Wang wrote:
+> > > > diff --git a/include/soc/imx/gpcv2.h b/include/soc/imx/gpcv2.h new
+> > > > file mode 100644 index 0000000..73d6e75
+> > > > --- /dev/null
+> > > > +++ b/include/soc/imx/gpcv2.h
+> > >
+> > > I do not like this header, which couples imx7d irqchip and pm driver
+> > > so much.  Can you please elaborate why we have to have this header?
+> >
+> > PM driver does depend on the irqchip driver. It needs some input like
+> > enabled irqs and wakeup irqs to decide which module to be powered off
+> > in low power states. I am also considering if the header file could be
+> > removed or not. So far it seems a common place to define a structure which is
+> used in both drivers is still required.
 > 
-> This patch adds support of shared OPPs to the OPP library.
-> 
-> Instead of a single device, dev_opp will not contain a list of devices
+> Please be more specific.  Trimming the header down to the macros and
+> structures/fields that are necessary to be in the header might be a good idea.
+> And then we can go through them one by one to see if there is a way to avoid
+> them being in the header.
 
-s/will not/will now/ ?
+The following structure is currently used in both drivers. The members "gpc_base/
+wakeup_sources/enabled_irqs" are now shared to PM driver. And the macro IMR_NUM
+will be referred by both drivers too.
+ 
+struct imx_gpcv2_irq {
+	spinlock_t lock;
+	void __iomem *gpc_base;
+	u32 wakeup_sources[IMR_NUM];
+	u32 enabled_irqs[IMR_NUM];
+	u32 cpu2wakeup;
+};
 
-> that use it. It also senses if the device (we are trying to initialize
-> OPPs for) shares OPPs with a device added earlier and in that case we
-> update the list of devices managed by OPPs instead of duplicating OPPs
-> again.
-> 
-> The same infrastructure will be used for the old OPP bindings, with
-> later patches.
-> 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks,
+Shenwei
 
-[...]
-
-> +static struct device_list_opp *_add_list_dev(const struct device *dev,
-> +					     struct device_opp *dev_opp)
-> +{
-> +	struct device_list_opp *list_dev;
-> +
-> +	list_dev = kzalloc(sizeof(*list_dev), GFP_KERNEL);
-> +	if (!list_dev)
-> +		return NULL;
-> +
-> +	/* Initialize list-dev */
-> +	list_add_rcu(&list_dev->node, &dev_opp->dev_list);
-> +	list_dev->dev = dev;
-
-Probably doesn't matter currently but how's about:
-
-	list_dev->dev = dev;
-	list_add_rcu(&list_dev->node, &dev_opp->dev_list);
-
-?
-
-> +
-> +	return list_dev;
-> +}
-
-Otherwise:
-
-Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+> Shawn
