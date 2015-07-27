@@ -1,61 +1,113 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 10:32:33 +0530
-Subject: [PATCH V2 03/11] OPP: Create _remove_device_opp() for freeing dev_opp
+Date: Mon, 27 Jul 2015 10:32:34 +0530
+Subject: [PATCH V2 04/11] OPP: Allocate dev_opp from _add_device_opp()
 In-Reply-To: <cover.1437972635.git.viresh.kumar@linaro.org>
 References: <cover.1437972635.git.viresh.kumar@linaro.org>
-Message-ID: <ab91ba59b946addcc9e2c072c5613f9394eed7cf.1437972635.git.viresh.kumar@linaro.org>
+Message-ID: <1b6eba9446126e95d06bce73596d24bbdc14505e.1437972635.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will be used from multiple places later. Lets create a separate
-routine for that.
+There is no need to complicate _opp_add_dynamic() with allocation of
+dev_opp as well. Allocate it from _add_device_opp() instead.
 
 Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/power/opp.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ drivers/base/power/opp.c | 41 ++++++++++++++++++-----------------------
+ 1 file changed, 18 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 8c3fd57975fb..7895fdd64192 100644
+index 7895fdd64192..901b6c77a791 100644
 --- a/drivers/base/power/opp.c
 +++ b/drivers/base/power/opp.c
-@@ -449,6 +449,22 @@ static void _kfree_device_rcu(struct rcu_head *head)
- }
+@@ -408,11 +408,11 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
  
  /**
-+ * _remove_device_opp() - Removes a device OPP table
-+ * @dev_opp: device OPP table to be removed.
-+ *
-+ * Removes/frees device OPP table it it doesn't contain any OPPs.
-+ */
-+static void _remove_device_opp(struct device_opp *dev_opp)
-+{
-+	if (!list_empty(&dev_opp->opp_list))
-+		return;
-+
-+	list_del_rcu(&dev_opp->node);
-+	call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
-+		  _kfree_device_rcu);
-+}
-+
-+/**
-  * _kfree_opp_rcu() - Free OPP RCU handler
-  * @head:	RCU head
+- * _add_device_opp() - Allocate a new device OPP table
++ * _add_device_opp() - Find device OPP table or allocate a new one
+  * @dev:	device for which we do this operation
+  *
+- * New device node which uses OPPs - used when multiple devices with OPP tables
+- * are maintained.
++ * It tries to find an existing table first, if it couldn't find one, it
++ * allocates a new OPP table and returns that.
+  *
+  * Return: valid device_opp pointer if success, else NULL.
   */
-@@ -481,11 +497,7 @@ static void _opp_remove(struct device_opp *dev_opp,
- 	list_del_rcu(&opp->node);
- 	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, _kfree_opp_rcu);
+@@ -420,6 +420,11 @@ static struct device_opp *_add_device_opp(struct device *dev)
+ {
+ 	struct device_opp *dev_opp;
  
--	if (list_empty(&dev_opp->opp_list)) {
--		list_del_rcu(&dev_opp->node);
--		call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
--			  _kfree_device_rcu);
++	/* Check for existing list for 'dev' first */
++	dev_opp = _find_device_opp(dev);
++	if (!IS_ERR(dev_opp))
++		return dev_opp;
++
+ 	/*
+ 	 * Allocate a new device OPP table. In the infrequent case where a new
+ 	 * device is needed to be added, we pay this penalty.
+@@ -575,7 +580,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_remove);
+ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 			    long u_volt, bool dynamic)
+ {
+-	struct device_opp *dev_opp = NULL;
++	struct device_opp *dev_opp;
+ 	struct dev_pm_opp *opp, *new_opp;
+ 	struct list_head *head;
+ 	int ret;
+@@ -592,19 +597,11 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 	new_opp->rate = freq;
+ 	new_opp->u_volt = u_volt;
+ 	new_opp->available = true;
+-	new_opp->dynamic = dynamic;
+-
+-	/* Check for existing list for 'dev' */
+-	dev_opp = _find_device_opp(dev);
+-	if (IS_ERR(dev_opp)) {
+-		dev_opp = _add_device_opp(dev);
+-		if (!dev_opp) {
+-			ret = -ENOMEM;
+-			goto free_opp;
+-		}
+ 
+-		head = &dev_opp->opp_list;
+-		goto list_add;
++	dev_opp = _add_device_opp(dev);
++	if (!dev_opp) {
++		ret = -ENOMEM;
++		goto free_opp;
+ 	}
+ 
+ 	/*
+@@ -613,14 +610,12 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 	 */
+ 	head = &dev_opp->opp_list;
+ 	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
+-		if (new_opp->rate <= opp->rate)
+-			break;
+-		else
++		if (new_opp->rate > opp->rate)
+ 			head = &opp->node;
 -	}
-+	_remove_device_opp(dev_opp);
- }
++		else if (new_opp->rate < opp->rate)
++			break;
  
- /**
+-	/* Duplicate OPPs ? */
+-	if (new_opp->rate == opp->rate) {
++		/* Duplicate OPPs */
+ 		ret = opp->available && new_opp->u_volt == opp->u_volt ?
+ 			0 : -EEXIST;
+ 
+@@ -630,7 +625,7 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 		goto free_opp;
+ 	}
+ 
+-list_add:
++	new_opp->dynamic = dynamic;
+ 	new_opp->dev_opp = dev_opp;
+ 	list_add_rcu(&new_opp->node, head);
+ 	mutex_unlock(&dev_opp_list_lock);
 -- 
 2.4.0
