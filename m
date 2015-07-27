@@ -1,22 +1,37 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 17:31:37 +0530
-Subject: [PATCH v2 3/7] cpufreq-dt: add turbo modes support
-In-Reply-To: <2522396.6jWphaZxGp@amdc1976>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <15810554.2OjPyuYJBt@amdc1976> <20150727113340.GA10181@linux>
- <2522396.6jWphaZxGp@amdc1976>
-Message-ID: <20150727120137.GD10181@linux>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 27 Jul 2015 14:02:01 +0200
+Subject: [PATCH v2 02/20] documentation: Clarify failed cmpxchg memory
+ ordering semantics
+In-Reply-To: <20150727115822.GH3358@arm.com>
+References: <1437734531-10698-1-git-send-email-will.deacon@arm.com>
+ <1437734531-10698-3-git-send-email-will.deacon@arm.com>
+ <20150727115822.GH3358@arm.com>
+Message-ID: <20150727120201.GW19282@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-07-15, 13:58, Bartlomiej Zolnierkiewicz wrote:
-> Thank you.  This is exactly the case here (I would like to get
-> Exynos4x12 conversion to use cpufreq-dt + exynos-cpufreq removal
-> in v4.3 if possible and adding new DT bindings will most likely
-> slow down the process considerably).
+On Mon, Jul 27, 2015 at 12:58:22PM +0100, Will Deacon wrote:
+> On Fri, Jul 24, 2015 at 11:41:53AM +0100, Will Deacon wrote:
+> > A failed cmpxchg does not provide any memory ordering guarantees, a
+> > property that is used to optimise the cmpxchg implementations on Alpha,
+> > PowerPC and arm64.
+> > 
+> > This patch updates atomic_ops.txt and memory-barriers.txt to reflect
+> > this.
+> > 
+> > Cc: Peter Zijlstra <peterz@infradead.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  Documentation/atomic_ops.txt      | 4 +++-
+> >  Documentation/memory-barriers.txt | 6 +++---
+> >  2 files changed, 6 insertions(+), 4 deletions(-)
+> 
+> Peter: are you ok with me taking this via the arm64 tree (along with the
+> rest of the series), or would you prefer this patch routed through -tip?
 
-Heh, I never asked you to add new DT bindings, I said we can solve it
-with DT. We already have turbo properties in DT.
+So I have this one queued, and typically these changes go through tip
+because the RCU tree also ends up there, and Paul is the typical source
+of patches there.
 
--- 
-viresh
+So to minimize collisions on memory-barriers.txt i'd like to keep it if
+its not too much hassle.
