@@ -1,64 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Jul 2015 13:26:48 -0700
-Subject: [PATCH 7/7] clk: sunxi: Add a simple gates driver
-In-Reply-To: <1437945270-32014-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1437945270-32014-1-git-send-email-maxime.ripard@free-electrons.com>
- <1437945270-32014-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20150727202648.GB14521@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Mon, 27 Jul 2015 15:32:54 -0500
+Subject: [PATCH v1 2/7] ARM: dts: ifc6410: add real regulators for sdcc
+ nodes.
+In-Reply-To: <1438005012-16263-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1438004945-16175-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1438005012-16263-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150727203254.GB12739@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26, Maxime Ripard wrote:
-> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
-> new file mode 100644
-> index 000000000000..1a3963a8a686
-> --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-simple-gates.c
-> @@ -0,0 +1,159 @@
-> +/*
-> + * Copyright 2015 Maxime Ripard
-> + *
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/clkdev.h>
+On Mon, Jul 27, 2015 at 02:50:12PM +0100, Srinivas Kandagatla wrote:
 
-Is this used?
+<snip>
 
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/reset-controller.h>
+>  			sdcc3: sdcc at 12180000 {
+>  				status = "okay";
+> +				vmmc-supply = <&pm8921_l6>;
+>  				pinctrl-names	= "default";
+>  				pinctrl-0	= <&card_detect>;
+>  				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
+> @@ -187,6 +200,8 @@
+>  			/* WLAN */
+>  			sdcc4: sdcc at 121c0000 {
+>  				status = "okay";
+> +				vmmc-supply = <&ext_3p3v>;
 
-Is this used?
+Where is ext_3p3v defined?
 
-> +#include <linux/spinlock.h>
-> +#include <linux/log2.h>
+> +				vqmmc-supply = <&pm8921_lvs1>;
 
-Is this used?
-
-> +
-> +static DEFINE_SPINLOCK(gates_lock);
-> +
-[...]
-> +
-> +static const int sun4i_a10_ahb_critical_clocks[] __initdata = {
-
-Shouldn't it be __initconst ?
-
-> +	14,	/* ahb_sdram */
-> +};
-> +
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
