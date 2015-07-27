@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:18 +0200
-Subject: [PATCH v4 08/46] usb: gadget: amd5536udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:31 +0200
+Subject: [PATCH v4 21/46] usb: gadget: mv_u3d_core: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-9-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-22-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,83 +11,43 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/amd5536udc.c | 57 ++++++++++++++++++++++++++++++-------
- 1 file changed, 47 insertions(+), 10 deletions(-)
+ drivers/usb/gadget/udc/mv_u3d_core.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/amd5536udc.c b/drivers/usb/gadget/udc/amd5536udc.c
-index de7e5e2..1a1d91c 100644
---- a/drivers/usb/gadget/udc/amd5536udc.c
-+++ b/drivers/usb/gadget/udc/amd5536udc.c
-@@ -138,15 +138,51 @@ static DECLARE_TASKLET(disconnect_tasklet, udc_tasklet_disconnect,
+diff --git a/drivers/usb/gadget/udc/mv_u3d_core.c b/drivers/usb/gadget/udc/mv_u3d_core.c
+index ea35a24..4c48969 100644
+--- a/drivers/usb/gadget/udc/mv_u3d_core.c
++++ b/drivers/usb/gadget/udc/mv_u3d_core.c
+@@ -1324,6 +1324,9 @@ static int mv_u3d_eps_init(struct mv_u3d *u3d)
+ 	ep->ep.ops = &mv_u3d_ep_ops;
+ 	ep->wedge = 0;
+ 	usb_ep_set_maxpacket_limit(&ep->ep, MV_U3D_EP0_MAX_PKT_SIZE);
++	ep->ep.caps.type_control = true;
++	ep->ep.caps.dir_in = true;
++	ep->ep.caps.dir_out = true;
+ 	ep->ep_num = 0;
+ 	ep->ep.desc = &mv_u3d_ep0_desc;
+ 	INIT_LIST_HEAD(&ep->queue);
+@@ -1339,14 +1342,20 @@ static int mv_u3d_eps_init(struct mv_u3d *u3d)
+ 		if (i & 1) {
+ 			snprintf(name, sizeof(name), "ep%din", i >> 1);
+ 			ep->direction = MV_U3D_EP_DIR_IN;
++			ep->ep.caps.dir_in = true;
+ 		} else {
+ 			snprintf(name, sizeof(name), "ep%dout", i >> 1);
+ 			ep->direction = MV_U3D_EP_DIR_OUT;
++			ep->ep.caps.dir_out = true;
+ 		}
+ 		ep->u3d = u3d;
+ 		strncpy(ep->name, name, sizeof(ep->name));
+ 		ep->ep.name = ep->name;
  
- /* endpoint names used for print */
- static const char ep0_string[] = "ep0in";
--static const char *const ep_string[] = {
--	ep0_string,
--	"ep1in-int", "ep2in-bulk", "ep3in-bulk", "ep4in-bulk", "ep5in-bulk",
--	"ep6in-bulk", "ep7in-bulk", "ep8in-bulk", "ep9in-bulk", "ep10in-bulk",
--	"ep11in-bulk", "ep12in-bulk", "ep13in-bulk", "ep14in-bulk",
--	"ep15in-bulk", "ep0out", "ep1out-bulk", "ep2out-bulk", "ep3out-bulk",
--	"ep4out-bulk", "ep5out-bulk", "ep6out-bulk", "ep7out-bulk",
--	"ep8out-bulk", "ep9out-bulk", "ep10out-bulk", "ep11out-bulk",
--	"ep12out-bulk", "ep13out-bulk", "ep14out-bulk", "ep15out-bulk"
-+static const struct {
-+	const char *name;
-+	const struct usb_ep_caps caps;
-+} ep_info[] = {
-+#define EP_INFO(_name, _type, _dir) \
-+	{ \
-+		.name = _name, \
-+		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## _type, \
-+				USB_EP_CAPS_DIR_ ## _dir), \
-+	}
++		ep->ep.caps.type_iso = true;
++		ep->ep.caps.type_bulk = true;
++		ep->ep.caps.type_int = true;
 +
-+	EP_INFO(ep0_string,	CONTROL, IN),
-+	EP_INFO("ep1in-int",	BULK,	IN),
-+	EP_INFO("ep2in-bulk",	BULK,	IN),
-+	EP_INFO("ep3in-bulk",	BULK,	IN),
-+	EP_INFO("ep4in-bulk",	BULK,	IN),
-+	EP_INFO("ep5in-bulk",	BULK,	IN),
-+	EP_INFO("ep6in-bulk",	BULK,	IN),
-+	EP_INFO("ep7in-bulk",	BULK,	IN),
-+	EP_INFO("ep8in-bulk",	BULK,	IN),
-+	EP_INFO("ep9in-bulk",	BULK,	IN),
-+	EP_INFO("ep10in-bulk",	BULK,	IN),
-+	EP_INFO("ep11in-bulk",	BULK,	IN),
-+	EP_INFO("ep12in-bulk",	BULK,	IN),
-+	EP_INFO("ep13in-bulk",	BULK,	IN),
-+	EP_INFO("ep14in-bulk",	BULK,	IN),
-+	EP_INFO("ep15in-bulk",	BULK,	IN),
-+	EP_INFO("ep0out",	CONTROL, OUT),
-+	EP_INFO("ep1out-bulk",	BULK,	OUT),
-+	EP_INFO("ep2out-bulk",	BULK,	OUT),
-+	EP_INFO("ep3out-bulk",	BULK,	OUT),
-+	EP_INFO("ep4out-bulk",	BULK,	OUT),
-+	EP_INFO("ep5out-bulk",	BULK,	OUT),
-+	EP_INFO("ep6out-bulk",	BULK,	OUT),
-+	EP_INFO("ep7out-bulk",	BULK,	OUT),
-+	EP_INFO("ep8out-bulk",	BULK,	OUT),
-+	EP_INFO("ep9out-bulk",	BULK,	OUT),
-+	EP_INFO("ep10out-bulk",	BULK,	OUT),
-+	EP_INFO("ep11out-bulk",	BULK,	OUT),
-+	EP_INFO("ep12out-bulk",	BULK,	OUT),
-+	EP_INFO("ep13out-bulk",	BULK,	OUT),
-+	EP_INFO("ep14out-bulk",	BULK,	OUT),
-+	EP_INFO("ep15out-bulk",	BULK,	OUT),
-+
-+#undef EP_INFO
- };
- 
- /* DMA usage flag */
-@@ -1517,7 +1553,8 @@ static void udc_setup_endpoints(struct udc *dev)
- 	for (tmp = 0; tmp < UDC_EP_NUM; tmp++) {
- 		ep = &dev->ep[tmp];
- 		ep->dev = dev;
--		ep->ep.name = ep_string[tmp];
-+		ep->ep.name = ep_info[tmp].name;
-+		ep->ep.caps = ep_info[tmp].caps;
- 		ep->num = tmp;
- 		/* txfifo size is calculated at enable time */
- 		ep->txfifo = dev->txfifo;
+ 		ep->ep.ops = &mv_u3d_ep_ops;
+ 		usb_ep_set_maxpacket_limit(&ep->ep, (unsigned short) ~0);
+ 		ep->ep_num = i / 2;
 -- 
 1.9.1
