@@ -1,37 +1,25 @@
-From: nschichan@freebox.fr (Nicolas Schichan)
-Date: Mon, 27 Jul 2015 15:06:50 +0200
-Subject: [PATCH V3 net-next 2/3] ARM: net: add support for BPF_ANC |
- SKF_AD_PAY_OFFSET in ARM JIT.
-In-Reply-To: <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
-References: <20150724.223155.121697079062172205.davem@davemloft.net>
- <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <1438002411-8709-3-git-send-email-nschichan@freebox.fr>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 27 Jul 2015 14:09:50 +0100
+Subject: inquiries on juno
+In-Reply-To: <CAN2waFtxdWGtg58Y8ejx-QztxxJhMXtQbFXbgM6OpDmyVA73xQ@mail.gmail.com>
+References: <CAN2waFugZ869RZe_3GbW+8qCZQL-h9fRt5g38JJUPkr8f8VR5A@mail.gmail.com>	<55B20037.2090705@arm.com>	<CAN2waFsDuw4s9AqU=6D5vfgHSK5iDknkxD5UR06yXGe+GGNSrg@mail.gmail.com>	<55B236E2.8050600@arm.com>	<CAN2waFtHqy+CV3nu3ZdGsxjTwD35xuhXiAn0tPrd4ZPYR7Ujww@mail.gmail.com>	<55B60F67.9000408@arm.com>
+ <CAN2waFtxdWGtg58Y8ejx-QztxxJhMXtQbFXbgM6OpDmyVA73xQ@mail.gmail.com>
+Message-ID: <55B62D9E.7060100@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
----
- arch/arm/net/bpf_jit_32.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 6ff248c..3c73caf 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -915,6 +915,14 @@ b_epilogue:
- 			off = offsetof(struct sk_buff, queue_mapping);
- 			emit(ARM_LDRH_I(r_A, r_skb, off), ctx);
- 			break;
-+		case BPF_ANC | SKF_AD_PAY_OFFSET:
-+			ctx->seen |= SEEN_SKB | SEEN_CALL;
-+
-+			emit(ARM_MOV_R(ARM_R0, r_skb), ctx);
-+			emit_mov_i(ARM_R3, (unsigned int)skb_get_poff, ctx);
-+			emit_blx_r(ARM_R3, ctx);
-+			emit(ARM_MOV_R(r_A, ARM_R0), ctx);
-+			break;
- 		case BPF_LDX | BPF_W | BPF_ABS:
- 			/*
- 			 * load a 32bit word from struct seccomp_data.
--- 
-1.9.1
+
+On 27/07/15 14:08, Zhaoyang Huang wrote:
+> Hi Sudeep,
+> Thank you for further clarification. I will update the latest firmware
+> and try again.
+>
+> BTW: Need I update the DTS file somewhere or just use the one get from
+> the formal v4.1?
+>
+
+Mainline is always preferred :)
+
+Regards,
+Sudeep
