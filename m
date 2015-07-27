@@ -1,272 +1,112 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 27 Jul 2015 14:23:26 +0100
-Subject: [PATCH v3 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-6-git-send-email-yong.wu@mediatek.com>
-Message-ID: <55B630CE.4050803@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 27 Jul 2015 21:28:02 +0800
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <20150727132802.GK12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/07/15 10:04, Yong Wu wrote:
-> This patch adds support for mediatek m4u (MultiMedia Memory Management
-> Unit).
->
-> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-[...]
-> +static void mtk_iommu_flush_pgtable(void *ptr, size_t size, void *cookie)
-> +{
-> +       struct mtk_iommu_domain *domain = cookie;
-> +       unsigned long offset = (unsigned long)ptr & ~PAGE_MASK;
-> +
-> +       dma_map_page(domain->data->dev, virt_to_page(ptr), offset,
-> +                    size, DMA_TO_DEVICE);
+On Wed, Jul 22, 2015 at 12:07:39PM -0500, Shenwei Wang wrote:
+> IMX7D contains a new version of GPC IP block (GPCv2). It has two
+> major functions: power management and wakeup source management.
+> 
+> GPCv2 provides low power mode control for Cortex-A7 and Cortex-M4
+> domains. And it can support WAIT, STOP, and DSM(Deep Sleep Mode) modes.
+> After configuring the GPCv2 module, the platform can enter into a
+> selected mode either automatically triggered by ARM WFI instruction or
+> manually by software. The system will exit the low power states
+> by the predefined wakeup sources which are managed by the gpcv2
+> irqchip driver.
+> 
+> This patch adds a new suspend driver to manage the power states on IMX7D.
+> It currently supports "SUSPEND_STANDBY" and "SUSPEND_MEM" states.
+> 
+> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+> Signed-off-by: Anson Huang <b20788@freescale.com>
+> ---
+>  arch/arm/mach-imx/Kconfig        |   1 +
+>  arch/arm/mach-imx/Makefile       |   2 +
+>  arch/arm/mach-imx/pm-imx7.c      | 765 +++++++++++++++++++++++++++++++++++++++
+>  arch/arm/mach-imx/suspend-imx7.S | 529 +++++++++++++++++++++++++++
+>  4 files changed, 1297 insertions(+)
+>  create mode 100644 arch/arm/mach-imx/pm-imx7.c
+>  create mode 100644 arch/arm/mach-imx/suspend-imx7.S
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index 5ccc9ea..4269c1e 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -552,6 +552,7 @@ config SOC_IMX7D
+>  	bool "i.MX7 Dual support"
+>  	select PINCTRL_IMX7D
+>  	select ARM_GIC
+> +	select IMX_GPCV2
 
-Nit: this looks like it may as well be dma_map_single.
+Yes, the existing list is already a bit out of order, but please do not
+make it worse.  Add it after HAVE_IMX_MMDC to keep them sort
+alphabetically.
 
-It would probably be worth following it with a matching unmap too, just 
-to avoid any possible leakage bugs (especially if this M4U ever appears 
-in a SoC supporting RAM above the 32-bit boundary).
+>  	select HAVE_IMX_ANATOP
+>  	select HAVE_IMX_MMDC
+>  	help
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 37c502a..b2ad476 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+>  
+>  ifeq ($(CONFIG_SUSPEND),y)
+>  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
+> +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
 
- > +}
- > +
-[...]
-> +static int mtk_iommu_parse_dt(struct platform_device *pdev,
-> +                             struct mtk_iommu_data *data)
-> +{
-> +       struct device *dev = &pdev->dev;
-> +       struct device_node *ofnode;
-> +       struct resource *res;
-> +       int i;
-> +
-> +       ofnode = dev->of_node;
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       data->base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(data->base))
-> +               return PTR_ERR(data->base);
-> +
-> +       data->irq = platform_get_irq(pdev, 0);
-> +       if (data->irq < 0)
-> +               return data->irq;
-> +
-> +       data->bclk = devm_clk_get(dev, "bclk");
-> +       if (IS_ERR(data->bclk))
-> +               return PTR_ERR(data->bclk);
-> +
-> +       data->larb_nr = of_count_phandle_with_args(
-> +                                       ofnode, "mediatek,larb", NULL);
-> +       if (data->larb_nr < 0)
-> +               return data->larb_nr;
-> +
-> +       for (i = 0; i < data->larb_nr; i++) {
-> +               struct device_node *larbnode;
-> +               struct platform_device *plarbdev;
-> +
-> +               larbnode = of_parse_phandle(ofnode, "mediatek,larb", i);
-> +               if (!larbnode)
-> +                       return -EINVAL;
-> +
-> +               plarbdev = of_find_device_by_node(larbnode);
-> +               of_node_put(larbnode);
-> +               if (!plarbdev)
-> +                       return -EPROBE_DEFER;
-> +               data->larbdev[i] = &plarbdev->dev;
-> +       }
+Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
 
-At a glance this seems like a job for of_parse_phandle_with_args, but I 
-may be missing something subtle.
-
-> +       return 0;
-> +}
+>  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
+>  obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
+>  endif
+> diff --git a/arch/arm/mach-imx/pm-imx7.c b/arch/arm/mach-imx/pm-imx7.c
+> new file mode 100644
+> index 0000000..50b9af4
+> --- /dev/null
+> +++ b/arch/arm/mach-imx/pm-imx7.c
+> @@ -0,0 +1,765 @@
 > +
-[...]
-> +static int mtk_iommu_init_domain_context(struct mtk_iommu_domain *dom)
-> +{
-> +       int ret;
-> +
-> +       if (dom->iop)
-> +               return 0;
-> +
-> +       spin_lock_init(&dom->pgtlock);
-> +       dom->cfg.quirks = IO_PGTABLE_QUIRK_ARM_NS |
-> +                       IO_PGTABLE_QUIRK_SHORT_SUPERSECTION |
-> +                       IO_PGTABLE_QUIRK_SHORT_MTK;
-> +       dom->cfg.pgsize_bitmap = mtk_iommu_ops.pgsize_bitmap,
-> +       dom->cfg.ias = 32;
-> +       dom->cfg.oas = 32;
-> +       dom->cfg.tlb = &mtk_iommu_gather_ops;
-> +
-> +       dom->iop = alloc_io_pgtable_ops(ARM_SHORT_DESC, &dom->cfg, dom);
-> +       if (!dom->iop) {
-> +               pr_err("Failed to alloc io pgtable\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       /* Update our support page sizes bitmap */
-> +       mtk_iommu_ops.pgsize_bitmap = dom->cfg.pgsize_bitmap;
-> +
-> +       ret = mtk_iommu_hw_init(dom);
-> +       if (ret)
-> +               free_io_pgtable_ops(dom->iop);
-> +
-> +       return ret;
-> +}
 
-I don't see that you need the above function at all - since your 
-pagetable config is fixed and doesn't have any depency on which IOMMU 
-you're attaching to, can't you just do all of that straight away in 
-domain_alloc?
+Drop this new line.
 
-> +static struct iommu_domain *mtk_iommu_domain_alloc(unsigned type)
-> +{
-> +       struct mtk_iommu_domain *priv;
+> +/*
+> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
 > +
-> +       /* We only support unmanaged domains for now */
-> +       if (type != IOMMU_DOMAIN_UNMANAGED)
-> +               return NULL;
-
-Have you had a chance to play with the latest DMA mapping series now 
-that I've integrated the default domain changes? I think if you handled 
-IOMMU_DOMAIN_DMA requests here and made them always return the 
-(preallocated) private domain, you should be able to get rid of the 
-tricks in attach_device completely.
-
-> +       priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-> +       if (!priv)
-> +               return NULL;
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
 > +
-> +       priv->domain.geometry.aperture_start = 0;
-> +       priv->domain.geometry.aperture_end = (1ULL << 32) - 1;
 
-DMA_BIT_MASK(32) ?
+Ditto
 
-> +       priv->domain.geometry.force_aperture = true;
+> +#include <linux/suspend.h>
+> +#include <asm/suspend.h>
+> +#include <asm/fncpy.h>
 > +
-> +       return &priv->domain;
-> +}
+> +#include <soc/imx/gpcv2.h>
 > +
-[...]
-> +static int mtk_iommu_add_device(struct device *dev)
-> +{
-> +       struct mtk_iommu_domain *mtkdom;
-> +       struct iommu_group *group;
-> +       struct mtk_iommu_client_priv *devhead;
-> +       int ret;
-> +
-> +       if (!dev->archdata.dma_ops)/* Not a iommu client device */
-> +               return -ENODEV;
+> +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
 
-I think archdata.dma_ops is the wrong thing to test here. It would be 
-better to use archdata.iommu, since you go on to dereference that 
-unconditionally anyway, plus then you only depend on your own of_xlate 
-behaviour, rather than some quirk of the arch code (which could quietly 
-change in future).
+Will this give a checkpatch warning?
 
-> +       group = iommu_group_get(dev);
-> +       if (!group) {
-> +               group = iommu_group_alloc();
-> +               if (IS_ERR(group)) {
-> +                       dev_err(dev, "Failed to allocate IOMMU group\n");
-> +                       return PTR_ERR(group);
-> +               }
-> +       }
-> +
-> +       ret = iommu_group_add_device(group, dev);
-> +       if (ret) {
-> +               dev_err(dev, "Failed to add IOMMU group\n");
-> +               goto err_group_put;
-> +       }
-> +
-> +       /* get the mtk_iommu_domain from the iommu device */
-> +       devhead = dev->archdata.iommu;
-> +       mtkdom = devhead->imudev->archdata.iommu;
-> +       ret = iommu_attach_group(&mtkdom->domain, group);
-> +       if (ret)
-> +               dev_err(dev, "Failed to attach IOMMU group\n");
-> +
-> +err_group_put:
-> +       iommu_group_put(group);
-> +       return ret;
-> +}
-> +
-[...]
-> +static struct iommu_ops mtk_iommu_ops = {
-> +       .domain_alloc   = mtk_iommu_domain_alloc,
-> +       .domain_free    = mtk_iommu_domain_free,
-> +       .attach_dev     = mtk_iommu_attach_device,
-> +       .detach_dev     = mtk_iommu_detach_device,
-> +       .map            = mtk_iommu_map,
-> +       .unmap          = mtk_iommu_unmap,
-> +       .map_sg         = default_iommu_map_sg,
-> +       .iova_to_phys   = mtk_iommu_iova_to_phys,
-> +       .add_device     = mtk_iommu_add_device,
-> +       .of_xlate       = mtk_iommu_of_xlate,
-> +       .pgsize_bitmap  = -1UL,
+> +static struct imx_gpcv2 *gpcv2_instance;
 
-As above, if you know the hardware only supports a single descriptor 
-format with a fixed set of page sizes, why not just represent that directly?
+I stop right here, as I need to understand why we need to have header
+soc/imx/gpcv2.h shared between irqchip driver and pm code.
 
-> +};
-> +
-[...]
-> +static int mtk_iommu_suspend(struct device *dev)
-> +{
-> +       struct mtk_iommu_domain *mtkdom = dev_get_drvdata(dev);
-> +       struct mtk_iommu_data *data = mtkdom->data;
-> +       void __iomem *base = data->base;
-> +       unsigned int i = 0;
-> +
-> +       data->reg[i++] = readl(base + REG_MMU_PT_BASE_ADDR);
-
-Redundancy nit: any particular reason for saving this here rather than 
-simply restoring it from mtkdom->cfg.arm_short_cfg.ttbr[0] on resume?
-
-> +       data->reg[i++] = readl(base + REG_MMU_STANDARD_AXI_MODE);
-> +       data->reg[i++] = readl(base + REG_MMU_DCM_DIS);
-> +       data->reg[i++] = readl(base + REG_MMU_CTRL_REG);
-> +       data->reg[i++] = readl(base + REG_MMU_IVRP_PADDR);
-> +       data->reg[i++] = readl(base + REG_MMU_INT_CONTROL0);
-> +       data->reg[i++] = readl(base + REG_MMU_INT_MAIN_CONTROL);
-
-Nit: given that these are fairly arbitrary discontiguous registers so 
-you can't have a simple loop over the array, it might be clearer to 
-replace the array with an equivalent struct, e.g.:
-
-struct mtk_iommu_suspend_regs {
-	u32 standard_axi_mode;
-	u32 dcm_dis;
-	...
-}
-
-	...
-	data->reg.dcm_dis = readl(base + REG_MMU_DCM_DIS);
-	...
-
-then since you refer to everything by name you don't have to worry about 
-the length and order of array elements if anything ever changes.
-
-> +       return 0;
-> +}
-> +
-> +static int mtk_iommu_resume(struct device *dev)
-> +{
-> +       struct mtk_iommu_domain *mtkdom = dev_get_drvdata(dev);
-> +       struct mtk_iommu_data *data = mtkdom->data;
-> +       void __iomem *base = data->base;
-> +       unsigned int i = 0;
-> +
-> +       writel(data->reg[i++], base + REG_MMU_PT_BASE_ADDR);
-> +       writel(data->reg[i++], base + REG_MMU_STANDARD_AXI_MODE);
-> +       writel(data->reg[i++], base + REG_MMU_DCM_DIS);
-> +       writel(data->reg[i++], base + REG_MMU_CTRL_REG);
-> +       writel(data->reg[i++], base + REG_MMU_IVRP_PADDR);
-> +       writel(data->reg[i++], base + REG_MMU_INT_CONTROL0);
-> +       writel(data->reg[i++], base + REG_MMU_INT_MAIN_CONTROL);
-> +       return 0;
-> +}
-
-Other than that though, modulo the issues with the pagetable code I 
-think this part of the driver is shaping up quite nicely.
-
-Robin.
+Shawn
