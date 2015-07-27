@@ -1,621 +1,657 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Mon, 27 Jul 2015 15:05:11 -0700
-Subject: [PATCH 1/5] input: touchscreen: add imx6ul_tsc driver support
-In-Reply-To: <1437996407-27266-2-git-send-email-haibo.chen@freescale.com>
-References: <1437996407-27266-1-git-send-email-haibo.chen@freescale.com>
- <1437996407-27266-2-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150727220511.GC3613@dtor-ws>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 27 Jul 2015 18:27:52 -0400 (EDT)
+Subject: [PATCH v3] ARM: appropriate __init annotation for const data
+Message-ID: <alpine.LFD.2.20.1507271750160.1806@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Haibo,
 
-On Mon, Jul 27, 2015 at 07:26:43PM +0800, Haibo Chen wrote:
-> Freescale i.MX6UL contains a internal touchscreen controller,
-> this patch add a driver to support this controller.
-> 
-> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> ---
->  drivers/input/touchscreen/Kconfig      |  12 +
->  drivers/input/touchscreen/Makefile     |   1 +
->  drivers/input/touchscreen/imx6ul_tsc.c | 510 +++++++++++++++++++++++++++++++++
->  3 files changed, 523 insertions(+)
->  create mode 100644 drivers/input/touchscreen/imx6ul_tsc.c
-> 
-> diff --git a/drivers/input/touchscreen/Kconfig b/drivers/input/touchscreen/Kconfig
-> index 5b272ba..32c300d 100644
-> --- a/drivers/input/touchscreen/Kconfig
-> +++ b/drivers/input/touchscreen/Kconfig
-> @@ -479,6 +479,18 @@ config TOUCHSCREEN_MTOUCH
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called mtouch.
->  
-> +config TOUCHSCREEN_IMX6UL_TSC
-> +	tristate "Freescale i.MX6UL touchscreen controller"
-> +	depends on OF
-> +	help
-> +	  Say Y here if you have a Freescale i.MX6UL, and want to
-> +	  use the internal touchscreen controller.
-> +
-> +	  If unsure, say N.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  moduel will be called imx6ul_tsc.
-> +
->  config TOUCHSCREEN_INEXIO
->  	tristate "iNexio serial touchscreens"
->  	select SERIO
-> diff --git a/drivers/input/touchscreen/Makefile b/drivers/input/touchscreen/Makefile
-> index c85aae2..9379b32 100644
-> --- a/drivers/input/touchscreen/Makefile
-> +++ b/drivers/input/touchscreen/Makefile
-> @@ -38,6 +38,7 @@ obj-$(CONFIG_TOUCHSCREEN_EGALAX)	+= egalax_ts.o
->  obj-$(CONFIG_TOUCHSCREEN_FUJITSU)	+= fujitsu_ts.o
->  obj-$(CONFIG_TOUCHSCREEN_GOODIX)	+= goodix.o
->  obj-$(CONFIG_TOUCHSCREEN_ILI210X)	+= ili210x.o
-> +obj-$(CONFIG_TOUCHSCREEN_IMX6UL_TSC)	+= imx6ul_tsc.o
->  obj-$(CONFIG_TOUCHSCREEN_INEXIO)	+= inexio.o
->  obj-$(CONFIG_TOUCHSCREEN_INTEL_MID)	+= intel-mid-touch.o
->  obj-$(CONFIG_TOUCHSCREEN_IPROC)		+= bcm_iproc_tsc.o
-> diff --git a/drivers/input/touchscreen/imx6ul_tsc.c b/drivers/input/touchscreen/imx6ul_tsc.c
-> new file mode 100644
-> index 0000000..5a5a368
-> --- /dev/null
-> +++ b/drivers/input/touchscreen/imx6ul_tsc.c
-> @@ -0,0 +1,510 @@
-> +/*
-> + * Freescale i.MX6UL touchscreen controller driver
-> + *
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/errno.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/gpio.h>
-> +#include <linux/input.h>
-> +#include <linux/slab.h>
-> +#include <linux/completion.h>
-> +#include <linux/delay.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +
-> +/* ADC configuration registers field define */
-> +#define ADC_AIEN		(0x1 << 7)
-> +#define ADC_CONV_DISABLE	0x1F
-> +#define ADC_CAL			(0x1 << 7)
-> +#define ADC_CALF		0x2
-> +#define ADC_12BIT_MODE		(0x2 << 2)
-> +#define ADC_IPG_CLK		0x00
-> +#define ADC_CLK_DIV_8		(0x03 << 5)
-> +#define ADC_SHORT_SAMPLE_MODE	(0x0 << 4)
-> +#define ADC_HARDWARE_TRIGGER	(0x1 << 13)
-> +#define SELECT_CHANNEL_4	0x04
-> +#define SELECT_CHANNEL_1	0x01
-> +#define DISABLE_CONVERSION_INT	(0x0 << 7)
-> +
-> +/* ADC registers */
-> +#define REG_ADC_HC0		0x00
-> +#define REG_ADC_HC1		0x04
-> +#define REG_ADC_HC2		0x08
-> +#define REG_ADC_HC3		0x0C
-> +#define REG_ADC_HC4		0x10
-> +#define REG_ADC_HS		0x14
-> +#define REG_ADC_R0		0x18
-> +#define REG_ADC_CFG		0x2C
-> +#define REG_ADC_GC		0x30
-> +#define REG_ADC_GS		0x34
-> +
-> +#define ADC_TIMEOUT		msecs_to_jiffies(100)
-> +
-> +/* TSC registers */
-> +#define REG_TSC_BASIC_SETING	0x00
-> +#define REG_TSC_PRE_CHARGE_TIME	0x10
-> +#define REG_TSC_FLOW_CONTROL	0x20
-> +#define REG_TSC_MEASURE_VALUE	0x30
-> +#define REG_TSC_INT_EN		0x40
-> +#define REG_TSC_INT_SIG_EN	0x50
-> +#define REG_TSC_INT_STATUS	0x60
-> +#define REG_TSC_DEBUG_MODE	0x70
-> +#define REG_TSC_DEBUG_MODE2	0x80
-> +
-> +/* TSC configuration registers field define */
-> +#define DETECT_4_WIRE_MODE	(0x0 << 4)
-> +#define AUTO_MEASURE		0x1
-> +#define MEASURE_SIGNAL		0x1
-> +#define DETECT_SIGNAL		(0x1 << 4)
-> +#define VALID_SIGNAL		(0x1 << 8)
-> +#define MEASURE_INT_EN		0x1
-> +#define MEASURE_SIG_EN		0x1
-> +#define VALID_SIG_EN		(0x1 << 8)
-> +#define DE_GLITCH_2		(0x2 << 29)
-> +#define START_SENSE		(0x1 << 12)
-> +#define TSC_DISABLE		(0x1 << 16)
-> +#define DETECT_MODE		0x2
-> +
-> +struct imx6ul_tsc {
-> +	struct device *dev;
-> +	struct input_dev *input;
-> +	void __iomem *tsc_regs;
-> +	void __iomem *adc_regs;
-> +	struct clk *tsc_clk;
-> +	struct clk *adc_clk;
-> +
-> +	int tsc_irq;
-> +	int adc_irq;
+Init data marked const should be annotated with __initconst for
+correctness and not __initdata.  In some cases the array gathering
+references to that data has to be marked const as well. This fixes
+LTO builds that otherwise fail with section mismatch errors.
 
-You do not need to store tsc_irq and adc_irq since you do not reference
-them anywhere but in probe().
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+---
 
-> +	int value;
+Changes from v2: Fixed the following files that escaped my build 
+coverage:
+arch/arm/mach-lpc32xx/phy3250.c
+arch/arm/mach-mxs/mach-mxs.c
+arch/arm/mach-omap2/vc.c
+arch/arm/mach-pxa/pxa-dt.c
+arch/arm/mach-spear/time.c
 
-Why do we need this?
-
-> +	int xnur_gpio;
-> +	int measure_delay_time;
-> +	int pre_charge_time;
-> +
-> +	struct completion completion;
-> +};
-> +
-> +/*
-> + * TSC module need ADC to get the measure value. So
-> + * before config TSC, we should initialize ADC module.
-> + */
-> +static void imx6ul_adc_init(struct imx6ul_tsc *tsc)
-> +{
-> +	int adc_hc = 0;
-> +	int adc_gc;
-> +	int adc_gs;
-> +	int adc_cfg;
-> +	int timeout;
-> +
-> +	adc_cfg = readl(tsc->adc_regs + REG_ADC_CFG);
-> +	adc_cfg |= ADC_12BIT_MODE | ADC_IPG_CLK;
-> +	adc_cfg |= ADC_CLK_DIV_8 | ADC_SHORT_SAMPLE_MODE;
-> +	adc_cfg &= ~ADC_HARDWARE_TRIGGER;
-> +	writel(adc_cfg, tsc->adc_regs + REG_ADC_CFG);
-> +
-> +	/* enable calibration interrupt */
-> +	adc_hc |= ADC_AIEN;
-> +	adc_hc |= ADC_CONV_DISABLE;
-> +	writel(adc_hc, tsc->adc_regs + REG_ADC_HC0);
-> +
-> +	/* start ADC calibration */
-> +	adc_gc = readl(tsc->adc_regs + REG_ADC_GC);
-> +	adc_gc |= ADC_CAL;
-> +	writel(adc_gc, tsc->adc_regs + REG_ADC_GC);
-> +
-> +	timeout = wait_for_completion_timeout
-> +			(&tsc->completion, ADC_TIMEOUT);
-> +	if (timeout == 0)
-> +		dev_err(tsc->dev, "Timeout for adc calibration\n");
-> +
-> +	adc_gs = readl(tsc->adc_regs + REG_ADC_GS);
-> +	if (adc_gs & ADC_CALF)
-> +		dev_err(tsc->dev, "ADC calibration failed\n");
-> +
-> +	/* TSC need the ADC work in hardware trigger */
-> +	adc_cfg = readl(tsc->adc_regs + REG_ADC_CFG);
-> +	adc_cfg |= ADC_HARDWARE_TRIGGER;
-> +	writel(adc_cfg, tsc->adc_regs + REG_ADC_CFG);
-> +}
-> +
-> +/*
-> + * This is a TSC workaround. Currently TSC misconnect two
-> + * ADC channels, this function remap channel configure for
-> + * hardware trigger.
-> + */
-> +static void imx6ul_tsc_channel_config(struct imx6ul_tsc *tsc)
-> +{
-> +	int adc_hc0, adc_hc1, adc_hc2, adc_hc3, adc_hc4;
-> +
-> +	adc_hc0 = DISABLE_CONVERSION_INT;
-> +	writel(adc_hc0, tsc->adc_regs + REG_ADC_HC0);
-> +
-> +	adc_hc1 = DISABLE_CONVERSION_INT | SELECT_CHANNEL_4;
-> +	writel(adc_hc1, tsc->adc_regs + REG_ADC_HC1);
-> +
-> +	adc_hc2 = DISABLE_CONVERSION_INT;
-> +	writel(adc_hc2, tsc->adc_regs + REG_ADC_HC2);
-> +
-> +	adc_hc3 = DISABLE_CONVERSION_INT | SELECT_CHANNEL_1;
-> +	writel(adc_hc3, tsc->adc_regs + REG_ADC_HC3);
-> +
-> +	adc_hc4 = DISABLE_CONVERSION_INT;
-> +	writel(adc_hc4, tsc->adc_regs + REG_ADC_HC4);
-> +}
-> +
-> +/*
-> + * TSC setting, confige the pre-charge time and measure delay time.
-> + * different touch screen may need different pre-charge time and
-> + * measure delay time.
-> + */
-> +static void imx6ul_tsc_set(struct imx6ul_tsc *tsc)
-> +{
-> +	int basic_setting = 0;
-> +	int start;
-> +
-> +	basic_setting |= tsc->measure_delay_time << 8;
-> +	basic_setting |= DETECT_4_WIRE_MODE | AUTO_MEASURE;
-> +	writel(basic_setting, tsc->tsc_regs + REG_TSC_BASIC_SETING);
-> +
-> +	writel(DE_GLITCH_2, tsc->tsc_regs + REG_TSC_DEBUG_MODE2);
-> +
-> +	writel(tsc->pre_charge_time, tsc->tsc_regs + REG_TSC_PRE_CHARGE_TIME);
-> +	writel(MEASURE_INT_EN, tsc->tsc_regs + REG_TSC_INT_EN);
-> +	writel(MEASURE_SIG_EN | VALID_SIG_EN,
-> +		tsc->tsc_regs + REG_TSC_INT_SIG_EN);
-> +
-> +	/* start sense detection */
-> +	start = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +	start |= START_SENSE;
-> +	start &= ~TSC_DISABLE;
-> +	writel(start, tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +}
-> +
-> +static void imx6ul_tsc_init(struct imx6ul_tsc *tsc)
-> +{
-> +	imx6ul_adc_init(tsc);
-> +	imx6ul_tsc_channel_config(tsc);
-> +	imx6ul_tsc_set(tsc);
-> +}
-> +
-> +static irqreturn_t tsc_irq(int irq, void *dev_id)
-> +{
-> +	struct imx6ul_tsc *tsc = (struct imx6ul_tsc *)dev_id;
-> +	int status;
-> +	int x, y;
-> +	int xnur;
-> +	int debug_mode2;
-> +	int state_machine;
-> +	int start;
-> +	unsigned long timeout;
-> +
-> +	status = readl(tsc->tsc_regs + REG_TSC_INT_STATUS);
-> +
-> +	/* write 1 to clear the bit measure-signal */
-> +	writel(MEASURE_SIGNAL | DETECT_SIGNAL,
-> +		tsc->tsc_regs + REG_TSC_INT_STATUS);
-> +
-> +	/* It's a HW self-clean bit. Set this bit and start sense detection */
-> +	start = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +	start |= START_SENSE;
-> +	writel(start, tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +
-> +	if (status & MEASURE_SIGNAL) {
-> +		tsc->value = readl(tsc->tsc_regs + REG_TSC_MEASURE_VALUE);
-> +		x = (tsc->value >> 16) & 0x0fff;
-> +		y = tsc->value & 0x0fff;
-> +
-> +		/*
-> +		 * Delay some time(max 2ms), wait the pre-charge done.
-> +		 * After the pre-change mode, TSC go into detect mode.
-> +		 * And in detect mode, we can get the xnur gpio value.
-> +		 * If xnur is low, this means the touch screen still
-> +		 * be touched. If xnur is high, this means finger leave
-> +		 * the touch screen.
-> +		 */
-> +		timeout = jiffies + HZ/500;
-> +		do {
-> +			if (time_after(jiffies, timeout)) {
-> +				xnur = 0;
-> +				goto touch_event;
-> +			}
-> +			usleep_range(200, 400);
-> +			debug_mode2 = readl(tsc->tsc_regs + REG_TSC_DEBUG_MODE2);
-> +			state_machine = (debug_mode2 >> 20) & 0x7;
-> +		} while (state_machine != DETECT_MODE);
-> +		usleep_range(200, 400);
-> +
-> +		xnur = gpio_get_value(tsc->xnur_gpio);
-> +touch_event:
-> +		if (xnur == 0) {
-> +			input_report_key(tsc->input, BTN_TOUCH, 1);
-> +			input_report_abs(tsc->input, ABS_X, x);
-> +			input_report_abs(tsc->input, ABS_Y, y);
-> +		} else
-> +			input_report_key(tsc->input, BTN_TOUCH, 0);
-> +
-> +		input_sync(tsc->input);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static irqreturn_t adc_irq(int irq, void *dev_id)
-> +{
-> +	struct imx6ul_tsc *tsc = (struct imx6ul_tsc *)dev_id;
-> +	int coco;
-> +	int value;
-> +
-> +	coco = readl(tsc->adc_regs + REG_ADC_HS);
-> +	if (coco & 0x01) {
-> +		value = readl(tsc->adc_regs + REG_ADC_R0);
-> +		complete(&tsc->completion);
-> +	}
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +static const struct of_device_id imx6ul_tsc_match[] = {
-> +	{ .compatible = "fsl,imx6ul-tsc", },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, imx6ul_tsc_match);
-> +
-> +static int imx6ul_tsc_probe(struct platform_device *pdev)
-> +{
-> +	struct imx6ul_tsc *tsc;
-> +	struct resource *tsc_mem;
-> +	struct resource *adc_mem;
-> +	struct input_dev *input_dev;
-> +	struct device_node *np = pdev->dev.of_node;
-> +	int err;
-> +
-> +	tsc = kzalloc(sizeof(struct imx6ul_tsc), GFP_KERNEL);
-
-Why not devm_kzalloc()?
-
-> +	if (!tsc) {
-> +		err = -ENOMEM;
-> +		goto err_free_mem_tsc;
-> +	}
-> +
-> +	input_dev = input_allocate_device();
-
-devm_input_allocate_device(&pdev->dev)?
-
-
-> +	if (!input_dev) {
-> +		err = -ENOMEM;
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc->dev = &pdev->dev;
-> +
-> +	tsc->input = input_dev;
-> +	tsc->input->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS);
-> +	tsc->input->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
-> +	input_set_abs_params(tsc->input, ABS_X, 0, 0xFFF, 0, 0);
-> +	input_set_abs_params(tsc->input, ABS_Y, 0, 0xFFF, 0, 0);
-> +
-> +	tsc->input->name = "iMX6UL TouchScreen Controller";
-> +
-> +	tsc->xnur_gpio = of_get_named_gpio(np, "xnur-gpio", 0);
-> +	err = gpio_request_one(tsc->xnur_gpio, GPIOF_IN, "tsc_X-");
-> +	if (err) {
-> +		dev_err(&pdev->dev, "failed to request GPIO tsc_X-\n");
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	tsc->tsc_regs = devm_ioremap_resource(&pdev->dev, tsc_mem);
-> +	if (IS_ERR(tsc->tsc_regs)) {
-> +		dev_err(&pdev->dev, "failed to remap tsc memory\n");
-> +		err = PTR_ERR(tsc->tsc_regs);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	adc_mem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-> +	tsc->adc_regs = devm_ioremap_resource(&pdev->dev, adc_mem);
-> +	if (IS_ERR(tsc->adc_regs)) {
-> +		dev_err(&pdev->dev, "failed to remap adc memory\n");
-> +		err = PTR_ERR(tsc->adc_regs);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc->tsc_clk = devm_clk_get(&pdev->dev, "tsc");
-> +	if (IS_ERR(tsc->tsc_clk)) {
-> +		dev_err(&pdev->dev, "failed getting tsc clock\n");
-> +		err = PTR_ERR(tsc->tsc_clk);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc->adc_clk = devm_clk_get(&pdev->dev, "adc");
-> +	if (IS_ERR(tsc->adc_clk)) {
-> +		dev_err(&pdev->dev, "failed getting adc clock\n");
-> +		err = PTR_ERR(tsc->adc_clk);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc->tsc_irq = platform_get_irq(pdev, 0);
-> +	if (tsc->tsc_irq <= 0) {
-> +		dev_err(&pdev->dev, "no tsc irq resource?\n");
-> +		err = -EINVAL;
-> +		goto err_free_mem;
-> +	}
-> +
-> +	tsc->adc_irq = platform_get_irq(pdev, 1);
-> +	if (tsc->adc_irq <= 0) {
-> +		dev_err(&pdev->dev, "no adc irq resource?\n");
-> +		err = -EINVAL;
-
-I think platform_get_irq() return negative errors, so let's check for
-tsc->adc_irq < 0 and do:
-
-		return tsc->adc_irq?
-
-> +		goto err_free_mem;
-> +	}
-> +
-> +	err = devm_request_threaded_irq(tsc->dev, tsc->tsc_irq,
-> +					NULL, tsc_irq,
-> +					IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
-
-Do we need to hard-code the trigger? Maybe rely on board/OF code to set
-up the trigger flags properly?
-
-> +					dev_name(&pdev->dev), tsc);
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev,
-> +			"failed requesting tsc irq %d\n",
-> +					    tsc->tsc_irq);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	err = devm_request_irq(tsc->dev, tsc->adc_irq,
-> +				adc_irq, 0,
-> +				dev_name(&pdev->dev), tsc);
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev,
-> +			"failed requesting adc irq %d\n",
-> +					    tsc->adc_irq);
-> +		goto err_free_mem;
-> +	}
-> +
-> +	err = of_property_read_u32(np, "measure_delay_time",
-> +				&tsc->measure_delay_time);
-> +	if (err)
-> +		tsc->measure_delay_time = 0xffff;
-> +
-> +	err = of_property_read_u32(np, "pre_charge_time",
-> +				&tsc->pre_charge_time);
-> +	if (err)
-> +		tsc->pre_charge_time = 0xfff;
-> +
-> +	init_completion(&tsc->completion);
-> +
-> +	err = clk_prepare_enable(tsc->adc_clk);
-> +	if (err) {
-> +		dev_err(&pdev->dev,
-> +			"Could not prepare or enable the adc clock.\n");
-> +		goto err_free_mem;
-> +	}
-> +
-> +	err = clk_prepare_enable(tsc->tsc_clk);
-> +	if (err) {
-> +		dev_err(&pdev->dev,
-> +			"Could not prepare or enable the tsc clock.\n");
-> +		goto error_tsc_clk_enable;
-> +	}
-> +
-> +	err = input_register_device(tsc->input);
-> +	if (err < 0) {
-> +		dev_err(&pdev->dev, "failed to register input device\n");
-> +		err = -EIO;
-> +		goto err_input_register;
-> +	}
-> +
-> +	imx6ul_tsc_init(tsc);
-> +
-> +	platform_set_drvdata(pdev, tsc);
-> +	return 0;
-> +
-> +err_input_register:
-> +	clk_disable_unprepare(tsc->tsc_clk);
-> +error_tsc_clk_enable:
-> +	clk_disable_unprepare(tsc->adc_clk);
-> +err_free_mem:
-> +	input_free_device(tsc->input);
-> +err_free_mem_tsc:
-> +	kfree(tsc);
-> +	return err;
-> +}
-> +
-> +static int imx6ul_tsc_remove(struct platform_device *pdev)
-> +{
-> +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
-> +
-> +	clk_disable_unprepare(tsc->tsc_clk);
-> +	clk_disable_unprepare(tsc->adc_clk);
-
-Just cutting clocks is not really nice. Why don't you shut down the
-device as you do in suspend, before disabling the clocks.
-
-> +	input_unregister_device(tsc->input);
-> +	kfree(tsc);
-> +
-> +	return 0;
-> +}
-> +
-> +#ifdef CONFIG_PM_SLEEP
-
-Drop ifdef.
-
-> +static int imx6ul_tsc_suspend(struct device *dev)
-
-__maybe_unused.
-
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
-> +	int tsc_flow;
-> +	int adc_cfg;
-> +
-> +	/* TSC controller enters to idle status */
-> +	tsc_flow = readl(tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +	tsc_flow |= TSC_DISABLE;
-> +	writel(tsc_flow, tsc->tsc_regs + REG_TSC_FLOW_CONTROL);
-> +
-> +	/* ADC controller enters to stop mode */
-> +	adc_cfg = readl(tsc->adc_regs + REG_ADC_HC0);
-> +	adc_cfg |= ADC_CONV_DISABLE;
-> +	writel(adc_cfg, tsc->adc_regs + REG_ADC_HC0);
-> +
-> +	clk_disable_unprepare(tsc->tsc_clk);
-> +	clk_disable_unprepare(tsc->adc_clk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int imx6ul_tsc_resume(struct device *dev)
-
-__maybe_unused.
-
-> +{
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	struct imx6ul_tsc *tsc = platform_get_drvdata(pdev);
-> +	int err;
-> +
-> +	err = clk_prepare_enable(tsc->adc_clk);
-> +	if (err)
-> +		return err;
-> +
-> +	err = clk_prepare_enable(tsc->tsc_clk);
-> +	if (err)
-
-Disable tsc->adc_clk?
-
-> +		return err;
-> +
-> +	imx6ul_tsc_init(tsc);
-> +	return 0;
-> +}
-> +#endif
-> +
-> +static SIMPLE_DEV_PM_OPS(imx6ul_tsc_pm_ops,
-> +			 imx6ul_tsc_suspend,
-> +			 imx6ul_tsc_resume);
-> +
-> +static struct platform_driver imx6ul_tsc_driver = {
-> +	.driver		= {
-> +		.name	= "imx6ul-tsc",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table	= imx6ul_tsc_match,
-> +		.pm	= &imx6ul_tsc_pm_ops,
-> +	},
-> +	.probe		= imx6ul_tsc_probe,
-> +	.remove		= imx6ul_tsc_remove,
-> +};
-> +module_platform_driver(imx6ul_tsc_driver);
-> +
-> +MODULE_AUTHOR("Haibo Chen <haibo.chen@freescale.com>");
-> +MODULE_DESCRIPTION("Freescale i.MX6UL Touchscreen controller driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 1.9.1
-> 
-
--- 
-Dmitry
+diff --git a/arch/arm/kernel/psci.c b/arch/arm/kernel/psci.c
+index f90fdf4ce7..2e60243347 100644
+--- a/arch/arm/kernel/psci.c
++++ b/arch/arm/kernel/psci.c
+@@ -278,7 +278,7 @@ out_put_node:
+ 	return err;
+ }
+ 
+-static const struct of_device_id psci_of_match[] __initconst = {
++static const struct of_device_id const psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci", .data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2", .data = psci_0_2_init},
+ 	{},
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index eaf58f88ef..82eec33c6a 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -38,7 +38,7 @@ static void __init at91rm9200_dt_device_init(void)
+ 	at91rm9200_pm_init();
+ }
+ 
+-static const char *at91rm9200_dt_board_compat[] __initconst = {
++static const char *const at91rm9200_dt_board_compat[] __initconst = {
+ 	"atmel,at91rm9200",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-at91/at91sam9.c b/arch/arm/mach-at91/at91sam9.c
+index e47a2093a0..7eb64f7630 100644
+--- a/arch/arm/mach-at91/at91sam9.c
++++ b/arch/arm/mach-at91/at91sam9.c
+@@ -72,7 +72,7 @@ static void __init at91sam9_dt_device_init(void)
+ 	at91sam9260_pm_init();
+ }
+ 
+-static const char *at91_dt_board_compat[] __initconst = {
++static const char *const at91_dt_board_compat[] __initconst = {
+ 	"atmel,at91sam9",
+ 	NULL
+ };
+@@ -89,7 +89,7 @@ static void __init at91sam9g45_dt_device_init(void)
+ 	at91sam9g45_pm_init();
+ }
+ 
+-static const char *at91sam9g45_board_compat[] __initconst = {
++static const char *const at91sam9g45_board_compat[] __initconst = {
+ 	"atmel,at91sam9g45",
+ 	NULL
+ };
+@@ -106,7 +106,7 @@ static void __init at91sam9x5_dt_device_init(void)
+ 	at91sam9x5_pm_init();
+ }
+ 
+-static const char *at91sam9x5_board_compat[] __initconst = {
++static const char *const at91sam9x5_board_compat[] __initconst = {
+ 	"atmel,at91sam9x5",
+ 	"atmel,at91sam9n12",
+ 	NULL
+diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+index e24df77abd..265ffeb203 100644
+--- a/arch/arm/mach-at91/pm.c
++++ b/arch/arm/mach-at91/pm.c
+@@ -311,7 +311,7 @@ static void at91sam9_sdram_standby(void)
+ 		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+ }
+ 
+-static const struct of_device_id ramc_ids[] __initconst = {
++static const struct of_device_id const ramc_ids[] __initconst = {
+ 	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
+ 	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
+ 	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
+diff --git a/arch/arm/mach-at91/sama5.c b/arch/arm/mach-at91/sama5.c
+index 41d829d8e7..8fc47630bb 100644
+--- a/arch/arm/mach-at91/sama5.c
++++ b/arch/arm/mach-at91/sama5.c
+@@ -52,7 +52,7 @@ static void __init sama5_dt_device_init(void)
+ 	at91sam9x5_pm_init();
+ }
+ 
+-static const char *sama5_dt_board_compat[] __initconst = {
++static const char *const sama5_dt_board_compat[] __initconst = {
+ 	"atmel,sama5",
+ 	NULL
+ };
+@@ -63,7 +63,7 @@ DT_MACHINE_START(sama5_dt, "Atmel SAMA5")
+ 	.dt_compat	= sama5_dt_board_compat,
+ MACHINE_END
+ 
+-static const char *sama5_alt_dt_board_compat[] __initconst = {
++static const char *const sama5_alt_dt_board_compat[] __initconst = {
+ 	"atmel,sama5d4",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
+index 7aef92720e..5478fe6bcc 100644
+--- a/arch/arm/mach-bcm/bcm_5301x.c
++++ b/arch/arm/mach-bcm/bcm_5301x.c
+@@ -44,7 +44,7 @@ static void __init bcm5301x_init_early(void)
+ 			"imprecise external abort");
+ }
+ 
+-static const char __initconst *bcm5301x_dt_compat[] = {
++static const char *const bcm5301x_dt_compat[] __initconst = {
+ 	"brcm,bcm4708",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-bcm/bcm_kona_smc.c b/arch/arm/mach-bcm/bcm_kona_smc.c
+index a55a7ecf14..cf3f8658f0 100644
+--- a/arch/arm/mach-bcm/bcm_kona_smc.c
++++ b/arch/arm/mach-bcm/bcm_kona_smc.c
+@@ -33,7 +33,7 @@ struct bcm_kona_smc_data {
+ 	unsigned result;
+ };
+ 
+-static const struct of_device_id bcm_kona_smc_ids[] __initconst = {
++static const struct of_device_id const bcm_kona_smc_ids[] __initconst = {
+ 	{.compatible = "brcm,kona-smc"},
+ 	{.compatible = "bcm,kona-smc"}, /* deprecated name */
+ 	{},
+diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+index 45abf6bd5f..c3d9642217 100644
+--- a/arch/arm/mach-clps711x/board-autcpu12.c
++++ b/arch/arm/mach-clps711x/board-autcpu12.c
+@@ -160,7 +160,7 @@ static struct platform_device autcpu12_mmgpio_pdev __initdata = {
+ 	},
+ };
+ 
+-static const struct gpio autcpu12_gpios[] __initconst = {
++static const struct gpio const autcpu12_gpios[] __initconst = {
+ 	{ AUTCPU12_DPOT_CS,	GPIOF_OUT_INIT_HIGH,	"DPOT CS" },
+ 	{ AUTCPU12_DPOT_CLK,	GPIOF_OUT_INIT_LOW,	"DPOT CLK" },
+ 	{ AUTCPU12_DPOT_UD,	GPIOF_OUT_INIT_LOW,	"DPOT UD" },
+diff --git a/arch/arm/mach-cns3xxx/core.c b/arch/arm/mach-cns3xxx/core.c
+index 4e9837ded9..db5eb69a42 100644
+--- a/arch/arm/mach-cns3xxx/core.c
++++ b/arch/arm/mach-cns3xxx/core.c
+@@ -339,7 +339,7 @@ static struct usb_ohci_pdata cns3xxx_usb_ohci_pdata = {
+ 	.power_off	= csn3xxx_usb_power_off,
+ };
+ 
+-static struct of_dev_auxdata cns3xxx_auxdata[] __initconst = {
++static const struct of_dev_auxdata const cns3xxx_auxdata[] __initconst = {
+ 	{ "intel,usb-ehci", CNS3XXX_USB_BASE, "ehci-platform", &cns3xxx_usb_ehci_pdata },
+ 	{ "intel,usb-ohci", CNS3XXX_USB_OHCI_BASE, "ohci-platform", &cns3xxx_usb_ohci_pdata },
+ 	{ "cavium,cns3420-ahci", CNS3XXX_SATA2_BASE, "ahci", NULL },
+@@ -392,7 +392,7 @@ static void __init cns3xxx_init(void)
+                         cns3xxx_auxdata, NULL);
+ }
+ 
+-static const char *cns3xxx_dt_compat[] __initdata = {
++static const char *const cns3xxx_dt_compat[] __initconst = {
+ 	"cavium,cns3410",
+ 	"cavium,cns3420",
+ 	NULL,
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 3b8740c083..676997895e 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -715,7 +715,7 @@ const short da850_lcdcntl_pins[] __initconst = {
+ 	-1
+ };
+ 
+-const short da850_vpif_capture_pins[] __initdata = {
++const short da850_vpif_capture_pins[] __initconst = {
+ 	DA850_VPIF_DIN0, DA850_VPIF_DIN1, DA850_VPIF_DIN2, DA850_VPIF_DIN3,
+ 	DA850_VPIF_DIN4, DA850_VPIF_DIN5, DA850_VPIF_DIN6, DA850_VPIF_DIN7,
+ 	DA850_VPIF_DIN8, DA850_VPIF_DIN9, DA850_VPIF_DIN10, DA850_VPIF_DIN11,
+@@ -725,7 +725,7 @@ const short da850_vpif_capture_pins[] __initdata = {
+ 	-1
+ };
+ 
+-const short da850_vpif_display_pins[] __initdata = {
++const short da850_vpif_display_pins[] __initconst = {
+ 	DA850_VPIF_DOUT0, DA850_VPIF_DOUT1, DA850_VPIF_DOUT2, DA850_VPIF_DOUT3,
+ 	DA850_VPIF_DOUT4, DA850_VPIF_DOUT5, DA850_VPIF_DOUT6, DA850_VPIF_DOUT7,
+ 	DA850_VPIF_DOUT8, DA850_VPIF_DOUT9, DA850_VPIF_DOUT10,
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 438f68547f..06b6451225 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -20,7 +20,7 @@
+ 
+ #define DA8XX_NUM_UARTS	3
+ 
+-static const struct of_device_id da8xx_irq_match[] __initconst = {
++static const struct of_device_id const da8xx_irq_match[] __initconst = {
+ 	{ .compatible = "ti,cp-intc", .data = cp_intc_of_init, },
+ 	{ }
+ };
+@@ -59,7 +59,7 @@ static void __init da850_init_machine(void)
+ 
+ }
+ 
+-static const char *da850_boards_compat[] __initdata = {
++static const char *const da850_boards_compat[] __initconst = {
+ 	"enbw,cmc",
+ 	"ti,da850-evm",
+ 	"ti,da850",
+diff --git a/arch/arm/mach-digicolor/digicolor.c b/arch/arm/mach-digicolor/digicolor.c
+index cfc88d1caa..4d62f1bde4 100644
+--- a/arch/arm/mach-digicolor/digicolor.c
++++ b/arch/arm/mach-digicolor/digicolor.c
+@@ -8,7 +8,7 @@
+ 
+ #include <asm/mach/arch.h>
+ 
+-static const char *digicolor_dt_compat[] __initconst = {
++static const char *const digicolor_dt_compat[] __initconst = {
+ 	"cnxt,cx92755",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-imx/mach-imx7d.c b/arch/arm/mach-imx/mach-imx7d.c
+index 4d4a19099a..62f3437257 100644
+--- a/arch/arm/mach-imx/mach-imx7d.c
++++ b/arch/arm/mach-imx/mach-imx7d.c
+@@ -31,7 +31,7 @@ static void __init imx7d_init_irq(void)
+ 	irqchip_init();
+ }
+ 
+-static const char *imx7d_dt_compat[] __initconst = {
++static const char *const imx7d_dt_compat[] __initconst = {
+ 	"fsl,imx7d",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-lpc32xx/phy3250.c b/arch/arm/mach-lpc32xx/phy3250.c
+index 7858d5b6f6..77d6b1bab2 100644
+--- a/arch/arm/mach-lpc32xx/phy3250.c
++++ b/arch/arm/mach-lpc32xx/phy3250.c
+@@ -212,7 +212,7 @@ static struct lpc32xx_mlc_platform_data lpc32xx_mlc_data = {
+ 	.dma_filter = pl08x_filter_id,
+ };
+ 
+-static const struct of_dev_auxdata lpc32xx_auxdata_lookup[] __initconst = {
++static const struct of_dev_auxdata const lpc32xx_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("arm,pl022", 0x20084000, "dev:ssp0", NULL),
+ 	OF_DEV_AUXDATA("arm,pl022", 0x2008C000, "dev:ssp1", NULL),
+ 	OF_DEV_AUXDATA("arm,pl110", 0x31040000, "dev:clcd", &lpc32xx_clcd_data),
+@@ -248,7 +248,7 @@ static void __init lpc3250_machine_init(void)
+ 			     lpc32xx_auxdata_lookup, NULL);
+ }
+ 
+-static char const *lpc32xx_dt_compat[] __initdata = {
++static const char *const lpc32xx_dt_compat[] __initconst = {
+ 	"nxp,lpc3220",
+ 	"nxp,lpc3230",
+ 	"nxp,lpc3240",
+diff --git a/arch/arm/mach-mmp/mmp-dt.c b/arch/arm/mach-mmp/mmp-dt.c
+index b2296c9309..6e155f03b8 100644
+--- a/arch/arm/mach-mmp/mmp-dt.c
++++ b/arch/arm/mach-mmp/mmp-dt.c
+@@ -20,12 +20,12 @@
+ 
+ extern void __init mmp_dt_init_timer(void);
+ 
+-static const char *pxa168_dt_board_compat[] __initdata = {
++static const char *const pxa168_dt_board_compat[] __initconst = {
+ 	"mrvl,pxa168-aspenite",
+ 	NULL,
+ };
+ 
+-static const char *pxa910_dt_board_compat[] __initdata = {
++static const char *const pxa910_dt_board_compat[] __initconst = {
+ 	"mrvl,pxa910-dkb",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-mmp/mmp2-dt.c b/arch/arm/mach-mmp/mmp2-dt.c
+index 998c0f533a..0341359b24 100644
+--- a/arch/arm/mach-mmp/mmp2-dt.c
++++ b/arch/arm/mach-mmp/mmp2-dt.c
+@@ -30,7 +30,7 @@ static void __init mmp_init_time(void)
+ 	of_clk_init(NULL);
+ }
+ 
+-static const char *mmp2_dt_board_compat[] __initdata = {
++static const char *const mmp2_dt_board_compat[] __initconst = {
+ 	"mrvl,mmp2-brownstone",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 2e7cec86e5..f1ea4700ef 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -282,7 +282,7 @@ static void __init apx4devkit_init(void)
+ #define TX28_FEC_PHY_RESET	MXS_GPIO_NR(4, 13)
+ #define TX28_FEC_nINT		MXS_GPIO_NR(4, 5)
+ 
+-static const struct gpio tx28_gpios[] __initconst = {
++static const struct gpio const tx28_gpios[] __initconst = {
+ 	{ ENET0_MDC__GPIO_4_0, GPIOF_OUT_INIT_LOW, "GPIO_4_0" },
+ 	{ ENET0_MDIO__GPIO_4_1, GPIOF_OUT_INIT_LOW, "GPIO_4_1" },
+ 	{ ENET0_RX_EN__GPIO_4_2, GPIOF_OUT_INIT_LOW, "GPIO_4_2" },
+@@ -528,7 +528,7 @@ static void mxs_restart(enum reboot_mode mode, const char *cmd)
+ 	soft_restart(0);
+ }
+ 
+-static const char *mxs_dt_compat[] __initdata = {
++static const char *const mxs_dt_compat[] __initconst = {
+ 	"fsl,imx28",
+ 	"fsl,imx23",
+ 	NULL,
+diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
+index 7add7994db..f62f8326aa 100644
+--- a/arch/arm/mach-omap2/prm_common.c
++++ b/arch/arm/mach-omap2/prm_common.c
+@@ -705,7 +705,7 @@ static struct omap_prcm_init_data scrm_data __initdata = {
+ };
+ #endif
+ 
+-static const struct of_device_id omap_prcm_dt_match_table[] __initconst = {
++static const struct of_device_id const omap_prcm_dt_match_table[] __initconst = {
+ #ifdef CONFIG_SOC_AM33XX
+ 	{ .compatible = "ti,am3-prcm", .data = &am3_prm_data },
+ #endif
+diff --git a/arch/arm/mach-omap2/vc.c b/arch/arm/mach-omap2/vc.c
+index 076fd20d7e..e5a35f6b83 100644
+--- a/arch/arm/mach-omap2/vc.c
++++ b/arch/arm/mach-omap2/vc.c
+@@ -563,7 +563,7 @@ struct i2c_init_data {
+ 	u8 hsscll_12;
+ };
+ 
+-static const __initdata struct i2c_init_data omap4_i2c_timing_data[] = {
++static const struct i2c_init_data const omap4_i2c_timing_data[] __initconst = {
+ 	{
+ 		.load = 50,
+ 		.loadbits = 0x3,
+diff --git a/arch/arm/mach-omap2/voltagedomains3xxx_data.c b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+index 261bb7cb4e..307676d8c5 100644
+--- a/arch/arm/mach-omap2/voltagedomains3xxx_data.c
++++ b/arch/arm/mach-omap2/voltagedomains3xxx_data.c
+@@ -95,7 +95,7 @@ static struct voltagedomain *voltagedomains_am35xx[] __initdata = {
+ };
+ 
+ 
+-static const char *sys_clk_name __initdata = "sys_ck";
++static const char *const sys_clk_name __initconst = "sys_ck";
+ 
+ void __init omap3xxx_voltagedomains_init(void)
+ {
+diff --git a/arch/arm/mach-omap2/voltagedomains44xx_data.c b/arch/arm/mach-omap2/voltagedomains44xx_data.c
+index 48b22a0a0c..9b1f245b57 100644
+--- a/arch/arm/mach-omap2/voltagedomains44xx_data.c
++++ b/arch/arm/mach-omap2/voltagedomains44xx_data.c
+@@ -92,7 +92,7 @@ static struct voltagedomain *voltagedomains_omap4[] __initdata = {
+ 	NULL,
+ };
+ 
+-static const char *sys_clk_name __initdata = "sys_clkin_ck";
++static const char *const sys_clk_name __initconst = "sys_clkin_ck";
+ 
+ void __init omap44xx_voltagedomains_init(void)
+ {
+diff --git a/arch/arm/mach-omap2/voltagedomains54xx_data.c b/arch/arm/mach-omap2/voltagedomains54xx_data.c
+index 33d22b8725..af5ff64964 100644
+--- a/arch/arm/mach-omap2/voltagedomains54xx_data.c
++++ b/arch/arm/mach-omap2/voltagedomains54xx_data.c
+@@ -78,7 +78,7 @@ static struct voltagedomain *voltagedomains_omap5[] __initdata = {
+ 	NULL,
+ };
+ 
+-static const char *sys_clk_name __initdata = "sys_clkin";
++static const char *const sys_clk_name __initconst = "sys_clkin";
+ 
+ void __init omap54xx_voltagedomains_init(void)
+ {
+diff --git a/arch/arm/mach-pxa/pxa-dt.c b/arch/arm/mach-pxa/pxa-dt.c
+index 7e0e5bd0c9..8e0e62ccdc 100644
+--- a/arch/arm/mach-pxa/pxa-dt.c
++++ b/arch/arm/mach-pxa/pxa-dt.c
+@@ -19,7 +19,7 @@
+ #include "generic.h"
+ 
+ #ifdef CONFIG_PXA3xx
+-static const struct of_dev_auxdata pxa3xx_auxdata_lookup[] __initconst = {
++static const struct of_dev_auxdata const pxa3xx_auxdata_lookup[] __initconst = {
+ 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40100000, "pxa2xx-uart.0", NULL),
+ 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40200000, "pxa2xx-uart.1", NULL),
+ 	OF_DEV_AUXDATA("mrvl,pxa-uart",		0x40700000, "pxa2xx-uart.2", NULL),
+@@ -39,7 +39,7 @@ static void __init pxa3xx_dt_init(void)
+ 			     pxa3xx_auxdata_lookup, NULL);
+ }
+ 
+-static const char *pxa3xx_dt_board_compat[] __initdata = {
++static const char *const pxa3xx_dt_board_compat[] __initconst = {
+ 	"marvell,pxa300",
+ 	"marvell,pxa310",
+ 	"marvell,pxa320",
+diff --git a/arch/arm/mach-realview/realview-dt.c b/arch/arm/mach-realview/realview-dt.c
+index cc28b89dd4..382cc1b905 100644
+--- a/arch/arm/mach-realview/realview-dt.c
++++ b/arch/arm/mach-realview/realview-dt.c
+@@ -13,7 +13,7 @@
+ #include <asm/hardware/cache-l2x0.h>
+ #include "core.h"
+ 
+-static const char *realview_dt_platform_compat[] __initconst = {
++static const char *const realview_dt_platform_compat[] __initconst = {
+ 	"arm,realview-eb",
+ 	"arm,realview-pb1176",
+ 	"arm,realview-pb11mp",
+diff --git a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+index f886478b88..5f028ff84c 100644
+--- a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
++++ b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+@@ -39,7 +39,7 @@ static void __init s3c2416_dt_machine_init(void)
+ 	s3c_pm_init();
+ }
+ 
+-static char const *s3c2416_dt_compat[] __initdata = {
++static const char *const s3c2416_dt_compat[] __initconst = {
+ 	"samsung,s3c2416",
+ 	"samsung,s3c2450",
+ 	NULL
+diff --git a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+index 2fddf38192..94e5bcfec9 100644
+--- a/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
++++ b/arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c
+@@ -61,7 +61,7 @@ static void s3c64xx_dt_restart(enum reboot_mode mode, const char *cmd)
+ 	soft_restart(0);
+ }
+ 
+-static char const *s3c64xx_dt_compat[] __initdata = {
++static const char *const s3c64xx_dt_compat[] __initconst = {
+ 	"samsung,s3c6400",
+ 	"samsung,s3c6410",
+ 	NULL
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index bf37e3c532..1e7c933c4d 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1348,7 +1348,7 @@ static void eva_restart(enum reboot_mode mode, const char *cmd)
+ 	writel((1 << 31), RESCNT2);
+ }
+ 
+-static const char *eva_boards_compat_dt[] __initdata = {
++static const char *const eva_boards_compat_dt[] __initconst = {
+ 	"renesas,armadillo800eva",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/board-bockw-reference.c b/arch/arm/mach-shmobile/board-bockw-reference.c
+index 9a74efda3d..4f78296f7d 100644
+--- a/arch/arm/mach-shmobile/board-bockw-reference.c
++++ b/arch/arm/mach-shmobile/board-bockw-reference.c
+@@ -72,7 +72,7 @@ static void __init bockw_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *bockw_boards_compat_dt[] __initdata = {
++static const char *const bockw_boards_compat_dt[] __initconst = {
+ 	"renesas,bockw-reference",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 25558d1f41..25a0e7233f 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -723,7 +723,7 @@ static void __init bockw_init_late(void)
+ 	ADD_USB_FUNC_DEVICE_IF_POSSIBLE();
+ }
+ 
+-static const char *bockw_boards_compat_dt[] __initdata = {
++static const char *const bockw_boards_compat_dt[] __initconst = {
+ 	"renesas,bockw",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
+index 260d8319fd..aa591e8393 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g.c
++++ b/arch/arm/mach-shmobile/board-kzm9g.c
+@@ -898,7 +898,7 @@ static void kzm9g_restart(enum reboot_mode mode, const char *cmd)
+ 	writel((1 << 31), RESCNT2);
+ }
+ 
+-static const char *kzm9g_boards_compat_dt[] __initdata = {
++static const char *const kzm9g_boards_compat_dt[] __initconst = {
+ 	"renesas,kzm9g",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/board-marzen-reference.c b/arch/arm/mach-shmobile/board-marzen-reference.c
+index b15eb92326..59ff4fbb64 100644
+--- a/arch/arm/mach-shmobile/board-marzen-reference.c
++++ b/arch/arm/mach-shmobile/board-marzen-reference.c
+@@ -38,7 +38,7 @@ static void __init marzen_init(void)
+ 	r8a7779_init_irq_extpin_dt(1); /* IRQ1 as individual interrupt */
+ }
+ 
+-static const char *marzen_boards_compat_dt[] __initdata = {
++static const char *const marzen_boards_compat_dt[] __initconst = {
+ 	"renesas,marzen",
+ 	"renesas,marzen-reference",
+ 	NULL,
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 51db288f19..2fff1aa5ab 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -330,7 +330,7 @@ static void __init marzen_init(void)
+ 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
+ }
+ 
+-static const char *marzen_boards_compat_dt[] __initdata = {
++static const char *const marzen_boards_compat_dt[] __initconst = {
+         "renesas,marzen",
+         NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r7s72100.c b/arch/arm/mach-shmobile/setup-r7s72100.c
+index 171174777b..d46639fc68 100644
+--- a/arch/arm/mach-shmobile/setup-r7s72100.c
++++ b/arch/arm/mach-shmobile/setup-r7s72100.c
+@@ -20,7 +20,7 @@
+ 
+ #include "common.h"
+ 
+-static const char *r7s72100_boards_compat_dt[] __initdata = {
++static const char *const r7s72100_boards_compat_dt[] __initconst = {
+ 	"renesas,r7s72100",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a73a4.c b/arch/arm/mach-shmobile/setup-r8a73a4.c
+index 446cee6119..20173c4f41 100644
+--- a/arch/arm/mach-shmobile/setup-r8a73a4.c
++++ b/arch/arm/mach-shmobile/setup-r8a73a4.c
+@@ -20,7 +20,7 @@
+ 
+ #include "common.h"
+ 
+-static const char *r8a73a4_boards_compat_dt[] __initdata = {
++static const char *const r8a73a4_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a73a4",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 00291cc177..a15b2f16dd 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -787,7 +787,7 @@ static void __init r8a7740_generic_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *r8a7740_boards_compat_dt[] __initdata = {
++static const char *const r8a7740_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7740",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index c49aa094fe..b9116c81e5 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -615,7 +615,7 @@ void __init r8a7778_init_irq_dt(void)
+ 	iounmap(base);
+ }
+ 
+-static const char *r8a7778_compat_dt[] __initdata = {
++static const char *const r8a7778_compat_dt[] __initconst = {
+ 	"renesas,r8a7778",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index c03e562be1..7a457eacd5 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -756,7 +756,7 @@ u32 __init r8a7779_read_mode_pins(void)
+ 	return mode;
+ }
+ 
+-static const char *r8a7779_compat_dt[] __initdata = {
++static const char *const r8a7779_compat_dt[] __initconst = {
+ 	"renesas,r8a7779",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-r8a7791.c b/arch/arm/mach-shmobile/setup-r8a7791.c
+index ef8eb3af58..3b8dbaf077 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7791.c
++++ b/arch/arm/mach-shmobile/setup-r8a7791.c
+@@ -23,7 +23,7 @@
+ #include "r8a7791.h"
+ #include "rcar-gen2.h"
+ 
+-static const char *r8a7791_boards_compat_dt[] __initdata = {
++static const char *const r8a7791_boards_compat_dt[] __initconst = {
+ 	"renesas,r8a7791",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fb2ab7590a..d09b787007 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -794,7 +794,7 @@ static void __init sh73a0_generic_init(void)
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+ }
+ 
+-static const char *sh73a0_boards_compat_dt[] __initdata = {
++static const char *const sh73a0_boards_compat_dt[] __initconst = {
+ 	"renesas,sh73a0",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-spear/time.c b/arch/arm/mach-spear/time.c
+index 26fda4ed4d..ee17f167d4 100644
+--- a/arch/arm/mach-spear/time.c
++++ b/arch/arm/mach-spear/time.c
+@@ -193,7 +193,7 @@ static void __init spear_clockevent_init(int irq)
+ 	setup_irq(irq, &spear_timer_irq);
+ }
+ 
+-const static struct of_device_id timer_of_match[] __initconst = {
++static const struct of_device_id const timer_of_match[] __initconst = {
+ 	{ .compatible = "st,spear-timer", },
+ 	{ },
+ };
+diff --git a/arch/arm/mach-sti/board-dt.c b/arch/arm/mach-sti/board-dt.c
+index b373acade3..ae10fb280a 100644
+--- a/arch/arm/mach-sti/board-dt.c
++++ b/arch/arm/mach-sti/board-dt.c
+@@ -14,7 +14,7 @@
+ 
+ #include "smp.h"
+ 
+-static const char *stih41x_dt_match[] __initdata = {
++static const char *const stih41x_dt_match[] __initconst = {
+ 	"st,stih415",
+ 	"st,stih416",
+ 	"st,stih407",
+diff --git a/arch/arm/mach-zx/zx296702.c b/arch/arm/mach-zx/zx296702.c
+index 60bb1a8e1b..a041e13ab0 100644
+--- a/arch/arm/mach-zx/zx296702.c
++++ b/arch/arm/mach-zx/zx296702.c
+@@ -13,7 +13,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ 
+-static const char *zx296702_dt_compat[] __initconst = {
++static const char *const zx296702_dt_compat[] __initconst = {
+ 	"zte,zx296702",
+ 	NULL,
+ };
