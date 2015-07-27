@@ -1,45 +1,49 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 27 Jul 2015 08:35:53 -0500
-Subject: [RESEND PATCH v2 1/2] dt: snps, dw-apb-ssi: Document new I/O data
- register width property
-In-Reply-To: <1437997035-3046-2-git-send-email-michael@smart-africa.com>
-References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
- <1437997035-3046-1-git-send-email-michael@smart-africa.com>
- <1437997035-3046-2-git-send-email-michael@smart-africa.com>
-Message-ID: <CAL_JsqKwO0__jT_c8dYsp-LoreoTdC+_qmjj_s-UqGPfSrxdzg@mail.gmail.com>
+From: mporter@konsulko.com (Matt Porter)
+Date: Mon, 27 Jul 2015 09:37:20 -0400
+Subject: [PATCH v3 2/2] doc: dt: add documentation for nxp,lpc1788-rtc
+In-Reply-To: <1436635730-15617-3-git-send-email-manabian@gmail.com>
+References: <1436635730-15617-1-git-send-email-manabian@gmail.com>
+ <1436635730-15617-3-git-send-email-manabian@gmail.com>
+Message-ID: <20150727133720.GA15004@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 6:37 AM, Michael van der Westhuizen
-<michael@smart-africa.com> wrote:
-> This change documents a new property for the snps,dw-apb-ssi device,
-> allowing an implementer to specify either four byte or two bytes
-> access to the SPI controller data register.
->
-> This supports a change that unbreaks this driver on picoXcell
-> platforms.
->
-> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
+On Sat, Jul 11, 2015 at 07:28:50PM +0200, Joachim Eastwood wrote:
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
 > ---
->
-> Changes in v2:
->   - Incorporate review feedback from Andy Shevchenko, reworking the
->     bindings to reflect common practice.
->
->  Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
-> index bd99193..b4f1086 100644
-> --- a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
-> +++ b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
-> @@ -10,6 +10,8 @@ Required properties:
->  Optional properties:
->  - cs-gpios : Specifies the gpio pis to be used for chipselects.
->  - num-cs : The number of chipselects. If omitted, this will default to 4.
-> +- snps,reg-io-width : The I/O register width (in bytes) implemented by
-> +  this device.  Supported values are 2 or 4 (the default).
+>  .../devicetree/bindings/rtc/nxp,lpc1788-rtc.txt     | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt b/Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt
+> new file mode 100644
+> index 000000000000..ad41a040432c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/nxp,lpc1788-rtc.txt
+> @@ -0,0 +1,21 @@
+> +NXP LPC1788 real-time clock
+> +
+> +The LPC1788 RTC provides calendar and clock functionality
+> +together with periodic tick and alarm interrupt support.
+> +
+> +Required properties:
+> +- compatible	: must contain "nxp,lpc1788-rtc"
+> +- reg		: Specifies base physical address and size of the registers.
+> +- interrupts	: A single interrupt specifier.
+> +- clocks	: Must contain entries for rtc and register clock
 
-Drop the snps as this is already a common property (at least for UARTs).
+"Must contain clock specifiers for rtc and register clock" ?
 
-Rob
+-Matt
+
+> +- clock-names	: Must contain "rtc" and "reg"
+> +  See ../clocks/clock-bindings.txt for details.
+> +
+> +Example:
+> +rtc: rtc at 40046000 {
+> +	compatible = "nxp,lpc1788-rtc";
+> +	reg = <0x40046000 0x1000>;
+> +	interrupts = <47>;
+> +	clocks = <&creg_clk 0>, <&ccu1 CLK_CPU_BUS>;
+> +	clock-names = "rtc", "reg";
+> +};
