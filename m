@@ -1,34 +1,37 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Mon, 27 Jul 2015 10:56:22 +0800
-Subject: [PATCH v4 7/7] arm64: dts: mt8173: Add subsystem clock
- controller device nodes
-In-Reply-To: <CAGS+omAUAHZUJQMnWJbH7NXB_Etp=OF3dWyMB7Ri1+rAyzyPBg@mail.gmail.com>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
- <1437706925-3222-8-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omAUAHZUJQMnWJbH7NXB_Etp=OF3dWyMB7Ri1+rAyzyPBg@mail.gmail.com>
-Message-ID: <1437965782.5614.4.camel@mtksdaap41>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 27 Jul 2015 08:32:39 +0530
+Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
+ bindings
+In-Reply-To: <2910042.ys2zsBBKt2@amdc1976>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
+ <2910042.ys2zsBBKt2@amdc1976>
+Message-ID: <20150727030239.GG19944@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Fri, 2015-07-24 at 19:32 +0800, Daniel Kurtz wrote:
-> > @@ -88,6 +88,13 @@
-> >                 #clock-cells = <0>;
-> >         };
-> >
-> > +       cpum_ck: dummy_clk {
+On 08-07-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
+> Isn't using u32 for storing frequency (in Hz) too small by today's
+> standards?
 > 
-> I'm not a big fan of this "dummy_clk".
-> The 'name' part of the devicetree node is supposed to be generic.
-> So, perhaps just oscillator at 2, and move it down below clk32k: oscillator at 1.
-> Otherwise:
+> [ Please note that the old v1 binding uses kHz not Hz. ]
 
-cpum_ck is a test clock which only available in IC test. It's empty on
-MT8173 evaluation or production boards. Should we name this kind of
-empty clock as an oscillator? Or is there a better name for it?
+I have thought about this a bit more and I am somewhat confused. Yes I
+agree that u32 isn't big enough for frequencies in Hz, i.e. Max value
+of 4294967295 ~ 4.29 GHz.
 
+But the bigger problem lies with the clk API that we have today. It
+declares clk-rate as a unsigned-long which is 32 bits on a 32 bit
+machine and 64 bits on a 64 bit machine. And every single piece of
+code reading "clock-frequency" DT property, reads it as a 32 bit value
+as we reserve only a single cell for it.
 
-Best regards,
+Now, if we wanna change that, we need to start changing from the
+clk-API itself and that's not gonna be a small task and I would leave
+it to Mike/Stephen for obvious reasons :)
 
-James
+So, I will keep this code in sync with rest of the kernel and lets see
+what Mike has to say.
+
+-- 
+viresh
