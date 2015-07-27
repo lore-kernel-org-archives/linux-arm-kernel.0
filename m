@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:19 +0200
-Subject: [PATCH v4 09/46] usb: gadget: at91_udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:22 +0200
+Subject: [PATCH v4 12/46] usb: gadget: dummy-hcd: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-10-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-13-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,25 +11,19 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/at91_udc.c | 33 ++++++++++++++++++++++++---------
- 1 file changed, 24 insertions(+), 9 deletions(-)
+ drivers/usb/gadget/udc/dummy_hcd.c | 65 +++++++++++++++++++++++++++++---------
+ 1 file changed, 50 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
-index fc42264..a04b073 100644
---- a/drivers/usb/gadget/udc/at91_udc.c
-+++ b/drivers/usb/gadget/udc/at91_udc.c
-@@ -59,15 +59,29 @@
- #define	DRIVER_VERSION	"3 May 2006"
+diff --git a/drivers/usb/gadget/udc/dummy_hcd.c b/drivers/usb/gadget/udc/dummy_hcd.c
+index 181112c..69fd29a 100644
+--- a/drivers/usb/gadget/udc/dummy_hcd.c
++++ b/drivers/usb/gadget/udc/dummy_hcd.c
+@@ -127,23 +127,57 @@ static inline struct dummy_request *usb_request_to_dummy_request
  
- static const char driver_name [] = "at91_udc";
--static const char * const ep_names[] = {
--	"ep0",
--	"ep1",
--	"ep2",
--	"ep3-int",
--	"ep4",
--	"ep5",
-+
+ static const char ep0name[] = "ep0";
+ 
+-static const char *const ep_name[] = {
+-	ep0name,				/* everyone has ep0 */
 +static const struct {
 +	const char *name;
 +	const struct usb_ep_caps caps;
@@ -40,31 +34,81 @@ index fc42264..a04b073 100644
 +		.caps = USB_EP_CAPS(USB_EP_CAPS_TYPE_ ## _type, \
 +				USB_EP_CAPS_DIR_ ## _dir), \
 +	}
-+
-+	EP_INFO("ep0",		CONTROL, ALL),
-+	EP_INFO("ep1",		ALL,	ALL),
-+	EP_INFO("ep2",		ALL,	ALL),
-+	EP_INFO("ep3-int",	INT,	ALL),
-+	EP_INFO("ep4",		ALL,	ALL),
-+	EP_INFO("ep5",		ALL,	ALL),
+ 
++	/* everyone has ep0 */
++	EP_INFO(ep0name,	CONTROL, ALL),
+ 	/* act like a pxa250: fifteen fixed function endpoints */
+-	"ep1in-bulk", "ep2out-bulk", "ep3in-iso", "ep4out-iso", "ep5in-int",
+-	"ep6in-bulk", "ep7out-bulk", "ep8in-iso", "ep9out-iso", "ep10in-int",
+-	"ep11in-bulk", "ep12out-bulk", "ep13in-iso", "ep14out-iso",
+-		"ep15in-int",
+-
++	EP_INFO("ep1in-bulk",	BULK,	IN),
++	EP_INFO("ep2out-bulk",	BULK,	OUT),
++	EP_INFO("ep3in-iso",	ISO,	IN),
++	EP_INFO("ep4out-iso",	ISO,	OUT),
++	EP_INFO("ep5in-int",	INT,	IN),
++	EP_INFO("ep6in-bulk",	BULK,	IN),
++	EP_INFO("ep7out-bulk",	BULK,	OUT),
++	EP_INFO("ep8in-iso",	ISO,	IN),
++	EP_INFO("ep9out-iso",	ISO,	OUT),
++	EP_INFO("ep10in-int",	INT,	IN),
++	EP_INFO("ep11in-bulk",	BULK,	IN),
++	EP_INFO("ep12out-bulk",	BULK,	OUT),
++	EP_INFO("ep13in-iso",	ISO,	IN),
++	EP_INFO("ep14out-iso",	ISO,	OUT),
++	EP_INFO("ep15in-int",	INT,	IN),
+ 	/* or like sa1100: two fixed function endpoints */
+-	"ep1out-bulk", "ep2in-bulk",
+-
++	EP_INFO("ep1out-bulk",	BULK,	OUT),
++	EP_INFO("ep2in-bulk",	BULK,	IN),
+ 	/* and now some generic EPs so we have enough in multi config */
+-	"ep3out", "ep4in", "ep5out", "ep6out", "ep7in", "ep8out", "ep9in",
+-	"ep10out", "ep11out", "ep12in", "ep13out", "ep14in", "ep15out",
++	EP_INFO("ep3out",	ALL,	OUT),
++	EP_INFO("ep4in",	ALL,	IN),
++	EP_INFO("ep5out",	ALL,	OUT),
++	EP_INFO("ep6out",	ALL,	OUT),
++	EP_INFO("ep7in",	ALL,	IN),
++	EP_INFO("ep8out",	ALL,	OUT),
++	EP_INFO("ep9in",	ALL,	IN),
++	EP_INFO("ep10out",	ALL,	OUT),
++	EP_INFO("ep11out",	ALL,	OUT),
++	EP_INFO("ep12in",	ALL,	IN),
++	EP_INFO("ep13out",	ALL,	OUT),
++	EP_INFO("ep14in",	ALL,	IN),
++	EP_INFO("ep15out",	ALL,	OUT),
 +
 +#undef EP_INFO
  };
--#define ep0name		ep_names[0]
+-#define DUMMY_ENDPOINTS	ARRAY_SIZE(ep_name)
 +
-+#define ep0name		ep_info[0].name
++#define DUMMY_ENDPOINTS	ARRAY_SIZE(ep_info)
  
- #define VBUS_POLL_TIMEOUT	msecs_to_jiffies(1000)
+ /*-------------------------------------------------------------------------*/
  
-@@ -1830,7 +1844,8 @@ static int at91udc_probe(struct platform_device *pdev)
+@@ -938,9 +972,10 @@ static void init_dummy_udc_hw(struct dummy *dum)
+ 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
+ 		struct dummy_ep	*ep = &dum->ep[i];
  
- 	for (i = 0; i < NUM_ENDPOINTS; i++) {
- 		ep = &udc->ep[i];
--		ep->ep.name = ep_names[i];
+-		if (!ep_name[i])
++		if (!ep_info[i].name)
+ 			break;
+-		ep->ep.name = ep_name[i];
 +		ep->ep.name = ep_info[i].name;
 +		ep->ep.caps = ep_info[i].caps;
- 		ep->ep.ops = &at91_ep_ops;
- 		ep->udc = udc;
- 		ep->int_mask = BIT(i);
+ 		ep->ep.ops = &dummy_ep_ops;
+ 		list_add_tail(&ep->ep.ep_list, &dum->gadget.ep_list);
+ 		ep->halted = ep->wedged = ep->already_seen =
+@@ -1684,7 +1719,7 @@ static void dummy_timer(unsigned long _dum_hcd)
+ 	}
+ 
+ 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
+-		if (!ep_name[i])
++		if (!ep_info[i].name)
+ 			break;
+ 		dum->ep[i].already_seen = 0;
+ 	}
 -- 
 1.9.1
