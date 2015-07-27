@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:28 +0200
-Subject: [PATCH v4 18/46] usb: gadget: gr_udc: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:45 +0200
+Subject: [PATCH v4 35/46] usb: renesas: gadget: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-19-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-36-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,36 +11,31 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/gr_udc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/usb/renesas_usbhs/mod_gadget.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/gr_udc.c b/drivers/usb/gadget/udc/gr_udc.c
-index c886887..8aa2593 100644
---- a/drivers/usb/gadget/udc/gr_udc.c
-+++ b/drivers/usb/gadget/udc/gr_udc.c
-@@ -2018,12 +2018,23 @@ static int gr_ep_init(struct gr_udc *dev, int num, int is_in, u32 maxplimit)
- 
- 		usb_ep_set_maxpacket_limit(&ep->ep, MAX_CTRL_PL_SIZE);
- 		ep->bytes_per_buffer = MAX_CTRL_PL_SIZE;
-+
-+		ep->ep.caps.type_control = true;
- 	} else {
- 		usb_ep_set_maxpacket_limit(&ep->ep, (u16)maxplimit);
- 		list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
-+
-+		ep->ep.caps.type_iso = true;
-+		ep->ep.caps.type_bulk = true;
-+		ep->ep.caps.type_int = true;
+diff --git a/drivers/usb/renesas_usbhs/mod_gadget.c b/drivers/usb/renesas_usbhs/mod_gadget.c
+index 494dfe0..de4f97d 100644
+--- a/drivers/usb/renesas_usbhs/mod_gadget.c
++++ b/drivers/usb/renesas_usbhs/mod_gadget.c
+@@ -1103,12 +1103,18 @@ int usbhs_mod_gadget_probe(struct usbhs_priv *priv)
+ 		if (usbhsg_is_dcp(uep)) {
+ 			gpriv->gadget.ep0 = &uep->ep;
+ 			usb_ep_set_maxpacket_limit(&uep->ep, 64);
++			uep->ep.caps.type_control = true;
+ 		}
+ 		/* init normal pipe */
+ 		else {
+ 			usb_ep_set_maxpacket_limit(&uep->ep, 512);
++			uep->ep.caps.type_iso = true;
++			uep->ep.caps.type_bulk = true;
++			uep->ep.caps.type_int = true;
+ 			list_add_tail(&uep->ep.ep_list, &gpriv->gadget.ep_list);
+ 		}
++		uep->ep.caps.dir_in = true;
++		uep->ep.caps.dir_out = true;
  	}
- 	list_add_tail(&ep->ep_list, &dev->ep_list);
  
-+	if (is_in)
-+		ep->ep.caps.dir_in = true;
-+	else
-+		ep->ep.caps.dir_out = true;
-+
- 	ep->tailbuf = dma_alloc_coherent(dev->dev, ep->ep.maxpacket_limit,
- 					 &ep->tailbuf_paddr, GFP_ATOMIC);
- 	if (!ep->tailbuf)
+ 	ret = usb_add_gadget_udc(dev, &gpriv->gadget);
 -- 
 1.9.1
