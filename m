@@ -1,130 +1,80 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 27 Jul 2015 11:46:25 -0700
-Subject: [PATCH] irq-bcm2836: Move SMP boot to the irqchip code.
-In-Reply-To: <1438022532-14576-1-git-send-email-eric@anholt.net>
-References: <alpine.DEB.2.11.1507261150500.18576@nanos>
- <1438022532-14576-1-git-send-email-eric@anholt.net>
-Message-ID: <55B67C81.1010900@gmail.com>
+From: fainelli@broadcom.com (Florian Fainelli)
+Date: Mon, 27 Jul 2015 11:47:09 -0700
+Subject: [PATCH 2/5] ARM: Add Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <20150323111427.GE11189@arm.com>
+References: <1425689693-31034-1-git-send-email-f.fainelli@gmail.com>
+ <1425689693-31034-3-git-send-email-f.fainelli@gmail.com>
+ <20150317172930.GY8399@arm.com> <55086C2E.3030700@gmail.com>
+ <20150323111427.GE11189@arm.com>
+Message-ID: <55B67CAD.6060409@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/07/15 11:42, Eric Anholt wrote:
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
+On 23/03/15 04:14, Will Deacon wrote:
+> On Tue, Mar 17, 2015 at 06:02:22PM +0000, Florian Fainelli wrote:
+>> On 17/03/15 10:29, Will Deacon wrote:
+>>> On Sat, Mar 07, 2015 at 12:54:50AM +0000, Florian Fainelli wrote:
+>>>> This patch adds support for the Broadcom Brahma-B15 CPU readahead cache
+>>>> controller. This cache controller sits between the L2 and the memory bus
+>>>> and its purpose is to provide a friendler burst size towards the DDR
+>>>> interface than the native cache line size.
+>>>>
+>>>> The readahead cache is mostly transparent, except for
+>>>> flush_kern_cache_all, flush_kern_cache_louis and flush_icache_all, which
+>>>> is precisely what we are overriding here.
+>>>
+>>> I'm struggling to understand why you care about flush_kern_cache_louis
+>>> and flush_icache_all for a cache that sits the other side of the L2.
+>>>
+>>> Can you explain why we need to do anything in these cases, please?
+>>
+>> Let's try, as you may have read in the comment, all MVA-based cache
+>> maintenance operations are snooped by the RAC, so they are effectively
+>> "transparent" to software, all others are not.
+>>
+>> flush_kern_cache_louis() and flush_icache_all() both use ICALLIUS in the
+>> SMP case and ICIALLU in the UP case which were flagged as not being
+>> transparently handled.
+>>
+>> The concern is that, if you perform a L1 cache (data or instruction)
+>> flush (essentially an invalidate), this will also flush (invalidate)
+>> corresponding L2 cache lines, but the RAC has no way to be signaled that
+>> is should also invalidate its own RAC cache lines pertaining to that
+>> data, and RAC holds per-CPU "super" cache lines.
+>>
+>> In arch/arm/kernel/smp.c, all uses of flush_cache_louis() are for
+>> writing-back data, so the RAC is not an issue. In
+>> arch/arm/kernel/suspend.c, flush_cache_louis() is known not to guarantee
+>> a "clean" all the way to main memory, so __cpu_flush_dcache_area is used
+>> in conjunction. In arch/arm/mm/idmap.c and mmu.c, the use of
+>> flush_cache_louis() seems to be meant to see fresh data, not write-back,
+>> so not transparent to the RAC, is that right?
+>>
+>> It may very well be that we are super cautious here and that the only
+>> case to take care of is essentially flush_cache_all(), and nothing more.
+>>
+>> Would you suggestions on how to instrument/exercise whether we really
+>> need to deal with flush_cache_louis() and flush_icache_all()?
 > 
-> Thomas: The problem with delaying IPI unmasking until secondary boot
-> is that it means we need the secondary boot process to integrate with
-> the irqchip code, which seems unusual given the dearth of includes I
-> could find between arch/arm/mach-* SMP boot code and drivers/irqchip/
-> to get function prototypes.  However, since the irqchip is most of
-> this register space already, it might make sense to just have the SMP
-> boot live in drivers/irqchip/.  Here's a patch that would do that,
-> that could be squashed into my change.
+> I think that both flush_cache_louis and flush_icache_all only care about
+> the inner-shareable domain, so you don't need to do anything with the
+> RAC. It's a bit like the PL310 outer-cache, which is also not affected
+> by these operations.
 
-I do not think this patch is going to work, there are CPU notifiers that
-allows you to listen for events (CPU_ONLINE, CPU_DEAD...) as to when
-(re)configuration of an interrupt controller can become necessary in
-other areas of the kernel.
-
-drivers/irqchip/irq-gic*.c contains code that deals with this for instance.
+I see, will keep experimenting with removing these two and see if
+anything breaks.
 
 > 
->  drivers/irqchip/irq-bcm2836.c | 57 +++++++++++++++++++++++++++++++++++++------
->  1 file changed, 50 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-> index 87340b0..5f2a40e 100644
-> --- a/drivers/irqchip/irq-bcm2836.c
-> +++ b/drivers/irqchip/irq-bcm2836.c
-> @@ -49,14 +49,16 @@
->  /* Same status bits as above, but for FIQ. */
->  #define LOCAL_FIQ_PENDING0		0x070
->  /*
-> - * Mailbox0 write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
-> + * Mailbox write-to-set bits.  There are 16 mailboxes, 4 per CPU, and
->   * these bits are organized by mailbox number and then CPU number.  We
->   * use mailbox 0 for IPIs.  The mailbox's interrupt is raised while
->   * any bit is set.
->   */
->  #define LOCAL_MAILBOX0_SET0		0x080
-> +#define LOCAL_MAILBOX3_SET0		0x08c
->  /* Mailbox0 write-to-clear bits. */
->  #define LOCAL_MAILBOX0_CLR0		0x0c0
-> +#define LOCAL_MAILBOX3_CLR0		0x0cc
->  
->  #define LOCAL_IRQ_CNTPSIRQ	0
->  #define LOCAL_IRQ_CNTPNSIRQ	1
-> @@ -195,6 +197,46 @@ static void bcm2836_arm_irqchip_send_ipi(const struct cpumask *mask,
->  		writel(1 << ipi, mailbox0_base + 16 * cpu);
->  	}
->  }
-> +
-> +/* Requests boot of a secondary CPU.
-> + *
-> + * The Raspberry Pi firmware has already started up the CPU and set it
-> + * spinning in a loop in low memory waiting for a value in mailbox 3
-> + * indicating what OS code it should jump to.
-> + */
-> +int __init bcm2836_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	int timeout = 20;
-> +	void __iomem *mailbox3_set_base = intc.base + LOCAL_MAILBOX3_SET0;
-> +	void __iomem *mailbox3_clr_base = intc.base + LOCAL_MAILBOX3_CLR0;
-> +	unsigned long secondary_startup_phys =
-> +		(unsigned long) virt_to_phys((void *)secondary_startup);
-> +
-> +	/* Unmask IPIs to the target cpu. */
-> +	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
-> +					       cpu);
-> +
-> +	dsb();
-> +
-> +	writel(secondary_startup_phys, mailbox3_set_base + 16 * cpu);
-> +
-> +	while (true) {
-> +		int val = readl(mailbox3_clr_base + 16 * cpu);
-> +
-> +		if (val == 0)
-> +			return 0;
-> +		if (timeout-- == 0)
-> +			return -ETIMEDOUT;
-> +		cpu_relax();
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct smp_operations bcm2836_smp_ops __initdata = {
-> +	.smp_boot_secondary	= bcm2836_smp_boot_secondary,
-> +};
-> +
->  #endif
->  
->  static const struct irq_domain_ops bcm2836_arm_irqchip_intc_ops = {
-> @@ -205,14 +247,15 @@ static void
->  bcm2836_arm_irqchip_smp_init(void)
->  {
->  #ifdef CONFIG_SMP
-> -	int i;
-> +	/* Unmask IPIs to the boot CPU. Other CPUs will be unmasked as
-> +	 * they're brought up.
-> +	 */
-> +	bcm2836_arm_irqchip_unmask_per_cpu_irq(LOCAL_MAILBOX_INT_CONTROL0, 0,
-> +					       smp_processor_id());
->  
-> -	/* unmask IPIs */
-> -	for_each_possible_cpu(i) {
-> -		bcm2836_arm_irqchip_unmask_per_cpu_irq(
-> -			LOCAL_MAILBOX_INT_CONTROL0, 0, i);
-> -	}
->  	set_smp_cross_call(bcm2836_arm_irqchip_send_ipi);
-> +
-> +	smp_set_ops(&bcm2836_smp_ops);
->  #endif
->  }
->  
-> 
+> I don't think there's a good way to determine statically if we have
+> missing cacheflush calls. Maybe a better bet would be to implement a
+> RAC driver using the outer_cache framework and only implement the
+> flush_all callback.
 
-
+Last I tried this, the performance became absolutely terrible for e.g:
+networking which involves doing frequent invalidation + write-back due
+to DMA operations. Also, it did not seem to me like it was possible to
+get an information about the DMA transfer direction (at least not at
+this level) which could help speed the write-back case since there
+nothing to do in that case (unlike in the PL310 case).
 -- 
 Florian
