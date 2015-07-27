@@ -1,34 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 27 Jul 2015 12:00:55 +0100
-Subject: inquiries on juno
-In-Reply-To: <CAN2waFtHqy+CV3nu3ZdGsxjTwD35xuhXiAn0tPrd4ZPYR7Ujww@mail.gmail.com>
-References: <CAN2waFugZ869RZe_3GbW+8qCZQL-h9fRt5g38JJUPkr8f8VR5A@mail.gmail.com>	<55B20037.2090705@arm.com>	<CAN2waFsDuw4s9AqU=6D5vfgHSK5iDknkxD5UR06yXGe+GGNSrg@mail.gmail.com>	<55B236E2.8050600@arm.com>
- <CAN2waFtHqy+CV3nu3ZdGsxjTwD35xuhXiAn0tPrd4ZPYR7Ujww@mail.gmail.com>
-Message-ID: <55B60F67.9000408@arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Jul 2015 13:01:43 +0200
+Subject: [PATCH v2 3/7] cpufreq-dt: add turbo modes support
+In-Reply-To: <20150727083754.GD31611@linux>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <1436456621-29839-4-git-send-email-b.zolnierkie@samsung.com>
+ <20150727083754.GD31611@linux>
+Message-ID: <15810554.2OjPyuYJBt@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi,
 
-On 27/07/15 11:16, Zhaoyang Huang wrote:
-> Dear Sudeep,
-> I applied the patch you mentioned on the git tree of v4.1 and get the
-> error for[1]. Then I cherry-picked the commit[3] which I get from github
-> where the missing function defined, while there is another error[2]. I
-> am not sure if I am on the right way? Thank you!
->
+On Monday, July 27, 2015 02:07:54 PM Viresh Kumar wrote:
+> On 09-07-15, 17:43, Bartlomiej Zolnierkiewicz wrote:
+> > diff --git a/include/linux/cpufreq-dt.h b/include/linux/cpufreq-dt.h
+> > index 0414009..483ca1b 100644
+> > --- a/include/linux/cpufreq-dt.h
+> > +++ b/include/linux/cpufreq-dt.h
+> > @@ -17,6 +17,7 @@ struct cpufreq_dt_platform_data {
+> >  	 * clock.
+> >  	 */
+> >  	bool independent_clocks;
+> > +	bool boost_supported;
+> >  };
+> 
+> I am planning to kill this structure soon, don't add anything to it.
+> We should be doing this based on DT.
 
-I haven't tried that patch on v4.1, so I am not aware of all the
-dependencies you may be missing. I have tried only on v4.2-rc* and it
-works fine to me.
+This change was in the original patch posted in April:
+https://lkml.org/lkml/2015/4/10/646
 
-Other option would be to have "earlycon" in cmdline but remove baud in
-stdout-path in Juno DT and see if it provides any log as where it's
-getting hung during the boot.
+your review from a month ago didn't contain this request:
+https://lkml.org/lkml/2015/6/22/667
 
-But I repeat that v4.1 with defconfig and DT compiled from source just
-works fine unless you are missing something in the firmware including 
-DT. Hope that helps.
+and now (after nearly 4 months) you are telling me that
+I should change this because you are planning to do some
+more changes in the future.
 
-Regards,
-Sudeep.
+Could we please keep it as it is for now and change it
+later (after independent_clocks configuration will get
+ported to use device tree)?
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
