@@ -1,112 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 27 Jul 2015 21:28:02 +0800
-Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
-In-Reply-To: <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
-Message-ID: <20150727132802.GK12927@tiger>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 27 Jul 2015 08:35:53 -0500
+Subject: [RESEND PATCH v2 1/2] dt: snps, dw-apb-ssi: Document new I/O data
+ register width property
+In-Reply-To: <1437997035-3046-2-git-send-email-michael@smart-africa.com>
+References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+ <1437997035-3046-1-git-send-email-michael@smart-africa.com>
+ <1437997035-3046-2-git-send-email-michael@smart-africa.com>
+Message-ID: <CAL_JsqKwO0__jT_c8dYsp-LoreoTdC+_qmjj_s-UqGPfSrxdzg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 22, 2015 at 12:07:39PM -0500, Shenwei Wang wrote:
-> IMX7D contains a new version of GPC IP block (GPCv2). It has two
-> major functions: power management and wakeup source management.
-> 
-> GPCv2 provides low power mode control for Cortex-A7 and Cortex-M4
-> domains. And it can support WAIT, STOP, and DSM(Deep Sleep Mode) modes.
-> After configuring the GPCv2 module, the platform can enter into a
-> selected mode either automatically triggered by ARM WFI instruction or
-> manually by software. The system will exit the low power states
-> by the predefined wakeup sources which are managed by the gpcv2
-> irqchip driver.
-> 
-> This patch adds a new suspend driver to manage the power states on IMX7D.
-> It currently supports "SUSPEND_STANDBY" and "SUSPEND_MEM" states.
-> 
-> Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+On Mon, Jul 27, 2015 at 6:37 AM, Michael van der Westhuizen
+<michael@smart-africa.com> wrote:
+> This change documents a new property for the snps,dw-apb-ssi device,
+> allowing an implementer to specify either four byte or two bytes
+> access to the SPI controller data register.
+>
+> This supports a change that unbreaks this driver on picoXcell
+> platforms.
+>
+> Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
 > ---
->  arch/arm/mach-imx/Kconfig        |   1 +
->  arch/arm/mach-imx/Makefile       |   2 +
->  arch/arm/mach-imx/pm-imx7.c      | 765 +++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-imx/suspend-imx7.S | 529 +++++++++++++++++++++++++++
->  4 files changed, 1297 insertions(+)
->  create mode 100644 arch/arm/mach-imx/pm-imx7.c
->  create mode 100644 arch/arm/mach-imx/suspend-imx7.S
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 5ccc9ea..4269c1e 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -552,6 +552,7 @@ config SOC_IMX7D
->  	bool "i.MX7 Dual support"
->  	select PINCTRL_IMX7D
->  	select ARM_GIC
-> +	select IMX_GPCV2
+>
+> Changes in v2:
+>   - Incorporate review feedback from Andy Shevchenko, reworking the
+>     bindings to reflect common practice.
+>
+>  Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+> index bd99193..b4f1086 100644
+> --- a/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+> +++ b/Documentation/devicetree/bindings/spi/snps,dw-apb-ssi.txt
+> @@ -10,6 +10,8 @@ Required properties:
+>  Optional properties:
+>  - cs-gpios : Specifies the gpio pis to be used for chipselects.
+>  - num-cs : The number of chipselects. If omitted, this will default to 4.
+> +- snps,reg-io-width : The I/O register width (in bytes) implemented by
+> +  this device.  Supported values are 2 or 4 (the default).
 
-Yes, the existing list is already a bit out of order, but please do not
-make it worse.  Add it after HAVE_IMX_MMDC to keep them sort
-alphabetically.
+Drop the snps as this is already a common property (at least for UARTs).
 
->  	select HAVE_IMX_ANATOP
->  	select HAVE_IMX_MMDC
->  	help
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 37c502a..b2ad476 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
->  
->  ifeq ($(CONFIG_SUSPEND),y)
->  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-> +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
-> +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
-
-Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
-
->  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
->  obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
->  endif
-> diff --git a/arch/arm/mach-imx/pm-imx7.c b/arch/arm/mach-imx/pm-imx7.c
-> new file mode 100644
-> index 0000000..50b9af4
-> --- /dev/null
-> +++ b/arch/arm/mach-imx/pm-imx7.c
-> @@ -0,0 +1,765 @@
-> +
-
-Drop this new line.
-
-> +/*
-> + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-
-Ditto
-
-> +#include <linux/suspend.h>
-> +#include <asm/suspend.h>
-> +#include <asm/fncpy.h>
-> +
-> +#include <soc/imx/gpcv2.h>
-> +
-> +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
-
-Will this give a checkpatch warning?
-
-> +static struct imx_gpcv2 *gpcv2_instance;
-
-I stop right here, as I need to understand why we need to have header
-soc/imx/gpcv2.h shared between irqchip driver and pm code.
-
-Shawn
+Rob
