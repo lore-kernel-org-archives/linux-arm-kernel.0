@@ -1,39 +1,32 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 27 Jul 2015 14:54:51 +0200
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <20150727123653.36C046C8007E@dd34104.kasserver.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de><55B5E6DB.8020009@redhat.com>
- <20150727123653.36C046C8007E@dd34104.kasserver.com>
-Message-ID: <55B62A1B.6030601@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 27 Jul 2015 14:23:26 +0200
+Subject: [GIT PULL] STi defconfig updates for v4.3, round 1
+In-Reply-To: <55AFD166.2070703@st.com>
+References: <55AFD166.2070703@st.com>
+Message-ID: <20150727122326.GA14224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jul 22, 2015 at 07:22:46PM +0200, Maxime Coquelin wrote:
+> Hi Olof, Arnd and Kevin,
+> 
+> Please consider this first round of STi defconfig updates for v4.3:
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mcoquelin/sti.git
+> tags/sti-defconfig-for-v4.3-1
+> 
+> for you to fetch changes up to 5ecd29ac5eaafbadaf80fc30c3b1a1ead8072294:
+> 
+>   ARM: multi_v7_defconfig: Enable support for PWM Regulators (2015-07-22
+> 14:29:45 +0200)
 
-On 27-07-15 14:36, public_timo.s at silentcreek.de wrote:
-> Hi again,
->
-> one more thing...
->
-> Hans de Goede schrieb am 27.07.2015 10:07:
->> IMHO we should just stick with the standard operating points unless we know
->> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
->> Lime).
->
-> If we stick to the standard operating points, shouldn't we honor their voltages
-> as well? If we set the minimum voltage for dcdc2 to 1.0V (as you did) or 1.05V
-> (as I did), this means that the lowest operating point of 144MHz at 0.9V defined
-> in sun7i-a20.dtsi (and with my definition the 312MHz opp as well) will not be
-> available because cpufreq-dt simply ignores operating points that aren't within
-> the set voltage range for that regulator.
+Thanks, merged.
 
-Ah, good point. I don't know what is the right thing todo here.
 
-ChenYu (in the CC), since you did most of the original work here, do
-you know why we have an op at 0.9 volt, but none of our boards allow the
-voltage to go that low in the regulator settings ?
-
-Regards,
-
-Hans
+-Olof
