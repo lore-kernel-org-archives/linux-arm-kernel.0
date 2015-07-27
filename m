@@ -1,220 +1,193 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 27 Jul 2015 09:52:39 +0200
-Subject: [PATCH v4 2/7] clk: mediatek: Fix rate and dependency of MT8173
- clocks
-In-Reply-To: <CAGS+omDjr6d9=+d-uphrENu3Kenr8QUc3VgbaWTd45wqWzi7tg@mail.gmail.com>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
- <20150727055232.GW18700@pengutronix.de>
- <CAGS+omDjr6d9=+d-uphrENu3Kenr8QUc3VgbaWTd45wqWzi7tg@mail.gmail.com>
-Message-ID: <18677675.jZ2GEqS3sy@diego>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 27 Jul 2015 09:02:46 +0100
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <55B5E5A6.2030509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 27. Juli 2015, 14:19:41 schrieb Daniel Kurtz:
-> On Jul 27, 2015 12:52, "Sascha Hauer" <s.hauer@pengutronix.de> wrote:
-> > On Fri, Jul 24, 2015 at 07:10:14PM +0800, Daniel Kurtz wrote:
-> > > On Fri, Jul 24, 2015 at 11:02 AM, James Liao <jamesjj.liao@mediatek.com>
-> 
-> wrote:
-> > > > Remove the dependency from clk_null, and give all root clocks a
-> > > > typical rate, include clkph_mck_o, usb_syspll_125m and hdmitx_dig_cts.
-> > > > 
-> > > > dpi_ck was removed due to no clock reference to it.
-> > > > 
-> > > > Replace parent clock of infra_cpum with cpum_ck, which is an external
-> > > > clock and can be defined in the deivce tree.
-> > > > 
-> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > > ---
-> > > > 
-> > > >  drivers/clk/mediatek/clk-mt8173.c      | 13 ++++++-------
-> > > >  include/dt-bindings/clock/mt8173-clk.h |  1 -
-> > > >  2 files changed, 6 insertions(+), 8 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/clk/mediatek/clk-mt8173.c
-> 
-> b/drivers/clk/mediatek/clk-mt8173.c
-> 
-> > > > index 4b9e04c..50b3266 100644
-> > > > --- a/drivers/clk/mediatek/clk-mt8173.c
-> > > > +++ b/drivers/clk/mediatek/clk-mt8173.c
-> > > > @@ -24,11 +24,9 @@
-> > > > 
-> > > >  static DEFINE_SPINLOCK(mt8173_clk_lock);
-> > > > 
-> > > > -static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
-> > > > -       FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
-> > > > -       FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
-> > > > -       FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m",
-> 
-> "clk_null", 1, 1),
-> 
-> > > > -       FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null",
-> 
-> 1, 1),
-> 
-> > > > +static const struct mtk_fixed_clk fixed_clks[] __initconst = {
-> > > > +       FIXED_CLK(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk26m", 400 *
-> 
-> MHZ),
-> 
-> > > > +       FIXED_CLK(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m",
-> 
-> "clk26m", 125 * MHZ),
-> 
-> > > >  };
-> > > >  
-> > > >  static const struct mtk_fixed_factor top_divs[] __initconst = {
-> > > > 
-> > > > @@ -53,6 +51,7 @@ static const struct mtk_fixed_factor top_divs[]
-> 
-> __initconst = {
-> 
-> > > >         FACTOR(CLK_TOP_CLKRTC_INT, "clkrtc_int", "clk26m", 1, 793),
-> > > >         FACTOR(CLK_TOP_FPC, "fpc_ck", "clk26m", 1, 1),
-> > > > 
-> > > > +       FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts",
-> 
-> "tvdpll_445p5m", 1, 3),
-> 
-> > > >         FACTOR(CLK_TOP_HDMITXPLL_D2, "hdmitxpll_d2",
-> 
-> "hdmitx_dig_cts", 1, 2),
-> 
-> > > >         FACTOR(CLK_TOP_HDMITXPLL_D3, "hdmitxpll_d3",
-> 
-> "hdmitx_dig_cts", 1, 3),
-> 
-> > > > @@ -611,7 +610,7 @@ static const struct mtk_gate infra_clks[]
-> 
-> __initconst = {
-> 
-> > > >         GATE_ICG(CLK_INFRA_GCE, "infra_gce", "axi_sel", 6),
-> > > >         GATE_ICG(CLK_INFRA_L2C_SRAM, "infra_l2c_sram", "axi_sel", 7),
-> > > >         GATE_ICG(CLK_INFRA_M4U, "infra_m4u", "mem_sel", 8),
-> > > > 
-> > > > -       GATE_ICG(CLK_INFRA_CPUM, "infra_cpum", "clk_null", 15),
-> > > > +       GATE_ICG(CLK_INFRA_CPUM, "infra_cpum", "cpum_ck", 15),
-> > > > 
-> > > >         GATE_ICG(CLK_INFRA_KP, "infra_kp", "axi_sel", 16),
-> > > >         GATE_ICG(CLK_INFRA_CEC, "infra_cec", "clk26m", 18),
-> > > >         GATE_ICG(CLK_INFRA_PMICSPI, "infra_pmicspi", "pmicspi_sel",
-> 
-> 22),
-> 
-> > > > @@ -714,7 +713,7 @@ static void __init mtk_topckgen_init(struct
-> 
-> device_node *node)
-> 
-> > > >         clk_data = mtk_alloc_clk_data(CLK_TOP_NR_CLK);
-> > > > 
-> > > > -       mtk_clk_register_factors(root_clk_alias,
-> 
-> ARRAY_SIZE(root_clk_alias), clk_data);
-> 
-> > > > +       mtk_clk_register_fixed_clks(fixed_clks,
-> 
-> ARRAY_SIZE(fixed_clks), clk_data);
-> 
-> > > >         mtk_clk_register_factors(top_divs, ARRAY_SIZE(top_divs),
-> 
-> clk_data);
-> 
-> > > >         mtk_clk_register_composites(top_muxes, ARRAY_SIZE(top_muxes),
-> 
-> base,
-> 
-> > > >                         &mt8173_clk_lock, clk_data);
-> > > > 
-> > > > diff --git a/include/dt-bindings/clock/mt8173-clk.h
-> 
-> b/include/dt-bindings/clock/mt8173-clk.h
-> 
-> > > > index 4ad76ed..7230c38 100644
-> > > > --- a/include/dt-bindings/clock/mt8173-clk.h
-> > > > +++ b/include/dt-bindings/clock/mt8173-clk.h
-> > > > @@ -18,7 +18,6 @@
-> > > > 
-> > > >  /* TOPCKGEN */
-> > > >  
-> > > >  #define CLK_TOP_CLKPH_MCK_O            1
-> > > > 
-> > > > -#define CLK_TOP_DPI                    2
-> > > > 
-> > > >  #define CLK_TOP_USB_SYSPLL_125M                3
-> > > 
-> > > I think we should renumber the rest of the CLK_TOP_*
-> > 
-> > They shouldn't be renumbered at all as this makes all binary device
-> > trees out there useless. That may not be a big issue with the MT8173
-> > at the moment as there are hardly any binary device trees with the
-> > mainline device trees shipped, but still we should get used to not
-> > break existing device trees without need.
-> 
-> As you mention, there are no devices shipped with mainline binary device
-> trees.  So, let's just correct the numbering now while we still can do it
-> painlessly.  It seems a bit unnecessary to preserve backwards compatibility
-> when we are still landing basic device support, like the clock tree.
+Hi Mark,
 
-in general I'm with Sascha on this regarding breaking the dt, and I guess
-the empty number does not hurt this much. Another argument against
-renumbering would be that the clock is there, it's just not used in the
-code anymore, but the clock is acutally still there.
+On 23/07/15 17:52, Mark Rutland wrote:
+> Currently msi-parent is used in a couple of drivers despite being fairly
+> underspecified. This patch adds a generic binding for MSIs (including
+> the existing msi-parent property) enabling the description of platform
+> devices capable of using MSIs.
+> 
+> While MSIs are primarily distinguished by doorbell and payload, some MSI
+> controllers (e.g. the GICv3 ITS) also use side-band information
+> accompanying the write to identify the master which originated the MSI,
+> to allow for sandboxing. This sideband information is non-probeable and
+> needs to be described in the DT. Other MSI controllers may have
+> additional configuration details which need to be described per-master.
+> 
+> This patch adds a generic msi-parent binding document, extending the
+> de-facto standard with a new (optional) #msi-cells which can be used to
+> express any per-master configuration and/or sideband data. This is
+> sufficient to describe non-hotpluggable devices.
+> 
+> For busses where sideband data may be derived from some bus-specific
+> master ID scheme, other properties will be required to describe the
+> mapping.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
+>  1 file changed, 135 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> new file mode 100644
+> index 0000000..c60c034
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> @@ -0,0 +1,135 @@
+> +This document describes the generic device tree binding for MSI controllers and
+> +their master(s).
+> +
+> +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
+> +write to an MMIO address.
+> +
+> +MSIs were originally specified by PCI (and are used with PCIe), but may also be
+> +used with other busses, and hence a mechanism is required to relate devices on
+> +those busses to the MSI controllers which they are capable of using,
+> +potentially including additional information.
+> +
+> +MSIs are distinguished by some combination of:
+> +
+> +- The doorbell (the MMIO address written to).
+> +  
+> +  Devices may be configured by software to write to arbitrary doorbells which
+> +  they can address. An MSI controller may feature a number of doorbells.
+> +
+> +- The payload (the value written to the doorbell).
+> +  
+> +  Devices may be configured to write an arbitrary payload chosen by software.
+> +  MSI controllers may have restrictions on permitted payloads.
+> +
+> +- Sideband information accompanying the write.
+> +  
+> +  Typically this is neither configurable nor probeable, and depends on the path
+> +  taken through the memory system (i.e. it is a property of the combination of
+> +  MSI controller and device rather than a property of either in isolation).
+> +
+> +
+> +MSI controllers:
+> +================
+> +
+> +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
+> +address by some master. An MSI controller may feature a number of doorbells.
+> +
+> +Required properties:
+> +--------------------
+> +
+> +- msi-controller: Identifies the node as an MSI controller.
+> +
+> +Optional properties:
+> +--------------------
+> +
+> +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
+> +
+> +  Typically this will encode information related to sideband data, and will
+> +  not encode doorbells or payloads as these can be configured dynamically.
+> +
+> +  The meaning of the msi-specifier is defined by the device tree binding of
+> +  the specific MSI controller. 
+> +
+> +
+> +MSI clients
+> +===========
+> +
+> +MSI clients are devices which generate MSIs. For each MSI they wish to
+> +generate, the doorbell and payload may be configured, though sideband
+> +information may not be configurable.
+> +
+> +Required properties:
+> +--------------------
+> +
+> +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
+> +  controller which the device is capable of using.
+> +
+> +  This property is unordered, and MSIs may be allocated from any combination of
+> +  MSI controllers listed in the msi-parent property.
+> +
+> +  If a device has restrictions on the allocation of MSIs, these restrictions
+> +  must be described with additional properties.
+> +
+> +  When #msi-cells is non-zero, busses with an msi-parent will require
+> +  additional properties to describe the relationship between devices on the bus
+> +  and the set of MSIs they can potentially generate.
+> +
+> +
+> +Example
+> +=======
+> +
+> +/ {
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +
+> +	msi_a: msi-controller at a {
+> +		reg = <0xa 0xf00>;
+> +		compatible = "vendor-a,some-controller";
+> +		msi-controller;
+> +		/* No sideband data, so #msi-cells omitted */
+> +	};
+> +
+> +	msi_b: msi-controller at b {
+> +		reg = <0xb 0xf00>;
+> +		compatible = "vendor-b,another-controller";
+> +		msi-controller;
+> +		/* Each device has some unique ID */
+> +		#msi-cells = <1>;
+> +	};
+> +
+> +	msi_c: msi-controller at c {
+> +		reg = <0xb 0xf00>;
+> +		compatible = "vendor-b,another-controller";
+> +		msi-controller;
+> +		/* Each device has some unique ID */
+> +		#msi-cells = <1>;
+> +	};
+> +
+> +	dev at 0 {
+> +		reg = <0x0 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +
+> +		/* Can only generate MSIs to msi_a */
+> +		msi-parent = <&msi_a>;
+> +	};
+> +
+> +	dev at 1 {
+> +		reg = <0x1 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +
+> +		/* 
+> +		 * Can generate MSIs to either A or B.
+> +		 */
+> +		msi-parent = <&msi_a>, <&msi_b 0x17>;
+> +	};
+> +
+> +	dev at 2 {
+> +		reg = <0x2 0xf00>;
+> +		compatible = "vendor-c,some-device";
+> +		/*
+> +		 * Has different IDs at each MSI controller.
+> +		 * Can generate MSIs to all of the MSI controllers.
+> +		 */
+> +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
+> +	};
+> +};
+> 
 
+This looks quite good for the non-PCI stuff. Should you also cover the
+PCI usage of msi-parent? I'm can't really see the meaning of #msi-cells
+in that context. Should it be entirely ignored? OR did you have some
+specific usage in mind?
 
-But on the other hand, the clock hasn't been part of an official kernel
-release yet (not in 4.1), and if we want to follow protocol to the letter,
-the removal of the clock id itself is already breakage, because the
-binding-header is considered part of the dt and removing a constant
-could already cause breakage in some universe far far away :-)
+Thanks,
 
-So you could try to convince the clock maintainers, that this might still
-be 4.2 material. Or do a smaller patch for 4.2 like the following, to at
-least follow the dt-protocol.
-
-Please also take a look at the mt8135 clock tree, to maybe fix this
-already too, before it becomes part of a release.
-
-
-Heiko
-
---------------- 8< -----------------
-From: Heiko Stuebner <heiko@sntech.de>
-Date: Mon, 27 Jul 2015 09:41:56 +0200
-Subject: [PATCH] clk: mediatek: mt8173: remove unused dpi_ck clock
-
-The dpi_ck clock is not actually used and its source isn't 100% clear too.
-So remove it for the time being.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- drivers/clk/mediatek/clk-mt8173.c      | 1 -
- include/dt-bindings/clock/mt8173-clk.h | 1 -
- 2 files changed, 2 deletions(-)
-
-diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
-index 8b6523d..80871e2 100644
---- a/drivers/clk/mediatek/clk-mt8173.c
-+++ b/drivers/clk/mediatek/clk-mt8173.c
-@@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
- 
- static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
- 	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
--	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
- 	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
- 	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
- };
-diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
-index 4ad76ed..7230c38 100644
---- a/include/dt-bindings/clock/mt8173-clk.h
-+++ b/include/dt-bindings/clock/mt8173-clk.h
-@@ -18,7 +18,6 @@
- /* TOPCKGEN */
- 
- #define CLK_TOP_CLKPH_MCK_O		1
--#define CLK_TOP_DPI			2
- #define CLK_TOP_USB_SYSPLL_125M		3
- #define CLK_TOP_HDMITX_DIG_CTS		4
- #define CLK_TOP_ARMCA7PLL_754M		5
+	M.
 -- 
-2.1.4
+Jazz is not dead. It just smells funny...
