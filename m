@@ -1,91 +1,42 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Jul 2015 10:40:46 +0100
-Subject: [PATCH v2 2/2] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <20150726185822.GB7557@n2100.arm.linux.org.uk>
-References: <1437754383-8162-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1437754383-8162-2-git-send-email-lorenzo.pieralisi@arm.com>
- <20150726185822.GB7557@n2100.arm.linux.org.uk>
-Message-ID: <20150727094046.GB10308@red-moon>
+From: r.baldyga@samsung.com (Robert Baldyga)
+Date: Mon, 27 Jul 2015 11:16:16 +0200
+Subject: [PATCH v4 06/46] usb: dwc2: gadget: add ep capabilities support
+In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
+References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-7-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 26, 2015 at 07:58:22PM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jul 24, 2015 at 05:13:03PM +0100, Lorenzo Pieralisi wrote:
-> > On ARM PCI systems relying on the pcibios API to initialize PCI host
-> > controllers, the pcibios_msi_controller weak callback is used to look-up
-> > the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
-> > 
-> > pci_sys_data is an ARM specific structure, which prevents using the
-> > same mechanism (so same PCI host controller drivers) on ARM64 systems.
-> > 
-> > Since the struct pci_bus already contains an msi_controller pointer and
-> > the kernel already uses it to look-up the msi controller,
-> > this patch converts ARM host controller and related pcibios/host bridges
-> > initialization routines so that the msi_controller pointer look-up can be
-> > carried out by PCI core code through the struct pci_bus msi pointer,
-> > removing the need for the arch specific pcibios_msi_controller callback
-> > and the related pci_sys_data msi_ctrl pointer.
-> > 
-> > ARM is the only arch relying on the pcibios_msi_controller() weak
-> > function, hence this patch removes the default weak implementation
-> > from PCI core code since it becomes of no use.
-> 
-> You don't mention the change from using pci_scan_root_bus() to using
-> pci_create_root_bus() here.
-> 
-> > -				sys->bus = pci_scan_root_bus(parent, sys->busnr,
-> > -						hw->ops, sys, &sys->resources);
-> > +			} else {
-> > +				sys->bus = pci_create_root_bus(parent,
-> > +							       sys->busnr,
-> > +							       hw->ops, sys,
-> > +							       &sys->resources);
-> 
-> By making this change, there is no nothing which will call
-> pci_bus_insert_busn_res().
+Convert endpoint configuration to new capabilities model.
 
-Yes, you are correct I noticed that too (I guess all ARM bridges
-relying on pci_scan_root_bus do NOT initialize the BUS resource
-so they rely on pci_scan_root_bus, and related BUS resource insertion
-to function properly).
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/dwc2/gadget.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-> What about the 18 users of the ->scan method, at least IOP13xx appears
-> to be MSI-enabled, though it's not clear whether it works with MSI.
-
-I do not think IOP13xx is affected by this change so we should be fine on
-that side, I should have chased all msi_ctrl users in this series,
-but the point raised above needs tackling regardless.
-
-> This doesn't seem to be a good approach.  Maybe having a version of
-> pci_scan_root_bus() which takes the MSI data as an argument would be
-> better than selectively copying pci_scan_root_bus() into the ARM code?
-
-I understand your point, let's try to find a fast way forward, we are
-stuck otherwise:
-
-1) I do not touch bios32 at all. I convert all host bridges that require
-   an msi pointer to use the scan pointer in struct hw_pci and basically
-   implement the change in bios32 in their scan method (I did that
-   already for the in tree host bridges that rely on the scan method
-   and require an msi pointer in pci_bus to function)
-2) I add pci_bus_insert_busn_res() in the bios32 code, therefore as you
-   said literally copying core code into bios32 (+ msi pointer
-   initialization), horrible, but I promise it will disappear as soon
-   as we are done converting all ARM PCI host to the new IRQ MSI domain
-   infrastructure, which do not require an msi pointer in the struct
-   pci_bus structure to be populated at all.
-3) I patch pci_scan_root_bus() to pass the MSI pointer. I think that
-   pcibios_msi_controller was added to avoid doing this, that
-   function has already 5 parameters and it is a treewide change,
-   I suspect Bjorn won't be happy about this at all.
-
-Those are the reasonable ideas I have in mind, I think (1) is the
-fastest (basically I _hope_ it should mean that I only have to patch
-drivers/pci/host/pcie-rcar.c) and I avoid patching ARM bios32.
-
-Comments very welcome before I proceed and I would appreciate some
-feedback from PCI host bridges platform maintainers too to find a way
-forward.
-
-Thanks,
-Lorenzo
+diff --git a/drivers/usb/dwc2/gadget.c b/drivers/usb/dwc2/gadget.c
+index 731b13d..3ee5b4c 100644
+--- a/drivers/usb/dwc2/gadget.c
++++ b/drivers/usb/dwc2/gadget.c
+@@ -3289,6 +3289,19 @@ static void s3c_hsotg_initep(struct dwc2_hsotg *hsotg,
+ 	usb_ep_set_maxpacket_limit(&hs_ep->ep, epnum ? 1024 : EP0_MPS_LIMIT);
+ 	hs_ep->ep.ops = &s3c_hsotg_ep_ops;
+ 
++	if (epnum == 0) {
++		hs_ep->ep.caps.type_control = true;
++	} else {
++		hs_ep->ep.caps.type_iso = true;
++		hs_ep->ep.caps.type_bulk = true;
++		hs_ep->ep.caps.type_int = true;
++	}
++
++	if (dir_in)
++		hs_ep->ep.caps.dir_in = true;
++	else
++		hs_ep->ep.caps.dir_out = true;
++
+ 	/*
+ 	 * if we're using dma, we need to set the next-endpoint pointer
+ 	 * to be something valid.
+-- 
+1.9.1
