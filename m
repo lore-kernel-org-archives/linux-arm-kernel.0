@@ -1,9 +1,9 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Mon, 27 Jul 2015 11:16:33 +0200
-Subject: [PATCH v4 23/46] usb: gadget: net2272: add ep capabilities support
+Date: Mon, 27 Jul 2015 11:16:28 +0200
+Subject: [PATCH v4 18/46] usb: gadget: gr_udc: add ep capabilities support
 In-Reply-To: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
 References: <1437988616-6962-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1437988616-6962-24-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1437988616-6962-19-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,36 @@ Convert endpoint configuration to new capabilities model.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/udc/net2272.c | 11 +++++++++++
+ drivers/usb/gadget/udc/gr_udc.c | 11 +++++++++++
  1 file changed, 11 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/net2272.c b/drivers/usb/gadget/udc/net2272.c
-index c2ed5da..18f5ebd 100644
---- a/drivers/usb/gadget/udc/net2272.c
-+++ b/drivers/usb/gadget/udc/net2272.c
-@@ -1404,6 +1404,17 @@ net2272_usb_reinit(struct net2272 *dev)
- 		else
- 			ep->fifo_size = 64;
- 		net2272_ep_reset(ep);
-+
-+		if (i == 0) {
-+			ep->ep.caps.type_control = true;
-+		} else {
-+			ep->ep.caps.type_iso = true;
-+			ep->ep.caps.type_bulk = true;
-+			ep->ep.caps.type_int = true;
-+		}
-+
-+		ep->ep.caps.dir_in = true;
-+		ep->ep.caps.dir_out = true;
- 	}
- 	usb_ep_set_maxpacket_limit(&dev->ep[0].ep, 64);
+diff --git a/drivers/usb/gadget/udc/gr_udc.c b/drivers/usb/gadget/udc/gr_udc.c
+index c886887..8aa2593 100644
+--- a/drivers/usb/gadget/udc/gr_udc.c
++++ b/drivers/usb/gadget/udc/gr_udc.c
+@@ -2018,12 +2018,23 @@ static int gr_ep_init(struct gr_udc *dev, int num, int is_in, u32 maxplimit)
  
+ 		usb_ep_set_maxpacket_limit(&ep->ep, MAX_CTRL_PL_SIZE);
+ 		ep->bytes_per_buffer = MAX_CTRL_PL_SIZE;
++
++		ep->ep.caps.type_control = true;
+ 	} else {
+ 		usb_ep_set_maxpacket_limit(&ep->ep, (u16)maxplimit);
+ 		list_add_tail(&ep->ep.ep_list, &dev->gadget.ep_list);
++
++		ep->ep.caps.type_iso = true;
++		ep->ep.caps.type_bulk = true;
++		ep->ep.caps.type_int = true;
+ 	}
+ 	list_add_tail(&ep->ep_list, &dev->ep_list);
+ 
++	if (is_in)
++		ep->ep.caps.dir_in = true;
++	else
++		ep->ep.caps.dir_out = true;
++
+ 	ep->tailbuf = dma_alloc_coherent(dev->dev, ep->ep.maxpacket_limit,
+ 					 &ep->tailbuf_paddr, GFP_ATOMIC);
+ 	if (!ep->tailbuf)
 -- 
 1.9.1
