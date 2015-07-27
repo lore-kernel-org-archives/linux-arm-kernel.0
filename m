@@ -1,62 +1,52 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 27 Jul 2015 11:50:26 +0200
-Subject: [PATCH] ARM64: zynqmp: Enable spi flashes on ep108
-Message-ID: <1ab9d1360f86aec30fcecf49ac0b52b10766f3fc.1437990621.git.michal.simek@xilinx.com>
+Date: Mon, 27 Jul 2015 11:48:09 +0200
+Subject: [PATCH 1/7] ARM64: zynqmp: Use zynqmp specific compatible string for
+ gpio
+Message-ID: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable spi flashes on ep108.
+The patch:
+"gpio: Added support to Zynq Ultrascale+ MPSoC"
+(sha1: bdf7a4ae371894b4dc10b5820006b0a82d484929)
+added zynqmp specific features. This patch is switching the driver to
+use the zynqmp compatible string.
+Also enable the driver for ep108 platform.
 
 Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 34 +++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 4 ++++
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 2 +-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index 47debdcbefbf..279a992ce70e 100644
+index 02b5d76c33f7..82deb24dddeb 100644
 --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
 +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -81,6 +81,40 @@
- 	status = "okay";
+@@ -42,6 +42,10 @@
+ 	};
  };
  
-+&spi0 {
++&gpio {
 +	status = "okay";
-+	num-cs = <1>;
-+	spi0_flash0: spi0_flash0 at 0 {
-+		compatible = "m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <50000000>;
-+		reg = <0>;
-+
-+		spi0_flash0 at 00000000 {
-+			label = "spi0_flash0";
-+			reg = <0x0 0x100000>;
-+		};
-+	};
 +};
 +
-+&spi1 {
-+	status = "okay";
-+	num-cs = <1>;
-+	spi1_flash0: spi1_flash0 at 0 {
-+		compatible = "m25p80";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		spi-max-frequency = <50000000>;
-+		reg = <0>;
-+
-+		spi1_flash0 at 00000000 {
-+			label = "spi1_flash0";
-+			reg = <0x0 0x100000>;
-+		};
-+	};
-+};
-+
- &uart0 {
+ &sata0 {
  	status = "okay";
- };
+ 	ceva,broken-gen2;
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index e7545edf6179..bd9ba0cab504 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -163,7 +163,7 @@
+ 		};
+ 
+ 		gpio: gpio at ff0a0000 {
+-			compatible = "xlnx,zynq-gpio-1.0";
++			compatible = "xlnx,zynqmp-gpio-1.0";
+ 			status = "disabled";
+ 			#gpio-cells = <0x2>;
+ 			clocks = <&misc_clk>;
 -- 
 2.3.5
