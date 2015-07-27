@@ -1,48 +1,125 @@
 From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 27 Jul 2015 15:42:20 -0700
-Subject: [PATCH v5 3/4] arm64: Add Broadcom iProc family support
+Date: Mon, 27 Jul 2015 15:42:18 -0700
+Subject: [PATCH v5 1/4] PCI: iproc: enable arm64 support for iProc PCIe
 In-Reply-To: <1438036941-27210-1-git-send-email-rjui@broadcom.com>
 References: <1438036941-27210-1-git-send-email-rjui@broadcom.com>
-Message-ID: <1438036941-27210-4-git-send-email-rjui@broadcom.com>
+Message-ID: <1438036941-27210-2-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support to Broadcom's iProc family of arm64 based SoCs
-in the arm64 Kconfig and defconfig files
+PCI: iproc: Add arm64 support
+
+Add arm64 support to the iProc PCIe driver.
+
+Note that on arm32, bus->sysdata points to the arm32-specific
+pci_sys_data struct, and pci_sys_data.private_data contains the
+iproc_pcie pointer. For arm64, there's nothing corresponding to
+pci_sys_data, so we keep the iproc_pcie pointer directly in
+bus->sysdata.
+
+In addition, arm64 does IRQ mapping in pcibios_add_device(), so it
+doesn't need pci_fixup_irqs() as arm32 does.
 
 Signed-off-by: Ray Jui <rjui@broadcom.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- arch/arm64/Kconfig.platforms |    5 +++++
- arch/arm64/configs/defconfig |    1 +
- 2 files changed, 6 insertions(+)
+ drivers/pci/host/pcie-iproc.c |   27 ++++++++++++++++++++-------
+ drivers/pci/host/pcie-iproc.h |    4 +++-
+ 2 files changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index f7e4327..e2deb18 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -1,5 +1,10 @@
- menu "Platform selection"
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index d77481e..ba087b5 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -58,9 +58,17 @@
+ #define SYS_RC_INTX_EN               0x330
+ #define SYS_RC_INTX_MASK             0xf
  
-+config ARCH_BCM_IPROC
-+	bool "Broadcom iProc SoC Family"
-+	help
-+	  This enables support for Broadcom iProc based SoCs
+-static inline struct iproc_pcie *sys_to_pcie(struct pci_sys_data *sys)
++static inline struct iproc_pcie *iproc_data(struct pci_bus *bus)
+ {
+-	return sys->private_data;
++	struct iproc_pcie *pcie;
++#ifdef CONFIG_ARM
++	struct pci_sys_data *sys = bus->sysdata;
 +
- config ARCH_EXYNOS
- 	bool
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 506b466..913f121 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULES=y
- CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
-+CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
++	pcie = sys->private_data;
++#else
++	pcie = bus->sysdata;
++#endif
++	return pcie;
+ }
+ 
+ /**
+@@ -71,8 +79,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
+ 					    unsigned int devfn,
+ 					    int where)
+ {
+-	struct pci_sys_data *sys = bus->sysdata;
+-	struct iproc_pcie *pcie = sys_to_pcie(sys);
++	struct iproc_pcie *pcie = iproc_data(bus);
+ 	unsigned slot = PCI_SLOT(devfn);
+ 	unsigned fn = PCI_FUNC(devfn);
+ 	unsigned busno = bus->number;
+@@ -186,6 +193,7 @@ static void iproc_pcie_enable(struct iproc_pcie *pcie)
+ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ {
+ 	int ret;
++	void *sysdata;
+ 	struct pci_bus *bus;
+ 
+ 	if (!pcie || !pcie->dev || !pcie->base)
+@@ -208,10 +216,13 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ 
+ 	iproc_pcie_reset(pcie);
+ 
++#ifdef CONFIG_ARM
+ 	pcie->sysdata.private_data = pcie;
+-
+-	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops,
+-				  &pcie->sysdata, res);
++	sysdata = &pcie->sysdata;
++#else
++	sysdata = pcie;
++#endif
++	bus = pci_create_root_bus(pcie->dev, 0, &iproc_pcie_ops, sysdata, res);
+ 	if (!bus) {
+ 		dev_err(pcie->dev, "unable to create PCI root bus\n");
+ 		ret = -ENOMEM;
+@@ -229,7 +240,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ 
+ 	pci_scan_child_bus(bus);
+ 	pci_assign_unassigned_bus_resources(bus);
++#ifdef CONFIG_ARM
+ 	pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
++#endif
+ 	pci_bus_add_devices(bus);
+ 
+ 	return 0;
+diff --git a/drivers/pci/host/pcie-iproc.h b/drivers/pci/host/pcie-iproc.h
+index ba0a108..c9e4c10 100644
+--- a/drivers/pci/host/pcie-iproc.h
++++ b/drivers/pci/host/pcie-iproc.h
+@@ -21,7 +21,7 @@
+  * @dev: pointer to device data structure
+  * @base: PCIe host controller I/O register base
+  * @resources: linked list of all PCI resources
+- * @sysdata: Per PCI controller data
++ * @sysdata: Per PCI controller data (ARM-specific)
+  * @root_bus: pointer to root bus
+  * @phy: optional PHY device that controls the Serdes
+  * @irqs: interrupt IDs
+@@ -29,7 +29,9 @@
+ struct iproc_pcie {
+ 	struct device *dev;
+ 	void __iomem *base;
++#ifdef CONFIG_ARM
+ 	struct pci_sys_data sysdata;
++#endif
+ 	struct pci_bus *root_bus;
+ 	struct phy *phy;
+ 	int irqs[IPROC_PCIE_MAX_NUM_IRQS];
 -- 
 1.7.9.5
