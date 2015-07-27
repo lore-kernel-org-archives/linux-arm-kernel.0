@@ -1,145 +1,131 @@
-From: michael@smart-africa.com (Michael van der Westhuizen)
-Date: Mon, 27 Jul 2015 13:37:15 +0200
-Subject: [RESEND PATCH v2 2/2] spi: dw: Allow interface drivers to limit data
- I/O to word sizes
-In-Reply-To: <1437997035-3046-1-git-send-email-michael@smart-africa.com>
-References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
- <1437997035-3046-1-git-send-email-michael@smart-africa.com>
-Message-ID: <1437997035-3046-3-git-send-email-michael@smart-africa.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 27 Jul 2015 12:38:54 +0100
+Subject: [PATCH 3/5] ARM: MCPM: make internal helpers private to the core
+ code
+In-Reply-To: <alpine.LFD.2.20.1507270004440.1806@knanqh.ubzr>
+References: <1430496392-15956-1-git-send-email-nicolas.pitre@linaro.org>
+ <1430496392-15956-4-git-send-email-nicolas.pitre@linaro.org>
+ <CAGb2v65D7vtuV4kfg0HoM_pp4=UmY29AzpOP=E5WWGM5fPO9XA@mail.gmail.com>
+ <alpine.LFD.2.20.1507241109050.1806@knanqh.ubzr>
+ <CAGb2v64KiT93nzbn04YXh8djHFpWgf0LOikScmKdou+EwimKFg@mail.gmail.com>
+ <alpine.LFD.2.20.1507270004440.1806@knanqh.ubzr>
+Message-ID: <20150727113854.GM10670@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
-accesses") changed all 16bit accesses in the DW_apb_ssi driver to 32bit.
-This, unfortunately, breaks data register access on picoXcell, where the
-DW IP needs data register accesses to be word accesses (all other
-accesses appear to be OK).
+On Mon, Jul 27, 2015 at 12:43:28AM -0400, Nicolas Pitre wrote:
+> On Sat, 25 Jul 2015, Chen-Yu Tsai wrote:
+> 
+> > On Fri, Jul 24, 2015 at 11:44 PM, Nicolas Pitre
+> > <nicolas.pitre@linaro.org> wrote:
+> > > On Fri, 24 Jul 2015, Chen-Yu Tsai wrote:
+> > >
+> > >> Hi,
+> > >>
+> > >> On Sat, May 2, 2015 at 12:06 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > >> > This concerns the following helpers:
+> > >> >
+> > >> >         __mcpm_cpu_going_down()
+> > >> >         __mcpm_cpu_down()
+> > >> >         __mcpm_outbound_enter_critical()
+> > >> >         __mcpm_outbound_leave_critical()
+> > >> >         __mcpm_cluster_state()
+> > >> >
+> > >> > They are and should only be used by the core code now.  Therefore their
+> > >> > declarations are removed from mcpm.h and their definitions are made
+> > >> > static, hence the need to move them before their users which accounts
+> > >> > for the bulk of this patch.
+> > >>
+> > >> I'm looking for some advice. On the Allwinner A80, at least on mainline,
+> > >> there is no external PMU or embedded controller in charge of power
+> > >> controls. What this means is that I'm doing power sequencing in the
+> > >> kernel as part of the MCPM calls, specifically powering down cores and
+> > >> clusters in the .wait_for_powerdown callback. (I don't think it's
+> > >> reasonable or even possible to power down stuff in .*_powerdown_prepare)
+> > >
+> > > Can you tell me more about the power control knobs at your disposal?  Do
+> > > power gates become effective immediately or only when WFI is asserted?
+> > >
+> > > And can you configure things so a core may be powered up asynchronously
+> > > from an IRQ?
+> > 
+> > The above probably wasn't clear enough. Power gates, reset controls and
+> > SMP/WFI/WFE status are mapped to various mmio registers. The controls
+> > are effective immediately.
+> > 
+> > The power gates and reset controls can only be manually controlled.
+> > There is no mainline support for the embedded controller yet, and I
+> > doubt Allwinner's firmware supports it either, as their kernel also
+> > does power sequencing itself. In a nutshell, the kernel is on its
+> > own, we do not support wakeups with IRQs.
+> > 
+> > >> Previously I was using __mcpm_cluster_state() to check if the last core
+> > >> in a cluster was to be powered off, and thus the whole cluster could be
+> > >> turned off as well.
+> > >> I could also check if the individual power gates or
+> > >> resets are asserted, but if a core was already scheduled to be brought
+> > >> up, and MCPM common framework didn't call .cluster_powerup, there might
+> > >> be a problem.
+> > >
+> > > I fail to see how a core could be scheduled to be brought up without
+> > > deasserting its reset line somehow though.
+> > 
+> > My point is could there be a race condition in the sequence of events?
+> > Say .*_powerup() deasserted the reset lines _after_ we checked them
+> > in .wait_for_powerdown(). As Dave mentioned, .wait_for_powerdown() is
+> > not called with the MCPM lock held.
+> 
+> In theory this should never happen.  Even if .wait_for_powerdown() was 
+> prevented from running concurrently with .*_powerup(), nothing would 
+> prevent .*_powerup() from running the moment .wait_for_powerdown() 
+> has returned.  So it is up to the higher level not to power up a CPU and 
+> wait for it to be down at the same time since this simply makes no 
+> sense... unless it really wants the CPU back right away.
+> 
+> > But I've resolved to waiting for L2 WFI before powering off clusters.
+> > 
+> > >> Any suggestions? Maybe export __mcpm_cluster_state() so platform code
+> > >> can know what's going to happen?
+> > >
+> > > The cluster state may change unexpectedly.  There is a special locking
+> > > sequence and state machine needed to make this information reliable.
+> > > Simply returning the current state wouldn't be enough to ensure
+> > > it can be used race free.
+> > 
+> > I see.
+> > 
+> > > As Dave stated, we might have to supplement the MCPM core code with
+> > > special methods involving a surviving CPU to perform the power-down
+> > > operation on the dying CPU's behalf.  Doing this in .wait_for_powerdown
+> > > is just an abuse of the API.
+> > 
+> > The other users I looked at all had other pieces of hardware taking care
+> > of this, so I couldn't really understand where I could put this.
+> 
+> I think what should be done in this case is simply to put the task of 
+> killing the CPU power on a work queue that gets executed by another CPU. 
+> Queueing the necessary work could be done from the MCPM core code the 
+> moment a special method exists in the machine backend structure. The 
+> work callback would take the MCPM lock, make sure the CPU/cluster state 
+> is "DOWN" and call that special method.
+> 
+> A call to .wait_for_powerdown() should not be responsible for the actual 
+> power down. It should remain optional.
+> 
+> > If adding another callback to handle this is acceptable, then I can
+> > look into it.
+> 
+> Please be my guest.
 
-This change introduces a new master variable to allow interface drivers
-to specify that 16bit data transfer I/O is required.  This change also
-introduces the ability to set this variable via device tree bindings in
-the MMIO interface driver.
+I think I originally named .wait_for_powerdown ".power_down_finish", or
+something like that, with the expectation that this would both do the
+serialisation and the last rites.
 
-Before this change, on a picoXcell pc3x3:
- spi_master spi32766: interrupt_transfer: fifo overrun/underrun
- m25p80 spi32766.0: error -5 reading 9f
- m25p80: probe of spi32766.0 failed with error -5
+The dual role was a bit confusing though, and doesn't necessarily fit
+the framework perfectly.
 
-After this change:
- m25p80 spi32766.0: m25p40 (512 Kbytes)
+Having an optional callback for the "last rites" part probably would
+be clearer.
 
-Fixes: dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit accesses")
-Signed-off-by: Michael van der Westhuizen <michael@smart-africa.com>
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
----
-
-Changes in v2:
-  - Incorporate review feedback from Andy Shevchenko
-    - Rework the DT bindings to accept an I/O register width as a
-      number of bytes rather than using a boolean spefifying the
-      width preference to be 16 bits.
-    - Add data register access wrapper functions and use them when
-      reading and writing the data register.
-
- drivers/spi/spi-dw-mmio.c |  4 ++++
- drivers/spi/spi-dw.c      |  4 ++--
- drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
- 3 files changed, 41 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/spi/spi-dw-mmio.c b/drivers/spi/spi-dw-mmio.c
-index eb03e12..e76bf72 100644
---- a/drivers/spi/spi-dw-mmio.c
-+++ b/drivers/spi/spi-dw-mmio.c
-@@ -74,6 +74,10 @@ static int dw_spi_mmio_probe(struct platform_device *pdev)
- 
- 	dws->max_freq = clk_get_rate(dwsmmio->clk);
- 
-+	if (pdev->dev.of_node)
-+		of_property_read_u32(pdev->dev.of_node, "snps,reg-io-width",
-+				     &dws->reg_io_width);
-+
- 	num_cs = 4;
- 
- 	if (pdev->dev.of_node)
-diff --git a/drivers/spi/spi-dw.c b/drivers/spi/spi-dw.c
-index 8d67d03..4fbfcdc 100644
---- a/drivers/spi/spi-dw.c
-+++ b/drivers/spi/spi-dw.c
-@@ -194,7 +194,7 @@ static void dw_writer(struct dw_spi *dws)
- 			else
- 				txw = *(u16 *)(dws->tx);
- 		}
--		dw_writel(dws, DW_SPI_DR, txw);
-+		dw_write_io_reg(dws, DW_SPI_DR, txw);
- 		dws->tx += dws->n_bytes;
- 	}
- }
-@@ -205,7 +205,7 @@ static void dw_reader(struct dw_spi *dws)
- 	u16 rxw;
- 
- 	while (max--) {
--		rxw = dw_readl(dws, DW_SPI_DR);
-+		rxw = dw_read_io_reg(dws, DW_SPI_DR);
- 		/* Care rx only if the transfer's original "rx" is not null */
- 		if (dws->rx_end - dws->len) {
- 			if (dws->n_bytes == 1)
-diff --git a/drivers/spi/spi-dw.h b/drivers/spi/spi-dw.h
-index 6c91391..b75ed32 100644
---- a/drivers/spi/spi-dw.h
-+++ b/drivers/spi/spi-dw.h
-@@ -109,6 +109,7 @@ struct dw_spi {
- 	u32			fifo_len;	/* depth of the FIFO buffer */
- 	u32			max_freq;	/* max bus freq supported */
- 
-+	u32			reg_io_width;	/* DR I/O width in bytes */
- 	u16			bus_num;
- 	u16			num_cs;		/* supported slave numbers */
- 
-@@ -145,11 +146,45 @@ static inline u32 dw_readl(struct dw_spi *dws, u32 offset)
- 	return __raw_readl(dws->regs + offset);
- }
- 
-+static inline u16 dw_readw(struct dw_spi *dws, u32 offset)
-+{
-+	return __raw_readw(dws->regs + offset);
-+}
-+
- static inline void dw_writel(struct dw_spi *dws, u32 offset, u32 val)
- {
- 	__raw_writel(val, dws->regs + offset);
- }
- 
-+static inline void dw_writew(struct dw_spi *dws, u32 offset, u16 val)
-+{
-+	__raw_writew(val, dws->regs + offset);
-+}
-+
-+static inline u32 dw_read_io_reg(struct dw_spi *dws, u32 offset)
-+{
-+	switch (dws->reg_io_width) {
-+	case 2:
-+		return dw_readw(dws, offset);
-+	case 4:
-+	default:
-+		return dw_readl(dws, offset);
-+	}
-+}
-+
-+static inline void dw_write_io_reg(struct dw_spi *dws, u32 offset, u32 val)
-+{
-+	switch (dws->reg_io_width) {
-+	case 2:
-+		dw_writew(dws, offset, val);
-+		break;
-+	case 4:
-+	default:
-+		dw_writel(dws, offset, val);
-+		break;
-+	}
-+}
-+
- static inline void spi_enable_chip(struct dw_spi *dws, int enable)
- {
- 	dw_writel(dws, DW_SPI_SSIENR, (enable ? 1 : 0));
--- 
-2.1.4
+Cheers
+---Dave
