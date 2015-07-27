@@ -1,179 +1,49 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 27 Jul 2015 12:14:14 +0100
-Subject: [PATCH v9 5/9] Documentation: nvmem: add nvmem api level and how-to
- doc
-In-Reply-To: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1437995654-11543-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Jul 2015 13:14:34 +0200
+Subject: [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
+In-Reply-To: <20150727103521.GA4103@linux>
+References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
+ <1595601.YD6UTxy5Qg@amdc1976> <20150727103521.GA4103@linux>
+Message-ID: <3141301.RS9TLygaba@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add basic how-to and api summary documentation for simple
-NVMEM framework.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- Documentation/nvmem/nvmem.txt | 152 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 152 insertions(+)
- create mode 100644 Documentation/nvmem/nvmem.txt
+Hi,
 
-diff --git a/Documentation/nvmem/nvmem.txt b/Documentation/nvmem/nvmem.txt
-new file mode 100644
-index 0000000..dbd40d8
---- /dev/null
-+++ b/Documentation/nvmem/nvmem.txt
-@@ -0,0 +1,152 @@
-+			    NVMEM SUBSYSTEM
-+	  Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-+
-+This document explains the NVMEM Framework along with the APIs provided,
-+and how to use it.
-+
-+1. Introduction
-+===============
-+*NVMEM* is the abbreviation for Non Volatile Memory layer. It is used to
-+retrieve configuration of SOC or Device specific data from non volatile
-+memories like eeprom, efuses and so on.
-+
-+Before this framework existed, NVMEM drivers like eeprom were stored in
-+drivers/misc, where they all had to duplicate pretty much the same code to
-+register a sysfs file, allow in-kernel users to access the content of the
-+devices they were driving, etc.
-+
-+This was also a problem as far as other in-kernel users were involved, since
-+the solutions used were pretty much different from one driver to another, there
-+was a rather big abstraction leak.
-+
-+This framework aims at solve these problems. It also introduces DT
-+representation for consumer devices to go get the data they require (MAC
-+Addresses, SoC/Revision ID, part numbers, and so on) from the NVMEMs. This
-+framework is based on regmap, so that most of the abstraction available in
-+regmap can be reused, across multiple types of buses.
-+
-+NVMEM Providers
-++++++++++++++++
-+
-+NVMEM provider refers to an entity that implements methods to initialize, read
-+and write the non-volatile memory.
-+
-+2. Registering/Unregistering the NVMEM provider
-+===============================================
-+
-+A NVMEM provider can register with NVMEM core by supplying relevant
-+nvmem configuration to nvmem_register(), on success core would return a valid
-+nvmem_device pointer.
-+
-+nvmem_unregister(nvmem) is used to unregister a previously registered provider.
-+
-+For example, a simple qfprom case:
-+
-+static struct nvmem_config econfig = {
-+	.name = "qfprom",
-+	.owner = THIS_MODULE,
-+};
-+
-+static int qfprom_probe(struct platform_device *pdev)
-+{
-+	...
-+	econfig.dev = &pdev->dev;
-+	nvmem = nvmem_register(&econfig);
-+	...
-+}
-+
-+It is mandatory that the NVMEM provider has a regmap associated with its
-+struct device. Failure to do would return error code from nvmem_register().
-+
-+NVMEM Consumers
-++++++++++++++++
-+
-+NVMEM consumers are the entities which make use of the NVMEM provider to
-+read from and to NVMEM.
-+
-+3. NVMEM cell based consumer APIs
-+=================================
-+
-+NVMEM cells are the data entries/fields in the NVMEM.
-+The NVMEM framework provides 3 APIs to read/write NVMEM cells.
-+
-+struct nvmem_cell *nvmem_cell_get(struct device *dev, const char *name);
-+struct nvmem_cell *devm_nvmem_cell_get(struct device *dev, const char *name);
-+
-+void nvmem_cell_put(struct nvmem_cell *cell);
-+void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
-+
-+void *nvmem_cell_read(struct nvmem_cell *cell, ssize_t *len);
-+int nvmem_cell_write(struct nvmem_cell *cell, void *buf, ssize_t len);
-+
-+*nvmem_cell_get() apis will get a reference to nvmem cell for a given id,
-+and nvmem_cell_read/write() can then read or write to the cell.
-+Once the usage of the cell is finished the consumer should call *nvmem_cell_put()
-+to free all the allocation memory for the cell.
-+
-+4. Direct NVMEM device based consumer APIs
-+==========================================
-+
-+In some instances it is necessary to directly read/write the NVMEM.
-+To facilitate such consumers NVMEM framework provides below apis.
-+
-+struct nvmem_device *nvmem_device_get(struct device *dev, const char *name);
-+struct nvmem_device *devm_nvmem_device_get(struct device *dev,
-+					   const char *name);
-+void nvmem_device_put(struct nvmem_device *nvmem);
-+int nvmem_device_read(struct nvmem_device *nvmem, unsigned int offset,
-+		      size_t bytes, void *buf);
-+int nvmem_device_write(struct nvmem_device *nvmem, unsigned int offset,
-+		       size_t bytes, void *buf);
-+int nvmem_device_cell_read(struct nvmem_device *nvmem,
-+			   struct nvmem_cell_info *info, void *buf);
-+int nvmem_device_cell_write(struct nvmem_device *nvmem,
-+			    struct nvmem_cell_info *info, void *buf);
-+
-+Before the consumers can read/write NVMEM directly, it should get hold
-+of nvmem_controller from one of the *nvmem_device_get() api.
-+
-+The difference between these apis and cell based apis is that these apis always
-+take nvmem_device as parameter.
-+
-+5. Releasing a reference to the NVMEM
-+=====================================
-+
-+When a consumers no longer needs the NVMEM, it has to release the reference
-+to the NVMEM it has obtained using the APIs mentioned in the above section.
-+The NVMEM framework provides 2 APIs to release a reference to the NVMEM.
-+
-+void nvmem_cell_put(struct nvmem_cell *cell);
-+void devm_nvmem_cell_put(struct device *dev, struct nvmem_cell *cell);
-+void nvmem_device_put(struct nvmem_device *nvmem);
-+void devm_nvmem_device_put(struct device *dev, struct nvmem_device *nvmem);
-+
-+Both these APIs are used to release a reference to the NVMEM and
-+devm_nvmem_cell_put and devm_nvmem_device_put destroys the devres associated
-+with this NVMEM.
-+
-+Userspace
-++++++++++
-+
-+6. Userspace binary interface
-+==============================
-+
-+Userspace can read/write the raw NVMEM file located at
-+/sys/bus/nvmem/devices/*/nvmem
-+
-+ex:
-+
-+hexdump /sys/bus/nvmem/devices/qfprom0/nvmem
-+
-+0000000 0000 0000 0000 0000 0000 0000 0000 0000
-+*
-+00000a0 db10 2240 0000 e000 0c00 0c00 0000 0c00
-+0000000 0000 0000 0000 0000 0000 0000 0000 0000
-+...
-+*
-+0001000
-+
-+7. DeviceTree Binding
-+=====================
-+
-+See Documentation/devicetree/bindings/nvmem/nvmem.txt
--- 
-1.9.1
+On Monday, July 27, 2015 04:05:21 PM Viresh Kumar wrote:
+> On 27-07-15, 12:24, Bartlomiej Zolnierkiewicz wrote:
+> > Have you read my explanation of the issue?
+> > 
+> > With your OPP-v2 patches cpufreq-dt picks turbo frequencies and uses
+> > them as normal ones.
+> > 
+> > (More at: http://www.spinics.net/lists/arm-kernel/msg430397.html)
+> 
+> Yes I did. I understand that the turbo frequencies are not considered
+> as such by OPP/cpufreq core and it requires your changes to get it
+> working.
+
+Sorry but you don't seem to understand the issue.
+
+The problem is that without my patch and with your OPP-v2 patches
+turbo frequencies get picked by OPP/cpufreq core and then by cpufreq-dt.
+This happens without enabling any boost & thermal etc. support for
+turbo frequencies.
+
+> But its not an issue or bug we are fixing, the problem is that the
+> code for opp-v2 isn't complete yet and your patches is putting things
+> in place. So, we are still doing the bring up here and not fixing a
+> bug really.
+
+I consider the possibility to use turbo frequencies without explicitly
+enabling boost support to be a buggy behavior.  While it is unlikely
+that somebody defines turbo frequencies in their dts file in the near
+future (except Exynos ones) it costs as nearly nothing to prevent
+such behavior now.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
