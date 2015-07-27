@@ -1,269 +1,215 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 27 Jul 2015 10:44:31 +0100
-Subject: [PATCH v2 5/6] mailbox: Add generic mechanism for testing Mailbox
- Controllers
-In-Reply-To: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
-References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1437990272-23111-6-git-send-email-lee.jones@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jul 2015 10:46:38 +0100
+Subject: [PATCH 1/3] Docs: dt: add generic MSI bindings
+In-Reply-To: <55B5E5A6.2030509@arm.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-2-git-send-email-mark.rutland@arm.com>
+ <55B5E5A6.2030509@arm.com>
+Message-ID: <20150727094638.GB9169@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This particular Client implementation uses shared memory in order
-to pass messages between Mailbox users; however, it can be easily
-hacked to support any type of Controller.
+On Mon, Jul 27, 2015 at 09:02:46AM +0100, Marc Zyngier wrote:
+> Hi Mark,
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/mailbox/Kconfig        |   7 ++
- drivers/mailbox/Makefile       |   2 +
- drivers/mailbox/mailbox-test.c | 210 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 219 insertions(+)
- create mode 100644 drivers/mailbox/mailbox-test.c
+Hi,
 
-diff --git a/drivers/mailbox/Kconfig b/drivers/mailbox/Kconfig
-index 2cc4c39..7720bde 100644
---- a/drivers/mailbox/Kconfig
-+++ b/drivers/mailbox/Kconfig
-@@ -77,4 +77,11 @@ config STI_MBOX
- 	  Mailbox implementation for STMicroelectonics family chips with
- 	  hardware for interprocessor communication.
- 
-+config MAILBOX_TEST
-+	tristate "Mailbox Test Client"
-+	depends on OF
-+	help
-+	  Test client to help with testing new Controller driver
-+	  implementations.
-+
- endif
-diff --git a/drivers/mailbox/Makefile b/drivers/mailbox/Makefile
-index 7cb4766..92435ef 100644
---- a/drivers/mailbox/Makefile
-+++ b/drivers/mailbox/Makefile
-@@ -2,6 +2,8 @@
- 
- obj-$(CONFIG_MAILBOX)		+= mailbox.o
- 
-+obj-$(CONFIG_MAILBOX_TEST)	+= mailbox-test.o
-+
- obj-$(CONFIG_ARM_MHU)	+= arm_mhu.o
- 
- obj-$(CONFIG_PL320_MBOX)	+= pl320-ipc.o
-diff --git a/drivers/mailbox/mailbox-test.c b/drivers/mailbox/mailbox-test.c
-new file mode 100644
-index 0000000..10bfe3a
---- /dev/null
-+++ b/drivers/mailbox/mailbox-test.c
-@@ -0,0 +1,210 @@
-+/*
-+ * Copyright (C) 2015 ST Microelectronics
-+ *
-+ * Author: Lee Jones <lee.jones@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ */
-+
-+#include <linux/debugfs.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/uaccess.h>
-+
-+#define MBOX_MAX_MSG_LEN 128
-+
-+static struct dentry *root_debugfs_dir;
-+
-+struct mbox_test_device {
-+	struct device		*dev;
-+	struct mbox_chan	*tx_channel;
-+	struct mbox_chan	*rx_channel;
-+	void __iomem		*mmio;
-+
-+};
-+
-+static ssize_t mbox_test_write(struct file *filp,
-+			       const char __user *userbuf,
-+			       size_t count, loff_t *ppos)
-+{
-+	struct mbox_test_device *tdev = filp->private_data;
-+	char *message;
-+	int ret;
-+
-+	if (count > MBOX_MAX_MSG_LEN) {
-+		dev_err(tdev->dev,
-+			"Message length %d greater than max allowed %d\n",
-+			count, MBOX_MAX_MSG_LEN);
-+		return -EINVAL;
-+	}
-+
-+	message = kzalloc(count, GFP_KERNEL);
-+	if (!message)
-+		return -ENOMEM;
-+
-+	ret = copy_from_user(message, userbuf, count);
-+	if (ret)
-+		return -EFAULT;
-+
-+	print_hex_dump(KERN_ERR, "Client: Sending: ", DUMP_PREFIX_ADDRESS,
-+		       16, 1, message, 16, true);
-+
-+	ret = mbox_send_message(tdev->tx_channel, message);
-+	if (ret < 0)
-+		dev_err(tdev->dev, "Failed to send message via mailbox\n");
-+
-+	kfree(message);
-+
-+	return ret < 0 ? ret : count;
-+}
-+
-+static const struct file_operations mbox_test_ops = {
-+	.write	= mbox_test_write,
-+	.open	= simple_open,
-+	.llseek	= generic_file_llseek,
-+};
-+
-+static int mbox_test_add_debugfs(struct platform_device *pdev,
-+				 struct mbox_test_device *tdev)
-+{
-+	if (!debugfs_initialized())
-+		return 0;
-+
-+	root_debugfs_dir = debugfs_create_dir("mailbox", NULL);
-+	if (!root_debugfs_dir) {
-+		dev_err(&pdev->dev, "Failed to create Mailbox debugfs\n");
-+		return -EINVAL;
-+	}
-+
-+	debugfs_create_file("send-message", 0200, root_debugfs_dir,
-+			    tdev, &mbox_test_ops);
-+
-+	return 0;
-+}
-+
-+static void mbox_test_receive_message(struct mbox_client *client, void *message)
-+{
-+	struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
-+
-+	if (!tdev->mmio) {
-+		dev_info(tdev->dev, "Client: Recived something [read mmio]\n");
-+		return;
-+	}
-+
-+	print_hex_dump(KERN_ERR, "Client: from co-proc: ", DUMP_PREFIX_ADDRESS,
-+		       16, 1, tdev->mmio, MBOX_MAX_MSG_LEN, true);
-+}
-+
-+static void mbox_test_prepare_message(struct mbox_client *client, void *message)
-+{
-+	struct mbox_test_device *tdev = dev_get_drvdata(client->dev);
-+
-+	if (tdev->mmio)
-+		memcpy(tdev->mmio, message, MBOX_MAX_MSG_LEN);
-+}
-+
-+static void mbox_test_message_sent(struct mbox_client *client,
-+				   void *message, int r)
-+{
-+	if (r)
-+		dev_warn(client->dev,
-+			 "Client: Message could not be sent: %d\n", r);
-+	else
-+		dev_info(client->dev,
-+			 "Client: Message sent\n");
-+}
-+
-+static struct mbox_chan *
-+mbox_test_request_channel(struct platform_device *pdev, const char *name)
-+{
-+	struct mbox_client *client;
-+
-+	client = devm_kzalloc(&pdev->dev, sizeof(*client), GFP_KERNEL);
-+	if (!client)
-+		return ERR_PTR(-ENOMEM);
-+
-+	client->dev		= &pdev->dev;
-+	client->rx_callback	= mbox_test_receive_message;
-+	client->tx_prepare	= mbox_test_prepare_message;
-+	client->tx_done		= mbox_test_message_sent;
-+	client->tx_block	= true;
-+	client->knows_txdone	= false;
-+	client->tx_tout		= 500;
-+
-+	return mbox_request_channel_byname(client, name);
-+}
-+
-+static int mbox_test_probe(struct platform_device *pdev)
-+{
-+	struct mbox_test_device *tdev;
-+	struct resource *res;
-+	int ret;
-+
-+	tdev = devm_kzalloc(&pdev->dev, sizeof(*tdev), GFP_KERNEL);
-+	if (!tdev)
-+		return -ENOMEM;
-+
-+	/* It's okay for MMIO to be NULL */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	tdev->mmio = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(tdev->mmio))
-+		tdev->mmio = NULL;
-+
-+	tdev->tx_channel = mbox_test_request_channel(pdev, "tx");
-+	if (IS_ERR(tdev->tx_channel))
-+		return PTR_ERR(tdev->tx_channel);
-+
-+	tdev->rx_channel = mbox_test_request_channel(pdev, "rx");
-+	if (IS_ERR(tdev->rx_channel))
-+		return PTR_ERR(tdev->rx_channel);
-+
-+	tdev->dev = &pdev->dev;
-+	platform_set_drvdata(pdev, tdev);
-+
-+	ret = mbox_test_add_debugfs(pdev, tdev);
-+	if (ret)
-+		return ret;
-+
-+	dev_info(&pdev->dev, "Successfully registered\n");
-+
-+	return 0;
-+}
-+
-+static int mbox_test_remove(struct platform_device *pdev)
-+{
-+	struct mbox_test_device *tdev = platform_get_drvdata(pdev);
-+
-+	debugfs_remove_recursive(root_debugfs_dir);
-+
-+	mbox_free_channel(tdev->tx_channel);
-+	mbox_free_channel(tdev->rx_channel);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mbox_test_match[] = {
-+	{ .compatible = "mailbox_test" },
-+	{},
-+};
-+
-+static struct platform_driver mbox_test_driver = {
-+	.driver = {
-+		.name = "mailbox_sti_test",
-+		.of_match_table = mbox_test_match,
-+	},
-+	.probe  = mbox_test_probe,
-+	.remove = mbox_test_remove,
-+};
-+module_platform_driver(mbox_test_driver);
-+
-+MODULE_DESCRIPTION("Generic Mailbox Testing Facility");
-+MODULE_AUTHOR("Lee Jones <lee.jones@linaro.org");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> On 23/07/15 17:52, Mark Rutland wrote:
+> > Currently msi-parent is used in a couple of drivers despite being fairly
+> > underspecified. This patch adds a generic binding for MSIs (including
+> > the existing msi-parent property) enabling the description of platform
+> > devices capable of using MSIs.
+> > 
+> > While MSIs are primarily distinguished by doorbell and payload, some MSI
+> > controllers (e.g. the GICv3 ITS) also use side-band information
+> > accompanying the write to identify the master which originated the MSI,
+> > to allow for sandboxing. This sideband information is non-probeable and
+> > needs to be described in the DT. Other MSI controllers may have
+> > additional configuration details which need to be described per-master.
+> > 
+> > This patch adds a generic msi-parent binding document, extending the
+> > de-facto standard with a new (optional) #msi-cells which can be used to
+> > express any per-master configuration and/or sideband data. This is
+> > sufficient to describe non-hotpluggable devices.
+> > 
+> > For busses where sideband data may be derived from some bus-specific
+> > master ID scheme, other properties will be required to describe the
+> > mapping.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> >  .../bindings/interrupt-controller/msi.txt          | 135 +++++++++++++++++++++
+> >  1 file changed, 135 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/interrupt-controller/msi.txt b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > new file mode 100644
+> > index 0000000..c60c034
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/interrupt-controller/msi.txt
+> > @@ -0,0 +1,135 @@
+> > +This document describes the generic device tree binding for MSI controllers and
+> > +their master(s).
+> > +
+> > +Message Signaled Interrupts (MSIs) are a class of interrupts generated by a
+> > +write to an MMIO address.
+> > +
+> > +MSIs were originally specified by PCI (and are used with PCIe), but may also be
+> > +used with other busses, and hence a mechanism is required to relate devices on
+> > +those busses to the MSI controllers which they are capable of using,
+> > +potentially including additional information.
+> > +
+> > +MSIs are distinguished by some combination of:
+> > +
+> > +- The doorbell (the MMIO address written to).
+> > +  
+> > +  Devices may be configured by software to write to arbitrary doorbells which
+> > +  they can address. An MSI controller may feature a number of doorbells.
+> > +
+> > +- The payload (the value written to the doorbell).
+> > +  
+> > +  Devices may be configured to write an arbitrary payload chosen by software.
+> > +  MSI controllers may have restrictions on permitted payloads.
+> > +
+> > +- Sideband information accompanying the write.
+> > +  
+> > +  Typically this is neither configurable nor probeable, and depends on the path
+> > +  taken through the memory system (i.e. it is a property of the combination of
+> > +  MSI controller and device rather than a property of either in isolation).
+> > +
+> > +
+> > +MSI controllers:
+> > +================
+> > +
+> > +An MSI controller signals interrupts to a CPU when a write is made to an MMIO
+> > +address by some master. An MSI controller may feature a number of doorbells.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- msi-controller: Identifies the node as an MSI controller.
+> > +
+> > +Optional properties:
+> > +--------------------
+> > +
+> > +- #msi-cells: The number of cells in an msi-specifier, required if not zero.
+> > +
+> > +  Typically this will encode information related to sideband data, and will
+> > +  not encode doorbells or payloads as these can be configured dynamically.
+> > +
+> > +  The meaning of the msi-specifier is defined by the device tree binding of
+> > +  the specific MSI controller. 
+> > +
+> > +
+> > +MSI clients
+> > +===========
+> > +
+> > +MSI clients are devices which generate MSIs. For each MSI they wish to
+> > +generate, the doorbell and payload may be configured, though sideband
+> > +information may not be configurable.
+> > +
+> > +Required properties:
+> > +--------------------
+> > +
+> > +- msi-parent: A list of phandle + msi-specifier pairs, one for each MSI
+> > +  controller which the device is capable of using.
+> > +
+> > +  This property is unordered, and MSIs may be allocated from any combination of
+> > +  MSI controllers listed in the msi-parent property.
+> > +
+> > +  If a device has restrictions on the allocation of MSIs, these restrictions
+> > +  must be described with additional properties.
+> > +
+> > +  When #msi-cells is non-zero, busses with an msi-parent will require
+> > +  additional properties to describe the relationship between devices on the bus
+> > +  and the set of MSIs they can potentially generate.
+> > +
+> > +
+> > +Example
+> > +=======
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	msi_a: msi-controller at a {
+> > +		reg = <0xa 0xf00>;
+> > +		compatible = "vendor-a,some-controller";
+> > +		msi-controller;
+> > +		/* No sideband data, so #msi-cells omitted */
+> > +	};
+> > +
+> > +	msi_b: msi-controller at b {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	msi_c: msi-controller at c {
+> > +		reg = <0xb 0xf00>;
+> > +		compatible = "vendor-b,another-controller";
+> > +		msi-controller;
+> > +		/* Each device has some unique ID */
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	dev at 0 {
+> > +		reg = <0x0 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +
+> > +		/* Can only generate MSIs to msi_a */
+> > +		msi-parent = <&msi_a>;
+> > +	};
+> > +
+> > +	dev at 1 {
+> > +		reg = <0x1 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +
+> > +		/* 
+> > +		 * Can generate MSIs to either A or B.
+> > +		 */
+> > +		msi-parent = <&msi_a>, <&msi_b 0x17>;
+> > +	};
+> > +
+> > +	dev at 2 {
+> > +		reg = <0x2 0xf00>;
+> > +		compatible = "vendor-c,some-device";
+> > +		/*
+> > +		 * Has different IDs at each MSI controller.
+> > +		 * Can generate MSIs to all of the MSI controllers.
+> > +		 */
+> > +		msi-parent = <&msi_a>, <&msi_b 0x17>, <&msi_c 0x53>;
+> > +	};
+> > +};
+> > 
+> 
+> This looks quite good for the non-PCI stuff. Should you also cover the
+> PCI usage of msi-parent?
+
+As far as I can tell, the current PCI usage of msi-parent is practically
+identical to the generic usage, with the proviso that the devices under
+a PCI root complex are assumed to be indistinguishable from the root
+complex from the PoV of the MSI controller.
+
+So I'm not sure what would be relevant to describe here.
+
+> I'm can't really see the meaning of #msi-cells in that context. Should
+> it be entirely ignored? OR did you have some specific usage in mind?
+
+It shouldn't be ignored; if the MSI controller has a non-zero #msi-cells
+then it requires that information to operate correctly (e.g. to
+distinguish masters).
+
+It may simply be that all devices under the root complex are
+indistinguishable from each other, but can be distinguished form other
+devices in the system using the same MSI controller.
+
+I also imagine that there may be PCI root complexes which signal their
+own management interrupts as MSIs. Such a root complex needs msi-parent
+to describe its relationship with the MSI controller, which is distinct
+from the relationship between its children and the MSI controller.
+
+Thanks,
+Mark.
