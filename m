@@ -1,32 +1,23 @@
 From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 27 Jul 2015 16:23:12 +0200
-Subject: [PATCH V2 06/11] opp: Add support to parse "operating-points-v2"
- bindings
-In-Reply-To: <f2267207114646280c5fd0e066d2b99f59a3c2e8.1437972635.git.viresh.kumar@linaro.org>
+Date: Mon, 27 Jul 2015 16:27:08 +0200
+Subject: [PATCH V2 07/11] OPP: Add clock-latency-ns support
+In-Reply-To: <7598a88f9de8d8dbd96de40b4ecdf30f68cfca8a.1437972635.git.viresh.kumar@linaro.org>
 References: <cover.1437972635.git.viresh.kumar@linaro.org>
- <f2267207114646280c5fd0e066d2b99f59a3c2e8.1437972635.git.viresh.kumar@linaro.org>
-Message-ID: <1447859.StpgrO19qi@amdc1976>
+ <7598a88f9de8d8dbd96de40b4ecdf30f68cfca8a.1437972635.git.viresh.kumar@linaro.org>
+Message-ID: <1509464.37oR9zhrb7@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-On Monday, July 27, 2015 10:32:36 AM Viresh Kumar wrote:
-> This adds support in OPP library to parse and create list of OPPs from
-> operating-points-v2 bindings. It takes care of most of the properties of
-> new bindings (except shared-opp, which will be handled separately).
+On Monday, July 27, 2015 10:32:37 AM Viresh Kumar wrote:
+> With "operating-points-v2" bindings, clock-latency is defined per OPP.
+> Users of this value expect a single value which defines the latency to
+> switch to any clock rate. Find maximum clock-latency-ns from the OPP
+> table to service requests from such users.
 > 
-> For backward compatibility, we keep supporting earlier bindings. We try
-> to search for the new bindings first, in case they aren't present we
-> look for the old deprecated ones.
-> 
-> There are few things marked as TODO:
-> - Support for multiple OPP tables
-> - Support for multiple regulators
-> 
-> They should be fixed separately.
-> 
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
