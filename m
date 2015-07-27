@@ -1,62 +1,60 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 27 Jul 2015 12:24:30 +0200
-Subject: [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
-In-Reply-To: <20150727083531.GC31611@linux>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-3-git-send-email-b.zolnierkie@samsung.com>
- <20150727083531.GC31611@linux>
-Message-ID: <1595601.YD6UTxy5Qg@amdc1976>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 27 Jul 2015 12:28:07 +0200
+Subject: [PATCH v2 1/4] mfd: max77686: Don't suggest in binding to use a
+ deprecated property
+In-Reply-To: <55ACC986.5040408@osg.samsung.com>
+References: <1437114567-17629-1-git-send-email-javier@osg.samsung.com>
+ <1437114567-17629-2-git-send-email-javier@osg.samsung.com>
+ <20150720081020.GD3061@x1> <55ACC986.5040408@osg.samsung.com>
+Message-ID: <55B607B7.6050803@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Mark,
 
-Hi,
-
-On Monday, July 27, 2015 02:05:31 PM Viresh Kumar wrote:
-> $subject is a bit wrong, we aren't fixing any issue here. We are
-> supporting a new feature and so it should be like:
-
-Have you read my explanation of the issue?
-
-With your OPP-v2 patches cpufreq-dt picks turbo frequencies and uses
-them as normal ones.
-
-(More at: http://www.spinics.net/lists/arm-kernel/msg430397.html)
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
-
-> cpufreq: Mark boost frequencies based on OPP's turbo mode
+On 07/20/2015 12:12 PM, Javier Martinez Canillas wrote:
+> Hello Lee,
 > 
-> On 09-07-15, 17:43, Bartlomiej Zolnierkiewicz wrote:
-> > Turbo modes should be marked with CPUFREQ_BOOST_FREQ flag in
-> > the frequency table entry.
-> > 
-> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> > Cc: Michael Turquette <mturquette@baylibre.com>
-> > Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> > ---
-> >  drivers/cpufreq/cpufreq_opp.c | 2 ++
-> >  1 file changed, 2 insertions(+)
-> > 
-> > diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
-> > index 773bcde..f0cf502 100644
-> > --- a/drivers/cpufreq/cpufreq_opp.c
-> > +++ b/drivers/cpufreq/cpufreq_opp.c
-> > @@ -75,6 +75,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
-> >  		}
-> >  		freq_table[i].driver_data = i;
-> >  		freq_table[i].frequency = rate / 1000;
-> > +		if (dev_pm_opp_get_turbo_mode_setting(opp) == true)
-> > +			freq_table[i].flags |= CPUFREQ_BOOST_FREQ;
-> >  	}
-> >  
-> >  	freq_table[i].driver_data = i;
+> Thanks a lot for your feedback.
 > 
-> Rest look fine.
+> On 07/20/2015 10:10 AM, Lee Jones wrote:
+>> On Fri, 17 Jul 2015, Javier Martinez Canillas wrote:
+>>
+>>> The regulator-compatible property from the regulator DT binding was
+>>> deprecated. But the max77686 DT binding doc still suggest to use it
+>>> instead of the regulator node name's which is the correct approach.
+>>>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> By convention shouldn't this be buck at 1, or something?
+>>
+>> Need Mark to look at this.
+>>
+> 
+> That's a very good question, the ePAPR doc says:
+> 
+> "The unit-address must match the first address specified in the reg property
+> of the node. If the node has no reg property, the @ and unit-address must be
+> omitted and the node-name alone differentiates the node from other nodes at
+> the same level in the tree"
+> 
+> This PMIC uses a single I2C address for all the regulators and these are
+> controlled by writing to different I2C register addresses. So the regulator
+> nodes don't have a reg property in this case.
+> 
+> By looking at other regulators bindings, besides the generic regulator.txt
+> and fixed-regulator.txt DT bindings, there are only 5 (out of 40) that use
+> the node-name at unit-address convention mentioned in the ePAPR document.
+> 
+> AFAICT all these are for regulators that are actually in different addresses
+> but I could be wrong so let's see what Mark says.
+> 
+
+Any opinions on this?
+
+thanks a lot and best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
