@@ -1,59 +1,150 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 17:03:40 +0530
-Subject: [PATCH v2 3/7] cpufreq-dt: add turbo modes support
-In-Reply-To: <15810554.2OjPyuYJBt@amdc1976>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-4-git-send-email-b.zolnierkie@samsung.com>
- <20150727083754.GD31611@linux> <15810554.2OjPyuYJBt@amdc1976>
-Message-ID: <20150727113340.GA10181@linux>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 27 Jul 2015 12:35:11 +0100
+Subject: [PATCH v2] xen/events: Support event channel rebind on ARM
+Message-ID: <1437996911-18985-1-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-07-15, 13:01, Bartlomiej Zolnierkiewicz wrote:
+Currently, the event channel rebind code is gated with the presence of
+the vector callback.
 
-First of all, please don't be angry :).. We can discuss and get things
-sorted out ...
+The virtual interrupt controller on ARM has the concept of per-CPU
+interrupt (PPI) which allow us to support per-VCPU event channel.
+Therefore there is no need of vector callback for ARM.
 
-> This change was in the original patch posted in April:
-> https://lkml.org/lkml/2015/4/10/646
+Xen is already using a free PPI to notify the guest VCPU of an event.
+Furthermore, the xen code initialization in Linux (see
+arch/arm/xen/enlighten.c) is requesting correctly a per-CPU IRQ.
 
-Yeah, and I already apologized for missing the request :)
+Introduce new helper xen_support_evtchn_rebind to allow architecture
+decide whether rebind an event is support or not. It will always return
+1 on ARM and keep the same behavior on x86.
 
-> your review from a month ago didn't contain this request:
-> https://lkml.org/lkml/2015/6/22/667
+This is also allow us to drop the usage of xen_have_vector_callback
+entirely in the ARM code.
 
-Your patch inserted almost 116 lines and most of the stuff was around
-adding new bindings to get things working with cpufreq-dt driver.
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: "H. Peter Anvin" <hpa@zytor.com>
+Cc: x86 at kernel.org
+---
+    Tested by setting the affinity manually via /proc on dom0 ARM64
 
-And so I replied to the most important stuff, i.e. don't add new
-bindings, we will sort it out with opp-v2.
+    Changes in v2:
+        - Use a static inline rather than a macro
+        - Add David's reviewed-by
+---
+ arch/arm/include/asm/xen/events.h   |  6 ++++++
+ arch/arm/xen/enlighten.c            |  4 ----
+ arch/arm64/include/asm/xen/events.h |  6 ++++++
+ arch/x86/include/asm/xen/events.h   | 14 ++++++++++++++
+ drivers/xen/events/events_base.c    |  6 +-----
+ include/xen/events.h                |  1 -
+ 6 files changed, 27 insertions(+), 10 deletions(-)
 
-And frankly that wasn't the time where we could have discussed how
-exactly we are going to use it. Ofcourse we should get it via DT,
-platform data is just not required.
-
-So, me not NAK ing this approach was fine as it wasn't about keeping
-this data in the platform data part.
-
-> and now (after nearly 4 months) you are telling me that
-
-I will say a month, as we discarded most of that patch recently :)
-
-> I should change this because you are planning to do some
-> more changes in the future.
-
-Its not about me doing some changes. But the whole point of doing the
-opp-v2 thing was to get rid of such platform data things..
-
-Just that your work is competing with opp-v2 code :)
-
-> Could we please keep it as it is for now and change it
-> later (after independent_clocks configuration will get
-> ported to use device tree)?
-
-I thought we can get your work to a better shape, with all credit to
-you. But if you have some dependency on this for 4.3, then I don't
-mind killing this structure after you have polluted it a bit more :)
-
+diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+index 8b1f37b..2123aaa 100644
+--- a/arch/arm/include/asm/xen/events.h
++++ b/arch/arm/include/asm/xen/events.h
+@@ -20,4 +20,10 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 							    atomic64_t,	\
+ 							    counter), (val))
+ 
++/* Rebind event channel is supported by default */
++static inline bool xen_support_evtchn_rebind(void)
++{
++	return 1;
++}
++
+ #endif /* _ASM_ARM_XEN_EVENTS_H */
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 9055c92..c50c8d3 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -45,10 +45,6 @@ static struct vcpu_info __percpu *xen_vcpu_info;
+ unsigned long xen_released_pages;
+ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
+ 
+-/* TODO: to be removed */
+-__read_mostly int xen_have_vector_callback;
+-EXPORT_SYMBOL_GPL(xen_have_vector_callback);
+-
+ static __read_mostly unsigned int xen_events_irq;
+ 
+ static __initdata struct device_node *xen_node;
+diff --git a/arch/arm64/include/asm/xen/events.h b/arch/arm64/include/asm/xen/events.h
+index 8655321..ed4aa90 100644
+--- a/arch/arm64/include/asm/xen/events.h
++++ b/arch/arm64/include/asm/xen/events.h
+@@ -18,4 +18,10 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ 
+ #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
+ 
++/* Rebind event channel is supported by default */
++static inline bool xen_support_evtchn_rebind(void)
++{
++	return 1;
++}
++
+ #endif /* _ASM_ARM64_XEN_EVENTS_H */
+diff --git a/arch/x86/include/asm/xen/events.h b/arch/x86/include/asm/xen/events.h
+index 608a79d..37bc720 100644
+--- a/arch/x86/include/asm/xen/events.h
++++ b/arch/x86/include/asm/xen/events.h
+@@ -20,4 +20,18 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+ /* No need for a barrier -- XCHG is a barrier on x86. */
+ #define xchg_xen_ulong(ptr, val) xchg((ptr), (val))
+ 
++/*
++ * Events delivered via platform PCI interrupts are always
++ * routed to vcpu 0 and hence cannot be rebound.
++ */
++static inline bool xen_support_evtchn_rebind(void)
++{
++	return (!xen_hvm_domain() || xen_have_vector_callback);
++}
++
++#define xen_support_evtchn_rebind()	\
++	(!xen_hvm_domain() || xen_have_vector_callback)
++
++extern int xen_have_vector_callback;
++
+ #endif /* _ASM_X86_XEN_EVENTS_H */
+diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+index 96093ae..ed620e5 100644
+--- a/drivers/xen/events/events_base.c
++++ b/drivers/xen/events/events_base.c
+@@ -1301,11 +1301,7 @@ static int rebind_irq_to_cpu(unsigned irq, unsigned tcpu)
+ 	if (!VALID_EVTCHN(evtchn))
+ 		return -1;
+ 
+-	/*
+-	 * Events delivered via platform PCI interrupts are always
+-	 * routed to vcpu 0 and hence cannot be rebound.
+-	 */
+-	if (xen_hvm_domain() && !xen_have_vector_callback)
++	if (!xen_support_evtchn_rebind())
+ 		return -1;
+ 
+ 	/* Send future instances of this interrupt to other vcpu. */
+diff --git a/include/xen/events.h b/include/xen/events.h
+index 7d95fdf..88da2ab 100644
+--- a/include/xen/events.h
++++ b/include/xen/events.h
+@@ -92,7 +92,6 @@ void xen_hvm_callback_vector(void);
+ #ifdef CONFIG_TRACING
+ #define trace_xen_hvm_callback_vector xen_hvm_callback_vector
+ #endif
+-extern int xen_have_vector_callback;
+ int xen_set_callback_via(uint64_t via);
+ void xen_evtchn_do_upcall(struct pt_regs *regs);
+ void xen_hvm_evtchn_do_upcall(void);
 -- 
-viresh
+2.1.4
