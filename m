@@ -1,45 +1,56 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Mon, 27 Jul 2015 01:45:45 -0300
-Subject: [PATCH 2/2] DT: pwm: Add NXP LPC18xx PWM/SCT binding documentation
-In-Reply-To: <1437972345-16444-1-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1437972345-16444-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <1437972345-16444-3-git-send-email-ariel@vanguardiasur.com.ar>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 27 Jul 2015 10:32:30 +0530
+Subject: [PATCH V2 00/11] OPP: Add code to support operating-points-v2 bindings
+Message-ID: <cover.1437972635.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree binding document for NXP LPC18xx PWM/SCT.
+Hi Rafael,
 
-Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
----
- .../devicetree/bindings/pwm/lpc1850-pwm.txt          | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
+This is mostly reviewed and its been out on the lists for around one and
+half month. We can get it pushed for 4.3 now. Resending the series
+because of minor updates in few patches, which were also sent as replies
+to earlier version.
 
-diff --git a/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
-new file mode 100644
-index 0000000..3055429
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
-@@ -0,0 +1,20 @@
-+* NXP LPC18xx Pulse Width Modulator driver
-+
-+Required properties:
-+  - compatible: Should be "nxp,lpc1850-pwm"
-+  - reg: Should contain physical base address and length of pwm registers.
-+  - clocks: Must contain an entry for each entry in clock-names.
-+    See ../clock/clock-bindings.txt for details.
-+  - clock-names: Must include the following entries.
-+    - pwm: PWM operating clock.
-+  - #pwm-cells: Should be 3. See pwm.txt in this directory for the description
-+    of the cells format.
-+
-+Example:
-+  pwm: pwm at 40000000 {
-+    compatible = "nxp,lpc1850-pwm";
-+    reg = <0x40000000 0x580>;
-+    clocks =<&ccu1 CLK_CPU_SCT>;
-+    clock-names = "pwm";
-+    #pwm-cells = <3>;
-+  };
+I have tested this on dual-core exynos board with the driver inbuilt as
+well as a module. Tried multiple insertion/removals of the module. Have
+tested cpufreq-dt driver with both old and new bindings.
+
+----------x-----------------x-------------
+
+This adds code to support operating-points-v2 bindings. Not everything
+is supported yet, but most of the basic stuff is.
+
+Pushed here as well for reference:
+ssh://git at git.linaro.org/people/viresh.kumar/linux.git opp/v2
+
+V1->V2:
+- 1/11 is a new patch which moves the bindings file into opp specific
+  folder.
+- 'opp-suspend' binding got updated and is part of individual OPPs now,
+  instead of a phandle present in the opp table.
+- Some more minor reformatting as suggested by Bartlomiej and Stephen,
+  they were already posted as reply to earlier patches in V1.
+
+Viresh Kumar (11):
+  opp: Create a directory for opp bindings
+  opp: Relocate few routines
+  OPP: Create _remove_device_opp() for freeing dev_opp
+  OPP: Allocate dev_opp from _add_device_opp()
+  OPP: Break _opp_add_dynamic() into smaller functions
+  opp: Add support to parse "operating-points-v2" bindings
+  OPP: Add clock-latency-ns support
+  opp: Add OPP sharing information to OPP library
+  OPP: Add support for opp-suspend
+  opp: Add helpers for initializing CPU OPPs
+  cpufreq-dt: Add support for operating-points-v2 bindings
+
+ .../devicetree/bindings/power/{ => opp}/opp.txt    |    0
+ drivers/base/power/opp.c                           | 1072 +++++++++++++++-----
+ drivers/cpufreq/cpufreq-dt.c                       |   56 +-
+ include/linux/pm_opp.h                             |   29 +
+ 4 files changed, 905 insertions(+), 252 deletions(-)
+ rename Documentation/devicetree/bindings/power/{ => opp}/opp.txt (100%)
+
 -- 
-1.9.1
+2.4.0
