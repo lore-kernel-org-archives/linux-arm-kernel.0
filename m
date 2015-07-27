@@ -1,28 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jul 2015 12:21:19 +0100
-Subject: [PATCH] ARM: asm/unified.h: guard the IT macros against
- redefinition when using LTO
-In-Reply-To: <20150727111613.GL10670@e103592.cambridge.arm.com>
-References: <alpine.LFD.2.20.1507241739280.1806@knanqh.ubzr>
- <20150727111613.GL10670@e103592.cambridge.arm.com>
-Message-ID: <20150727112119.GG7557@n2100.arm.linux.org.uk>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Mon, 27 Jul 2015 19:26:42 +0800
+Subject: [PATCH 0/5] Add imx6ul touch screen controller support
+Message-ID: <1437996407-27266-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 12:16:15PM +0100, Dave Martin wrote:
-> Another scary thing with LTO is asms that use directives like
-> .arch_extension, .fpu etc. that will stay active for the rest of the LTO
-> unit of nothing is done about it.
+i.MX6UL contains a touch screen controller. This patch set add 
+imx6ul touch screen controller driver support. 
 
-That would be a problem, especially for things like the neon support,
-as we specifically want stuff like that to be built separately.  The
-same probably applies where we want to build with different architecture
-options.
+Haibo Chen (5):
+  input: touchscreen: add imx6ul_tsc driver support
+  Documentation: Detail permitted DT properties for the imx6ul_tsc
+  ARM: imx_v6_v7_defconfig: enable imx6ul_tsc
+  ARM: dts: imx6ul.dtsi: add TSC support
+  ARM: dts: imx6ul-14x14-evk.dts: add tsc support
 
-So, maybe the answer is to build most of the kernel with LTO enabled, but
-those bits which require explicit -march= or -mfpu= options need to remain
-separate non-LTO-able objects.
+ .../bindings/input/touchscreen/imx6ul_tsc.txt      |  14 +
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts             |  18 +
+ arch/arm/boot/dts/imx6ul.dtsi                      |  11 +
+ arch/arm/configs/imx_v6_v7_defconfig               |   1 +
+ drivers/input/touchscreen/Kconfig                  |  12 +
+ drivers/input/touchscreen/Makefile                 |   1 +
+ drivers/input/touchscreen/imx6ul_tsc.c             | 510 +++++++++++++++++++++
+ 7 files changed, 567 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/imx6ul_tsc.txt
+ create mode 100644 drivers/input/touchscreen/imx6ul_tsc.c
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
