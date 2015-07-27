@@ -1,28 +1,51 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 17:06:41 +0530
-Subject: [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
-In-Reply-To: <3141301.RS9TLygaba@amdc1976>
-References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1595601.YD6UTxy5Qg@amdc1976> <20150727103521.GA4103@linux>
- <3141301.RS9TLygaba@amdc1976>
-Message-ID: <20150727113641.GB10181@linux>
+From: michael@smart-africa.com (Michael van der Westhuizen)
+Date: Mon, 27 Jul 2015 13:37:13 +0200
+Subject: [RESEND PATCH v2 0/2] spi: dw: Reintroduce optional 16 bit data
+ register I/O
+In-Reply-To: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+References: <1435163696-14767-1-git-send-email-michael@smart-africa.com>
+Message-ID: <1437997035-3046-1-git-send-email-michael@smart-africa.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27-07-15, 13:14, Bartlomiej Zolnierkiewicz wrote:
-> Sorry but you don't seem to understand the issue.
+The commit dd11444327ce ("spi: dw-spi: Convert 16bit accesses to 32bit
+accesses") globally changed all register access in the dw_apb_ssi driver
+to 32 bit access, which breaks data register (FIFO) access on picoXcell
+platforms.
 
-:)
+This series introduces a boolean to the core spi-dw driver to indicate
+to the core that 16 bit data register access is appropriate, implements
+the code that respects that flag and updates the dw-spi-mmio driver to
+allow setting this boolean from the device tree.
 
-No, I did. I understand that if someone uses opp bindings today with
-some entries as turbo OPPs, cpufreq will use them as normal
-frequencies. And that may harm the board.
+A binding documentation fix is included in this series.
 
-BUT, opp-v2 code isn't ready to be used yet. And platforms should see
-what all is implemented before trying to use them.
+Prior to applying this change the following error presents on
+a picoCell pc3x3 platform:
+  spi_master spi32766: interrupt_transfer: fifo overrun/underrun
+  m25p80 spi32766.0: error -5 reading 9f
+  m25p80: probe of spi32766.0 failed with error -5
 
-All I was saying is, this isn't a FIX as we haven't introduced the
-feature yet. Otherwise I had no issues with the patch.
+With this series applied:
+  m25p80 spi32766.0: m25p40 (512 Kbytes)
+
+(Resend requested by Mark Brown)
+
+Changes in v2:
+  - Incorporate review feedback from Andy Shevchenko, reworking the
+    bindings to reflect common practice and adjusting the driver
+    to suit.
+  - Add a wrapper inline function for accessing the data register
+    using the configured with.
+
+Michael van der Westhuizen (2):
+  dt: snps,dw-apb-ssi: Document new I/O data register width property
+  spi: dw: Allow interface drivers to limit data I/O to word sizes
+
+ drivers/spi/spi-dw-mmio.c |  4 ++++
+ drivers/spi/spi-dw.c      |  4 ++--
+ drivers/spi/spi-dw.h      | 35 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 41 insertions(+), 2 deletions(-)
 
 -- 
-viresh
+2.1.4
