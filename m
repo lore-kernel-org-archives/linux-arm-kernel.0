@@ -1,136 +1,68 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 27 Jul 2015 10:16:02 +0100
-Subject: [PATCH v3 3/3] arm: kernel: implement cpuidle_ops with psci
- backend
-In-Reply-To: <20150726214554.GC7557@n2100.arm.linux.org.uk>
-References: <1436430685-2202-4-git-send-email-jszhang@marvell.com>
- <20150714103421.GU7557@n2100.arm.linux.org.uk>
- <20150714110302.GA334@red-moon>
- <20150714122904.GV7557@n2100.arm.linux.org.uk>
- <20150714145546.GA14556@red-moon>
- <20150714204138.GW7557@n2100.arm.linux.org.uk>
- <20150715134603.GA14862@red-moon>
- <20150715144507.GZ7557@n2100.arm.linux.org.uk>
- <20150715154056.GA10418@red-moon>
- <20150726214554.GC7557@n2100.arm.linux.org.uk>
-Message-ID: <20150727091602.GA10308@red-moon>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Jul 2015 10:16:17 +0100
+Subject: [PATCH 2/3] Docs: dt: Add PCI MSI map bindings
+In-Reply-To: <FD9C4916-6BDC-40F2-A273-91BFBD3B0075@caviumnetworks.com>
+References: <1437670365-20704-1-git-send-email-mark.rutland@arm.com>
+ <1437670365-20704-3-git-send-email-mark.rutland@arm.com>
+ <FD9C4916-6BDC-40F2-A273-91BFBD3B0075@caviumnetworks.com>
+Message-ID: <20150727091535.GA9169@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jul 26, 2015 at 10:45:54PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jul 15, 2015 at 04:40:56PM +0100, Lorenzo Pieralisi wrote:
-> > static struct cpuidle_ops psci_cpuidle_ops __initdata = {
-> > 	.suspend = cpu_psci_cpu_suspend,
-> > 	.init = cpu_psci_cpu_init_idle,
-> > };
-> > CPUIDLE_METHOD_OF_DECLARE(psci_cpuidle, "psci", &psci_cpuidle_ops);
-> > 
-> > to drivers/firmware unless it is guarded by CONFIG_ARM, that's what
-> > I am saying, is that clear ?
+> > +Example (5)
+> > +===========
+> > +
+> > +/ {
+> > +	#address-cells = <1>;
+> > +	#size-cells = <1>;
+> > +
+> > +	msi_a: msi-controller at a {
+> > +		reg = <0xa 0x1>;
+> > +		compatible = "vendor,some-controller";
+> > +		msi-controller;
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	msi_b: msi-controller at b {
+> > +		reg = <0xb 0x1>;
+> > +		compatible = "vendor,some-controller";
+> > +		msi-controller;
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	msi_c: msi-controller at c {
+> > +		reg = <0xc 0x1>;
+> > +		compatible = "vendor,some-controller";
+> > +		msi-controller;
+> > +		#msi-cells = <1>;
+> > +	};
+> > +
+> > +	pci: pci at c {
+> > +		reg = <0xf 0x1>;
+> > +		compatible = "vendor,pcie-root-complex";
+> > +		device_type = "pci";
+> > +
+> > +		/*
+> > +		 * The sideband data provided to MSI controller a is the
+> > +		 * RID, but the high bit of the bus number is negated.
+> > +		 * The sideband data provided to MSI controller b is the
+> > +		 * RID, identity-mapped.
+> > +		 * MSI controller c is not addressable.
+> > +		 */
+> > +		msi-map = <0x0000 &msi_a 0x8000 0x08000>,
+> > +			  <0x8000 &msi_a 0x0000 0x08000>,
+> > +			  <0x0000 &msi_b 0x0000 0x10000>;
+> > +	};
 > 
-> I'd appreciate it if you didn't go bitching to Philippe, who then phones
-> me to discuss this problem.  That's not the way "business" is done.
-> 
-> You definitely _can_ move this into drivers/.  There's absolutely nothing
-> stopping that.  Yes, CPUIDLE_METHOD_OF_DECLARE() may be an ARM-only thing,
-> that doesn't stop drivers using it - and the hint there is in the name.
-> Drivers.  They belong in the drivers/ subdirectory, not the arch/
-> subdirectory.
-> 
-> What's so difficult to get about that?
-> 
-> All two _existing_ users of CPUIDLE_METHOD_OF_DECLARE() are in drivers/
-> already:
-> 
-> $ git grep CPUIDLE_METHOD_OF_DECLARE
-> arch/arm/include/asm/cpuidle.h:#define CPUIDLE_METHOD_OF_DECLARE(name, _method,_ops)                   \
-> drivers/soc/qcom/spm.c:CPUIDLE_METHOD_OF_DECLARE(qcom_idle_v1, "qcom,kpss-acc-v1", &qcom_cpuidle_ops);
-> drivers/soc/qcom/spm.c:CPUIDLE_METHOD_OF_DECLARE(qcom_idle_v2, "qcom,kpss-acc-v2", &qcom_cpuidle_ops);
-> 
-> So there's absolutely no argument you can possibly make about "it's in
-> asm/ so code using it must be in arch/arm."
-> 
-> > How do you want us to do it ?
-> 
-> I want this under drivers/, like I've said already several times in
-> this thread.o
+> they can be identical right? like
+> 	<0x8000 &msi_a 0x0000 0x08000>,
+>  	<0x8000 &msi_b 0x0000 0x08000>;
 
-We will move it there.
+In general that would be valid, yes.
 
-> > M.Rutland's patch series represents the code reorganisation and as far
-> > as I am concerned that's a complete and well defined plan, I still do
-> > not understand why you are NAKing that piece of code, it is completely
-> > orthogonal to what we are debating above, please have a look at it
-> > otherwise we are going around in circles here.
-> 
-> It's not a well-defined plan if it involves dispersing related code or
-> data structures across the kernel tree, especially when there is very
-> little reason for it to be dispersed.
-> 
-> > > Right now, I'm getting the impression that there is _no_ plan, or if
-> > > there is, it's an absurd plan which results in data structures which
-> > > should not be in arch/arm being left behind there.
-> > 
-> > Mark's series does not leave any data structure behind, it is moving
-> > code to a common place in the kernel so that the _current_ PSCI
-> > implementation can be shared between ARM and ARM64, again please
-> > have a look at it, we can tackle how to define cpuidle_ops in a way
-> > that you deem reasonable later, it is a separate issue, please
-> > understand.
-> 
-> You misunderstand me.  Yes, Mark's series _on its own_ doesn't leave it
-> behind, but it _has the effect_ that when combined with subsequent
-> patches, it _causes_ that to happen.
+In this case two entries are required for MSI controller a because the
+high bit passed to it is negated. This does not occur for MSI controller
+b, so it only requires a single entry to describe the transformation.
 
-Let's forget the issues related to CPUidle, we have an agreement on the way
-forward, I will make sure it is implemented.
-
-I just wanted to say, please do not block Mark's series because of this patch,
-that series makes sense standalone and is a step in the right direction, I
-will make sure we implement the changes you requested in this thread on
-top of it if you allow it to get into the kernel.
-
-> Look, there's a simple solution to this: if the plan is to move CPU idle
-> PSCI support into drivers/ then lets move the whole thing into drivers.
-> That's a sane plan.  What isn't a sane plan is to mvoe all the CPU idle
-> PSCI code into drivers/ and then have a PSCI data structure left in
-> arch/arm/.
-> 
-> It can live in a separate file which is only built for ARM, rather than
-> having ifdefs surround it, but the important thing is that it is localised
-> with the rest of the code, so as changes happen, it gets noticed.  No one
-> in years to come will remember to look in arch/arm/ when making changes to
-> the PSCI CPU idle code.
-> 
-> This is no different to what drivers/soc/qcom/spm.c is doing.
-> 
-> So.  Sane plan: "let's move all the PSCI stuff into drivers/whatever/psci/".
-> That's something I'm happy with.
-
-I am ok with that too, so I think we are in agreement.
-
-> Insane plan: "let's move the PSCI code into drivers/whatever/psci/, let's
-> keep PSCI data structures using that code in arch/arm".  That plan (in its
-> entirety) I'm NAKing, because it is _no_ plan.
-> 
-> Lastly, I didn't realise that is an ARM only thing - that was merged
-> without my involvement or ACK, the change wasn't even CC'd to me (so
-> it's no wonder I know little about it.)  I'd have NAKed that change too
-> had I seen it, suggesting that the contents of it (which are used by
-> drivers/soc/qcom/spm.c) should be located elsewhere - something which
-> I've done in the past when people have tried to shove stuff into
-> arch/arm/include/asm which gets used by stuff outside of arch/arm.
-> 
-> Are we clear?
-
-Yes, I would only ask you, if the plan above (which can be implemented
-in two steps) makes sense to you please consider accepting Mark's change
-to consolidate PSCI code into drivers/firmware/psci, it is a stepping stone
-without which the changes above can't happen, I will take charge of completing
-the move of CPUidle code and create the required shim layer into
-drivers to make this happen.
-
-Are you ok with this ?
-
-Thanks !!
-Lorenzo
+Thanks,
+Mark.
