@@ -1,45 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 27 Jul 2015 16:59:23 +0100
-Subject: [PATCH v4 5/7] arm64: add KASAN support
-In-Reply-To: <1437756119-12817-6-git-send-email-a.ryabinin@samsung.com>
-References: <1437756119-12817-1-git-send-email-a.ryabinin@samsung.com>
- <1437756119-12817-6-git-send-email-a.ryabinin@samsung.com>
-Message-ID: <20150727155922.GB350@e104818-lin.cambridge.arm.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Jul 2015 18:37:08 +0200
+Subject: [PATCH V2 10/11] opp: Add helpers for initializing CPU OPPs
+In-Reply-To: <8bc35e1fd3ac581f2b96929e331c01d1287aca27.1437972635.git.viresh.kumar@linaro.org>
+References: <cover.1437972635.git.viresh.kumar@linaro.org>
+ <8bc35e1fd3ac581f2b96929e331c01d1287aca27.1437972635.git.viresh.kumar@linaro.org>
+Message-ID: <2526828.VLyJR8Xy8B@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 07:41:57PM +0300, Andrey Ryabinin wrote:
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 4d2a925..2cacf55 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -40,6 +40,12 @@ else
->  TEXT_OFFSET := 0x00080000
->  endif
->  
-> +# KASAN_SHADOW_OFFSET = VA_START + (1 << (VA_BITS - 3)) - (1 << 61)
-> +KASAN_SHADOW_OFFSET := $(shell printf "0x%x\n" $$(( \
-> +			(-1 << $(CONFIG_ARM64_VA_BITS)) \
-> +			+ (1 << ($(CONFIG_ARM64_VA_BITS) - 3)) \
-> +			- (1 << (64 - 3)) )) )
 
-Does this work with any POSIX shell? Do we always have a 64-bit type?
-As I wasn't sure about this, I suggested awk (or perl).
+Hi,
 
-> +static void __init clear_pgds(unsigned long start,
-> +			unsigned long end)
-> +{
-> +	/*
-> +	 * Remove references to kasan page tables from
-> +	 * swapper_pg_dir. pgd_clear() can't be used
-> +	 * here because it's nop on 2,3-level pagetable setups
-> +	 */
-> +	for (; start && start < end; start += PGDIR_SIZE)
-> +		set_pgd(pgd_offset_k(start), __pgd(0));
-> +}
+On Monday, July 27, 2015 10:32:40 AM Viresh Kumar wrote:
+> With "operating-points-v2" its possible to tell which devices share
+> OPPs. We already have infrastructure to decode that information.
+> 
+> This patch adds following APIs:
+> - of_get_cpus_sharing_opps: Returns cpumask of CPUs sharing OPPs (only
+>   valid with v2 bindings).
+> - of_cpumask_init_opp_table: Initializes OPPs for all CPUs present in
+>   cpumask.
+> - of_cpumask_free_opp_table: Frees OPPs for all CPUs present in cpumask.
+> 
+> - set_cpus_sharing_opps: Sets which CPUs share OPPs (only valid with old
+>   OPP bindings, as this information isn't present in DT).
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-I don't think we need the "start" check, just "start < end". Do you
-expect a start == 0 (or overflow)?
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 
--- 
-Catalin
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
