@@ -1,45 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 Jul 2015 14:48:32 +0200
-Subject: [GIT PULL 2/2] omap dts changes for dm814x for v4.3
-In-Reply-To: <55b22a44.4b226b0a.bc37c.ffffce74SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <pull-1437718313-185670>
- <55b22a44.4b226b0a.bc37c.ffffce74SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20150727124832.GJ14224@localhost>
+Date: Mon, 27 Jul 2015 14:49:32 +0200
+Subject: [GIT PULL] pxa for v4.3 - v2
+In-Reply-To: <87si8de3w6.fsf@belgarion.home>
+References: <87si8de3w6.fsf@belgarion.home>
+Message-ID: <20150727124932.GK14224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 24, 2015 at 05:06:11AM -0700, Tony Lindgren wrote:
-> The following changes since commit f9d50fef4b6447527c2be1ad07499221c2511391:
+On Fri, Jul 24, 2015 at 09:45:13PM +0200, Robert Jarzmik wrote:
 > 
->   ARM: OMAP2+: omap3-pandora: add wifi support (2015-07-21 04:07:42 -0700)
+> Hi Arnd, Kevin, and Olof,
+> 
+> This is the pxa pull request for 4.3 development cycle, the second one after a
+> small fix triggered by 0-day kernel builder. It is a quite small one, the main
+> work happening on the drivers side, mostly dmaengine centric work.
+> 
+> For the record, the diff from the previous pull request is in [1].
+> 
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
+> 
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/dt-dm814x
+>   https://github.com/rjarzmik/linux.git tags/pxa-for-4.3-v2
 > 
-> for you to fetch changes up to f5887fe5d14181aef0653ab04f60988252d42461:
+> for you to fetch changes up to 6d6db340a7e832dc18a6a95d9f9fc79d03ff959e:
 > 
->   ARM: OMAP2+: Add custom abort handler for t410 (2015-07-23 22:33:19 -0700)
-> 
-> ----------------------------------------------------------------
-> omap dts changes for minimal dm814x support for v4.3 merge window.
-> 
-> These changes make dm814x boot and adds minimal board support for
-> dm814x-evm and hp t410.
-> 
-> Note that to boot these depend on omap-for-v4.3/soc-signed branch,
-> but as dm814x support is currently broken, these can be merged
-> separately with the other dts changes.
+>   ARM: pxa: Use setup_timer (2015-07-18 12:16:43 +0200)
 > 
 > ----------------------------------------------------------------
-> Tony Lindgren (5):
->       ARM: dts: Add minimal dm814x support
->       ARM: dts: Add minimal clocks for dm814x
->       ARM: dts: Add minimal dts support for dm8148-evm
->       ARM: dts: Add minimal support for HP T410
->       ARM: OMAP2+: Add custom abort handler for t410
+> This is the pxa changes for v4.3 cycle.
+> 
+> There is mostly one evolution on the dma side, to enable cooperation
+> of the legacy pxa DMA API, and the new dmaengine API.
+> Once all drivers using DMA are converted, the legacy DMA API should
+> be removed.
 
-Thanks, merged.
+
+Merged into next/soc. Thanks!
 
 
 -Olof
