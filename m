@@ -1,114 +1,80 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Mon, 27 Jul 2015 18:24:26 +0000
-Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
-In-Reply-To: <20150727132802.GK12927@tiger>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
- <20150727132802.GK12927@tiger>
-Message-ID: <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 27 Jul 2015 13:39:05 -0500
+Subject: [PATCH v2 06/13] irqchip: kill off set_irq_flags usage
+In-Reply-To: <55B3904B.3050408@free-electrons.com>
+References: <1436711211-18223-1-git-send-email-robh@kernel.org>
+ <1436711211-18223-7-git-send-email-robh@kernel.org>
+ <55B3904B.3050408@free-electrons.com>
+Message-ID: <CAL_JsqKJgYYEghd3PHZawkHnrqBp1+ok0Fj45a8roipMDmCQjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2015?7?27? 8:28
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Huang
-> Yongcai-B20788; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
-> 
-> > ---
-> >  arch/arm/mach-imx/Kconfig        |   1 +
-> >  arch/arm/mach-imx/Makefile       |   2 +
-> >  arch/arm/mach-imx/pm-imx7.c      | 765
-> +++++++++++++++++++++++++++++++++++++++
-> >  arch/arm/mach-imx/suspend-imx7.S | 529 +++++++++++++++++++++++++++
-> >  4 files changed, 1297 insertions(+)
-> >  create mode 100644 arch/arm/mach-imx/pm-imx7.c  create mode 100644
-> > arch/arm/mach-imx/suspend-imx7.S
-> >
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index 5ccc9ea..4269c1e 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -552,6 +552,7 @@ config SOC_IMX7D
-> >  	bool "i.MX7 Dual support"
-> >  	select PINCTRL_IMX7D
-> >  	select ARM_GIC
-> > +	select IMX_GPCV2
-> 
-> Yes, the existing list is already a bit out of order, but please do not make it worse.
-> Add it after HAVE_IMX_MMDC to keep them sort alphabetically.
+On Sat, Jul 25, 2015 at 8:34 AM, Gregory CLEMENT
+<gregory.clement@free-electrons.com> wrote:
+> Hi Rob,
+>
+> On 12/07/2015 16:26, Rob Herring wrote:
+>> set_irq_flags is ARM specific with custom flags which have genirq
+>> equivalents. Convert drivers to use the genirq interfaces directly, so we
+>> can kill off set_irq_flags. The translation of flags is as follows:
+>>
+>> IRQF_VALID -> !IRQ_NOREQUEST
+>> IRQF_PROBE -> !IRQ_NOPROBE
+>> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
+>>
+>> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
+>> and setting IRQ_NOREQUEST already, so there is no need to do this in
+>> .map() functions and we can simply remove the set_irq_flags calls. Some
+>> users also set IRQ_NOPROBE and this has been maintained although it is not
+>> clear that is really needed. There appears to be a great deal of blind
+>> copy and paste of this code.
+>>
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Jason Cooper <jason@lakedaemon.net>
+>> Cc: Kukjin Kim <kgene@kernel.org>
+>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>> Cc: Lee Jones <lee@kernel.org>
+>> Cc: Alexander Shiyan <shc_work@mail.ru>
+>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-samsung-soc at vger.kernel.org
+>> Cc: linux-rpi-kernel at lists.infradead.org
+>> ---
+>> v2:
+>> - Fix build error on clps711x
+>>
+> [...]
+>
+>> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+>> index 0d3b0fe..b8bf8b0 100644
+>> --- a/drivers/irqchip/irq-armada-370-xp.c
+>> +++ b/drivers/irqchip/irq-armada-370-xp.c
+>> @@ -201,7 +201,6 @@ static int armada_370_xp_msi_map(struct irq_domain *domain, unsigned int virq,
+>>  {
+>>       irq_set_chip_and_handler(virq, &armada_370_xp_msi_irq_chip,
+>>                                handle_simple_irq);
+>> -     set_irq_flags(virq, IRQF_VALID);
+>
+> OK
+>
+>>
+>>       return 0;
+>>  }
+>> @@ -318,7 +317,7 @@ static int armada_370_xp_mpic_irq_map(struct irq_domain *h,
+>>               irq_set_chip_and_handler(virq, &armada_370_xp_irq_chip,
+>>                                       handle_level_irq);
+>>       }
+>> -     set_irq_flags(virq, IRQF_VALID | IRQF_PROBE);
+>> +     irq_set_noprobe(virq);
+>
+> I think it should be irq_set_probe(virq), I don't see why you inverted the probe flag.
 
-Okay.
- 
-> >  	select HAVE_IMX_ANATOP
-> >  	select HAVE_IMX_MMDC
-> >  	help
-> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > index 37c502a..b2ad476 100644
-> > --- a/arch/arm/mach-imx/Makefile
-> > +++ b/arch/arm/mach-imx/Makefile
-> > @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
-> >
-> >  ifeq ($(CONFIG_SUSPEND),y)
-> >  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-> > +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
-> > +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
-> 
-> Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
+Yes, this translation and similar ones are messed up. I've gone back
+thru and fixed these.
 
-CONFIG_IMX_GPCV2 is more suitable here. As long as a SOC has the same GPCv2 block, the codes should be reused.
- 
+However, it is questionable whether you really want to enable probing
+on these lines or care either way.
 
-> >  obj-$(CONFIG_SOC_IMX6) += suspend-imx6.o
-> >  obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o  endif diff --git
-> > a/arch/arm/mach-imx/pm-imx7.c b/arch/arm/mach-imx/pm-imx7.c new file
-> > mode 100644 index 0000000..50b9af4
-> > --- /dev/null
-> > +++ b/arch/arm/mach-imx/pm-imx7.c
-> > @@ -0,0 +1,765 @@
-> > +
-> 
-> Drop this new line.
-> 
-> > +/*
-> > + * Copyright (C) 2015 Freescale Semiconductor, Inc.
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > +modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/of_address.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/mfd/syscon.h>
-> > +#include <linux/regmap.h>
-> > +#include <linux/slab.h>
-> > +
-> 
-> Ditto
-> 
-> > +#include <linux/suspend.h>
-> > +#include <asm/suspend.h>
-> > +#include <asm/fncpy.h>
-> > +
-> > +#include <soc/imx/gpcv2.h>
-> > +
-> > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
-> 
-> Will this give a checkpatch warning?
-
-Yes. Any suggestion for that? Move it to a header file?
-
-Thanks,
-Shenwei
-
-> > +static struct imx_gpcv2 *gpcv2_instance;
-> 
-> I stop right here, as I need to understand why we need to have header
-> soc/imx/gpcv2.h shared between irqchip driver and pm code.
-> 
-> Shawn
+Rob
