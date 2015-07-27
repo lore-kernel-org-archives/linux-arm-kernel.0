@@ -1,71 +1,54 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 27 Jul 2015 10:23:50 +0200
-Subject: [PATCH] mmc: sdhci-of-arasan: Get quirks from device tree
-In-Reply-To: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
-References: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
-Message-ID: <55B5EA96.6020604@monstr.eu>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 27 Jul 2015 09:30:58 +0100
+Subject: Tegra baseline test results for v4.2-rc4
+Message-ID: <55B5EC42.7090608@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2015 10:04 AM, Shawn Lin wrote:
-> This patch adds the interface to get quirks from dts, and
-> there is no need to assign different quirks by condition statement
-> of arasan IP version.
-> 
-> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
-> ---
-> 
->  drivers/mmc/host/sdhci-of-arasan.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index ef5a7d2..db07788 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -132,6 +132,7 @@ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
->  static int sdhci_arasan_probe(struct platform_device *pdev)
->  {
->  	int ret;
-> +	u32 quirktab[2];
->  	struct clk *clk_xin;
->  	struct sdhci_host *host;
->  	struct sdhci_pltfm_host *pltfm_host;
-> @@ -172,6 +173,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->  		goto clk_disable_all;
->  	}
->  
-> +	if (of_property_read_u32_array(pdev->dev.of_node,
-> +				       "arasan,quirks", &quirktab[0], 2)) {
+Here are some basic Tegra test results for Linux v4.2-rc4.
+Logs and other details at:
 
-This is not documented anywhere that's why you should send binding to DT
-mailing list and get ACK for it.
-
-> +		host->quirks |= quirktab[0];
-> +		host->quirks2 |= quirktab[1];
-> +	}
-> +
->  	if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
->  		host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
->  		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
-> 
-
-Also is there any binding which is done in this way?
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+    https://nvtb.github.io//linux/test_v4.2-rc4/20150726130102/
 
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/777dda76/attachment.sig>
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 1/ 1): qemu-vexpress64
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.2-rc3 (52721d9d3334c1cb1f76219a161084094ec634dc)):
+   text     data      bss    total  kernel
+  +4103   +12288        0   +16391  defconfig
+    +59     +128        0     +187  multi_v7_defconfig
+  +1353     +256        0    +1609  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.2-rc3 (52721d9d3334c1cb1f76219a161084094ec634dc))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
