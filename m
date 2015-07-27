@@ -1,42 +1,72 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 28 Jul 2015 01:29:31 +0300
-Subject: [PATCH v2] ARM: shmobile: r8a7794: add PFC DT support
-In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
-Message-ID: <1878107.PNh5nFF1p8@wasted.cogentembedded.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 27 Jul 2015 15:42:17 -0700
+Subject: [PATCH v5 0/4] Add Broadcom North Star 2 support
+Message-ID: <1438036941-27210-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the generic R8A7794 part of the PFC device node.
+This patch series adds Broadcom North Star 2 (NS2) SoC support. NS2 is an ARMv8
+based SoC and under the Broadcom iProc family.
 
-Based on original patch by Hisashi Nakamura <hisashi.nakamura.ak@renesas.com>.
+Sorry for tying this with the Broadcom iProc PCIe driver fixes for ARM64. I
+have to tie them together because iProc PCIe support is enabled by default
+when ARCH_BCM_IPROC is enabled. Without the fixes in the iProc PCIe driver,
+enabling CONFIG_ARCH_BCM_IPROC would break the build for arm64 defconfig. Let
+me know if there's a better way to handle this.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+This patch series is generated based on v4.2-rc2 and tested on Broadcom NS2 SVK
 
----
-This patch is against 'renesas-devel-20150727-v4.2-rc4' tag of Simon Horman's
-'renesas.git' repo.
+Code available on GITHUB:
+repo: https://github.com/Broadcom/arm64-linux.git
+branch: ns2-core-v5
 
-Changes in version 2:
-- refreshed the patch.
+Changes from V4:
+- Incorporate iProc PCIe changes from Bjorn Helgaas to handle ARM32 specific
+struct pci_sys_data
+- Move ARCH_BCM_IPROC from arch/arm64/Kconfig to arch/arm64/Kconfig.platforms
 
- arch/arm/boot/dts/r8a7794.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+Changes from V3:
+- Add more paragraph to the iProc PCIe arm64 support patch commit message to
+explain the change and anticipated future change in more details
 
-Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-@@ -108,6 +108,12 @@
- 		clocks = <&mstp4_clks R8A7794_CLK_IRQC>;
- 	};
- 
-+	pfc: pin-controller at e6060000 {
-+		compatible = "renesas,pfc-r8a7794";
-+		reg = <0 0xe6060000 0 0x11c>;
-+		#gpio-range-cells = <3>;
-+	};
-+
- 	dmac0: dma-controller at e6700000 {
- 		compatible = "renesas,rcar-dmac";
- 		reg = <0 0xe6700000 0 0x20000>;
+Changes from V2:
+- Drop hardcoded earlycon kernel command line paramter in NS2 SVK dts file
+because 1) earlycon is a debugging feature that can be enabled in the
+bootloader and should not be enabled by default in the board dts file and 2)
+of_earlycon should be used and support should be added to 8250 DW driver
+
+Changes from V1:
+- Took Arnd's advice to tweak the location of struct pci_sys_data within
+struct iproc_pcie. This helps to get rid of most of the CONFIG_ARM wrap in
+iProc PCIe core driver
+- Use stdout-path and alias for serial console in NS2 SVK dts
+- Add all 4 CPU descriptions in NS2 dtsi
+- Remove "clock-frequency" property in the armv8 timer node so timer frequency
+can be determined based on readings from CNTFRQ_EL0
+- Remove config flag ARCH_BCM_NS2. Leave only ARCH_BCM_IPROC for all Broadcom
+arm64 SoCs as advised
+
+Ray Jui (4):
+  PCI: iproc: enable arm64 support for iProc PCIe
+  PCI: iproc: Fix ARM64 dependency in Kconfig
+  arm64: Add Broadcom iProc family support
+  arm64: dts: Add Broadcom North Star 2 support
+
+ Documentation/devicetree/bindings/arm/bcm/ns2.txt |    9 ++
+ arch/arm64/Kconfig.platforms                      |    5 +
+ arch/arm64/boot/dts/Makefile                      |    1 +
+ arch/arm64/boot/dts/broadcom/Makefile             |    5 +
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts          |   59 +++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi             |  118 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                      |    1 +
+ drivers/pci/host/Kconfig                          |    2 +-
+ drivers/pci/host/pcie-iproc.c                     |   27 +++--
+ drivers/pci/host/pcie-iproc.h                     |    4 +-
+ 10 files changed, 222 insertions(+), 9 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/ns2.txt
+ create mode 100644 arch/arm64/boot/dts/broadcom/Makefile
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-svk.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2.dtsi
+
+-- 
+1.7.9.5
