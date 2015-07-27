@@ -1,79 +1,59 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 27 Jul 2015 10:57:33 +0200
-Subject: [PATCH v3 0/2] clk: improve handling of orphan clocks
-In-Reply-To: <20150508100247.GQ11057@lukather>
-References: <1429735986-18592-1-git-send-email-heiko@sntech.de>
- <554BD33D.7050907@codeaurora.org> <20150508100247.GQ11057@lukather>
-Message-ID: <4099394.C7vEjTFs8V@diego>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 27 Jul 2015 10:59:39 +0200
+Subject: [PATCH v3 0/5] add driver for Atmel QSPI controller
+Message-ID: <cover.1437986785.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime, Stephen,
+ChangeLog
 
-Am Freitag, 8. Mai 2015, 12:02:47 schrieb Maxime Ripard:
-> On Thu, May 07, 2015 at 02:03:57PM -0700, Stephen Boyd wrote:
-> > On 05/07/15 08:17, Kevin Hilman wrote:
-> > > On Fri, May 1, 2015 at 4:40 PM, Stephen Boyd <sboyd@codeaurora.org> 
-wrote:
-> > >> On 05/01/15 15:07, Heiko St?bner wrote:
-> > >>> Am Freitag, 1. Mai 2015, 13:52:47 schrieb Stephen Boyd:
-> > >>>>> Instead I guess we could hook it less deep into clk_get_sys, like in
-> > >>>>> the
-> > >>>>> following patch?
-> > >>>> 
-> > >>>> It looks like it will work at least, but still I'd prefer to keep the
-> > >>>> orphan check contained to clk.c. How about this compile tested only
-> > >>>> patch?
-> > >>> 
-> > >>> I gave this a spin on my rk3288-firefly board. It still boots, the
-> > >>> clock tree looks the same and it also still defers nicely in the
-> > >>> scenario I needed it for. The implementation also looks nice - and of
-> > >>> course much more compact than my check in two places :-) . I don't
-> > >>> know if you want to put this as follow-up on top or fold it into the
-> > >>> original orphan-check, so in any case
-> > >>> 
-> > >>> Tested-by: Heiko Stuebner <heiko@sntech.de>
-> > >>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> > >> 
-> > >> Thanks. I'm leaning towards tossing your patch 2/2 and replacing it
-> > >> with
-> > >> my patch and a note that it's based on an earlier patch from you.
-> > > 
-> > > It appears this has landed in linux-next in the form of 882667c1fcf1
-> > > clk: prevent orphan clocks from being used.  A bunch of boot failures
-> > > for sunxi in today's linux-next[1] were bisected down to that patch.
-> > > 
-> > > I confirmed that reverting that commit on top of next/master gets
-> > > sunxi booting again.
-> > 
-> > Thanks for the report. I've removed the two clk orphan patches from
-> > clk-next. Would it be possible to try with next-20150507 and
-> > clk_ignore_unused on the command line?
-> 
-> This makes it work, but it's not really an option.
-> 
-> > Also we can try to see if critical clocks aren't being forced on by
-> > applying this patch and looking for clk_get() failures
-> 
-> And that shows that the CPU and DDR clocks are not protected, which
-> obviously is pretty mad.
-> 
-> I've mass converted all our probing code to use OF_CLK_DECLARE, and
-> make things work again.
-> 
-> http://code.bulix.org/5goa5j-88345?raw
-> 
-> Is this an acceptable solution?
-> 
-> We were already moving to this, I'm not really fond of doing this like
-> that, but I guess this whole debacle makes it necessary.
+v3:
+- reword the comment which explains that spi_nor_set_protocol() is used by
+  the spi-nor framework to notify lower layers, especially the (Q)SPI
+  controller about a protocol change.
+- change the definitions of register/bitfield macros in the Atmel QSPI
+  controller driver: get rid of concatenation operator and use BIT and
+  GENMASK macros when possible.
+- use #define[SPACE] instead of #define[TAB]
 
+v2:
+- remove the patches to set the "latency code" of Spansion QSPI memories
+  (support of Spansion memories may be submitted in later series).
+- rename "qspi" node into "spi" in the DT example to fit ePAPR standard.
+- remove the useless "qspi0" label from the DT node example.
+- remove the leading 0 from the size of the second memory region to make
+  it consistent with the size of the first memory region.
+- indent the DT bindings documentation to make it more readable.
+- remove the useless ".bus	= &platform_bus_type," line from the
+  platform driver definition.
 
-did this lead anywhere meanwhile.
+v1:
 
-Last I remember the change to orphan handling made sunxi fail, but I'm still 
-hoping to get this usable at some point :-)
+This series of patches add support for the new Atmel QSPI controller
+embedded inside sama5d2x SoCs.
 
+These patches were first developped for linux-3.18-at91 and tested on a
+sama5d27 Xplained ultra board, which embeds a Micron n25q128a13 QSPI NOR
+flash memory. Then the series was adapted for mainline.
 
-Thanks
-Heiko
+Cyrille Pitchen (5):
+  mtd: spi-nor: notify (Q)SPI controller about protocol change
+  Documentation: mtd: add a DT property to set the number of dummy
+    cycles
+  mtd: spi-nor: allow to tune the number of dummy cycles
+  Documentation: atmel-quadspi: add binding file for Atmel QSPI driver
+  mtd: atmel-quadspi: add driver for Atmel QSPI controller
+
+ .../devicetree/bindings/mtd/atmel-quadspi.txt      |  29 +
+ .../devicetree/bindings/mtd/jedec,spi-nor.txt      |   6 +
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/atmel-quadspi.c                | 877 +++++++++++++++++++++
+ drivers/mtd/spi-nor/spi-nor.c                      | 118 ++-
+ include/linux/mtd/spi-nor.h                        |  15 +
+ 7 files changed, 1034 insertions(+), 19 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mtd/atmel-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/atmel-quadspi.c
+
+-- 
+1.8.2.2
