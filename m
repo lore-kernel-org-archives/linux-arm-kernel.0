@@ -1,44 +1,40 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 27 Jul 2015 21:06:07 +0800
-Subject: [GIT PULL] CSR prima2_defconfig fixes for 4.2
-Message-ID: <CAGsJ_4xHZsM46zPzZwq-1na5ScxV8bBe+yY_aQY1Hd6re6Dv_g@mail.gmail.com>
+From: nschichan@freebox.fr (Nicolas Schichan)
+Date: Mon, 27 Jul 2015 15:06:49 +0200
+Subject: [PATCH V3 net-next 1/3] ARM: net: add support for BPF_ANC |
+ SKF_AD_PKTTYPE in ARM JIT.
+In-Reply-To: <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
+References: <20150724.223155.121697079062172205.davem@davemloft.net>
+ <1438002411-8709-1-git-send-email-nschichan@freebox.fr>
+Message-ID: <1438002411-8709-2-git-send-email-nschichan@freebox.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
+---
+ arch/arm/net/bpf_jit_32.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/baohua/linux.git
-tags/prima2-defconfig-for-4.2
-
-for you to fetch changes up to 764c222555fe80cbc8fcbed985863e9b07858d51:
-
-  ARM: prima2_defconfig: enable build for hwspinlock (2015-07-28 04:41:20 +0800)
-
-----------------------------------------------------------------
-enable SiRFSoC device drivers in CSR prima2_defconfig
-
-make savedefconfig at first, then enable
-1. sdhci driver
-2. onkey
-3. rtc
-4. hwspinlock
-for prima2_defconfig
-
-----------------------------------------------------------------
-Barry Song (5):
-      ARM: prima2_defconfig: fix the outdated defconfig
-      ARM: prima2_defconfig: enable build for SiRFSoC SDHC host
-      ARM: prima2_defconfig: enable build for misc input
-      ARM: prima2_defconfig: enable build for RTC
-      ARM: prima2_defconfig: enable build for hwspinlock
-
- arch/arm/configs/prima2_defconfig |   12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
-
--barry
+diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+index c011e22..6ff248c 100644
+--- a/arch/arm/net/bpf_jit_32.c
++++ b/arch/arm/net/bpf_jit_32.c
+@@ -895,6 +895,17 @@ b_epilogue:
+ 				OP_IMM3(ARM_AND, r_A, r_A, 0x1, ctx);
+ 			}
+ 			break;
++		case BPF_ANC | SKF_AD_PKTTYPE:
++			ctx->seen |= SEEN_SKB;
++			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff,
++						  __pkt_type_offset[0]) != 1);
++			off = PKT_TYPE_OFFSET();
++			emit(ARM_LDRB_I(r_A, r_skb, off), ctx);
++			emit(ARM_AND_I(r_A, r_A, PKT_TYPE_MAX), ctx);
++#ifdef __BIG_ENDIAN_BITFIELD
++			emit(ARM_LSR_I(r_A, r_A, 5), ctx);
++#endif
++			break;
+ 		case BPF_ANC | SKF_AD_QUEUE:
+ 			ctx->seen |= SEEN_SKB;
+ 			BUILD_BUG_ON(FIELD_SIZEOF(struct sk_buff,
+-- 
+1.9.1
