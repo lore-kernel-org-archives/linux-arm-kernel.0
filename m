@@ -1,51 +1,186 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Mon, 27 Jul 2015 19:36:26 +0200
-Subject: [PATCH 3/3] ARM: errata 430973: move !ARCH_MULTIPLATFORM to
- Kconfig
-In-Reply-To: <55B6011C.9070906@codethink.co.uk>
-References: <1437612483-30160-1-git-send-email-sre@kernel.org>
- <1437612483-30160-4-git-send-email-sre@kernel.org>
- <20150723123553.GE7576@n2100.arm.linux.org.uk>
- <20150724001605.GA1453@earth>
- <20150726225145.GF7576@n2100.arm.linux.org.uk>
- <20150727011447.GA23087@earth> <55B6011C.9070906@codethink.co.uk>
-Message-ID: <20150727173625.GC22086@earth>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 27 Jul 2015 20:43:01 +0300
+Subject: [PATCH] driver core: correct device's shutdown order
+Message-ID: <1438018981-13893-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Now device's shutdown sequence is performed in reverse order of their
+registration in devices_kset list and this sequence corresponds to the
+reverse device's creation order. So, devices_kset data tracks
+"parent<-child" device's dependencies only.
 
-On Mon, Jul 27, 2015 at 10:59:56AM +0100, Ben Dooks wrote:
-> > I think you missed the part adding the !ARCH_MULTIPLATFORM 
-> > dependency in Kconfig for ARM_ERRATA_430973. I only removed the 
-> > check in the sourcecode, since it is no longer required with the 
-> > dependency being in Kconfig.
-> > 
-> > So I guess there are 3 options now:
-> > 
-> > 1. Add !ARCH_MULTIPLATFORM dependency to Kconfig, keep extra check 
-> > in the sourcecode 2. Add !ARCH_MULTIPLATFORM dependency to Kconfig,
-> > remove extra check in the sourcecode 3. Remove !ARCH_MULTIPLATFORM
-> > dependency alltogether
-> > 
-> > I will send an appropriate patch, if you tell me your preferred 
-> > option.
-> 
-> This isn't the only place ARM_ERRATA_430973 is used, [...]
+Unfortunately, that's not enough and causes problems in case of
+implementing board's specific shutdown procedures. For example [1]:
+"DRA7XX_evm uses PCF8575 and one of the PCF output lines feeds to
+MMC/SD and this line should be driven high in order for the MMC/SD to
+be detected. This line is modelled as regulator and the hsmmc driver
+takes care of enabling and disabling it. In the case of 'reboot',
+during shutdown path as part of it's cleanup process the hsmmc driver
+disables this regulator. This makes MMC boot not functional."
 
-The dependency on ARM_ERRATA_430973 has been removed from
-arch/arm/mm/proc-v7-2level.S in 4.1 (commit id e748994), so
-that it always flushes. The only additional places are in the
-Nokia N900 boardcode and the N900 pdata-quirk, which are
-removed in PATCH 1/3.
+To handle this issue the .shutdown() callback could be implemented
+for PCF8575 device where corresponding GPIO pins will be configured to
+states, required for correct warm/cold reset. This can be achieved
+only when all .shutdown() callbacks have been called already for all
+PCF8575's consumers. But devices_kset is not filled correctly now:
 
-So actually it is the only place.
+devices_kset: Device61 4e000000.dmm
+devices_kset: Device62 48070000.i2c
+devices_kset: Device63 48072000.i2c
+devices_kset: Device64 48060000.i2c
+devices_kset: Device65 4809c000.mmc
+...
+devices_kset: Device102 fixedregulator-sd
+...
+devices_kset: Device181 0-0020 // PCF8575
+devices_kset: Device182 gpiochip496
+devices_kset: Device183 0-0021 // PCF8575
+devices_kset: Device184 gpiochip480
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150727/7c76e4e5/attachment.sig>
+As can be seen from above .shutdown() callback for PCF8575 will be called
+before its consumers, which, in turn means, that any changes of PCF8575
+GPIO's pins will be or unsafe or overwritten later by GPIO's consumers.
+The problem can be solved if devices_kset list will be filled not only
+according device creation order, but also according device's probing
+order to track "supplier<-consumer" dependencies also.
+
+Hence, as a fix, lets add devices_kset_move_last(),
+devices_kset_move_before(), devices_kset_move_after() and call them
+from device_move() and also add call of devices_kset_move_last() in
+really_probe(). After this change all entries in devices_kset will
+be sorted according to device's creation ("parent<-child") and
+probing ("supplier<-consumer") order.
+
+devices_kset after:
+devices_kset: Device121 48070000.i2c
+devices_kset: Device122 i2c-0
+...
+devices_kset: Device147 regulator.24
+devices_kset: Device148 0-0020
+devices_kset: Device149 gpiochip496
+devices_kset: Device150 0-0021
+devices_kset: Device151 gpiochip480
+devices_kset: Device152 0-0019
+...
+devices_kset: Device372 fixedregulator-sd
+devices_kset: Device373 regulator.29
+devices_kset: Device374 4809c000.mmc
+devices_kset: Device375 mmc0
+
+[1] http://www.spinics.net/lists/linux-mmc/msg29825.html
+
+Cc: Sekhar Nori <nsekhar@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/base/base.h |  1 +
+ drivers/base/core.c | 49 +++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/base/dd.c   |  8 ++++++++
+ 3 files changed, 58 insertions(+)
+
+diff --git a/drivers/base/base.h b/drivers/base/base.h
+index fd3347d..8c5eb73 100644
+--- a/drivers/base/base.h
++++ b/drivers/base/base.h
+@@ -134,6 +134,7 @@ extern int devres_release_all(struct device *dev);
+ 
+ /* /sys/devices directory */
+ extern struct kset *devices_kset;
++extern void devices_kset_move_last(struct device *dev);
+ 
+ #if defined(CONFIG_MODULES) && defined(CONFIG_SYSFS)
+ extern void module_add_driver(struct module *mod, struct device_driver *drv);
+diff --git a/drivers/base/core.c b/drivers/base/core.c
+index dafae6d..fc5a558 100644
+--- a/drivers/base/core.c
++++ b/drivers/base/core.c
+@@ -534,6 +534,52 @@ static DEVICE_ATTR_RO(dev);
+ struct kset *devices_kset;
+ 
+ /**
++ * devices_kset_move_before - Move device in the devices_kset's list.
++ * @deva: Device to move.
++ * @devb: Device @deva should come before.
++ */
++static void devices_kset_move_before(struct device *deva, struct device *devb)
++{
++	if (!devices_kset)
++		return;
++	pr_debug("devices_kset: Moving %s before %s\n",
++		 dev_name(deva), dev_name(devb));
++	spin_lock(&devices_kset->list_lock);
++	list_move_tail(&deva->kobj.entry, &devb->kobj.entry);
++	spin_unlock(&devices_kset->list_lock);
++}
++
++/**
++ * devices_kset_move_after - Move device in the devices_kset's list.
++ * @deva: Device to move
++ * @devb: Device @deva should come after.
++ */
++static void devices_kset_move_after(struct device *deva, struct device *devb)
++{
++	if (!devices_kset)
++		return;
++	pr_debug("devices_kset: Moving %s after %s\n",
++		 dev_name(deva), dev_name(devb));
++	spin_lock(&devices_kset->list_lock);
++	list_move(&deva->kobj.entry, &devb->kobj.entry);
++	spin_unlock(&devices_kset->list_lock);
++}
++
++/**
++ * devices_kset_move_last - move the device to the end of devices_kset's list.
++ * @dev: device to move
++ */
++void devices_kset_move_last(struct device *dev)
++{
++	if (!devices_kset)
++		return;
++	pr_debug("devices_kset: Moving %s to end of list\n", dev_name(dev));
++	spin_lock(&devices_kset->list_lock);
++	list_move_tail(&dev->kobj.entry, &devices_kset->list);
++	spin_unlock(&devices_kset->list_lock);
++}
++
++/**
+  * device_create_file - create sysfs attribute file for device.
+  * @dev: device.
+  * @attr: device attribute descriptor.
+@@ -1923,12 +1969,15 @@ int device_move(struct device *dev, struct device *new_parent,
+ 		break;
+ 	case DPM_ORDER_DEV_AFTER_PARENT:
+ 		device_pm_move_after(dev, new_parent);
++		devices_kset_move_after(dev, new_parent);
+ 		break;
+ 	case DPM_ORDER_PARENT_BEFORE_DEV:
+ 		device_pm_move_before(new_parent, dev);
++		devices_kset_move_before(new_parent, dev);
+ 		break;
+ 	case DPM_ORDER_DEV_LAST:
+ 		device_pm_move_last(dev);
++		devices_kset_move_last(dev);
+ 		break;
+ 	}
+ 
+diff --git a/drivers/base/dd.c b/drivers/base/dd.c
+index a638bbb..cc2b1d4 100644
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -304,6 +304,14 @@ static int really_probe(struct device *dev, struct device_driver *drv)
+ 			goto probe_failed;
+ 	}
+ 
++	/*
++	 * Ensure devices are listed in devices_kset in correct order
++	 * It's important to move Dev to the end of devices_kset before
++	 * calling .probe, because it could be recursive and parent Dev
++	 * should always go first
++	 */
++	devices_kset_move_last(dev);
++
+ 	if (dev->bus->probe) {
+ 		ret = dev->bus->probe(dev);
+ 		if (ret)
+-- 
+2.4.6
