@@ -1,17 +1,47 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 27 Jul 2015 14:03:39 +0530
-Subject: [PATCH v2 1/7] opp: add dev_pm_opp_get_turbo_mode_setting() helper
-In-Reply-To: <1436456621-29839-2-git-send-email-b.zolnierkie@samsung.com>
+Date: Mon, 27 Jul 2015 14:05:31 +0530
+Subject: [PATCH v2 2/7] cpufreq: opp: fix handling of turbo modes
+In-Reply-To: <1436456621-29839-3-git-send-email-b.zolnierkie@samsung.com>
 References: <1436456621-29839-1-git-send-email-b.zolnierkie@samsung.com>
- <1436456621-29839-2-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <20150727083339.GB31611@linux>
+ <1436456621-29839-3-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <20150727083531.GC31611@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09-07-15, 17:43, Bartlomiej Zolnierkiewicz wrote:
-> +bool dev_pm_opp_get_turbo_mode_setting(struct dev_pm_opp *opp)
+$subject is a bit wrong, we aren't fixing any issue here. We are
+supporting a new feature and so it should be like:
 
-This should be named dev_pm_opp_is_turbo().
+cpufreq: Mark boost frequencies based on OPP's turbo mode
+
+On 09-07-15, 17:43, Bartlomiej Zolnierkiewicz wrote:
+> Turbo modes should be marked with CPUFREQ_BOOST_FREQ flag in
+> the frequency table entry.
+> 
+> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> Cc: Michael Turquette <mturquette@baylibre.com>
+> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/cpufreq/cpufreq_opp.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/cpufreq_opp.c b/drivers/cpufreq/cpufreq_opp.c
+> index 773bcde..f0cf502 100644
+> --- a/drivers/cpufreq/cpufreq_opp.c
+> +++ b/drivers/cpufreq/cpufreq_opp.c
+> @@ -75,6 +75,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+>  		}
+>  		freq_table[i].driver_data = i;
+>  		freq_table[i].frequency = rate / 1000;
+> +		if (dev_pm_opp_get_turbo_mode_setting(opp) == true)
+> +			freq_table[i].flags |= CPUFREQ_BOOST_FREQ;
+>  	}
+>  
+>  	freq_table[i].driver_data = i;
+
+Rest look fine.
 
 -- 
 viresh
