@@ -1,55 +1,72 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 27 Jul 2015 14:43:20 +0200
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <20150727120918.191F76C82FB4@dd34104.kasserver.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de><55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com>
-Message-ID: <55B62768.6040403@redhat.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Mon, 27 Jul 2015 13:43:46 +0100
+Subject: [Xen-devel] [PATCH v2] xen/events: Support event channel rebind
+ on ARM
+In-Reply-To: <55B62588.3050502@citrix.com>
+References: <1437996911-18985-1-git-send-email-julien.grall@citrix.com>
+ <55B62588.3050502@citrix.com>
+Message-ID: <55B62782.9050701@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27-07-15 14:09, public_timo.s at silentcreek.de wrote:
-> Hi,
->
-> Hans de Goede schrieb am 27.07.2015 10:07:
->
->> I've a simular patch here:
+On 27/07/15 13:35, David Vrabel wrote:
+> On 27/07/15 12:35, Julien Grall wrote:
+>> Currently, the event channel rebind code is gated with the presence of
+>> the vector callback.
 >>
->> https://github.com/jwrdegoede/linux-sunxi/commit/6a30b7d5be6012b81e5e1439a444e41c0ac1afc1
+>> The virtual interrupt controller on ARM has the concept of per-CPU
+>> interrupt (PPI) which allow us to support per-VCPU event channel.
+>> Therefore there is no need of vector callback for ARM.
 >>
->> I did not submit this upstream yet as it is part of a series to enable the otg
->> controller on the bananapi which needs axp-usb-power-supply support for which
->> the actual powersupply driver changes are still pending.
-> Oops, I see. Are you planning to submit this for 4.3 or later?
+>> Xen is already using a free PPI to notify the guest VCPU of an event.
+>> Furthermore, the xen code initialization in Linux (see
+>> arch/arm/xen/enlighten.c) is requesting correctly a per-CPU IRQ.
+>>
+>> Introduce new helper xen_support_evtchn_rebind to allow architecture
+>> decide whether rebind an event is support or not. It will always return
+>> 1 on ARM and keep the same behavior on x86.
+>>
+>> This is also allow us to drop the usage of xen_have_vector_callback
+>> entirely in the ARM code.
+> 
+> This did not apply cleanly.  Please always base patches on Linus's
+> master branch.
 
-I plan to submit this for 4.3.
+My patch is based on Linus's master branch. Although, it has a
+pre-requisite of [1] which I sent a few seconds before it. Though it's
+only for applying because the 2 patches are not related.
 
->> As you can see other then you adding the cpu operating points are patches are
->> identical, which is good :)
-> Yep, that and you chose a slightly higher maximum voltage for the CPU.
->
->> IMHO we should just stick with the standard operating points unless we know
->> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
->> Lime).
-> I'd be fine with that as I don't have any stability issues with the lower
-> voltages. What about the 1008MHz operating point that I "reintroduced"? It was
-> dropped here [1]  because there was no regulator support.
+I should have mentioned it in the mail, sorry.
 
-That is in essence an overclocked setting, the max CPU voltage officially is
-1.4V, I do not think that we should provide any overclocked settings in the
-official dts files. If people really want to overclock they will have to
-modify there dts themselves IMHO.
+> This also breaks the x86 build.
 
- > Can this be reenabled
-> on board level (which means overriding the defaults inherited from
-> sun7i-a20.dtsi) or should this be done at SOC level for all boards (which
-> means we have to add regulator nodes for all boards in the first place)?
+I forgot to test this new version when I turned the macro into a static
+inline.
 
-Technically this is possible, but I do not think that it is a good idea.
+> /local/davidvr/work/k.org/tip/arch/x86/include/asm/xen/events.h: In
+> function ?xen_support_evtchn_rebind?:
+> /local/davidvr/work/k.org/tip/arch/x86/include/asm/xen/events.h:29:85:
+> error: ?xen_have_vector_callback? undeclared (first use in this function)
+>   return (!xen_hvm_domain() || xen_have_vector_callback);
+> 
+>> --- a/arch/arm/include/asm/xen/events.h
+>> +++ b/arch/arm/include/asm/xen/events.h
+>> @@ -20,4 +20,10 @@ static inline int xen_irqs_disabled(struct pt_regs *regs)
+>>  							    atomic64_t,	\
+>>  							    counter), (val))
+>>  
+>> +/* Rebind event channel is supported by default */
+>> +static inline bool xen_support_evtchn_rebind(void)
+>> +{
+>> +	return 1;
+> 
+> This should be true (similarly for arm64).
+
+Will resend a new version, and remove the dependency on [1].
 
 Regards,
 
-Hans
+[1] http://permalink.gmane.org/gmane.linux.kernel/2004690
+
+-- 
+Julien Grall
