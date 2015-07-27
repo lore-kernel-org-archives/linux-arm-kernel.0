@@ -1,45 +1,60 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 27 Jul 2015 12:44:05 +0200
-Subject: [PATCHv4 3/6] dmaengine: mv_xor: remove support for dmacap,* DT
- properties
-In-Reply-To: <20150722051653.GR23525@localhost>
-References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1436365699-6862-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20150722051653.GR23525@localhost>
-Message-ID: <20150727124405.53752fe2@free-electrons.com>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Mon, 27 Jul 2015 15:31:02 +0530
+Subject: [PATCH 7/7] ARM64: zynqmp: Add eeprom memories on i2c bus
+In-Reply-To: <84f7d2137afdc5581c1d5d9b27feb2c5e5592308.1437990464.git.michal.simek@xilinx.com>
+References: <48a75b64b05dc094e34fe27e5d03552dbfe77fe2.1437990464.git.michal.simek@xilinx.com>
+ <84f7d2137afdc5581c1d5d9b27feb2c5e5592308.1437990464.git.michal.simek@xilinx.com>
+Message-ID: <CAKfKVtG-Uq0aJYnLqACO30mNj=D7+7y5skhf8JSqnWAgoJNk7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+Hi,
 
-On Wed, 22 Jul 2015 10:46:53 +0530, Vinod Koul wrote:
+On Mon, Jul 27, 2015 at 3:18 PM, Michal Simek <michal.simek@xilinx.com> wrote:
+> Add i2c eeprom memories on i2c bus.
+>
+> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+> ---
+>
+>  arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> index 206e18eca2fb..47debdcbefbf 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+> @@ -36,6 +36,24 @@
+>         status = "okay";
+>  };
+>
+> +&i2c0 {
+> +       status = "okay";
+> +       clock-frequency = <100000>;
+If I am not wrong eeprom could work at 400k Could we make that as the speed.
 
-> >  	xor01 {
-> >  	      interrupts = <52>;
-> > -	      dmacap,memcpy;
-> > -	      dmacap,xor;
-> > -	      dmacap,memset;
-> I maybe wrong but there was an assumption that DT properties, even if bad
-> are always there as they need to be treated as kernel ABI.
-> 
-> How will it work if someone has older DT implementation or older driver?
-
-Supporting a new DT with an old kernel has never been part of the
-requirements of the DT ABI stability.
-
-Supporting an old DT with a new kernel is the actual requirement. And
-the patch I'm proposing does not break this at all: a new kernel will
-simply ignore those dmacap,* properties from an old DT, and the driver
-automatically knows by itself what are the capabilities of the
-different XOR engines.
-
-Therefore, there is no backward compatibility issue introduced by this
-patch.
-
-Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +       eeprom at 54 {
+> +               compatible = "at,24c64";
+> +               reg = <0x54>;
+> +       };
+> +};
+> +
+> +&i2c1 {
+> +       status = "okay";
+> +       clock-frequency = <100000>;
+> +       eeprom at 55 {
+> +               compatible = "at,24c64";
+> +               reg = <0x55>;
+> +       };
+> +};
+> +
+>  &gem0 {
+>         status = "okay";
+>         phy-handle = <&phy0>;
+> --
+> 2.3.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
