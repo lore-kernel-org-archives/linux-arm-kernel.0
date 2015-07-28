@@ -1,65 +1,169 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 28 Jul 2015 11:43:42 +0200
-Subject: linux-next: build failure after merge of the tip tree
-In-Reply-To: <55B74042.6070600@arm.com>
-References: <20150728124324.40f44f01@canb.auug.org.au>
- <55B74042.6070600@arm.com>
-Message-ID: <55B74ECE.5060409@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jul 2015 10:45:33 +0100
+Subject: [PATCH 2/2] arm64: Use last level TLBI for user pte changes
+In-Reply-To: <20150727174915.GM3358@arm.com>
+References: <1437728396-5408-1-git-send-email-catalin.marinas@arm.com>
+ <1437728396-5408-3-git-send-email-catalin.marinas@arm.com>
+ <20150727174915.GM3358@arm.com>
+Message-ID: <20150728094533.GA16461@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep, Stephen,
-
-On 28/07/2015 10:41, Sudeep Holla wrote:
-> Hi Stephen,
+On Mon, Jul 27, 2015 at 06:49:15PM +0100, Will Deacon wrote:
+> On Fri, Jul 24, 2015 at 09:59:56AM +0100, Catalin Marinas wrote:
+> > The flush_tlb_page() function is used on user address ranges when PTEs
+> > (or PMDs/PUDs for huge pages) were changed (attributes or clearing). For
+> > such cases, it is more efficient to invalidate only the last level of
+> > the TLB with the "tlbi vale1is" instruction.
+> > 
+> > In the TLB shoot-down case, the TLB caching of the intermediate page
+> > table levels (pmd, pud, pgd) is handled by __flush_tlb_pgtable() via the
+> > __(pte|pmd|pud)_free_tlb() functions and it is not deferred to
+> > tlb_finish_mmu() (as of commit 285994a62c80 - "arm64: Invalidate the TLB
+> > corresponding to intermediate page table levels"). The tlb_flush()
+> > function only needs to invalidate the TLB for the last level of page
+> > tables; a new arm64-specific __flush_tlb_page_range() function performs
+> > only the last level TLBI.
 > 
-> On 28/07/15 03:43, Stephen Rothwell wrote:
->> Hi all,
->>
->> After merging the tip tree, today's linux-next build (arm
->> multi_v7_defconfig) failed like this:
->>
->> arch/arm/mach-mvebu/board-v7.c: In function 'mvebu_init_irq':
->> arch/arm/mach-mvebu/board-v7.c:138:3: error: implicit declaration of function 'gic_set_irqchip_flags' [-Werror=implicit-function-declaration]
->>     gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
->>     ^
->>
->> Caused by commit
->>
->>    e6f134f8e30e ("ARM: mvebu: Allow using the GIC for wakeup in standby mode")
->>
->> from the mvebu tree interacting with commit
->>
->>    0d3f2c92e004 ("irqchip/gic: Remove redundant gic_set_irqchip_flags")
->>
->> from the tip tree.
->>
->> I have applied the following merge fix patch for today:
->>
+> [...]
 > 
-> Thanks for the fix, I was aware of this and asked Thomas Petazzoni
-> and Gregory CLEMENT to revert the commit e6f134f8e30e if possible
-> yesterday [1]
+> > diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+> > index 1643908eb5f3..48794ab79cc0 100644
+> > --- a/arch/arm64/include/asm/tlbflush.h
+> > +++ b/arch/arm64/include/asm/tlbflush.h
+> > @@ -87,7 +87,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+> >  		((unsigned long)ASID(vma->vm_mm) << 48);
+> >  
+> >  	dsb(ishst);
+> > -	asm("tlbi	vae1is, %0" : : "r" (addr));
+> > +	asm("tlbi	vale1is, %0" : : "r" (addr));
+> >  	dsb(ish);
+> >  }
+> >  
+> > @@ -97,6 +97,26 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+> >   */
+> >  #define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
+> >  
+> > +static inline void __flush_tlb_page_range(struct vm_area_struct *vma,
+> > +					  unsigned long start, unsigned long end)
+> > +{
+> > +	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
+> > +	unsigned long addr;
+> > +
+> > +	if ((end - start) > MAX_TLB_RANGE) {
+> > +		flush_tlb_mm(vma->vm_mm);
+> > +		return;
+> > +	}
+> > +
+> > +	start = asid | (start >> 12);
+> > +	end = asid | (end >> 12);
+> > +
+> > +	dsb(ishst);
+> > +	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+> > +		asm("tlbi vale1is, %0" : : "r"(addr));
+> > +	dsb(ish);
+> > +}
 > 
-
-I've just remove the commit from my branches, it should be OK now.
-
-
-Thanks,
-
-Gregory
-
-
-> Regards,
-> Sudeep
+> This is identical to __flush_tlb_range apart from the asm op.
 > 
-> [1] 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359585.html
-> 
+> What happens if you add a "const bool leaf" parameter and stick a
+> conditional inside the loop?
 
+It looks better indeed (at the same code generated). The first patch
+remains unchanged and the second patch is below ("git am -c" should be
+able to detect the scissors line):
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+-----8<--------------
+>From 8c95d0be9f25e2df6f53c16071494c4aee6aee87 Mon Sep 17 00:00:00 2001
+From: Catalin Marinas <catalin.marinas@arm.com>
+Date: Wed, 18 Mar 2015 11:28:06 +0000
+Subject: [PATCH v2] arm64: Use last level TLBI for user pte changes
+
+The flush_tlb_page() function is used on user address ranges when PTEs
+(or PMDs/PUDs for huge pages) were changed (attributes or clearing). For
+such cases, it is more efficient to invalidate only the last level of
+the TLB with the "tlbi vale1is" instruction.
+
+In the TLB shoot-down case, the TLB caching of the intermediate page
+table levels (pmd, pud, pgd) is handled by __flush_tlb_pgtable() via the
+__(pte|pmd|pud)_free_tlb() functions and it is not deferred to
+tlb_finish_mmu() (as of commit 285994a62c80 - "arm64: Invalidate the TLB
+corresponding to intermediate page table levels"). The tlb_flush()
+function only needs to invalidate the TLB for the last level of page
+tables; the __flush_tlb_range() function gains a fourth argument for
+last level TLBI.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/tlb.h      |  7 ++++++-
+ arch/arm64/include/asm/tlbflush.h | 21 ++++++++++++++++-----
+ 2 files changed, 22 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/include/asm/tlb.h b/arch/arm64/include/asm/tlb.h
+index 3a0242c7eb8d..d6e6b6660380 100644
+--- a/arch/arm64/include/asm/tlb.h
++++ b/arch/arm64/include/asm/tlb.h
+@@ -41,7 +41,12 @@ static inline void tlb_flush(struct mmu_gather *tlb)
+ 		flush_tlb_mm(tlb->mm);
+ 	} else {
+ 		struct vm_area_struct vma = { .vm_mm = tlb->mm, };
+-		flush_tlb_range(&vma, tlb->start, tlb->end);
++		/*
++		 * The intermediate page table levels are already handled by
++		 * the __(pte|pmd|pud)_free_tlb() functions, so last level
++		 * TLBI is sufficient here.
++		 */
++		__flush_tlb_range(&vma, tlb->start, tlb->end, true);
+ 	}
+ }
+ 
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index 1643908eb5f3..c3a5f83e1276 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -87,7 +87,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+ 		((unsigned long)ASID(vma->vm_mm) << 48);
+ 
+ 	dsb(ishst);
+-	asm("tlbi	vae1is, %0" : : "r" (addr));
++	asm("tlbi	vale1is, %0" : : "r" (addr));
+ 	dsb(ish);
+ }
+ 
+@@ -97,8 +97,9 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
+  */
+ #define MAX_TLB_RANGE	(1024UL << PAGE_SHIFT)
+ 
+-static inline void flush_tlb_range(struct vm_area_struct *vma,
+-				   unsigned long start, unsigned long end)
++static inline void __flush_tlb_range(struct vm_area_struct *vma,
++				     unsigned long start, unsigned long end,
++				     bool last_level)
+ {
+ 	unsigned long asid = (unsigned long)ASID(vma->vm_mm) << 48;
+ 	unsigned long addr;
+@@ -112,11 +113,21 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
+ 	end = asid | (end >> 12);
+ 
+ 	dsb(ishst);
+-	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12))
+-		asm("tlbi vae1is, %0" : : "r"(addr));
++	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
++		if (last_level)
++			asm("tlbi vale1is, %0" : : "r"(addr));
++		else
++			asm("tlbi vae1is, %0" : : "r"(addr));
++	}
+ 	dsb(ish);
+ }
+ 
++static inline void flush_tlb_range(struct vm_area_struct *vma,
++				   unsigned long start, unsigned long end)
++{
++	__flush_tlb_range(vma, start, end, false);
++}
++
+ static inline void flush_tlb_kernel_range(unsigned long start, unsigned long end)
+ {
+ 	unsigned long addr;
