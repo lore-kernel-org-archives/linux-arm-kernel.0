@@ -1,36 +1,57 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue, 28 Jul 2015 17:09:29 +0200 (CEST)
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <55B790BA.5000509@redhat.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
- <55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com>
- <55B62768.6040403@redhat.com>
- <20150728124911.GA2564@lukather><55B790BA.5000509@redhat.com>
-Message-ID: <20150728150929.233B56C80391@dd34104.kasserver.com>
+From: dinh.linux@gmail.com (dinh.linux at gmail.com)
+Date: Tue, 28 Jul 2015 10:12:44 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.3
+Message-ID: <1438096364-28519-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd, Kevin, and Olof:
 
-Hans de Goede schrieb am 28.07.2015 16:24:
-> I've no problem with Timo submitting a cleaned up version of his
-> patch and you taking that instead. I just wanted to point out that
-> I do have a similar patch pending.
+Please consider pulling these patches for v4.3.
 
-Ok, I will do that. It might take a couple of days, though, as I will be moving
-moving in the next few days as well.
+Thanks,
+Dinh
 
-However, another question first then: What maximum voltage for the dcdc2
-regulator should we use then? You used 1.5V, I used 1.45V so far, which is what
-Cubieboard 2 and Cubietruck use.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-But after the discussion about overvoltaged settings, I'm wondering whether we
-should limit the regulartor (and not only the opp) to 1.40V as well? Or is
-1.45V ok for everybody here?
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
+are available in the git repository at:
 
-Thanks and regards,
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.3
 
-Timo
+for you to fetch changes up to 2e4c7588f6c1d24ae991a85140e05139e953c9b5:
+
+  ARM: socfpga: dts: add osc1 as a possible parent for dbg_base_clk (2015-07-24 22:10:59 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.3
+- Update clocking for DTS nodes
+- Add DTS board file for Terasic DE0 Atlas board
+- Use stdout-patch for chosen node
+- Enable prefetch-data and prefetch-instr
+
+----------------------------------------------------------------
+Dalon Westergreen (1):
+      ARM: dts: socfpga: Add support of Terasic DE0 Atlas board
+
+Dinh Nguyen (5):
+      ARM: dts: socfpga: enable the data and instruction prefetch for the l2 cache
+      ARM: dts: socfpga: use stdout-path for chosen node
+      ARM: socfpga: dts: Correct the parent clock for l3_sp_clk and dbg_clk
+      ARM: socfpga: dts: Fix gpio dts entry for the correct clock
+      ARM: socfpga: dts: add osc1 as a possible parent for dbg_base_clk
+
+Matthew Gerlach (1):
+      ARM: socfpga: dts: add missing clock gates to socfpga.dtsi
+
+ arch/arm/boot/dts/Makefile                        |   1 +
+ arch/arm/boot/dts/socfpga.dtsi                    |  45 +++++++--
+ arch/arm/boot/dts/socfpga_arria10.dtsi            |   5 +
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi      |   3 +-
+ arch/arm/boot/dts/socfpga_arria5_socdk.dts        |   3 +-
+ arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts | 111 ++++++++++++++++++++++
+ arch/arm/boot/dts/socfpga_cyclone5_socdk.dts      |   3 +-
+ arch/arm/boot/dts/socfpga_cyclone5_sockit.dts     |   3 +-
+ 8 files changed, 163 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/boot/dts/socfpga_cyclone5_de0_sockit.dts
