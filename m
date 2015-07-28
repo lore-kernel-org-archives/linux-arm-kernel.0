@@ -1,71 +1,37 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 28 Jul 2015 09:04:02 +0000
-Subject: [PATCH 08/10] ARM: dts: atlas7: add software digital radio nodes and
- its DMA channels
+Date: Tue, 28 Jul 2015 09:04:03 +0000
+Subject: [PATCH 09/10] ARM: dts: atlas7: put pinctl property to get pinmux for
+ NAND
 In-Reply-To: <1438074244-18708-1-git-send-email-21cnbao@gmail.com>
 References: <1438074244-18708-1-git-send-email-21cnbao@gmail.com>
-Message-ID: <1438074244-18708-9-git-send-email-21cnbao@gmail.com>
+Message-ID: <1438074244-18708-10-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yonghui Zhang <yonghui.zhang@csr.com>
+From: Huayi Li <huayi.li@csr.com>
 
-this patch adds SDR(software digital raio) nodes and the DMA channels
-for it.
+Nand controller often share some pins with sd/mmc controller on
+atlas and prima series, nand node can be disabled if the pins are
+used by sd/mmc controller.
 
-Signed-off-by: Yonghui Zhang <yonghui.zhang@csr.com>
+Signed-off-by: Huayi Li <huayi.li@csr.com>
 Signed-off-by: Barry Song <Baohua.Song@csr.com>
 ---
- arch/arm/boot/dts/atlas7.dtsi | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/atlas7.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/arch/arm/boot/dts/atlas7.dtsi b/arch/arm/boot/dts/atlas7.dtsi
-index 456cf81..de38bc98 100644
+index de38bc98..83449b3 100644
 --- a/arch/arm/boot/dts/atlas7.dtsi
 +++ b/arch/arm/boot/dts/atlas7.dtsi
-@@ -1370,11 +1370,42 @@
- 			compatible = "arteris, flexnoc", "simple-bus";
- 			#address-cells = <1>;
- 			#size-cells = <1>;
--			ranges = <0x13000000 0x13000000 0x3000>;
-+			ranges = <0x13000000 0x13000000 0x3000>,
-+				<0x13010000 0x13010000 0x1400>,
-+				<0x13010800 0x13010800 0x100>,
-+				<0x13011000 0x13011000 0x100>;
- 			gpum at 0x13000000 {
- 				compatible = "sirf,nocfw-gpum";
- 				reg = <0x13000000 0x3000>;
- 			};
-+			dmacsdrr: dma-controller at 13010800 {
-+				cell-index = <5>;
-+				compatible = "sirf,atlas7-dmac-v2";
-+				reg = <0x13010800 0x100>;
-+				interrupts = <0 8 0>;
-+				clocks = <&car 127>;
-+				#dma-cells = <1>;
-+				#dma-channels = <1>;
-+			};
-+			dmacsdrw: dma-controller at 13011000 {
-+				cell-index = <6>;
-+				compatible = "sirf,atlas7-dmac-v2";
-+				reg = <0x13011000 0x100>;
-+				interrupts = <0 9 0>;
-+				clocks = <&car 127>;
-+				#dma-cells = <1>;
-+				#dma-channels = <1>;
-+			};
-+			sdr at 0x13010000 {
-+				compatible = "sirf,atlas7-sdr";
-+				reg = <0x13010000 0x1400>;
-+				interrupts = <0 7 0>,
-+					   <0 8 0>,
-+					   <0 9 0>;
-+				clocks = <&car 127>;
-+				dmas = <&dmacsdrr 0>, <&dmacsdrw 0>;
-+				dma-names = "tx", "rx";
-+			};
- 		};
- 
- 		mediam {
+@@ -1458,6 +1458,8 @@
+ 			nand at 17050000 {
+ 				compatible = "sirf,atlas7-nand";
+ 				reg = <0x17050000 0x10000>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&nd_df_pmx>;
+ 				interrupts = <0 41 0>;
+ 				clocks = <&car 108>, <&car 112>;
+ 				clock-names = "nand_io", "nand_nand";
 -- 
 1.9.1
