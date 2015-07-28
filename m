@@ -1,79 +1,227 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jul 2015 14:47:10 +0100
-Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <1438090663.25925.75.camel@mhfsdcap03>
-References: <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
- <20150721171101.GN31095@arm.com>
- <1437715466.23932.68.camel@mhfsdcap03>
- <20150724165325.GC21177@arm.com>
- <1437970868.25925.20.camel@mhfsdcap03> <55B63AB2.4050006@arm.com>
- <20150727141102.GJ3358@arm.com>
- <1438060094.25925.69.camel@mhfsdcap03>
- <20150728110023.GH29209@arm.com>
- <1438090663.25925.75.camel@mhfsdcap03>
-Message-ID: <20150728134710.GM29209@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Jul 2015 14:46:21 +0100
+Subject: [PATCH v6 14/19] irqchip: gicv3-its: Make the PCI/MSI code standalone
+In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
+References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 02:37:43PM +0100, Yong Wu wrote:
-> On Tue, 2015-07-28 at 12:00 +0100, Will Deacon wrote:
-> > On Tue, Jul 28, 2015 at 06:08:14AM +0100, Yong Wu wrote:
-> > > On Mon, 2015-07-27 at 15:11 +0100, Will Deacon wrote:
-> > > > On Mon, Jul 27, 2015 at 03:05:38PM +0100, Robin Murphy wrote:
-> > > > > On 27/07/15 05:21, Yong Wu wrote:
-> > > > > >>>>> +       } else {        /* page or largepage */
-> > > > > >>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
-> > > > > >>>>> +                       if (large) { /* special Bit */
-> > > > > >>>>
-> > > > > >>>> This definitely needs a better comment! What exactly are you doing here
-> > > > > >>>> and what is that quirk all about?
-> > > > > >>>
-> > > > > >>> I use this quirk is for MTK Special Bit as we don't have the XN bit in
-> > > > > >>> pagetable.
-> > > > > >>
-> > > > > >> I'm still not really clear about what this is.
-> > > > > >
-> > > > > > There is some difference between the standard spec and MTK HW,
-> > > > > > Our hw don't implement some bits, like XN and AP.
-> > > > > > So I add a quirk for MTK special.
-> > > > > 
-> > > > > When you say it doesn't implement these bits, do you mean that having 
-> > > > > them set will lead to Bad Things happening in the hardware, or that it 
-> > > > > will simply ignore them and not enforce any of the protections they 
-> > > > > imply? The former case would definitely want clearly documenting 
-> > > > > somewhere, whereas for the latter case I'm not sure it's even worth the 
-> > > > > complication of having a quirk - if the value doesn't matter there seems 
-> > > > > little point in doing a special dance just for the sake of semantic 
-> > > > > correctness of the in-memory PTEs, in my opinion.
-> > > > 
-> > > > Agreed. We should only use quirks if the current (architecturally
-> > > > compliant) code causes real issues with the hardware. Then the quirk can
-> > > > be used to either avoid the problematic routines or to take extra steps
-> > > > to make things work as the architecture intended.
-> > > > 
-> > > > I've asked how this IOMMU differs from the architecture on a number of
-> > > > occasions, but I'm still yet to receive a response other than "it's special".
-> > > > 
-> > > 
-> > > After check further with DE, Our pagetable is refer to ARM-v7's
-> > > short-descriptor which is a little different from ARM-v8. like bit0(PXN)
-> > > in section and supersection, I didn't read ARM-v7 spec before, so I add
-> > > a MTK quirk to disable PXN bit in section and supersection.(if the PXN
-> > > bit is wrote in ARM-v7 spec, HW will page fault.)
-> > 
-> > I've been reviewing this using the ARMv7 ARM (Rev.C of DDI0406C) the whole
-> > time. PXN is there as an optional field in non-LPAE implementations. That's
-> > fine and doesn't require any quirks.
-> 
-> Thanks for your confirm.
-> Then I delete all the PXN bit in here?
-> 
-> Take a example, 
-> #define ARM_SHORT_PGD_SECTION_XN		(BIT(0) | BIT(4))
-> I will change it to "BIT(4)".
+We can now lookup the base ITS domain, making it possible to
+initialize the PCI/MSI code independently from the main ITS
+subsystem.
 
-Yes. Then the PXN bit can be added later as a quirk when we have an
-implementation that supports it.
+This allows us to remove all the previously add hooks.
 
-Will
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c | 47 +++++++++++++++++++++++++++----
+ drivers/irqchip/irq-gic-v3-its.c         | 48 +++++++++++++++++++++-----------
+ include/linux/irqchip/arm-gic-v3.h       |  5 ----
+ 3 files changed, 73 insertions(+), 27 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index 7614721..cf351c6 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -20,8 +20,6 @@
+ #include <linux/of_irq.h>
+ #include <linux/of_pci.h>
+ 
+-#include <linux/irqchip/arm-gic-v3.h>
+-
+ static void its_mask_msi_irq(struct irq_data *d)
+ {
+ 	pci_msi_mask_irq(d);
+@@ -74,17 +72,24 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+ {
+ 	struct pci_dev *pdev;
+ 	struct its_pci_alias dev_alias;
++	struct msi_domain_info *msi_info;
+ 
+ 	if (!dev_is_pci(dev))
+ 		return -EINVAL;
+ 
++	msi_info = msi_get_domain_info(domain->parent);
++
+ 	pdev = to_pci_dev(dev);
+ 	dev_alias.pdev = pdev;
+ 	dev_alias.count = nvec;
+ 
+ 	pci_for_each_dma_alias(pdev, its_get_pci_alias, &dev_alias);
+ 
+-	return its_msi_prepare(domain, dev_alias.dev_id, dev_alias.count, info);
++	/* ITS specific DeviceID, as the core ITS ignores dev. */
++	info->scratchpad[0].ul = dev_alias.dev_id;
++
++	return msi_info->ops->msi_prepare(domain->parent,
++					  dev, dev_alias.count, info);
+ }
+ 
+ static struct msi_domain_ops its_pci_msi_ops = {
+@@ -98,8 +103,38 @@ static struct msi_domain_info its_pci_msi_domain_info = {
+ 	.chip	= &its_msi_irq_chip,
+ };
+ 
+-struct irq_domain *its_pci_msi_alloc_domain(struct device_node *np,
+-					    struct irq_domain *parent)
++static struct of_device_id its_device_id[] = {
++	{	.compatible	= "arm,gic-v3-its",	},
++	{},
++};
++
++static int __init its_pci_msi_init(void)
+ {
+-	return pci_msi_create_irq_domain(np, &its_pci_msi_domain_info, parent);
++	struct device_node *np;
++	struct irq_domain *parent;
++
++	for (np = of_find_matching_node(NULL, its_device_id); np;
++	     np = of_find_matching_node(np, its_device_id)) {
++		if (!of_property_read_bool(np, "msi-controller"))
++			continue;
++
++		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
++		if (!parent || !msi_get_domain_info(parent)) {
++			pr_err("%s: unable to locate ITS domain\n",
++			       np->full_name);
++			continue;
++		}
++
++		if (!pci_msi_create_irq_domain(np, &its_pci_msi_domain_info,
++					       parent)) {
++			pr_err("%s: unable to create PCI domain\n",
++			       np->full_name);
++			continue;
++		}
++
++		pr_info("PCI/MSI: %s domain created\n", np->full_name);
++	}
++
++	return 0;
+ }
++early_initcall(its_pci_msi_init);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index ca8b1cc..21b002f 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -60,7 +60,6 @@ struct its_collection {
+ struct its_node {
+ 	raw_spinlock_t		lock;
+ 	struct list_head	entry;
+-	struct irq_domain	*domain;
+ 	void __iomem		*base;
+ 	unsigned long		phys_base;
+ 	struct its_cmd_block	*cmd_base;
+@@ -1152,13 +1151,25 @@ static int its_alloc_device_irq(struct its_device *dev, irq_hw_number_t *hwirq)
+ 	return 0;
+ }
+ 
+-int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
+-		    int nvec, msi_alloc_info_t *info)
++static int its_msi_prepare(struct irq_domain *domain, struct device *dev,
++			   int nvec, msi_alloc_info_t *info)
+ {
+ 	struct its_node *its;
+ 	struct its_device *its_dev;
++	struct msi_domain_info *msi_info;
++	u32 dev_id;
++
++	/*
++	 * We ignore "dev" entierely, and rely on the dev_id that has
++	 * been passed via the scratchpad. This limits this domain's
++	 * usefulness to upper layers that definitely know that they
++	 * are built on top of the ITS.
++	 */
++	dev_id = info->scratchpad[0].ul;
++
++	msi_info = msi_get_domain_info(domain);
++	its = msi_info->data;
+ 
+-	its = domain->parent->host_data;
+ 	its_dev = its_find_device(its, dev_id);
+ 	if (its_dev) {
+ 		/*
+@@ -1180,6 +1191,10 @@ out:
+ 	return 0;
+ }
+ 
++static struct msi_domain_ops its_msi_domain_ops = {
++	.msi_prepare	= its_msi_prepare,
++};
++
+ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+ 				    unsigned int virq,
+ 				    irq_hw_number_t hwirq)
+@@ -1316,7 +1331,7 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	struct resource res;
+ 	struct its_node *its;
+ 	void __iomem *its_base;
+-	struct irq_domain *inner_domain = NULL;
++	struct irq_domain *inner_domain;
+ 	u32 val;
+ 	u64 baser, tmp;
+ 	int err;
+@@ -1406,20 +1421,26 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
+ 
+ 	if (of_property_read_bool(node, "msi-controller")) {
++		struct msi_domain_info *info;
++
++		info = kzalloc(sizeof(*info), GFP_KERNEL);
++		if (!info) {
++			err = -ENOMEM;
++			goto out_free_tables;
++		}
++
+ 		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+ 		if (!inner_domain) {
+ 			err = -ENOMEM;
++			kfree(info);
+ 			goto out_free_tables;
+ 		}
+ 
+ 		inner_domain->parent = parent;
+ 		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+-
+-		its->domain = its_pci_msi_alloc_domain(node, inner_domain);
+-		if (!its->domain) {
+-			err = -ENOMEM;
+-			goto out_free_domains;
+-		}
++		info->ops = &its_msi_domain_ops;
++		info->data = its;
++		inner_domain->host_data = info;
+ 	}
+ 
+ 	spin_lock(&its_lock);
+@@ -1428,11 +1449,6 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 
+ 	return 0;
+ 
+-out_free_domains:
+-	if (its->domain)
+-		irq_domain_remove(its->domain);
+-	if (inner_domain)
+-		irq_domain_remove(inner_domain);
+ out_free_tables:
+ 	its_free_tables(its);
+ out_free_cmd:
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index d6149ba..bf982e0 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -389,11 +389,6 @@ struct irq_domain;
+ int its_cpu_init(void);
+ int its_init(struct device_node *node, struct rdists *rdists,
+ 	     struct irq_domain *domain);
+-int its_msi_prepare(struct irq_domain *domain, u32 dev_id,
+-		    int nvec, msi_alloc_info_t *info);
+-
+-struct irq_domain *its_pci_msi_alloc_domain(struct device_node *node,
+-					    struct irq_domain *parent);
+ 
+ #endif
+ 
+-- 
+2.1.4
