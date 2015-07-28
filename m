@@ -1,73 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 28 Jul 2015 11:41:53 +0200
-Subject: [PATCH v3 3/4] ARM: mvebu: Allow using the GIC for wakeup in
- standby mode
-In-Reply-To: <1435924553-22428-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1435924553-22428-1-git-send-email-gregory.clement@free-electrons.com>
- <1435924553-22428-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <55B74E61.80406@free-electrons.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 28 Jul 2015 10:42:23 +0100
+Subject: [PATCH] arm64: KVM: remove remaining reference to vgic_sr_vectors
+Message-ID: <1438076543-6768-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since commit 8a14849 (arm64: KVM: Switch vgic save/restore to
+alternative_insn) vgic_sr_vectors is not used anymore, so remove
+remaining leftovers and kill the structure.
 
-On 03/07/2015 13:55, Gregory CLEMENT wrote:
-> On the Armada 375/38x/39x SoCs, in standby mode the SoCs stay powered
-> and it is possible to wake-up from any interrupt sources. This patch
-> adds flag to the GIC irqchip driver to let linux know this.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ arch/arm64/include/asm/kvm_host.h |    5 -----
+ arch/arm64/kernel/asm-offsets.c   |    2 --
+ 2 files changed, 7 deletions(-)
 
-I eventually remove this patch, as now these two flags are part of the GIC driver:
-https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=irq/core&id=0d3f2c92e004c67404fabea19728c1962b777bd6
-
-
-Gregory
-
-
-> ---
->  arch/arm/mach-mvebu/board-v7.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mvebu/board-v7.c b/arch/arm/mach-mvebu/board-v7.c
-> index e5911defccac..b789f7037445 100644
-> --- a/arch/arm/mach-mvebu/board-v7.c
-> +++ b/arch/arm/mach-mvebu/board-v7.c
-> @@ -18,6 +18,7 @@
->  #include <linux/of_address.h>
->  #include <linux/of_fdt.h>
->  #include <linux/of_platform.h>
-> +#include <linux/irq.h>
->  #include <linux/io.h>
->  #include <linux/clocksource.h>
->  #include <linux/dma-mapping.h>
-> @@ -26,6 +27,7 @@
->  #include <linux/signal.h>
->  #include <linux/slab.h>
->  #include <linux/irqchip.h>
-> +#include <linux/irqchip/arm-gic.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -129,6 +131,13 @@ static int armada_375_external_abort_wa(unsigned long addr, unsigned int fsr,
->  
->  static void __init mvebu_init_irq(void)
->  {
-> +	struct device_node *np;
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
-> +	if (np)
-> +		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
-> +				      IRQCHIP_MASK_ON_SUSPEND);
-> +	of_node_put(np);
->  	irqchip_init();
->  	mvebu_scu_enable();
->  	coherency_init();
-> 
-
-
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 2709db2..19f1182 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -216,11 +216,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+ 		     hyp_stack_ptr, vector_ptr);
+ }
+ 
+-struct vgic_sr_vectors {
+-	void	*save_vgic;
+-	void	*restore_vgic;
+-};
+-
+ static inline void kvm_arch_hardware_disable(void) {}
+ static inline void kvm_arch_hardware_unsetup(void) {}
+ static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index c99701a..f0c960d 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -125,8 +125,6 @@ int main(void)
+   DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
+   DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
+   DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
+-  DEFINE(VGIC_SAVE_FN,		offsetof(struct vgic_sr_vectors, save_vgic));
+-  DEFINE(VGIC_RESTORE_FN,	offsetof(struct vgic_sr_vectors, restore_vgic));
+   DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
+   DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
+   DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
