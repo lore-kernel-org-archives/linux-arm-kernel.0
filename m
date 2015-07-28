@@ -1,37 +1,40 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:04:01 +0530
-Subject: [PATCH v7 08/13] clk: qcom: gdsc: Add GDSCs in msm8916 GCC
+Date: Tue, 28 Jul 2015 15:04:03 +0530
+Subject: [PATCH v7 10/13] clk: qcom: gdsc: Add GDSCs in msm8974 MMCC
 In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
 References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-9-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438076046-4706-11-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add all data for the GDSCs which are part of msm8916 GCC block.
+From: Stephen Boyd <sboyd@codeaurora.org>
 
+Add the GDSC instances that exist as part of msm8974 MMCC block
+
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/Kconfig                     |  1 +
- drivers/clk/qcom/gcc-msm8916.c               | 57 ++++++++++++++++++++++++++++
- include/dt-bindings/clock/qcom,gcc-msm8916.h |  8 ++++
- 3 files changed, 66 insertions(+)
+ drivers/clk/qcom/Kconfig                      |  1 +
+ drivers/clk/qcom/mmcc-msm8974.c               | 78 +++++++++++++++++++++++++++
+ include/dt-bindings/clock/qcom,mmcc-msm8974.h |  8 +++
+ 3 files changed, 87 insertions(+)
 
 diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
-index d3a695b..abec45a 100644
+index a6fcb1d..edab172 100644
 --- a/drivers/clk/qcom/Kconfig
 +++ b/drivers/clk/qcom/Kconfig
-@@ -53,6 +53,7 @@ config MSM_GCC_8660
- 
- config MSM_GCC_8916
- 	tristate "MSM8916 Global Clock Controller"
+@@ -98,6 +98,7 @@ config MSM_GCC_8974
+ config MSM_MMCC_8974
+ 	tristate "MSM8974 Multimedia Clock Controller"
+ 	select MSM_GCC_8974
 +	select QCOM_GDSC
  	depends on COMMON_CLK_QCOM
  	help
- 	  Support for the global clock controller on msm8916 devices.
-diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
-index c66f7bc..4da1223 100644
---- a/drivers/clk/qcom/gcc-msm8916.c
-+++ b/drivers/clk/qcom/gcc-msm8916.c
+ 	  Support for the multimedia clock controller on msm8974 devices.
+diff --git a/drivers/clk/qcom/mmcc-msm8974.c b/drivers/clk/qcom/mmcc-msm8974.c
+index 07f4cc1..018d4c7 100644
+--- a/drivers/clk/qcom/mmcc-msm8974.c
++++ b/drivers/clk/qcom/mmcc-msm8974.c
 @@ -31,6 +31,7 @@
  #include "clk-rcg.h"
  #include "clk-branch.h"
@@ -40,98 +43,119 @@ index c66f7bc..4da1223 100644
  
  enum {
  	P_XO,
-@@ -2562,6 +2563,52 @@ static struct clk_branch gcc_venus0_vcodec0_clk = {
- 	},
+@@ -2349,6 +2350,72 @@ static struct pll_config mmpll3_config = {
+ 	.aux_output_mask = BIT(1),
  };
  
-+static struct gdsc venus_gdsc = {
-+	.gdscr = 0x4c018,
++static struct gdsc venus0_gdsc = {
++	.gdscr = 0x1024,
++	.cxcs = (unsigned int []){ 0x1028 },
++	.cxc_count = 1,
++	.resets = (unsigned int []){ VENUS0_RESET },
++	.reset_count = 1,
 +	.pd = {
-+		.name = "venus",
++		.name = "venus0",
 +	},
-+	.pwrsts = PWRSTS_OFF_ON,
++	.pwrsts = PWRSTS_ON,
 +	.con_ids = { NULL },
 +};
 +
 +static struct gdsc mdss_gdsc = {
-+	.gdscr = 0x4d078,
++	.gdscr = 0x2304,
++	.cxcs = (unsigned int []){ 0x231c, 0x2320 },
++	.cxc_count = 2,
 +	.pd = {
 +		.name = "mdss",
 +	},
-+	.pwrsts = PWRSTS_OFF_ON,
++	.pwrsts = PWRSTS_RET_ON,
 +	.con_ids = { NULL },
 +};
 +
-+static struct gdsc jpeg_gdsc = {
-+	.gdscr = 0x5701c,
++static struct gdsc camss_jpeg_gdsc = {
++	.gdscr = 0x35a4,
++	.cxcs = (unsigned int []){ 0x35a8, 0x35ac, 0x35b0 },
++	.cxc_count = 3,
 +	.pd = {
-+		.name = "jpeg",
++		.name = "camss_jpeg",
 +	},
 +	.pwrsts = PWRSTS_OFF_ON,
 +	.con_ids = { NULL },
 +};
 +
-+static struct gdsc vfe_gdsc = {
-+	.gdscr = 0x58034,
++static struct gdsc camss_vfe_gdsc = {
++	.gdscr = 0x36a4,
++	.cxcs = (unsigned int []){ 0x36a8, 0x36ac, 0x3704, 0x3714, 0x36b0 },
++	.cxc_count = 5,
 +	.pd = {
-+		.name = "vfe",
++		.name = "camss_vfe",
 +	},
 +	.pwrsts = PWRSTS_OFF_ON,
 +	.con_ids = { NULL },
 +};
 +
 +static struct gdsc oxili_gdsc = {
-+	.gdscr = 0x5901c,
++	.gdscr = 0x4024,
++	.cxcs = (unsigned int []){ 0x4028 },
++	.cxc_count = 1,
 +	.pd = {
 +		.name = "oxili",
 +	},
-+	.root_con_id = "gfx3d_clk_src",
 +	.pwrsts = PWRSTS_OFF_ON,
 +	.con_ids = { NULL },
 +};
 +
- static struct clk_regmap *gcc_msm8916_clocks[] = {
- 	[GPLL0] = &gpll0.clkr,
- 	[GPLL0_VOTE] = &gpll0_vote,
-@@ -2703,6 +2750,14 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
- 	[GCC_VENUS0_VCODEC0_CLK] = &gcc_venus0_vcodec0_clk.clkr,
- };
- 
-+static struct gdsc *gcc_msm8916_gdscs[] = {
-+	[VENUS_GDSC] = &venus_gdsc,
-+	[MDSS_GDSC] = &mdss_gdsc,
-+	[JPEG_GDSC] = &jpeg_gdsc,
-+	[VFE_GDSC] = &vfe_gdsc,
-+	[OXILI_GDSC] = &oxili_gdsc,
++static struct gdsc oxilicx_gdsc = {
++	.gdscr = 0x4034,
++	.pd = {
++		.name = "oxilicx",
++	},
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
 +};
 +
- static const struct qcom_reset_map gcc_msm8916_resets[] = {
- 	[GCC_BLSP1_BCR] = { 0x01000 },
- 	[GCC_BLSP1_QUP1_BCR] = { 0x02000 },
-@@ -2810,6 +2865,8 @@ static const struct qcom_cc_desc gcc_msm8916_desc = {
- 	.num_clks = ARRAY_SIZE(gcc_msm8916_clocks),
- 	.resets = gcc_msm8916_resets,
- 	.num_resets = ARRAY_SIZE(gcc_msm8916_resets),
-+	.gdscs = gcc_msm8916_gdscs,
-+	.num_gdscs = ARRAY_SIZE(gcc_msm8916_gdscs),
+ static struct clk_regmap *mmcc_msm8974_clocks[] = {
+ 	[MMSS_AHB_CLK_SRC] = &mmss_ahb_clk_src.clkr,
+ 	[MMSS_AXI_CLK_SRC] = &mmss_axi_clk_src.clkr,
+@@ -2525,6 +2592,15 @@ static const struct qcom_reset_map mmcc_msm8974_resets[] = {
+ 	[OCMEMNOC_RESET] = { 0x50b0 },
  };
  
- static const struct of_device_id gcc_msm8916_match_table[] = {
-diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
-index e430f64..11566c5 100644
---- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
-+++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
-@@ -153,4 +153,12 @@
- #define GCC_VENUS0_AXI_CLK			136
- #define GCC_VENUS0_VCODEC0_CLK			137
++static struct gdsc *mmcc_msm8974_gdscs[] = {
++	[VENUS0_GDSC] = &venus0_gdsc,
++	[MDSS_GDSC] = &mdss_gdsc,
++	[CAMSS_JPEG_GDSC] = &camss_jpeg_gdsc,
++	[CAMSS_VFE_GDSC] = &camss_vfe_gdsc,
++	[OXILI_GDSC] = &oxili_gdsc,
++	[OXILICX_GDSC] = &oxilicx_gdsc,
++};
++
+ static const struct regmap_config mmcc_msm8974_regmap_config = {
+ 	.reg_bits	= 32,
+ 	.reg_stride	= 4,
+@@ -2539,6 +2615,8 @@ static const struct qcom_cc_desc mmcc_msm8974_desc = {
+ 	.num_clks = ARRAY_SIZE(mmcc_msm8974_clocks),
+ 	.resets = mmcc_msm8974_resets,
+ 	.num_resets = ARRAY_SIZE(mmcc_msm8974_resets),
++	.gdscs = mmcc_msm8974_gdscs,
++	.num_gdscs = ARRAY_SIZE(mmcc_msm8974_gdscs),
+ };
  
-+/* Indexes for GDSCs */
-+#define BIMC_GDSC				0
-+#define VENUS_GDSC				1
-+#define MDSS_GDSC				2
-+#define JPEG_GDSC				3
-+#define VFE_GDSC				4
-+#define OXILI_GDSC				5
+ static const struct of_device_id mmcc_msm8974_match_table[] = {
+diff --git a/include/dt-bindings/clock/qcom,mmcc-msm8974.h b/include/dt-bindings/clock/qcom,mmcc-msm8974.h
+index 032ed87..28651e5 100644
+--- a/include/dt-bindings/clock/qcom,mmcc-msm8974.h
++++ b/include/dt-bindings/clock/qcom,mmcc-msm8974.h
+@@ -158,4 +158,12 @@
+ #define SPDM_RM_AXI					141
+ #define SPDM_RM_OCMEMNOC				142
+ 
++/* gdscs */
++#define VENUS0_GDSC					0
++#define MDSS_GDSC					1
++#define CAMSS_JPEG_GDSC					2
++#define CAMSS_VFE_GDSC					3
++#define OXILI_GDSC					4
++#define OXILICX_GDSC					5
 +
  #endif
 -- 
