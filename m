@@ -1,34 +1,29 @@
-From: mohun106@gmail.com (mohun106 at gmail.com)
-Date: Mon, 27 Jul 2015 19:14:43 -0700
-Subject: [PATCH 3/3] net: thunderx: Select CONFIG_MDIO_OCTEON for ThunderX NIC
-In-Reply-To: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
-References: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
-Message-ID: <1438049683-10630-4-git-send-email-mohun106@gmail.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 28 Jul 2015 12:20:25 +1000
+Subject: linux-next: manual merge of the tip tree with the arm-soc tree
+Message-ID: <20150728122025.6b2cdbc8@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Hi all,
 
-The CONFIG_MDIO_OCTEON is required so that the ThunderX NIC driver can
-talk to the PHY drivers.
+Today's linux-next merge of the tip tree got a conflict in:
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
----
- drivers/net/ethernet/cavium/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+  arch/arm/mach-shmobile/intc-sh73a0.c
 
-diff --git a/drivers/net/ethernet/cavium/Kconfig b/drivers/net/ethernet/cavium/Kconfig
-index c4d6bbe..3584420 100644
---- a/drivers/net/ethernet/cavium/Kconfig
-+++ b/drivers/net/ethernet/cavium/Kconfig
-@@ -37,6 +37,8 @@ config	THUNDER_NIC_BGX
- 	tristate "Thunder MAC interface driver (BGX)"
- 	depends on 64BIT
- 	default ARCH_THUNDER
-+	select PHYLIB
-+	select MDIO_OCTEON
- 	---help---
- 	  This driver supports programming and controlling of MAC
- 	  interface from NIC physical function driver.
+between commit:
+
+  30f8925a57d8 ("ARM: shmobile: Remove legacy board code for KZM-A9-GT")
+
+from the arm-soc tree and commit:
+
+  0d3f2c92e004 ("irqchip/gic: Remove redundant gic_set_irqchip_flags")
+
+from the tip tree.
+
+I fixed it up (I just removed the file) and can carry the fix as necessary
+(no action is required).
+
 -- 
-1.7.1
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
