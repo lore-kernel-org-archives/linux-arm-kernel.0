@@ -1,61 +1,104 @@
-From: mohun106@gmail.com (mohun106 at gmail.com)
-Date: Tue, 28 Jul 2015 15:12:12 -0700
-Subject: [PATCH v2 2/3] net: mdio-octeon: Fix octeon_mdiobus_probe function
- for return values
-In-Reply-To: <1438121533-21528-1-git-send-email-mohun106@gmail.com>
-References: <1438121533-21528-1-git-send-email-mohun106@gmail.com>
-Message-ID: <1438121533-21528-3-git-send-email-mohun106@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 29 Jul 2015 01:14:59 +0300
+Subject: [PATCH v3] ARM: shmobile: silk: initial device tree
+In-Reply-To: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+References: <201404250239.39150.sergei.shtylyov@cogentembedded.com>
+Message-ID: <2360526.88foRQAOiM@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+Add the initial device  tree for the R8A7794 SoC based SILK low cost board.
+SCIF2 serial port support is included, so that the serial console can work.
 
-This patch fixes a possible crash in the octeon_mdiobus_probe function
-if the return values are not handled properly.
+Based on the original patch by Vladimir Barinov
+<vladimir.barinov@cogentembedded.com>.
 
-Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
 ---
- drivers/net/phy/mdio-octeon.c |   14 +++++++++-----
- 1 files changed, 9 insertions(+), 5 deletions(-)
+This patch is against the 'renesas-devel-20150728-v4.2-rc4' tag of Simon
+Horman's 'renesas.git' repo. It requires R8A7794 PFC DT patch posted yesterday
+in order to compile.
 
-diff --git a/drivers/net/phy/mdio-octeon.c b/drivers/net/phy/mdio-octeon.c
-index 1509937..fcf4e4d 100644
---- a/drivers/net/phy/mdio-octeon.c
-+++ b/drivers/net/phy/mdio-octeon.c
-@@ -277,24 +277,28 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--
- 	if (res_mem == NULL) {
- 		dev_err(&pdev->dev, "found no memory resource\n");
--		err = -ENXIO;
--		goto fail;
-+		return -ENXIO;
- 	}
+Changes in version 3:
+- refreshed the patch;
+- reformatted the changelog.
+
+Changes in version 2:
+- removed "console=" parameter from the kernel command line;
+- added PFC node with SCIF2 pins subnode and referred it from the SCIF2 node;
+- rebased the patch
+- mentioned the origin of patch in the changelog.
+
+ arch/arm/boot/dts/Makefile         |    1 
+ arch/arm/boot/dts/r8a7794-silk.dts |   51 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 52 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -515,6 +515,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7793-gose.dtb \
+ 	r8a7794-alt.dtb \
++	r8a7794-silk.dtb \
+ 	sh73a0-kzm9g.dtb
+ dtb-$(CONFIG_ARCH_SOCFPGA) += \
+ 	socfpga_arria5_socdk.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7794-silk.dts
+===================================================================
+--- /dev/null
++++ renesas/arch/arm/boot/dts/r8a7794-silk.dts
+@@ -0,0 +1,51 @@
++/*
++ * Device Tree Source for the SILK board
++ *
++ * Copyright (C) 2014 Renesas Electronics Corporation
++ * Copyright (C) 2014-2015 Renesas Solutions Corp.
++ * Copyright (C) 2014-2015 Cogent Embedded, Inc.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
 +
- 	bus->mdio_phys = res_mem->start;
- 	bus->regsize = resource_size(res_mem);
++/dts-v1/;
++#include "r8a7794.dtsi"
 +
- 	if (!devm_request_mem_region(&pdev->dev, bus->mdio_phys, bus->regsize,
- 				     res_mem->name)) {
- 		dev_err(&pdev->dev, "request_mem_region failed\n");
--		goto fail;
-+		return -ENXIO;
- 	}
++/ {
++	model = "SILK";
++	compatible = "renesas,silk", "renesas,r8a7794";
 +
- 	bus->register_base =
- 		(u64)devm_ioremap(&pdev->dev, bus->mdio_phys, bus->regsize);
-+	if (!bus->register_base) {
-+		dev_err(&pdev->dev, "dev_ioremap failed\n");
-+		return -ENOMEM;
-+	}
- 
- 	bus->mii_bus = mdiobus_alloc();
--
- 	if (!bus->mii_bus)
- 		goto fail;
- 
--- 
-1.7.1
++	aliases {
++		serial0 = &scif2;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = &scif2;
++	};
++
++	memory at 40000000 {
++		device_type = "memory";
++		reg = <0 0x40000000 0 0x40000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <20000000>;
++};
++
++&pfc {
++	scif2_pins: serial2 {
++		renesas,groups = "scif2_data";
++		renesas,function = "scif2";
++	};
++};
++
++&scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
