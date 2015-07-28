@@ -1,105 +1,67 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jul 2015 14:46:11 +0100
-Subject: [PATCH v6 04/19] PCI/MSI: Add hooks to populate the msi_domain field
+Date: Tue, 28 Jul 2015 14:46:10 +0100
+Subject: [PATCH v6 03/19] device core: Introduce per-device MSI domain pointer
 In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
 References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1438091186-10244-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to be able to populate the device msi_domain field,
-add the necessary hooks to propagate the host bridge msi_domain
-across secondary busses to devices.
+As MSI-type features are creeping into non-PCI devices, it is
+starting to make sense to give our struct device some form of
+support for this, by allowing a pointer to an MSI irq domain to
+be set/retrieved.
 
-So far, nobody populates the initial msi_domain.
-
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/probe.c | 42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ include/linux/device.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cefd636..c03ecbf 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -661,6 +661,32 @@ static void pci_set_bus_speed(struct pci_bus *bus)
- 	}
- }
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 22227e7..6d6f2d7 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -714,6 +714,7 @@ struct device_dma_parameters {
+  * @pins:	For device pin management.
+  *		See Documentation/pinctrl.txt for details.
+  * @msi_list:	Hosts MSI descriptors
++ * @msi_domain: The generic MSI domain this device is using.
+  * @numa_node:	NUMA node this device is close to.
+  * @dma_mask:	Dma mask (if dma'ble device).
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+@@ -774,6 +775,9 @@ struct device {
+ 	struct dev_pm_info	power;
+ 	struct dev_pm_domain	*pm_domain;
  
-+static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain	*msi_domain;
++#endif
+ #ifdef CONFIG_PINCTRL
+ 	struct dev_pin_info	*pins;
+ #endif
+@@ -864,6 +868,22 @@ static inline void set_dev_node(struct device *dev, int node)
+ }
+ #endif
+ 
++static inline struct irq_domain *dev_get_msi_domain(const struct device *dev)
 +{
-+	/*
-+	 * Any firmware interface that can resolve the msi_domain
-+	 * should be called from here.
-+	 */
-+
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	return dev->msi_domain;
++#else
 +	return NULL;
++#endif
 +}
 +
-+static void pci_set_bus_msi_domain(struct pci_bus *bus)
++static inline void dev_set_msi_domain(struct device *dev, struct irq_domain *d)
 +{
-+	struct irq_domain *d;
-+
-+	/*
-+	 * Either bus is the root, and we must obtain it from the
-+	 * firmware, or we inherit it from the bridge device.
-+	 */
-+	if (pci_is_root_bus(bus))
-+		d = pci_host_bridge_msi_domain(bus);
-+	else
-+		d = dev_get_msi_domain(&bus->self->dev);
-+
-+	dev_set_msi_domain(&bus->dev, d);
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	dev->msi_domain = d;
++#endif
 +}
 +
- static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 					   struct pci_dev *bridge, int busnr)
+ static inline void *dev_get_drvdata(const struct device *dev)
  {
-@@ -714,6 +740,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 	bridge->subordinate = child;
- 
- add_dev:
-+	pci_set_bus_msi_domain(child);
- 	ret = device_register(&child->dev);
- 	WARN_ON(ret < 0);
- 
-@@ -1544,6 +1571,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
- 	pci_enable_acs(dev);
- }
- 
-+static void pci_set_msi_domain(struct pci_dev *dev)
-+{
-+	/*
-+	 * If no domain has been set through the pcibios_add_device
-+	 * callback, inherit the default from the bus device.
-+	 */
-+	if (!dev_get_msi_domain(&dev->dev))
-+		dev_set_msi_domain(&dev->dev,
-+				   dev_get_msi_domain(&dev->bus->dev));
-+}
-+
- void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- {
- 	int ret;
-@@ -1585,6 +1623,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	ret = pcibios_add_device(dev);
- 	WARN_ON(ret < 0);
- 
-+	/* Setup MSI irq domain */
-+	pci_set_msi_domain(dev);
-+
- 	/* Notifier could use PCI capabilities */
- 	dev->match_driver = false;
- 	ret = device_add(&dev->dev);
-@@ -1975,6 +2016,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- 	b->bridge = get_device(&bridge->dev);
- 	device_enable_async_suspend(b->bridge);
- 	pci_set_bus_of_node(b);
-+	pci_set_bus_msi_domain(b);
- 
- 	if (!parent)
- 		set_dev_node(b->bridge, pcibus_to_node(b));
+ 	return dev->driver_data;
 -- 
 2.1.4
