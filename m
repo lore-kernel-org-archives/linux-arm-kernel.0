@@ -1,46 +1,42 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 28 Jul 2015 08:24:26 -0700
-Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
- counter from coprocessor
-In-Reply-To: <1438032507.17734.46.camel@gmail.com>
-References: <1438032507.17734.46.camel@gmail.com>
-Message-ID: <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
+From: dinh.linux@gmail.com (dinh.linux at gmail.com)
+Date: Tue, 28 Jul 2015 10:24:43 -0500
+Subject: [GIT PULL] SoCFPGA updates for v4.3
+Message-ID: <1438097083-28875-1-git-send-email-dinh.linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexey,
+Hi Arnd, Kevin, and Olof:
 
-On Mon, Jul 27, 2015 at 2:28 PM, Alexey Klimov <klimov.linux@gmail.com> wrote:
-> Hi all,
->
-> year(s) ago it was discovered that MCT timer and ARM architectured
-> timer
-> are the same hardware with different interface. Here [1].
->
-> I followed mail-list discussions about removing MCT and using arch
-> timer for Exynos5-based SoCs but things aren't moving at least latest
-> upstream kernel on odroid-xu3 will use MCT as default timers.
-> Maybe the reason are some power-management related things that very
-> specific to Samsung. I don't know.
->
->
-> Idea of this draft patchset comes from Doug patches when he tried to
-> optimize read of 64-bit counter located in mmio. [2]
-> Why not using cp15 counter instead if possible?
+Please consider pulling these patches for v4.3.
 
-I hate to burst your bubble here, but...
+Thanks,
+Dinh
 
-...I think it would be a bad idea to use the cp15 counter on exynos
-5422.  According to Samsung, there are issues where using cp15 could
-sometimes return the wrong value, especially if you happen to read it
-while on an A7 instead of an A15.  It will tend to work pretty well,
-but Samsung claimed that it might not work right on some CPUs or at
-some temperatures.
+The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
-I've added Alim who provided this information to me (in the private
-http://crosbug.com/p/29556).  He may be able to elaborate more.
+  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
 
-Generally I'd say that if the arch timer works for you: use the arch
-timer.  If the arch timer doesn't work for you, use the MCT.
+are available in the git repository at:
 
--Doug
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_for_v4.3
+
+for you to fetch changes up to cd871d517d46f26943f3c8f61c0d2ac6665da6a2:
+
+  ARM: socfpga: add reset for the Arria 10 platform (2015-07-20 15:44:43 -0500)
+
+----------------------------------------------------------------
+SoCFPGA updates for v4.3
+- Add smp.ops.cpu_kill() for kexec
+- Add reboot capability for Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: socfpga: add reset for the Arria 10 platform
+
+Hiraku Toyooka (1):
+      ARM: socfpga: add smp_ops.cpu_kill to make kexec/kdump available
+
+ arch/arm/mach-socfpga/core.h    |  1 +
+ arch/arm/mach-socfpga/platsmp.c | 13 +++++++++++++
+ arch/arm/mach-socfpga/socfpga.c | 26 ++++++++++++++++++++++++++
+ 3 files changed, 40 insertions(+)
