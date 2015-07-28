@@ -1,44 +1,48 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 28 Jul 2015 09:41:38 +0100
-Subject: linux-next: build failure after merge of the tip tree
-In-Reply-To: <20150728124324.40f44f01@canb.auug.org.au>
-References: <20150728124324.40f44f01@canb.auug.org.au>
-Message-ID: <55B74042.6070600@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 28 Jul 2015 14:11:12 +0530
+Subject: [RFC PATCH 1/5] spi: introduce flag for memory mapped read
+In-Reply-To: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+References: <1438072876-16338-1-git-send-email-vigneshr@ti.com>
+Message-ID: <1438072876-16338-2-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+TI QSPI controller has SFI translator which exposes entire flash memory
+as memory mapped region for read. With this interface, the CPU
+can copy data from flash using normal memcpy call. SFI translator
+takes care of generating appropriate SPI signals to read data from
+flash. This interface works only with SPI flash memories and cannot be
+used with other SPI devices.
+Introduce use_mmap_read field in spi_message struct. This can be set by
+mtd devices (m25p80) to indicate to spi-master (ti-qspi) to perform
+memory mapped read. This helps to distinguish whether the spi-message is
+from mtd layer(hence mmap read is possible) or by other spi devices.
 
-On 28/07/15 03:43, Stephen Rothwell wrote:
-> Hi all,
->
-> After merging the tip tree, today's linux-next build (arm
-> multi_v7_defconfig) failed like this:
->
-> arch/arm/mach-mvebu/board-v7.c: In function 'mvebu_init_irq':
-> arch/arm/mach-mvebu/board-v7.c:138:3: error: implicit declaration of function 'gic_set_irqchip_flags' [-Werror=implicit-function-declaration]
->     gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
->     ^
->
-> Caused by commit
->
->    e6f134f8e30e ("ARM: mvebu: Allow using the GIC for wakeup in standby mode")
->
-> from the mvebu tree interacting with commit
->
->    0d3f2c92e004 ("irqchip/gic: Remove redundant gic_set_irqchip_flags")
->
-> from the tip tree.
->
-> I have applied the following merge fix patch for today:
->
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ include/linux/spi/spi.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Thanks for the fix, I was aware of this and asked Thomas Petazzoni
-and Gregory CLEMENT to revert the commit e6f134f8e30e if possible
-yesterday [1]
-
-Regards,
-Sudeep
-
-[1] 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359585.html
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index d673072346f2..f1a0329ee63f 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -640,6 +640,8 @@ struct spi_transfer {
+  * @actual_length: the total number of bytes that were transferred in all
+  *	successful segments
+  * @status: zero for success, else negative errno
++ * @use_mmap_mode: Indicate to spi master to perform memory mapped
++ *	read if possible.
+  * @queue: for use by whichever driver currently owns the message
+  * @state: for use by whichever driver currently owns the message
+  *
+@@ -681,6 +683,7 @@ struct spi_message {
+ 	unsigned		frame_length;
+ 	unsigned		actual_length;
+ 	int			status;
++	bool			use_mmap_mode;
+ 
+ 	/* for optional use by whatever driver currently owns the
+ 	 * spi_message ...  between calls to spi_async and then later
+-- 
+2.4.6
