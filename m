@@ -1,64 +1,26 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Mon, 27 Jul 2015 17:32:54 -0700
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <20150727234351.GW30479@wotan.suse.de>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150727231755.GV30479@wotan.suse.de>
- <CAPcyv4i07wV1Mf1XCs-U98w979enk9PYKquh7CSMcJv0T1kH1Q@mail.gmail.com>
- <20150727234351.GW30479@wotan.suse.de>
-Message-ID: <CAPcyv4i=QPHxHp-VZ63tKbVyBW66BgGXBq0Z3K8gnZMVd=1r6A@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Jul 2015 09:34:53 +0900
+Subject: [PATCH 0/2] ARM: shmobile: Add JPU device nodes to Renesas R-Car
+ SoCs.
+In-Reply-To: <1437744346-499-1-git-send-email-mikhail.ulyanov@cogentembedded.com>
+References: <1437744346-499-1-git-send-email-mikhail.ulyanov@cogentembedded.com>
+Message-ID: <20150728003453.GA21162@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 4:43 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
-> On Mon, Jul 27, 2015 at 04:31:09PM -0700, Dan Williams wrote:
->> On Mon, Jul 27, 2015 at 4:17 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
->> > On Fri, Jul 24, 2015 at 10:38:42PM -0400, Dan Williams wrote:
->> >> Existing users of ioremap_cache() are mapping memory that is known in
->> >> advance to not have i/o side effects.  These users are forced to cast
->> >> away the __iomem annotation, or otherwise neglect to fix the sparse
->> >> errors thrown when dereferencing pointers to this memory.  Provide
->> >> memremap() as a non __iomem annotated ioremap_*() in the case when
->> >> ioremap is otherwise a pointer to memory.
->> >
->> > Ok so a special use case.
->> >
->> >> Outside of ioremap() and
->> >> ioremap_nocache(), the expectation is that most calls to
->> >> ioremap_<type>() are seeking memory-like semantics (e.g.  speculative
->> >> reads, and prefetching permitted).  These callsites can be moved to
->> >> memremap() over time.
->> >
->> > Such memory-like smantics are not well defined yet and this has caused
->> > issues over expectations over a slew of APIs. As you note above
->> > your own defined 'semantics' so far for memremap are just that there are
->> > no i/o side effects, when the mapped memory is just a pointer to memory,
->> > as such I do not think its fair to set the excpectations that we'll
->> > switch all other ioremap_*() callers to the same memremap() API. Now,
->> > it may be a good idea to use something similar, ie, to pass flags,
->> > but setting the expectations outright to move to memremap() without having
->> > any agreement having been made over semantics seems uncalled for at this
->> > point in time, specially when you are noting that the expectations for
->> > both sets of calls are different.
->> >
->> > So perhaps:
->> >
->> > "
->> > Outside of ioremap() and ioremap_nocache(), all other ioremap_<type>()
->> > variant calls are seeking memory-like semantics (e.g.  speculative
->> > reads, and prefetching permitted) and all calls expecations currently
->> > differ depending on architecture. Once and if we get agreement on such
->> > semantics we may be able to move such ioremap_*() variant calls to
->> > a similar API where the semantics required are clearly spelled out
->> > and well defined and passed as arguments.
->>
->> I still think ioremap_wc(), and now ioremap_uc(), are special and are
->> not obvious candidates for conversion to memremap().
->
-> OK great, then we're in strong agreement, so removing the "Outside of
-> ioremap() and... over time" might be best then? Otherwise what I posted
-> seems to reflect the state of affairs better?
->
+On Fri, Jul 24, 2015 at 04:25:44PM +0300, Mikhail Ulyanov wrote:
+> This series of patches contains device tree nodes definitions for JPEG
+> codec peripheral found in the Renesas R-Car SoCs.
+> 
+> This series of patches is against the renesas-devel-20150720-v4.2-rc3
+> of https://kernel.googlesource.com/pub/scm/linux/kernel/git/horms/renesas
+> 
+> The driver itself was accepted by Hans Verkuil
+> http://git.linuxtv.org/cgit.cgi/hverkuil/media_tree.git
+> commit hash 761a0eee505f3a7051b187e67cd28c50b385d409
+> 
+> Mikhail Ulyanov (2):
+>   ARM: shmobile: r8a7790: Add JPU device node.
+>   ARM: shmobile: r8a7791: Add JPU device node.
 
-Ah yes, I need to clean that up.  Thanks!
+Thanks, I have queued up both patches.
