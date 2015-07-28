@@ -1,84 +1,73 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 28 Jul 2015 11:45:50 -0500
-Subject: [PATCH 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <1438080345-7233-4-git-send-email-lftan@altera.com>
-References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-4-git-send-email-lftan@altera.com>
-Message-ID: <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Jul 2015 17:55:04 +0100
+Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+In-Reply-To: <1438100507.5211.170.camel@redhat.com>
+References: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
+ <1438100507.5211.170.camel@redhat.com>
+Message-ID: <55B7B3E8.9020000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> This patch adds the Altera PCIe host controller driver.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  drivers/pci/host/Kconfig       |   9 +
->  drivers/pci/host/Makefile      |   1 +
->  drivers/pci/host/pcie-altera.c | 576 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 586 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-altera.c
->
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 675c2d1..af19039 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -145,4 +145,13 @@ config PCIE_IPROC_BCMA
->           Say Y here if you want to use the Broadcom iProc PCIe controller
->           through the BCMA bus interface
->
-> +config PCIE_ALTERA
-> +       bool "Altera PCIe controller"
-> +       depends on ARCH_SOCFPGA
-> +       depends on OF
+Hi Alex,
 
-I don't think you need this, "depends on ARCH_SOCFPGA" should already
-have taken care of this.
+On 28/07/15 17:21, Alex Williamson wrote:
+> On Fri, 2015-07-24 at 14:33 +0530, Pranavkumar Sawargaonkar wrote:
+>> In current VFIO MSI/MSI-X implementation, linux host kernel
+>> allocates MSI/MSI-X vectors when userspace requests through vfio ioctls.
+>> Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
+>> to the userspace when raised.
+>> Guest OS will see emulated MSI/MSI-X controller and receives an interrupt
+>> when kernel notifies the same via irqfd.
+>>
+>> Host kernel allocates MSI/MSI-X using standard linux routines
+>> like pci_enable_msix_range() and pci_enable_msi_range(). 
+>> These routines along with requset_irq() in host kernel sets up 
+>> MSI/MSI-X vectors with Physical MSI/MSI-X addresses provided by
+>> interrupt controller driver in host kernel.
+>>
+>> This means when a device is assigned with the guest OS, MSI/MSI-X addresses
+>> present in PCIe EP are the PAs programmed by the host linux kernel.
+>>
+>> In x86 MSI/MSI-X physical address range is reserved and iommu is aware
+>> about these addreses and transalation is bypassed for these address range.
+>>
+>> Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical address range and
+>> all the transactions including MSI go through iommu/smmu without bypass.
+>> This requires extending current vfio MSI layer with additional functionality
+>> for ARM/ARM64 by
+>> 1. Programing IOVA (referred as a MSI virtual doorbell address)
+>>    in device's MSI vector as a MSI address.
+>>    This IOVA will be provided by the userspace based on the
+>>    MSI/MSI-X addresses reserved for the guest.
+>> 2. Create an IOMMU mapping between this IOVA and
+>>    Physical address (PA) assigned to the MSI vector.
+>>
+>> This RFC is proposing a solution for MSI/MSI-X passthrough for ARM/ARM64.
+> 
+> 
+> Hi Pranavkumar,
+> 
+> Freescale has the same, or very similar, need, so any solution in this
+> space will need to work for both ARM and powerpc.  I'm not a big fan of
+> this approach as it seems to require the user to configure MSI/X via
+> ioctl and then call a separate ioctl mapping the doorbells.  That's more
+> code for the user, more code to get wrong and potentially a gap between
+> configuring MSI/X and enabling mappings where we could see IOMMU faults.
+> 
+> If we know that doorbell mappings are required, why can't we set aside a
+> bank of IOVA space and have them mapped automatically as MSI/X is being
+> configured?  Then the user's need for special knowledge and handling of
+> this case is limited to setup.  The IOVA space will be mapped and used
+> as needed, we only need the user to specify the IOVA space reserved for
+> this.  Thanks,
 
-> +       select PCI_MSI_IRQ_DOMAIN if PCI_MSI
-> +       help
-> +         Say Y here if you want to enable PCIe controller support for Altera
-> +         SoCFPGA family of SoCs.
-> +
->  endmenu
+I guess my immediate worry is that it seems to impose a fixed mapping
+for all the guests, which would restrict the "shape" of the mappings we
+give to a guest. Or did you intend for that IOVA mapping to be defined
+on a "per userspace instance" basis?
 
-<snip>
+Thanks,
 
-> +
-> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
-> +{
-> +       u8 loop;
-> +       struct tlp_rp_regpair_t tlp_rp_regdata;
-> +
-> +       for (loop = TLP_LOOP; loop > 0; loop--) {
-> +
-> +               tlp_read_rx(pcie, &tlp_rp_regdata);
-> +
-> +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
-> +
-> +                       if (value)
-> +                               *value = tlp_rp_regdata.reg0;
-> +
-> +                       return PCIBIOS_SUCCESSFUL;
-> +               }
-
-Remove all the unnecessary newlines in this function.
-> +       }
-> +
-> +       return -ENOENT;
-> +}
-> +
-
-<snip>
-
-> +
-> +static struct platform_driver altera_pcie_driver = {
-> +       .probe          = altera_pcie_probe,
-> +       .remove         = altera_pcie_remove,
-> +       .driver = {
-> +               .name   = "altera-pcie",
-> +               .owner  = THIS_MODULE,
-
-Don't need to set owner anymore as this will get populated by the driver core.
-
-Dinh
+	M.
+-- 
+Jazz is not dead. It just smells funny...
