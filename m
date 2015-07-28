@@ -1,87 +1,80 @@
 From: b38611@freescale.com (Fugang Duan)
-Date: Tue, 28 Jul 2015 15:30:40 +0800
-Subject: [PATCH v2 2/4] ARM: imx6ul: add fec MAC refrence clock and phy fixup
- init
+Date: Tue, 28 Jul 2015 15:30:41 +0800
+Subject: [PATCH v2 3/4] ARM: dts: imx: add fec1 and fec2 nodes for SOC i.MX6UL
 In-Reply-To: <1438068642-6876-1-git-send-email-b38611@freescale.com>
 References: <1438068642-6876-1-git-send-email-b38611@freescale.com>
-Message-ID: <1438068642-6876-3-git-send-email-b38611@freescale.com>
+Message-ID: <1438068642-6876-4-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add FEC MAC refrence clock init.
-Add phy fixup init for i.MX6ul 14x14 evk board that installs KSZ8081 phy.
-For the phy, there needs extra phy fixup for MII and RMII mode.
+SOC i.MX6UL has two ethernet MACs, add fec1 and fec2 support for i.MX6UL.
 
-Signed-off-by: Fugang Duan <b38611@freescale.com>
+Signed-off-by: Fugang Duan <B38611@freescale.com>
 ---
- arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+ arch/arm/boot/dts/imx6ul.dtsi | 37 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-index f206506..0d81152 100644
---- a/arch/arm/mach-imx/mach-imx6ul.c
-+++ b/arch/arm/mach-imx/mach-imx6ul.c
-@@ -7,11 +7,53 @@
-  */
- #include <linux/irqchip.h>
- #include <linux/of_platform.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-+#include <linux/micrel_phy.h>
-+#include <linux/phy.h>
-+#include <linux/regmap.h>
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
+diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+index dc0f5b4..3190e6c 100644
+--- a/arch/arm/boot/dts/imx6ul.dtsi
++++ b/arch/arm/boot/dts/imx6ul.dtsi
+@@ -14,6 +14,8 @@
  
- #include "common.h"
+ / {
+ 	aliases {
++		ethernet0 = &fec1;
++		ethernet1 = &fec2;
+ 		gpio0 = &gpio1;
+ 		gpio1 = &gpio2;
+ 		gpio2 = &gpio3;
+@@ -293,6 +295,23 @@
+ 				#interrupt-cells = <2>;
+ 			};
  
-+static void __init imx6ul_enet_clk_init(void)
-+{
-+	struct regmap *gpr;
++			fec2: ethernet at 020b4000 {
++				compatible = "fsl,imx6ul-fec", "fsl,imx6q-fec";
++				reg = <0x020b4000 0x4000>;
++				interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_ENET>,
++					 <&clks IMX6UL_CLK_ENET_AHB>,
++					 <&clks IMX6UL_CLK_ENET_PTP>,
++					 <&clks IMX6UL_CLK_ENET2_REF_125M>,
++					 <&clks IMX6UL_CLK_ENET2_REF_125M>;
++				clock-names = "ipg", "ahb", "ptp",
++					      "enet_clk_ref", "enet_out";
++				fsl,num-tx-queues=<1>;
++				fsl,num-rx-queues=<1>;
++				status = "disabled";
++			};
 +
-+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
-+	if (!IS_ERR(gpr))
-+		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_ENET_CLK_DIR,
-+				   IMX6UL_GPR1_ENET_CLK_OUTPUT);
-+	else
-+		pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
-+
-+}
-+
-+static int ksz8081_phy_fixup(struct phy_device *dev)
-+{
-+	if (dev && dev->interface == PHY_INTERFACE_MODE_MII) {
-+		phy_write(dev, 0x1f, 0x8110);
-+		phy_write(dev, 0x16, 0x201);
-+	} else if (dev && dev->interface == PHY_INTERFACE_MODE_RMII) {
-+		phy_write(dev, 0x1f, 0x8190);
-+		phy_write(dev, 0x16, 0x202);
-+	}
-+
-+	return 0;
-+}
-+
-+static void __init imx6ul_enet_phy_init(void)
-+{
-+	phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff, ksz8081_phy_fixup);
-+}
-+
-+static inline void imx6ul_enet_init(void)
-+{
-+	imx6ul_enet_clk_init();
-+	imx6ul_enet_phy_init();
-+}
-+
- static void __init imx6ul_init_machine(void)
- {
- 	struct device *parent;
-@@ -21,6 +63,7 @@ static void __init imx6ul_init_machine(void)
- 		pr_warn("failed to initialize soc device\n");
+ 			wdog1: wdog at 020bc000 {
+ 				compatible = "fsl,imx6ul-wdt", "fsl,imx21-wdt";
+ 				reg = <0x020bc000 0x4000>;
+@@ -484,6 +503,24 @@
+ 			reg = <0x02100000 0x100000>;
+ 			ranges;
  
- 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-+	imx6ul_enet_init();
- 	imx_anatop_init();
- }
- 
++			fec1: ethernet at 02188000 {
++				compatible = "fsl,imx6ul-fec", "fsl,imx6q-fec";
++				reg = <0x02188000 0x4000>;
++				interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>,
++					     <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
++				clocks = <&clks IMX6UL_CLK_ENET>,
++					 <&clks IMX6UL_CLK_ENET_AHB>,
++					 <&clks IMX6UL_CLK_ENET_PTP>,
++					 <&clks IMX6UL_CLK_ENET_REF>,
++					 <&clks IMX6UL_CLK_ENET_REF>;
++				clock-names = "ipg", "ahb", "ptp",
++					      "enet_clk_ref", "enet_out";
++				fsl,num-tx-queues=<1>;
++				fsl,num-rx-queues=<1>;
++				status = "disabled";
++			};
++
++
+ 			usdhc1: usdhc at 02190000 {
+ 				compatible = "fsl,imx6ul-usdhc", "fsl,imx6sx-usdhc";
+ 				reg = <0x02190000 0x4000>;
 -- 
 1.9.1
