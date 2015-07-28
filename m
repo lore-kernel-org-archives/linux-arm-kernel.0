@@ -1,66 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 Jul 2015 10:54:50 +0200
-Subject: [PATCH 1/3] ARM: at91/soc: add basic support for new sama5d2 SoC
-In-Reply-To: <20150629150421.GB485@piout.net>
-References: <cover.1434632966.git.nicolas.ferre@atmel.com>
- <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
- <20150618152105.GK27492@piout.net> <55913E3B.6060009@atmel.com>
- <20150629150421.GB485@piout.net>
-Message-ID: <55B7435A.2060205@atmel.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 28 Jul 2015 09:03:54 +0000
+Subject: [PATCH 00/10] ARM: dts: atlas7: add some missed nodes and properties
+Message-ID: <1438074244-18708-1-git-send-email-21cnbao@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/06/2015 17:04, Alexandre Belloni a ?crit :
-> On 29/06/2015 at 14:46:51 +0200, Nicolas Ferre wrote :
->> Le 18/06/2015 17:21, Alexandre Belloni a ?crit :
->>> Hi,
->>>
->>> On 18/06/2015 at 15:18:28 +0200, Nicolas Ferre wrote :
->>>> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
->>>> index c53a19b4aab2..6650a8ffaa64 100644
->>>> --- a/Documentation/arm/Atmel/README
->>>> +++ b/Documentation/arm/Atmel/README
->>>> @@ -90,6 +90,12 @@ the Atmel website: http://www.atmel.com.
->>>>          + Datasheet
->>>>            http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
->>>>  
->>>> +    * ARM Cortex-A5 + NEON based SoCs
->>>> +      - sama5d2 family
->>>> +        - sama5d27
->>>> +        + Datasheet
->>>> +          Coming soon
->>>
->>> Shouldn't that go directly before or after the sama5d4 family ?
->>
->> This is "after" sama5d4: I sorted this file according to SoC release
->> date whereas I sorted the other entries in alpa-numerial order (sama5d2
->> placed before sama5d3).
->>
->> Is it what you answered?
->>
-> 
-> No, I meant doing something like:
-> 
->     * ARM Cortex-A5 + NEON based SoCs
->       - sama5d4 family
->         - sama5d41
->         - sama5d42
->         - sama5d43
->         - sama5d44 (device superset)
->         + Datasheet
->           http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
->       - sama5d2 family
->         - sama5d27
->         + Datasheet
->           Coming soon
-> 
-> Else, you end up with two "ARM Cortex-A5 + NEON based SoCs" sections.
+From: Barry Song <Baohua.Song@csr.com>
 
-Oh, yes. Sure, I'll modify this.
 
-Do you think that it's worth sending another series or I can take it for
-the pull-request when it's modified?
+Andy Sun (1):
+  ARM: dts: atlas7: add a GPIO key for rearview button
 
-Bye,
+Dongli Li (1):
+  ARM: dts: atlas7: add lost G2D node
+
+Guo Zeng (1):
+  ARM: dts: atlas7: add lost PWM node
+
+Huayi Li (1):
+  ARM: dts: atlas7: put pinctl property to get pinmux for NAND
+
+Lily.Li (1):
+  ARM: dts: atlas7: add lost jpeg node
+
+Qipan Li (1):
+  ARM: dts: atlas7: add alias name for spi device
+
+Xiaofeng Fei (1):
+  ARM: dts: atlas7: add multimedia codec node
+
+Ye He (2):
+  ARM: dts: atlas7: add performance monitor unit node
+  ARM: dts: atlas7: add lost gmac node
+
+Yonghui Zhang (1):
+  ARM: dts: atlas7: add software digital radio nodes and its DMA
+    channels
+
+ arch/arm/boot/dts/atlas7-evb.dts | 18 ++++++++
+ arch/arm/boot/dts/atlas7.dtsi    | 97 ++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 111 insertions(+), 4 deletions(-)
+
 -- 
-Nicolas Ferre
+1.9.1
