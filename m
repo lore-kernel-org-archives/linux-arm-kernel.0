@@ -1,109 +1,108 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jul 2015 13:17:08 +0800
-Subject: [PATCH v1 2/4] ARM: imx6ul: add fec MAC refrence clock and phy
- fixup init
-In-Reply-To: <1437122304-20598-3-git-send-email-b38611@freescale.com>
-References: <1437122304-20598-1-git-send-email-b38611@freescale.com>
- <1437122304-20598-3-git-send-email-b38611@freescale.com>
-Message-ID: <20150728051708.GD12927@tiger>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 28 Jul 2015 13:19:42 +0800
+Subject: [PATCH v4 2/7] clk: mediatek: Fix rate and dependency of MT8173
+ clocks
+In-Reply-To: <18677675.jZ2GEqS3sy@diego>
+References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+ <20150727055232.GW18700@pengutronix.de>
+ <CAGS+omDjr6d9=+d-uphrENu3Kenr8QUc3VgbaWTd45wqWzi7tg@mail.gmail.com>
+ <18677675.jZ2GEqS3sy@diego>
+Message-ID: <1438060782.17770.18.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 04:38:22PM +0800, Fugang Duan wrote:
-> Add FEC MAC refrence clock init.
-> Add phy fixup init for i.MX6ul 14x14 evk board that installs KSZ8081 phy.
-> For the phy, there needs extra phy fixup for MII and RMII mode.
+Hi,
+
+On Mon, 2015-07-27 at 09:52 +0200, Heiko St?bner wrote:
+> Am Montag, 27. Juli 2015, 14:19:41 schrieb Daniel Kurtz:
+> > On Jul 27, 2015 12:52, "Sascha Hauer" <s.hauer@pengutronix.de> wrote:
+> > > On Fri, Jul 24, 2015 at 07:10:14PM +0800, Daniel Kurtz wrote:
+
+> > > > >  /* TOPCKGEN */
+> > > > >  
+> > > > >  #define CLK_TOP_CLKPH_MCK_O            1
+> > > > > 
+> > > > > -#define CLK_TOP_DPI                    2
+> > > > > 
+> > > > >  #define CLK_TOP_USB_SYSPLL_125M                3
+> > > > 
+> > > > I think we should renumber the rest of the CLK_TOP_*
+> > > 
+> > > They shouldn't be renumbered at all as this makes all binary device
+> > > trees out there useless. That may not be a big issue with the MT8173
+> > > at the moment as there are hardly any binary device trees with the
+> > > mainline device trees shipped, but still we should get used to not
+> > > break existing device trees without need.
+> > 
+> > As you mention, there are no devices shipped with mainline binary device
+> > trees.  So, let's just correct the numbering now while we still can do it
+> > painlessly.  It seems a bit unnecessary to preserve backwards compatibility
+> > when we are still landing basic device support, like the clock tree.
 > 
-> Signed-off-by: Fugang Duan <b38611@freescale.com>
+> in general I'm with Sascha on this regarding breaking the dt, and I guess
+> the empty number does not hurt this much. Another argument against
+> renumbering would be that the clock is there, it's just not used in the
+> code anymore, but the clock is acutally still there.
+> 
+> 
+> But on the other hand, the clock hasn't been part of an official kernel
+> release yet (not in 4.1), and if we want to follow protocol to the letter,
+> the removal of the clock id itself is already breakage, because the
+> binding-header is considered part of the dt and removing a constant
+> could already cause breakage in some universe far far away :-)
+> 
+> So you could try to convince the clock maintainers, that this might still
+> be 4.2 material. Or do a smaller patch for 4.2 like the following, to at
+> least follow the dt-protocol.
+> 
+> Please also take a look at the mt8135 clock tree, to maybe fix this
+> already too, before it becomes part of a release.
+
+There is no non-existed clock in current MT8135 clock implementation. So
+we just need to remove dpi_ck from MT8173 clocks.
+
+I'll send a new patchset to remove dpi_ck in a small separated patch.
+
+
+Best regards,
+James
+
+
+> --------------- 8< -----------------
+> From: Heiko Stuebner <heiko@sntech.de>
+> Date: Mon, 27 Jul 2015 09:41:56 +0200
+> Subject: [PATCH] clk: mediatek: mt8173: remove unused dpi_ck clock
+> 
+> The dpi_ck clock is not actually used and its source isn't 100% clear too.
+> So remove it for the time being.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
+>  drivers/clk/mediatek/clk-mt8173.c      | 1 -
+>  include/dt-bindings/clock/mt8173-clk.h | 1 -
+>  2 files changed, 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
-> index f206506..d4f8b6c 100644
-> --- a/arch/arm/mach-imx/mach-imx6ul.c
-> +++ b/arch/arm/mach-imx/mach-imx6ul.c
-> @@ -9,9 +9,51 @@
->  #include <linux/of_platform.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> +#include <linux/phy.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
-
-Please group <linux/*> headers together and have them sort
-alphabetically.
-
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+> index 8b6523d..80871e2 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
 >  
->  #include "common.h"
+>  static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+>  	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> -	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+>  	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+>  	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+>  };
+> diff --git a/include/dt-bindings/clock/mt8173-clk.h b/include/dt-bindings/clock/mt8173-clk.h
+> index 4ad76ed..7230c38 100644
+> --- a/include/dt-bindings/clock/mt8173-clk.h
+> +++ b/include/dt-bindings/clock/mt8173-clk.h
+> @@ -18,7 +18,6 @@
+>  /* TOPCKGEN */
 >  
-> +static void __init imx6ul_enet_clk_init(void)
-> +{
-> +	struct regmap *gpr;
-> +
-> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
-> +	if (!IS_ERR(gpr))
-> +		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_ENET_CLK_DIR,
-> +				   IMX6UL_GPR1_ENET_CLK_OUTPUT);
-
-Is it correct to set this up for all board designs?
-
-> +	else
-> +		pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
-> +
-> +}
-> +
-> +static int ksz8081_phy_fixup(struct phy_device *dev)
-> +{
-> +	if (dev && dev->interface == PHY_INTERFACE_MODE_MII) {
-> +		phy_write(dev, 0x1f, 0x8110);
-> +		phy_write(dev, 0x16, 0x201);
-> +	} else if (dev && dev->interface == PHY_INTERFACE_MODE_RMII) {
-> +		phy_write(dev, 0x1f, 0x8190);
-> +		phy_write(dev, 0x16, 0x202);
-> +	}
-
-Can this be done from device tree like what 954c396756e3 (net/phy:
-micrel: Add OF configuration support for ksz9021) does?
-> +
-> +	return 0;
-> +}
-> +
-> +#define PHY_ID_KSZ8081	0x00221560
-
-include/linux/micrel_phy.h already has this.
-
-Shawn
-
-> +static void __init imx6ul_enet_phy_init(void)
-> +{
-> +	phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff, ksz8081_phy_fixup);
-> +}
-> +
-> +static inline void imx6ul_enet_init(void)
-> +{
-> +	imx6ul_enet_clk_init();
-> +	imx6ul_enet_phy_init();
-> +}
-> +
->  static void __init imx6ul_init_machine(void)
->  {
->  	struct device *parent;
-> @@ -21,6 +63,7 @@ static void __init imx6ul_init_machine(void)
->  		pr_warn("failed to initialize soc device\n");
->  
->  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +	imx6ul_enet_init();
->  	imx_anatop_init();
->  }
->  
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>  #define CLK_TOP_CLKPH_MCK_O		1
+> -#define CLK_TOP_DPI			2
+>  #define CLK_TOP_USB_SYSPLL_125M		3
+>  #define CLK_TOP_HDMITX_DIG_CTS		4
+>  #define CLK_TOP_ARMCA7PLL_754M		5
