@@ -1,26 +1,95 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 28 Jul 2015 14:56:59 -0700
-Subject: [PATCH 2/7] clk: atlas7: export mux clks so that driver can use it
-In-Reply-To: <1438064845-17894-3-git-send-email-21cnbao@gmail.com>
-References: <1438064845-17894-1-git-send-email-21cnbao@gmail.com>
- <1438064845-17894-3-git-send-email-21cnbao@gmail.com>
-Message-ID: <55B7FAAB.8070801@codeaurora.org>
+From: mohun106@gmail.com (Radha Mohan)
+Date: Tue, 28 Jul 2015 14:48:13 -0700
+Subject: [PATCH 1/3] net: mdio-octeon: Modify driver to work on both
+ ThunderX and Octeon
+In-Reply-To: <55B78C9C.6080006@caviumnetworks.com>
+References: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
+ <1438049683-10630-2-git-send-email-mohun106@gmail.com>
+ <55B78C9C.6080006@caviumnetworks.com>
+Message-ID: <CAC8NTUUYW1YhUPxh670TqZM0h_QLpcPS6a4-Gd=UssdPmNH3xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2015 11:27 PM, Barry Song wrote:
-> From: Guo Zeng <guo.zeng@csr.com>
+On Tue, Jul 28, 2015 at 7:07 AM, David Daney <ddaney@caviumnetworks.com> wrote:
+> On 07/27/2015 07:14 PM, mohun106 at gmail.com wrote:
+>>
+>> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>>
+>> This patch modifies the mdio-octeon driver to work on both ThunderX and
+>> Octeon SoCs from Cavium Inc.
+>>
+>> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+>> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
+>> Signed-off-by: David Daney <david.daney@cavium.com>
+>> ---
+>>   drivers/net/phy/Kconfig       |    9 ++-
+>>   drivers/net/phy/mdio-octeon.c |  122
+>> +++++++++++++++++++++++++++++++++++-----
+>>   2 files changed, 111 insertions(+), 20 deletions(-)
+>>
+>> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
+>> index cf18940..0d6af19 100644
+>> --- a/drivers/net/phy/Kconfig
+>> +++ b/drivers/net/phy/Kconfig
+>> @@ -145,13 +145,14 @@ config MDIO_GPIO
+>>           will be called mdio-gpio.
+>>
+>>   config MDIO_OCTEON
+>> -       tristate "Support for MDIO buses on Octeon SOCs"
+>> -       depends on CAVIUM_OCTEON_SOC
+>> +       tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
+>> +       depends on 64BIT
+>>         default y
 >
-> this patch makes mux clks can be referenced by device drivers.
 >
-> Signed-off-by: Guo Zeng <guo.zeng@csr.com>
-> Signed-off-by: Barry Song <Barry.Song@csr.com>
-> ---
+> If it now depends only on 64BIT, we should probably remove the "default".
+> People building for x86 are not interested in this driver.
+>
 
-The subject makes this sounds like we're exporting clocks to drivers via
-extern, but that's not happening. Perhaps the subject could be clarified
-to say something like "export mux clks so that consumers can get them"?
+Ok got it.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>
+> [...]
+>>
+>>
+>> +#ifdef __BIG_ENDIAN_BITFIELD
+>> +#define OCT_MDIO_BITFIELD_FIELD(field, more)   \
+>> +       field;                                  \
+>> +       more
+>> +
+>> +#else
+>> +#define OCT_MDIO_BITFIELD_FIELD(field, more)   \
+>> +       more                                    \
+>> +       field;
+>> +
+>> +#endif
+>> +
+>> +union cvmx_smix_clk {
+>> +       uint64_t u64;
+>
+>
+> Perhaps: s/uint64_t/u64/
+>
+> There are several of these.
+
+Ok will do. If there aren;t any more comments I will re-submit another version.
+
+>
+>
+>> +       struct cvmx_smix_clk_s {
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
+>> +         OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
+>> +         ;))))))))))
+>> +       } s;
+>> +};
+>> +
+>
+> [...]
