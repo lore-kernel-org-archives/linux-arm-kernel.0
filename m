@@ -1,122 +1,90 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jul 2015 14:46:25 +0100
-Subject: [PATCH v6 18/19] PCI/MSI: pci-xgene-msi: Get rid of struct
- msi_controller
+Date: Tue, 28 Jul 2015 14:46:24 +0100
+Subject: [PATCH v6 17/19] irqchip: GICv2m: Add platform MSI support
 In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
 References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1438091186-10244-19-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Gene MSI driver only uses the msi_controller structure as
-a way to match the host bridge  with its MSI HW, and thus the
-msi_domain.
+In order to support non-PCI MSI with GICv2m, add the minimal
+required entry points for the MSI domain, which is actually almost
+nothing (we just use the defaults provided by the core code).
 
-But now that we can directly associate an msi_domain with a device,
-there is no use keeping this msi_controller around.
-
-Just remove all traces of msi_controller from the driver.
-
-Tested-by: Duc Dang <dhdang@apm.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/pci/host/pci-xgene-msi.c | 41 ++++++++++++++++------------------------
- 1 file changed, 16 insertions(+), 25 deletions(-)
+ drivers/irqchip/irq-gic-v2m.c | 33 +++++++++++++++++++++++++--------
+ 1 file changed, 25 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-index 2d31d4d..ec5a14b 100644
---- a/drivers/pci/host/pci-xgene-msi.c
-+++ b/drivers/pci/host/pci-xgene-msi.c
-@@ -40,8 +40,8 @@ struct xgene_msi_group {
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index ec9c376..db04fc1 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -50,7 +50,6 @@ struct v2m_data {
+ 	u32 spi_start;		/* The SPI number that MSIs start */
+ 	u32 nr_spis;		/* The number of SPIs for MSIs */
+ 	unsigned long *bm;	/* MSI vector bitmap */
+-	struct irq_domain *domain;
+ };
  
- struct xgene_msi {
- 	struct device_node	*node;
--	struct msi_controller	mchip;
--	struct irq_domain	*domain;
-+	struct irq_domain	*inner_domain;
-+	struct irq_domain	*msi_domain;
- 	u64			msi_addr;
- 	void __iomem		*msi_regs;
- 	unsigned long		*bitmap;
-@@ -252,17 +252,17 @@ static const struct irq_domain_ops msi_domain_ops = {
- 
- static int xgene_allocate_domains(struct xgene_msi *msi)
- {
--	msi->domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
--					    &msi_domain_ops, msi);
--	if (!msi->domain)
-+	msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-+						  &msi_domain_ops, msi);
-+	if (!msi->inner_domain)
- 		return -ENOMEM;
- 
--	msi->mchip.domain = pci_msi_create_irq_domain(msi->mchip.of_node,
--						      &xgene_msi_domain_info,
--						      msi->domain);
-+	msi->msi_domain = pci_msi_create_irq_domain(msi->node,
-+						    &xgene_msi_domain_info,
-+						    msi->inner_domain);
- 
--	if (!msi->mchip.domain) {
--		irq_domain_remove(msi->domain);
-+	if (!msi->msi_domain) {
-+		irq_domain_remove(msi->inner_domain);
- 		return -ENOMEM;
- 	}
- 
-@@ -271,10 +271,10 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
- 
- static void xgene_free_domains(struct xgene_msi *msi)
- {
--	if (msi->mchip.domain)
--		irq_domain_remove(msi->mchip.domain);
--	if (msi->domain)
--		irq_domain_remove(msi->domain);
-+	if (msi->msi_domain)
-+		irq_domain_remove(msi->msi_domain);
-+	if (msi->inner_domain)
-+		irq_domain_remove(msi->inner_domain);
+ static void gicv2m_mask_msi_irq(struct irq_data *d)
+@@ -212,12 +211,25 @@ static bool is_msi_spi_valid(u32 base, u32 num)
+ 	return true;
  }
  
- static int xgene_msi_init_allocator(struct xgene_msi *xgene_msi)
-@@ -340,7 +340,7 @@ static void xgene_msi_isr(unsigned int irq, struct irq_desc *desc)
- 			 * CPU0
- 			 */
- 			hw_irq = hwirq_to_canonical_hwirq(hw_irq);
--			virq = irq_find_mapping(xgene_msi->domain, hw_irq);
-+			virq = irq_find_mapping(xgene_msi->inner_domain, hw_irq);
- 			WARN_ON(!virq);
- 			if (virq != 0)
- 				generic_handle_irq(virq);
-@@ -497,7 +497,7 @@ static int xgene_msi_probe(struct platform_device *pdev)
- 		goto error;
++static struct irq_chip gicv2m_pmsi_irq_chip = {
++	.name			= "pMSI",
++};
++
++static struct msi_domain_ops gicv2m_pmsi_ops = {
++};
++
++static struct msi_domain_info gicv2m_pmsi_domain_info = {
++	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
++	.ops	= &gicv2m_pmsi_ops,
++	.chip	= &gicv2m_pmsi_irq_chip,
++};
++
+ static int __init gicv2m_init_one(struct device_node *node,
+ 				  struct irq_domain *parent)
+ {
+ 	int ret;
+ 	struct v2m_data *v2m;
+-	struct irq_domain *inner_domain;
++	struct irq_domain *inner_domain, *pci_domain, *plat_domain;
+ 
+ 	v2m = kzalloc(sizeof(struct v2m_data), GFP_KERNEL);
+ 	if (!v2m) {
+@@ -270,10 +282,13 @@ static int __init gicv2m_init_one(struct device_node *node,
+ 
+ 	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
+ 	inner_domain->parent = parent;
+-	v2m->domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
+-						inner_domain);
+-	if (!v2m->domain) {
+-		pr_err("Failed to create MSI domain\n");
++	pci_domain = pci_msi_create_irq_domain(node, &gicv2m_msi_domain_info,
++					       inner_domain);
++	plat_domain = platform_msi_create_irq_domain(node,
++						     &gicv2m_pmsi_domain_info,
++						     inner_domain);
++	if (!pci_domain || !plat_domain) {
++		pr_err("Failed to create MSI domains\n");
+ 		ret = -ENOMEM;
+ 		goto err_free_domains;
  	}
- 	xgene_msi->msi_addr = res->start;
--
-+	xgene_msi->node = pdev->dev.of_node;
- 	xgene_msi->num_cpus = num_possible_cpus();
- 
- 	rc = xgene_msi_init_allocator(xgene_msi);
-@@ -561,19 +561,10 @@ static int xgene_msi_probe(struct platform_device *pdev)
- 
- 	cpu_notifier_register_done();
- 
--	xgene_msi->mchip.of_node = pdev->dev.of_node;
--	rc = of_pci_msi_chip_add(&xgene_msi->mchip);
--	if (rc) {
--		dev_err(&pdev->dev, "failed to add MSI controller chip\n");
--		goto error_notifier;
--	}
--
- 	dev_info(&pdev->dev, "APM X-Gene PCIe MSI driver loaded\n");
- 
+@@ -287,8 +302,10 @@ static int __init gicv2m_init_one(struct device_node *node,
  	return 0;
  
--error_notifier:
--	unregister_hotcpu_notifier(&xgene_msi_cpu_notifier);
- error:
- 	xgene_msi_remove(pdev);
- 	return rc;
+ err_free_domains:
+-	if (v2m->domain)
+-		irq_domain_remove(v2m->domain);
++	if (plat_domain)
++		irq_domain_remove(plat_domain);
++	if (pci_domain)
++		irq_domain_remove(pci_domain);
+ 	if (inner_domain)
+ 		irq_domain_remove(inner_domain);
+ err_free_bm:
 -- 
 2.1.4
