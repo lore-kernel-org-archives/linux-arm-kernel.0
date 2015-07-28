@@ -1,136 +1,47 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 28 Jul 2015 15:55:10 -0700
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <20150728022936.GB1229@linux>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
- <20150728022936.GB1229@linux>
-Message-ID: <20150728225510.GB3159@codeaurora.org>
+Date: Tue, 28 Jul 2015 16:03:16 -0700
+Subject: [PATCH 05/10] opp: Add support to parse "operating-points-v2"
+ bindings
+In-Reply-To: <20150727030239.GG19944@linux>
+References: <cover.1434369079.git.viresh.kumar@linaro.org>
+ <1b5a393f2162752cbb773956dff15739e7525a1d.1434369079.git.viresh.kumar@linaro.org>
+ <2910042.ys2zsBBKt2@amdc1976> <20150727030239.GG19944@linux>
+Message-ID: <55B80A34.1010805@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28, Viresh Kumar wrote:
-> Cc'ing few people (whom I cc'd last time as well :)).
-> 
-> On 27-07-15, 16:20, Lee Jones wrote:
-> > These OPPs are used in ST's CPUFreq implementation.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> > 
-> > Changelog:
-> >  - None, new patch
-> > 
-> >  Documentation/devicetree/bindings/power/opp-st.txt | 76 ++++++++++++++++++++++
-> >  1 file changed, 76 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/power/opp-st.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/power/opp-st.txt b/Documentation/devicetree/bindings/power/opp-st.txt
-> > new file mode 100644
-> > index 0000000..6eb2a91
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/power/opp-st.txt
-> > @@ -0,0 +1,76 @@
-> > +STMicroelectronics OPP (Operating Performance Points) Bindings
-> > +--------------------------------------------------------------
-> > +
-> > +Frequency Scaling only
-> > +----------------------
-> > +
-> > +Located in CPU's node:
-> > +
-> > +- operating-points	: [See: ./opp.txt]
-> > +
-> > +Example [safe]
-> > +--------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +				 /* kHz     uV   */
-> > +		operating-points = <1500000 0
-> > +				    1200000 0
-> > +				    800000  0
-> > +				    500000  0>;
-> > +	};
-> > +};
-> > +
-> > +Dynamic Voltage and Frequency Scaling (DVFS)
-> > +--------------------------------------------
-> > +
-> > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
-> > +
-> > +- compatible		: Should be "operating-points-v2-sti"
-> > +- opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
-> 
-> Or should we mention:
-> - opp{1..N} 		: Each 'oppX' subnode shall contain below properties,
->                           over what ./opp.txt defines:
-> 
-> ?
-> 
-> 
-> > + - opp-hz		: CPU frequency [Hz] for this OPP [See: ./opp.txt]
-> > + - st,avs		: List of available voltages [uV] indexed by process code
-> > + - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
-> > + - st,substrate		: Substrate version this OPP is suitable for [0xFF means ALL]
-> > +- st,syscfg		: Phandle to Major number register
-> > +				First cell: offset to major number
-> > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
-> > +				First cell: offset to process code
-> > +				Second cell: offset to minor number
-> > +
-> > +WARNING: The opp{1..N} nodes will be provided by the bootloader.  Do not attempt to
-> > +	 artificially synthesise the opp{1..N} nodes or any of their descendants.
-> > +	 They are very platform specific and may damage the hardware if created
-> > +	 incorrectly.
-> > +
-> > +Example [unsafe]
-> > +----------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +		operating-points-v2	= <&cpu0_opp_list>;
-> > +	};
-> > +};
-> > +
-> > +/* ############################################################ */
-> > +/* # WARNING: Do not attempt to copy/replicate this node,     # */
-> > +/* #          it is only to be supplied by the bootloader !!! # */
-> > +/* ############################################################ */
-> > +cpu0-opp-list {
-> > +	compatible	= "operating-points-v2-sti";
-> > +	st,syscfg	= <&syscfg [major_offset]>;
-> > +	st,syscfg-eng   = <&syscfg_eng [pcode_offset] [minor_offset]>;
-> > +
-> > +	opp0 {
-> > +		opp-hz		= <1200000000>;
-> > +		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
-> > +		st,substrate	= <0xff>;
-> > +		st,cuts		= <0xff>;
-> > +	};
-> > +	opp1 {
-> > +		opp-hz		= <1500000000>;
-> > +		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
-> > +		st,substrate	= <0xff>;
-> > +		st,cuts		= <0x2>;
-> > +	};
-> > +};
-> 
-> I don't see more problems here, unless we can move some of this to the
-> generic bindings.
-> 
-> @Rob/Stephen: Please respond before it is late :)
-> 
+On 07/26/2015 08:02 PM, Viresh Kumar wrote:
+> On 08-07-15, 15:41, Bartlomiej Zolnierkiewicz wrote:
+>> Isn't using u32 for storing frequency (in Hz) too small by today's
+>> standards?
+>>
+>> [ Please note that the old v1 binding uses kHz not Hz. ]
+> I have thought about this a bit more and I am somewhat confused. Yes I
+> agree that u32 isn't big enough for frequencies in Hz, i.e. Max value
+> of 4294967295 ~ 4.29 GHz.
+>
+> But the bigger problem lies with the clk API that we have today. It
+> declares clk-rate as a unsigned-long which is 32 bits on a 32 bit
+> machine and 64 bits on a 64 bit machine. And every single piece of
+> code reading "clock-frequency" DT property, reads it as a 32 bit value
+> as we reserve only a single cell for it.
+>
+> Now, if we wanna change that, we need to start changing from the
+> clk-API itself and that's not gonna be a small task and I would leave
+> it to Mike/Stephen for obvious reasons :)
+>
+> So, I will keep this code in sync with rest of the kernel and lets see
+> what Mike has to say.
+>
 
-It's interesting to have vendor specific properties like avs,
-cuts, and substrate. That could replace our planned usage of the
-opp-names property where we encode similar information (speed
-bin, revision, etc.) into a string that we look for.
-
-So I wonder why the avs/cut/substrate information can't be
-encoded into the opp name? That would make these properties
-obsolete, given that all they're used for is to pick out the
-correct OPP?
+There is talk about moving to 64 bits for the frequency in the clk API.
+It's not actively being developed though and I'm not sure when we'll get
+there. From a DT perspective though, I don't see why it would be bad to
+have two cells instead of one cell for the frequency here. It would
+allow up to 64 bits of frequency so that when we change the clk API we
+won't need to do anything in the OPP bindings to handle it. Just because
+we have problems in the kernel doesn't mean we should put the same
+problems into DT.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
