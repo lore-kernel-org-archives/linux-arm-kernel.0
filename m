@@ -1,187 +1,239 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 28 Jul 2015 21:19:42 +0800
-Subject: [PATCH V3 2/5] clk: introduce clk_core_enable_lock and
- clk_core_disable_lock functions
+Date: Tue, 28 Jul 2015 21:19:43 +0800
+Subject: [PATCH V3 3/5] clk: move clk_disable_unused after
+ clk_core_disable_unprepare function
 In-Reply-To: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
 References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1438089585-30103-3-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1438089585-30103-4-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This can be useful when clock core wants to enable/disable clocks.
-Then we don't have to convert the struct clk_core to struct clk to call
-clk_enable/clk_disable which is a bit un-align with exist using.
-
-And after introduce clk_core_{enable|disable}_lock, we can refine
-clk_eanble and clk_disable a bit.
-
-As well as clk_core_{enable|disable}_lock, we also added
-clk_core_{prepare|unprepare}_lock and clk_core_prepare_enable/
-clk_core_unprepare_disable for clock core to easily use.
+No function level change, just moving code place.
+clk_disable_unused function will need to call clk_core_prepare_enable/
+clk_core_disable_unprepare when adding CLK_OPS_PARENT_ON features.
+So move it after clk_core_disable_unprepare to avoid adding forward
+declared functions.
 
 Cc: Mike Turquette <mturquette@linaro.org>
 Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
 ---
- drivers/clk/clk.c | 85 +++++++++++++++++++++++++++++++++++++++++--------------
- 1 file changed, 63 insertions(+), 22 deletions(-)
+ drivers/clk/clk.c | 196 +++++++++++++++++++++++++++---------------------------
+ 1 file changed, 98 insertions(+), 98 deletions(-)
 
 diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 4c7f7b2..c2310d5 100644
+index c2310d5..ac158c4 100644
 --- a/drivers/clk/clk.c
 +++ b/drivers/clk/clk.c
-@@ -583,6 +583,13 @@ static void clk_core_unprepare(struct clk_core *core)
- 	clk_core_unprepare(core->parent);
+@@ -171,104 +171,6 @@ static bool clk_core_is_enabled(struct clk_core *core)
+ 	return core->ops->is_enabled(core->hw);
  }
  
-+static void clk_core_unprepare_lock(struct clk_core *core)
+-static void clk_unprepare_unused_subtree(struct clk_core *core)
+-{
+-	struct clk_core *child;
+-
+-	lockdep_assert_held(&prepare_lock);
+-
+-	hlist_for_each_entry(child, &core->children, child_node)
+-		clk_unprepare_unused_subtree(child);
+-
+-	if (core->prepare_count)
+-		return;
+-
+-	if (core->flags & CLK_IGNORE_UNUSED)
+-		return;
+-
+-	if (clk_core_is_prepared(core)) {
+-		trace_clk_unprepare(core);
+-		if (core->ops->unprepare_unused)
+-			core->ops->unprepare_unused(core->hw);
+-		else if (core->ops->unprepare)
+-			core->ops->unprepare(core->hw);
+-		trace_clk_unprepare_complete(core);
+-	}
+-}
+-
+-static void clk_disable_unused_subtree(struct clk_core *core)
+-{
+-	struct clk_core *child;
+-	unsigned long flags;
+-
+-	lockdep_assert_held(&prepare_lock);
+-
+-	hlist_for_each_entry(child, &core->children, child_node)
+-		clk_disable_unused_subtree(child);
+-
+-	flags = clk_enable_lock();
+-
+-	if (core->enable_count)
+-		goto unlock_out;
+-
+-	if (core->flags & CLK_IGNORE_UNUSED)
+-		goto unlock_out;
+-
+-	/*
+-	 * some gate clocks have special needs during the disable-unused
+-	 * sequence.  call .disable_unused if available, otherwise fall
+-	 * back to .disable
+-	 */
+-	if (clk_core_is_enabled(core)) {
+-		trace_clk_disable(core);
+-		if (core->ops->disable_unused)
+-			core->ops->disable_unused(core->hw);
+-		else if (core->ops->disable)
+-			core->ops->disable(core->hw);
+-		trace_clk_disable_complete(core);
+-	}
+-
+-unlock_out:
+-	clk_enable_unlock(flags);
+-}
+-
+-static bool clk_ignore_unused;
+-static int __init clk_ignore_unused_setup(char *__unused)
+-{
+-	clk_ignore_unused = true;
+-	return 1;
+-}
+-__setup("clk_ignore_unused", clk_ignore_unused_setup);
+-
+-static int clk_disable_unused(void)
+-{
+-	struct clk_core *core;
+-
+-	if (clk_ignore_unused) {
+-		pr_warn("clk: Not disabling unused clocks\n");
+-		return 0;
+-	}
+-
+-	clk_prepare_lock();
+-
+-	hlist_for_each_entry(core, &clk_root_list, child_node)
+-		clk_disable_unused_subtree(core);
+-
+-	hlist_for_each_entry(core, &clk_orphan_list, child_node)
+-		clk_disable_unused_subtree(core);
+-
+-	hlist_for_each_entry(core, &clk_root_list, child_node)
+-		clk_unprepare_unused_subtree(core);
+-
+-	hlist_for_each_entry(core, &clk_orphan_list, child_node)
+-		clk_unprepare_unused_subtree(core);
+-
+-	clk_prepare_unlock();
+-
+-	return 0;
+-}
+-late_initcall_sync(clk_disable_unused);
+-
+ /***    helper functions   ***/
+ 
+ const char *__clk_get_name(struct clk *clk)
+@@ -817,6 +719,104 @@ static void clk_core_disable_unprepare(struct clk_core *core)
+ 	clk_core_unprepare_lock(core);
+ }
+ 
++static void clk_unprepare_unused_subtree(struct clk_core *core)
 +{
-+	clk_prepare_lock();
-+	clk_core_unprepare(core);
-+	clk_prepare_unlock();
++	struct clk_core *child;
++
++	lockdep_assert_held(&prepare_lock);
++
++	hlist_for_each_entry(child, &core->children, child_node)
++		clk_unprepare_unused_subtree(child);
++
++	if (core->prepare_count)
++		return;
++
++	if (core->flags & CLK_IGNORE_UNUSED)
++		return;
++
++	if (clk_core_is_prepared(core)) {
++		trace_clk_unprepare(core);
++		if (core->ops->unprepare_unused)
++			core->ops->unprepare_unused(core->hw);
++		else if (core->ops->unprepare)
++			core->ops->unprepare(core->hw);
++		trace_clk_unprepare_complete(core);
++	}
 +}
 +
- /**
-  * clk_unprepare - undo preparation of a clock source
-  * @clk: the clk being unprepared
-@@ -599,9 +606,7 @@ void clk_unprepare(struct clk *clk)
- 	if (IS_ERR_OR_NULL(clk))
- 		return;
- 
--	clk_prepare_lock();
--	clk_core_unprepare(clk->core);
--	clk_prepare_unlock();
-+	clk_core_unprepare_lock(clk->core);
- }
- EXPORT_SYMBOL_GPL(clk_unprepare);
- 
-@@ -637,6 +642,17 @@ static int clk_core_prepare(struct clk_core *core)
- 	return 0;
- }
- 
-+static int clk_core_prepare_lock(struct clk_core *core)
++static void clk_disable_unused_subtree(struct clk_core *core)
 +{
-+	int ret;
-+
-+	clk_prepare_lock();
-+	ret = clk_core_prepare(core);
-+	clk_prepare_unlock();
-+
-+	return ret;
-+}
-+
- /**
-  * clk_prepare - prepare a clock source
-  * @clk: the clk being prepared
-@@ -651,16 +667,10 @@ static int clk_core_prepare(struct clk_core *core)
-  */
- int clk_prepare(struct clk *clk)
- {
--	int ret;
--
- 	if (!clk)
- 		return 0;
- 
--	clk_prepare_lock();
--	ret = clk_core_prepare(clk->core);
--	clk_prepare_unlock();
--
--	return ret;
-+	return clk_core_prepare_lock(clk->core);
- }
- EXPORT_SYMBOL_GPL(clk_prepare);
- 
-@@ -687,6 +697,15 @@ static void clk_core_disable(struct clk_core *core)
- 	clk_core_disable(core->parent);
- }
- 
-+static void clk_core_disable_lock(struct clk_core *core)
-+{
++	struct clk_core *child;
 +	unsigned long flags;
 +
++	lockdep_assert_held(&prepare_lock);
++
++	hlist_for_each_entry(child, &core->children, child_node)
++		clk_disable_unused_subtree(child);
++
 +	flags = clk_enable_lock();
-+	clk_core_disable(core);
++
++	if (core->enable_count)
++		goto unlock_out;
++
++	if (core->flags & CLK_IGNORE_UNUSED)
++		goto unlock_out;
++
++	/*
++	 * some gate clocks have special needs during the disable-unused
++	 * sequence.  call .disable_unused if available, otherwise fall
++	 * back to .disable
++	 */
++	if (clk_core_is_enabled(core)) {
++		trace_clk_disable(core);
++		if (core->ops->disable_unused)
++			core->ops->disable_unused(core->hw);
++		else if (core->ops->disable)
++			core->ops->disable(core->hw);
++		trace_clk_disable_complete(core);
++	}
++
++unlock_out:
 +	clk_enable_unlock(flags);
 +}
 +
- /**
-  * clk_disable - gate a clock
-  * @clk: the clk being gated
-@@ -701,14 +720,10 @@ static void clk_core_disable(struct clk_core *core)
-  */
- void clk_disable(struct clk *clk)
- {
--	unsigned long flags;
--
- 	if (IS_ERR_OR_NULL(clk))
- 		return;
- 
--	flags = clk_enable_lock();
--	clk_core_disable(clk->core);
--	clk_enable_unlock(flags);
-+	clk_core_disable_lock(clk->core);
- }
- EXPORT_SYMBOL_GPL(clk_disable);
- 
-@@ -747,6 +762,18 @@ static int clk_core_enable(struct clk_core *core)
- 	return 0;
- }
- 
-+static int clk_core_enable_lock(struct clk_core *core)
++static bool clk_ignore_unused;
++static int __init clk_ignore_unused_setup(char *__unused)
 +{
-+	unsigned long flags;
-+	int ret;
-+
-+	flags = clk_enable_lock();
-+	ret = clk_core_enable(core);
-+	clk_enable_unlock(flags);
-+
-+	return ret;
++	clk_ignore_unused = true;
++	return 1;
 +}
++__setup("clk_ignore_unused", clk_ignore_unused_setup);
 +
- /**
-  * clk_enable - ungate a clock
-  * @clk: the clk being ungated
-@@ -762,19 +789,33 @@ static int clk_core_enable(struct clk_core *core)
-  */
- int clk_enable(struct clk *clk)
- {
--	unsigned long flags;
--	int ret;
--
- 	if (!clk)
- 		return 0;
- 
--	flags = clk_enable_lock();
--	ret = clk_core_enable(clk->core);
--	clk_enable_unlock(flags);
-+	return clk_core_enable_lock(clk->core);
-+}
-+EXPORT_SYMBOL_GPL(clk_enable);
-+
-+static int clk_core_prepare_enable(struct clk_core *core)
++static int clk_disable_unused(void)
 +{
-+	int ret;
++	struct clk_core *core;
 +
-+	ret = clk_core_prepare_lock(core);
-+	if (ret)
-+		return ret;
++	if (clk_ignore_unused) {
++		pr_warn("clk: Not disabling unused clocks\n");
++		return 0;
++	}
 +
-+	ret = clk_core_enable_lock(core);
-+	if (ret)
-+		clk_core_unprepare_lock(core);
- 
- 	return ret;
- }
--EXPORT_SYMBOL_GPL(clk_enable);
++	clk_prepare_lock();
 +
-+static void clk_core_disable_unprepare(struct clk_core *core)
-+{
-+	clk_core_disable_lock(core);
-+	clk_core_unprepare_lock(core);
++	hlist_for_each_entry(core, &clk_root_list, child_node)
++		clk_disable_unused_subtree(core);
++
++	hlist_for_each_entry(core, &clk_orphan_list, child_node)
++		clk_disable_unused_subtree(core);
++
++	hlist_for_each_entry(core, &clk_root_list, child_node)
++		clk_unprepare_unused_subtree(core);
++
++	hlist_for_each_entry(core, &clk_orphan_list, child_node)
++		clk_unprepare_unused_subtree(core);
++
++	clk_prepare_unlock();
++
++	return 0;
 +}
- 
++late_initcall_sync(clk_disable_unused);
++
  static int clk_core_round_rate_nolock(struct clk_core *core,
  				      struct clk_rate_request *req)
+ {
 -- 
 1.9.1
