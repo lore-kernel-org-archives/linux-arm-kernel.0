@@ -1,67 +1,82 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 28 Jul 2015 06:57:17 -0700
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <55B73C64.5050903@xilinx.com>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <1438070702.3193.4.camel@pengutronix.de>
- <55B73C64.5050903@xilinx.com>
-Message-ID: <CAAtXAHc=WTg3VHugKZ+SHnCA7OKXLLay-aOJyk9C9r+Z2MWwBg@mail.gmail.com>
+From: jerin.jacob@caviumnetworks.com (Jerin Jacob)
+Date: Tue, 28 Jul 2015 19:33:52 +0530
+Subject: [PATCH] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20150728112057.GI29209@arm.com>
+References: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20150724144103.GC12569@arm.com>
+ <20150727051025.GA5310@localhost.localdomain>
+ <20150728112057.GI29209@arm.com>
+Message-ID: <20150728140347.GA9934@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philip, Michal,
+On Tue, Jul 28, 2015 at 12:20:57PM +0100, Will Deacon wrote:
+> On Mon, Jul 27, 2015 at 06:10:29AM +0100, Jerin Jacob wrote:
+> > On Fri, Jul 24, 2015 at 03:41:03PM +0100, Will Deacon wrote:
+> > > On Fri, Jul 24, 2015 at 06:54:23AM +0100, Jerin Jacob wrote:
+> > > > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > > > +		enum pci_mmap_state mmap_state, int write_combine)
+> > > > +{
+> > > > +	/*
+> > > > +	* I/O space can be accessed via normal processor loads and stores on
+> > > > +	* this platform but for now we elect not to do this and portable
+> > > > +	* drivers should not do this anyway.
+> > > > +	*/
+> > > > +	if (mmap_state == pci_mmap_io)
+> > > > +		return -EINVAL;
+> > > > +
+> > > > +	if (write_combine)
+> > > > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> > > > +	else
+> > > > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> > > > +
+> > > > +	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+> > > > +	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
+> > > > +}
+> > > 
+> > > So pci_iomap_range chooses the memory attributes based on the BAR flags
+> > > (and even then it looks weird -- CACHEABLE => ioremap, else ioremap_nocache,
+> > > which is just the same as ioremap on arm64).
+> > > 
+> > > It would be good to understand (a) why this is different and (b) what
+> > 
+> > AFAIU, pci_iomap_range is the generic implementation and chooses to
+> > use only minimal attributes that works on all the architectures.
+> > The primary consumer of pci_iomap_range is virtio_pci driver,Which
+> > doesn't care about HW PCI memory attributes like Prefetchable.
+> 
+> pci_iomap calls pci_iomap_range.
 
-thanks for your reviews.
+Yes, I missed that.
 
-On Tue, Jul 28, 2015 at 1:25 AM, Michal Simek <michal.simek@xilinx.com> wrote:
-> On 07/28/2015 10:05 AM, Philipp Zabel wrote:
->> Am Freitag, den 24.07.2015, 17:21 -0700 schrieb Moritz Fischer:
->>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->>> ---
->>>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->>>  1 file changed, 13 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>> new file mode 100644
->>> index 0000000..ac4499e
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->>> @@ -0,0 +1,13 @@
->>> +Xilinx Zynq PL Reset Manager
->>> +
->>> +Required properties:
->>> +- compatible: "xlnx,zynq-reset-pl"
->>> +- syscon <&slcr>;
->>> +- #reset-cells: 1
->>> +
->>> +Example:
->>> +    rstc: rstc at 240 {
->>> +            #reset-cells = <1>;
->>> +            compatible = "xlnx,zynq-reset-pl";
->>> +            syscon = <&slcr>;
->>
->> Why the syscon phandle if rstc always is the child of slcr? Why not just
->> request the syscon for the rstc's parent node.
->
-> We are using this description for pincntrl which was properly reviewed
-> that's why I expect Moritz just use the same style.
-> But yes also referencing parent should work.
+> 
+> > > the consistent set of attributes should be.
+> > 
+> > PCI perspective, memory attributes are Prefetchable and non-Prefetchable
+> > for a given BAR.
+> > 
+> > Former one does have read side-effects or supports write
+> > merging(typically used
+> > by graphics memory) and latter one has read side effects and does not
+> > support write merging(typically used by register files)
+> > 
+> > IMO, In armv8 nomenclature, MT_NORMAL_NC and MT_DEVICE_nGnRnE map
+> > correctly to above PCI memory attribute definitions.
+> 
+> I agree with your choice of memory types (well, almost. We probably don't
+> need the nE), I'm just after some consistency within the kernel, because
 
-Michal is right, I tried to be consistent with the pinctrl. Either one
-is fine for me.
-We'll just have to make a decision :-)
->
-> TBH I don't have strong preference but having unified style is something
-> what I would prefer.
->
-> Also I see that using parent is used by others and it looks like that
-> having something like syscon_regmap_lookup_parent will be worth to have.
->
-> Thanks,
-> Michal
->
->
-Moritz
+I thought so, However, Since PCIe deals with off-chip peripherals,
+IMO it should be MT_DEVICE_nGnRnE(strongly ordered).
+Early write acknowledgment may have side effect based on the topology.
+(connected under Bridge etc).
+IMO, It make sense to mark as nGnRE for on-chip peripherals. But
+If you still think we need to mark as nGnRE then I can submit v2 with
+nGnRE else IMO, currect patch is fine for pci_mmap_page_range
+
+Jerin
+
+> pci_iomap_range looks wrong to me. Another different example is
+> pci_ioremap_bar, which always uses ioremap_nocache.
+> 
+> Will
