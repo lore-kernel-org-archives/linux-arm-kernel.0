@@ -1,54 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Jul 2015 14:55:45 +0200
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <20150728090216.892076C80D94@dd34104.kasserver.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
- <55B5E6DB.8020009@redhat.com>
- <20150727123653.36C046C8007E@dd34104.kasserver.com>
- <55B62A1B.6030601@redhat.com>
- <CAGb2v65ApKvrj6K+kw43u=0q6=auTsmQjCXhibgZkW+vd5nDqA@mail.gmail.com>
- <20150728090216.892076C80D94@dd34104.kasserver.com>
-Message-ID: <20150728125545.GC2564@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jul 2015 13:55:52 +0100
+Subject: [PATCH 4/4] ARM: omap2: restore OMAP4 barrier behaviour
+In-Reply-To: <55B6A161.8010307@ti.com>
+References: <20150715174647.GA7557@n2100.arm.linux.org.uk>
+ <E1ZFQmM-0006GN-5Y@rmk-PC.arm.linux.org.uk>
+ <55B6A161.8010307@ti.com>
+Message-ID: <20150728125552.GH7576@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 11:02:16AM +0200, Timo Sigurdsson wrote:
-> Hi,
+On Mon, Jul 27, 2015 at 04:23:45PM -0500, Dan Murphy wrote:
+> Russell
 > 
-> Chen-Yu Tsai schrieb am 27.07.2015 15:14:
-> >> ChenYu (in the CC), since you did most of the original work here, do
-> >> you know why we have an op at 0.9 volt, but none of our boards allow the
-> >> voltage to go that low in the regulator settings ?
-> > 
-> > I'm on vacation now, so apologies for the bad formatting.
-> > 
-> > The OPPs are from a common subset
-> > of the settings from the fex files available
-> > at the time. Some fex files actually set
-> > min and max voltage thus eliminating
-> > the highest and lowest OPPs.
-> > 
-> > At least that is how Maxime and I
-> > interpreted them.
+> On 07/15/2015 12:47 PM, Russell King wrote:
+> > +#ifdef CONFIG_OMAP_INTERCONNECT_BARRIER
+> > +
+> >  /* Used to implement memory barrier on DRAM path */
+> >  #define OMAP4_DRAM_BARRIER_VA			0xfe600000
+> >  
+> > -void __iomem *dram_sync, *sram_sync;
+> > +static void __iomem *dram_sync, *sram_sync;
+> > +static phys_addr_t dram_sync_paddr;
+> > +static u32 dram_sync_size;
+> > +
+> > +/*
+> > + * The OMAP4 bus structure contains asynchrnous bridges which can buffer
+> > + * data writes from the MPU. These asynchronous bridges can be found on
+> > + * paths between the MPU to EMIF, and the MPU to L3 interconnects.
+> > + *
+> > + * We need to be careful about re-ordering which can happen as a result
+> > + * of different accesses being performed via different paths, and
+> > + * therefore different asynchronous bridges.
+> > + */
+> >  
+> > -static phys_addr_t paddr;
+> > -static u32 size;
+> > +/*
+> > + * OMAP4 interconnect barrier which is called for each mb() and wmb().
+> > + * This is to ensure that normal paths to DRAM (normal memory, cacheable
+> > + * accesses) are properly synchronised with writes to DMA coherent memory
+> > + * (normal memory, uncacheable) and device writes.
+> > + *
+> > + * The mb() and wmb() barriers only operate only on the MPU->MA->EMIF
+> > + * path, as we need to ensure that data is visible to other system
+> > + * masters prior to writes to those system masters being seen.
+> > + *
+> > + * Note: the SRAM path is not synchronised via mb() and wmb().
+> > + */
+> > +static void omap4_mb(void)
 > 
-> IMHO for a common maximum opp that's a good approach. But for the lowest
-> frequency setting, it would seem more logical to me, to raise the voltage
-> to a point where all boards will run fine with them, unless those boards 
-> cannot handle the frequency regardless of the higher voltage.
+> Sorry for the late response but this throws a warning when CONFIG_ARCH_OMAP4
+> is not configured.
+> 
+> arch/arm/mach-omap2/omap4-common.c:85:13: warning: 'omap4_mb' defined but not used [-Wunused-function]
 
-Agreed.
+Sorry, I'm going to have to disagree with you and your compiler on this.
+This is how the code is structured:
 
-Maxime
+#ifdef CONFIG_OMAP_INTERCONNECT_BARRIER
+...
+static void omap4_mb(void)
+{
+        if (dram_sync)
+                writel_relaxed(0, dram_sync);
+}
+...
+void __init omap_barriers_init(void)
+{
+...
+        soc_mb = omap4_mb;
+}
+
+#endif
+
+So, the definition of omap4_mb(), and the use of the same are both
+under the same ifdef.  You can't build omap4_mb() without also building
+omap_barriers_init() as well.
+
+So, there's no way that omap4_mb() would be "defined but not used".
+
+I think you have some changes in your kernel which, maybe, place an
+ifdef around omap_barriers_init() which _would_ cause the warning you're
+seeing if they aren't set.
+
+Also, please trim context before the relevant part to which you're
+replying. I almost gave up paging down to see whether there was actually
+anything worth replying to.  If there's nothing in the first 50 lines of
+the message, it's a waste of space.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/5a5e33c7/attachment-0001.sig>
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
