@@ -1,14 +1,14 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 28 Jul 2015 15:19:46 +0200
-Subject: [PATCH v2 15/22] backlight: Probe backlight devices on demand
+Date: Tue, 28 Jul 2015 15:19:49 +0200
+Subject: [PATCH v2 18/22] pinctrl: Probe pinctrl devices on demand
 In-Reply-To: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1438089593-7696-16-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1438089593-7696-19-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a backlight device through its firmware node, probe it
-if it hasn't already.
+When looking up a pin controller through its firmware node, probe it if
+it hasn't already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
 cumbersome to find out why a device failed to probe, and can introduce
@@ -19,21 +19,20 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
 Changes in v2: None
 
- drivers/video/backlight/backlight.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pinctrl/devicetree.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/video/backlight/backlight.c b/drivers/video/backlight/backlight.c
-index bddc8b17a4d8..f7151d916435 100644
---- a/drivers/video/backlight/backlight.c
-+++ b/drivers/video/backlight/backlight.c
-@@ -559,6 +559,8 @@ struct backlight_device *of_find_backlight_by_node(struct device_node *node)
- {
- 	struct device *dev;
+diff --git a/drivers/pinctrl/devicetree.c b/drivers/pinctrl/devicetree.c
+index fe04e748dfe4..490860f6374e 100644
+--- a/drivers/pinctrl/devicetree.c
++++ b/drivers/pinctrl/devicetree.c
+@@ -112,6 +112,7 @@ static int dt_to_map_one_config(struct pinctrl *p, const char *statename,
  
-+	fwnode_ensure_device(&node->fwnode);
-+
- 	dev = class_find_device(backlight_class, NULL, node, of_parent_match);
- 
- 	return dev ? to_backlight_device(dev) : NULL;
+ 	/* Find the pin controller containing np_config */
+ 	np_pctldev = of_node_get(np_config);
++	fwnode_ensure_device(&np_pctldev->fwnode);
+ 	for (;;) {
+ 		np_pctldev = of_get_next_parent(np_pctldev);
+ 		if (!np_pctldev || of_node_is_root(np_pctldev)) {
 -- 
 2.4.3
