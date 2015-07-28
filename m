@@ -1,65 +1,52 @@
-From: lznuaa@gmail.com (Zhi Li)
-Date: Tue, 28 Jul 2015 11:39:21 -0500
-Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
-In-Reply-To: <20150728143045.GG12927@tiger>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
- <20150727132802.GK12927@tiger>
- <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <20150728010235.GU12927@tiger>
- <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <20150728143045.GG12927@tiger>
-Message-ID: <CAHrpEqSGF-4=e4CxcMnFhcV8kR0kQ12xTCedGR03jQ3PTOunUw@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 28 Jul 2015 11:43:12 -0500
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+In-Reply-To: <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
+References: <20150724224258.GA23990@google.com>
+ <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
+Message-ID: <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 9:30 AM, Shawn Guo <shawnguo@kernel.org> wrote:
-> On Tue, Jul 28, 2015 at 02:16:20PM +0000, Shenwei Wang wrote:
->> > The files are named with "-imx7".  It's a clear sign that the build of the files
->> > should be controlled by something like related to "imx7".
->> > Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only supported imx7
->> > soc and there is no CONFIG_SOC_IMX7 available so far, it falls on
->> > CONFIG_SOC_IMX7D.
+On Fri, Jul 24, 2015 at 7:05 PM, Duc Dang <dhdang@apm.com> wrote:
+> Hi Bjorn,
+>
+> On Fri, Jul 24, 2015 at 3:42 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
 >>
->> We can also interpret "-imx7" is the first SoC which has the GPCv2 block.
->
-> In that case you should name the block gpc-imx7d rather than gpcv2 and
-> symbol as GPC_IMX7D rather than IMX_GPCV2.
-
-So far, only IMX7D use this GPC.
-i.MX8 will use system controller to control power.
-
-best regards
-Frank Li
-
->
->> > > > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
->> > > >
->> > > > Will this give a checkpatch warning?
->> > >
->> > > Yes. Any suggestion for that? Move it to a header file?
->> >
->> > Get rid of it.
+>> I regularly see faults like this on an APM X-Gene:
 >>
->> Then you may resolve the following compile error:
+>>   U-Boot 2013.04-mustang_sw_1.14.14 (Dec 16 2014 - 15:59:33)
+>>   CPU0: APM ARM 64-bit Potenza Rev B0 2400MHz PCP 2400MHz
+>>        32 KB ICACHE, 32 KB DCACHE
+>>        SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+>>   ...
+>>   Unhandled fault: synchronous external abort (0x96000010) at 0xffffff8000110034
+>>   Internal error: : 96000010 [#1] SMP
+>>   Modules linked in:
+>>   CPU: 0 PID: 3723 Comm: ... 4.1.0-smp-DEV #3
+>>   Hardware name: APM X-Gene Mustang board (DT)
+>>   task: ffffffc7dc1a4140 ti: ffffffc7dc118000 task.ti: ffffffc7dc118000
+>>   PC is at pci_generic_config_read32+0x4c/0xb8
+>>   LR is at pci_generic_config_read32+0x40/0xb8
+>>   pc : [<ffffffc00033b90c>] lr : [<ffffffc00033b900>] pstate: 600001c5
+>>   ...
+>>   Call trace:
+>>   [<ffffffc00033b90c>] pci_generic_config_read32+0x4c/0xb8
+>>   [<ffffffc00033bf58>] pci_user_read_config_byte+0x60/0xc4
+>>   [<ffffffc0003496a8>] pci_read_config+0x15c/0x238
+>>   [<ffffffc0002393b4>] sysfs_kf_bin_read+0x68/0xa0
+>>   [<ffffffc00023896c>] kernfs_fop_read+0x9c/0x1ac
+>>   [<ffffffc0001c361c>] __vfs_read+0x44/0x128
+>>   [<ffffffc0001c3e28>] vfs_read+0x84/0x144
+>>   [<ffffffc0001c4764>] SyS_read+0x50/0xb0
 >
-> You didn't get my point.  Rather than defining it as a global variable,
-> we should try to keep imx_gpcv2_irq as an internal data structure to
-> irqchip driver, and use well-defined interface to access the data from
-> pm driver when necessary.
->
-> Shawn
->
->>
->> CC      arch/arm/mach-imx/pm-imx7.o
->> arch/arm/mach-imx/pm-imx7.c: In function ?imx_gpcv2_pm_init?:
->> arch/arm/mach-imx/pm-imx7.c:836:7: error: ?gpcv2_irq_instance? undeclared (first use in this function)
->>   cd = gpcv2_irq_instance;
->>        ^
->> arch/arm/mach-imx/pm-imx7.c:836:7: note: each undeclared identifier is reported only once for each function it appears in
->> make[1]: *** [arch/arm/mach-imx/pm-imx7.o] Error 1
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The log shows kernel gets an exception when trying to access Mellanox
+> card configuration space. This is usually due to suboptimal PCIe
+> SerDes parameters are using in your board, which will cause bad link
+> quality.
+> The PCIe SerDes programming is done in U-Boot, so I suggest you do a
+> U-Boot upgrade to our latest X-Gene U-Boot release.
+
+I installed U-Boot 1.15.12, which I thought was the latest.  I'm still
+seeing this issue regularly, approx once/hour.
