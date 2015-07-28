@@ -1,81 +1,35 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 28 Jul 2015 15:28:26 +0800
-Subject: [PATCH v5 4/5] Documentation: DT: Add HiSilicon PCIe host binding
-In-Reply-To: <1437794486-21134-5-git-send-email-wangzhou1@hisilicon.com>
-References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
- <1437794486-21134-5-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <55B72F1A.50701@hisilicon.com>
+From: b38611@freescale.com (Fugang Duan)
+Date: Tue, 28 Jul 2015 15:30:39 +0800
+Subject: [PATCH v2 1/4] ARM: imx6ul: add fec bits to GPR syscon definition
+In-Reply-To: <1438068642-6876-1-git-send-email-b38611@freescale.com>
+References: <1438068642-6876-1-git-send-email-b38611@freescale.com>
+Message-ID: <1438068642-6876-2-git-send-email-b38611@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/25 11:21, Zhou Wang wrote:
-> This patch adds related DTS binding document for HiSilicon PCIe host driver.
-> 
-> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+FEC requires additional bits to select refrence clock.
 
-Hi Arnd and Rob,
+Signed-off-by: Fugang Duan <B38611@freescale.com>
+---
+ include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-As Bjorn mentioned in v4 series, this patch need your ack.
-Could you help to review this patch?
-
-Thanks,
-Zhou
-
-> ---
->  .../devicetree/bindings/pci/hisilicon-pcie.txt     | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> new file mode 100644
-> index 0000000..2afc9d1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
-> @@ -0,0 +1,46 @@
-> +HiSilicon PCIe host bridge DT description
-> +
-> +HiSilicon PCIe host controller is based on Designware PCI core.
-> +It shares common functions with PCIe Designware core driver and inherits
-> +common properties defined in
-> +Documentation/devicetree/bindings/pci/designware-pci.txt.
-> +
-> +Additional properties are described here:
-> +
-> +Required properties:
-> +- compatible: Should contain "hisilicon,hip05-pcie".
-> +- reg: Should contain rc_dbi, subctrl, config registers location and length.
-> +- reg-names: Must include the following entries:
-> +  "rc_dbi": controller configuration registers;
-> +  "subctrl": whole PCIe hosts configuration registers;
-> +  "config": PCIe configuration space registers.
-> +- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
-> +- port-id: Should be 0, 1, 2 or 3.
-> +
-> +Optional properties:
-> +- status: Either "ok" or "disabled".
-> +- dma-coherent: Present if DMA operations are coherent.
-> +
-> +Example:
-> +	pcie at 0xb0080000 {
-> +		compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
-> +		reg = <0 0xb0080000 0 0x10000>, <0 0xb0000000 0 0x10000>,
-> +		      <0x220 0x00000000 0 0x2000>;
-> +		reg-names = "rc_dbi", "subctrl", "config";
-> +		bus-range = <0  15>;
-> +		msi-parent = <&its_pcie>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +		device_type = "pci";
-> +		dma-coherent;
-> +		ranges = <0x82000000 0 0x00000000 0x220 0x00000000 0 0x10000000>;
-> +		num-lanes = <8>;
-> +		port-id = <1>;
-> +		#interrupts-cells = <1>;
-> +		interrupts-map-mask = <0xf800 0 0 7>;
-> +		interrupts-map = <0x0 0 0 1 &mbigen_pcie 1 10
-> +				  0x0 0 0 2 &mbigen_pcie 2 11
-> +				  0x0 0 0 3 &mbigen_pcie 3 12
-> +				  0x0 0 0 4 &mbigen_pcie 4 13>;
-> +		status = "ok";
-> +	};
-> 
+diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+index d16f4c8..558a485 100644
+--- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
++++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
+@@ -435,4 +435,12 @@
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_LVDS			(0x1 << 1)
+ #define IMX6SX_GPR5_DISP_MUX_DCIC1_MASK			(0x1 << 1)
+ 
++/* For imx6ul iomux gpr register field define */
++#define IMX6UL_GPR1_ENET1_CLK_DIR		(0x1 << 17)
++#define IMX6UL_GPR1_ENET2_CLK_DIR		(0x1 << 18)
++#define IMX6UL_GPR1_ENET1_CLK_OUTPUT		(0x1 << 17)
++#define IMX6UL_GPR1_ENET2_CLK_OUTPUT		(0x1 << 18)
++#define IMX6UL_GPR1_ENET_CLK_DIR		(0x3 << 17)
++#define IMX6UL_GPR1_ENET_CLK_OUTPUT		(0x3 << 17)
++
+ #endif /* __LINUX_IMX6Q_IOMUXC_GPR_H */
+-- 
+1.9.1
