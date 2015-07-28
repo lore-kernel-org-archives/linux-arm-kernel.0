@@ -1,218 +1,84 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Tue, 28 Jul 2015 15:49:32 +0300
-Subject: [RFC PATCH 1/3] clocksource: exynos_mct: allow mct to read
- counter from coprocessor
-In-Reply-To: <55B71D10.4060505@samsung.com>
-References: <1438032512.17734.47.camel@gmail.com>
- <55B71D10.4060505@samsung.com>
-Message-ID: <CALW4P++8rohnRvu=S5RcRJ0VPJj4OqdAXBypUaSoW_RvjwD7PA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jul 2015 14:49:11 +0200
+Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
+ board-specific operating points for LeMaker BananaPi
+In-Reply-To: <55B62768.6040403@redhat.com>
+References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
+ <55B5E6DB.8020009@redhat.com>
+ <20150727120918.191F76C82FB4@dd34104.kasserver.com>
+ <55B62768.6040403@redhat.com>
+Message-ID: <20150728124911.GA2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 9:11 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 28.07.2015 06:28, Alexey Klimov wrote:
->> It was discovered that 64-bit mmio MCT counter holds
->> the same value as ARM arch timer 64-bit physical counter.
->> Even more: arch timer and MCT are same underlying hardware
->> timer.
->>
->> Patch adds code to MCT to allow it to read 64-bit counter
->> from coprocessor cp15 registers since it's way more
->> faster than reading the same counter from MCT mmio region.
->>
->> That functionality triggers only if special property
->> use-cp15-phys-counter is present in device tree,
->> only on 32-bit ARMv7 systems and only if HYP mode is
->> available.
->
+Hi,
+
+On Mon, Jul 27, 2015 at 02:43:20PM +0200, Hans de Goede wrote:
 > Hi,
->
-> It would be nice to put here also the measurements from cover letter.
-> This would be the justification for the commit.
+> 
+> On 27-07-15 14:09, public_timo.s at silentcreek.de wrote:
+> >Hi,
+> >
+> >Hans de Goede schrieb am 27.07.2015 10:07:
+> >
+> >>I've a simular patch here:
+> >>
+> >>https://github.com/jwrdegoede/linux-sunxi/commit/6a30b7d5be6012b81e5e1439a444e41c0ac1afc1
+> >>
+> >>I did not submit this upstream yet as it is part of a series to enable the otg
+> >>controller on the bananapi which needs axp-usb-power-supply support for which
+> >>the actual powersupply driver changes are still pending.
+> >
+> >Oops, I see. Are you planning to submit this for 4.3 or later?
+> 
+> I plan to submit this for 4.3.
 
-Ok, I will add them. I will try to find time to perform more precise
-measurements.
+I don't feel like holding patches that were posted before you did
+because you did them some time ago and never submitted them is
+reasonnable and / or encouraging for new submitters of patches.
 
-> I guess same optimization could be done for ARMv8 Exynos SoCs?
+I'd really like to get more sunxi-people contributing, and that starts
+with that kind of trivial stuff. Holding them back because one of the
+usual (and experienced) developpers is a bit counter-productive (and
+I'm sure you still have a lot of patches to submit anyway ;)).
 
-I honestly don't know, don't have access to ARMv8 Exynos SoCs.
-If i remember correctly there are no public-available 64-bit Exynos
-boards yet. Exynos7420 is on the way to be released.
+> >>As you can see other then you adding the cpu operating points are patches are
+> >>identical, which is good :)
+> >Yep, that and you chose a slightly higher maximum voltage for the CPU.
+> >
+> >>IMHO we should just stick with the standard operating points unless we know
+> >>that there are stability issues with them (such as e.g. on the A10 OlinuxIno
+> >>Lime).
+> >I'd be fine with that as I don't have any stability issues with the lower
+> >voltages. What about the 1008MHz operating point that I "reintroduced"? It was
+> >dropped here [1]  because there was no regulator support.
+> 
+> That is in essence an overclocked setting, the max CPU voltage officially is
+> 1.4V, I do not think that we should provide any overclocked settings in the
+> official dts files. If people really want to overclock they will have to
+> modify there dts themselves IMHO.
 
-The main concern is that MCT probably not enabled for arm64 and
-some cleanup/re-factoring is required for cycles_t variable. See
-message in exynos4_read_current_timer() in MCT.
-Also ARMv8 requires arm generic timer to be available and fully
-operational. So for me it looks like current upstream kernel will work
-on top of arm arch timer.
+I fully agree.
 
->> Idea of rewriting accessors is taken from arm_arch_timer.c.
->>
->> By default MCT will read counter from mmio since it's
->> guaranteed to work.
->>
->> Signed-off-by: Alexey Klimov <klimov.linux@gmail.com>
->> ---
->>  drivers/clocksource/exynos_mct.c | 77 ++++++++++++++++++++++++++++++++++------
->>  1 file changed, 67 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 9064ff7..039b41c 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -26,6 +26,9 @@
->>  #include <linux/clocksource.h>
->>  #include <linux/sched_clock.h>
->>
->> +#include <asm/arch_timer.h>  /* for cp15 physical arch timer counter */
->> +#include <asm/virt.h>                /* for checking HYP mode */
->> +
->>  #define EXYNOS4_MCTREG(x)            (x)
->>  #define EXYNOS4_MCT_G_CNT_L          EXYNOS4_MCTREG(0x100)
->>  #define EXYNOS4_MCT_G_CNT_U          EXYNOS4_MCTREG(0x104)
->> @@ -82,6 +85,17 @@ static unsigned long clk_rate;
->>  static unsigned int mct_int_type;
->>  static int mct_irqs[MCT_NR_IRQS];
->>
->> +static u32 notrace __exynos4_read_count_32(void);
->> +static u64 __exynos4_read_count_64(void);
->> +
->> +/*
->> + * Default to __exynos4_read_count_{32,64} functions that reads counter from
->> + * MCT mmio region and this method is guaranteed
->> + * to exist (if MCT was successfully initialized).
->> + */
->> +u32 (*exynos4_read_count_32)(void) = __exynos4_read_count_32;
->> +u64 (*exynos4_read_count_64)(void) = __exynos4_read_count_64;
->
-> I think these could be static.
+> > Can this be reenabled on board level (which means overriding the
+> >defaults inherited from sun7i-a20.dtsi) or should this be done at
+> >SOC level for all boards (which means we have to add regulator
+> >nodes for all boards in the first place)?
+> 
+> Technically this is possible, but I do not think that it is a good idea.
 
-Yeah. Will fix it right away.
+And here as well.
 
->> +
->>  struct mct_clock_event_device {
->>       struct clock_event_device evt;
->>       unsigned long base;
->> @@ -163,16 +177,16 @@ static void exynos4_mct_frc_start(void)
->>  }
->>
->>  /**
->> - * exynos4_read_count_64 - Read all 64-bits of the global counter
->> + * __exynos4_read_count_64 - Read all 64-bits of the global counter
->>   *
->> - * This will read all 64-bits of the global counter taking care to make sure
->> - * that the upper and lower half match.  Note that reading the MCT can be quite
->> - * slow (hundreds of nanoseconds) so you should use the 32-bit (lower half
->> - * only) version when possible.
->> + * This will read all 64-bits of the global counter from MCT mmio region
->> + * taking care to make sure that the upper and lower half match.
->> + * Note that reading the MCT can be quite slow (hundreds of nanoseconds)
->> + * so you should use the 32-bit (lower half only) version when possible.
->>   *
->>   * Returns the number of cycles in the global counter.
->>   */
->> -static u64 exynos4_read_count_64(void)
->> +static u64 __exynos4_read_count_64(void)
->>  {
->>       unsigned int lo, hi;
->>       u32 hi2 = readl_relaxed(reg_base + EXYNOS4_MCT_G_CNT_U);
->> @@ -187,18 +201,45 @@ static u64 exynos4_read_count_64(void)
->>  }
->>
->>  /**
->> - * exynos4_read_count_32 - Read the lower 32-bits of the global counter
->> + * __exynos4_read_cp15_count_64 - Read all 64-bits of the global counter
->> + * from coprocessor regisers.
->>   *
->> - * This will read just the lower 32-bits of the global counter.  This is marked
->> - * as notrace so it can be used by the scheduler clock.
->> + * Note that reading here is faster than reading from MCT mmio region.
->> + *
->> + * Returns the number of cycles in the global counter.
->> + */
->> +static u64 __exynos4_read_cp15_count_64(void)
->> +{
->> +     return arch_counter_get_cntpct();
->> +}
->> +
->> +/**
->> + * __exynos4_read_count_32 - Read the lower 32-bits of the global counter
->> + *
->> + * This will read just the lower 32-bits of the global counter from
->> + * MCT mmio region.
->> + * This is marked as notrace so it can be used by the scheduler clock.
->>   *
->>   * Returns the number of cycles in the global counter (lower 32 bits).
->>   */
->> -static u32 notrace exynos4_read_count_32(void)
->> +static u32 notrace __exynos4_read_count_32(void)
->>  {
->>       return readl_relaxed(reg_base + EXYNOS4_MCT_G_CNT_L);
->>  }
->>
->> +/**
->> + * __exynos4_read_cp15_count_32 - Read the lower 32-bits of the global counter
->> + *
->> + * This will read global counter from coprocessor regisers.
->
-> s/regisers/registers/
-
-Will fix it.
-
->> + * This is marked as notrace so it can be used by the scheduler clock.
->> + *
->> + * Returns the number of cycles in the global counter (lower 32 bits).
->> + */
->> +static u32 notrace __exynos4_read_cp15_count_32(void)
->> +{
->> +     return arch_counter_get_cntpct();
->> +}
->> +
->>  static cycle_t exynos4_frc_read(struct clocksource *cs)
->>  {
->>       return exynos4_read_count_32();
->> @@ -599,6 +640,22 @@ static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
->>       for (i = MCT_L0_IRQ; i < nr_irqs; i++)
->>               mct_irqs[i] = irq_of_parse_and_map(np, i);
->>
->> +     /*
->> +      * If use-cp15-phys-counter property is present in device tree
->> +      * then use CP15 ARM arch timer 64-bit physical counter
->> +      * to speedup reading since it keeps the same value like
->> +      * 64-bit counter in MCT mmio region.
->> +      * If HYP mode is available we can rely on physical
->> +      * timer counter to be accessible from PL1.
->> +      */
->> +     if (IS_ENABLED(CONFIG_ARM) && is_hyp_mode_available() &&
->> +             of_property_read_bool(np, "use-cp15-phys-counter")) {
->
-> This looks like a property specific to Exynos. Add a "samsung," prefix.
->
-> Best regards,
-> Krzysztof
-
-Agree.
-
-Thanks for comments and review.
-
-Best regards,
-Alexey Klimov.
-
-
->> +
->> +             /* point MCT functions to read counter from coprocessor */
->> +             exynos4_read_count_32 = __exynos4_read_cp15_count_32;
->> +             exynos4_read_count_64 = __exynos4_read_cp15_count_64;
->> +     }
->> +
->>       exynos4_timer_resources(np, of_iomap(np, 0));
->>       exynos4_clocksource_init();
->>       exynos4_clockevent_init();
->>
->
-
-
+Maxime
 
 -- 
-Best regards, Klimov Alexey
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/1790dca3/attachment.sig>
