@@ -1,154 +1,33 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Tue, 28 Jul 2015 14:47:19 -0400
-Subject: [PATCH v1 7/7] ARM: dts: ifc6410: add inforce LVDS panel support
-In-Reply-To: <55B7C0DC.2010501@suse.de>
-References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438088076-17606-1-git-send-email-srinivas.kandagatla@linaro.org>
- <55B7C0DC.2010501@suse.de>
-Message-ID: <CAF6AEGvps12_faC5kU-bVueFgK=EErXNYumgA9Rs9zRpTjy+7w@mail.gmail.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Tue, 28 Jul 2015 11:52:13 -0700
+Subject: [PATCH] PCI: iproc: Fix BCMA dependency in Kconfig
+Message-ID: <1438109533-28694-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 1:50 PM, Andreas F?rber <afaerber@suse.de> wrote:
-> Am 28.07.2015 um 14:54 schrieb Srinivas Kandagatla:
->> This patch adds LVDS panel for IFC6410.
->>
->> Signed-off-by: Rob Clark <robdclark@gmail.com>
->> [Rob Clark: WIP patch]
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> ---
->>  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 66 ++++++++++++++++++++++++++++++
->>  1 file changed, 66 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> index 1ab71f1..3bdac02 100644
->> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
->> @@ -63,6 +63,12 @@
->>                                       qcom,switch-mode-frequency = <3200000>;
->>                               };
->>
->> +                             pm8921_l2: l2 {
->> +                                     regulator-min-microvolt = <1200000>;
->> +                                     regulator-max-microvolt = <1200000>;
->> +                                     bias-pull-down;
->> +                             };
->> +
->>                               pm8921_l3: l3 {
->>                                       regulator-min-microvolt = <3050000>;
->>                                       regulator-max-microvolt = <3300000>;
->> @@ -96,6 +102,10 @@
->>                               pm8921_lvs1: lvs1 {
->>                                       bias-pull-down;
->>                               };
->> +
->> +                             pm8921_lvs7: lvs7 {
->> +                                     bias-pull-down;
->> +                             };
->>                       };
->>               };
->>
->> @@ -119,6 +129,41 @@
->>
->>               mdp: qcom,mdp at 5100000 {
->>                       status = "okay";
->> +                     qcom,lvds-panel = <&panel>;
->
-> In my testing this broke/uglified HDMI output. Since not everyone has
-> that LVDS panel attached, or might have a different panel type, I don't
-> think the panel node belongs in the generic -ifc6410.dts file.
-> I suggest you add an -ifc6410+inforce-lvds.dts or so for that.
+The current iProc BCMA front-end driver can only work on ARM32 based
+platforms; therefore its config option in Kconfig should be changed to
+reflect that. This fixes arm64 allmodconfig build failure when compiling
+the the iProc BCMA driver that contains struct pci_sys_data that is
+arm32 specific
 
-I think the problem is not so much the dt bindings, since we have an
-i2c/ddc where we can probe the panel's edid and see if it is actually
-attached.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/pci/host/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Probably panel_simple_probe() should attempt to read edid (or at least
-first block) if ddc is not null, and return an error if that times
-out.  That way we could tell at runtime whether the panel is there or
-not.
-
-BR,
--R
-
->> +                     lvds-vccs-3p3v-supply = <&ext_3p3v>;
->> +                     lvds-pll-vdda-supply = <&pm8921_l2>;
->> +                     lvds-vdda-supply = <&pm8921_lvs7>;
->> +             };
->> +
->> +             panel_3p3v: panel_3p3v {
->
-> s/_/-/ ?
->
->> +                     compatible = "regulator-fixed";
->> +                     pinctrl-0 = <&disp_en_gpios>;
->> +                     pinctrl-names = "default";
->> +                     regulator-min-microvolt = <3300000>;
->> +                     regulator-max-microvolt = <3300000>;
->> +                     regulator-name = "panel_en_3p3v";
->> +                     regulator-type = "voltage";
->> +                     startup-delay-us = <0>;
->> +                     gpio = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
->> +                     enable-active-high;
->> +                     regulator-boot-on;
->> +             };
->> +
->> +             backlight: backlight{
->> +                     pinctrl-0 = <&pwm_bl_gpios>;
->> +                     pinctrl-names = "default";
->> +                     compatible = "gpio-backlight";
->> +                     gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
->> +                     default-on;
->> +             };
->> +
->> +             panel: auo,b101xtn01 {
->
-> panel: panel { ?
->
-> Regards,
-> Andreas
->
->> +                     status = "okay";
->> +                     compatible = "auo,b101xtn01";
->> +
->> +                     ddc-i2c-bus = <&i2c3>;
->> +                     backlight = <&backlight>;
->> +                     power-supply = <&panel_3p3v>;
->>               };
->>
->>               gsbi3: gsbi at 16200000 {
->> @@ -235,6 +280,27 @@
->>                               pm8921_gpio: gpio at 150 {
->>                                       pinctrl-names = "default";
->>                                       pinctrl-0 = <&wlan_default_gpios>;
->> +
->> +                                     pwm_bl_gpios: pwm-bl-gpios {
->> +                                             pios {
->> +                                                     pins = "gpio26";
->> +                                                     bias-disable;
->> +                                                     function = "normal";
->> +                                                     qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
->> +                                                     power-source = <PM8921_GPIO_S4>;
->> +                                             };
->> +                                     };
->> +
->> +                                     disp_en_gpios: disp-en-gpios {
->> +                                             pios {
->> +                                                     pins = "gpio36";
->> +                                                     bias-disable;
->> +                                                     function = "normal";
->> +                                                     qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
->> +                                                     power-source = <PM8921_GPIO_S4>;
->> +                                             };
->> +                                     };
->> +
->>                                       wlan_default_gpios: wlan-gpios {
->>                                               pios {
->>                                                       pins = "gpio43";
->>
->
->
-> --
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-> 21284 (AG N?rnberg)
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d2c6144..2cc9afe 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -136,7 +136,7 @@ config PCIE_IPROC_PLATFORM
+ 
+ config PCIE_IPROC_BCMA
+ 	bool "Broadcom iProc PCIe BCMA bus driver"
+-	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
++	depends on ARCH_BCM_IPROC && ARM
+ 	select PCIE_IPROC
+ 	select BCMA
+ 	select PCI_DOMAINS
+-- 
+1.7.9.5
