@@ -1,96 +1,138 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:03:58 +0530
-Subject: [PATCH v7 05/13] clk: qcom: gdsc: Enable an RCG before turing on the
- gdsc
+Date: Tue, 28 Jul 2015 15:03:59 +0530
+Subject: [PATCH v7 06/13] clk: qcom: gdsc: Add support for Memory RET/OFF
 In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
 References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-6-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438076046-4706-7-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some gdsc instances require a certain root clock (RCG) to be turned on
-*before* the power domain itself can be turned on. Handle this as part
-of the gdsc enable/disable callbacks.
+Along with the GDSC power switch, there is additional control
+to either retain all memory (core and peripheral) within a given
+powerdomain or to turn them off while the GDSC is powered down.
+Add support for these by modelling a RET state where all
+memory is retained and an OFF state where all memory gets turned
+off.
+The controls provided are granular enough to be able to support
+various differnt levels of RET states, like a 'shallow RET' with all memory
+retained and a 'deep RET' with some memory retained while some others
+are lost. The current patch does not support this and considers
+just one RET state where all memory is retained. Futher work, if
+needed can support multiple different levels of RET state.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gdsc.c | 20 +++++++++++++++++++-
- drivers/clk/qcom/gdsc.h |  5 +++++
- 2 files changed, 24 insertions(+), 1 deletion(-)
+ drivers/clk/qcom/gdsc.c | 33 +++++++++++++++++++++++++++++++++
+ drivers/clk/qcom/gdsc.h | 13 +++++++++++++
+ 2 files changed, 46 insertions(+)
 
 diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index c7f109b..b802ecf 100644
+index b802ecf..162c0be 100644
 --- a/drivers/clk/qcom/gdsc.c
 +++ b/drivers/clk/qcom/gdsc.c
-@@ -89,6 +89,9 @@ static int gdsc_enable(struct generic_pm_domain *domain)
- 	struct gdsc *sc = domain_to_gdsc(domain);
- 	int ret;
+@@ -37,6 +37,9 @@
+ #define EN_FEW_WAIT_VAL		(0x8 << 16)
+ #define CLK_DIS_WAIT_VAL	(0x2 << 12)
  
-+	if (sc->root_clk)
-+		clk_prepare_enable(sc->root_clk);
++#define RETAIN_MEM		BIT(14)
++#define RETAIN_PERIPH		BIT(13)
 +
+ #define TIMEOUT_US		100
+ 
+ #define domain_to_gdsc(domain) container_of(domain, struct gdsc, pd)
+@@ -84,6 +87,24 @@ static int gdsc_toggle_logic(struct gdsc *sc, bool en)
+ 	return -ETIMEDOUT;
+ }
+ 
++static inline void gdsc_force_mem_on(struct gdsc *sc)
++{
++	int i;
++	u32 mask = RETAIN_MEM | RETAIN_PERIPH;
++
++	for (i = 0; i < sc->cxc_count; i++)
++		regmap_update_bits(sc->regmap, sc->cxcs[i], mask, mask);
++}
++
++static inline void gdsc_clear_mem_on(struct gdsc *sc)
++{
++	int i;
++	u32 mask = RETAIN_MEM | RETAIN_PERIPH;
++
++	for (i = 0; i < sc->cxc_count; i++)
++		regmap_update_bits(sc->regmap, sc->cxcs[i], mask, 0);
++}
++
+ static int gdsc_enable(struct generic_pm_domain *domain)
+ {
+ 	struct gdsc *sc = domain_to_gdsc(domain);
+@@ -95,6 +116,10 @@ static int gdsc_enable(struct generic_pm_domain *domain)
  	ret = gdsc_toggle_logic(sc, true);
  	if (ret)
  		return ret;
-@@ -106,9 +109,15 @@ static int gdsc_enable(struct generic_pm_domain *domain)
++
++	if (sc->pwrsts & PWRSTS_OFF)
++		gdsc_force_mem_on(sc);
++
+ 	/*
+ 	 * If clocks to this power domain were already on, they will take an
+ 	 * additional 4 clock cycles to re-enable after the power domain is
+@@ -114,6 +139,9 @@ static int gdsc_disable(struct generic_pm_domain *domain)
  
- static int gdsc_disable(struct generic_pm_domain *domain)
- {
-+	int ret;
- 	struct gdsc *sc = domain_to_gdsc(domain);
+ 	ret = gdsc_toggle_logic(sc, false);
  
--	return gdsc_toggle_logic(sc, false);
-+	ret = gdsc_toggle_logic(sc, false);
++	if (sc->pwrsts & PWRSTS_OFF)
++		gdsc_clear_mem_on(sc);
 +
-+	if (sc->root_clk)
-+		clk_disable_unprepare(sc->root_clk);
-+
-+	return ret;
- }
+ 	if (sc->root_clk)
+ 		clk_disable_unprepare(sc->root_clk);
  
- static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
-@@ -133,6 +142,15 @@ static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
- 			goto fail;
- 		}
- 	}
+@@ -188,6 +216,11 @@ static int gdsc_init(struct gdsc *sc)
+ 	if (on < 0)
+ 		return on;
+ 
++	if (on || (sc->pwrsts & PWRSTS_RET))
++		gdsc_force_mem_on(sc);
++	else
++		gdsc_clear_mem_on(sc);
 +
-+	if (sc->root_con_id) {
-+		sc->root_clk = clk_get(dev, sc->root_con_id);
-+		if (IS_ERR(sc->root_clk)) {
-+			dev_err(dev, "failed to get root clock\n");
-+			return PTR_ERR(sc->root_clk);
-+		}
-+	}
-+
- 	return 0;
- fail:
- 	pm_clk_destroy(dev);
+ 	sc->pd.power_off = gdsc_disable;
+ 	sc->pd.power_on = gdsc_enable;
+ 	sc->pd.attach_dev = gdsc_attach;
 diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-index 68bcda3..cbd95e4 100644
+index cbd95e4..01b2208 100644
 --- a/drivers/clk/qcom/gdsc.h
 +++ b/drivers/clk/qcom/gdsc.h
-@@ -17,6 +17,7 @@
- #include <linux/err.h>
- #include <linux/pm_domain.h>
- 
-+struct clk;
+@@ -20,6 +20,13 @@
+ struct clk;
  struct regmap;
  
++/* Powerdomain allowable state bitfields */
++#define PWRSTS_OFF		BIT(0)
++#define PWRSTS_RET		BIT(1)
++#define PWRSTS_ON		BIT(2)
++#define PWRSTS_OFF_ON		(PWRSTS_OFF | PWRSTS_ON)
++#define PWRSTS_RET_ON		(PWRSTS_RET | PWRSTS_ON)
++
  /**
-@@ -24,12 +25,16 @@ struct regmap;
+  * struct gdsc - Globally Distributed Switch Controller
   * @pd: generic power domain
-  * @regmap: regmap for MMIO accesses
+@@ -27,6 +34,9 @@ struct regmap;
   * @gdscr: gsdc control register
-+ * @root_con_id: root clock to be enabled
-+ * @root_clk: clk handle for the root clk
+  * @root_con_id: root clock to be enabled
+  * @root_clk: clk handle for the root clk
++ * @cxcs: offsets of branch registers to toggle mem/periph bits in
++ * @cxc_count: number of @cxcs
++ * @pwrsts: Possible powerdomain power states
   * @con_ids: List of clocks to be controlled for the gdsc
   */
  struct gdsc {
- 	struct generic_pm_domain	pd;
- 	struct regmap			*regmap;
+@@ -35,6 +45,9 @@ struct gdsc {
  	unsigned int			gdscr;
-+	char				*root_con_id;
-+	struct clk			*root_clk;
+ 	char				*root_con_id;
+ 	struct clk			*root_clk;
++	unsigned int			*cxcs;
++	unsigned int			cxc_count;
++	const u8			pwrsts;
  	const char			*con_ids[];
  };
  
