@@ -1,57 +1,65 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Tue, 28 Jul 2015 14:46:35 +0000
-Subject: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <20150728143854.GH12927@tiger>
-References: <1438025400-5919-1-git-send-email-shenwei.wang@freescale.com>
- <1438025400-5919-2-git-send-email-shenwei.wang@freescale.com>
- <20150728012452.GX12927@tiger>
- <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
- <20150728143854.GH12927@tiger>
-Message-ID: <CY1PR0301MB084351EFDDA403AF522B3171838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: b29396@freescale.com (Dong Aisheng)
+Date: Tue, 28 Jul 2015 22:38:25 +0800
+Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock
+ on during operation
+In-Reply-To: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <20150728143824.GB16916@shlinux1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: 2015?7?28? 9:39
-> To: Wang Shenwei-B38339
-> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Huang
-> Yongcai-B20788; linux-kernel at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
-> sources
+On Tue, Jul 28, 2015 at 09:19:40PM +0800, Dong Aisheng wrote:
+> This patch series adds support in clock framework for clocks which operations
+> requires its parent clock is on.
 > 
-> On Tue, Jul 28, 2015 at 02:27:42PM +0000, Shenwei Wang wrote:
-> > > > +static int gpcv2_wakeup_source_save(void) {
-> > > > +	struct imx_gpcv2_irq *cd;
-> > >
-> > > We generally name variables in an abbrev of the types to make them
-> > > intuitive.  I tried hard to map "cd" to "imx_gpcv2_irq" and failed.
-> > > Can you help me on that?
-> >
-> > CD is the abbreviation of chip data which is a member of irq_data.
+> Such clock type is initially met on Freescale i.MX7D platform that all clocks
+> operations, including enable/disable, rate change and re-parent, requires its
+> parent clock on. No sure if any other SoC has the similar clock type.
 > 
-> You are defining a variable of type imx_gpcv2_irq, neither chip_data nor irq_data.
-
-Imx_gpcv2_irq itself is the chip_data of irq_data.
-
-> > > > +void ca7_cpu_resume(void);
-> > > > +void imx7_suspend(void __iomem *ocram_vbase);
-> > >
-> > > Why do these declarations need to be in this header?
-> >
-> > Just to resolve the compile errors.
+> Current clock core can not support such type of clock well.
 > 
-> Wrong solution.  They belong to some header in arch/arm/mach-imx not
-> include/soc/imx, as there is no code outside arch/arm/mach-imx needs these
-> declaration.
+> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
+> in clock core that enable its parent clock firstly for each operation and disable
+> it later after operation complete.
+> 
+> The most special case is for set_parent() operation which requires both parent,
+> old one and new one, to be enabled at the same time during the operation.
+> 
+> The patch series is based on for-next branch of Michael's git:
+> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
+> 
+> Change Log:
+> v2->v3:
+>  * rebased version, no other changes.
+> 
+> v1->v2:
+>  Mainly addressed Stephen Boyd's comments
+>  * remove dupliciated code with __clk_set_parent_after
+>  * introduce more clk_core_x APIs for core easily use
+>  * move clk_disable_unused code position
+>  * use clk_core_x API to make code more clean and easily read
+> 
+> Dong Aisheng (5):
+>   clk: remove duplicated code with __clk_set_parent_after
+>   clk: introduce clk_core_enable_lock and clk_core_disable_lock
+>     functions
+>   clk: move clk_disable_unused after clk_core_disable_unprepare function
+>   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+>     parent on
+>   clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+>     parent on
+> 
+>  drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
+>  include/linux/clk-provider.h |   5 +
+>  2 files changed, 200 insertions(+), 143 deletions(-)
+> 
 
-It is a little ugly. I was thinking to have a gpcv2.h header file, so put them there. 
-But as the header file is going to be removed, I am considering to move it to 
-common.h. Although it seems not beautiful too.
+Sorry, forgot to update Mike's new email address.
+Updated.
 
-Thanks,
-Shenwei
+Regards
+Dong Aisheng
 
-> Shawn
+> -- 
+> 1.9.1
+> 
