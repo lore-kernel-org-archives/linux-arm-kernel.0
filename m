@@ -1,33 +1,66 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Tue, 28 Jul 2015 11:52:13 -0700
-Subject: [PATCH] PCI: iproc: Fix BCMA dependency in Kconfig
-Message-ID: <1438109533-28694-1-git-send-email-rjui@broadcom.com>
+From: Frank.Li@freescale.com (Frank.Li at freescale.com)
+Date: Wed, 29 Jul 2015 01:50:00 +0800
+Subject: [PATCH v2 1/1] ARM: dts: imx7d: enable snvs rtc,
+ onoffkey and power off
+Message-ID: <1438105800-6255-1-git-send-email-Frank.Li@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current iProc BCMA front-end driver can only work on ARM32 based
-platforms; therefore its config option in Kconfig should be changed to
-reflect that. This fixes arm64 allmodconfig build failure when compiling
-the the iProc BCMA driver that contains struct pci_sys_data that is
-arm32 specific
+From: Frank Li <Frank.Li@freescale.com>
 
-Signed-off-by: Ray Jui <rjui@broadcom.com>
+Change SNVS rtc to syscon interface.
+Enable onoff key and power off function.
+
+Signed-off-by: Frank Li <Frank.Li@freescale.com>
 ---
- drivers/pci/host/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Change from v1 to v2.
+ - default enable snvs_poweroff
+ - wakeup -> wakeup_source
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index d2c6144..2cc9afe 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -136,7 +136,7 @@ config PCIE_IPROC_PLATFORM
+ arch/arm/boot/dts/imx7d.dtsi | 26 ++++++++++++++++++++------
+ 1 file changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 9014b80..b738ce0 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -525,17 +525,31 @@
+ 			};
  
- config PCIE_IPROC_BCMA
- 	bool "Broadcom iProc PCIe BCMA bus driver"
--	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
-+	depends on ARCH_BCM_IPROC && ARM
- 	select PCIE_IPROC
- 	select BCMA
- 	select PCI_DOMAINS
+ 			snvs: snvs at 30370000 {
+-				compatible = "fsl,sec-v4.0-mon", "simple-bus";
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				ranges = <0 0x30370000 0x10000>;
++				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
++				reg = <0x30370000 0x10000>;
+ 
+-				snvs-rtc-lp at 34 {
++				snvs_rtc: snvs-rtc-lp {
+ 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
+-					reg = <0x34 0x58>;
++					regmap = <&snvs>;
++					offset = <0x34>;
+ 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
+ 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+ 				};
++
++				snvs_poweroff: snvs-poweroff {
++					compatible = "syscon-poweroff";
++					regmap = <&snvs>;
++					offset = <0x38>;
++					mask = <0x60>;
++				};
++
++				snvs_pwrkey: snvs-powerkey {
++					compatible = "fsl,sec-v4.0-pwrkey";
++					regmap = <&snvs>;
++					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
++					linux,keycode = <KEY_POWER>;
++					wakeup-source;
++				};
+ 			};
+ 
+ 			clks: ccm at 30380000 {
 -- 
-1.7.9.5
+1.9.1
