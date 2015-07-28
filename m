@@ -1,43 +1,103 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 28 Jul 2015 08:26:27 -0500
-Subject: [PATCH 2/6] arm: mach-socfpga: enable pci support
-In-Reply-To: <1438080345-7233-3-git-send-email-lftan@altera.com>
-References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-3-git-send-email-lftan@altera.com>
-Message-ID: <CAL_JsqK8HbYMbQf+8vFuDiTe3j9THus+YwLZDdJpQM5faQTY3g@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Tue, 28 Jul 2015 21:37:43 +0800
+Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
+ allocator.
+In-Reply-To: <20150728110023.GH29209@arm.com>
+References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
+ <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
+ <20150721171101.GN31095@arm.com> <1437715466.23932.68.camel@mhfsdcap03>
+ <20150724165325.GC21177@arm.com> <1437970868.25925.20.camel@mhfsdcap03>
+ <55B63AB2.4050006@arm.com> <20150727141102.GJ3358@arm.com>
+ <1438060094.25925.69.camel@mhfsdcap03> <20150728110023.GH29209@arm.com>
+Message-ID: <1438090663.25925.75.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> Enable CONFIG_ARCH_SUPPORT_MSI and CONFIG_PCI in SOCFPGA platform.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  arch/arm/mach-socfpga/Kconfig | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-> index 90efdeb..7ff4576 100644
-> --- a/arch/arm/mach-socfpga/Kconfig
-> +++ b/arch/arm/mach-socfpga/Kconfig
-> @@ -1,6 +1,7 @@
->  menuconfig ARCH_SOCFPGA
->         bool "Altera SOCFPGA family" if ARCH_MULTI_V7
->         select ARCH_SUPPORTS_BIG_ENDIAN
-> +       select ARCH_SUPPORTS_MSI
+On Tue, 2015-07-28 at 12:00 +0100, Will Deacon wrote:
+> On Tue, Jul 28, 2015 at 06:08:14AM +0100, Yong Wu wrote:
+> > On Mon, 2015-07-27 at 15:11 +0100, Will Deacon wrote:
+> > > On Mon, Jul 27, 2015 at 03:05:38PM +0100, Robin Murphy wrote:
+> > > > On 27/07/15 05:21, Yong Wu wrote:
+> > > > >>>>> +       } else {        /* page or largepage */
+> > > > >>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
+> > > > >>>>> +                       if (large) { /* special Bit */
+> > > > >>>>
+> > > > >>>> This definitely needs a better comment! What exactly are you doing here
+> > > > >>>> and what is that quirk all about?
+> > > > >>>
+> > > > >>> I use this quirk is for MTK Special Bit as we don't have the XN bit in
+> > > > >>> pagetable.
+> > > > >>
+> > > > >> I'm still not really clear about what this is.
+> > > > >
+> > > > > There is some difference between the standard spec and MTK HW,
+> > > > > Our hw don't implement some bits, like XN and AP.
+> > > > > So I add a quirk for MTK special.
+> > > > 
+> > > > When you say it doesn't implement these bits, do you mean that having 
+> > > > them set will lead to Bad Things happening in the hardware, or that it 
+> > > > will simply ignore them and not enforce any of the protections they 
+> > > > imply? The former case would definitely want clearly documenting 
+> > > > somewhere, whereas for the latter case I'm not sure it's even worth the 
+> > > > complication of having a quirk - if the value doesn't matter there seems 
+> > > > little point in doing a special dance just for the sake of semantic 
+> > > > correctness of the in-memory PTEs, in my opinion.
+> > > 
+> > > Agreed. We should only use quirks if the current (architecturally
+> > > compliant) code causes real issues with the hardware. Then the quirk can
+> > > be used to either avoid the problematic routines or to take extra steps
+> > > to make things work as the architecture intended.
+> > > 
+> > > I've asked how this IOMMU differs from the architecture on a number of
+> > > occasions, but I'm still yet to receive a response other than "it's special".
+> > > 
+> > 
+> > After check further with DE, Our pagetable is refer to ARM-v7's
+> > short-descriptor which is a little different from ARM-v8. like bit0(PXN)
+> > in section and supersection, I didn't read ARM-v7 spec before, so I add
+> > a MTK quirk to disable PXN bit in section and supersection.(if the PXN
+> > bit is wrote in ARM-v7 spec, HW will page fault.)
+> 
+> I've been reviewing this using the ARMv7 ARM (Rev.C of DDI0406C) the whole
+> time. PXN is there as an optional field in non-LPAE implementations. That's
+> fine and doesn't require any quirks.
 
-This doesn't exist in mainline having been removed in 3.12.
+Thanks for your confirm.
+Then I delete all the PXN bit in here?
 
->         select ARM_AMBA
->         select ARM_GIC
->         select CACHE_L2X0
-> @@ -9,6 +10,7 @@ menuconfig ARCH_SOCFPGA
->         select HAVE_ARM_SCU
->         select HAVE_ARM_TWD if SMP
->         select MFD_SYSCON
-> +       select PCI
+Take a example, 
+#define ARM_SHORT_PGD_SECTION_XN		(BIT(0) | BIT(4))
+I will change it to "BIT(4)".
 
-This should not be selected by the platform, but be user selectable
-unless perhaps you require PCI to boot.
+> 
+> > Then I write this code according to ARM-v8 spec defaultly, and add a
+> > ARM-v7 quirk?
+> 
+> No, I don't think you need this, as the v8 and v7 short-descriptor formats
+> look compatible to me. You should only need a quirk if architecturally
+> compliant code cannot work on your hardware.
+> 
+> > And there is a little different between ARM-v7 spec and MTK pagetable.
+> > It's the XN(bit0) in small page. MTK don't implement XN bit. 
+> > The bit[1:0] in MTK's small page should be 2'b10, if it's 2'b11, HW will
+> > page fault.
+> 
+> Aha, thanks! *That* is worthy of a quirk. Something like:
+> 
+>   IO_PGTABLE_QUIRK_ARM_NO_XN
 
-Rob
+Thanks, I will add it.
+
+> 
+> > (MTK don't implement AP bits too, but HW don't use them, it is ok even
+> > though AP bits is wrote)
+> 
+> Yeah, I think that's fine. The pgtable code will honour the request but
+> the h/w will ignore it.
+> 
+> > In the end, I will add two quirk like this, is it OK?
+> 
+> I think you only need the one I mentioned above. I don't see the need
+> for PXN at all (as I said in the last review).
+> 
+> Will
