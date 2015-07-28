@@ -1,36 +1,52 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Tue, 28 Jul 2015 23:06:40 +0100
-Subject: [PATCH v2] arm64/efi: prefer AllocatePages() over
- efi_low_alloc() for vmlinux
-In-Reply-To: <CAKv+Gu_EtOV8wannMLG87ai_x3ARu4rUSo9D6w2DQ+Kb5Kjn-A@mail.gmail.com>
-References: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
- <20150728211752.GE2773@codeblueprint.co.uk>
- <CAKv+Gu_EtOV8wannMLG87ai_x3ARu4rUSo9D6w2DQ+Kb5Kjn-A@mail.gmail.com>
-Message-ID: <20150728220640.GF2773@codeblueprint.co.uk>
+From: pebolle@tiscali.nl (Paul Bolle)
+Date: Wed, 29 Jul 2015 00:06:55 +0200
+Subject: [PATCH v2 3/6] mailbox: Add support for ST's Mailbox IP
+In-Reply-To: <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+References: <1437990272-23111-1-git-send-email-lee.jones@linaro.org>
+ <1437990272-23111-4-git-send-email-lee.jones@linaro.org>
+Message-ID: <1438121215.30903.27.camel@tiscali.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jul, at 11:24:23PM, Ard Biesheuvel wrote:
-> 
-> This workaround fixes another issue as well: the arm64 kernel needs to
-> be loaded 512 KB above a 2MB aligned boundary, and using
-> efi_low_alloc() as we do loses (2 MB - 512 KB) at the bottom if part
-> of that 512 KB is occupied, since efi_low_alloc() is not aware of the
-> fact that the first 512 KB will remain unused.
-> 
-> What would be most helpful is if efi_low_alloc() could take an offset
-> param in addition to the alignment, i.e., alignment == 2MB and offset
-> == 512 KB. The offset would default to 0, reverting to the original
-> behavior.
-> 
-> If you'd be ok with such a change, I can propose it instead, and wire
-> it up into this function.
+On ma, 2015-07-27 at 10:44 +0100, Lee Jones wrote:
+> --- /dev/null
+> +++ b/drivers/mailbox/mailbox-sti.c
 
-It's probably because it's late but I'm having trouble thinking this
-change through fully.
+> +static int sti_mbox_probe(struct platform_device *pdev)
+> +{
+> +	[...]
+> +
+> +	match = of_match_device(sti_mailbox_match, &pdev->dev);
+> +	if (!match) {
+> +		dev_err(&pdev->dev, "No configuration found\n");
+> +		return -ENODEV;
+> +	}
+> +	pdev->dev.platform_data = (struct sti_mbox_pdata *) match->data;
+> +
+> +	[...]
+> +}
 
-If it's not too much work, sure, please go ahead and propose a patch,
-even the untested, uncompiled "this is what I'm thinking" type.
+> +static struct platform_driver sti_mbox_driver = {
+> +	.probe = sti_mbox_probe,
+> +	.remove = sti_mbox_remove,
+> +	.driver = {
+> +		.name = "sti-mailbox",
+> +		.of_match_table = sti_mailbox_match,
+> +	},
+> +};
+> +module_platform_driver(sti_mbox_driver);
 
--- 
-Matt Fleming, Intel Open Source Technology Center
+> +MODULE_ALIAS("platform:mailbox-sti");
+
+It seems this alias is only useful if there's a corresponding struct
+platform_device with a "mailbox-sti" .name. I couldn't spot that
+platform_device.
+
+Besides, if I read sti_max_probe() correctly, without OF support loading
+this module won't accomplish much. So what would another way of
+autoloading this module buy you?
+
+Thanks,
+
+
+Paul Bolle
