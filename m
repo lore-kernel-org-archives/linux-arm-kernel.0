@@ -1,294 +1,181 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 28 Jul 2015 11:32:15 +0100
-Subject: [PATCH v3 2/2] ARM: pci: kill pcibios_msi_controller
-In-Reply-To: <1438079535-11956-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1438079535-11956-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1438079535-11956-2-git-send-email-lorenzo.pieralisi@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 28 Jul 2015 12:32:14 +0200
+Subject: [PATCH v2 2/4] ARM: Kirkwood: add modes-map property to ns2-leds
+ nodes
+In-Reply-To: <55B3A047.70905@free-electrons.com>
+References: <1435859803-19583-1-git-send-email-simon.guinot@sequanux.org>
+ <1435859803-19583-3-git-send-email-simon.guinot@sequanux.org>
+ <55B3A047.70905@free-electrons.com>
+Message-ID: <55B75A2E.4080803@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM PCI systems relying on the pcibios API to initialize PCI host
-controllers, the pcibios_msi_controller weak callback is used to look-up
-the msi_controller pointer, through pci_sys_data msi_ctrl pointer.
+Hi Simon, Jacek,
 
-pci_sys_data is an ARM specific structure, which prevents using the
-same mechanism (so same PCI host controller drivers) on ARM64 systems.
+On 25/07/2015 16:42, Gregory CLEMENT wrote:
+> Hi Simon, Jacek, Bryan, Richard,
+> 
+> On 02/07/2015 19:56, Simon Guinot wrote:
+>> From: Vincent Donnefort <vdonnefort@gmail.com>
+>>
+>> Since the LED modes mapping is no longer hardcoded inside the leds-ns2
+>> driver, then it must be provided through the modes-map property in the
+>> ns2-leds nodes.
+>>
+>> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+> 
+> As the other patch of the series seem to be merged in the led branch,
+> then I can apply this patch on mvebu/dt.
+> 
+> It is OK for being in linux-next, however this patch depend on "leds:
+> leds-ns2: move LED modes mapping outside of the driver", so I will need
+> to find a way to express this dependency when I will do the pull request
+> to arm-soc.
+> 
 
-Since the struct pci_bus already contains an msi_controller pointer and
-the kernel already uses it to look-up the msi controller,
-this patch converts ARM host controller and related pcibios/host bridges
-initialization routines so that the msi_controller pointer look-up can be
-carried out by PCI core code through the struct pci_bus msi pointer,
-removing the need for the arch specific pcibios_msi_controller callback
-and the related pci_sys_data msi_ctrl pointer.
+Eventually I removed this patch from my branch.
+Jacek, you can take it with my
 
-To simplify the conversion, this patch adds a new function in PCI
-core code (pci_scan_root_bus_msi()) that takes the msi_controller
-pointer as an additional parameter wrt pci_scan_root_bus() so that
-the msi controller pointer can be effectively propagated at probe time
-through the augmented API.
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-The existing pci_scan_root_bus() API is made to rely on the newly
-introduced function, by passing a NULL msi pointer to it so
-that it can be used when no msi controller pointer passing is required
-without additional code (and API conversions) in the core PCI layer.
 
-ARM is the only arch relying on the pcibios_msi_controller() weak
-function, hence this patch also removes its default weak implementation
-from PCI core code since it becomes of no use.
+Thanks,
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Suggested-by: Russell King <linux@arm.linux.org.uk>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Pratyush Anand <pratyush.anand@gmail.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jingoo Han <jingoohan1@gmail.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Simon Horman <horms@verge.net.au>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
-Cc: Michal Simek <michal.simek@xilinx.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
-v2->v3
+Gregory
 
-- Added pci_scan_root_bus_msi() in core PCI code and converted ARM bios32 to
-  use it
 
-v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359183.html
+> 
+> Thanks,
+> 
+> Gregory
+> 
+> 
+>> ---
+>>  arch/arm/boot/dts/kirkwood-d2net.dts   | 5 +++++
+>>  arch/arm/boot/dts/kirkwood-is2.dts     | 5 +++++
+>>  arch/arm/boot/dts/kirkwood-ns2.dts     | 5 +++++
+>>  arch/arm/boot/dts/kirkwood-ns2max.dts  | 5 +++++
+>>  arch/arm/boot/dts/kirkwood-ns2mini.dts | 5 +++++
+>>  5 files changed, 25 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/kirkwood-d2net.dts b/arch/arm/boot/dts/kirkwood-d2net.dts
+>> index 6b7856025001..e1c25c35e9ce 100644
+>> --- a/arch/arm/boot/dts/kirkwood-d2net.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-d2net.dts
+>> @@ -10,6 +10,7 @@
+>>  
+>>  /dts-v1/;
+>>  
+>> +#include <dt-bindings/leds/leds-ns2.h>
+>>  #include "kirkwood-netxbig.dtsi"
+>>  
+>>  / {
+>> @@ -28,6 +29,10 @@
+>>  			label = "d2net_v2:blue:sata";
+>>  			slow-gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+>>  			cmd-gpio = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+>> +			modes-map = <NS_V2_LED_OFF  1 0
+>> +				     NS_V2_LED_ON   0 1
+>> +				     NS_V2_LED_ON   1 1
+>> +				     NS_V2_LED_SATA 0 0>;
+>>  		};
+>>  	};
+>>  
+>> diff --git a/arch/arm/boot/dts/kirkwood-is2.dts b/arch/arm/boot/dts/kirkwood-is2.dts
+>> index da674bbd49a8..4121674abd1c 100644
+>> --- a/arch/arm/boot/dts/kirkwood-is2.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-is2.dts
+>> @@ -1,5 +1,6 @@
+>>  /dts-v1/;
+>>  
+>> +#include <dt-bindings/leds/leds-ns2.h>
+>>  #include "kirkwood-ns2-common.dtsi"
+>>  
+>>  / {
+>> @@ -27,6 +28,10 @@
+>>  			label = "ns2:blue:sata";
+>>  			slow-gpio = <&gpio0 29 0>;
+>>  			cmd-gpio = <&gpio0 30 0>;
+>> +			modes-map = <NS_V2_LED_OFF  1 0
+>> +				     NS_V2_LED_ON   0 1
+>> +				     NS_V2_LED_ON   1 1
+>> +				     NS_V2_LED_SATA 0 0>;
+>>  		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/kirkwood-ns2.dts b/arch/arm/boot/dts/kirkwood-ns2.dts
+>> index 53368d1022cc..190189d235e6 100644
+>> --- a/arch/arm/boot/dts/kirkwood-ns2.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-ns2.dts
+>> @@ -1,5 +1,6 @@
+>>  /dts-v1/;
+>>  
+>> +#include <dt-bindings/leds/leds-ns2.h>
+>>  #include "kirkwood-ns2-common.dtsi"
+>>  
+>>  / {
+>> @@ -27,6 +28,10 @@
+>>  			label = "ns2:blue:sata";
+>>  			slow-gpio = <&gpio0 29 0>;
+>>  			cmd-gpio = <&gpio0 30 0>;
+>> +			modes-map = <NS_V2_LED_OFF  1 0
+>> +				     NS_V2_LED_ON   0 1
+>> +				     NS_V2_LED_ON   1 1
+>> +				     NS_V2_LED_SATA 0 0>;
+>>  		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/kirkwood-ns2max.dts b/arch/arm/boot/dts/kirkwood-ns2max.dts
+>> index 72c78d0b1116..55cc41d9c80c 100644
+>> --- a/arch/arm/boot/dts/kirkwood-ns2max.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-ns2max.dts
+>> @@ -1,5 +1,6 @@
+>>  /dts-v1/;
+>>  
+>> +#include <dt-bindings/leds/leds-ns2.h>
+>>  #include "kirkwood-ns2-common.dtsi"
+>>  
+>>  / {
+>> @@ -46,6 +47,10 @@
+>>  			label = "ns2:blue:sata";
+>>  			slow-gpio = <&gpio0 29 0>;
+>>  			cmd-gpio = <&gpio0 30 0>;
+>> +			modes-map = <NS_V2_LED_OFF  1 0
+>> +				     NS_V2_LED_ON   0 1
+>> +				     NS_V2_LED_ON   1 1
+>> +				     NS_V2_LED_SATA 0 0>;
+>>  		};
+>>  	};
+>>  };
+>> diff --git a/arch/arm/boot/dts/kirkwood-ns2mini.dts b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+>> index c441bf62c09f..9935f3ec29b4 100644
+>> --- a/arch/arm/boot/dts/kirkwood-ns2mini.dts
+>> +++ b/arch/arm/boot/dts/kirkwood-ns2mini.dts
+>> @@ -1,5 +1,6 @@
+>>  /dts-v1/;
+>>  
+>> +#include <dt-bindings/leds/leds-ns2.h>
+>>  #include "kirkwood-ns2-common.dtsi"
+>>  
+>>  / {
+>> @@ -47,6 +48,10 @@
+>>  			label = "ns2:blue:sata";
+>>  			slow-gpio = <&gpio0 29 0>;
+>>  			cmd-gpio = <&gpio0 30 0>;
+>> +			modes-map = <NS_V2_LED_OFF  1 0
+>> +				     NS_V2_LED_ON   0 1
+>> +				     NS_V2_LED_ON   1 1
+>> +				     NS_V2_LED_SATA 0 0>;
+>>  		};
+>>  	};
+>>  };
+>>
+> 
+> 
 
-v1->v2
 
-- Added patch to replace panic statements with WARN
-- Removed unused pcibios_msi_controller() and pci_msi_controller() from
-  core code
-- Dropped RFT status
-
-v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/356028.html
-
- arch/arm/include/asm/mach/pci.h    |  5 -----
- arch/arm/kernel/bios32.c           | 17 +++--------------
- drivers/pci/host/pcie-designware.c |  9 +++++++--
- drivers/pci/host/pcie-xilinx.c     | 12 ++++++++++--
- drivers/pci/msi.c                  | 17 +----------------
- drivers/pci/probe.c                | 15 +++++++++++++--
- include/linux/pci.h                |  4 ++++
- 7 files changed, 38 insertions(+), 41 deletions(-)
-
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 28b9bb3..8857d28 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -19,9 +19,7 @@ struct pci_bus;
- struct device;
- 
- struct hw_pci {
--#ifdef CONFIG_PCI_MSI
- 	struct msi_controller *msi_ctrl;
--#endif
- 	struct pci_ops	*ops;
- 	int		nr_controllers;
- 	void		**private_data;
-@@ -42,9 +40,6 @@ struct hw_pci {
-  * Per-controller structure
-  */
- struct pci_sys_data {
--#ifdef CONFIG_PCI_MSI
--	struct msi_controller *msi_ctrl;
--#endif
- 	struct list_head node;
- 	int		busnr;		/* primary bus number			*/
- 	u64		mem_offset;	/* bus->cpu memory mapping offset	*/
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index a5c782c..1a20076 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -18,15 +18,6 @@
- 
- static int debug_pci;
- 
--#ifdef CONFIG_PCI_MSI
--struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
--{
--	struct pci_sys_data *sysdata = dev->bus->sysdata;
--
--	return sysdata->msi_ctrl;
--}
--#endif
--
- /*
-  * We can't use pci_get_device() here since we are
-  * called from interrupt context.
-@@ -462,9 +453,6 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		if (WARN(!sys, "PCI: unable to allocate sys data!"))
- 			break;
- 
--#ifdef CONFIG_PCI_MSI
--		sys->msi_ctrl = hw->msi_ctrl;
--#endif
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
-@@ -486,8 +474,9 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 			if (hw->scan)
- 				sys->bus = hw->scan(nr, sys);
- 			else
--				sys->bus = pci_scan_root_bus(parent, sys->busnr,
--						hw->ops, sys, &sys->resources);
-+				sys->bus = pci_scan_root_bus_msi(parent,
-+					sys->busnr, hw->ops, sys,
-+					&sys->resources, hw->msi_ctrl);
- 
- 			if (WARN(!sys->bus, "PCI: unable to scan bus!")) {
- 				kfree(sys);
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 69486be..e584dfa 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -526,7 +526,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 
- #ifdef CONFIG_PCI_MSI
- 	dw_pcie_msi_chip.dev = pp->dev;
--	dw_pci.msi_ctrl = &dw_pcie_msi_chip;
- #endif
- 
- 	dw_pci.nr_controllers = 1;
-@@ -708,11 +707,17 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	struct pcie_port *pp = sys_to_pcie(sys);
- 
- 	pp->root_bus_nr = sys->busnr;
--	bus = pci_scan_root_bus(pp->dev, sys->busnr,
-+	bus = pci_create_root_bus(pp->dev, sys->busnr,
- 				  &dw_pcie_ops, sys, &sys->resources);
- 	if (!bus)
- 		return NULL;
- 
-+#ifdef CONFIG_PCI_MSI
-+	bus->msi = &dw_pcie_msi_chip;
-+#endif
-+
-+	pci_scan_child_bus(bus);
-+
- 	if (bus && pp->ops->scan_bus)
- 		pp->ops->scan_bus(pp);
- 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index f1a06a0..b21eb7d 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -647,9 +647,18 @@ static struct pci_bus *xilinx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
- 	struct pci_bus *bus;
- 
- 	port->root_busno = sys->busnr;
--	bus = pci_scan_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
-+	bus = pci_create_root_bus(port->dev, sys->busnr, &xilinx_pcie_ops,
- 				sys, &sys->resources);
- 
-+	if (!bus)
-+		return NULL;
-+
-+#ifdef CONFIG_PCI_MSI
-+	bus->msi = &xilinx_pcie_msi_chip;
-+#endif
-+
-+	pci_scan_child_bus(bus);
-+
- 	return bus;
- }
- 
-@@ -847,7 +856,6 @@ static int xilinx_pcie_probe(struct platform_device *pdev)
- 
- #ifdef CONFIG_PCI_MSI
- 	xilinx_pcie_msi_chip.dev = port->dev;
--	hw.msi_ctrl = &xilinx_pcie_msi_chip;
- #endif
- 	pci_common_init_dev(dev, &hw);
- 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index f66be86..0d20142 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -77,24 +77,9 @@ static void pci_msi_teardown_msi_irqs(struct pci_dev *dev)
- 
- /* Arch hooks */
- 
--struct msi_controller * __weak pcibios_msi_controller(struct pci_dev *dev)
--{
--	return NULL;
--}
--
--static struct msi_controller *pci_msi_controller(struct pci_dev *dev)
--{
--	struct msi_controller *msi_ctrl = dev->bus->msi;
--
--	if (msi_ctrl)
--		return msi_ctrl;
--
--	return pcibios_msi_controller(dev);
--}
--
- int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
--	struct msi_controller *chip = pci_msi_controller(dev);
-+	struct msi_controller *chip = dev->bus->msi;
- 	int err;
- 
- 	if (!chip || !chip->setup_irq)
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index cefd636..4915c6d 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -2096,8 +2096,9 @@ void pci_bus_release_busn_res(struct pci_bus *b)
- 			res, ret ? "can not be" : "is");
- }
- 
--struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
--		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata,
-+		struct list_head *resources, struct msi_controller *msi)
- {
- 	struct resource_entry *window;
- 	bool found = false;
-@@ -2114,6 +2115,8 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 	if (!b)
- 		return NULL;
- 
-+	b->msi = msi;
-+
- 	if (!found) {
- 		dev_info(&b->dev,
- 		 "No busn resource found for root bus, will use [bus %02x-ff]\n",
-@@ -2128,6 +2131,14 @@ struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 
- 	return b;
- }
-+EXPORT_SYMBOL(pci_scan_root_bus_msi);
-+
-+struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
-+		struct pci_ops *ops, void *sysdata, struct list_head *resources)
-+{
-+	return pci_scan_root_bus_msi(parent, bus, ops, sysdata, resources,
-+				     NULL);
-+}
- EXPORT_SYMBOL(pci_scan_root_bus);
- 
- struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops,
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 8a0321a..4d4f9d2 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -787,6 +787,10 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
- int pci_bus_insert_busn_res(struct pci_bus *b, int bus, int busmax);
- int pci_bus_update_busn_res_end(struct pci_bus *b, int busmax);
- void pci_bus_release_busn_res(struct pci_bus *b);
-+struct pci_bus *pci_scan_root_bus_msi(struct device *parent, int bus,
-+				      struct pci_ops *ops, void *sysdata,
-+				      struct list_head *resources,
-+				      struct msi_controller *msi);
- struct pci_bus *pci_scan_root_bus(struct device *parent, int bus,
- 					     struct pci_ops *ops, void *sysdata,
- 					     struct list_head *resources);
 -- 
-2.2.1
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
