@@ -1,33 +1,57 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue, 28 Jul 2015 16:45:28 +0200 (CEST)
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <20150728124911.GA2564@lukather>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
- <55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com>
- <55B62768.6040403@redhat.com><20150728124911.GA2564@lukather>
-Message-ID: <20150728144528.E3A916C82F6B@dd34104.kasserver.com>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 28 Jul 2015 14:46:35 +0000
+Subject: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <20150728143854.GH12927@tiger>
+References: <1438025400-5919-1-git-send-email-shenwei.wang@freescale.com>
+ <1438025400-5919-2-git-send-email-shenwei.wang@freescale.com>
+ <20150728012452.GX12927@tiger>
+ <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728143854.GH12927@tiger>
+Message-ID: <CY1PR0301MB084351EFDDA403AF522B3171838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Maxime Ripard schrieb am 28.07.2015 14:49:
-> I don't feel like holding patches that were posted before you did
-> because you did them some time ago and never submitted them is
-> reasonnable and / or encouraging for new submitters of patches.
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2015?7?28? 9:39
+> To: Wang Shenwei-B38339
+> Cc: shawn.guo at linaro.org; tglx at linutronix.de; jason at lakedaemon.net; Huang
+> Yongcai-B20788; linux-kernel at vger.kernel.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+> sources
 > 
-> I'd really like to get more sunxi-people contributing, and that starts
-> with that kind of trivial stuff. Holding them back because one of the
-> usual (and experienced) developpers is a bit counter-productive (and
-> I'm sure you still have a lot of patches to submit anyway ;)).
+> On Tue, Jul 28, 2015 at 02:27:42PM +0000, Shenwei Wang wrote:
+> > > > +static int gpcv2_wakeup_source_save(void) {
+> > > > +	struct imx_gpcv2_irq *cd;
+> > >
+> > > We generally name variables in an abbrev of the types to make them
+> > > intuitive.  I tried hard to map "cd" to "imx_gpcv2_irq" and failed.
+> > > Can you help me on that?
+> >
+> > CD is the abbreviation of chip data which is a member of irq_data.
+> 
+> You are defining a variable of type imx_gpcv2_irq, neither chip_data nor irq_data.
 
-Just for the record: I wouldn't be discouraged by that. The only thing that
-matters to me here is that regulator support will be added, regardless of 
-who submitted the patch. But anyway, I will rework the patch along the 
-statements made during this discussion.
+Imx_gpcv2_irq itself is the chip_data of irq_data.
 
-Regards,
+> > > > +void ca7_cpu_resume(void);
+> > > > +void imx7_suspend(void __iomem *ocram_vbase);
+> > >
+> > > Why do these declarations need to be in this header?
+> >
+> > Just to resolve the compile errors.
+> 
+> Wrong solution.  They belong to some header in arch/arm/mach-imx not
+> include/soc/imx, as there is no code outside arch/arm/mach-imx needs these
+> declaration.
 
-Timo
+It is a little ugly. I was thinking to have a gpcv2.h header file, so put them there. 
+But as the header file is going to be removed, I am considering to move it to 
+common.h. Although it seems not beautiful too.
+
+Thanks,
+Shenwei
+
+> Shawn
