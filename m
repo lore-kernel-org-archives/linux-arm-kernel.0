@@ -1,60 +1,58 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Tue, 28 Jul 2015 10:21:47 -0600
-Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
-In-Reply-To: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
-References: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <1438100507.5211.170.camel@redhat.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 28 Jul 2015 18:15:46 +0200
+Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.2
+In-Reply-To: <CABuKBeK=TQ1CQx4Co2m5p9xri4oBGMKynJL+9evm3xaTjvr8FQ@mail.gmail.com>
+References: <CABuKBeK=TQ1CQx4Co2m5p9xri4oBGMKynJL+9evm3xaTjvr8FQ@mail.gmail.com>
+Message-ID: <20150728161546.GA16690@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 14:33 +0530, Pranavkumar Sawargaonkar wrote:
-> In current VFIO MSI/MSI-X implementation, linux host kernel
-> allocates MSI/MSI-X vectors when userspace requests through vfio ioctls.
-> Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
-> to the userspace when raised.
-> Guest OS will see emulated MSI/MSI-X controller and receives an interrupt
-> when kernel notifies the same via irqfd.
+Hi Matthias,
+
+On Tue, Jul 28, 2015 at 02:06:30PM +0200, Matthias Brugger wrote:
+> Hi all,
 > 
-> Host kernel allocates MSI/MSI-X using standard linux routines
-> like pci_enable_msix_range() and pci_enable_msi_range(). 
-> These routines along with requset_irq() in host kernel sets up 
-> MSI/MSI-X vectors with Physical MSI/MSI-X addresses provided by
-> interrupt controller driver in host kernel.
+> Please take the following changes into account.
 > 
-> This means when a device is assigned with the guest OS, MSI/MSI-X addresses
-> present in PCIe EP are the PAs programmed by the host linux kernel.
+> Thanks,
+> Matthias
 > 
-> In x86 MSI/MSI-X physical address range is reserved and iommu is aware
-> about these addreses and transalation is bypassed for these address range.
+> ---
 > 
-> Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical address range and
-> all the transactions including MSI go through iommu/smmu without bypass.
-> This requires extending current vfio MSI layer with additional functionality
-> for ARM/ARM64 by
-> 1. Programing IOVA (referred as a MSI virtual doorbell address)
->    in device's MSI vector as a MSI address.
->    This IOVA will be provided by the userspace based on the
->    MSI/MSI-X addresses reserved for the guest.
-> 2. Create an IOMMU mapping between this IOVA and
->    Physical address (PA) assigned to the MSI vector.
+> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 > 
-> This RFC is proposing a solution for MSI/MSI-X passthrough for ARM/ARM64.
+>   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-arm64
+> 
+> for you to fetch changes up to e26945245e414eff42ee1ffeaedf198911bf1d77:
+> 
+>   arm64: dts: mediatek: add mt6795 support (2015-07-23 19:55:55 +0200)
+> 
+> ----------------------------------------------------------------
+> - arm64: dts: mediatek: add mt6795 support
+> - Document: DT: Add bindings for mediatek MT6795 SoC Platform
+> - arm64: dts: mediatek: Add MT8173 MMC dts
+> - arm64: dts: mt8173: Add afe device node
+> - arm64: dts: mt8173-evb: Add PMIC support
+> - dts: mt8173-evb: Add da9211 to i2c1
+> - ARM: dts: mt8173: support arm64 cpuidle-dt
+> - ARM64: MediaTek MT8173: Add SCPSYS device node
+> - arm64: dts: mt8173: Add I2C device node
+> - arm64: dts: mt8173: Add watchdog device node
+> - arm64: dts: mt8173: Add PMIC wrapper device node
+> - arm64: dts: mt8173: Use real clock for UARTs
+> - arm64: dts: mt8173: Add clock controller device nodes
+> 
+
+Merged, but please write a descriptive tag message in the future instead of
+just listing the patches. A brief overview of what's in the branch is a lot
+more useful, since the list of patches makes it into the merge commit anyway.
 
 
-Hi Pranavkumar,
+Thanks,
 
-Freescale has the same, or very similar, need, so any solution in this
-space will need to work for both ARM and powerpc.  I'm not a big fan of
-this approach as it seems to require the user to configure MSI/X via
-ioctl and then call a separate ioctl mapping the doorbells.  That's more
-code for the user, more code to get wrong and potentially a gap between
-configuring MSI/X and enabling mappings where we could see IOMMU faults.
 
-If we know that doorbell mappings are required, why can't we set aside a
-bank of IOVA space and have them mapped automatically as MSI/X is being
-configured?  Then the user's need for special knowledge and handling of
-this case is limited to setup.  The IOVA space will be mapped and used
-as needed, we only need the user to specify the IOVA space reserved for
-this.  Thanks,
-
-Alex
+-Olof
