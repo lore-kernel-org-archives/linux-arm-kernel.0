@@ -1,57 +1,36 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 28 Jul 2015 11:07:49 -0400
-Subject: [PATCH 0/2] arm64: support initrd outside of mapped RAM
-In-Reply-To: <20150728145906.GE15213@leverpostej>
-References: <1438093961-15536-1-git-send-email-msalter@redhat.com>
- <20150728145906.GE15213@leverpostej>
-Message-ID: <1438096069.14248.13.camel@redhat.com>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Tue, 28 Jul 2015 17:09:29 +0200 (CEST)
+Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
+ board-specific operating points for LeMaker BananaPi
+In-Reply-To: <55B790BA.5000509@redhat.com>
+References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
+ <55B5E6DB.8020009@redhat.com>
+ <20150727120918.191F76C82FB4@dd34104.kasserver.com>
+ <55B62768.6040403@redhat.com>
+ <20150728124911.GA2564@lukather><55B790BA.5000509@redhat.com>
+Message-ID: <20150728150929.233B56C80391@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-28 at 15:59 +0100, Mark Rutland wrote:
-> Hi Mark,
-> 
-> As a heads-up, it looks like you missed a space when sending this; Arnd
-> and Ard got merged into:
-> 
-> "Arnd Bergmann <arnd@arndb.de>--cc=Ard Biesheuvel" <
-> ard.biesheuvel at linaro.org>
-> 
-> I've corrected that for this reply.
+Hi,
 
-Oops. Thanks.
+Hans de Goede schrieb am 28.07.2015 16:24:
+> I've no problem with Timo submitting a cleaned up version of his
+> patch and you taking that instead. I just wanted to point out that
+> I do have a similar patch pending.
 
-> 
-> On Tue, Jul 28, 2015 at 03:32:39PM +0100, Mark Salter wrote:
-> > When booting an arm64 kernel w/initrd using UEFI/grub, use of mem= will 
-> > likely
-> > cut off part or all of the initrd. This leaves it outside the kernel 
-> > linear
-> > map which leads to failure when unpacking. The x86 code has a similar 
-> > need to
-> > relocate an initrd outside of mapped memory in some cases.
-> > 
-> > The current x86 code uses early_memremap() to copy the original initrd 
-> > from
-> > unmapped to mapped RAM. This patchset creates a generic 
-> > copy_from_early_mem()
-> > utility based on that x86 code and has arm64 use it to relocate the 
-> > initrd
-> > if necessary.
-> 
-> This sounds like a sane idea to me.
-> 
-> > Mark Salter (2):
-> >   mm: add utility for early copy from unmapped ram
-> >   arm64: support initrd outside kernel linear map
-> > 
-> >  arch/arm64/kernel/setup.c           | 55 
-> > +++++++++++++++++++++++++++++++++++++
-> >  include/asm-generic/early_ioremap.h |  6 ++++
-> >  mm/early_ioremap.c                  | 22 +++++++++++++++
-> >  3 files changed, 83 insertions(+)
-> 
-> Any reason for not moving x86 over to the new generic version?
+Ok, I will do that. It might take a couple of days, though, as I will be moving
+moving in the next few days as well.
 
-I have a patch to do that but I'm not sure how to contrive a
-testcase to exercise it.
+However, another question first then: What maximum voltage for the dcdc2
+regulator should we use then? You used 1.5V, I used 1.45V so far, which is what
+Cubieboard 2 and Cubietruck use.
+
+But after the discussion about overvoltaged settings, I'm wondering whether we
+should limit the regulartor (and not only the opp) to 1.40V as well? Or is
+1.45V ok for everybody here?
+
+
+Thanks and regards,
+
+Timo
