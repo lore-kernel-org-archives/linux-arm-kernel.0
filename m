@@ -1,272 +1,79 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 28 Jul 2015 07:20:04 +0200
-Subject: [PATCH 7/7] usb: gadget: remove gadget_chips.h
+Date: Tue, 28 Jul 2015 07:19:58 +0200
+Subject: [PATCH 1/7] usb: gadget: add 'quirk_altset_not_supp' to usb_gadget
 In-Reply-To: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
 References: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438060804-21706-8-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438060804-21706-2-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This header file contains helpers for quirks based on UDC controller name.
-Since we have generic quirk bitfields in usb_gadget structure for all of
-these quirks we don't need to have this header any longer.
+Due to some UDC controllers may not support altsettings, usb gadget layer
+needs to provide a generic way to inform gadget functions about non-standard
+hardware limitations.
 
-This patch removes gadget_chips.h file and makes sure that it's no longer
-included anywhere in kernel sources.
+This patch adds 'quirk_altset_not_supp' field to struct usb_gadget and helper
+function gadget_is_altset_supported(). It also sets 'quirk_altset_not_supp'
+to 1 in pxa25x_udc and pxa27x_udc drivers, which have such limitation.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/epautoconf.c              |  2 -
- drivers/usb/gadget/function/f_acm.c          |  1 -
- drivers/usb/gadget/function/f_mass_storage.c |  1 -
- drivers/usb/gadget/function/f_obex.c         |  1 -
- drivers/usb/gadget/function/f_serial.c       |  1 -
- drivers/usb/gadget/function/f_sourcesink.c   |  1 -
- drivers/usb/gadget/function/u_ether.h        |  2 -
- drivers/usb/gadget/function/u_uac1.h         |  2 -
- drivers/usb/gadget/legacy/audio.c            |  1 -
- drivers/usb/gadget/legacy/gmidi.c            |  2 -
- drivers/usb/gadget/legacy/hid.c              |  1 -
- drivers/usb/gadget/legacy/nokia.c            |  1 -
- drivers/usb/gadget/legacy/printer.c          |  2 -
- drivers/usb/gadget/legacy/serial.c           |  1 -
- drivers/usb/gadget/udc/gadget_chips.h        | 55 ----------------------------
- 15 files changed, 74 deletions(-)
- delete mode 100644 drivers/usb/gadget/udc/gadget_chips.h
+ drivers/usb/gadget/udc/pxa25x_udc.c |  1 +
+ drivers/usb/gadget/udc/pxa27x_udc.c |  1 +
+ include/linux/usb/gadget.h          | 11 +++++++++++
+ 3 files changed, 13 insertions(+)
 
-diff --git a/drivers/usb/gadget/epautoconf.c b/drivers/usb/gadget/epautoconf.c
-index 254ece7..bde091f 100644
---- a/drivers/usb/gadget/epautoconf.c
-+++ b/drivers/usb/gadget/epautoconf.c
-@@ -20,8 +20,6 @@
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
+diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
+index f53e526..b82cb14 100644
+--- a/drivers/usb/gadget/udc/pxa25x_udc.c
++++ b/drivers/usb/gadget/udc/pxa25x_udc.c
+@@ -1176,6 +1176,7 @@ static void udc_reinit(struct pxa25x_udc *dev)
+ 	INIT_LIST_HEAD (&dev->gadget.ep_list);
+ 	INIT_LIST_HEAD (&dev->gadget.ep0->ep_list);
+ 	dev->ep0state = EP0_IDLE;
++	dev->gadget.quirk_altset_not_supp = 1;
  
--#include "gadget_chips.h"
--
+ 	/* basic endpoint records init */
+ 	for (i = 0; i < PXA_UDC_NUM_ENDPOINTS; i++) {
+diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
+index 042f06b..670ac0b 100644
+--- a/drivers/usb/gadget/udc/pxa27x_udc.c
++++ b/drivers/usb/gadget/udc/pxa27x_udc.c
+@@ -1710,6 +1710,7 @@ static void udc_init_data(struct pxa_udc *dev)
+ 	INIT_LIST_HEAD(&dev->gadget.ep_list);
+ 	INIT_LIST_HEAD(&dev->gadget.ep0->ep_list);
+ 	dev->udc_usb_ep[0].pxa_ep = &dev->pxa_ep[0];
++	dev->gadget.quirk_altset_not_supp = 1;
+ 	ep0_idle(dev);
+ 
+ 	/* PXA endpoints init */
+diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+index 91b71a3..5362faa 100644
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -617,6 +617,7 @@ struct usb_gadget {
+ 	unsigned			a_hnp_support:1;
+ 	unsigned			a_alt_hnp_support:1;
+ 	unsigned			quirk_ep_out_aligned_size:1;
++	unsigned			quirk_altset_not_supp:1;
+ 	unsigned			is_selfpowered:1;
+ 	unsigned			deactivated:1;
+ 	unsigned			connected:1;
+@@ -673,6 +674,16 @@ usb_ep_align_maybe(struct usb_gadget *g, struct usb_ep *ep, size_t len)
+ }
+ 
  /**
-  * usb_ep_autoconfig_ss() - choose an endpoint matching the ep
-  * descriptor and ep companion descriptor
-diff --git a/drivers/usb/gadget/function/f_acm.c b/drivers/usb/gadget/function/f_acm.c
-index aad8165..be9df09 100644
---- a/drivers/usb/gadget/function/f_acm.c
-+++ b/drivers/usb/gadget/function/f_acm.c
-@@ -21,7 +21,6 @@
- #include <linux/err.h>
- 
- #include "u_serial.h"
--#include "gadget_chips.h"
- 
- 
- /*
-diff --git a/drivers/usb/gadget/function/f_mass_storage.c b/drivers/usb/gadget/function/f_mass_storage.c
-index a229194..b85e82f 100644
---- a/drivers/usb/gadget/function/f_mass_storage.c
-+++ b/drivers/usb/gadget/function/f_mass_storage.c
-@@ -219,7 +219,6 @@
- #include <linux/usb/gadget.h>
- #include <linux/usb/composite.h>
- 
--#include "gadget_chips.h"
- #include "configfs.h"
- 
- 
-diff --git a/drivers/usb/gadget/function/f_obex.c b/drivers/usb/gadget/function/f_obex.c
-index 2682d59..5460426 100644
---- a/drivers/usb/gadget/function/f_obex.c
-+++ b/drivers/usb/gadget/function/f_obex.c
-@@ -20,7 +20,6 @@
- #include <linux/module.h>
- 
- #include "u_serial.h"
--#include "gadget_chips.h"
- 
- 
- /*
-diff --git a/drivers/usb/gadget/function/f_serial.c b/drivers/usb/gadget/function/f_serial.c
-index 2e02dfa..1d162e2 100644
---- a/drivers/usb/gadget/function/f_serial.c
-+++ b/drivers/usb/gadget/function/f_serial.c
-@@ -16,7 +16,6 @@
- #include <linux/device.h>
- 
- #include "u_serial.h"
--#include "gadget_chips.h"
- 
- 
- /*
-diff --git a/drivers/usb/gadget/function/f_sourcesink.c b/drivers/usb/gadget/function/f_sourcesink.c
-index e6af171..cbfaf86 100644
---- a/drivers/usb/gadget/function/f_sourcesink.c
-+++ b/drivers/usb/gadget/function/f_sourcesink.c
-@@ -20,7 +20,6 @@
- #include <linux/err.h>
- 
- #include "g_zero.h"
--#include "gadget_chips.h"
- #include "u_f.h"
- 
- /*
-diff --git a/drivers/usb/gadget/function/u_ether.h b/drivers/usb/gadget/function/u_ether.h
-index 1384f00..c77145b 100644
---- a/drivers/usb/gadget/function/u_ether.h
-+++ b/drivers/usb/gadget/function/u_ether.h
-@@ -20,8 +20,6 @@
- #include <linux/usb/cdc.h>
- #include <linux/netdevice.h>
- 
--#include "gadget_chips.h"
--
- #define QMULT_DEFAULT 5
- 
- /*
-diff --git a/drivers/usb/gadget/function/u_uac1.h b/drivers/usb/gadget/function/u_uac1.h
-index fe386df..5c2ac8e 100644
---- a/drivers/usb/gadget/function/u_uac1.h
-+++ b/drivers/usb/gadget/function/u_uac1.h
-@@ -21,8 +21,6 @@
- #include <sound/pcm.h>
- #include <sound/pcm_params.h>
- 
--#include "gadget_chips.h"
--
- #define FILE_PCM_PLAYBACK	"/dev/snd/pcmC0D0p"
- #define FILE_PCM_CAPTURE	"/dev/snd/pcmC0D0c"
- #define FILE_CONTROL		"/dev/snd/controlC0"
-diff --git a/drivers/usb/gadget/legacy/audio.c b/drivers/usb/gadget/legacy/audio.c
-index 9b2c1c6..685cf3b 100644
---- a/drivers/usb/gadget/legacy/audio.c
-+++ b/drivers/usb/gadget/legacy/audio.c
-@@ -15,7 +15,6 @@
- #include <linux/module.h>
- #include <linux/usb/composite.h>
- 
--#include "gadget_chips.h"
- #define DRIVER_DESC		"Linux USB Audio Gadget"
- #define DRIVER_VERSION		"Feb 2, 2012"
- 
-diff --git a/drivers/usb/gadget/legacy/gmidi.c b/drivers/usb/gadget/legacy/gmidi.c
-index 650568d..8a18348 100644
---- a/drivers/usb/gadget/legacy/gmidi.c
-+++ b/drivers/usb/gadget/legacy/gmidi.c
-@@ -35,8 +35,6 @@
- #include <linux/usb/audio.h>
- #include <linux/usb/midi.h>
- 
--#include "gadget_chips.h"
--
- #include "u_midi.h"
- 
- /*-------------------------------------------------------------------------*/
-diff --git a/drivers/usb/gadget/legacy/hid.c b/drivers/usb/gadget/legacy/hid.c
-index e4874d3..7e5d2c4 100644
---- a/drivers/usb/gadget/legacy/hid.c
-+++ b/drivers/usb/gadget/legacy/hid.c
-@@ -19,7 +19,6 @@
- #include <linux/usb/composite.h>
- #include <linux/usb/g_hid.h>
- 
--#include "gadget_chips.h"
- #define DRIVER_DESC		"HID Gadget"
- #define DRIVER_VERSION		"2010/03/16"
- 
-diff --git a/drivers/usb/gadget/legacy/nokia.c b/drivers/usb/gadget/legacy/nokia.c
-index 264c97e..cfa45cd 100644
---- a/drivers/usb/gadget/legacy/nokia.c
-+++ b/drivers/usb/gadget/legacy/nokia.c
-@@ -23,7 +23,6 @@
- #include "u_ether.h"
- #include "u_phonet.h"
- #include "u_ecm.h"
--#include "gadget_chips.h"
- #include "f_mass_storage.h"
- 
- /* Defines */
-diff --git a/drivers/usb/gadget/legacy/printer.c b/drivers/usb/gadget/legacy/printer.c
-index 0c1fc06..a22d30a 100644
---- a/drivers/usb/gadget/legacy/printer.c
-+++ b/drivers/usb/gadget/legacy/printer.c
-@@ -19,8 +19,6 @@
- #include <linux/usb/gadget.h>
- #include <linux/usb/g_printer.h>
- 
--#include "gadget_chips.h"
--
- USB_GADGET_COMPOSITE_OPTIONS();
- 
- #define DRIVER_DESC		"Printer Gadget"
-diff --git a/drivers/usb/gadget/legacy/serial.c b/drivers/usb/gadget/legacy/serial.c
-index 9836d16..c5d42e0 100644
---- a/drivers/usb/gadget/legacy/serial.c
-+++ b/drivers/usb/gadget/legacy/serial.c
-@@ -17,7 +17,6 @@
- #include <linux/tty_flip.h>
- 
- #include "u_serial.h"
--#include "gadget_chips.h"
- 
- 
- /* Defines */
-diff --git a/drivers/usb/gadget/udc/gadget_chips.h b/drivers/usb/gadget/udc/gadget_chips.h
-deleted file mode 100644
-index bcd04bc..0000000
---- a/drivers/usb/gadget/udc/gadget_chips.h
-+++ /dev/null
-@@ -1,55 +0,0 @@
--/*
-- * USB device controllers have lots of quirks.  Use these macros in
-- * gadget drivers or other code that needs to deal with them, and which
-- * autoconfigures instead of using early binding to the hardware.
-- *
-- * This SHOULD eventually work like the ARM mach_is_*() stuff, driven by
-- * some config file that gets updated as new hardware is supported.
-- * (And avoiding all runtime comparisons in typical one-choice configs!)
-- *
-- * NOTE:  some of these controller drivers may not be available yet.
-- * Some are available on 2.4 kernels; several are available, but not
-- * yet pushed in the 2.6 mainline tree.
-- */
--
--#ifndef __GADGET_CHIPS_H
--#define __GADGET_CHIPS_H
--
--#include <linux/usb/gadget.h>
--
--/*
-- * NOTICE: the entries below are alphabetical and should be kept
-- * that way.
-- *
-- * Always be sure to add new entries to the correct position or
-- * accept the bashing later.
-- *
-- * If you have forgotten the alphabetical order let VIM/EMACS
-- * do that for you.
-- */
--#define gadget_is_at91(g)		(!strcmp("at91_udc", (g)->name))
--#define gadget_is_goku(g)		(!strcmp("goku_udc", (g)->name))
--#define gadget_is_musbhdrc(g)		(!strcmp("musb-hdrc", (g)->name))
--#define gadget_is_net2280(g)		(!strcmp("net2280", (g)->name))
--#define gadget_is_pxa(g)		(!strcmp("pxa25x_udc", (g)->name))
--#define gadget_is_pxa27x(g)		(!strcmp("pxa27x_udc", (g)->name))
--
--/**
-- * gadget_supports_altsettings - return true if altsettings work
-- * @gadget: the gadget in question
-- */
--static inline bool gadget_supports_altsettings(struct usb_gadget *gadget)
--{
--	/* PXA 21x/25x/26x has no altsettings at all */
--	if (gadget_is_pxa(gadget))
--		return false;
--
--	/* PXA 27x and 3xx have *broken* altsetting support */
--	if (gadget_is_pxa27x(gadget))
--		return false;
--
--	/* Everything else is *presumably* fine ... */
--	return true;
--}
--
--#endif /* __GADGET_CHIPS_H */
++ * gadget_is_altset_supported - return true iff the hardware supports
++ *	altsettings
++ * @g: controller to check for quirk
++ */
++static inline int gadget_is_altset_supported(struct usb_gadget *g)
++{
++	return !g->quirk_altset_not_supp;
++}
++
++/**
+  * gadget_is_dualspeed - return true iff the hardware handles high speed
+  * @g: controller that might support both high and full speeds
+  */
 -- 
 1.9.1
