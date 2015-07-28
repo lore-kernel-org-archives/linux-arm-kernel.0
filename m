@@ -1,87 +1,51 @@
-From: yury.norov@gmail.com (Yury)
-Date: Wed, 29 Jul 2015 00:23:18 +0300
-Subject: [PATCH] lib: Make _find_next_bit helper function inline
-In-Reply-To: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
-References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
-Message-ID: <55B7F2C6.9010000@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Jul 2015 23:24:23 +0200
+Subject: [PATCH v2] arm64/efi: prefer AllocatePages() over efi_low_alloc()
+ for vmlinux
+In-Reply-To: <20150728211752.GE2773@codeblueprint.co.uk>
+References: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150728211752.GE2773@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu_EtOV8wannMLG87ai_x3ARu4rUSo9D6w2DQ+Kb5Kjn-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.07.2015 22:09, Cassidy Burden wrote:
-> I've tested Yury Norov's find_bit reimplementation with the test_find_bit
-> module (https://lkml.org/lkml/2015/3/8/141) and measured about 35-40%
-> performance degradation on arm64 3.18 run with fixed CPU frequency.
+On 28 July 2015 at 23:17, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Fri, 24 Jul, at 01:38:27PM, Ard Biesheuvel wrote:
+>> When allocating memory for the kernel image, try the AllocatePages()
+>> boot service to obtain memory at the preferred offset of
+>> 'dram_base + TEXT_OFFSET', and only revert to efi_low_alloc() if that
+>> fails. This is the only way to allocate at the base of DRAM if DRAM
+>> starts at 0x0, since efi_low_alloc() refuses to allocate at 0x0.
+>>
+>> Tested-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>> v2:
+>> - reshuffle code flow to make it more logical, and have only a single
+>>   memcpy() invocation at the end of the function
+>> ---
+>>  arch/arm64/kernel/efi-stub.c | 41 ++++++++++++++++++++++++++++++++---------
+>>  1 file changed, 32 insertions(+), 9 deletions(-)
 >
-> The performance degradation appears to be caused by the
-> helper function _find_next_bit. After inlining this function into
-> find_next_bit and find_next_zero_bit I get slightly better performance
-> than the old implementation:
+> Would it be easier if we allow efi_low_alloc() to return 0x0 for some
+> uses? If you don't need the preference for low allocations, probably
+> not, but I don't want to see us working around limitations in
+> efi_low_alloc() instead of just fixing it.
 >
-> find_next_zero_bit          find_next_bit
-> old      new     inline     old      new     inline
-> 26       36      24         24       33      23
-> 25       36      24         24       33      23
-> 26       36      24         24       33      23
-> 25       36      24         24       33      23
-> 25       36      24         24       33      23
-> 25       37      24         24       33      23
-> 25       37      24         24       33      23
-> 25       37      24         24       33      23
-> 25       36      24         24       33      23
-> 25       37      24         24       33      23
->
-> Signed-off-by: Cassidy Burden <cburden@codeaurora.org>
-> Cc: Alexey Klimov <klimov.linux@gmail.com>
-> Cc: David S. Miller <davem@davemloft.net>
-> Cc: Daniel Borkmann <dborkman@redhat.com>
-> Cc: Hannes Frederic Sowa <hannes@stressinduktion.org>
-> Cc: Lai Jiangshan <laijs@cn.fujitsu.com>
-> Cc: Mark Salter <msalter@redhat.com>
-> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Cc: Thomas Graf <tgraf@suug.ch>
-> Cc: Valentin Rothberg <valentinrothberg@gmail.com>
-> Cc: Chris Wilson <chris@chris-wilson.co.uk>
-> ---
->   lib/find_bit.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/lib/find_bit.c b/lib/find_bit.c
-> index 18072ea..d0e04f9 100644
-> --- a/lib/find_bit.c
-> +++ b/lib/find_bit.c
-> @@ -28,7 +28,7 @@
->    * find_next_zero_bit.  The difference is the "invert" argument, which
->    * is XORed with each fetched word before searching it for one bits.
->    */
-> -static unsigned long _find_next_bit(const unsigned long *addr,
-> +static inline unsigned long _find_next_bit(const unsigned long *addr,
->   		unsigned long nbits, unsigned long start, unsigned long invert)
->   {
->   	unsigned long tmp;
 
-Hi Cassidi,
+This workaround fixes another issue as well: the arm64 kernel needs to
+be loaded 512 KB above a 2MB aligned boundary, and using
+efi_low_alloc() as we do loses (2 MB - 512 KB) at the bottom if part
+of that 512 KB is occupied, since efi_low_alloc() is not aware of the
+fact that the first 512 KB will remain unused.
 
-At first, I'm really surprised that there's no assembler implementation
-of find_bit routines for aarch64. Aarch32 has ones...
+What would be most helpful is if efi_low_alloc() could take an offset
+param in addition to the alignment, i.e., alignment == 2MB and offset
+== 512 KB. The offset would default to 0, reverting to the original
+behavior.
 
-I was thinking on inlining the helper, but decided not to do this....
+If you'd be ok with such a change, I can propose it instead, and wire
+it up into this function.
 
-1. Test is not too realistic. https://lkml.org/lkml/2015/2/1/224
-The typical usage pattern is to look for a single bit or range of bits.
-So in practice nobody calls find_next_bit thousand times.
-
-2. Way more important to fit functions into as less cache lines as
-possible. https://lkml.org/lkml/2015/2/12/114
-In this case, inlining increases cache lines consumption almost twice...
-
-3. Inlining prevents compiler from some other possible optimizations. It's
-probable that in real module compiler will inline callers of _find_next_bit,
-and final output will be better. I don't like to point out the compiler how
-it should do its work.
-
-Nevertheless, if this is your real case, and inlining helps, I'm OK with it.
-
-But I think, before/after for x86 is needed as well.
-And why don't you consider '__always_inline__'? Simple inline is only a 
-hint and
-guarantees nothing.
+-- 
+Ard.
