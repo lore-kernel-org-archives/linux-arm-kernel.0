@@ -1,54 +1,71 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Tue, 28 Jul 2015 09:29:52 +0100
-Subject: [PATCH 1/3] nmi: create generic NMI backtrace implementation
-In-Reply-To: <20150725144229.GZ7557@n2100.arm.linux.org.uk>
-References: <20150715203911.GF7557@n2100.arm.linux.org.uk>
- <E1ZFTSm-0006uz-3s@rmk-PC.arm.linux.org.uk> <55A7753C.9020708@linaro.org>
- <20150716093744.GI7557@n2100.arm.linux.org.uk> <55A77E9D.2030509@linaro.org>
- <20150725144229.GZ7557@n2100.arm.linux.org.uk>
-Message-ID: <55B73D80.4010901@linaro.org>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 28 Jul 2015 09:30:04 +0100
+Subject: [PATCH V3 10/19] drm/tegra: dc: Prepare for generic PM domains
+In-Reply-To: <20150717104154.GM3057@ulmo>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
+ <20150717104154.GM3057@ulmo>
+Message-ID: <55B73D8C.103@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/07/15 15:42, Russell King - ARM Linux wrote:
-> On Thu, Jul 16, 2015 at 10:51:25AM +0100, Daniel Thompson wrote:
->> On 16/07/15 10:37, Russell King - ARM Linux wrote:
->>> That can be implemented in the arch raise() method if needed - most
->>> architectures shouldn't need it as if they are properly raising a NMI
->>> which is, by definition, deliverable with normal IRQs disabled.
+
+On 17/07/15 11:41, Thierry Reding wrote:
+> * PGP Signed by an unknown key
+> 
+> On Mon, Jul 13, 2015 at 01:39:48PM +0100, Jon Hunter wrote:
+>> Add support to the tegra dc driver for generic PM domains. However,
+>> to ensure backward compatibility with older device tree blobs ensure
+>> that the driver can work with or without generic PM domains. In order
+>> to migrate to generic PM domain infrastructure the necessary changes
+>> are:
 >>
->> Agreed. The bug certainly could be fixed in the ARM raise() function.
+>> 1. If the "power-domains" property is present in the DT device node then
+>>    generic PM domains is supported and pm_runtime_enable() should be
+>>    called for the device. Furthermore, the enabling and disabling of the
+>>    power-domain is handled via calling pm_runtime_get/put, respectively.
+> 
+> The device could be PM runtime enabled even if no power-domains property
+> is set. Couldn't we check something more direct, like for example if the
+> dev->pm_domain is non-NULL?
+
+Yes could do that instead.
+
+> Perhaps it'd be worth converting the driver to use runtime PM first, and
+> move all the powergate and clock handling into suspend/resume functions,
+> and then we can conditionalize whether or not we call the legacy API iff
+> dev->pm_domain == NULL?
+
+May be that would be a cleaner transition than trying to do it all in
+one go.
+
+>> 2. To ensure that clocks are managed consistently when generic PM domains
+>>    are used and are not used, drivers should be migrated to use the
+>>    tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
+>>    functions instead of the current tegra_powergate_sequence_power_up()
+>>    and tegra_powergate_power_off(). The purpose of the
+>>    tegra_powergate_power_on_legacy() and tegra_powergate_power_off_legacy()
+>>    APIs is to mimick the behaviour of the tegra generic power-domain code,
+>>    such that if generic power domains are not supported the functionality
+>>    is the same.
 >>
->> However I'm still curious whether there is any architecture that benefits
->> from forcing the current CPU into an NMI handler? Why doesn't the
->> don't-run-unnecessary-code argument apply here as well?
->
-> The benefit is that we get a consistent way of invoking the backtrace,
-> since causing the NMI exception gives us a 'struct pt_regs' to work
-> with, which we wouldn't otherwise have if we tried to call it "inline".
->
-> The NMI backtrace includes dumping the register state of the NMI-
-> receiving CPUs, which needs a 'struct pt_regs' and generating a that in
-> arch-independent code wouldn't be nice.
+>> 3. The main difference between the tegra_powergate_sequence_power_up() API
+>>    and the tegra_powergate_power_on_legacy() is that the clock used to
+>>    enable the powergate is not kept enabled when using the
+>>    tegra_powergate_power_on_legacy() API. Therefore, drivers must enable
+>>    the clocks they need after calling tegra_powergate_power_on_legacy()
+>>    and disable these clocks before calling
+>>    tegra_powergate_power_off_legacy().
+> 
+> This seems like it should go into the previous patch. I'm not sure I
+> understand why this is necessary. Wouldn't it be easier to update the
+> drivers to properly cope with this? We'll need to move them to runtime
+> PM at some point anyway, so if we do that first, we should be able to
+> hide all these details within the driver's suspend/resume functions
+> but without the need for the API churn here.
 
-Previously I have relied on dump_stack() for this. That should work 
-everywhere although guess the arch code might display the stack display 
-differently.
+I will take a look at that. I was trying to get the clock handling in
+the driver to be consistent when generic power domains are used and when
+they are not. However, may be that is not a big deal.
 
-
-> In any case, if this area needs changing in the generic code, it should
-> be done as a separate change so that it can be properly assessed and
-> validated on x86.
-
-Do you want me to supply a patch to fix the IRQ issue in the arm 
-specific code for now?
-
-If we don't fix that then the behaviour of SysRq-L on ARM will change 
-and the output will no longer include the CPU that executed SysRq-L.
-
-
-> In the mean time, I will action Thomas' request to put it into my tree
-> so that we can get some reasonable linux-next time with it, and hopefully
-> have some progress towards FIQ-based backtracing for ARM.
-
-Great!
+Jon
