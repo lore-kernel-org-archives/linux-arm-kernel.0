@@ -1,125 +1,71 @@
-From: jon.nettleton@gmail.com (Jon Nettleton)
-Date: Tue, 28 Jul 2015 18:12:26 +0200
-Subject: [PATCH v2] imx: thermal: use CPU temperature grade info for
- thresholds
-In-Reply-To: <CAJ+vNU1PQZa9KoCU9o_ws6jAAjhGVJby-1P583SVejT5TrAFTQ@mail.gmail.com>
-References: <1430409757-16195-1-git-send-email-tharvey@gateworks.com>
- <1432251947-13335-1-git-send-email-tharvey@gateworks.com>
- <20150524024836.GA3264@dragon>
- <CALHpu34OpsfrWLZmrBB5mTVoiyAiEpsnuq7rSf95c9xHYrqzJQ@mail.gmail.com>
- <CAJ+vNU0t70Df8t+zv=vqaL_uzv=TQ8EHxKm67FNGSKMmq6Lfkw@mail.gmail.com>
- <CALHpu37a5O9x16MY7jk6TT+b9xqVsaRn=oh1_MLWydL3uX3drw@mail.gmail.com>
- <CAJ+vNU1PQZa9KoCU9o_ws6jAAjhGVJby-1P583SVejT5TrAFTQ@mail.gmail.com>
-Message-ID: <CALHpu35HB7KSoPcdYdyCDcHs3fnfMUaJ+3QiCyjj8zZRTPys7Q@mail.gmail.com>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Tue, 28 Jul 2015 19:20:25 +0300
+Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
+ counter from coprocessor
+In-Reply-To: <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
+References: <1438032507.17734.46.camel@gmail.com>
+ <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
+Message-ID: <CALW4P+LqjhQ+Puadz4W-n_v=KEnwvQiUkk5jkDLRxhjVQGwFyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tim,
+Hi Doug,
 
-Okay that all sounds fine.  I came into this half way through so I
-missed the core of what you were trying to accomplish, sorry to
-de-rail the conversation a bit.
+On Tue, Jul 28, 2015 at 6:24 PM, Doug Anderson <dianders@chromium.org> wrote:
+> Alexey,
+>
+> On Mon, Jul 27, 2015 at 2:28 PM, Alexey Klimov <klimov.linux@gmail.com> wrote:
+>> Hi all,
+>>
+>> year(s) ago it was discovered that MCT timer and ARM architectured
+>> timer
+>> are the same hardware with different interface. Here [1].
+>>
+>> I followed mail-list discussions about removing MCT and using arch
+>> timer for Exynos5-based SoCs but things aren't moving at least latest
+>> upstream kernel on odroid-xu3 will use MCT as default timers.
+>> Maybe the reason are some power-management related things that very
+>> specific to Samsung. I don't know.
+>>
+>>
+>> Idea of this draft patchset comes from Doug patches when he tried to
+>> optimize read of 64-bit counter located in mmio. [2]
+>> Why not using cp15 counter instead if possible?
+>
+> I hate to burst your bubble here, but...
+>
+> ...I think it would be a bad idea to use the cp15 counter on exynos
+> 5422.  According to Samsung, there are issues where using cp15 could
+> sometimes return the wrong value, especially if you happen to read it
+> while on an A7 instead of an A15.  It will tend to work pretty well,
+> but Samsung claimed that it might not work right on some CPUs or at
+> some temperatures.
 
-I will gladly ACK the patch and will follow up with patches we can
-discuss for additional changes.
+I think this is right time when I can say "If only I had known about
+it before!".
+That's quite interesting especially about temperature issues.
+Maybe it's worth to insert comments in driver/docs about this.
 
--Jon
+> I've added Alim who provided this information to me (in the private
+> http://crosbug.com/p/29556).  He may be able to elaborate more.
 
-On Tue, Jul 28, 2015 at 4:50 PM, Tim Harvey <tharvey@gateworks.com> wrote:
-> On Tue, May 26, 2015 at 11:08 PM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
->> On Tue, May 26, 2015 at 11:24 PM, Tim Harvey <tharvey@gateworks.com> wrote:
->>> On Sat, May 23, 2015 at 10:19 PM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
->>>> On Sun, May 24, 2015 at 4:48 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
->>>>> On Thu, May 21, 2015 at 04:45:47PM -0700, Tim Harvey wrote:
->>>>>> The IMX6Q/IMX6DL SoC's have a 2-bit temperature grade stored in OTP which
->>>>>> is valid for all IMX6 SoC's (despite the fact that the IMXSDLRM and
->>>>>> IMXSXRM do not document this - this has been proven via tests as well as
->>>>>> verified by Freescale FAE).
->>>>>>
->>>>>> Instead of assuming a fixed 85C for passive cooling threshold and 105C for
->>>>>> critical use the thermal grade for these configurations.
->>>>>>
->>>>>> We will set the critical to maxT - 5C and passive to maxT - 10C.
->>>>
->>>> I would like to chime in here if you don't mind.  I have been carrying
->>>> a patch similar to this in the SolidRun repo to fix cooling issues
->>>> that we have had.  I would recommend keeping the passive temp at maxT
->>>> - 20C due to the thermal properties of the chip.  I have found that
->>>> around 85-90C we can maintain a relatively steady thermal state with
->>>> only passive cooling.  Generally with a hard non-NEON based cpu
->>>> workload the iMX6 will level off at about 87C with all the cores
->>>> clocked to 1Ghz, and sometimes dipping down to 800Mhz periodically.
->>>> With a NEON based workload on all the cores it will push beyond this
->>>> and generally end up finding steady state at about 800Mhz right around
->>>> 90C.
->>>>
->>>> If you raise the initial passive threshold by 10C it will allow enough
->>>> heat to build up in the chip that the only way to avoid reaching
->>>> critical temps is by dropping the CPU down to its lowest frequency.
->>>> This is not the best experience as then you have a much warmer chip
->>>> and if the workload doesn't change you will just be switching between
->>>> running at the highest cpu frequency or lowest which makes for a
->>>> choppy experience.  A longer passive cooling zone allows the
->>>> temperature of the chip to be regulated using only passive methods but
->>>> without drastic performance drops.
->>>>
->>>> I am doing things a bit differently in my implementation as I setup a
->>>> passive cooling zone for each cpu frequency, but that is just so you
->>>> can have more control from userspace by changing the different passive
->>>> trip points.
->>>>
->>>> -Jon
->>>
->>> Jon,
->>>
->>> I can agree with leaving a Max-20C passive delta. What do you think
->>> about the critical threshold of Max-5C and rule of not allowing it to
->>> be changed?
->>>
->>
->> Tim,
->>
->> I definitely agree that the Critical temp should be a fixed point.  Is
->> the purpose of lowering the critical threshold from the hardware
->> default, to allow Linux to shutdown more cleanly rather than just have
->> the hardware shutting down?  If that is the case then I think that is
->> fine.  If it is to protect the SOC then that is unnecessary.  We have
->> heated the SOCs to well beyond the critical threshold and they have
->> survived just fine.
->>
->> This is a bit out of context but here is the formula I am using to
->> figure out my trip points.  By default I use a linear set of trip
->> points for passive cooling.
->> https://github.com/linux4kix/linux-linaro-stable-mx6/commit/212c17d543739a5fe0bd75b66c10f05177e8bcb0
->>
->> The short of it is I set a trip delta of 6C and then figure out the
->> lowest passive trip point as Critical - (#passive trip points * trip
->> delta), where each cpu frequency stage is a passive trip point.  This
->> will allow an 800Mhz SOC with 2 trip points to run at full speed
->> longer than a 1.2Ghz with 4 trip points.  The idea being that the
->> higher the clock rate means we will generate more heat and have more
->> passive cooling levels so it is better to drop the top speed of the
->> CPU earlier in order to let the passive cooling be effective and find
->> a steady state.
->>
->> This may be a bit over the top but has fixed problems where long
->> running processes would build up heat and eventually cause a thermal
->> shutdown, but doesn't completely cripple the faster SOCs.
+Alim, could you please add details if any?
+
+> Generally I'd say that if the arch timer works for you: use the arch
+> timer.  If the arch timer doesn't work for you, use the MCT.
 >
-> Jon,
->
-> Yes - the purpose of lowering the critical threshold from the hardware
-> default is to allow Linux to shutdown more cleanly.
->
-> If you agree with the fact that the patch here offers the improvement
-> of using OTG temperature grade as a basis can you ack it and if you
-> feel that the thresholds need to be adjusted perhaps propose a
-> follow-on patch? I feel people can debate the temperature delta's
-> endlessly but what I was really after here was to fix the fact that
-> all the processors are not temperature graded equally because they are
-> packaged differently (metal case on automotive offering better thermal
-> conductivity vs plastic case on consumer)
->
-> Regards,
->
-> Tim
+> -Doug
+
+I possess no knowledge if there're any different hw revisions of
+odroid-xu3 on the field
+but looks like arch timer works fine for me on odroid-xu3 Exynos5422
+SoC with upstream kernel.
+Is it right direction to switch xu3 to arch timer?
+Do you have any info or ideas about enabling MCT G_TCON register to
+start arch timer
+and what's the best way to do it?
+
+Thanks.
+
+-- 
+Best regards, Klimov Alexey
