@@ -1,41 +1,154 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Tue, 28 Jul 2015 17:29:14 +0200
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <20150728150929.233B56C80391@dd34104.kasserver.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
- <55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com>
- <55B62768.6040403@redhat.com>
- <20150728124911.GA2564@lukather><55B790BA.5000509@redhat.com>
- <20150728150929.233B56C80391@dd34104.kasserver.com>
-Message-ID: <55B79FCA.7070907@redhat.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 28 Jul 2015 16:30:54 +0100
+Subject: [PATCH V3 10/19] drm/tegra: dc: Prepare for generic PM domains
+In-Reply-To: <20150728112030.GA10949@ulmo.nvidia.com>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
+ <20150717104154.GM3057@ulmo> <55B73D8C.103@nvidia.com>
+ <20150728112030.GA10949@ulmo.nvidia.com>
+Message-ID: <55B7A02E.40506@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 07/28/2015 05:09 PM, Timo Sigurdsson wrote:
-> Hi,
->
-> Hans de Goede schrieb am 28.07.2015 16:24:
->> I've no problem with Timo submitting a cleaned up version of his
->> patch and you taking that instead. I just wanted to point out that
->> I do have a similar patch pending.
->
-> Ok, I will do that. It might take a couple of days, though, as I will be moving
-> moving in the next few days as well.
->
-> However, another question first then: What maximum voltage for the dcdc2
-> regulator should we use then? You used 1.5V, I used 1.45V so far, which is what
-> Cubieboard 2 and Cubietruck use.
->
-> But after the discussion about overvoltaged settings, I'm wondering whether we
-> should limit the regulartor (and not only the opp) to 1.40V as well? Or is
-> 1.45V ok for everybody here?
+On 28/07/15 12:20, Thierry Reding wrote:
+> On Tue, Jul 28, 2015 at 09:30:04AM +0100, Jon Hunter wrote:
+>> May be that would be a cleaner transition than trying to do it all in
+>> one go.
+> 
+> I have a couple of patches in my tree to do this for DRM as part of an
+> effort to restore DPMS. It's fairly tricky to get right in DRM and
+> requires all sorts of changes to the driver.
 
-The datasheets lists a max cpu-voltage of 1.40V, so lets stick with that.
+Hmmm ... I was just thinking about moving what is currently there in the pm-runtime helpers ...
 
-Regards,
-
-Hans
+diff --git a/drivers/gpu/drm/tegra/dc.c b/drivers/gpu/drm/tegra/dc.c
+index a287e4fec865..0f1dc01215b1 100644
+--- a/drivers/gpu/drm/tegra/dc.c
++++ b/drivers/gpu/drm/tegra/dc.c
+@@ -10,6 +10,7 @@
+ #include <linux/clk.h>
+ #include <linux/debugfs.h>
+ #include <linux/iommu.h>
++#include <linux/pm_runtime.h>
+ #include <linux/reset.h>
+ 
+ #include <soc/tegra/pmc.h>
+@@ -1922,29 +1923,12 @@ static int tegra_dc_probe(struct platform_device *pdev)
+ 			dc->powergate = TEGRA_POWERGATE_DIS;
+ 		else
+ 			dc->powergate = TEGRA_POWERGATE_DISB;
++	}
+ 
+-		err = tegra_powergate_sequence_power_up(dc->powergate, dc->clk,
+-							dc->rst);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to power partition: %d\n",
+-				err);
+-			return err;
+-		}
+-	} else {
+-		err = clk_prepare_enable(dc->clk);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to enable clock: %d\n",
+-				err);
+-			return err;
+-		}
++	platform_set_drvdata(pdev, dc);
+ 
+-		err = reset_control_deassert(dc->rst);
+-		if (err < 0) {
+-			dev_err(&pdev->dev, "failed to deassert reset: %d\n",
+-				err);
+-			return err;
+-		}
+-	}
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	dc->regs = devm_ioremap_resource(&pdev->dev, regs);
+@@ -1978,8 +1962,6 @@ static int tegra_dc_probe(struct platform_device *pdev)
+ 	if (!dc->syncpt)
+ 		dev_warn(&pdev->dev, "failed to allocate syncpoint\n");
+ 
+-	platform_set_drvdata(pdev, dc);
+-
+ 	return 0;
+ }
+ 
+@@ -2003,6 +1985,17 @@ static int tegra_dc_remove(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
++	pm_runtime_put(&pdev->dev);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int tegra_dc_runtime_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct tegra_dc *dc = platform_get_drvdata(pdev);
++
+ 	reset_control_assert(dc->rst);
+ 
+ 	if (dc->soc->has_powergate)
+@@ -2013,11 +2006,54 @@ static int tegra_dc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++static int tegra_dc_runtime_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct tegra_dc *dc = platform_get_drvdata(pdev);
++	int err;
++
++	if (dc->soc->has_powergate) {
++		err = tegra_powergate_sequence_power_up(dc->powergate, dc->clk,
++							dc->rst);
++		if (err < 0) {
++			dev_err(&pdev->dev, "failed to power partition: %d\n",
++				err);
++			return err;
++		}
++	} else {
++		err = clk_prepare_enable(dc->clk);
++		if (err < 0) {
++			dev_err(&pdev->dev, "failed to enable clock: %d\n",
++				err);
++			return err;
++		}
++
++		err = reset_control_deassert(dc->rst);
++		if (err < 0) {
++			dev_err(&pdev->dev, "failed to deassert reset: %d\n",
++				err);
++			return err;
++		}
++	}
++
++	return 0;
++}
++
++static struct dev_pm_ops tegra_dc_pm_ops = {
++	SET_RUNTIME_PM_OPS(tegra_dc_runtime_suspend,
++			   tegra_dc_runtime_resume, NULL)
++};
++#define TEGRA_DC_PM_OPS (&tegra_dc_pm_ops)
++#else
++#define TEGRA_DC_PM_OPS NULL
++#endif /* CONFIG_PM */
++
+ struct platform_driver tegra_dc_driver = {
+ 	.driver = {
+ 		.name = "tegra-dc",
+ 		.owner = THIS_MODULE,
+ 		.of_match_table = tegra_dc_of_match,
++		.pm = TEGRA_DC_PM_OPS,
+ 	},
+ 	.probe = tegra_dc_probe,
+ 	.remove = tegra_dc_remove,
+-- 
+2.1.4
