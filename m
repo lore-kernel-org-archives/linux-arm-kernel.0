@@ -1,95 +1,38 @@
-From: msalter@redhat.com (Mark Salter)
-Date: Tue, 28 Jul 2015 10:32:41 -0400
-Subject: [PATCH 2/2] arm64: support initrd outside kernel linear map
-In-Reply-To: <1438093961-15536-1-git-send-email-msalter@redhat.com>
-References: <1438093961-15536-1-git-send-email-msalter@redhat.com>
-Message-ID: <1438093961-15536-3-git-send-email-msalter@redhat.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 22:38:54 +0800
+Subject: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
+ sources
+In-Reply-To: <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1438025400-5919-1-git-send-email-shenwei.wang@freescale.com>
+ <1438025400-5919-2-git-send-email-shenwei.wang@freescale.com>
+ <20150728012452.GX12927@tiger>
+ <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <20150728143854.GH12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of mem= could leave part or all of the initrd outside of
-the kernel linear map. This will lead to an error when unpacking
-the initrd and a probable failure to boot. This patch catches that
-situation and relocates the initrd to be fully within the linear
-map.
+On Tue, Jul 28, 2015 at 02:27:42PM +0000, Shenwei Wang wrote:
+> > > +static int gpcv2_wakeup_source_save(void) {
+> > > +	struct imx_gpcv2_irq *cd;
+> > 
+> > We generally name variables in an abbrev of the types to make them intuitive.  I
+> > tried hard to map "cd" to "imx_gpcv2_irq" and failed.
+> > Can you help me on that?
+> 
+> CD is the abbreviation of chip data which is a member of irq_data.
 
-Signed-off-by: Mark Salter <msalter@redhat.com>
----
- arch/arm64/kernel/setup.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 55 insertions(+)
+You are defining a variable of type imx_gpcv2_irq, neither chip_data nor
+irq_data.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index f3067d4..96339b5 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -359,6 +359,60 @@ static void __init request_standard_resources(void)
- 	}
- }
- 
-+/*
-+ * Relocate initrd if it is not completely within the linear mapping.
-+ * This would be the case if mem= cuts out all or part of it.
-+ */
-+static void __init relocate_initrd(void)
-+{
-+#ifdef CONFIG_BLK_DEV_INITRD
-+	phys_addr_t orig_start = __virt_to_phys(initrd_start);
-+	phys_addr_t orig_end = __virt_to_phys(initrd_end);
-+	phys_addr_t ram_end = memblock_end_of_DRAM();
-+	phys_addr_t new_start;
-+	unsigned long size, to_free = 0;
-+	void *dest;
-+
-+	if (orig_end <= ram_end)
-+		return;
-+
-+	/* Note if any of original initrd will freeing below */
-+	if (orig_start < ram_end)
-+		to_free = ram_end - orig_start;
-+
-+	size = orig_end - orig_start;
-+
-+	/* initrd needs to be relocated completely inside linear mapping */
-+	new_start = memblock_find_in_range(0, PFN_PHYS(max_pfn),
-+					   size, PAGE_SIZE);
-+	if (!new_start)
-+		panic("Cannot relocate initrd of size %ld\n", size);
-+	memblock_reserve(new_start, size);
-+
-+	initrd_start = __phys_to_virt(new_start);
-+	initrd_end   = initrd_start + size;
-+
-+	pr_info("Moving initrd from [%llx-%llx] to [%llx-%llx]\n",
-+		orig_start, orig_start + size - 1,
-+		new_start, new_start + size - 1);
-+
-+	dest = (void *)initrd_start;
-+
-+	if (to_free) {
-+		memcpy(dest, (void *)__phys_to_virt(orig_start), to_free);
-+		dest += to_free;
-+	}
-+
-+	copy_from_early_mem(dest, orig_start + to_free, size - to_free);
-+
-+	if (to_free) {
-+		pr_info("Freeing original RAMDISK from [%llx-%llx]\n",
-+			orig_start, orig_start + to_free - 1);
-+		memblock_free(orig_start, to_free);
-+	}
-+#endif
-+}
-+
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
- 
- void __init setup_arch(char **cmdline_p)
-@@ -392,6 +446,7 @@ void __init setup_arch(char **cmdline_p)
- 	acpi_boot_table_init();
- 
- 	paging_init();
-+	relocate_initrd();
- 	request_standard_resources();
- 
- 	early_ioremap_reset();
--- 
-2.4.3
+> > > +void ca7_cpu_resume(void);
+> > > +void imx7_suspend(void __iomem *ocram_vbase);
+> > 
+> > Why do these declarations need to be in this header?
+> 
+> Just to resolve the compile errors.
+
+Wrong solution.  They belong to some header in arch/arm/mach-imx not
+include/soc/imx, as there is no code outside arch/arm/mach-imx needs
+these declaration.
+
+Shawn
