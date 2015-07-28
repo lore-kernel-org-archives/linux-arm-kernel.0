@@ -1,87 +1,84 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jul 2015 17:45:27 +0100
-Subject: [PATCH v4 2/4] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <00fb13713dc8a69dc32b859f9311e70d78fb0c7a.1437070995.git.robin.murphy@arm.com>
-References: <cover.1437070995.git.robin.murphy@arm.com>
- <00fb13713dc8a69dc32b859f9311e70d78fb0c7a.1437070995.git.robin.murphy@arm.com>
-Message-ID: <20150728164526.GA536@e104818-lin.cambridge.arm.com>
+From: dinh.linux@gmail.com (Dinh Nguyen)
+Date: Tue, 28 Jul 2015 11:45:50 -0500
+Subject: [PATCH 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1438080345-7233-4-git-send-email-lftan@altera.com>
+References: <1438080345-7233-1-git-send-email-lftan@altera.com>
+ <1438080345-7233-4-git-send-email-lftan@altera.com>
+Message-ID: <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 07:40:13PM +0100, Robin Murphy wrote:
-> +/**
-> + * iommu_dma_alloc - Allocate and map a buffer contiguous in IOVA space
-> + * @dev: Device to allocate memory for. Must be a real device
-> + *	 attached to an iommu_dma_domain
-> + * @size: Size of buffer in bytes
-> + * @gfp: Allocation flags
-> + * @prot: IOMMU mapping flags
-> + * @handle: Out argument for allocated DMA handle
-> + * @flush_page: Arch callback to flush a single page from all caches to
-> + *		ensure DMA visibility of __GFP_ZERO. May be NULL if not
-> + *		required.
-> + *
-> + * If @size is less than PAGE_SIZE, then a full CPU page will be allocated,
-> + * but an IOMMU which supports smaller pages might not map the whole thing.
-> + *
-> + * Return: Array of struct page pointers describing the buffer,
-> + *	   or NULL on failure.
-> + */
-> +struct page **iommu_dma_alloc(struct device *dev, size_t size,
-> +		gfp_t gfp, int prot, dma_addr_t *handle,
-> +		void (*flush_page)(const void *, phys_addr_t))
+On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
+> This patch adds the Altera PCIe host controller driver.
+>
+> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> ---
+>  drivers/pci/host/Kconfig       |   9 +
+>  drivers/pci/host/Makefile      |   1 +
+>  drivers/pci/host/pcie-altera.c | 576 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 586 insertions(+)
+>  create mode 100644 drivers/pci/host/pcie-altera.c
+>
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index 675c2d1..af19039 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -145,4 +145,13 @@ config PCIE_IPROC_BCMA
+>           Say Y here if you want to use the Broadcom iProc PCIe controller
+>           through the BCMA bus interface
+>
+> +config PCIE_ALTERA
+> +       bool "Altera PCIe controller"
+> +       depends on ARCH_SOCFPGA
+> +       depends on OF
+
+I don't think you need this, "depends on ARCH_SOCFPGA" should already
+have taken care of this.
+
+> +       select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+> +       help
+> +         Say Y here if you want to enable PCIe controller support for Altera
+> +         SoCFPGA family of SoCs.
+> +
+>  endmenu
+
+<snip>
+
+> +
+> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
 > +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->dma_api_cookie;
-> +	struct iova *iova;
-> +	struct page **pages;
-> +	struct sg_table sgt;
-> +	dma_addr_t dma_addr;
-> +	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+> +       u8 loop;
+> +       struct tlp_rp_regpair_t tlp_rp_regdata;
 > +
-> +	*handle = DMA_ERROR_CODE;
+> +       for (loop = TLP_LOOP; loop > 0; loop--) {
 > +
-> +	pages = __iommu_dma_alloc_pages(count, gfp);
-> +	if (!pages)
-> +		return NULL;
+> +               tlp_read_rx(pcie, &tlp_rp_regdata);
 > +
-> +	iova = __alloc_iova(iovad, size, dev->coherent_dma_mask);
-> +	if (!iova)
-> +		goto out_free_pages;
+> +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
 > +
-> +	size = iova_align(iovad, size);
-> +	if (sg_alloc_table_from_pages(&sgt, pages, count, 0, size, GFP_KERNEL))
-> +		goto out_free_iova;
+> +                       if (value)
+> +                               *value = tlp_rp_regdata.reg0;
 > +
-> +	if (gfp & __GFP_ZERO) {
-> +		struct sg_mapping_iter miter;
-> +		/*
-> +		 * The flushing provided by the SG_MITER_TO_SG flag only
-> +		 * applies to highmem pages, so it won't do the job here.
-> +		 */
+> +                       return PCIBIOS_SUCCESSFUL;
+> +               }
 
-The comment here is slightly wrong. The SG_MITER_FROM_SG flushing is
-done by calling flush_kernel_dcache_page(). This function can be no-op
-even on architectures implementing highmem. For example, on arm32 it
-only does some flushing if there is a potential D-cache alias with user
-space. The flush that you call below is for DMA operations, something
-entirely different.
+Remove all the unnecessary newlines in this function.
+> +       }
+> +
+> +       return -ENOENT;
+> +}
+> +
 
-> +		sg_miter_start(&miter, sgt.sgl, sgt.orig_nents, SG_MITER_FROM_SG);
-> +		while (sg_miter_next(&miter)) {
-> +			memset(miter.addr, 0, PAGE_SIZE);
+<snip>
 
-Isn't __GFP_ZERO already honoured by alloc_pages in
-__iommu_dma_alloc_pages?
+> +
+> +static struct platform_driver altera_pcie_driver = {
+> +       .probe          = altera_pcie_probe,
+> +       .remove         = altera_pcie_remove,
+> +       .driver = {
+> +               .name   = "altera-pcie",
+> +               .owner  = THIS_MODULE,
 
-> +			if (flush_page)
-> +				flush_page(miter.addr, page_to_phys(miter.page));
+Don't need to set owner anymore as this will get populated by the driver core.
 
-Could you instead do the check as !(prot & IOMEM_CACHE) so that it saves
-architecture code from passing NULL when coherent?
-
-I'm still not convinced we need this flushing here but I'll follow up in
-patch 3/4.
-
--- 
-Catalin
+Dinh
