@@ -1,177 +1,54 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Tue, 28 Jul 2015 16:28:47 +0200
-Subject: [PATCH 2/4] ASoc: rockchip: Add rockchip SPDIF transceiver driver
-In-Reply-To: <1438085011-16577-3-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1438085011-16577-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1438085011-16577-3-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <8512006.Rsa7Aqr0B5@diego>
+From: aisheng.dong@freescale.com (Dong Aisheng)
+Date: Tue, 28 Jul 2015 21:19:40 +0800
+Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock on
+ during operation
+Message-ID: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch series adds support in clock framework for clocks which operations
+requires its parent clock is on.
 
-could you streamline the prefixes a bit perhaps? I.e. so far I've seen
+Such clock type is initially met on Freescale i.MX7D platform that all clocks
+operations, including enable/disable, rate change and re-parent, requires its
+parent clock on. No sure if any other SoC has the similar clock type.
 
-rk_spdif_dev
-spdif_runtime_suspend
-rockchip_snd_txctrl
-rockchip_spdif_hw_params
+Current clock core can not support such type of clock well.
 
-I guess rockchip_spdif_* or rk_spdif_* for everything might make this a bit 
-nicer
+This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
+in clock core that enable its parent clock firstly for each operation and disable
+it later after operation complete.
 
+The most special case is for set_parent() operation which requires both parent,
+old one and new one, to be enabled at the same time during the operation.
 
-Am Dienstag, 28. Juli 2015, 14:03:29 schrieb Sjoerd Simons:
-> Add a driver for the SDPIF transceiver available on RK3066, RK3188 and
-> RK3288. Heavily based on the rockchip i2s driver.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
->  sound/soc/rockchip/Kconfig          |   9 +
->  sound/soc/rockchip/Makefile         |   3 +
->  sound/soc/rockchip/rockchip_spdif.c | 375
-> ++++++++++++++++++++++++++++++++++++ sound/soc/rockchip/rockchip_spdif.h | 
-> 63 ++++++
->  4 files changed, 450 insertions(+)
->  create mode 100644 sound/soc/rockchip/rockchip_spdif.c
->  create mode 100644 sound/soc/rockchip/rockchip_spdif.h
-> 
-> diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
-> index 58bae8e..20bc676 100644
-> --- a/sound/soc/rockchip/Kconfig
-> +++ b/sound/soc/rockchip/Kconfig
-> @@ -15,6 +15,14 @@ config SND_SOC_ROCKCHIP_I2S
->  	  Rockchip I2S device. The device supports upto maximum of
->  	  8 channels each for play and record.
-> 
-> +config SND_SOC_ROCKCHIP_SPDIF
-> +	tristate "Rockchip SPDIF Device Driver"
-> +	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
-> +	select SND_SOC_GENERIC_DMAENGINE_PCM
-> +	help
-> +	  Say Y or M if you want to add support for SPDIF driver for
-> +	  Rockchip SPDIF transceiver device.
-> +
->  config SND_SOC_ROCKCHIP_MAX98090
->  	tristate "ASoC support for Rockchip boards using a MAX98090 codec"
->  	depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB
-> @@ -33,3 +41,4 @@ config SND_SOC_ROCKCHIP_RT5645
->  	help
->  	  Say Y or M here if you want to add support for SoC audio on Rockchip
->  	  boards using the RT5645/RT5650 codec, such as Veyron.
-> +
+The patch series is based on for-next branch of Michael's git:
+git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
 
-unrelated newline
+Change Log:
+v2->v3:
+ * rebased version, no other changes.
 
-> diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
-> index 1bc1dc3..b02ab69 100644
-> --- a/sound/soc/rockchip/Makefile
-> +++ b/sound/soc/rockchip/Makefile
-> @@ -1,10 +1,13 @@
->  # ROCKCHIP Platform Support
->  snd-soc-i2s-objs := rockchip_i2s.o
-> +snd-soc-spdif-objs := rockchip_spdif.o
-> 
->  obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-i2s.o
-> +obj-$(CONFIG_SND_SOC_ROCKCHIP_SPDIF) += snd-soc-spdif.o
-> 
->  snd-soc-rockchip-max98090-objs := rockchip_max98090.o
->  snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
-> 
->  obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip-max98090.o
->  obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
-> +
-> diff --git a/sound/soc/rockchip/rockchip_spdif.c
-> b/sound/soc/rockchip/rockchip_spdif.c new file mode 100644
-> index 0000000..e60ccf6
-> --- /dev/null
-> +++ b/sound/soc/rockchip/rockchip_spdif.c
-> @@ -0,0 +1,375 @@
-> +/* sound/soc/rockchip/rockchip_spdif.c
-> + *
-> + * ALSA SoC Audio Layer - Rockchip I2S Controller driver
-								^spdif
+v1->v2:
+ Mainly addressed Stephen Boyd's comments
+ * remove dupliciated code with __clk_set_parent_after
+ * introduce more clk_core_x APIs for core easily use
+ * move clk_disable_unused code position
+ * use clk_core_x API to make code more clean and easily read
 
-> + *
-> + * Copyright (c) 2014 Rockchip Electronics Co. Ltd.
-> + * Author: Jianqun <jay.xu@rock-chips.com>
-> + * Copyright (c) 2015 Collabora Ltd.
-> + * Author: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/delay.h>
-> +#include <linux/of_gpio.h>
-> +#include <linux/clk.h>
-> +#include <linux/pm_runtime.h>
-> +#include <linux/regmap.h>
-> +#include <sound/pcm_params.h>
-> +#include <sound/dmaengine_pcm.h>
-> +
-> +#include "rockchip_spdif.h"
-> +
-> +#define DRV_NAME "rockchip-spdif"
-> +
-> +struct rk_spdif_dev {
-> +	struct device *dev;
-> +
-> +	struct clk *mclk;
-> +	struct clk *hclk;
-> +
-> +	struct snd_dmaengine_dai_dma_data playback_dma_data;
-> +
-> +	struct regmap *regmap;
-> +};
-> +
-> +static int spdif_runtime_suspend(struct device *dev)
-> +{
-> +	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-> +
-> +	clk_disable_unprepare(spdif->mclk);
-> +
-> +	return 0;
-> +}
-> +
-> +static int spdif_runtime_resume(struct device *dev)
-> +{
-> +	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-> +	int ret;
-> +
-> +	ret = clk_prepare_enable(spdif->mclk);
-> +	if (ret) {
-> +		dev_err(spdif->dev, "clock enable failed %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static inline struct rk_spdif_dev *to_info(struct snd_soc_dai *dai)
-> +{
-> +	return snd_soc_dai_get_drvdata(dai);
-> +}
-> +
-> +static void rockchip_snd_txctrl(struct rk_spdif_dev *spdif, int on)
-> +{
-> +	if (on) {
-> +		regmap_update_bits(spdif->regmap, SPDIF_DMACR,
-> +				   SPDIF_DMACR_TDE_ENABLE,
-> +				   SPDIF_DMACR_TDE_ENABLE);
-> +
-> +		regmap_update_bits(spdif->regmap, SPDIF_XFER,
-> +				   SPDIF_XFER_TXS_START,
-> +				   SPDIF_XFER_TXS_START);
+Dong Aisheng (5):
+  clk: remove duplicated code with __clk_set_parent_after
+  clk: introduce clk_core_enable_lock and clk_core_disable_lock
+    functions
+  clk: move clk_disable_unused after clk_core_disable_unprepare function
+  clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+    parent on
+  clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
+    parent on
 
-personally I'm always unsure of regmap return values. While the underlying 
-method is mmio in this case, regmap_* in theory still has the possibility to 
-return errors, so I'm not sure if it's ok to silently ignore them.
+ drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
+ include/linux/clk-provider.h |   5 +
+ 2 files changed, 200 insertions(+), 143 deletions(-)
 
-Here it would simply mean return the error and also return it in 
-rockchip_spdif_trigger below.
-
-
-Heiko
+-- 
+1.9.1
