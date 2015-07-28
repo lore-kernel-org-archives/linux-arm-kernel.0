@@ -1,38 +1,51 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 28 Jul 2015 15:19:33 +0200
-Subject: [PATCH v2 02/22] of/platform: Set fwnode field for new devices
+Date: Tue, 28 Jul 2015 15:19:36 +0200
+Subject: [PATCH v2 05/22] ACPI: add acpi_dev_get_device()
 In-Reply-To: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1438089593-7696-3-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1438089593-7696-6-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When allocating a new platform device, set the fwnode field in the
-struct device to point to the device_node.
-
-This is needed by platform-independent code that needs to do something
-with devices based on the data provided by the firmware.
+This function is just a getter for struct acpi_device.dev and is needed
+in the implementation of the fwnode API when building with !CONFIG_ACPI.
 
 Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 ---
 
 Changes in v2:
-- Use set_primary_fwnode()
+- Add acpi_dev_get_device()
 
- drivers/of/platform.c | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/acpi.h | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index ddf8e42c9367..ff27494cda8c 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -139,6 +139,7 @@ struct platform_device *of_device_alloc(struct device_node *np,
- 	}
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 01e6770d8e27..d1ad6c20c7e4 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -78,6 +78,11 @@ static inline void acpi_preset_companion(struct device *dev,
+ 	ACPI_COMPANION_SET(dev, acpi_find_child_device(parent, addr, NULL));
+ }
  
- 	dev->dev.of_node = of_node_get(np);
-+	set_primary_fwnode(&dev->dev, &dev->dev.of_node->fwnode);
- 	dev->dev.parent = parent ? : &platform_bus;
++static inline struct device *acpi_dev_get_device(struct acpi_device *adev)
++{
++	return &adev->dev;
++}
++
+ static inline const char *acpi_dev_name(struct acpi_device *adev)
+ {
+ 	return dev_name(&adev->dev);
+@@ -476,6 +481,11 @@ static inline bool has_acpi_companion(struct device *dev)
+ 	return false;
+ }
  
- 	if (bus_id)
++static inline struct device *acpi_dev_get_device(struct acpi_device *adev)
++{
++	return NULL;
++}
++
+ static inline const char *acpi_dev_name(struct acpi_device *adev)
+ {
+ 	return NULL;
 -- 
 2.4.3
