@@ -1,24 +1,19 @@
 From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Mon, 27 Jul 2015 21:52:54 -0700
+Date: Mon, 27 Jul 2015 21:55:10 -0700
 Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
  Controller bindings.
-In-Reply-To: <20150728025833.GQ2650@xsjsorenbubuntu>
+In-Reply-To: <55B5BD08.60802@monstr.eu>
 References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
  <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <20150728025833.GQ2650@xsjsorenbubuntu>
-Message-ID: <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
+ <55B5BD08.60802@monstr.eu>
+Message-ID: <CAAtXAHeWtXVe4c5z_6AxMS0CggA2pN57mNArJsKG9=QxWs-zRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+Hi Michal,
 
-thanks for your feedback.
-
-On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> Hi Moritz,
->
-> On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
+On Sun, Jul 26, 2015 at 10:09 PM, Michal Simek <monstr@monstr.eu> wrote:
+> On 07/25/2015 02:21 AM, Moritz Fischer wrote:
 >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
 >> ---
 >>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
@@ -32,69 +27,73 @@ On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
 >> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
 >> @@ -0,0 +1,13 @@
 >> +Xilinx Zynq PL Reset Manager
+>
+> here
+>
 >> +
 >> +Required properties:
 >> +- compatible: "xlnx,zynq-reset-pl"
+>
+> Currently it is not just PL reset controller.
+>
 >> +- syscon <&slcr>;
+>
+>
+> missing : and please be more descriptive here.
+>
 >> +- #reset-cells: 1
 >> +
 >> +Example:
 >> +     rstc: rstc at 240 {
 >> +             #reset-cells = <1>;
 >> +             compatible = "xlnx,zynq-reset-pl";
+>
+> Compatible property should go first.
+>
+> I am missing that reg property
+>
 >> +             syscon = <&slcr>;
 >> +     };
+>>
 >
-> I think you also have to add the outputs and make them part of the
-> binding. Otherwise you'd have to read the implementation to find
-> out what device should be hooked up to which output of the reset-controller.
+Would something like this work:
 
-Is something like this what you had in mind? I had that prepared for
-the next round of patches:
+Xilinx Zynq Reset Manager
 
-Reset outputs:
- 0  : soft reset
- 32 : ddr reset
- 64 : topsw reset
- 96 : dmac reset
- 128: usb0 reset
- 129: usb1 reset
- 160: gem0 reset
- 161: gem1 reset
- 164: gem0 rx reset
- 165: gem1 rx reset
- 166: gem0 ref reset
- 167: gem1 ref reset
- 192: sdio0 reset
- 193: sdio1 reset
- 196: sdio0 ref reset
- 197: sdio1 ref reset
- 224: spi0 reset
- 225: spi1 reset
- 226: spi0 ref reset
- 227: spi1 ref reset
- 256: can0 reset
- 257: can1 reset
- 258: can0 ref reset
- 259: can1 ref reset
- 288: i2c0 reset
- 289: i2c1 reset
- 320: uart0 reset
- 321: uart1 reset
- 322: uart0 ref reset
- 323: uart1 ref reset
- 352: gpio reset
- 384: lqspi reset
- 385: qspi ref reset
- 416: smc reset
- 417: smc ref reset
- 448: ocm reset
- 512: fpga0 out reset
- 513: fpga1 out reset
- 514: fpga2 out reset
- 515: fpga3 out reset
- 544: a9 reset 0
- 545: a9 reset 1
- 552: peri reset
+The Zynq AP-SoC has several different resets.
 
->         S?ren
+See Chapter 26 of the Zynq TRM (UG585) for more information about Zynq resets.
+
+Required properties:
+- compatible: "xlnx,zynq-reset"
+- reg: SLCR offset and size taken via syscon <0x200 0x50>
+- syscon: <&slcr>
+  This should be a phandle to the Zynq's SLCR register.
+- #reset-cells: Must be 1
+
+The Zynq Reset Manager needs to be a child node of the SLCR.
+
+Example:
+        rstc: rstc at 200 {
+                compatible = "xlnx,zynq-reset";
+                reg = <0x200 0x50>;
+                #reset-cells = <1>;
+                syscon = <&slcr>;
+        };
+
+> Thanks,
+> Michal
+>
+>
+> --
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+>
+>
+
+Thanks for your feedback,
+
+Moritz
