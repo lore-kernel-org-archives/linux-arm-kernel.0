@@ -1,41 +1,44 @@
-From: dinh.linux@gmail.com (Dinh Nguyen)
-Date: Tue, 28 Jul 2015 12:00:19 -0500
-Subject: [PATCH 4/6] pci: altera: Add Altera PCIe MSI driver
-In-Reply-To: <1438080345-7233-5-git-send-email-lftan@altera.com>
-References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-5-git-send-email-lftan@altera.com>
-Message-ID: <CADhT+wf2oYVZHn1XAODYJUsxwu03TAzN6ZEQCkSBjU5ruKWCDQ@mail.gmail.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 28 Jul 2015 18:16:02 +0100
+Subject: [Xen-devel] [PATCH 4/8] xen: Use the correctly the Xen memory
+ terminologies
+In-Reply-To: <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <55B7B8D2.5060107@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> This patch adds Altera PCIe MSI driver. This soft IP supports configurable
-> number of vectors, which is a dts parameter.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
-> ---
->  drivers/pci/host/Kconfig           |   7 +
->  drivers/pci/host/Makefile          |   1 +
->  drivers/pci/host/pcie-altera-msi.c | 318 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 326 insertions(+)
->  create mode 100644 drivers/pci/host/pcie-altera-msi.c
->
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index af19039..a8b87fd 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -154,4 +154,11 @@ config PCIE_ALTERA
->           Say Y here if you want to enable PCIe controller support for Altera
->           SoCFPGA family of SoCs.
->
-> +config PCIE_ALTERA_MSI
-> +       bool "Altera PCIe MSI feature"
-> +       depends on PCI_MSI && PCIE_ALTERA
-> +       help
-> +         Say Y here if you want PCIe MSI support for the Altera SocFPGA SoC.
-> +         This MSI driver supports Altera MSI to GIC controller IP.
-> +
+On 28/07/15 16:02, Julien Grall wrote:
+> Based on include/xen/mm.h [1], Linux is mistakenly using MFN when GFN
+> is meant, I suspect this is because the first support for Xen was for
+> PV. This brough some misimplementation of helpers on ARM and make the
+> developper confused the expected behavior.
 
-Couldn't this driver get combined with the pcie-altera driver?
+For the benefit of other subsystem maintainers, this is a purely
+mechanical change in Xen-specific terminology.  It doesn't need reviews
+or acks from non-Xen people (IMO).
 
-Dinh
+> For instance, with pfn_to_mfn, we expect to get an MFN based on the name.
+> Although, if we look at the implementation on x86, it's returning a GFN.
+> 
+> For clarity and avoid new confusion, replace any reference of mfn into
+> gnf in any helpers used by PV drivers.
+> 
+> Take also the opportunity to simplify simple construction such
+> as pfn_to_mfn(page_to_pfn(page)) into page_to_gfn. More complex clean up
+> will come in follow-up patches.
+> 
+> I think it may be possible to do further clean up in the x86 code to
+> ensure that helpers returning machine address (such as virt_address) is
+> not used by no auto-translated guests. I will let x86 xen expert doing
+> it.
+
+Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+
+It looks a bit odd to use GFN in some of the PV code where the
+hypervisor API uses MFN but overall I think using the correct
+terminology where possible is best.  But I'd like to have Boris's or
+Konrad's opinion on this.
+
+David
