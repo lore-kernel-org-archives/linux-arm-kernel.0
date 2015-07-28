@@ -1,93 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jul 2015 12:00:23 +0100
-Subject: [PATCH v3 3/6] iommu: add ARM short descriptor page table
- allocator.
-In-Reply-To: <1438060094.25925.69.camel@mhfsdcap03>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-4-git-send-email-yong.wu@mediatek.com>
- <20150721171101.GN31095@arm.com>
- <1437715466.23932.68.camel@mhfsdcap03>
- <20150724165325.GC21177@arm.com>
- <1437970868.25925.20.camel@mhfsdcap03> <55B63AB2.4050006@arm.com>
- <20150727141102.GJ3358@arm.com>
- <1438060094.25925.69.camel@mhfsdcap03>
-Message-ID: <20150728110023.GH29209@arm.com>
+Date: Tue, 28 Jul 2015 12:20:57 +0100
+Subject: [PATCH] arm64: pci: add support for pci_mmap_page_range
+In-Reply-To: <20150727051025.GA5310@localhost.localdomain>
+References: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
+ <20150724144103.GC12569@arm.com>
+ <20150727051025.GA5310@localhost.localdomain>
+Message-ID: <20150728112057.GI29209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 06:08:14AM +0100, Yong Wu wrote:
-> On Mon, 2015-07-27 at 15:11 +0100, Will Deacon wrote:
-> > On Mon, Jul 27, 2015 at 03:05:38PM +0100, Robin Murphy wrote:
-> > > On 27/07/15 05:21, Yong Wu wrote:
-> > > >>>>> +       } else {        /* page or largepage */
-> > > >>>>> +               if (quirk & IO_PGTABLE_QUIRK_SHORT_MTK) {
-> > > >>>>> +                       if (large) { /* special Bit */
-> > > >>>>
-> > > >>>> This definitely needs a better comment! What exactly are you doing here
-> > > >>>> and what is that quirk all about?
-> > > >>>
-> > > >>> I use this quirk is for MTK Special Bit as we don't have the XN bit in
-> > > >>> pagetable.
-> > > >>
-> > > >> I'm still not really clear about what this is.
-> > > >
-> > > > There is some difference between the standard spec and MTK HW,
-> > > > Our hw don't implement some bits, like XN and AP.
-> > > > So I add a quirk for MTK special.
-> > > 
-> > > When you say it doesn't implement these bits, do you mean that having 
-> > > them set will lead to Bad Things happening in the hardware, or that it 
-> > > will simply ignore them and not enforce any of the protections they 
-> > > imply? The former case would definitely want clearly documenting 
-> > > somewhere, whereas for the latter case I'm not sure it's even worth the 
-> > > complication of having a quirk - if the value doesn't matter there seems 
-> > > little point in doing a special dance just for the sake of semantic 
-> > > correctness of the in-memory PTEs, in my opinion.
+On Mon, Jul 27, 2015 at 06:10:29AM +0100, Jerin Jacob wrote:
+> On Fri, Jul 24, 2015 at 03:41:03PM +0100, Will Deacon wrote:
+> > On Fri, Jul 24, 2015 at 06:54:23AM +0100, Jerin Jacob wrote:
+> > > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> > > +		enum pci_mmap_state mmap_state, int write_combine)
+> > > +{
+> > > +	/*
+> > > +	* I/O space can be accessed via normal processor loads and stores on
+> > > +	* this platform but for now we elect not to do this and portable
+> > > +	* drivers should not do this anyway.
+> > > +	*/
+> > > +	if (mmap_state == pci_mmap_io)
+> > > +		return -EINVAL;
+> > > +
+> > > +	if (write_combine)
+> > > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+> > > +	else
+> > > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> > > +
+> > > +	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+> > > +	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
+> > > +}
 > > 
-> > Agreed. We should only use quirks if the current (architecturally
-> > compliant) code causes real issues with the hardware. Then the quirk can
-> > be used to either avoid the problematic routines or to take extra steps
-> > to make things work as the architecture intended.
+> > So pci_iomap_range chooses the memory attributes based on the BAR flags
+> > (and even then it looks weird -- CACHEABLE => ioremap, else ioremap_nocache,
+> > which is just the same as ioremap on arm64).
 > > 
-> > I've asked how this IOMMU differs from the architecture on a number of
-> > occasions, but I'm still yet to receive a response other than "it's special".
-> > 
+> > It would be good to understand (a) why this is different and (b) what
 > 
-> After check further with DE, Our pagetable is refer to ARM-v7's
-> short-descriptor which is a little different from ARM-v8. like bit0(PXN)
-> in section and supersection, I didn't read ARM-v7 spec before, so I add
-> a MTK quirk to disable PXN bit in section and supersection.(if the PXN
-> bit is wrote in ARM-v7 spec, HW will page fault.)
+> AFAIU, pci_iomap_range is the generic implementation and chooses to
+> use only minimal attributes that works on all the architectures.
+> The primary consumer of pci_iomap_range is virtio_pci driver,Which
+> doesn't care about HW PCI memory attributes like Prefetchable.
 
-I've been reviewing this using the ARMv7 ARM (Rev.C of DDI0406C) the whole
-time. PXN is there as an optional field in non-LPAE implementations. That's
-fine and doesn't require any quirks.
+pci_iomap calls pci_iomap_range.
 
-> Then I write this code according to ARM-v8 spec defaultly, and add a
-> ARM-v7 quirk?
+> > the consistent set of attributes should be.
+> 
+> PCI perspective, memory attributes are Prefetchable and non-Prefetchable
+> for a given BAR.
+> 
+> Former one does have read side-effects or supports write
+> merging(typically used
+> by graphics memory) and latter one has read side effects and does not
+> support write merging(typically used by register files)
+> 
+> IMO, In armv8 nomenclature, MT_NORMAL_NC and MT_DEVICE_nGnRnE map
+> correctly to above PCI memory attribute definitions.
 
-No, I don't think you need this, as the v8 and v7 short-descriptor formats
-look compatible to me. You should only need a quirk if architecturally
-compliant code cannot work on your hardware.
-
-> And there is a little different between ARM-v7 spec and MTK pagetable.
-> It's the XN(bit0) in small page. MTK don't implement XN bit. 
-> The bit[1:0] in MTK's small page should be 2'b10, if it's 2'b11, HW will
-> page fault.
-
-Aha, thanks! *That* is worthy of a quirk. Something like:
-
-  IO_PGTABLE_QUIRK_ARM_NO_XN
-
-> (MTK don't implement AP bits too, but HW don't use them, it is ok even
-> though AP bits is wrote)
-
-Yeah, I think that's fine. The pgtable code will honour the request but
-the h/w will ignore it.
-
-> In the end, I will add two quirk like this, is it OK?
-
-I think you only need the one I mentioned above. I don't see the need
-for PXN at all (as I said in the last review).
+I agree with your choice of memory types (well, almost. We probably don't
+need the nE), I'm just after some consistency within the kernel, because
+pci_iomap_range looks wrong to me. Another different example is
+pci_ioremap_bar, which always uses ioremap_nocache.
 
 Will
