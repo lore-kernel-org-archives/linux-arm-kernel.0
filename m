@@ -1,62 +1,54 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 28 Jul 2015 19:45:22 -0300
-Subject: [PATCH 2/2] DT: pwm: Add NXP LPC18xx PWM/SCT binding documentation
-In-Reply-To: <CAGhQ9Vyy+oUAWm0q2+NV0D9RVf5qyED8Tn54-cGzbDc-EZR4yw@mail.gmail.com>
-References: <1437972345-16444-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1437972345-16444-3-git-send-email-ariel@vanguardiasur.com.ar>
- <CAGhQ9Vyy+oUAWm0q2+NV0D9RVf5qyED8Tn54-cGzbDc-EZR4yw@mail.gmail.com>
-Message-ID: <CAAEAJfApE8=cAue-bc5xPD_XAtV8qzur12C4okF-uLJ-__reBA@mail.gmail.com>
+From: ross.zwisler@linux.intel.com (Ross Zwisler)
+Date: Tue, 28 Jul 2015 16:51:29 -0600
+Subject: [PATCH v2 18/25] libnvdimm, pmem: switch from ioremap_cache to
+ memremap
+In-Reply-To: <20150725023940.8664.2784.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023940.8664.2784.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <1438123889.2459.0.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2015 at 19:37, Joachim  Eastwood <manabian@gmail.com> wrote:
-> On 27 July 2015 at 06:45, Ariel D'Alessandro <ariel@vanguardiasur.com.ar> wrote:
->> Add the devicetree binding document for NXP LPC18xx PWM/SCT.
->>
->> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->> ---
->>  .../devicetree/bindings/pwm/lpc1850-pwm.txt          | 20 ++++++++++++++++++++
->>  1 file changed, 20 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
->>
->> diff --git a/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
->> new file mode 100644
->> index 0000000..3055429
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pwm/lpc1850-pwm.txt
->> @@ -0,0 +1,20 @@
->> +* NXP LPC18xx Pulse Width Modulator driver
->> +
->> +Required properties:
->> +  - compatible: Should be "nxp,lpc1850-pwm"
->> +  - reg: Should contain physical base address and length of pwm registers.
->> +  - clocks: Must contain an entry for each entry in clock-names.
->> +    See ../clock/clock-bindings.txt for details.
->> +  - clock-names: Must include the following entries.
->> +    - pwm: PWM operating clock.
->> +  - #pwm-cells: Should be 3. See pwm.txt in this directory for the description
->> +    of the cells format.
->> +
->> +Example:
->> +  pwm: pwm at 40000000 {
->> +    compatible = "nxp,lpc1850-pwm";
->
-> I would prefer "nxp,lpc1850-sct" for a couple of reasons. SCT is the
-> name of hardware block as described in the user manual and while PWM
-> is the most obvious usage for this block on Linux, the hardware is not
-> limited to just doing that. So as a bit of future proofing if someone
-> wants to use this block for more than PWM I would prefer SCT.
->
+On Fri, 2015-07-24 at 22:39 -0400, Dan Williams wrote:
+> In preparation for deprecating ioremap_cache() convert its usage in
+> libnvdimm and the PMEM API to memremap.
+> 
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+>  arch/x86/include/asm/io.h         |    7 +------
+>  arch/x86/mm/ioremap.c             |    6 ++++++
+>  tools/testing/nvdimm/Kbuild       |    2 +-
+>  tools/testing/nvdimm/test/iomap.c |    6 +++---
+>  4 files changed, 11 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+> index cc9c61bc1abe..8aeb6456188a 100644
+> --- a/arch/x86/include/asm/io.h
+> +++ b/arch/x86/include/asm/io.h
+> @@ -248,12 +248,7 @@ static inline void flush_write_buffers(void)
+>  #endif
+>  }
+>  
+> -static inline void __pmem *arch_memremap_pmem(resource_size_t offset,
+> -	unsigned long size)
+> -{
+> -	return (void __force __pmem *) ioremap_cache(offset, size);
+> -}
+> -
+> +void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size);
+>  #endif /* __KERNEL__ */
+>  
+>  extern void native_io_delay(void);
+> diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
+> index 6f759c7c2ab7..7b422e7574b1 100644
+> --- a/arch/x86/mm/ioremap.c
+> +++ b/arch/x86/mm/ioremap.c
+> @@ -317,6 +317,12 @@ void __iomem *ioremap_cache(resource_size_t phys_addr, unsigned long size)
+>  }
+>  EXPORT_SYMBOL(ioremap_cache);
+>  
+> +void __pmem *arch_memremap_pmem(resource_size_t offset, size_t size)
+> +{
+> +	return (void __force __pmem *) ioremap_cache(offset, size);
 
-Shouldn't we use something like "nxp,lpc1850-sct-pwm"?
-
-Sounds like the word PWM should be in the compatible as it describes
-not only the
-device, but the device used in a certain way.
-
-Otherwise, how would we use "nxp,lpc1850-sct" to distinguish a PWM from
-e.g. a clocksource/clockevents (we can also use SCT for that)?
-
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Did you mean for this to be a call to memremap() instead of ioremap_cache()?
