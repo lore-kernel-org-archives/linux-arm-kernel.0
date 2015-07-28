@@ -1,44 +1,39 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 28 Jul 2015 10:05:02 +0200
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq
- Reset Controller bindings.
-In-Reply-To: <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
-Message-ID: <1438070702.3193.4.camel@pengutronix.de>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 28 Jul 2015 09:07:17 +0100
+Subject: [PATCH v1 2/7] ARM: dts: ifc6410: add real regulators for sdcc
+ nodes.
+In-Reply-To: <20150727203254.GB12739@qualcomm.com>
+References: <1438004945-16175-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1438005012-16263-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <20150727203254.GB12739@qualcomm.com>
+Message-ID: <55B73835.3020304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 24.07.2015, 17:21 -0700 schrieb Moritz Fischer:
-> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> ---
->  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->  1 file changed, 13 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> new file mode 100644
-> index 0000000..ac4499e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> @@ -0,0 +1,13 @@
-> +Xilinx Zynq PL Reset Manager
-> +
-> +Required properties:
-> +- compatible: "xlnx,zynq-reset-pl"
-> +- syscon <&slcr>;
-> +- #reset-cells: 1
-> +
-> +Example:
-> +	rstc: rstc at 240 {
-> +		#reset-cells = <1>;
-> +		compatible = "xlnx,zynq-reset-pl";
-> +		syscon = <&slcr>;
 
-Why the syscon phandle if rstc always is the child of slcr? Why not just
-request the syscon for the rstc's parent node.
 
-> +	};
+On 27/07/15 21:32, Andy Gross wrote:
+> On Mon, Jul 27, 2015 at 02:50:12PM +0100, Srinivas Kandagatla wrote:
+>
+> <snip>
+>
+>>   			sdcc3: sdcc at 12180000 {
+>>   				status = "okay";
+>> +				vmmc-supply = <&pm8921_l6>;
+>>   				pinctrl-names	= "default";
+>>   				pinctrl-0	= <&card_detect>;
+>>   				cd-gpios	= <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
+>> @@ -187,6 +200,8 @@
+>>   			/* WLAN */
+>>   			sdcc4: sdcc at 121c0000 {
+>>   				status = "okay";
+>> +				vmmc-supply = <&ext_3p3v>;
+>
+> Where is ext_3p3v defined?
+Oops,  This is missing in this patch, I think re-ordering few other 
+patches introduced this. I will send a these 3 patches as we discussed.
 
-regards
-Philipp
+--srini
+>
+>> +				vqmmc-supply = <&pm8921_lvs1>;
+>
