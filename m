@@ -1,206 +1,81 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Tue, 28 Jul 2015 17:13:03 +0200
-Subject: [PATCH 2/4] ASoc: rockchip: Add rockchip SPDIF transceiver driver
-In-Reply-To: <8512006.Rsa7Aqr0B5@diego>
-References: <1438085011-16577-1-git-send-email-sjoerd.simons@collabora.co.uk>
- <1438085011-16577-3-git-send-email-sjoerd.simons@collabora.co.uk>
- <8512006.Rsa7Aqr0B5@diego>
-Message-ID: <1438096383.3969.39.camel@collabora.co.uk>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 28 Jul 2015 15:14:01 +0000
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <20150728143045.GG12927@tiger>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+ <20150727132802.GK12927@tiger>
+ <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728010235.GU12927@tiger>
+ <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728143045.GG12927@tiger>
+Message-ID: <CY1PR0301MB084365339B13A858A0B5AAC9838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-28 at 16:28 +0200, Heiko St?bner wrote:
-> Hi,
-> 
-> could you streamline the prefixes a bit perhaps? I.e. so far I've 
-> seen
-> 
-> rk_spdif_dev
-> spdif_runtime_suspend
-> rockchip_snd_txctrl
-> rockchip_spdif_hw_params
-> 
-> I guess rockchip_spdif_* or rk_spdif_* for everything might make this 
-> a bit 
-> nicer
-
-Will do in V2, i probalby copied a few too many warts from the i2s
-driver ;)
-
-Thanks for the review!
 
 
-> Am Dienstag, 28. Juli 2015, 14:03:29 schrieb Sjoerd Simons:
-> > Add a driver for the SDPIF transceiver available on RK3066, RK3188 
-> > and
-> > RK3288. Heavily based on the rockchip i2s driver.
-> > 
-> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> > ---
-> >  sound/soc/rockchip/Kconfig          |   9 +
-> >  sound/soc/rockchip/Makefile         |   3 +
-> >  sound/soc/rockchip/rockchip_spdif.c | 375
-> > ++++++++++++++++++++++++++++++++++++ 
-> > sound/soc/rockchip/rockchip_spdif.h | 
-> > 63 ++++++
-> >  4 files changed, 450 insertions(+)
-> >  create mode 100644 sound/soc/rockchip/rockchip_spdif.c
-> >  create mode 100644 sound/soc/rockchip/rockchip_spdif.h
-> > 
-> > diff --git a/sound/soc/rockchip/Kconfig 
-> > b/sound/soc/rockchip/Kconfig
-> > index 58bae8e..20bc676 100644
-> > --- a/sound/soc/rockchip/Kconfig
-> > +++ b/sound/soc/rockchip/Kconfig
-> > @@ -15,6 +15,14 @@ config SND_SOC_ROCKCHIP_I2S
-> >  	  Rockchip I2S device. The device supports upto maximum of
-> >  	  8 channels each for play and record.
-> > 
-> > +config SND_SOC_ROCKCHIP_SPDIF
-> > +	tristate "Rockchip SPDIF Device Driver"
-> > +	depends on CLKDEV_LOOKUP && SND_SOC_ROCKCHIP
-> > +	select SND_SOC_GENERIC_DMAENGINE_PCM
-> > +	help
-> > +	  Say Y or M if you want to add support for SPDIF driver 
-> > for
-> > +	  Rockchip SPDIF transceiver device.
-> > +
-> >  config SND_SOC_ROCKCHIP_MAX98090
-> >  	tristate "ASoC support for Rockchip boards using a 
-> > MAX98090 codec"
-> >  	depends on SND_SOC_ROCKCHIP && I2C && GPIOLIB
-> > @@ -33,3 +41,4 @@ config SND_SOC_ROCKCHIP_RT5645
-> >  	help
-> >  	  Say Y or M here if you want to add support for SoC audio 
-> > on Rockchip
-> >  	  boards using the RT5645/RT5650 codec, such as Veyron.
-> > +
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2015?7?28? 9:31
+> To: Wang Shenwei-B38339
+> Cc: jason at lakedaemon.net; Huang Yongcai-B20788;
+> linux-kernel at vger.kernel.org; tglx at linutronix.de; shawn.guo at linaro.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
 > 
-> unrelated newline
+> On Tue, Jul 28, 2015 at 02:16:20PM +0000, Shenwei Wang wrote:
+> > > The files are named with "-imx7".  It's a clear sign that the build
+> > > of the files should be controlled by something like related to "imx7".
+> > > Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only
+> > > supported imx7 soc and there is no CONFIG_SOC_IMX7 available so far,
+> > > it falls on CONFIG_SOC_IMX7D.
+> >
+> > We can also interpret "-imx7" is the first SoC which has the GPCv2 block.
 > 
-> > diff --git a/sound/soc/rockchip/Makefile 
-> > b/sound/soc/rockchip/Makefile
-> > index 1bc1dc3..b02ab69 100644
-> > --- a/sound/soc/rockchip/Makefile
-> > +++ b/sound/soc/rockchip/Makefile
-> > @@ -1,10 +1,13 @@
-> >  # ROCKCHIP Platform Support
-> >  snd-soc-i2s-objs := rockchip_i2s.o
-> > +snd-soc-spdif-objs := rockchip_spdif.o
-> > 
-> >  obj-$(CONFIG_SND_SOC_ROCKCHIP_I2S) += snd-soc-i2s.o
-> > +obj-$(CONFIG_SND_SOC_ROCKCHIP_SPDIF) += snd-soc-spdif.o
-> > 
-> >  snd-soc-rockchip-max98090-objs := rockchip_max98090.o
-> >  snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
-> > 
-> >  obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip
-> > -max98090.o
-> >  obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
-> > +
-> > diff --git a/sound/soc/rockchip/rockchip_spdif.c
-> > b/sound/soc/rockchip/rockchip_spdif.c new file mode 100644
-> > index 0000000..e60ccf6
-> > --- /dev/null
-> > +++ b/sound/soc/rockchip/rockchip_spdif.c
-> > @@ -0,0 +1,375 @@
-> > +/* sound/soc/rockchip/rockchip_spdif.c
-> > + *
-> > + * ALSA SoC Audio Layer - Rockchip I2S Controller driver
-> 								^spd
-> if
-> 
-> > + *
-> > + * Copyright (c) 2014 Rockchip Electronics Co. Ltd.
-> > + * Author: Jianqun <jay.xu@rock-chips.com>
-> > + * Copyright (c) 2015 Collabora Ltd.
-> > + * Author: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> > + *
-> > + * This program is free software; you can redistribute it and/or 
-> > modify
-> > + * it under the terms of the GNU General Public License version 2 
-> > as
-> > + * published by the Free Software Foundation.
-> > + */
-> > +
-> > +#include <linux/module.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/of_gpio.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/pm_runtime.h>
-> > +#include <linux/regmap.h>
-> > +#include <sound/pcm_params.h>
-> > +#include <sound/dmaengine_pcm.h>
-> > +
-> > +#include "rockchip_spdif.h"
-> > +
-> > +#define DRV_NAME "rockchip-spdif"
-> > +
-> > +struct rk_spdif_dev {
-> > +	struct device *dev;
-> > +
-> > +	struct clk *mclk;
-> > +	struct clk *hclk;
-> > +
-> > +	struct snd_dmaengine_dai_dma_data playback_dma_data;
-> > +
-> > +	struct regmap *regmap;
-> > +};
-> > +
-> > +static int spdif_runtime_suspend(struct device *dev)
-> > +{
-> > +	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-> > +
-> > +	clk_disable_unprepare(spdif->mclk);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int spdif_runtime_resume(struct device *dev)
-> > +{
-> > +	struct rk_spdif_dev *spdif = dev_get_drvdata(dev);
-> > +	int ret;
-> > +
-> > +	ret = clk_prepare_enable(spdif->mclk);
-> > +	if (ret) {
-> > +		dev_err(spdif->dev, "clock enable failed %d\n", 
-> > ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static inline struct rk_spdif_dev *to_info(struct snd_soc_dai 
-> > *dai)
-> > +{
-> > +	return snd_soc_dai_get_drvdata(dai);
-> > +}
-> > +
-> > +static void rockchip_snd_txctrl(struct rk_spdif_dev *spdif, int 
-> > on)
-> > +{
-> > +	if (on) {
-> > +		regmap_update_bits(spdif->regmap, SPDIF_DMACR,
-> > +				   SPDIF_DMACR_TDE_ENABLE,
-> > +				   SPDIF_DMACR_TDE_ENABLE);
-> > +
-> > +		regmap_update_bits(spdif->regmap, SPDIF_XFER,
-> > +				   SPDIF_XFER_TXS_START,
-> > +				   SPDIF_XFER_TXS_START);
-> 
-> personally I'm always unsure of regmap return values. While the 
-> underlying 
-> method is mmio in this case, regmap_* in theory still has the 
-> possibility to 
-> return errors, so I'm not sure if it's ok to silently ignore them.
-> 
-> Here it would simply mean return the error and also return it in 
-> rockchip_spdif_trigger below.
-> 
-> 
-> Heiko
+> In that case you should name the block gpc-imx7d rather than gpcv2 and symbol
+> as GPC_IMX7D rather than IMX_GPCV2.
 
--- 
-Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Collabora Ltd.
+I don't want to couple the gpcv2 driver with a SoC. Let's use your suggestion CONFIG_SOC_IMX7D
+for now, because it introduce less modifications.
+ 
+> > > > > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
+> > > > >
+> > > > > Will this give a checkpatch warning?
+> > > >
+> > > > Yes. Any suggestion for that? Move it to a header file?
+> > >
+> > > Get rid of it.
+> >
+> > Then you may resolve the following compile error:
+> 
+> You didn't get my point.  Rather than defining it as a global variable, we should
+> try to keep imx_gpcv2_irq as an internal data structure to irqchip driver, and use
+> well-defined interface to access the data from pm driver when necessary.
+
+Either to export a variable or a function, you will finally meet the same problem
+:where to declare it? Otherwise the same compile error will happen too.
+
+Regards,
+Shenwei
+ 
+
+> Shawn
+> 
+> >
+> > CC      arch/arm/mach-imx/pm-imx7.o
+> > arch/arm/mach-imx/pm-imx7.c: In function ?imx_gpcv2_pm_init?:
+> > arch/arm/mach-imx/pm-imx7.c:836:7: error: ?gpcv2_irq_instance? undeclared
+> (first use in this function)
+> >   cd = gpcv2_irq_instance;
+> >        ^
+> > arch/arm/mach-imx/pm-imx7.c:836:7: note: each undeclared identifier is
+> > reported only once for each function it appears in
+> > make[1]: *** [arch/arm/mach-imx/pm-imx7.o] Error 1
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ULP1 3rd Party Tools Requirements.xlsx
+Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+Size: 19256 bytes
+Desc: ULP1 3rd Party Tools Requirements.xlsx
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/02174255/attachment-0001.xlsx>
