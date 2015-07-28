@@ -1,47 +1,81 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jul 2015 09:02:35 +0800
-Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
-In-Reply-To: <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
- <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
- <20150727132802.GK12927@tiger>
- <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <20150728010235.GU12927@tiger>
+Date: Tue, 28 Jul 2015 09:05:13 +0800
+Subject: [PATCH v8 3/5] mtd: nand: vf610_nfc: add device tree bindings
+In-Reply-To: <1438015365-15685-4-git-send-email-stefan@agner.ch>
+References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
+ <1438015365-15685-4-git-send-email-stefan@agner.ch>
+Message-ID: <20150728010513.GV12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 06:24:26PM +0000, Shenwei Wang wrote:
-> > > @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
-> > >
-> > >  ifeq ($(CONFIG_SUSPEND),y)
-> > >  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
-> > > +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
-> > > +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
-> > 
-> > Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
+On Mon, Jul 27, 2015 at 06:42:43PM +0200, Stefan Agner wrote:
+> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+
+Acked-by: Shawn Guo <shawnguo@kernel.org>
+
+> ---
+>  .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
 > 
-> CONFIG_IMX_GPCV2 is more suitable here. As long as a SOC has the same GPCv2 block, the codes should be reused.
-
-Let's see what problem it will have.  Saying GPCv2 block is used on
-imx8, we will have something like below.
-
-obj-$(CONFIG_IMX_GPCV2) += suspend-imx7.o pm-imx7.o suspend-imx8.o pm-imx8.o
-
-If people want to build a kernel with imx8 support only, suspend-imx7.o
-and pm-imx7.o will also be built in there, which is undesirable.
-
-The files are named with "-imx7".  It's a clear sign that the build of
-the files should be controlled by something like related to "imx7".
-Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only
-supported imx7 soc and there is no CONFIG_SOC_IMX7 available so far,
-it falls on CONFIG_SOC_IMX7D.
-
-> > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
-> > 
-> > Will this give a checkpatch warning?
+> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+> new file mode 100644
+> index 0000000..cae5f25
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+> @@ -0,0 +1,45 @@
+> +Freescale's NAND flash controller (NFC)
+> +
+> +This variant of the Freescale NAND flash controller (NFC) can be found on
+> +Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
+> +
+> +Required properties:
+> +- compatible: Should be set to "fsl,vf610-nfc"
+> +- reg: address range of the NFC
+> +- interrupts: interrupt of the NFC
+> +- nand-bus-width: see nand.txt
+> +- nand-ecc-mode: see nand.txt
+> +- nand-on-flash-bbt: see nand.txt
+> +- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
+> +- assigned-clock-rates: The NAND bus timing is derived from this clock
+> +    rate and should not exceed maximum timing for any NAND memory chip
+> +    in a board stuffing. Typical NAND memory timings derived from this
+> +    clock are found in the SoC hardware reference manual. Furthermore,
+> +    there might be restrictions on maximum rates when using hardware ECC.
+> +
+> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
+> +  representing partitions.
+> +
+> +Required properties for hardware ECC:
+> +- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
+> +- nand-ecc-step-size: step size equals page size, currently only 2k pages are
+> +    supported
+> +
+> +Example:
+> +
+> +	nfc: nand at 400e0000 {
+> +		compatible = "fsl,vf610-nfc";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x400e0000 0x4000>;
+> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&clks VF610_CLK_NFC>;
+> +		clock-names = "nfc";
+> +		assigned-clocks = <&clks VF610_CLK_NFC>;
+> +		assigned-clock-rates = <33000000>;
+> +		nand-bus-width = <8>;
+> +		nand-ecc-mode = "hw";
+> +		nand-ecc-strength = <32>;
+> +		nand-ecc-step-size = <2048>;
+> +		nand-on-flash-bbt;
+> +	};
+> -- 
+> 2.4.5
 > 
-> Yes. Any suggestion for that? Move it to a header file?
-
-Get rid of it.
-
-Shawn
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
