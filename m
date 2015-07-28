@@ -1,33 +1,33 @@
 From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Jul 2015 13:53:42 +0100
-Subject: [PATCH v1 1/7] ARM: dts: ifc6410: Add pwrseq support for WLAN
+Date: Tue, 28 Jul 2015 13:53:50 +0100
+Subject: [PATCH v1 2/7] ARM: dts: qs600: add pwrseq support to WLAN
 In-Reply-To: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
 References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1438088022-17350-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1438088030-17395-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pwrseq for WLAN which resets the WLAN just before the
-SDIO bus is up.
+Add pwrseq support to sdcc4 which would enable a proper reset of WLAN
+without ugly hacks in the board support file.
 
 Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 88d6655..df560cf 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -1,5 +1,6 @@
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+index 34ccb26..3ca1b80 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -1,4 +1,6 @@
  #include "qcom-apq8064-v2.0.dtsi"
- #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/gpio/gpio.h>
 +#include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
  
  / {
- 	model = "Qualcomm APQ8064/IFC6410";
-@@ -206,6 +207,28 @@
- 			status = "okay";
+ 	model = "CompuLab CM-QS600";
+@@ -155,6 +157,29 @@
+ 			regulator-always-on;
  		};
  
 +		qcom,ssbi at 500000 {
@@ -49,16 +49,17 @@ index 88d6655..df560cf 100644
 +
 +		sdcc4_pwrseq:pwrseq {
 +			compatible = "mmc-pwrseq-simple";
-+			reset-gpios = <&pm8921_gpio 43 GPIO_ACTIVE_LOW>;
++			/* WLAN reset */
++			reset-gpios = <&pm8921_gpio 42 GPIO_ACTIVE_LOW>;
 +		};
 +
  		amba {
  			/* eMMC */
  			sdcc1: sdcc at 12400000 {
-@@ -227,6 +250,7 @@
+@@ -173,6 +198,7 @@
  				status = "okay";
- 				vmmc-supply = <&ext_3p3v>;
- 				vqmmc-supply = <&pm8921_lvs1>;
+ 				vmmc-supply = <&v3p3_fixed>;
+ 				vqmmc-supply = <&v3p3_fixed>;
 +				mmc-pwrseq = <&sdcc4_pwrseq>;
  			};
  		};
