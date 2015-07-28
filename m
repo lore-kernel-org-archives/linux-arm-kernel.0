@@ -1,111 +1,99 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:03:57 +0530
-Subject: [PATCH v7 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+Date: Tue, 28 Jul 2015 15:03:58 +0530
+Subject: [PATCH v7 05/13] clk: qcom: gdsc: Enable an RCG before turing on the
+ gdsc
 In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
 References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-5-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438076046-4706-6-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_PM disabled, turn the devices clocks on during
-driver binding to the device, and turn them off when the
-driver is unbound from the device.
+Some gdsc instances require a certain root clock (RCG) to be turned on
+*before* the power domain itself can be turned on. Handle this as part
+of the gdsc enable/disable callbacks.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/gdsc.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ drivers/clk/qcom/gdsc.c | 20 +++++++++++++++++++-
+ drivers/clk/qcom/gdsc.h |  5 +++++
+ 2 files changed, 24 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index 68b810a..c7f109b 100644
+index c7f109b..b802ecf 100644
 --- a/drivers/clk/qcom/gdsc.c
 +++ b/drivers/clk/qcom/gdsc.c
-@@ -12,10 +12,12 @@
-  */
+@@ -89,6 +89,9 @@ static int gdsc_enable(struct generic_pm_domain *domain)
+ 	struct gdsc *sc = domain_to_gdsc(domain);
+ 	int ret;
  
- #include <linux/bitops.h>
-+#include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/err.h>
- #include <linux/jiffies.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/pm_clock.h>
- #include <linux/pm_domain.h>
- #include <linux/regmap.h>
-@@ -211,3 +213,72 @@ void gdsc_unregister(struct device *dev)
++	if (sc->root_clk)
++		clk_prepare_enable(sc->root_clk);
++
+ 	ret = gdsc_toggle_logic(sc, true);
+ 	if (ret)
+ 		return ret;
+@@ -106,9 +109,15 @@ static int gdsc_enable(struct generic_pm_domain *domain)
+ 
+ static int gdsc_disable(struct generic_pm_domain *domain)
  {
- 	of_genpd_del_provider(dev->of_node);
++	int ret;
+ 	struct gdsc *sc = domain_to_gdsc(domain);
+ 
+-	return gdsc_toggle_logic(sc, false);
++	ret = gdsc_toggle_logic(sc, false);
++
++	if (sc->root_clk)
++		clk_disable_unprepare(sc->root_clk);
++
++	return ret;
  }
+ 
+ static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
+@@ -133,6 +142,15 @@ static int gdsc_attach(struct generic_pm_domain *domain, struct device *dev)
+ 			goto fail;
+ 		}
+ 	}
 +
-+#ifndef CONFIG_PM
-+struct gdsc_notifier_block {
-+	struct notifier_block nb;
-+	const char *con_ids[];
-+};
-+
-+static void enable_clock(struct device *dev, const char *con_id)
-+{
-+	struct clk *clk;
-+
-+	clk = clk_get(dev, con_id);
-+	if (!IS_ERR(clk)) {
-+		clk_prepare_enable(clk);
-+		clk_put(clk);
++	if (sc->root_con_id) {
++		sc->root_clk = clk_get(dev, sc->root_con_id);
++		if (IS_ERR(sc->root_clk)) {
++			dev_err(dev, "failed to get root clock\n");
++			return PTR_ERR(sc->root_clk);
++		}
 +	}
-+}
 +
-+static void disable_clock(struct device *dev, const char *con_id)
-+{
-+	struct clk *clk;
-+
-+	clk = clk_get(dev, con_id);
-+	if (!IS_ERR(clk)) {
-+		clk_disable_unprepare(clk);
-+		clk_put(clk);
-+	}
-+}
-+
-+static int clk_notify(struct notifier_block *nb, unsigned long action,
-+		      void *data)
-+{
-+	int sz;
-+	struct device *dev = data;
-+	const char **con_id;
-+	struct gdsc_notifier_block *gdsc_nb;
-+
-+	if (!of_find_property(dev->of_node, "power-domains", &sz))
-+		return 0;
-+
-+	gdsc_nb = container_of(nb, struct gdsc_notifier_block, nb);
-+
-+	if (!gdsc_nb->con_ids[0])
-+		return 0;
-+
-+	switch (action) {
-+	case BUS_NOTIFY_BIND_DRIVER:
-+		for (con_id = gdsc_nb->con_ids; *con_id; con_id++)
-+			enable_clock(dev, *con_id);
-+		break;
-+	case BUS_NOTIFY_UNBOUND_DRIVER:
-+		for (con_id = gdsc_nb->con_ids; *con_id; con_id++)
-+			disable_clock(dev, *con_id);
-+		break;
-+	}
-+	return 0;
-+}
-+
-+static struct gdsc_notifier_block gdsc_nb = {
-+	.nb.notifier_call = clk_notify,
-+	.con_ids = { NULL },
-+};
-+
-+static __init int qcom_pm_runtime_init(void)
-+{
-+	return bus_register_notifier(&platform_bus_type, &gdsc_nb.nb);
-+}
-+core_initcall(qcom_pm_runtime_init);
-+#endif
+ 	return 0;
+ fail:
+ 	pm_clk_destroy(dev);
+diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
+index 68bcda3..cbd95e4 100644
+--- a/drivers/clk/qcom/gdsc.h
++++ b/drivers/clk/qcom/gdsc.h
+@@ -17,6 +17,7 @@
+ #include <linux/err.h>
+ #include <linux/pm_domain.h>
+ 
++struct clk;
+ struct regmap;
+ 
+ /**
+@@ -24,12 +25,16 @@ struct regmap;
+  * @pd: generic power domain
+  * @regmap: regmap for MMIO accesses
+  * @gdscr: gsdc control register
++ * @root_con_id: root clock to be enabled
++ * @root_clk: clk handle for the root clk
+  * @con_ids: List of clocks to be controlled for the gdsc
+  */
+ struct gdsc {
+ 	struct generic_pm_domain	pd;
+ 	struct regmap			*regmap;
+ 	unsigned int			gdscr;
++	char				*root_con_id;
++	struct clk			*root_clk;
+ 	const char			*con_ids[];
+ };
+ 
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
