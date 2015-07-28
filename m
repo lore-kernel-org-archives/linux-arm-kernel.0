@@ -1,54 +1,68 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 28 Jul 2015 10:25:08 +0200
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <1438070702.3193.4.camel@pengutronix.de>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <1438070702.3193.4.camel@pengutronix.de>
-Message-ID: <55B73C64.5050903@xilinx.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 28 Jul 2015 11:29:33 +0300
+Subject: [PATCH 1/2] ARM: dts: Add support for phyCORE-AM335x SoM
+In-Reply-To: <20150727143444.GD15004@beef>
+References: <1437035449-26956-1-git-send-email-t.remmet@phytec.de>
+ <20150727143444.GD15004@beef>
+Message-ID: <55B73D6D.2040801@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2015 10:05 AM, Philipp Zabel wrote:
-> Am Freitag, den 24.07.2015, 17:21 -0700 schrieb Moritz Fischer:
->> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> ---
->>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+Hi Matt,
+
+On 07/27/15 17:34, Matt Porter wrote:
+> On Thu, Jul 16, 2015 at 10:30:48AM +0200, Teresa Remmet wrote:
+>> phyCORE-AM335x is a SoM (System on Module) containing
+>> a AM335x SOC. The module can be connected to different
+>> carrier boards.
 >>
->> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>> Some hardware parts are configurable on the phyCORE-AM335x.
+>> So they are disabled on default in this som dtsi file.
+>> They will be enabled in the board dts files, when populated.
+>>
+>> * RAM up to 1GiB
+>> * PMIC
+>> * NAND flash up to 1GiB
+>> * Eth PHY on SOM: 1x RMII
+>> * SPI NOR flash 8MiB (optional)
+>> * i2c RTC (optional)
+>> * i2c EEPROM 4kiB (optional)
+>>
+>> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+>> ---
+>>  arch/arm/boot/dts/am335x-phycore-som.dtsi | 368 ++++++++++++++++++++++++++++++
+>>  1 file changed, 368 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/am335x-phycore-som.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
 >> new file mode 100644
->> index 0000000..ac4499e
+>> index 0000000..4d28fc3
 >> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> @@ -0,0 +1,13 @@
->> +Xilinx Zynq PL Reset Manager
+>> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+
+[...]
+
+>> +#include "am33xx.dtsi"
 >> +
->> +Required properties:
->> +- compatible: "xlnx,zynq-reset-pl"
->> +- syscon <&slcr>;
->> +- #reset-cells: 1
->> +
->> +Example:
->> +	rstc: rstc at 240 {
->> +		#reset-cells = <1>;
->> +		compatible = "xlnx,zynq-reset-pl";
->> +		syscon = <&slcr>;
+>> +/ {
+>> +	model = "Phytec AM335x phyCORE";
+>> +	compatible = "phytec,am335x-phycore-som", "ti,am33xx";
 > 
-> Why the syscon phandle if rstc always is the child of slcr? Why not just
-> request the syscon for the rstc's parent node.
+> One minor thing here...wildcards in compatible strings aren't permitted.
+> However, family compatibles like "ti,am33xx" that came in before this
+> was enforced are grandfathered. Ideally, the newly introced board/som
+> specific strings should not propagate that wildcard. i.e. something
+> like "phytec,am3352-phycore-som" or whatever is the base family part
+> on these SOMs.
+> 
 
-We are using this description for pincntrl which was properly reviewed
-that's why I expect Moritz just use the same style.
-But yes also referencing parent should work.
+I'm not sure this is wild card.
+I tend to think that it is the real name of the som [1], no?
 
-TBH I don't have strong preference but having unified style is something
-what I would prefer.
+http://phytec.com/products/system-on-modules/phycore/am335x/
 
-Also I see that using parent is used by others and it looks like that
-having something like syscon_regmap_lookup_parent will be worth to have.
+[...]
 
-Thanks,
-Michal
+-- 
+Regards,
+Igor.
