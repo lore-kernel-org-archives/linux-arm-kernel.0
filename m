@@ -1,171 +1,139 @@
 From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:04:00 +0530
-Subject: [PATCH v7 07/13] clk: qcom: gdsc: Add support for ON only state
+Date: Tue, 28 Jul 2015 15:04:01 +0530
+Subject: [PATCH v7 08/13] clk: qcom: gdsc: Add GDSCs in msm8916 GCC
 In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
 References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-8-git-send-email-rnayak@codeaurora.org>
+Message-ID: <1438076046-4706-9-git-send-email-rnayak@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain devices can have GDSCs' which support ON as the only state.
-They can't be power collapsed to either hit RET or OFF.
-The clients drivers for these GDSCs' however would expect the state
-of the core to be reset following a GDSC disable and re-enable.
-To do this assert/deassert reset lines every time the client
-driver would request the GDSC to be powered on/off instead.
+Add all data for the GDSCs which are part of msm8916 GCC block.
 
 Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
 ---
- drivers/clk/qcom/common.c |  3 ++-
- drivers/clk/qcom/gdsc.c   | 35 ++++++++++++++++++++++++++++++++++-
- drivers/clk/qcom/gdsc.h   | 11 ++++++++++-
- 3 files changed, 46 insertions(+), 3 deletions(-)
+ drivers/clk/qcom/Kconfig                     |  1 +
+ drivers/clk/qcom/gcc-msm8916.c               | 57 ++++++++++++++++++++++++++++
+ include/dt-bindings/clock/qcom,gcc-msm8916.h |  8 ++++
+ 3 files changed, 66 insertions(+)
 
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index a319aa8..4bc87e1 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -124,7 +124,8 @@ int qcom_cc_really_probe(struct platform_device *pdev,
- 		goto err_reset;
+diff --git a/drivers/clk/qcom/Kconfig b/drivers/clk/qcom/Kconfig
+index d3a695b..abec45a 100644
+--- a/drivers/clk/qcom/Kconfig
++++ b/drivers/clk/qcom/Kconfig
+@@ -53,6 +53,7 @@ config MSM_GCC_8660
  
- 	if (desc->gdscs && desc->num_gdscs) {
--		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
-+		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs,
-+				    &reset->rcdev, regmap);
- 		if (ret)
- 			goto err_pd;
- 	}
-diff --git a/drivers/clk/qcom/gdsc.c b/drivers/clk/qcom/gdsc.c
-index 162c0be..276b850 100644
---- a/drivers/clk/qcom/gdsc.c
-+++ b/drivers/clk/qcom/gdsc.c
-@@ -21,6 +21,7 @@
- #include <linux/pm_clock.h>
- #include <linux/pm_domain.h>
- #include <linux/regmap.h>
-+#include <linux/reset-controller.h>
- #include <linux/slab.h>
- #include "gdsc.h"
+ config MSM_GCC_8916
+ 	tristate "MSM8916 Global Clock Controller"
++	select QCOM_GDSC
+ 	depends on COMMON_CLK_QCOM
+ 	help
+ 	  Support for the global clock controller on msm8916 devices.
+diff --git a/drivers/clk/qcom/gcc-msm8916.c b/drivers/clk/qcom/gcc-msm8916.c
+index c66f7bc..4da1223 100644
+--- a/drivers/clk/qcom/gcc-msm8916.c
++++ b/drivers/clk/qcom/gcc-msm8916.c
+@@ -31,6 +31,7 @@
+ #include "clk-rcg.h"
+ #include "clk-branch.h"
+ #include "reset.h"
++#include "gdsc.h"
  
-@@ -87,6 +88,24 @@ static int gdsc_toggle_logic(struct gdsc *sc, bool en)
- 	return -ETIMEDOUT;
- }
- 
-+static inline int gdsc_deassert_reset(struct gdsc *sc)
-+{
-+	int i;
-+
-+	for (i = 0; i < sc->reset_count; i++)
-+		sc->rcdev->ops->deassert(sc->rcdev, sc->resets[i]);
-+	return 0;
-+}
-+
-+static inline int gdsc_assert_reset(struct gdsc *sc)
-+{
-+	int i;
-+
-+	for (i = 0; i < sc->reset_count; i++)
-+		sc->rcdev->ops->assert(sc->rcdev, sc->resets[i]);
-+	return 0;
-+}
-+
- static inline void gdsc_force_mem_on(struct gdsc *sc)
- {
- 	int i;
-@@ -110,6 +129,9 @@ static int gdsc_enable(struct generic_pm_domain *domain)
- 	struct gdsc *sc = domain_to_gdsc(domain);
- 	int ret;
- 
-+	if (sc->pwrsts == PWRSTS_ON)
-+		return gdsc_deassert_reset(sc);
-+
- 	if (sc->root_clk)
- 		clk_prepare_enable(sc->root_clk);
- 
-@@ -137,6 +159,9 @@ static int gdsc_disable(struct generic_pm_domain *domain)
- 	int ret;
- 	struct gdsc *sc = domain_to_gdsc(domain);
- 
-+	if (sc->pwrsts == PWRSTS_ON)
-+		return gdsc_assert_reset(sc);
-+
- 	ret = gdsc_toggle_logic(sc, false);
- 
- 	if (sc->pwrsts & PWRSTS_OFF)
-@@ -212,6 +237,13 @@ static int gdsc_init(struct gdsc *sc)
- 	if (ret)
- 		return ret;
- 
-+	/* Force gdsc ON if only ON state is supported */
-+	if (sc->pwrsts == PWRSTS_ON) {
-+		ret = gdsc_toggle_logic(sc, true);
-+		if (ret)
-+			return ret;
-+	}
-+
- 	on = gdsc_is_enabled(sc);
- 	if (on < 0)
- 		return on;
-@@ -232,7 +264,7 @@ static int gdsc_init(struct gdsc *sc)
- }
- 
- int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
--		  struct regmap *regmap)
-+		  struct reset_controller_dev *rcdev, struct regmap *regmap)
- {
- 	int i, ret;
- 	struct genpd_onecell_data *data;
-@@ -251,6 +283,7 @@ int gdsc_register(struct device *dev, struct gdsc **scs, size_t num,
- 		if (!scs[i])
- 			continue;
- 		scs[i]->regmap = regmap;
-+		scs[i]->rcdev = rcdev;
- 		ret = gdsc_init(scs[i]);
- 		if (ret)
- 			return ret;
-diff --git a/drivers/clk/qcom/gdsc.h b/drivers/clk/qcom/gdsc.h
-index 01b2208..bf95bbd 100644
---- a/drivers/clk/qcom/gdsc.h
-+++ b/drivers/clk/qcom/gdsc.h
-@@ -19,6 +19,7 @@
- 
- struct clk;
- struct regmap;
-+struct reset_controller_dev;
- 
- /* Powerdomain allowable state bitfields */
- #define PWRSTS_OFF		BIT(0)
-@@ -36,6 +37,9 @@ struct regmap;
-  * @root_clk: clk handle for the root clk
-  * @cxcs: offsets of branch registers to toggle mem/periph bits in
-  * @cxc_count: number of @cxcs
-+ * @resets: ids of resets associated with this gdsc
-+ * @reset_count: number of @resets
-+ * @rcdev: reset controller
-  * @pwrsts: Possible powerdomain power states
-  * @con_ids: List of clocks to be controlled for the gdsc
-  */
-@@ -48,14 +52,19 @@ struct gdsc {
- 	unsigned int			*cxcs;
- 	unsigned int			cxc_count;
- 	const u8			pwrsts;
-+	struct reset_controller_dev	*rcdev;
-+	unsigned int			*resets;
-+	unsigned int			reset_count;
- 	const char			*con_ids[];
+ enum {
+ 	P_XO,
+@@ -2562,6 +2563,52 @@ static struct clk_branch gcc_venus0_vcodec0_clk = {
+ 	},
  };
  
- #ifdef CONFIG_QCOM_GDSC
--int gdsc_register(struct device *, struct gdsc **, size_t n, struct regmap *);
-+int gdsc_register(struct device *, struct gdsc **, size_t n,
-+		  struct reset_controller_dev *, struct regmap *);
- void gdsc_unregister(struct device *);
- #else
- static inline int gdsc_register(struct device *d, struct gdsc **g, size_t n,
-+				struct reset_controller_dev *rcdev,
- 				struct regmap *r)
- {
- 	return -ENOSYS;
++static struct gdsc venus_gdsc = {
++	.gdscr = 0x4c018,
++	.pd = {
++		.name = "venus",
++	},
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
++};
++
++static struct gdsc mdss_gdsc = {
++	.gdscr = 0x4d078,
++	.pd = {
++		.name = "mdss",
++	},
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
++};
++
++static struct gdsc jpeg_gdsc = {
++	.gdscr = 0x5701c,
++	.pd = {
++		.name = "jpeg",
++	},
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
++};
++
++static struct gdsc vfe_gdsc = {
++	.gdscr = 0x58034,
++	.pd = {
++		.name = "vfe",
++	},
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
++};
++
++static struct gdsc oxili_gdsc = {
++	.gdscr = 0x5901c,
++	.pd = {
++		.name = "oxili",
++	},
++	.root_con_id = "gfx3d_clk_src",
++	.pwrsts = PWRSTS_OFF_ON,
++	.con_ids = { NULL },
++};
++
+ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GPLL0] = &gpll0.clkr,
+ 	[GPLL0_VOTE] = &gpll0_vote,
+@@ -2703,6 +2750,14 @@ static struct clk_regmap *gcc_msm8916_clocks[] = {
+ 	[GCC_VENUS0_VCODEC0_CLK] = &gcc_venus0_vcodec0_clk.clkr,
+ };
+ 
++static struct gdsc *gcc_msm8916_gdscs[] = {
++	[VENUS_GDSC] = &venus_gdsc,
++	[MDSS_GDSC] = &mdss_gdsc,
++	[JPEG_GDSC] = &jpeg_gdsc,
++	[VFE_GDSC] = &vfe_gdsc,
++	[OXILI_GDSC] = &oxili_gdsc,
++};
++
+ static const struct qcom_reset_map gcc_msm8916_resets[] = {
+ 	[GCC_BLSP1_BCR] = { 0x01000 },
+ 	[GCC_BLSP1_QUP1_BCR] = { 0x02000 },
+@@ -2810,6 +2865,8 @@ static const struct qcom_cc_desc gcc_msm8916_desc = {
+ 	.num_clks = ARRAY_SIZE(gcc_msm8916_clocks),
+ 	.resets = gcc_msm8916_resets,
+ 	.num_resets = ARRAY_SIZE(gcc_msm8916_resets),
++	.gdscs = gcc_msm8916_gdscs,
++	.num_gdscs = ARRAY_SIZE(gcc_msm8916_gdscs),
+ };
+ 
+ static const struct of_device_id gcc_msm8916_match_table[] = {
+diff --git a/include/dt-bindings/clock/qcom,gcc-msm8916.h b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+index e430f64..11566c5 100644
+--- a/include/dt-bindings/clock/qcom,gcc-msm8916.h
++++ b/include/dt-bindings/clock/qcom,gcc-msm8916.h
+@@ -153,4 +153,12 @@
+ #define GCC_VENUS0_AXI_CLK			136
+ #define GCC_VENUS0_VCODEC0_CLK			137
+ 
++/* Indexes for GDSCs */
++#define BIMC_GDSC				0
++#define VENUS_GDSC				1
++#define MDSS_GDSC				2
++#define JPEG_GDSC				3
++#define VFE_GDSC				4
++#define OXILI_GDSC				5
++
+ #endif
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
 of Code Aurora Forum, hosted by The Linux Foundation
