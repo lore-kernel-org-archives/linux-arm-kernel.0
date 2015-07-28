@@ -1,76 +1,53 @@
-From: t.remmet@phytec.de (Teresa Remmet)
-Date: Tue, 28 Jul 2015 10:47:28 +0200
-Subject: [PATCH 1/2] ARM: dts: Add support for phyCORE-AM335x SoM
-In-Reply-To: <55B73D6D.2040801@compulab.co.il>
-References: <1437035449-26956-1-git-send-email-t.remmet@phytec.de>
- <20150727143444.GD15004@beef> <55B73D6D.2040801@compulab.co.il>
-Message-ID: <1438073248.3649.6.camel@lws-tremmet.phytec.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Jul 2015 09:47:40 +0100
+Subject: [RFC V2] arm64:use set_fixmap_offset to make it more clear
+In-Reply-To: <21A5B6D3-B813-4DC3-B392-009991B9CA00@gmail.com>
+References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
+ <9A8FA704-5D35-404B-BEBE-C92AF25505C3@gmail.com>
+ <21A5B6D3-B813-4DC3-B392-009991B9CA00@gmail.com>
+Message-ID: <20150728084740.GC29209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Igor,
-
-Am Dienstag, den 28.07.2015, 11:29 +0300 schrieb Igor Grinberg:
-> Hi Matt,
+On Tue, Jul 28, 2015 at 07:31:20AM +0100, yalin wang wrote:
 > 
-> On 07/27/15 17:34, Matt Porter wrote:
-> > On Thu, Jul 16, 2015 at 10:30:48AM +0200, Teresa Remmet wrote:
-> >> phyCORE-AM335x is a SoM (System on Module) containing
-> >> a AM335x SOC. The module can be connected to different
-> >> carrier boards.
-> >>
-> >> Some hardware parts are configurable on the phyCORE-AM335x.
-> >> So they are disabled on default in this som dtsi file.
-> >> They will be enabled in the board dts files, when populated.
-> >>
-> >> * RAM up to 1GiB
-> >> * PMIC
-> >> * NAND flash up to 1GiB
-> >> * Eth PHY on SOM: 1x RMII
-> >> * SPI NOR flash 8MiB (optional)
-> >> * i2c RTC (optional)
-> >> * i2c EEPROM 4kiB (optional)
-> >>
-> >> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
-> >> ---
-> >>  arch/arm/boot/dts/am335x-phycore-som.dtsi | 368 ++++++++++++++++++++++++++++++
-> >>  1 file changed, 368 insertions(+)
-> >>  create mode 100644 arch/arm/boot/dts/am335x-phycore-som.dtsi
-> >>
-> >> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> >> new file mode 100644
-> >> index 0000000..4d28fc3
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
-> 
-> [...]
-> 
-> >> +#include "am33xx.dtsi"
-> >> +
-> >> +/ {
-> >> +	model = "Phytec AM335x phyCORE";
-> >> +	compatible = "phytec,am335x-phycore-som", "ti,am33xx";
+> > On Jul 24, 2015, at 19:52, yalin wang <yalin.wang2010@gmail.com> wrote:
 > > 
-> > One minor thing here...wildcards in compatible strings aren't permitted.
-> > However, family compatibles like "ti,am33xx" that came in before this
-> > was enforced are grandfathered. Ideally, the newly introced board/som
-> > specific strings should not propagate that wildcard. i.e. something
-> > like "phytec,am3352-phycore-som" or whatever is the base family part
-> > on these SOMs.
+> > A little change to patch_map() function,
+> > use set_fixmap_offset() to make code more clear.
 > > 
-> 
-> I'm not sure this is wild card.
-> I tend to think that it is the real name of the som [1], no?
-> 
-> http://phytec.com/products/system-on-modules/phycore/am335x/
+> > Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
+> > ---
+> > arch/arm64/kernel/insn.c | 5 ++---
+> > 1 file changed, 2 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> > index dd9671c..f341866 100644
+> > --- a/arch/arm64/kernel/insn.c
+> > +++ b/arch/arm64/kernel/insn.c
+> > @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
+> > 		return addr;
+> > 
+> > 	BUG_ON(!page);
+> > -	set_fixmap(fixmap, page_to_phys(page));
+> > -
+> > -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+> > +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
+> > +			(uintaddr & ~PAGE_MASK));
+> > }
+> > 
+> > static void __kprobes patch_unmap(int fixmap)
+> > -- 
+> > 1.9.1
+> > 
+> Marinas,
+> this V2 patch can build without warning even CONFIG_DEBUG_SET_MODULE_RONX enabled,
+> could you review it.
+> Thanks.
 
-Yes, your right. This is the name of the SoM. The phyCORE may have
-different am335x versions mounted. So there is not the one am3352 or
-am3359 always used.
+I queued this already for 4.3. There's a (benign) sparse warning about the
+addr parameter to patch_map being overridden by the local scope of
+set_fixmap_offset which could be solved with a healthy portion of
+underscores in the core code.
 
-Regards,
-Teresa
-
-> 
-> [...]
-> 
+Will
