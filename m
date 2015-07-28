@@ -1,225 +1,64 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 28 Jul 2015 16:02:43 +0100
-Subject: [PATCH 2/8] xen: Make clear that swiotlb and biomerge are dealing
- with DMA address
+Date: Tue, 28 Jul 2015 16:02:42 +0100
+Subject: [PATCH 1/8] arm/xen: Remove helpers which are PV specific
 In-Reply-To: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
 References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <1438095769-2560-3-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438095769-2560-2-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The swiotlb is required when programming a DMA address on ARM when a
-device is not protected by an IOMMU.
+ARM guests are assimilated to HVM guest on ARM. The current
+implementation is assuming a 1:1 mapping which is only true for DOM0 and
+may not be at all in the future.
 
-In this case, the DMA address should always be equal to the machine address.
-For DOM0 memory, Xen ensure it by have an identity mapping between the
-guest address and host address. However, when mapping a foreign grant
-reference, the 1:1 model doesn't work.
+Furthermore, all the helpers but arbitrary_virt_to_machine are used in
+x86 specific code (or only compiled for).
 
-For ARM guest, most of the callers of pfn_to_mfn expects to get a GFN
-(Guest Frame Number), i.e a PFN (Page Frame Number) from the Linux point
-of view given that all ARM guest are auto-translated.
+The helper arbitrary_virt_to_machine is only used in PV specific code.
+Therefore we should never call the function.
 
-Even though the name pfn_to_mfn is misleading, we need to ensure that
-those caller get a GFN and not by mistake a MFN. In pratical, I haven't
-seen error related to this but we should fix it for the sake of
-correctness.
-
-In order to fix the implementation of pfn_to_mfn on ARM in a follow-up
-patch, we have to introduce new helpers to return the DMA from a PFN and
-the invert.
-
-On x86, the new helpers will be an alias of pfn_to_mfn and mfn_to_pfn.
-
-The helpers will be used in swiotlb and xen_biovec_phys_mergeable.
-
-This is necessary in the latter because we have to ensure that the
-biovec code will not try to merge a biovec using foreign page and
-another using Linux memory.
-
-Lastly, the helper mfn_to_local_pfn has been renamed to dnf_to_local_pfn
-given that the only usage was in swiotlb.
+Add a BUG() in this helper and drop all the others.
 
 Signed-off-by: Julien Grall <julien.grall@citrix.com>
 Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-Cc: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-Cc: David Vrabel <david.vrabel@citrix.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- arch/arm/include/asm/xen/page.h | 23 +++++++++++++++++++++--
- arch/arm/xen/mm.c               |  4 ++--
- arch/x86/include/asm/xen/page.h |  8 ++++++--
- drivers/xen/biomerge.c          |  6 +++---
- drivers/xen/swiotlb-xen.c       | 16 ++++++++--------
- 5 files changed, 40 insertions(+), 17 deletions(-)
+ arch/arm/include/asm/xen/page.h | 16 ++--------------
+ 1 file changed, 2 insertions(+), 14 deletions(-)
 
 diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index c2e9dcd..6c9f6d2 100644
+index 1bee8ca..c2e9dcd 100644
 --- a/arch/arm/include/asm/xen/page.h
 +++ b/arch/arm/include/asm/xen/page.h
-@@ -52,7 +52,26 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
- 	return mfn;
- }
+@@ -54,26 +54,14 @@ static inline unsigned long mfn_to_pfn(unsigned long mfn)
  
--#define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
-+/* Pseudo-physical <-> DMA conversion */
-+static inline unsigned long pfn_to_dfn(unsigned long pfn)
-+{
-+	unsigned long mfn;
-+
-+	if (phys_to_mach.rb_node != NULL) {
-+		mfn = __pfn_to_mfn(pfn);
-+		if (mfn != INVALID_P2M_ENTRY)
-+			return mfn;
-+	}
-+
-+	return pfn;
-+}
-+
-+static inline unsigned long dfn_to_pfn(unsigned long dfn)
-+{
-+	return dfn;
-+}
-+
-+#define dfn_to_local_pfn(dfn)	dfn_to_pfn(dfn)
+ #define mfn_to_local_pfn(mfn) mfn_to_pfn(mfn)
  
+-static inline xmaddr_t phys_to_machine(xpaddr_t phys)
+-{
+-	unsigned offset = phys.paddr & ~PAGE_MASK;
+-	return XMADDR(PFN_PHYS(pfn_to_mfn(PFN_DOWN(phys.paddr))) | offset);
+-}
+-
+-static inline xpaddr_t machine_to_phys(xmaddr_t machine)
+-{
+-	unsigned offset = machine.maddr & ~PAGE_MASK;
+-	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
+-}
  /* VIRT <-> MACHINE conversion */
+-#define virt_to_machine(v)	(phys_to_machine(XPADDR(__pa(v))))
  #define virt_to_mfn(v)		(pfn_to_mfn(virt_to_pfn(v)))
-@@ -96,7 +115,7 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ #define mfn_to_virt(m)		(__va(mfn_to_pfn(m) << PAGE_SHIFT))
  
- bool xen_arch_need_swiotlb(struct device *dev,
- 			   unsigned long pfn,
--			   unsigned long mfn);
-+			   unsigned long dfn);
- unsigned long xen_get_swiotlb_free_pages(unsigned int order);
- 
- #endif /* _ASM_ARM_XEN_PAGE_H */
-diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-index 03e75fe..12bde72 100644
---- a/arch/arm/xen/mm.c
-+++ b/arch/arm/xen/mm.c
-@@ -139,9 +139,9 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
- 
- bool xen_arch_need_swiotlb(struct device *dev,
- 			   unsigned long pfn,
--			   unsigned long mfn)
-+			   unsigned long dfn)
++/* Only used in PV code. However ARM guest is always assimilated as HVM. */
+ static inline xmaddr_t arbitrary_virt_to_machine(void *vaddr)
  {
--	return (!hypercall_cflush && (pfn != mfn) && !is_device_dma_coherent(dev));
-+	return (!hypercall_cflush && (pfn != dfn) && !is_device_dma_coherent(dev));
+-	/* TODO: assuming it is mapped in the kernel 1:1 */
+-	return virt_to_machine(vaddr);
++	BUG();
  }
  
- int xen_create_contiguous_region(phys_addr_t pstart, unsigned int order,
-diff --git a/arch/x86/include/asm/xen/page.h b/arch/x86/include/asm/xen/page.h
-index c44a5d5..046e91a 100644
---- a/arch/x86/include/asm/xen/page.h
-+++ b/arch/x86/include/asm/xen/page.h
-@@ -178,6 +178,10 @@ static inline xpaddr_t machine_to_phys(xmaddr_t machine)
- 	return XPADDR(PFN_PHYS(mfn_to_pfn(PFN_DOWN(machine.maddr))) | offset);
- }
- 
-+/* Pseudo-physical <-> DMA conversion */
-+#define pfn_to_dfn(pfn)		pfn_to_mfn(pfn)
-+#define dfn_to_pfn(dfn)		mfn_to_pfn(dfn)
-+
- /*
-  * We detect special mappings in one of two ways:
-  *  1. If the MFN is an I/O page then Xen will set the m2p entry
-@@ -198,7 +202,7 @@ static inline xpaddr_t machine_to_phys(xmaddr_t machine)
-  *      require. In all the cases we care about, the FOREIGN_FRAME bit is
-  *      masked (e.g., pfn_to_mfn()) so behaviour there is correct.
-  */
--static inline unsigned long mfn_to_local_pfn(unsigned long mfn)
-+static inline unsigned long dfn_to_local_pfn(unsigned long mfn)
- {
- 	unsigned long pfn;
- 
-@@ -264,7 +268,7 @@ void make_lowmem_page_readwrite(void *vaddr);
- 
- static inline bool xen_arch_need_swiotlb(struct device *dev,
- 					 unsigned long pfn,
--					 unsigned long mfn)
-+					 unsigned long dfn)
- {
- 	return false;
- }
-diff --git a/drivers/xen/biomerge.c b/drivers/xen/biomerge.c
-index 0edb91c..4bc5866 100644
---- a/drivers/xen/biomerge.c
-+++ b/drivers/xen/biomerge.c
-@@ -6,10 +6,10 @@
- bool xen_biovec_phys_mergeable(const struct bio_vec *vec1,
- 			       const struct bio_vec *vec2)
- {
--	unsigned long mfn1 = pfn_to_mfn(page_to_pfn(vec1->bv_page));
--	unsigned long mfn2 = pfn_to_mfn(page_to_pfn(vec2->bv_page));
-+	unsigned long dfn1 = pfn_to_dfn(page_to_pfn(vec1->bv_page));
-+	unsigned long dfn2 = pfn_to_dfn(page_to_pfn(vec2->bv_page));
- 
- 	return __BIOVEC_PHYS_MERGEABLE(vec1, vec2) &&
--		((mfn1 == mfn2) || ((mfn1+1) == mfn2));
-+		((dfn1 == dfn2) || ((dfn1+1) == dfn2));
- }
- EXPORT_SYMBOL(xen_biovec_phys_mergeable);
-diff --git a/drivers/xen/swiotlb-xen.c b/drivers/xen/swiotlb-xen.c
-index 4c54932..52c3138 100644
---- a/drivers/xen/swiotlb-xen.c
-+++ b/drivers/xen/swiotlb-xen.c
-@@ -82,8 +82,8 @@ static u64 start_dma_addr;
-  */
- static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
- {
--	unsigned long mfn = pfn_to_mfn(PFN_DOWN(paddr));
--	dma_addr_t dma = (dma_addr_t)mfn << PAGE_SHIFT;
-+	unsigned long dfn = pfn_to_dfn(PFN_DOWN(paddr));
-+	dma_addr_t dma = (dma_addr_t)dfn << PAGE_SHIFT;
- 
- 	dma |= paddr & ~PAGE_MASK;
- 
-@@ -92,7 +92,7 @@ static inline dma_addr_t xen_phys_to_bus(phys_addr_t paddr)
- 
- static inline phys_addr_t xen_bus_to_phys(dma_addr_t baddr)
- {
--	unsigned long pfn = mfn_to_pfn(PFN_DOWN(baddr));
-+	unsigned long pfn = dfn_to_pfn(PFN_DOWN(baddr));
- 	dma_addr_t dma = (dma_addr_t)pfn << PAGE_SHIFT;
- 	phys_addr_t paddr = dma;
- 
-@@ -110,15 +110,15 @@ static int check_pages_physically_contiguous(unsigned long pfn,
- 					     unsigned int offset,
- 					     size_t length)
- {
--	unsigned long next_mfn;
-+	unsigned long next_dfn;
- 	int i;
- 	int nr_pages;
- 
--	next_mfn = pfn_to_mfn(pfn);
-+	next_dfn = pfn_to_dfn(pfn);
- 	nr_pages = (offset + length + PAGE_SIZE-1) >> PAGE_SHIFT;
- 
- 	for (i = 1; i < nr_pages; i++) {
--		if (pfn_to_mfn(++pfn) != ++next_mfn)
-+		if (pfn_to_dfn(++pfn) != ++next_dfn)
- 			return 0;
- 	}
- 	return 1;
-@@ -138,8 +138,8 @@ static inline int range_straddles_page_boundary(phys_addr_t p, size_t size)
- 
- static int is_xen_swiotlb_buffer(dma_addr_t dma_addr)
- {
--	unsigned long mfn = PFN_DOWN(dma_addr);
--	unsigned long pfn = mfn_to_local_pfn(mfn);
-+	unsigned long dfn = PFN_DOWN(dma_addr);
-+	unsigned long pfn = dfn_to_local_pfn(dfn);
- 	phys_addr_t paddr;
- 
- 	/* If the address is outside our domain, it CAN
+ /* TODO: this shouldn't be here but it is because the frontend drivers
 -- 
 2.1.4
