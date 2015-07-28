@@ -1,118 +1,103 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Jul 2015 13:54:36 +0100
-Subject: [PATCH v1 7/7] ARM: dts: ifc6410: add inforce LVDS panel support
-In-Reply-To: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1438088076-17606-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jul 2015 14:55:00 +0200
+Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
+ board-specific operating points for LeMaker BananaPi
+In-Reply-To: <20150728090209.1D7BC6C80542@dd34104.kasserver.com>
+References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de>
+ <55B5E6DB.8020009@redhat.com>
+ <20150727120918.191F76C82FB4@dd34104.kasserver.com>
+ <55B62768.6040403@redhat.com>
+ <20150728090209.1D7BC6C80542@dd34104.kasserver.com>
+Message-ID: <20150728125500.GB2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds LVDS panel for IFC6410.
+On Tue, Jul 28, 2015 at 11:02:09AM +0200, Timo Sigurdsson wrote:
+> Hi,
+> 
+> Hans de Goede schrieb am 27.07.2015 14:43:
+> >>> I've a simular patch here:
+> >>>
+> >>> https://github.com/jwrdegoede/linux-sunxi/commit/6a30b7d5be6012b81e5e1439a444e41c0ac1afc1
+> >>>
+> >>> I did not submit this upstream yet as it is part of a series to enable the
+> >>> otg
+> >>> controller on the bananapi which needs axp-usb-power-supply support for which
+> >>> the actual powersupply driver changes are still pending.
+> >> Oops, I see. Are you planning to submit this for 4.3 or later?
+> > 
+> > I plan to submit this for 4.3.
+>
+> Ok, then I guess we can drop my patch.
 
-Signed-off-by: Rob Clark <robdclark@gmail.com>
-[Rob Clark: WIP patch]
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 66 ++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+Please don't.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-index 1ab71f1..3bdac02 100644
---- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-@@ -63,6 +63,12 @@
- 					qcom,switch-mode-frequency = <3200000>;
- 				};
- 
-+				pm8921_l2: l2 {
-+					regulator-min-microvolt = <1200000>;
-+					regulator-max-microvolt = <1200000>;
-+					bias-pull-down;
-+				};
-+
- 				pm8921_l3: l3 {
- 					regulator-min-microvolt = <3050000>;
- 					regulator-max-microvolt = <3300000>;
-@@ -96,6 +102,10 @@
- 				pm8921_lvs1: lvs1 {
- 					bias-pull-down;
- 				};
-+
-+				pm8921_lvs7: lvs7 {
-+					bias-pull-down;
-+				};
- 			};
- 		};
- 
-@@ -119,6 +129,41 @@
- 
- 		mdp: qcom,mdp at 5100000 {
- 			status = "okay";
-+			qcom,lvds-panel = <&panel>;
-+			lvds-vccs-3p3v-supply = <&ext_3p3v>;
-+			lvds-pll-vdda-supply = <&pm8921_l2>;
-+			lvds-vdda-supply = <&pm8921_lvs7>;
-+		};
-+
-+		panel_3p3v: panel_3p3v {
-+			compatible = "regulator-fixed";
-+			pinctrl-0 = <&disp_en_gpios>;
-+			pinctrl-names = "default";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-name = "panel_en_3p3v";
-+			regulator-type = "voltage";
-+			startup-delay-us = <0>;
-+			gpio = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			regulator-boot-on;
-+		};
-+
-+		backlight: backlight{
-+			pinctrl-0 = <&pwm_bl_gpios>;
-+			pinctrl-names = "default";
-+			compatible = "gpio-backlight";
-+			gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
-+			default-on;
-+		};
-+
-+		panel: auo,b101xtn01 {
-+			status = "okay";
-+			compatible = "auo,b101xtn01";
-+
-+			ddc-i2c-bus = <&i2c3>;
-+			backlight = <&backlight>;
-+			power-supply = <&panel_3p3v>;
- 		};
- 
- 		gsbi3: gsbi at 16200000 {
-@@ -235,6 +280,27 @@
- 				pm8921_gpio: gpio at 150 {
- 					pinctrl-names = "default";
- 					pinctrl-0 = <&wlan_default_gpios>;
-+
-+					pwm_bl_gpios: pwm-bl-gpios {
-+						pios {
-+							pins = "gpio26";
-+							bias-disable;
-+							function = "normal";
-+							qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
-+							power-source = <PM8921_GPIO_S4>;
-+						};
-+					};
-+
-+					disp_en_gpios: disp-en-gpios {
-+						pios {
-+							pins = "gpio36";
-+							bias-disable;
-+							function = "normal";
-+							qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
-+							power-source = <PM8921_GPIO_S4>;
-+						};
-+					};
-+
- 					wlan_default_gpios: wlan-gpios {
- 						pios {
- 							pins = "gpio43";
+> >>> IMHO we should just stick with the standard operating points unless we know
+> >>> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
+> >>> Lime).
+> >> I'd be fine with that as I don't have any stability issues with the lower
+> >> voltages. What about the 1008MHz operating point that I "reintroduced"? It was
+> >> dropped here [1]  because there was no regulator support.
+> > 
+> > That is in essence an overclocked setting, the max CPU voltage officially is
+> > 1.4V, I do not think that we should provide any overclocked settings in the
+> > official dts files. If people really want to overclock they will have to
+> > modify there dts themselves IMHO.
+> 
+> Personally, I would be fine with that. Even though I think, it might
+> be good to have them in the official files just for convenience and
+> because people who are used to the sunxi-3.4 kernels are used to
+> having the 1008MHz opp (and it was in mainline for a short while,
+> too).
+
+It was used in mainline, and reverted because it was not stable
+enough.
+
+There's a lot of things we do differently in mainline, it's one of
+them. If someone can provide an OPP for 1008MHz that is stable for all
+the boards and within the operating limits of the SoC, I'd be totally
+fine with that, but we didn't find it so far.
+
+> For those who don't want to use that setting, it's easier to
+> limit the maximum in userspace compared to compiling a new device
+> tree blob.
+
+Except that the kernel should not rely on the userspace to be stable
+and harmless for the hardware. It should just work reliably by itself.
+
+> But I do understand your point, so I guess it's just something that
+> maintainers have to make a decision for. As I said, either way is
+> fine for me.
+> 
+> > > Can this be reenabled
+> >> on board level (which means overriding the defaults inherited from
+> >> sun7i-a20.dtsi) or should this be done at SOC level for all boards (which
+> >> means we have to add regulator nodes for all boards in the first place)?
+> > 
+> > Technically this is possible, but I do not think that it is a good idea.
+> 
+> I guess the same applies here, too. It's something maintainers should have a
+> common understanding on. I don't know how much variation there is among the
+> A20 boards in terms of frequencies and voltages.
+
+If you look at the FEX file, a lot. But most of them are just
+variations of the same OPP.
+
+I value much more a set of OPPs that has been tested on a wide range
+of device, that we know are working reliably on all of them, over a
+FEX file providing a set of OPPs that for some of them have never even
+been tested before because the 3.4 kernel simply ignored them.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/ee568e62/attachment-0001.sig>
