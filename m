@@ -1,54 +1,43 @@
 From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 28 Jul 2015 21:19:40 +0800
-Subject: [PATCH V3 0/5] clk: support clocks which requires parent clock on
- during operation
-Message-ID: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+Date: Tue, 28 Jul 2015 21:19:41 +0800
+Subject: [PATCH V3 1/5] clk: remove duplicated code with __clk_set_parent_after
+In-Reply-To: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
+Message-ID: <1438089585-30103-2-git-send-email-aisheng.dong@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support in clock framework for clocks which operations
-requires its parent clock is on.
+__clk_set_parent_after() actually used the second argument then we
+could put this duplicate logic in there and call it with a different
+order of arguments in the success vs. error paths in this function.
 
-Such clock type is initially met on Freescale i.MX7D platform that all clocks
-operations, including enable/disable, rate change and re-parent, requires its
-parent clock on. No sure if any other SoC has the similar clock type.
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
+---
+ drivers/clk/clk.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-Current clock core can not support such type of clock well.
-
-This patch introduce a new flag CLK_SET_PARENT_ON to handle this special case
-in clock core that enable its parent clock firstly for each operation and disable
-it later after operation complete.
-
-The most special case is for set_parent() operation which requires both parent,
-old one and new one, to be enabled at the same time during the operation.
-
-The patch series is based on for-next branch of Michael's git:
-git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-
-Change Log:
-v2->v3:
- * rebased version, no other changes.
-
-v1->v2:
- Mainly addressed Stephen Boyd's comments
- * remove dupliciated code with __clk_set_parent_after
- * introduce more clk_core_x APIs for core easily use
- * move clk_disable_unused code position
- * use clk_core_x API to make code more clean and easily read
-
-Dong Aisheng (5):
-  clk: remove duplicated code with __clk_set_parent_after
-  clk: introduce clk_core_enable_lock and clk_core_disable_lock
-    functions
-  clk: move clk_disable_unused after clk_core_disable_unprepare function
-  clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-    parent on
-  clk: core: add CLK_OPS_PARENT_ON flags to support clocks require
-    parent on
-
- drivers/clk/clk.c            | 338 +++++++++++++++++++++++++------------------
- include/linux/clk-provider.h |   5 +
- 2 files changed, 200 insertions(+), 143 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 7bb9757..4c7f7b2 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1185,14 +1185,8 @@ static int __clk_set_parent(struct clk_core *core, struct clk_core *parent,
+ 		flags = clk_enable_lock();
+ 		clk_reparent(core, old_parent);
+ 		clk_enable_unlock(flags);
++		__clk_set_parent_after(core, old_parent, parent);
+ 
+-		if (core->prepare_count) {
+-			flags = clk_enable_lock();
+-			clk_core_disable(core);
+-			clk_core_disable(parent);
+-			clk_enable_unlock(flags);
+-			clk_core_unprepare(parent);
+-		}
+ 		return ret;
+ 	}
+ 
 -- 
 1.9.1
