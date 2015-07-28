@@ -1,192 +1,135 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 Jul 2015 12:25:51 +0200
-Subject: [PATCH v2 3/3] ARM: at91/dt: add minimal sama5d2 Xplained board
-In-Reply-To: <1438079151-29653-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1438079151-29653-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1438079151-29653-4-git-send-email-nicolas.ferre@atmel.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 28 Jul 2015 12:30:07 +0200
+Subject: [PATCH v2 0/3] Add DT support for netxbig LEDs
+In-Reply-To: <55B3F580.2040207@gmail.com>
+References: <1434628373-11834-1-git-send-email-simon.guinot@sequanux.org>
+ <55B3A32C.1010305@free-electrons.com> <55B3E536.5010107@gmail.com>
+ <55B3F580.2040207@gmail.com>
+Message-ID: <55B759AF.8050304@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add minimal support for the new sama5d2 Xplained board. Only USB, sd/mmc,
-spi/i2c, ethernet and uart/usart peripherals added.
-With this DTS file you can boot the board and begin to play with it.
-Rootfs on NFS and sd card have successfully been tested.
+Hi Jacek, Simon,
+On 25/07/2015 22:45, Jacek Anaszewski wrote:
+> I confused two patch sets. Everything I wrote in the reply
+> below was related to leds-ns2 [1] patch set.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
+About taking the dts part of this patch set in the led branch, I agree.
+It will solve the dependency problem I would have. Usually we (the mvebu
+maintainer) take all the dts related to void the merge conflict.
 
-Changes in v2:
-- enable spi and i2c nodes
-- enable sdmmc0
-- move to stdout-path for console
+For these ones, I don't expect any merge problem because they are all located
+in dts and only in one family.
 
- arch/arm/boot/dts/Makefile                  |   1 +
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 145 ++++++++++++++++++++++++++++
- 2 files changed, 146 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-sama5d2_xplained.dts
+So you can also take "[PATCH v2 2/4] ARM: Kirkwood: add modes-map property to
+ns2-leds nodes" with my
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 63e90c5ff679..db25557fa8b1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -41,6 +41,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	at91sam9x35ek.dtb
- dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-kizbox2.dtb \
-+	at91-sama5d2_xplained.dtb \
- 	at91-sama5d3_xplained.dtb \
- 	sama5d31ek.dtb \
- 	sama5d33ek.dtb \
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-new file mode 100644
-index 000000000000..4bb77381ed55
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -0,0 +1,145 @@
-+/*
-+ * at91-sama5d2_xplained.dts - Device Tree file for SAMA5D2 Xplained board
-+ *
-+ *  Copyright (C) 2015 Atmel,
-+ *                2015 Nicolas Ferre <nicolas.ferre@atmel.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+/dts-v1/;
-+#include "sama5d2.dtsi"
-+
-+/ {
-+	model = "Atmel SAMA5D2 Xplained";
-+	compatible = "atmel,sama5d2-xplained", "atmel,sama5d2", "atmel,sama5";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x80000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		main_clock: clock at 0 {
-+			compatible = "atmel,osc", "fixed-clock";
-+			clock-frequency = <12000000>;
-+		};
-+
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <12000000>;
-+		};
-+	};
-+
-+	ahb {
-+		usb0: gadget at 00300000 {
-+			status = "okay";
-+		};
-+
-+		usb1: ohci at 00400000 {
-+			num-ports = <3>;
-+			status = "okay";
-+		};
-+
-+		usb2: ehci at 00500000 {
-+			status = "okay";
-+		};
-+
-+		sdmmc0: sdio-host at a0000000 {
-+			bus-width = <8>;
-+			non-removable;
-+			status = "okay";
-+		};
-+
-+		sdmmc1: sdio-host at b0000000 {
-+			bus-width = <4>;
-+			status = "okay"; /* conflict with qspi0 */
-+		};
-+
-+		apb {
-+			spi0: spi at f8000000 {
-+				status = "okay";
-+
-+				m25p80 at 0 {
-+					compatible = "atmel,at25df321a";
-+					reg = <0>;
-+					spi-max-frequency = <50000000>;
-+				};
-+			};
-+
-+			macb0: ethernet at f8008000 {
-+				phy-mode = "rmii";
-+				status = "okay";
-+			};
-+
-+			uart1: serial at f8020000 {
-+				status = "okay";
-+			};
-+
-+			i2c0: i2c at f8028000 {
-+				dmas = <0>, <0>;
-+				status = "okay";
-+			};
-+
-+			uart3: serial at fc008000 {
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at fc028000 {
-+				dmas = <0>, <0>;
-+				status = "okay";
-+
-+				at24 at 54 {
-+					compatible = "atmel,24c02";
-+					reg = <0x54>;
-+					pagesize = <16>;
-+				};
-+			};
-+		};
-+	};
-+};
+and I will remove this one from my branches.
+
+Thanks,
+
+Gregory
+
+
+> When it is related to leds-netxbig driver - there was already
+> version 3 posted [2], but it is not the final one, we are waiting
+> for the update.
+
+Right, I missed this third version.
+
+
+
+> 
+> On 25.07.2015 21:36, Jacek Anaszewski wrote:
+>> Hi Gregory,
+>>
+>> On 25.07.2015 16:54, Gregory CLEMENT wrote:
+>>> Hi Simon, Bryan, Richard,
+>>>
+>>> On 18/06/2015 13:52, Simon Guinot wrote:
+>>>> Hello,
+>>>>
+>>>> This patch series adds DT support for the LEDs found on the
+>>>> Kirkwood-based
+>>>> LaCie boards 2Big and 5Big Network v2.
+>>>
+>>> I saw that some led related patch on kirkwood based board have been
+>>> merged.
+>>> What is the status of this series?
+>>
+>> LED subsystem part has been merged to linux-next, since DTS files
+>> are not required for the compilation to succeed. We've been waiting
+>> for ARM/Marvell Kirkwood maintainer opinion to decide on how to proceed
+>> regarding patch 2/4.
+>>
+>>> I still have the patch 2 and 3 in my inbox waiting for being applied.
+>>
+>> Patch 3 affects only drivers/leds/leds-ns2.c, you were probably
+>> thinking of patch 1 which modifies the out of LED tree file
+>> include/linux/platform_data/leds-kirkwood-ns2.h.
+>>
+>> IMO it would be best if the whole series went through the
+>> LED tree.
+>>
+>>> Thanks,
+>>>
+>>> Gregory
+>>>
+>>>
+>>>>
+>>>> Changes since v1:
+>>>> - Check timer mode value retrieved from DT.
+>>>> - In netxbig_leds_get_of_pdata, don't use unsigned long variables to get
+>>>>    timer delay values from DT with function of_property_read_u32_index.
+>>>>    Instead, use a temporary u32 variable. This allows to silence a
+>>>> static
+>>>>    checker warning.
+>>>> - Make timer property optional in the binding documentation. It is now
+>>>>    aligned with the driver code.
+>>>>
+>>>> Simon
+>>>>
+>>>> Simon Guinot (3):
+>>>>    leds: netxbig: add device tree binding
+>>>>    ARM: Kirkwood: add LED DT entries for netxbig boards
+>>>>    ARM: mvebu: remove static LED setup for netxbig boards
+>>>>
+>>>>   .../devicetree/bindings/gpio/netxbig-gpio-ext.txt  |  22 ++
+>>>>   .../devicetree/bindings/leds/leds-netxbig.txt      |  92 ++++++++
+>>>>   arch/arm/boot/dts/kirkwood-net5big.dts             |  60 +++++
+>>>>   arch/arm/boot/dts/kirkwood-netxbig.dtsi            |  80 +++++++
+>>>>   arch/arm/mach-mvebu/Kconfig                        |   7 -
+>>>>   arch/arm/mach-mvebu/Makefile                       |   1 -
+>>>>   arch/arm/mach-mvebu/board.h                        |  21 --
+>>>>   arch/arm/mach-mvebu/kirkwood.c                     |   4 -
+>>>>   arch/arm/mach-mvebu/netxbig.c                      | 191
+>>>> ----------------
+>>>>   drivers/leds/leds-netxbig.c                        | 250
+>>>> +++++++++++++++++++--
+>>>>   include/dt-bindings/leds/leds-netxbig.h            |  18 ++
+>>>>   11 files changed, 501 insertions(+), 245 deletions(-)
+>>>>   create mode 100644
+>>>> Documentation/devicetree/bindings/gpio/netxbig-gpio-ext.txt
+>>>>   create mode 100644
+>>>> Documentation/devicetree/bindings/leds/leds-netxbig.txt
+>>>>   delete mode 100644 arch/arm/mach-mvebu/board.h
+>>>>   delete mode 100644 arch/arm/mach-mvebu/netxbig.c
+>>>>   create mode 100644 include/dt-bindings/leds/leds-netxbig.h
+>>>>
+>>>
+>>>
+>>
+> 
+> [1] 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/353807.html
+> [2] 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351486.html
+> 
+
+
 -- 
-2.1.3
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
