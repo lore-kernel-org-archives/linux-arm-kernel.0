@@ -1,133 +1,51 @@
-From: aisheng.dong@freescale.com (Dong Aisheng)
-Date: Tue, 28 Jul 2015 21:19:45 +0800
-Subject: [PATCH V3 5/5] clk: core: add CLK_OPS_PARENT_ON flags to support
- clocks require parent on
-In-Reply-To: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
-References: <1438089585-30103-1-git-send-email-aisheng.dong@freescale.com>
-Message-ID: <1438089585-30103-6-git-send-email-aisheng.dong@freescale.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 22:30:45 +0800
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+ <20150727132802.GK12927@tiger>
+ <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728010235.GU12927@tiger>
+ <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <20150728143045.GG12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Freescale i.MX7D platform, all clocks operations, including
-enable/disable, rate change and re-parent, requires its parent clock on.
-Current clock core can not support it well.
-This patch adding flag CLK_OPS_PARENT_ON to handle this special case in
-clock core that enable its parent clock firstly for each operation and
-disable it later after operation complete.
+On Tue, Jul 28, 2015 at 02:16:20PM +0000, Shenwei Wang wrote:
+> > The files are named with "-imx7".  It's a clear sign that the build of the files
+> > should be controlled by something like related to "imx7".
+> > Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only supported imx7
+> > soc and there is no CONFIG_SOC_IMX7 available so far, it falls on
+> > CONFIG_SOC_IMX7D.
+> 
+> We can also interpret "-imx7" is the first SoC which has the GPCv2 block. 
 
-This patch fixes changing clock rate and switch parent while its parent
-is off. The most special case is for set_parent() operation which requires
-both parent, including old one and new one, to be enabled at the same time
-during the operation.
+In that case you should name the block gpc-imx7d rather than gpcv2 and
+symbol as GPC_IMX7D rather than IMX_GPCV2.
 
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Dong Aisheng <aisheng.dong@freescale.com>
----
- drivers/clk/clk.c | 46 +++++++++++++++++++++++++++++-----------------
- 1 file changed, 29 insertions(+), 17 deletions(-)
+> > > > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
+> > > >
+> > > > Will this give a checkpatch warning?
+> > >
+> > > Yes. Any suggestion for that? Move it to a header file?
+> > 
+> > Get rid of it.
+> 
+> Then you may resolve the following compile error:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index cf31dc4..93eb9e3 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1159,7 +1159,7 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
- 	struct clk_core *old_parent = core->parent;
- 
- 	/*
--	 * Migrate prepare state between parents and prevent race with
-+	 * 1. Migrate prepare state between parents and prevent race with
- 	 * clk_enable().
- 	 *
- 	 * If the clock is not prepared, then a race with
-@@ -1174,13 +1174,17 @@ static struct clk_core *__clk_set_parent_before(struct clk_core *core,
- 	 * hardware and software states.
- 	 *
- 	 * See also: Comment for clk_set_parent() below.
-+	 *
-+	 * 2. enable two parents clock for .set_parent() operation if finding
-+	 * flag CLK_OPS_PARENT_ON
- 	 */
--	if (core->prepare_count) {
--		clk_core_prepare(parent);
--		flags = clk_enable_lock();
--		clk_core_enable(parent);
--		clk_core_enable(core);
--		clk_enable_unlock(flags);
-+	if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
-+		clk_core_prepare_enable(parent);
-+		if (core->prepare_count)
-+			clk_core_enable_lock(core);
-+		else
-+			clk_core_prepare_enable(old_parent);
-+
- 	}
- 
- 	/* update the clk tree topology */
-@@ -1195,18 +1199,16 @@ static void __clk_set_parent_after(struct clk_core *core,
- 				   struct clk_core *parent,
- 				   struct clk_core *old_parent)
- {
--	unsigned long flags;
--
- 	/*
- 	 * Finish the migration of prepare state and undo the changes done
- 	 * for preventing a race with clk_enable().
- 	 */
--	if (core->prepare_count) {
--		flags = clk_enable_lock();
--		clk_core_disable(core);
--		clk_core_disable(old_parent);
--		clk_enable_unlock(flags);
--		clk_core_unprepare(old_parent);
-+	if (core->prepare_count || core->flags & CLK_OPS_PARENT_ON) {
-+		clk_core_disable_unprepare(old_parent);
-+		if (core->prepare_count)
-+			clk_core_disable_lock(core);
-+		else
-+			clk_core_disable_unprepare(parent);
- 	}
- }
- 
-@@ -1453,13 +1455,17 @@ static void clk_change_rate(struct clk_core *core)
- 	unsigned long best_parent_rate = 0;
- 	bool skip_set_rate = false;
- 	struct clk_core *old_parent;
-+	struct clk_core *parent = NULL;
- 
- 	old_rate = core->rate;
- 
--	if (core->new_parent)
-+	if (core->new_parent) {
-+		parent = core->new_parent;
- 		best_parent_rate = core->new_parent->rate;
--	else if (core->parent)
-+	} else if (core->parent) {
-+		parent = core->parent;
- 		best_parent_rate = core->parent->rate;
-+	}
- 
- 	if (core->new_parent && core->new_parent != core->parent) {
- 		old_parent = __clk_set_parent_before(core, core->new_parent);
-@@ -1480,6 +1486,9 @@ static void clk_change_rate(struct clk_core *core)
- 
- 	trace_clk_set_rate(core, core->new_rate);
- 
-+	if (core->flags & CLK_OPS_PARENT_ON)
-+		clk_core_prepare_enable(parent);
-+
- 	if (!skip_set_rate && core->ops->set_rate)
- 		core->ops->set_rate(core->hw, core->new_rate, best_parent_rate);
- 
-@@ -1487,6 +1496,9 @@ static void clk_change_rate(struct clk_core *core)
- 
- 	core->rate = clk_recalc(core, best_parent_rate);
- 
-+	if (core->flags & CLK_OPS_PARENT_ON)
-+		clk_core_disable_unprepare(parent);
-+
- 	if (core->notifier_count && old_rate != core->rate)
- 		__clk_notify(core, POST_RATE_CHANGE, old_rate, core->rate);
- 
--- 
-1.9.1
+You didn't get my point.  Rather than defining it as a global variable,
+we should try to keep imx_gpcv2_irq as an internal data structure to
+irqchip driver, and use well-defined interface to access the data from
+pm driver when necessary.
+
+Shawn
+
+> 
+> CC      arch/arm/mach-imx/pm-imx7.o
+> arch/arm/mach-imx/pm-imx7.c: In function ?imx_gpcv2_pm_init?:
+> arch/arm/mach-imx/pm-imx7.c:836:7: error: ?gpcv2_irq_instance? undeclared (first use in this function)
+>   cd = gpcv2_irq_instance;
+>        ^
+> arch/arm/mach-imx/pm-imx7.c:836:7: note: each undeclared identifier is reported only once for each function it appears in
+> make[1]: *** [arch/arm/mach-imx/pm-imx7.o] Error 1
