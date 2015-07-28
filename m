@@ -1,71 +1,60 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Tue, 28 Jul 2015 19:20:25 +0300
-Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
- counter from coprocessor
-In-Reply-To: <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
-References: <1438032507.17734.46.camel@gmail.com>
- <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
-Message-ID: <CALW4P+LqjhQ+Puadz4W-n_v=KEnwvQiUkk5jkDLRxhjVQGwFyw@mail.gmail.com>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Tue, 28 Jul 2015 10:21:47 -0600
+Subject: [RFC 0/2] VFIO: Add virtual MSI doorbell support.
+In-Reply-To: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
+References: <1437728590-23126-1-git-send-email-pranavkumar@linaro.org>
+Message-ID: <1438100507.5211.170.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On Fri, 2015-07-24 at 14:33 +0530, Pranavkumar Sawargaonkar wrote:
+> In current VFIO MSI/MSI-X implementation, linux host kernel
+> allocates MSI/MSI-X vectors when userspace requests through vfio ioctls.
+> Vfio creates irqfd mappings to notify MSI/MSI-X interrupts
+> to the userspace when raised.
+> Guest OS will see emulated MSI/MSI-X controller and receives an interrupt
+> when kernel notifies the same via irqfd.
+> 
+> Host kernel allocates MSI/MSI-X using standard linux routines
+> like pci_enable_msix_range() and pci_enable_msi_range(). 
+> These routines along with requset_irq() in host kernel sets up 
+> MSI/MSI-X vectors with Physical MSI/MSI-X addresses provided by
+> interrupt controller driver in host kernel.
+> 
+> This means when a device is assigned with the guest OS, MSI/MSI-X addresses
+> present in PCIe EP are the PAs programmed by the host linux kernel.
+> 
+> In x86 MSI/MSI-X physical address range is reserved and iommu is aware
+> about these addreses and transalation is bypassed for these address range.
+> 
+> Unlike x86, ARM/ARM64 does not reserve MSI/MSI-X Physical address range and
+> all the transactions including MSI go through iommu/smmu without bypass.
+> This requires extending current vfio MSI layer with additional functionality
+> for ARM/ARM64 by
+> 1. Programing IOVA (referred as a MSI virtual doorbell address)
+>    in device's MSI vector as a MSI address.
+>    This IOVA will be provided by the userspace based on the
+>    MSI/MSI-X addresses reserved for the guest.
+> 2. Create an IOMMU mapping between this IOVA and
+>    Physical address (PA) assigned to the MSI vector.
+> 
+> This RFC is proposing a solution for MSI/MSI-X passthrough for ARM/ARM64.
 
-On Tue, Jul 28, 2015 at 6:24 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Alexey,
->
-> On Mon, Jul 27, 2015 at 2:28 PM, Alexey Klimov <klimov.linux@gmail.com> wrote:
->> Hi all,
->>
->> year(s) ago it was discovered that MCT timer and ARM architectured
->> timer
->> are the same hardware with different interface. Here [1].
->>
->> I followed mail-list discussions about removing MCT and using arch
->> timer for Exynos5-based SoCs but things aren't moving at least latest
->> upstream kernel on odroid-xu3 will use MCT as default timers.
->> Maybe the reason are some power-management related things that very
->> specific to Samsung. I don't know.
->>
->>
->> Idea of this draft patchset comes from Doug patches when he tried to
->> optimize read of 64-bit counter located in mmio. [2]
->> Why not using cp15 counter instead if possible?
->
-> I hate to burst your bubble here, but...
->
-> ...I think it would be a bad idea to use the cp15 counter on exynos
-> 5422.  According to Samsung, there are issues where using cp15 could
-> sometimes return the wrong value, especially if you happen to read it
-> while on an A7 instead of an A15.  It will tend to work pretty well,
-> but Samsung claimed that it might not work right on some CPUs or at
-> some temperatures.
 
-I think this is right time when I can say "If only I had known about
-it before!".
-That's quite interesting especially about temperature issues.
-Maybe it's worth to insert comments in driver/docs about this.
+Hi Pranavkumar,
 
-> I've added Alim who provided this information to me (in the private
-> http://crosbug.com/p/29556).  He may be able to elaborate more.
+Freescale has the same, or very similar, need, so any solution in this
+space will need to work for both ARM and powerpc.  I'm not a big fan of
+this approach as it seems to require the user to configure MSI/X via
+ioctl and then call a separate ioctl mapping the doorbells.  That's more
+code for the user, more code to get wrong and potentially a gap between
+configuring MSI/X and enabling mappings where we could see IOMMU faults.
 
-Alim, could you please add details if any?
+If we know that doorbell mappings are required, why can't we set aside a
+bank of IOVA space and have them mapped automatically as MSI/X is being
+configured?  Then the user's need for special knowledge and handling of
+this case is limited to setup.  The IOVA space will be mapped and used
+as needed, we only need the user to specify the IOVA space reserved for
+this.  Thanks,
 
-> Generally I'd say that if the arch timer works for you: use the arch
-> timer.  If the arch timer doesn't work for you, use the MCT.
->
-> -Doug
-
-I possess no knowledge if there're any different hw revisions of
-odroid-xu3 on the field
-but looks like arch timer works fine for me on odroid-xu3 Exynos5422
-SoC with upstream kernel.
-Is it right direction to switch xu3 to arch timer?
-Do you have any info or ideas about enabling MCT G_TCON register to
-start arch timer
-and what's the best way to do it?
-
-Thanks.
-
--- 
-Best regards, Klimov Alexey
+Alex
