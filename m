@@ -1,67 +1,109 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 28 Jul 2015 09:07:14 +0800
-Subject: [PATCH] mmc: sdhci-of-arasan: Get quirks from device tree
-In-Reply-To: <55B5EA96.6020604@monstr.eu>
-References: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
- <55B5EA96.6020604@monstr.eu>
-Message-ID: <55B6D5C2.4080907@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 09:07:43 +0800
+Subject: [PATCH v8 0/5] mtd: nand: vf610_nfc: Freescale NFC for VF610
+In-Reply-To: <1438015365-15685-1-git-send-email-stefan@agner.ch>
+References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
+Message-ID: <20150728010743.GW12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/27 16:23, Michal Simek wrote:
-> On 07/27/2015 10:04 AM, Shawn Lin wrote:
->> This patch adds the interface to get quirks from dts, and
->> there is no need to assign different quirks by condition statement
->> of arasan IP version.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> ---
->>
->>   drivers/mmc/host/sdhci-of-arasan.c | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
->> index ef5a7d2..db07788 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -132,6 +132,7 @@ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
->>   static int sdhci_arasan_probe(struct platform_device *pdev)
->>   {
->>   	int ret;
->> +	u32 quirktab[2];
->>   	struct clk *clk_xin;
->>   	struct sdhci_host *host;
->>   	struct sdhci_pltfm_host *pltfm_host;
->> @@ -172,6 +173,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
->>   		goto clk_disable_all;
->>   	}
->>   
->> +	if (of_property_read_u32_array(pdev->dev.of_node,
->> +				       "arasan,quirks", &quirktab[0], 2)) {
-> This is not documented anywhere that's why you should send binding to DT
-> mailing list and get ACK for it.
-Thanks, Michal. You'r right, and  forgive me, a green hand, for my 
-inappropriate patch.
->> +		host->quirks |= quirktab[0];
->> +		host->quirks2 |= quirktab[1];
->> +	}
->> +
->>   	if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
->>   		host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
->>   		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
->>
-> Also is there any binding which is done in this way?
-Thanks.
-BTW:
-I got a FPGA board w/ a sdhci-arasn emmc controller & PHY IP which can 
-support emmc version 5.1.
-But I cannot find any documented details from  IP databook for the 
-vendor version, such as "sdhci-4.9a".
-The only one is "ACS eMMC5.1 PHY IP uses TSMC ESD I/O protection 
-structures TMSC  product name
-tphn28hpcgv2od3 Version 120a". Is "sdhci-120a" the version if  I add a 
-compatib node?
-Kindly hope you can elaborate more ?)
-> Thanks,
-> Michal
->
+On Mon, Jul 27, 2015 at 06:42:40PM +0200, Stefan Agner wrote:
+> The eigth revision fixes some rough spots in the device trees.
+> 
+> More information and the full test log of earlier patchset version
+> can be found in the cover letter of the last revision v6:
+> http://thread.gmane.org/gmane.linux.kernel/1979868
+> 
+> Changes since v7:
+> - vf610-twr.dts: Moved NFC pinmux into the existing iomuxc node
+>   and sort new nfc node behind the existing iomuxc node as well.
+> - vf610-twr.dts/vf-colibri.dtsi: Dropped _1 suffixes
+
+Now I'm happy with the dts part and waiting for mtd part to be accepted
+to actually apply them.
+
+Shawn
+
+> 
+> Changes since v6:
+> - Rebased ontop of l2-mtd/master (v4.2-rc1 based)
+> - Removed HAVE_NAND_VF610_NFC and use depends on. This made
+>   "[PATCH v6 4/6] ARM: vf610: enable NAND Flash Controller" unnecessary
+> 
+> Changes since v5:
+> - Removed fsl,mpc5125-nfc compatible string
+> - Removed readl/writel_relaxed
+> - Change interface of vf610_nfc_transfer_size to match other accessors
+> 
+> Changes since v4:
+> - Rebased ontop of l2-mtd/master (v4.1-rc4 based)
+> - Eliminate unnecessary page read (NAND_CMD_SEQIN) since the driver does
+>   not support sub-page writes anyway (improves write performance)
+> - Support ONFI by enabling READID command with offset and parameter page
+>   reads (CMD_PARAM)
+> - Change to dedicated read_page/write_page function, enables raw writes
+> - Use __LITTLE_ENDIAN to distingush between LE/BE relevant statements
+> - Eliminated vf610_nfc_probe_dt in favor of common DT init code
+> - Use wait_for_completion_timeout
+> - Some style fixes (spaces, etc.)
+> 
+> Changes since v3:
+> - Make the driver selectable when COMPILE_TEST is set
+> - Fix compile error due to superfluous ECC_STATUS configuration in initial
+>   patch (without ECC correction ECC_STATUS does not need to be configured)
+> - Remove custom BBT pattern and switch to in-band BBT in the initial patch
+> - Include two bug fixes, for details see the corresponding U-Boot patches:
+>   http://thread.gmane.org/gmane.comp.boot-loaders.u-boot/215802
+> 
+> Changes since v2:
+> - Updated binding documentation
+> 
+> Changes since v1:
+> - Nest nfc_config struct within the main nfc struct
+> - Use assigned clock binding to specify NFC clock
+> - Rebased ontop of MSCM IR patchset (driver parts have been merged)
+> - Split out arch Kconfig in a separate config
+> - Fix module license
+> - Updated MAINTAINERS
+> 
+> Changes since RFC (Bill Pringlemeir):
+> - Renamed driver from fsl_nfc to vf610_nfc
+> - Use readl/writel for all register in accessor functions
+> - Optimized field accessor functions
+> - Implemented PM (suspend/resume) functions
+> - Implemented basic support for ECC strength/ECC step size from dt
+> - Improved performance of count_written_bits by using hweight32
+> - Support ECC with 60-bytes to correct up to 32 bit errors
+> - Changed to in-band BBT (NAND_BBT_NO_OOB) which also allows ECC modes
+>   which uses up to 60 bytes on 64 byte OOB
+> - Removed custom (downstream) BBT pattern since BBT table won't be
+>   compatible anyway (due to the change above)
+> 
+> Stefan Agner (5):
+>   mtd: nand: vf610_nfc: Freescale NFC for VF610, MPC5125 and others
+>   mtd: nand: vf610_nfc: add hardware BCH-ECC support
+>   mtd: nand: vf610_nfc: add device tree bindings
+>   ARM: dts: vf610twr: add NAND flash controller peripherial
+>   ARM: dts: vf-colibri: enable NAND flash controller
+> 
+>  .../devicetree/bindings/mtd/vf610-nfc.txt          |  45 ++
+>  MAINTAINERS                                        |   6 +
+>  arch/arm/boot/dts/vf-colibri.dtsi                  |  32 +
+>  arch/arm/boot/dts/vf610-twr.dts                    |  40 +
+>  arch/arm/boot/dts/vfxxx.dtsi                       |   8 +
+>  drivers/mtd/nand/Kconfig                           |  11 +
+>  drivers/mtd/nand/Makefile                          |   1 +
+>  drivers/mtd/nand/vf610_nfc.c                       | 839 +++++++++++++++++++++
+>  8 files changed, 982 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
+>  create mode 100644 drivers/mtd/nand/vf610_nfc.c
+> 
+> -- 
+> 2.4.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
