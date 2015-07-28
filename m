@@ -1,30 +1,54 @@
 From: haibo.chen@freescale.com (Haibo Chen)
-Date: Tue, 28 Jul 2015 17:58:39 +0800
-Subject: [PATCH v2 3/5] ARM: imx_v6_v7_defconfig: enable imx6ul_tsc
+Date: Tue, 28 Jul 2015 17:58:41 +0800
+Subject: [PATCH v2 5/5] ARM: dts: imx6ul-14x14-evk.dts: add tsc support
 In-Reply-To: <1438077521-12857-1-git-send-email-haibo.chen@freescale.com>
 References: <1438077521-12857-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438077521-12857-4-git-send-email-haibo.chen@freescale.com>
+Message-ID: <1438077521-12857-6-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable imx6ul touchscreen controller
+Add touch screen surpport for i.MX6UL-EVK board.
 
 Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6ul-14x14-evk.dts | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index e1ba3e2..9823ddc 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -157,6 +157,7 @@ CONFIG_MOUSE_PS2=m
- CONFIG_MOUSE_PS2_ELANTECH=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_EGALAX=y
-+CONFIG_TOUCHSCREEN_IMX6UL_TSC=y
- CONFIG_TOUCHSCREEN_MC13783=y
- CONFIG_TOUCHSCREEN_TSC2007=y
- CONFIG_TOUCHSCREEN_STMPE=y
+diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+index 61b41ee..9995656 100644
+--- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
++++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
+@@ -44,6 +44,15 @@
+ 	soc-supply = <&reg_soc>;
+ };
+ 
++&tsc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_tsc>;
++	xnur-gpio = <&gpio1 3 0>;
++	measure-delay-time = <0xffff>;
++	pre-charge-time = <0xfff>;
++	status = "okay";
++};
++
+ &uart1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_uart1>;
+@@ -212,6 +221,15 @@
+ 		>;
+ 	};
+ 
++	pinctrl_tsc: tscgrp {
++		fsl,pins = <
++			MX6UL_PAD_GPIO1_IO01__GPIO1_IO01		0xb0
++			MX6UL_PAD_GPIO1_IO02__GPIO1_IO02		0xb0
++			MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0xb0
++			MX6UL_PAD_GPIO1_IO04__GPIO1_IO04		0xb0
++		>;
++	};
++
+ 	pinctrl_uart1: uart1grp {
+ 		fsl,pins = <
+ 			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
 -- 
 1.9.1
