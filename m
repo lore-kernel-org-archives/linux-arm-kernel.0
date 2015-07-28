@@ -1,18 +1,18 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 28 Jul 2015 14:08:02 +0200
-Subject: [PULL REQUEST] ARM: mediatek: dts updates for v4.3
-Message-ID: <CABuKBeJxTrQQ0jUkjr22pJ5o=60Rw+7Z0qOkYefdS1tCMAeBrA@mail.gmail.com>
+Date: Tue, 28 Jul 2015 14:09:43 +0200
+Subject: [PULL REQUEST] ARM: mediatek: soc updates for v4.3
+Message-ID: <CABuKBeL8e1eZ3LNYWkKg38qJk+XZ-+Oy+112rLMvkMuwKtL-JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi all,
 
-Please take the following changes into account.
+Please take the following patches.
 
 Thanks,
 Matthias
 
----
+--
 
 The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
@@ -20,42 +20,46 @@ The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
 
 are available in the git repository at:
 
-  https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-dts
+  https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-soc
 
-for you to fetch changes up to 7d4938c14d239768a2e0bdd94457f405e6d35555:
+for you to fetch changes up to 3e0452d27a784d50f09bec9de8ac673849b9e303:
 
-  ARM: dts: mediatek: add mt6580 basic support (2015-07-18 00:22:42 +0200)
-
-----------------------------------------------------------------
-- ARM: dts: mediatek: add mt6580 basic support
-- Document: DT: Add bindings for mediatek MT6580 SoC Platform
-- ARM: dts: mediatek mt8135: Use real UART clocks
-- ARM: dts: mt8135-evbp1: Add PMIC support
-- ARM: dts: mt8135: Add pmic wrapper nodes
-- ARM: dts: mediatek: Enable clock support for Mediatek MT8135.
+  ARM: mediatek: Add regmap to mediatek Kconfig (2015-07-23 20:01:42 +0200)
 
 ----------------------------------------------------------------
-James Liao (1):
-      ARM: dts: mediatek: Enable clock support for Mediatek MT8135.
+- ARM: mediatek: Add regmap to mediatek Kconfig
+- soc: mediatek: Drop owner assignment from platform_driver
+- soc: Mediatek: Add SCPSYS power domain driver
+- dt-bindings: soc: Add documentation for the MediaTek SCPSYS unit
+- soc: mediatek: Add infracfg misc driver support
 
-Mars Cheng (2):
-      Document: DT: Add bindings for mediatek MT6580 SoC Platform
-      ARM: dts: mediatek: add mt6580 basic support
+----------------------------------------------------------------
+Krzysztof Kozlowski (1):
+      soc: mediatek: Drop owner assignment from platform_driver
+
+Matthias Brugger (1):
+      ARM: mediatek: Add regmap to mediatek Kconfig
 
 Sascha Hauer (3):
-      ARM: dts: mt8135: Add pmic wrapper nodes
-      ARM: dts: mt8135-evbp1: Add PMIC support
-      ARM: dts: mediatek mt8135: Use real UART clocks
+      soc: mediatek: Add infracfg misc driver support
+      dt-bindings: soc: Add documentation for the MediaTek SCPSYS unit
+      soc: Mediatek: Add SCPSYS power domain driver
 
- Documentation/devicetree/bindings/arm/mediatek.txt |   4 +
- .../bindings/arm/mediatek/mediatek,sysirq.txt      |   1 +
- .../devicetree/bindings/serial/mtk-uart.txt        |   3 +-
- .../bindings/timer/mediatek,mtk-timer.txt          |   6 +-
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/mt6580-evbp1.dts                 |  38 ++++
- arch/arm/boot/dts/mt6580.dtsi                      | 116 +++++++++++++
- arch/arm/boot/dts/mt8135-evbp1.dts                 | 193 +++++++++++++++++++++
- arch/arm/boot/dts/mt8135.dtsi                      |  58 ++++++-
- 9 files changed, 411 insertions(+), 9 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt6580-evbp1.dts
- create mode 100644 arch/arm/boot/dts/mt6580.dtsi
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |  41 ++
+ arch/arm/mach-mediatek/Kconfig                     |   1 +
+ drivers/soc/mediatek/Kconfig                       |  19 +
+ drivers/soc/mediatek/Makefile                      |   2 +
+ drivers/soc/mediatek/mtk-infracfg.c                |  91 ++++
+ drivers/soc/mediatek/mtk-pmic-wrap.c               |   1 -
+ drivers/soc/mediatek/mtk-scpsys.c                  | 487 +++++++++++++++++++++
+ include/dt-bindings/power/mt8173-power.h           |  15 +
+ include/linux/soc/mediatek/infracfg.h              |  26 ++
+ 9 files changed, 682 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
+ create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
+ create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
+ create mode 100644 include/dt-bindings/power/mt8173-power.h
+ create mode 100644 include/linux/soc/mediatek/infracfg.h
+
+-- 
+motzblog.wordpress.com
