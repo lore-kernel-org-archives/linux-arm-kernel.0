@@ -1,48 +1,65 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Tue, 28 Jul 2015 10:42:23 +0100
-Subject: [PATCH] arm64: KVM: remove remaining reference to vgic_sr_vectors
-Message-ID: <1438076543-6768-1-git-send-email-vladimir.murzin@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 28 Jul 2015 11:43:42 +0200
+Subject: linux-next: build failure after merge of the tip tree
+In-Reply-To: <55B74042.6070600@arm.com>
+References: <20150728124324.40f44f01@canb.auug.org.au>
+ <55B74042.6070600@arm.com>
+Message-ID: <55B74ECE.5060409@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 8a14849 (arm64: KVM: Switch vgic save/restore to
-alternative_insn) vgic_sr_vectors is not used anymore, so remove
-remaining leftovers and kill the structure.
+Hi Sudeep, Stephen,
 
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm64/include/asm/kvm_host.h |    5 -----
- arch/arm64/kernel/asm-offsets.c   |    2 --
- 2 files changed, 7 deletions(-)
+On 28/07/2015 10:41, Sudeep Holla wrote:
+> Hi Stephen,
+> 
+> On 28/07/15 03:43, Stephen Rothwell wrote:
+>> Hi all,
+>>
+>> After merging the tip tree, today's linux-next build (arm
+>> multi_v7_defconfig) failed like this:
+>>
+>> arch/arm/mach-mvebu/board-v7.c: In function 'mvebu_init_irq':
+>> arch/arm/mach-mvebu/board-v7.c:138:3: error: implicit declaration of function 'gic_set_irqchip_flags' [-Werror=implicit-function-declaration]
+>>     gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+>>     ^
+>>
+>> Caused by commit
+>>
+>>    e6f134f8e30e ("ARM: mvebu: Allow using the GIC for wakeup in standby mode")
+>>
+>> from the mvebu tree interacting with commit
+>>
+>>    0d3f2c92e004 ("irqchip/gic: Remove redundant gic_set_irqchip_flags")
+>>
+>> from the tip tree.
+>>
+>> I have applied the following merge fix patch for today:
+>>
+> 
+> Thanks for the fix, I was aware of this and asked Thomas Petazzoni
+> and Gregory CLEMENT to revert the commit e6f134f8e30e if possible
+> yesterday [1]
+> 
 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 2709db2..19f1182 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -216,11 +216,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
- 		     hyp_stack_ptr, vector_ptr);
- }
- 
--struct vgic_sr_vectors {
--	void	*save_vgic;
--	void	*restore_vgic;
--};
--
- static inline void kvm_arch_hardware_disable(void) {}
- static inline void kvm_arch_hardware_unsetup(void) {}
- static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index c99701a..f0c960d 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -125,8 +125,6 @@ int main(void)
-   DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
-   DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
-   DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
--  DEFINE(VGIC_SAVE_FN,		offsetof(struct vgic_sr_vectors, save_vgic));
--  DEFINE(VGIC_RESTORE_FN,	offsetof(struct vgic_sr_vectors, restore_vgic));
-   DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
-   DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
-   DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
+I've just remove the commit from my branches, it should be OK now.
+
+
+Thanks,
+
+Gregory
+
+
+> Regards,
+> Sudeep
+> 
+> [1] 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359585.html
+> 
+
+
 -- 
-1.7.9.5
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
