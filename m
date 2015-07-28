@@ -1,49 +1,93 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 Jul 2015 09:37:19 +0200
-Subject: [PATCH v2 2/2] ARM: at91: at91_dt_defconfig: enable ISI and ov2640
- support
-In-Reply-To: <1434449315-9243-2-git-send-email-josh.wu@atmel.com>
-References: <1434449315-9243-1-git-send-email-josh.wu@atmel.com>
- <1434449315-9243-2-git-send-email-josh.wu@atmel.com>
-Message-ID: <55B7312F.9040505@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jul 2015 08:41:04 +0100
+Subject: [PATCH v4 1/2] dt: cpufreq: st: Provide bindings for ST's
+ CPUFreq implementation
+In-Reply-To: <20150728022308.GA1229@linux>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <20150728022308.GA1229@linux>
+Message-ID: <20150728074104.GL21114@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 16/06/2015 12:08, Josh Wu a ?crit :
-> Add Atmel-isi and ov2640 driver in defconfig
-> 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
-> 
-> Changes in v2: None
-> 
->  arch/arm/configs/at91_dt_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-> index bcef49a..d089ec9 100644
-> --- a/arch/arm/configs/at91_dt_defconfig
-> +++ b/arch/arm/configs/at91_dt_defconfig
-> @@ -131,6 +131,12 @@ CONFIG_POWER_RESET=y
->  CONFIG_WATCHDOG=y
->  CONFIG_AT91SAM9X_WATCHDOG=y
->  CONFIG_SSB=m
-> +CONFIG_MEDIA_SUPPORT=y
-> +CONFIG_MEDIA_CAMERA_SUPPORT=y
-> +CONFIG_V4L_PLATFORM_DRIVERS=y
-> +CONFIG_SOC_CAMERA=y
-> +CONFIG_VIDEO_ATMEL_ISI=y
-> +CONFIG_SOC_CAMERA_OV2640=y
+On Tue, 28 Jul 2015, Viresh Kumar wrote:
 
-I would select this camera driver as a module. Your thoughts?
-
-Bye,
-
->  CONFIG_FB=y
->  CONFIG_FB_ATMEL=y
->  CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> On 27-07-15, 16:20, Lee Jones wrote:
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> > 
+> > Changelog:
+> >  - Using OPP-v2
+> >  - Moved (and linked) a bunch of documentation to ../power/
+> > 
+> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 40 ++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > new file mode 100644
+> > index 0000000..79add9d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> > @@ -0,0 +1,40 @@
+> > +Binding for ST's CPUFreq driver
+> > +===============================
+> > +
+> > +Frequency Scaling only
+> > +----------------------
+> > +
+> > +Located in CPU's node:
+> > +
+> > +- operating-points		: [See: ../power/opp.txt]
+> > +
+> > +Example [safe]
+> > +--------------
+> > +
+> > +cpus {
+> > +	cpu at 0 {
+> > +				 /* kHz     uV   */
+> > +		operating-points = <1500000 0
+> > +				    1200000 0
+> > +				    800000  0
+> > +				    500000  0>;
+> > +	};
+> > +};
+> > +
+> > +Dynamic Voltage and Frequency Scaling (DVFS)
+> > +--------------------------------------------
+> > +
+> > +Located in CPU's node:
+> > +
+> > +- operating-points-v2-sti	: [See ../power/opp-st.txt]
+> > +
+> > +Example [unsafe]
+> > +----------------
+> > +
+> > +cpus {
+> > +	cpu at 0 {
+> > +		operating-points-v2	= <[OPP list phandle]>;
+> > +	};
+> > +};
+> > +
+> > +For an example of an OPP list, see ../power/opp-st.txt.
 > 
+> I don't think you need this file/patch at all.. It is almost blank and
+> doesn't define a binding. And so there is no need to specify this at
+> all. Just an OPP binding file is enough.
 
+I have two issues with that.  Firstly, although the driver uses the
+OPP API (it also uses the Regulator and Clock API too), it is
+fundamentally a CPUFreq driver, so I think it should have a CPUFreq
+DT entry.  Secondly, if someone doesn't know the history of the
+ST CPUFreq set, they will look here for an accompanying document.  I
+personally wouldn't think to look in power/*opp* for a CPUFreq
+binding.
+
+Perhaps, as all of the CPUFreq drivers use the OPP API, everything
+should be moved to drivers/base/power or drivers/power?
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
