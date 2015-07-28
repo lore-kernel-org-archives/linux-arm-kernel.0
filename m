@@ -1,91 +1,87 @@
-From: Haibo.Chen@freescale.com (Chen Bough)
-Date: Tue, 28 Jul 2015 08:50:39 +0000
-Subject: [PATCH 5/5] ARM: dts: imx6ul-14x14-evk.dts: add tsc support
-In-Reply-To: <20150727141259.GO12927@tiger>
-References: <1437996407-27266-1-git-send-email-haibo.chen@freescale.com>
- <1437996407-27266-6-git-send-email-haibo.chen@freescale.com>
- <20150727141259.GO12927@tiger>
-Message-ID: <BY1PR03MB1388B543998289A17C7B31A99A8D0@BY1PR03MB1388.namprd03.prod.outlook.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 28 Jul 2015 10:51:44 +0200
+Subject: [PATCH] clk: at91: add PMC sama5d2 support
+In-Reply-To: <1434631409-4919-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1434631409-4919-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150728105144.5669541b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, 18 Jun 2015 14:43:29 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+
+> Add support for the new sama5d2 SoC and adapt capabilities.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  drivers/clk/at91/pmc.c           | 15 +++++++++++++++
+>  include/dt-bindings/clock/at91.h |  1 +
+>  include/linux/clk/at91_pmc.h     |  1 +
+>  3 files changed, 17 insertions(+)
+> 
+> diff --git a/drivers/clk/at91/pmc.c b/drivers/clk/at91/pmc.c
+> index bed2ce6b3cb9..3ac059678486 100644
+> --- a/drivers/clk/at91/pmc.c
+> +++ b/drivers/clk/at91/pmc.c
+> @@ -207,6 +207,14 @@ static const struct at91_pmc_caps at91sam9x5_caps = {
+>  			  AT91_PMC_MOSCRCS | AT91_PMC_CFDEV,
+>  };
+>  
+> +static const struct at91_pmc_caps sama5d2_caps = {
+> +	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+> +			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+> +			  AT91_PMC_PCK1RDY | AT91_PMC_PCK2RDY |
+> +			  AT91_PMC_MOSCSELS | AT91_PMC_MOSCRCS |
+> +			  AT91_PMC_CFDEV | AT91_PMC_GCKRDY,
+> +};
+> +
+>  static const struct at91_pmc_caps sama5d3_caps = {
+>  	.available_irqs = AT91_PMC_MOSCS | AT91_PMC_LOCKA | AT91_PMC_MCKRDY |
+>  			  AT91_PMC_LOCKU | AT91_PMC_PCK0RDY |
+> @@ -443,6 +451,13 @@ static void __init of_at91sam9x5_pmc_setup(struct device_node *np)
+>  CLK_OF_DECLARE(at91sam9x5_clk_pmc, "atmel,at91sam9x5-pmc",
+>  	       of_at91sam9x5_pmc_setup);
+>  
+> +static void __init of_sama5d2_pmc_setup(struct device_node *np)
+> +{
+> +	of_at91_pmc_setup(np, &sama5d2_caps);
+> +}
+> +CLK_OF_DECLARE(sama5d2_clk_pmc, "atmel,sama5d2-pmc",
+> +	       of_sama5d2_pmc_setup);
+> +
+>  static void __init of_sama5d3_pmc_setup(struct device_node *np)
+>  {
+>  	of_at91_pmc_setup(np, &sama5d3_caps);
+> diff --git a/include/dt-bindings/clock/at91.h b/include/dt-bindings/clock/at91.h
+> index 0b4cb999a3f7..ab3ee241d10c 100644
+> --- a/include/dt-bindings/clock/at91.h
+> +++ b/include/dt-bindings/clock/at91.h
+> @@ -18,5 +18,6 @@
+>  #define AT91_PMC_MOSCSELS	16		/* Main Oscillator Selection */
+>  #define AT91_PMC_MOSCRCS	17		/* Main On-Chip RC */
+>  #define AT91_PMC_CFDEV		18		/* Clock Failure Detector Event */
+> +#define AT91_PMC_GCKRDY		24		/* Generated Clocks */
+>  
+>  #endif
+> diff --git a/include/linux/clk/at91_pmc.h b/include/linux/clk/at91_pmc.h
+> index ae61860e6892..1e6932222e11 100644
+> --- a/include/linux/clk/at91_pmc.h
+> +++ b/include/linux/clk/at91_pmc.h
+> @@ -164,6 +164,7 @@ extern void __iomem *at91_pmc_base;
+>  #define		AT91_PMC_MOSCSELS	(1 << 16)		/* Main Oscillator Selection [some SAM9] */
+>  #define		AT91_PMC_MOSCRCS	(1 << 17)		/* Main On-Chip RC [some SAM9] */
+>  #define		AT91_PMC_CFDEV		(1 << 18)		/* Clock Failure Detector Event [some SAM9] */
+> +#define		AT91_PMC_GCKRDY		(1 << 24)		/* Generated Clocks */
+>  #define	AT91_PMC_IMR		0x6c			/* Interrupt Mask Register */
+>  
+>  #define AT91_PMC_PLLICPR	0x80			/* PLL Charge Pump Current Register */
 
 
-> -----Original Message-----
-> From: Shawn Guo [mailto:shawnguo at kernel.org]
-> Sent: Monday, July 27, 2015 10:13 PM
-> To: Chen Haibo-B51421
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> kernel at pengutronix.de; linux at arm.linux.org.uk; dmitry.torokhov at gmail.com;
-> devicetree at vger.kernel.org; sbranden at broadcom.com; arnd at arndb.de;
-> mchehab at osg.samsung.com; christian.gmeiner at gmail.com;
-> scott.liu at emc.com.tw; linux-kernel at vger.kernel.org; hdegoede at redhat.com;
-> jonathar at broadcom.com; benjamin.tissoires at redhat.com;
-> hans.verkuil at cisco.com; hadess at hadess.net; linux-input at vger.kernel.org;
-> geert at linux-m68k.org; sebastien.szymanski at armadeus.com;
-> mamlinav at gmail.com; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 5/5] ARM: dts: imx6ul-14x14-evk.dts: add tsc support
-> 
-> On Mon, Jul 27, 2015 at 07:26:47PM +0800, Haibo Chen wrote:
-> > Add touch screen surpport for i.MX6UL-EVK board.
-> >
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
-> > ---
-> >  arch/arm/boot/dts/imx6ul-14x14-evk.dts | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > index 61b41ee..323d32d 100644
-> > --- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > +++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-> > @@ -44,6 +44,15 @@
-> >  	soc-supply = <&reg_soc>;
-> >  };
-> >
-> > +&tsc {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_tsc>;
-> > +	status = "okay";
-> 
-> We generally have "status" at the bottom of the property list.
-> 
-> Shawn
->
- 
-[haibo] Yes, it's my negligence, I will amend this.
 
-> > +	xnur-gpio = <&gpio1 3 0>;
-> > +	measure_delay_time = <0xffff>;
-> > +	pre_charge_time = <0xfff>;
-> > +};
-> > +
-> >  &uart1 {
-> >  	pinctrl-names = "default";
-> >  	pinctrl-0 = <&pinctrl_uart1>;
-> > @@ -212,6 +221,15 @@
-> >  		>;
-> >  	};
-> >
-> > +	pinctrl_tsc: tscgrp {
-> > +		fsl,pins = <
-> > +			MX6UL_PAD_GPIO1_IO01__GPIO1_IO01		0xb0
-> > +			MX6UL_PAD_GPIO1_IO02__GPIO1_IO02		0xb0
-> > +			MX6UL_PAD_GPIO1_IO03__GPIO1_IO03		0xb0
-> > +			MX6UL_PAD_GPIO1_IO04__GPIO1_IO04		0xb0
-> > +		>;
-> > +	};
-> > +
-> >  	pinctrl_uart1: uart1grp {
-> >  		fsl,pins = <
-> >  			MX6UL_PAD_UART1_TX_DATA__UART1_DCE_TX 0x1b0b1
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
