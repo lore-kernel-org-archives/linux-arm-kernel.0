@@ -1,64 +1,65 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 28 Jul 2015 07:19:57 +0200
-Subject: [PATCH 0/7] usb: gadget: get rid of UDC name-based quirks
-Message-ID: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
+Date: Tue, 28 Jul 2015 07:19:59 +0200
+Subject: [PATCH 2/7] usb: gadget: add 'quirk_stall_not_supp' to usb_gadget
+In-Reply-To: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
+References: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438060804-21706-3-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Due to some UDC controllers may not support stalling, usb gadget layer
+needs to provide a generic way to inform gadget functions about non-standard
+hardware limitations.
 
-This patch set replaces quirks based on UDC name with generic quirk
-bitfields in struct usb_gadget. It allows to avoid checking for UDC
-name in USB function drivers. Instead we have few quirk bitfields
-informing rather about chip-specific limitations than specific chip
-name. Thanks to this it's possible to handle new chips with similar
-hardware limitations without changing code of USB functions.
+This patch adds 'quirk_stall_not_supp' field to struct usb_gadget and helper
+function gadget_is_stall_supported(). It also sets 'quirk_stall_not_supp'
+to 1 in at91_udc driver, which has such limitation.
 
-IMPORTANT
-This patch set depends on my previous patch series. They should be
-applied in following order:
-1. "usb: gadget: miscellaneous fixes"
-   https://lkml.org/lkml/2015/7/13/122
-2. "usb: gadget: rework ep matching and claiming mechanism"
-   https://lkml.org/lkml/2015/7/27/181
-3. this patchset
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+---
+ drivers/usb/gadget/udc/at91_udc.c |  1 +
+ include/linux/usb/gadget.h        | 10 ++++++++++
+ 2 files changed, 11 insertions(+)
 
-Best regards,
-Robert Baldyga
-
-Robert Baldyga (7):
-  usb: gadget: add 'quirk_altset_not_supp' to usb_gadget
-  usb: gadget: add 'quirk_stall_not_supp' to usb_gadget
-  usb: gadget: add 'quirk_zlp_not_supp' to usb_gadget
-  usb: gadget: f_mass_storage: check quirk instead of UDC name
-  usb: gadget: f_ecm/f_ncm: check quirk instead of UDC name
-  usb: gadget: apply generic altsetting support check mechanism
-  usb: gadget: remove gadget_chips.h
-
- drivers/usb/gadget/epautoconf.c              |  2 -
- drivers/usb/gadget/function/f_acm.c          |  1 -
- drivers/usb/gadget/function/f_ecm.c          |  4 +-
- drivers/usb/gadget/function/f_mass_storage.c |  4 +-
- drivers/usb/gadget/function/f_ncm.c          |  5 +--
- drivers/usb/gadget/function/f_obex.c         |  3 +-
- drivers/usb/gadget/function/f_serial.c       |  1 -
- drivers/usb/gadget/function/f_sourcesink.c   |  1 -
- drivers/usb/gadget/function/u_ether.h        |  4 +-
- drivers/usb/gadget/function/u_uac1.h         |  2 -
- drivers/usb/gadget/legacy/audio.c            |  1 -
- drivers/usb/gadget/legacy/gmidi.c            |  2 -
- drivers/usb/gadget/legacy/hid.c              |  1 -
- drivers/usb/gadget/legacy/nokia.c            |  3 +-
- drivers/usb/gadget/legacy/printer.c          |  2 -
- drivers/usb/gadget/legacy/serial.c           |  1 -
- drivers/usb/gadget/udc/at91_udc.c            |  1 +
- drivers/usb/gadget/udc/gadget_chips.h        | 55 ----------------------------
- drivers/usb/gadget/udc/pxa25x_udc.c          |  1 +
- drivers/usb/gadget/udc/pxa27x_udc.c          |  1 +
- drivers/usb/musb/musb_gadget.c               |  1 +
- include/linux/usb/gadget.h                   | 31 ++++++++++++++++
- 22 files changed, 44 insertions(+), 83 deletions(-)
- delete mode 100644 drivers/usb/gadget/udc/gadget_chips.h
-
+diff --git a/drivers/usb/gadget/udc/at91_udc.c b/drivers/usb/gadget/udc/at91_udc.c
+index a04b073..f663dce 100644
+--- a/drivers/usb/gadget/udc/at91_udc.c
++++ b/drivers/usb/gadget/udc/at91_udc.c
+@@ -839,6 +839,7 @@ static void udc_reinit(struct at91_udc *udc)
+ 
+ 	INIT_LIST_HEAD(&udc->gadget.ep_list);
+ 	INIT_LIST_HEAD(&udc->gadget.ep0->ep_list);
++	udc->gadget.quirk_stall_not_supp = 1;
+ 
+ 	for (i = 0; i < NUM_ENDPOINTS; i++) {
+ 		struct at91_ep *ep = &udc->ep[i];
+diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
+index 5362faa..55cb6b2 100644
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -618,6 +618,7 @@ struct usb_gadget {
+ 	unsigned			a_alt_hnp_support:1;
+ 	unsigned			quirk_ep_out_aligned_size:1;
+ 	unsigned			quirk_altset_not_supp:1;
++	unsigned			quirk_stall_not_supp:1;
+ 	unsigned			is_selfpowered:1;
+ 	unsigned			deactivated:1;
+ 	unsigned			connected:1;
+@@ -684,6 +685,15 @@ static inline int gadget_is_altset_supported(struct usb_gadget *g)
+ }
+ 
+ /**
++ * gadget_is_stall_supported - return true iff the hardware supports stalling
++ * @g: controller to check for quirk
++ */
++static inline int gadget_is_stall_supported(struct usb_gadget *g)
++{
++	return !g->quirk_stall_not_supp;
++}
++
++/**
+  * gadget_is_dualspeed - return true iff the hardware handles high speed
+  * @g: controller that might support both high and full speeds
+  */
 -- 
 1.9.1
