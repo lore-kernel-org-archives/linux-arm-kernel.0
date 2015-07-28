@@ -1,42 +1,41 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jul 2015 13:46:57 +0100
-Subject: [PATCH v4 0/4] arm64: IOMMU-backed DMA mapping
-In-Reply-To: <55AD2E97.1040901@arm.com>
-References: <cover.1437070995.git.robin.murphy@arm.com>
- <20150720152637.GD10969@8bytes.org> <55AD2E97.1040901@arm.com>
-Message-ID: <20150728124657.GK29209@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Jul 2015 14:48:09 +0200
+Subject: [RESEND PATCH] pinctrl: at91: fix null pointer dereference
+In-Reply-To: <1438069696-25303-1-git-send-email-ludovic.desroches@atmel.com>
+References: <20150715133048.GD14886@odux.rfo.atmel.com>
+ <1438069696-25303-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CACRpkdaiwcTzxG=KqPZxk6ijLOE0PAh9ybkNqUYhkmAcQV40eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg, Robin,
+On Tue, Jul 28, 2015 at 9:48 AM, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
 
-On Mon, Jul 20, 2015 at 06:23:35PM +0100, Robin Murphy wrote:
-> On 20/07/15 16:26, Joerg Roedel wrote:
-> > On Thu, Jul 16, 2015 at 07:40:11PM +0100, Robin Murphy wrote:
-> >>   arch/arm64/Kconfig                   |   1 +
-> >>   arch/arm64/include/asm/dma-mapping.h |  15 +-
-> >>   arch/arm64/mm/dma-mapping.c          | 452 +++++++++++++++++++++++++++++
-> >
-> > What happened to the plan to merge this with the existing iommu-based
-> > dma-api implementation for 32 bit ARM?
-> 
-> The issue currently is that there are a bunch of drivers using the 
-> exported arm_iommu_* functions directly. From what I can tell, they seem 
-> like they could probably all be converted to using default domains 
-> and/or the new domain type abstractions via the core IOMMU API, which 
-> would then allow killing off dma_iommu_mapping and rewriting the 
-> arch/arm implementation to use the new shared code. I don't currently 
-> have any 32-bit platform to test with, so I'm a little dubious of taking 
-> that all on myself right now.
-> 
-> In the meantime on arm64, DMA mapping ops are needed for SMMUv3 platform 
-> device support, the Mediatek M4U patches and my own SMMUv2 work, so it 
-> would be very useful to get the arm64 and common code in as a first 
-> step, then look at cleaning up arch/arm for 4.4 without dangling 
-> dependencies.
+> From: David Dueck <davidcdueck@googlemail.com>
+>
+> Not all gpio banks are necessarily enabled, in the current code this can
+> lead to null pointer dereferences.
+>
+> [   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
+(...)
+>
+> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
+> CC: Boris Brezillon <boris.brezillon@free-electrons.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> ---
+>
+> This patch fixes a oops in the kernel because of a NULL pointer in a table.
+> Having a NULL pointer in this table is the normal behavior if a PIO controller
+> is not enabled. So this fix is not a quick and dirty hack, it's usual to skip
+> an entry from a table if it is not filled.
 
-What's the plan with this? Do we need to port 32-bit ARM before it's a
-candidate for merging, or can we push ahead with getting this up and
-running for arm64 (which currently can't use an IOMMU for DMA)?
+Fair enough, better too many checks than too few.
 
-Will
+Is this a regression to v4.2 that should go to stable or v4.3 material?
+
+Yours,
+Linus Walleij
