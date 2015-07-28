@@ -1,41 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jul 2015 09:55:25 +0100
-Subject: [PATCH v4 1/2] dt: cpufreq: st: Provide bindings for ST's
- CPUFreq implementation
-In-Reply-To: <20150728083513.GA26276@linux>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <20150728083513.GA26276@linux>
-Message-ID: <20150728085525.GQ14943@x1>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 28 Jul 2015 10:54:50 +0200
+Subject: [PATCH 1/3] ARM: at91/soc: add basic support for new sama5d2 SoC
+In-Reply-To: <20150629150421.GB485@piout.net>
+References: <cover.1434632966.git.nicolas.ferre@atmel.com>
+ <fe6d862c640a3708e80c0cc4c694ab5d9079060b.1434632966.git.nicolas.ferre@atmel.com>
+ <20150618152105.GK27492@piout.net> <55913E3B.6060009@atmel.com>
+ <20150629150421.GB485@piout.net>
+Message-ID: <55B7435A.2060205@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jul 2015, Viresh Kumar wrote:
-
-> On 27-07-15, 16:20, Lee Jones wrote:
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> > 
-> > Changelog:
-> >  - Using OPP-v2
-> >  - Moved (and linked) a bunch of documentation to ../power/
-> > 
-> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 40 ++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+Le 29/06/2015 17:04, Alexandre Belloni a ?crit :
+> On 29/06/2015 at 14:46:51 +0200, Nicolas Ferre wrote :
+>> Le 18/06/2015 17:21, Alexandre Belloni a ?crit :
+>>> Hi,
+>>>
+>>> On 18/06/2015 at 15:18:28 +0200, Nicolas Ferre wrote :
+>>>> diff --git a/Documentation/arm/Atmel/README b/Documentation/arm/Atmel/README
+>>>> index c53a19b4aab2..6650a8ffaa64 100644
+>>>> --- a/Documentation/arm/Atmel/README
+>>>> +++ b/Documentation/arm/Atmel/README
+>>>> @@ -90,6 +90,12 @@ the Atmel website: http://www.atmel.com.
+>>>>          + Datasheet
+>>>>            http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
+>>>>  
+>>>> +    * ARM Cortex-A5 + NEON based SoCs
+>>>> +      - sama5d2 family
+>>>> +        - sama5d27
+>>>> +        + Datasheet
+>>>> +          Coming soon
+>>>
+>>> Shouldn't that go directly before or after the sama5d4 family ?
+>>
+>> This is "after" sama5d4: I sorted this file according to SoC release
+>> date whereas I sorted the other entries in alpa-numerial order (sama5d2
+>> placed before sama5d3).
+>>
+>> Is it what you answered?
+>>
 > 
-> For both patches:
+> No, I meant doing something like:
 > 
-> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+>     * ARM Cortex-A5 + NEON based SoCs
+>       - sama5d4 family
+>         - sama5d41
+>         - sama5d42
+>         - sama5d43
+>         - sama5d44 (device superset)
+>         + Datasheet
+>           http://www.atmel.com/Images/Atmel-11238-32-bit-Cortex-A5-Microcontroller-SAMA5D4_Datasheet.pdf
+>       - sama5d2 family
+>         - sama5d27
+>         + Datasheet
+>           Coming soon
+> 
+> Else, you end up with two "ARM Cortex-A5 + NEON based SoCs" sections.
 
-W00t!  I'll start fixing up the driver.
+Oh, yes. Sure, I'll modify this.
 
-> But I would like Rob to have a look as well :)
+Do you think that it's worth sending another series or I can take it for
+the pull-request when it's modified?
 
-No problem.
-
+Bye,
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Nicolas Ferre
