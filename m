@@ -1,63 +1,32 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 28 Jul 2015 14:00:53 +0200
-Subject: [PATCH v3] ARM: kill off set_irq_flags usage
-In-Reply-To: <1438030523-15853-1-git-send-email-robh@kernel.org>
-References: <1438030523-15853-1-git-send-email-robh@kernel.org>
-Message-ID: <20150728120053.GB21866@localhost>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Tue, 28 Jul 2015 14:03:27 +0200
+Subject: [PATCH 0/4] Add SPDIF support for rockchip
+Message-ID: <1438085011-16577-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 03:55:13PM -0500, Rob Herring wrote:
-> set_irq_flags is ARM specific with custom flags which have genirq
-> equivalents. Convert drivers to use the genirq interfaces directly, so we
-> can kill off set_irq_flags. The translation of flags is as follows:
-> 
-> IRQF_VALID -> !IRQ_NOREQUEST
-> IRQF_PROBE -> !IRQ_NOPROBE
-> IRQF_NOAUTOEN -> IRQ_NOAUTOEN
-> 
-> For IRQs managed by an irqdomain, the irqdomain core code handles clearing
-> and setting IRQ_NOREQUEST already, so there is no need to do this in
-> .map() functions and we can simply remove the set_irq_flags calls. Some
-> users also modify IRQ_NOPROBE and this has been maintained although it
-> is not clear that is really needed. There appears to be a great deal of
-> blind copy and paste of this code.
-> 
-> Signed-off-by: Rob Herring <robh@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@deeprootsystems.com>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Acked-by: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Acked-by: Krzysztof Halasa <khalasa@piap.pl>
-> Cc: Greg Ungerer <gerg@uclinux.org>
-> Cc: Roland Stigge <stigge@antcom.de>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Daniel Mack <daniel@zonque.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Cc: Simtec Linux Team <linux@simtec.co.uk>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Acked-by: Wan ZongShun <mcuos.com@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> Thomas asked that this be merged thru subsystem trees instead of arm-soc,
-> so please apply just this patch to your tree.
+This patchset adds support for the Rockchip SPDIF transceiver as present on
+RK3066, RK3188 and RK3288 boards and enables it on a Radxa rock pro.
 
-"this be merged through subsystem trees" + "please apply just this
-patch". I'm going to assume that the first "this" means a patch series. So
-I've applied this to next/cleanup, let me know if this was in error and
-should be removed, it's easy to drop at this time.
+Tested on a Radxa Rock Pro board.
 
+Sjoerd Simons (4):
+  ASoC: dt-bindings: add rockchip tranceiver bindings
+  ASoc: rockchip: Add rockchip SPDIF transceiver driver
+  ARM: dts: rockchip: Add SPDIF transceiver for RK3188
+  ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock
 
--Olof
+ .../devicetree/bindings/sound/rockchip-spdif.txt   |  41 +++
+ arch/arm/boot/dts/rk3188-radxarock.dts             |  19 ++
+ arch/arm/boot/dts/rk3188.dtsi                      |  22 ++
+ sound/soc/rockchip/Kconfig                         |   9 +
+ sound/soc/rockchip/Makefile                        |   3 +
+ sound/soc/rockchip/rockchip_spdif.c                | 375 +++++++++++++++++++++
+ sound/soc/rockchip/rockchip_spdif.h                |  63 ++++
+ 7 files changed, 532 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip-spdif.txt
+ create mode 100644 sound/soc/rockchip/rockchip_spdif.c
+ create mode 100644 sound/soc/rockchip/rockchip_spdif.h
+
+-- 
+2.4.6
