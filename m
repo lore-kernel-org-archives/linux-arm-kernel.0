@@ -1,98 +1,73 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 28 Jul 2015 19:09:09 +0530
-Subject: [PATCH 1/2] pci: host: pci-dra7xx: Add support to make gpio drive
- PERST# line
-In-Reply-To: <1438090750-11604-1-git-send-email-kishon@ti.com>
-References: <1438090750-11604-1-git-send-email-kishon@ti.com>
-Message-ID: <1438090750-11604-2-git-send-email-kishon@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 28 Jul 2015 08:39:46 -0500
+Subject: [PATCH v2 04/22] of/platform: add of_platform_device_find()
+In-Reply-To: <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
+References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAL_JsqJGhFXDKuayuKc2E58X5A7ZGN=uYCVDLnXw_t3_auBg+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PERST# line in am57x-evm is connected to a gpio line and PERST#
-should be driven high to indicate the clocks are stable (As per
-Figure 2-10: Power Up of the PCIe CEM spec 3.0).
+On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> From an arbitrary node in the tree, find the enclosing node that
+> corresponds to a platform device, as registered by
+> of_platform_populate().
+>
+> This can be used to find out what device needs to be probed so the
+> dependency described by a given node is made available.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> ---
+>
+> Changes in v2:
+> - Move the logic for finding a platform device from its firmware node to
+>   of/platform.c as it's not needed for ACPI nodes.
+>
+>  drivers/of/platform.c       | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/of_platform.h |  1 +
+>  2 files changed, 61 insertions(+)
+>
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index ff27494cda8c..89c5cd513027 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -501,6 +501,66 @@ void of_platform_depopulate(struct device *parent)
+>  }
+>  EXPORT_SYMBOL_GPL(of_platform_depopulate);
+>
+> +static bool of_is_platform(struct device_node *np)
+> +{
+> +       int count;
+> +
+> +       count = of_property_count_strings(np, "compatible");
+> +
+> +       /* The node has to have a compatible string */
+> +       if (!count)
+> +               return false;
+> +
+> +       /* But it cannot be just a simple memory-mapped bus */
+> +       if (count == 1 && of_match_node(of_default_bus_match_table, np))
+> +               return false;
+> +
+> +       /* But AMBA devices aren't platform devices */
+> +       if (of_device_is_compatible(np, "arm,primecell"))
+> +               return false;
+> +
+> +       /* Node is immediately below root */
+> +       if (!np->parent || !np->parent->parent)
+> +               return true;
+> +
+> +       /* If it's a node in a simple memory-mapped bus */
+> +       if (of_match_node(of_default_bus_match_table, np->parent))
+> +               return true;
 
-Add support in pci-dra7xx driver to make gpio drive PERST#
-line here.
+This seems really fragile. What about platform devices which are
+children of MFDs but are not "simple-mfd"?
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- Documentation/devicetree/bindings/pci/ti-pci.txt |    3 +++
- drivers/pci/host/pci-dra7xx.c                    |   24 ++++++++++++++++++++--
- 2 files changed, 25 insertions(+), 2 deletions(-)
+Does of_find_device_by_node not work for you? That is probably not the
+most efficient search, but we could fix that. We could add struct
+device ptr to struct device_node and check without searching for
+example.
 
-diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-index 3d21791..60e2516 100644
---- a/Documentation/devicetree/bindings/pci/ti-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-@@ -23,6 +23,9 @@ PCIe Designware Controller
-    interrupt-map-mask,
-    interrupt-map : as specified in ../designware-pcie.txt
- 
-+Optional Property:
-+ - gpios : Should be added if a gpio line is required to drive PERST# line
-+
- Example:
- axi {
- 	compatible = "simple-bus";
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 7acc833..d3d0faf 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -17,6 +17,7 @@
- #include <linux/irqdomain.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/of_gpio.h>
- #include <linux/pci.h>
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
-@@ -336,6 +337,9 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
- 	char name[10];
-+	int gpio_sel;
-+	enum of_gpio_flags flags;
-+	unsigned long gpio_flags;
- 
- 	dra7xx = devm_kzalloc(dev, sizeof(*dra7xx), GFP_KERNEL);
- 	if (!dra7xx)
-@@ -398,6 +402,22 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 		goto err_get_sync;
- 	}
- 
-+	gpio_sel = of_get_gpio_flags(dev->of_node, 0, &flags);
-+	if (gpio_is_valid(gpio_sel)) {
-+		gpio_flags = (flags & OF_GPIO_ACTIVE_LOW) ?
-+				GPIOF_OUT_INIT_LOW : GPIOF_OUT_INIT_HIGH;
-+		ret = devm_gpio_request_one(dev, gpio_sel, gpio_flags,
-+					    "pcie_reset");
-+		if (ret) {
-+			dev_err(&pdev->dev, "gpio%d request failed, ret %d\n",
-+				gpio_sel, ret);
-+			goto err_gpio;
-+		}
-+	} else if (gpio_sel == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto err_gpio;
-+	}
-+
- 	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_DEVICE_CMD);
- 	reg &= ~LTSSM_EN;
- 	dra7xx_pcie_writel(dra7xx, PCIECTRL_DRA7XX_CONF_DEVICE_CMD, reg);
-@@ -406,11 +426,11 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 
- 	ret = dra7xx_add_pcie_port(dra7xx, pdev);
- 	if (ret < 0)
--		goto err_add_port;
-+		goto err_gpio;
- 
- 	return 0;
- 
--err_add_port:
-+err_gpio:
- 	pm_runtime_put(dev);
- 
- err_get_sync:
--- 
-1.7.9.5
+Rob
