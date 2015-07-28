@@ -1,29 +1,76 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 28 Jul 2015 12:20:25 +1000
-Subject: linux-next: manual merge of the tip tree with the arm-soc tree
-Message-ID: <20150728122025.6b2cdbc8@canb.auug.org.au>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 28 Jul 2015 07:53:08 +0530
+Subject: [PATCH v4 1/2] dt: cpufreq: st: Provide bindings for ST's
+ CPUFreq implementation
+In-Reply-To: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <20150728022308.GA1229@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On 27-07-15, 16:20, Lee Jones wrote:
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> 
+> Changelog:
+>  - Using OPP-v2
+>  - Moved (and linked) a bunch of documentation to ../power/
+> 
+>  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 40 ++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> new file mode 100644
+> index 0000000..79add9d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
+> @@ -0,0 +1,40 @@
+> +Binding for ST's CPUFreq driver
+> +===============================
+> +
+> +Frequency Scaling only
+> +----------------------
+> +
+> +Located in CPU's node:
+> +
+> +- operating-points		: [See: ../power/opp.txt]
+> +
+> +Example [safe]
+> +--------------
+> +
+> +cpus {
+> +	cpu at 0 {
+> +				 /* kHz     uV   */
+> +		operating-points = <1500000 0
+> +				    1200000 0
+> +				    800000  0
+> +				    500000  0>;
+> +	};
+> +};
+> +
+> +Dynamic Voltage and Frequency Scaling (DVFS)
+> +--------------------------------------------
+> +
+> +Located in CPU's node:
+> +
+> +- operating-points-v2-sti	: [See ../power/opp-st.txt]
+> +
+> +Example [unsafe]
+> +----------------
+> +
+> +cpus {
+> +	cpu at 0 {
+> +		operating-points-v2	= <[OPP list phandle]>;
+> +	};
+> +};
+> +
+> +For an example of an OPP list, see ../power/opp-st.txt.
 
-Today's linux-next merge of the tip tree got a conflict in:
-
-  arch/arm/mach-shmobile/intc-sh73a0.c
-
-between commit:
-
-  30f8925a57d8 ("ARM: shmobile: Remove legacy board code for KZM-A9-GT")
-
-from the arm-soc tree and commit:
-
-  0d3f2c92e004 ("irqchip/gic: Remove redundant gic_set_irqchip_flags")
-
-from the tip tree.
-
-I fixed it up (I just removed the file) and can carry the fix as necessary
-(no action is required).
+I don't think you need this file/patch at all.. It is almost blank and
+doesn't define a binding. And so there is no need to specify this at
+all. Just an OPP binding file is enough.
 
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+viresh
