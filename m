@@ -1,54 +1,50 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Tue, 28 Jul 2015 16:15:12 +0800
-Subject: [PATCH v2 2/2] ARM: at91: at91_dt_defconfig: enable ISI and ov2640
- support
-In-Reply-To: <55B7312F.9040505@atmel.com>
-References: <1434449315-9243-1-git-send-email-josh.wu@atmel.com>
- <1434449315-9243-2-git-send-email-josh.wu@atmel.com>
- <55B7312F.9040505@atmel.com>
-Message-ID: <55B73A10.4040608@atmel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 28 Jul 2015 17:21:47 +0900
+Subject: [PATCH] MAINTAINERS: pinctrl: Move Thomas Abraham to CREDITS
+Message-ID: <1438071707-20685-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/28/2015 3:37 PM, Nicolas Ferre wrote:
-> Le 16/06/2015 12:08, Josh Wu a ?crit :
->> Add Atmel-isi and ov2640 driver in defconfig
->>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>
->> Changes in v2: None
->>
->>   arch/arm/configs/at91_dt_defconfig | 6 ++++++
->>   1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
->> index bcef49a..d089ec9 100644
->> --- a/arch/arm/configs/at91_dt_defconfig
->> +++ b/arch/arm/configs/at91_dt_defconfig
->> @@ -131,6 +131,12 @@ CONFIG_POWER_RESET=y
->>   CONFIG_WATCHDOG=y
->>   CONFIG_AT91SAM9X_WATCHDOG=y
->>   CONFIG_SSB=m
->> +CONFIG_MEDIA_SUPPORT=y
->> +CONFIG_MEDIA_CAMERA_SUPPORT=y
->> +CONFIG_V4L_PLATFORM_DRIVERS=y
->> +CONFIG_SOC_CAMERA=y
->> +CONFIG_VIDEO_ATMEL_ISI=y
->> +CONFIG_SOC_CAMERA_OV2640=y
-> I would select this camera driver as a module. Your thoughts?
+Thomas Abraham's Linaro email address bounces for several months. Also
+there were no replies for several emails sent on LKML to his Samsung
+address. Move his name to CREDITS.
 
-yes, I agree.
-Do I need to resent the patch for this?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Thomas Abraham <thomas.ab@samsung.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Link: http://lkml.org/lkml/2015/6/15/15
+---
+ CREDITS     | 4 ++++
+ MAINTAINERS | 1 -
+ 2 files changed, 4 insertions(+), 1 deletion(-)
 
-Best Regards,
-Josh Wu
-
->
-> Bye,
->
->>   CONFIG_FB=y
->>   CONFIG_FB_ATMEL=y
->>   CONFIG_BACKLIGHT_LCD_SUPPORT=y
->>
->
+diff --git a/CREDITS b/CREDITS
+index 4fcf9cd8544c..bcb8efaa9459 100644
+--- a/CREDITS
++++ b/CREDITS
+@@ -20,6 +20,10 @@ D: One of assisting postmasters for vger.kernel.org's lists
+ S: (ask for current address)
+ S: Finland
+ 
++N: Thomas Abraham
++E: thomas.ab at samsung.com
++D: Samsung pin controller driver
++
+ N: Dragos Acostachioaie
+ E: dragos at iname.com
+ W: http://www.arbornet.org/~dragos
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 4bed1920eb2a..f0a63f06ca33 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8008,7 +8008,6 @@ F:	drivers/pinctrl/sh-pfc/
+ 
+ PIN CONTROLLER - SAMSUNG
+ M:	Tomasz Figa <tomasz.figa@gmail.com>
+-M:	Thomas Abraham <thomas.abraham@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-samsung-soc at vger.kernel.org (moderated for non-subscribers)
+ S:	Maintained
+-- 
+1.9.1
