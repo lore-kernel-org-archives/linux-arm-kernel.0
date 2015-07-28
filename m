@@ -1,66 +1,39 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 28 Jul 2015 11:31:05 +0200
-Subject: [PATCH 6/9] gpiolib-of: Reuse 'line-name' from DT as gpio
- descriptor name
-In-Reply-To: <1437125570-28623-7-git-send-email-mpa@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-7-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150728093105.GL28535@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jul 2015 10:31:06 +0100
+Subject: [PATCH] arm64: mm: mark create_mapping as __init
+Message-ID: <1438075866-15483-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 11:32:47AM +0200, Markus Pargmann wrote:
-> The DT describes gpios with subnodes. These subnodes can contain a
-> property 'line-name'. This information can be useful in other areas
-> where we want to identify a GPIO by its name.
-> 
-> This patch stores the line-name in the gpio descriptor.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/gpio/gpiolib-of.c | 29 ++++++++++++++++++++---------
->  1 file changed, 20 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-> index 64950591a764..cefc665a558c 100644
-> --- a/drivers/gpio/gpiolib-of.c
-> +++ b/drivers/gpio/gpiolib-of.c
-> @@ -184,11 +184,6 @@ static struct gpio_desc *of_parse_gpio(struct device_node *np,
->  		*dflags |= GPIOD_OUT_LOW;
->  	else if (of_property_read_bool(np, "output-high"))
->  		*dflags |= GPIOD_OUT_HIGH;
-> -	else {
-> -		pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
-> -			desc_to_gpio(gg_data.out_gpio), np->name);
-> -		return ERR_PTR(-EINVAL);
-> -	}
->
->  	if (name && of_property_read_string(np, "line-name", name))
->  		*name = np->name;
-> @@ -214,15 +209,31 @@ static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
->  
->  	for_each_child_of_node(chip->of_node, np) {
->  		const char *name = NULL;
-> -		if (!of_property_read_bool(np, "gpio-hog"))
-> -			continue;
-> +		struct gpio_desc *name_desc;
->  
->  		desc = of_parse_gpio(np, &name, &lflags, &dflags);
->  		if (IS_ERR(desc))
->  			continue;
->  
-> -		if (gpiod_hog(desc, name, lflags, dflags))
-> -			continue;
-> +		if (name) {
-> +			name_desc = gpio_name_to_desc(name);
-> +			if (name_desc)
-> +				pr_err("GPIO name collision for '%s' detected at GPIO line %d (%s)\n",
-> +				       name, desc_to_gpio(desc), np->name);
-> +			else
-> +				desc->name = name;
+Currently create_mapping is marked with __ref, apparently because it
+refers to early_alloc. However, create_mapping has no logic to prevent
+erroneous use of early_alloc after it has been freed, and is only ever
+called by __init functions anyway. Thus the __ref marker is misleading
+and unnecessary.
 
-This will introduce a regression. As I mentioned in a comment on an
-earlier patch, of_get_gpio_hog falls back to using the node name and
-those need not be unique.
+Instead, this patch marks create_mapping as __init, resulting in
+warnings if it is used from a a non __init functions, and allowing its
+memory to be reclaimed.
 
-Johan
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/mmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 63012fe..9211b85 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -267,7 +267,7 @@ static void *late_alloc(unsigned long size)
+ 	return ptr;
+ }
+ 
+-static void __ref create_mapping(phys_addr_t phys, unsigned long virt,
++static void __init create_mapping(phys_addr_t phys, unsigned long virt,
+ 				  phys_addr_t size, pgprot_t prot)
+ {
+ 	if (virt < VMALLOC_START) {
+-- 
+1.9.1
