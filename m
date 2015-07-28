@@ -1,79 +1,48 @@
-From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 28 Jul 2015 07:19:58 +0200
-Subject: [PATCH 1/7] usb: gadget: add 'quirk_altset_not_supp' to usb_gadget
-In-Reply-To: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
-References: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438060804-21706-2-git-send-email-r.baldyga@samsung.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Tue, 28 Jul 2015 13:29:58 +0800
+Subject: [PATCH v4 7/7] arm64: dts: mt8173: Add subsystem clock
+ controller device nodes
+In-Reply-To: <24796517.2pfRdOOmRJ@ubix>
+References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
+ <CAGS+omAUAHZUJQMnWJbH7NXB_Etp=OF3dWyMB7Ri1+rAyzyPBg@mail.gmail.com>
+ <1437965782.5614.4.camel@mtksdaap41> <24796517.2pfRdOOmRJ@ubix>
+Message-ID: <1438061398.17770.25.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to some UDC controllers may not support altsettings, usb gadget layer
-needs to provide a generic way to inform gadget functions about non-standard
-hardware limitations.
+On Mon, 2015-07-27 at 03:21 -0700, Matthias Brugger wrote:
+> On Monday, July 27, 2015 10:56:22 AM James Liao wrote:
+> > Hi Daniel,
+> > 
+> > On Fri, 2015-07-24 at 19:32 +0800, Daniel Kurtz wrote:
+> > > > @@ -88,6 +88,13 @@
+> > > > 
+> > > >                 #clock-cells = <0>;
+> > > >         
+> > > >         };
+> > > > 
+> > > > +       cpum_ck: dummy_clk {
+> > > 
+> > > I'm not a big fan of this "dummy_clk".
+> > > The 'name' part of the devicetree node is supposed to be generic.
+> > > So, perhaps just oscillator at 2, and move it down below clk32k:
+> > > oscillator at 1.
+> > 
+> > > Otherwise:
+> > cpum_ck is a test clock which only available in IC test. It's empty on
+> > MT8173 evaluation or production boards. Should we name this kind of
+> > empty clock as an oscillator? Or is there a better name for it?
+> > 
+> 
+> So if it will never be part of any available boards, why do you want to add 
+> it?
 
-This patch adds 'quirk_altset_not_supp' field to struct usb_gadget and helper
-function gadget_is_altset_supported(). It also sets 'quirk_altset_not_supp'
-to 1 in pxa25x_udc and pxa27x_udc drivers, which have such limitation.
+infra_cpum is a clock gate, and its clock comes from an external clock.
+In previous versions we named the external clock as "clk_null", but it's
+not accepted. A specified name is preferred even it's not available on
+some boards. So I named it as cpum_ck in this patch.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
----
- drivers/usb/gadget/udc/pxa25x_udc.c |  1 +
- drivers/usb/gadget/udc/pxa27x_udc.c |  1 +
- include/linux/usb/gadget.h          | 11 +++++++++++
- 3 files changed, 13 insertions(+)
 
-diff --git a/drivers/usb/gadget/udc/pxa25x_udc.c b/drivers/usb/gadget/udc/pxa25x_udc.c
-index f53e526..b82cb14 100644
---- a/drivers/usb/gadget/udc/pxa25x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa25x_udc.c
-@@ -1176,6 +1176,7 @@ static void udc_reinit(struct pxa25x_udc *dev)
- 	INIT_LIST_HEAD (&dev->gadget.ep_list);
- 	INIT_LIST_HEAD (&dev->gadget.ep0->ep_list);
- 	dev->ep0state = EP0_IDLE;
-+	dev->gadget.quirk_altset_not_supp = 1;
- 
- 	/* basic endpoint records init */
- 	for (i = 0; i < PXA_UDC_NUM_ENDPOINTS; i++) {
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 042f06b..670ac0b 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -1710,6 +1710,7 @@ static void udc_init_data(struct pxa_udc *dev)
- 	INIT_LIST_HEAD(&dev->gadget.ep_list);
- 	INIT_LIST_HEAD(&dev->gadget.ep0->ep_list);
- 	dev->udc_usb_ep[0].pxa_ep = &dev->pxa_ep[0];
-+	dev->gadget.quirk_altset_not_supp = 1;
- 	ep0_idle(dev);
- 
- 	/* PXA endpoints init */
-diff --git a/include/linux/usb/gadget.h b/include/linux/usb/gadget.h
-index 91b71a3..5362faa 100644
---- a/include/linux/usb/gadget.h
-+++ b/include/linux/usb/gadget.h
-@@ -617,6 +617,7 @@ struct usb_gadget {
- 	unsigned			a_hnp_support:1;
- 	unsigned			a_alt_hnp_support:1;
- 	unsigned			quirk_ep_out_aligned_size:1;
-+	unsigned			quirk_altset_not_supp:1;
- 	unsigned			is_selfpowered:1;
- 	unsigned			deactivated:1;
- 	unsigned			connected:1;
-@@ -673,6 +674,16 @@ usb_ep_align_maybe(struct usb_gadget *g, struct usb_ep *ep, size_t len)
- }
- 
- /**
-+ * gadget_is_altset_supported - return true iff the hardware supports
-+ *	altsettings
-+ * @g: controller to check for quirk
-+ */
-+static inline int gadget_is_altset_supported(struct usb_gadget *g)
-+{
-+	return !g->quirk_altset_not_supp;
-+}
-+
-+/**
-  * gadget_is_dualspeed - return true iff the hardware handles high speed
-  * @g: controller that might support both high and full speeds
-  */
--- 
-1.9.1
+Best regards,
+
+James
