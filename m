@@ -1,45 +1,27 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 28 Jul 2015 14:41:26 -0700
-Subject: [PATCH v2] clk: exynos4: Fix wrong clock for Exynos4x12 ADC
-In-Reply-To: <55B472C7.5000109@gmail.com>
-References: <1434074005-18846-1-git-send-email-k.kozlowski@samsung.com>
- <20150721224235.GA30021@codeaurora.org>
- <55AED88D.2060009@samsung.com> <55B472C7.5000109@gmail.com>
-Message-ID: <20150728214126.GA3159@codeaurora.org>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Tue, 28 Jul 2015 14:45:37 -0700
+Subject: [PATCH] lib: Make _find_next_bit helper function inline
+In-Reply-To: <55B7F2C6.9010000@gmail.com>
+References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
+ <55B7F2C6.9010000@gmail.com>
+Message-ID: <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/26, Sylwester Nawrocki wrote:
-> On 07/22/2015 08:41 AM, Krzysztof Kozlowski wrote:
-> >On 22.07.2015 07:42, Stephen Boyd wrote:
-> >>>On 06/12, Krzysztof Kozlowski wrote:
-> [...]
-> >>>>>Signed-off-by: Krzysztof Kozlowski<k.kozlowski@samsung.com>
-> >>>>>Cc:<stable@vger.kernel.org>
-> >>>>>Fixes: c63c57433003 ("ARM: dts: Add ADC's dt data to read raw data for exynos4x12")
-> >>>>>Link:https://lkml.org/lkml/2015/6/11/85
-> >>>
-> >>>Did you want clk maintainers to apply this? The To: list is not
-> >>>helping so I'm not sure what's going on and it seems to have
-> >>>slipped through the cracks.
-> >
-> >Thank you for being proactive! I appreciate this.
-> >Some time ago Sylwester replied that he took care about this patch so I
-> >think this will go through Samsung clock tree.
-> >
-> >Sylwester, are you planning to send this as fix for 4.2-rc?
-> 
-> I think it qualifies for 4.3, it's not a new regression and will be
-> backported to -stable anyway.
-> I would prefer clk maintainers have applied this, otherwise I would
-> need to make a (questionable) pull request with only one patch, since
-> all patches except this one after the last merge window were part
-> of bigger series touching multiple subsystems and applied through
-> the samsung soc tree.
-> 
+On Wed, 29 Jul 2015 00:23:18 +0300 Yury <yury.norov@gmail.com> wrote:
 
-Ok. Applied to clk-next.
+> But I think, before/after for x86 is needed as well.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+That would be nice.
+
+> And why don't you consider '__always_inline__'? Simple inline is only a 
+> hint and
+> guarantees nothing.
+
+Yup.  My x86_64 compiler just ignores the "inline".  When I use
+__always_inline, find_bit.o's text goes from 776 bytes to 863. 
+Hopefully we get something in return for that bloat!
+
+
+Also, if _find_next_bit() benefits from this then _find_next_bit_le()
+will presumably also benefit.
