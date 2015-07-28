@@ -1,60 +1,47 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 28 Jul 2015 08:51:45 +0800
-Subject: [PATCH] mmc: sdhci-of-arasan: Get quirks from device tree
-In-Reply-To: <55B64BFF.8030909@metafoo.de>
-References: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
- <55B64BFF.8030909@metafoo.de>
-Message-ID: <55B6D221.8090600@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 09:02:35 +0800
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+ <20150727132802.GK12927@tiger>
+ <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+Message-ID: <20150728010235.GU12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/7/27 23:19, Lars-Peter Clausen wrote:
-> On 07/27/2015 10:04 AM, Shawn Lin wrote:
->> This patch adds the interface to get quirks from dts, and
->> there is no need to assign different quirks by condition statement
->> of arasan IP version.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> ---
->>
->>   drivers/mmc/host/sdhci-of-arasan.c | 7 +++++++
->>   1 file changed, 7 insertions(+)
->>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c 
->> b/drivers/mmc/host/sdhci-of-arasan.c
->> index ef5a7d2..db07788 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -132,6 +132,7 @@ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, 
->> sdhci_arasan_suspend,
->>   static int sdhci_arasan_probe(struct platform_device *pdev)
->>   {
->>       int ret;
->> +    u32 quirktab[2];
->>       struct clk *clk_xin;
->>       struct sdhci_host *host;
->>       struct sdhci_pltfm_host *pltfm_host;
->> @@ -172,6 +173,12 @@ static int sdhci_arasan_probe(struct 
->> platform_device *pdev)
->>           goto clk_disable_all;
->>       }
->>
->> +    if (of_property_read_u32_array(pdev->dev.of_node,
->> +                       "arasan,quirks", &quirktab[0], 2)) {
->> +        host->quirks |= quirktab[0];
->> +        host->quirks2 |= quirktab[1];
->> +    }
->
-> The quirks are part of the Linux internal API, making them part of the 
-> public ABI is not necessarily the best idea. It means they become 
-> fixed, you can't remove any quirk types, can't change any quirk type, 
-> nor can add new quirk types.
->
-Thank for your kindly reply, Lars.  It seems I have lots to learn if I 
-want to get involved in upstream :)
-So this patch is inappropriate for kernel.
-> - Lars
->
->
->
->
+On Mon, Jul 27, 2015 at 06:24:26PM +0000, Shenwei Wang wrote:
+> > > @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+> > >
+> > >  ifeq ($(CONFIG_SUSPEND),y)
+> > >  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> > > +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
+> > > +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
+> > 
+> > Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
+> 
+> CONFIG_IMX_GPCV2 is more suitable here. As long as a SOC has the same GPCv2 block, the codes should be reused.
+
+Let's see what problem it will have.  Saying GPCv2 block is used on
+imx8, we will have something like below.
+
+obj-$(CONFIG_IMX_GPCV2) += suspend-imx7.o pm-imx7.o suspend-imx8.o pm-imx8.o
+
+If people want to build a kernel with imx8 support only, suspend-imx7.o
+and pm-imx7.o will also be built in there, which is undesirable.
+
+The files are named with "-imx7".  It's a clear sign that the build of
+the files should be controlled by something like related to "imx7".
+Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only
+supported imx7 soc and there is no CONFIG_SOC_IMX7 available so far,
+it falls on CONFIG_SOC_IMX7D.
+
+> > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
+> > 
+> > Will this give a checkpatch warning?
+> 
+> Yes. Any suggestion for that? Move it to a header file?
+
+Get rid of it.
+
+Shawn
