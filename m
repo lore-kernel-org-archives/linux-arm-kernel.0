@@ -1,93 +1,193 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jul 2015 13:55:52 +0100
-Subject: [PATCH 4/4] ARM: omap2: restore OMAP4 barrier behaviour
-In-Reply-To: <55B6A161.8010307@ti.com>
-References: <20150715174647.GA7557@n2100.arm.linux.org.uk>
- <E1ZFQmM-0006GN-5Y@rmk-PC.arm.linux.org.uk>
- <55B6A161.8010307@ti.com>
-Message-ID: <20150728125552.GH7576@n2100.arm.linux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jul 2015 14:00:55 +0100
+Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
+ disable} framework
+In-Reply-To: <20150728114022.GW2564@lukather>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
+ <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
+ <20150728114022.GW2564@lukather>
+Message-ID: <20150728130055.GV14943@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 04:23:45PM -0500, Dan Murphy wrote:
-> Russell
+On Tue, 28 Jul 2015, Maxime Ripard wrote:
+
+> On Mon, Jul 27, 2015 at 09:53:38AM +0100, Lee Jones wrote:
+> > On Mon, 27 Jul 2015, Maxime Ripard wrote:
+> > 
+> > > On Wed, Jul 22, 2015 at 02:04:13PM +0100, Lee Jones wrote:
+> > > > These new API calls will firstly provide a mechanisms to tag a clock as
+> > > > critical and secondly allow any knowledgeable driver to (un)gate clocks,
+> > > > even if they are marked as critical.
+> > > > 
+> > > > Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > ---
+> > > >  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
+> > > >  include/linux/clk-provider.h |  2 ++
+> > > >  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
+> > > >  3 files changed, 77 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > > > index 61c3fc5..486b1da 100644
+> > > > --- a/drivers/clk/clk.c
+> > > > +++ b/drivers/clk/clk.c
+> > > > @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
+> > > >  
+> > > >  /***    private data structures    ***/
+> > > >  
+> > > > +/**
+> > > > + * struct critical -	Provides 'play' over critical clocks.  A clock can be
+> > > > + *			marked as critical, meaning that it should not be
+> > > > + *			disabled.  However, if a driver which is aware of the
+> > > > + *			critical behaviour wants to control it, it can do so
+> > > > + *			using clk_enable_critical() and clk_disable_critical().
+> > > > + *
+> > > > + * @enabled	Is clock critical?  Once set, doesn't change
+> > > > + * @leave_on	Self explanatory.  Can be disabled by knowledgeable drivers
+> > > > + */
+> > > > +struct critical {
+> > > > +	bool enabled;
+> > > > +	bool leave_on;
+> > > > +};
+> > > > +
+> > > >  struct clk_core {
+> > > >  	const char		*name;
+> > > >  	const struct clk_ops	*ops;
+> > > > @@ -75,6 +90,7 @@ struct clk_core {
+> > > >  	struct dentry		*dentry;
+> > > >  #endif
+> > > >  	struct kref		ref;
+> > > > +	struct critical		critical;
+> > > >  };
+> > > >  
+> > > >  struct clk {
+> > > > @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
+> > > >  	if (WARN_ON(clk->enable_count == 0))
+> > > >  		return;
+> > > >  
+> > > > +	/* Refuse to turn off a critical clock */
+> > > > +	if (clk->enable_count == 1 && clk->critical.leave_on)
+> > > > +		return;
+> > > > +
+> > > 
+> > > I think it should be handled by a separate counting. Otherwise, if you
+> > > have two users that marked the clock as critical, and then one of them
+> > > disable it...
+> > > 
+> > > >  	if (--clk->enable_count > 0)
+> > > >  		return;
+> > > >  
+> > > > @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
+> > > >  }
+> > > >  EXPORT_SYMBOL_GPL(clk_disable);
+> > > >  
+> > > > +void clk_disable_critical(struct clk *clk)
+> > > > +{
+> > > > +	clk->core->critical.leave_on = false;
+> > > 
+> > > .. you just lost the fact that it was critical in the first place.
+> > 
+> > I thought about both of these points, which is why I came up with this
+> > strategy.
+> > 
+> > Any device which uses the *_critical() API should a) have knowledge of
+> > what happens when a particular critical clock is gated and b) have
+> > thought about the consequences.
 > 
-> On 07/15/2015 12:47 PM, Russell King wrote:
-> > +#ifdef CONFIG_OMAP_INTERCONNECT_BARRIER
-> > +
-> >  /* Used to implement memory barrier on DRAM path */
-> >  #define OMAP4_DRAM_BARRIER_VA			0xfe600000
-> >  
-> > -void __iomem *dram_sync, *sram_sync;
-> > +static void __iomem *dram_sync, *sram_sync;
-> > +static phys_addr_t dram_sync_paddr;
-> > +static u32 dram_sync_size;
-> > +
-> > +/*
-> > + * The OMAP4 bus structure contains asynchrnous bridges which can buffer
-> > + * data writes from the MPU. These asynchronous bridges can be found on
-> > + * paths between the MPU to EMIF, and the MPU to L3 interconnects.
-> > + *
-> > + * We need to be careful about re-ordering which can happen as a result
-> > + * of different accesses being performed via different paths, and
-> > + * therefore different asynchronous bridges.
-> > + */
-> >  
-> > -static phys_addr_t paddr;
-> > -static u32 size;
-> > +/*
-> > + * OMAP4 interconnect barrier which is called for each mb() and wmb().
-> > + * This is to ensure that normal paths to DRAM (normal memory, cacheable
-> > + * accesses) are properly synchronised with writes to DMA coherent memory
-> > + * (normal memory, uncacheable) and device writes.
-> > + *
-> > + * The mb() and wmb() barriers only operate only on the MPU->MA->EMIF
-> > + * path, as we need to ensure that data is visible to other system
-> > + * masters prior to writes to those system masters being seen.
-> > + *
-> > + * Note: the SRAM path is not synchronised via mb() and wmb().
-> > + */
-> > +static void omap4_mb(void)
+> Indeed.
 > 
-> Sorry for the late response but this throws a warning when CONFIG_ARCH_OMAP4
-> is not configured.
+> > I don't think we can use reference counting, because we'd need as
+> > many critical clock owners as there are critical clocks.
 > 
-> arch/arm/mach-omap2/omap4-common.c:85:13: warning: 'omap4_mb' defined but not used [-Wunused-function]
+> Which we can have if we replace the call to clk_prepare_enable you add
+> in your fourth patch in __set_critical_clocks.
 
-Sorry, I'm going to have to disagree with you and your compiler on this.
-This is how the code is structured:
+What should it be replaced with?
 
-#ifdef CONFIG_OMAP_INTERCONNECT_BARRIER
-...
-static void omap4_mb(void)
-{
-        if (dram_sync)
-                writel_relaxed(0, dram_sync);
-}
-...
-void __init omap_barriers_init(void)
-{
-...
-        soc_mb = omap4_mb;
-}
+> > Cast your mind back to the reasons for this critical clock API.  One
+> > of the most important intentions of this API is the requirement
+> > mitigation for each of the critical clocks to have an owner
+> > (driver).
+> > 
+> > With regards to your second point, that's what 'critical.enabled'
+> > is for.  Take a look at clk_enable_critical().
+> 
+> I don't think this addresses the issue, if you just throw more
+> customers at it, the issue remain with your implementation.
+> 
+> If you have three customers that used the critical API, and if on of
+> these calls clk_disable_critical, you're losing leave_on.
 
-#endif
+That's the idea.  See my point above, the one you replied "Indeed"
+to.  So when a driver uses clk_disable_critical() it's saying, "I know
+why this clock is a critical clock, and I know that nothing terrible
+will happen if I disable it, as I have that covered".  So then if it's
+not the last user to call clk_disable(), the last one out the door
+will be allowed to finally gate the clock, regardless whether it's
+critical aware or not.
 
-So, the definition of omap4_mb(), and the use of the same are both
-under the same ifdef.  You can't build omap4_mb() without also building
-omap_barriers_init() as well.
+Then, when we come to enable the clock again, the critical aware user
+then re-marks the clock as leave_on, so not critical un-aware user can
+take the final reference and disable the clock.
 
-So, there's no way that omap4_mb() would be "defined but not used".
+> Which means that if there's one of the two users left that calls
+> clk_disable on it, the clock will actually be disabled, which is
+> clearly not what we want to do, as we have still a user that want the
+> clock to be enabled.
 
-I think you have some changes in your kernel which, maybe, place an
-ifdef around omap_barriers_init() which _would_ cause the warning you're
-seeing if they aren't set.
+That's not what happens (at least it shouldn't if I've coded it up
+right).  The API _still_ requires all of the users to give-up their
+reference.
 
-Also, please trim context before the relevant part to which you're
-replying. I almost gave up paging down to see whether there was actually
-anything worth replying to.  If there's nothing in the first 50 lines of
-the message, it's a waste of space.
+> It would be much more robust to have another count for the critical
+> stuff, initialised to one by the __set_critical_clocks function.
+
+If I understand you correctly, we already have a count.  We use the
+original reference count.  No need for one of our own.
+
+Using your RAM Clock (Clock 4) as an example
+--------------------------------------------
+
+Early start-up:
+  Clock 4 is marked as critical and a reference is taken (ref == 1)
+
+Driver probe:
+  SPI enables Clock 4 (ref == 2)
+  I2C enables Clock 4 (ref == 3)
+
+Suspend (without RAM driver's permission):
+  SPI disables Clock 4 (ref == 2)
+  I2C disables Clock 4 (ref == 1)
+  /*
+   * Clock won't be gated because:
+   *   .leave_on is True - can't dec final reference
+   */
+
+Suspend (with RAM driver's permission):
+  /* Order is unimportant */
+  SPI disables Clock 4 (ref == 2)
+  RAM disables Clock 4 (ref == 1) /* Won't turn off here (ref > 0)
+  I2C disables Clock 4 (ref == 0) /* (.leave_on == False) last ref can be taken */
+  /*
+   * Clock will be gated because:
+   *   .leave_on is False, so (ref == 0)
+   */
+
+Resume:
+  /* Order is unimportant */
+  SPI enables Clock 4 (ref == 1)
+  RAM enables Clock 4 and re-enables .leave_on (ref == 2)
+  I2C enables Clock 4 (ref == 3)
+
+Hopefully that clears things up.
+
+Please tell me if the code doesn't reflect this strategy, or if you
+can see anything wrong with how it operates.
 
 -- 
-FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
-according to speedtest.net.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
