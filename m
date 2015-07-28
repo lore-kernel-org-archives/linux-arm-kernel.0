@@ -1,78 +1,137 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 28 Jul 2015 16:29:40 -0700
-Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
- counter from coprocessor
-In-Reply-To: <CALW4P+LqjhQ+Puadz4W-n_v=KEnwvQiUkk5jkDLRxhjVQGwFyw@mail.gmail.com>
-References: <1438032507.17734.46.camel@gmail.com>
- <CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>
- <CALW4P+LqjhQ+Puadz4W-n_v=KEnwvQiUkk5jkDLRxhjVQGwFyw@mail.gmail.com>
-Message-ID: <CAD=FV=VMEGrS7XdVDLTM89WHVd_zQtjs0aM2CaWCecE3WqG9Uw@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 28 Jul 2015 19:43:20 -0400 (EDT)
+Subject: [PATCH] drivers/clk: appropriate __init annotation for const data
+Message-ID: <alpine.LFD.2.20.1507281430130.26147@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Tue, Jul 28, 2015 at 9:20 AM, Alexey Klimov <klimov.linux@gmail.com> wrote:
-> Hi Doug,
->
-> On Tue, Jul 28, 2015 at 6:24 PM, Doug Anderson <dianders@chromium.org> wrote:
->> Alexey,
->>
->> On Mon, Jul 27, 2015 at 2:28 PM, Alexey Klimov <klimov.linux@gmail.com> wrote:
->>> Hi all,
->>>
->>> year(s) ago it was discovered that MCT timer and ARM architectured
->>> timer
->>> are the same hardware with different interface. Here [1].
->>>
->>> I followed mail-list discussions about removing MCT and using arch
->>> timer for Exynos5-based SoCs but things aren't moving at least latest
->>> upstream kernel on odroid-xu3 will use MCT as default timers.
->>> Maybe the reason are some power-management related things that very
->>> specific to Samsung. I don't know.
->>>
->>>
->>> Idea of this draft patchset comes from Doug patches when he tried to
->>> optimize read of 64-bit counter located in mmio. [2]
->>> Why not using cp15 counter instead if possible?
->>
->> I hate to burst your bubble here, but...
->>
->> ...I think it would be a bad idea to use the cp15 counter on exynos
->> 5422.  According to Samsung, there are issues where using cp15 could
->> sometimes return the wrong value, especially if you happen to read it
->> while on an A7 instead of an A15.  It will tend to work pretty well,
->> but Samsung claimed that it might not work right on some CPUs or at
->> some temperatures.
->
-> I think this is right time when I can say "If only I had known about
-> it before!".
+Init data marked const should be annotated with __initconst for
+correctness and not __initdata.  This also fixes LTO builds that
+otherwise fail with section mismatch errors.
 
-Yeah, we spent a whole lot of time on this too before giving up after
-we found out it was not possible to use.
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
 
-
-> That's quite interesting especially about temperature issues.
-> Maybe it's worth to insert comments in driver/docs about this.
-
-Maybe not a bad idea.  Depends if you think someone else will try to
-do this...  ...and if they do, will they check mailing list traffic.
-
-
->> Generally I'd say that if the arch timer works for you: use the arch
->> timer.  If the arch timer doesn't work for you, use the MCT.
->>
->> -Doug
->
-> I possess no knowledge if there're any different hw revisions of
-> odroid-xu3 on the field
-> but looks like arch timer works fine for me on odroid-xu3 Exynos5422
-> SoC with upstream kernel.
-
-Well, it looked like it worked for us too.  In fact, I never saw a
-failure.  All I know is that Samsung said: don't do this, it's not a
-good idea.  The performance gain wasn't enough to go against that...
-That's when I started trying to optimize the MCT a little bit.  ;)
-
-
--Doug
+diff --git a/drivers/clk/clk-asm9260.c b/drivers/clk/clk-asm9260.c
+index 90897af8d9..25308ce09a 100644
+--- a/drivers/clk/clk-asm9260.c
++++ b/drivers/clk/clk-asm9260.c
+@@ -244,10 +244,10 @@ static const struct asm9260_gate_data asm9260_ahb_gates[] __initconst = {
+ 		HW_AHBCLKCTRL1,	16 },
+ };
+ 
+-static const char __initdata *main_mux_p[] =   { NULL, NULL };
+-static const char __initdata *i2s0_mux_p[] =   { NULL, NULL, "i2s0m_div"};
+-static const char __initdata *i2s1_mux_p[] =   { NULL, NULL, "i2s1m_div"};
+-static const char __initdata *clkout_mux_p[] = { NULL, NULL, "rtc"};
++static const char *const main_mux_p[] __initconst =   { NULL, NULL };
++static const char *const i2s0_mux_p[] __initconst =   { NULL, NULL, "i2s0m_div"};
++static const char *const i2s1_mux_p[] __initconst =   { NULL, NULL, "i2s1m_div"};
++static const char *const clkout_mux_p[] __initconst = { NULL, NULL, "rtc"};
+ static u32 three_mux_table[] = {0, 1, 3};
+ 
+ static struct asm9260_mux_clock asm9260_mux_clks[] __initdata = {
+diff --git a/drivers/clk/clk-stm32f4.c b/drivers/clk/clk-stm32f4.c
+index 3f6f7ad394..c316454ef8 100644
+--- a/drivers/clk/clk-stm32f4.c
++++ b/drivers/clk/clk-stm32f4.c
+@@ -293,7 +293,7 @@ stm32f4_rcc_lookup_clk(struct of_phandle_args *clkspec, void *data)
+ 	return clks[i];
+ }
+ 
+-static const char *sys_parents[] __initdata =   { "hsi", NULL, "pll" };
++static const char *const sys_parents[] __initconst =   { "hsi", NULL, "pll" };
+ 
+ static const struct clk_div_table ahb_div_table[] = {
+ 	{ 0x0,   1 }, { 0x1,   1 }, { 0x2,   1 }, { 0x3,   1 },
+diff --git a/drivers/clk/hisilicon/clk-hi6220.c b/drivers/clk/hisilicon/clk-hi6220.c
+index 4563343b64..d7c7d73bd3 100644
+--- a/drivers/clk/hisilicon/clk-hi6220.c
++++ b/drivers/clk/hisilicon/clk-hi6220.c
+@@ -91,23 +91,23 @@ CLK_OF_DECLARE(hi6220_clk_ao, "hisilicon,hi6220-aoctrl", hi6220_clk_ao_init);
+ 
+ 
+ /* clocks in sysctrl */
+-static const char *mmc0_mux0_p[] __initdata = { "pll_ddr_gate", "syspll", };
+-static const char *mmc0_mux1_p[] __initdata = { "mmc0_mux0", "pll_media_gate", };
+-static const char *mmc0_src_p[] __initdata = { "mmc0srcsel", "mmc0_div", };
+-static const char *mmc1_mux0_p[] __initdata = { "pll_ddr_gate", "syspll", };
+-static const char *mmc1_mux1_p[] __initdata = { "mmc1_mux0", "pll_media_gate", };
+-static const char *mmc1_src_p[]  __initdata = { "mmc1srcsel", "mmc1_div", };
+-static const char *mmc2_mux0_p[] __initdata = { "pll_ddr_gate", "syspll", };
+-static const char *mmc2_mux1_p[] __initdata = { "mmc2_mux0", "pll_media_gate", };
+-static const char *mmc2_src_p[]  __initdata = { "mmc2srcsel", "mmc2_div", };
+-static const char *mmc0_sample_in[] __initdata = { "mmc0_sample", "mmc0_pad", };
+-static const char *mmc1_sample_in[] __initdata = { "mmc1_sample", "mmc1_pad", };
+-static const char *mmc2_sample_in[] __initdata = { "mmc2_sample", "mmc2_pad", };
+-static const char *uart1_src[] __initdata = { "clk_tcxo", "clk_150m", };
+-static const char *uart2_src[] __initdata = { "clk_tcxo", "clk_150m", };
+-static const char *uart3_src[] __initdata = { "clk_tcxo", "clk_150m", };
+-static const char *uart4_src[] __initdata = { "clk_tcxo", "clk_150m", };
+-static const char *hifi_src[] __initdata = { "syspll", "pll_media_gate", };
++static const char *const mmc0_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
++static const char *const mmc0_mux1_p[] __initconst = { "mmc0_mux0", "pll_media_gate", };
++static const char *const mmc0_src_p[] __initconst = { "mmc0srcsel", "mmc0_div", };
++static const char *const mmc1_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
++static const char *const mmc1_mux1_p[] __initconst = { "mmc1_mux0", "pll_media_gate", };
++static const char *const mmc1_src_p[]  __initconst = { "mmc1srcsel", "mmc1_div", };
++static const char *const mmc2_mux0_p[] __initconst = { "pll_ddr_gate", "syspll", };
++static const char *const mmc2_mux1_p[] __initconst = { "mmc2_mux0", "pll_media_gate", };
++static const char *const mmc2_src_p[]  __initconst = { "mmc2srcsel", "mmc2_div", };
++static const char *const mmc0_sample_in[] __initconst = { "mmc0_sample", "mmc0_pad", };
++static const char *const mmc1_sample_in[] __initconst = { "mmc1_sample", "mmc1_pad", };
++static const char *const mmc2_sample_in[] __initconst = { "mmc2_sample", "mmc2_pad", };
++static const char *const uart1_src[] __initconst = { "clk_tcxo", "clk_150m", };
++static const char *const uart2_src[] __initconst = { "clk_tcxo", "clk_150m", };
++static const char *const uart3_src[] __initconst = { "clk_tcxo", "clk_150m", };
++static const char *const uart4_src[] __initconst = { "clk_tcxo", "clk_150m", };
++static const char *const hifi_src[] __initconst = { "syspll", "pll_media_gate", };
+ 
+ static struct hisi_gate_clock hi6220_separated_gate_clks_sys[] __initdata = {
+ 	{ HI6220_MMC0_CLK,      "mmc0_clk",      "mmc0_src",       CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x200, 0,  0, },
+@@ -197,9 +197,9 @@ CLK_OF_DECLARE(hi6220_clk_sys, "hisilicon,hi6220-sysctrl", hi6220_clk_sys_init);
+ 
+ 
+ /* clocks in media controller */
+-static const char *clk_1000_1200_src[] __initdata = { "pll_gpu_gate", "media_syspll_src", };
+-static const char *clk_1440_1200_src[] __initdata = { "media_syspll_src", "media_pll_src", };
+-static const char *clk_1000_1440_src[] __initdata = { "pll_gpu_gate", "media_pll_src", };
++static const char *const clk_1000_1200_src[] __initconst = { "pll_gpu_gate", "media_syspll_src", };
++static const char *const clk_1440_1200_src[] __initconst = { "media_syspll_src", "media_pll_src", };
++static const char *const clk_1000_1440_src[] __initconst = { "pll_gpu_gate", "media_pll_src", };
+ 
+ static struct hisi_gate_clock hi6220_separated_gate_clks_media[] __initdata = {
+ 	{ HI6220_DSI_PCLK,       "dsi_pclk",         "vpucodec",      CLK_SET_RATE_PARENT|CLK_IGNORE_UNUSED, 0x520, 0,  0, },
+diff --git a/drivers/clk/versatile/clk-realview.c b/drivers/clk/versatile/clk-realview.c
+index c8b523117f..0c1f224515 100644
+--- a/drivers/clk/versatile/clk-realview.c
++++ b/drivers/clk/versatile/clk-realview.c
+@@ -33,13 +33,13 @@ static const struct icst_params realview_oscvco_params = {
+ 	.idx2s		= icst307_idx2s,
+ };
+ 
+-static const struct clk_icst_desc __initdata realview_osc0_desc = {
++static const struct clk_icst_desc realview_osc0_desc __initconst = {
+ 	.params = &realview_oscvco_params,
+ 	.vco_offset = REALVIEW_SYS_OSC0_OFFSET,
+ 	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
+ };
+ 
+-static const struct clk_icst_desc __initdata realview_osc4_desc = {
++static const struct clk_icst_desc realview_osc4_desc __initconst = {
+ 	.params = &realview_oscvco_params,
+ 	.vco_offset = REALVIEW_SYS_OSC4_OFFSET,
+ 	.lock_offset = REALVIEW_SYS_LOCK_OFFSET,
+diff --git a/drivers/clk/versatile/clk-versatile.c b/drivers/clk/versatile/clk-versatile.c
+index 7a4f8635bd..81d59eada2 100644
+--- a/drivers/clk/versatile/clk-versatile.c
++++ b/drivers/clk/versatile/clk-versatile.c
+@@ -35,7 +35,7 @@ static const struct icst_params cp_auxosc_params = {
+ 	.idx2s		= icst525_idx2s,
+ };
+ 
+-static const struct clk_icst_desc __initdata cm_auxosc_desc = {
++static const struct clk_icst_desc cm_auxosc_desc __initconst = {
+ 	.params = &cp_auxosc_params,
+ 	.vco_offset = 0x1c,
+ 	.lock_offset = INTEGRATOR_HDR_LOCK_OFFSET,
