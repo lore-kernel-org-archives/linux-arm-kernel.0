@@ -1,81 +1,45 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 28 Jul 2015 07:07:24 -0700
-Subject: [PATCH 1/3] net: mdio-octeon: Modify driver to work on both
- ThunderX and Octeon
-In-Reply-To: <1438049683-10630-2-git-send-email-mohun106@gmail.com>
-References: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
- <1438049683-10630-2-git-send-email-mohun106@gmail.com>
-Message-ID: <55B78C9C.6080006@caviumnetworks.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 28 Jul 2015 15:59:17 +0200
+Subject: [PATCH v2] drm/i2c: tda998x: Fix bad checksum of the HDMI AVI
+ infoframe
+Message-ID: <mailman.7.1438092694.1755.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2015 07:14 PM, mohun106 at gmail.com wrote:
-> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->
-> This patch modifies the mdio-octeon driver to work on both ThunderX and
-> Octeon SoCs from Cavium Inc.
->
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->   drivers/net/phy/Kconfig       |    9 ++-
->   drivers/net/phy/mdio-octeon.c |  122 +++++++++++++++++++++++++++++++++++-----
->   2 files changed, 111 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-> index cf18940..0d6af19 100644
-> --- a/drivers/net/phy/Kconfig
-> +++ b/drivers/net/phy/Kconfig
-> @@ -145,13 +145,14 @@ config MDIO_GPIO
->   	  will be called mdio-gpio.
->
->   config MDIO_OCTEON
-> -	tristate "Support for MDIO buses on Octeon SOCs"
-> -	depends on CAVIUM_OCTEON_SOC
-> +	tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
-> +	depends on 64BIT
->   	default y
+Using hdmi_avi_infoframe_pack() to create the AVI infoframe calculates
+the checksum of the frame and breaks the second calculation which is
+done in tda998x_write_if(). Then the HDMI AVI frame is wrong and
+the display device does not handle correctly the video frames.
 
-If it now depends only on 64BIT, we should probably remove the 
-"default".  People building for x86 are not interested in this driver.
+Fixes: 8c7a075da9f7980c ("use drm_hdmi_avi_infoframe_from_display_mode()")
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+v2: add the Fixes: tag
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-
-[...]
->
-> +#ifdef __BIG_ENDIAN_BITFIELD
-> +#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-> +	field;					\
-> +	more
-> +
-> +#else
-> +#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-> +	more					\
-> +	field;
-> +
-> +#endif
-> +
-> +union cvmx_smix_clk {
-> +	uint64_t u64;
-
-Perhaps: s/uint64_t/u64/
-
-There are several of these.
-
-
-> +	struct cvmx_smix_clk_s {
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
-> +	  OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
-> +	  ;))))))))))
-> +	} s;
-> +};
-> +
-[...]
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index fe1599d..424228b 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -606,8 +606,6 @@ static void
+ tda998x_write_if(struct tda998x_priv *priv, uint8_t bit, uint16_t addr,
+ 		 uint8_t *buf, size_t size)
+ {
+-	buf[PB(0)] = tda998x_cksum(buf, size);
+-
+ 	reg_clear(priv, REG_DIP_IF_FLAGS, bit);
+ 	reg_write_range(priv, addr, buf, size);
+ 	reg_set(priv, REG_DIP_IF_FLAGS, bit);
+@@ -627,6 +625,8 @@ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
+ 	buf[PB(4)] = p->audio_frame[4];
+ 	buf[PB(5)] = p->audio_frame[5] & 0xf8; /* DM_INH + LSV */
+ 
++	buf[PB(0)] = tda998x_cksum(buf, sizeof(buf));
++
+ 	tda998x_write_if(priv, DIP_IF_FLAGS_IF4, REG_IF4_HB0, buf,
+ 			 sizeof(buf));
+ }
+-- 
+2.4.6
