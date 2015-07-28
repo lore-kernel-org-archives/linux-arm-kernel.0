@@ -1,75 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jul 2015 23:01:43 -0700
-Subject: n900 in 4.2-rc0: repeating oopses
-In-Reply-To: <20150726092615.GA6824@amd>
-References: <20150416093234.GA17423@amd> <20150629091146.GA5103@amd>
- <20150630092404.GA19285@amd> <20150630095310.GF27720@pali>
- <20150701065932.GS4156@atomide.com> <20150701072255.GA17577@pali>
- <20150701095954.GD7969@amd> <20150701103421.GV4156@atomide.com>
- <20150726092615.GA6824@amd>
-Message-ID: <20150728060143.GK16878@atomide.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 14:04:37 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 4.2, 2nd round
+Message-ID: <20150728060437.GF12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [150726 02:29]:
-> Hi!
-> 
-> > > > So, Pavel can you re-test? Maybe there can be problem with some driver
-> > > > which Tony did not compiled into zImage? Just speculation...
-> > > 
-> > > I re-tested with today's git, and it seems to boot. Thanks for help...
-> > 
-> > OK good to hear.
-> >  
-> > > Now. "echo mem > /sys/power/state" is broken, as in "returns
-> > > immediately in about 50% cases". The messages are
-> > > 
-> > > Powerdomain (per_pwrdm) didn't enter target state 1
-> > > Powerdomain (core_pwerdm) didn't enter target state 1
-> > > 
-> > > Any ideas? Thanks,
-> > 
-> > Works for me after enabling the idle timeouts with the following
-> > script and blanking the screen and disconnecting USB:
-> > 
-> > Also both keyboard LEDs should start blinking after the idle
-> > timeout with screen blanked and USB disconnected. If not, you
-> > have some module loaded that blocks the deeper idle states.
-> 
-> Ok, tried that, I had to do:
-> 
->  cd /sys/class/gpio
->  echo 162 > export
->  cd gpio162
->  echo out > direction
->  echo 1 > value
-> 
-> to get the debug lights to work. But I could not get those leds to
-> blink.
+The following changes since commit d438462c20a300139c2e5e65b96cadaa21b58d9a:
 
-I think that's the GPIO override for them? And in that case the
-PMIC sys_clkreq and sys_off_mode signals are not cutting off the
-LEDs I believe.
+  ARM: imx6: gpc: always enable PU domain if CONFIG_PM is not set (2015-07-08 22:52:08 +0800)
 
-Also not that any driver blocking the deeper idle states will
-also cause the LEDs to stay on. And USB cable being plugged in
-too at least for core off.. So you if you're using NFSroot over
-USB Ethernet, you probably can only see the left LED ever go off.
- 
-> > modprobe leds-gpio
-> > modprobe ledtrig-default-on
-> 
-> Is this actually neccessary/relevant?
+are available in the git repository at:
 
-Yes at least with omap2plus_defconfig.
- 
-> > echo 255 > /sys/class/backlight/acx565akm/brightness
-> 
-> And this?
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.2-2
 
-It used to be the backlight did not come on initially as modules
-or something.. May not be needed any longer.
+for you to fetch changes up to e053f96b1a00022b4e2c7ceb7ac0229646626507:
 
-Regards,
+  ARM: dts: i.MX35: Fix can support. (2015-07-25 11:35:08 +0800)
 
-Tony
+----------------------------------------------------------------
+The i.MX fixes for 4.2, 2nd round:
+ - Add the required second clock for i.MX35 FlexCAN in device tree,
+   so that the device can be probed by kernel successfully.
+
+----------------------------------------------------------------
+Denis Carikli (1):
+      ARM: dts: i.MX35: Fix can support.
+
+ arch/arm/boot/dts/imx35.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
