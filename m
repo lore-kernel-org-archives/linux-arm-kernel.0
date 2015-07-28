@@ -1,66 +1,60 @@
-From: Frank.Li@freescale.com (Frank.Li at freescale.com)
-Date: Wed, 29 Jul 2015 01:50:00 +0800
-Subject: [PATCH v2 1/1] ARM: dts: imx7d: enable snvs rtc,
- onoffkey and power off
-Message-ID: <1438105800-6255-1-git-send-email-Frank.Li@freescale.com>
+From: cburden@codeaurora.org (Cassidy Burden)
+Date: Tue, 28 Jul 2015 12:09:24 -0700
+Subject: [PATCH] lib: Make _find_next_bit helper function inline
+Message-ID: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Frank Li <Frank.Li@freescale.com>
+I've tested Yury Norov's find_bit reimplementation with the test_find_bit
+module (https://lkml.org/lkml/2015/3/8/141) and measured about 35-40%
+performance degradation on arm64 3.18 run with fixed CPU frequency.
 
-Change SNVS rtc to syscon interface.
-Enable onoff key and power off function.
+The performance degradation appears to be caused by the
+helper function _find_next_bit. After inlining this function into
+find_next_bit and find_next_zero_bit I get slightly better performance
+than the old implementation:
 
-Signed-off-by: Frank Li <Frank.Li@freescale.com>
+find_next_zero_bit          find_next_bit
+old      new     inline     old      new     inline
+26       36      24         24       33      23
+25       36      24         24       33      23
+26       36      24         24       33      23
+25       36      24         24       33      23
+25       36      24         24       33      23
+25       37      24         24       33      23
+25       37      24         24       33      23
+25       37      24         24       33      23
+25       36      24         24       33      23
+25       37      24         24       33      23
+
+Signed-off-by: Cassidy Burden <cburden@codeaurora.org>
+Cc: Alexey Klimov <klimov.linux@gmail.com>
+Cc: David S. Miller <davem@davemloft.net>
+Cc: Daniel Borkmann <dborkman@redhat.com>
+Cc: Hannes Frederic Sowa <hannes@stressinduktion.org>
+Cc: Lai Jiangshan <laijs@cn.fujitsu.com>
+Cc: Mark Salter <msalter@redhat.com>
+Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Cc: Thomas Graf <tgraf@suug.ch>
+Cc: Valentin Rothberg <valentinrothberg@gmail.com>
+Cc: Chris Wilson <chris@chris-wilson.co.uk>
 ---
-Change from v1 to v2.
- - default enable snvs_poweroff
- - wakeup -> wakeup_source
+ lib/find_bit.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx7d.dtsi | 26 ++++++++++++++++++++------
- 1 file changed, 20 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 9014b80..b738ce0 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -525,17 +525,31 @@
- 			};
- 
- 			snvs: snvs at 30370000 {
--				compatible = "fsl,sec-v4.0-mon", "simple-bus";
--				#address-cells = <1>;
--				#size-cells = <1>;
--				ranges = <0 0x30370000 0x10000>;
-+				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
-+				reg = <0x30370000 0x10000>;
- 
--				snvs-rtc-lp at 34 {
-+				snvs_rtc: snvs-rtc-lp {
- 					compatible = "fsl,sec-v4.0-mon-rtc-lp";
--					reg = <0x34 0x58>;
-+					regmap = <&snvs>;
-+					offset = <0x34>;
- 					interrupts = <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>,
- 						     <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
- 				};
-+
-+				snvs_poweroff: snvs-poweroff {
-+					compatible = "syscon-poweroff";
-+					regmap = <&snvs>;
-+					offset = <0x38>;
-+					mask = <0x60>;
-+				};
-+
-+				snvs_pwrkey: snvs-powerkey {
-+					compatible = "fsl,sec-v4.0-pwrkey";
-+					regmap = <&snvs>;
-+					interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+					linux,keycode = <KEY_POWER>;
-+					wakeup-source;
-+				};
- 			};
- 
- 			clks: ccm at 30380000 {
+diff --git a/lib/find_bit.c b/lib/find_bit.c
+index 18072ea..d0e04f9 100644
+--- a/lib/find_bit.c
++++ b/lib/find_bit.c
+@@ -28,7 +28,7 @@
+  * find_next_zero_bit.  The difference is the "invert" argument, which
+  * is XORed with each fetched word before searching it for one bits.
+  */
+-static unsigned long _find_next_bit(const unsigned long *addr,
++static inline unsigned long _find_next_bit(const unsigned long *addr,
+ 		unsigned long nbits, unsigned long start, unsigned long invert)
+ {
+ 	unsigned long tmp;
 -- 
-1.9.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
