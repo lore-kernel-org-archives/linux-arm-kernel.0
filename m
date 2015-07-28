@@ -1,52 +1,45 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 28 Jul 2015 09:44:38 +0200
-Subject: [RFCv2 2/3] dts: zynq: Add devicetree entry for Xilinx Zynq reset
- controller.
-In-Reply-To: <55B72857.3020108@atmel.com>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-3-git-send-email-moritz.fischer@ettus.com>
- <55B5D62D.4010407@monstr.eu>
- <CAAtXAHepDRbiiznHnT3dLLLWS_VH2a9BhnNgZzDECx__QceEeg@mail.gmail.com>
- <55B72857.3020108@atmel.com>
-Message-ID: <55B732E6.7080901@xilinx.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 28 Jul 2015 13:17:09 +0530
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150728073439.GK21114@x1>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux> <20150728073439.GK21114@x1>
+Message-ID: <20150728074709.GA13710@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2015 08:59 AM, Nicolas Ferre wrote:
-> Le 28/07/2015 07:03, Moritz Fischer a ?crit :
->> Hi Michal,
->>
->> I agree we need to be careful with changing the bindings.
->>
->> On Sun, Jul 26, 2015 at 11:56 PM, Michal Simek <monstr@monstr.eu> wrote:
->>> Hi Moritz,
->>>
->>> On 07/25/2015 02:21 AM, Moritz Fischer wrote:
->>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->>>> ---
->>>>  arch/arm/boot/dts/zynq-7000.dtsi            | 43 ++++++++++++-
->>>
->>> This patch is nice in general but every change in binding should be
->>> discussed separately. There is also necessary to wire them up in the
->>> driver to do action. That's why I think that will be the best just to
->>> add the code to slcr and keep others untouched.
->>
->> Ok, just to clarify: You'd suggest to just add the rstc as child node
->> to the slcr,
->> and leave the other nodes untouched?
->>
->>>
->>> For example MACB/GEM is one example. Adding names to this node and
->>> extending driver to work properly with reset means that all others MACB
->>> users will be affected. Definitely this patch should be ACKed by Nicolas.
+On 28-07-15, 08:34, Lee Jones wrote:
+> I disagree.  For one, only 'opp-hz' is defined in ./opp.tx.  Secondly
+
+There are other properties in op.txt like turbo, opp-suspend, latency,
+etc.. which can be useful for your platform to. Its not used for now
+is a different thing.
+
+> it would be annoying to have to have to keep jumping between documents
+> to obtain the whole picture.  Finally, generic bindings are repeated
+> in platform/device specific documentation all the time.  Grep for
+> 'clocks' or 'regulator-* or 'interrupts' or 'reg' or 'clock-frequency'
+
+Yeah, I agree. I am not against that. What I meant to say was that its
+an extension to opp-v2. So whatever is present in opp-v2 can be used
+by ST's driver, without mentioning that here as well.
+
+> (which IMHO I think you should have used instead of 'opp-hz', but
+> that's by the by), or any number of other generic properties.
+
+Hmm, probably yes. See I don't know everything :)
+
+> > @Rob/Stephen: Please respond before it is late :)
 > 
-> Actually, I don't know why a reset property should be added to the macb
-> driver...
+> No one knows this stuff better than you.  If you can't think of an
+> already existing binding that could suit to portray our 'cuts' and
+> 'substrate' information (with a similar way to support our "all cuts"
+> and "all substrates" options, then there probably isn't one. ;)
 
-I expect resetting IP core can solve something. But as I said it is
-questionable if IP should be reset when driver is probed. Definitely on
-Zynq there is a support for it. I am not aware about any problem which
-requires IP to be reset.
+Oh, I wasn't saying that there is an existing binding for supporting
+your case. But if we want to move the cuts property to the generic
+bindings so that others can use it. :)
 
-Thanks,
-Michal
+-- 
+viresh
