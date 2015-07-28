@@ -1,135 +1,67 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 28 Jul 2015 18:44:06 +0100
-Subject: [PATCH v5 1/5] ARM/PCI: remove align_resource in pci_sys_data
-In-Reply-To: <55B72C7E.1020102@hisilicon.com>
-References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
- <1437794486-21134-2-git-send-email-wangzhou1@hisilicon.com>
- <55B72C7E.1020102@hisilicon.com>
-Message-ID: <20150728174406.GB19909@red-moon>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 28 Jul 2015 10:45:26 -0700
+Subject: X-Gene: Unhandled fault: synchronous external abort in
+ pci_generic_config_read32
+In-Reply-To: <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
+References: <20150724224258.GA23990@google.com>
+ <CADaLNDmYZ=8XQt82W_H74QaOiX3UwkVxkE1_EWRgzhkG1boebw@mail.gmail.com>
+ <CAErSpo549xfAnx62quCqGHh3DNay5Lfb6EhEG+4EXooEuueQFQ@mail.gmail.com>
+Message-ID: <CADaLNDn95H=g73DKWRsrB4SuWcf+-8mkepbwb_DC-sFsVkrk6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[CC'ing RMK]
+On Tue, Jul 28, 2015 at 9:43 AM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+> On Fri, Jul 24, 2015 at 7:05 PM, Duc Dang <dhdang@apm.com> wrote:
+>> Hi Bjorn,
+>>
+>> On Fri, Jul 24, 2015 at 3:42 PM, Bjorn Helgaas <bhelgaas@google.com> wrote:
+>>>
+>>> I regularly see faults like this on an APM X-Gene:
+>>>
+>>>   U-Boot 2013.04-mustang_sw_1.14.14 (Dec 16 2014 - 15:59:33)
+>>>   CPU0: APM ARM 64-bit Potenza Rev B0 2400MHz PCP 2400MHz
+>>>        32 KB ICACHE, 32 KB DCACHE
+>>>        SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
+>>>   ...
+>>>   Unhandled fault: synchronous external abort (0x96000010) at 0xffffff8000110034
+>>>   Internal error: : 96000010 [#1] SMP
+>>>   Modules linked in:
+>>>   CPU: 0 PID: 3723 Comm: ... 4.1.0-smp-DEV #3
+>>>   Hardware name: APM X-Gene Mustang board (DT)
+>>>   task: ffffffc7dc1a4140 ti: ffffffc7dc118000 task.ti: ffffffc7dc118000
+>>>   PC is at pci_generic_config_read32+0x4c/0xb8
+>>>   LR is at pci_generic_config_read32+0x40/0xb8
+>>>   pc : [<ffffffc00033b90c>] lr : [<ffffffc00033b900>] pstate: 600001c5
+>>>   ...
+>>>   Call trace:
+>>>   [<ffffffc00033b90c>] pci_generic_config_read32+0x4c/0xb8
+>>>   [<ffffffc00033bf58>] pci_user_read_config_byte+0x60/0xc4
+>>>   [<ffffffc0003496a8>] pci_read_config+0x15c/0x238
+>>>   [<ffffffc0002393b4>] sysfs_kf_bin_read+0x68/0xa0
+>>>   [<ffffffc00023896c>] kernfs_fop_read+0x9c/0x1ac
+>>>   [<ffffffc0001c361c>] __vfs_read+0x44/0x128
+>>>   [<ffffffc0001c3e28>] vfs_read+0x84/0x144
+>>>   [<ffffffc0001c4764>] SyS_read+0x50/0xb0
+>>
+>> The log shows kernel gets an exception when trying to access Mellanox
+>> card configuration space. This is usually due to suboptimal PCIe
+>> SerDes parameters are using in your board, which will cause bad link
+>> quality.
+>> The PCIe SerDes programming is done in U-Boot, so I suggest you do a
+>> U-Boot upgrade to our latest X-Gene U-Boot release.
+>
+> I installed U-Boot 1.15.12, which I thought was the latest.  I'm still
+> seeing this issue regularly, approx once/hour.
 
-On Tue, Jul 28, 2015 at 08:17:18AM +0100, Zhou Wang wrote:
-> On 2015/7/25 11:21, Zhou Wang wrote:
-> > From: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> > 
-> > This patch is needed in order to unify the PCIe designware framework for ARM and
-> > ARM64 architectures. In the PCIe designware unification process we are calling
-> > pci_create_root_bus() passing a "sysdata" parameter that is the same for both
-> > ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
-> > cause a problem with the function pcibios_align_resource(); in fact this will
-> > cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
-> > "struct pcie_port*" pointer.
-> > 
-> > This patch solves the issue by removing "align_resource" from "pci_sys_data"
-> > struct and defining a static global function pointer in "bios32.c"
-> > 
-> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> 
-> Hi Arnd and Rob,
-> 
-> What is your opinion about this patch? Gabriele adds a global pointer in bios32.c
-> to store align_resource, so we could remove sys->align_resource in pcibios_align_resource.
-> 
-> As Lorenzo mentioned in v4 series, this is a temporary solution before moving
-> align_resource to host bridge structure.
-> 
-> Any comments welcome.
+Our latest U-Boot is 1.15.15, but U-Boot 1.15.12 is already a good
+version to use. Are you running any PCIe traffic test when the error
+happens? I will try to reproduce the issue with my Mustang board as
+well.
 
-The align_resource() pointer is just used in drivers/pci/host/pci-mvebu.c,
-I would like the pci-mvebu.c maintainers to comment on this and test it, I
-do not expect it to create any issue and might be a temporary solution to
-make progress on ARM/ARM64 consolidation, it is a blocking point.
+And it will be useful if you can share your "lspci -vvv" output when
+the board is running, we can check to see if there is any error status
+reported.
 
-It would be good if Russell can have a look too, I do not see what
-issue this can trigger given that is just used in:
-
-drivers/pci/host/pci-mvebu.c
-
-and a global pointer (not saying it is elegant, but it should work)
-might be ok.
-
-So yes, comments very welcome.
-
-Thanks,
-Lorenzo
-
-> 
-> Thanks,
-> Zhou
-> 
-> > ---
-> >  arch/arm/include/asm/mach/pci.h |  5 -----
-> >  arch/arm/kernel/bios32.c        | 12 ++++++++----
-> >  2 files changed, 8 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-> > index 28b9bb3..8a4e4de 100644
-> > --- a/arch/arm/include/asm/mach/pci.h
-> > +++ b/arch/arm/include/asm/mach/pci.h
-> > @@ -58,11 +58,6 @@ struct pci_sys_data {
-> >  					/* IRQ mapping				*/
-> >  	int		(*map_irq)(const struct pci_dev *, u8, u8);
-> >  					/* Resource alignement requirements	*/
-> > -	resource_size_t (*align_resource)(struct pci_dev *dev,
-> > -					  const struct resource *res,
-> > -					  resource_size_t start,
-> > -					  resource_size_t size,
-> > -					  resource_size_t align);
-> >  	void		*private_data;	/* platform controller private data	*/
-> >  };
-> >  
-> > diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> > index fcbbbb1..4cdc64d 100644
-> > --- a/arch/arm/kernel/bios32.c
-> > +++ b/arch/arm/kernel/bios32.c
-> > @@ -17,6 +17,11 @@
-> >  #include <asm/mach/pci.h>
-> >  
-> >  static int debug_pci;
-> > +static resource_size_t (*align_resource)(struct pci_dev *dev,
-> > +		  const struct resource *res,
-> > +		  resource_size_t start,
-> > +		  resource_size_t size,
-> > +		  resource_size_t align) = NULL;
-> >  
-> >  #ifdef CONFIG_PCI_MSI
-> >  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
-> > @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
-> >  		sys->busnr   = busnr;
-> >  		sys->swizzle = hw->swizzle;
-> >  		sys->map_irq = hw->map_irq;
-> > -		sys->align_resource = hw->align_resource;
-> > +		align_resource = hw->align_resource;
-> >  		INIT_LIST_HEAD(&sys->resources);
-> >  
-> >  		if (hw->private_data)
-> > @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> >  				resource_size_t size, resource_size_t align)
-> >  {
-> >  	struct pci_dev *dev = data;
-> > -	struct pci_sys_data *sys = dev->sysdata;
-> >  	resource_size_t start = res->start;
-> >  
-> >  	if (res->flags & IORESOURCE_IO && start & 0x300)
-> > @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
-> >  
-> >  	start = (start + align - 1) & ~(align - 1);
-> >  
-> > -	if (sys->align_resource)
-> > -		return sys->align_resource(dev, res, start, size, align);
-> > +	if (align_resource)
-> > +		return align_resource(dev, res, start, size, align);
-> >  
-> >  	return start;
-> >  }
-> > 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+-- 
+Regards,
+Duc Dang.
