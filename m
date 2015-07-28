@@ -1,67 +1,68 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:04:06 +0530
-Subject: [PATCH v7 13/13] arm: dts: qcom: Add #power-domain-cells property
-In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-14-git-send-email-rnayak@codeaurora.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 28 Jul 2015 11:42:15 +0200
+Subject: [PATCH v2 3/4] ARM: mvebu: Allow using the GIC for wakeup in
+ standby mode
+In-Reply-To: <55B60FBE.7060606@arm.com>
+References: <1435684740-24912-1-git-send-email-gregory.clement@free-electrons.com>
+ <1435684740-24912-4-git-send-email-gregory.clement@free-electrons.com>
+ <20150701175436.7dff0754@free-electrons.com> <55B60FBE.7060606@arm.com>
+Message-ID: <55B74E77.60904@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msm8974 has gcc and mmcc nodes, and apq8084 has a gcc node which
-implement gdsc powerdomains. Add the #power-domain-cells property
-to them.
+Hi Sudeep,
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- arch/arm/boot/dts/qcom-apq8084.dtsi   | 1 +
- arch/arm/boot/dts/qcom-msm8974.dtsi   | 2 ++
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
- 3 files changed, 4 insertions(+)
+On 27/07/2015 13:02, Sudeep Holla wrote:
+> Hi Thomas/Gregory,
+> 
+> On 01/07/15 16:54, Thomas Petazzoni wrote:
+>> Dear Gregory CLEMENT,
+>>
+>> On Tue, 30 Jun 2015 19:18:59 +0200, Gregory CLEMENT wrote:
+>>
+>>>   static void __init mvebu_init_irq(void)
+>>>   {
+>>> +	if (of_machine_is_compatible("marvell,armada375") ||
+>>> +	    of_machine_is_compatible("marvell,armada380") ||
+>>> +	    of_machine_is_compatible("marvell,armada390"))
+>>
+>> What we really want to know is if we're using the GIC, so what about
+>> instead:
+>>
+>> 	np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-gic");
+>> 	if (np)
+>> 		gic_set_irqchip_flags(IRQCHIP_SKIP_SET_WAKE |
+>> 				      IRQCHIP_MASK_ON_SUSPEND);
+> 
+> As I had mentioned before, this function was planned to be removed. tglx
+> has now pulled in the patch into tip/core[1]. If this patch is already
+> pulled in, it's better to revert so that it won't break the build in
+> linux-next. Since the flags are now moved to GIC driver, this patch is
+> no longer required. Sorry for the trouble.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8084.dtsi b/arch/arm/boot/dts/qcom-apq8084.dtsi
-index 7084010..1cdb568 100644
---- a/arch/arm/boot/dts/qcom-apq8084.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8084.dtsi
-@@ -221,6 +221,7 @@
- 			compatible = "qcom,gcc-apq8084";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 37b47b5..8a2dfa6 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -217,6 +217,7 @@
- 			compatible = "qcom,gcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfc400000 0x4000>;
- 		};
- 
-@@ -224,6 +225,7 @@
- 			compatible = "qcom,mmcc-msm8974";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0xfd8c0000 0x6000>;
- 		};
- 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 0f49ebd..3b0645a 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -120,6 +120,7 @@
- 			compatible = "qcom,gcc-msm8916";
- 			#clock-cells = <1>;
- 			#reset-cells = <1>;
-+			#power-domain-cells = <1>;
- 			reg = <0x1800000 0x80000>;
- 		};
- 
+Your patch has been merged in th irq branch just a few day after I merged this one.
+But fortunately I can remove the commit from my branch without any trouble.
+
+It is done now.
+
+
+Thanks,
+
+Gregory
+
+
+
+> 
+> Regards,
+> Sudeep
+> 
+> [1] 
+> https://git.kernel.org/cgit/linux/kernel/git/tip/tip.git/commit/?h=irq/core&id=0d3f2c92e004c67404fabea19728c1962b777bd6
+> 
+
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
