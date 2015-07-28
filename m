@@ -1,45 +1,85 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 28 Jul 2015 15:59:17 +0200
-Subject: [PATCH v2] drm/i2c: tda998x: Fix bad checksum of the HDMI AVI
- infoframe
-Message-ID: <mailman.7.1438092694.1755.linux-arm-kernel@lists.infradead.org>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 28 Jul 2015 16:16:19 +0200
+Subject: [PATCH 0/9] gpiolib: Add GPIO name support
+In-Reply-To: <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+Message-ID: <20150728141619.GP28535@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using hdmi_avi_infoframe_pack() to create the AVI infoframe calculates
-the checksum of the frame and breaks the second calculation which is
-done in tda998x_write_if(). Then the HDMI AVI frame is wrong and
-the display device does not handle correctly the video frames.
+On Fri, Jul 17, 2015 at 10:05:52PM +0200, Linus Walleij wrote:
+> On Fri, Jul 17, 2015 at 11:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+> 
+> > This is a proposal to add GPIO names to the kernel based on devicetree
+> > descriptions.
+> >
+> > This series adds GPIO name support. Until now it is only possible to use names
+> > for already requested GPIOs (for example what they are used for). It is not
+> > possible to identify GPIOs by a name although most of them have a name for
+> > example in the schematics of the board. This makes it difficult to identify
+> > a specific GPIO from userspace.
+> >
+> > As the GPIO name information is a hardware description this series uses the
+> > devicetree bindings introduced by the GPIO hogging mechanism, specifically
+> > 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
+> > names as fallback. The gpio numbers still have a higher priority to ensure
+> > backwards compatibility.
+> >
+> > Exported GPIOs are still using their number as directory name (gpio<ID>). But the
+> > directories now contain a 'name' file which is '(null)' for non-existent names
+> > and the name otherwise.
+> >
+> > This series can be used to have an easy name mapping for udev with a quite
+> > simple rule similar to this:
+> >         SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
+> >         PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
+> > With this rule udev adds a link for each exported GPIO with a name into
+> > /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
+> > it.
+> 
+> I must say I like this series.
+> 
+> Because it makes the GPIO sysfs ABI *less* insane. Especially
+> I like the patch that makes a distinction between "label" (use)
+> and "name" (the name of the actual line). That illustrates clearly
+> that this is thought-through.
+> 
+> However I still have some doubts as it will expand the sysfs ABI,
+> and we have discussed a char device for GPIO chips as a better
+> alternative, for example since these can do get/set multiple GPIOs
+> with a single context switch (ioctl), whereas sysfs is "one value per file"
+> and would be able to expose some flags better.
 
-Fixes: 8c7a075da9f7980c ("use drm_hdmi_avi_infoframe_from_display_mode()")
-Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
----
-v2: add the Fixes: tag
----
- drivers/gpu/drm/i2c/tda998x_drv.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I'm also reluctant to band-aiding the sysfs interface with more ABI that
+we need to maintain forever. Making it easier to use also reduces the
+incentives to come up with a saner interface.
 
-diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index fe1599d..424228b 100644
---- a/drivers/gpu/drm/i2c/tda998x_drv.c
-+++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -606,8 +606,6 @@ static void
- tda998x_write_if(struct tda998x_priv *priv, uint8_t bit, uint16_t addr,
- 		 uint8_t *buf, size_t size)
- {
--	buf[PB(0)] = tda998x_cksum(buf, size);
--
- 	reg_clear(priv, REG_DIP_IF_FLAGS, bit);
- 	reg_write_range(priv, addr, buf, size);
- 	reg_set(priv, REG_DIP_IF_FLAGS, bit);
-@@ -627,6 +625,8 @@ tda998x_write_aif(struct tda998x_priv *priv, struct tda998x_encoder_params *p)
- 	buf[PB(4)] = p->audio_frame[4];
- 	buf[PB(5)] = p->audio_frame[5] & 0xf8; /* DM_INH + LSV */
- 
-+	buf[PB(0)] = tda998x_cksum(buf, sizeof(buf));
-+
- 	tda998x_write_if(priv, DIP_IF_FLAGS_IF4, REG_IF4_HB0, buf,
- 			 sizeof(buf));
- }
--- 
-2.4.6
+As I mentioned in a comment to patch 6/9, this series introduces an
+incompatibility with current DT since it no longer allows two hogs to
+use the same name, while the current hog implementation is documented to
+fall back to using the (not necessarily unique) node name when a
+line-name property isn't specified.
+
+Even though this looks like it could be worked around, it's an example
+of the kind of issues we risk running into if we keep on incrementally
+patching this interface.
+
+That said, this is a step along the lines that we have discussed in the
+past. Adding pin functions (line names) to generic pin nodes in DT makes
+sense, but we need to think through the details first. For example:
+
+ - Should we allow duplicate pin functions (line names)? We need to
+   consider not just on-chip controllers, but also hot-pluggable
+   controllers and device-tree overlays.
+
+ - Should we allow initial configurations to be specified and still
+   allow (some) pins to be requested later ("soft" hogging)?
+
+ - Should we specify pin directionality? I've suggested elsewhere that
+   adding such limitations (e.g. as a mask) may make sense in cases were
+   changing pin direction is known to cause damage.
+
+ - What would a new gpio interface look like?
+
+Johan 
