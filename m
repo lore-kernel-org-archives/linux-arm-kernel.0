@@ -1,41 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 Jul 2015 14:48:09 +0200
-Subject: [RESEND PATCH] pinctrl: at91: fix null pointer dereference
-In-Reply-To: <1438069696-25303-1-git-send-email-ludovic.desroches@atmel.com>
-References: <20150715133048.GD14886@odux.rfo.atmel.com>
- <1438069696-25303-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CACRpkdaiwcTzxG=KqPZxk6ijLOE0PAh9ybkNqUYhkmAcQV40eg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Jul 2015 13:48:47 +0100
+Subject: [PATCH v3 0/5] iommu/arm-smmu: add support for non-pci devices
+In-Reply-To: <55AE1F2F.3090106@arm.com>
+References: <1437463833-16112-1-git-send-email-thunder.leizhen@huawei.com>
+ <55AE1F2F.3090106@arm.com>
+Message-ID: <20150728124847.GL29209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 9:48 AM, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
+On Tue, Jul 21, 2015 at 11:30:07AM +0100, Robin Murphy wrote:
+> On 21/07/15 08:30, Zhen Lei wrote:
+> > Changelog:
+> > v2 -> v3:
+> > 1. add support for pci device hotplug, which missed in patch v2.
+> > 2. only support #iommu-cells = <1>, add corresponding description in arm,smmu-v3.txt.
+> > 3. add function find_smmu_by_device which extracted from find_smmu_by_node, to resolve
+> >     the problem mentioned by Robin Murphy in [PATCH v2 7/9].
+> >     Additionally:
+> >     +    platform_set_drvdata(pdev, smmu);       //Patch v2
+> >     +	dev->archdata.iommu = smmu;             //Patch v3, dev = &pdev->dev
+> 
+> 
+> I didn't give any Reviewed-by tags, much less to revised patches that 
+> I've not even looked at yet; please see section 13 of 
+> Documentation/SubmittingPatches for what the Reviewed-by tag means.
 
-> From: David Dueck <davidcdueck@googlemail.com>
->
-> Not all gpio banks are necessarily enabled, in the current code this can
-> lead to null pointer dereferences.
->
-> [   51.130000] Unable to handle kernel NULL pointer dereference at virtual address 00000058
-(...)
->
-> Signed-off-by: David Dueck <davidcdueck@googlemail.com>
-> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> CC: Nicolas Ferre <nicolas.ferre@atmel.com>
-> CC: Boris Brezillon <boris.brezillon@free-electrons.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
-> ---
->
-> This patch fixes a oops in the kernel because of a NULL pointer in a table.
-> Having a NULL pointer in this table is the normal behavior if a PIO controller
-> is not enabled. So this fix is not a quick and dirty hack, it's usual to skip
-> an entry from a table if it is not filled.
+That said, it would be great if you could review the patches anyway ;)
 
-Fair enough, better too many checks than too few.
+Also, it looks like this is all based on Laurent's IOMMU probe deferral
+series which hasn't seen any movement for a while.
 
-Is this a regression to v4.2 that should go to stable or v4.3 material?
+Laurent: are you planning to repost that, or is it worth us picking up
+the original version and bashing it into shape ourselves?
 
-Yours,
-Linus Walleij
+Will
