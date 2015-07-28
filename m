@@ -1,94 +1,61 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 28 Jul 2015 11:50:04 +0200
-Subject: [PATCH 7/9] gpiolib-sysfs: Add gpio name parsing for sysfs export
-In-Reply-To: <1437125570-28623-8-git-send-email-mpa@pengutronix.de>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-8-git-send-email-mpa@pengutronix.de>
-Message-ID: <20150728095004.GM28535@localhost>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Jul 2015 10:52:22 +0100
+Subject: [PATCH] arm64: KVM: remove remaining reference to vgic_sr_vectors
+In-Reply-To: <1438076543-6768-1-git-send-email-vladimir.murzin@arm.com>
+References: <1438076543-6768-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <55B750D6.30909@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 11:32:48AM +0200, Markus Pargmann wrote:
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  drivers/gpio/gpiolib-sysfs.c | 41 ++++++++++++++++++++++++++++-------------
->  1 file changed, 28 insertions(+), 13 deletions(-)
+On 28/07/15 10:42, Vladimir Murzin wrote:
+> Since commit 8a14849 (arm64: KVM: Switch vgic save/restore to
+> alternative_insn) vgic_sr_vectors is not used anymore, so remove
+> remaining leftovers and kill the structure.
 > 
-> diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
-> index b57ed8e55ab5..c3b74440ca67 100644
-> --- a/drivers/gpio/gpiolib-sysfs.c
-> +++ b/drivers/gpio/gpiolib-sysfs.c
-> @@ -443,18 +443,25 @@ static ssize_t export_store(struct class *class,
->  				const char *buf, size_t len)
->  {
->  	long			gpio;
-> -	struct gpio_desc	*desc;
-> +	struct gpio_desc	*desc = NULL;
->  	int			status;
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+
+Thanks Vladimir, I'll queue that up in -next.
+
+Thanks,
+
+	M.
+
+> ---
+>  arch/arm64/include/asm/kvm_host.h |    5 -----
+>  arch/arm64/kernel/asm-offsets.c   |    2 --
+>  2 files changed, 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 2709db2..19f1182 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -216,11 +216,6 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+>  		     hyp_stack_ptr, vector_ptr);
+>  }
 >  
->  	status = kstrtol(buf, 0, &gpio);
-> -	if (status < 0)
-> -		goto done;
-> +	if (!status)
-> +		desc = gpio_to_desc(gpio);
->  
-> -	desc = gpio_to_desc(gpio);
-> -	/* reject invalid GPIOs */
-> +	/* Fall back on detection by name */
->  	if (!desc) {
-> -		pr_warn("%s: invalid GPIO %ld\n", __func__, gpio);
-> -		return -EINVAL;
-> +		char *gpio_name = kstrdup(buf, GFP_KERNEL);
+> -struct vgic_sr_vectors {
+> -	void	*save_vgic;
+> -	void	*restore_vgic;
+> -};
+> -
+>  static inline void kvm_arch_hardware_disable(void) {}
+>  static inline void kvm_arch_hardware_unsetup(void) {}
+>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index c99701a..f0c960d 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -125,8 +125,6 @@ int main(void)
+>    DEFINE(KVM_TIMER_ENABLED,	offsetof(struct kvm, arch.timer.enabled));
+>    DEFINE(VCPU_KVM,		offsetof(struct kvm_vcpu, kvm));
+>    DEFINE(VCPU_VGIC_CPU,		offsetof(struct kvm_vcpu, arch.vgic_cpu));
+> -  DEFINE(VGIC_SAVE_FN,		offsetof(struct vgic_sr_vectors, save_vgic));
+> -  DEFINE(VGIC_RESTORE_FN,	offsetof(struct vgic_sr_vectors, restore_vgic));
+>    DEFINE(VGIC_V2_CPU_HCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_hcr));
+>    DEFINE(VGIC_V2_CPU_VMCR,	offsetof(struct vgic_cpu, vgic_v2.vgic_vmcr));
+>    DEFINE(VGIC_V2_CPU_MISR,	offsetof(struct vgic_cpu, vgic_v2.vgic_misr));
+> 
 
-Must check for allocation failures, but why use kstrdup at all?
 
-> +
-> +		desc = gpio_name_to_desc(strim(gpio_name));
-> +		kfree(gpio_name);
-> +
-> +		/* reject invalid GPIOs */
-> +		if (!desc) {
-> +			pr_warn("%s: invalid GPIO %s\n", __func__, buf);
-> +			return -EINVAL;
-> +		}
->  	}
->  
->  	/* No extra locking here; FLAG_SYSFS just signifies that the
-> @@ -485,17 +492,25 @@ static ssize_t unexport_store(struct class *class,
->  				const char *buf, size_t len)
->  {
->  	long			gpio;
-> -	struct gpio_desc	*desc;
-> +	struct gpio_desc	*desc = NULL;
->  	int			status;
->  
->  	status = kstrtol(buf, 0, &gpio);
-> -	if (status < 0)
-> -		goto done;
-> +	if (!status)
-> +		desc = gpio_to_desc(gpio);
-> +
-> +	/* Fall back on detection by name */
-> +	if (!desc) {
-> +		char *gpio_name = kstrdup(buf, GFP_KERNEL);
-
-Same here.
-
-> +
-> +		desc = gpio_name_to_desc(strim(gpio_name));
-> +		kfree(gpio_name);
-> +	}
-> +
-
-Random whitespace change.
-
->  
-> -	desc = gpio_to_desc(gpio);
->  	/* reject bogus commands (gpio_unexport ignores them) */
->  	if (!desc) {
-> -		pr_warn("%s: invalid GPIO %ld\n", __func__, gpio);
-> +		pr_warn("%s: invalid GPIO %s\n", __func__, buf);
->  		return -EINVAL;
->  	}
-
-Johan
+-- 
+Jazz is not dead. It just smells funny...
