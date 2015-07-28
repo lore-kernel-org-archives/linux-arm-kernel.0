@@ -1,427 +1,105 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 28 Jul 2015 00:14:08 -0700
-Subject: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new feature
- support
-In-Reply-To: <1438066825-21923-2-git-send-email-wenyou.yang@atmel.com>
-References: <1438066825-21923-1-git-send-email-wenyou.yang@atmel.com>
- <1438066825-21923-2-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <55B72BC0.8070206@roeck-us.net>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Tue, 28 Jul 2015 15:17:18 +0800
+Subject: [PATCH v5 1/5] ARM/PCI: remove align_resource in pci_sys_data
+In-Reply-To: <1437794486-21134-2-git-send-email-wangzhou1@hisilicon.com>
+References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437794486-21134-2-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <55B72C7E.1020102@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/28/2015 12:00 AM, Wenyou Yang wrote:
-> In the datasheet, the new feature is describled as
-> "WDT_MR can be written until a LOCKMR command is issued in WDT_CR".
-> That is to say, as long as the bootstrap and u-boot don't issue a LOCKMR
-> command, WDT_MR can be written in kernel.
->
-> So the driver can enable/disable the watchdog timer hardware,
-> set WDV(Watchdog Counter Value) and WDD(Watchdog Delta Value) fields
-> of WDT_MR register to set the watchdog timer timeout.
->
-> The timer is not necessary that regularly sends a keepalive ping to
-> the watchdog timer hardware.
->
-> It is introduced from sama5d4 SoCs.
->
-Since there are so many changes, I wonder is a separate driver would make more sense.
+On 2015/7/25 11:21, Zhou Wang wrote:
+> From: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> 
+> This patch is needed in order to unify the PCIe designware framework for ARM and
+> ARM64 architectures. In the PCIe designware unification process we are calling
+> pci_create_root_bus() passing a "sysdata" parameter that is the same for both
+> ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
+> cause a problem with the function pcibios_align_resource(); in fact this will
+> cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
+> "struct pcie_port*" pointer.
+> 
+> This patch solves the issue by removing "align_resource" from "pci_sys_data"
+> struct and defining a static global function pointer in "bios32.c"
+> 
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 
-Thoughts ?
+Hi Arnd and Rob,
 
-Guenter
+What is your opinion about this patch? Gabriele adds a global pointer in bios32.c
+to store align_resource, so we could remove sys->align_resource in pcibios_align_resource.
 
-> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+As Lorenzo mentioned in v4 series, this is a temporary solution before moving
+align_resource to host bridge structure.
+
+Any comments welcome.
+
+Thanks,
+Zhou
+
 > ---
->   drivers/watchdog/at91sam9_wdt.c |  255 ++++++++++++++++++++++++++++-----------
->   drivers/watchdog/at91sam9_wdt.h |    4 +
->   2 files changed, 190 insertions(+), 69 deletions(-)
->
-> diff --git a/drivers/watchdog/at91sam9_wdt.c b/drivers/watchdog/at91sam9_wdt.c
-> index 1443b3c..6b61084 100644
-> --- a/drivers/watchdog/at91sam9_wdt.c
-> +++ b/drivers/watchdog/at91sam9_wdt.c
-> @@ -10,9 +10,12 @@
->    */
->
->   /*
-> + * For AT91SAM9x SoCs, the Watchdog Timer has the following constraint.
->    * The Watchdog Timer Mode Register can be only written to once. If the
->    * timeout need to be set from Linux, be sure that the bootstrap or the
->    * bootloader doesn't write to this register.
-> + * From SAMA5D4, the Watchdog Timer Mode Register can be written
-> + * until a LOCKMR command is issued in WDT_CR.
->    */
->
->   #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-> @@ -80,6 +83,11 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
->   	"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
->
->   #define to_wdt(wdd) container_of(wdd, struct at91wdt, wdd)
-> +
-> +struct at91wdt_variant {
-> +	bool mr_writable;
-> +};
-> +
->   struct at91wdt {
->   	struct watchdog_device wdd;
->   	void __iomem *base;
-> @@ -90,6 +98,9 @@ struct at91wdt {
->   	unsigned long heartbeat;	/* WDT heartbeat in jiffies */
->   	bool nowayout;
->   	unsigned int irq;
-> +	bool use_timer;
-> +	bool enabled;
-> +	struct at91wdt_variant *drv_data;
->   };
->
->   /* ......................................................................... */
-> @@ -133,21 +144,67 @@ static void at91_ping(unsigned long data)
->   static int at91_wdt_start(struct watchdog_device *wdd)
->   {
->   	struct at91wdt *wdt = to_wdt(wdd);
-> -	/* calculate when the next userspace timeout will be */
-> -	wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
-> +	u32 reg;
-> +
-> +	if (wdt->drv_data->mr_writable) {
-> +		reg = wdt_read(wdt, AT91_WDT_MR);
-> +		reg &= ~AT91_WDT_WDDIS;
-> +		wdt_write(wdt, AT91_WDT_MR, reg);
-> +	} else {
-> +		/* calculate when the next userspace timeout will be */
-> +		wdt->next_heartbeat = jiffies + wdd->timeout * HZ;
-> +	}
-> +
->   	return 0;
->   }
->
->   static int at91_wdt_stop(struct watchdog_device *wdd)
->   {
-> -	/* The watchdog timer hardware can not be stopped... */
-> +	struct at91wdt *wdt = to_wdt(wdd);
-> +	u32 reg;
-> +
-> +	if (wdt->drv_data->mr_writable) {
-> +		reg = wdt_read(wdt, AT91_WDT_MR);
-> +		reg |= AT91_WDT_WDDIS;
-> +		wdt_write(wdt, AT91_WDT_MR, reg);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int at91_wdt_ping(struct watchdog_device *wdd)
-> +{
-> +	struct at91wdt *wdt = to_wdt(wdd);
-> +
-> +	wdt_write(wdt, AT91_WDT_CR, AT91_WDT_KEY | AT91_WDT_WDRSTT);
-> +
->   	return 0;
->   }
->
->   static int at91_wdt_set_timeout(struct watchdog_device *wdd, unsigned int new_timeout)
->   {
-> -	wdd->timeout = new_timeout;
-> -	return at91_wdt_start(wdd);
-> +	struct at91wdt *wdt = to_wdt(wdd);
-> +	u32 reg, timeout;
-> +
-> +	if (wdt->drv_data->mr_writable) {
-> +		timeout = secs_to_ticks(new_timeout);
-> +		if (timeout > WDT_COUNTER_MAX_TICKS)
-> +			return -EINVAL;
-> +
-> +		reg = wdt_read(wdt, AT91_WDT_MR);
-> +		reg &= ~AT91_WDT_WDV;
-> +		reg |= AT91_WDT_WDV_(timeout);
-> +		reg &= ~AT91_WDT_WDD;
-> +		reg |= AT91_WDT_WDD_(timeout);
-> +		wdt_write(wdt, AT91_WDT_MR, reg);
-> +
-> +		wdd->timeout = new_timeout;
-> +
-> +		return 0;
-> +	} else {
-> +		wdd->timeout = new_timeout;
-> +		return at91_wdt_start(wdd);
-> +	}
->   }
->
->   static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
-> @@ -161,50 +218,65 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->   	unsigned long max_heartbeat;
->   	struct device *dev = &pdev->dev;
->
-> -	tmp = wdt_read(wdt, AT91_WDT_MR);
-> -	if ((tmp & mask) != (wdt->mr & mask)) {
-> -		if (tmp == WDT_MR_RESET) {
-> -			wdt_write(wdt, AT91_WDT_MR, wdt->mr);
-> -			tmp = wdt_read(wdt, AT91_WDT_MR);
-> +	if (wdt->drv_data->mr_writable) {
-> +		wdt->use_timer = false;
-> +
-> +		wdt_write(wdt, AT91_WDT_MR, wdt->mr | AT91_WDT_WDDIS);
-> +	} else {
-> +		wdt->use_timer = true;
-> +
-> +		tmp = wdt_read(wdt, AT91_WDT_MR);
-> +		if ((tmp & mask) != (wdt->mr & mask)) {
-> +			if (tmp == WDT_MR_RESET) {
-> +				wdt_write(wdt, AT91_WDT_MR, wdt->mr);
-> +				tmp = wdt_read(wdt, AT91_WDT_MR);
-> +			}
->   		}
-> -	}
->
-> -	if (tmp & AT91_WDT_WDDIS) {
-> -		if (wdt->mr & AT91_WDT_WDDIS)
-> -			return 0;
-> -		dev_err(dev, "watchdog is disabled\n");
-> -		return -EINVAL;
-> +		if (tmp & AT91_WDT_WDDIS) {
-> +			if (wdt->mr & AT91_WDT_WDDIS)
-> +				return 0;
-> +
-> +			dev_err(dev, "watchdog is disabled\n");
-> +			return -EINVAL;
-> +		}
->   	}
->
-> -	value = tmp & AT91_WDT_WDV;
-> -	delta = (tmp & AT91_WDT_WDD) >> 16;
-> +	tmp = wdt_read(wdt, AT91_WDT_MR);
-> +	wdt->enabled = (tmp & AT91_WDT_WDDIS) ? false : true;
->
-> -	if (delta < value)
-> -		min_heartbeat = ticks_to_hz_roundup(value - delta);
-> +	if (wdt->use_timer) {
-> +		value = tmp & AT91_WDT_WDV;
-> +		delta = (tmp & AT91_WDT_WDD) >> 16;
->
-> -	max_heartbeat = ticks_to_hz_rounddown(value);
-> -	if (!max_heartbeat) {
-> -		dev_err(dev,
-> -			"heartbeat is too small for the system to handle it correctly\n");
-> -		return -EINVAL;
-> -	}
-> +		if (delta < value)
-> +			min_heartbeat = ticks_to_hz_roundup(value - delta);
->
-> -	/*
-> -	 * Try to reset the watchdog counter 4 or 2 times more often than
-> -	 * actually requested, to avoid spurious watchdog reset.
-> -	 * If this is not possible because of the min_heartbeat value, reset
-> -	 * it at the min_heartbeat period.
-> -	 */
-> -	if ((max_heartbeat / 4) >= min_heartbeat)
-> -		wdt->heartbeat = max_heartbeat / 4;
-> -	else if ((max_heartbeat / 2) >= min_heartbeat)
-> -		wdt->heartbeat = max_heartbeat / 2;
-> -	else
-> -		wdt->heartbeat = min_heartbeat;
-> -
-> -	if (max_heartbeat < min_heartbeat + 4)
-> -		dev_warn(dev,
-> -			 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
-> +		max_heartbeat = ticks_to_hz_rounddown(value);
-> +		if (!max_heartbeat) {
-> +			dev_err(dev,
-> +				"heartbeat is too small for the system to handle it correctly\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		/*
-> +		 * Try to reset the watchdog counter 4 or 2 times more often than
-> +		 * actually requested, to avoid spurious watchdog reset.
-> +		 * If this is not possible because of the min_heartbeat value, reset
-> +		 * it at the min_heartbeat period.
-> +		 */
-> +		if ((max_heartbeat / 4) >= min_heartbeat)
-> +			wdt->heartbeat = max_heartbeat / 4;
-> +		else if ((max_heartbeat / 2) >= min_heartbeat)
-> +			wdt->heartbeat = max_heartbeat / 2;
-> +		else
-> +			wdt->heartbeat = min_heartbeat;
-> +
-> +		if (max_heartbeat < min_heartbeat + 4) {
-> +			dev_warn(dev,
-> +				 "min heartbeat and max heartbeat might be too close for the system to handle it correctly\n");
-> +		}
-> +	}
->
->   	if ((tmp & AT91_WDT_WDFIEN) && wdt->irq) {
->   		err = request_irq(wdt->irq, wdt_interrupt,
-> @@ -215,21 +287,24 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->   			return err;
->   	}
->
-> -	if ((tmp & wdt->mr_mask) != (wdt->mr & wdt->mr_mask))
-> -		dev_warn(dev,
-> -			 "watchdog already configured differently (mr = %x expecting %x)\n",
-> -			 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
-> +	if (wdt->use_timer) {
-> +		if ((tmp & wdt->mr_mask) != (wdt->mr & wdt->mr_mask)) {
-> +			dev_warn(dev,
-> +				 "watchdog already configured differently (mr = %x expecting %x)\n",
-> +				 tmp & wdt->mr_mask, wdt->mr & wdt->mr_mask);
-> +		}
->
-> -	setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
-> +		setup_timer(&wdt->timer, at91_ping, (unsigned long)wdt);
->
-> -	/*
-> -	 * Use min_heartbeat the first time to avoid spurious watchdog reset:
-> -	 * we don't know for how long the watchdog counter is running, and
-> -	 *  - resetting it right now might trigger a watchdog fault reset
-> -	 *  - waiting for heartbeat time might lead to a watchdog timeout
-> -	 *    reset
-> -	 */
-> -	mod_timer(&wdt->timer, jiffies + min_heartbeat);
-> +		/*
-> +		 * Use min_heartbeat the first time to avoid spurious watchdog reset:
-> +		 * we don't know for how long the watchdog counter is running, and
-> +		 *  - resetting it right now might trigger a watchdog fault reset
-> +		 *  - waiting for heartbeat time might lead to a watchdog timeout
-> +		 *    reset
-> +		 */
-> +		mod_timer(&wdt->timer, jiffies + min_heartbeat);
-> +	}
->
->   	/* Try to set timeout from device tree first */
->   	if (watchdog_init_timeout(&wdt->wdd, 0, dev))
-> @@ -239,12 +314,14 @@ static int at91_wdt_init(struct platform_device *pdev, struct at91wdt *wdt)
->   	if (err)
->   		goto out_stop_timer;
->
-> -	wdt->next_heartbeat = jiffies + wdt->wdd.timeout * HZ;
-> +	if (wdt->use_timer)
-> +		wdt->next_heartbeat = jiffies + wdt->wdd.timeout * HZ;
->
->   	return 0;
->
->   out_stop_timer:
-> -	del_timer(&wdt->timer);
-> +	if (wdt->use_timer)
-> +		del_timer(&wdt->timer);
->   	return err;
->   }
->
-> @@ -256,13 +333,54 @@ static const struct watchdog_info at91_wdt_info = {
->   						WDIOF_MAGICCLOSE,
->   };
->
-> -static const struct watchdog_ops at91_wdt_ops = {
-> +static struct watchdog_ops at91_wdt_ops = {
->   	.owner =	THIS_MODULE,
->   	.start =	at91_wdt_start,
->   	.stop =		at91_wdt_stop,
->   	.set_timeout =	at91_wdt_set_timeout,
->   };
->
-> +static const struct at91wdt_variant drv_data_at91sam9260 = {
-> +	.mr_writable = false,
-> +};
-> +
-> +#if defined(CONFIG_OF)
-> +static const struct at91wdt_variant drv_data_sama5d4 = {
-> +	.mr_writable = true,
-> +};
-> +
-> +static const struct of_device_id at91_wdt_dt_ids[] = {
-> +	{ .compatible = "atmel,at91sam9260-wdt",
-> +	  .data = &drv_data_at91sam9260 },
-> +	{ .compatible = "atmel,sama5d4-wdt",
-> +	  .data = &drv_data_sama5d4 },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> +#endif
-> +
-> +static const struct platform_device_id at91wdt_ids[] = {
-> +	{
-> +		.name = "at91_wdt",
-> +		.driver_data = (unsigned long)&drv_data_at91sam9260,
-> +	},
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(platform, at91wdt_ids);
-> +
-> +static struct at91wdt_variant *at91wdt_get_drv_data(struct platform_device *pdev)
-> +{
-> +	const struct of_device_id *match;
-> +
-> +	if (pdev->dev.of_node) {
-> +		match = of_match_node(at91_wdt_dt_ids, pdev->dev.of_node);
-> +		return (struct at91wdt_variant *)match->data;
-> +	} else {
-> +		return (struct at91wdt_variant *)
-> +			platform_get_device_id(pdev)->driver_data;
-> +	}
-> +}
-> +
->   #if defined(CONFIG_OF)
->   static int of_at91wdt_init(struct device_node *np, struct at91wdt *wdt)
->   {
-> @@ -336,6 +454,10 @@ static int __init at91wdt_probe(struct platform_device *pdev)
->   	if (!wdt)
->   		return -ENOMEM;
->
-> +	wdt->drv_data = at91wdt_get_drv_data(pdev);
-> +	if (wdt->drv_data->mr_writable)
-> +		at91_wdt_ops.ping = at91_wdt_ping;
-> +
->   	wdt->mr = (WDT_HW_TIMEOUT * 256) | AT91_WDT_WDRSTEN | AT91_WDT_WDD |
->   		  AT91_WDT_WDDBGHLT | AT91_WDT_WDIDLEHLT;
->   	wdt->mr_mask = 0x3FFFFFFF;
-> @@ -364,8 +486,12 @@ static int __init at91wdt_probe(struct platform_device *pdev)
->
->   	platform_set_drvdata(pdev, wdt);
->
-> -	pr_info("enabled (heartbeat=%d sec, nowayout=%d)\n",
-> -		wdt->wdd.timeout, wdt->nowayout);
-> +	if (wdt->enabled) {
-> +		dev_info(&pdev->dev, "enabled (heartbeat=%d sec, nowayout=%d)\n",
-> +			wdt->wdd.timeout, wdt->nowayout);
-> +	} else {
-> +		dev_info(&pdev->dev, "not enabled\n");
-> +	}
->
->   	return 0;
->   }
-> @@ -381,15 +507,6 @@ static int __exit at91wdt_remove(struct platform_device *pdev)
->   	return 0;
->   }
->
-> -#if defined(CONFIG_OF)
-> -static const struct of_device_id at91_wdt_dt_ids[] = {
-> -	{ .compatible = "atmel,at91sam9260-wdt" },
-> -	{ /* sentinel */ }
-> -};
-> -
-> -MODULE_DEVICE_TABLE(of, at91_wdt_dt_ids);
-> -#endif
-> -
->   static struct platform_driver at91wdt_driver = {
->   	.remove		= __exit_p(at91wdt_remove),
->   	.driver		= {
-> diff --git a/drivers/watchdog/at91sam9_wdt.h b/drivers/watchdog/at91sam9_wdt.h
-> index c6fbb2e6..79add4f 100644
-> --- a/drivers/watchdog/at91sam9_wdt.h
-> +++ b/drivers/watchdog/at91sam9_wdt.h
-> @@ -22,11 +22,15 @@
->
->   #define AT91_WDT_MR		0x04			/* Watchdog Mode Register */
->   #define		AT91_WDT_WDV		(0xfff << 0)		/* Counter Value */
-> +#define			AT91_WDT_WDV_MSK	(0xfff)
-> +#define			AT91_WDT_WDV_(x)	(((x) & AT91_WDT_WDV_MSK) << 0)
->   #define		AT91_WDT_WDFIEN		(1     << 12)		/* Fault Interrupt Enable */
->   #define		AT91_WDT_WDRSTEN	(1     << 13)		/* Reset Processor */
->   #define		AT91_WDT_WDRPROC	(1     << 14)		/* Timer Restart */
->   #define		AT91_WDT_WDDIS		(1     << 15)		/* Watchdog Disable */
->   #define		AT91_WDT_WDD		(0xfff << 16)		/* Delta Value */
-> +#define			AT91_WDT_WDD_MSK	(0xfff)
-> +#define			AT91_WDT_WDD_(x)	(((x) & AT91_WDT_WDD_MSK) << 16)
->   #define		AT91_WDT_WDDBGHLT	(1     << 28)		/* Debug Halt */
->   #define		AT91_WDT_WDIDLEHLT	(1     << 29)		/* Idle Halt */
->
->
+>  arch/arm/include/asm/mach/pci.h |  5 -----
+>  arch/arm/kernel/bios32.c        | 12 ++++++++----
+>  2 files changed, 8 insertions(+), 9 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+> index 28b9bb3..8a4e4de 100644
+> --- a/arch/arm/include/asm/mach/pci.h
+> +++ b/arch/arm/include/asm/mach/pci.h
+> @@ -58,11 +58,6 @@ struct pci_sys_data {
+>  					/* IRQ mapping				*/
+>  	int		(*map_irq)(const struct pci_dev *, u8, u8);
+>  					/* Resource alignement requirements	*/
+> -	resource_size_t (*align_resource)(struct pci_dev *dev,
+> -					  const struct resource *res,
+> -					  resource_size_t start,
+> -					  resource_size_t size,
+> -					  resource_size_t align);
+>  	void		*private_data;	/* platform controller private data	*/
+>  };
+>  
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index fcbbbb1..4cdc64d 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -17,6 +17,11 @@
+>  #include <asm/mach/pci.h>
+>  
+>  static int debug_pci;
+> +static resource_size_t (*align_resource)(struct pci_dev *dev,
+> +		  const struct resource *res,
+> +		  resource_size_t start,
+> +		  resource_size_t size,
+> +		  resource_size_t align) = NULL;
+>  
+>  #ifdef CONFIG_PCI_MSI
+>  struct msi_controller *pcibios_msi_controller(struct pci_dev *dev)
+> @@ -468,7 +473,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
+>  		sys->busnr   = busnr;
+>  		sys->swizzle = hw->swizzle;
+>  		sys->map_irq = hw->map_irq;
+> -		sys->align_resource = hw->align_resource;
+> +		align_resource = hw->align_resource;
+>  		INIT_LIST_HEAD(&sys->resources);
+>  
+>  		if (hw->private_data)
+> @@ -589,7 +594,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  				resource_size_t size, resource_size_t align)
+>  {
+>  	struct pci_dev *dev = data;
+> -	struct pci_sys_data *sys = dev->sysdata;
+>  	resource_size_t start = res->start;
+>  
+>  	if (res->flags & IORESOURCE_IO && start & 0x300)
+> @@ -597,8 +601,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+>  
+>  	start = (start + align - 1) & ~(align - 1);
+>  
+> -	if (sys->align_resource)
+> -		return sys->align_resource(dev, res, start, size, align);
+> +	if (align_resource)
+> +		return align_resource(dev, res, start, size, align);
+>  
+>  	return start;
+>  }
+> 
