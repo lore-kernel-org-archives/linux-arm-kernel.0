@@ -1,81 +1,75 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 28 Jul 2015 14:24:29 +0200
-Subject: [GIT PULL] ARM: mediatek: arm64 updates for v4.3
-Message-ID: <CABuKBeJTfRnJ_+5rLZw3-SWgXpfv+3+UR2jOBhADTbi1Sz1Axg@mail.gmail.com>
+From: mporter@konsulko.com (Matt Porter)
+Date: Tue, 28 Jul 2015 08:24:47 -0400
+Subject: [PATCH 1/2] ARM: dts: Add support for phyCORE-AM335x SoM
+In-Reply-To: <1438073248.3649.6.camel@lws-tremmet.phytec.de>
+References: <1437035449-26956-1-git-send-email-t.remmet@phytec.de>
+ <20150727143444.GD15004@beef> <55B73D6D.2040801@compulab.co.il>
+ <1438073248.3649.6.camel@lws-tremmet.phytec.de>
+Message-ID: <20150728122447.GE15004@beef>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jul 28, 2015 at 10:47:28AM +0200, Teresa Remmet wrote:
+> Hello Igor,
+> 
+> Am Dienstag, den 28.07.2015, 11:29 +0300 schrieb Igor Grinberg:
+> > Hi Matt,
+> > 
+> > On 07/27/15 17:34, Matt Porter wrote:
+> > > On Thu, Jul 16, 2015 at 10:30:48AM +0200, Teresa Remmet wrote:
+> > >> phyCORE-AM335x is a SoM (System on Module) containing
+> > >> a AM335x SOC. The module can be connected to different
+> > >> carrier boards.
+> > >>
+> > >> Some hardware parts are configurable on the phyCORE-AM335x.
+> > >> So they are disabled on default in this som dtsi file.
+> > >> They will be enabled in the board dts files, when populated.
+> > >>
+> > >> * RAM up to 1GiB
+> > >> * PMIC
+> > >> * NAND flash up to 1GiB
+> > >> * Eth PHY on SOM: 1x RMII
+> > >> * SPI NOR flash 8MiB (optional)
+> > >> * i2c RTC (optional)
+> > >> * i2c EEPROM 4kiB (optional)
+> > >>
+> > >> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+> > >> ---
+> > >>  arch/arm/boot/dts/am335x-phycore-som.dtsi | 368 ++++++++++++++++++++++++++++++
+> > >>  1 file changed, 368 insertions(+)
+> > >>  create mode 100644 arch/arm/boot/dts/am335x-phycore-som.dtsi
+> > >>
+> > >> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+> > >> new file mode 100644
+> > >> index 0000000..4d28fc3
+> > >> --- /dev/null
+> > >> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+> > 
+> > [...]
+> > 
+> > >> +#include "am33xx.dtsi"
+> > >> +
+> > >> +/ {
+> > >> +	model = "Phytec AM335x phyCORE";
+> > >> +	compatible = "phytec,am335x-phycore-som", "ti,am33xx";
+> > > 
+> > > One minor thing here...wildcards in compatible strings aren't permitted.
+> > > However, family compatibles like "ti,am33xx" that came in before this
+> > > was enforced are grandfathered. Ideally, the newly introced board/som
+> > > specific strings should not propagate that wildcard. i.e. something
+> > > like "phytec,am3352-phycore-som" or whatever is the base family part
+> > > on these SOMs.
+> > > 
+> > 
+> > I'm not sure this is wild card.
+> > I tend to think that it is the real name of the som [1], no?
+> > 
+> > http://phytec.com/products/system-on-modules/phycore/am335x/
+> 
+> Yes, your right. This is the name of the SoM. The phyCORE may have
+> different am335x versions mounted. So there is not the one am3352 or
+> am3359 always used.
 
-Please take the following changes into account.
-In the last mail I screwed up the subject, these patches are naturally for v4.3.
+Ok, great. Disregard then.
 
-Thanks,
-Matthias
-
----
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-arm64
-
-for you to fetch changes up to e26945245e414eff42ee1ffeaedf198911bf1d77:
-
-  arm64: dts: mediatek: add mt6795 support (2015-07-23 19:55:55 +0200)
-
-----------------------------------------------------------------
-- arm64: dts: mediatek: add mt6795 support
-- Document: DT: Add bindings for mediatek MT6795 SoC Platform
-- arm64: dts: mediatek: Add MT8173 MMC dts
-- arm64: dts: mt8173: Add afe device node
-- arm64: dts: mt8173-evb: Add PMIC support
-- dts: mt8173-evb: Add da9211 to i2c1
-- ARM: dts: mt8173: support arm64 cpuidle-dt
-- ARM64: MediaTek MT8173: Add SCPSYS device node
-- arm64: dts: mt8173: Add I2C device node
-- arm64: dts: mt8173: Add watchdog device node
-- arm64: dts: mt8173: Add PMIC wrapper device node
-- arm64: dts: mt8173: Use real clock for UARTs
-- arm64: dts: mt8173: Add clock controller device nodes
-
-----------------------------------------------------------------
-Eddie Huang (4):
-      arm64: dts: mt8173: Add watchdog device node
-      arm64: dts: mt8173: Add I2C device node
-      arm64: dts: mt8173-evb: Add PMIC support
-      arm64: dts: mediatek: Add MT8173 MMC dts
-
-Henry Chen (1):
-      dts: mt8173-evb: Add da9211 to i2c1
-
-Howard Chen (1):
-      ARM: dts: mt8173: support arm64 cpuidle-dt
-
-Koro Chen (1):
-      arm64: dts: mt8173: Add afe device node
-
-Mars Cheng (2):
-      Document: DT: Add bindings for mediatek MT6795 SoC Platform
-      arm64: dts: mediatek: add mt6795 support
-
-Sascha Hauer (4):
-      arm64: dts: mt8173: Add clock controller device nodes
-      arm64: dts: mt8173: Use real clock for UARTs
-      arm64: dts: mt8173: Add PMIC wrapper device node
-      ARM64: MediaTek MT8173: Add SCPSYS device node
-
- Documentation/devicetree/bindings/arm/mediatek.txt |   9 +-
- .../bindings/arm/mediatek/mediatek,sysirq.txt      |   3 +-
- .../devicetree/bindings/serial/mtk-uart.txt        |   5 +-
- arch/arm64/boot/dts/mediatek/Makefile              |   1 +
- arch/arm64/boot/dts/mediatek/mt6795-evb.dts        |  41 +++
- arch/arm64/boot/dts/mediatek/mt6795.dtsi           | 162 ++++++++++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        | 353 +++++++++++++++++++++
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           | 327 ++++++++++++++++++-
- 8 files changed, 883 insertions(+), 18 deletions(-)
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6795-evb.dts
- create mode 100644 arch/arm64/boot/dts/mediatek/mt6795.dtsi
+-Matt
