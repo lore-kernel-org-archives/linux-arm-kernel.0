@@ -1,285 +1,61 @@
 From: mohun106@gmail.com (mohun106 at gmail.com)
-Date: Mon, 27 Jul 2015 19:14:41 -0700
-Subject: [PATCH 1/3] net: mdio-octeon: Modify driver to work on both ThunderX
- and Octeon
+Date: Mon, 27 Jul 2015 19:14:42 -0700
+Subject: [PATCH 2/3] net: mdio-octeon: Fix octeon_mdiobus_probe function for
+ return values
 In-Reply-To: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
 References: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
-Message-ID: <1438049683-10630-2-git-send-email-mohun106@gmail.com>
+Message-ID: <1438049683-10630-3-git-send-email-mohun106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
 
-This patch modifies the mdio-octeon driver to work on both ThunderX and
-Octeon SoCs from Cavium Inc.
+This patch fixes a possible crash in the octeon_mdiobus_probe function
+if the return values are not handled properly.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 ---
- drivers/net/phy/Kconfig       |    9 ++-
- drivers/net/phy/mdio-octeon.c |  122 +++++++++++++++++++++++++++++++++++-----
- 2 files changed, 111 insertions(+), 20 deletions(-)
+ drivers/net/phy/mdio-octeon.c |   14 +++++++++-----
+ 1 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index cf18940..0d6af19 100644
---- a/drivers/net/phy/Kconfig
-+++ b/drivers/net/phy/Kconfig
-@@ -145,13 +145,14 @@ config MDIO_GPIO
- 	  will be called mdio-gpio.
- 
- config MDIO_OCTEON
--	tristate "Support for MDIO buses on Octeon SOCs"
--	depends on CAVIUM_OCTEON_SOC
-+	tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
-+	depends on 64BIT
- 	default y
- 	help
- 
--	  This module provides a driver for the Octeon MDIO busses.
--	  It is required by the Octeon Ethernet device drivers.
-+	  This module provides a driver for the Octeon and ThunderX MDIO
-+	  busses. It is required by the Octeon and ThunderX ethernet device
-+	  drivers.
- 
- 	  If in doubt, say Y.
- 
 diff --git a/drivers/net/phy/mdio-octeon.c b/drivers/net/phy/mdio-octeon.c
-index c838ad6..507aade 100644
+index 507aade..428ae75 100644
 --- a/drivers/net/phy/mdio-octeon.c
 +++ b/drivers/net/phy/mdio-octeon.c
-@@ -7,6 +7,7 @@
-  */
+@@ -277,24 +277,28 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- #include <linux/platform_device.h>
-+#include <linux/of_address.h>
- #include <linux/of_mdio.h>
- #include <linux/delay.h>
- #include <linux/module.h>
-@@ -14,11 +15,12 @@
- #include <linux/phy.h>
- #include <linux/io.h>
- 
-+#ifdef CONFIG_CAVIUM_OCTEON_SOC
- #include <asm/octeon/octeon.h>
--#include <asm/octeon/cvmx-smix-defs.h>
-+#endif
- 
--#define DRV_VERSION "1.0"
--#define DRV_DESCRIPTION "Cavium Networks Octeon SMI/MDIO driver"
-+#define DRV_VERSION "1.1"
-+#define DRV_DESCRIPTION "Cavium Networks Octeon/ThunderX SMI/MDIO driver"
- 
- #define SMI_CMD		0x0
- #define SMI_WR_DAT	0x8
-@@ -26,6 +28,79 @@
- #define SMI_CLK		0x18
- #define SMI_EN		0x20
- 
-+#ifdef __BIG_ENDIAN_BITFIELD
-+#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-+	field;					\
-+	more
+ 	res_mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-
+ 	if (res_mem == NULL) {
+ 		dev_err(&pdev->dev, "found no memory resource\n");
+-		err = -ENXIO;
+-		goto fail;
++		return -ENXIO;
+ 	}
 +
-+#else
-+#define OCT_MDIO_BITFIELD_FIELD(field, more)	\
-+	more					\
-+	field;
+ 	bus->mdio_phys = res_mem->start;
+ 	bus->regsize = resource_size(res_mem);
 +
-+#endif
+ 	if (!devm_request_mem_region(&pdev->dev, bus->mdio_phys, bus->regsize,
+ 				     res_mem->name)) {
+ 		dev_err(&pdev->dev, "request_mem_region failed\n");
+-		goto fail;
++		return -ENXIO;
+ 	}
 +
-+union cvmx_smix_clk {
-+	uint64_t u64;
-+	struct cvmx_smix_clk_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
-+	  ;))))))))))
-+	} s;
-+};
-+
-+union cvmx_smix_cmd {
-+	uint64_t u64;
-+	struct cvmx_smix_cmd_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phy_op:2,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_13_15:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 phy_adr:5,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_5_7:3,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reg_adr:5,
-+	  ;))))))
-+	} s;
-+};
-+
-+union cvmx_smix_en {
-+	uint64_t u64;
-+	struct cvmx_smix_en_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_1_63:63,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 en:1,
-+	  ;))
-+	} s;
-+};
-+
-+union cvmx_smix_rd_dat {
-+	uint64_t u64;
-+	struct cvmx_smix_rd_dat_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
-+	  ;))))
-+	} s;
-+};
-+
-+union cvmx_smix_wr_dat {
-+	uint64_t u64;
-+	struct cvmx_smix_wr_dat_s {
-+	  OCT_MDIO_BITFIELD_FIELD(u64 reserved_18_63:46,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 pending:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 val:1,
-+	  OCT_MDIO_BITFIELD_FIELD(u64 dat:16,
-+	  ;))))
-+	} s;
-+};
-+
- enum octeon_mdiobus_mode {
- 	UNINIT = 0,
- 	C22,
-@@ -41,6 +116,21 @@ struct octeon_mdiobus {
- 	int phy_irq[PHY_MAX_ADDR];
- };
+ 	bus->register_base =
+ 		(u64)devm_ioremap(&pdev->dev, bus->mdio_phys, bus->regsize);
++	if (!bus->register_base) {
++		dev_err(&pdev->dev, "dev_ioremap failed\n");
++		return -ENOMEM;
++	}
  
-+#ifdef CONFIG_CAVIUM_OCTEON_SOC
-+static void oct_mdio_writeq(u64 val, u64 addr)
-+{
-+	cvmx_write_csr(addr, val);
-+}
-+
-+static u64 oct_mdio_readq(u64 addr)
-+{
-+	return cvmx_read_csr(addr);
-+}
-+#else
-+#define oct_mdio_writeq(val, addr)	writeq_relaxed(val, (void *)addr)
-+#define oct_mdio_readq(addr)		readq_relaxed((void *)addr)
-+#endif
-+
- static void octeon_mdiobus_set_mode(struct octeon_mdiobus *p,
- 				    enum octeon_mdiobus_mode m)
- {
-@@ -49,10 +139,10 @@ static void octeon_mdiobus_set_mode(struct octeon_mdiobus *p,
- 	if (m == p->mode)
- 		return;
- 
--	smi_clk.u64 = cvmx_read_csr(p->register_base + SMI_CLK);
-+	smi_clk.u64 = oct_mdio_readq(p->register_base + SMI_CLK);
- 	smi_clk.s.mode = (m == C45) ? 1 : 0;
- 	smi_clk.s.preamble = 1;
--	cvmx_write_csr(p->register_base + SMI_CLK, smi_clk.u64);
-+	oct_mdio_writeq(smi_clk.u64, p->register_base + SMI_CLK);
- 	p->mode = m;
- }
- 
-@@ -67,7 +157,7 @@ static int octeon_mdiobus_c45_addr(struct octeon_mdiobus *p,
- 
- 	smi_wr.u64 = 0;
- 	smi_wr.s.dat = regnum & 0xffff;
--	cvmx_write_csr(p->register_base + SMI_WR_DAT, smi_wr.u64);
-+	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
- 
- 	regnum = (regnum >> 16) & 0x1f;
- 
-@@ -75,14 +165,14 @@ static int octeon_mdiobus_c45_addr(struct octeon_mdiobus *p,
- 	smi_cmd.s.phy_op = 0; /* MDIO_CLAUSE_45_ADDRESS */
- 	smi_cmd.s.phy_adr = phy_id;
- 	smi_cmd.s.reg_adr = regnum;
--	cvmx_write_csr(p->register_base + SMI_CMD, smi_cmd.u64);
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
- 
- 	do {
- 		/* Wait 1000 clocks so we don't saturate the RSL bus
- 		 * doing reads.
- 		 */
- 		__delay(1000);
--		smi_wr.u64 = cvmx_read_csr(p->register_base + SMI_WR_DAT);
-+		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
- 	} while (smi_wr.s.pending && --timeout);
- 
- 	if (timeout <= 0)
-@@ -114,14 +204,14 @@ static int octeon_mdiobus_read(struct mii_bus *bus, int phy_id, int regnum)
- 	smi_cmd.s.phy_op = op;
- 	smi_cmd.s.phy_adr = phy_id;
- 	smi_cmd.s.reg_adr = regnum;
--	cvmx_write_csr(p->register_base + SMI_CMD, smi_cmd.u64);
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
- 
- 	do {
- 		/* Wait 1000 clocks so we don't saturate the RSL bus
- 		 * doing reads.
- 		 */
- 		__delay(1000);
--		smi_rd.u64 = cvmx_read_csr(p->register_base + SMI_RD_DAT);
-+		smi_rd.u64 = oct_mdio_readq(p->register_base + SMI_RD_DAT);
- 	} while (smi_rd.s.pending && --timeout);
- 
- 	if (smi_rd.s.val)
-@@ -153,20 +243,20 @@ static int octeon_mdiobus_write(struct mii_bus *bus, int phy_id,
- 
- 	smi_wr.u64 = 0;
- 	smi_wr.s.dat = val;
--	cvmx_write_csr(p->register_base + SMI_WR_DAT, smi_wr.u64);
-+	oct_mdio_writeq(smi_wr.u64, p->register_base + SMI_WR_DAT);
- 
- 	smi_cmd.u64 = 0;
- 	smi_cmd.s.phy_op = op;
- 	smi_cmd.s.phy_adr = phy_id;
- 	smi_cmd.s.reg_adr = regnum;
--	cvmx_write_csr(p->register_base + SMI_CMD, smi_cmd.u64);
-+	oct_mdio_writeq(smi_cmd.u64, p->register_base + SMI_CMD);
- 
- 	do {
- 		/* Wait 1000 clocks so we don't saturate the RSL bus
- 		 * doing reads.
- 		 */
- 		__delay(1000);
--		smi_wr.u64 = cvmx_read_csr(p->register_base + SMI_WR_DAT);
-+		smi_wr.u64 = oct_mdio_readq(p->register_base + SMI_WR_DAT);
- 	} while (smi_wr.s.pending && --timeout);
- 
- 	if (timeout <= 0)
-@@ -210,7 +300,7 @@ static int octeon_mdiobus_probe(struct platform_device *pdev)
- 
- 	smi_en.u64 = 0;
- 	smi_en.s.en = 1;
--	cvmx_write_csr(bus->register_base + SMI_EN, smi_en.u64);
-+	oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
- 
- 	bus->mii_bus->priv = bus;
- 	bus->mii_bus->irq = bus->phy_irq;
-@@ -234,7 +324,7 @@ fail_register:
- 	mdiobus_free(bus->mii_bus);
- fail:
- 	smi_en.u64 = 0;
--	cvmx_write_csr(bus->register_base + SMI_EN, smi_en.u64);
-+	oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
- 	return err;
- }
- 
-@@ -248,7 +338,7 @@ static int octeon_mdiobus_remove(struct platform_device *pdev)
- 	mdiobus_unregister(bus->mii_bus);
- 	mdiobus_free(bus->mii_bus);
- 	smi_en.u64 = 0;
--	cvmx_write_csr(bus->register_base + SMI_EN, smi_en.u64);
-+	oct_mdio_writeq(smi_en.u64, bus->register_base + SMI_EN);
- 	return 0;
- }
+ 	bus->mii_bus = mdiobus_alloc();
+-
+ 	if (!bus->mii_bus)
+ 		goto fail;
  
 -- 
 1.7.1
