@@ -1,13 +1,13 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 28 Jul 2015 15:19:47 +0200
-Subject: [PATCH v2 16/22] usb: phy: Probe phy devices on demand
+Date: Tue, 28 Jul 2015 15:19:48 +0200
+Subject: [PATCH v2 17/22] clk: Probe clk providers on demand
 In-Reply-To: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
 References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1438089593-7696-17-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1438089593-7696-18-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When looking up a phy through its firmware node, probe it if it hasn't
+When looking up a clock through its firmware node, probe it if it hasn't
 already.
 
 The goal is to reduce deferred probes to a minimum, as it makes it very
@@ -19,21 +19,22 @@ Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
 Changes in v2: None
 
- drivers/usb/phy/phy.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/clk/clk.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/usb/phy/phy.c b/drivers/usb/phy/phy.c
-index 98f75d2842b7..2d51c12d0726 100644
---- a/drivers/usb/phy/phy.c
-+++ b/drivers/usb/phy/phy.c
-@@ -196,6 +196,8 @@ struct  usb_phy *devm_usb_get_phy_by_node(struct device *dev,
- 		goto err0;
- 	}
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 7bb975747a2c..3cc951989a12 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2979,6 +2979,9 @@ struct clk *__of_clk_get_from_provider(struct of_phandle_args *clkspec,
+ 	if (!clkspec)
+ 		return ERR_PTR(-EINVAL);
  
-+	fwnode_ensure_device(&node->fwnode);
++	if (clkspec->np)
++		fwnode_ensure_device(&clkspec->np->fwnode);
 +
- 	spin_lock_irqsave(&phy_lock, flags);
- 
- 	phy = __of_usb_find_phy(node);
+ 	/* Check if we have such a provider in our array */
+ 	mutex_lock(&of_clk_mutex);
+ 	list_for_each_entry(provider, &of_clk_providers, link) {
 -- 
 2.4.3
