@@ -1,104 +1,49 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jul 2015 11:19:23 +0800
-Subject: [PATCH v2 2/4] ARM: dts: vf500-colibri: Add device tree node for
- touchscreen support
-In-Reply-To: <63bed3ee9ee4211df15d11becf1f78824e640a82.1437058481.git.maitysanchayan@gmail.com>
-References: <cover.1437058481.git.maitysanchayan@gmail.com>
- <63bed3ee9ee4211df15d11becf1f78824e640a82.1437058481.git.maitysanchayan@gmail.com>
-Message-ID: <20150728031923.GB12927@tiger>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 27 Jul 2015 20:20:28 -0700
+Subject: [PATCH v3 0/5] Qualcomm Shared Memory & RPM drivers
+Message-ID: <1438053633-6659-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 16, 2015 at 08:43:20PM +0530, Sanchayan Maity wrote:
-> Add device tree node for touchscreen support on Colibri VF50. The
-> touchscreen functionality on VF50 uses the ADC channels of Vybrid
-> and some GPIOs. Also add pinctrl nodes for proper pinmux.
-> 
-> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> ---
->  arch/arm/boot/dts/vf500-colibri-eval-v3.dts |  4 +++
->  arch/arm/boot/dts/vf500-colibri.dtsi        | 46 +++++++++++++++++++++++++++++
->  2 files changed, 50 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> index 7fc782c..c5efb57 100644
-> --- a/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> +++ b/arch/arm/boot/dts/vf500-colibri-eval-v3.dts
-> @@ -15,3 +15,7 @@
->  	model = "Toradex Colibri VF50 on Colibri Evaluation Board";
->  	compatible = "toradex,vf500-colibri_vf50-on-eval", "toradex,vf500-colibri_vf50", "fsl,vf500";
->  };
-> +
-> +&touchctrl {
-> +	status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/vf500-colibri.dtsi b/arch/arm/boot/dts/vf500-colibri.dtsi
-> index cee34a3..7cbe341 100644
-> --- a/arch/arm/boot/dts/vf500-colibri.dtsi
-> +++ b/arch/arm/boot/dts/vf500-colibri.dtsi
-> @@ -17,4 +17,50 @@
->  	memory {
->  		reg = <0x80000000 0x8000000>;
->  	};
-> +
-> +	touchctrl: vf50_touchctrl {
+The third iteration of the patches to add support for the regulators provided
+by the RPM on family B Qualcomm devices.
 
-Minus rather than underscore should be used in node name.  And node name
-should be generic.  "touchscreen" might be a good choice.
+This depends on the SMEM implementation that Andy already picked up.
 
-Shawn
+Changes since v2:
+- Made smd copy functions work on words for the word access channels
+- Corrected access of smem items from secure heap
+- Updated error handling path in RPM driver
+- Moved init of smd to postcore and rpm to arch
+- Minor nits from Georgi on the SMD code
+- Moved rpm driver from mfd to soc
 
-> +		compatible = "toradex,vf50-touchctrl";
-> +		io-channels = <&adc1 0>,<&adc0 0>,
-> +				<&adc0 1>,<&adc1 2>;
-> +		xp-gpios = <&gpio0 13 GPIO_ACTIVE_LOW>;
-> +		xm-gpios = <&gpio2 29 GPIO_ACTIVE_HIGH>;
-> +		yp-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>;
-> +		ym-gpios = <&gpio0 4 GPIO_ACTIVE_HIGH>;
-> +		pen-detect-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
-> +		pen-pullup-gpios = <&gpio0 9 GPIO_ACTIVE_HIGH>;
-> +		pinctrl-names = "idle","default","gpios";
-> +		pinctrl-0 = <&pinctrl_touchctrl_idle>;
-> +		pinctrl-1 = <&pinctrl_touchctrl_default>;
-> +		pinctrl-2 = <&pinctrl_touchctrl_gpios>;
-> +		status = "disabled";
-> +	};
-> +};
-> +
-> +&iomuxc {
-> +	vf610-colibri {
-> +		pinctrl_touchctrl_idle: touchctrl_idle {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__GPIO_8		0x206d
-> +				VF610_PAD_PTA19__GPIO_9		0x206d
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_default: touchctrl_default {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA18__ADC0_SE0	0x2060
-> +				VF610_PAD_PTA19__ADC0_SE1	0x2060
-> +				VF610_PAD_PTA16__ADC1_SE0	0x2060
-> +				VF610_PAD_PTB2__ADC1_SE2	0x2060
-> +				>;
-> +		};
-> +
-> +		pinctrl_touchctrl_gpios: touchctrl_gpios {
-> +			fsl,pins = <
-> +				VF610_PAD_PTA23__GPIO_13	0x22e9
-> +				VF610_PAD_PTB23__GPIO_93	0x22e9
-> +				VF610_PAD_PTA22__GPIO_12	0x22e9
-> +				VF610_PAD_PTA11__GPIO_4		0x22e9
-> +				>;
-> +		};
-> +	};
->  };
-> -- 
-> 2.4.6
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Bjorn Andersson (5):
+  soc: qcom: Add device tree binding for Shared Memory Device
+  soc: qcom: Add Shared Memory Driver
+  devicetree: soc: Add Qualcomm SMD based RPM DT binding
+  soc: qcom: Driver for the Qualcomm RPM over SMD
+  regulator: Regulator driver for the Qualcomm RPM
+
+ .../devicetree/bindings/soc/qcom,smd-rpm.txt       |  117 ++
+ .../devicetree/bindings/soc/qcom/qcom,smd.txt      |   79 ++
+ drivers/regulator/Kconfig                          |   12 +
+ drivers/regulator/Makefile                         |    1 +
+ drivers/regulator/qcom_smd-regulator.c             |  349 ++++++
+ drivers/soc/qcom/Kconfig                           |   22 +
+ drivers/soc/qcom/Makefile                          |    2 +
+ drivers/soc/qcom/smd-rpm.c                         |  244 ++++
+ drivers/soc/qcom/smd.c                             | 1319 ++++++++++++++++++++
+ include/linux/soc/qcom/smd-rpm.h                   |   35 +
+ include/linux/soc/qcom/smd.h                       |   46 +
+ 11 files changed, 2226 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom,smd-rpm.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/qcom/qcom,smd.txt
+ create mode 100644 drivers/regulator/qcom_smd-regulator.c
+ create mode 100644 drivers/soc/qcom/smd-rpm.c
+ create mode 100644 drivers/soc/qcom/smd.c
+ create mode 100644 include/linux/soc/qcom/smd-rpm.h
+ create mode 100644 include/linux/soc/qcom/smd.h
+
+-- 
+1.8.2.2
