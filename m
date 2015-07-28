@@ -1,24 +1,53 @@
-From: betty.dall@hp.com (Dall, Elizabeth J)
-Date: Tue, 28 Jul 2015 14:37:46 +0000
-Subject: X-Gene: Unhandled fault: synchronous external abort in
- pci_generic_config_read32
-References: <20150724224258.GA23990@google.com>
-Message-ID: <45B5D2ED2CA81049B5F9826D4DFA5BA756F589A4@G9W0707.americas.hpqcorp.net>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 28 Jul 2015 16:02:44 +0100
+Subject: [PATCH 3/8] arm/xen: implement correctly pfn_to_mfn
+In-Reply-To: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <1438095769-2560-4-git-send-email-julien.grall@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/24/2015 04:43 PM, Bjorn Helgaas wrote:
-> I regularly see faults like this on an APM X-Gene:
-> 
->   U-Boot 2013.04-mustang_sw_1.14.14 (Dec 16 2014 - 15:59:33)
->   CPU0: APM ARM 64-bit Potenza Rev B0 2400MHz PCP 2400MHz
->        32 KB ICACHE, 32 KB DCACHE
->        SOC 2000MHz IOBAXI 400MHz AXI 250MHz AHB 200MHz GFC 125MHz
->   ...
->   Unhandled fault: synchronous external abort (0x96000010) at 0xffffff8000110034
+After the commit introducing convertion between DMA and guest address,
+all the callers of pfn_to_mfn are expecting to get a GFN (Guest Frame
+Number). On ARM, all the guests are auto-translated so the GFN is equal
+to the Linux PFN (Pseudo-physical Frame Number).
 
-The 0x96000010 is the value of the ESR register and decodes to "Stack
-Pointer Alignment exception". The ISS field for this exception code is
-reserved, so no additional info.
+The current implementation may return an MFN if the caller is passing a
+PFN associated to a mapped foreign grant. In pratical, I haven't seen
+the problem on running guest but we should fix it for the sake of
+correctness.
 
--Betty Dall
+Correct the implementation by always returning the pfn passed in parameter.
+
+A follow-up patch will take care to rename pfn_to_mfn to a suitable
+name.
+
+Signed-off-by: Julien Grall <julien.grall@citrix.com>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/include/asm/xen/page.h | 8 --------
+ 1 file changed, 8 deletions(-)
+
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 6c9f6d2..493471f 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -36,14 +36,6 @@ extern struct rb_root phys_to_mach;
+ 
+ static inline unsigned long pfn_to_mfn(unsigned long pfn)
+ {
+-	unsigned long mfn;
+-
+-	if (phys_to_mach.rb_node != NULL) {
+-		mfn = __pfn_to_mfn(pfn);
+-		if (mfn != INVALID_P2M_ENTRY)
+-			return mfn;
+-	}
+-
+ 	return pfn;
+ }
+ 
+-- 
+2.1.4
