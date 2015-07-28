@@ -1,69 +1,54 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 28 Jul 2015 09:13:05 +0100
-Subject: [PATCH v2 3/3] ARM: dts: qs600: Add real regulators to sdcc
-In-Reply-To: <1438071116-30065-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1438071116-30065-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1438071185-30192-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Tue, 28 Jul 2015 16:15:12 +0800
+Subject: [PATCH v2 2/2] ARM: at91: at91_dt_defconfig: enable ISI and ov2640
+ support
+In-Reply-To: <55B7312F.9040505@atmel.com>
+References: <1434449315-9243-1-git-send-email-josh.wu@atmel.com>
+ <1434449315-9243-2-git-send-email-josh.wu@atmel.com>
+ <55B7312F.9040505@atmel.com>
+Message-ID: <55B73A10.4040608@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds real regulators to sdcc nodes.
+On 7/28/2015 3:37 PM, Nicolas Ferre wrote:
+> Le 16/06/2015 12:08, Josh Wu a ?crit :
+>> Add Atmel-isi and ov2640 driver in defconfig
+>>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>
+>> Changes in v2: None
+>>
+>>   arch/arm/configs/at91_dt_defconfig | 6 ++++++
+>>   1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+>> index bcef49a..d089ec9 100644
+>> --- a/arch/arm/configs/at91_dt_defconfig
+>> +++ b/arch/arm/configs/at91_dt_defconfig
+>> @@ -131,6 +131,12 @@ CONFIG_POWER_RESET=y
+>>   CONFIG_WATCHDOG=y
+>>   CONFIG_AT91SAM9X_WATCHDOG=y
+>>   CONFIG_SSB=m
+>> +CONFIG_MEDIA_SUPPORT=y
+>> +CONFIG_MEDIA_CAMERA_SUPPORT=y
+>> +CONFIG_V4L_PLATFORM_DRIVERS=y
+>> +CONFIG_SOC_CAMERA=y
+>> +CONFIG_VIDEO_ATMEL_ISI=y
+>> +CONFIG_SOC_CAMERA_OV2640=y
+> I would select this camera driver as a module. Your thoughts?
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+yes, I agree.
+Do I need to resent the patch for this?
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-index 71512b3..34ccb26 100644
---- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
-@@ -67,6 +67,12 @@
- 					bias-pull-down;
- 				};
- 
-+				pm8921_l5: l5 {
-+					regulator-min-microvolt = <2750000>;
-+					regulator-max-microvolt = <3000000>;
-+					bias-pull-down;
-+				};
-+
- 				pm8921_l23: l23 {
- 					regulator-min-microvolt = <1700000>;
- 					regulator-max-microvolt = <1900000>;
-@@ -140,19 +146,33 @@
- 			status = "okay";
- 		};
- 
-+		/* on board fixed 3.3v supply */
-+		v3p3_fixed: v3p3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "PCIE V3P3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
- 		amba {
- 			/* eMMC */
- 			sdcc1: sdcc at 12400000 {
- 				status = "okay";
-+				vmmc-supply = <&pm8921_l5>;
-+				vqmmc-supply = <&pm8921_s4>;
- 			};
- 
- 			/* External micro SD card */
- 			sdcc3: sdcc at 12180000 {
- 				status = "okay";
-+				vmmc-supply = <&v3p3_fixed>;
- 			};
- 			/* WLAN */
- 			sdcc4: sdcc at 121c0000 {
- 				status = "okay";
-+				vmmc-supply = <&v3p3_fixed>;
-+				vqmmc-supply = <&v3p3_fixed>;
- 			};
- 		};
- 	};
--- 
-1.9.1
+Best Regards,
+Josh Wu
+
+>
+> Bye,
+>
+>>   CONFIG_FB=y
+>>   CONFIG_FB_ATMEL=y
+>>   CONFIG_BACKLIGHT_LCD_SUPPORT=y
+>>
+>
