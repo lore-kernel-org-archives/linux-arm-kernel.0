@@ -1,44 +1,44 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Tue, 28 Jul 2015 14:31:20 +0800
-Subject: [RFC V2] arm64:use set_fixmap_offset to make it more clear
-In-Reply-To: <9A8FA704-5D35-404B-BEBE-C92AF25505C3@gmail.com>
-References: <A5D61263-B664-469F-9F49-160D6E17F432@gmail.com>
- <9A8FA704-5D35-404B-BEBE-C92AF25505C3@gmail.com>
-Message-ID: <21A5B6D3-B813-4DC3-B392-009991B9CA00@gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 28 Jul 2015 08:59:35 +0200
+Subject: [RFCv2 2/3] dts: zynq: Add devicetree entry for Xilinx Zynq reset
+ controller.
+In-Reply-To: <CAAtXAHepDRbiiznHnT3dLLLWS_VH2a9BhnNgZzDECx__QceEeg@mail.gmail.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>	<1437783682-13632-3-git-send-email-moritz.fischer@ettus.com>	<55B5D62D.4010407@monstr.eu>
+ <CAAtXAHepDRbiiznHnT3dLLLWS_VH2a9BhnNgZzDECx__QceEeg@mail.gmail.com>
+Message-ID: <55B72857.3020108@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Le 28/07/2015 07:03, Moritz Fischer a ?crit :
+> Hi Michal,
+> 
+> I agree we need to be careful with changing the bindings.
+> 
+> On Sun, Jul 26, 2015 at 11:56 PM, Michal Simek <monstr@monstr.eu> wrote:
+>> Hi Moritz,
+>>
+>> On 07/25/2015 02:21 AM, Moritz Fischer wrote:
+>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>>> ---
+>>>  arch/arm/boot/dts/zynq-7000.dtsi            | 43 ++++++++++++-
+>>
+>> This patch is nice in general but every change in binding should be
+>> discussed separately. There is also necessary to wire them up in the
+>> driver to do action. That's why I think that will be the best just to
+>> add the code to slcr and keep others untouched.
+> 
+> Ok, just to clarify: You'd suggest to just add the rstc as child node
+> to the slcr,
+> and leave the other nodes untouched?
+> 
+>>
+>> For example MACB/GEM is one example. Adding names to this node and
+>> extending driver to work properly with reset means that all others MACB
+>> users will be affected. Definitely this patch should be ACKed by Nicolas.
 
-> On Jul 24, 2015, at 19:52, yalin wang <yalin.wang2010@gmail.com> wrote:
-> 
-> A little change to patch_map() function,
-> use set_fixmap_offset() to make code more clear.
-> 
-> Signed-off-by: yalin wang <yalin.wang2010@gmail.com>
-> ---
-> arch/arm64/kernel/insn.c | 5 ++---
-> 1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index dd9671c..f341866 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -101,9 +101,8 @@ static void __kprobes *patch_map(void *addr, int fixmap)
-> 		return addr;
-> 
-> 	BUG_ON(!page);
-> -	set_fixmap(fixmap, page_to_phys(page));
-> -
-> -	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
-> +	return (void *)set_fixmap_offset(fixmap, page_to_phys(page) +
-> +			(uintaddr & ~PAGE_MASK));
-> }
-> 
-> static void __kprobes patch_unmap(int fixmap)
-> -- 
-> 1.9.1
-> 
-Marinas,
-this V2 patch can build without warning even CONFIG_DEBUG_SET_MODULE_RONX enabled,
-could you review it.
-Thanks.
+Actually, I don't know why a reset property should be added to the macb
+driver...
+
+Bye,
+-- 
+Nicolas Ferre
