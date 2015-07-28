@@ -1,35 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jul 2015 14:46:17 +0100
-Subject: [PATCH v6 10/19] genirq: Add DOMAIN_BUS_NEXUS irqdomain property
+Date: Tue, 28 Jul 2015 14:46:19 +0100
+Subject: [PATCH v6 12/19] irqchip: gicv3-its: Register irq domain with NEXUS
+ token
 In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
 References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1438091186-10244-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-13-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some IRQ domains are not designed to directly provide interrupts
-to devices, but strictly to be used by other domains. An example
-of this is the GICv3 ITS, which is completely bus agnostic, and
-on which it is possible to implement a PCI/MSI domain.
-
-Just introduce the irq_domain_bus_token property for now.
+Now that we can distinguish between multiple domains carrying the
+same device_node, tag the raw ITS domain with DOMAIN_BUS_NEXUS.
+This will allow MSI providers built on top of the raw ITS domain
+to identify it.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqdomain.h | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/irqchip/irq-gic-v3-its.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index b4a74f7..d3ca792 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -56,6 +56,7 @@ enum irq_domain_bus_token {
- 	DOMAIN_BUS_ANY		= 0,
- 	DOMAIN_BUS_PCI_MSI,
- 	DOMAIN_BUS_PLATFORM_MSI,
-+	DOMAIN_BUS_NEXUS,
- };
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 7c01fe4..760467d 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1407,13 +1407,14 @@ static int its_probe(struct device_node *node, struct irq_domain *parent)
+ 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
  
- /**
+ 	if (of_property_read_bool(its->msi_chip.of_node, "msi-controller")) {
+-		its->domain = irq_domain_add_tree(NULL, &its_domain_ops, its);
++		its->domain = irq_domain_add_tree(node, &its_domain_ops, its);
+ 		if (!its->domain) {
+ 			err = -ENOMEM;
+ 			goto out_free_tables;
+ 		}
+ 
+ 		its->domain->parent = parent;
++		its->domain->bus_token = DOMAIN_BUS_NEXUS;
+ 
+ 		its->msi_chip.domain = its_pci_msi_alloc_domain(node,
+ 								its->domain);
 -- 
 2.1.4
