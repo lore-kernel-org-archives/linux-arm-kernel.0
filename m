@@ -1,54 +1,57 @@
-From: klimov.linux@gmail.com (Alexey Klimov)
-Date: Tue, 28 Jul 2015 15:34:34 +0300
-Subject: [RFC PATCH 3/3] ARM: dts: add MCT property use-cp15-phys-counter
- for exynos5422-odroidxu3
-In-Reply-To: <55B718CA.3050103@samsung.com>
-References: <1438032528.17734.49.camel@gmail.com>
- <55B718CA.3050103@samsung.com>
-Message-ID: <CALW4P+K2gHqL8H_rDHuu4pNXtAEJOGZVvCv+erD4k7WkTP+Muw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jul 2015 14:39:39 +0200
+Subject: [PATCH v2 2/2] ARM: sunxi: dt: Convert users to the PIO
+ interrupts binding
+In-Reply-To: <CACRpkdYT0gsrZZcWrkES4EdF0G1oY_t0isOTbJtbCGx2KP2HTw@mail.gmail.com>
+References: <1438000918-9026-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1438000918-9026-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdYT0gsrZZcWrkES4EdF0G1oY_t0isOTbJtbCGx2KP2HTw@mail.gmail.com>
+Message-ID: <20150728123939.GZ2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Mon, Jul 27, 2015 at 02:58:29PM +0200, Linus Walleij wrote:
+> On Mon, Jul 27, 2015 at 2:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+> > The current DTs were setting the cell size to 2, but used the default xlate
+> > function that was assuming an interrupt cell size of 1, leading to the
+> > second part of the cell (the flags) being ignored, while we were having an
+> > inconsistent binding between the interrupts and gpio (that could also be
+> > used as interrupts).
+> >
+> > That "binding" doesn't work either with newer SoCs that have multiple irq
+> > banks.
+> >
+> > Now that we fixed the pinctrl driver to handle this like it should always
+> > have been handled, convert the DT users, and while we're at it, remove the
+> > size-cells property of PIO that is completely useless.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I guess this will be merged through ARM SoC?
+> 
+> If you want me to carry it in pinctrl and you're *certain* it
+> will not collide with something else coming in from ARM SoC
+> then tell me ... prefer to even have ARM SoC maintainers
+> ACK on this actually.
 
-On Tue, Jul 28, 2015 at 8:53 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 28.07.2015 06:28, Alexey Klimov wrote:
->> Speedup MCT operation on odroid-xu3 dev board by using
->> coprocessor 64-bit counter instead of reading same counter
->> located in mmio region.
->>
->> Tested on Odroid-xu3.
->>
->> Signed-off-by: Alexey Klimov <klimov.linux@gmail.com>
->> ---
->>  arch/arm/boot/dts/exynos5422-odroidxu3.dts | 4 ++++
->
-> Please do this in Odroid XU3 common DTSI:
-> arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+I'll merge it through my tree (and then arm-soc).
 
-
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> index 78e6a50..b7f6c8f 100644
->> --- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
->> @@ -18,6 +18,10 @@
->>       compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
->>  };
->>
->> +&mct {
->> +     use-cp15-phys-counter;
->> +};
->> +
->
-> Put the node in alphabetical position.
->
-> Best regards,
-> Krzysztof
-
-Thanks. Will do it.
+Thanks!
+Maxime
 
 -- 
-Best regards, Klimov Alexey
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/b50e16f1/attachment.sig>
