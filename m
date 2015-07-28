@@ -1,66 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jul 2015 12:20:57 +0100
-Subject: [PATCH] arm64: pci: add support for pci_mmap_page_range
-In-Reply-To: <20150727051025.GA5310@localhost.localdomain>
-References: <1437717263-11979-1-git-send-email-jerin.jacob@caviumnetworks.com>
- <20150724144103.GC12569@arm.com>
- <20150727051025.GA5310@localhost.localdomain>
-Message-ID: <20150728112057.GI29209@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 28 Jul 2015 13:20:32 +0200
+Subject: [PATCH V3 10/19] drm/tegra: dc: Prepare for generic PM domains
+In-Reply-To: <55B73D8C.103@nvidia.com>
+References: <1436791197-32358-1-git-send-email-jonathanh@nvidia.com>
+ <1436791197-32358-11-git-send-email-jonathanh@nvidia.com>
+ <20150717104154.GM3057@ulmo> <55B73D8C.103@nvidia.com>
+Message-ID: <20150728112030.GA10949@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 06:10:29AM +0100, Jerin Jacob wrote:
-> On Fri, Jul 24, 2015 at 03:41:03PM +0100, Will Deacon wrote:
-> > On Fri, Jul 24, 2015 at 06:54:23AM +0100, Jerin Jacob wrote:
-> > > +int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> > > +		enum pci_mmap_state mmap_state, int write_combine)
-> > > +{
-> > > +	/*
-> > > +	* I/O space can be accessed via normal processor loads and stores on
-> > > +	* this platform but for now we elect not to do this and portable
-> > > +	* drivers should not do this anyway.
-> > > +	*/
-> > > +	if (mmap_state == pci_mmap_io)
-> > > +		return -EINVAL;
-> > > +
-> > > +	if (write_combine)
-> > > +		vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
-> > > +	else
-> > > +		vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-> > > +
-> > > +	return remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
-> > > +	       vma->vm_end - vma->vm_start, vma->vm_page_prot);
-> > > +}
+On Tue, Jul 28, 2015 at 09:30:04AM +0100, Jon Hunter wrote:
+> 
+> On 17/07/15 11:41, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
 > > 
-> > So pci_iomap_range chooses the memory attributes based on the BAR flags
-> > (and even then it looks weird -- CACHEABLE => ioremap, else ioremap_nocache,
-> > which is just the same as ioremap on arm64).
+> > On Mon, Jul 13, 2015 at 01:39:48PM +0100, Jon Hunter wrote:
+> >> Add support to the tegra dc driver for generic PM domains. However,
+> >> to ensure backward compatibility with older device tree blobs ensure
+> >> that the driver can work with or without generic PM domains. In order
+> >> to migrate to generic PM domain infrastructure the necessary changes
+> >> are:
+> >>
+> >> 1. If the "power-domains" property is present in the DT device node then
+> >>    generic PM domains is supported and pm_runtime_enable() should be
+> >>    called for the device. Furthermore, the enabling and disabling of the
+> >>    power-domain is handled via calling pm_runtime_get/put, respectively.
 > > 
-> > It would be good to understand (a) why this is different and (b) what
+> > The device could be PM runtime enabled even if no power-domains property
+> > is set. Couldn't we check something more direct, like for example if the
+> > dev->pm_domain is non-NULL?
 > 
-> AFAIU, pci_iomap_range is the generic implementation and chooses to
-> use only minimal attributes that works on all the architectures.
-> The primary consumer of pci_iomap_range is virtio_pci driver,Which
-> doesn't care about HW PCI memory attributes like Prefetchable.
-
-pci_iomap calls pci_iomap_range.
-
-> > the consistent set of attributes should be.
+> Yes could do that instead.
 > 
-> PCI perspective, memory attributes are Prefetchable and non-Prefetchable
-> for a given BAR.
+> > Perhaps it'd be worth converting the driver to use runtime PM first, and
+> > move all the powergate and clock handling into suspend/resume functions,
+> > and then we can conditionalize whether or not we call the legacy API iff
+> > dev->pm_domain == NULL?
 > 
-> Former one does have read side-effects or supports write
-> merging(typically used
-> by graphics memory) and latter one has read side effects and does not
-> support write merging(typically used by register files)
-> 
-> IMO, In armv8 nomenclature, MT_NORMAL_NC and MT_DEVICE_nGnRnE map
-> correctly to above PCI memory attribute definitions.
+> May be that would be a cleaner transition than trying to do it all in
+> one go.
 
-I agree with your choice of memory types (well, almost. We probably don't
-need the nE), I'm just after some consistency within the kernel, because
-pci_iomap_range looks wrong to me. Another different example is
-pci_ioremap_bar, which always uses ioremap_nocache.
+I have a couple of patches in my tree to do this for DRM as part of an
+effort to restore DPMS. It's fairly tricky to get right in DRM and
+requires all sorts of changes to the driver.
 
-Will
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/f7735d82/attachment.sig>
