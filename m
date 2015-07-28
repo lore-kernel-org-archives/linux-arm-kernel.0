@@ -1,65 +1,30 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 28 Jul 2015 14:09:43 +0200
-Subject: [PULL REQUEST] ARM: mediatek: soc updates for v4.3
-Message-ID: <CABuKBeL8e1eZ3LNYWkKg38qJk+XZ-+Oy+112rLMvkMuwKtL-JA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 28 Jul 2015 14:10:52 +0200
+Subject: [PATCH] pinctrl: sirf: add power management support for atlas7
+In-Reply-To: <1437998245-13135-1-git-send-email-21cnbao@gmail.com>
+References: <1437998245-13135-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <CACRpkdaLPwv8v0vh_4Jo0OooD+vwV_6XnPNuL8C6cem8btoJxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Mon, Jul 27, 2015 at 1:57 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-Please take the following patches.
+> From: Wei Chen <Wei.Chen@csr.com>
+>
+> We had not implemented the pm interface of atlas7 pinctrl
+> and gpio drivers. So when system resumes from sleep, all
+> pin configuration and gpio status will be lost.
+>
+> Now, we implement these interfaces to support pm.
+>
+> At the same time, this patch also drops a lot of if-else
+> by look-up table for getting and setting pull.
+>
+> Signed-off-by: Wei Chen <Wei.Chen@csr.com>
+> Signed-off-by: Barry Song <Baohua.Song@csr.com>
 
-Thanks,
-Matthias
+Patch applied. Had to rebase it a bit so make sure to check the
+result.
 
---
-
-The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-
-  Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-
-are available in the git repository at:
-
-  https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-soc
-
-for you to fetch changes up to 3e0452d27a784d50f09bec9de8ac673849b9e303:
-
-  ARM: mediatek: Add regmap to mediatek Kconfig (2015-07-23 20:01:42 +0200)
-
-----------------------------------------------------------------
-- ARM: mediatek: Add regmap to mediatek Kconfig
-- soc: mediatek: Drop owner assignment from platform_driver
-- soc: Mediatek: Add SCPSYS power domain driver
-- dt-bindings: soc: Add documentation for the MediaTek SCPSYS unit
-- soc: mediatek: Add infracfg misc driver support
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      soc: mediatek: Drop owner assignment from platform_driver
-
-Matthias Brugger (1):
-      ARM: mediatek: Add regmap to mediatek Kconfig
-
-Sascha Hauer (3):
-      soc: mediatek: Add infracfg misc driver support
-      dt-bindings: soc: Add documentation for the MediaTek SCPSYS unit
-      soc: Mediatek: Add SCPSYS power domain driver
-
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  41 ++
- arch/arm/mach-mediatek/Kconfig                     |   1 +
- drivers/soc/mediatek/Kconfig                       |  19 +
- drivers/soc/mediatek/Makefile                      |   2 +
- drivers/soc/mediatek/mtk-infracfg.c                |  91 ++++
- drivers/soc/mediatek/mtk-pmic-wrap.c               |   1 -
- drivers/soc/mediatek/mtk-scpsys.c                  | 487 +++++++++++++++++++++
- include/dt-bindings/power/mt8173-power.h           |  15 +
- include/linux/soc/mediatek/infracfg.h              |  26 ++
- 9 files changed, 682 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
- create mode 100644 drivers/soc/mediatek/mtk-infracfg.c
- create mode 100644 drivers/soc/mediatek/mtk-scpsys.c
- create mode 100644 include/dt-bindings/power/mt8173-power.h
- create mode 100644 include/linux/soc/mediatek/infracfg.h
-
--- 
-motzblog.wordpress.com
+Yours,
+Linus Walleij
