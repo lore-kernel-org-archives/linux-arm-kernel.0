@@ -1,135 +1,112 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jul 2015 14:46:22 +0100
-Subject: [PATCH v6 15/19] irqchip: gicv3-its: Add platform MSI support
+Date: Tue, 28 Jul 2015 14:46:12 +0100
+Subject: [PATCH v6 05/19] PCI/MSI: of: Add support for OF-provided msi_domain
 In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
 References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1438091186-10244-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support non-PCI MSI with the GICv3 ITS, add the minimal
-required entry points for the MSI domain (an msi_prepare implementation).
+In order to populate the PCI host bridge msi_domain, use the
+"msi-parent" attribute to lookup a corresponding irq domain.
+If found, this is our MSI domain.
 
-The rest is only boilerplate code to find the raw ITS domain.
+This gets plugged into the core PCI code.
 
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/Makefile                      |  2 +-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 93 +++++++++++++++++++++++++++
- 2 files changed, 94 insertions(+), 1 deletion(-)
- create mode 100644 drivers/irqchip/irq-gic-v3-its-platform-msi.c
+ drivers/pci/of.c    | 25 +++++++++++++++++++++++++
+ drivers/pci/probe.c |  5 ++++-
+ include/linux/pci.h |  4 ++++
+ 3 files changed, 33 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 0d5f2a9..11d08c9 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -22,7 +22,7 @@ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
- obj-$(CONFIG_ARM_GIC)			+= irq-gic.o irq-gic-common.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
--obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o
-+obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
- obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
- obj-$(CONFIG_ATMEL_AIC_IRQ)		+= irq-atmel-aic-common.o irq-atmel-aic.o
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-new file mode 100644
-index 0000000..a865505
---- /dev/null
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -0,0 +1,93 @@
-+/*
-+ * Copyright (C) 2013-2015 ARM Limited, All Rights Reserved.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/drivers/pci/of.c b/drivers/pci/of.c
+index f092993..85844d8 100644
+--- a/drivers/pci/of.c
++++ b/drivers/pci/of.c
+@@ -9,6 +9,7 @@
+  * 2 of the License, or (at your option) any later version.
+  */
+ 
++#include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/of.h>
+@@ -59,3 +60,27 @@ struct device_node * __weak pcibios_get_phb_of_node(struct pci_bus *bus)
+ 		return of_node_get(bus->bridge->parent->of_node);
+ 	return NULL;
+ }
 +
-+#include <linux/device.h>
-+#include <linux/msi.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+
-+static struct irq_chip its_pmsi_irq_chip = {
-+	.name			= "ITS-pMSI",
-+};
-+
-+static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
-+			    int nvec, msi_alloc_info_t *info)
++struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus)
 +{
-+	struct msi_domain_info *msi_info;
-+	u32 dev_id;
-+	int ret;
-+
-+	msi_info = msi_get_domain_info(domain->parent);
-+
-+	/* Suck the DeviceID out of the msi-parent property */
-+	ret = of_property_read_u32_index(dev->of_node, "msi-parent",
-+					 1, &dev_id);
-+	if (ret)
-+		return ret;
-+
-+	/* ITS specific DeviceID, as the core ITS ignores dev. */
-+	info->scratchpad[0].ul = dev_id;
-+
-+	return msi_info->ops->msi_prepare(domain->parent,
-+					  dev, nvec, info);
-+}
-+
-+static struct msi_domain_ops its_pmsi_ops = {
-+	.msi_prepare	= its_pmsi_prepare,
-+};
-+
-+static struct msi_domain_info its_pmsi_domain_info = {
-+	.flags	= (MSI_FLAG_USE_DEF_DOM_OPS | MSI_FLAG_USE_DEF_CHIP_OPS),
-+	.ops	= &its_pmsi_ops,
-+	.chip	= &its_pmsi_irq_chip,
-+};
-+
-+static struct of_device_id its_device_id[] = {
-+	{	.compatible	= "arm,gic-v3-its",	},
-+	{},
-+};
-+
-+static int __init its_pmsi_init(void)
-+{
++#ifdef CONFIG_IRQ_DOMAIN
 +	struct device_node *np;
-+	struct irq_domain *parent;
++	struct irq_domain *d;
 +
-+	for (np = of_find_matching_node(NULL, its_device_id); np;
-+	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_property_read_bool(np, "msi-controller"))
-+			continue;
++	if (!bus->dev.of_node)
++		return NULL;
 +
-+		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
-+		if (!parent || !msi_get_domain_info(parent)) {
-+			pr_err("%s: unable to locate ITS domain\n",
-+			       np->full_name);
-+			continue;
-+		}
++	/* Start looking for a phandle to an MSI controller. */
++	np = of_parse_phandle(bus->dev.of_node, "msi-parent", 0);
++	if (!np)
++		return NULL;
 +
-+		if (!platform_msi_create_irq_domain(np, &its_pmsi_domain_info,
-+						    parent)) {
-+			pr_err("%s: unable to create platform domain\n",
-+			       np->full_name);
-+			continue;
-+		}
++	d = irq_find_matching_host(np, DOMAIN_BUS_PCI_MSI);
++	if (d)
++		return d;
 +
-+		pr_info("Platform MSI: %s domain created\n", np->full_name);
-+	}
-+
-+	return 0;
++	return irq_find_host(np);
++#else
++	return NULL;
++#endif
 +}
-+early_initcall(its_pmsi_init);
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index c03ecbf..a7afeac 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -663,12 +663,15 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+ 
+ static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
+ {
++	struct irq_domain *d;
++
+ 	/*
+ 	 * Any firmware interface that can resolve the msi_domain
+ 	 * should be called from here.
+ 	 */
++	d = pci_host_bridge_of_msi_domain(bus);
+ 
+-	return NULL;
++	return d;
+ }
+ 
+ static void pci_set_bus_msi_domain(struct pci_bus *bus)
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index fbf245f..772616d 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1841,10 +1841,12 @@ int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
+ /* PCI <-> OF binding helpers */
+ #ifdef CONFIG_OF
+ struct device_node;
++struct irq_domain;
+ void pci_set_of_node(struct pci_dev *dev);
+ void pci_release_of_node(struct pci_dev *dev);
+ void pci_set_bus_of_node(struct pci_bus *bus);
+ void pci_release_bus_of_node(struct pci_bus *bus);
++struct irq_domain *pci_host_bridge_of_msi_domain(struct pci_bus *bus);
+ 
+ /* Arch may override this (weak) */
+ struct device_node *pcibios_get_phb_of_node(struct pci_bus *bus);
+@@ -1867,6 +1869,8 @@ static inline void pci_set_bus_of_node(struct pci_bus *bus) { }
+ static inline void pci_release_bus_of_node(struct pci_bus *bus) { }
+ static inline struct device_node *
+ pci_device_to_OF_node(const struct pci_dev *pdev) { return NULL; }
++static inline struct irq_domain *
++pci_host_bridge_of_msi_domain(struct pci_bus *bus) { return NULL; }
+ #endif  /* CONFIG_OF */
+ 
+ #ifdef CONFIG_EEH
 -- 
 2.1.4
