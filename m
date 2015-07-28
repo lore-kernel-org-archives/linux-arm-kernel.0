@@ -1,95 +1,36 @@
-From: mohun106@gmail.com (Radha Mohan)
-Date: Tue, 28 Jul 2015 14:48:13 -0700
-Subject: [PATCH 1/3] net: mdio-octeon: Modify driver to work on both
- ThunderX and Octeon
-In-Reply-To: <55B78C9C.6080006@caviumnetworks.com>
-References: <1438049683-10630-1-git-send-email-mohun106@gmail.com>
- <1438049683-10630-2-git-send-email-mohun106@gmail.com>
- <55B78C9C.6080006@caviumnetworks.com>
-Message-ID: <CAC8NTUUYW1YhUPxh670TqZM0h_QLpcPS6a4-Gd=UssdPmNH3xQ@mail.gmail.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Tue, 28 Jul 2015 23:06:40 +0100
+Subject: [PATCH v2] arm64/efi: prefer AllocatePages() over
+ efi_low_alloc() for vmlinux
+In-Reply-To: <CAKv+Gu_EtOV8wannMLG87ai_x3ARu4rUSo9D6w2DQ+Kb5Kjn-A@mail.gmail.com>
+References: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20150728211752.GE2773@codeblueprint.co.uk>
+ <CAKv+Gu_EtOV8wannMLG87ai_x3ARu4rUSo9D6w2DQ+Kb5Kjn-A@mail.gmail.com>
+Message-ID: <20150728220640.GF2773@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 7:07 AM, David Daney <ddaney@caviumnetworks.com> wrote:
-> On 07/27/2015 07:14 PM, mohun106 at gmail.com wrote:
->>
->> From: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->>
->> This patch modifies the mdio-octeon driver to work on both ThunderX and
->> Octeon SoCs from Cavium Inc.
->>
->> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> Signed-off-by: Radha Mohan Chintakuntla <rchintakuntla@cavium.com>
->> Signed-off-by: David Daney <david.daney@cavium.com>
->> ---
->>   drivers/net/phy/Kconfig       |    9 ++-
->>   drivers/net/phy/mdio-octeon.c |  122
->> +++++++++++++++++++++++++++++++++++-----
->>   2 files changed, 111 insertions(+), 20 deletions(-)
->>
->> diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
->> index cf18940..0d6af19 100644
->> --- a/drivers/net/phy/Kconfig
->> +++ b/drivers/net/phy/Kconfig
->> @@ -145,13 +145,14 @@ config MDIO_GPIO
->>           will be called mdio-gpio.
->>
->>   config MDIO_OCTEON
->> -       tristate "Support for MDIO buses on Octeon SOCs"
->> -       depends on CAVIUM_OCTEON_SOC
->> +       tristate "Support for MDIO buses on Octeon and ThunderX SOCs"
->> +       depends on 64BIT
->>         default y
->
->
-> If it now depends only on 64BIT, we should probably remove the "default".
-> People building for x86 are not interested in this driver.
->
+On Tue, 28 Jul, at 11:24:23PM, Ard Biesheuvel wrote:
+> 
+> This workaround fixes another issue as well: the arm64 kernel needs to
+> be loaded 512 KB above a 2MB aligned boundary, and using
+> efi_low_alloc() as we do loses (2 MB - 512 KB) at the bottom if part
+> of that 512 KB is occupied, since efi_low_alloc() is not aware of the
+> fact that the first 512 KB will remain unused.
+> 
+> What would be most helpful is if efi_low_alloc() could take an offset
+> param in addition to the alignment, i.e., alignment == 2MB and offset
+> == 512 KB. The offset would default to 0, reverting to the original
+> behavior.
+> 
+> If you'd be ok with such a change, I can propose it instead, and wire
+> it up into this function.
 
-Ok got it.
+It's probably because it's late but I'm having trouble thinking this
+change through fully.
 
->
-> [...]
->>
->>
->> +#ifdef __BIG_ENDIAN_BITFIELD
->> +#define OCT_MDIO_BITFIELD_FIELD(field, more)   \
->> +       field;                                  \
->> +       more
->> +
->> +#else
->> +#define OCT_MDIO_BITFIELD_FIELD(field, more)   \
->> +       more                                    \
->> +       field;
->> +
->> +#endif
->> +
->> +union cvmx_smix_clk {
->> +       uint64_t u64;
->
->
-> Perhaps: s/uint64_t/u64/
->
-> There are several of these.
+If it's not too much work, sure, please go ahead and propose a patch,
+even the untested, uncompiled "this is what I'm thinking" type.
 
-Ok will do. If there aren;t any more comments I will re-submit another version.
-
->
->
->> +       struct cvmx_smix_clk_s {
->> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_25_63:39,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 mode:1,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_21_23:3,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 sample_hi:5,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 sample_mode:1,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 reserved_14_14:1,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 clk_idle:1,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 preamble:1,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 sample:4,
->> +         OCT_MDIO_BITFIELD_FIELD(u64 phase:8,
->> +         ;))))))))))
->> +       } s;
->> +};
->> +
->
-> [...]
+-- 
+Matt Fleming, Intel Open Source Technology Center
