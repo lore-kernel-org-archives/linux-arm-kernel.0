@@ -1,42 +1,65 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 28 Jul 2015 18:17:52 +0200
-Subject: [PULL REQUEST] ARM: mediatek: soc updates for v4.3
-In-Reply-To: <CABuKBeL8e1eZ3LNYWkKg38qJk+XZ-+Oy+112rLMvkMuwKtL-JA@mail.gmail.com>
-References: <CABuKBeL8e1eZ3LNYWkKg38qJk+XZ-+Oy+112rLMvkMuwKtL-JA@mail.gmail.com>
-Message-ID: <20150728161752.GC16690@localhost>
+From: lznuaa@gmail.com (Zhi Li)
+Date: Tue, 28 Jul 2015 11:39:21 -0500
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <20150728143045.GG12927@tiger>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+ <20150727132802.GK12927@tiger>
+ <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728010235.GU12927@tiger>
+ <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728143045.GG12927@tiger>
+Message-ID: <CAHrpEqSGF-4=e4CxcMnFhcV8kR0kQ12xTCedGR03jQ3PTOunUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 02:09:43PM +0200, Matthias Brugger wrote:
-> Hi all,
-> 
-> Please take the following patches.
-> 
-> Thanks,
-> Matthias
-> 
-> --
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.2-next-soc
-> 
-> for you to fetch changes up to 3e0452d27a784d50f09bec9de8ac673849b9e303:
-> 
->   ARM: mediatek: Add regmap to mediatek Kconfig (2015-07-23 20:01:42 +0200)
-> 
-> ----------------------------------------------------------------
-> - ARM: mediatek: Add regmap to mediatek Kconfig
-> - soc: mediatek: Drop owner assignment from platform_driver
-> - soc: Mediatek: Add SCPSYS power domain driver
-> - dt-bindings: soc: Add documentation for the MediaTek SCPSYS unit
-> - soc: mediatek: Add infracfg misc driver support
+On Tue, Jul 28, 2015 at 9:30 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Tue, Jul 28, 2015 at 02:16:20PM +0000, Shenwei Wang wrote:
+>> > The files are named with "-imx7".  It's a clear sign that the build of the files
+>> > should be controlled by something like related to "imx7".
+>> > Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only supported imx7
+>> > soc and there is no CONFIG_SOC_IMX7 available so far, it falls on
+>> > CONFIG_SOC_IMX7D.
+>>
+>> We can also interpret "-imx7" is the first SoC which has the GPCv2 block.
+>
+> In that case you should name the block gpc-imx7d rather than gpcv2 and
+> symbol as GPC_IMX7D rather than IMX_GPCV2.
 
-Merged, thanks.
+So far, only IMX7D use this GPC.
+i.MX8 will use system controller to control power.
 
+best regards
+Frank Li
 
--Olof
+>
+>> > > > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
+>> > > >
+>> > > > Will this give a checkpatch warning?
+>> > >
+>> > > Yes. Any suggestion for that? Move it to a header file?
+>> >
+>> > Get rid of it.
+>>
+>> Then you may resolve the following compile error:
+>
+> You didn't get my point.  Rather than defining it as a global variable,
+> we should try to keep imx_gpcv2_irq as an internal data structure to
+> irqchip driver, and use well-defined interface to access the data from
+> pm driver when necessary.
+>
+> Shawn
+>
+>>
+>> CC      arch/arm/mach-imx/pm-imx7.o
+>> arch/arm/mach-imx/pm-imx7.c: In function ?imx_gpcv2_pm_init?:
+>> arch/arm/mach-imx/pm-imx7.c:836:7: error: ?gpcv2_irq_instance? undeclared (first use in this function)
+>>   cd = gpcv2_irq_instance;
+>>        ^
+>> arch/arm/mach-imx/pm-imx7.c:836:7: note: each undeclared identifier is reported only once for each function it appears in
+>> make[1]: *** [arch/arm/mach-imx/pm-imx7.o] Error 1
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
