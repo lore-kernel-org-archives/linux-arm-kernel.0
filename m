@@ -1,60 +1,57 @@
-From: cburden@codeaurora.org (Cassidy Burden)
-Date: Tue, 28 Jul 2015 12:09:24 -0700
-Subject: [PATCH] lib: Make _find_next_bit helper function inline
-Message-ID: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Tue, 28 Jul 2015 15:12:11 -0400
+Subject: [PATCH 4/8] xen: Use the correctly the Xen memory terminologies
+In-Reply-To: <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+Message-ID: <55B7D40B.5080903@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've tested Yury Norov's find_bit reimplementation with the test_find_bit
-module (https://lkml.org/lkml/2015/3/8/141) and measured about 35-40%
-performance degradation on arm64 3.18 run with fixed CPU frequency.
+On 07/28/2015 11:02 AM, Julien Grall wrote:
+> Based on include/xen/mm.h [1], Linux is mistakenly using MFN when GFN
+> is meant, I suspect this is because the first support for Xen was for
+> PV. This brough some misimplementation of helpers on ARM and make the
+> developper confused the expected behavior.
+>
+> For instance, with pfn_to_mfn, we expect to get an MFN based on the name.
+> Although, if we look at the implementation on x86, it's returning a GFN.
+>
+> For clarity and avoid new confusion, replace any reference of mfn into
+> gnf in any helpers used by PV drivers.
 
-The performance degradation appears to be caused by the
-helper function _find_next_bit. After inlining this function into
-find_next_bit and find_next_zero_bit I get slightly better performance
-than the old implementation:
 
-find_next_zero_bit          find_next_bit
-old      new     inline     old      new     inline
-26       36      24         24       33      23
-25       36      24         24       33      23
-26       36      24         24       33      23
-25       36      24         24       33      23
-25       36      24         24       33      23
-25       37      24         24       33      23
-25       37      24         24       33      23
-25       37      24         24       33      23
-25       36      24         24       33      23
-25       37      24         24       33      23
 
-Signed-off-by: Cassidy Burden <cburden@codeaurora.org>
-Cc: Alexey Klimov <klimov.linux@gmail.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Daniel Borkmann <dborkman@redhat.com>
-Cc: Hannes Frederic Sowa <hannes@stressinduktion.org>
-Cc: Lai Jiangshan <laijs@cn.fujitsu.com>
-Cc: Mark Salter <msalter@redhat.com>
-Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Thomas Graf <tgraf@suug.ch>
-Cc: Valentin Rothberg <valentinrothberg@gmail.com>
-Cc: Chris Wilson <chris@chris-wilson.co.uk>
----
- lib/find_bit.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/lib/find_bit.c b/lib/find_bit.c
-index 18072ea..d0e04f9 100644
---- a/lib/find_bit.c
-+++ b/lib/find_bit.c
-@@ -28,7 +28,7 @@
-  * find_next_zero_bit.  The difference is the "invert" argument, which
-  * is XORed with each fetched word before searching it for one bits.
-  */
--static unsigned long _find_next_bit(const unsigned long *addr,
-+static inline unsigned long _find_next_bit(const unsigned long *addr,
- 		unsigned long nbits, unsigned long start, unsigned long invert)
- {
- 	unsigned long tmp;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> @@ -730,7 +730,7 @@ static void xen_do_pin(unsigned level, unsigned long pfn)
+>   	struct mmuext_op op;
+>
+>   	op.cmd = level;
+> -	op.arg1.mfn = pfn_to_mfn(pfn);
+> +	op.arg1.mfn = pfn_to_gfn(pfn);
+
+
+This looks slightly odd. It is correct but given that purpose of this 
+series is to make things more clear perhaps we can add another union 
+member (gfn) to mmuext_op.arg1?
+
+(Of course, the hypervisor will continue referring to mfn which could 
+still be confusing)
+
+
+>
+>   	xen_extend_mmuext_op(&op);
+>   }
+> @@ -1323,7 +1323,7 @@ static void __xen_write_cr3(bool kernel, unsigned long cr3)
+>   	trace_xen_mmu_write_cr3(kernel, cr3);
+>
+>   	if (cr3)
+> -		mfn = pfn_to_mfn(PFN_DOWN(cr3));
+> +		mfn = pfn_to_gfn(PFN_DOWN(cr3));
+
+Here too. And further down, thoughout this patch.
+
+
+
+
+-boris
