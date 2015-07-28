@@ -1,193 +1,76 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jul 2015 14:00:55 +0100
-Subject: [PATCH v7 3/5] clk: Supply the critical clock {init, enable,
- disable} framework
-In-Reply-To: <20150728114022.GW2564@lukather>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-4-git-send-email-lee.jones@linaro.org>
- <20150727072549.GP2564@lukather> <20150727085338.GW3436@x1>
- <20150728114022.GW2564@lukather>
-Message-ID: <20150728130055.GV14943@x1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 28 Jul 2015 14:02:25 +0100
+Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
+ counter from coprocessor
+In-Reply-To: <1438032507.17734.46.camel@gmail.com>
+References: <1438032507.17734.46.camel@gmail.com>
+Message-ID: <20150728130225.GB15213@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jul 2015, Maxime Ripard wrote:
-
-> On Mon, Jul 27, 2015 at 09:53:38AM +0100, Lee Jones wrote:
-> > On Mon, 27 Jul 2015, Maxime Ripard wrote:
-> > 
-> > > On Wed, Jul 22, 2015 at 02:04:13PM +0100, Lee Jones wrote:
-> > > > These new API calls will firstly provide a mechanisms to tag a clock as
-> > > > critical and secondly allow any knowledgeable driver to (un)gate clocks,
-> > > > even if they are marked as critical.
-> > > > 
-> > > > Suggested-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  drivers/clk/clk.c            | 45 ++++++++++++++++++++++++++++++++++++++++++++
-> > > >  include/linux/clk-provider.h |  2 ++
-> > > >  include/linux/clk.h          | 30 +++++++++++++++++++++++++++++
-> > > >  3 files changed, 77 insertions(+)
-> > > > 
-> > > > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> > > > index 61c3fc5..486b1da 100644
-> > > > --- a/drivers/clk/clk.c
-> > > > +++ b/drivers/clk/clk.c
-> > > > @@ -46,6 +46,21 @@ static struct clk_core *clk_core_lookup(const char *name);
-> > > >  
-> > > >  /***    private data structures    ***/
-> > > >  
-> > > > +/**
-> > > > + * struct critical -	Provides 'play' over critical clocks.  A clock can be
-> > > > + *			marked as critical, meaning that it should not be
-> > > > + *			disabled.  However, if a driver which is aware of the
-> > > > + *			critical behaviour wants to control it, it can do so
-> > > > + *			using clk_enable_critical() and clk_disable_critical().
-> > > > + *
-> > > > + * @enabled	Is clock critical?  Once set, doesn't change
-> > > > + * @leave_on	Self explanatory.  Can be disabled by knowledgeable drivers
-> > > > + */
-> > > > +struct critical {
-> > > > +	bool enabled;
-> > > > +	bool leave_on;
-> > > > +};
-> > > > +
-> > > >  struct clk_core {
-> > > >  	const char		*name;
-> > > >  	const struct clk_ops	*ops;
-> > > > @@ -75,6 +90,7 @@ struct clk_core {
-> > > >  	struct dentry		*dentry;
-> > > >  #endif
-> > > >  	struct kref		ref;
-> > > > +	struct critical		critical;
-> > > >  };
-> > > >  
-> > > >  struct clk {
-> > > > @@ -995,6 +1011,10 @@ static void clk_core_disable(struct clk_core *clk)
-> > > >  	if (WARN_ON(clk->enable_count == 0))
-> > > >  		return;
-> > > >  
-> > > > +	/* Refuse to turn off a critical clock */
-> > > > +	if (clk->enable_count == 1 && clk->critical.leave_on)
-> > > > +		return;
-> > > > +
-> > > 
-> > > I think it should be handled by a separate counting. Otherwise, if you
-> > > have two users that marked the clock as critical, and then one of them
-> > > disable it...
-> > > 
-> > > >  	if (--clk->enable_count > 0)
-> > > >  		return;
-> > > >  
-> > > > @@ -1037,6 +1057,13 @@ void clk_disable(struct clk *clk)
-> > > >  }
-> > > >  EXPORT_SYMBOL_GPL(clk_disable);
-> > > >  
-> > > > +void clk_disable_critical(struct clk *clk)
-> > > > +{
-> > > > +	clk->core->critical.leave_on = false;
-> > > 
-> > > .. you just lost the fact that it was critical in the first place.
-> > 
-> > I thought about both of these points, which is why I came up with this
-> > strategy.
-> > 
-> > Any device which uses the *_critical() API should a) have knowledge of
-> > what happens when a particular critical clock is gated and b) have
-> > thought about the consequences.
+On Mon, Jul 27, 2015 at 10:28:27PM +0100, Alexey Klimov wrote:
+> Hi all,
 > 
-> Indeed.
+> year(s) ago it was discovered that MCT timer and ARM architectured
+> timer
+> are the same hardware with different interface. Here [1].
+
+Are they actually interfaces to the same timer, or are they just fed by
+the same system counter?
+
+> I followed mail-list discussions about removing MCT and using arch
+> timer for Exynos5-based SoCs but things aren't moving at least latest
+> upstream kernel on odroid-xu3 will use MCT as default timers.
+> Maybe the reason are some power-management related things that very
+> specific to Samsung. I don't know.
 > 
-> > I don't think we can use reference counting, because we'd need as
-> > many critical clock owners as there are critical clocks.
 > 
-> Which we can have if we replace the call to clk_prepare_enable you add
-> in your fourth patch in __set_critical_clocks.
+> Idea of this draft patchset comes from Doug patches when he tried to
+> optimize read of 64-bit counter located in mmio. [2]
+> Why not using cp15 counter instead if possible?
 
-What should it be replaced with?
+If they're the same device, then you can simply use the architected
+timer, and gain all the benefits without additional code. That could
+give you additional benefits (e.g. VDSO support).
 
-> > Cast your mind back to the reasons for this critical clock API.  One
-> > of the most important intentions of this API is the requirement
-> > mitigation for each of the critical clocks to have an owner
-> > (driver).
-> > 
-> > With regards to your second point, that's what 'critical.enabled'
-> > is for.  Take a look at clk_enable_critical().
+> Previous numbers for 1000000 gettimeofday() calls from userspace
+> are about 1 ms. With this patches we have 0.5 ms or even better.
+> So twice as fast.
 > 
-> I don't think this addresses the issue, if you just throw more
-> customers at it, the issue remain with your implementation.
+> Just as matter of interest i tried to perform 2000000 sched_yield()
+> calls from userspace. I see around 20% speedup with patches applied.
 > 
-> If you have three customers that used the critical API, and if on of
-> these calls clk_disable_critical, you're losing leave_on.
+> I tried to use hackbench but it's hard to feel the difference, maybe
+> speedup is 0.5% but with bad fluctuation.
+> 
+> Everything is tested on odroid-xu3.
+> Looks like Cortex-A9 based Samsung SoCs (odroid-u2, odroid-x) don't
+> have arch timer.
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2014
+> -May/256943.html
+> [2] https://lkml.org/lkml/2014/6/20/431
+> 
+> 
+> 
+> Current code created with such assumptions: 
+> -- don't want to insert huge refactoring in MCT code;
+> -- target platform only ARMv7 Exynos5-based SoC that works in 32-bit
+> mode so i don't want to build described functionality on ARM64.
 
-That's the idea.  See my point above, the one you replied "Indeed"
-to.  So when a driver uses clk_disable_critical() it's saying, "I know
-why this clock is a critical clock, and I know that nothing terrible
-will happen if I disable it, as I have that covered".  So then if it's
-not the last user to call clk_disable(), the last one out the door
-will be allowed to finally gate the clock, regardless whether it's
-critical aware or not.
+For arm64 the generic timer is mandatory, and I can't imagine a case
+where we wouldn't use it in preference.
 
-Then, when we come to enable the clock again, the critical aware user
-then re-marks the clock as leave_on, so not critical un-aware user can
-take the final reference and disable the clock.
+> Currently i'm trying to patch odroid-xu3 DT only.
+> -- firmware on odroid-xu3 is broken and secondary cores start
+> in SVC mode instead of HYP mode. Maybe i can remove check for hyp mode;
+> -- in addition instead of DT property I may parse PFR regs and find
+> Generic Timer Extension there.
 
-> Which means that if there's one of the two users left that calls
-> clk_disable on it, the clock will actually be disabled, which is
-> clearly not what we want to do, as we have still a user that want the
-> clock to be enabled.
+ID_PFR1.GenTimer only tells you whether or not the generic timer is
+implemented in the CPU, not how it's wired up (e.g. whether it shares
+the system counter with the MCT), so I don't think it tells you anything
+useful.
 
-That's not what happens (at least it shouldn't if I've coded it up
-right).  The API _still_ requires all of the users to give-up their
-reference.
-
-> It would be much more robust to have another count for the critical
-> stuff, initialised to one by the __set_critical_clocks function.
-
-If I understand you correctly, we already have a count.  We use the
-original reference count.  No need for one of our own.
-
-Using your RAM Clock (Clock 4) as an example
---------------------------------------------
-
-Early start-up:
-  Clock 4 is marked as critical and a reference is taken (ref == 1)
-
-Driver probe:
-  SPI enables Clock 4 (ref == 2)
-  I2C enables Clock 4 (ref == 3)
-
-Suspend (without RAM driver's permission):
-  SPI disables Clock 4 (ref == 2)
-  I2C disables Clock 4 (ref == 1)
-  /*
-   * Clock won't be gated because:
-   *   .leave_on is True - can't dec final reference
-   */
-
-Suspend (with RAM driver's permission):
-  /* Order is unimportant */
-  SPI disables Clock 4 (ref == 2)
-  RAM disables Clock 4 (ref == 1) /* Won't turn off here (ref > 0)
-  I2C disables Clock 4 (ref == 0) /* (.leave_on == False) last ref can be taken */
-  /*
-   * Clock will be gated because:
-   *   .leave_on is False, so (ref == 0)
-   */
-
-Resume:
-  /* Order is unimportant */
-  SPI enables Clock 4 (ref == 1)
-  RAM enables Clock 4 and re-enables .leave_on (ref == 2)
-  I2C enables Clock 4 (ref == 3)
-
-Hopefully that clears things up.
-
-Please tell me if the code doesn't reflect this strategy, or if you
-can see anything wrong with how it operates.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Mark.
