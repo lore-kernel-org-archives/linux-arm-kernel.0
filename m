@@ -1,85 +1,79 @@
-From: johan@kernel.org (Johan Hovold)
-Date: Tue, 28 Jul 2015 16:16:19 +0200
-Subject: [PATCH 0/9] gpiolib: Add GPIO name support
-In-Reply-To: <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
-Message-ID: <20150728141619.GP28535@localhost>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Tue, 28 Jul 2015 14:16:20 +0000
+Subject: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
+In-Reply-To: <20150728010235.GU12927@tiger>
+References: <1437584859-64203-1-git-send-email-shenwei.wang@freescale.com>
+ <1437584859-64203-3-git-send-email-shenwei.wang@freescale.com>
+ <20150727132802.GK12927@tiger>
+ <CY1PR0301MB084353EB59E199271D536F68838E0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <20150728010235.GU12927@tiger>
+Message-ID: <CY1PR0301MB0843D0437575B34EE569F50A838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 10:05:52PM +0200, Linus Walleij wrote:
-> On Fri, Jul 17, 2015 at 11:32 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
+
+
+> -----Original Message-----
+> From: Shawn Guo [mailto:shawnguo at kernel.org]
+> Sent: 2015?7?27? 20:03
+> To: Wang Shenwei-B38339
+> Cc: jason at lakedaemon.net; Huang Yongcai-B20788;
+> linux-kernel at vger.kernel.org; tglx at linutronix.de; shawn.guo at linaro.org;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v6 2/2] ARM: imx: Add suspend codes for imx7D
 > 
-> > This is a proposal to add GPIO names to the kernel based on devicetree
-> > descriptions.
+> On Mon, Jul 27, 2015 at 06:24:26PM +0000, Shenwei Wang wrote:
+> > > > @@ -87,6 +87,8 @@ obj-$(CONFIG_SOC_IMX7D) += mach-imx7d.o
+> > > >
+> > > >  ifeq ($(CONFIG_SUSPEND),y)
+> > > >  AFLAGS_suspend-imx6.o :=-Wa,-march=armv7-a
+> > > > +AFLAGS_suspend-imx7.o :=-Wa,-march=armv7-a
+> > > > +obj-$(CONFIG_IMX_GPCV2)	+= suspend-imx7.o pm-imx7.o
+> > >
+> > > Shouldn't it be controlled by CONFIG_SOC_IMX7D instead?
 > >
-> > This series adds GPIO name support. Until now it is only possible to use names
-> > for already requested GPIOs (for example what they are used for). It is not
-> > possible to identify GPIOs by a name although most of them have a name for
-> > example in the schematics of the board. This makes it difficult to identify
-> > a specific GPIO from userspace.
-> >
-> > As the GPIO name information is a hardware description this series uses the
-> > devicetree bindings introduced by the GPIO hogging mechanism, specifically
-> > 'line-name', to identify GPIOs. The sysfs 'export' file is changed to accept
-> > names as fallback. The gpio numbers still have a higher priority to ensure
-> > backwards compatibility.
-> >
-> > Exported GPIOs are still using their number as directory name (gpio<ID>). But the
-> > directories now contain a 'name' file which is '(null)' for non-existent names
-> > and the name otherwise.
-> >
-> > This series can be used to have an easy name mapping for udev with a quite
-> > simple rule similar to this:
-> >         SUBSYSTEM=="gpio", KERNEL=="gpio*", ATTR{name}!="(null)", ACTION=="add", \
-> >         PROGRAM+="/bin/sh -c 'mkdir -p /dev/gpios; rm -f /dev/gpios/$attr{name}; ln -s /sys%p/ /dev/gpios/$attr{name}"
-> > With this rule udev adds a link for each exported GPIO with a name into
-> > /dev/gpios/. This way it is not necessary to know the number of a GPIO to use
-> > it.
+> > CONFIG_IMX_GPCV2 is more suitable here. As long as a SOC has the same
+> GPCv2 block, the codes should be reused.
 > 
-> I must say I like this series.
+> Let's see what problem it will have.  Saying GPCv2 block is used on imx8, we will
+> have something like below.
 > 
-> Because it makes the GPIO sysfs ABI *less* insane. Especially
-> I like the patch that makes a distinction between "label" (use)
-> and "name" (the name of the actual line). That illustrates clearly
-> that this is thought-through.
+> obj-$(CONFIG_IMX_GPCV2) += suspend-imx7.o pm-imx7.o suspend-imx8.o
+> pm-imx8.o
+
+I don't think so. If imx8 use the same GPCv2 block, there should be no pm-imx8.o and suspend-imx8.o.
+We should try to reuse the existing ones.
+ 
+> If people want to build a kernel with imx8 support only, suspend-imx7.o and
+> pm-imx7.o will also be built in there, which is undesirable.
 > 
-> However I still have some doubts as it will expand the sysfs ABI,
-> and we have discussed a char device for GPIO chips as a better
-> alternative, for example since these can do get/set multiple GPIOs
-> with a single context switch (ioctl), whereas sysfs is "one value per file"
-> and would be able to expose some flags better.
+> The files are named with "-imx7".  It's a clear sign that the build of the files
+> should be controlled by something like related to "imx7".
+> Ideally, it should be CONFIG_SOC_IMX7.  Since imx7d is the only supported imx7
+> soc and there is no CONFIG_SOC_IMX7 available so far, it falls on
+> CONFIG_SOC_IMX7D.
 
-I'm also reluctant to band-aiding the sysfs interface with more ABI that
-we need to maintain forever. Making it easier to use also reduces the
-incentives to come up with a saner interface.
+We can also interpret "-imx7" is the first SoC which has the GPCv2 block. 
 
-As I mentioned in a comment to patch 6/9, this series introduces an
-incompatibility with current DT since it no longer allows two hogs to
-use the same name, while the current hog implementation is documented to
-fall back to using the (not necessarily unique) node name when a
-line-name property isn't specified.
+> > > > +extern struct imx_gpcv2_irq *gpcv2_irq_instance;
+> > >
+> > > Will this give a checkpatch warning?
+> >
+> > Yes. Any suggestion for that? Move it to a header file?
+> 
+> Get rid of it.
 
-Even though this looks like it could be worked around, it's an example
-of the kind of issues we risk running into if we keep on incrementally
-patching this interface.
+Then you may resolve the following compile error:
 
-That said, this is a step along the lines that we have discussed in the
-past. Adding pin functions (line names) to generic pin nodes in DT makes
-sense, but we need to think through the details first. For example:
+CC      arch/arm/mach-imx/pm-imx7.o
+arch/arm/mach-imx/pm-imx7.c: In function ?imx_gpcv2_pm_init?:
+arch/arm/mach-imx/pm-imx7.c:836:7: error: ?gpcv2_irq_instance? undeclared (first use in this function)
+  cd = gpcv2_irq_instance;
+       ^
+arch/arm/mach-imx/pm-imx7.c:836:7: note: each undeclared identifier is reported only once for each function it appears in
+make[1]: *** [arch/arm/mach-imx/pm-imx7.o] Error 1
 
- - Should we allow duplicate pin functions (line names)? We need to
-   consider not just on-chip controllers, but also hot-pluggable
-   controllers and device-tree overlays.
+Regards,
+Shenwei
 
- - Should we allow initial configurations to be specified and still
-   allow (some) pins to be requested later ("soft" hogging)?
-
- - Should we specify pin directionality? I've suggested elsewhere that
-   adding such limitations (e.g. as a mask) may make sense in cases were
-   changing pin direction is known to cause damage.
-
- - What would a new gpio interface look like?
-
-Johan 
+> Shawn
