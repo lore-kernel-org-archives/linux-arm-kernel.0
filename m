@@ -1,78 +1,67 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 28 Jul 2015 08:55:33 -0500
-Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
-In-Reply-To: <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAL_JsqL=e+fL_67_GPKjt_7wJ81GfFx7m9gjxmBDvW_JBXWpfQ@mail.gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 28 Jul 2015 06:57:17 -0700
+Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <55B73C64.5050903@xilinx.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
+ <1438070702.3193.4.camel@pengutronix.de>
+ <55B73C64.5050903@xilinx.com>
+Message-ID: <CAAtXAHc=WTg3VHugKZ+SHnCA7OKXLLay-aOJyk9C9r+Z2MWwBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 10:20 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> These OPPs are used in ST's CPUFreq implementation.
+Philip, Michal,
+
+thanks for your reviews.
+
+On Tue, Jul 28, 2015 at 1:25 AM, Michal Simek <michal.simek@xilinx.com> wrote:
+> On 07/28/2015 10:05 AM, Philipp Zabel wrote:
+>> Am Freitag, den 24.07.2015, 17:21 -0700 schrieb Moritz Fischer:
+>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
+>>>  1 file changed, 13 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>>> new file mode 100644
+>>> index 0000000..ac4499e
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>>> @@ -0,0 +1,13 @@
+>>> +Xilinx Zynq PL Reset Manager
+>>> +
+>>> +Required properties:
+>>> +- compatible: "xlnx,zynq-reset-pl"
+>>> +- syscon <&slcr>;
+>>> +- #reset-cells: 1
+>>> +
+>>> +Example:
+>>> +    rstc: rstc at 240 {
+>>> +            #reset-cells = <1>;
+>>> +            compatible = "xlnx,zynq-reset-pl";
+>>> +            syscon = <&slcr>;
+>>
+>> Why the syscon phandle if rstc always is the child of slcr? Why not just
+>> request the syscon for the rstc's parent node.
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
+> We are using this description for pincntrl which was properly reviewed
+> that's why I expect Moritz just use the same style.
+> But yes also referencing parent should work.
+
+Michal is right, I tried to be consistent with the pinctrl. Either one
+is fine for me.
+We'll just have to make a decision :-)
 >
-> Changelog:
->  - None, new patch
+> TBH I don't have strong preference but having unified style is something
+> what I would prefer.
 >
->  Documentation/devicetree/bindings/power/opp-st.txt | 76 ++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/power/opp-st.txt
+> Also I see that using parent is used by others and it looks like that
+> having something like syscon_regmap_lookup_parent will be worth to have.
 >
-> diff --git a/Documentation/devicetree/bindings/power/opp-st.txt b/Documentation/devicetree/bindings/power/opp-st.txt
-> new file mode 100644
-> index 0000000..6eb2a91
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/power/opp-st.txt
-> @@ -0,0 +1,76 @@
-> +STMicroelectronics OPP (Operating Performance Points) Bindings
-> +--------------------------------------------------------------
-> +
-> +Frequency Scaling only
-> +----------------------
-> +
-> +Located in CPU's node:
-> +
-> +- operating-points     : [See: ./opp.txt]
-> +
-> +Example [safe]
-> +--------------
-> +
-> +cpus {
-> +       cpu at 0 {
-> +                                /* kHz     uV   */
-> +               operating-points = <1500000 0
-> +                                   1200000 0
-> +                                   800000  0
-> +                                   500000  0>;
-> +       };
-> +};
-> +
-> +Dynamic Voltage and Frequency Scaling (DVFS)
-> +--------------------------------------------
-> +
-> +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
-> +
-> +- compatible           : Should be "operating-points-v2-sti"
-> +- opp{1..N}            : Each 'oppX' subnode will contain the following properties:
-> + - opp-hz              : CPU frequency [Hz] for this OPP [See: ./opp.txt]
-> + - st,avs              : List of available voltages [uV] indexed by process code
-
-Add a unit suffix (-microvolt).
-
-> + - st,cuts             : Cut version this OPP is suitable for [0xFF means ALL]
-> + - st,substrate                : Substrate version this OPP is suitable for [0xFF means ALL]
-
-How about not present means all?
-
-> +- st,syscfg            : Phandle to Major number register
-> +                               First cell: offset to major number
-> +- st,syscfg-eng                : Phandle to Minor number and Pcode registers
-> +                               First cell: offset to process code
-> +                               Second cell: offset to minor number
-
-Would the proposed nvmem binding work for this?
-
-Rob
+> Thanks,
+> Michal
+>
+>
+Moritz
