@@ -1,65 +1,43 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue, 28 Jul 2015 11:02:09 +0200 (CEST)
-Subject: [linux-sunxi] [RFC] ARM: dts: sunxi: Add regulators and
- board-specific operating points for LeMaker BananaPi
-In-Reply-To: <55B62768.6040403@redhat.com>
-References: <1437960486-2809-1-git-send-email-public_timo.s@silentcreek.de><55B5E6DB.8020009@redhat.com>
- <20150727120918.191F76C82FB4@dd34104.kasserver.com><55B62768.6040403@redhat.com>
-Message-ID: <20150728090209.1D7BC6C80542@dd34104.kasserver.com>
+From: johan@kernel.org (Johan Hovold)
+Date: Tue, 28 Jul 2015 11:03:31 +0200
+Subject: [PATCH 1/9] gpiolib: Fix possible use of wrong name
+In-Reply-To: <1437125570-28623-2-git-send-email-mpa@pengutronix.de>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20150728090331.GI28535@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jul 17, 2015 at 11:32:42AM +0200, Markus Pargmann wrote:
+> The name is set optionally from DT. Therefore we need to reset the name
+> variable for every loop iteration. Otherwise we could use a wrong or
+> uninitialized name.
 
-Hans de Goede schrieb am 27.07.2015 14:43:
->>> I've a simular patch here:
->>>
->>> https://github.com/jwrdegoede/linux-sunxi/commit/6a30b7d5be6012b81e5e1439a444e41c0ac1afc1
->>>
->>> I did not submit this upstream yet as it is part of a series to enable the
->>> otg
->>> controller on the bananapi which needs axp-usb-power-supply support for which
->>> the actual powersupply driver changes are still pending.
->> Oops, I see. Are you planning to submit this for 4.3 or later?
+This doesn't make sense. of_get_gpio_hog falls back to using the node
+name so name will always be updated (unless there's an error).
+
+Could be better documented, though.
+
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  drivers/gpio/gpiolib-of.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> I plan to submit this for 4.3.
-Ok, then I guess we can drop my patch.
+> diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> index 9a0ec48a4737..60aebe4d7c26 100644
+> --- a/drivers/gpio/gpiolib-of.c
+> +++ b/drivers/gpio/gpiolib-of.c
+> @@ -209,11 +209,11 @@ static void of_gpiochip_scan_hogs(struct gpio_chip *chip)
+>  {
+>  	struct gpio_desc *desc = NULL;
+>  	struct device_node *np;
+> -	const char *name;
+>  	enum gpio_lookup_flags lflags;
+>  	enum gpiod_flags dflags;
+>  
+>  	for_each_child_of_node(chip->of_node, np) {
+> +		const char *name = NULL;
+>  		if (!of_property_read_bool(np, "gpio-hog"))
+>  			continue;
 
->>> IMHO we should just stick with the standard operating points unless we know
->>> that there are stability issues with them (such as e.g. on the A10 OlinuxIno
->>> Lime).
->> I'd be fine with that as I don't have any stability issues with the lower
->> voltages. What about the 1008MHz operating point that I "reintroduced"? It was
->> dropped here [1]  because there was no regulator support.
-> 
-> That is in essence an overclocked setting, the max CPU voltage officially is
-> 1.4V, I do not think that we should provide any overclocked settings in the
-> official dts files. If people really want to overclock they will have to
-> modify there dts themselves IMHO.
-
-Personally, I would be fine with that. Even though I think, it might be good to
-have them in the official files just for convenience and because people who are 
-used to the sunxi-3.4 kernels are used to having the 1008MHz opp (and it was in
-mainline for a short while, too). For those who don't want to use that setting,
-it's easier to limit the maximum in userspace compared to compiling a new
-device tree blob. But I do understand your point, so I guess it's just
-something that maintainers have to make a decision for. As I said, either way
-is fine for me.
-
-> > Can this be reenabled
->> on board level (which means overriding the defaults inherited from
->> sun7i-a20.dtsi) or should this be done at SOC level for all boards (which
->> means we have to add regulator nodes for all boards in the first place)?
-> 
-> Technically this is possible, but I do not think that it is a good idea.
-
-I guess the same applies here, too. It's something maintainers should have a
-common understanding on. I don't know how much variation there is among the
-A20 boards in terms of frequencies and voltages. If there is a lot, I'd say
-it would be desireable to have board-specific opp. The downside I see in my
-approach is that it impacts readability of the dts(i) files when settings
-are overridden further down the tree.
-
-Thanks and regards,
-
-Timo
+Johan
