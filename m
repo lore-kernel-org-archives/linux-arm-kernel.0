@@ -1,37 +1,76 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Tue, 28 Jul 2015 08:45:55 -0000
-Subject: [PATCH v3] ARM: dts: Add SPI CS on exynos5250-snow
-In-Reply-To: <a5054dfad3d48c582b062b0536125c9bcff41f31.1438027526.git.hramrach@gmail.com>
-References: <a5054dfad3d48c582b062b0536125c9bcff41f31.1438027526.git.hramrach@gmail.com>
-Message-ID: <e1952e8c102a3b7a7f3f79c759c44093e0d11dc7.1438073049.git.hramrach@gmail.com>
+From: t.remmet@phytec.de (Teresa Remmet)
+Date: Tue, 28 Jul 2015 10:47:28 +0200
+Subject: [PATCH 1/2] ARM: dts: Add support for phyCORE-AM335x SoM
+In-Reply-To: <55B73D6D.2040801@compulab.co.il>
+References: <1437035449-26956-1-git-send-email-t.remmet@phytec.de>
+ <20150727143444.GD15004@beef> <55B73D6D.2040801@compulab.co.il>
+Message-ID: <1438073248.3649.6.camel@lws-tremmet.phytec.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although there is only one choice of chipselect it is necessary to
-specify it. The driver cannot claim the gpio otherwise.
+Hello Igor,
 
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-Acked-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Am Dienstag, den 28.07.2015, 11:29 +0300 schrieb Igor Grinberg:
+> Hi Matt,
+> 
+> On 07/27/15 17:34, Matt Porter wrote:
+> > On Thu, Jul 16, 2015 at 10:30:48AM +0200, Teresa Remmet wrote:
+> >> phyCORE-AM335x is a SoM (System on Module) containing
+> >> a AM335x SOC. The module can be connected to different
+> >> carrier boards.
+> >>
+> >> Some hardware parts are configurable on the phyCORE-AM335x.
+> >> So they are disabled on default in this som dtsi file.
+> >> They will be enabled in the board dts files, when populated.
+> >>
+> >> * RAM up to 1GiB
+> >> * PMIC
+> >> * NAND flash up to 1GiB
+> >> * Eth PHY on SOM: 1x RMII
+> >> * SPI NOR flash 8MiB (optional)
+> >> * i2c RTC (optional)
+> >> * i2c EEPROM 4kiB (optional)
+> >>
+> >> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+> >> ---
+> >>  arch/arm/boot/dts/am335x-phycore-som.dtsi | 368 ++++++++++++++++++++++++++++++
+> >>  1 file changed, 368 insertions(+)
+> >>  create mode 100644 arch/arm/boot/dts/am335x-phycore-som.dtsi
+> >>
+> >> diff --git a/arch/arm/boot/dts/am335x-phycore-som.dtsi b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+> >> new file mode 100644
+> >> index 0000000..4d28fc3
+> >> --- /dev/null
+> >> +++ b/arch/arm/boot/dts/am335x-phycore-som.dtsi
+> 
+> [...]
+> 
+> >> +#include "am33xx.dtsi"
+> >> +
+> >> +/ {
+> >> +	model = "Phytec AM335x phyCORE";
+> >> +	compatible = "phytec,am335x-phycore-som", "ti,am33xx";
+> > 
+> > One minor thing here...wildcards in compatible strings aren't permitted.
+> > However, family compatibles like "ti,am33xx" that came in before this
+> > was enforced are grandfathered. Ideally, the newly introced board/som
+> > specific strings should not propagate that wildcard. i.e. something
+> > like "phytec,am3352-phycore-som" or whatever is the base family part
+> > on these SOMs.
+> > 
+> 
+> I'm not sure this is wild card.
+> I tend to think that it is the real name of the som [1], no?
+> 
+> http://phytec.com/products/system-on-modules/phycore/am335x/
 
---
- - don't move unrelated line
- - use symbolic GPIO_ACTIVE_HIGH
----
- arch/arm/boot/dts/exynos5250-snow.dts | 1 +
- 1 file changed, 1 insertion(+)
+Yes, your right. This is the name of the SoM. The phyCORE may have
+different am335x versions mounted. So there is not the one am3352 or
+am3359 always used.
 
-diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-index b7f4122..2d6a976 100644
---- a/arch/arm/boot/dts/exynos5250-snow.dts
-+++ b/arch/arm/boot/dts/exynos5250-snow.dts
-@@ -688,6 +688,7 @@
- 	status = "okay";
- 	samsung,spi-src-clk = <0>;
- 	num-cs = <1>;
-+	cs-gpios = <&gpa2 5 GPIO_ACTIVE_HIGH>;
- };
- 
- &usbdrd_dwc3 {
--- 
-2.1.4
+Regards,
+Teresa
+
+> 
+> [...]
+> 
