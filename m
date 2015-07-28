@@ -1,90 +1,141 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 Jul 2015 09:32:20 +0200
-Subject: [PATCH 2/2] ARM: at91/dt: sama5d4: move ADC pinctrl to board
- device trees
-In-Reply-To: <1434959149-4067-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1434959149-4067-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1434959149-4067-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <55B73004.2070401@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jul 2015 08:34:39 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150728022936.GB1229@linux>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux>
+Message-ID: <20150728073439.GK21114@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 22/06/2015 09:45, Alexandre Belloni a ?crit :
-> The ADC pinctrl is board specific, move it to the board device trees.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+On Tue, 28 Jul 2015, Viresh Kumar wrote:
 
-To the series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 9 +++++++++
->  arch/arm/boot/dts/at91-sama5d4ek.dts        | 9 +++++++++
->  arch/arm/boot/dts/sama5d4.dtsi              | 9 ---------
->  3 files changed, 18 insertions(+), 9 deletions(-)
+> Cc'ing few people (whom I cc'd last time as well :)).
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> index c740e1a2a3a5..50033760df93 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> @@ -123,6 +123,15 @@
->  			};
->  
->  			adc0: adc at fc034000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <
-> +					/* external trigger conflicts with USBA_VBUS */
-> +					&pinctrl_adc0_ad0
-> +					&pinctrl_adc0_ad1
-> +					&pinctrl_adc0_ad2
-> +					&pinctrl_adc0_ad3
-> +					&pinctrl_adc0_ad4
-> +					>;
->  				atmel,adc-vref = <3300>;
->  				status = "okay";
->  			};
-> diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> index 89ef4a540db5..202891b4c1b7 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-> @@ -99,6 +99,15 @@
->  			};
->  
->  			adc0: adc at fc034000 {
-> +				pinctrl-names = "default";
-> +				pinctrl-0 = <
-> +					/* external trigger conflicts with USBA_VBUS */
-> +					&pinctrl_adc0_ad0
-> +					&pinctrl_adc0_ad1
-> +					&pinctrl_adc0_ad2
-> +					&pinctrl_adc0_ad3
-> +					&pinctrl_adc0_ad4
-> +					>;
->  				/* The vref depends on JP22 of EK. If connect 1-2 then use 3.3V. connect 2-3 use 3.0V */
->  				atmel,adc-vref = <3300>;
->  				/*atmel,adc-ts-wires = <4>;*/	/* Set up ADC touch screen */
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index ca1e52989a29..04779fe1c70b 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -1078,15 +1078,6 @@
->  				compatible = "atmel,at91sam9x5-adc";
->  				reg = <0xfc034000 0x100>;
->  				interrupts = <44 IRQ_TYPE_LEVEL_HIGH 5>;
-> -				pinctrl-names = "default";
-> -				pinctrl-0 = <
-> -					/* external trigger is conflict with USBA_VBUS */
-> -					&pinctrl_adc0_ad0
-> -					&pinctrl_adc0_ad1
-> -					&pinctrl_adc0_ad2
-> -					&pinctrl_adc0_ad3
-> -					&pinctrl_adc0_ad4
-> -					>;
->  				clocks = <&adc_clk>,
->  					 <&adc_op_clk>;
->  				clock-names = "adc_clk", "adc_op_clk";
+> On 27-07-15, 16:20, Lee Jones wrote:
+> > These OPPs are used in ST's CPUFreq implementation.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> > 
+> > Changelog:
+> >  - None, new patch
+> > 
+> >  Documentation/devicetree/bindings/power/opp-st.txt | 76 ++++++++++++++++++++++
+> >  1 file changed, 76 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/power/opp-st.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/power/opp-st.txt b/Documentation/devicetree/bindings/power/opp-st.txt
+> > new file mode 100644
+> > index 0000000..6eb2a91
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/opp-st.txt
+> > @@ -0,0 +1,76 @@
+> > +STMicroelectronics OPP (Operating Performance Points) Bindings
+> > +--------------------------------------------------------------
+> > +
+> > +Frequency Scaling only
+> > +----------------------
+> > +
+> > +Located in CPU's node:
+> > +
+> > +- operating-points	: [See: ./opp.txt]
+> > +
+> > +Example [safe]
+> > +--------------
+> > +
+> > +cpus {
+> > +	cpu at 0 {
+> > +				 /* kHz     uV   */
+> > +		operating-points = <1500000 0
+> > +				    1200000 0
+> > +				    800000  0
+> > +				    500000  0>;
+> > +	};
+> > +};
+> > +
+> > +Dynamic Voltage and Frequency Scaling (DVFS)
+> > +--------------------------------------------
+> > +
+> > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
+> > +
+> > +- compatible		: Should be "operating-points-v2-sti"
+> > +- opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
 > 
+> Or should we mention:
+> - opp{1..N} 		: Each 'oppX' subnode shall contain below properties,
+>                           over what ./opp.txt defines:
+> 
+> ?
 
+I disagree.  For one, only 'opp-hz' is defined in ./opp.tx.  Secondly
+it would be annoying to have to have to keep jumping between documents
+to obtain the whole picture.  Finally, generic bindings are repeated
+in platform/device specific documentation all the time.  Grep for
+'clocks' or 'regulator-* or 'interrupts' or 'reg' or 'clock-frequency'
+(which IMHO I think you should have used instead of 'opp-hz', but
+that's by the by), or any number of other generic properties.
+
+> > + - opp-hz		: CPU frequency [Hz] for this OPP [See: ./opp.txt]
+> > + - st,avs		: List of available voltages [uV] indexed by process code
+> > + - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
+> > + - st,substrate		: Substrate version this OPP is suitable for [0xFF means ALL]
+> > +- st,syscfg		: Phandle to Major number register
+> > +				First cell: offset to major number
+> > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
+> > +				First cell: offset to process code
+> > +				Second cell: offset to minor number
+> > +
+> > +WARNING: The opp{1..N} nodes will be provided by the bootloader.  Do not attempt to
+> > +	 artificially synthesise the opp{1..N} nodes or any of their descendants.
+> > +	 They are very platform specific and may damage the hardware if created
+> > +	 incorrectly.
+> > +
+> > +Example [unsafe]
+> > +----------------
+> > +
+> > +cpus {
+> > +	cpu at 0 {
+> > +		operating-points-v2	= <&cpu0_opp_list>;
+> > +	};
+> > +};
+> > +
+> > +/* ############################################################ */
+> > +/* # WARNING: Do not attempt to copy/replicate this node,     # */
+> > +/* #          it is only to be supplied by the bootloader !!! # */
+> > +/* ############################################################ */
+> > +cpu0-opp-list {
+> > +	compatible	= "operating-points-v2-sti";
+> > +	st,syscfg	= <&syscfg [major_offset]>;
+> > +	st,syscfg-eng   = <&syscfg_eng [pcode_offset] [minor_offset]>;
+> > +
+> > +	opp0 {
+> > +		opp-hz		= <1200000000>;
+> > +		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
+> > +		st,substrate	= <0xff>;
+> > +		st,cuts		= <0xff>;
+> > +	};
+> > +	opp1 {
+> > +		opp-hz		= <1500000000>;
+> > +		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
+> > +		st,substrate	= <0xff>;
+> > +		st,cuts		= <0x2>;
+> > +	};
+> > +};
+> 
+> I don't see more problems here, unless we can move some of this to the
+> generic bindings.
+> 
+> @Rob/Stephen: Please respond before it is late :)
+
+No one knows this stuff better than you.  If you can't think of an
+already existing binding that could suit to portray our 'cuts' and
+'substrate' information (with a similar way to support our "all cuts"
+and "all substrates" options, then there probably isn't one. ;)
 
 -- 
-Nicolas Ferre
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
