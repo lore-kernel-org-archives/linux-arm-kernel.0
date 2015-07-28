@@ -1,206 +1,105 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 28 Jul 2015 14:46:07 +0100
-Subject: [PATCH v6 00/19] Per-device MSI domain & platform MSI
-Message-ID: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 28 Jul 2015 14:46:11 +0100
+Subject: [PATCH v6 04/19] PCI/MSI: Add hooks to populate the msi_domain field
+In-Reply-To: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
+References: <1438091186-10244-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1438091186-10244-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MSI-like interrupts are starting to creep out of the PCI world, and
-can now be seen into a number of "platform"-type busses. The
-introduction of the MSI domains feature in v3.19 recognised that fact,
-and started providing a way to implement this.
+In order to be able to populate the device msi_domain field,
+add the necessary hooks to propagate the host bridge msi_domain
+across secondary busses to devices.
 
-Another step in this direction is Jiang Liu's msi_desc series:
+So far, nobody populates the initial msi_domain.
 
-https://github.com/jiangliu/linux.git msi_desc_v1
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/pci/probe.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-which moves the msi_list from being specific to PCI devices into the
-generic device structure.
-
-A problem we have to solve is to identify which MSI domain a device is
-"connected" to. Currently, PCI gets away with a mixture of
-arch-specific callbacks, and a msi_controller structure that can
-optionally carry a pointer to an MSI domain. As we add new bus types
-and start dealing with topologies that do not map to what PCI does,
-this doesn't scale anymore.
-
-This patch series tries to address some of it by providing a basic
-link between 'struct device' and an MSI domain. It also adds :
-
-- a way to "tag" domains according to the "type" of interrupt it
-  provides (PCI/MSI, platform MSI...), allowing a driver for a piece
-  of HW identified by its device_node to provide several IRQ domains
-
-- (yet another) way for PCI to propagate the domain pointer through
-  the PCI device hierarchy, providing a method for OF to kick-start
-  the propagation process, and finally allowing the PCI/MSI layer to
-  use that information
-
-- a similar way to hook an MSI domain to a platform device.
-
-- a generic implementation of MSI for platform devices that can be
-  supported by interrupt controllers.
-
-- support code for platform MSI for both GICv2m and GICv3 ITS.
-
-This makes implementing MSI support in platform devices a relatively
-trivial task.
-
-Additionally, a few patches use most of the above to remove any trace
-of the msi_controller structure from the three MSI controllers that
-are currently in use on arm64, so that they solely rely on the above
-infrastructure, leading to some interesting improvements (also known
-as "gross hack prevention measures"). We also take this opportunity to
-kill the domain pointer from the msi_controller structure.
-
-My hope is to eventually kill msi_controller entirely, and only rely
-on the msi_domain contained in the device structure (any help
-welcomed, as I already have cleaned up Tegra, and Lorenzo has scrubbed
-Designware).
-
-This has been tested on arm64 with GICv2m (AMD Seattle) and GICv3 ITS
-(FVP model), and use of platform MSI has been tested with the ARM
-SMMUv3.
-
-Patches are on top of 4.2-rc2 and Jiang Liu's series, and available
-at:
-
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/npci-msi-v3
-
-It also applies on tip/irq/core with a couple of trivial conflicts.
-
-As always, comments most welcome...
-
-* From v5:
-  - Fixed a few nits noticed by Bjorn
-  - Removed spurious comments
-  - Collected Acked- and Reviewed-bys
-
-* From v4:
-  - Nice cleanups in the PCI code after review from Bjorn
-  - Platform MSI now gets its own namespace in struct msi_desc
-  - Fixed bisectability issue caught by the 01.org folks
-
-Marc Zyngier (19):
-  genirq: irqdomain: Allow irq domain aliasing
-  PCI: MSI: Register irq domain with specific token
-  device core: Introduce per-device MSI domain pointer
-  PCI/MSI: Add hooks to populate the msi_domain field
-  PCI/MSI: of: Add support for OF-provided msi_domain
-  PCI/MSI: of: Allow msi_domain lookup using the host bridge node
-  PCI/MSI: Let pci_msi_get_domain use struct device's msi_domain
-  platform: of: Assign MSI domain to platform device
-  drivers: base: Add MSI domain support for non-PCI devices
-  genirq: Add DOMAIN_BUS_NEXUS irqdomain property
-  irqchip: gicv3-its: Split PCI/MSI code from the core ITS driver
-  irqchip: gicv3-its: Register irq domain with NEXUS token
-  irqchip: gicv3-its: Get rid of struct msi_controller
-  irqchip: gicv3-its: Make the PCI/MSI code standalone
-  irqchip: gicv3-its: Add platform MSI support
-  irqchip: GICv2m: Get rid of struct msi_controller
-  irqchip: GICv2m: Add platform MSI support
-  PCI/MSI: pci-xgene-msi: Get rid of struct msi_controller
-  PCI/MSI: Drop domain field from msi_controller
-
- arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |   3 +-
- arch/powerpc/platforms/cell/interrupt.c          |   3 +-
- arch/powerpc/platforms/embedded6xx/flipper-pic.c |   3 +-
- arch/powerpc/platforms/powermac/pic.c            |   3 +-
- arch/powerpc/platforms/powernv/opal-irqchip.c    |   3 +-
- arch/powerpc/platforms/ps3/interrupt.c           |   3 +-
- arch/powerpc/sysdev/ehv_pic.c                    |   3 +-
- arch/powerpc/sysdev/i8259.c                      |   3 +-
- arch/powerpc/sysdev/ipic.c                       |   3 +-
- arch/powerpc/sysdev/mpic.c                       |   3 +-
- arch/powerpc/sysdev/qe_lib/qe_ic.c               |   3 +-
- arch/powerpc/sysdev/xics/xics-common.c           |   3 +-
- drivers/base/Makefile                            |   1 +
- drivers/base/platform-msi.c                      | 282 +++++++++++++++++++++++
- drivers/irqchip/Makefile                         |   2 +-
- drivers/irqchip/irq-gic-v2m.c                    |  52 +++--
- drivers/irqchip/irq-gic-v3-its-pci-msi.c         | 140 +++++++++++
- drivers/irqchip/irq-gic-v3-its-platform-msi.c    |  93 ++++++++
- drivers/irqchip/irq-gic-v3-its.c                 | 140 ++++-------
- drivers/of/irq.c                                 |  21 ++
- drivers/of/platform.c                            |   1 +
- drivers/pci/host/pci-xgene-msi.c                 |  41 ++--
- drivers/pci/msi.c                                |  19 +-
- drivers/pci/of.c                                 |  30 +++
- drivers/pci/probe.c                              |  45 ++++
- include/linux/device.h                           |  20 ++
- include/linux/irqchip/arm-gic-v3.h               |   1 +
- include/linux/irqdomain.h                        |  26 ++-
- include/linux/msi.h                              |  18 +-
- include/linux/of_irq.h                           |   1 +
- include/linux/pci.h                              |   4 +
- kernel/irq/irqdomain.c                           |  18 +-
- 32 files changed, 815 insertions(+), 176 deletions(-)
- create mode 100644 drivers/base/platform-msi.c
- create mode 100644 drivers/irqchip/irq-gic-v3-its-pci-msi.c
- create mode 100644 drivers/irqchip/irq-gic-v3-its-platform-msi.c
-
--- 
-2.1.4
-
-*** BLURB HERE ***
-
-Marc Zyngier (19):
-  genirq: irqdomain: Allow irq domain aliasing
-  PCI: MSI: Register irq domain with specific token
-  device core: Introduce per-device MSI domain pointer
-  PCI/MSI: Add hooks to populate the msi_domain field
-  PCI/MSI: of: Add support for OF-provided msi_domain
-  PCI/MSI: of: Allow msi_domain lookup using the host bridge node
-  PCI/MSI: Let pci_msi_get_domain use struct device's msi_domain
-  platform: of: Assign MSI domain to platform device
-  drivers: base: Add MSI domain support for non-PCI devices
-  genirq: Add DOMAIN_BUS_NEXUS irqdomain property
-  irqchip: gicv3-its: Split PCI/MSI code from the core ITS driver
-  irqchip: gicv3-its: Register irq domain with NEXUS token
-  irqchip: gicv3-its: Get rid of struct msi_controller
-  irqchip: gicv3-its: Make the PCI/MSI code standalone
-  irqchip: gicv3-its: Add platform MSI support
-  irqchip: GICv2m: Get rid of struct msi_controller
-  irqchip: GICv2m: Add platform MSI support
-  PCI/MSI: pci-xgene-msi: Get rid of struct msi_controller
-  PCI/MSI: Drop domain field from msi_controller
-
- arch/powerpc/platforms/512x/mpc5121_ads_cpld.c   |   3 +-
- arch/powerpc/platforms/cell/interrupt.c          |   3 +-
- arch/powerpc/platforms/embedded6xx/flipper-pic.c |   3 +-
- arch/powerpc/platforms/powermac/pic.c            |   3 +-
- arch/powerpc/platforms/powernv/opal-irqchip.c    |   3 +-
- arch/powerpc/platforms/ps3/interrupt.c           |   3 +-
- arch/powerpc/sysdev/ehv_pic.c                    |   3 +-
- arch/powerpc/sysdev/i8259.c                      |   3 +-
- arch/powerpc/sysdev/ipic.c                       |   3 +-
- arch/powerpc/sysdev/mpic.c                       |   3 +-
- arch/powerpc/sysdev/qe_lib/qe_ic.c               |   3 +-
- arch/powerpc/sysdev/xics/xics-common.c           |   3 +-
- drivers/base/Makefile                            |   1 +
- drivers/base/platform-msi.c                      | 282 +++++++++++++++++++++++
- drivers/irqchip/Makefile                         |   2 +-
- drivers/irqchip/irq-gic-v2m.c                    |  52 +++--
- drivers/irqchip/irq-gic-v3-its-pci-msi.c         | 140 +++++++++++
- drivers/irqchip/irq-gic-v3-its-platform-msi.c    |  93 ++++++++
- drivers/irqchip/irq-gic-v3-its.c                 | 140 ++++-------
- drivers/of/irq.c                                 |  21 ++
- drivers/of/platform.c                            |   1 +
- drivers/pci/host/pci-xgene-msi.c                 |  41 ++--
- drivers/pci/msi.c                                |  20 +-
- drivers/pci/of.c                                 |  30 +++
- drivers/pci/probe.c                              |  45 ++++
- include/linux/device.h                           |  20 ++
- include/linux/irqchip/arm-gic-v3.h               |   1 +
- include/linux/irqdomain.h                        |  26 ++-
- include/linux/msi.h                              |  18 +-
- include/linux/of_irq.h                           |   1 +
- include/linux/pci.h                              |   4 +
- kernel/irq/irqdomain.c                           |  18 +-
- 32 files changed, 816 insertions(+), 176 deletions(-)
- create mode 100644 drivers/base/platform-msi.c
- create mode 100644 drivers/irqchip/irq-gic-v3-its-pci-msi.c
- create mode 100644 drivers/irqchip/irq-gic-v3-its-platform-msi.c
-
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index cefd636..c03ecbf 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -661,6 +661,32 @@ static void pci_set_bus_speed(struct pci_bus *bus)
+ 	}
+ }
+ 
++static struct irq_domain *pci_host_bridge_msi_domain(struct pci_bus *bus)
++{
++	/*
++	 * Any firmware interface that can resolve the msi_domain
++	 * should be called from here.
++	 */
++
++	return NULL;
++}
++
++static void pci_set_bus_msi_domain(struct pci_bus *bus)
++{
++	struct irq_domain *d;
++
++	/*
++	 * Either bus is the root, and we must obtain it from the
++	 * firmware, or we inherit it from the bridge device.
++	 */
++	if (pci_is_root_bus(bus))
++		d = pci_host_bridge_msi_domain(bus);
++	else
++		d = dev_get_msi_domain(&bus->self->dev);
++
++	dev_set_msi_domain(&bus->dev, d);
++}
++
+ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 					   struct pci_dev *bridge, int busnr)
+ {
+@@ -714,6 +740,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 	bridge->subordinate = child;
+ 
+ add_dev:
++	pci_set_bus_msi_domain(child);
+ 	ret = device_register(&child->dev);
+ 	WARN_ON(ret < 0);
+ 
+@@ -1544,6 +1571,17 @@ static void pci_init_capabilities(struct pci_dev *dev)
+ 	pci_enable_acs(dev);
+ }
+ 
++static void pci_set_msi_domain(struct pci_dev *dev)
++{
++	/*
++	 * If no domain has been set through the pcibios_add_device
++	 * callback, inherit the default from the bus device.
++	 */
++	if (!dev_get_msi_domain(&dev->dev))
++		dev_set_msi_domain(&dev->dev,
++				   dev_get_msi_domain(&dev->bus->dev));
++}
++
+ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ {
+ 	int ret;
+@@ -1585,6 +1623,9 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	ret = pcibios_add_device(dev);
+ 	WARN_ON(ret < 0);
+ 
++	/* Setup MSI irq domain */
++	pci_set_msi_domain(dev);
++
+ 	/* Notifier could use PCI capabilities */
+ 	dev->match_driver = false;
+ 	ret = device_add(&dev->dev);
+@@ -1975,6 +2016,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	b->bridge = get_device(&bridge->dev);
+ 	device_enable_async_suspend(b->bridge);
+ 	pci_set_bus_of_node(b);
++	pci_set_bus_msi_domain(b);
+ 
+ 	if (!parent)
+ 		set_dev_node(b->bridge, pcibus_to_node(b));
 -- 
 2.1.4
