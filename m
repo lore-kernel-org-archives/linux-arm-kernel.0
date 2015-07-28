@@ -1,39 +1,109 @@
-From: jamesjj.liao@mediatek.com (James Liao)
-Date: Tue, 28 Jul 2015 13:10:45 +0800
-Subject: [PATCH v4 1/7] clk: mediatek: Add fixed clocks support for
- Mediatek SoC.
-In-Reply-To: <CAGS+omAhnqy7AZ6x7QoEez3Fq8ghkj5_DrNCf18c0AO+aKnoyQ@mail.gmail.com>
-References: <1437706925-3222-1-git-send-email-jamesjj.liao@mediatek.com>
- <1437706925-3222-2-git-send-email-jamesjj.liao@mediatek.com>
- <CAGS+omAhnqy7AZ6x7QoEez3Fq8ghkj5_DrNCf18c0AO+aKnoyQ@mail.gmail.com>
-Message-ID: <1438060245.17770.11.camel@mtksdaap41>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 28 Jul 2015 13:17:08 +0800
+Subject: [PATCH v1 2/4] ARM: imx6ul: add fec MAC refrence clock and phy
+ fixup init
+In-Reply-To: <1437122304-20598-3-git-send-email-b38611@freescale.com>
+References: <1437122304-20598-1-git-send-email-b38611@freescale.com>
+ <1437122304-20598-3-git-send-email-b38611@freescale.com>
+Message-ID: <20150728051708.GD12927@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Fri, 2015-07-24 at 19:33 +0800, Daniel Kurtz wrote:
-> Hi James,
+On Fri, Jul 17, 2015 at 04:38:22PM +0800, Fugang Duan wrote:
+> Add FEC MAC refrence clock init.
+> Add phy fixup init for i.MX6ul 14x14 evk board that installs KSZ8081 phy.
+> For the phy, there needs extra phy fixup for MII and RMII mode.
 > 
-> On Fri, Jul 24, 2015 at 11:01 AM, James Liao <jamesjj.liao@mediatek.com> wrote:
-> >
-> > +void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks, int num,
-> > +               struct clk_onecell_data *clk_data)
+> Signed-off-by: Fugang Duan <b38611@freescale.com>
+> ---
+>  arch/arm/mach-imx/mach-imx6ul.c | 43 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6ul.c b/arch/arm/mach-imx/mach-imx6ul.c
+> index f206506..d4f8b6c 100644
+> --- a/arch/arm/mach-imx/mach-imx6ul.c
+> +++ b/arch/arm/mach-imx/mach-imx6ul.c
+> @@ -9,9 +9,51 @@
+>  #include <linux/of_platform.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> +#include <linux/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+
+Please group <linux/*> headers together and have them sort
+alphabetically.
+
+>  
+>  #include "common.h"
+>  
+> +static void __init imx6ul_enet_clk_init(void)
+> +{
+> +	struct regmap *gpr;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6ul-iomuxc-gpr");
+> +	if (!IS_ERR(gpr))
+> +		regmap_update_bits(gpr, IOMUXC_GPR1, IMX6UL_GPR1_ENET_CLK_DIR,
+> +				   IMX6UL_GPR1_ENET_CLK_OUTPUT);
+
+Is it correct to set this up for all board designs?
+
+> +	else
+> +		pr_err("failed to find fsl,imx6ul-iomux-gpr regmap\n");
+> +
+> +}
+> +
+> +static int ksz8081_phy_fixup(struct phy_device *dev)
+> +{
+> +	if (dev && dev->interface == PHY_INTERFACE_MODE_MII) {
+> +		phy_write(dev, 0x1f, 0x8110);
+> +		phy_write(dev, 0x16, 0x201);
+> +	} else if (dev && dev->interface == PHY_INTERFACE_MODE_RMII) {
+> +		phy_write(dev, 0x1f, 0x8190);
+> +		phy_write(dev, 0x16, 0x202);
+> +	}
+
+Can this be done from device tree like what 954c396756e3 (net/phy:
+micrel: Add OF configuration support for ksz9021) does?
+> +
+> +	return 0;
+> +}
+> +
+> +#define PHY_ID_KSZ8081	0x00221560
+
+include/linux/micrel_phy.h already has this.
+
+Shawn
+
+> +static void __init imx6ul_enet_phy_init(void)
+> +{
+> +	phy_register_fixup_for_uid(PHY_ID_KSZ8081, 0xffffffff, ksz8081_phy_fixup);
+> +}
+> +
+> +static inline void imx6ul_enet_init(void)
+> +{
+> +	imx6ul_enet_clk_init();
+> +	imx6ul_enet_phy_init();
+> +}
+> +
+>  static void __init imx6ul_init_machine(void)
+>  {
+>  	struct device *parent;
+> @@ -21,6 +63,7 @@ static void __init imx6ul_init_machine(void)
+>  		pr_warn("failed to initialize soc device\n");
+>  
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +	imx6ul_enet_init();
+>  	imx_anatop_init();
+>  }
+>  
+> -- 
+> 1.9.1
 > 
 > 
-> void __init mtk_clk_register_fixed_clks(...
-
-It will be added in next patch.
-
-
-> > -extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
-> > +void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
-> Technically, this hunk is unrelated and should probably be in its own patch.
-
-It will be in a separated patch.
-
-
-Best regards,
-
-James
