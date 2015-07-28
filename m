@@ -1,38 +1,97 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jul 2015 22:38:54 +0800
-Subject: [PATCH v7 1/2] irqchip: imx-gpcv2: IMX GPCv2 driver for wakeup
- sources
-In-Reply-To: <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
-References: <1438025400-5919-1-git-send-email-shenwei.wang@freescale.com>
- <1438025400-5919-2-git-send-email-shenwei.wang@freescale.com>
- <20150728012452.GX12927@tiger>
- <CY1PR0301MB08438D52968A601F94DBB55C838D0@CY1PR0301MB0843.namprd03.prod.outlook.com>
-Message-ID: <20150728143854.GH12927@tiger>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Jul 2015 15:39:19 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <CAL_JsqL=e+fL_67_GPKjt_7wJ81GfFx7m9gjxmBDvW_JBXWpfQ@mail.gmail.com>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <CAL_JsqL=e+fL_67_GPKjt_7wJ81GfFx7m9gjxmBDvW_JBXWpfQ@mail.gmail.com>
+Message-ID: <20150728143919.GW14943@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 02:27:42PM +0000, Shenwei Wang wrote:
-> > > +static int gpcv2_wakeup_source_save(void) {
-> > > +	struct imx_gpcv2_irq *cd;
-> > 
-> > We generally name variables in an abbrev of the types to make them intuitive.  I
-> > tried hard to map "cd" to "imx_gpcv2_irq" and failed.
-> > Can you help me on that?
+On Tue, 28 Jul 2015, Rob Herring wrote:
+
+> On Mon, Jul 27, 2015 at 10:20 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> > These OPPs are used in ST's CPUFreq implementation.
+> >
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >
+> > Changelog:
+> >  - None, new patch
+> >
+> >  Documentation/devicetree/bindings/power/opp-st.txt | 76 ++++++++++++++++++++++
+> >  1 file changed, 76 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/power/opp-st.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/power/opp-st.txt b/Documentation/devicetree/bindings/power/opp-st.txt
+> > new file mode 100644
+> > index 0000000..6eb2a91
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/power/opp-st.txt
+> > @@ -0,0 +1,76 @@
+> > +STMicroelectronics OPP (Operating Performance Points) Bindings
+> > +--------------------------------------------------------------
+> > +
+> > +Frequency Scaling only
+> > +----------------------
+> > +
+> > +Located in CPU's node:
+> > +
+> > +- operating-points     : [See: ./opp.txt]
+> > +
+> > +Example [safe]
+> > +--------------
+> > +
+> > +cpus {
+> > +       cpu at 0 {
+> > +                                /* kHz     uV   */
+> > +               operating-points = <1500000 0
+> > +                                   1200000 0
+> > +                                   800000  0
+> > +                                   500000  0>;
+> > +       };
+> > +};
+> > +
+> > +Dynamic Voltage and Frequency Scaling (DVFS)
+> > +--------------------------------------------
+> > +
+> > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
+> > +
+> > +- compatible           : Should be "operating-points-v2-sti"
+> > +- opp{1..N}            : Each 'oppX' subnode will contain the following properties:
+> > + - opp-hz              : CPU frequency [Hz] for this OPP [See: ./opp.txt]
+> > + - st,avs              : List of available voltages [uV] indexed by process code
 > 
-> CD is the abbreviation of chip data which is a member of irq_data.
+> Add a unit suffix (-microvolt).
 
-You are defining a variable of type imx_gpcv2_irq, neither chip_data nor
-irq_data.
+Sure.
 
-> > > +void ca7_cpu_resume(void);
-> > > +void imx7_suspend(void __iomem *ocram_vbase);
-> > 
-> > Why do these declarations need to be in this header?
+> > + - st,cuts             : Cut version this OPP is suitable for [0xFF means ALL]
+> > + - st,substrate                : Substrate version this OPP is suitable for [0xFF means ALL]
 > 
-> Just to resolve the compile errors.
+> How about not present means all?
 
-Wrong solution.  They belong to some header in arch/arm/mach-imx not
-include/soc/imx, as there is no code outside arch/arm/mach-imx needs
-these declaration.
+I think that would be an unsafe assumption.  If it's forgotten, then
+we may try to run an invalid/dangerous voltage/frequency combination.
 
-Shawn
+I'd really like 'all' to be defined an deliberate.
+
+> > +- st,syscfg            : Phandle to Major number register
+> > +                               First cell: offset to major number
+> > +- st,syscfg-eng                : Phandle to Minor number and Pcode registers
+> > +                               First cell: offset to process code
+> > +                               Second cell: offset to minor number
+> 
+> Would the proposed nvmem binding work for this?
+
+We already use sysconf for all of this type of stuff, as this
+information is contained in ST's Sysconf banks.  Moving over to a new
+API would be a huge move and would require lots of planning
+discussions with ST.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
