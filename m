@@ -1,93 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Jul 2015 08:41:04 +0100
-Subject: [PATCH v4 1/2] dt: cpufreq: st: Provide bindings for ST's
- CPUFreq implementation
-In-Reply-To: <20150728022308.GA1229@linux>
-References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
- <20150728022308.GA1229@linux>
-Message-ID: <20150728074104.GL21114@x1>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 28 Jul 2015 09:44:38 +0200
+Subject: [RFCv2 2/3] dts: zynq: Add devicetree entry for Xilinx Zynq reset
+ controller.
+In-Reply-To: <55B72857.3020108@atmel.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-3-git-send-email-moritz.fischer@ettus.com>
+ <55B5D62D.4010407@monstr.eu>
+ <CAAtXAHepDRbiiznHnT3dLLLWS_VH2a9BhnNgZzDECx__QceEeg@mail.gmail.com>
+ <55B72857.3020108@atmel.com>
+Message-ID: <55B732E6.7080901@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jul 2015, Viresh Kumar wrote:
-
-> On 27-07-15, 16:20, Lee Jones wrote:
-> > Cc: devicetree at vger.kernel.org
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> > 
-> > Changelog:
-> >  - Using OPP-v2
-> >  - Moved (and linked) a bunch of documentation to ../power/
-> > 
-> >  .../devicetree/bindings/cpufreq/cpufreq-st.txt     | 40 ++++++++++++++++++++++
-> >  1 file changed, 40 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-> > new file mode 100644
-> > index 0000000..79add9d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/cpufreq/cpufreq-st.txt
-> > @@ -0,0 +1,40 @@
-> > +Binding for ST's CPUFreq driver
-> > +===============================
-> > +
-> > +Frequency Scaling only
-> > +----------------------
-> > +
-> > +Located in CPU's node:
-> > +
-> > +- operating-points		: [See: ../power/opp.txt]
-> > +
-> > +Example [safe]
-> > +--------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +				 /* kHz     uV   */
-> > +		operating-points = <1500000 0
-> > +				    1200000 0
-> > +				    800000  0
-> > +				    500000  0>;
-> > +	};
-> > +};
-> > +
-> > +Dynamic Voltage and Frequency Scaling (DVFS)
-> > +--------------------------------------------
-> > +
-> > +Located in CPU's node:
-> > +
-> > +- operating-points-v2-sti	: [See ../power/opp-st.txt]
-> > +
-> > +Example [unsafe]
-> > +----------------
-> > +
-> > +cpus {
-> > +	cpu at 0 {
-> > +		operating-points-v2	= <[OPP list phandle]>;
-> > +	};
-> > +};
-> > +
-> > +For an example of an OPP list, see ../power/opp-st.txt.
+On 07/28/2015 08:59 AM, Nicolas Ferre wrote:
+> Le 28/07/2015 07:03, Moritz Fischer a ?crit :
+>> Hi Michal,
+>>
+>> I agree we need to be careful with changing the bindings.
+>>
+>> On Sun, Jul 26, 2015 at 11:56 PM, Michal Simek <monstr@monstr.eu> wrote:
+>>> Hi Moritz,
+>>>
+>>> On 07/25/2015 02:21 AM, Moritz Fischer wrote:
+>>>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>>>> ---
+>>>>  arch/arm/boot/dts/zynq-7000.dtsi            | 43 ++++++++++++-
+>>>
+>>> This patch is nice in general but every change in binding should be
+>>> discussed separately. There is also necessary to wire them up in the
+>>> driver to do action. That's why I think that will be the best just to
+>>> add the code to slcr and keep others untouched.
+>>
+>> Ok, just to clarify: You'd suggest to just add the rstc as child node
+>> to the slcr,
+>> and leave the other nodes untouched?
+>>
+>>>
+>>> For example MACB/GEM is one example. Adding names to this node and
+>>> extending driver to work properly with reset means that all others MACB
+>>> users will be affected. Definitely this patch should be ACKed by Nicolas.
 > 
-> I don't think you need this file/patch at all.. It is almost blank and
-> doesn't define a binding. And so there is no need to specify this at
-> all. Just an OPP binding file is enough.
+> Actually, I don't know why a reset property should be added to the macb
+> driver...
 
-I have two issues with that.  Firstly, although the driver uses the
-OPP API (it also uses the Regulator and Clock API too), it is
-fundamentally a CPUFreq driver, so I think it should have a CPUFreq
-DT entry.  Secondly, if someone doesn't know the history of the
-ST CPUFreq set, they will look here for an accompanying document.  I
-personally wouldn't think to look in power/*opp* for a CPUFreq
-binding.
+I expect resetting IP core can solve something. But as I said it is
+questionable if IP should be reset when driver is probed. Definitely on
+Zynq there is a support for it. I am not aware about any problem which
+requires IP to be reset.
 
-Perhaps, as all of the CPUFreq drivers use the OPP API, everything
-should be moved to drivers/base/power or drivers/power?
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Michal
