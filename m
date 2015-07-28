@@ -1,81 +1,67 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 28 Jul 2015 09:05:13 +0800
-Subject: [PATCH v8 3/5] mtd: nand: vf610_nfc: add device tree bindings
-In-Reply-To: <1438015365-15685-4-git-send-email-stefan@agner.ch>
-References: <1438015365-15685-1-git-send-email-stefan@agner.ch>
- <1438015365-15685-4-git-send-email-stefan@agner.ch>
-Message-ID: <20150728010513.GV12927@tiger>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Tue, 28 Jul 2015 09:07:14 +0800
+Subject: [PATCH] mmc: sdhci-of-arasan: Get quirks from device tree
+In-Reply-To: <55B5EA96.6020604@monstr.eu>
+References: <1437984249-18332-1-git-send-email-shawn.lin@rock-chips.com>
+ <55B5EA96.6020604@monstr.eu>
+Message-ID: <55B6D5C2.4080907@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 06:42:43PM +0200, Stefan Agner wrote:
-> Signed-off-by: Bill Pringlemeir <bpringlemeir@nbsps.com>
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-
-Acked-by: Shawn Guo <shawnguo@kernel.org>
-
-> ---
->  .../devicetree/bindings/mtd/vf610-nfc.txt          | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/vf610-nfc.txt b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> new file mode 100644
-> index 0000000..cae5f25
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/vf610-nfc.txt
-> @@ -0,0 +1,45 @@
-> +Freescale's NAND flash controller (NFC)
-> +
-> +This variant of the Freescale NAND flash controller (NFC) can be found on
-> +Vybrid (vf610), MPC5125, MCF54418 and Kinetis K70.
-> +
-> +Required properties:
-> +- compatible: Should be set to "fsl,vf610-nfc"
-> +- reg: address range of the NFC
-> +- interrupts: interrupt of the NFC
-> +- nand-bus-width: see nand.txt
-> +- nand-ecc-mode: see nand.txt
-> +- nand-on-flash-bbt: see nand.txt
-> +- assigned-clocks: main clock from the SoC, for Vybrid <&clks VF610_CLK_NFC>;
-> +- assigned-clock-rates: The NAND bus timing is derived from this clock
-> +    rate and should not exceed maximum timing for any NAND memory chip
-> +    in a board stuffing. Typical NAND memory timings derived from this
-> +    clock are found in the SoC hardware reference manual. Furthermore,
-> +    there might be restrictions on maximum rates when using hardware ECC.
-> +
-> +- #address-cells, #size-cells : Must be present if the device has sub-nodes
-> +  representing partitions.
-> +
-> +Required properties for hardware ECC:
-> +- nand-ecc-strength: supported strengths are 24 and 32 bit (see nand.txt)
-> +- nand-ecc-step-size: step size equals page size, currently only 2k pages are
-> +    supported
-> +
-> +Example:
-> +
-> +	nfc: nand at 400e0000 {
-> +		compatible = "fsl,vf610-nfc";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		reg = <0x400e0000 0x4000>;
-> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&clks VF610_CLK_NFC>;
-> +		clock-names = "nfc";
-> +		assigned-clocks = <&clks VF610_CLK_NFC>;
-> +		assigned-clock-rates = <33000000>;
-> +		nand-bus-width = <8>;
-> +		nand-ecc-mode = "hw";
-> +		nand-ecc-strength = <32>;
-> +		nand-ecc-step-size = <2048>;
-> +		nand-on-flash-bbt;
-> +	};
-> -- 
-> 2.4.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+On 2015/7/27 16:23, Michal Simek wrote:
+> On 07/27/2015 10:04 AM, Shawn Lin wrote:
+>> This patch adds the interface to get quirks from dts, and
+>> there is no need to assign different quirks by condition statement
+>> of arasan IP version.
+>>
+>> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+>> ---
+>>
+>>   drivers/mmc/host/sdhci-of-arasan.c | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+>> index ef5a7d2..db07788 100644
+>> --- a/drivers/mmc/host/sdhci-of-arasan.c
+>> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+>> @@ -132,6 +132,7 @@ static SIMPLE_DEV_PM_OPS(sdhci_arasan_dev_pm_ops, sdhci_arasan_suspend,
+>>   static int sdhci_arasan_probe(struct platform_device *pdev)
+>>   {
+>>   	int ret;
+>> +	u32 quirktab[2];
+>>   	struct clk *clk_xin;
+>>   	struct sdhci_host *host;
+>>   	struct sdhci_pltfm_host *pltfm_host;
+>> @@ -172,6 +173,12 @@ static int sdhci_arasan_probe(struct platform_device *pdev)
+>>   		goto clk_disable_all;
+>>   	}
+>>   
+>> +	if (of_property_read_u32_array(pdev->dev.of_node,
+>> +				       "arasan,quirks", &quirktab[0], 2)) {
+> This is not documented anywhere that's why you should send binding to DT
+> mailing list and get ACK for it.
+Thanks, Michal. You'r right, and  forgive me, a green hand, for my 
+inappropriate patch.
+>> +		host->quirks |= quirktab[0];
+>> +		host->quirks2 |= quirktab[1];
+>> +	}
+>> +
+>>   	if (of_device_is_compatible(pdev->dev.of_node, "arasan,sdhci-4.9a")) {
+>>   		host->quirks |= SDHCI_QUIRK_NO_HISPD_BIT;
+>>   		host->quirks2 |= SDHCI_QUIRK2_HOST_NO_CMD23;
+>>
+> Also is there any binding which is done in this way?
+Thanks.
+BTW:
+I got a FPGA board w/ a sdhci-arasn emmc controller & PHY IP which can 
+support emmc version 5.1.
+But I cannot find any documented details from  IP databook for the 
+vendor version, such as "sdhci-4.9a".
+The only one is "ACS eMMC5.1 PHY IP uses TSMC ESD I/O protection 
+structures TMSC  product name
+tphn28hpcgv2od3 Version 120a". Is "sdhci-120a" the version if  I add a 
+compatib node?
+Kindly hope you can elaborate more ?)
+> Thanks,
+> Michal
+>
