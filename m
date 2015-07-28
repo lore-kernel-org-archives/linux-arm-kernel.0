@@ -1,140 +1,61 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 28 Jul 2015 19:50:20 +0200
-Subject: [PATCH v1 7/7] ARM: dts: ifc6410: add inforce LVDS panel support
-In-Reply-To: <1438088076-17606-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1438088076-17606-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <55B7C0DC.2010501@suse.de>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 28 Jul 2015 10:51:18 -0700
+Subject: [PATCH 0/2 RESEND] power: reset: Add syscon reboot/poweroff
+ device nodes for APM X-Gene platform
+In-Reply-To: <20150726183742.GA24272@localhost>
+References: <1433272747-27114-1-git-send-email-ttnguyen@apm.com>
+ <20150714084004.GA14593@localhost>
+ <CAPw-ZT=d2=dh-Hjugo9BStCuhTp82MMapUa1EGrD01EoTOG-nA@mail.gmail.com>
+ <CAOesGMhKRxUtr6XXsZgCJVUFTFL3eHySP8y-SmEzi=R53MxLRw@mail.gmail.com>
+ <CAPw-ZTnk8cZyFyMnBMUYXuxs9=2ydqxOzm+dYsg-=9_Suq+q7A@mail.gmail.com>
+ <CAOesGMimzcUDW4e1etxZNerEusWmEtT_um8XZoT0MkFpCnTf5w@mail.gmail.com>
+ <CADaLNDmPqb73UrOaVphkywZh8mfd4sPdA6i25USLt53sZ3hFuw@mail.gmail.com>
+ <20150726183742.GA24272@localhost>
+Message-ID: <CADaLNDkaoFC-Hj7fk+iadm0tuimpNG6C3TqoLBBanEZ=gnntJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.07.2015 um 14:54 schrieb Srinivas Kandagatla:
-> This patch adds LVDS panel for IFC6410.
-> 
-> Signed-off-by: Rob Clark <robdclark@gmail.com>
-> [Rob Clark: WIP patch]
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 66 ++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> index 1ab71f1..3bdac02 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
-> @@ -63,6 +63,12 @@
->  					qcom,switch-mode-frequency = <3200000>;
->  				};
->  
-> +				pm8921_l2: l2 {
-> +					regulator-min-microvolt = <1200000>;
-> +					regulator-max-microvolt = <1200000>;
-> +					bias-pull-down;
-> +				};
-> +
->  				pm8921_l3: l3 {
->  					regulator-min-microvolt = <3050000>;
->  					regulator-max-microvolt = <3300000>;
-> @@ -96,6 +102,10 @@
->  				pm8921_lvs1: lvs1 {
->  					bias-pull-down;
->  				};
-> +
-> +				pm8921_lvs7: lvs7 {
-> +					bias-pull-down;
-> +				};
->  			};
->  		};
->  
-> @@ -119,6 +129,41 @@
->  
->  		mdp: qcom,mdp at 5100000 {
->  			status = "okay";
-> +			qcom,lvds-panel = <&panel>;
+On Sun, Jul 26, 2015 at 11:37 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Jul 25, 2015 at 11:34:42AM -0700, Duc Dang wrote:
+>> Hi Olof,
+>>
+>> We are debating whether we should setup a company server (where we can
+>> have full control about storage, user permissions, backup, ...) or
+>> just use github.com to host our X-Gene kernel tree.
+>>
+>> Github seems already provide everything we need for a public source
+>> tree. Per your experience, what is your (and probably other
+>> maintainers) reference in git hosting server? Is there any
+>> inconvenience or difficulty for the maintainers to pull/merge code
+>> from Github versus from a company server?
+>
+> Hosting on github is fine with us in general. We do prefer to get
+> signed pull requests in particular when they come from other sources
+> than kernel.org, mostly because there's another third party involved in
+> hosting the repo and by using signed tags there's less room for anyone
+> to do bad stuff with the repository without someone noticing.
+>
+> If you host on github, please still use native git pull requests and not the
+> ones that github provides via the web interface.
+>
+> Note however, that given the total volume of patches there's no strong need for
+> you to have a public repo just to send code to us -- we're happy applying
+> patches at the volumes we're currently looking at. I can imagine other reasons
+> for why you would like to have a public repo though.
+>
 
-In my testing this broke/uglified HDMI output. Since not everyone has
-that LVDS panel attached, or might have a different panel type, I don't
-think the panel node belongs in the generic -ifc6410.dts file.
-I suggest you add an -ifc6410+inforce-lvds.dts or so for that.
+Thanks for the information, Olof.
 
-> +			lvds-vccs-3p3v-supply = <&ext_3p3v>;
-> +			lvds-pll-vdda-supply = <&pm8921_l2>;
-> +			lvds-vdda-supply = <&pm8921_lvs7>;
-> +		};
-> +
-> +		panel_3p3v: panel_3p3v {
+We are setting up a public repo on Github. I will make sure that
+native git pull request is used.
 
-s/_/-/ ?
+I will need your help in signing the PGP key when the repo is ready.
 
-> +			compatible = "regulator-fixed";
-> +			pinctrl-0 = <&disp_en_gpios>;
-> +			pinctrl-names = "default";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			regulator-name = "panel_en_3p3v";
-> +			regulator-type = "voltage";
-> +			startup-delay-us = <0>;
-> +			gpio = <&pm8921_gpio 36 GPIO_ACTIVE_HIGH>;
-> +			enable-active-high;
-> +			regulator-boot-on;
-> +		};
-> +
-> +		backlight: backlight{
-> +			pinctrl-0 = <&pwm_bl_gpios>;
-> +			pinctrl-names = "default";
-> +			compatible = "gpio-backlight";
-> +			gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
-> +			default-on;
-> +		};
-> +
-> +		panel: auo,b101xtn01 {
-
-panel: panel { ?
-
-Regards,
-Andreas
-
-> +			status = "okay";
-> +			compatible = "auo,b101xtn01";
-> +
-> +			ddc-i2c-bus = <&i2c3>;
-> +			backlight = <&backlight>;
-> +			power-supply = <&panel_3p3v>;
->  		};
->  
->  		gsbi3: gsbi at 16200000 {
-> @@ -235,6 +280,27 @@
->  				pm8921_gpio: gpio at 150 {
->  					pinctrl-names = "default";
->  					pinctrl-0 = <&wlan_default_gpios>;
-> +
-> +					pwm_bl_gpios: pwm-bl-gpios {
-> +						pios {
-> +							pins = "gpio26";
-> +							bias-disable;
-> +							function = "normal";
-> +							qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
-> +							power-source = <PM8921_GPIO_S4>;
-> +						};
-> +					};
-> +
-> +					disp_en_gpios: disp-en-gpios {
-> +						pios {
-> +							pins = "gpio36";
-> +							bias-disable;
-> +							function = "normal";
-> +							qcom,drive-strength = <PMIC_GPIO_STRENGTH_HIGH>;
-> +							power-source = <PM8921_GPIO_S4>;
-> +						};
-> +					};
-> +
->  					wlan_default_gpios: wlan-gpios {
->  						pios {
->  							pins = "gpio43";
-> 
-
+>
+> Thanks,
+>
+> -Olof
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Dilip Upmanyu, Graham Norton; HRB
-21284 (AG N?rnberg)
+Regards,
+Duc Dang.
