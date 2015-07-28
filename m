@@ -1,77 +1,90 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Tue, 28 Jul 2015 15:03:55 +0530
-Subject: [PATCH v7 02/13] clk: qcom: gdsc: Prepare common clk probe to
- register gdscs
-In-Reply-To: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-References: <1438076046-4706-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <1438076046-4706-3-git-send-email-rnayak@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Jul 2015 11:32:22 +0200
+Subject: [PATCH v7 5/5] clk: dt: Introduce binding for critical clock
+ support
+In-Reply-To: <20150727073149.GV3436@x1>
+References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
+ <1437570255-21049-6-git-send-email-lee.jones@linaro.org>
+ <20150727071013.GO2564@lukather> <20150727073149.GV3436@x1>
+Message-ID: <20150728093222.GV2564@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The common clk probe registers a clk provider and a reset controller.
-Update it to register a genpd provider using the gdsc data provided
-by each platform.
+On Mon, Jul 27, 2015 at 08:31:49AM +0100, Lee Jones wrote:
+> On Mon, 27 Jul 2015, Maxime Ripard wrote:
+> 
+> > Hi Lee,
+> > 
+> > On Wed, Jul 22, 2015 at 02:04:15PM +0100, Lee Jones wrote:
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  .../devicetree/bindings/clock/clock-bindings.txt   | 39 ++++++++++++++++++++++
+> > >  1 file changed, 39 insertions(+)
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > index 06fc6d5..4137034 100644
+> > > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
+> > > @@ -44,6 +44,45 @@ For example:
+> > >    clocks by index. The names should reflect the clock output signal
+> > >    names for the device.
+> > >  
+> > > +critical-clock:	Some hardware contains bunches of clocks which, in normal
+> > > +		circumstances, must never be turned off.  If drivers a) fail to
+> > > +		obtain a reference to any of these or b) give up a previously
+> > > +		obtained reference during suspend, it is possible that some
+> > > +		Operating Systems might attempt to disable them to save power.
+> > > +		If this happens a platform can fail irrecoverably as a result.
+> > > +		Usually the only way to recover from these failures is to
+> > > +		reboot.
+> > > +
+> > > +		To avoid either of these two scenarios from catastrophically
+> > > +		disabling an otherwise perfectly healthy running system,
+> > > +		clocks can be identified as 'critical' using this property from
+> > > +		inside a clocksource's node.
+> > > +
+> > > +		This property is not to be abused.  It is only to be used to
+> > > +		protect platforms from being crippled by gated clocks, NOT as a
+> > > +		convenience function to avoid using the framework correctly
+> > > +		inside device drivers.
+> > > +
+> > > +		Expected values are hardware clock indices.  If the
+> > > +		clock-indices property (see below) is used, then supplied
+> > > +		values must correspond to one of the listed identifiers.
+> > > +		Using the clock-indices example below, hardware clock <2>
+> > > +		is missing, therefore it is considered invalid to then
+> > > +		list clock <2> as a critical clock.
+> > 
+> > I think we should also consider having it simply as a boolean. Using
+> > indices for clocks that don't have any (for example because it only
+> > provides a single clock) seem to not really make much sense.
+> 
+> Then how would you distinguish between the clocks if the provider
+> provides more than a single clock?
 
-Signed-off-by: Rajendra Nayak <rnayak@codeaurora.org>
----
- drivers/clk/qcom/common.c | 15 ++++++++++++++-
- drivers/clk/qcom/common.h |  2 ++
- 2 files changed, 16 insertions(+), 1 deletion(-)
+What I had in mind was that, you would have three cases:
 
-diff --git a/drivers/clk/qcom/common.c b/drivers/clk/qcom/common.c
-index f7101e3..a319aa8 100644
---- a/drivers/clk/qcom/common.c
-+++ b/drivers/clk/qcom/common.c
-@@ -21,6 +21,7 @@
- #include "clk-rcg.h"
- #include "clk-regmap.h"
- #include "reset.h"
-+#include "gdsc.h"
- 
- struct qcom_cc {
- 	struct qcom_reset_controller reset;
-@@ -120,8 +121,19 @@ int qcom_cc_really_probe(struct platform_device *pdev,
- 
- 	ret = reset_controller_register(&reset->rcdev);
- 	if (ret)
--		of_clk_del_provider(dev->of_node);
-+		goto err_reset;
- 
-+	if (desc->gdscs && desc->num_gdscs) {
-+		ret = gdsc_register(dev, desc->gdscs, desc->num_gdscs, regmap);
-+		if (ret)
-+			goto err_pd;
-+	}
-+
-+	return 0;
-+err_pd:
-+	reset_controller_unregister(&reset->rcdev);
-+err_reset:
-+	of_clk_del_provider(dev->of_node);
- 	return ret;
- }
- EXPORT_SYMBOL_GPL(qcom_cc_really_probe);
-@@ -140,6 +152,7 @@ EXPORT_SYMBOL_GPL(qcom_cc_probe);
- 
- void qcom_cc_remove(struct platform_device *pdev)
- {
-+	gdsc_unregister(&pdev->dev);
- 	of_clk_del_provider(pdev->dev.of_node);
- 	reset_controller_unregister(platform_get_drvdata(pdev));
- }
-diff --git a/drivers/clk/qcom/common.h b/drivers/clk/qcom/common.h
-index 7a0e737..2892b71f 100644
---- a/drivers/clk/qcom/common.h
-+++ b/drivers/clk/qcom/common.h
-@@ -28,6 +28,8 @@ struct qcom_cc_desc {
- 	size_t num_clks;
- 	const struct qcom_reset_map *resets;
- 	size_t num_resets;
-+	struct gdsc **gdscs;
-+	size_t num_gdscs;
- };
- 
- extern const struct freq_tbl *qcom_find_freq(const struct freq_tbl *f,
+  - critical-clocks is not there: no clocks are made critical
+
+  - critical-clocks is there, but doesn't have any values: all the
+    clocks provided are marked critical
+
+  - critical-clocks is there and it has a list of values: only the
+    clocks listed are marked critical.
+
+Does that make sense to you?
+
+Thanks,
+Maxime
+
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
-of Code Aurora Forum, hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150728/1de9ebb8/attachment-0001.sig>
