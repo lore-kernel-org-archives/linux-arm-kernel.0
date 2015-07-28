@@ -1,50 +1,62 @@
 From: r.baldyga@samsung.com (Robert Baldyga)
-Date: Tue, 28 Jul 2015 07:20:02 +0200
-Subject: [PATCH 5/7] usb: gadget: f_ecm/f_ncm: check quirk instead of UDC name
+Date: Tue, 28 Jul 2015 07:20:03 +0200
+Subject: [PATCH 6/7] usb: gadget: apply generic altsetting support check
+ mechanism
 In-Reply-To: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
 References: <1438060804-21706-1-git-send-email-r.baldyga@samsung.com>
-Message-ID: <1438060804-21706-6-git-send-email-r.baldyga@samsung.com>
+Message-ID: <1438060804-21706-7-git-send-email-r.baldyga@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use generic mechanism to check if UDC controller supports zlp.
+Replace calls of gadget_supports_altsettings() function (which check altset
+support by comparing UDC controller name with hardcoded names) with
+gadget_is_altset_supported() which checks generic quirk bitfield.
 
 Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
 ---
- drivers/usb/gadget/function/f_ecm.c | 4 ++--
- drivers/usb/gadget/function/f_ncm.c | 5 ++---
- 2 files changed, 4 insertions(+), 5 deletions(-)
+ drivers/usb/gadget/function/f_obex.c  | 2 +-
+ drivers/usb/gadget/function/u_ether.h | 2 +-
+ drivers/usb/gadget/legacy/nokia.c     | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/usb/gadget/function/f_ecm.c b/drivers/usb/gadget/function/f_ecm.c
-index 798760f..7b7424f 100644
---- a/drivers/usb/gadget/function/f_ecm.c
-+++ b/drivers/usb/gadget/function/f_ecm.c
-@@ -585,8 +585,8 @@ static int ecm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
- 			/* Enable zlps by default for ECM conformance;
- 			 * override for musb_hdrc (avoids txdma ovhead).
- 			 */
--			ecm->port.is_zlp_ok = !(gadget_is_musbhdrc(cdev->gadget)
--				);
-+			ecm->port.is_zlp_ok =
-+				gadget_is_zlp_supported(cdev->gadget);
- 			ecm->port.cdc_filter = DEFAULT_FILTER;
- 			DBG(cdev, "activate ecm\n");
- 			net = gether_connect(&ecm->port);
-diff --git a/drivers/usb/gadget/function/f_ncm.c b/drivers/usb/gadget/function/f_ncm.c
-index bdcda9f..3f05c6bd 100644
---- a/drivers/usb/gadget/function/f_ncm.c
-+++ b/drivers/usb/gadget/function/f_ncm.c
-@@ -853,9 +853,8 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
- 			/* Enable zlps by default for NCM conformance;
- 			 * override for musb_hdrc (avoids txdma ovhead)
- 			 */
--			ncm->port.is_zlp_ok = !(
--				gadget_is_musbhdrc(cdev->gadget)
--				);
-+			ncm->port.is_zlp_ok =
-+				gadget_is_zlp_supported(cdev->gadget);
- 			ncm->port.cdc_filter = DEFAULT_FILTER;
- 			DBG(cdev, "activate ncm\n");
- 			net = gether_connect(&ncm->port);
+diff --git a/drivers/usb/gadget/function/f_obex.c b/drivers/usb/gadget/function/f_obex.c
+index 5519f85..2682d59 100644
+--- a/drivers/usb/gadget/function/f_obex.c
++++ b/drivers/usb/gadget/function/f_obex.c
+@@ -297,7 +297,7 @@ static inline bool can_support_obex(struct usb_configuration *c)
+ 	 *
+ 	 * Altsettings are mandatory, however...
+ 	 */
+-	if (!gadget_supports_altsettings(c->cdev->gadget))
++	if (!gadget_is_altset_supported(c->cdev->gadget))
+ 		return false;
+ 
+ 	/* everything else is *probably* fine ... */
+diff --git a/drivers/usb/gadget/function/u_ether.h b/drivers/usb/gadget/function/u_ether.h
+index 334b3894..1384f00 100644
+--- a/drivers/usb/gadget/function/u_ether.h
++++ b/drivers/usb/gadget/function/u_ether.h
+@@ -259,7 +259,7 @@ void gether_disconnect(struct gether *);
+ /* Some controllers can't support CDC Ethernet (ECM) ... */
+ static inline bool can_support_ecm(struct usb_gadget *gadget)
+ {
+-	if (!gadget_supports_altsettings(gadget))
++	if (!gadget_is_altset_supported(gadget))
+ 		return false;
+ 
+ 	/* Everything else is *presumably* fine ... but this is a bit
+diff --git a/drivers/usb/gadget/legacy/nokia.c b/drivers/usb/gadget/legacy/nokia.c
+index 8902f45..264c97e 100644
+--- a/drivers/usb/gadget/legacy/nokia.c
++++ b/drivers/usb/gadget/legacy/nokia.c
+@@ -292,7 +292,7 @@ static int nokia_bind(struct usb_composite_dev *cdev)
+ 	nokia_config_500ma_driver.iConfiguration = status;
+ 	nokia_config_100ma_driver.iConfiguration = status;
+ 
+-	if (!gadget_supports_altsettings(gadget)) {
++	if (!gadget_is_altset_supported(gadget)) {
+ 		status = -ENODEV;
+ 		goto err_usb;
+ 	}
 -- 
 1.9.1
