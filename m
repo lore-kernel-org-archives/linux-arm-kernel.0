@@ -1,33 +1,38 @@
 From: lftan@altera.com (Ley Foon Tan)
-Date: Tue, 28 Jul 2015 18:45:40 +0800
-Subject: [PATCH 1/6] arm: add msi.h to Kbuild
+Date: Tue, 28 Jul 2015 18:45:41 +0800
+Subject: [PATCH 2/6] arm: mach-socfpga: enable pci support
 In-Reply-To: <1438080345-7233-1-git-send-email-lftan@altera.com>
 References: <1438080345-7233-1-git-send-email-lftan@altera.com>
-Message-ID: <1438080345-7233-2-git-send-email-lftan@altera.com>
+Message-ID: <1438080345-7233-3-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include asm-generic/msi.h to support CONFIG_GENERIC_MSI_IRQ_DOMAIN.
-This to fix compilation error:
-"include/linux/msi.h:123:21: fatal error: asm/msi.h:
-No such file or directory"
+Enable CONFIG_ARCH_SUPPORT_MSI and CONFIG_PCI in SOCFPGA platform.
 
 Signed-off-by: Ley Foon Tan <lftan@altera.com>
 ---
- arch/arm/include/asm/Kbuild | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-socfpga/Kconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
-index 83c5019..ddc2761 100644
---- a/arch/arm/include/asm/Kbuild
-+++ b/arch/arm/include/asm/Kbuild
-@@ -14,6 +14,7 @@ generic-y += local.h
- generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += msgbuf.h
-+generic-y += msi.h
- generic-y += param.h
- generic-y += parport.h
- generic-y += poll.h
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 90efdeb..7ff4576 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -1,6 +1,7 @@
+ menuconfig ARCH_SOCFPGA
+ 	bool "Altera SOCFPGA family" if ARCH_MULTI_V7
+ 	select ARCH_SUPPORTS_BIG_ENDIAN
++	select ARCH_SUPPORTS_MSI
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select CACHE_L2X0
+@@ -9,6 +10,7 @@ menuconfig ARCH_SOCFPGA
+ 	select HAVE_ARM_SCU
+ 	select HAVE_ARM_TWD if SMP
+ 	select MFD_SYSCON
++	select PCI
+ 
+ if ARCH_SOCFPGA
+ config SOCFPGA_SUSPEND
 -- 
 1.8.2.1
