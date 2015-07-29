@@ -1,131 +1,60 @@
-From: emunson@akamai.com (Eric B Munson)
-Date: Wed, 29 Jul 2015 11:42:51 -0400
-Subject: [PATCH V6 2/6] mm: mlock: Add new mlock system call
-In-Reply-To: <1438184575-10537-1-git-send-email-emunson@akamai.com>
-References: <1438184575-10537-1-git-send-email-emunson@akamai.com>
-Message-ID: <1438184575-10537-3-git-send-email-emunson@akamai.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Wed, 29 Jul 2015 15:45:14 +0000
+Subject: bug in identity map for 4KB pages?
+In-Reply-To: <20150729114258.GK15213@leverpostej>
+References: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu_PMvbeKRnx8t3P+44q1pt-NiUcCMTq6vK-8yUMRjQPdA@mail.gmail.com>
+ <20150729114258.GK15213@leverpostej>
+Message-ID: <BY2PR0301MB0743FFE35289BF228DBCE4C8878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the refactored mlock code, introduce a new system call for mlock.
-The new call will allow the user to specify what lock states are being
-added.  mlock2 is trivial at the moment, but a follow on patch will add
-a new mlock state making it useful.
 
-Signed-off-by: Eric B Munson <emunson@akamai.com>
-Cc: Michal Hocko <mhocko@suse.cz>
-Cc: Vlastimil Babka <vbabka@suse.cz>
-Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-Cc: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Stephen Rothwell <sfr@canb.auug.org.au>
-Cc: Guenter Roeck <linux@roeck-us.net>
-Cc: linux-alpha at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: adi-buildroot-devel at lists.sourceforge.net
-Cc: linux-cris-kernel at axis.com
-Cc: linux-ia64 at vger.kernel.org
-Cc: linux-m68k at lists.linux-m68k.org
-Cc: linux-am33-list at redhat.com
-Cc: linux-parisc at vger.kernel.org
-Cc: linuxppc-dev at lists.ozlabs.org
-Cc: linux-s390 at vger.kernel.org
-Cc: linux-sh at vger.kernel.org
-Cc: sparclinux at vger.kernel.org
-Cc: linux-xtensa at linux-xtensa.org
-Cc: linux-api at vger.kernel.org
-Cc: linux-arch at vger.kernel.org
-Cc: linux-mm at kvack.org
----
- arch/x86/entry/syscalls/syscall_32.tbl | 1 +
- arch/x86/entry/syscalls/syscall_64.tbl | 1 +
- include/linux/syscalls.h               | 2 ++
- include/uapi/asm-generic/unistd.h      | 4 +++-
- kernel/sys_ni.c                        | 1 +
- mm/mlock.c                             | 9 +++++++++
- 6 files changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/entry/syscalls/syscall_32.tbl b/arch/x86/entry/syscalls/syscall_32.tbl
-index ef8187f..839d5df 100644
---- a/arch/x86/entry/syscalls/syscall_32.tbl
-+++ b/arch/x86/entry/syscalls/syscall_32.tbl
-@@ -365,3 +365,4 @@
- 356	i386	memfd_create		sys_memfd_create
- 357	i386	bpf			sys_bpf
- 358	i386	execveat		sys_execveat			stub32_execveat
-+359	i386	mlock2			sys_mlock2
-diff --git a/arch/x86/entry/syscalls/syscall_64.tbl b/arch/x86/entry/syscalls/syscall_64.tbl
-index 9ef32d5..ad36769 100644
---- a/arch/x86/entry/syscalls/syscall_64.tbl
-+++ b/arch/x86/entry/syscalls/syscall_64.tbl
-@@ -329,6 +329,7 @@
- 320	common	kexec_file_load		sys_kexec_file_load
- 321	common	bpf			sys_bpf
- 322	64	execveat		stub_execveat
-+323	common	mlock2			sys_mlock2
- 
- #
- # x32-specific system call numbers start at 512 to avoid cache impact
-diff --git a/include/linux/syscalls.h b/include/linux/syscalls.h
-index b45c45b..56a3d59 100644
---- a/include/linux/syscalls.h
-+++ b/include/linux/syscalls.h
-@@ -884,4 +884,6 @@ asmlinkage long sys_execveat(int dfd, const char __user *filename,
- 			const char __user *const __user *argv,
- 			const char __user *const __user *envp, int flags);
- 
-+asmlinkage long sys_mlock2(unsigned long start, size_t len, int flags);
-+
- #endif
-diff --git a/include/uapi/asm-generic/unistd.h b/include/uapi/asm-generic/unistd.h
-index e016bd9..14a6013 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -709,9 +709,11 @@ __SYSCALL(__NR_memfd_create, sys_memfd_create)
- __SYSCALL(__NR_bpf, sys_bpf)
- #define __NR_execveat 281
- __SC_COMP(__NR_execveat, sys_execveat, compat_sys_execveat)
-+#define __NR_mlock2 282
-+__SYSCALL(__NR_mlock2, sys_mlock2)
- 
- #undef __NR_syscalls
--#define __NR_syscalls 282
-+#define __NR_syscalls 283
- 
- /*
-  * All syscalls below here should go away really,
-diff --git a/kernel/sys_ni.c b/kernel/sys_ni.c
-index 7995ef5..4818b71 100644
---- a/kernel/sys_ni.c
-+++ b/kernel/sys_ni.c
-@@ -193,6 +193,7 @@ cond_syscall(sys_mlock);
- cond_syscall(sys_munlock);
- cond_syscall(sys_mlockall);
- cond_syscall(sys_munlockall);
-+cond_syscall(sys_mlock2);
- cond_syscall(sys_mincore);
- cond_syscall(sys_madvise);
- cond_syscall(sys_mremap);
-diff --git a/mm/mlock.c b/mm/mlock.c
-index 1585cca..807f986 100644
---- a/mm/mlock.c
-+++ b/mm/mlock.c
-@@ -642,6 +642,15 @@ SYSCALL_DEFINE2(mlock, unsigned long, start, size_t, len)
- 	return do_mlock(start, len, VM_LOCKED);
- }
- 
-+SYSCALL_DEFINE3(mlock2, unsigned long, start, size_t, len, int, flags)
-+{
-+	vm_flags_t vm_flags = VM_LOCKED;
-+	if (flags)
-+		return -EINVAL;
-+
-+	return do_mlock(start, len, vm_flags);
-+}
-+
- SYSCALL_DEFINE2(munlock, unsigned long, start, size_t, len)
- {
- 	int ret;
--- 
-1.9.1
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Wednesday, July 29, 2015 6:43 AM
+> To: Ard Biesheuvel; Yoder Stuart-B08248
+> Cc: Marc Zyngier; Catalin Marinas; Newton Peter-RA3823; Will Deacon; linux-arm-kernel at lists.infradead.org
+> Subject: Re: bug in identity map for 4KB pages?
+> 
+> On Wed, Jul 29, 2015 at 08:47:10AM +0100, Ard Biesheuvel wrote:
+> > On 29 July 2015 at 04:37, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+> > > Our system has RAM at a high address, and previously required using 48-bit VA
+> > > in order to have an idmap that covered all of RAM.
+> > >
+> > > In testing on 4.2-rc4, which now contains support for the increased VA range
+> > > of the idmap without using 48-bit VA, I'm finding that things work for
+> > > 64KB pages, but do not for 4KB pages.
+> > >
+> > > Is there any known limitation here with 4KB pages?  Any ideas?
+> > >
+> >
+> > You probably have memory at 0x8000_0000 and at 0x80_8000_0000, right?
+
+Yes.  We have 2GB of memory at 0x8000_0000 and the remainder at 
+0x80_8000_0000.
+
+> > So the physical arrangement still requires more than the 39 bits of
+> > virtual address space you get with 3 levels, even if the ID map can
+> > cope now. That is why you get the 0x40_0000_0000 virtual address:
+> > __phys_to_virt() just wraps to a positive number.
+> 
+> Ah, I see. So it's the linear mapping rather than the idmap which is the
+> problem.
+> 
+> We cut memory which would fall below the start of the linear map in
+> early_init_dt_add_memory_arch, by cutting memory below phys_offset.
+> 
+> It looks like we already have the logic for cutting memory beyond the
+> end of the linear map, so we should just need to override the limit.
+
+What is the effect of cutting that memory?  ...are we losing something?
+
+> Stuart, does the below patch prevent the panic you see?
+
+I will try it and let you know...can try the suggested patch by
+Ard as well.
+
+Thanks,
+Stuart
