@@ -1,163 +1,149 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 29 Jul 2015 12:02:48 +0530
-Subject: [PATCH v2 2/5] ARM: OMAP2+: DRA7: Add hwmod entries for PWMSS
-In-Reply-To: <55B109C1.80901@ti.com>
-References: <1433332284-10766-1-git-send-email-vigneshr@ti.com>
- <1433332284-10766-3-git-send-email-vigneshr@ti.com>
- <alpine.DEB.2.02.1507152029460.32764@utopia.booyaka.com>
- <55A7CE59.6010600@ti.com> <55B109C1.80901@ti.com>
-Message-ID: <55B87390.5010809@ti.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 29 Jul 2015 15:35:00 +0900
+Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
+ Rinato/Monk board
+In-Reply-To: <559C6C8E.2070309@samsung.com>
+References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
+ <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
+ <5594E57C.2010300@samsung.com>
+ <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
+ <092101d0b8c2$e2b39310$a81ab930$@kernel.org> <559C6C8E.2070309@samsung.com>
+Message-ID: <55B87414.10800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear Kukjin,
 
+Please pick this patch because exynos3250-cpufreq patch-set
+was already merged on linux-samsung.git.
 
-On 07/23/2015 09:05 PM, R, Vignesh wrote:
+Thanks,
+Chanwoo Choi
+
+On 07/08/2015 09:19 AM, Krzysztof Kozlowski wrote:
+> On 07.07.2015 23:40, Kukjin Kim wrote:
+>> Krzysztof Kozlowski wrote:
+>>>
+>>> 2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
+>>>> On 02.07.2015 15:11, Chanwoo Choi wrote:
+>>>>> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
+>>>>>> On 02.07.2015 14:37, Chanwoo Choi wrote:
+>>>>>>> This patch add the cooling device to control the overheating issue on
+>>>>>>> Exynos3250-based Rinato/Monk board.
+>>>>>>>
+>>>>>>> Cc: Kukjin Kim <kgene@kernel.org>
+>>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+>>>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+>>>>>>> ---
+>>>>>>> Depends on:
+>>>>>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
+>>>>>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
+>>>>>>> [1] https://lkml.org/lkml/2015/7/1/696
+>>>>>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
+>>>>>>>
+>>>>>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
+>>>>>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
+>>>>>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
+>>>>>>>  3 files changed, 31 insertions(+)
+>>>>>>>
+>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
+>>>>>>> index 7863265d4868..540a0adf2be6 100644
+>>>>>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
+>>>>>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
+>>>>>>> @@ -116,6 +116,21 @@
+>>>>>>>             min-microvolt = <1100000>;
+>>>>>>>             max-microvolt = <2700000>;
+>>>>>>>     };
+>>>>>>> +
+>>>>>>> +   thermal-zones {
+>>>>>>> +           cpu_thermal: cpu-thermal {
+>>>>>>> +                   cooling-maps {
+>>>>>>> +                           map0 {
+>>>>>>> +                                   /* Correspond to 500MHz at freq_table */
+>>>>>>> +                                   cooling-device = <&cpu0 5 5>;
+>>>>>>> +                           };
+>>>>>>> +                           map1 {
+>>>>>>> +                                   /* Correspond to 200MHz at freq_table */
+>>>>>>> +                                   cooling-device = <&cpu0 8 8>;
+>>>>>>> +                           };
+>>>>>>> +                   };
+>>>>>>> +           };
+>>>>>>> +   };
+>>>>>>>  };
+>>>>>>>
+>>>>>>>  &adc {
+>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
+>>>>>>> index ddd7ac283045..0e62a6435e07 100644
+>>>>>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
+>>>>>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
+>>>>>>> @@ -107,6 +107,21 @@
+>>>>>>>             min-microvolt = <1100000>;
+>>>>>>>             max-microvolt = <2700000>;
+>>>>>>>     };
+>>>>>>> +
+>>>>>>> +   thermal-zones {
+>>>>>>> +           cpu_thermal: cpu-thermal {
+>>>>>>> +                   cooling-maps {
+>>>>>>> +                           map0 {
+>>>>>>> +                                   /* Corresponds to 500MHz */
+>>>>>>> +                                   cooling-device = <&cpu0 5 5>;
+>>>>>>> +                           };
+>>>>>>> +                           map1 {
+>>>>>>> +                                   /* Corresponds to 200MHz */
+>>>>>>> +                                   cooling-device = <&cpu0 8 8>;
+>>>>>>> +                           };
+>>>>>>> +                   };
+>>>>>>> +           };
+>>>>>>> +   };
+>>>>>>>  };
+>>>>>>>
+>>>>>>>  &adc {
+>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+>>>>>>> index e0f3b2ed41a3..a4931b660ddb 100644
+>>>>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
+>>>>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
+>>>>>>> @@ -55,6 +55,7 @@
+>>>>>>>                     clock-frequency = <1000000000>;
+>>>>>>>                     clocks = <&cmu CLK_ARM_CLK>;
+>>>>>>>                     clock-names = "cpu";
+>>>>>>> +                   #cooling-cells = <2>;
+>>>>>>>
+>>>>>>
+>>>>>> Don't you need also cooling-{min,max}-state properties?
+>>>>>
+>>>>> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
+>>>>>
+>>>>> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
+>>>>> in drivers/thermal/*. But, there are no any code to parse it.
+>>>>>
+>>>>> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-
+>>> state.
+>>>>>
+>>>>> I think that there are mismatch between document and thermal core driver.
+>>>>
+>>>> Thanks for explanation, looks good.
+>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>>>
+>>>> Best regards,
+>>>> Krzysztof
+>>>
+>>> Dear Kukjin,
+>>>
+>>> Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
+>>> cpufreq-dt 3250, this patch) are actually an one continuous chain.
+>>> Dependencies are already in mainline. Are you gonna to pick up
+>>> everything?
+>>>
+>> Yes, I want and I will. BTW maybe clk change is required together? If so, as you
+>> know we need to get ack from clk guy. Is my understanding right?
 > 
+> Right. I think the samsung clock and cpufreq patches still need acks.
 > 
-> On 7/16/2015 9:01 PM, R, Vignesh wrote:
->> Hi,
->>
->> On 07/16/2015 03:24 AM, Paul Walmsley wrote:
->>> Hi,
->>>
->>> some comments.
->>>
->>> On Wed, 3 Jun 2015, Vignesh R wrote:
->>>
->>>> Add hwmod entries for the PWMSS on DRA7.
->>>>
->>>> Set l4_root_clk_div as the main_clk of PWMSS. It is fixed-factored clock
->>>> equal to L4PER2_L3_GICLK/2(l3_iclk_div/2).
->>>> As per AM57x TRM SPRUHZ6[1], October 2014, Section 29.1.3 Table 29-4,
->>>> clock source to PWMSS is L4PER2_L3_GICLK. But it is actually
->>>> L4PER2_L3_GICLK/2. The TRM does not show the division by 2.
->>>
->>> Is the divide-by-two coming from PWMSS_EPWM.EPWM_TBCTL[HSPCLKDIV]?  Or is 
->>> HSPCLKDIV a separate divider after the divide-by-2 you mention above?
->>
->> No, it not related to HSPCLKDIV. The TRM wrongly states L4PER2_L3_GICLK
->> as clock input for PWMSS. But actually  L4PER2_L4_GICLK(=L3_GICLK/2) is
->> the clock input for PWMSS. This will be updated in TRM soon.
->>
->>>
->>>> [1] www.ti.com/lit/ug/spruhz6/spruhz6.pdf
->>>>
->>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>>> ---
->>>>
->>>> v2:
->>>>  * add TRM references.
->>>>
->>>>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 239 ++++++++++++++++++++++++++++++
->>>>  1 file changed, 239 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> index 0e64c2fac0b5..86a7ac9a3138 100644
->>>> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
->>>> @@ -362,6 +362,149 @@ static struct omap_hwmod dra7xx_dcan2_hwmod = {
->>>>  	},
->>>>  };
->>>>  
->>>> +/* pwmss  */
->>>> +static struct omap_hwmod_class_sysconfig dra7xx_epwmss_sysc = {
->>>> +	.rev_offs	= 0x0,
->>>> +	.sysc_offs	= 0x4,
->>>> +	.sysc_flags	= SYSC_HAS_SIDLEMODE | SYSC_HAS_RESET_STATUS,
->>>
->>> This doesn't match SPRUHZ6 Table 29-13 "PWMSS_SYSCONFIG".  There's no 
->>> RESETSTATUS bit.  There is a SOFTRESET bit. 
->>>
->>> Could you please confirm whether this is intentional?
->>
->> sorry my bad... I will change this in v3.
->>
->>>
->>>> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
->>>> +	.sysc_fields	= &omap_hwmod_sysc_type2,
->>>> +};
->>>> +
->>>> +struct omap_hwmod_class dra7xx_epwmss_hwmod_class = {
->>>> +	.name		= "epwmss",
->>>> +	.sysc		= &dra7xx_epwmss_sysc,
->>>> +};
->>>> +
->>>> +static struct omap_hwmod_class dra7xx_ecap_hwmod_class = {
->>>> +	.name		= "ecap",
->>>> +};
->>>> +
->>>> +static struct omap_hwmod_class dra7xx_eqep_hwmod_class = {
->>>> +	.name		= "eqep",
->>>> +};
->>>> +
->>>> +struct omap_hwmod_class dra7xx_ehrpwm_hwmod_class = {
->>>> +	.name		= "ehrpwm",
->>>> +};
->>>> +
->>>> +/* epwmss0 */
->>>> +struct omap_hwmod dra7xx_epwmss0_hwmod = {
->>>> +	.name		= "epwmss0",
->>>> +	.class		= &dra7xx_epwmss_hwmod_class,
->>>> +	.clkdm_name	= "l4per2_clkdm",
->>>> +	.main_clk	= "l4_root_clk_div",
->>>> +	.prcm		= {
->>>> +		.omap4	= {
->>>> +			.modulemode	= MODULEMODE_SWCTRL,
->>>> +			.clkctrl_offs	= DRA7XX_CM_L4PER2_PWMSS1_CLKCTRL_OFFSET,
->>>> +			.context_offs	= DRA7XX_RM_L4PER2_PWMSS1_CONTEXT_OFFSET,
->>>> +		},
->>>> +	},
->>>
->>> Per my comment on the previous patch, sounds like it might be better to 
->>> mark this as HWMOD_SWSUP_SIDLE?  Then again, see the next comment below 
->>> re: main_clk.
->>>
->>>> +};
->>>> +
->>>> +/* ecap0 */
->>>> +struct omap_hwmod dra7xx_ecap0_hwmod = {
->>>> +	.name		= "ecap0",
->>>> +	.class		= &dra7xx_ecap_hwmod_class,
->>>> +	.clkdm_name	= "l4per2_clkdm",
->>>> +	.main_clk	= "l4_root_clk_div",
->>>
->>> Looking at SPRUHZ6 Section 29.1.4.2 "PWMSS Modules Local Clock Gating", 
->>> there appears to be a local "mini-PRCM" for the PWMSS which implements 
->>> clock gating and reports back on the status of what I'd guess is the local 
->>> clock gating FSM.
->>>
->>> So from that point of view, you should probably create a clock driver that 
->>> manages both the clock gate request bit and the FSM status bit.  It should 
->>> be something that can be reused for the other PWMSS IP blocks.  Then 
->>> you'd create per-IP block clock nodes and set the main_clk to point to 
->>> that node.
->>>
->>
->> Since, this register is within the config space of PWMSS, the individual
->> gating and reporting for the modules within PWMSS
->> (PWMSS_CLKCONFIG) is currently being taken care by pwm-tipwmss.c(almost
->> the sole function this driver is doing). It has been the same since
->> am335x. Adding new clock nodes will result in driver changes and also
->> changes to am335x, am437x (and other platforms) hwmod files. It also
->> involves adding new nodes to clocks.dtsi and it will be difficult to
->> maintain backward compatibility for older platforms. Is it not better to
->> keep this as is, in order to maintain consistency (with am335x, am437x
->> etc) and also that these clock bits are within IP's config space?
->>
-> ping...
+> Best regards,
+> Krzysztof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-
-I really want PWMSS support to go into v4.3... I see two options:
-
-1. Drop pwm-tipwmss.c that is currently managing "PWMSS Modules Local
-Clock Gating" and change am335x, am437x and dra7 to use new main_clk and
-update clocks.dtsi (Breaks DT backward compatibility for am335x, am437x)
-2. Or stick with $subject approach to maintain consistency.
-
-I prefer second option, Shall I send a v3 fixing other comments for this
-patch?
-
--- 
-Regards
-Vignesh
