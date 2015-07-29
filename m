@@ -1,138 +1,248 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Tue, 28 Jul 2015 23:14:58 -0700
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <20150728225337.GF2650@xsjsorenbubuntu>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <20150728025833.GQ2650@xsjsorenbubuntu>
- <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
- <20150728225337.GF2650@xsjsorenbubuntu>
-Message-ID: <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Wed, 29 Jul 2015 14:16:58 +0800
+Subject: [PATCH] ARM: zx: Add power domains for ZX296702
+Message-ID: <1438150618-22278-1-git-send-email-jun.nie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi S?ren,
+Add power domains for ZX296702 to power off
+inactive power domains in runtime.
 
-On Tue, Jul 28, 2015 at 3:53 PM, S?ren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
-> On Mon, 2015-07-27 at 09:52PM -0700, Moritz Fischer wrote:
->> Hi S?ren,
->>
->> thanks for your feedback.
->>
->> On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
->> <soren.brinkmann@xilinx.com> wrote:
->> > Hi Moritz,
->> >
->> > On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
->> >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
->> >> ---
->> >>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
->> >>  1 file changed, 13 insertions(+)
->> >>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> >>
->> >> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> >> new file mode 100644
->> >> index 0000000..ac4499e
->> >> --- /dev/null
->> >> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
->> >> @@ -0,0 +1,13 @@
->> >> +Xilinx Zynq PL Reset Manager
->> >> +
->> >> +Required properties:
->> >> +- compatible: "xlnx,zynq-reset-pl"
->> >> +- syscon <&slcr>;
->> >> +- #reset-cells: 1
->> >> +
->> >> +Example:
->> >> +     rstc: rstc at 240 {
->> >> +             #reset-cells = <1>;
->> >> +             compatible = "xlnx,zynq-reset-pl";
->> >> +             syscon = <&slcr>;
->> >> +     };
->> >
->> > I think you also have to add the outputs and make them part of the
->> > binding. Otherwise you'd have to read the implementation to find
->> > out what device should be hooked up to which output of the reset-controller.
->>
->> Is something like this what you had in mind? I had that prepared for
->> the next round of patches:
->>
->> Reset outputs:
->>  0  : soft reset
->>  32 : ddr reset
->>  64 : topsw reset
->>  96 : dmac reset
->>  128: usb0 reset
->>  129: usb1 reset
->>  160: gem0 reset
->>  161: gem1 reset
->>  164: gem0 rx reset
->>  165: gem1 rx reset
->>  166: gem0 ref reset
->>  167: gem1 ref reset
->>  192: sdio0 reset
->>  193: sdio1 reset
->>  196: sdio0 ref reset
->>  197: sdio1 ref reset
->>  224: spi0 reset
->>  225: spi1 reset
->>  226: spi0 ref reset
->>  227: spi1 ref reset
->>  256: can0 reset
->>  257: can1 reset
->>  258: can0 ref reset
->>  259: can1 ref reset
->>  288: i2c0 reset
->>  289: i2c1 reset
->>  320: uart0 reset
->>  321: uart1 reset
->>  322: uart0 ref reset
->>  323: uart1 ref reset
->>  352: gpio reset
->>  384: lqspi reset
->>  385: qspi ref reset
->>  416: smc reset
->>  417: smc ref reset
->>  448: ocm reset
->>  512: fpga0 out reset
->>  513: fpga1 out reset
->>  514: fpga2 out reset
->>  515: fpga3 out reset
->>  544: a9 reset 0
->>  545: a9 reset 1
->>  552: peri reset
->
-> Basically, yes. I guess the gaps are due to directly mapping this number
-> to bank and bit instead of doing some more complex mapping in between?
-> I'm not sure whether I like this :) I guess if a number is off the
-> driver would still toggle the addressed bit?
+Signed-off-by: Jun Nie <jun.nie@linaro.org>
+---
+ arch/arm/mach-zx/Kconfig              |   1 +
+ arch/arm/mach-zx/Makefile             |   2 +-
+ arch/arm/mach-zx/zx296702-pm-domain.c | 202 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 204 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/mach-zx/zx296702-pm-domain.c
 
-My assumption was that people would use a #include
-<dt-bindings/xlnx,zynq-reset.h> in their dts. Assuming I got the
-numbers in there right this makes it hard to misuse by accident.
-I'm not saying it's perfect ...
-
-> I'm not sure, is it worth
-> to do some explicit mapping from logical outputs to a physical reset? It
-> seems it would be a little safer since it would be easy to check that
-> the addressed reset is valid and there wouldn't be any reserved/invalid
-> bits be toggled. Also, it would make the outputs in here a continuous
-> series of numbers without these gaps. Not sure though whether
-> it's worth the additional complexity in the implementation.
-
-So your suggestion is to have a large switch case kind of thingy? I
-thought about it and it seemed complex as there's quite a bunch of
-resets with gaps. Do you know of a driver that does something similar?
-When I wrote this I looked at the other reset drivers and figured they
-all had this kind of bank mapping of sorts so I assumed that's how
-people usually do it.
-
->
->         Thanks,
->         S?ren
-
-Thanks again for your input,
-
-Moritz
+diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
+index 2a910dc..7fdc5bf 100644
+--- a/arch/arm/mach-zx/Kconfig
++++ b/arch/arm/mach-zx/Kconfig
+@@ -13,6 +13,7 @@ config SOC_ZX296702
+ 	select ARM_GLOBAL_TIMER
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
++	select PM_GENERIC_DOMAINS
+ 	help
+ 	  Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
+ endif
+diff --git a/arch/arm/mach-zx/Makefile b/arch/arm/mach-zx/Makefile
+index 7c2edf6..a4b4864 100644
+--- a/arch/arm/mach-zx/Makefile
++++ b/arch/arm/mach-zx/Makefile
+@@ -1,2 +1,2 @@
+-obj-$(CONFIG_SOC_ZX296702) += zx296702.o
++obj-$(CONFIG_SOC_ZX296702) += zx296702.o zx296702-pm-domain.o
+ obj-$(CONFIG_SMP) += headsmp.o platsmp.o
+diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
+new file mode 100644
+index 0000000..45b8271
+--- /dev/null
++++ b/arch/arm/mach-zx/zx296702-pm-domain.c
+@@ -0,0 +1,202 @@
++/*
++ * Copyright (C) 2015 Linaro Ltd.
++ *
++ * Author: Jun Nie <jun.nie@linaro.org>
++ * License terms: GNU General Public License (GPL) version 2
++ */
++#include <linux/delay.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/pm_domain.h>
++#include <linux/slab.h>
++
++#define PCU_DM_CLKEN        0x18
++#define PCU_DM_RSTEN        0x1C
++#define PCU_DM_ISOEN        0x20
++#define PCU_DM_PWRDN        0x24
++#define PCU_DM_ACK_SYNC     0x28
++
++enum {
++	PCU_DM_NEON0 = 0,
++	PCU_DM_NEON1,
++	PCU_DM_GPU,
++	PCU_DM_DECPPU,
++	PCU_DM_VOU,
++	PCU_DM_R2D,
++	PCU_DM_TOP,
++};
++
++static void __iomem *pcubase;
++
++struct zx_pm_domain {
++	struct generic_pm_domain dm;
++	unsigned int bit;
++};
++
++static int normal_power_off(struct generic_pm_domain *domain)
++{
++	struct zx_pm_domain *zpd = (struct zx_pm_domain *)domain;
++	unsigned long loop = 1000;
++	u32 tmp;
++
++	tmp = readl_relaxed(pcubase + PCU_DM_CLKEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp, pcubase + PCU_DM_CLKEN);
++	udelay(5);
++
++	tmp = readl_relaxed(pcubase + PCU_DM_ISOEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp | BIT(zpd->bit), pcubase + PCU_DM_ISOEN);
++	udelay(5);
++
++	tmp = readl_relaxed(pcubase + PCU_DM_RSTEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp, pcubase + PCU_DM_RSTEN);
++	udelay(5);
++
++	tmp = readl_relaxed(pcubase + PCU_DM_PWRDN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp | BIT(zpd->bit), pcubase + PCU_DM_PWRDN);
++	do {
++		tmp = readl_relaxed(pcubase + PCU_DM_ACK_SYNC) & BIT(zpd->bit);
++	} while (--loop && !tmp);
++
++	if (!loop) {
++		pr_err("Error: %s %s fail\n", __func__, domain->name);
++		return -EIO;
++	}
++
++	return 0;
++}
++
++static int normal_power_on(struct generic_pm_domain *domain)
++{
++	struct zx_pm_domain *zpd = (struct zx_pm_domain *)domain;
++	unsigned long loop = 10000;
++	u32 tmp;
++
++	tmp = readl_relaxed(pcubase + PCU_DM_PWRDN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp, pcubase + PCU_DM_PWRDN);
++	do {
++		tmp = readl_relaxed(pcubase + PCU_DM_ACK_SYNC) & BIT(zpd->bit);
++	} while (--loop && tmp);
++
++	if (!loop) {
++		pr_err("Error: %s %s fail\n", __func__, domain->name);
++		return -EIO;
++	}
++
++	tmp = readl_relaxed(pcubase + PCU_DM_RSTEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp | BIT(zpd->bit), pcubase + PCU_DM_RSTEN);
++	udelay(5);
++
++	tmp = readl_relaxed(pcubase + PCU_DM_ISOEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp, pcubase + PCU_DM_ISOEN);
++	udelay(5);
++
++	tmp = readl_relaxed(pcubase + PCU_DM_CLKEN);
++	tmp &= ~BIT(zpd->bit);
++	writel_relaxed(tmp | BIT(zpd->bit), pcubase + PCU_DM_CLKEN);
++	udelay(5);
++	return 0;
++}
++
++static struct zx_pm_domain gpu_domain = {
++	.dm = {
++		.name		= "gpu_domain",
++		.power_off	= normal_power_off,
++		.power_on	= normal_power_on,
++	},
++	.bit = PCU_DM_GPU,
++};
++
++static struct zx_pm_domain decppu_domain = {
++	.dm = {
++		.name		= "decppu_domain",
++		.power_off	= normal_power_off,
++		.power_on	= normal_power_on,
++	},
++	.bit = PCU_DM_DECPPU,
++};
++
++static struct zx_pm_domain vou_domain = {
++	.dm = {
++		.name		= "vou_domain",
++		.power_off	= normal_power_off,
++		.power_on	= normal_power_on,
++	},
++	.bit = PCU_DM_VOU,
++};
++
++static struct zx_pm_domain r2d_domain = {
++	.dm = {
++		.name		= "r2d_domain",
++		.power_off	= normal_power_off,
++		.power_on	= normal_power_on,
++	},
++	.bit = PCU_DM_R2D,
++};
++
++static struct generic_pm_domain *zx296702_pm_domains[] = {
++	&vou_domain.dm,
++	&gpu_domain.dm,
++	&decppu_domain.dm,
++	&r2d_domain.dm,
++};
++
++static int zx296702_pd_probe(struct platform_device *pdev)
++{
++	struct genpd_onecell_data *genpd_data;
++	struct resource *res;
++	int i;
++
++	genpd_data = devm_kzalloc(&pdev->dev, sizeof(*genpd_data), GFP_KERNEL);
++	if (!genpd_data)
++		return -ENOMEM;
++
++	genpd_data->domains = zx296702_pm_domains;
++	genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no memory resource defined\n");
++		return -ENODEV;
++	}
++
++	pcubase = devm_ioremap_resource(&pdev->dev, res);
++	if (!pcubase) {
++		dev_err(&pdev->dev, "ioremap fail.\n");
++		return -EIO;
++	}
++
++	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
++		pm_genpd_init(zx296702_pm_domains[i], NULL, false);
++
++	of_genpd_add_provider_onecell(pdev->dev.of_node, genpd_data);
++	return 0;
++}
++
++static const struct of_device_id zx296702_pm_domain_matches[] __initconst = {
++	{ .compatible = "zte,zx296702-pcu", },
++	{ },
++};
++
++static struct platform_driver zx296702_pd_driver = {
++	.driver = {
++		.name = "zx-powerdomain",
++		.owner = THIS_MODULE,
++		.of_match_table = zx296702_pm_domain_matches,
++	},
++	.probe = zx296702_pd_probe,
++};
++
++static int __init zx296702_pd_init(void)
++{
++	return platform_driver_register(&zx296702_pd_driver);
++}
++subsys_initcall(zx296702_pd_init);
+-- 
+1.9.1
