@@ -1,38 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 28 Jul 2015 18:26:20 +0200
-Subject: [GIT PULL] SoCFPGA updates for v4.3
-In-Reply-To: <1438097083-28875-1-git-send-email-dinh.linux@gmail.com>
-References: <1438097083-28875-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <20150728162620.GF16690@localhost>
+Date: Wed, 29 Jul 2015 22:10:14 +0200
+Subject: [PATCH v2] PCI: iproc: Fix BCMA dependency in Kconfig
+In-Reply-To: <1438189973-5712-1-git-send-email-rjui@broadcom.com>
+References: <1438189973-5712-1-git-send-email-rjui@broadcom.com>
+Message-ID: <20150729201014.GA28206@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 10:24:43AM -0500, dinh.linux at gmail.com wrote:
-> Hi Arnd, Kevin, and Olof:
+On Wed, Jul 29, 2015 at 10:12:53AM -0700, Ray Jui wrote:
+> The current iProc BCMA front-end driver can only work on ARM32 based
+> platforms; therefore its config option in Kconfig should be changed to
+> reflect that. This fixes arm64 allmodconfig build failure when compiling
+> the the iProc BCMA driver that contains struct pci_sys_data that is
+> arm32 specific
 > 
-> Please consider pulling these patches for v4.3.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_for_v4.3
-> 
-> for you to fetch changes up to cd871d517d46f26943f3c8f61c0d2ac6665da6a2:
-> 
->   ARM: socfpga: add reset for the Arria 10 platform (2015-07-20 15:44:43 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA updates for v4.3
-> - Add smp.ops.cpu_kill() for kexec
-> - Add reboot capability for Arria10
+> Signed-off-by: Ray Jui <rjui@broadcom.com>
 
-Merged, thanks!
+Applied to next/arm64 together with the original series.
 
 
 -Olof
