@@ -1,49 +1,92 @@
 From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 29 Jul 2015 11:03:55 +0800
-Subject: [PATCH 2/6] arm: mach-socfpga: enable pci support
-In-Reply-To: <CAL_JsqK8HbYMbQf+8vFuDiTe3j9THus+YwLZDdJpQM5faQTY3g@mail.gmail.com>
+Date: Wed, 29 Jul 2015 11:05:07 +0800
+Subject: [PATCH 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
 References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-3-git-send-email-lftan@altera.com>
- <CAL_JsqK8HbYMbQf+8vFuDiTe3j9THus+YwLZDdJpQM5faQTY3g@mail.gmail.com>
-Message-ID: <CAFiDJ584tv9od635_+AVObFAuwu7OZHeBDZ2DRdwCzDz40RjHg@mail.gmail.com>
+ <1438080345-7233-4-git-send-email-lftan@altera.com>
+ <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
+Message-ID: <CAFiDJ5-c8h7ry4NWMCADbDgxaeEyOOHHWDSwJfRJuo-Vw7mOdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 9:26 PM, Rob Herring <robherring2@gmail.com> wrote:
+On Wed, Jul 29, 2015 at 12:45 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
 > On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
->> Enable CONFIG_ARCH_SUPPORT_MSI and CONFIG_PCI in SOCFPGA platform.
+>> This patch adds the Altera PCIe host controller driver.
 >>
 >> Signed-off-by: Ley Foon Tan <lftan@altera.com>
 >> ---
->>  arch/arm/mach-socfpga/Kconfig | 2 ++
->>  1 file changed, 2 insertions(+)
+>>  drivers/pci/host/Kconfig       |   9 +
+>>  drivers/pci/host/Makefile      |   1 +
+>>  drivers/pci/host/pcie-altera.c | 576 +++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 586 insertions(+)
+>>  create mode 100644 drivers/pci/host/pcie-altera.c
 >>
->> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
->> index 90efdeb..7ff4576 100644
->> --- a/arch/arm/mach-socfpga/Kconfig
->> +++ b/arch/arm/mach-socfpga/Kconfig
->> @@ -1,6 +1,7 @@
->>  menuconfig ARCH_SOCFPGA
->>         bool "Altera SOCFPGA family" if ARCH_MULTI_V7
->>         select ARCH_SUPPORTS_BIG_ENDIAN
->> +       select ARCH_SUPPORTS_MSI
+>> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+>> index 675c2d1..af19039 100644
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>> @@ -145,4 +145,13 @@ config PCIE_IPROC_BCMA
+>>           Say Y here if you want to use the Broadcom iProc PCIe controller
+>>           through the BCMA bus interface
+>>
+>> +config PCIE_ALTERA
+>> +       bool "Altera PCIe controller"
+>> +       depends on ARCH_SOCFPGA
+>> +       depends on OF
 >
-> This doesn't exist in mainline having been removed in 3.12.
-Will removed this.
+> I don't think you need this, "depends on ARCH_SOCFPGA" should already
+> have taken care of this.
+Okay, will remove this.
 >
->>         select ARM_AMBA
->>         select ARM_GIC
->>         select CACHE_L2X0
->> @@ -9,6 +10,7 @@ menuconfig ARCH_SOCFPGA
->>         select HAVE_ARM_SCU
->>         select HAVE_ARM_TWD if SMP
->>         select MFD_SYSCON
->> +       select PCI
+>> +       select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+>> +       help
+>> +         Say Y here if you want to enable PCIe controller support for Altera
+>> +         SoCFPGA family of SoCs.
+>> +
+>>  endmenu
 >
-> This should not be selected by the platform, but be user selectable
-> unless perhaps you require PCI to boot.
+> <snip>
+>
+>> +
+>> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
+>> +{
+>> +       u8 loop;
+>> +       struct tlp_rp_regpair_t tlp_rp_regdata;
+>> +
+>> +       for (loop = TLP_LOOP; loop > 0; loop--) {
+>> +
+>> +               tlp_read_rx(pcie, &tlp_rp_regdata);
+>> +
+>> +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
+>> +
+>> +                       if (value)
+>> +                               *value = tlp_rp_regdata.reg0;
+>> +
+>> +                       return PCIBIOS_SUCCESSFUL;
+>> +               }
+>
+> Remove all the unnecessary newlines in this function.
+Noted.
 
-Will removed this as well.
+>> +       }
+>> +
+>> +       return -ENOENT;
+>> +}
+>> +
+>
+> <snip>
+>
+>> +
+>> +static struct platform_driver altera_pcie_driver = {
+>> +       .probe          = altera_pcie_probe,
+>> +       .remove         = altera_pcie_remove,
+>> +       .driver = {
+>> +               .name   = "altera-pcie",
+>> +               .owner  = THIS_MODULE,
+>
+> Don't need to set owner anymore as this will get populated by the driver core.
+
+Will remove it.
 
 Thanks for reviewing.
 
