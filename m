@@ -1,50 +1,55 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 29 Jul 2015 18:19:24 +0200
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
- controller-data
-In-Reply-To: <20150729140046.GB11082@sirena.org.uk>
-References: <cover.1438170519.git.hramrach@gmail.com>
- <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
- <20150729140046.GB11082@sirena.org.uk>
-Message-ID: <CAOMqctTZVET=U=2o65HpWSm4W660XZtYYbBND2k4u9CnfjfMhQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 29 Jul 2015 17:25:11 +0100
+Subject: [PATCH v3 2/2] PCI: generic: add arm64 support
+In-Reply-To: <1438183681-30519-2-git-send-email-jchandra@broadcom.com>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+ <1438183681-30519-2-git-send-email-jchandra@broadcom.com>
+Message-ID: <20150729162510.GA29159@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2015 at 16:00, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jul 29, 2015 at 12:19:57PM +0200, Michal Suchanek wrote:
->
-> Please use subject lines matching the style for the subsytsem so people
-> can spot that the patch is in some way relevant.
->
->> The controller-data subnode has no compatible. This can lead to other
->> drivers getting confused by it. Add a compatible to make devicetreee
->> unambiguous.
->
-> I can't tell from this commit message what the issue you're trying to
-> fix is, sorry.  Nodes without compatible strings are entirely normal and
-> don't need compatible strings.  It sounds like a bug in whatever other
-> driver is becoming confused.
+On Wed, Jul 29, 2015 at 04:28:01PM +0100, Jayachandran C wrote:
+> Enable pci-host-generic driver available in arm64. This needs
+> drivers/pci/setup-irq.o as well.
 
-The driver that gets confused is ofpart.
+You should move the Kconfig change to the previous patch,
+and create another a stand-alone patch (that you will send as
+first in the patch sequence) to compile setup-irq.c on ARM64.
 
-The two-line patch to allow it to just ignore controller-data has been
-rejected on the basis that s3c64xx should use a compatible string
-because ofpart monopolizes all nodes without compatible which are
-children of a mtd device. Devicetrees containing such nodes that are
-not partitions are presumably invalid and should be rejected when
-ofpart is compiled into the kernel.
+Thanks,
+Lorenzo
 
->
->> +     if (!of_get_property(data_np, "compatible", NULL) ||
->> +         strcmp(of_get_property(data_np, "compatible", NULL),
->> +                "samsung,s3c-controller-data"))
->> +             dev_err(&spi->dev, "child node 'controller-data' does not have correct compatible\n");
->
-> This will break all existing users which is not acceptable for
-> mainline, we need to preserve compatibility with existing device trees.
-
-It will not break anything. It will just spam dmesg.
-
-Thanks
-
-Michal
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  drivers/pci/Makefile     | 1 +
+>  drivers/pci/host/Kconfig | 2 +-
+>  2 files changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+> index 73e4af4..be3f631 100644
+> --- a/drivers/pci/Makefile
+> +++ b/drivers/pci/Makefile
+> @@ -33,6 +33,7 @@ obj-$(CONFIG_PCI_IOV) += iov.o
+>  #
+>  obj-$(CONFIG_ALPHA) += setup-irq.o
+>  obj-$(CONFIG_ARM) += setup-irq.o
+> +obj-$(CONFIG_ARM64) += setup-irq.o
+>  obj-$(CONFIG_UNICORE32) += setup-irq.o
+>  obj-$(CONFIG_SUPERH) += setup-irq.o
+>  obj-$(CONFIG_MIPS) += setup-irq.o
+> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+> index c132bdd..675c2d1 100644
+> --- a/drivers/pci/host/Kconfig
+> +++ b/drivers/pci/host/Kconfig
+> @@ -53,7 +53,7 @@ config PCI_RCAR_GEN2_PCIE
+>  
+>  config PCI_HOST_GENERIC
+>  	bool "Generic PCI host controller"
+> -	depends on ARM && OF
+> +	depends on (ARM || ARM64) && OF
+>  	help
+>  	  Say Y here if you want to support a simple generic PCI host
+>  	  controller, such as the one emulated by kvmtool.
+> -- 
+> 1.9.1
+> 
