@@ -1,31 +1,41 @@
-From: mcgrof@suse.com (Luis R. Rodriguez)
-Date: Wed, 29 Jul 2015 23:52:30 +0200
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <CAPcyv4j67493ROvnC1EZBEFMiWB=gLu=C-Y-PrJf0BvO3A=y2w@mail.gmail.com>
-References: <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de>
- <20150729182712.GI30479@wotan.suse.de>
- <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
- <1438203638.3214.418.camel@hp.com>
- <20150729214358.GK30479@wotan.suse.de>
- <CAPcyv4j67493ROvnC1EZBEFMiWB=gLu=C-Y-PrJf0BvO3A=y2w@mail.gmail.com>
-Message-ID: <20150729215230.GL30479@wotan.suse.de>
+From: Shenwei.Wang@freescale.com (Shenwei Wang)
+Date: Wed, 29 Jul 2015 21:54:58 +0000
+Subject: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+In-Reply-To: <CAOMZO5DaZ+1Ud0RAX2RELz5c0zyZUo_X1y50gY2XwM5o0BeVmg@mail.gmail.com>
+References: <1438203535-38028-1-git-send-email-shenwei.wang@freescale.com>
+ <CAOMZO5Aj5PASPKRq47vmenDBSPMPHdLgSbJZXkhZu3MNYprqXA@mail.gmail.com>
+ <CY1PR0301MB0843BEF6A40A0A28018E0D5D838C0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+ <CAOMZO5DaZ+1Ud0RAX2RELz5c0zyZUo_X1y50gY2XwM5o0BeVmg@mail.gmail.com>
+Message-ID: <CY1PR0301MB08437D6E977C99821622976A838C0@CY1PR0301MB0843.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 02:47:40PM -0700, Dan Williams wrote:
-> On Wed, Jul 29, 2015 at 2:43 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
-> > While at it, Dan, will / should memremap() support overlapping calls ?
-> > What is the expectation on behaviour ?
+
+
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: 2015?7?29? 16:46
+> To: Wang Shenwei-B38339
+> Cc: Greg Kroah-Hartman; linux-arm-kernel at lists.infradead.org;
+> linux-serial at vger.kernel.org
+> Subject: Re: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
+> ram/disk
 > 
-> It will be the same as ioremap().  Each mapping gets its own virtual
-> address and overlapping calls are permitted.  The only protection is
-> that RAM is never mapped with an alias.
+> On Wed, Jul 29, 2015 at 6:41 PM, Shenwei Wang <Shenwei.Wang@freescale.com>
+> wrote:
+> 
+> >> clk_enable() may fail, so you should check its return value.
+> >
+> > The check seems a little superfluous because the failure condition for
+> > clk_enable is (clk == NULL || IS_ERR(clk)) Once this function is
+> > called which means the initialization of the driver is successful.
+> 
+> Not superfluos. You can't assume that clk_enable() will always be successful.
+> Better check its return value.
 
-If you could document this as part of your next respin that'd be
-highly appreciated.
+I am very interesting to know if you could provide an example condition that may cause 
+clk_enable failed in this callback function?
 
-  Luis
+Regards,
+Shenwei
