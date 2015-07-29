@@ -1,51 +1,123 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:45 +0530
-Subject: [PATCH 15/17] mmc: host: omap_hsmmc: use ios->vdd for setting vmmc
- voltage
+Date: Wed, 29 Jul 2015 16:39:39 +0530
+Subject: [PATCH 09/17] mmc: host: omap_hsmmc: add separate function to set
+ pbias
 In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
 References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-16-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-10-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vdd voltage is set in mmc core to ios->vdd and vmmc should actually
-be set to this voltage. Modify omap_hsmmc_enable_supply
-to not take vdd as argument since now it's directly set to
-the voltage in ios->vdd.
+No functional change. Cleanup omap_hsmmc_set_power by adding separate
+functions to set pbias and invoke it from omap_hsmmc_set_power.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   78 +++++++++++++++++++++++++----------------
+ 1 file changed, 48 insertions(+), 30 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index a50edbc..5116c42 100644
+index a0f8c1d..8bb3f60 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -246,12 +246,13 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
+@@ -306,6 +306,48 @@ err_set_ocr:
+ 	return ret;
+ }
  
- #ifdef CONFIG_REGULATOR
- 
--static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int vdd)
-+static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
++static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
++				int vdd)
++{
++	int ret;
++
++	if (!host->pbias)
++		return 0;
++
++	if (power_on) {
++		if (vdd <= VDD_165_195)
++			ret = regulator_set_voltage(host->pbias, VDD_1V8,
++						    VDD_1V8);
++		else
++			ret = regulator_set_voltage(host->pbias, VDD_3V0,
++						    VDD_3V0);
++		if (ret < 0) {
++			dev_err(host->dev, "pbias set voltage fail\n");
++			return ret;
++		}
++
++		if (host->pbias_enabled == 0) {
++			ret = regulator_enable(host->pbias);
++			if (ret) {
++				dev_err(host->dev, "pbias reg enable fail\n");
++				return ret;
++			}
++			host->pbias_enabled = 1;
++		}
++	} else {
++		if (host->pbias_enabled == 1) {
++			ret = regulator_disable(host->pbias);
++			if (ret) {
++				dev_err(host->dev, "pbias reg disable fail\n");
++				return ret;
++			}
++			host->pbias_enabled = 0;
++		}
++	}
++
++	return 0;
++}
++
+ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
  {
- 	int ret;
-+	struct mmc_ios *ios = &mmc->ios;
+ 	struct omap_hsmmc_host *host =
+@@ -323,16 +365,9 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
+ 	if (mmc_pdata(host)->before_set_reg)
+ 		mmc_pdata(host)->before_set_reg(dev, power_on, vdd);
  
- 	if (mmc->supply.vmmc) {
--		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-+		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, ios->vdd);
- 		if (ret)
+-	if (host->pbias) {
+-		if (host->pbias_enabled == 1) {
+-			ret = regulator_disable(host->pbias);
+-			if (ret) {
+-				dev_err(dev, "pbias reg disable failed\n");
+-				return ret;
+-			}
+-			host->pbias_enabled = 0;
+-		}
+-	}
++	ret = omap_hsmmc_set_pbias(host, false, 0);
++	if (ret)
++		return ret;
+ 
+ 	/*
+ 	 * Assume Vcc regulator is used only to power the card ... OMAP
+@@ -357,26 +392,9 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
  			return ret;
  	}
-@@ -380,7 +381,7 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
- 	 * chips/cards need an interface voltage rail too.
- 	 */
- 	if (power_on) {
--		ret = omap_hsmmc_enable_supply(mmc, vdd);
-+		ret = omap_hsmmc_enable_supply(mmc);
- 		if (ret)
- 			return ret;
  
+-	if (host->pbias) {
+-		if (vdd <= VDD_165_195)
+-			ret = regulator_set_voltage(host->pbias, VDD_1V8,
+-								VDD_1V8);
+-		else
+-			ret = regulator_set_voltage(host->pbias, VDD_3V0,
+-								VDD_3V0);
+-		if (ret < 0)
+-			goto err_set_voltage;
+-
+-		if (host->pbias_enabled == 0) {
+-			ret = regulator_enable(host->pbias);
+-			if (ret) {
+-				dev_err(dev, "pbias reg enable failed\n");
+-				goto err_set_voltage;
+-			} else {
+-				host->pbias_enabled = 1;
+-			}
+-		}
+-	}
++	ret = omap_hsmmc_set_pbias(host, true, vdd);
++	if (ret)
++		goto err_set_voltage;
+ 
+ 	if (mmc_pdata(host)->after_set_reg)
+ 		mmc_pdata(host)->after_set_reg(dev, power_on, vdd);
 -- 
 1.7.9.5
