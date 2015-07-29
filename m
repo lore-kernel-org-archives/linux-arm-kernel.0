@@ -1,63 +1,26 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Wed, 29 Jul 2015 10:07:04 +0530
-Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
-In-Reply-To: <55B826B0.2090705@codeaurora.org>
-References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
- <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
- <55B03D65.8040207@codeaurora.org> <55B0A764.6010708@codeaurora.org>
- <55B826B0.2090705@codeaurora.org>
-Message-ID: <55B85870.7060900@codeaurora.org>
+From: agross@codeaurora.org (Andy Gross)
+Date: Tue, 28 Jul 2015 23:56:52 -0500
+Subject: [PATCH v1 0/7] DT: APQ8064 for qcom-dt-next
+In-Reply-To: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20150729045652.GA24343@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jul 28, 2015 at 01:52:36PM +0100, Srinivas Kandagatla wrote:
+> Hi Andy, 
+> 
+> As discussed here are some dt patches which depend on
+> pmic header "dt-bindings/pinctrl/qcom,pmic-gpio.h" which is availble in
+> linux-next.
 
-On 07/29/2015 06:34 AM, Stephen Boyd wrote:
-> On 07/23/2015 01:35 AM, Rajendra Nayak wrote:
->> []..
->>
->>>> +
->>>> +#ifndef CONFIG_PM
->>>> +static void enable_clock(struct device *dev, const char *con_id)
->>>> +{
->>>> +    struct clk *clk;
->>>> +
->>>> +    clk = clk_get(dev, con_id);
->>>> +    if (!IS_ERR(clk)) {
->>>> +        clk_prepare_enable(clk);
->>>> +        clk_put(clk);
->>>> +    }
->>>> +}
->>>> +
->>>> +static void disable_clock(struct device *dev, const char *con_id)
->>>> +{
->>>> +    struct clk *clk;
->>>> +
->>>> +    clk = clk_get(dev, con_id);
->>>> +    if (!IS_ERR(clk)) {
->>>> +        clk_disable_unprepare(clk);
->>>> +        clk_put(clk);
->>>> +    }
->>>> +}
->>>
->>> Is there a reason why this whole patch isn't generic code? I recall some
->>> discussion but I forgot now and there isn't any mention of why this
->>> isn't generic code in the commit text.
->>
->> If by generic code, you mean using PM clocks, then this thread should
->> give some context..
->> http://www.spinics.net/lists/arm-kernel/msg414072.html
->
-> Sorry, I read the thread and I tried to understand what was going on but
-> I'm still lost. Can you clarify further in the commit text somehow?
+Ok.  I took all of these and put them on top of my 4.3 tags on the
+qcom/for-next.  I compiled against the current next master and all was well.
 
-So I can add this in the commit text, if it seems fine
+<snip>
 
-"The use of pm_clk_add_notifier() isn't appropriate here since we need
-to only manage clocks with valid power domain associations done via
-DT, instead of what pm_clk_add_notifier() does, which is manage clocks
-for all on SoC/off SoC devices associating all of them to a dummy power 
-domain instead"
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
