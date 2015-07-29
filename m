@@ -1,78 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Jul 2015 14:27:58 +0100
-Subject: [PATCH v2] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <1438176174.11600.198.camel@citrix.com>
-References: <1437993343-9542-1-git-send-email-ian.campbell@citrix.com>
- <CAK7LNAQKswPzeFYdSVq3JDk2qawZ8e5ogBFMWdor-CibMovU3g@mail.gmail.com>
- <1438176174.11600.198.camel@citrix.com>
-Message-ID: <20150729132758.GR15213@leverpostej>
+From: klimov.linux@gmail.com (Alexey Klimov)
+Date: Wed, 29 Jul 2015 16:30:56 +0300
+Subject: [PATCH] lib: Make _find_next_bit helper function inline
+In-Reply-To: <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
+References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
+ <55B7F2C6.9010000@gmail.com>
+ <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
+Message-ID: <1438176656.18723.8.camel@ceres>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 02:22:54PM +0100, Ian Campbell wrote:
-> On Wed, 2015-07-29 at 20:07 +0900, Masahiro Yamada wrote:
-> > Hi Ian,
-> > 
-> > 
-> > 2015-07-27 19:35 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
-> > > Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
-> > > LogicTile Express 20MG" added a new dts file to arch/arm64 which
-> > > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
-> > > .dtsi supplied by arch/arm.
-> > > 
-> > > Unfortunately this causes some issues for the split device tree
-> > > repository[0], since things get moved around there. In that context
-> > > the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
-> > > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
-> > > 
-> > > The sharing of the .dtsi is legitimate since the baseboard is the same
-> > > for various vexpress systems whatever processor they use.
-> > > 
-> > > Rather than using ../../ tricks to pickup .dtsi files from another
-> > > arch this patch creates a new directory include/dt-dtsi as a
-> > > home for such cross-arch .dtsi files, arranges for it to be in the
-> > > include path when the .dts files are processed by cpp and switches the
-> > 
-> > 
-> > "include/dt-dtsi/"  can be referenced from normal C sources.
-> > 
-> > I think another possible home for cross-arch DTSI is "kernel/dts/".
-> > This directory can be hidden from C sources.
+On ??., 2015-07-28 at 14:45 -0700, Andrew Morton wrote:
+> On Wed, 29 Jul 2015 00:23:18 +0300 Yury <yury.norov@gmail.com> wrote:
 > 
-> I suppose, I don't really mind and will follow the direction of the other
-> DTB maintainers. It doesn't seem like a big deal to me.
-
-I don't really have a preference either way.
-
-> > >@@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
-> > >                 /* Active high IRQ 0 is connected to GIC's SPI0 */
-> > >                 interrupt-map = <0 0 0 &gic 0 0 4>;
-> > > 
-> > > -               /include/ "vexpress-v2m-rs1.dtsi"
-> > > +               #include <arm/vexpress-v2m-rs1.dtsi>
-> > >         };
-> > >  };
-> > 
-> > 
-> > 
-> > You do not have to replace /include/ with #include,
-> > if you add the include path for DTC.
+> > But I think, before/after for x86 is needed as well.
 > 
-> Ah, I looked for this but -i is not documented in the man page.
+> That would be nice.
 > 
-> Is there any reason to prefer one over the other?
+> > And why don't you consider '__always_inline__'? Simple inline is only a 
+> > hint and
+> > guarantees nothing.
+> 
+> Yup.  My x86_64 compiler just ignores the "inline".  When I use
+> __always_inline, find_bit.o's text goes from 776 bytes to 863. 
+> Hopefully we get something in return for that bloat!
 
-#include allows you to use CPP in the file you're including, /include/
-does not.
+On my x86_64 (core-i5 something, with disabled cpufreq) i got following
+numbers:
+find_next_zero_bit
+old	new	__always_inline
+20	21	22	
+20	21	22
+20	22	23
+21	21	22
+21	21	23
+20	21	22
+20	21	23
+21	22	23
+20	22	22
+21	21	22
 
-I would imagine we have to use #include in case the dtsi itself has
-#include statements...
+find_next_bit
+old	new	__always_inline
+19	21	24
+19	22	24
+19	22	24
+19	21	24
+20	22	24
+19	21	23
+19	21	23
+20	21	24
+19	22	24
+19	21	24
 
-> > Please add include path for DTC too
-> > so that both /include/ and #include are available.
+I will re-check on another machine. It's really interesting if
+__always_inline makes things better for aarch64 and worse for x86_64. It
+will be nice if someone will check it on x86_64 too.
 
-... though that does not preclude adding it to the path for /include/.
+Best regards,
+Alexey Klimov.
 
-Thanks,
-Mark.
+> Also, if _find_next_bit() benefits from this then _find_next_bit_le()
+> will presumably also benefit.
+> 
+> 
