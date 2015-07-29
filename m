@@ -1,161 +1,162 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 29 Jul 2015 18:08:52 +0800
-Subject: [PATCH v4 03/10] irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to
- simplify GICv2 init code
+Date: Wed, 29 Jul 2015 18:08:53 +0800
+Subject: [PATCH v4 04/10] irqchip / GICv3: Refactor gic_of_init() for GICv3
+ driver
 In-Reply-To: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
 References: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <1438164539-29256-4-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <1438164539-29256-5-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the ACPI self-probe infrastructure for irqchip is ready,
-we use the infrastructure to simplify GICv2 init code.
+From: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 
-acpi_irqchip_init() is renamed as acpi_irq_init() to replace
-the previous hardcode version of acpi_irq_init() in asm/irq.h,
-also cleanup the code which previously calling the GIC driver
-manually in arch/arm64/kernel/acpi.c.
+Isolate hardware abstraction (FDT) code to gic_of_init().
+Rest of the logic goes to gic_init_bases() and expects well
+defined data to initialize GIC properly. The same solution
+is used for GICv2 driver.
 
->From now on, GIC init calls reside in their drivers only.
-This means the code becomes cleaner and it is not spread
-outside irqchip driver.
+This is needed for ACPI initialization later.
 
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 ---
- arch/arm64/include/asm/irq.h         | 13 -------------
- arch/arm64/kernel/acpi.c             | 25 -------------------------
- drivers/irqchip/irq-gic-acpi.c       |  2 +-
- drivers/irqchip/irq-gic.c            |  3 ++-
- include/linux/acpi_irq.h             |  4 +++-
- include/linux/irqchip/arm-gic-acpi.h |  9 +--------
- 6 files changed, 7 insertions(+), 49 deletions(-)
+ drivers/irqchip/irq-gic-v3.c | 105 +++++++++++++++++++++++++------------------
+ 1 file changed, 61 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm64/include/asm/irq.h b/arch/arm64/include/asm/irq.h
-index bbb251b..94c5367 100644
---- a/arch/arm64/include/asm/irq.h
-+++ b/arch/arm64/include/asm/irq.h
-@@ -1,8 +1,6 @@
- #ifndef __ASM_IRQ_H
- #define __ASM_IRQ_H
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index 5492f4e..19a65de 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -766,17 +766,69 @@ static const struct irq_domain_ops gic_irq_domain_ops = {
+ 	.free = gic_irq_domain_free,
+ };
  
--#include <linux/irqchip/arm-gic-acpi.h>
--
- #include <asm-generic/irq.h>
- 
- struct pt_regs;
-@@ -10,15 +8,4 @@ struct pt_regs;
- extern void migrate_irqs(void);
- extern void set_handle_irq(void (*handle_irq)(struct pt_regs *));
- 
--static inline void acpi_irq_init(void)
--{
--	/*
--	 * Hardcode ACPI IRQ chip initialization to GICv2 for now.
--	 * Proper irqchip infrastructure will be implemented along with
--	 * incoming  GICv2m|GICv3|ITS bits.
--	 */
--	acpi_gic_init();
--}
--#define acpi_irq_init acpi_irq_init
--
- #endif
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index 19de753..d6463bb 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -205,28 +205,3 @@ void __init acpi_boot_table_init(void)
- 			disable_acpi();
- 	}
- }
--
--void __init acpi_gic_init(void)
--{
--	struct acpi_table_header *table;
--	acpi_status status;
--	acpi_size tbl_size;
++static int __init gic_init_bases(void __iomem *dist_base,
++			    struct redist_region *rdist_regs,
++			    u32 nr_redist_regions,
++			    u64 redist_stride,
++			    void *domain_token)
++{
++	u32 typer;
++	int gic_irqs;
++	int err;
++
++	gic_data.dist_base = dist_base;
++	gic_data.redist_regions = rdist_regs;
++	gic_data.nr_redist_regions = nr_redist_regions;
++	gic_data.redist_stride = redist_stride;
++
++	/*
++	 * Find out how many interrupts are supported.
++	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
++	 */
++	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
++	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
++	gic_irqs = GICD_TYPER_IRQS(typer);
++	if (gic_irqs > 1020)
++		gic_irqs = 1020;
++	gic_data.irq_nr = gic_irqs;
++
++	gic_data.domain = irq_domain_add_tree(domain_token, &gic_irq_domain_ops,
++					      &gic_data);
++	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
++
++	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
++		err = -ENOMEM;
++		goto out_free;
++	}
++
++	set_handle_irq(gic_handle_irq);
++
++	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
++		its_init(domain_token, &gic_data.rdists, gic_data.domain);
++
++	gic_smp_init();
++	gic_dist_init();
++	gic_cpu_init();
++	gic_cpu_pm_init();
++
++	return 0;
++
++out_free:
++	if (gic_data.domain)
++		irq_domain_remove(gic_data.domain);
++	free_percpu(gic_data.rdists.rdist);
++	return err;
++}
++
++#ifdef CONFIG_OF
+ static int __init gic_of_init(struct device_node *node, struct device_node *parent)
+ {
+ 	void __iomem *dist_base;
+ 	struct redist_region *rdist_regs;
+ 	u64 redist_stride;
+ 	u32 nr_redist_regions;
+-	u32 typer;
+ 	u32 reg;
+-	int gic_irqs;
 -	int err;
+-	int i;
++	int err, i;
+ 
+ 	dist_base = of_iomap(node, 0);
+ 	if (!dist_base) {
+@@ -820,47 +872,11 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	if (of_property_read_u64(node, "redistributor-stride", &redist_stride))
+ 		redist_stride = 0;
+ 
+-	gic_data.dist_base = dist_base;
+-	gic_data.redist_regions = rdist_regs;
+-	gic_data.nr_redist_regions = nr_redist_regions;
+-	gic_data.redist_stride = redist_stride;
++	err = gic_init_bases(dist_base, rdist_regs, nr_redist_regions,
++			     redist_stride, node);
++	if (!err)
++		return 0;
+ 
+-	/*
+-	 * Find out how many interrupts are supported.
+-	 * The GIC only supports up to 1020 interrupt sources (SGI+PPI+SPI)
+-	 */
+-	typer = readl_relaxed(gic_data.dist_base + GICD_TYPER);
+-	gic_data.rdists.id_bits = GICD_TYPER_ID_BITS(typer);
+-	gic_irqs = GICD_TYPER_IRQS(typer);
+-	if (gic_irqs > 1020)
+-		gic_irqs = 1020;
+-	gic_data.irq_nr = gic_irqs;
 -
--	if (acpi_disabled)
--		return;
+-	gic_data.domain = irq_domain_add_tree(node, &gic_irq_domain_ops,
+-					      &gic_data);
+-	gic_data.rdists.rdist = alloc_percpu(typeof(*gic_data.rdists.rdist));
 -
--	status = acpi_get_table_with_size(ACPI_SIG_MADT, 0, &table, &tbl_size);
--	if (ACPI_FAILURE(status)) {
--		const char *msg = acpi_format_exception(status);
--
--		pr_err("Failed to get MADT table, %s\n", msg);
--		return;
+-	if (WARN_ON(!gic_data.domain) || WARN_ON(!gic_data.rdists.rdist)) {
+-		err = -ENOMEM;
+-		goto out_free;
 -	}
 -
--	err = gic_v2_acpi_init(table);
--	if (err)
--		pr_err("Failed to initialize GIC IRQ controller");
+-	set_handle_irq(gic_handle_irq);
 -
--	early_acpi_os_unmap_memory((char *)table, tbl_size);
--}
-diff --git a/drivers/irqchip/irq-gic-acpi.c b/drivers/irqchip/irq-gic-acpi.c
-index 011468d..95454e3 100644
---- a/drivers/irqchip/irq-gic-acpi.c
-+++ b/drivers/irqchip/irq-gic-acpi.c
-@@ -119,7 +119,7 @@ irqchip_acpi_match_end __used __section(__irqchip_acpi_table_end);
- 
- extern struct acpi_table_id __irqchip_acpi_table[];
- 
--void __init acpi_irqchip_init(void)
-+void __init acpi_irq_init(void)
- {
- 	struct acpi_table_id *id;
- 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index ce531e6..bec6b00 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -1109,7 +1109,7 @@ static int gic_acpi_gsi_desc_populate(struct acpi_gsi_descriptor *data,
- 	return 0;
+-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+-		its_init(node, &gic_data.rdists, gic_data.domain);
+-
+-	gic_smp_init();
+-	gic_dist_init();
+-	gic_cpu_init();
+-	gic_cpu_pm_init();
+-
+-	return 0;
+-
+-out_free:
+-	if (gic_data.domain)
+-		irq_domain_remove(gic_data.domain);
+-	free_percpu(gic_data.rdists.rdist);
+ out_unmap_rdist:
+ 	for (i = 0; i < nr_redist_regions; i++)
+ 		if (rdist_regs[i].redist_base)
+@@ -872,3 +888,4 @@ out_unmap_dist:
  }
  
--int __init
-+static int __init
- gic_v2_acpi_init(struct acpi_table_header *table)
- {
- 	void __iomem *cpu_base, *dist_base;
-@@ -1163,4 +1163,5 @@ gic_v2_acpi_init(struct acpi_table_header *table)
- 			   gic_acpi_gsi_desc_populate);
- 	return 0;
- }
-+IRQCHIP_ACPI_DECLARE(gic_v2, ACPI_MADT_GIC_VERSION_V2, gic_v2_acpi_init);
- #endif
-diff --git a/include/linux/acpi_irq.h b/include/linux/acpi_irq.h
-index f10c872..4c0e108 100644
---- a/include/linux/acpi_irq.h
-+++ b/include/linux/acpi_irq.h
-@@ -3,7 +3,9 @@
- 
- #include <linux/irq.h>
- 
--#ifndef acpi_irq_init
-+#ifdef CONFIG_ACPI
-+void acpi_irq_init(void);
-+#else
- static inline void acpi_irq_init(void) { }
- #endif
- 
-diff --git a/include/linux/irqchip/arm-gic-acpi.h b/include/linux/irqchip/arm-gic-acpi.h
-index 13bc676..56cd82c 100644
---- a/include/linux/irqchip/arm-gic-acpi.h
-+++ b/include/linux/irqchip/arm-gic-acpi.h
-@@ -21,12 +21,5 @@
- #define ACPI_GIC_CPU_IF_MEM_SIZE	(SZ_8K)
- #define ACPI_GICV3_DIST_MEM_SIZE	(SZ_64K)
- 
--struct acpi_table_header;
--
--int gic_v2_acpi_init(struct acpi_table_header *table);
--void acpi_gic_init(void);
--#else
--static inline void acpi_gic_init(void) { }
--#endif
--
-+#endif /* CONFIG_ACPI */
- #endif /* ARM_GIC_ACPI_H_ */
+ IRQCHIP_DECLARE(gic_v3, "arm,gic-v3", gic_of_init);
++#endif
 -- 
 1.9.1
