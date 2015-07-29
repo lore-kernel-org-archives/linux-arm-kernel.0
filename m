@@ -1,39 +1,81 @@
-From: mcgrof@suse.com (Luis R. Rodriguez)
-Date: Wed, 29 Jul 2015 20:27:13 +0200
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <20150729065004.GA17162@lst.de>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de>
-Message-ID: <20150729182712.GI30479@wotan.suse.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Jul 2015 19:29:06 +0100
+Subject: question about detect hard lockups without NMIs using secondary
+ cpus
+In-Reply-To: <CADUS3onib4DYYtPo7RfLAYiN4fpspzcFCx86-pJwuLc37hz3dQ@mail.gmail.com>
+References: <CADUS3onib4DYYtPo7RfLAYiN4fpspzcFCx86-pJwuLc37hz3dQ@mail.gmail.com>
+Message-ID: <20150729182905.GO7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 08:50:04AM +0200, Christoph Hellwig wrote:
-> On Mon, Jul 27, 2015 at 04:26:03PM -0700, Dan Williams wrote:
-> > Oh, because all we have at this point is ioremap_cache() which
-> > silently falls back.  It's not until the introduction of
-> > arch_memremp() where we update the arch code to break that behavior.
+On Thu, Jul 30, 2015 at 12:03:46AM +0800, yoma sophian wrote:
+> hi all:
+> below link introduced how to emulate NMIs on systems where they are
+> not available by using timer interrupts on other cpus.
 > 
-> Ok, makes sense.  Might be worth to document in the changelog.
+> http://article.gmane.org/gmane.linux.kernel/1419661
 > 
-> > That said, I think it may be beneficial to allow a fallback if the
-> > user cares.  So maybe memremap() can call plain ioremap() if
-> > MEMREMAP_STRICT is not set and none of the other mapping types are
-> > satisfied.
+> in kernel/watchdog.c
+>     --> watchdog_overflow_callback
+>           if (is_hardlockup()) {
+>            ...........................
+>                 if (hardlockup_panic)
+>                         panic("Watchdog detected hard LOCKUP on cpu %d",
+>                               this_cpu); /*************/
+>                 else
+>                         WARN(1, "Watchdog detected hard LOCKUP on cpu %d",
+>                              this_cpu);
+>              .......................
+>         }
 > 
-> Is there a real use case for it?  Fallback APIs always seem confusing
-> and it might make more sense to do this in the caller(s) that actually
-> need it.
+> I have some questions:
+> a.
+> in SMP system, suppose 4 cores, and hardlockup_panic is 1.
+> Core0 find Core1 hard lcokup in hardIRQ context
+> the panic function, above with '*' marked, will fail on
+> smp_send_stop(), and we will have no idea where core1 is trapped in,
+> right?
 
-It seems semantics-wise we are trying to separate these two really, so I agree
-with this. Having a fallback would onloy make things more complicated for any
-sanitizer / checker / etc, and I don't think the practical gains of having a
-fallback outweight the gains of having a clear semantic separation on intended
-memory type and interactions with it.
+watchdog_overflow_callback() is only ever entered for the failed core.
+What you missed out on is:
 
-  Luis
+	int this_cpu = smp_processor_id();
+
+which gets the CPU number of the CPU executing this code.  So, Core 0
+will never find Core 1 having locked up via this code path.
+
+> b.
+> things will get worse if we are running single core system if hard
+> lockup happen.
+> We even have no idea what happen.
+
+Basically, without NMIs (or FIQs in ARM speak) lockups with IRQs off are
+undetectable by the kernel other than "the system stopped responding".
+
+In a SMP system, there are mechanisms by which other CPUs can detect a
+locked-up CPU, and they can call trigger_all_cpu_backtrace() - and that
+can only get a trace out of the locked up CPU if it uses FIQs.  A CPU
+which has locked up in an IRQs-off region won't be able to receive an
+IRQ or IPI by definition.
+
+Work has been going on for the last 9 months to try and bring a working
+trigger_all_cpu_backtrace() implementation, initially with IRQs and
+later with FIQs.
+
+In previous merge windows, we have moved forward with getting some FIQ
+changes merged, and in the next merge window, I have patches queued up
+(available in linux-next) which add IRQ-based trigger_all_cpu_backtrace()
+support.
+
+The next piece of the puzzle is sorting out the patches which bring FIQ
+based trigger_all_cpu_backtrace() support - but even if we do, that won't
+be available everywhere - for example, it won't be available if your kernel
+runs in the non-secure world with a secure monitor, because FIQs generally
+aren't usable in that world.
+
+The only other alternative is a hardware JTAG debugger to inspect the
+state of all CPUs in the system.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
