@@ -1,345 +1,152 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Jul 2015 18:24:24 +0100
-Subject: [PATCH v5 2/5] PCI: designware: Add ARM64 support
-In-Reply-To: <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
-References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
- <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <20150729172423.GB29159@red-moon>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 29 Jul 2015 10:38:02 -0700
+Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
+ <20150728025833.GQ2650@xsjsorenbubuntu>
+ <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
+ <20150728225337.GF2650@xsjsorenbubuntu>
+ <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
+Message-ID: <20150729173802.GO2650@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jul 25, 2015 at 04:21:23AM +0100, Zhou Wang wrote:
-> This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
-> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
-> move related operations to dw_pcie_host_init. Also set pp->root_bus_nr = 0 in
-> each PCIe host driver which is based on pcie-designware. This patch also try
-
-Memory for ports is kzalloc'ed, so there is no need to zero it. I still
-think that you should explain the root_bus_nr setting to 0 a bit
-better, why you make the change and why it is safe.
-
-[...]
-
-> -int dw_pcie_host_init(struct pcie_port *pp)
-> +int __init dw_pcie_host_init(struct pcie_port *pp)
->  {
->         struct device_node *np = pp->dev->of_node;
->         struct platform_device *pdev = to_platform_device(pp->dev);
-> -       struct of_pci_range range;
-> -       struct of_pci_range_parser parser;
-> +       struct pci_bus *bus;
->         struct resource *cfg_res;
-> -       u32 val, na, ns;
-> +       LIST_HEAD(res);
-> +       u32 val, ns;
->         const __be32 *addrp;
->         int i, index, ret;
-> +       struct resource_entry *win;
+On Tue, 2015-07-28 at 11:14PM -0700, Moritz Fischer wrote:
+> Hi S?ren,
 > 
-> -       /* Find the address cell size and the number of cells in order to get
-> -        * the untranslated address.
-> -        */
-> -       of_property_read_u32(np, "#address-cells", &na);
-> +       /* Find the number of cells in order to get the untranslated address */
->         ns = of_n_size_cells(np);
+> On Tue, Jul 28, 2015 at 3:53 PM, S?ren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+> > On Mon, 2015-07-27 at 09:52PM -0700, Moritz Fischer wrote:
+> >> Hi S?ren,
+> >>
+> >> thanks for your feedback.
+> >>
+> >> On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
+> >> <soren.brinkmann@xilinx.com> wrote:
+> >> > Hi Moritz,
+> >> >
+> >> > On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
+> >> >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> >> >> ---
+> >> >>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
+> >> >>  1 file changed, 13 insertions(+)
+> >> >>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> >> >>
+> >> >> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> >> >> new file mode 100644
+> >> >> index 0000000..ac4499e
+> >> >> --- /dev/null
+> >> >> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+> >> >> @@ -0,0 +1,13 @@
+> >> >> +Xilinx Zynq PL Reset Manager
+> >> >> +
+> >> >> +Required properties:
+> >> >> +- compatible: "xlnx,zynq-reset-pl"
+> >> >> +- syscon <&slcr>;
+> >> >> +- #reset-cells: 1
+> >> >> +
+> >> >> +Example:
+> >> >> +     rstc: rstc at 240 {
+> >> >> +             #reset-cells = <1>;
+> >> >> +             compatible = "xlnx,zynq-reset-pl";
+> >> >> +             syscon = <&slcr>;
+> >> >> +     };
+> >> >
+> >> > I think you also have to add the outputs and make them part of the
+> >> > binding. Otherwise you'd have to read the implementation to find
+> >> > out what device should be hooked up to which output of the reset-controller.
+> >>
+> >> Is something like this what you had in mind? I had that prepared for
+> >> the next round of patches:
+> >>
+> >> Reset outputs:
+> >>  0  : soft reset
+> >>  32 : ddr reset
+> >>  64 : topsw reset
+> >>  96 : dmac reset
+> >>  128: usb0 reset
+> >>  129: usb1 reset
+> >>  160: gem0 reset
+> >>  161: gem1 reset
+> >>  164: gem0 rx reset
+> >>  165: gem1 rx reset
+> >>  166: gem0 ref reset
+> >>  167: gem1 ref reset
+> >>  192: sdio0 reset
+> >>  193: sdio1 reset
+> >>  196: sdio0 ref reset
+> >>  197: sdio1 ref reset
+> >>  224: spi0 reset
+> >>  225: spi1 reset
+> >>  226: spi0 ref reset
+> >>  227: spi1 ref reset
+> >>  256: can0 reset
+> >>  257: can1 reset
+> >>  258: can0 ref reset
+> >>  259: can1 ref reset
+> >>  288: i2c0 reset
+> >>  289: i2c1 reset
+> >>  320: uart0 reset
+> >>  321: uart1 reset
+> >>  322: uart0 ref reset
+> >>  323: uart1 ref reset
+> >>  352: gpio reset
+> >>  384: lqspi reset
+> >>  385: qspi ref reset
+> >>  416: smc reset
+> >>  417: smc ref reset
+> >>  448: ocm reset
+> >>  512: fpga0 out reset
+> >>  513: fpga1 out reset
+> >>  514: fpga2 out reset
+> >>  515: fpga3 out reset
+> >>  544: a9 reset 0
+> >>  545: a9 reset 1
+> >>  552: peri reset
+> >
+> > Basically, yes. I guess the gaps are due to directly mapping this number
+> > to bank and bit instead of doing some more complex mapping in between?
+> > I'm not sure whether I like this :) I guess if a number is off the
+> > driver would still toggle the addressed bit?
 > 
->         cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
-> @@ -392,78 +382,62 @@ int dw_pcie_host_init(struct pcie_port *pp)
->                 dev_err(pp->dev, "missing *config* reg space\n");
->         }
-> 
-> -       if (of_pci_range_parser_init(&parser, np)) {
-> -               dev_err(pp->dev, "missing ranges property\n");
-> -               return -EINVAL;
-> -       }
-> +       ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
-> +       if (ret)
-> +               return ret;
-> 
->         /* Get the I/O and memory ranges from DT */
-> -       for_each_of_pci_range(&parser, &range) {
-> -               unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
-> -
-> -               if (restype == IORESOURCE_IO) {
-> -                       of_pci_range_to_resource(&range, np, &pp->io);
-> -                       pp->io.name = "I/O";
-> -                       pp->io.start = max_t(resource_size_t,
-> -                                            PCIBIOS_MIN_IO,
-> -                                            range.pci_addr + global_io_offset);
-> -                       pp->io.end = min_t(resource_size_t,
-> -                                          IO_SPACE_LIMIT,
-> -                                          range.pci_addr + range.size
-> -                                          + global_io_offset - 1);
-> -                       pp->io_size = resource_size(&pp->io);
-> -                       pp->io_bus_addr = range.pci_addr;
-> -                       pp->io_base = range.cpu_addr;
-> -
-> -                       /* Find the untranslated IO space address */
-> -                       pp->io_mod_base = of_read_number(parser.range -
-> -                                                        parser.np + na, ns);
-> -               }
-> -               if (restype == IORESOURCE_MEM) {
-> -                       of_pci_range_to_resource(&range, np, &pp->mem);
-> -                       pp->mem.name = "MEM";
-> -                       pp->mem_size = resource_size(&pp->mem);
-> -                       pp->mem_bus_addr = range.pci_addr;
-> -
-> -                       /* Find the untranslated MEM space address */
-> -                       pp->mem_mod_base = of_read_number(parser.range -
-> -                                                         parser.np + na, ns);
-> -               }
-> -               if (restype == 0) {
-> -                       of_pci_range_to_resource(&range, np, &pp->cfg);
-> -                       pp->cfg0_size = resource_size(&pp->cfg)/2;
-> -                       pp->cfg1_size = resource_size(&pp->cfg)/2;
-> -                       pp->cfg0_base = pp->cfg.start;
-> -                       pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
-> +       resource_list_for_each_entry(win, &res) {
-> +               switch (resource_type(win->res)) {
-> +               case IORESOURCE_IO:
-> +                       pp->io = win->res;
-> +                       pp->io->name = "I/O";
-> +                       pp->io_size = resource_size(pp->io);
-> +                       pp->io_bus_addr = pp->io->start - win->offset;
-> +                       pp->io_mod_base = win->__res.start;
-> +                       ret = pci_remap_iospace(pp->io, pp->io_base);
-> +                       if (ret) {
-> +                               dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
-> +                                        ret, pp->io);
-> +                               continue;
-> +                       }
-> +                       break;
-> +               case IORESOURCE_MEM:
-> +                       pp->mem = win->res;
-> +                       pp->mem->name = "MEM";
-> +                       pp->mem_size = resource_size(pp->mem);
-> +                       pp->mem_bus_addr = pp->mem->start - win->offset;
-> +                       pp->mem_mod_base = win->__res.start;
-> +                       break;
-> +               case 0:
-> +                       pp->cfg = win->res;
-> +                       pp->cfg0_size = resource_size(pp->cfg)/2;
-> +                       pp->cfg1_size = resource_size(pp->cfg)/2;
-> +                       pp->cfg0_base = pp->cfg->start;
-> +                       pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
-> 
->                         /* Find the untranslated configuration space address */
-> -                       pp->cfg0_mod_base = of_read_number(parser.range -
-> -                                                          parser.np + na, ns);
-> -                       pp->cfg1_mod_base = pp->cfg0_mod_base +
-> -                                           pp->cfg0_size;
-> +                       pp->cfg0_mod_base = win->__res.start;
-> +                       pp->cfg1_mod_base = pp->cfg0_mod_base + pp->cfg0_size;
-> +                       break;
-> +               case IORESOURCE_BUS:
-> +                       pp->busn = win->res;
-> +                       break;
-> +               default:
-> +                       continue;
->                 }
->         }
-> 
-> -       ret = of_pci_parse_bus_range(np, &pp->busn);
-> -       if (ret < 0) {
-> -               pp->busn.name = np->name;
-> -               pp->busn.start = 0;
-> -               pp->busn.end = 0xff;
-> -               pp->busn.flags = IORESOURCE_BUS;
-> -               dev_dbg(pp->dev, "failed to parse bus-range property: %d, using default %pR\n",
-> -                       ret, &pp->busn);
-> -       }
-> -
->         if (!pp->dbi_base) {
-> -               pp->dbi_base = devm_ioremap(pp->dev, pp->cfg.start,
-> -                                       resource_size(&pp->cfg));
-> +               pp->dbi_base = devm_ioremap(pp->dev, pp->cfg->start,
-> +                                       resource_size(pp->cfg));
->                 if (!pp->dbi_base) {
->                         dev_err(pp->dev, "error with ioremap\n");
->                         return -ENOMEM;
->                 }
->         }
-> 
-> -       pp->mem_base = pp->mem.start;
-> +       pp->mem_base = pp->mem->start;
-> 
->         if (!pp->va_cfg0_base) {
->                 pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
-> @@ -524,15 +498,28 @@ int dw_pcie_host_init(struct pcie_port *pp)
->         val |= PORT_LOGIC_SPEED_CHANGE;
->         dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
-> 
-> -#ifdef CONFIG_PCI_MSI
-> -       dw_pcie_msi_chip.dev = pp->dev;
+> My assumption was that people would use a #include
+> <dt-bindings/xlnx,zynq-reset.h> in their dts. Assuming I got the
+> numbers in there right this makes it hard to misuse by accident.
+> I'm not saying it's perfect ...
 
-Is it safe to remove the dev assignment ?
-
-> -       dw_pci.msi_ctrl = &dw_pcie_msi_chip;
-> +       bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
-> +                             pp, &res);
-> +       if (!bus)
-> +               return -ENOMEM;
-> +
-> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
-> +       bus->msi = container_of(&pp->irq_domain, struct msi_controller, domain);
-> +#else
-> +       bus->msi = &dw_pcie_msi_chip;
->  #endif
-
-For the records, this patch conflicts with my MSI series:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360461.html
-
-Conflict resolution is easy but it is worth keeping in mind.
-
-Thanks !
-Lorenzo
+Michal always turned down the #include patches with the argument of
+re-using the dts files outside of the Linux sources where those includes
+etc may not be available in this form.
 
 > 
-> -       dw_pci.nr_controllers = 1;
-> -       dw_pci.private_data = (void **)&pp;
-> +       pci_scan_child_bus(bus);
-> +       if (pp->ops->scan_bus)
-> +               pp->ops->scan_bus(pp);
+> > I'm not sure, is it worth
+> > to do some explicit mapping from logical outputs to a physical reset? It
+> > seems it would be a little safer since it would be easy to check that
+> > the addressed reset is valid and there wouldn't be any reserved/invalid
+> > bits be toggled. Also, it would make the outputs in here a continuous
+> > series of numbers without these gaps. Not sure though whether
+> > it's worth the additional complexity in the implementation.
 > 
-> -       pci_common_init_dev(pp->dev, &dw_pci);
-> +#ifdef CONFIG_ARM
-> +       /* support old dtbs that incorrectly describe IRQs */
-> +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
-> +#endif
-> +
-> +       pci_assign_unassigned_bus_resources(bus);
-> +       pci_bus_add_devices(bus);
-> 
->         return 0;
->  }
-> @@ -633,7 +620,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
->  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
->                         int size, u32 *val)
->  {
-> -       struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> +       struct pcie_port *pp = bus->sysdata;
->         int ret;
-> 
->         if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
-> @@ -657,7 +644,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
->  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
->                         int where, int size, u32 val)
->  {
-> -       struct pcie_port *pp = sys_to_pcie(bus->sysdata);
-> +       struct pcie_port *pp = bus->sysdata;
->         int ret;
-> 
->         if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
-> @@ -681,62 +668,6 @@ static struct pci_ops dw_pcie_ops = {
->         .write = dw_pcie_wr_conf,
->  };
-> 
-> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
-> -{
-> -       struct pcie_port *pp;
-> -
-> -       pp = sys_to_pcie(sys);
-> -
-> -       if (global_io_offset < SZ_1M && pp->io_size > 0) {
-> -               sys->io_offset = global_io_offset - pp->io_bus_addr;
-> -               pci_ioremap_io(global_io_offset, pp->io_base);
-> -               global_io_offset += SZ_64K;
-> -               pci_add_resource_offset(&sys->resources, &pp->io,
-> -                                       sys->io_offset);
-> -       }
-> -
-> -       sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
-> -       pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
-> -       pci_add_resource(&sys->resources, &pp->busn);
-> -
-> -       return 1;
-> -}
-> -
-> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
-> -{
-> -       struct pci_bus *bus;
-> -       struct pcie_port *pp = sys_to_pcie(sys);
-> -
-> -       pp->root_bus_nr = sys->busnr;
-> -       bus = pci_scan_root_bus(pp->dev, sys->busnr,
-> -                                 &dw_pcie_ops, sys, &sys->resources);
-> -       if (!bus)
-> -               return NULL;
-> -
-> -       if (bus && pp->ops->scan_bus)
-> -               pp->ops->scan_bus(pp);
-> -
-> -       return bus;
-> -}
-> -
-> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
-> -{
-> -       struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
-> -       int irq;
-> -
-> -       irq = of_irq_parse_and_map_pci(dev, slot, pin);
-> -       if (!irq)
-> -               irq = pp->irq;
-> -
-> -       return irq;
-> -}
-> -
-> -static struct hw_pci dw_pci = {
-> -       .setup          = dw_pcie_setup,
-> -       .scan           = dw_pcie_scan_bus,
-> -       .map_irq        = dw_pcie_map_irq,
-> -};
-> -
->  void dw_pcie_setup_rc(struct pcie_port *pp)
->  {
->         u32 val;
-> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-> index d0bbd27..efac57d 100644
-> --- a/drivers/pci/host/pcie-designware.h
-> +++ b/drivers/pci/host/pcie-designware.h
-> @@ -34,7 +34,7 @@ struct pcie_port {
->         u64                     cfg1_mod_base;
->         void __iomem            *va_cfg1_base;
->         u32                     cfg1_size;
-> -       u64                     io_base;
-> +       resource_size_t         io_base;
->         u64                     io_mod_base;
->         phys_addr_t             io_bus_addr;
->         u32                     io_size;
-> @@ -42,10 +42,10 @@ struct pcie_port {
->         u64                     mem_mod_base;
->         phys_addr_t             mem_bus_addr;
->         u32                     mem_size;
-> -       struct resource         cfg;
-> -       struct resource         io;
-> -       struct resource         mem;
-> -       struct resource         busn;
-> +       struct resource         *cfg;
-> +       struct resource         *io;
-> +       struct resource         *mem;
-> +       struct resource         *busn;
->         int                     irq;
->         u32                     lanes;
->         struct pcie_host_ops    *ops;
-> diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
-> index c49fbdc..03eb204 100644
-> --- a/drivers/pci/host/pcie-spear13xx.c
-> +++ b/drivers/pci/host/pcie-spear13xx.c
-> @@ -286,7 +286,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
->                 return ret;
->         }
-> 
-> -       pp->root_bus_nr = -1;
-> +       pp->root_bus_nr = 0;
->         pp->ops = &spear13xx_pcie_host_ops;
-> 
->         ret = dw_pcie_host_init(pp);
-> --
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> So your suggestion is to have a large switch case kind of thingy? I
+> thought about it and it seemed complex as there's quite a bunch of
+> resets with gaps. Do you know of a driver that does something similar?
+
+Yeah, that was what I had in mind. Some big switch-case lookup that maps
+a logical reset number from DT to the HW.
+No, I haven't looked around what other drivers do. So, probably the
+right thing is to just do what everybody else does.
+I was more thinking about how easy it might be to re-use the driver for
+the next-gen device.
+
+> When I wrote this I looked at the other reset drivers and figured they
+> all had this kind of bank mapping of sorts so I assumed that's how
+> people usually do it.
+
+Yeah, I don't think we should make things overly complicated without a
+good reason. So, unless DT or reset folks have any objections, I'm fine
+with it.
+
+	Thanks,
+	S?ren
