@@ -1,39 +1,33 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 29 Jul 2015 14:37:44 -0500
-Subject: [PATCH 12/17] ARM: dts: am57xx-beagle-x15: Fix regulator populated
- in MMC1 dt node
-In-Reply-To: <1438168187-1614-13-git-send-email-kishon@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
- <1438168187-1614-13-git-send-email-kishon@ti.com>
-Message-ID: <55B92B88.1080409@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Jul 2015 20:38:47 +0100
+Subject: [PATCH 1/2] ARM: integrator: move framebuffers to driver
+In-Reply-To: <1438172831-11450-1-git-send-email-linus.walleij@linaro.org>
+References: <1438172831-11450-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20150729193846.GQ7557@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2015 06:09 AM, Kishon Vijay Abraham I wrote:
-> For beagle x15, both the vdd and io lines are connected to the
-> same regulator (ldo1_reg). However vmmc_aux is populated to vdd_3v3.
-> Remove it.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |    1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index a63bf78..d0db5c5 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -579,7 +579,6 @@
->  	pinctrl-0 = <&mmc1_pins_default>;
->  
->  	vmmc-supply = <&ldo1_reg>;
-> -	vmmc_aux-supply = <&vdd_3v3>;
->  	pbias-supply = <&pbias_mmc_reg>;
->  	bus-width = <4>;
->  	cd-gpios = <&gpio6 27 0>; /* gpio 219 */
-> 
-Acked-by: Nishanth Menon <nm@ti.com>
+On Wed, Jul 29, 2015 at 02:27:11PM +0200, Linus Walleij wrote:
+> Commit 11c32d7b6274cb0f554943d65bd4a126c4a86dcd
+> "video: move Versatile CLCD helpers" already moved the
+> CLCD mode setting helpers for Versatile and Integrator/CP
+> to drivers/video/fbdev. Let's do the same for the IM-PD1
+> add-on board, copy the missing displays into the database
+> and simplify the code.
+
+And thereby break the support.  The IM-PD1 CLCD can only access the memory
+on the IM-PD1.  That's why the CLCD driver itself doesn't just allocate
+the frame buffer using dma_alloc_writecombine().  Where the memory comes
+from is platform specific.  In this case...
+
+> -static int impd1fb_clcd_setup(struct clcd_fb *fb)
+> -{
+> -	unsigned long framebase = fb->dev->res.start + 0x01000000;
+> -	unsigned long framesize = SZ_1M;
+
+It's a chunk of SRAM offset by the specified value and of the specified
+size above.
 
 -- 
-Regards,
-Nishanth Menon
+FTTC broadband for 0.8mile line: currently at 10.5Mbps down 400kbps up
+according to speedtest.net.
