@@ -1,196 +1,95 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 29 Jul 2015 15:29:16 +0800
-Subject: [PATCH v3 6/6] dts: mt8173: Add iommu/smi nodes for mt8173
-In-Reply-To: <CAGS+omB5xS8LoQR9-S8iqhdsRb4OWQ_B656dJSincLZ9nby1ZA@mail.gmail.com>
-References: <1437037475-9065-1-git-send-email-yong.wu@mediatek.com>
- <1437037475-9065-7-git-send-email-yong.wu@mediatek.com>
- <CAGS+omB5xS8LoQR9-S8iqhdsRb4OWQ_B656dJSincLZ9nby1ZA@mail.gmail.com>
-Message-ID: <1438154956.25925.132.camel@mhfsdcap03>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jul 2015 09:47:10 +0200
+Subject: bug in identity map for 4KB pages?
+In-Reply-To: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <CAKv+Gu_PMvbeKRnx8t3P+44q1pt-NiUcCMTq6vK-8yUMRjQPdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-07-23 at 22:40 +0800, Daniel Kurtz wrote:
-> Hi Yong,
-> 
-> On Thu, Jul 16, 2015 at 5:04 PM, Yong Wu <yong.wu@mediatek.com> wrote:
-> >
-> > This patch add the iommu/larbs nodes for mt8173
-> 
-> To what tree does this apply?
-> Please rebase these patches (especially this one) on an Matthias'
-> current v4.2-next/for-next.
+On 29 July 2015 at 04:37, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+> Our system has RAM at a high address, and previously required using 48-bit VA
+> in order to have an idmap that covered all of RAM.
+>
+> In testing on 4.2-rc4, which now contains support for the increased VA range
+> of the idmap without using 48-bit VA, I'm finding that things work for
+> 64KB pages, but do not for 4KB pages.
+>
+> Is there any known limitation here with 4KB pages?  Any ideas?
+>
 
-Hi Daniel,
-    Sorry for reply so late. I will rebase these patch next time.
-    And the m4u/smi dsti is based on clocks, So I have to add the
-patches of the latest MTK clocks[1] locally, then prepare this iommu
-dtsi patch.
+You probably have memory at 0x8000_0000 and at 0x80_8000_0000, right?
+So the physical arrangement still requires more than the 39 bits of
+virtual address space you get with 3 levels, even if the ID map can
+cope now. That is why you get the 0x40_0000_0000 virtual address:
+__phys_to_virt() just wraps to a positive number.
 
-[1]:http://lists.infradead.org/pipermail/linux-mediatek/2015-July/001800.html
+-- 
+Ard.
 
-> 
-> 
-> >
-> > Signed-off-by: Yong Wu <yong.wu@mediatek.com>
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   81 ++++++++++++++++++++++++++++++
-> >  1 file changed, 81 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index e81ac1f..7b8e73c 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -14,6 +14,7 @@
-> >  #include <dt-bindings/clock/mt8173-clk.h>
-> >  #include <dt-bindings/interrupt-controller/irq.h>
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +#include <dt-bindings/memory/mt8173-larb-port.h>
-> >  #include <dt-bindings/power/mt8173-power.h>
-> >  #include <dt-bindings/reset-controller/mt8173-resets.h>
-> >  #include "mt8173-pinfunc.h"
-> > @@ -240,6 +241,17 @@
-> >                         reg = <0 0x10200620 0 0x20>;
-> >                 };
-> >
-> > +               iommu: mmsys_iommu at 10205000 {
-> 
-> This name should be generic, like this (this comment really applies to
-> the binding patch):
-> 
->    iommu: iommu at 10205000
 
-Thanks.
-
-> 
-> > +                       compatible = "mediatek,mt8173-m4u";
-> > +                       reg = <0 0x10205000 0 0x1000>;
-> > +                       interrupts = <GIC_SPI 139 IRQ_TYPE_LEVEL_LOW>;
-> > +                       clocks = <&infracfg CLK_INFRA_M4U>;
-> > +                       clock-names = "bclk";
-> > +                       mediatek,larb = <&larb0 &larb1 &larb2
-> > +                                       &larb3 &larb4 &larb5>;
-> 
-> Tiny nit... please align the "&".
-> 
-> Otherwise, this one is:
-> 
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-
-Thanks very much. I will improve them next version.
-Look forward to that line:)
-
-> 
-> Thanks!
-> -Dan
-> 
-> > +                       #iommu-cells = <2>;
-> > +               };
-> > +
-> >                 apmixedsys: clock-controller at 10209000 {
-> >                         compatible = "mediatek,mt8173-apmixedsys";
-> >                         reg = <0 0x10209000 0 0x1000>;
-> > @@ -401,29 +413,98 @@
-> >                         #clock-cells = <1>;
-> >                 };
-> >
-> > +               larb0: larb at 14021000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x14021000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +                       clocks = <&mmsys CLK_MM_SMI_LARB0>,
-> > +                                <&mmsys CLK_MM_SMI_LARB0>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> > +               smi_common: smi at 14022000 {
-> > +                       compatible = "mediatek,mt8173-smi";
-> > +                       reg = <0 0x14022000 0 0x1000>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +                       clocks = <&mmsys CLK_MM_SMI_COMMON>,
-> > +                                <&mmsys CLK_MM_SMI_COMMON>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> > +               larb4: larb at 14027000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x14027000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_MM>;
-> > +                       clocks = <&mmsys CLK_MM_SMI_LARB4>,
-> > +                                <&mmsys CLK_MM_SMI_LARB4>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> >                 imgsys: imgsys at 15000000 {
-> >                         compatible = "mediatek,mt8173-imgsys", "syscon";
-> >                         reg = <0 0x15000000 0 0x1000>;
-> >                         #clock-cells = <1>;
-> >                 };
-> >
-> > +               larb2: larb at 15001000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x15001000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_ISP>;
-> > +                       clocks = <&imgsys CLK_IMG_LARB2_SMI>,
-> > +                                <&imgsys CLK_IMG_LARB2_SMI>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> >                 vdecsys: vdecsys at 16000000 {
-> >                         compatible = "mediatek,mt8173-vdecsys", "syscon";
-> >                         reg = <0 0x16000000 0 0x1000>;
-> >                         #clock-cells = <1>;
-> >                 };
-> >
-> > +               larb1: larb at 16010000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x16010000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
-> > +                       clocks = <&vdecsys CLK_VDEC_CKEN>,
-> > +                                <&vdecsys CLK_VDEC_LARB_CKEN>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> >                 vencsys: vencsys at 18000000 {
-> >                         compatible = "mediatek,mt8173-vencsys", "syscon";
-> >                         reg = <0 0x18000000 0 0x1000>;
-> >                         #clock-cells = <1>;
-> >                 };
-> >
-> > +               larb3: larb at 18001000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x18001000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC>;
-> > +                       clocks = <&vencsys CLK_VENC_CKE1>,
-> > +                                <&vencsys CLK_VENC_CKE0>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> > +
-> >                 vencltsys: vencltsys at 19000000 {
-> >                         compatible = "mediatek,mt8173-vencltsys", "syscon";
-> >                         reg = <0 0x19000000 0 0x1000>;
-> >                         #clock-cells = <1>;
-> >                 };
-> > +
-> > +               larb5: larb at 19001000 {
-> > +                       compatible = "mediatek,mt8173-smi-larb";
-> > +                       reg = <0 0x19001000 0 0x1000>;
-> > +                       mediatek,smi = <&smi_common>;
-> > +                       power-domains = <&scpsys MT8173_POWER_DOMAIN_VENC_LT>;
-> > +                       clocks = <&vencltsys CLK_VENCLT_CKE1>,
-> > +                                <&vencltsys CLK_VENCLT_CKE0>;
-> > +                       clock-names = "apb", "smi";
-> > +               };
-> >         };
-> >  };
-> >
-> > --
-> > 1.7.9.5
-> >
-> 
-> 
-> 
+> ------------------------------------------------------------------------------
+>
+> Booting Linux on physical CPU 0x0
+> Initializing cgroup subsys cpu
+> Linux version 4.2.0-rc4+ (b08248 at right) (gcc version 4.8.3 20131202 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC 2013.11) ) #180 SMP PREEMPT Tue Jul 28 20:51:47 CDT 2015
+> CPU: AArch64 Processor [411fd071] revision 1
+> Detected PIPT I-cache on CPU0
+> alternatives: enabling workaround for ARM erratum 832075
+> alternatives: detected feature GIC system register CPU interface
+> earlycon: Early serial console at MMIO 0x21c0600 (options '115200')
+> bootconsole [uart0] enabled
+> efi: Getting EFI parameters from FDT:
+> efi: UEFI not found.
+> cma: Reserved 16 MiB at 0x00000000fec00000
+> BUG: not creating mapping for 0x0000008080000000 at 0x0000004000000000 - outside kernel range
+> Unable to handle kernel paging request at virtual address 435ffff000
+> pgd = ffffffc000924000
+> [435ffff000] *pgd=0000000000000000, *pud=0000000000000000
+> Internal error: Oops: 96000045 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 0 PID: 0 Comm: swapper Not tainted 4.2.0-rc4+ #180
+> Hardware name: Freescale Layerscape 2085a software Simulator model (DT)
+> task: ffffffc00088cc70 ti: ffffffc000880000 task.ti: ffffffc000880000
+> PC is at memset+0x16c/0x1c0
+> LR is at early_alloc+0x70/0x80
+> pc : [<ffffffc0003250ac>] lr : [<ffffffc00080de50>] pstate: 400002c5
+> sp : ffffffc000883ea0
+> x29: ffffffc000883ea0 x28: 00000000a00000dc
+> x27: ffffffc000081198 x26: 00000083e0000000
+> x25: ffffffc000000000 x24: ffffffc00089a000
+> x23: 0000000000000018 x22: 00000000c0000000
+> x21: 0000008080000000 x20: 000000435ffff000
+> x19: 0000000000001000 x18: 0000000000000000
+> x17: 0000000000000006 x16: 00000083e0000000
+> x15: 0000000000000018 x14: 0000008080000000
+> x13: ffffffc000900dd0 x12: 0000000000000578
+> x11: 0000000600000000 x10: 00000083dffff000
+> x9 : 0000000000000000 x8 : 000000435ffff000
+> x7 : 0000000000000000 x6 : 000000000000003f
+> x5 : 0000000000000040 x4 : 0000000000000000
+> x3 : 0000000000000004 x2 : 0000000000000fc0
+> x1 : 0000000000000000 x0 : 000000435ffff000
+>
+> Process swapper (pid: 0, stack limit = 0xffffffc000880020)
+> Stack: (0xffffffc000883ea0 to 0xffffffc000884000)
+> 3ea0: 00883ec0 ffffffc0 0080df60 ffffffc0 00900200 ffffffc0 00886000 ffffffc0
+> 3ec0: 00883f20 ffffffc0 0080b7ac ffffffc0 00080000 ffffffc0 fa9fa000 ffffffbf
+> 3ee0: 00000040 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
+> 3f00: 80921000 00000000 80924000 00000000 00000040 00000000 fa9fa000 ffffffbf
+> 3f20: 00883fa0 ffffffc0 00809690 ffffffc0 00000001 00000000 0083c120 ffffffc0
+> 3f40: 9fffa000 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
+> 3f60: 80921000 00000000 80924000 00000000 00000001 00000000 9fffa000 00000000
+> 3f80: 00000000 00000000 00000000 80000000 00000080 00000000 64667467 ff616b73
+> 3fa0: 00000000 00000000 805d3000 00000000 fff9fa40 00000000 00000e12 00000000
+> 3fc0: 9fffa000 00000000 00000000 00000000 00000000 00000000 80000000 00000000
+> 3fe0: 00000000 00000000 0083c948 ffffffc0 00000000 00000000 00000000 00000000
+> Call trace:
+> [<ffffffc0003250ac>] memset+0x16c/0x1c0
+> [<ffffffc00080df5c>] paging_init+0xd0/0x174
+> [<ffffffc00080b7a8>] setup_arch+0x28c/0x5c4
+> [<ffffffc00080968c>] start_kernel+0x94/0x3d0
+> Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
+> ---[ end trace cb88537fdc8fa200 ]---
+> Kernel panic - not syncing: Attempted to kill the idle task!
+> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
