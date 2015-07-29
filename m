@@ -1,57 +1,52 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 29 Jul 2015 09:57:29 +0900
-Subject: [PATCH v3] ARM: dts: Add SPI CS on exynos5250-snow
-In-Reply-To: <e1952e8c102a3b7a7f3f79c759c44093e0d11dc7.1438073049.git.hramrach@gmail.com>
-References: <a5054dfad3d48c582b062b0536125c9bcff41f31.1438027526.git.hramrach@gmail.com>
- <e1952e8c102a3b7a7f3f79c759c44093e0d11dc7.1438073049.git.hramrach@gmail.com>
-Message-ID: <041501d0c999$8af92f30$a0eb8d90$@kernel.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 28 Jul 2015 18:04:48 -0700
+Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+In-Reply-To: <55B0A764.6010708@codeaurora.org>
+References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
+ <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
+ <55B03D65.8040207@codeaurora.org> <55B0A764.6010708@codeaurora.org>
+Message-ID: <55B826B0.2090705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Suchanek wrote:
-> 
-> Although there is only one choice of chipselect it is necessary to
-> specify it. The driver cannot claim the gpio otherwise.
-> 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> Acked-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
+On 07/23/2015 01:35 AM, Rajendra Nayak wrote:
+> []..
+>
+>>> +
+>>> +#ifndef CONFIG_PM
+>>> +static void enable_clock(struct device *dev, const char *con_id)
+>>> +{
+>>> +    struct clk *clk;
+>>> +
+>>> +    clk = clk_get(dev, con_id);
+>>> +    if (!IS_ERR(clk)) {
+>>> +        clk_prepare_enable(clk);
+>>> +        clk_put(clk);
+>>> +    }
+>>> +}
+>>> +
+>>> +static void disable_clock(struct device *dev, const char *con_id)
+>>> +{
+>>> +    struct clk *clk;
+>>> +
+>>> +    clk = clk_get(dev, con_id);
+>>> +    if (!IS_ERR(clk)) {
+>>> +        clk_disable_unprepare(clk);
+>>> +        clk_put(clk);
+>>> +    }
+>>> +}
+>>
+>> Is there a reason why this whole patch isn't generic code? I recall some
+>> discussion but I forgot now and there isn't any mention of why this
+>> isn't generic code in the commit text.
+>
+> If by generic code, you mean using PM clocks, then this thread should
+> give some context..
+> http://www.spinics.net/lists/arm-kernel/msg414072.html
 
->From here ---8<--------8<-----------
+Sorry, I read the thread and I tried to understand what was going on but 
+I'm still lost. Can you clarify further in the commit text somehow?
 
-> --
->  - don't move unrelated line
->  - use symbolic GPIO_ACTIVE_HIGH
-
-to here  ---8<--------8<-----------
-
-should be added under the following '---'.
-
-Please add some additional comments like above 'changes since previous version'
-under the following '---' not '--', because all comments will be logged before
-the '---' and I don't want to keep the changes basically.
-
-Anyway, applied with removing above comments.
-
-Thanks,
-Kukjin
-
-> ---
->  arch/arm/boot/dts/exynos5250-snow.dts | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-snow.dts b/arch/arm/boot/dts/exynos5250-snow.dts
-> index b7f4122..2d6a976 100644
-> --- a/arch/arm/boot/dts/exynos5250-snow.dts
-> +++ b/arch/arm/boot/dts/exynos5250-snow.dts
-> @@ -688,6 +688,7 @@
->  	status = "okay";
->  	samsung,spi-src-clk = <0>;
->  	num-cs = <1>;
-> +	cs-gpios = <&gpa2 5 GPIO_ACTIVE_HIGH>;
->  };
-> 
->  &usbdrd_dwc3 {
-> --
-> 2.1.4
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
