@@ -1,28 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Jul 2015 16:30:21 +0200
-Subject: [PATCH] PCI: iproc: Fix BCMA dependency in Kconfig
-In-Reply-To: <1438109533-28694-1-git-send-email-rjui@broadcom.com>
-References: <1438109533-28694-1-git-send-email-rjui@broadcom.com>
-Message-ID: <33449873.RA3z6vhrMA@wuerfel>
+Date: Wed, 29 Jul 2015 16:34:21 +0200
+Subject: [PATCH] dmaengine: xgene-dma: Add ACPI support for X-Gene DMA
+ engine driver
+In-Reply-To: <1437484479-2822-1-git-send-email-rsahu@apm.com>
+References: <1437484479-2822-1-git-send-email-rsahu@apm.com>
+Message-ID: <2384915.JHlOHWBXHy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 July 2015 11:52:13 Ray Jui wrote:
->  config PCIE_IPROC_BCMA
->         bool "Broadcom iProc PCIe BCMA bus driver"
-> -       depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
-> +       depends on ARCH_BCM_IPROC && ARM
->         select PCIE_IPROC
->         select BCMA
->         select PCI_DOMAINS
+On Tuesday 21 July 2015 18:44:39 Rameshwar Prasad Sahu wrote:
+> This patch adds ACPI support for the APM X-Gene DMA engine driver.
+> 
+> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 > 
 
-How about this:
-
-	depends on ARM && (ARCH_BCM_IPROC || COMPILE_TEST)
-
-That would leave the compile test present for non-iproc
-ARM platforms while preventing ARM64 and MIPS builds with
-ARCH_BCM_IPROC set.
+How does a slave driver refer to a channel in case of ACPI?
 
 	Arnd
