@@ -1,48 +1,24 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 29 Jul 2015 16:23:11 +0530
-Subject: [PATCH V3 16/16] cpufreq: dt: Add support for turbo/boost mode
-In-Reply-To: <cover.1438166099.git.viresh.kumar@linaro.org>
-References: <cover.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <5dba664d47ca399e0ad7a55f2d74688d1300a703.1438166099.git.viresh.kumar@linaro.org>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 29 Jul 2015 12:02:50 +0100
+Subject: [PATCH 0/8] Use correctly the Xen memory terminologies in Linux
+In-Reply-To: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+Message-ID: <55B8B2DA.8090900@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With opp-v2 DT bindings, few OPPs can be used only for the boost mode.
-But using such OPPs require the boost mode to be supported by cpufreq
-driver.
+On 28/07/15 16:02, Julien Grall wrote:
+> Hi all,
+> 
+> This patch series aims to use the memory terminologies described in
+> include/linux/mm.h [1] for Linux xen code.
 
-We will parse DT bindings only during ->init() and so can enable boost
-support only after registering cpufreq driver.
+I mistakenly wrote the wrong include here. It should be include/xen/mm.h
+from the Xen tree:
 
-This enables boost support as soon as any policy has boost/turbo OPPs
-for its CPUs.
+http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=e758ed14f390342513405dd766e874934573e6cb
 
-We don't need to disable boost support as that is done by the core, when
-the driver is unregistered.
+Regards,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/cpufreq-dt.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
-index c6e7033076de..b9259abd25d4 100644
---- a/drivers/cpufreq/cpufreq-dt.c
-+++ b/drivers/cpufreq/cpufreq-dt.c
-@@ -330,6 +330,14 @@ static int cpufreq_init(struct cpufreq_policy *policy)
- 		goto out_free_cpufreq_table;
- 	}
- 
-+	/* Support turbo/boost mode */
-+	if (policy_has_boost_freq(policy)) {
-+		/* This gets disabled by core on driver unregister */
-+		ret = cpufreq_enable_boost_support();
-+		if (ret)
-+			goto out_free_cpufreq_table;
-+	}
-+
- 	policy->cpuinfo.transition_latency = transition_latency;
- 
- 	of_node_put(np);
 -- 
-2.4.0
+Julien Grall
