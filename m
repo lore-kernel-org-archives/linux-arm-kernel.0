@@ -1,83 +1,55 @@
 From: jamesjj.liao@mediatek.com (James Liao)
-Date: Wed, 29 Jul 2015 14:52:28 +0800
-Subject: [PATCH v5 04/10] clk: mediatek: Add fixed clocks support for Mediatek
- SoC.
+Date: Wed, 29 Jul 2015 14:52:26 +0800
+Subject: [PATCH v5 02/10] clk: mediatek: Remove unused code from MT8173.
 In-Reply-To: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
 References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <1438152754-11970-5-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <1438152754-11970-3-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds fixed clocks support by using CCF fixed-rate
-clock implementation.
+Remove unused header files from MT8173, and remove unused
+keywords from function declaration.
 
 Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 ---
- drivers/clk/mediatek/clk-mtk.c | 23 +++++++++++++++++++++++
- drivers/clk/mediatek/clk-mtk.h | 17 +++++++++++++++++
- 2 files changed, 40 insertions(+)
+ drivers/clk/mediatek/clk-mt8173.c | 2 --
+ drivers/clk/mediatek/clk-mtk.h    | 4 ++--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clk/mediatek/clk-mtk.c b/drivers/clk/mediatek/clk-mtk.c
-index 268b6ff..cf08db6 100644
---- a/drivers/clk/mediatek/clk-mtk.c
-+++ b/drivers/clk/mediatek/clk-mtk.c
-@@ -49,6 +49,29 @@ err_out:
- 	return NULL;
- }
+diff --git a/drivers/clk/mediatek/clk-mt8173.c b/drivers/clk/mediatek/clk-mt8173.c
+index 4486f8f..4478849 100644
+--- a/drivers/clk/mediatek/clk-mt8173.c
++++ b/drivers/clk/mediatek/clk-mt8173.c
+@@ -14,8 +14,6 @@
  
-+void __init mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
-+		int num, struct clk_onecell_data *clk_data)
-+{
-+	int i;
-+	struct clk *clk;
-+
-+	for (i = 0; i < num; i++) {
-+		const struct mtk_fixed_clk *rc = &clks[i];
-+
-+		clk = clk_register_fixed_rate(NULL, rc->name, rc->parent,
-+				rc->parent ? 0 : CLK_IS_ROOT, rc->rate);
-+
-+		if (IS_ERR(clk)) {
-+			pr_err("Failed to register clk %s: %ld\n",
-+					rc->name, PTR_ERR(clk));
-+			continue;
-+		}
-+
-+		if (clk_data)
-+			clk_data->clks[rc->id] = clk;
-+	}
-+}
-+
- void __init mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
- 		int num, struct clk_onecell_data *clk_data)
- {
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+-#include <linux/slab.h>
+-#include <linux/mfd/syscon.h>
+ 
+ #include "clk-mtk.h"
+ #include "clk-gate.h"
 diff --git a/drivers/clk/mediatek/clk-mtk.h b/drivers/clk/mediatek/clk-mtk.h
-index 740fe5e..32d4f55 100644
+index 9dda9d8..740fe5e 100644
 --- a/drivers/clk/mediatek/clk-mtk.h
 +++ b/drivers/clk/mediatek/clk-mtk.h
-@@ -25,6 +25,23 @@
+@@ -41,7 +41,7 @@ struct mtk_fixed_factor {
+ 		.div = _div,				\
+ 	}
  
- #define MHZ (1000 * 1000)
+-extern void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
++void mtk_clk_register_factors(const struct mtk_fixed_factor *clks,
+ 		int num, struct clk_onecell_data *clk_data);
  
-+struct mtk_fixed_clk {
-+	int id;
-+	const char *name;
-+	const char *parent;
-+	unsigned long rate;
-+};
-+
-+#define FIXED_CLK(_id, _name, _parent, _rate) {		\
-+		.id = _id,				\
-+		.name = _name,				\
-+		.parent = _parent,			\
-+		.rate = _rate,				\
-+	}
-+
-+void mtk_clk_register_fixed_clks(const struct mtk_fixed_clk *clks,
-+		int num, struct clk_onecell_data *clk_data);
-+
- struct mtk_fixed_factor {
- 	int id;
- 	const char *name;
+ struct mtk_composite {
+@@ -152,7 +152,7 @@ struct mtk_pll_data {
+ 	int pcw_shift;
+ };
+ 
+-void __init mtk_clk_register_plls(struct device_node *node,
++void mtk_clk_register_plls(struct device_node *node,
+ 		const struct mtk_pll_data *plls, int num_plls,
+ 		struct clk_onecell_data *clk_data);
+ 
 -- 
 1.8.1.1.dirty
