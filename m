@@ -1,152 +1,97 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 29 Jul 2015 10:38:02 -0700
-Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
- Controller bindings.
-In-Reply-To: <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
-References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
- <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
- <20150728025833.GQ2650@xsjsorenbubuntu>
- <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
- <20150728225337.GF2650@xsjsorenbubuntu>
- <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
-Message-ID: <20150729173802.GO2650@xsjsorenbubuntu>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 29 Jul 2015 12:38:44 -0500
+Subject: [PATCH] arm64: override early_init_dt_add_memory_arch()
+In-Reply-To: <1438186495-18126-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1438186495-18126-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAL_JsqKMyOwfNVV5nfAGO0vVgTR7dpPAxMfdeW9mjMd1WfMs3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-07-28 at 11:14PM -0700, Moritz Fischer wrote:
-> Hi S?ren,
-> 
-> On Tue, Jul 28, 2015 at 3:53 PM, S?ren Brinkmann
-> <soren.brinkmann@xilinx.com> wrote:
-> > On Mon, 2015-07-27 at 09:52PM -0700, Moritz Fischer wrote:
-> >> Hi S?ren,
-> >>
-> >> thanks for your feedback.
-> >>
-> >> On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
-> >> <soren.brinkmann@xilinx.com> wrote:
-> >> > Hi Moritz,
-> >> >
-> >> > On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
-> >> >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
-> >> >> ---
-> >> >>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
-> >> >>  1 file changed, 13 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> >> >> new file mode 100644
-> >> >> index 0000000..ac4499e
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
-> >> >> @@ -0,0 +1,13 @@
-> >> >> +Xilinx Zynq PL Reset Manager
-> >> >> +
-> >> >> +Required properties:
-> >> >> +- compatible: "xlnx,zynq-reset-pl"
-> >> >> +- syscon <&slcr>;
-> >> >> +- #reset-cells: 1
-> >> >> +
-> >> >> +Example:
-> >> >> +     rstc: rstc at 240 {
-> >> >> +             #reset-cells = <1>;
-> >> >> +             compatible = "xlnx,zynq-reset-pl";
-> >> >> +             syscon = <&slcr>;
-> >> >> +     };
-> >> >
-> >> > I think you also have to add the outputs and make them part of the
-> >> > binding. Otherwise you'd have to read the implementation to find
-> >> > out what device should be hooked up to which output of the reset-controller.
-> >>
-> >> Is something like this what you had in mind? I had that prepared for
-> >> the next round of patches:
-> >>
-> >> Reset outputs:
-> >>  0  : soft reset
-> >>  32 : ddr reset
-> >>  64 : topsw reset
-> >>  96 : dmac reset
-> >>  128: usb0 reset
-> >>  129: usb1 reset
-> >>  160: gem0 reset
-> >>  161: gem1 reset
-> >>  164: gem0 rx reset
-> >>  165: gem1 rx reset
-> >>  166: gem0 ref reset
-> >>  167: gem1 ref reset
-> >>  192: sdio0 reset
-> >>  193: sdio1 reset
-> >>  196: sdio0 ref reset
-> >>  197: sdio1 ref reset
-> >>  224: spi0 reset
-> >>  225: spi1 reset
-> >>  226: spi0 ref reset
-> >>  227: spi1 ref reset
-> >>  256: can0 reset
-> >>  257: can1 reset
-> >>  258: can0 ref reset
-> >>  259: can1 ref reset
-> >>  288: i2c0 reset
-> >>  289: i2c1 reset
-> >>  320: uart0 reset
-> >>  321: uart1 reset
-> >>  322: uart0 ref reset
-> >>  323: uart1 ref reset
-> >>  352: gpio reset
-> >>  384: lqspi reset
-> >>  385: qspi ref reset
-> >>  416: smc reset
-> >>  417: smc ref reset
-> >>  448: ocm reset
-> >>  512: fpga0 out reset
-> >>  513: fpga1 out reset
-> >>  514: fpga2 out reset
-> >>  515: fpga3 out reset
-> >>  544: a9 reset 0
-> >>  545: a9 reset 1
-> >>  552: peri reset
-> >
-> > Basically, yes. I guess the gaps are due to directly mapping this number
-> > to bank and bit instead of doing some more complex mapping in between?
-> > I'm not sure whether I like this :) I guess if a number is off the
-> > driver would still toggle the addressed bit?
-> 
-> My assumption was that people would use a #include
-> <dt-bindings/xlnx,zynq-reset.h> in their dts. Assuming I got the
-> numbers in there right this makes it hard to misuse by accident.
-> I'm not saying it's perfect ...
+On Wed, Jul 29, 2015 at 11:14 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> Override the __weak early_init_dt_add_memory_arch() with our own
+> version. This allows us to relax the imposed restrictions at memory
+> discovery time, and clip the memory we will not able to address in
+> a single go at mapping time.
 
-Michal always turned down the #include patches with the argument of
-re-using the dts files outside of the Linux sources where those includes
-etc may not be available in this form.
+This doesn't really explain what is the problem you are solving.
 
-> 
-> > I'm not sure, is it worth
-> > to do some explicit mapping from logical outputs to a physical reset? It
-> > seems it would be a little safer since it would be easy to check that
-> > the addressed reset is valid and there wouldn't be any reserved/invalid
-> > bits be toggled. Also, it would make the outputs in here a continuous
-> > series of numbers without these gaps. Not sure though whether
-> > it's worth the additional complexity in the implementation.
-> 
-> So your suggestion is to have a large switch case kind of thingy? I
-> thought about it and it seemed complex as there's quite a bunch of
-> resets with gaps. Do you know of a driver that does something similar?
+> So copy the generic original, but only retain the check against
+> regions whose sizes become zero when clipped to page alignment.
+>
+> The clipping against the maximum size of the linear region has been
+> moved to arm64_memblock_init().
 
-Yeah, that was what I had in mind. Some big switch-case lookup that maps
-a logical reset number from DT to the HW.
-No, I haven't looked around what other drivers do. So, probably the
-right thing is to just do what everybody else does.
-I was more thinking about how easy it might be to re-use the driver for
-the next-gen device.
+IIRC, the checks in early_init_dt_add_memory_arch came from the arm64
+version of it. If you now want to remove them, then I'm okay removing
+them from the weak function (assuming my memory is correct). None of
+this seems architecture specific to me. Perhaps memblock needs handle
+the clipping itself. The arch sets the limits, DT provides the raw
+memory ranges, and then memblock sorts out the actual memory blocks.
 
-> When I wrote this I looked at the other reset drivers and figured they
-> all had this kind of bank mapping of sorts so I assumed that's how
-> people usually do it.
+Rob
 
-Yeah, I don't think we should make things overly complicated without a
-good reason. So, unless DT or reset folks have any objections, I'm fine
-with it.
-
-	Thanks,
-	S?ren
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/mm/init.c | 35 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index ad87ce826cce..76a624611939 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -158,6 +158,25 @@ early_param("mem", early_mem);
+>
+>  void __init arm64_memblock_init(void)
+>  {
+> +       /*
+> +        * Remove the memory that we will not be able to cover
+> +        * with the linear mapping.
+> +        */
+> +       const s64 linear_region_size = -(s64)PAGE_OFFSET;
+> +
+> +       if (memblock_start_of_DRAM() < memstart_addr) {
+> +               pr_warn("Ignoring memory below PHYS_OFFSET (0x%012llx - 0x%012llx)\n",
+> +                       (u64)memblock_start_of_DRAM(), memstart_addr - 1);
+> +               memblock_remove(0, memstart_addr);
+> +       }
+> +
+> +       if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
+> +               pr_warn("Ignoring memory outside of linear range (0x%012llx - 0x%012llx)\n",
+> +                       memstart_addr + linear_region_size,
+> +                       (u64)memblock_end_of_DRAM() - 1);
+> +               memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
+> +       }
+> +
+>         memblock_enforce_memory_limit(memory_limit);
+>
+>         /*
+> @@ -374,3 +393,19 @@ static int __init keepinitrd_setup(char *__unused)
+>
+>  __setup("keepinitrd", keepinitrd_setup);
+>  #endif
+> +
+> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
+> +{
+> +       if (!PAGE_ALIGNED(base)) {
+> +               if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
+> +                       pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
+> +                               base, base + size);
+> +                       return;
+> +               }
+> +               size -= PAGE_SIZE - (base & ~PAGE_MASK);
+> +               base = PAGE_ALIGN(base);
+> +       }
+> +       size &= PAGE_MASK;
+> +
+> +       memblock_add(base, size);
+> +}
+> --
+> 1.9.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
