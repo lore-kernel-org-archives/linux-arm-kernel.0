@@ -1,42 +1,37 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:43 +0530
-Subject: [PATCH 13/17] mmc: host: omap_hsmmc: enable/disable vmmc_aux
- regulator based on prior state
-In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-14-git-send-email-kishon@ti.com>
+From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
+Date: Wed, 29 Jul 2015 13:13:20 +0200
+Subject: [PATCH] arm64: remove redundant object file list
+Message-ID: <1438168400-20082-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable vmmc_aux regulator only if it is in disabled state and disable
-vmmc_aux regulator only if it is in enabled state.
+Commit 4b3dc9679cf7 ("arm64: force CONFIG_SMP=y and remove redundant
+#ifdefs") forces SMP on arm64. To build the necessary objects for SMP,
+they were added to the arm64-obj-y rule in arch/arm64/kernel/Makefile,
+without removing the arm64-obj-$(CONFIG_SMP) rule.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Remove redundant object file list depending on always-yes CONFIG_SMP in
+arch/arm64/kernel/Makefile.
+
+Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
 ---
- drivers/mmc/host/omap_hsmmc.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I found this inconsistency using the undertaker and
+undertaker-checkpatch tools (https://undertaker.cs.fau.de/).
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 58bda42..001f8a0 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -258,7 +258,7 @@ static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int vdd)
- 	}
- 
- 	/* Enable interface voltage rail, if needed */
--	if (mmc->supply.vqmmc) {
-+	if (mmc->supply.vqmmc && !regulator_is_enabled(mmc->supply.vqmmc)) {
- 		ret = regulator_enable(mmc->supply.vqmmc);
- 		if (ret) {
- 			dev_err(mmc_dev(mmc), "vmmc_aux reg enable failed\n");
-@@ -280,7 +280,7 @@ static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
- 	int ret;
- 	int status;
- 
--	if (mmc->supply.vqmmc) {
-+	if (mmc->supply.vqmmc && regulator_is_enabled(mmc->supply.vqmmc)) {
- 		ret = regulator_disable(mmc->supply.vqmmc);
- 		if (ret) {
- 			dev_err(mmc_dev(mmc), "vmmc_aux reg disable failed\n");
+ arch/arm64/kernel/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index f126cfe..c662197 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -25,7 +25,6 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+-arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_callchain.o
+ arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
 -- 
-1.7.9.5
+2.1.4
