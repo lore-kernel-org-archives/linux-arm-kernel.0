@@ -1,41 +1,45 @@
-From: wei.liu2@citrix.com (Wei Liu)
-Date: Wed, 29 Jul 2015 11:13:24 +0100
-Subject: [PATCH 4/8] xen: Use the correctly the Xen memory terminologies
-In-Reply-To: <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
-References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
- <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
-Message-ID: <20150729101323.GW5111@zion.uk.xensource.com>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 29 Jul 2015 12:19:46 +0200
+Subject: [PATCH 07/10] usb: chipidea: usbmisc_imx: add unburst setting
+ for imx6
+In-Reply-To: <20150729075728.GC27605@shlinux2>
+References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
+ <1438137734-27311-8-git-send-email-peter.chen@freescale.com>
+ <20150729103022.7cfe0466@ipc1.ka-ro>
+ <20150729075728.GC27605@shlinux2>
+Message-ID: <20150729121946.009e7f03@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 04:02:45PM +0100, Julien Grall wrote:
-[...]
-> diff --git a/drivers/net/xen-netback/netback.c b/drivers/net/xen-netback/netback.c
-> index 7d50711..3b7b7c3 100644
-> --- a/drivers/net/xen-netback/netback.c
-> +++ b/drivers/net/xen-netback/netback.c
-> @@ -314,7 +314,7 @@ static void xenvif_gop_frag_copy(struct xenvif_queue *queue, struct sk_buff *skb
->  		} else {
->  			copy_gop->source.domid = DOMID_SELF;
->  			copy_gop->source.u.gmfn =
-> -				virt_to_mfn(page_address(page));
-> +				virt_to_gfn(page_address(page));
->  		}
->  		copy_gop->source.offset = offset;
->  
-> @@ -1284,7 +1284,7 @@ static void xenvif_tx_build_gops(struct xenvif_queue *queue,
->  		queue->tx_copy_ops[*copy_ops].source.offset = txreq.offset;
->  
->  		queue->tx_copy_ops[*copy_ops].dest.u.gmfn =
-> -			virt_to_mfn(skb->data);
-> +			virt_to_gfn(skb->data);
->  		queue->tx_copy_ops[*copy_ops].dest.domid = DOMID_SELF;
->  		queue->tx_copy_ops[*copy_ops].dest.offset =
->  			offset_in_page(skb->data);
+Hi,
 
-Reviewed-by: Wei Liu <wei.liu2@citrix.com>
+> On Wed, Jul 29, 2015 at 10:30:22AM +0200, Lothar Wa?mann wrote:
+> > Hi,
+> > 
+> > > With this setting and AHBBRST at SBUSCFG as "Incremental burst of
+> > > unspecified length", each unburst size can be taken as one single transfer.
+> > > It is benefit for unburst size transfer.
+> > > 
+> > What is an 'unburst'?
+> > 
+> 
+> Assume burst size is 8 dword, unburst size 't' < 8.
+> 
+> With this feature, 't' length payload can be taken
+> as one burst transfer, otherwise, the single transfer
+> (1 dword) will be used.
+> 
+IMO non-burst would be a better word.
 
-One possible improvement is to change gmfn in copy_gop to gfn as well.
-But that's outside of netback code.
 
-Wei.
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
