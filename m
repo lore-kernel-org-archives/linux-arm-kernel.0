@@ -1,87 +1,56 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 29 Jul 2015 10:42:10 +0800
-Subject: [PATCH 06/10] usb: chipidea: add ahb burst configuration interface
+Date: Wed, 29 Jul 2015 10:42:11 +0800
+Subject: [PATCH 07/10] usb: chipidea: usbmisc_imx: add unburst setting for imx6
 In-Reply-To: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
 References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1438137734-27311-7-git-send-email-peter.chen@freescale.com>
+Message-ID: <1438137734-27311-8-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The users can change it through dts or platform data if they
-want to change the default value.
+With this setting and AHBBRST at SBUSCFG as "Incremental burst of
+unspecified length", each unburst size can be taken as one single transfer.
+It is benefit for unburst size transfer.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/bits.h  |  3 +++
- drivers/usb/chipidea/core.c  | 14 ++++++++++++++
- include/linux/usb/chipidea.h |  2 ++
- 3 files changed, 19 insertions(+)
+ drivers/usb/chipidea/usbmisc_imx.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index 831a8f6..462ad02 100644
---- a/drivers/usb/chipidea/bits.h
-+++ b/drivers/usb/chipidea/bits.h
-@@ -25,6 +25,9 @@
- #define VERSION		      (0xF << 25)
- #define CIVERSION	      (0x7 << 29)
+diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
+index 3cefd49..69d39dc 100644
+--- a/drivers/usb/chipidea/usbmisc_imx.c
++++ b/drivers/usb/chipidea/usbmisc_imx.c
+@@ -54,6 +54,7 @@
+ #define MX53_USB_PHYCTRL1_PLLDIV_MASK	0x3
+ #define MX53_USB_PLL_DIV_24_MHZ		0x01
  
-+/* SBUSCFG */
-+#define AHBBRST_MASK		0x7
++#define MX6_BM_UNBURST_SETTING		BIT(1)
+ #define MX6_BM_OVER_CUR_DIS		BIT(7)
+ #define MX6_BM_WAKEUP_ENABLE		BIT(10)
+ #define MX6_BM_ID_WAKEUP		BIT(16)
+@@ -255,14 +256,21 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
+ 	if (data->index > 3)
+ 		return -EINVAL;
+ 
++	spin_lock_irqsave(&usbmisc->lock, flags);
 +
- /* HCCPARAMS */
- #define HCCPARAMS_LEN         BIT(17)
- 
-diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index 38bd036..f60cbf6 100644
---- a/drivers/usb/chipidea/core.c
-+++ b/drivers/usb/chipidea/core.c
-@@ -439,6 +439,9 @@ void ci_platform_configure(struct ci_hdrc *ci)
- 
- 	hw_write(ci, OP_USBCMD, 0xff0000, ci->platdata->itc_setting << 16);
- 
-+	if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
-+		hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
-+			ci->platdata->ahb_burst_config);
- }
- 
- /**
-@@ -647,6 +650,17 @@ static int ci_get_platdata(struct device *dev,
- 		}
+ 	if (data->disable_oc) {
+-		spin_lock_irqsave(&usbmisc->lock, flags);
+ 		reg = readl(usbmisc->base + data->index * 4);
+ 		writel(reg | MX6_BM_OVER_CUR_DIS,
+ 			usbmisc->base + data->index * 4);
+-		spin_unlock_irqrestore(&usbmisc->lock, flags);
  	}
  
-+	if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
-+		ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
-+			&platdata->ahb_burst_config);
-+		if (ret) {
-+			dev_err(dev,
-+				"failed to get ahb-burst-config\n");
-+			return ret;
-+		}
-+		platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
-+	}
++	/* SoC unburst setting */
++	reg = readl(usbmisc->base + data->index * 4);
++	writel(reg | MX6_BM_UNBURST_SETTING,
++			usbmisc->base + data->index * 4);
 +
++	spin_unlock_irqrestore(&usbmisc->lock, flags);
++
+ 	usbmisc_imx6q_set_wakeup(data, false);
+ 
  	return 0;
- }
- 
-diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 982f8cc..9848a4e 100644
---- a/include/linux/usb/chipidea.h
-+++ b/include/linux/usb/chipidea.h
-@@ -33,6 +33,7 @@ struct ci_hdrc_platform_data {
- #define CI_HDRC_DISABLE_HOST_STREAMING		BIT(10)
- #define CI_HDRC_DISABLE_STREAMING (CI_HDRC_DISABLE_DEVICE_STREAMING |	\
- 		CI_HDRC_DISABLE_HOST_STREAMING)
-+#define CI_HDRC_OVERRIDE_AHB_BURST		BIT(11)
- 	enum usb_dr_mode	dr_mode;
- #define CI_HDRC_CONTROLLER_RESET_EVENT		0
- #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
-@@ -42,6 +43,7 @@ struct ci_hdrc_platform_data {
- 	bool			tpl_support;
- 	/* interrupt threshold setting */
- 	u32			itc_setting;
-+	u32			ahb_burst_config;
- };
- 
- /* Default offset of capability registers */
 -- 
 1.9.1
