@@ -1,48 +1,31 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 29 Jul 2015 16:53:57 +0800
-Subject: [PATCH 4/6] pci: altera: Add Altera PCIe MSI driver
-In-Reply-To: <CADhT+wf2oYVZHn1XAODYJUsxwu03TAzN6ZEQCkSBjU5ruKWCDQ@mail.gmail.com>
-References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-5-git-send-email-lftan@altera.com>
- <CADhT+wf2oYVZHn1XAODYJUsxwu03TAzN6ZEQCkSBjU5ruKWCDQ@mail.gmail.com>
-Message-ID: <CAFiDJ5-UebtEmj6vQ1Xn-eORDyJWtDVwOWz57XZtpq4GaYjDoQ@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 29 Jul 2015 09:55:22 +0100
+Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <55B893A7.2030206@codeaurora.org>
+References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55B893A7.2030206@codeaurora.org>
+Message-ID: <55B894FA.8050008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 1:00 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
-> On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
->> This patch adds Altera PCIe MSI driver. This soft IP supports configurable
->> number of vectors, which is a dts parameter.
+
+
+On 29/07/15 09:49, Rajendra Nayak wrote:
+> On 07/27/2015 04:42 PM, Srinivas Kandagatla wrote:
+>> Hi Greg/Kevin,
 >>
->> Signed-off-by: Ley Foon Tan <lftan@altera.com>
->> ---
->>  drivers/pci/host/Kconfig           |   7 +
->>  drivers/pci/host/Makefile          |   1 +
->>  drivers/pci/host/pcie-altera-msi.c | 318 +++++++++++++++++++++++++++++++++++++
->>  3 files changed, 326 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-altera-msi.c
+>> This patchset adds a new simple NVMEM framework to kernel, and it is
+>> tested
+>> with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
+>> "begal bone cape manager" and few more on the way.
 >>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index af19039..a8b87fd 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -154,4 +154,11 @@ config PCIE_ALTERA
->>           Say Y here if you want to enable PCIe controller support for Altera
->>           SoCFPGA family of SoCs.
->>
->> +config PCIE_ALTERA_MSI
->> +       bool "Altera PCIe MSI feature"
->> +       depends on PCI_MSI && PCIE_ALTERA
->> +       help
->> +         Say Y here if you want PCIe MSI support for the Altera SocFPGA SoC.
->> +         This MSI driver supports Altera MSI to GIC controller IP.
->> +
+>> Can you please consider this as 4.3 material, AFAIK there are more
+>> than 3 drivers
+>> depending on this framework which are wating since last 2 merge windows.
 >
-> Couldn't this driver get combined with the pcie-altera driver?
-Prefer to separate them, since they are 2 separate IPs.
-Theoretically, this MSI driver can work with other PCIe host as well.
+> I have been testing these with the qcom tsens driver, and did test v9
+> as well, so feel free to add my tested by for the entire series,
+>
+> Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
 
-Thanks.
-
-Regard
-Ley Foon
+Thanks Rajendra for the tested-by.
