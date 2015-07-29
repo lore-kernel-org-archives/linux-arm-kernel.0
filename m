@@ -1,192 +1,134 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 29 Jul 2015 16:23:09 +0530
-Subject: [PATCH V3 14/16] cpufreq: Allow drivers to enable boost support after
- registering driver
+Date: Wed, 29 Jul 2015 16:23:10 +0530
+Subject: [PATCH V3 15/16] cpufreq: dt: Add support for operating-points-v2
+ bindings
 In-Reply-To: <cover.1438166099.git.viresh.kumar@linaro.org>
 References: <cover.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <98379f9625b9cc8ade2e052c29e86c29e11cea5e.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <c7e42623089a04f1d607f0912736aa1ec1d5c48a.1438166099.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases it wouldn't be known at time of driver registration, if
-the driver needs to support boost frequencies.
+Support for parsing operating-points-v2 bindings is in place now, lets
+modify cpufreq-dt driver to use them.
 
-For example, while getting boost information from DT with opp-v2
-bindings, we need to parse the bindings for all the CPUs to know if
-turbo/boost OPPs are supported or not.
+For backward compatibility we will continue to support earlier bindings.
+Special handling for that is required, to make sure OPPs are initialized
+for all the CPUs.
 
-One way out to do that efficiently is to delay supporting boost mode
-(i.e. creating /sys/devices/system/cpu/cpufreq/boost file), until the
-time OPP bindings are parsed.
-
-At that point, the driver can enable boost support. This can be done at
-->init(), where the frequency table is created.
-
-To do that, the driver requires few APIs from cpufreq core that let him
-do this. This patch provides these APIs.
-
+Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/cpufreq/cpufreq.c    | 68 +++++++++++++++++++++++++++++++-------------
- drivers/cpufreq/freq_table.c | 15 ++++++++++
- include/linux/cpufreq.h      | 12 ++++++++
- 3 files changed, 75 insertions(+), 20 deletions(-)
+ drivers/cpufreq/cpufreq-dt.c | 56 ++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 46 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/cpufreq/cpufreq.c b/drivers/cpufreq/cpufreq.c
-index 46251e8d30f2..db4390ca5243 100644
---- a/drivers/cpufreq/cpufreq.c
-+++ b/drivers/cpufreq/cpufreq.c
-@@ -2459,6 +2459,49 @@ int cpufreq_boost_supported(void)
- }
- EXPORT_SYMBOL_GPL(cpufreq_boost_supported);
+diff --git a/drivers/cpufreq/cpufreq-dt.c b/drivers/cpufreq/cpufreq-dt.c
+index 528a82bf5038..c6e7033076de 100644
+--- a/drivers/cpufreq/cpufreq-dt.c
++++ b/drivers/cpufreq/cpufreq-dt.c
+@@ -184,7 +184,6 @@ static int allocate_resources(int cpu, struct device **cdev,
  
-+static int create_boost_sysfs_file(void)
-+{
-+	int ret;
-+
-+	if (!cpufreq_boost_supported())
-+		return 0;
+ static int cpufreq_init(struct cpufreq_policy *policy)
+ {
+-	struct cpufreq_dt_platform_data *pd;
+ 	struct cpufreq_frequency_table *freq_table;
+ 	struct device_node *np;
+ 	struct private_data *priv;
+@@ -193,6 +192,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 	struct clk *cpu_clk;
+ 	unsigned long min_uV = ~0, max_uV = 0;
+ 	unsigned int transition_latency;
++	bool need_update = false;
+ 	int ret;
+ 
+ 	ret = allocate_resources(policy->cpu, &cpu_dev, &cpu_reg, &cpu_clk);
+@@ -208,8 +208,47 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 		goto out_put_reg_clk;
+ 	}
+ 
+-	/* OPPs might be populated at runtime, don't check for error here */
+-	of_init_opp_table(cpu_dev);
++	/* Get OPP-sharing information from "operating-points-v2" bindings */
++	ret = of_get_cpus_sharing_opps(cpu_dev, policy->cpus);
++	if (ret) {
++		/*
++		 * operating-points-v2 not supported, fallback to old method of
++		 * finding shared-OPPs for backward compatibility.
++		 */
++		if (ret == -ENOENT)
++			need_update = true;
++		else
++			goto out_node_put;
++	}
 +
 +	/*
-+	 * Check if driver provides function to enable boost -
-+	 * if not, use cpufreq_boost_set_sw as default
++	 * Initialize OPP tables for all policy->cpus. They will be shared by
++	 * all CPUs which have marked their CPUs shared with OPP bindings.
++	 *
++	 * For platforms not using operating-points-v2 bindings, we do this
++	 * before updating policy->cpus. Otherwise, we will end up creating
++	 * duplicate OPPs for policy->cpus.
++	 *
++	 * OPPs might be populated at runtime, don't check for error here
 +	 */
-+	if (!cpufreq_driver->set_boost)
-+		cpufreq_driver->set_boost = cpufreq_boost_set_sw;
++	of_cpumask_init_opp_table(policy->cpus);
 +
-+	ret = cpufreq_sysfs_create_file(&boost.attr);
-+	if (ret)
-+		pr_err("%s: cannot register global BOOST sysfs file\n",
-+		       __func__);
++	if (need_update) {
++		struct cpufreq_dt_platform_data *pd = cpufreq_get_driver_data();
 +
-+	return ret;
-+}
++		if (!pd || !pd->independent_clocks)
++			cpumask_setall(policy->cpus);
 +
-+static void remove_boost_sysfs_file(void)
-+{
-+	if (cpufreq_boost_supported())
-+		cpufreq_sysfs_remove_file(&boost.attr);
-+}
++		/*
++		 * OPP tables are initialized only for policy->cpu, do it for
++		 * others as well.
++		 */
++		set_cpus_sharing_opps(cpu_dev, policy->cpus);
 +
-+int cpufreq_enable_boost_support(void)
-+{
-+	if (!cpufreq_driver)
-+		return -EINVAL;
-+
-+	if (cpufreq_boost_supported())
-+		return 0;
-+
-+	cpufreq_driver->boost_supported = true;
-+
-+	/* This will get removed on driver unregister */
-+	return create_boost_sysfs_file();
-+}
-+EXPORT_SYMBOL_GPL(cpufreq_enable_boost_support);
-+
- int cpufreq_boost_enabled(void)
- {
- 	return cpufreq_driver->boost_enabled;
-@@ -2508,21 +2551,9 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
- 	if (driver_data->setpolicy)
- 		driver_data->flags |= CPUFREQ_CONST_LOOPS;
++		of_property_read_u32(np, "clock-latency", &transition_latency);
++	} else {
++		transition_latency = dev_pm_opp_get_max_clock_latency(cpu_dev);
++	}
  
--	if (cpufreq_boost_supported()) {
--		/*
--		 * Check if driver provides function to enable boost -
--		 * if not, use cpufreq_boost_set_sw as default
--		 */
--		if (!cpufreq_driver->set_boost)
--			cpufreq_driver->set_boost = cpufreq_boost_set_sw;
+ 	/*
+ 	 * But we need OPP table to function so if it is not there let's
+@@ -230,7 +269,7 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	of_property_read_u32(np, "voltage-tolerance", &priv->voltage_tolerance);
+ 
+-	if (of_property_read_u32(np, "clock-latency", &transition_latency))
++	if (!transition_latency)
+ 		transition_latency = CPUFREQ_ETERNAL;
+ 
+ 	if (!IS_ERR(cpu_reg)) {
+@@ -293,10 +332,6 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ 
+ 	policy->cpuinfo.transition_latency = transition_latency;
+ 
+-	pd = cpufreq_get_driver_data();
+-	if (!pd || !pd->independent_clocks)
+-		cpumask_setall(policy->cpus);
 -
--		ret = cpufreq_sysfs_create_file(&boost.attr);
--		if (ret) {
--			pr_err("%s: cannot register global BOOST sysfs file\n",
--			       __func__);
--			goto err_null_driver;
--		}
--	}
-+	ret = create_boost_sysfs_file();
-+	if (ret)
-+		goto err_null_driver;
+ 	of_node_put(np);
  
- 	ret = subsys_interface_register(&cpufreq_interface);
- 	if (ret)
-@@ -2543,8 +2574,7 @@ int cpufreq_register_driver(struct cpufreq_driver *driver_data)
- err_if_unreg:
- 	subsys_interface_unregister(&cpufreq_interface);
- err_boost_unreg:
--	if (cpufreq_boost_supported())
--		cpufreq_sysfs_remove_file(&boost.attr);
-+	remove_boost_sysfs_file();
- err_null_driver:
- 	write_lock_irqsave(&cpufreq_driver_lock, flags);
- 	cpufreq_driver = NULL;
-@@ -2573,9 +2603,7 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
- 	/* Protect against concurrent cpu hotplug */
- 	get_online_cpus();
- 	subsys_interface_unregister(&cpufreq_interface);
--	if (cpufreq_boost_supported())
--		cpufreq_sysfs_remove_file(&boost.attr);
--
-+	remove_boost_sysfs_file();
- 	unregister_hotcpu_notifier(&cpufreq_cpu_notifier);
- 
- 	write_lock_irqsave(&cpufreq_driver_lock, flags);
-diff --git a/drivers/cpufreq/freq_table.c b/drivers/cpufreq/freq_table.c
-index dfbbf981ed56..a8f1daffc9bc 100644
---- a/drivers/cpufreq/freq_table.c
-+++ b/drivers/cpufreq/freq_table.c
-@@ -18,6 +18,21 @@
-  *                     FREQUENCY TABLE HELPERS                       *
-  *********************************************************************/
- 
-+bool policy_has_boost_freq(struct cpufreq_policy *policy)
-+{
-+	struct cpufreq_frequency_table *pos, *table = policy->freq_table;
-+
-+	if (!table)
-+		return false;
-+
-+	cpufreq_for_each_valid_entry(pos, table)
-+		if (pos->flags & CPUFREQ_BOOST_FREQ)
-+			return true;
-+
-+	return false;
-+}
-+EXPORT_SYMBOL_GPL(policy_has_boost_freq);
-+
- int cpufreq_frequency_table_cpuinfo(struct cpufreq_policy *policy,
- 				    struct cpufreq_frequency_table *table)
- {
-diff --git a/include/linux/cpufreq.h b/include/linux/cpufreq.h
-index bde1e567b3a9..95f018649abf 100644
---- a/include/linux/cpufreq.h
-+++ b/include/linux/cpufreq.h
-@@ -578,6 +578,8 @@ ssize_t cpufreq_show_cpus(const struct cpumask *mask, char *buf);
- int cpufreq_boost_trigger_state(int state);
- int cpufreq_boost_supported(void);
- int cpufreq_boost_enabled(void);
-+int cpufreq_enable_boost_support(void);
-+bool policy_has_boost_freq(struct cpufreq_policy *policy);
- #else
- static inline int cpufreq_boost_trigger_state(int state)
- {
-@@ -591,6 +593,16 @@ static inline int cpufreq_boost_enabled(void)
- {
  	return 0;
- }
-+
-+static inline int cpufreq_enable_boost_support(void)
-+{
-+	return -EINVAL;
-+}
-+
-+static inline bool policy_has_boost_freq(struct cpufreq_policy *policy)
-+{
-+	return false;
-+}
- #endif
- /* the following funtion is for cpufreq core use only */
- struct cpufreq_frequency_table *cpufreq_frequency_get_table(unsigned int cpu);
+@@ -306,7 +341,8 @@ static int cpufreq_init(struct cpufreq_policy *policy)
+ out_free_priv:
+ 	kfree(priv);
+ out_free_opp:
+-	of_free_opp_table(cpu_dev);
++	of_cpumask_free_opp_table(policy->cpus);
++out_node_put:
+ 	of_node_put(np);
+ out_put_reg_clk:
+ 	clk_put(cpu_clk);
+@@ -322,7 +358,7 @@ static int cpufreq_exit(struct cpufreq_policy *policy)
+ 
+ 	cpufreq_cooling_unregister(priv->cdev);
+ 	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
+-	of_free_opp_table(priv->cpu_dev);
++	of_cpumask_free_opp_table(policy->related_cpus);
+ 	clk_put(policy->clk);
+ 	if (!IS_ERR(priv->cpu_reg))
+ 		regulator_put(priv->cpu_reg);
 -- 
 2.4.0
