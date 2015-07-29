@@ -1,72 +1,46 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Jul 2015 14:27:49 +0200
-Subject: [PATCH 2/2] ARM: integrator: unexport IM-PD1 external interface
-Message-ID: <1438172869-11518-1-git-send-email-linus.walleij@linaro.org>
+Date: Wed, 29 Jul 2015 14:29:18 +0200
+Subject: [PATCH] ARM: integrator: add some defconfig options
+Message-ID: <1438172958-11800-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make this IM/PD1 driver fully self-contained. No external driver
-uses this symbol so unexport it, move all definitons into the
-driver and remove the header file.
+The integrator needs syscon LEDs, physmap MTD and we might
+as well throw in EXT4, as this is nice to have for MMC/SD
+card rootfs.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-integrator/impd1.c | 14 +++++++++++---
- arch/arm/mach-integrator/impd1.h | 14 --------------
- 2 files changed, 11 insertions(+), 17 deletions(-)
- delete mode 100644 arch/arm/mach-integrator/impd1.h
+ arch/arm/configs/integrator_defconfig | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-integrator/impd1.c b/arch/arm/mach-integrator/impd1.c
-index f164643b7c59..a03e9a1a32f4 100644
---- a/arch/arm/mach-integrator/impd1.c
-+++ b/arch/arm/mach-integrator/impd1.c
-@@ -31,7 +31,17 @@
- 
- #include <asm/sizes.h>
- #include "lm.h"
--#include "impd1.h"
-+
-+#define IMPD1_LEDS	0x0c
-+#define IMPD1_INT	0x10
-+#define IMPD1_SW	0x14
-+#define IMPD1_CTRL	0x18
-+
-+#define IMPD1_CTRL_DISP_LCD	(0 << 0)
-+#define IMPD1_CTRL_DISP_VGA	(1 << 0)
-+#define IMPD1_CTRL_DISP_LCD1	(2 << 0)
-+#define IMPD1_CTRL_DISP_ENABLE	(1 << 2)
-+#define IMPD1_CTRL_DISP_MASK	(7 << 0)
- 
- static int module_id;
- 
-@@ -53,8 +63,6 @@ void impd1_tweak_control(struct device *dev, u32 mask, u32 val)
- 	writel(cur | val, impd1->base + IMPD1_CTRL);
- }
- 
--EXPORT_SYMBOL(impd1_tweak_control);
--
- /*
-  * MMC support
-  */
-diff --git a/arch/arm/mach-integrator/impd1.h b/arch/arm/mach-integrator/impd1.h
-deleted file mode 100644
-index 76de4dc9bee4..000000000000
---- a/arch/arm/mach-integrator/impd1.h
-+++ /dev/null
-@@ -1,14 +0,0 @@
--#define IMPD1_LEDS	0x0c
--#define IMPD1_INT	0x10
--#define IMPD1_SW	0x14
--#define IMPD1_CTRL	0x18
--
--#define IMPD1_CTRL_DISP_LCD	(0 << 0)
--#define IMPD1_CTRL_DISP_VGA	(1 << 0)
--#define IMPD1_CTRL_DISP_LCD1	(2 << 0)
--#define IMPD1_CTRL_DISP_ENABLE	(1 << 2)
--#define IMPD1_CTRL_DISP_MASK	(7 << 0)
--
--struct device;
--
--void impd1_tweak_control(struct device *dev, u32 mask, u32 val);
+diff --git a/arch/arm/configs/integrator_defconfig b/arch/arm/configs/integrator_defconfig
+index 71f14675d009..c2e4526827db 100644
+--- a/arch/arm/configs/integrator_defconfig
++++ b/arch/arm/configs/integrator_defconfig
+@@ -51,7 +51,7 @@ CONFIG_MTD_CFI=y
+ CONFIG_MTD_CFI_ADV_OPTIONS=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_PHYSMAP=y
+-CONFIG_PROC_DEVICETREE=y
++CONFIG_MTD_PHYSMAP_OF=y
+ CONFIG_BLK_DEV_LOOP=y
+ CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_RAM_SIZE=8192
+@@ -71,12 +71,14 @@ CONFIG_MMC=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_PL030=y
+ CONFIG_EXT2_FS=y
++CONFIG_EXT4_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
 -- 
 2.4.3
