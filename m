@@ -1,26 +1,35 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 29 Jul 2015 14:47:40 -0700
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <20150729214358.GK30479@wotan.suse.de>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de>
- <20150729182712.GI30479@wotan.suse.de>
- <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
- <1438203638.3214.418.camel@hp.com>
- <20150729214358.GK30479@wotan.suse.de>
-Message-ID: <CAPcyv4j67493ROvnC1EZBEFMiWB=gLu=C-Y-PrJf0BvO3A=y2w@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 29 Jul 2015 23:50:59 +0200
+Subject: [PATCH 1/2] ARM: BCM5301X: activate some additional options in pl310
+ cache controller
+Message-ID: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 2:43 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
-> While at it, Dan, will / should memremap() support overlapping calls ?
-> What is the expectation on behaviour ?
+In the default Broadcom SDK the shared override is activated for this
+cache controller, do the same in the upstream code. Data and
+instruction prefetching is not activated by default for this cache
+controller on the bcm53xx SoC, do it manually like it is done in the
+vendor SDK.
 
-It will be the same as ioremap().  Each mapping gets its own virtual
-address and overlapping calls are permitted.  The only protection is
-that RAM is never mapped with an alias.
+Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 21fefd4..0bae982 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -78,6 +78,9 @@
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0x2000 0x1000>;
+ 			cache-unified;
++			arm,shared-override;
++			prefetch-data = <1>;
++			prefetch-instr = <1>;
+ 			cache-level = <2>;
+ 		};
+ 	};
+-- 
+2.1.4
