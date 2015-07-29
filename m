@@ -1,136 +1,85 @@
 From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 29 Jul 2015 10:42:14 +0800
-Subject: [PATCH 10/10] usb: chipidea: add tx/rx burst size configuration
- interface
+Date: Wed, 29 Jul 2015 10:42:10 +0800
+Subject: [PATCH 06/10] usb: chipidea: add ahb burst configuration interface
 In-Reply-To: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
 References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1438137734-27311-11-git-send-email-peter.chen@freescale.com>
+Message-ID: <1438137734-27311-7-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user can adjust it through dts or platform data
+The users can change it through dts or platform data if they
+want to change the default value.
 
 Signed-off-by: Peter Chen <peter.chen@freescale.com>
 ---
- drivers/usb/chipidea/bits.h  |  4 ++++
- drivers/usb/chipidea/ci.h    |  1 +
- drivers/usb/chipidea/core.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/usb/chipidea.h |  4 ++++
- 4 files changed, 44 insertions(+)
+ drivers/usb/chipidea/bits.h  |  3 +++
+ drivers/usb/chipidea/core.c  | 14 ++++++++++++++
+ include/linux/usb/chipidea.h |  2 ++
+ 3 files changed, 19 insertions(+)
 
 diff --git a/drivers/usb/chipidea/bits.h b/drivers/usb/chipidea/bits.h
-index 462ad02..e462f55 100644
+index 831a8f6..462ad02 100644
 --- a/drivers/usb/chipidea/bits.h
 +++ b/drivers/usb/chipidea/bits.h
-@@ -61,6 +61,10 @@
- /* Set non-zero value for internal TT Hub address representation */
- #define TTCTRL_TTHA		(0x7fUL << 24)
+@@ -25,6 +25,9 @@
+ #define VERSION		      (0xF << 25)
+ #define CIVERSION	      (0x7 << 29)
  
-+/* BURSTSIZE */
-+#define RX_BURST_MASK		0xff
-+#define TX_BURST_MASK		0xff00
++/* SBUSCFG */
++#define AHBBRST_MASK		0x7
 +
- /* PORTSC */
- #define PORTSC_CCS            BIT(0)
- #define PORTSC_CSC            BIT(1)
-diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-index b562544..41d7cf6 100644
---- a/drivers/usb/chipidea/ci.h
-+++ b/drivers/usb/chipidea/ci.h
-@@ -51,6 +51,7 @@ enum ci_hw_regs {
- 	OP_DEVICEADDR,
- 	OP_ENDPTLISTADDR,
- 	OP_TTCTRL,
-+	OP_BURSTSIZE,
- 	OP_PORTSC,
- 	OP_DEVLC,
- 	OP_OTGSC,
+ /* HCCPARAMS */
+ #define HCCPARAMS_LEN         BIT(17)
+ 
 diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
-index f60cbf6..0375412 100644
+index 38bd036..f60cbf6 100644
 --- a/drivers/usb/chipidea/core.c
 +++ b/drivers/usb/chipidea/core.c
-@@ -86,6 +86,7 @@ static const u8 ci_regs_nolpm[] = {
- 	[OP_DEVICEADDR]		= 0x14U,
- 	[OP_ENDPTLISTADDR]	= 0x18U,
- 	[OP_TTCTRL]		= 0x1CU,
-+	[OP_BURSTSIZE]		= 0x20U,
- 	[OP_PORTSC]		= 0x44U,
- 	[OP_DEVLC]		= 0x84U,
- 	[OP_OTGSC]		= 0x64U,
-@@ -109,6 +110,7 @@ static const u8 ci_regs_lpm[] = {
- 	[OP_DEVICEADDR]		= 0x14U,
- 	[OP_ENDPTLISTADDR]	= 0x18U,
- 	[OP_TTCTRL]		= 0x1CU,
-+	[OP_BURSTSIZE]		= 0x20U,
- 	[OP_PORTSC]		= 0x44U,
- 	[OP_DEVLC]		= 0x84U,
- 	[OP_OTGSC]		= 0xC4U,
-@@ -442,6 +444,17 @@ void ci_platform_configure(struct ci_hdrc *ci)
- 	if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
- 		hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
- 			ci->platdata->ahb_burst_config);
-+
-+	/* override burst size, take effect only when ahb_burst_config is 0 */
-+	if (!hw_read_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK)) {
-+		if (ci->platdata->flags & CI_HDRC_OVERRIDE_TX_BURST)
-+			hw_write(ci, OP_BURSTSIZE, TX_BURST_MASK,
-+			ci->platdata->tx_burst_size << __ffs(TX_BURST_MASK));
-+
-+		if (ci->platdata->flags & CI_HDRC_OVERRIDE_RX_BURST)
-+			hw_write(ci, OP_BURSTSIZE, RX_BURST_MASK,
-+				ci->platdata->rx_burst_size);
-+	}
+@@ -439,6 +439,9 @@ void ci_platform_configure(struct ci_hdrc *ci)
+ 
+ 	hw_write(ci, OP_USBCMD, 0xff0000, ci->platdata->itc_setting << 16);
+ 
++	if (ci->platdata->flags & CI_HDRC_OVERRIDE_AHB_BURST)
++		hw_write_id_reg(ci, ID_SBUSCFG, AHBBRST_MASK,
++			ci->platdata->ahb_burst_config);
  }
  
  /**
-@@ -661,6 +674,28 @@ static int ci_get_platdata(struct device *dev,
- 		platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
+@@ -647,6 +650,17 @@ static int ci_get_platdata(struct device *dev,
+ 		}
  	}
  
-+	if (of_find_property(dev->of_node, "tx-burst-size-dword", NULL)) {
-+		ret = of_property_read_u32(dev->of_node, "tx-burst-size-dword",
-+			&platdata->tx_burst_size);
++	if (of_find_property(dev->of_node, "ahb-burst-config", NULL)) {
++		ret = of_property_read_u32(dev->of_node, "ahb-burst-config",
++			&platdata->ahb_burst_config);
 +		if (ret) {
 +			dev_err(dev,
-+				"failed to get tx-burst-size-dword\n");
++				"failed to get ahb-burst-config\n");
 +			return ret;
 +		}
-+		platdata->flags |= CI_HDRC_OVERRIDE_TX_BURST;
-+	}
-+
-+	if (of_find_property(dev->of_node, "rx-burst-size-dword", NULL)) {
-+		ret = of_property_read_u32(dev->of_node, "rx-burst-size-dword",
-+			&platdata->rx_burst_size);
-+		if (ret) {
-+			dev_err(dev,
-+				"failed to get rx-burst-size-dword\n");
-+			return ret;
-+		}
-+		platdata->flags |= CI_HDRC_OVERRIDE_RX_BURST;
++		platdata->flags |= CI_HDRC_OVERRIDE_AHB_BURST;
 +	}
 +
  	return 0;
  }
  
 diff --git a/include/linux/usb/chipidea.h b/include/linux/usb/chipidea.h
-index 9848a4e..524ef3d 100644
+index 982f8cc..9848a4e 100644
 --- a/include/linux/usb/chipidea.h
 +++ b/include/linux/usb/chipidea.h
-@@ -34,6 +34,8 @@ struct ci_hdrc_platform_data {
+@@ -33,6 +33,7 @@ struct ci_hdrc_platform_data {
+ #define CI_HDRC_DISABLE_HOST_STREAMING		BIT(10)
  #define CI_HDRC_DISABLE_STREAMING (CI_HDRC_DISABLE_DEVICE_STREAMING |	\
  		CI_HDRC_DISABLE_HOST_STREAMING)
- #define CI_HDRC_OVERRIDE_AHB_BURST		BIT(11)
-+#define CI_HDRC_OVERRIDE_TX_BURST		BIT(12)
-+#define CI_HDRC_OVERRIDE_RX_BURST		BIT(13)
++#define CI_HDRC_OVERRIDE_AHB_BURST		BIT(11)
  	enum usb_dr_mode	dr_mode;
  #define CI_HDRC_CONTROLLER_RESET_EVENT		0
  #define CI_HDRC_CONTROLLER_STOPPED_EVENT	1
-@@ -44,6 +46,8 @@ struct ci_hdrc_platform_data {
+@@ -42,6 +43,7 @@ struct ci_hdrc_platform_data {
+ 	bool			tpl_support;
  	/* interrupt threshold setting */
  	u32			itc_setting;
- 	u32			ahb_burst_config;
-+	u32			tx_burst_size;
-+	u32			rx_burst_size;
++	u32			ahb_burst_config;
  };
  
  /* Default offset of capability registers */
