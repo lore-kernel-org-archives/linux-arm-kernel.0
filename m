@@ -1,87 +1,74 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 29 Jul 2015 15:37:41 -0500
-Subject: [Patch v5 1/6] ACPI/PCI: Enhance ACPI core to support sparse IO
- space
-In-Reply-To: <1433780448-18636-2-git-send-email-jiang.liu@linux.intel.com>
-References: <1433780448-18636-1-git-send-email-jiang.liu@linux.intel.com>
- <1433780448-18636-2-git-send-email-jiang.liu@linux.intel.com>
-Message-ID: <20150729203741.GC9640@google.com>
+From: cburden@codeaurora.org (Cassidy Burden)
+Date: Wed, 29 Jul 2015 13:40:39 -0700
+Subject: [PATCH] lib: Make _find_next_bit helper function inline
+In-Reply-To: <1438176656.18723.8.camel@ceres>
+References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
+ <55B7F2C6.9010000@gmail.com>
+ <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
+ <1438176656.18723.8.camel@ceres>
+Message-ID: <55B93A47.90107@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 09, 2015 at 12:20:43AM +0800, Jiang Liu wrote:
-> Enhance ACPI resource parsing interfaces to support sparse IO space,
-> which will be used to share common code between x86 and IA64 later.
-> 
-> Tested-by: Tony Luck <tony.luck@intel.com>
-> Signed-off-by: Jiang Liu <jiang.liu@linux.intel.com>
-> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> ---
->  drivers/acpi/resource.c |    9 ++++++---
->  include/linux/ioport.h  |    1 +
->  2 files changed, 7 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> index 8244f013f210..fdcc73dad2c1 100644
-> --- a/drivers/acpi/resource.c
-> +++ b/drivers/acpi/resource.c
-> @@ -123,7 +123,7 @@ bool acpi_dev_resource_memory(struct acpi_resource *ares, struct resource *res)
->  EXPORT_SYMBOL_GPL(acpi_dev_resource_memory);
->  
->  static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
-> -				      u8 io_decode)
-> +				      u8 io_decode, u8 translation_type)
->  {
->  	res->flags = IORESOURCE_IO;
->  
-> @@ -135,6 +135,8 @@ static void acpi_dev_ioresource_flags(struct resource *res, u64 len,
->  
->  	if (io_decode == ACPI_DECODE_16)
->  		res->flags |= IORESOURCE_IO_16BIT_ADDR;
-> +	if (translation_type == ACPI_SPARSE_TRANSLATION)
-> +		res->flags |= IORESOURCE_IO_SPARSE;
->  }
->  
->  static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
-> @@ -142,7 +144,7 @@ static void acpi_dev_get_ioresource(struct resource *res, u64 start, u64 len,
->  {
->  	res->start = start;
->  	res->end = start + len - 1;
-> -	acpi_dev_ioresource_flags(res, len, io_decode);
-> +	acpi_dev_ioresource_flags(res, len, io_decode, 0);
->  }
->  
->  /**
-> @@ -227,7 +229,8 @@ static bool acpi_decode_space(struct resource_win *win,
->  		acpi_dev_memresource_flags(res, len, wp);
->  		break;
->  	case ACPI_IO_RANGE:
-> -		acpi_dev_ioresource_flags(res, len, iodec);
-> +		acpi_dev_ioresource_flags(res, len, iodec,
-> +					  addr->info.io.translation_type);
->  		break;
->  	case ACPI_BUS_NUMBER_RANGE:
->  		res->flags = IORESOURCE_BUS;
-> diff --git a/include/linux/ioport.h b/include/linux/ioport.h
-> index 388e3ae94f7a..24bea087e7af 100644
-> --- a/include/linux/ioport.h
-> +++ b/include/linux/ioport.h
-> @@ -94,6 +94,7 @@ struct resource {
->  /* PnP I/O specific bits (IORESOURCE_BITS) */
->  #define IORESOURCE_IO_16BIT_ADDR	(1<<0)
->  #define IORESOURCE_IO_FIXED		(1<<1)
-> +#define IORESOURCE_IO_SPARSE		(1<<2)
+I changed the test module to now set the entire array to all 0/1s and
+only flip a few bits. There appears to be a performance benefit, but
+it's only 2-3% better (if that). If the main benefit of the original
+patch was to save space then inlining definitely doesn't seem worth the
+small gains in real use cases.
 
-I don't really like this bit.  We adding a new generic IORESOURCE_* bit
-just for a special case, and it's only used in one place, for one arch,
-during enumeration.
+find_next_zero_bit (us)
+old      new     inline
+14440    17080   17086
+4779     5181    5069
+10844    12720   12746
+9642     11312   11253
+3858     3818    3668
+10540    12349   12307
+12470    14716   14697
+5403     6002    5942
+2282     1820    1418
+13632    16056   15998
+11048    13019   13030
+6025     6790    6706
+13255    15586   15605
+3038     2744    2539
+10353    12219   12239
+10498    12251   12322
+14767    17452   17454
+12785    15048   15052
+1655     1034    691
+9924     11611   11558
 
-Don't we have a similar problem (struct resource can't express all the
-information from an ACPI resource) for the _TRA value for bridge windows?
-If it's a similar issue, we should solve it in a similar way.
+find_next_bit (us)
+old      new     inline
+8535     9936    9667
+14666    17372   16880
+2315     1799    1355
+6578     9092    8806
+6548     7558    7274
+9448     11213   10821
+3467     3497    3449
+2719     3079    2911
+6115     7989    7796
+13582    16113   15643
+4643     4946    4766
+3406     3728    3536
+7118     9045    8805
+3174     3011    2701
+13300    16780   16252
+14285    16848   16330
+11583    13669   13207
+13063    15455   14989
+12661    14955   14500
+12068    14166   13790
 
->  /* PCI ROM control bits (IORESOURCE_BITS) */
->  #define IORESOURCE_ROM_ENABLE		(1<<0)	/* ROM is enabled, same as PCI_ROM_ADDRESS_ENABLE */
-> -- 
-> 1.7.10.4
-> 
+On 7/29/2015 6:30 AM, Alexey Klimov wrote:
+> I will re-check on another machine. It's really interesting if
+> __always_inline makes things better for aarch64 and worse for x86_64. It
+> will be nice if someone will check it on x86_64 too.
+
+Very odd, this may be related to the other compiler optimizations Yuri
+mentioned?
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
