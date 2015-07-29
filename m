@@ -1,188 +1,328 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 29 Jul 2015 15:43:04 +0100
-Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
-Message-ID: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 29 Jul 2015 17:51:38 +0300
+Subject: [PATCH v4 4/5] tty/serial: at91: add support to FIFOs
+In-Reply-To: <4d8e90ad2cbb0d020dae4a4806ffc8864b5b22b6.1435842688.git.cyrille.pitchen@atmel.com>
+References: <cover.1435842688.git.cyrille.pitchen@atmel.com>
+ <4d8e90ad2cbb0d020dae4a4806ffc8864b5b22b6.1435842688.git.cyrille.pitchen@atmel.com>
+Message-ID: <CAHp75VdW8grMZdh0VmZAL-EhMdw-M6-PtJUT4Ms8SidsWu4QSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gic_init_bases() function initialises an array that stores the mapping
-between the GIC and CPUs. This array is a global array that is
-unconditionally initialised on every call to gic_init_bases(). Although,
-it is not common for there to be more than one GIC instance, there are
-some devices that do support nested GIC controllers and gic_init_bases()
-can be called more than once.
+On Thu, Jul 2, 2015 at 4:18 PM, Cyrille Pitchen
+<cyrille.pitchen@atmel.com> wrote:
+> Depending on the hardware, TX and RX FIFOs may be available. The RX
+> FIFO can avoid receive overruns, especially when DMA transfers are
+> not used to read data from the Receive Holding Register. For heavy
+> system load, The CPU is likely not be able to fetch data fast enough
+> from the RHR.
 
-A 2nd call to gic_init_bases() will clear the previous CPU mapping and
-will only setup the mapping again for CPU0. This is because for child GIC
-controllers there is most likely only one recipient of the interrupt.
+This patch broke avr32 console (as seen in today's linux-next) on ATNGW100.
+Reverting helps. I'm pretty sure the issue is in 8 bit vs. 32 bit I/O access.
 
-Fix this by moving the CPU mapping array to the GIC chip data structure
-so that it is initialised for each GIC instance separately. It is assumed
-that the bL switcher code is only interested in the root or primary GIC
-instance.
+# uname -a
+Linux buildroot 4.2.0-rc4-next-20150729+ #97 Wed Jul 29 17:50:11 EEST
+2015 avr32 GNU/Linux
 
-Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
----
- arch/arm/common/bL_switcher.c   |  2 +-
- drivers/irqchip/irq-gic.c       | 41 ++++++++++++++++++++++-------------------
- include/linux/irqchip/arm-gic.h |  2 +-
- 3 files changed, 24 insertions(+), 21 deletions(-)
+Do you, guys, have that board (NGW100) or it's officially unsupported?
+If the latter is the case I would really appreciate if you remove the
+support from the kernel side.
 
-diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
-index 37dc0fe1093f..4111d7b36077 100644
---- a/arch/arm/common/bL_switcher.c
-+++ b/arch/arm/common/bL_switcher.c
-@@ -488,7 +488,7 @@ static int bL_switcher_halve_cpus(void)
- 		cluster = MPIDR_AFFINITY_LEVEL(cpu_logical_map(i), 1);
- 
- 		/* Let's take note of the GIC ID for this CPU */
--		gic_id = gic_get_cpu_id(i);
-+		gic_id = gic_get_cpu_id(i, 0);
- 		if (gic_id < 0) {
- 			pr_err("%s: bad GIC ID for CPU %d\n", __func__, i);
- 			bL_switcher_restore_cpus();
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index a530d9a9b810..78a7706c607e 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -50,6 +50,8 @@
- 
- #include "irq-gic-common.h"
- 
-+#define NR_GIC_CPU_IF 8
-+
- union gic_base {
- 	void __iomem *common_base;
- 	void __percpu * __iomem *percpu_base;
-@@ -70,18 +72,16 @@ struct gic_chip_data {
- #ifdef CONFIG_GIC_NON_BANKED
- 	void __iomem *(*get_base)(union gic_base *);
- #endif
-+	/*
-+	 * The GIC mapping of CPU interfaces does not necessarily match
-+	 * the logical CPU numbering.  Let's use a mapping as returned
-+	 * by the GIC itself.
-+	 */
-+	u8 cpu_map[NR_GIC_CPU_IF];
- };
- 
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
- 
--/*
-- * The GIC mapping of CPU interfaces does not necessarily match
-- * the logical CPU numbering.  Let's use a mapping as returned
-- * by the GIC itself.
-- */
--#define NR_GIC_CPU_IF 8
--static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
--
- #ifndef MAX_GIC_NR
- #define MAX_GIC_NR	1
- #endif
-@@ -237,6 +237,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
- static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
-+	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
- 	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
- 	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
- 	u32 val, mask, bit;
-@@ -252,7 +253,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 
- 	raw_spin_lock_irqsave(&irq_controller_lock, flags);
- 	mask = 0xff << shift;
--	bit = gic_cpu_map[cpu] << shift;
-+	bit = gic->cpu_map[cpu] << shift;
- 	val = readl_relaxed(reg) & ~mask;
- 	writel_relaxed(val | bit, reg);
- 	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
-@@ -420,7 +421,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	 */
- 	BUG_ON(cpu >= NR_GIC_CPU_IF);
- 	cpu_mask = gic_get_cpumask(gic);
--	gic_cpu_map[cpu] = cpu_mask;
-+	gic->cpu_map[cpu] = cpu_mask;
- 
- 	/*
- 	 * Clear our mask from the other map entries in case they're
-@@ -428,7 +429,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
- 	 */
- 	for (i = 0; i < NR_GIC_CPU_IF; i++)
- 		if (i != cpu)
--			gic_cpu_map[i] &= ~cpu_mask;
-+			gic->cpu_map[i] &= ~cpu_mask;
- 
- 	gic_cpu_config(dist_base, NULL);
- 
-@@ -677,7 +678,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- 
- 	/* Convert our logical CPU mask into a physical one. */
- 	for_each_cpu(cpu, mask)
--		map |= gic_cpu_map[cpu];
-+		map |= gic->cpu_map[cpu];
- 
- 	/*
- 	 * Ensure that stores to Normal memory are visible to the
-@@ -722,15 +723,17 @@ void gic_send_sgi(unsigned int cpu_id, unsigned int irq)
-  * or -1 if the CPU number is too large or the interface ID is
-  * unknown (more than one bit set).
-  */
--int gic_get_cpu_id(unsigned int cpu)
-+int gic_get_cpu_id(unsigned int cpu, unsigned int gic_nr)
- {
- 	unsigned int cpu_bit;
- 
-+	if (gic_nr >= MAX_GIC_NR)
-+		return -EINVAL;
- 	if (cpu >= NR_GIC_CPU_IF)
--		return -1;
--	cpu_bit = gic_cpu_map[cpu];
-+		return -EINVAL;
-+	cpu_bit = gic_data[gic_nr].cpu_map[cpu];
- 	if (cpu_bit & (cpu_bit - 1))
--		return -1;
-+		return -EINVAL;
- 	return __ffs(cpu_bit);
- }
- 
-@@ -759,14 +762,14 @@ void gic_migrate_target(unsigned int new_cpu_id)
- 		return;
- 	gic_irqs = gic_data[gic_nr].gic_irqs;
- 
--	cur_cpu_id = __ffs(gic_cpu_map[cpu]);
-+	cur_cpu_id = __ffs(gic->cpu_map[cpu]);
- 	cur_target_mask = 0x01010101 << cur_cpu_id;
- 	ror_val = (cur_cpu_id - new_cpu_id) & 31;
- 
- 	raw_spin_lock(&irq_controller_lock);
- 
- 	/* Update the target interface for this logical CPU */
--	gic_cpu_map[cpu] = 1 << new_cpu_id;
-+	gic->cpu_map[cpu] = 1 << new_cpu_id;
- 
- 	/*
- 	 * Find all the peripheral interrupts targetting the current
-@@ -981,7 +984,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 	 * It will be refined as each CPU probes its ID.
- 	 */
- 	for (i = 0; i < NR_GIC_CPU_IF; i++)
--		gic_cpu_map[i] = 0xff;
-+		gic->cpu_map[i] = 0xff;
- 
- 	/*
- 	 * Find out how many interrupts are supported.
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index f52a9024be9a..9a4d30564492 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -111,7 +111,7 @@ static inline void gic_init(unsigned int nr, int start,
- int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
- 
- void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
--int gic_get_cpu_id(unsigned int cpu);
-+int gic_get_cpu_id(unsigned int cpu, unsigned int gic_nr);
- void gic_migrate_target(unsigned int new_cpu_id);
- unsigned long gic_get_sgir_physaddr(void);
- 
+>
+> In addition, the RX FIFO can supersede the DMA/PDC to control the RTS
+> line when the Hardware Handshaking mode is enabled. Two thresholds
+> are to be set for that purpose:
+> - When the number of data in the RX FIFO crosses and becomes lower
+>   than or equal to the low threshold, the RTS line is set to low
+>   level: the remote peer is requested to send data.
+> - When the number of data in the RX FIFO crosses and becomes greater
+>   than or equal to the high threshold, the RTS line is set to high
+>   level: the remote peer should stop sending new data.
+> - low threshold <= high threshold
+> Once these two thresholds are set properly, this new feature is
+> enabled by setting the FIFO RTS Control bit of the FIFO Mode Register.
+>
+> FIFOs also introduce a new multiple data mode: the USART works either
+> in multiple data mode or in single data (legacy) mode.
+>
+> If MODE9 bit is set into the Mode Register or if USMODE is set to
+> either LIN_MASTER, LIN_SLAVE or LON_MODE, FIFOs operate in single
+> data mode. Otherwise, they operate in multiple data mode.
+>
+> In this new multiple data mode, accesses to the Receive Holding
+> Register or Transmit Holding Register slightly change.
+>
+> Since this driver implements neither the 9bit data feature (MODE9 bit
+> set into the Mode Register) nor LIN modes, the USART works in
+> multiple data mode whenever FIFOs are available and enabled. We also
+> assume that data are 8bit wide.
+>
+> In single data mode, 32bit access CAN be used to read a single data
+> from RHR or write a single data into THR.
+> However in multiple data mode, a 32bit access to RHR now allows us to
+> read four consecutive data from RX FIFO. Also a 32bit access to THR
+> now allows to write four consecutive data into TX FIFO. So we MUST
+> use 8bit access whenever only one data have to be read/written at a
+> time.
+>
+> Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> ---
+>  drivers/tty/serial/atmel_serial.c | 100 +++++++++++++++++++++++++++++++++++---
+>  include/linux/atmel_serial.h      |  36 ++++++++++++++
+>  2 files changed, 130 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index e7c337de31d1..87de21f0c7a3 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -56,6 +56,15 @@
+>  /* Revisit: We should calculate this based on the actual port settings */
+>  #define PDC_RX_TIMEOUT         (3 * 10)                /* 3 bytes */
+>
+> +/* The minium number of data FIFOs should be able to contain */
+> +#define ATMEL_MIN_FIFO_SIZE    8
+> +/*
+> + * These two offsets are substracted from the RX FIFO size to define the RTS
+> + * high and low thresholds
+> + */
+> +#define ATMEL_RTS_HIGH_OFFSET  16
+> +#define ATMEL_RTS_LOW_OFFSET   20
+> +
+>  #if defined(CONFIG_SERIAL_ATMEL_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
+>  #define SUPPORT_SYSRQ
+>  #endif
+> @@ -141,6 +150,9 @@ struct atmel_uart_port {
+>         struct mctrl_gpios      *gpios;
+>         int                     gpio_irq[UART_GPIO_MAX];
+>         unsigned int            tx_done_mask;
+> +       u32                     fifo_size;
+> +       u32                     rts_high;
+> +       u32                     rts_low;
+>         bool                    ms_irq_enabled;
+>         bool                    is_usart;       /* usart or uart */
+>         struct timer_list       uart_timer;     /* uart timer */
+> @@ -191,6 +203,16 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
+>         __raw_writel(value, port->membase + reg);
+>  }
+>
+> +static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
+> +{
+> +       return __raw_readb(port->membase + reg);
+> +}
+> +
+> +static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
+> +{
+> +       __raw_writeb(value, port->membase + reg);
+> +}
+> +
+>  #ifdef CONFIG_SERIAL_ATMEL_PDC
+>  static bool atmel_use_pdc_rx(struct uart_port *port)
+>  {
+> @@ -635,7 +657,7 @@ static void atmel_rx_chars(struct uart_port *port)
+>
+>         status = atmel_uart_readl(port, ATMEL_US_CSR);
+>         while (status & ATMEL_US_RXRDY) {
+> -               ch = atmel_uart_readl(port, ATMEL_US_RHR);
+> +               ch = atmel_uart_readb(port, ATMEL_US_RHR);
+>
+>                 /*
+>                  * note that the error handling code is
+> @@ -686,7 +708,7 @@ static void atmel_tx_chars(struct uart_port *port)
+>
+>         if (port->x_char &&
+>             (atmel_uart_readl(port, ATMEL_US_CSR) & atmel_port->tx_done_mask)) {
+> -               atmel_uart_writel(port, ATMEL_US_THR, port->x_char);
+> +               atmel_uart_writeb(port, ATMEL_US_THR, port->x_char);
+>                 port->icount.tx++;
+>                 port->x_char = 0;
+>         }
+> @@ -695,7 +717,7 @@ static void atmel_tx_chars(struct uart_port *port)
+>
+>         while (atmel_uart_readl(port, ATMEL_US_CSR) &
+>                atmel_port->tx_done_mask) {
+> -               atmel_uart_writel(port, ATMEL_US_THR, xmit->buf[xmit->tail]);
+> +               atmel_uart_writeb(port, ATMEL_US_THR, xmit->buf[xmit->tail]);
+>                 xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+>                 port->icount.tx++;
+>                 if (uart_circ_empty(xmit))
+> @@ -1796,6 +1818,29 @@ static int atmel_startup(struct uart_port *port)
+>                         atmel_set_ops(port);
+>         }
+>
+> +       /*
+> +        * Enable FIFO when available
+> +        */
+> +       if (atmel_port->fifo_size) {
+> +               unsigned int txrdym = ATMEL_US_ONE_DATA;
+> +               unsigned int rxrdym = ATMEL_US_ONE_DATA;
+> +               unsigned int fmr;
+> +
+> +               atmel_uart_writel(port, ATMEL_US_CR,
+> +                                 ATMEL_US_FIFOEN |
+> +                                 ATMEL_US_RXFCLR |
+> +                                 ATMEL_US_TXFLCLR);
+> +
+> +               fmr = ATMEL_US_TXRDYM(txrdym) | ATMEL_US_RXRDYM(rxrdym);
+> +               if (atmel_port->rts_high &&
+> +                   atmel_port->rts_low)
+> +                       fmr |=  ATMEL_US_FRTSC |
+> +                               ATMEL_US_RXFTHRES(atmel_port->rts_high) |
+> +                               ATMEL_US_RXFTHRES2(atmel_port->rts_low);
+> +
+> +               atmel_uart_writel(port, ATMEL_US_FMR, fmr);
+> +       }
+> +
+>         /* Save current CSR for comparison in atmel_tasklet_func() */
+>         atmel_port->irq_status_prev = atmel_get_lines_status(port);
+>         atmel_port->irq_status = atmel_port->irq_status_prev;
+> @@ -2213,7 +2258,7 @@ static int atmel_poll_get_char(struct uart_port *port)
+>         while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_RXRDY))
+>                 cpu_relax();
+>
+> -       return atmel_uart_readl(port, ATMEL_US_RHR);
+> +       return atmel_uart_readb(port, ATMEL_US_RHR);
+>  }
+>
+>  static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+> @@ -2221,7 +2266,7 @@ static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+>         while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+>                 cpu_relax();
+>
+> -       atmel_uart_writel(port, ATMEL_US_THR, ch);
+> +       atmel_uart_writeb(port, ATMEL_US_THR, ch);
+>  }
+>  #endif
+>
+> @@ -2328,7 +2373,7 @@ static void atmel_console_putchar(struct uart_port *port, int ch)
+>  {
+>         while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+>                 cpu_relax();
+> -       atmel_uart_writel(port, ATMEL_US_THR, ch);
+> +       atmel_uart_writeb(port, ATMEL_US_THR, ch);
+>  }
+>
+>  /*
+> @@ -2603,6 +2648,48 @@ static int atmel_init_gpios(struct atmel_uart_port *p, struct device *dev)
+>         return 0;
+>  }
+>
+> +static void atmel_serial_probe_fifos(struct atmel_uart_port *port,
+> +                                    struct platform_device *pdev)
+> +{
+> +       port->fifo_size = 0;
+> +       port->rts_low = 0;
+> +       port->rts_high = 0;
+> +
+> +       if (of_property_read_u32(pdev->dev.of_node,
+> +                                "atmel,fifo-size",
+> +                                &port->fifo_size))
+> +               return;
+> +
+> +       if (!port->fifo_size)
+> +               return;
+> +
+> +       if (port->fifo_size < ATMEL_MIN_FIFO_SIZE) {
+> +               port->fifo_size = 0;
+> +               dev_err(&pdev->dev, "Invalid FIFO size\n");
+> +               return;
+> +       }
+> +
+> +       /*
+> +        * 0 <= rts_low <= rts_high <= fifo_size
+> +        * Once their CTS line asserted by the remote peer, some x86 UARTs tend
+> +        * to flush their internal TX FIFO, commonly up to 16 data, before
+> +        * actually stopping to send new data. So we try to set the RTS High
+> +        * Threshold to a reasonably high value respecting this 16 data
+> +        * empirical rule when possible.
+> +        */
+> +       port->rts_high = max_t(int, port->fifo_size >> 1,
+> +                              port->fifo_size - ATMEL_RTS_HIGH_OFFSET);
+> +       port->rts_low  = max_t(int, port->fifo_size >> 2,
+> +                              port->fifo_size - ATMEL_RTS_LOW_OFFSET);
+> +
+> +       dev_info(&pdev->dev, "Using FIFO (%u data)\n",
+> +                port->fifo_size);
+> +       dev_dbg(&pdev->dev, "RTS High Threshold : %2u data\n",
+> +               port->rts_high);
+> +       dev_dbg(&pdev->dev, "RTS Low Threshold  : %2u data\n",
+> +               port->rts_low);
+> +}
+> +
+>  static int atmel_serial_probe(struct platform_device *pdev)
+>  {
+>         struct atmel_uart_port *port;
+> @@ -2639,6 +2726,7 @@ static int atmel_serial_probe(struct platform_device *pdev)
+>         port = &atmel_ports[ret];
+>         port->backup_imr = 0;
+>         port->uart.line = ret;
+> +       atmel_serial_probe_fifos(port, pdev);
+>
+>         spin_lock_init(&port->lock_suspended);
+>
+> diff --git a/include/linux/atmel_serial.h b/include/linux/atmel_serial.h
+> index c384c21d65f0..ee696d7e8a43 100644
+> --- a/include/linux/atmel_serial.h
+> +++ b/include/linux/atmel_serial.h
+> @@ -35,6 +35,11 @@
+>  #define        ATMEL_US_DTRDIS         BIT(17) /* Data Terminal Ready Disable */
+>  #define        ATMEL_US_RTSEN          BIT(18) /* Request To Send Enable */
+>  #define        ATMEL_US_RTSDIS         BIT(19) /* Request To Send Disable */
+> +#define        ATMEL_US_TXFCLR         BIT(24) /* Transmit FIFO Clear */
+> +#define        ATMEL_US_RXFCLR         BIT(25) /* Receive FIFO Clear */
+> +#define        ATMEL_US_TXFLCLR        BIT(26) /* Transmit FIFO Lock Clear */
+> +#define        ATMEL_US_FIFOEN         BIT(30) /* FIFO enable */
+> +#define        ATMEL_US_FIFODIS        BIT(31) /* FIFO disable */
+>
+>  #define ATMEL_US_MR            0x04    /* Mode Register */
+>  #define        ATMEL_US_USMODE         GENMASK(3, 0)   /* Mode of the USART */
+> @@ -124,6 +129,37 @@
+>  #define ATMEL_US_NER           0x44    /* Number of Errors Register */
+>  #define ATMEL_US_IF            0x4c    /* IrDA Filter Register */
+>
+> +#define ATMEL_US_CMPR          0x90    /* Comparaison Register */
+> +#define ATMEL_US_FMR           0xa0    /* FIFO Mode Register */
+> +#define        ATMEL_US_TXRDYM(data)   (((data) & 0x3) << 0)   /* TX Ready Mode */
+> +#define        ATMEL_US_RXRDYM(data)   (((data) & 0x3) << 4)   /* RX Ready Mode */
+> +#define                ATMEL_US_ONE_DATA       0x0
+> +#define                ATMEL_US_TWO_DATA       0x1
+> +#define                ATMEL_US_FOUR_DATA      0x2
+> +#define        ATMEL_US_FRTSC          BIT(7)  /* FIFO RTS pin Control */
+> +#define        ATMEL_US_TXFTHRES(thr)  (((thr) & 0x3f) << 8)   /* TX FIFO Threshold */
+> +#define        ATMEL_US_RXFTHRES(thr)  (((thr) & 0x3f) << 16)  /* RX FIFO Threshold */
+> +#define        ATMEL_US_RXFTHRES2(thr) (((thr) & 0x3f) << 24)  /* RX FIFO Threshold2 */
+> +
+> +#define ATMEL_US_FLR           0xa4    /* FIFO Level Register */
+> +#define        ATMEL_US_TXFL(reg)      (((reg) >> 0) & 0x3f)   /* TX FIFO Level */
+> +#define        ATMEL_US_RXFL(reg)      (((reg) >> 16) & 0x3f)  /* RX FIFO Level */
+> +
+> +#define ATMEL_US_FIER          0xa8    /* FIFO Interrupt Enable Register */
+> +#define ATMEL_US_FIDR          0xac    /* FIFO Interrupt Disable Register */
+> +#define ATMEL_US_FIMR          0xb0    /* FIFO Interrupt Mask Register */
+> +#define ATMEL_US_FESR          0xb4    /* FIFO Event Status Register */
+> +#define        ATMEL_US_TXFEF          BIT(0)  /* Transmit FIFO Empty Flag */
+> +#define        ATMEL_US_TXFFF          BIT(1)  /* Transmit FIFO Full Flag */
+> +#define        ATMEL_US_TXFTHF         BIT(2)  /* Transmit FIFO Threshold Flag */
+> +#define        ATMEL_US_RXFEF          BIT(3)  /* Receive FIFO Empty Flag */
+> +#define        ATMEL_US_RXFFF          BIT(4)  /* Receive FIFO Full Flag */
+> +#define        ATMEL_US_RXFTHF         BIT(5)  /* Receive FIFO Threshold Flag */
+> +#define        ATMEL_US_TXFPTEF        BIT(6)  /* Transmit FIFO Pointer Error Flag */
+> +#define        ATMEL_US_RXFPTEF        BIT(7)  /* Receive FIFO Pointer Error Flag */
+> +#define        ATMEL_US_TXFLOCK        BIT(8)  /* Transmit FIFO Lock (FESR only) */
+> +#define        ATMEL_US_RXFTHF2        BIT(9)  /* Receive FIFO Threshold Flag 2 */
+> +
+>  #define ATMEL_US_NAME          0xf0    /* Ip Name */
+>  #define ATMEL_US_VERSION       0xfc    /* Ip Version */
+>
+> --
+> 1.8.2.2
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
+
 -- 
-2.1.4
+With Best Regards,
+Andy Shevchenko
