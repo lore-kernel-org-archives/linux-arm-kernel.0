@@ -1,156 +1,345 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Wed, 29 Jul 2015 12:20:53 -0500
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <20150729172053.GE31170@google.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 29 Jul 2015 18:24:24 +0100
+Subject: [PATCH v5 2/5] PCI: designware: Add ARM64 support
+In-Reply-To: <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
+References: <1437794486-21134-1-git-send-email-wangzhou1@hisilicon.com>
+ <1437794486-21134-3-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <20150729172423.GB29159@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gabriele,
+On Sat, Jul 25, 2015 at 04:21:23AM +0100, Zhou Wang wrote:
+> This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+> function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+> move related operations to dw_pcie_host_init. Also set pp->root_bus_nr = 0 in
+> each PCIe host driver which is based on pcie-designware. This patch also try
 
-As far as I can tell, this is not specific to PCIe, so please use "PCI" in
-the subject as a generic term that includes both PCI and PCIe.
+Memory for ports is kzalloc'ed, so there is no need to zero it. I still
+think that you should explain the root_bus_nr setting to 0 a bit
+better, why you make the change and why it is safe.
 
-On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
-> From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> 
->     This patch is needed port PCIe designware to new DT parsing API
->     As discussed in
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/317743.html
->     in designware we have a problem as the PCI addresses in the PCIe controller
->     address space are required in order to perform correct HW operation.
-> 
->     In order to solve this problem commit f4c55c5a3 "PCI: designware:
->     Program ATU with untranslated address" added code to read the PCIe
+[...]
 
-Conventional reference is 12-char SHA1, like this:
-
-  f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated address")
-
->     controller start address directly from the DT ranges.
-> 
->     In the new DT parsing API of_pci_get_host_bridge_resources() hides the
->     DT parser from the host controller drivers, so it is not possible
->     for drivers to parse values directly from the DT.
-> 
->     In http://www.spinics.net/lists/linux-pci/msg42540.html we already tried
->     to use the new DT parsing API but there is a bug (obviously) in setting
->     the <*>_mod_base addresses
->     Applying this patch we can easily set "<*>_mod_base = win->__res.start"
-
-By itself, this patch adds something.  It would help me understand it if
-the *user* of this new something were in the same patch series.
-
->     This patch adds a new field in "struct of_pci_range" to store the
->     pci bus start address; it fills the field in of_pci_range_parser_one();
->     in of_pci_get_host_bridge_resources() it retrieves the resource entry
->     after it is created and added to the resource list and uses
->     entry->__res.start to store the pci controller address
-
-struct of_pci_range is starting to get confusing to non-OF folks like me.
-It now contains:
-
-  u32 pci_space;
-  u64 pci_addr;
-  u64 cpu_addr;
-  u64 bus_addr;
-
-Can you explain what all these things mean, and maybe even add one-line
-comments to the structure?
-
-pci_space: The only uses I see are to determine whether to print
-"Prefetch".  I don't see any real functionality that uses this.
-
-pci_addr: I assume this is a PCI bus address, like what you would see if
-you put an analyzer on the bus/link.  This address could go in a BAR.
-
-cpu_addr: I assume this is a CPU physical address, like what you would see
-in /proc/iomem and what you would pass to ioremap().
-
-bus_addr: ?
-
-I'm trying to imagine how this might be expressed in ACPI.  A host bridge
-ACPI _CRS contains a CPU physical address and applying a _TRA (translation
-offset) to the CPU address gives you a PCI bus address.  I know this code
-is OF, not ACPI, but I assume that it should be possible to describe your
-hardware via ACPI as well as by OF.
-
->     the patch is based on 4.2-rc1
-
-You can put this after the "---" line because it's not relevant in the
-permanent changelog.
-
->     Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->     Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
->     Acked-by: Rob Herring <robh@kernel.org>
-
-Please un-indent your changelog.
-
-> ---
->  drivers/of/address.c       | 2 ++
->  drivers/of/of_pci.c        | 4 ++++
->  include/linux/of_address.h | 1 +
->  3 files changed, 7 insertions(+)
-> 
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 8bfda6a..23a5793 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -253,6 +253,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
->  						struct of_pci_range *range)
+> -int dw_pcie_host_init(struct pcie_port *pp)
+> +int __init dw_pcie_host_init(struct pcie_port *pp)
 >  {
->  	const int na = 3, ns = 2;
-> +	const int p_ns = of_n_size_cells(parser->node);
->  
->  	if (!range)
->  		return NULL;
-> @@ -265,6 +266,7 @@ struct of_pci_range *of_pci_range_parser_one(struct of_pci_range_parser *parser,
->  	range->pci_addr = of_read_number(parser->range + 1, ns);
->  	range->cpu_addr = of_translate_address(parser->node,
->  				parser->range + na);
-> +	range->bus_addr = of_read_number(parser->range + na, p_ns);
->  	range->size = of_read_number(parser->range + parser->pna + na, ns);
->  
->  	parser->range += parser->np;
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 5751dc5..fe57030 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
->  
->  	pr_debug("Parsing ranges property...\n");
->  	for_each_of_pci_range(&parser, &range) {
-> +		struct resource_entry *entry;
->  		/* Read next ranges element */
->  		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
->  			snprintf(range_type, 4, " IO");
-> @@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct device_node *dev,
->  		}
->  
->  		pci_add_resource_offset(resources, res,	res->start - range.pci_addr);
-> +		entry = list_last_entry(resources, struct resource_entry, node);
-> +		/* we are using __res for storing the PCI controller address */
-> +		entry->__res.start = range.bus_addr;
->  	}
->  
->  	return 0;
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index d88e81b..865f96e 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -16,6 +16,7 @@ struct of_pci_range {
->  	u32 pci_space;
->  	u64 pci_addr;
->  	u64 cpu_addr;
-> +	u64 bus_addr;
->  	u64 size;
->  	u32 flags;
+>         struct device_node *np = pp->dev->of_node;
+>         struct platform_device *pdev = to_platform_device(pp->dev);
+> -       struct of_pci_range range;
+> -       struct of_pci_range_parser parser;
+> +       struct pci_bus *bus;
+>         struct resource *cfg_res;
+> -       u32 val, na, ns;
+> +       LIST_HEAD(res);
+> +       u32 val, ns;
+>         const __be32 *addrp;
+>         int i, index, ret;
+> +       struct resource_entry *win;
+> 
+> -       /* Find the address cell size and the number of cells in order to get
+> -        * the untranslated address.
+> -        */
+> -       of_property_read_u32(np, "#address-cells", &na);
+> +       /* Find the number of cells in order to get the untranslated address */
+>         ns = of_n_size_cells(np);
+> 
+>         cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+> @@ -392,78 +382,62 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>                 dev_err(pp->dev, "missing *config* reg space\n");
+>         }
+> 
+> -       if (of_pci_range_parser_init(&parser, np)) {
+> -               dev_err(pp->dev, "missing ranges property\n");
+> -               return -EINVAL;
+> -       }
+> +       ret = of_pci_get_host_bridge_resources(np, 0, 0xff, &res, &pp->io_base);
+> +       if (ret)
+> +               return ret;
+> 
+>         /* Get the I/O and memory ranges from DT */
+> -       for_each_of_pci_range(&parser, &range) {
+> -               unsigned long restype = range.flags & IORESOURCE_TYPE_BITS;
+> -
+> -               if (restype == IORESOURCE_IO) {
+> -                       of_pci_range_to_resource(&range, np, &pp->io);
+> -                       pp->io.name = "I/O";
+> -                       pp->io.start = max_t(resource_size_t,
+> -                                            PCIBIOS_MIN_IO,
+> -                                            range.pci_addr + global_io_offset);
+> -                       pp->io.end = min_t(resource_size_t,
+> -                                          IO_SPACE_LIMIT,
+> -                                          range.pci_addr + range.size
+> -                                          + global_io_offset - 1);
+> -                       pp->io_size = resource_size(&pp->io);
+> -                       pp->io_bus_addr = range.pci_addr;
+> -                       pp->io_base = range.cpu_addr;
+> -
+> -                       /* Find the untranslated IO space address */
+> -                       pp->io_mod_base = of_read_number(parser.range -
+> -                                                        parser.np + na, ns);
+> -               }
+> -               if (restype == IORESOURCE_MEM) {
+> -                       of_pci_range_to_resource(&range, np, &pp->mem);
+> -                       pp->mem.name = "MEM";
+> -                       pp->mem_size = resource_size(&pp->mem);
+> -                       pp->mem_bus_addr = range.pci_addr;
+> -
+> -                       /* Find the untranslated MEM space address */
+> -                       pp->mem_mod_base = of_read_number(parser.range -
+> -                                                         parser.np + na, ns);
+> -               }
+> -               if (restype == 0) {
+> -                       of_pci_range_to_resource(&range, np, &pp->cfg);
+> -                       pp->cfg0_size = resource_size(&pp->cfg)/2;
+> -                       pp->cfg1_size = resource_size(&pp->cfg)/2;
+> -                       pp->cfg0_base = pp->cfg.start;
+> -                       pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+> +       resource_list_for_each_entry(win, &res) {
+> +               switch (resource_type(win->res)) {
+> +               case IORESOURCE_IO:
+> +                       pp->io = win->res;
+> +                       pp->io->name = "I/O";
+> +                       pp->io_size = resource_size(pp->io);
+> +                       pp->io_bus_addr = pp->io->start - win->offset;
+> +                       pp->io_mod_base = win->__res.start;
+> +                       ret = pci_remap_iospace(pp->io, pp->io_base);
+> +                       if (ret) {
+> +                               dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
+> +                                        ret, pp->io);
+> +                               continue;
+> +                       }
+> +                       break;
+> +               case IORESOURCE_MEM:
+> +                       pp->mem = win->res;
+> +                       pp->mem->name = "MEM";
+> +                       pp->mem_size = resource_size(pp->mem);
+> +                       pp->mem_bus_addr = pp->mem->start - win->offset;
+> +                       pp->mem_mod_base = win->__res.start;
+> +                       break;
+> +               case 0:
+> +                       pp->cfg = win->res;
+> +                       pp->cfg0_size = resource_size(pp->cfg)/2;
+> +                       pp->cfg1_size = resource_size(pp->cfg)/2;
+> +                       pp->cfg0_base = pp->cfg->start;
+> +                       pp->cfg1_base = pp->cfg->start + pp->cfg0_size;
+> 
+>                         /* Find the untranslated configuration space address */
+> -                       pp->cfg0_mod_base = of_read_number(parser.range -
+> -                                                          parser.np + na, ns);
+> -                       pp->cfg1_mod_base = pp->cfg0_mod_base +
+> -                                           pp->cfg0_size;
+> +                       pp->cfg0_mod_base = win->__res.start;
+> +                       pp->cfg1_mod_base = pp->cfg0_mod_base + pp->cfg0_size;
+> +                       break;
+> +               case IORESOURCE_BUS:
+> +                       pp->busn = win->res;
+> +                       break;
+> +               default:
+> +                       continue;
+>                 }
+>         }
+> 
+> -       ret = of_pci_parse_bus_range(np, &pp->busn);
+> -       if (ret < 0) {
+> -               pp->busn.name = np->name;
+> -               pp->busn.start = 0;
+> -               pp->busn.end = 0xff;
+> -               pp->busn.flags = IORESOURCE_BUS;
+> -               dev_dbg(pp->dev, "failed to parse bus-range property: %d, using default %pR\n",
+> -                       ret, &pp->busn);
+> -       }
+> -
+>         if (!pp->dbi_base) {
+> -               pp->dbi_base = devm_ioremap(pp->dev, pp->cfg.start,
+> -                                       resource_size(&pp->cfg));
+> +               pp->dbi_base = devm_ioremap(pp->dev, pp->cfg->start,
+> +                                       resource_size(pp->cfg));
+>                 if (!pp->dbi_base) {
+>                         dev_err(pp->dev, "error with ioremap\n");
+>                         return -ENOMEM;
+>                 }
+>         }
+> 
+> -       pp->mem_base = pp->mem.start;
+> +       pp->mem_base = pp->mem->start;
+> 
+>         if (!pp->va_cfg0_base) {
+>                 pp->va_cfg0_base = devm_ioremap(pp->dev, pp->cfg0_base,
+> @@ -524,15 +498,28 @@ int dw_pcie_host_init(struct pcie_port *pp)
+>         val |= PORT_LOGIC_SPEED_CHANGE;
+>         dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+> 
+> -#ifdef CONFIG_PCI_MSI
+> -       dw_pcie_msi_chip.dev = pp->dev;
+
+Is it safe to remove the dev assignment ?
+
+> -       dw_pci.msi_ctrl = &dw_pcie_msi_chip;
+> +       bus = pci_create_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
+> +                             pp, &res);
+> +       if (!bus)
+> +               return -ENOMEM;
+> +
+> +#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
+> +       bus->msi = container_of(&pp->irq_domain, struct msi_controller, domain);
+> +#else
+> +       bus->msi = &dw_pcie_msi_chip;
+>  #endif
+
+For the records, this patch conflicts with my MSI series:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360461.html
+
+Conflict resolution is easy but it is worth keeping in mind.
+
+Thanks !
+Lorenzo
+
+> 
+> -       dw_pci.nr_controllers = 1;
+> -       dw_pci.private_data = (void **)&pp;
+> +       pci_scan_child_bus(bus);
+> +       if (pp->ops->scan_bus)
+> +               pp->ops->scan_bus(pp);
+> 
+> -       pci_common_init_dev(pp->dev, &dw_pci);
+> +#ifdef CONFIG_ARM
+> +       /* support old dtbs that incorrectly describe IRQs */
+> +       pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +#endif
+> +
+> +       pci_assign_unassigned_bus_resources(bus);
+> +       pci_bus_add_devices(bus);
+> 
+>         return 0;
+>  }
+> @@ -633,7 +620,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+>  static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>                         int size, u32 *val)
+>  {
+> -       struct pcie_port *pp = sys_to_pcie(bus->sysdata);
+> +       struct pcie_port *pp = bus->sysdata;
+>         int ret;
+> 
+>         if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+> @@ -657,7 +644,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+>  static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+>                         int where, int size, u32 val)
+>  {
+> -       struct pcie_port *pp = sys_to_pcie(bus->sysdata);
+> +       struct pcie_port *pp = bus->sysdata;
+>         int ret;
+> 
+>         if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
+> @@ -681,62 +668,6 @@ static struct pci_ops dw_pcie_ops = {
+>         .write = dw_pcie_wr_conf,
 >  };
-> -- 
+> 
+> -static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+> -{
+> -       struct pcie_port *pp;
+> -
+> -       pp = sys_to_pcie(sys);
+> -
+> -       if (global_io_offset < SZ_1M && pp->io_size > 0) {
+> -               sys->io_offset = global_io_offset - pp->io_bus_addr;
+> -               pci_ioremap_io(global_io_offset, pp->io_base);
+> -               global_io_offset += SZ_64K;
+> -               pci_add_resource_offset(&sys->resources, &pp->io,
+> -                                       sys->io_offset);
+> -       }
+> -
+> -       sys->mem_offset = pp->mem.start - pp->mem_bus_addr;
+> -       pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
+> -       pci_add_resource(&sys->resources, &pp->busn);
+> -
+> -       return 1;
+> -}
+> -
+> -static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+> -{
+> -       struct pci_bus *bus;
+> -       struct pcie_port *pp = sys_to_pcie(sys);
+> -
+> -       pp->root_bus_nr = sys->busnr;
+> -       bus = pci_scan_root_bus(pp->dev, sys->busnr,
+> -                                 &dw_pcie_ops, sys, &sys->resources);
+> -       if (!bus)
+> -               return NULL;
+> -
+> -       if (bus && pp->ops->scan_bus)
+> -               pp->ops->scan_bus(pp);
+> -
+> -       return bus;
+> -}
+> -
+> -static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+> -{
+> -       struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+> -       int irq;
+> -
+> -       irq = of_irq_parse_and_map_pci(dev, slot, pin);
+> -       if (!irq)
+> -               irq = pp->irq;
+> -
+> -       return irq;
+> -}
+> -
+> -static struct hw_pci dw_pci = {
+> -       .setup          = dw_pcie_setup,
+> -       .scan           = dw_pcie_scan_bus,
+> -       .map_irq        = dw_pcie_map_irq,
+> -};
+> -
+>  void dw_pcie_setup_rc(struct pcie_port *pp)
+>  {
+>         u32 val;
+> diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+> index d0bbd27..efac57d 100644
+> --- a/drivers/pci/host/pcie-designware.h
+> +++ b/drivers/pci/host/pcie-designware.h
+> @@ -34,7 +34,7 @@ struct pcie_port {
+>         u64                     cfg1_mod_base;
+>         void __iomem            *va_cfg1_base;
+>         u32                     cfg1_size;
+> -       u64                     io_base;
+> +       resource_size_t         io_base;
+>         u64                     io_mod_base;
+>         phys_addr_t             io_bus_addr;
+>         u32                     io_size;
+> @@ -42,10 +42,10 @@ struct pcie_port {
+>         u64                     mem_mod_base;
+>         phys_addr_t             mem_bus_addr;
+>         u32                     mem_size;
+> -       struct resource         cfg;
+> -       struct resource         io;
+> -       struct resource         mem;
+> -       struct resource         busn;
+> +       struct resource         *cfg;
+> +       struct resource         *io;
+> +       struct resource         *mem;
+> +       struct resource         *busn;
+>         int                     irq;
+>         u32                     lanes;
+>         struct pcie_host_ops    *ops;
+> diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
+> index c49fbdc..03eb204 100644
+> --- a/drivers/pci/host/pcie-spear13xx.c
+> +++ b/drivers/pci/host/pcie-spear13xx.c
+> @@ -286,7 +286,7 @@ static int spear13xx_add_pcie_port(struct pcie_port *pp,
+>                 return ret;
+>         }
+> 
+> -       pp->root_bus_nr = -1;
+> +       pp->root_bus_nr = 0;
+>         pp->ops = &spear13xx_pcie_host_ops;
+> 
+>         ret = dw_pcie_host_init(pp);
+> --
 > 1.9.1
 > 
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
 > the body of a message to majordomo at vger.kernel.org
 > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
