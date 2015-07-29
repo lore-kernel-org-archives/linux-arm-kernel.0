@@ -1,74 +1,111 @@
-From: cburden@codeaurora.org (Cassidy Burden)
-Date: Wed, 29 Jul 2015 13:40:39 -0700
-Subject: [PATCH] lib: Make _find_next_bit helper function inline
-In-Reply-To: <1438176656.18723.8.camel@ceres>
-References: <1438110564-19932-1-git-send-email-cburden@codeaurora.org>
- <55B7F2C6.9010000@gmail.com>
- <20150728144537.67d46b5714c99d25f0bb33fb@linux-foundation.org>
- <1438176656.18723.8.camel@ceres>
-Message-ID: <55B93A47.90107@codeaurora.org>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Wed, 29 Jul 2015 20:49:57 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+Message-ID: <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I changed the test module to now set the entire array to all 0/1s and
-only flip a few bits. There appears to be a performance benefit, but
-it's only 2-3% better (if that). If the main benefit of the original
-patch was to save space then inlining definitely doesn't seem worth the
-small gains in real use cases.
 
-find_next_zero_bit (us)
-old      new     inline
-14440    17080   17086
-4779     5181    5069
-10844    12720   12746
-9642     11312   11253
-3858     3818    3668
-10540    12349   12307
-12470    14716   14697
-5403     6002    5942
-2282     1820    1418
-13632    16056   15998
-11048    13019   13030
-6025     6790    6706
-13255    15586   15605
-3038     2744    2539
-10353    12219   12239
-10498    12251   12322
-14767    17452   17454
-12785    15048   15052
-1655     1034    691
-9924     11611   11558
+> -----Original Message-----
+> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> Sent: Wednesday, July 29, 2015 2:51 PM
+> To: Yoder Stuart-B08248
+> Cc: Marc Zyngier; Catalin Marinas; Will Deacon; linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823;
+> Mark Rutland
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+> 
+> On 29 July 2015 at 21:27, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+> >
+> >> -----Original Message-----
+> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> >> Sent: Thursday, July 23, 2015 7:44 AM
+> >> To: Yoder Stuart-B08248; Catalin Marinas; Will Deacon
+> >> Cc: linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823
+> >> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+> >>
+> >> On 22/07/15 20:49, Stuart Yoder wrote:
+> >> > Catalin/Will,
+> >> >
+> >> > This is not a patch mean to be applied, but a query about whether there
+> >> > is any reason to not enable 48-bit VA by default in the arm64 defconfig.
+> >> >
+> >> > The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
+> >> > reasons mentioned in [1].
+> >> >
+> >> > Based on the comment in [1] by Catalin, it seems that the intent
+> >> > is to turn this on by default.
+> >> >
+> >> > Is there any issues anyone sees with a patch that does this:
+> >> >
+> >> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> >> > index 4e17e7e..5acf75d 100644
+> >> > @@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
+> >> >  CONFIG_PCI=y
+> >> >  CONFIG_PCI_MSI=y
+> >> >  CONFIG_PCI_XGENE=y
+> >> > +CONFIG_ARM64_VA_BITS_48=y
+> >> >  CONFIG_SMP=y
+> >> >  CONFIG_PREEMPT=y
+> >> >  CONFIG_KSM=y
+> >> >
+> >> > Thanks,
+> >> > Stuart
+> >> >
+> >> > [1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
+> >> >
+> >>
+> >> Is that still a requirement now that our idmap can use 4 levels (as part
+> >> of dd006da)?
+> >
+> > So, yes it appears still to be a requirement.  The idmap support is not
+> > the issue, it's the linear mapping.
+> >
+> > Has there been discussion or thinking about enabling 48-bit VA in the
+> > default defconfig?  As mentioned before, it seemed that supporting 48-bit
+> > VA was the planned default (~1 year ago), and was waiting on KVM issues to get
+> > resolved.
+> >
+> > A related question is what the thinking around enabling 64KB pages
+> > by default.  Any chance of that happening?
+> >
+> > I would like to see our platform work with the default defconfig, which
+> > is the reason for the questions.
+> >
+> 
+> Perhaps you should mention, for the benefit of those not following the
+> other thread, that the platform in question has 2 chunks of memory,
+> i.e., 2 GB and 14 GB, with a 508 GB hole in between.
 
-find_next_bit (us)
-old      new     inline
-8535     9936    9667
-14666    17372   16880
-2315     1799    1355
-6578     9092    8806
-6548     7558    7274
-9448     11213   10821
-3467     3497    3449
-2719     3079    2911
-6115     7989    7796
-13582    16113   15643
-4643     4946    4766
-3406     3728    3536
-7118     9045    8805
-3174     3011    2701
-13300    16780   16252
-14285    16848   16330
-11583    13669   13207
-13063    15455   14989
-12661    14955   14500
-12068    14166   13790
+Yes, our physical memory layout for RAM looks like this:
+2 GB at 0x8000_0000
+510 GB at 0x80_8000_0000
 
-On 7/29/2015 6:30 AM, Alexey Klimov wrote:
-> I will re-check on another machine. It's really interesting if
-> __always_inline makes things better for aarch64 and worse for x86_64. It
-> will be nice if someone will check it on x86_64 too.
+> 
+> To be honest, I think this is poorly designed, and I am not sure we
+> should cater for such configurations in the defconfig.
 
-Very odd, this may be related to the other compiler optimizations Yuri
-mentioned?
--- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Agree, if this is a one-off weird platform then we shouldn't.
+
+But, the 'Principles of ARM Memory Maps' doc proposes this:
+2 GB at 0x8000_0000
+30 GB at 0x8_8000_0000
+480 GB at 0x88_0000_0000
+
+...i.e. if you have > 32 GB then your RAM regions are split into 3 
+chunks.  The aarch64 kernel will support > than 32GB right?  A
+basic server will have that much or more.
+
+How will we deal with systems with > 32GB of memory that follow that
+map?
+
+When do we expect the default page size for the aarch64 kernel to be
+changed to 64KB?  Any workload that puts pressure on the TLBs will benefit
+from this.
+
+Thanks,
+Stuart
