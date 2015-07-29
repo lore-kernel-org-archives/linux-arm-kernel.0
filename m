@@ -1,138 +1,196 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Wed, 29 Jul 2015 16:04:29 +0000
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F175@lhreml503-mbs>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 29 Jul 2015 18:10:45 +0200 (CEST)
+Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
+In-Reply-To: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+Message-ID: <alpine.DEB.2.11.1507291810040.3825@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn
+On Wed, 29 Jul 2015, Jon Hunter wrote:
 
-Liviu and Rob already acked, do you think it is ok to merge this?
+Cc'ing Marc ...
 
-Cheers
-
-Gab
-
-> -----Original Message-----
-> From: Gabriele Paoloni
-> Sent: Monday, July 27, 2015 4:17 PM
-> To: Gabriele Paoloni; arnd at arndb.de; lorenzo.pieralisi at arm.com;
-> Wangzhou (B); bhelgaas at google.com; robh+dt at kernel.org;
-> james.morse at arm.com; Liviu.Dudau at arm.com
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> qiuzhenfa; Liguozhu (Kenneth)
-> Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
+> The gic_init_bases() function initialises an array that stores the mapping
+> between the GIC and CPUs. This array is a global array that is
+> unconditionally initialised on every call to gic_init_bases(). Although,
+> it is not common for there to be more than one GIC instance, there are
+> some devices that do support nested GIC controllers and gic_init_bases()
+> can be called more than once.
 > 
-> From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+> will only setup the mapping again for CPU0. This is because for child GIC
+> controllers there is most likely only one recipient of the interrupt.
 > 
->     This patch is needed port PCIe designware to new DT parsing API
->     As discussed in
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> January/317743.html
->     in designware we have a problem as the PCI addresses in the PCIe
-> controller
->     address space are required in order to perform correct HW operation.
+> Fix this by moving the CPU mapping array to the GIC chip data structure
+> so that it is initialised for each GIC instance separately. It is assumed
+> that the bL switcher code is only interested in the root or primary GIC
+> instance.
 > 
->     In order to solve this problem commit f4c55c5a3 "PCI: designware:
->     Program ATU with untranslated address" added code to read the PCIe
->     controller start address directly from the DT ranges.
-> 
->     In the new DT parsing API of_pci_get_host_bridge_resources() hides
-> the
->     DT parser from the host controller drivers, so it is not possible
->     for drivers to parse values directly from the DT.
-> 
->     In http://www.spinics.net/lists/linux-pci/msg42540.html we already
-> tried
->     to use the new DT parsing API but there is a bug (obviously) in
-> setting
->     the <*>_mod_base addresses
->     Applying this patch we can easily set "<*>_mod_base = win-
-> >__res.start"
-> 
->     This patch adds a new field in "struct of_pci_range" to store the
->     pci bus start address; it fills the field in
-> of_pci_range_parser_one();
->     in of_pci_get_host_bridge_resources() it retrieves the resource
-> entry
->     after it is created and added to the resource list and uses
->     entry->__res.start to store the pci controller address
-> 
->     the patch is based on 4.2-rc1
-> 
->     Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->     Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
->     Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
 > ---
->  drivers/of/address.c       | 2 ++
->  drivers/of/of_pci.c        | 4 ++++
->  include/linux/of_address.h | 1 +
->  3 files changed, 7 insertions(+)
+>  arch/arm/common/bL_switcher.c   |  2 +-
+>  drivers/irqchip/irq-gic.c       | 41 ++++++++++++++++++++++-------------------
+>  include/linux/irqchip/arm-gic.h |  2 +-
+>  3 files changed, 24 insertions(+), 21 deletions(-)
 > 
-> diff --git a/drivers/of/address.c b/drivers/of/address.c
-> index 8bfda6a..23a5793 100644
-> --- a/drivers/of/address.c
-> +++ b/drivers/of/address.c
-> @@ -253,6 +253,7 @@ struct of_pci_range *of_pci_range_parser_one(struct
-> of_pci_range_parser *parser,
->  						struct of_pci_range *range)
->  {
->  	const int na = 3, ns = 2;
-> +	const int p_ns = of_n_size_cells(parser->node);
-> 
->  	if (!range)
->  		return NULL;
-> @@ -265,6 +266,7 @@ struct of_pci_range *of_pci_range_parser_one(struct
-> of_pci_range_parser *parser,
->  	range->pci_addr = of_read_number(parser->range + 1, ns);
->  	range->cpu_addr = of_translate_address(parser->node,
->  				parser->range + na);
-> +	range->bus_addr = of_read_number(parser->range + na, p_ns);
->  	range->size = of_read_number(parser->range + parser->pna + na,
-> ns);
-> 
->  	parser->range += parser->np;
-> diff --git a/drivers/of/of_pci.c b/drivers/of/of_pci.c
-> index 5751dc5..fe57030 100644
-> --- a/drivers/of/of_pci.c
-> +++ b/drivers/of/of_pci.c
-> @@ -198,6 +198,7 @@ int of_pci_get_host_bridge_resources(struct
-> device_node *dev,
-> 
->  	pr_debug("Parsing ranges property...\n");
->  	for_each_of_pci_range(&parser, &range) {
-> +		struct resource_entry *entry;
->  		/* Read next ranges element */
->  		if ((range.flags & IORESOURCE_TYPE_BITS) == IORESOURCE_IO)
->  			snprintf(range_type, 4, " IO");
-> @@ -240,6 +241,9 @@ int of_pci_get_host_bridge_resources(struct
-> device_node *dev,
->  		}
-> 
->  		pci_add_resource_offset(resources, res,	res->start -
-> range.pci_addr);
-> +		entry = list_last_entry(resources, struct resource_entry,
-> node);
-> +		/* we are using __res for storing the PCI controller
-> address */
-> +		entry->__res.start = range.bus_addr;
->  	}
-> 
->  	return 0;
-> diff --git a/include/linux/of_address.h b/include/linux/of_address.h
-> index d88e81b..865f96e 100644
-> --- a/include/linux/of_address.h
-> +++ b/include/linux/of_address.h
-> @@ -16,6 +16,7 @@ struct of_pci_range {
->  	u32 pci_space;
->  	u64 pci_addr;
->  	u64 cpu_addr;
-> +	u64 bus_addr;
->  	u64 size;
->  	u32 flags;
+> diff --git a/arch/arm/common/bL_switcher.c b/arch/arm/common/bL_switcher.c
+> index 37dc0fe1093f..4111d7b36077 100644
+> --- a/arch/arm/common/bL_switcher.c
+> +++ b/arch/arm/common/bL_switcher.c
+> @@ -488,7 +488,7 @@ static int bL_switcher_halve_cpus(void)
+>  		cluster = MPIDR_AFFINITY_LEVEL(cpu_logical_map(i), 1);
+>  
+>  		/* Let's take note of the GIC ID for this CPU */
+> -		gic_id = gic_get_cpu_id(i);
+> +		gic_id = gic_get_cpu_id(i, 0);
+>  		if (gic_id < 0) {
+>  			pr_err("%s: bad GIC ID for CPU %d\n", __func__, i);
+>  			bL_switcher_restore_cpus();
+> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+> index a530d9a9b810..78a7706c607e 100644
+> --- a/drivers/irqchip/irq-gic.c
+> +++ b/drivers/irqchip/irq-gic.c
+> @@ -50,6 +50,8 @@
+>  
+>  #include "irq-gic-common.h"
+>  
+> +#define NR_GIC_CPU_IF 8
+> +
+>  union gic_base {
+>  	void __iomem *common_base;
+>  	void __percpu * __iomem *percpu_base;
+> @@ -70,18 +72,16 @@ struct gic_chip_data {
+>  #ifdef CONFIG_GIC_NON_BANKED
+>  	void __iomem *(*get_base)(union gic_base *);
+>  #endif
+> +	/*
+> +	 * The GIC mapping of CPU interfaces does not necessarily match
+> +	 * the logical CPU numbering.  Let's use a mapping as returned
+> +	 * by the GIC itself.
+> +	 */
+> +	u8 cpu_map[NR_GIC_CPU_IF];
 >  };
-> --
-> 1.9.1
+>  
+>  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
+>  
+> -/*
+> - * The GIC mapping of CPU interfaces does not necessarily match
+> - * the logical CPU numbering.  Let's use a mapping as returned
+> - * by the GIC itself.
+> - */
+> -#define NR_GIC_CPU_IF 8
+> -static u8 gic_cpu_map[NR_GIC_CPU_IF] __read_mostly;
+> -
+>  #ifndef MAX_GIC_NR
+>  #define MAX_GIC_NR	1
+>  #endif
+> @@ -237,6 +237,7 @@ static int gic_set_type(struct irq_data *d, unsigned int type)
+>  static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>  			    bool force)
+>  {
+> +	struct gic_chip_data *gic = irq_data_get_irq_chip_data(d);
+>  	void __iomem *reg = gic_dist_base(d) + GIC_DIST_TARGET + (gic_irq(d) & ~3);
+>  	unsigned int cpu, shift = (gic_irq(d) % 4) * 8;
+>  	u32 val, mask, bit;
+> @@ -252,7 +253,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+>  
+>  	raw_spin_lock_irqsave(&irq_controller_lock, flags);
+>  	mask = 0xff << shift;
+> -	bit = gic_cpu_map[cpu] << shift;
+> +	bit = gic->cpu_map[cpu] << shift;
+>  	val = readl_relaxed(reg) & ~mask;
+>  	writel_relaxed(val | bit, reg);
+>  	raw_spin_unlock_irqrestore(&irq_controller_lock, flags);
+> @@ -420,7 +421,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	 */
+>  	BUG_ON(cpu >= NR_GIC_CPU_IF);
+>  	cpu_mask = gic_get_cpumask(gic);
+> -	gic_cpu_map[cpu] = cpu_mask;
+> +	gic->cpu_map[cpu] = cpu_mask;
+>  
+>  	/*
+>  	 * Clear our mask from the other map entries in case they're
+> @@ -428,7 +429,7 @@ static void gic_cpu_init(struct gic_chip_data *gic)
+>  	 */
+>  	for (i = 0; i < NR_GIC_CPU_IF; i++)
+>  		if (i != cpu)
+> -			gic_cpu_map[i] &= ~cpu_mask;
+> +			gic->cpu_map[i] &= ~cpu_mask;
+>  
+>  	gic_cpu_config(dist_base, NULL);
+>  
+> @@ -677,7 +678,7 @@ static void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+>  
+>  	/* Convert our logical CPU mask into a physical one. */
+>  	for_each_cpu(cpu, mask)
+> -		map |= gic_cpu_map[cpu];
+> +		map |= gic->cpu_map[cpu];
+>  
+>  	/*
+>  	 * Ensure that stores to Normal memory are visible to the
+> @@ -722,15 +723,17 @@ void gic_send_sgi(unsigned int cpu_id, unsigned int irq)
+>   * or -1 if the CPU number is too large or the interface ID is
+>   * unknown (more than one bit set).
+>   */
+> -int gic_get_cpu_id(unsigned int cpu)
+> +int gic_get_cpu_id(unsigned int cpu, unsigned int gic_nr)
+>  {
+>  	unsigned int cpu_bit;
+>  
+> +	if (gic_nr >= MAX_GIC_NR)
+> +		return -EINVAL;
+>  	if (cpu >= NR_GIC_CPU_IF)
+> -		return -1;
+> -	cpu_bit = gic_cpu_map[cpu];
+> +		return -EINVAL;
+> +	cpu_bit = gic_data[gic_nr].cpu_map[cpu];
+>  	if (cpu_bit & (cpu_bit - 1))
+> -		return -1;
+> +		return -EINVAL;
+>  	return __ffs(cpu_bit);
+>  }
+>  
+> @@ -759,14 +762,14 @@ void gic_migrate_target(unsigned int new_cpu_id)
+>  		return;
+>  	gic_irqs = gic_data[gic_nr].gic_irqs;
+>  
+> -	cur_cpu_id = __ffs(gic_cpu_map[cpu]);
+> +	cur_cpu_id = __ffs(gic->cpu_map[cpu]);
+>  	cur_target_mask = 0x01010101 << cur_cpu_id;
+>  	ror_val = (cur_cpu_id - new_cpu_id) & 31;
+>  
+>  	raw_spin_lock(&irq_controller_lock);
+>  
+>  	/* Update the target interface for this logical CPU */
+> -	gic_cpu_map[cpu] = 1 << new_cpu_id;
+> +	gic->cpu_map[cpu] = 1 << new_cpu_id;
+>  
+>  	/*
+>  	 * Find all the peripheral interrupts targetting the current
+> @@ -981,7 +984,7 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+>  	 * It will be refined as each CPU probes its ID.
+>  	 */
+>  	for (i = 0; i < NR_GIC_CPU_IF; i++)
+> -		gic_cpu_map[i] = 0xff;
+> +		gic->cpu_map[i] = 0xff;
+>  
+>  	/*
+>  	 * Find out how many interrupts are supported.
+> diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
+> index f52a9024be9a..9a4d30564492 100644
+> --- a/include/linux/irqchip/arm-gic.h
+> +++ b/include/linux/irqchip/arm-gic.h
+> @@ -111,7 +111,7 @@ static inline void gic_init(unsigned int nr, int start,
+>  int gicv2m_of_init(struct device_node *node, struct irq_domain *parent);
+>  
+>  void gic_send_sgi(unsigned int cpu_id, unsigned int irq);
+> -int gic_get_cpu_id(unsigned int cpu);
+> +int gic_get_cpu_id(unsigned int cpu, unsigned int gic_nr);
+>  void gic_migrate_target(unsigned int new_cpu_id);
+>  unsigned long gic_get_sgir_physaddr(void);
+>  
+> -- 
+> 2.1.4
+> 
+> 
