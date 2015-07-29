@@ -1,58 +1,39 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 29 Jul 2015 20:21:34 +0200
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
- controller-data
-In-Reply-To: <20150729171613.GI11162@sirena.org.uk>
-References: <cover.1438170519.git.hramrach@gmail.com>
- <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
- <20150729140046.GB11082@sirena.org.uk>
- <CAOMqctTZVET=U=2o65HpWSm4W660XZtYYbBND2k4u9CnfjfMhQ@mail.gmail.com>
- <20150729171613.GI11162@sirena.org.uk>
-Message-ID: <CAOMqctQzh69RCQu8pK1EuuYkrZsh6mg34+YWJFzSvimcK3B0rA@mail.gmail.com>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Wed, 29 Jul 2015 20:27:13 +0200
+Subject: [PATCH v2 08/25] arch: introduce memremap()
+In-Reply-To: <20150729065004.GA17162@lst.de>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150726172527.GA29513@lst.de>
+ <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
+ <20150727051258.GB15836@lst.de>
+ <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
+ <20150729065004.GA17162@lst.de>
+Message-ID: <20150729182712.GI30479@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2015 at 19:16, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jul 29, 2015 at 06:19:24PM +0200, Michal Suchanek wrote:
->> On 29 July 2015 at 16:00, Mark Brown <broonie@kernel.org> wrote:
->
->> > I can't tell from this commit message what the issue you're trying to
->> > fix is, sorry.  Nodes without compatible strings are entirely normal and
->> > don't need compatible strings.  It sounds like a bug in whatever other
->> > driver is becoming confused.
->
->> The driver that gets confused is ofpart.
->
->> The two-line patch to allow it to just ignore controller-data has been
->> rejected on the basis that s3c64xx should use a compatible string
->> because ofpart monopolizes all nodes without compatible which are
->> children of a mtd device. Devicetrees containing such nodes that are
->> not partitions are presumably invalid and should be rejected when
->> ofpart is compiled into the kernel.
->
-> That seems like an extremely limited binding, the normal thing here
-> would be to create a specifically named node to contain the collection
-> of subnodes like many PMICs do for their regulators.  As a fix I'd
-> suggest just silently ignoring nodes it can't understand, or printing a
-> warning if that's a serious issue.
->
->> >> +     if (!of_get_property(data_np, "compatible", NULL) ||
->> >> +         strcmp(of_get_property(data_np, "compatible", NULL),
->> >> +                "samsung,s3c-controller-data"))
->> >> +             dev_err(&spi->dev, "child node 'controller-data' does not have correct compatible\n");
->
->> > This will break all existing users which is not acceptable for
->> > mainline, we need to preserve compatibility with existing device trees.
->
->> It will not break anything. It will just spam dmesg.
->
-> I'm confused - if all this change does is to spam dmesg then what's the
-> point?
+On Wed, Jul 29, 2015 at 08:50:04AM +0200, Christoph Hellwig wrote:
+> On Mon, Jul 27, 2015 at 04:26:03PM -0700, Dan Williams wrote:
+> > Oh, because all we have at this point is ioremap_cache() which
+> > silently falls back.  It's not until the introduction of
+> > arch_memremp() where we update the arch code to break that behavior.
+> 
+> Ok, makes sense.  Might be worth to document in the changelog.
+> 
+> > That said, I think it may be beneficial to allow a fallback if the
+> > user cares.  So maybe memremap() can call plain ioremap() if
+> > MEMREMAP_STRICT is not set and none of the other mapping types are
+> > satisfied.
+> 
+> Is there a real use case for it?  Fallback APIs always seem confusing
+> and it might make more sense to do this in the caller(s) that actually
+> need it.
 
-Presumably when your SPI NOR flash fails to probe this message will be
-just above and you will look into the binding doc and add the
-compatible.
+It seems semantics-wise we are trying to separate these two really, so I agree
+with this. Having a fallback would onloy make things more complicated for any
+sanitizer / checker / etc, and I don't think the practical gains of having a
+fallback outweight the gains of having a clear semantic separation on intended
+memory type and interactions with it.
 
-Thanks
-
-Michal
+  Luis
