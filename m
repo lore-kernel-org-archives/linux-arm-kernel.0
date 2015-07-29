@@ -1,125 +1,192 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jul 2015 22:58:59 +0200
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
-Message-ID: <CAKv+Gu_ipKu2+z_WF+gEFCGMagOeLNwLwoDk18SFHADpnVfGxw@mail.gmail.com>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Wed, 29 Jul 2015 15:58:55 -0500
+Subject: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+Message-ID: <1438203535-38028-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2015 at 22:49, Stuart Yoder <stuart.yoder@freescale.com> wrote:
->
->> -----Original Message-----
->> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
->> Sent: Wednesday, July 29, 2015 2:51 PM
->> To: Yoder Stuart-B08248
->> Cc: Marc Zyngier; Catalin Marinas; Will Deacon; linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823;
->> Mark Rutland
->> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
->>
->> On 29 July 2015 at 21:27, Stuart Yoder <stuart.yoder@freescale.com> wrote:
->> >
->> >> -----Original Message-----
->> >> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
->> >> Sent: Thursday, July 23, 2015 7:44 AM
->> >> To: Yoder Stuart-B08248; Catalin Marinas; Will Deacon
->> >> Cc: linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823
->> >> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
->> >>
->> >> On 22/07/15 20:49, Stuart Yoder wrote:
->> >> > Catalin/Will,
->> >> >
->> >> > This is not a patch mean to be applied, but a query about whether there
->> >> > is any reason to not enable 48-bit VA by default in the arm64 defconfig.
->> >> >
->> >> > The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
->> >> > reasons mentioned in [1].
->> >> >
->> >> > Based on the comment in [1] by Catalin, it seems that the intent
->> >> > is to turn this on by default.
->> >> >
->> >> > Is there any issues anyone sees with a patch that does this:
->> >> >
->> >> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> >> > index 4e17e7e..5acf75d 100644
->> >> > @@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
->> >> >  CONFIG_PCI=y
->> >> >  CONFIG_PCI_MSI=y
->> >> >  CONFIG_PCI_XGENE=y
->> >> > +CONFIG_ARM64_VA_BITS_48=y
->> >> >  CONFIG_SMP=y
->> >> >  CONFIG_PREEMPT=y
->> >> >  CONFIG_KSM=y
->> >> >
->> >> > Thanks,
->> >> > Stuart
->> >> >
->> >> > [1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
->> >> >
->> >>
->> >> Is that still a requirement now that our idmap can use 4 levels (as part
->> >> of dd006da)?
->> >
->> > So, yes it appears still to be a requirement.  The idmap support is not
->> > the issue, it's the linear mapping.
->> >
->> > Has there been discussion or thinking about enabling 48-bit VA in the
->> > default defconfig?  As mentioned before, it seemed that supporting 48-bit
->> > VA was the planned default (~1 year ago), and was waiting on KVM issues to get
->> > resolved.
->> >
->> > A related question is what the thinking around enabling 64KB pages
->> > by default.  Any chance of that happening?
->> >
->> > I would like to see our platform work with the default defconfig, which
->> > is the reason for the questions.
->> >
->>
->> Perhaps you should mention, for the benefit of those not following the
->> other thread, that the platform in question has 2 chunks of memory,
->> i.e., 2 GB and 14 GB, with a 508 GB hole in between.
->
-> Yes, our physical memory layout for RAM looks like this:
-> 2 GB at 0x8000_0000
-> 510 GB at 0x80_8000_0000
->
+When system goes into low power states like SUSPEND_MEM and
+HIBERNATION, the hardware IP block may be powered off to reduce
+the power consumption. This power down may cause problems on
+some imx platforms, because the hardware settings are reset to
+its power on default values which may differ from the ones when
+it power off. This patch added the dev_pm_ops and implemented
+two callbacks: suspend_noirq and resume_noirq, which will save
+the necessory hardware parameters right before power down and
+recover them before system uses the hardware.
 
-Once you use more than 256 GB of DRAM, you are going to need 4 levels
-of page tables anyway for 4 KB pages.
+Because added the dev_pm_ops, the old suspend/resume callbacks
+under platform_driver will not be called any more. Changed their
+prototypes and moved those two callbacks into dev_pm_ops too.
 
->>
->> To be honest, I think this is poorly designed, and I am not sure we
->> should cater for such configurations in the defconfig.
->
-> Agree, if this is a one-off weird platform then we shouldn't.
->
-> But, the 'Principles of ARM Memory Maps' doc proposes this:
-> 2 GB at 0x8000_0000
-> 30 GB at 0x8_8000_0000
-> 480 GB at 0x88_0000_0000
->
-> ...i.e. if you have > 32 GB then your RAM regions are split into 3
-> chunks.  The aarch64 kernel will support > than 32GB right?  A
-> basic server will have that much or more.
->
-> How will we deal with systems with > 32GB of memory that follow that
-> map?
->
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+Change log:
 
-We will use either 64 KB pages or 4 levels of page tables, obviously.
-But that does not mean it should be the default for everyone.
+PATCH v3
+	After added the dev_pm_ops, the old suspend/resume callbacks
+	under platform_driver will not be called. Changed their
+	prototypes and moved them into dev_pm_ops too.
 
-> When do we expect the default page size for the aarch64 kernel to be
-> changed to 64KB?  Any workload that puts pressure on the TLBs will benefit
-> from this.
->
+PATCH v2
+	Change pr_debug to dev_dbg per GregK's review feedback.
 
-64 K pages are fully supported, but also, it is simply not the
-default, and I don't expect it to be for the foreseeable future. TLB
-pressure is a very artificial argument to make, since it is highly
-workload dependent how it affects performance and there are downsides
-to the higher granularity as well.
+ drivers/tty/serial/imx.c | 120 ++++++++++++++++++++++++++++++++++-------------
+ 1 file changed, 88 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 2c90dc3..10dece3 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -216,6 +216,7 @@ struct imx_port {
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+ 	wait_queue_head_t	dma_wait;
++	unsigned int            saved_reg[10];
+ };
+
+ struct imx_port_ucrs {
+@@ -1811,36 +1812,6 @@ static struct uart_driver imx_reg = {
+ 	.cons           = IMX_CONSOLE,
+ };
+
+-static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+-{
+-	struct imx_port *sport = platform_get_drvdata(dev);
+-	unsigned int val;
+-
+-	/* enable wakeup from i.MX UART */
+-	val = readl(sport->port.membase + UCR3);
+-	val |= UCR3_AWAKEN;
+-	writel(val, sport->port.membase + UCR3);
+-
+-	uart_suspend_port(&imx_reg, &sport->port);
+-
+-	return 0;
+-}
+-
+-static int serial_imx_resume(struct platform_device *dev)
+-{
+-	struct imx_port *sport = platform_get_drvdata(dev);
+-	unsigned int val;
+-
+-	/* disable wakeup from i.MX UART */
+-	val = readl(sport->port.membase + UCR3);
+-	val &= ~UCR3_AWAKEN;
+-	writel(val, sport->port.membase + UCR3);
+-
+-	uart_resume_port(&imx_reg, &sport->port);
+-
+-	return 0;
+-}
+-
+ #ifdef CONFIG_OF
+ /*
+  * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
+@@ -1992,16 +1963,101 @@ static int serial_imx_remove(struct platform_device *pdev)
+ 	return uart_remove_one_port(&imx_reg, &sport->port);
+ }
+
++static int imx_serial_port_suspend_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	/* Save necessary regs */
++	clk_enable(sport->clk_ipg);
++	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
++	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
++	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
++	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
++	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
++	sport->saved_reg[5] = readl(sport->port.membase + UESC);
++	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
++	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
++	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
++	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
++	clk_disable(sport->clk_ipg);
++
++	dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static int imx_serial_port_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++
++	clk_enable(sport->clk_ipg);
++	writel(sport->saved_reg[4], sport->port.membase + UFCR);
++	writel(sport->saved_reg[5], sport->port.membase + UESC);
++	writel(sport->saved_reg[6], sport->port.membase + UTIM);
++	writel(sport->saved_reg[7], sport->port.membase + UBIR);
++	writel(sport->saved_reg[8], sport->port.membase + UBMR);
++	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
++	writel(sport->saved_reg[0], sport->port.membase + UCR1);
++	writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
++	writel(sport->saved_reg[2], sport->port.membase + UCR3);
++	writel(sport->saved_reg[3], sport->port.membase + UCR4);
++	clk_disable(sport->clk_ipg);
++
++	dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase, sport->port.line);
++
++	return 0;
++}
++
++static int imx_serial_port_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	unsigned int val;
++
++	/* enable wakeup from i.MX UART */
++	val = readl(sport->port.membase + UCR3);
++	val |= UCR3_AWAKEN;
++	writel(val, sport->port.membase + UCR3);
++
++	uart_suspend_port(&imx_reg, &sport->port);
++
++	return 0;
++}
++
++static int imx_serial_port_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	unsigned int val;
++
++	/* disable wakeup from i.MX UART */
++	val = readl(sport->port.membase + UCR3);
++	val &= ~UCR3_AWAKEN;
++	writel(val, sport->port.membase + UCR3);
++
++	uart_resume_port(&imx_reg, &sport->port);
++
++	return 0;
++}
++
++static const struct dev_pm_ops imx_serial_port_pm_ops = {
++	.suspend_noirq = imx_serial_port_suspend_noirq,
++	.resume_noirq = imx_serial_port_resume_noirq,
++	.suspend = imx_serial_port_suspend,
++	.resume = imx_serial_port_resume,
++};
++
+ static struct platform_driver serial_imx_driver = {
+ 	.probe		= serial_imx_probe,
+ 	.remove		= serial_imx_remove,
+
+-	.suspend	= serial_imx_suspend,
+-	.resume		= serial_imx_resume,
+ 	.id_table	= imx_uart_devtype,
+ 	.driver		= {
+ 		.name	= "imx-uart",
+ 		.of_match_table = imx_uart_dt_ids,
++		.pm	= &imx_serial_port_pm_ops,
+ 	},
+ };
+
+--
+2.5.0.rc2
