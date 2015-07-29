@@ -1,139 +1,68 @@
 From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 29 Jul 2015 19:19:25 +0000
-Subject: bug in identity map for 4KB pages?
-In-Reply-To: <CAKv+Gu_V9M9aJLXBLDiu+jGBYky0S4Pux4y-nJp8LT6+A-XdZQ@mail.gmail.com>
-References: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu_PMvbeKRnx8t3P+44q1pt-NiUcCMTq6vK-8yUMRjQPdA@mail.gmail.com>
- <20150729114258.GK15213@leverpostej>
- <BY2PR0301MB0743FFE35289BF228DBCE4C8878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu8GgANoC0u_UK+cGAG=hpfMKx842KiPwkm=jmY6Pxaspw@mail.gmail.com>
- <BY2PR0301MB0743F59DAE1E386D05D5CF72878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu_Kz1jpfGyXE4xoUXF22iBLd_iqiyXgAf3zY2p8tFcDkA@mail.gmail.com>
- <CAKv+Gu_V9M9aJLXBLDiu+jGBYky0S4Pux4y-nJp8LT6+A-XdZQ@mail.gmail.com>
-Message-ID: <BY2PR0301MB0743D07038A8D30746B57056878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+Date: Wed, 29 Jul 2015 19:27:16 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <55B0E1AD.60409@arm.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+Message-ID: <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-
 > -----Original Message-----
-> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> Sent: Wednesday, July 29, 2015 1:41 PM
-> To: Yoder Stuart-B08248
-> Cc: Mark Rutland; Marc Zyngier; Catalin Marinas; Newton Peter-RA3823; Will Deacon; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: bug in identity map for 4KB pages?
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, July 23, 2015 7:44 AM
+> To: Yoder Stuart-B08248; Catalin Marinas; Will Deacon
+> Cc: linux-arm-kernel at lists.infradead.org; Newton Peter-RA3823
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
 > 
-> On 29 July 2015 at 18:12, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > On 29 July 2015 at 17:58, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> >>
-> >>> -----Original Message-----
-> >>> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> >>> Sent: Wednesday, July 29, 2015 10:48 AM
-> >>> To: Yoder Stuart-B08248
-> >>> Cc: Mark Rutland; Marc Zyngier; Catalin Marinas; Newton Peter-RA3823; Will Deacon; linux-arm-
-> >>> kernel at lists.infradead.org
-> >>> Subject: Re: bug in identity map for 4KB pages?
-> >>>
-> >>> On 29 July 2015 at 17:45, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> >>> >
-> >>> >
-> >>> >> -----Original Message-----
-> >>> >> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> >>> >> Sent: Wednesday, July 29, 2015 6:43 AM
-> >>> >> To: Ard Biesheuvel; Yoder Stuart-B08248
-> >>> >> Cc: Marc Zyngier; Catalin Marinas; Newton Peter-RA3823; Will Deacon; linux-arm-
-> kernel at lists.infradead.org
-> >>> >> Subject: Re: bug in identity map for 4KB pages?
-> >>> >>
-> >>> >> On Wed, Jul 29, 2015 at 08:47:10AM +0100, Ard Biesheuvel wrote:
-> >>> >> > On 29 July 2015 at 04:37, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> >>> >> > > Our system has RAM at a high address, and previously required using 48-bit VA
-> >>> >> > > in order to have an idmap that covered all of RAM.
-> >>> >> > >
-> >>> >> > > In testing on 4.2-rc4, which now contains support for the increased VA range
-> >>> >> > > of the idmap without using 48-bit VA, I'm finding that things work for
-> >>> >> > > 64KB pages, but do not for 4KB pages.
-> >>> >> > >
-> >>> >> > > Is there any known limitation here with 4KB pages?  Any ideas?
-> >>> >> > >
-> >>> >> >
-> >>> >> > You probably have memory at 0x8000_0000 and at 0x80_8000_0000, right?
-> >>> >
-> >>> > Yes.  We have 2GB of memory at 0x8000_0000 and the remainder at
-> >>> > 0x80_8000_0000.
-> >>> >
-> >>> >> > So the physical arrangement still requires more than the 39 bits of
-> >>> >> > virtual address space you get with 3 levels, even if the ID map can
-> >>> >> > cope now. That is why you get the 0x40_0000_0000 virtual address:
-> >>> >> > __phys_to_virt() just wraps to a positive number.
-> >>> >>
-> >>> >> Ah, I see. So it's the linear mapping rather than the idmap which is the
-> >>> >> problem.
-> >>> >>
-> >>> >> We cut memory which would fall below the start of the linear map in
-> >>> >> early_init_dt_add_memory_arch, by cutting memory below phys_offset.
-> >>> >>
-> >>> >> It looks like we already have the logic for cutting memory beyond the
-> >>> >> end of the linear map, so we should just need to override the limit.
-> >>> >
-> >>> > What is the effect of cutting that memory?  ...are we losing something?
-> >>> >
-> >>>
-> >>> Yes, you will lose everything above 2 GB in the current configuration.
-> >>
-> >> Hmmm...so you really mean that a 16 GB system will have only 2GB
-> >> total available for both kernel/user space?   That won't be workable
-> >> as a long term solution.
-> >>
+> On 22/07/15 20:49, Stuart Yoder wrote:
+> > Catalin/Will,
 > >
-> > I agree. So that essentially means that 3 level page table kernels are
-> > unsuitable for such systems.
+> > This is not a patch mean to be applied, but a query about whether there
+> > is any reason to not enable 48-bit VA by default in the arm64 defconfig.
 > >
-> >>> >> Stuart, does the below patch prevent the panic you see?
-> >>> >
-> >>> > I will try it and let you know...can try the suggested patch by
-> >>> > Ard as well.
-> >>> >
-> >>>
-> >>> Is it possible to load the kernel at 0x80_0000_0000? I think your
-> >>> system will just boot fine in that case, and you will only lose the
-> >>> lower 2 GB in that case.
-> >>
-> >> So, it's like that lower 2 GB does not exist at all? ...that is going to
-> >> be hard for our customers to swallow I think.
-> >>
-> >> With 48-bit VA enabled, we get all 16GB (and beyond) of memory.
-> >>
+> > The Freescale LS2085A physical memory map requires 48-bit VA in Linux for the
+> > reasons mentioned in [1].
 > >
-> > Indeed.
+> > Based on the comment in [1] by Catalin, it seems that the intent
+> > is to turn this on by default.
 > >
-> >> If it's true that due to our physical memory map that we will not
-> >> be able to access all RAM with a standard defconfig, then makes
-> >> me wonder whether we need to request our hardware designers to change
-> >> that physical map.  (but, IIRC this physical map is that recommended
-> >> by ARM)
-> >>
+> > Is there any issues anyone sees with a patch that does this:
 > >
-> > Well, I am aware of an ARM document that explains the placement at
-> > 0x8000_0000, 0x80_8000_0000 etc.
-> > But as far as I know, this is not a general recommendation for
-> > hardware, but an internal guideline for the reference platforms. Of
-> > course, you need some memory below 4 GB if you want to boot 32-bit
-> > kernels without jumping through a lot of hoops, i.e., you won't be
-> > able to boot a 32-bit ARM kernel on AMD Seattle which has all of its
-> > memory at 0x80_0000_0000
+> > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> > index 4e17e7e..5acf75d 100644
+> > @@ -47,6 +47,7 @@ CONFIG_ARCH_ZYNQMP=y
+> >  CONFIG_PCI=y
+> >  CONFIG_PCI_MSI=y
+> >  CONFIG_PCI_XGENE=y
+> > +CONFIG_ARM64_VA_BITS_48=y
+> >  CONFIG_SMP=y
+> >  CONFIG_PREEMPT=y
+> >  CONFIG_KSM=y
+> >
+> > Thanks,
+> > Stuart
+> >
+> > [1] https://www.marc.info/?l=linux-arm-kernel&m=140965303205473&w=1
 > >
 > 
-> I found the doc in question:
-> http://infocenter.arm.com/help/topic/com.arm.doc.den0001c/DEN0001C_principles_of_arm_memory_maps.pdf
-> 
-> However, it recommends the following layout for up to 512 GB of DRAM:
-> 2 GB at 0x8000_0000
-> 30 GB at 0x8_8000_0000
-> 480 GB at 0x88_0000_0000
+> Is that still a requirement now that our idmap can use 4 levels (as part
+> of dd006da)?
 
-Thanks, I found that as well.  Not sure why the recommendation was not followed
-in our case.
+So, yes it appears still to be a requirement.  The idmap support is not
+the issue, it's the linear mapping.  
 
+Has there been discussion or thinking about enabling 48-bit VA in the
+default defconfig?  As mentioned before, it seemed that supporting 48-bit
+VA was the planned default (~1 year ago), and was waiting on KVM issues to get
+resolved.
+
+A related question is what the thinking around enabling 64KB pages 
+by default.  Any chance of that happening?
+
+I would like to see our platform work with the default defconfig, which
+is the reason for the questions.
+
+Thanks,
 Stuart
