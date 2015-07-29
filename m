@@ -1,42 +1,66 @@
-From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
-Date: Wed, 29 Jul 2015 13:07:57 +0200
-Subject: [PATCH] arm64: remove dead-code depending on CONFIG_UP_LATE_INIT
-Message-ID: <1438168077-19243-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 29 Jul 2015 16:39:44 +0530
+Subject: [PATCH 14/17] mmc: host: omap_hsmmc: use regulator_is_enabled to find
+ pbias status
+In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
+References: <1438168187-1614-1-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-15-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4b3dc9679cf7 ("arm64: force CONFIG_SMP=y and remove redundant
-#ifdefs") removed UP_LATE_INIT from Kconfig, as it had !SMP as dependency
-and therfore can not be selected anymore.
+Use regulator_is_enabled of pbias regulator to find pbias regulator
+status instead of maintaining a custom bookkeeping
+pbias_enabled variable.
 
-Remove dead #ifdef-block depending on UP_LATE_INIT in
-arch/arm64/kernel/setup.c
-
-Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
-I found this inconsistency using the undertaker and
-undertaker-checkpatch tools (https://undertaker.cs.fau.de/).
+ drivers/mmc/host/omap_hsmmc.c |    8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
- arch/arm64/kernel/setup.c | 7 -------
- 1 file changed, 7 deletions(-)
-
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 0533f0b..d512ac8 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -213,13 +213,6 @@ void __init do_post_cpus_up_work(void)
- 	apply_alternatives_all();
- }
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 001f8a0..a50edbc 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -182,7 +182,6 @@ struct omap_hsmmc_host {
+ 	struct	clk		*fclk;
+ 	struct	clk		*dbclk;
+ 	struct	regulator	*pbias;
+-	bool			pbias_enabled;
+ 	void	__iomem		*base;
+ 	resource_size_t		mapbase;
+ 	spinlock_t		irq_lock; /* Prevent races with irq handler */
+@@ -326,22 +325,20 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
+ 			return ret;
+ 		}
  
--#ifdef CONFIG_UP_LATE_INIT
--void __init up_late_init(void)
--{
--	do_post_cpus_up_work();
--}
--#endif /* CONFIG_UP_LATE_INIT */
--
- static void __init setup_processor(void)
- {
- 	u64 features;
+-		if (host->pbias_enabled == 0) {
++		if (!regulator_is_enabled(host->pbias)) {
+ 			ret = regulator_enable(host->pbias);
+ 			if (ret) {
+ 				dev_err(host->dev, "pbias reg enable fail\n");
+ 				return ret;
+ 			}
+-			host->pbias_enabled = 1;
+ 		}
+ 	} else {
+-		if (host->pbias_enabled == 1) {
++		if (regulator_is_enabled(host->pbias)) {
+ 			ret = regulator_disable(host->pbias);
+ 			if (ret) {
+ 				dev_err(host->dev, "pbias reg disable fail\n");
+ 				return ret;
+ 			}
+-			host->pbias_enabled = 0;
+ 		}
+ 	}
+ 
+@@ -2073,7 +2070,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	host->base	= base + pdata->reg_offset;
+ 	host->power_mode = MMC_POWER_OFF;
+ 	host->next_data.cookie = 1;
+-	host->pbias_enabled = 0;
+ 
+ 	ret = omap_hsmmc_gpio_init(mmc, host, pdata);
+ 	if (ret)
 -- 
-2.1.4
+1.7.9.5
