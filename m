@@ -1,41 +1,38 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 29 Jul 2015 14:02:01 +0800
-Subject: [PATCH] drivers/rtc/rtc-pl031.c: reset registers in init flow
-Message-ID: <1438149721-11072-1-git-send-email-leo.yan@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Jul 2015 08:02:26 +0200
+Subject: [PATCH 02/10] usb: chipidea: define stream mode disable for both
+ roles
+In-Reply-To: <20150729055155.GD18700@pengutronix.de>
+References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
+ <1438137734-27311-3-git-send-email-peter.chen@freescale.com>
+ <20150729055155.GD18700@pengutronix.de>
+Message-ID: <20150729060226.GH18700@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When use rtc-pl031 for suspend test on Hisilicon's SoC Hi6220, Usually
-the data register (DR) will read back as value zero. So the suspend
-test code will set the match register (MR) for 10 seconds' timeout; But
-there have chance later will read back some random values from DR
-register; So finally miss with match value and will not trigger
-waken up event anymore.
+On Wed, Jul 29, 2015 at 07:51:55AM +0200, Sascha Hauer wrote:
+> Hi Peter,
+> 
+> On Wed, Jul 29, 2015 at 10:42:06AM +0800, Peter Chen wrote:
+> > The system bus and chipidea IP have different limitations for
+> > both host and device mode.
+> > For example, with below errata, we need to enable SDIS(Stream Disable Mode)
+> > at host mode. But we don't want it for device mode at the same system.
+> > 
+> > TAR 9000378958
+> > Title: Non-Double Word Aligned Buffer Address Sometimes Causes Host to Hang on OUT Retry
+> > Impacted Configuration: Host mode, all transfer types
+> > Description:
+> > The host core operating in streaming mode may under run while sending the data packet of an OUT transaction. This under run can occur if there are unexpected system delays in fetching the remaining packet data from memory. The host forces a bad CRC on the packet, the device detects the error and discards the packet. The host then retries a Bulk, Interrupt, or Control transfer if an under run occurs according to the USB specification.
+> 
+> Please add linebreaks at 75 characters or so.
 
-This issue can be dismissed by reset registers in initialization flow;
-And this code have no harm for ST's variant.
+Oh sorry, this already had been addressed. Should have read further.
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/rtc/rtc-pl031.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+Sascha
 
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 99181fff..01768de 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -345,6 +345,12 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
- 	dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
- 
-+	/* Init registers */
-+	writel(0x0, ldata->base + RTC_LR);
-+	writel(0x0, ldata->base + RTC_DR);
-+	writel(0x0, ldata->base + RTC_IMSC);
-+	writel(RTC_BIT_AI, ldata->base + RTC_ICR);
-+
- 	data = readl(ldata->base + RTC_CR);
- 	/* Enable the clockwatch on ST Variants */
- 	if (vendor->clockwatch)
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
