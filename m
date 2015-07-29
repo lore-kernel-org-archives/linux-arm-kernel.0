@@ -1,89 +1,82 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 29 Jul 2015 08:52:56 +0200
-Subject: [PATCH 6/9] gpiolib-of: Reuse 'line-name' from DT as gpio
- descriptor name
-In-Reply-To: <20150728093105.GL28535@localhost>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-7-git-send-email-mpa@pengutronix.de>
- <20150728093105.GL28535@localhost>
-Message-ID: <20150729065256.GD30895@pengutronix.de>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 29 Jul 2015 14:52:24 +0800
+Subject: [PATCH v5 00/10] Fixes and new clocks support for Mediatek MT8173
+Message-ID: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 11:31:05AM +0200, Johan Hovold wrote:
-> On Fri, Jul 17, 2015 at 11:32:47AM +0200, Markus Pargmann wrote:
-> > The DT describes gpios with subnodes. These subnodes can contain a
-> > property 'line-name'. This information can be useful in other areas
-> > where we want to identify a GPIO by its name.
-> > 
-> > This patch stores the line-name in the gpio descriptor.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/gpio/gpiolib-of.c | 29 ++++++++++++++++++++---------
-> >  1 file changed, 20 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-> > index 64950591a764..cefc665a558c 100644
-> > --- a/drivers/gpio/gpiolib-of.c
-> > +++ b/drivers/gpio/gpiolib-of.c
-> > @@ -184,11 +184,6 @@ static struct gpio_desc *of_parse_gpio(struct device_node *np,
-> >  		*dflags |= GPIOD_OUT_LOW;
-> >  	else if (of_property_read_bool(np, "output-high"))
-> >  		*dflags |= GPIOD_OUT_HIGH;
-> > -	else {
-> > -		pr_warn("GPIO line %d (%s): no hogging state specified, bailing out\n",
-> > -			desc_to_gpio(gg_data.out_gpio), np->name);
-> > -		return ERR_PTR(-EINVAL);
-> > -	}
-> >
-> >  	if (name && of_property_read_string(np, "line-name", name))
-> >  		*name = np->name;
-> > @@ -214,15 +209,31 @@ static void of_gpiochip_scan_gpios(struct gpio_chip *chip)
-> >  
-> >  	for_each_child_of_node(chip->of_node, np) {
-> >  		const char *name = NULL;
-> > -		if (!of_property_read_bool(np, "gpio-hog"))
-> > -			continue;
-> > +		struct gpio_desc *name_desc;
-> >  
-> >  		desc = of_parse_gpio(np, &name, &lflags, &dflags);
-> >  		if (IS_ERR(desc))
-> >  			continue;
-> >  
-> > -		if (gpiod_hog(desc, name, lflags, dflags))
-> > -			continue;
-> > +		if (name) {
-> > +			name_desc = gpio_name_to_desc(name);
-> > +			if (name_desc)
-> > +				pr_err("GPIO name collision for '%s' detected at GPIO line %d (%s)\n",
-> > +				       name, desc_to_gpio(desc), np->name);
-> > +			else
-> > +				desc->name = name;
-> 
-> This will introduce a regression. As I mentioned in a comment on an
-> earlier patch, of_get_gpio_hog falls back to using the node name and
-> those need not be unique.
+This patchset is based on 4.2-rc1 and [1], and contains minor fixes and
+subsystem clocks support for Mediatek MT8173.
 
-Yes, will fix this as well.
+The previous reviews can be found in [2]. The most different from previous
+patchset are adding separated patches for minor coding fixes, and refining
+USB clock implementation by removing mtk_clk_register_apmixed_ex().
 
-Thanks,
+changes since v4:
+- Add a separated patch to remove unused dpi_ck.
+- Add separated patches to fix clk/mediatek in release 4.2-rc1.
+- Add __init* for initialization data and functions.
+- Rename dummy_clk with oscillator in DT.
+- Remove mtk_clk_register_apmixed_ex(), call mtk_clk_register_ref2usb_tx()
+  directly to register USB clock.
 
-Markus
+changes since v3:
+- Remove clk_null dependency from root clocks.
+- Use fixed-rate clocks with typical rate to replace clk_null.
+- Separate ref2usb_tx implementation to clk-apmixed.c
+- Use clock-controller as the name of clock providers.
 
-> 
-> Johan
-> 
+changes since v2:
+- Rebase to 4.2-rc1.
+- Add device tree nodes for subsystem clocks.
+- Fine tune comments of patches.
+- Add __init, __initconst and const to init data and functions.
+- Removed unused code from init functions of subsystem clocks.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/28df365e/attachment-0001.sig>
+changes since v1:
+- Add CA7PLL and CA15PLL as critical clocks.
+- Use the same register descriptor for imgsys, vensys and vencltsys.
+- Generalize apmixedsys special clocks registration.
+
+[1] https://patchwork.kernel.org/patch/6446341/
+[2] https://lkml.org/lkml/2015/7/23/911
+
+James Liao (9):
+  clk: mediatek: Removed unused dpi_ck clock from MT8173
+  clk: mediatek: Remove unused code from MT8173.
+  clk: mediatek: Add __initdata and __init for data and functions
+  clk: mediatek: Add fixed clocks support for Mediatek SoC.
+  clk: mediatek: Fix rate and dependency of MT8173 clocks
+  dt-bindings: ARM: Mediatek: Document devicetree bindings for clock
+    controllers
+  clk: mediatek: Add subsystem clocks of MT8173
+  clk: mediatek: Add USB clock support in MT8173 APMIXEDSYS
+  arm64: dts: mt8173: Add subsystem clock controller device nodes
+
+Sascha Hauer (1):
+  clk: mediatek: mt8173: Fix enabling of critical clocks
+
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |  22 ++
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |  22 ++
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |  22 ++
+ .../bindings/arm/mediatek/mediatek,vencltsys.txt   |  22 ++
+ .../bindings/arm/mediatek/mediatek,vencsys.txt     |  22 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  37 +++
+ drivers/clk/mediatek/Makefile                      |   2 +-
+ drivers/clk/mediatek/clk-apmixed.c                 | 107 ++++++
+ drivers/clk/mediatek/clk-gate.c                    |   2 +-
+ drivers/clk/mediatek/clk-mt8173.c                  | 361 ++++++++++++++++++++-
+ drivers/clk/mediatek/clk-mtk.c                     |  36 +-
+ drivers/clk/mediatek/clk-mtk.h                     |  24 +-
+ drivers/clk/mediatek/clk-pll.c                     |   7 +-
+ include/dt-bindings/clock/mt8173-clk.h             | 101 +++++-
+ 14 files changed, 749 insertions(+), 38 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,imgsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vdecsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencltsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,vencsys.txt
+ create mode 100644 drivers/clk/mediatek/clk-apmixed.c
+
+--
+1.8.1.1.dirty
