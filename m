@@ -1,61 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jul 2015 13:30:39 +0200
-Subject: [PATCH] arm64/Documentation: clarify wording regarding memory below
- the Image
-Message-ID: <1438169439-15216-1-git-send-email-ard.biesheuvel@linaro.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 29 Jul 2015 16:39:41 +0530
+Subject: [PATCH 11/17] mmc: host: omap_hsmmc: don't use ->set_power to set
+ initial regulator state
+In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
+References: <1438168187-1614-1-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-12-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clarify that the memory below the start of the image but inside the
-region covered by the linear mapping has no special significance to
-the kernel, and may be used by the firmware provided that it is marked
-as reserved.
+If the regulator is enabled on boot (checked using regulator_is_enabled),
+invoke regulator_enable() so that the usecount reflects the correct
+state of the regulator and then disable the regulator so that the
+initial state of the regulator is disabled. Avoid using ->set_power,
+since set_power also takes care of setting the voltages which is not
+needed at this point.
 
-Also, fix up some whitespace errors.
-
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- Documentation/arm64/booting.txt | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   67 +++++++++++++++++++++++++++++++++++------
+ 1 file changed, 57 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 1690350f16e7..7d9d3c2286b2 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -81,7 +81,7 @@ The decompressed kernel image contains a 64-byte header as follows:
-   u64 res3	= 0;		/* reserved */
-   u64 res4	= 0;		/* reserved */
-   u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
--  u32 res5;      		/* reserved (used for PE COFF offset) */
-+  u32 res5;			/* reserved (used for PE COFF offset) */
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 2e5c7cd..58bda42 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -407,9 +407,63 @@ err_set_voltage:
+ 	return ret;
+ }
  
++static int omap_hsmmc_disable_boot_regulator(struct regulator *reg)
++{
++	int ret;
++
++	if (!reg)
++		return 0;
++
++	if (regulator_is_enabled(reg)) {
++		ret = regulator_enable(reg);
++		if (ret)
++			return ret;
++
++		ret = regulator_disable(reg);
++		if (ret)
++			return ret;
++	}
++
++	return 0;
++}
++
++static int omap_hsmmc_disable_boot_regulators(struct omap_hsmmc_host *host)
++{
++	struct mmc_host *mmc = host->mmc;
++	int ret;
++
++	/*
++	 * disable regulators enabled during boot and get the usecount
++	 * right so that regulators can be enabled/disabled by checking
++	 * the return value of regulator_is_enabled
++	 */
++	ret = omap_hsmmc_disable_boot_regulator(mmc->supply.vmmc);
++	if (ret) {
++		dev_err(host->dev, "fail to disable boot enabled vmmc reg\n");
++		return ret;
++	}
++
++	ret = omap_hsmmc_disable_boot_regulator(mmc->supply.vqmmc);
++	if (ret) {
++		dev_err(host->dev,
++			"fail to disable boot enabled vmmc_aux reg\n");
++		return ret;
++	}
++
++	ret = omap_hsmmc_disable_boot_regulator(host->pbias);
++	if (ret) {
++		dev_err(host->dev,
++			"failed to disable boot enabled pbias reg\n");
++		return ret;
++	}
++
++	return 0;
++}
++
+ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ {
+ 	int ocr_value = 0;
++	int ret;
+ 	struct mmc_host *mmc = host->mmc;
  
- Header notes:
-@@ -103,7 +103,7 @@ Header notes:
+ 	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
+@@ -448,17 +502,10 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	/* For eMMC do not power off when not in sleep state */
+ 	if (mmc_pdata(host)->no_regulator_off_init)
+ 		return 0;
+-	/*
+-	 * To disable boot_on regulator, enable regulator
+-	 * to increase usecount and then disable it.
+-	 */
+-	if ((mmc->supply.vmmc && regulator_is_enabled(mmc->supply.vmmc) > 0) ||
+-	    (mmc->supply.vqmmc && regulator_is_enabled(mmc->supply.vqmmc))) {
+-		int vdd = ffs(mmc_pdata(host)->ocr_mask) - 1;
  
- - The flags field (introduced in v3.17) is a little-endian 64-bit field
-   composed as follows:
--  Bit 0: 	Kernel endianness.  1 if BE, 0 if LE.
-+  Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
-   Bits 1-63:	Reserved.
+-		mmc_pdata(host)->set_power(host->dev, 1, vdd);
+-		mmc_pdata(host)->set_power(host->dev, 0, 0);
+-	}
++	ret = omap_hsmmc_disable_boot_regulators(host);
++	if (ret)
++		return ret;
  
- - When image_size is zero, a bootloader should attempt to keep as much
-@@ -115,11 +115,14 @@ The Image must be placed text_offset bytes from a 2MB aligned base
- address near the start of usable system RAM and called there. Memory
- below that base address is currently unusable by Linux, and therefore it
- is strongly recommended that this location is the start of system RAM.
-+The region between the 2 MB aligned base address and the start of the
-+image has no special significance to the kernel, and may be used for
-+other purposes.
- At least image_size bytes from the start of the image must be free for
- use by the kernel.
- 
--Any memory described to the kernel (even that below the 2MB aligned base
--address) which is not marked as reserved from the kernel e.g. with a
-+Any memory described to the kernel (even that below the start of the
-+image) which is not marked as reserved from the kernel (e.g., with a
- memreserve region in the device tree) will be considered as available to
- the kernel.
- 
+ 	return 0;
+ }
 -- 
-1.9.1
+1.7.9.5
