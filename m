@@ -1,148 +1,72 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:38 +0530
-Subject: [PATCH 08/17] mmc: host: omap_hsmmc: add separate functions for
- enable/disable supply
-In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
-References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-9-git-send-email-kishon@ti.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Jul 2015 13:49:53 +0200
+Subject: bug in identity map for 4KB pages?
+In-Reply-To: <20150729114258.GK15213@leverpostej>
+References: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu_PMvbeKRnx8t3P+44q1pt-NiUcCMTq6vK-8yUMRjQPdA@mail.gmail.com>
+ <20150729114258.GK15213@leverpostej>
+Message-ID: <CAKv+Gu-0NO5QnK34iXEK2_ATgsSYLMUwiq7u_=iPv5UrNba4kQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Cleanup omap_hsmmc_set_power by adding separate
-functions for enable/disable supply and invoke it from
-omap_hsmmc_set_power.
+On 29 July 2015 at 13:42, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Wed, Jul 29, 2015 at 08:47:10AM +0100, Ard Biesheuvel wrote:
+>> On 29 July 2015 at 04:37, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+>> > Our system has RAM at a high address, and previously required using 48-bit VA
+>> > in order to have an idmap that covered all of RAM.
+>> >
+>> > In testing on 4.2-rc4, which now contains support for the increased VA range
+>> > of the idmap without using 48-bit VA, I'm finding that things work for
+>> > 64KB pages, but do not for 4KB pages.
+>> >
+>> > Is there any known limitation here with 4KB pages?  Any ideas?
+>> >
+>>
+>> You probably have memory at 0x8000_0000 and at 0x80_8000_0000, right?
+>> So the physical arrangement still requires more than the 39 bits of
+>> virtual address space you get with 3 levels, even if the ID map can
+>> cope now. That is why you get the 0x40_0000_0000 virtual address:
+>> __phys_to_virt() just wraps to a positive number.
+>
+> Ah, I see. So it's the linear mapping rather than the idmap which is the
+> problem.
+>
+> We cut memory which would fall below the start of the linear map in
+> early_init_dt_add_memory_arch, by cutting memory below phys_offset.
+>
+> It looks like we already have the logic for cutting memory beyond the
+> end of the linear map, so we should just need to override the limit.
+>
+> Stuart, does the below patch prevent the panic you see?
+>
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- drivers/mmc/host/omap_hsmmc.c |  101 +++++++++++++++++++++++++++--------------
- 1 file changed, 66 insertions(+), 35 deletions(-)
+Wouldn't something like this make more sense?
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index d308552..a0f8c1d 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -247,6 +247,65 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
- 
- #ifdef CONFIG_REGULATOR
- 
-+static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int vdd)
-+{
-+	int ret;
-+
-+	if (mmc->supply.vmmc) {
-+		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	/* Enable interface voltage rail, if needed */
-+	if (mmc->supply.vqmmc) {
-+		ret = regulator_enable(mmc->supply.vqmmc);
-+		if (ret) {
-+			dev_err(mmc_dev(mmc), "vmmc_aux reg enable failed\n");
-+			goto err_vqmmc;
-+		}
-+	}
-+
-+	return 0;
-+
-+err_vqmmc:
-+	if (mmc->supply.vmmc)
-+		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-+
-+	return ret;
-+}
-+
-+static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
-+{
-+	int ret;
-+	int status;
-+
-+	if (mmc->supply.vqmmc) {
-+		ret = regulator_disable(mmc->supply.vqmmc);
-+		if (ret) {
-+			dev_err(mmc_dev(mmc), "vmmc_aux reg disable failed\n");
-+			return ret;
-+		}
-+	}
-+
-+	if (mmc->supply.vmmc) {
-+		ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-+		if (ret)
-+			goto err_set_ocr;
-+	}
-+
-+	return 0;
-+
-+err_set_ocr:
-+	if (mmc->supply.vqmmc) {
-+		status = regulator_enable(mmc->supply.vqmmc);
-+		if (status)
-+			dev_err(mmc_dev(mmc), "vmmc_aux re-enable failed\n");
-+	}
-+
-+	return ret;
-+}
-+
- static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 597831bdddf3..64480b65ef17 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -158,6 +158,15 @@ early_param("mem", early_mem);
+
+ void __init arm64_memblock_init(void)
  {
- 	struct omap_hsmmc_host *host =
-@@ -289,36 +348,13 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
- 	 * chips/cards need an interface voltage rail too.
- 	 */
- 	if (power_on) {
--		if (mmc->supply.vmmc) {
--			ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
--			if (ret)
--				return ret;
--		}
--
--		/* Enable interface voltage rail, if needed */
--		if (mmc->supply.vqmmc) {
--			ret = regulator_enable(mmc->supply.vqmmc);
--			if (ret) {
--				dev_err(dev, "vmmc_aux reg enable failed\n");
--				goto err_set_vqmmc;
--			}
--		}
-+		ret = omap_hsmmc_enable_supply(mmc, vdd);
-+		if (ret)
-+			return ret;
- 	} else {
--		/* Shut down the rail */
--		if (mmc->supply.vqmmc) {
--			ret = regulator_disable(mmc->supply.vqmmc);
--			if (ret) {
--				dev_err(dev, "vmmc_aux reg disable failed\n");
--				return ret;
--			}
--		}
--
--		if (mmc->supply.vmmc) {
--			/* Then proceed to shut down the local regulator */
--			ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
--			if (ret)
--				return ret;
--		}
-+		ret = omap_hsmmc_disable_supply(mmc);
-+		if (ret)
-+			return ret;
- 	}
- 
- 	if (host->pbias) {
-@@ -348,12 +384,7 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
- 	return 0;
- 
- err_set_voltage:
--	if (mmc->supply.vqmmc)
--		regulator_disable(mmc->supply.vqmmc);
--
--err_set_vqmmc:
--	if (mmc->supply.vmmc)
--		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
-+	omap_hsmmc_disable_supply(mmc);
- 
- 	return ret;
- }
++       /*
++        * Remove the memory that we will not be able to cover
++        * with the linear mapping.
++        */
++       const s64 linear_region_size = -(s64)PAGE_OFFSET;
++
++       memblock_remove(0, memstart_addr);
++       memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
++
+        memblock_enforce_memory_limit(memory_limit);
+
+        /*
+"""
+
+(taken from my patch 'arm64: override early_init_dt_add_memory_arch()'
+sent to the list a while ago as part of the linear mapping decoupling
+series)
+
 -- 
-1.7.9.5
+Ard.
