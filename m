@@ -1,77 +1,89 @@
-From: Shenwei.Wang@freescale.com (Shenwei Wang)
-Date: Wed, 29 Jul 2015 21:41:00 +0000
-Subject: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
- ram/disk
-In-Reply-To: <CAOMZO5Aj5PASPKRq47vmenDBSPMPHdLgSbJZXkhZu3MNYprqXA@mail.gmail.com>
-References: <1438203535-38028-1-git-send-email-shenwei.wang@freescale.com>
- <CAOMZO5Aj5PASPKRq47vmenDBSPMPHdLgSbJZXkhZu3MNYprqXA@mail.gmail.com>
-Message-ID: <CY1PR0301MB0843BEF6A40A0A28018E0D5D838C0@CY1PR0301MB0843.namprd03.prod.outlook.com>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Wed, 29 Jul 2015 23:43:58 +0200
+Subject: [PATCH v2 08/25] arch: introduce memremap()
+In-Reply-To: <1438203638.3214.418.camel@hp.com>
+References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
+ <20150726172527.GA29513@lst.de>
+ <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
+ <20150727051258.GB15836@lst.de>
+ <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
+ <20150729065004.GA17162@lst.de>
+ <20150729182712.GI30479@wotan.suse.de>
+ <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
+ <1438203638.3214.418.camel@hp.com>
+Message-ID: <20150729214358.GK30479@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: 2015?7?29? 16:21
-> To: Wang Shenwei-B38339
-> Cc: Greg Kroah-Hartman; linux-arm-kernel at lists.infradead.org;
-> linux-serial at vger.kernel.org
-> Subject: Re: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
-> ram/disk
+On Wed, Jul 29, 2015 at 03:00:38PM -0600, Toshi Kani wrote:
+> On Wed, 2015-07-29 at 11:33 -0700, Dan Williams wrote:
+> > On Wed, Jul 29, 2015 at 11:27 AM, Luis R. Rodriguez <mcgrof@suse.com> 
+> > wrote:
+> > > On Wed, Jul 29, 2015 at 08:50:04AM +0200, Christoph Hellwig wrote:
+> > > > On Mon, Jul 27, 2015 at 04:26:03PM -0700, Dan Williams wrote:
+> > > > > Oh, because all we have at this point is ioremap_cache() which
+> > > > > silently falls back.  It's not until the introduction of
+> > > > > arch_memremp() where we update the arch code to break that 
+> > > > > behavior.
+> > > > 
+> > > > Ok, makes sense.  Might be worth to document in the changelog.
+> > > > 
+> > > > > That said, I think it may be beneficial to allow a fallback if the
+> > > > > user cares.  So maybe memremap() can call plain ioremap() if
+> > > > > MEMREMAP_STRICT is not set and none of the other mapping types are
+> > > > > satisfied.
+> > > > 
+> > > > Is there a real use case for it?  Fallback APIs always seem confusing
+> > > > and it might make more sense to do this in the caller(s) that 
+> > > > actually
+> > > > need it.
+> > > 
+> > > It seems semantics-wise we are trying to separate these two really, so 
+> > > I agree
+> > > with this. Having a fallback would onloy make things more complicated 
+> > > for any
+> > > sanitizer / checker / etc, and I don't think the practical gains of 
+> > > having a
+> > > fallback outweight the gains of having a clear semantic separation on 
+> > > intended
+> > > memory type and interactions with it.
+> > > 
+> > 
+> > Yup, consider it dropped.  Drivers that want fallback behavior can do
+> > it explicitly.
 > 
-> On Wed, Jul 29, 2015 at 5:58 PM, Shenwei Wang <shenwei.wang@freescale.com>
-> wrote:
-> 
-> > +static int imx_serial_port_suspend_noirq(struct device *dev) {
-> > +       struct platform_device *pdev = to_platform_device(dev);
-> > +       struct imx_port *sport = platform_get_drvdata(pdev);
-> > +
-> > +       /* Save necessary regs */
-> > +       clk_enable(sport->clk_ipg);
-> 
-> clk_enable() may fail, so you should check its return value.
+> I agree in general.  However, for the drivers to be able to fall back
+> properly, they will need to know the cache type they can fall back with. 
 
-The check seems a little superfluous because the failure condition for clk_enable is 
-(clk == NULL || IS_ERR(clk))
-Once this function is called which means the initialization of the driver is successful.
+That would depend on the purpose of the region and the driver developer should
+in theory know best. One issue with this of course is that, as we've
+discovered, the semantics of on the ioremap*() variant front regarding cache
+types is not clearly well defined, or at least it may be only well defined
+implicitly on x86 only, so the driver developer can only *hope* for the best
+across architectures. Our ambiguity on our semantics on ioremap*() variants
+therefore means driver developers can resonably be puzzled by what fallbacks to
+use. That also means architectures maintainers should not whip driver developers
+for any misuse. Such considerations are why although we're now revisiting
+semantics for ioremap*() variants I was in hopes we could be at least somewhat
+pedantic about memremap() semantics.
 
-> > +       sport->saved_reg[0] = readl(sport->port.membase + UCR1);
-> > +       sport->saved_reg[1] = readl(sport->port.membase + UCR2);
-> > +       sport->saved_reg[2] = readl(sport->port.membase + UCR3);
-> > +       sport->saved_reg[3] = readl(sport->port.membase + UCR4);
-> > +       sport->saved_reg[4] = readl(sport->port.membase + UFCR);
-> > +       sport->saved_reg[5] = readl(sport->port.membase + UESC);
-> > +       sport->saved_reg[6] = readl(sport->port.membase + UTIM);
-> > +       sport->saved_reg[7] = readl(sport->port.membase + UBIR);
-> > +       sport->saved_reg[8] = readl(sport->port.membase + UBMR);
-> > +       sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
-> > +       clk_disable(sport->clk_ipg);
-> > +
-> > +       dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase,
-> > + sport->port.line);
-> > +
-> > +       return 0;
-> > +}
-> > +
-> > +static int imx_serial_port_resume_noirq(struct device *dev) {
-> > +       struct platform_device *pdev = to_platform_device(dev);
-> > +       struct imx_port *sport = platform_get_drvdata(pdev);
-> > +
-> > +       clk_enable(sport->clk_ipg);
-> 
-> Same here.
-> 
-> > +       writel(sport->saved_reg[4], sport->port.membase + UFCR);
-> > +       writel(sport->saved_reg[5], sport->port.membase + UESC);
-> > +       writel(sport->saved_reg[6], sport->port.membase + UTIM);
-> > +       writel(sport->saved_reg[7], sport->port.membase + UBIR);
-> > +       writel(sport->saved_reg[8], sport->port.membase + UBMR);
-> > +       writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
-> > +       writel(sport->saved_reg[0], sport->port.membase + UCR1);
-> > +       writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
-> 
-> Why this magic '| 0x1'? Can't you use a define instead?
+For instance since memremap() only has 2 types right now can a respective
+fallback be documented as an alternative to help with this ? Or can we not
+generalize this ?  One for MEMREMAP_WB and one for MEMREMAP_WT ?
 
-Yes, should be a macro.
+> ioremap() falls back to the cache type of an existing mapping to avoid
+> aliasing.
 
-Thanks,
-Shenwei
+Does that assume an existing ioremap*() call was used on a bigger range?
+Do you know if that happens to only be the case for x86 (I'd think so)
+or if its the same for other architectures ?
+
+While at it, Dan, will / should memremap() support overlapping calls ?
+What is the expectation on behaviour ?
+
+PS: I did see you reply about this being about lacking an arch implementation
+for a memremap() type, not a cache type, but as the driver uses one memremap()
+type the goal for a region is just as important as the resulting type.
+
+  Luis
