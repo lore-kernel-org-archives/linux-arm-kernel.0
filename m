@@ -1,70 +1,77 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jul 2015 10:23:36 -0500
-Subject: [PATCH v2] dtb: Create a common home for cross-architecture dtsi
- files.
-In-Reply-To: <1438176174.11600.198.camel@citrix.com>
-References: <1437993343-9542-1-git-send-email-ian.campbell@citrix.com>
- <CAK7LNAQKswPzeFYdSVq3JDk2qawZ8e5ogBFMWdor-CibMovU3g@mail.gmail.com>
- <1438176174.11600.198.camel@citrix.com>
-Message-ID: <CAL_JsqL7KRcSv5jSneWYj1PJOYbvMQ8HOAGK+w-+MDBMpMatow@mail.gmail.com>
+Date: Wed, 29 Jul 2015 10:27:31 -0500
+Subject: [PATCH v2 04/22] of/platform: add of_platform_device_find()
+In-Reply-To: <CAAObsKD9BN7dsEiNB=OvJkoOQPwxwnP794w=X4AwtYz3oxEJqw@mail.gmail.com>
+References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_JsqJGhFXDKuayuKc2E58X5A7ZGN=uYCVDLnXw_t3_auBg+w@mail.gmail.com>
+ <CAAObsKBfRLdPc0gs55ARfa+qZJAOEyEgRyTf8krZnQMb6-j03g@mail.gmail.com>
+ <CAL_Jsq+RqGAxHE5-ocD-htddBHckG24oZNqfgmMF3Jak6wDXBQ@mail.gmail.com>
+ <CAAObsKA+vMsgiC52jReJckeDjXhdd=_NBocFbMapdwFReiY1SQ@mail.gmail.com>
+ <CAAObsKD9BN7dsEiNB=OvJkoOQPwxwnP794w=X4AwtYz3oxEJqw@mail.gmail.com>
+Message-ID: <CAL_Jsq+2b4+pf9G1ynWSkDgyC1agmS-TdTVjzdfQKNBWuuOHgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 8:22 AM, Ian Campbell <ian.campbell@citrix.com> wrote:
-> On Wed, 2015-07-29 at 20:07 +0900, Masahiro Yamada wrote:
->> Hi Ian,
->>
->>
->> 2015-07-27 19:35 GMT+09:00 Ian Campbell <ian.campbell@citrix.com>:
->> > Commit 9ccd608070b6 "arm64: dts: add device tree for ARM SMM-A53x2 on
->> > LogicTile Express 20MG" added a new dts file to arch/arm64 which
->> > included "../../../../arm/boot/dts/vexpress-v2m-rs1.dtsi", i.e. a
->> > .dtsi supplied by arch/arm.
->> >
->> > Unfortunately this causes some issues for the split device tree
->> > repository[0], since things get moved around there. In that context
->> > the new .dts ends up at src/arm64/arm/vexpress-v2f-1xv7-ca53x2.dts
->> > while the include is at src/arm/vexpress-v2m-rs1.dtsi.
->> >
->> > The sharing of the .dtsi is legitimate since the baseboard is the same
->> > for various vexpress systems whatever processor they use.
->> >
->> > Rather than using ../../ tricks to pickup .dtsi files from another
->> > arch this patch creates a new directory include/dt-dtsi as a
->> > home for such cross-arch .dtsi files, arranges for it to be in the
->> > include path when the .dts files are processed by cpp and switches the
->>
->>
->> "include/dt-dtsi/"  can be referenced from normal C sources.
->>
->> I think another possible home for cross-arch DTSI is "kernel/dts/".
->> This directory can be hidden from C sources.
->
-> I suppose, I don't really mind and will follow the direction of the other
-> DTB maintainers. It doesn't seem like a big deal to me.
+On Wed, Jul 29, 2015 at 6:20 AM, Tomeu Vizoso
+<tomeu.vizoso@collabora.com> wrote:
+> On 29 July 2015 at 08:14, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> On 28 July 2015 at 17:31, Rob Herring <robherring2@gmail.com> wrote:
+>>> On Tue, Jul 28, 2015 at 8:54 AM, Tomeu Vizoso
+>>> <tomeu.vizoso@collabora.com> wrote:
+>>>> On 28 July 2015 at 15:39, Rob Herring <robherring2@gmail.com> wrote:
+>>>>> On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+>>>>> <tomeu.vizoso@collabora.com> wrote:
+>>>>>> From an arbitrary node in the tree, find the enclosing node that
+>>>>>> corresponds to a platform device, as registered by
+>>>>>> of_platform_populate().
 
-Seems fine to me. We might think of other things to put here that are
-not includes. Overlays perhaps?
+[...]
 
->
->> >@@ -223,7 +223,7 @@ Example of a VE tile description (simplified)
->> >                 /* Active high IRQ 0 is connected to GIC's SPI0 */
->> >                 interrupt-map = <0 0 0 &gic 0 0 4>;
->> >
->> > -               /include/ "vexpress-v2m-rs1.dtsi"
->> > +               #include <arm/vexpress-v2m-rs1.dtsi>
->> >         };
->> >  };
+>>>> If I had a way to get, say, a i2c device from its fwnode then I would
+>>>> just need to make sure that a device's parent is probed before probing
+>>>> it and everything would be cleaner in the OF case.
+>>>
+>>> If you have the struct device from the device_node, then you should be
+>>> able to do this, right?
 >>
+>> Yes, if I could go back from the device_node to the struct device that
+>> was registered from it, for all buses, then all this would be much
+>> simpler and more robust. It would basically work like in the ACPI
+>> case.
 >>
+>> I will play with this idea.
 >>
->> You do not have to replace /include/ with #include,
->> if you add the include path for DTC.
+>>>>> That is probably not the
+>>>>> most efficient search, but we could fix that. We could add struct
+>>>>> device ptr to struct device_node and check without searching for
+>>>>> example.
+>>>>
+>>>> That would be great, but I thought there was an issue with a OF node
+>>>> being able to be related to more than one struct device (but I haven't
+>>>> found this myself yet).
+>>>
+>>> I think it pretty much should be one to one. I'm not aware of any
+>>> examples where that is not the case. This function would already be
+>>> broken if you could have more than one struct device.
+>>
+>> Well, for platform devices we currently know that there can only be
+>> one struct device for a given device_node, but that's not so clear for
+>> other devices.
 >
-> Ah, I looked for this but -i is not documented in the man page.
+> Just found this case:
 >
-> Is there any reason to prefer one over the other?
+> http://lxr.free-electrons.com/source/drivers/spi/spi-tegra114.c#L1124
+>
+> Looks like SPI master devices point to the same device_node as the
+> platform device that registers them.
 
-Yes, so you don't force the use of the C preprocessor.
+I don't think this is a problem. The device ptr would only point to
+the platform device. Nothing else is going to know about the ptr,
+modify it nor expect that it points to the same struct device that
+contains the of_node ptr.
+
+So I think any instances of struct device like this are ones you don't
+care about for purposes of probe dependencies.
 
 Rob
