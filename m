@@ -1,94 +1,34 @@
 From: lftan@altera.com (Ley Foon Tan)
-Date: Wed, 29 Jul 2015 11:05:07 +0800
-Subject: [PATCH 3/6] pci:host: Add Altera PCIe host controller driver
-In-Reply-To: <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
+Date: Wed, 29 Jul 2015 11:07:47 +0800
+Subject: [PATCH 4/6] pci: altera: Add Altera PCIe MSI driver
+In-Reply-To: <CADhT+wf2oYVZHn1XAODYJUsxwu03TAzN6ZEQCkSBjU5ruKWCDQ@mail.gmail.com>
 References: <1438080345-7233-1-git-send-email-lftan@altera.com>
- <1438080345-7233-4-git-send-email-lftan@altera.com>
- <CADhT+weU=VB=fQxXsXeF-0WjQj5rofeCDhV1LfbFWOm-7Oem0w@mail.gmail.com>
-Message-ID: <CAFiDJ5-c8h7ry4NWMCADbDgxaeEyOOHHWDSwJfRJuo-Vw7mOdw@mail.gmail.com>
+ <1438080345-7233-5-git-send-email-lftan@altera.com>
+ <CADhT+wf2oYVZHn1XAODYJUsxwu03TAzN6ZEQCkSBjU5ruKWCDQ@mail.gmail.com>
+Message-ID: <CAFiDJ5_eeibeGwzYXGQnw2ZX8CT_usdz9DciZD+HpxboOfor=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 12:45 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
+On Wed, Jul 29, 2015 at 1:00 AM, Dinh Nguyen <dinh.linux@gmail.com> wrote:
 > On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
->> This patch adds the Altera PCIe host controller driver.
+>> This patch adds Altera PCIe MSI driver. This soft IP supports configurable
+>> number of vectors, which is a dts parameter.
+>> @@ -154,4 +154,11 @@ config PCIE_ALTERA
+>>           Say Y here if you want to enable PCIe controller support for Altera
+>>           SoCFPGA family of SoCs.
 >>
->> Signed-off-by: Ley Foon Tan <lftan@altera.com>
->> ---
->>  drivers/pci/host/Kconfig       |   9 +
->>  drivers/pci/host/Makefile      |   1 +
->>  drivers/pci/host/pcie-altera.c | 576 +++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 586 insertions(+)
->>  create mode 100644 drivers/pci/host/pcie-altera.c
->>
->> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
->> index 675c2d1..af19039 100644
->> --- a/drivers/pci/host/Kconfig
->> +++ b/drivers/pci/host/Kconfig
->> @@ -145,4 +145,13 @@ config PCIE_IPROC_BCMA
->>           Say Y here if you want to use the Broadcom iProc PCIe controller
->>           through the BCMA bus interface
->>
->> +config PCIE_ALTERA
->> +       bool "Altera PCIe controller"
->> +       depends on ARCH_SOCFPGA
->> +       depends on OF
->
-> I don't think you need this, "depends on ARCH_SOCFPGA" should already
-> have taken care of this.
-Okay, will remove this.
->
->> +       select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+>> +config PCIE_ALTERA_MSI
+>> +       bool "Altera PCIe MSI feature"
+>> +       depends on PCI_MSI && PCIE_ALTERA
 >> +       help
->> +         Say Y here if you want to enable PCIe controller support for Altera
->> +         SoCFPGA family of SoCs.
+>> +         Say Y here if you want PCIe MSI support for the Altera SocFPGA SoC.
+>> +         This MSI driver supports Altera MSI to GIC controller IP.
 >> +
->>  endmenu
 >
-> <snip>
->
->> +
->> +static int tlp_read_packet(struct altera_pcie *pcie, u32 *value)
->> +{
->> +       u8 loop;
->> +       struct tlp_rp_regpair_t tlp_rp_regdata;
->> +
->> +       for (loop = TLP_LOOP; loop > 0; loop--) {
->> +
->> +               tlp_read_rx(pcie, &tlp_rp_regdata);
->> +
->> +               if (tlp_rp_regdata.ctrl & RP_RXCPL_EOP) {
->> +
->> +                       if (value)
->> +                               *value = tlp_rp_regdata.reg0;
->> +
->> +                       return PCIBIOS_SUCCESSFUL;
->> +               }
->
-> Remove all the unnecessary newlines in this function.
-Noted.
+> Couldn't this driver get combined with the pcie-altera driver?
 
->> +       }
->> +
->> +       return -ENOENT;
->> +}
->> +
->
-> <snip>
->
->> +
->> +static struct platform_driver altera_pcie_driver = {
->> +       .probe          = altera_pcie_probe,
->> +       .remove         = altera_pcie_remove,
->> +       .driver = {
->> +               .name   = "altera-pcie",
->> +               .owner  = THIS_MODULE,
->
-> Don't need to set owner anymore as this will get populated by the driver core.
-
-Will remove it.
-
-Thanks for reviewing.
+This MSI IP is a soft IP and it is optional to PCI system. So, we have
+individual driver for it and user can disable it.
 
 Regards
 Ley Foon
