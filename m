@@ -1,56 +1,64 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 29 Jul 2015 09:15:31 +0200
-Subject: [PATCH v4] clk: at91: add generated clock driver
-In-Reply-To: <1438099685-5592-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1438099685-5592-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20150729091531.2f167170@bbrezillon>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Wed, 29 Jul 2015 15:17:13 +0800
+Subject: [PATCH v5 01/10] clk: mediatek: Removed unused dpi_ck clock
+ from MT8173
+In-Reply-To: <6282882.pftQBj38E3@diego>
+References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438152754-11970-2-git-send-email-jamesjj.liao@mediatek.com>
+ <6282882.pftQBj38E3@diego>
+Message-ID: <1438154233.17770.39.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Hi Stephen,
 
-On Tue, 28 Jul 2015 18:08:05 +0200
-Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+Could you help to apply this patch into 4.2?
 
 
-> +static void clk_generated_startup(struct clk_generated *gck)
-> +{
-> +	struct at91_pmc *pmc = gck->pmc;
-> +	u32 tmp;
-> +
-> +	pmc_lock(pmc);
-> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
-> +	tmp = pmc_read(pmc, AT91_PMC_PCR);
-> +	pmc_unlock(pmc);
-> +
-> +	gck->parent_id = (tmp & AT91_PMC_PCR_GCKCSS_MASK)
-> +					>> AT91_PMC_PCR_GCKCSS_OFFSET;
-> +	/*
-> +	 * make sure that what we read in hardware is coherent with
-> +	 * what we've just probed
-> +	 */
-> +	if (gck->parent_id >= __clk_get_num_parents(gck->hw.clk))
-> +		gck->parent_id = 0;
+Best regards,
 
-Hm, I'm not sure this is correct. Here, you're just faking the
-fact that your current parent is the first one in the parent list while
-it actually points to the 6th entry. Not only your rate will be false
-(the one calculated in ->round_rate()), but you're also changing the
-behavior of the clk_set_rate() and clk_set_parent() operation (AFAIR,
-if you try to change to the first parent, the core code will think it's
-already properly configured and will never call ->set_parent()).
+James
 
-This leaves 2 solutions here:
-- implement the missing clk driver and add an entry in the parent
-  list
-- select the 1st parent clk (I mean, change the register value) if the
-  hardware points to the 6th one.
-
-Best Regards,
-
-Boris
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+On Wed, 2015-07-29 at 09:05 +0200, Heiko St?bner wrote:
+> Am Mittwoch, 29. Juli 2015, 14:52:25 schrieb James Liao:
+> > The dpi_ck clock can be removed because it not actually used
+> > in topckgen and subsystems.
+> > 
+> > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> 
+> From our past discussions this change looks about right, and should still 
+> become _part of 4.2_, to not have the CLK_TOP_DPI become part of the 
+> devicetree CLK_TOP_DPI.
+> 
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> > ---
+> >  drivers/clk/mediatek/clk-mt8173.c      | 1 -
+> >  include/dt-bindings/clock/mt8173-clk.h | 1 -
+> >  2 files changed, 2 deletions(-)
+> > 
+> > diff --git a/drivers/clk/mediatek/clk-mt8173.c
+> > b/drivers/clk/mediatek/clk-mt8173.c index 4b9e04c..4486f8f 100644
+> > --- a/drivers/clk/mediatek/clk-mt8173.c
+> > +++ b/drivers/clk/mediatek/clk-mt8173.c
+> > @@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+> > 
+> >  static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+> >  	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> > -	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+> >  	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+> >  	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+> >  };
+> > diff --git a/include/dt-bindings/clock/mt8173-clk.h
+> > b/include/dt-bindings/clock/mt8173-clk.h index 4ad76ed..7230c38 100644
+> > --- a/include/dt-bindings/clock/mt8173-clk.h
+> > +++ b/include/dt-bindings/clock/mt8173-clk.h
+> > @@ -18,7 +18,6 @@
+> >  /* TOPCKGEN */
+> > 
+> >  #define CLK_TOP_CLKPH_MCK_O		1
+> > -#define CLK_TOP_DPI			2
+> >  #define CLK_TOP_USB_SYSPLL_125M		3
+> >  #define CLK_TOP_HDMITX_DIG_CTS		4
+> >  #define CLK_TOP_ARMCA7PLL_754M		5
+> 
