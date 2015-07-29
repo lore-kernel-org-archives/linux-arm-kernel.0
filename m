@@ -1,35 +1,37 @@
 From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 29 Jul 2015 23:50:59 +0200
-Subject: [PATCH 1/2] ARM: BCM5301X: activate some additional options in pl310
- cache controller
-Message-ID: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
+Date: Wed, 29 Jul 2015 23:51:00 +0200
+Subject: [PATCH 2/2] ARM: BCM5301X: Add profiling support
+In-Reply-To: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
+References: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
+Message-ID: <1438206660-30718-2-git-send-email-hauke@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the default Broadcom SDK the shared override is activated for this
-cache controller, do the same in the upstream code. Data and
-instruction prefetching is not activated by default for this cache
-controller on the bcm53xx SoC, do it manually like it is done in the
-vendor SDK.
+From: Felix Fietkau <nbd@openwrt.org>
 
+Signed-off-by: Felix Fietkau <nbd@openwrt.org>
 Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
 ---
- arch/arm/boot/dts/bcm5301x.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 21fefd4..0bae982 100644
+index 0bae982..6f50f67 100644
 --- a/arch/arm/boot/dts/bcm5301x.dtsi
 +++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -78,6 +78,9 @@
- 			compatible = "arm,pl310-cache";
- 			reg = <0x2000 0x1000>;
- 			cache-unified;
-+			arm,shared-override;
-+			prefetch-data = <1>;
-+			prefetch-instr = <1>;
- 			cache-level = <2>;
+@@ -85,6 +85,13 @@
  		};
  	};
+ 
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupts =
++			<GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
++			<GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	clocks {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
 -- 
 2.1.4
