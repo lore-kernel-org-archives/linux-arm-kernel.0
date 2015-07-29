@@ -1,65 +1,56 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 29 Jul 2015 09:08:42 +0200
-Subject: [PATCH 9/9] gpiolib: Add gpio name information to
- /sys/kernel/debug/gpio
-In-Reply-To: <20150728095842.GO28535@localhost>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
- <20150728095842.GO28535@localhost>
-Message-ID: <20150729070842.GG30895@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 29 Jul 2015 09:15:31 +0200
+Subject: [PATCH v4] clk: at91: add generated clock driver
+In-Reply-To: <1438099685-5592-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1438099685-5592-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150729091531.2f167170@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 11:58:42AM +0200, Johan Hovold wrote:
-> On Fri, Jul 17, 2015 at 11:32:50AM +0200, Markus Pargmann wrote:
-> > Add some information about gpio names to the debugfs gpio file. name and
-> > label of a GPIO are then displayed next to each other. This way it is
-> > easy to see what the real name of GPIO is and what the driver requested
-> > it for.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/gpio/gpiolib.c | 11 ++++++++---
-> >  1 file changed, 8 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> > index dcac3bcf21dd..0f1d1f5faf5d 100644
-> > --- a/drivers/gpio/gpiolib.c
-> > +++ b/drivers/gpio/gpiolib.c
-> > @@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-> >  	int			is_irq;
-> >  
-> >  	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
-> > -		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
-> > +		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
-> > +			if (gdesc->name) {
-> > +				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
-> > +					   gpio, gdesc->name);
-> > +			}
-> 
-> So now we'd no longer just be listing requested gpios, but on a similar
-> format to how requested ones used to be represented.
+Hi Nicolas,
 
-Better suggestions on how to display those extra information in debugfs?
+On Tue, 28 Jul 2015 18:08:05 +0200
+Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
 
-> 
-> Then there's the debugfs as ABI discussion...
 
-I didn't consider debugfs as ABI as I thought it is just for debugging purposes?
+> +static void clk_generated_startup(struct clk_generated *gck)
+> +{
+> +	struct at91_pmc *pmc = gck->pmc;
+> +	u32 tmp;
+> +
+> +	pmc_lock(pmc);
+> +	pmc_write(pmc, AT91_PMC_PCR, (gck->id & AT91_PMC_PCR_PID_MASK));
+> +	tmp = pmc_read(pmc, AT91_PMC_PCR);
+> +	pmc_unlock(pmc);
+> +
+> +	gck->parent_id = (tmp & AT91_PMC_PCR_GCKCSS_MASK)
+> +					>> AT91_PMC_PCR_GCKCSS_OFFSET;
+> +	/*
+> +	 * make sure that what we read in hardware is coherent with
+> +	 * what we've just probed
+> +	 */
+> +	if (gck->parent_id >= __clk_get_num_parents(gck->hw.clk))
+> +		gck->parent_id = 0;
 
-Best regards,
+Hm, I'm not sure this is correct. Here, you're just faking the
+fact that your current parent is the first one in the parent list while
+it actually points to the 6th entry. Not only your rate will be false
+(the one calculated in ->round_rate()), but you're also changing the
+behavior of the clk_set_rate() and clk_set_parent() operation (AFAIR,
+if you try to change to the first parent, the core code will think it's
+already properly configured and will never call ->set_parent()).
 
-Markus
+This leaves 2 solutions here:
+- implement the missing clk driver and add an entry in the parent
+  list
+- select the 1st parent clk (I mean, change the register value) if the
+  hardware points to the 6th one.
+
+Best Regards,
+
+Boris
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/f78dab89/attachment.sig>
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
