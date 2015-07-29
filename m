@@ -1,52 +1,65 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 29 Jul 2015 09:05:52 +0200
-Subject: [PATCH v5 01/10] clk: mediatek: Removed unused dpi_ck clock from
- MT8173
-In-Reply-To: <1438152754-11970-2-git-send-email-jamesjj.liao@mediatek.com>
-References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438152754-11970-2-git-send-email-jamesjj.liao@mediatek.com>
-Message-ID: <6282882.pftQBj38E3@diego>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 29 Jul 2015 09:08:42 +0200
+Subject: [PATCH 9/9] gpiolib: Add gpio name information to
+ /sys/kernel/debug/gpio
+In-Reply-To: <20150728095842.GO28535@localhost>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-10-git-send-email-mpa@pengutronix.de>
+ <20150728095842.GO28535@localhost>
+Message-ID: <20150729070842.GG30895@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 29. Juli 2015, 14:52:25 schrieb James Liao:
-> The dpi_ck clock can be removed because it not actually used
-> in topckgen and subsystems.
+On Tue, Jul 28, 2015 at 11:58:42AM +0200, Johan Hovold wrote:
+> On Fri, Jul 17, 2015 at 11:32:50AM +0200, Markus Pargmann wrote:
+> > Add some information about gpio names to the debugfs gpio file. name and
+> > label of a GPIO are then displayed next to each other. This way it is
+> > easy to see what the real name of GPIO is and what the driver requested
+> > it for.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/gpio/gpiolib.c | 11 ++++++++---
+> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> > index dcac3bcf21dd..0f1d1f5faf5d 100644
+> > --- a/drivers/gpio/gpiolib.c
+> > +++ b/drivers/gpio/gpiolib.c
+> > @@ -2308,14 +2308,19 @@ static void gpiolib_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+> >  	int			is_irq;
+> >  
+> >  	for (i = 0; i < chip->ngpio; i++, gpio++, gdesc++) {
+> > -		if (!test_bit(FLAG_REQUESTED, &gdesc->flags))
+> > +		if (!test_bit(FLAG_REQUESTED, &gdesc->flags)) {
+> > +			if (gdesc->name) {
+> > +				seq_printf(s, " gpio-%-3d (%-20.20s)\n",
+> > +					   gpio, gdesc->name);
+> > +			}
 > 
-> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+> So now we'd no longer just be listing requested gpios, but on a similar
+> format to how requested ones used to be represented.
 
->From our past discussions this change looks about right, and should still 
-become _part of 4.2_, to not have the CLK_TOP_DPI become part of the 
-devicetree CLK_TOP_DPI.
+Better suggestions on how to display those extra information in debugfs?
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> 
+> Then there's the debugfs as ABI discussion...
 
-> ---
->  drivers/clk/mediatek/clk-mt8173.c      | 1 -
->  include/dt-bindings/clock/mt8173-clk.h | 1 -
->  2 files changed, 2 deletions(-)
-> 
-> diff --git a/drivers/clk/mediatek/clk-mt8173.c
-> b/drivers/clk/mediatek/clk-mt8173.c index 4b9e04c..4486f8f 100644
-> --- a/drivers/clk/mediatek/clk-mt8173.c
-> +++ b/drivers/clk/mediatek/clk-mt8173.c
-> @@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
-> 
->  static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
->  	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
-> -	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
->  	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
->  	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
->  };
-> diff --git a/include/dt-bindings/clock/mt8173-clk.h
-> b/include/dt-bindings/clock/mt8173-clk.h index 4ad76ed..7230c38 100644
-> --- a/include/dt-bindings/clock/mt8173-clk.h
-> +++ b/include/dt-bindings/clock/mt8173-clk.h
-> @@ -18,7 +18,6 @@
->  /* TOPCKGEN */
-> 
->  #define CLK_TOP_CLKPH_MCK_O		1
-> -#define CLK_TOP_DPI			2
->  #define CLK_TOP_USB_SYSPLL_125M		3
->  #define CLK_TOP_HDMITX_DIG_CTS		4
->  #define CLK_TOP_ARMCA7PLL_754M		5
+I didn't consider debugfs as ABI as I thought it is just for debugging purposes?
+
+Best regards,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/f78dab89/attachment.sig>
