@@ -1,58 +1,84 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Wed, 29 Jul 2015 15:21:56 -0700
-Subject: [PATCH v2 24/25] arch: remove ioremap_wt,
- replace with arch_memremap
-In-Reply-To: <20150727080347.GA18599@lst.de>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725024015.8664.42950.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150727080347.GA18599@lst.de>
-Message-ID: <CAPcyv4icZ4aWgPeYnmuj0eeK6wm36A=D2qHW0e3FJBvzpeEWaQ@mail.gmail.com>
+From: tipbot@zytor.com (tip-bot for Marc Zyngier)
+Date: Wed, 29 Jul 2015 15:25:32 -0700
+Subject: [tip:irq/core] device core: Introduce per-device MSI domain pointer
+In-Reply-To: <1438091186-10244-4-git-send-email-marc.zyngier@arm.com>
+References: <1438091186-10244-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <tip-f1421db8ca4c110144be97a5997ed83d34685db5@git.kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jul 27, 2015 at 1:03 AM, Christoph Hellwig <hch@lst.de> wrote:
->> +++ b/arch/frv/include/asm/io.h
->> @@ -17,8 +17,6 @@
->>
->>  #ifdef __KERNEL__
->>
->> -#define ARCH_HAS_IOREMAP_WT
->> -
->>  #include <linux/types.h>
->>  #include <asm/virtconvert.h>
->>  #include <asm/string.h>
->> @@ -267,20 +265,17 @@ static inline void __iomem *ioremap_nocache(unsigned long physaddr, unsigned lon
->>       return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
->>  }
->>
->> -static inline void __iomem *ioremap_wt(unsigned long physaddr, unsigned long size)
->> -{
->> -     return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
->> -}
->> -
->> -static inline void __iomem *ioremap_fullcache(unsigned long physaddr, unsigned long size)
->> -{
->> -     return __ioremap(physaddr, size, IOMAP_FULL_CACHING);
->> -}
->
->
->> +void *arch_memremap(resource_size_t offset, size_t size, unsigned long flags)
->> +{
->> +     return (void *) offset;
->> +}
->> +EXPORT_SYMBOL(arch_memremap);
->
-> This doesn't look like a correct replacement.
+Commit-ID:  f1421db8ca4c110144be97a5997ed83d34685db5
+Gitweb:     http://git.kernel.org/tip/f1421db8ca4c110144be97a5997ed83d34685db5
+Author:     Marc Zyngier <marc.zyngier@arm.com>
+AuthorDate: Tue, 28 Jul 2015 14:46:10 +0100
+Committer:  Thomas Gleixner <tglx@linutronix.de>
+CommitDate: Thu, 30 Jul 2015 00:14:37 +0200
 
-It doesn't, but frv jumps through a lot of hoops to give the illusion
-it actually supports different mapping types only to do this simple
-case in the end.  Given we don't want fallback semantics I will simply
-remove these false wrappers in the next revision of the patches.
+device core: Introduce per-device MSI domain pointer
 
-> Also shouldn't the replacements of ioremap_fullcache or ioremap_wc be
-> in the previous patch?
->
-> A few more similar issues pop up for other architectures as well.
+As MSI-type features are creeping into non-PCI devices, it is
+starting to make sense to give our struct device some form of
+support for this, by allowing a pointer to an MSI irq domain to
+be set/retrieved.
 
-I went ahead and moved the deletion of ioremap_cached() and
-ioremap_fullcache() to their own patches.
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: Yijing Wang <wangyijing@huawei.com>
+Cc: Ma Jun <majun258@huawei.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Duc Dang <dhdang@apm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Jiang Liu <jiang.liu@linux.intel.com>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Link: http://lkml.kernel.org/r/1438091186-10244-4-git-send-email-marc.zyngier at arm.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ include/linux/device.h | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/include/linux/device.h b/include/linux/device.h
+index 3d3139a..50e0005 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -715,6 +715,7 @@ struct device_dma_parameters {
+  * @pins:	For device pin management.
+  *		See Documentation/pinctrl.txt for details.
+  * @msi_list:	Hosts MSI descriptors
++ * @msi_domain: The generic MSI domain this device is using.
+  * @numa_node:	NUMA node this device is close to.
+  * @dma_mask:	Dma mask (if dma'ble device).
+  * @coherent_dma_mask: Like dma_mask, but for alloc_coherent mapping as not all
+@@ -775,6 +776,9 @@ struct device {
+ 	struct dev_pm_info	power;
+ 	struct dev_pm_domain	*pm_domain;
+ 
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	struct irq_domain	*msi_domain;
++#endif
+ #ifdef CONFIG_PINCTRL
+ 	struct dev_pin_info	*pins;
+ #endif
+@@ -865,6 +869,22 @@ static inline void set_dev_node(struct device *dev, int node)
+ }
+ #endif
+ 
++static inline struct irq_domain *dev_get_msi_domain(const struct device *dev)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	return dev->msi_domain;
++#else
++	return NULL;
++#endif
++}
++
++static inline void dev_set_msi_domain(struct device *dev, struct irq_domain *d)
++{
++#ifdef CONFIG_GENERIC_MSI_IRQ_DOMAIN
++	dev->msi_domain = d;
++#endif
++}
++
+ static inline void *dev_get_drvdata(const struct device *dev)
+ {
+ 	return dev->driver_data;
