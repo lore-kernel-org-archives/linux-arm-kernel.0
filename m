@@ -1,138 +1,358 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 29 Jul 2015 16:23:03 +0530
-Subject: [PATCH V3 08/16] PM / OPP: Add clock-latency-ns support
+Date: Wed, 29 Jul 2015 16:23:04 +0530
+Subject: [PATCH V3 09/16] PM / OPP: Add OPP sharing information to OPP library
 In-Reply-To: <cover.1438166099.git.viresh.kumar@linaro.org>
 References: <cover.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <b8c6ec6cfbae452514f2e3c55ccf44c4a4e5101d.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <9e9e98854a0be13fa3af292b7da80c4906ae1367.1438166099.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With "operating-points-v2" bindings, clock-latency is defined per OPP.
-Users of this value expect a single value which defines the latency to
-switch to any clock rate. Find maximum clock-latency-ns from the OPP
-table to service requests from such users.
+An opp can be shared by multiple devices, for example its very common
+for CPUs to share the OPPs, i.e. when they share clock/voltage rails.
+
+This patch adds support of shared OPPs to the OPP library.
+
+Instead of a single device, dev_opp will now contain a list of devices
+that use it. It also senses if the device (we are trying to initialize
+OPPs for) shares OPPs with a device added earlier and in that case we
+update the list of devices managed by OPPs instead of duplicating OPPs
+again.
+
+The same infrastructure will be used for the old OPP bindings, with
+later patches.
 
 Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/power/opp.c | 41 +++++++++++++++++++++++++++++++++++++++--
- include/linux/pm_opp.h   |  6 ++++++
- 2 files changed, 45 insertions(+), 2 deletions(-)
+ drivers/base/power/opp.c | 174 ++++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 150 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 0e0eff4d9299..8638204c457e 100644
+index 8638204c457e..5d699e3ec136 100644
 --- a/drivers/base/power/opp.c
 +++ b/drivers/base/power/opp.c
-@@ -57,6 +57,8 @@
-  * @u_volt_min:	Minimum voltage in microvolts corresponding to this OPP
-  * @u_volt_max:	Maximum voltage in microvolts corresponding to this OPP
-  * @u_amp:	Maximum current drawn by the device in microamperes
-+ * @clock_latency_ns: Latency (in nanoseconds) of switching to this OPP's
-+ *		frequency from any other OPP's frequency.
-  * @dev_opp:	points back to the device_opp struct this opp belongs to
-  * @rcu_head:	RCU callback head used for deferred freeing
-  * @np:		OPP's device node.
-@@ -75,6 +77,7 @@ struct dev_pm_opp {
- 	unsigned long u_volt_min;
- 	unsigned long u_volt_max;
- 	unsigned long u_amp;
-+	unsigned long clock_latency_ns;
+@@ -86,16 +86,33 @@ struct dev_pm_opp {
+ };
  
- 	struct device_opp *dev_opp;
- 	struct rcu_head rcu_head;
-@@ -109,6 +112,8 @@ struct device_opp {
+ /**
++ * struct device_list_opp - devices managed by 'struct device_opp'
++ * @node:	list node
++ * @dev:	device to which the struct object belongs
++ * @rcu_head:	RCU callback head used for deferred freeing
++ *
++ * This is an internal data structure maintaining the list of devices that are
++ * managed by 'struct device_opp'.
++ */
++struct device_list_opp {
++	struct list_head node;
++	const struct device *dev;
++	struct rcu_head rcu_head;
++};
++
++/**
+  * struct device_opp - Device opp structure
+  * @node:	list node - contains the devices with OPPs that
+  *		have been registered. Nodes once added are not modified in this
+  *		list.
+  *		RCU usage: nodes are not modified in the list of device_opp,
+  *		however addition is possible and is secured by dev_opp_list_lock
+- * @dev:	device pointer
+  * @srcu_head:	notifier head to notify the OPP availability changes.
+  * @rcu_head:	RCU callback head used for deferred freeing
++ * @dev_list:	list of devices that share these OPPs
+  * @opp_list:	list of opps
++ * @np:		struct device_node pointer for opp's DT node.
++ * @shared_opp: OPP is shared between multiple devices.
+  *
+  * This is an internal data structure maintaining the link to opps attached to
+  * a device. This structure is not meant to be shared to users as it is
+@@ -108,12 +125,14 @@ struct dev_pm_opp {
+ struct device_opp {
+ 	struct list_head node;
+ 
+-	struct device *dev;
  	struct srcu_notifier_head srcu_head;
  	struct rcu_head rcu_head;
++	struct list_head dev_list;
  	struct list_head opp_list;
-+
-+	unsigned long clock_latency_ns_max;
+ 
++	struct device_node *np;
+ 	unsigned long clock_latency_ns_max;
++	bool shared_opp;
  };
  
  /*
-@@ -226,6 +231,32 @@ unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp)
- EXPORT_SYMBOL_GPL(dev_pm_opp_get_freq);
+@@ -133,6 +152,38 @@ do {									\
+ 			   "dev_opp_list_lock protection");		\
+ } while (0)
  
- /**
-+ * dev_pm_opp_get_max_clock_latency() - Get max clock latency in nanoseconds
-+ * @dev:	device for which we do this operation
-+ *
-+ * Return: This function returns the max clock latency in nanoseconds.
-+ *
-+ * Locking: This function takes rcu_read_lock().
-+ */
-+unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
++static struct device_list_opp *_find_list_dev(const struct device *dev,
++					      struct device_opp *dev_opp)
++{
++	struct device_list_opp *list_dev;
++
++	list_for_each_entry(list_dev, &dev_opp->dev_list, node)
++		if (list_dev->dev == dev)
++			return list_dev;
++
++	return NULL;
++}
++
++static struct device_opp *_managed_opp(const struct device_node *np)
 +{
 +	struct device_opp *dev_opp;
-+	unsigned long clock_latency_ns;
 +
-+	rcu_read_lock();
++	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node) {
++		if (dev_opp->np == np) {
++			/*
++			 * Multiple devices can point to the same OPP table and
++			 * so will have same node-pointer, np.
++			 *
++			 * But the OPPs will be considered as shared only if the
++			 * OPP table contains a "opp-shared" property.
++			 */
++			return dev_opp->shared_opp ? dev_opp : NULL;
++		}
++	}
 +
-+	dev_opp = _find_device_opp(dev);
-+	if (IS_ERR(dev_opp))
-+		clock_latency_ns = 0;
-+	else
-+		clock_latency_ns = dev_opp->clock_latency_ns_max;
-+
-+	rcu_read_unlock();
-+	return clock_latency_ns;
++	return NULL;
 +}
-+EXPORT_SYMBOL_GPL(dev_pm_opp_get_max_clock_latency);
 +
-+/**
-  * dev_pm_opp_get_opp_count() - Get number of opps available in the opp list
-  * @dev:	device for which we do this operation
-  *
-@@ -779,6 +810,8 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
- 	new_opp->np = np;
- 	new_opp->dynamic = false;
- 	new_opp->available = true;
-+	of_property_read_u32(np, "clock-latency-ns",
-+			     (u32 *)&new_opp->clock_latency_ns);
+ /**
+  * _find_device_opp() - find device_opp struct using device pointer
+  * @dev:	device pointer used to lookup device OPPs
+@@ -149,21 +200,18 @@ do {									\
+  */
+ static struct device_opp *_find_device_opp(struct device *dev)
+ {
+-	struct device_opp *tmp_dev_opp, *dev_opp = ERR_PTR(-ENODEV);
++	struct device_opp *dev_opp;
  
- 	ret = opp_get_microvolt(new_opp, dev);
- 	if (ret)
-@@ -790,11 +823,15 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
+ 	if (unlikely(IS_ERR_OR_NULL(dev))) {
+ 		pr_err("%s: Invalid parameters\n", __func__);
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
+-	list_for_each_entry_rcu(tmp_dev_opp, &dev_opp_list, node) {
+-		if (tmp_dev_opp->dev == dev) {
+-			dev_opp = tmp_dev_opp;
+-			break;
+-		}
+-	}
++	list_for_each_entry_rcu(dev_opp, &dev_opp_list, node)
++		if (_find_list_dev(dev, dev_opp))
++			return dev_opp;
+ 
+-	return dev_opp;
++	return ERR_PTR(-ENODEV);
+ }
+ 
+ /**
+@@ -450,6 +498,39 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+ 
++/* List-dev Helpers */
++static void _kfree_list_dev_rcu(struct rcu_head *head)
++{
++	struct device_list_opp *list_dev;
++
++	list_dev = container_of(head, struct device_list_opp, rcu_head);
++	kfree_rcu(list_dev, rcu_head);
++}
++
++static void _remove_list_dev(struct device_list_opp *list_dev,
++			     struct device_opp *dev_opp)
++{
++	list_del(&list_dev->node);
++	call_srcu(&dev_opp->srcu_head.srcu, &list_dev->rcu_head,
++		  _kfree_list_dev_rcu);
++}
++
++static struct device_list_opp *_add_list_dev(const struct device *dev,
++					     struct device_opp *dev_opp)
++{
++	struct device_list_opp *list_dev;
++
++	list_dev = kzalloc(sizeof(*list_dev), GFP_KERNEL);
++	if (!list_dev)
++		return NULL;
++
++	/* Initialize list-dev */
++	list_dev->dev = dev;
++	list_add_rcu(&list_dev->node, &dev_opp->dev_list);
++
++	return list_dev;
++}
++
+ /**
+  * _add_device_opp() - Find device OPP table or allocate a new one
+  * @dev:	device for which we do this operation
+@@ -462,6 +543,7 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_floor);
+ static struct device_opp *_add_device_opp(struct device *dev)
+ {
+ 	struct device_opp *dev_opp;
++	struct device_list_opp *list_dev;
+ 
+ 	/* Check for existing list for 'dev' first */
+ 	dev_opp = _find_device_opp(dev);
+@@ -476,7 +558,14 @@ static struct device_opp *_add_device_opp(struct device *dev)
+ 	if (!dev_opp)
+ 		return NULL;
+ 
+-	dev_opp->dev = dev;
++	INIT_LIST_HEAD(&dev_opp->dev_list);
++
++	list_dev = _add_list_dev(dev, dev_opp);
++	if (!list_dev) {
++		kfree(dev_opp);
++		return NULL;
++	}
++
+ 	srcu_init_notifier_head(&dev_opp->srcu_head);
+ 	INIT_LIST_HEAD(&dev_opp->opp_list);
+ 
+@@ -504,9 +593,19 @@ static void _kfree_device_rcu(struct rcu_head *head)
+  */
+ static void _remove_device_opp(struct device_opp *dev_opp)
+ {
++	struct device_list_opp *list_dev;
++
+ 	if (!list_empty(&dev_opp->opp_list))
+ 		return;
+ 
++	list_dev = list_first_entry(&dev_opp->dev_list, struct device_list_opp,
++				    node);
++
++	_remove_list_dev(list_dev, dev_opp);
++
++	/* dev_list must be empty now */
++	WARN_ON(!list_empty(&dev_opp->dev_list));
++
+ 	list_del_rcu(&dev_opp->node);
+ 	call_srcu(&dev_opp->srcu_head.srcu, &dev_opp->rcu_head,
+ 		  _kfree_device_rcu);
+@@ -616,7 +715,8 @@ static struct dev_pm_opp *_allocate_opp(struct device *dev,
+ 	return opp;
+ }
+ 
+-static int _opp_add(struct dev_pm_opp *new_opp, struct device_opp *dev_opp)
++static int _opp_add(struct device *dev, struct dev_pm_opp *new_opp,
++		    struct device_opp *dev_opp)
+ {
+ 	struct dev_pm_opp *opp;
+ 	struct list_head *head = &dev_opp->opp_list;
+@@ -639,7 +739,7 @@ static int _opp_add(struct dev_pm_opp *new_opp, struct device_opp *dev_opp)
+ 			break;
+ 
+ 		/* Duplicate OPPs */
+-		dev_warn(dev_opp->dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
++		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
+ 			 __func__, opp->rate, opp->u_volt, opp->available,
+ 			 new_opp->rate, new_opp->u_volt, new_opp->available);
+ 
+@@ -702,7 +802,7 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 	new_opp->available = true;
+ 	new_opp->dynamic = dynamic;
+ 
+-	ret = _opp_add(new_opp, dev_opp);
++	ret = _opp_add(dev, new_opp, dev_opp);
  	if (ret)
  		goto free_opp;
  
-+	if (new_opp->clock_latency_ns > dev_opp->clock_latency_ns_max)
-+		dev_opp->clock_latency_ns_max = new_opp->clock_latency_ns;
+@@ -819,7 +919,7 @@ static int _opp_add_static_v2(struct device *dev, struct device_node *np)
+ 
+ 	of_property_read_u32(np, "opp-microamp", (u32 *)&new_opp->u_amp);
+ 
+-	ret = _opp_add(new_opp, dev_opp);
++	ret = _opp_add(dev, new_opp, dev_opp);
+ 	if (ret)
+ 		goto free_opp;
+ 
+@@ -1052,6 +1152,9 @@ void of_free_opp_table(struct device *dev)
+ 	struct device_opp *dev_opp;
+ 	struct dev_pm_opp *opp, *tmp;
+ 
++	/* Hold our list modification lock here */
++	mutex_lock(&dev_opp_list_lock);
 +
+ 	/* Check for existing list for 'dev' */
+ 	dev_opp = _find_device_opp(dev);
+ 	if (IS_ERR(dev_opp)) {
+@@ -1062,18 +1165,21 @@ void of_free_opp_table(struct device *dev)
+ 			     IS_ERR_OR_NULL(dev) ?
+ 					"Invalid device" : dev_name(dev),
+ 			     error);
+-		return;
++		goto unlock;
+ 	}
+ 
+-	/* Hold our list modification lock here */
+-	mutex_lock(&dev_opp_list_lock);
+-
+-	/* Free static OPPs */
+-	list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
+-		if (!opp->dynamic)
+-			_opp_remove(dev_opp, opp, true);
++	/* Find if dev_opp manages a single device */
++	if (list_is_singular(&dev_opp->dev_list)) {
++		/* Free static OPPs */
++		list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
++			if (!opp->dynamic)
++				_opp_remove(dev_opp, opp, true);
++		}
++	} else {
++		_remove_list_dev(_find_list_dev(dev, dev_opp), dev_opp);
+ 	}
+ 
++unlock:
  	mutex_unlock(&dev_opp_list_lock);
- 
--	pr_debug("%s: turbo:%d rate:%lu uv:%lu uvmin:%lu uvmax:%lu\n",
-+	pr_debug("%s: turbo:%d rate:%lu uv:%lu uvmin:%lu uvmax:%lu latency:%lu\n",
- 		 __func__, new_opp->turbo, new_opp->rate, new_opp->u_volt,
--		 new_opp->u_volt_min, new_opp->u_volt_max);
-+		 new_opp->u_volt_min, new_opp->u_volt_max,
-+		 new_opp->clock_latency_ns);
- 
- 	/*
- 	 * Notify the changes in the availability of the operable
-diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-index cec2d4540914..20324b579adc 100644
---- a/include/linux/pm_opp.h
-+++ b/include/linux/pm_opp.h
-@@ -31,6 +31,7 @@ unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp);
- unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp);
- 
- int dev_pm_opp_get_opp_count(struct device *dev);
-+unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev);
- 
- struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
- 					      unsigned long freq,
-@@ -67,6 +68,11 @@ static inline int dev_pm_opp_get_opp_count(struct device *dev)
- 	return 0;
  }
- 
-+static inline unsigned long dev_pm_opp_get_max_clock_latency(struct device *dev)
-+{
-+	return 0;
-+}
-+
- static inline struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
- 					unsigned long freq, bool available)
+ EXPORT_SYMBOL_GPL(of_free_opp_table);
+@@ -1099,6 +1205,7 @@ static int _of_init_opp_table_v2(struct device *dev,
+ 				 const struct property *prop)
  {
+ 	struct device_node *opp_np, *np;
++	struct device_opp *dev_opp;
+ 	int ret = 0, count = 0;
+ 
+ 	if (!prop->value)
+@@ -1109,6 +1216,14 @@ static int _of_init_opp_table_v2(struct device *dev,
+ 	if (IS_ERR(opp_np))
+ 		return PTR_ERR(opp_np);
+ 
++	dev_opp = _managed_opp(opp_np);
++	if (dev_opp) {
++		/* OPPs are already managed */
++		if (!_add_list_dev(dev, dev_opp))
++			ret = -ENOMEM;
++		goto put_opp_np;
++	}
++
+ 	/* We have opp-list node now, iterate over it and add OPPs */
+ 	for_each_available_child_of_node(opp_np, np) {
+ 		count++;
+@@ -1125,8 +1240,19 @@ static int _of_init_opp_table_v2(struct device *dev,
+ 	if (WARN_ON(!count))
+ 		goto put_opp_np;
+ 
+-	if (ret)
++	if (!ret) {
++		if (!dev_opp) {
++			dev_opp = _find_device_opp(dev);
++			if (WARN_ON(!dev_opp))
++				goto put_opp_np;
++		}
++
++		dev_opp->np = opp_np;
++		dev_opp->shared_opp = of_property_read_bool(opp_np,
++							    "opp-shared");
++	} else {
+ 		of_free_opp_table(dev);
++	}
+ 
+ put_opp_np:
+ 	of_node_put(opp_np);
 -- 
 2.4.0
