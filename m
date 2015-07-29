@@ -1,60 +1,61 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 29 Jul 2015 17:03:56 +0800
-Subject: [PATCH v3 5/6] mmc: sdhci-esdhc-imx: config watermark level and burst
- length
-In-Reply-To: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438160637-28061-6-git-send-email-haibo.chen@freescale.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Jul 2015 11:23:10 +0200
+Subject: [PATCH 0/9] gpiolib: Add GPIO name support
+In-Reply-To: <20150728141619.GP28535@localhost>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <CACRpkdY=SLGyrcvWT355b3Z+pBwb9gPzVcieD8mOn=zdyJ1mFw@mail.gmail.com>
+ <20150728141619.GP28535@localhost>
+Message-ID: <CACRpkdYV=MDcEmsknuAXghGe_PcnqCQdvK2AQd8N28g7weGtFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i.MX7D support eMMC HS400 mode, this mode can run in 8 bit,200MHZ
-DDR mode. So the I/O speed improve a lot compare to SD3.0
+On Tue, Jul 28, 2015 at 4:16 PM, Johan Hovold <johan@kernel.org> wrote:
 
-The default burst length is 8, if we don't change this value, in
-HS400 mode, when we do eMMC read operation, we can find that the
-clock signal will stop for a period of time. This means the speed
-of data moving on AHB bus is slower than I/O speed. So we should
-improve the speed of data moving on AHB bus.
+> That said, this is a step along the lines that we have discussed in the
+> past. Adding pin functions (line names) to generic pin nodes in DT makes
+> sense, but we need to think through the details first. For example:
+>
+>  - Should we allow duplicate pin functions (line names)? We need to
+>    consider not just on-chip controllers, but also hot-pluggable
+>    controllers and device-tree overlays.
 
-For imx7d usdhc, this patch set the burst length as 16, and set
-watermark level as 64. The test result is the clock signal has
-no stop during the eMMC HS400 operation. For other imx usdhc, remain
-the default value: burst length as 8, watermark level as 16.
+I guess the typical example is if we have two identical GPIO
+expanders. We have this with arch/arm/boot/dts/ste-nomadik-nhk15.dts
+for example.
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+With this scheme, they will simply have to name their lines
+uniquely for things to work since /sys/class/gpio is a flat
+space, not hierarchic per-gpiochip (as would be preferred,
+should this be sane to maintain).
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 158f93b..37d0095 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -239,6 +239,11 @@ static inline int is_imx6q_usdhc(struct pltfm_imx_data *data)
- 	return data->socdata == &usdhc_imx6q_data;
- }
- 
-+static inline int is_imx7d_usdhc(struct pltfm_imx_data *data)
-+{
-+	return data->socdata == &usdhc_imx7d_data;
-+}
-+
- static inline int esdhc_is_usdhc(struct pltfm_imx_data *data)
- {
- 	return !!(data->socdata->flags & ESDHC_FLAG_USDHC);
-@@ -1145,7 +1150,11 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 	 * to something insane.  Change it back here.
- 	 */
- 	if (esdhc_is_usdhc(imx_data)) {
--		writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-+		if (is_imx7d_usdhc(imx_data))
-+			writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-+		else
-+			writel(0x08100810, host->ioaddr + ESDHC_WTMK_LVL);
-+
- 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
- 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
--- 
-1.9.1
+>  - Should we allow initial configurations to be specified and still
+>    allow (some) pins to be requested later ("soft" hogging)?
+
+That is a key idea in this patch set.
+
+Maybe we need a "userspace hog" to mark these specifically as
+not used by the operating system. (Bringing me back to my
+tirade about people doing stupid things in userspace just because
+they don't know about all the nice GPIO stuff in the kernel.)
+
+>  - Should we specify pin directionality? I've suggested elsewhere that
+>    adding such limitations (e.g. as a mask) may make sense in cases were
+>    changing pin direction is known to cause damage.
+
+We have the flag jamming IRQ lines to be input, but input-only
+and output-only seems reasonable for hogs in reaction to the
+current "input", "output-low" and "output-high" properties.
+
+Could be a separate patch though.
+
+>  - What would a new gpio interface look like?
+
+Yeah :/ people are scared of adding chardevs it seems.
+
+I think they are kind of nice, the biggest problem seems to be
+totally confused userspace with udev and mdev and none of
+them ever knows about new stuff and people get problems
+becuase of old rootfs:es.
+
+Yours,
+Linus Walleij
