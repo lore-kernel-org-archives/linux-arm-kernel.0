@@ -1,40 +1,19 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 28 Jul 2015 18:25:57 +0200
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.3
-In-Reply-To: <1438096364-28519-1-git-send-email-dinh.linux@gmail.com>
-References: <1438096364-28519-1-git-send-email-dinh.linux@gmail.com>
-Message-ID: <20150728162557.GE16690@localhost>
+Date: Wed, 29 Jul 2015 22:06:33 +0200
+Subject: [PATCH] ARM: zx: Add power domains for ZX296702
+In-Reply-To: <1438150618-22278-1-git-send-email-jun.nie@linaro.org>
+References: <1438150618-22278-1-git-send-email-jun.nie@linaro.org>
+Message-ID: <20150729200633.GG16690@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 10:12:44AM -0500, dinh.linux at gmail.com wrote:
-> Hi Arnd, Kevin, and Olof:
+On Wed, Jul 29, 2015 at 02:16:58PM +0800, Jun Nie wrote:
+> Add power domains for ZX296702 to power off
+> inactive power domains in runtime.
 > 
-> Please consider pulling these patches for v4.3.
-> 
-> Thanks,
-> Dinh
-> 
-> The following changes since commit d770e558e21961ad6cfdf0ff7df0eb5d7d4f0754:
-> 
->   Linux 4.2-rc1 (2015-07-05 11:01:52 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_dts_for_v4.3
-> 
-> for you to fetch changes up to 2e4c7588f6c1d24ae991a85140e05139e953c9b5:
-> 
->   ARM: socfpga: dts: add osc1 as a possible parent for dbg_base_clk (2015-07-24 22:10:59 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA DTS updates for v4.3
-> - Update clocking for DTS nodes
-> - Add DTS board file for Terasic DE0 Atlas board
-> - Use stdout-patch for chosen node
-> - Enable prefetch-data and prefetch-instr
+> Signed-off-by: Jun Nie <jun.nie@linaro.org>
 
-Merged, thanks.
+Applied to next/soc.
 
 
 -Olof
