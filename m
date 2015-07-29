@@ -1,71 +1,59 @@
-From: toshi.kani@hp.com (Toshi Kani)
-Date: Wed, 29 Jul 2015 15:11:14 -0600
-Subject: [PATCH v2 08/25] arch: introduce memremap()
-In-Reply-To: <1438203638.3214.418.camel@hp.com>
-References: <20150725023649.8664.59145.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150725023842.8664.97620.stgit@dwillia2-desk3.amr.corp.intel.com>
- <20150726172527.GA29513@lst.de>
- <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
- <20150727051258.GB15836@lst.de>
- <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
- <20150729065004.GA17162@lst.de> <20150729182712.GI30479@wotan.suse.de>
- <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
- <1438203638.3214.418.camel@hp.com>
-Message-ID: <1438204274.3214.421.camel@hp.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Jul 2015 18:21:08 -0300
+Subject: [PATCH v3 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+In-Reply-To: <1438203535-38028-1-git-send-email-shenwei.wang@freescale.com>
+References: <1438203535-38028-1-git-send-email-shenwei.wang@freescale.com>
+Message-ID: <CAOMZO5Aj5PASPKRq47vmenDBSPMPHdLgSbJZXkhZu3MNYprqXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-07-29 at 15:00 -0600, Toshi Kani wrote:
-> On Wed, 2015-07-29 at 11:33 -0700, Dan Williams wrote:
-> > On Wed, Jul 29, 2015 at 11:27 AM, Luis R. Rodriguez <mcgrof@suse.com> 
-> > wrote:
-> > > On Wed, Jul 29, 2015 at 08:50:04AM +0200, Christoph Hellwig wrote:
-> > > > On Mon, Jul 27, 2015 at 04:26:03PM -0700, Dan Williams wrote:
-> > > > > Oh, because all we have at this point is ioremap_cache() which
-> > > > > silently falls back.  It's not until the introduction of
-> > > > > arch_memremp() where we update the arch code to break that 
-> > > > > behavior.
-> > > > 
-> > > > Ok, makes sense.  Might be worth to document in the changelog.
-> > > > 
-> > > > > That said, I think it may be beneficial to allow a fallback if 
-> > > > > the
-> > > > > user cares.  So maybe memremap() can call plain ioremap() if
-> > > > > MEMREMAP_STRICT is not set and none of the other mapping types 
-> > > > > are
-> > > > > satisfied.
-> > > > 
-> > > > Is there a real use case for it?  Fallback APIs always seem 
-> > > > confusing
-> > > > and it might make more sense to do this in the caller(s) that 
-> > > > actually
-> > > > need it.
-> > > 
-> > > It seems semantics-wise we are trying to separate these two really, 
-> > > so 
-> > > I agree
-> > > with this. Having a fallback would onloy make things more complicated 
-> > > 
-> > > for any
-> > > sanitizer / checker / etc, and I don't think the practical gains of 
-> > > having a
-> > > fallback outweight the gains of having a clear semantic separation on 
-> > > 
-> > > intended
-> > > memory type and interactions with it.
-> > > 
-> > 
-> > Yup, consider it dropped.  Drivers that want fallback behavior can do
-> > it explicitly.
-> 
-> I agree in general.  However, for the drivers to be able to fall back
-> properly, they will need to know the cache type they can fall back with. 
->  ioremap() falls back to the cache type of an existing mapping to avoid
-> aliasing.
+On Wed, Jul 29, 2015 at 5:58 PM, Shenwei Wang
+<shenwei.wang@freescale.com> wrote:
 
-Never mind...  In this context, we are talking about fallback in case of "
-API not implemented" on arch.  I was talking about fallback in case of
-aliasing.
+> +static int imx_serial_port_suspend_noirq(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct imx_port *sport = platform_get_drvdata(pdev);
+> +
+> +       /* Save necessary regs */
+> +       clk_enable(sport->clk_ipg);
 
-Thanks,
--Toshi
+clk_enable() may fail, so you should check its return value.
+
+> +       sport->saved_reg[0] = readl(sport->port.membase + UCR1);
+> +       sport->saved_reg[1] = readl(sport->port.membase + UCR2);
+> +       sport->saved_reg[2] = readl(sport->port.membase + UCR3);
+> +       sport->saved_reg[3] = readl(sport->port.membase + UCR4);
+> +       sport->saved_reg[4] = readl(sport->port.membase + UFCR);
+> +       sport->saved_reg[5] = readl(sport->port.membase + UESC);
+> +       sport->saved_reg[6] = readl(sport->port.membase + UTIM);
+> +       sport->saved_reg[7] = readl(sport->port.membase + UBIR);
+> +       sport->saved_reg[8] = readl(sport->port.membase + UBMR);
+> +       sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
+> +       clk_disable(sport->clk_ipg);
+> +
+> +       dev_dbg(dev, "0x%p (%d)\r\n", sport->port.membase, sport->port.line);
+> +
+> +       return 0;
+> +}
+> +
+> +static int imx_serial_port_resume_noirq(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct imx_port *sport = platform_get_drvdata(pdev);
+> +
+> +       clk_enable(sport->clk_ipg);
+
+Same here.
+
+> +       writel(sport->saved_reg[4], sport->port.membase + UFCR);
+> +       writel(sport->saved_reg[5], sport->port.membase + UESC);
+> +       writel(sport->saved_reg[6], sport->port.membase + UTIM);
+> +       writel(sport->saved_reg[7], sport->port.membase + UBIR);
+> +       writel(sport->saved_reg[8], sport->port.membase + UBMR);
+> +       writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
+> +       writel(sport->saved_reg[0], sport->port.membase + UCR1);
+> +       writel(sport->saved_reg[1] | 0x1, sport->port.membase + UCR2);
+
+Why this magic '| 0x1'? Can't you use a define instead?
