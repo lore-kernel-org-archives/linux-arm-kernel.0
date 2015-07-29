@@ -1,37 +1,103 @@
-From: jonas.rabenstein@studium.uni-erlangen.de (Jonas Rabenstein)
-Date: Wed, 29 Jul 2015 13:13:20 +0200
-Subject: [PATCH] arm64: remove redundant object file list
-Message-ID: <1438168400-20082-1-git-send-email-jonas.rabenstein@studium.uni-erlangen.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 29 Jul 2015 16:39:46 +0530
+Subject: [PATCH 16/17] mmc: host: omap_hsmmc: remove CONFIG_REGULATOR check
+In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
+References: <1438168187-1614-1-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-17-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 4b3dc9679cf7 ("arm64: force CONFIG_SMP=y and remove redundant
-#ifdefs") forces SMP on arm64. To build the necessary objects for SMP,
-they were added to the arm64-obj-y rule in arch/arm64/kernel/Makefile,
-without removing the arm64-obj-$(CONFIG_SMP) rule.
+Now that support for platforms which have optional regulator is added,
+remove CONFIG_REGULATOR check in omap_hsmmc.
 
-Remove redundant object file list depending on always-yes CONFIG_SMP in
-arch/arm64/kernel/Makefile.
-
-Signed-off-by: Jonas Rabenstein <jonas.rabenstein@studium.uni-erlangen.de>
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
-I found this inconsistency using the undertaker and
-undertaker-checkpatch tools (https://undertaker.cs.fau.de/).
+ drivers/mmc/host/omap_hsmmc.c |   35 +++--------------------------------
+ 1 file changed, 3 insertions(+), 32 deletions(-)
 
- arch/arm64/kernel/Makefile | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index f126cfe..c662197 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -25,7 +25,6 @@ arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
- 					   ../../arm/kernel/opcodes.o
- arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
- arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
--arm64-obj-$(CONFIG_SMP)			+= smp.o smp_spin_table.o topology.o
- arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o
- arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o perf_callchain.o
- arm64-obj-$(CONFIG_HAVE_HW_BREAKPOINT)	+= hw_breakpoint.o
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index 5116c42..aa4ba28 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -203,7 +203,6 @@ struct omap_hsmmc_host {
+ 	int			context_loss;
+ 	int			protect_card;
+ 	int			reqs_blocked;
+-	int			use_reg;
+ 	int			req_in_progress;
+ 	unsigned long		clk_rate;
+ 	unsigned int		flags;
+@@ -244,8 +243,6 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
+ 	return mmc_gpio_get_cd(host->mmc);
+ }
+ 
+-#ifdef CONFIG_REGULATOR
+-
+ static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
+ {
+ 	int ret;
+@@ -513,29 +510,6 @@ static void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
+ 	mmc_pdata(host)->set_power = NULL;
+ }
+ 
+-static inline int omap_hsmmc_have_reg(void)
+-{
+-	return 1;
+-}
+-
+-#else
+-
+-static inline int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+-{
+-	return -EINVAL;
+-}
+-
+-static inline void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
+-{
+-}
+-
+-static inline int omap_hsmmc_have_reg(void)
+-{
+-	return 0;
+-}
+-
+-#endif
+-
+ static irqreturn_t omap_hsmmc_cover_irq(int irq, void *dev_id);
+ 
+ static int omap_hsmmc_gpio_init(struct mmc_host *mmc,
+@@ -2195,11 +2169,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 		goto err_irq;
+ 	}
+ 
+-	if (omap_hsmmc_have_reg() && !mmc_pdata(host)->set_power) {
++	if (!mmc_pdata(host)->set_power) {
+ 		ret = omap_hsmmc_reg_get(host);
+ 		if (ret)
+ 			goto err_irq;
+-		host->use_reg = 1;
+ 	}
+ 
+ 	mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
+@@ -2242,8 +2215,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 
+ err_slot_name:
+ 	mmc_remove_host(mmc);
+-	if (host->use_reg)
+-		omap_hsmmc_reg_put(host);
++	omap_hsmmc_reg_put(host);
+ err_irq:
+ 	device_init_wakeup(&pdev->dev, false);
+ 	if (host->tx_chan)
+@@ -2267,8 +2239,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
+ 
+ 	pm_runtime_get_sync(host->dev);
+ 	mmc_remove_host(host->mmc);
+-	if (host->use_reg)
+-		omap_hsmmc_reg_put(host);
++	omap_hsmmc_reg_put(host);
+ 
+ 	if (host->tx_chan)
+ 		dma_release_channel(host->tx_chan);
 -- 
-2.1.4
+1.7.9.5
