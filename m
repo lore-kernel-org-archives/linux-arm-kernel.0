@@ -1,41 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jul 2015 19:40:43 +0100
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
- controller-data
-In-Reply-To: <CAOMqctQzh69RCQu8pK1EuuYkrZsh6mg34+YWJFzSvimcK3B0rA@mail.gmail.com>
-References: <cover.1438170519.git.hramrach@gmail.com>
- <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
- <20150729140046.GB11082@sirena.org.uk>
- <CAOMqctTZVET=U=2o65HpWSm4W660XZtYYbBND2k4u9CnfjfMhQ@mail.gmail.com>
- <20150729171613.GI11162@sirena.org.uk>
- <CAOMqctQzh69RCQu8pK1EuuYkrZsh6mg34+YWJFzSvimcK3B0rA@mail.gmail.com>
-Message-ID: <20150729184043.GL11162@sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 29 Jul 2015 19:46:06 +0100
+Subject: [PATCH v2 3/9] iommu/arm-smmu: Clean up DMA API usage
+In-Reply-To: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
+References: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
+Message-ID: <eba4661ed193ea41052764c2c60ae8932294e6f1.1438195011.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 08:21:34PM +0200, Michal Suchanek wrote:
-> On 29 July 2015 at 19:16, Mark Brown <broonie@kernel.org> wrote:
+With the correct DMA API calls now integrated into the io-pgtable code,
+let that handle the flushing of non-coherent page table updates.
 
-> >> It will not break anything. It will just spam dmesg.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ drivers/iommu/arm-smmu.c | 22 ++++++----------------
+ 1 file changed, 6 insertions(+), 16 deletions(-)
 
-> > I'm confused - if all this change does is to spam dmesg then what's the
-> > point?
-
-> Presumably when your SPI NOR flash fails to probe this message will be
-> just above and you will look into the binding doc and add the
-> compatible.
-
-If you're looking to add a warning message when the flash device fails
-to probe then add that in the flash driver when it detects an error,
-this will cause needless noise for everyone else using this controller
-purely to work around the broken binding.
-
-And like I say compatible really seems like it isn't an appropriate
-property here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/feb69d4f/attachment-0001.sig>
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 0583ed2..5770ab9 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -611,24 +611,13 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
+ static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
+ {
+ 	struct arm_smmu_domain *smmu_domain = cookie;
+-	struct arm_smmu_device *smmu = smmu_domain->smmu;
+-	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
+ 
+-
+-	/* Ensure new page tables are visible to the hardware walker */
+-	if (smmu->features & ARM_SMMU_FEAT_COHERENT_WALK) {
++	/*
++	 * Ensure new page tables are visible to a coherent hardware walker.
++	 * The page table code deals with flushing for the non-coherent case.
++	 */
++	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_COHERENT_WALK)
+ 		dsb(ishst);
+-	} else {
+-		/*
+-		 * If the SMMU can't walk tables in the CPU caches, treat them
+-		 * like non-coherent DMA since we need to flush the new entries
+-		 * all the way out to memory. There's no possibility of
+-		 * recursion here as the SMMU table walker will not be wired
+-		 * through another SMMU.
+-		 */
+-		dma_map_page(smmu->dev, virt_to_page(addr), offset, size,
+-			     DMA_TO_DEVICE);
+-	}
+ }
+ 
+ static struct iommu_gather_ops arm_smmu_gather_ops = {
+@@ -899,6 +888,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 		.ias		= ias,
+ 		.oas		= oas,
+ 		.tlb		= &arm_smmu_gather_ops,
++		.iommu_dev	= smmu->dev,
+ 	};
+ 
+ 	smmu_domain->smmu = smmu;
+-- 
+1.9.1
