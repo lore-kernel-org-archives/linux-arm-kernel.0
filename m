@@ -1,116 +1,65 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Wed, 29 Jul 2015 10:05:22 +0900
-Subject: [PATCHv6] ARM: dts: add exynos5422-cpus.dtsi to correct cpu order
-In-Reply-To: <CAPTzV14nPH0PcRqf1na7a7wJTu23r8bZmCwGiEafAFbMyoRM2Q@mail.gmail.com>
-References: <1436833441-8405-1-git-send-email-parkch98@gmail.com>
- <55A45C63.2030907@samsung.com> <06b101d0bdf2$8aad8fb0$a008af10$@kernel.org>
- <CAPTzV15+BWEo6PjJMwHVjqVdUnZuJ=PBAUprF_vZaSRTYiuNXw@mail.gmail.com>
- <075c01d0be0e$587fe260$097fa720$@kernel.org>
- <CAPTzV14nPH0PcRqf1na7a7wJTu23r8bZmCwGiEafAFbMyoRM2Q@mail.gmail.com>
-Message-ID: <044601d0c99a$a5218b90$ef64a2b0$@kernel.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 Jul 2015 18:22:41 -0700
+Subject: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new feature
+ support
+In-Reply-To: <B256D81BAE5131468A838E5D7A243641C9F820CB@penmbx01>
+References: <1438066825-21923-1-git-send-email-wenyou.yang@atmel.com>
+ <1438066825-21923-2-git-send-email-wenyou.yang@atmel.com>
+ <55B72BC0.8070206@roeck-us.net>
+ <B256D81BAE5131468A838E5D7A243641C9F820CB@penmbx01>
+Message-ID: <55B82AE1.2050906@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chanho Park wrote:
-> 
-> Hi,
-> 
-> On Tue, Jul 14, 2015 at 5:23 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> > Chanho Park wrote:
-> >>
-> >> Hi Kukjin,
-> >>
-> >> On Tue, Jul 14, 2015 at 2:04 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> >> > Krzysztof Kozlowski wrote:
-> >> >>
-> >> >> On 14.07.2015 09:24, Chanho Park wrote:
-> >> >> > The odroid-xu3 board which is based on exynos5422 not exynos5800 is
-> >> >> > booted from cortex-a7 core unlike exynos5800. The odroid-xu3's cpu order
-> >> >> > is quite strange. cpu0 and cpu5-7 are cortex-a7 cores and cpu1-4 are
-> >> >> > cortex-a15 cores. To correct this mis-odering, I added exynos5422-cpus.dtsi
-> >> >> > and reversing cpu orders from exynos5420. Now, cpu0-3 are cortex-a7 and
-> >> >> > cpu4-7 are cortex-a15.
-> >> >> >
-> >> >> > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> >> > Signed-off-by: Chanho Park <parkch98@gmail.com>
-> >> >> > ---
-> >
-> > [...]
-> >
-> >> >> >
-> >> >> > Secondary cpu booting problem[1] is not resolved yet. Need more investigations
-> >> >> > to work booting 8 cores correctly.
-> >> >> >
-> >> >> > [1]: http://www.spinics.net/lists/linux-samsung-soc/msg45525.html
-> >> >> >
-> >> >> >  arch/arm/boot/dts/exynos5422-cpus.dtsi             | 81 ++++++++++++++++++++++
-> >> >> >  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi |  1 +
-> >> >> >  2 files changed, 82 insertions(+)
-> >> >> >  create mode 100644 arch/arm/boot/dts/exynos5422-cpus.dtsi
-> >> >>
-> >> >> Thanks, applied to my tree. I'll send it to Kukjin for v4.3 unless he
-> >> >> picks it also.
-> >> >>
-> >> > Well, let me see. I'm thinking we need to sort out the cpu ordering and dtsi
-> >> > inclusions for exynos5420, 5422 and 5800 related to DT files.
-> >> >
-> >> > See,
-> >> >
-> >> > 1) exynos5420 DT (cpu0~3: a15, cpu 4~7: a7)
-> >> > 2) exynos5800 DT is including exynos5420 DT
-> >> > 3) exynos5422 and exynos5800 based boards are including exynos5800 DT.
-> >> >
-> >> > Then making exynos5422-cpus DT for exynos5422 based boards?
-> >> > (cpu0~3: a7, cpu4~7: a15)
-> >> >
-> >> > I think, it could cause confusion when new board based on them are added
-> >> > because it's not clear and the boot cpu could be selected by bootloader part.
-> >>
-> >> The iROM will check the GPIO pin to select which core is run as cpu0.
-> >> I think no one will change the GPIO pin if a new board which is based
-> >> on exynos5422 :)
-> >>
-> > Yes, I know the boot sequence and it means it depends on board configuration
-> > not SoC. That?s why I'm saying it should be handled in board DT file. I think,
-> > most of current exynos big.LITTLE model should do if it could be changed
-> > according to board configuration.
-> 
-> I also agreed it's not a SoC configuration since second
-> patch(exynos5422.dtsi -> exynos5422-cpu.dtsi).
-> 
-> >
-> >> >
-> >> > So how about creating exynos5422-cpus and exynos5420-cpus then including the
-> >> > cpus DT file in each board accordingly?
-> >> >
-> >> > Or more clear way to avoid confusion?
-> >>
-> >> In this situation, all exynos5422 boards(odroid xu3 series and mobile
-> >> phone) have same cpu configurations. If we move the exynos5420 cpu
-> >> configuration from exynos5420.dtsi, we should change all dts which
-> >> including exynos5420.dtsi.
-> >
-> > Maybe same board configuration. Just adding inclusion should be fine at this
-> > moment.
-> >
-> >> I think we'd better to defer the change until a new exynos5422 board
-> >> which has different cpu configurations is added.
-> >>
-> > I mean, according to current inclusion of exynos5422 based boards' DT file, it
-> > is including exynos5420 DT via exynos5800 DT and then override different cpu
-> > ordering (5422-cpu DT) because of different board configuration (just GPIO
-> > value) and it is not a good way in this case.
-> 
-> Actually, I don't want to disturb current dts hierarchy even though it
-> looks strange. The common features of exynos5800 and exynos5422 should
-> be in the exynos5800.dtsi because they shared many things except the
-> cpu order.
-> Please consider the exynos5422-cpu.dtsi is just board configurations
-> to represent cpu order.
-> 
-Yeah, strange and it can cause some confusing...but OK, we don't have much
-choice at the moment, so applied to support it even we need some re-work
-'current dts hierarchy' next time.
+On 07/28/2015 05:38 PM, Yang, Wenyou wrote:
+> Hi Guenter,
+>
+> Thank you very much for your review.
+>
+>> -----Original Message-----
+>> From: Guenter Roeck [mailto:linux at roeck-us.net]
+>> Sent: 2015?7?28? 15:14
+>> To: Yang, Wenyou; wim at iguana.be; robh+dt at kernel.org; pawel.moll at arm.com;
+>> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org
+>> Cc: sylvain.rochet at finsecur.com; Ferre, Nicolas; boris.brezillon at free-
+>> electrons.com; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
+>> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+>> Subject: Re: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new feature
+>> support
+>>
+>> On 07/28/2015 12:00 AM, Wenyou Yang wrote:
+>>> In the datasheet, the new feature is describled as "WDT_MR can be
+>>> written until a LOCKMR command is issued in WDT_CR".
+>>> That is to say, as long as the bootstrap and u-boot don't issue a
+>>> LOCKMR command, WDT_MR can be written in kernel.
+>>>
+>>> So the driver can enable/disable the watchdog timer hardware, set
+>>> WDV(Watchdog Counter Value) and WDD(Watchdog Delta Value) fields of
+>>> WDT_MR register to set the watchdog timer timeout.
+>>>
+>>> The timer is not necessary that regularly sends a keepalive ping to
+>>> the watchdog timer hardware.
+>>>
+>>> It is introduced from sama5d4 SoCs.
+>>>
+>> Since there are so many changes, I wonder is a separate driver would make more
+>> sense.
+> Yes, a bit many changes.
+> I thought reuse the driver code.
+> If a separate driver, I am afraid it includes much duplicated code.
+> After all, it is for the same device with different feature.
+>
+> I don't think it is necessary to have multiple drivers for the same peripheral with different feature.
+>
 
-Thanks,
-Kukjin
+The concept for the two mechanisms is all different: In one, the watchdog keepalive is triggered
+from timer code. In the other, the watchdog timeout is triggered directly from the heartbeat
+function. One assumes that the watchdog is always running, and that it must be pinged even
+if closed. The other disables the watchdog on close.
+
+What I _can_ see is that the driver is becoming an unmaintainable mess, with lots of if/else
+in pretty much every function. I consider this much less desirable than a bit of code
+duplication - if there is any. Seriously, most of the added code might as well be for
+a completely different chip.
+
+Guenter
