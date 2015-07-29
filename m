@@ -1,222 +1,335 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 29 Jul 2015 16:23:01 +0530
-Subject: [PATCH V3 06/16] PM / OPP: Break _opp_add_dynamic() into smaller
- functions
+Date: Wed, 29 Jul 2015 16:23:02 +0530
+Subject: [PATCH V3 07/16] PM / OPP: Add support to parse "operating-points-v2"
+ bindings
 In-Reply-To: <cover.1438166099.git.viresh.kumar@linaro.org>
 References: <cover.1438166099.git.viresh.kumar@linaro.org>
-Message-ID: <f5778b7bf5d30d888297c9e2fd7097901e9c47d9.1438166099.git.viresh.kumar@linaro.org>
+Message-ID: <6d8d9cd0c3ae2d3fa8c3aadedb5ac403785b7675.1438166099.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Later commits would add support for new OPP bindings and this would be
-required then. So, lets do it in a separate patch to make it easily
-reviewable.
+This adds support in OPP library to parse and create list of OPPs from
+operating-points-v2 bindings. It takes care of most of the properties of
+new bindings (except shared-opp, which will be handled separately).
 
-Another change worth noticing is INIT_LIST_HEAD(&opp->node). We weren't
-doing it earlier as we never tried to delete a list node before it is
-added to list. But this wouldn't be the case anymore. We might try to
-delete a node (just to reuse the same code paths), without it being
-getting added to the list.
+For backward compatibility, we keep supporting earlier bindings. We try
+to search for the new bindings first, in case they aren't present we
+look for the old deprecated ones.
+
+There are few things marked as TODO:
+- Support for multiple OPP tables
+- Support for multiple regulators
+
+They should be fixed separately.
 
 Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
 ---
- drivers/base/power/opp.c | 125 ++++++++++++++++++++++++++++-------------------
- 1 file changed, 76 insertions(+), 49 deletions(-)
+ drivers/base/power/opp.c | 257 ++++++++++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 233 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/base/power/opp.c b/drivers/base/power/opp.c
-index 28d70c9f86ed..0d8dbf21c299 100644
+index 0d8dbf21c299..0e0eff4d9299 100644
 --- a/drivers/base/power/opp.c
 +++ b/drivers/base/power/opp.c
-@@ -484,6 +484,7 @@ static void _kfree_opp_rcu(struct rcu_head *head)
-  * _opp_remove()  - Remove an OPP from a table definition
+@@ -51,10 +51,15 @@
+  *		order.
+  * @dynamic:	not-created from static DT entries.
+  * @available:	true/false - marks if this OPP as available or not
++ * @turbo:	true if turbo (boost) OPP
+  * @rate:	Frequency in hertz
+- * @u_volt:	Nominal voltage in microvolts corresponding to this OPP
++ * @u_volt:	Target voltage in microvolts corresponding to this OPP
++ * @u_volt_min:	Minimum voltage in microvolts corresponding to this OPP
++ * @u_volt_max:	Maximum voltage in microvolts corresponding to this OPP
++ * @u_amp:	Maximum current drawn by the device in microamperes
   * @dev_opp:	points back to the device_opp struct this opp belongs to
-  * @opp:	pointer to the OPP to remove
-+ * @notify:	OPP_EVENT_REMOVE notification should be sent or not
+  * @rcu_head:	RCU callback head used for deferred freeing
++ * @np:		OPP's device node.
   *
-  * This function removes an opp definition from the opp list.
-  *
-@@ -492,13 +493,14 @@ static void _kfree_opp_rcu(struct rcu_head *head)
-  * strategy.
+  * This structure stores the OPP information for a given device.
   */
- static void _opp_remove(struct device_opp *dev_opp,
--			struct dev_pm_opp *opp)
-+			struct dev_pm_opp *opp, bool notify)
- {
- 	/*
- 	 * Notify the changes in the availability of the operable
- 	 * frequency/voltage list.
- 	 */
--	srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_REMOVE, opp);
-+	if (notify)
-+		srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_REMOVE, opp);
- 	list_del_rcu(&opp->node);
- 	call_srcu(&dev_opp->srcu_head.srcu, &opp->rcu_head, _kfree_opp_rcu);
+@@ -63,11 +68,18 @@ struct dev_pm_opp {
  
-@@ -544,12 +546,70 @@ void dev_pm_opp_remove(struct device *dev, unsigned long freq)
- 		goto unlock;
- 	}
+ 	bool available;
+ 	bool dynamic;
++	bool turbo;
+ 	unsigned long rate;
++
+ 	unsigned long u_volt;
++	unsigned long u_volt_min;
++	unsigned long u_volt_max;
++	unsigned long u_amp;
  
--	_opp_remove(dev_opp, opp);
-+	_opp_remove(dev_opp, opp, true);
- unlock:
- 	mutex_unlock(&dev_opp_list_lock);
+ 	struct device_opp *dev_opp;
+ 	struct rcu_head rcu_head;
++
++	struct device_node *np;
+ };
+ 
+ /**
+@@ -679,6 +691,125 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
+ 	return ret;
  }
- EXPORT_SYMBOL_GPL(dev_pm_opp_remove);
  
-+static struct dev_pm_opp *_allocate_opp(struct device *dev,
-+					struct device_opp **dev_opp)
++/* TODO: Support multiple regulators */
++static int opp_get_microvolt(struct dev_pm_opp *opp, struct device *dev)
 +{
-+	struct dev_pm_opp *opp;
++	u32 microvolt[3] = {0};
++	int count, ret;
 +
-+	/* allocate new OPP node */
-+	opp = kzalloc(sizeof(*opp), GFP_KERNEL);
-+	if (!opp)
-+		return NULL;
++	count = of_property_count_u32_elems(opp->np, "opp-microvolt");
++	if (!count)
++		return 0;
 +
-+	INIT_LIST_HEAD(&opp->node);
-+
-+	*dev_opp = _add_device_opp(dev);
-+	if (!*dev_opp) {
-+		kfree(opp);
-+		return NULL;
++	/* There can be one or three elements here */
++	if (count != 1 && count != 3) {
++		dev_err(dev, "%s: Invalid number of elements in opp-microvolt property (%d)\n",
++			__func__, count);
++		return -EINVAL;
 +	}
 +
-+	return opp;
-+}
-+
-+static int _opp_add(struct dev_pm_opp *new_opp, struct device_opp *dev_opp)
-+{
-+	struct dev_pm_opp *opp;
-+	struct list_head *head = &dev_opp->opp_list;
-+
-+	/*
-+	 * Insert new OPP in order of increasing frequency and discard if
-+	 * already present.
-+	 *
-+	 * Need to use &dev_opp->opp_list in the condition part of the 'for'
-+	 * loop, don't replace it with head otherwise it will become an infinite
-+	 * loop.
-+	 */
-+	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
-+		if (new_opp->rate > opp->rate) {
-+			head = &opp->node;
-+			continue;
-+		}
-+
-+		if (new_opp->rate < opp->rate)
-+			break;
-+
-+		/* Duplicate OPPs */
-+		dev_warn(dev_opp->dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
-+			 __func__, opp->rate, opp->u_volt, opp->available,
-+			 new_opp->rate, new_opp->u_volt, new_opp->available);
-+
-+		return opp->available && new_opp->u_volt == opp->u_volt ?
-+			0 : -EEXIST;
++	ret = of_property_read_u32_array(opp->np, "opp-microvolt", microvolt,
++					 count);
++	if (ret) {
++		dev_err(dev, "%s: error parsing opp-microvolt: %d\n", __func__,
++			ret);
++		return -EINVAL;
 +	}
 +
-+	new_opp->dev_opp = dev_opp;
-+	list_add_rcu(&new_opp->node, head);
++	opp->u_volt = microvolt[0];
++	opp->u_volt_min = microvolt[1];
++	opp->u_volt_max = microvolt[2];
 +
 +	return 0;
 +}
 +
- /**
-  * _opp_add_dynamic() - Allocate a dynamic OPP.
-  * @dev:	device for which we do this operation
-@@ -581,62 +641,28 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 			    long u_volt, bool dynamic)
- {
- 	struct device_opp *dev_opp;
--	struct dev_pm_opp *opp, *new_opp;
--	struct list_head *head;
++/**
++ * _opp_add_static_v2() - Allocate static OPPs (As per 'v2' DT bindings)
++ * @dev:	device for which we do this operation
++ * @np:		device node
++ *
++ * This function adds an opp definition to the opp list and returns status. The
++ * opp can be controlled using dev_pm_opp_enable/disable functions and may be
++ * removed by dev_pm_opp_remove.
++ *
++ * Locking: The internal device_opp and opp structures are RCU protected.
++ * Hence this function internally uses RCU updater strategy with mutex locks
++ * to keep the integrity of the internal data structures. Callers should ensure
++ * that this function is *NOT* called under RCU protection or in contexts where
++ * mutex cannot be locked.
++ *
++ * Return:
++ * 0		On success OR
++ *		Duplicate OPPs (both freq and volt are same) and opp->available
++ * -EEXIST	Freq are same and volt are different OR
++ *		Duplicate OPPs (both freq and volt are same) and !opp->available
++ * -ENOMEM	Memory allocation failure
++ * -EINVAL	Failed parsing the OPP node
++ */
++static int _opp_add_static_v2(struct device *dev, struct device_node *np)
++{
++	struct device_opp *dev_opp;
 +	struct dev_pm_opp *new_opp;
- 	int ret;
- 
--	/* allocate new OPP node */
--	new_opp = kzalloc(sizeof(*new_opp), GFP_KERNEL);
--	if (!new_opp)
--		return -ENOMEM;
--
- 	/* Hold our list modification lock here */
- 	mutex_lock(&dev_opp_list_lock);
- 
++	u64 rate;
++	int ret;
++
++	/* Hold our list modification lock here */
++	mutex_lock(&dev_opp_list_lock);
++
 +	new_opp = _allocate_opp(dev, &dev_opp);
 +	if (!new_opp) {
 +		ret = -ENOMEM;
 +		goto unlock;
 +	}
 +
- 	/* populate the opp table */
- 	new_opp->rate = freq;
- 	new_opp->u_volt = u_volt;
- 	new_opp->available = true;
-+	new_opp->dynamic = dynamic;
- 
--	dev_opp = _add_device_opp(dev);
--	if (!dev_opp) {
--		ret = -ENOMEM;
--		goto free_opp;
--	}
--
--	/*
--	 * Insert new OPP in order of increasing frequency
--	 * and discard if already present
--	 */
--	head = &dev_opp->opp_list;
--
--	/*
--	 * Need to use &dev_opp->opp_list in the condition part of the 'for'
--	 * loop, don't replace it with head otherwise it will become an infinite
--	 * loop.
--	 */
--	list_for_each_entry_rcu(opp, &dev_opp->opp_list, node) {
--		if (new_opp->rate > opp->rate) {
--			head = &opp->node;
--			continue;
--		}
--
--		if (new_opp->rate < opp->rate)
--			break;
--
--		/* Duplicate OPPs */
--		ret = opp->available && new_opp->u_volt == opp->u_volt ?
--			0 : -EEXIST;
--
--		dev_warn(dev, "%s: duplicate OPPs detected. Existing: freq: %lu, volt: %lu, enabled: %d. New: freq: %lu, volt: %lu, enabled: %d\n",
--			 __func__, opp->rate, opp->u_volt, opp->available,
--			 new_opp->rate, new_opp->u_volt, new_opp->available);
++	ret = of_property_read_u64(np, "opp-hz", &rate);
++	if (ret < 0) {
++		dev_err(dev, "%s: opp-hz not found\n", __func__);
++		goto free_opp;
++	}
++
++	/*
++	 * Rate is defined as an unsigned long in clk API, and so casting
++	 * explicitly to its type. Must be fixed once rate is 64 bit
++	 * guaranteed in clk API.
++	 */
++	new_opp->rate = (unsigned long)rate;
++	new_opp->turbo = of_property_read_bool(np, "turbo-mode");
++
++	new_opp->np = np;
++	new_opp->dynamic = false;
++	new_opp->available = true;
++
++	ret = opp_get_microvolt(new_opp, dev);
++	if (ret)
++		goto free_opp;
++
++	of_property_read_u32(np, "opp-microamp", (u32 *)&new_opp->u_amp);
++
 +	ret = _opp_add(new_opp, dev_opp);
 +	if (ret)
- 		goto free_opp;
--	}
- 
--	new_opp->dynamic = dynamic;
--	new_opp->dev_opp = dev_opp;
--	list_add_rcu(&new_opp->node, head);
- 	mutex_unlock(&dev_opp_list_lock);
- 
- 	/*
-@@ -647,8 +673,9 @@ static int _opp_add_dynamic(struct device *dev, unsigned long freq,
- 	return 0;
- 
- free_opp:
++		goto free_opp;
++
++	mutex_unlock(&dev_opp_list_lock);
++
++	pr_debug("%s: turbo:%d rate:%lu uv:%lu uvmin:%lu uvmax:%lu\n",
++		 __func__, new_opp->turbo, new_opp->rate, new_opp->u_volt,
++		 new_opp->u_volt_min, new_opp->u_volt_max);
++
++	/*
++	 * Notify the changes in the availability of the operable
++	 * frequency/voltage list.
++	 */
++	srcu_notifier_call_chain(&dev_opp->srcu_head, OPP_EVENT_ADD, new_opp);
++	return 0;
++
++free_opp:
 +	_opp_remove(dev_opp, new_opp, false);
 +unlock:
- 	mutex_unlock(&dev_opp_list_lock);
--	kfree(new_opp);
- 	return ret;
++	mutex_unlock(&dev_opp_list_lock);
++	return ret;
++}
++
+ /**
+  * dev_pm_opp_add()  - Add an OPP table from a table definitions
+  * @dev:	device for which we do this operation
+@@ -910,29 +1041,64 @@ void of_free_opp_table(struct device *dev)
  }
+ EXPORT_SYMBOL_GPL(of_free_opp_table);
  
-@@ -876,7 +903,7 @@ void of_free_opp_table(struct device *dev)
- 	/* Free static OPPs */
- 	list_for_each_entry_safe(opp, tmp, &dev_opp->opp_list, node) {
- 		if (!opp->dynamic)
--			_opp_remove(dev_opp, opp);
-+			_opp_remove(dev_opp, opp, true);
- 	}
+-/**
+- * of_init_opp_table() - Initialize opp table from device tree
+- * @dev:	device pointer used to lookup device OPPs.
+- *
+- * Register the initial OPP table with the OPP library for given device.
+- *
+- * Locking: The internal device_opp and opp structures are RCU protected.
+- * Hence this function indirectly uses RCU updater strategy with mutex locks
+- * to keep the integrity of the internal data structures. Callers should ensure
+- * that this function is *NOT* called under RCU protection or in contexts where
+- * mutex cannot be locked.
+- *
+- * Return:
+- * 0		On success OR
+- *		Duplicate OPPs (both freq and volt are same) and opp->available
+- * -EEXIST	Freq are same and volt are different OR
+- *		Duplicate OPPs (both freq and volt are same) and !opp->available
+- * -ENOMEM	Memory allocation failure
+- * -ENODEV	when 'operating-points' property is not found or is invalid data
+- *		in device node.
+- * -ENODATA	when empty 'operating-points' property is found
+- */
+-int of_init_opp_table(struct device *dev)
++/* Returns opp descriptor node from its phandle. Caller must do of_node_put() */
++static struct device_node *
++_of_get_opp_desc_node_from_prop(struct device *dev, const struct property *prop)
++{
++	struct device_node *opp_np;
++
++	opp_np = of_find_node_by_phandle(be32_to_cpup(prop->value));
++	if (!opp_np) {
++		dev_err(dev, "%s: Prop: %s contains invalid opp desc phandle\n",
++			__func__, prop->name);
++		return ERR_PTR(-EINVAL);
++	}
++
++	return opp_np;
++}
++
++/* Initializes OPP tables based on new bindings */
++static int _of_init_opp_table_v2(struct device *dev,
++				 const struct property *prop)
++{
++	struct device_node *opp_np, *np;
++	int ret = 0, count = 0;
++
++	if (!prop->value)
++		return -ENODATA;
++
++	/* Get opp node */
++	opp_np = _of_get_opp_desc_node_from_prop(dev, prop);
++	if (IS_ERR(opp_np))
++		return PTR_ERR(opp_np);
++
++	/* We have opp-list node now, iterate over it and add OPPs */
++	for_each_available_child_of_node(opp_np, np) {
++		count++;
++
++		ret = _opp_add_static_v2(dev, np);
++		if (ret) {
++			dev_err(dev, "%s: Failed to add OPP, %d\n", __func__,
++				ret);
++			break;
++		}
++	}
++
++	/* There should be one of more OPP defined */
++	if (WARN_ON(!count))
++		goto put_opp_np;
++
++	if (ret)
++		of_free_opp_table(dev);
++
++put_opp_np:
++	of_node_put(opp_np);
++
++	return ret;
++}
++
++/* Initializes OPP tables based on old-deprecated bindings */
++static int _of_init_opp_table_v1(struct device *dev)
+ {
+ 	const struct property *prop;
+ 	const __be32 *val;
+@@ -967,5 +1133,48 @@ int of_init_opp_table(struct device *dev)
  
- 	mutex_unlock(&dev_opp_list_lock);
+ 	return 0;
+ }
++
++/**
++ * of_init_opp_table() - Initialize opp table from device tree
++ * @dev:	device pointer used to lookup device OPPs.
++ *
++ * Register the initial OPP table with the OPP library for given device.
++ *
++ * Locking: The internal device_opp and opp structures are RCU protected.
++ * Hence this function indirectly uses RCU updater strategy with mutex locks
++ * to keep the integrity of the internal data structures. Callers should ensure
++ * that this function is *NOT* called under RCU protection or in contexts where
++ * mutex cannot be locked.
++ *
++ * Return:
++ * 0		On success OR
++ *		Duplicate OPPs (both freq and volt are same) and opp->available
++ * -EEXIST	Freq are same and volt are different OR
++ *		Duplicate OPPs (both freq and volt are same) and !opp->available
++ * -ENOMEM	Memory allocation failure
++ * -ENODEV	when 'operating-points' property is not found or is invalid data
++ *		in device node.
++ * -ENODATA	when empty 'operating-points' property is found
++ * -EINVAL	when invalid entries are found in opp-v2 table
++ */
++int of_init_opp_table(struct device *dev)
++{
++	const struct property *prop;
++
++	/*
++	 * OPPs have two version of bindings now. The older one is deprecated,
++	 * try for the new binding first.
++	 */
++	prop = of_find_property(dev->of_node, "operating-points-v2", NULL);
++	if (!prop) {
++		/*
++		 * Try old-deprecated bindings for backward compatibility with
++		 * older dtbs.
++		 */
++		return _of_init_opp_table_v1(dev);
++	}
++
++	return _of_init_opp_table_v2(dev, prop);
++}
+ EXPORT_SYMBOL_GPL(of_init_opp_table);
+ #endif
 -- 
 2.4.0
