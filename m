@@ -1,124 +1,162 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Wed, 29 Jul 2015 19:17:00 +0800
-Subject: [rtc-linux] [PATCH] drivers/rtc/rtc-pl031.c: reset registers in
- init flow
-In-Reply-To: <CACRpkdZ5Kvc0LPeG_HAHwejoCRV4JRbpA2+zwNCAxTqzxdDYzQ@mail.gmail.com>
-References: <1438149721-11072-1-git-send-email-leo.yan@linaro.org>
- <CACRpkdZ5Kvc0LPeG_HAHwejoCRV4JRbpA2+zwNCAxTqzxdDYzQ@mail.gmail.com>
-Message-ID: <20150729111700.GA12912@leoy-linaro>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 29 Jul 2015 13:20:03 +0200
+Subject: [PATCH v2 04/22] of/platform: add of_platform_device_find()
+In-Reply-To: <CAAObsKA+vMsgiC52jReJckeDjXhdd=_NBocFbMapdwFReiY1SQ@mail.gmail.com>
+References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAL_JsqJGhFXDKuayuKc2E58X5A7ZGN=uYCVDLnXw_t3_auBg+w@mail.gmail.com>
+ <CAAObsKBfRLdPc0gs55ARfa+qZJAOEyEgRyTf8krZnQMb6-j03g@mail.gmail.com>
+ <CAL_Jsq+RqGAxHE5-ocD-htddBHckG24oZNqfgmMF3Jak6wDXBQ@mail.gmail.com>
+ <CAAObsKA+vMsgiC52jReJckeDjXhdd=_NBocFbMapdwFReiY1SQ@mail.gmail.com>
+Message-ID: <CAAObsKD9BN7dsEiNB=OvJkoOQPwxwnP794w=X4AwtYz3oxEJqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 29 July 2015 at 08:14, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> On 28 July 2015 at 17:31, Rob Herring <robherring2@gmail.com> wrote:
+>> On Tue, Jul 28, 2015 at 8:54 AM, Tomeu Vizoso
+>> <tomeu.vizoso@collabora.com> wrote:
+>>> On 28 July 2015 at 15:39, Rob Herring <robherring2@gmail.com> wrote:
+>>>> On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
+>>>> <tomeu.vizoso@collabora.com> wrote:
+>>>>> From an arbitrary node in the tree, find the enclosing node that
+>>>>> corresponds to a platform device, as registered by
+>>>>> of_platform_populate().
+>>>>>
+>>>>> This can be used to find out what device needs to be probed so the
+>>>>> dependency described by a given node is made available.
+>>>>>
+>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>>> ---
+>>>>>
+>>>>> Changes in v2:
+>>>>> - Move the logic for finding a platform device from its firmware node to
+>>>>>   of/platform.c as it's not needed for ACPI nodes.
+>>>>>
+>>>>>  drivers/of/platform.c       | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>>>>>  include/linux/of_platform.h |  1 +
+>>>>>  2 files changed, 61 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>>>>> index ff27494cda8c..89c5cd513027 100644
+>>>>> --- a/drivers/of/platform.c
+>>>>> +++ b/drivers/of/platform.c
+>>>>> @@ -501,6 +501,66 @@ void of_platform_depopulate(struct device *parent)
+>>>>>  }
+>>>>>  EXPORT_SYMBOL_GPL(of_platform_depopulate);
+>>>>>
+>>>>> +static bool of_is_platform(struct device_node *np)
+>>>>> +{
+>>>>> +       int count;
+>>>>> +
+>>>>> +       count = of_property_count_strings(np, "compatible");
+>>>>> +
+>>>>> +       /* The node has to have a compatible string */
+>>>>> +       if (!count)
+>>>>> +               return false;
+>>>>> +
+>>>>> +       /* But it cannot be just a simple memory-mapped bus */
+>>>>> +       if (count == 1 && of_match_node(of_default_bus_match_table, np))
+>>>>> +               return false;
+>>>>> +
+>>>>> +       /* But AMBA devices aren't platform devices */
+>>>>> +       if (of_device_is_compatible(np, "arm,primecell"))
+>>>>> +               return false;
+>>>>> +
+>>>>> +       /* Node is immediately below root */
+>>>>> +       if (!np->parent || !np->parent->parent)
+>>>>> +               return true;
+>>>>> +
+>>>>> +       /* If it's a node in a simple memory-mapped bus */
+>>>>> +       if (of_match_node(of_default_bus_match_table, np->parent))
+>>>>> +               return true;
+>>>>
+>>>> This seems really fragile.
+>>>
+>>> I think this finding logic matches the logic for registering platform
+>>> devices in of_platform_populate and also what is documented in
+>>> Documentation/devicetree/usage-model.txt.
+>>
+>> Right. So now we have that logic in 2 places. One is descending from
+>> the root and one is walking up from the child. That's an opportunity
+>> for some mismatch.
+>
+> Definitely.
+>
+>>>> What about platform devices which are
+>>>> children of MFDs but are not "simple-mfd"?
+>>>
+>>> This code should deal fine with those (the boards I tested with do
+>>> have them). It probes the mfd master, and that in turn will call
+>>> mfd_add_devices causing the target device to be probed.
+>>
+>> I don't see how this function would ever return true in this case
+>> unless you put the MFD at the root level. The only other way to return
+>> true is matching on of_default_bus_match_table for the parent (i.e.
+>> the MFD).
+>
+> Oops, you are right.
+>
+>>>> Does of_find_device_by_node not work for you?
+>>>
+>>> Well, the dependencies aren't always platform devices, that's why I
+>>> need to go up the tree until I find a node that corresponds to a
+>>> platform device that I can query and probe.
+>>>
+>>> If I had a way to get, say, a i2c device from its fwnode then I would
+>>> just need to make sure that a device's parent is probed before probing
+>>> it and everything would be cleaner in the OF case.
+>>
+>> If you have the struct device from the device_node, then you should be
+>> able to do this, right?
+>
+> Yes, if I could go back from the device_node to the struct device that
+> was registered from it, for all buses, then all this would be much
+> simpler and more robust. It would basically work like in the ACPI
+> case.
+>
+> I will play with this idea.
+>
+>>>> That is probably not the
+>>>> most efficient search, but we could fix that. We could add struct
+>>>> device ptr to struct device_node and check without searching for
+>>>> example.
+>>>
+>>> That would be great, but I thought there was an issue with a OF node
+>>> being able to be related to more than one struct device (but I haven't
+>>> found this myself yet).
+>>
+>> I think it pretty much should be one to one. I'm not aware of any
+>> examples where that is not the case. This function would already be
+>> broken if you could have more than one struct device.
+>
+> Well, for platform devices we currently know that there can only be
+> one struct device for a given device_node, but that's not so clear for
+> other devices.
 
-On Wed, Jul 29, 2015 at 11:08:30AM +0200, Linus Walleij wrote:
-> On Wed, Jul 29, 2015 at 8:02 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> 
-> > When use rtc-pl031 for suspend test on Hisilicon's SoC Hi6220, Usually
-> > the data register (DR) will read back as value zero. So the suspend
-> > test code will set the match register (MR) for 10 seconds' timeout; But
-> > there have chance later will read back some random values from DR
-> > register; So finally miss with match value and will not trigger
-> > waken up event anymore.
-> >
-> > This issue can be dismissed by reset registers in initialization flow;
-> > And this code have no harm for ST's variant.
-> >
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> 
-> I don't understand this...
+Just found this case:
 
-Sorry for confusion. This issue is found when i use file
-kernel/power/suspend_test.c to verify the system suspend. Before the
-system suspend, the flow need set 10's alarm in RTC for waken up
-event.
+http://lxr.free-electrons.com/source/drivers/spi/spi-tegra114.c#L1124
 
-But what i observed the phenomenon is:
+Looks like SPI master devices point to the same device_node as the
+platform device that registers them.
 
-At the init phase:
-RTC_LR = 0x0;
-RTC_DR = 0x0;
-RTC_MR = 0x0;
+Regards,
 
-According to the timeout is 10s, the function *pl031_set_alarm()* will
-set RTC_MR = 10; So usually RTC_DR will increase one for every second
-and will trigger interrupt when RTC_DR equal to RTC_MR. But on
-Hi6220, though the RTC_DR init value is zero, but very soon it will be
-set a random value which is bigger than 10. So it will never match with
-RTC_MR register anymore; finally the system cannot resume back due the
-waken up event will not be triggered.
+Tomeu
 
-So suspect RTC_LR has not been initailized correctly and it will load
-random value to RTC_DR. After reset the RTC_LR, this issue will be
-fixed.
-
-> > +       /* Init registers */
-> > +       writel(0x0, ldata->base + RTC_LR);
-> 
-> This will reset the clock to jan 1st 1970 on every reboot.
-> The idea is that the RTC should *preserve* the system time
-> if you reboot the system, so NACK.
-> 
-> Usually userspace has a script using hwclock to read the
-> system time from the rtc to system time with hwclock -s
-> after userspace comes up. Likewise it writes it back with
-> hwclock -w before rebooting.
-
-This change is wrong.
-
-> > +       writel(0x0, ldata->base + RTC_DR);
-> 
-> This is a read-only register in the PL031 clean variant.
-> What do you want to achieve here? Is this register writeable
-> on the HiSilicon?
-
-Checked the manual, this register is RO. Will drop it.
-
-> > +       writel(0x0, ldata->base + RTC_IMSC);
-> 
-> OK
-> 
-> > +       writel(RTC_BIT_AI, ldata->base + RTC_ICR);
-> 
-> So why do we want to have the alarm enabled by
-> default, before the kernel nor userspace has requested
-> it?
-
-This is to clear any pending interrupt, but not enable alarm.
-
-> If your problem is with suspend/resume I suggest you work
-> on the [runtime]_suspend/resume hooks instead of probe().
-> Possibly you need to save/restore state across suspend/resume.
-
-Do you think below change is make sense?
-
----8<---
-
-diff --git a/drivers/rtc/rtc-pl031.c b/drivers/rtc/rtc-pl031.c
-index 99181fff..c461e03 100644
---- a/drivers/rtc/rtc-pl031.c
-+++ b/drivers/rtc/rtc-pl031.c
-@@ -345,6 +345,10 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 	dev_dbg(&adev->dev, "designer ID = 0x%02x\n", amba_manf(adev));
- 	dev_dbg(&adev->dev, "revision = 0x%01x\n", amba_rev(adev));
- 
-+	/* Init registers */
-+	writel(0x0, ldata->base + RTC_IMSC);
-+	writel(RTC_BIT_AI, ldata->base + RTC_ICR);
-+
- 	data = readl(ldata->base + RTC_CR);
- 	/* Enable the clockwatch on ST Variants */
- 	if (vendor->clockwatch)
-@@ -368,6 +372,9 @@ static int pl031_probe(struct amba_device *adev, const struct amba_id *id)
- 				writel(time, ldata->base + RTC_LR);
- 			}
- 		}
-+	} else {
-+		time = readl(ldata->base + RTC_DR);
-+		writel(time, ldata->base + RTC_LR);
- 	}
- 
- 	device_init_wakeup(&adev->dev, 1);
-
-Thanks,
-Leo Yan
+>> There is an issue where you could have 2 drivers match the same node,
+>> but on different compatible strings. But that's a different issue.
+>
+> Yup.
+>
+> Thanks,
+>
+> Tomeu
+>
+>> Rob
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
