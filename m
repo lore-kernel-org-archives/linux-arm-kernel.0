@@ -1,37 +1,31 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 29 Jul 2015 23:51:00 +0200
-Subject: [PATCH 2/2] ARM: BCM5301X: Add profiling support
-In-Reply-To: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
-References: <1438206660-30718-1-git-send-email-hauke@hauke-m.de>
-Message-ID: <1438206660-30718-2-git-send-email-hauke@hauke-m.de>
+From: mcgrof@suse.com (Luis R. Rodriguez)
+Date: Wed, 29 Jul 2015 23:52:30 +0200
+Subject: [PATCH v2 08/25] arch: introduce memremap()
+In-Reply-To: <CAPcyv4j67493ROvnC1EZBEFMiWB=gLu=C-Y-PrJf0BvO3A=y2w@mail.gmail.com>
+References: <20150726172527.GA29513@lst.de>
+ <CAPcyv4igoopDPpcCRU1TNYdwPhiYdcDiRA7L9Jdian=0rtexRg@mail.gmail.com>
+ <20150727051258.GB15836@lst.de>
+ <CAPcyv4jN6jYzw11qOOR-xd_w6s5dguQSoHyvmPFSWtL9S+tz3w@mail.gmail.com>
+ <20150729065004.GA17162@lst.de>
+ <20150729182712.GI30479@wotan.suse.de>
+ <CAPcyv4iAeMAmU1QRZ1=WTav0cg2=-gqzzrt3nMC1QoD1+hOeBg@mail.gmail.com>
+ <1438203638.3214.418.camel@hp.com>
+ <20150729214358.GK30479@wotan.suse.de>
+ <CAPcyv4j67493ROvnC1EZBEFMiWB=gLu=C-Y-PrJf0BvO3A=y2w@mail.gmail.com>
+Message-ID: <20150729215230.GL30479@wotan.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Felix Fietkau <nbd@openwrt.org>
+On Wed, Jul 29, 2015 at 02:47:40PM -0700, Dan Williams wrote:
+> On Wed, Jul 29, 2015 at 2:43 PM, Luis R. Rodriguez <mcgrof@suse.com> wrote:
+> > While at it, Dan, will / should memremap() support overlapping calls ?
+> > What is the expectation on behaviour ?
+> 
+> It will be the same as ioremap().  Each mapping gets its own virtual
+> address and overlapping calls are permitted.  The only protection is
+> that RAM is never mapped with an alias.
 
-Signed-off-by: Felix Fietkau <nbd@openwrt.org>
-Signed-off-by: Hauke Mehrtens <hauke@hauke-m.de>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+If you could document this as part of your next respin that'd be
+highly appreciated.
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 0bae982..6f50f67 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -85,6 +85,13 @@
- 		};
- 	};
- 
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupts =
-+			<GIC_SPI 8 IRQ_TYPE_LEVEL_HIGH>,
-+			<GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	clocks {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
--- 
-2.1.4
+  Luis
