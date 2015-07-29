@@ -1,123 +1,146 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:39 +0530
-Subject: [PATCH 09/17] mmc: host: omap_hsmmc: add separate function to set
- pbias
+Date: Wed, 29 Jul 2015 16:39:35 +0530
+Subject: [PATCH 05/17] mmc: host: omap_hsmmc: use mmc_host's vmmc and vqmmc
 In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
 References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-10-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No functional change. Cleanup omap_hsmmc_set_power by adding separate
-functions to set pbias and invoke it from omap_hsmmc_set_power.
+No functional change. Instead of using our own vcc and vcc_aux
+members, use vmmc and vqmmc present in mmc_host which is present
+for the same purpose.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Reviewed-by: Roger Quadros <rogerq@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   78 +++++++++++++++++++++++++----------------
- 1 file changed, 48 insertions(+), 30 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   63 ++++++++++++++++++-----------------------
+ 1 file changed, 28 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index a0f8c1d..8bb3f60 100644
+index 0e690d7..dad1473 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -306,6 +306,48 @@ err_set_ocr:
- 	return ret;
- }
- 
-+static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
-+				int vdd)
-+{
-+	int ret;
-+
-+	if (!host->pbias)
-+		return 0;
-+
-+	if (power_on) {
-+		if (vdd <= VDD_165_195)
-+			ret = regulator_set_voltage(host->pbias, VDD_1V8,
-+						    VDD_1V8);
-+		else
-+			ret = regulator_set_voltage(host->pbias, VDD_3V0,
-+						    VDD_3V0);
-+		if (ret < 0) {
-+			dev_err(host->dev, "pbias set voltage fail\n");
-+			return ret;
-+		}
-+
-+		if (host->pbias_enabled == 0) {
-+			ret = regulator_enable(host->pbias);
-+			if (ret) {
-+				dev_err(host->dev, "pbias reg enable fail\n");
-+				return ret;
-+			}
-+			host->pbias_enabled = 1;
-+		}
-+	} else {
-+		if (host->pbias_enabled == 1) {
-+			ret = regulator_disable(host->pbias);
-+			if (ret) {
-+				dev_err(host->dev, "pbias reg disable fail\n");
-+				return ret;
-+			}
-+			host->pbias_enabled = 0;
-+		}
-+	}
-+
-+	return 0;
-+}
-+
- static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
+@@ -181,15 +181,6 @@ struct omap_hsmmc_host {
+ 	struct	mmc_data	*data;
+ 	struct	clk		*fclk;
+ 	struct	clk		*dbclk;
+-	/*
+-	 * vcc == configured supply
+-	 * vcc_aux == optional
+-	 *   -	MMC1, supply for DAT4..DAT7
+-	 *   -	MMC2/MMC2, external level shifter voltage supply, for
+-	 *	chip (SDIO, eMMC, etc) or transceiver (MMC2 only)
+-	 */
+-	struct	regulator	*vcc;
+-	struct	regulator	*vcc_aux;
+ 	struct	regulator	*pbias;
+ 	bool			pbias_enabled;
+ 	void	__iomem		*base;
+@@ -260,13 +251,14 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
  {
  	struct omap_hsmmc_host *host =
-@@ -323,16 +365,9 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
- 	if (mmc_pdata(host)->before_set_reg)
- 		mmc_pdata(host)->before_set_reg(dev, power_on, vdd);
- 
--	if (host->pbias) {
--		if (host->pbias_enabled == 1) {
--			ret = regulator_disable(host->pbias);
--			if (ret) {
--				dev_err(dev, "pbias reg disable failed\n");
--				return ret;
--			}
--			host->pbias_enabled = 0;
--		}
--	}
-+	ret = omap_hsmmc_set_pbias(host, false, 0);
-+	if (ret)
-+		return ret;
+ 		platform_get_drvdata(to_platform_device(dev));
++	struct mmc_host *mmc = host->mmc;
+ 	int ret = 0;
  
  	/*
- 	 * Assume Vcc regulator is used only to power the card ... OMAP
-@@ -357,26 +392,9 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
- 			return ret;
+ 	 * If we don't see a Vcc regulator, assume it's a fixed
+ 	 * voltage always-on regulator.
+ 	 */
+-	if (!host->vcc)
++	if (!mmc->supply.vmmc)
+ 		return 0;
+ 
+ 	if (mmc_pdata(host)->before_set_reg)
+@@ -295,23 +287,23 @@ static int omap_hsmmc_set_power(struct device *dev, int power_on, int vdd)
+ 	 * chips/cards need an interface voltage rail too.
+ 	 */
+ 	if (power_on) {
+-		if (host->vcc)
+-			ret = mmc_regulator_set_ocr(host->mmc, host->vcc, vdd);
++		if (mmc->supply.vmmc)
++			ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+ 		/* Enable interface voltage rail, if needed */
+-		if (ret == 0 && host->vcc_aux) {
+-			ret = regulator_enable(host->vcc_aux);
+-			if (ret < 0 && host->vcc)
+-				ret = mmc_regulator_set_ocr(host->mmc,
+-							host->vcc, 0);
++		if (ret == 0 && mmc->supply.vqmmc) {
++			ret = regulator_enable(mmc->supply.vqmmc);
++			if (ret < 0 && mmc->supply.vmmc)
++				ret = mmc_regulator_set_ocr(mmc,
++							    mmc->supply.vmmc,
++							    0);
+ 		}
+ 	} else {
+ 		/* Shut down the rail */
+-		if (host->vcc_aux)
+-			ret = regulator_disable(host->vcc_aux);
+-		if (host->vcc) {
++		if (mmc->supply.vqmmc)
++			ret = regulator_disable(mmc->supply.vqmmc);
++		if (mmc->supply.vmmc) {
+ 			/* Then proceed to shut down the local regulator */
+-			ret = mmc_regulator_set_ocr(host->mmc,
+-						host->vcc, 0);
++			ret = mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, 0);
+ 		}
  	}
  
--	if (host->pbias) {
--		if (vdd <= VDD_165_195)
--			ret = regulator_set_voltage(host->pbias, VDD_1V8,
--								VDD_1V8);
--		else
--			ret = regulator_set_voltage(host->pbias, VDD_3V0,
--								VDD_3V0);
--		if (ret < 0)
--			goto err_set_voltage;
--
--		if (host->pbias_enabled == 0) {
--			ret = regulator_enable(host->pbias);
--			if (ret) {
--				dev_err(dev, "pbias reg enable failed\n");
--				goto err_set_voltage;
--			} else {
--				host->pbias_enabled = 1;
--			}
--		}
--	}
-+	ret = omap_hsmmc_set_pbias(host, true, vdd);
-+	if (ret)
-+		goto err_set_voltage;
+@@ -342,29 +334,30 @@ error_set_power:
+ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ {
+ 	int ocr_value = 0;
++	struct mmc_host *mmc = host->mmc;
  
- 	if (mmc_pdata(host)->after_set_reg)
- 		mmc_pdata(host)->after_set_reg(dev, power_on, vdd);
+-	host->vcc = devm_regulator_get_optional(host->dev, "vmmc");
+-	if (IS_ERR(host->vcc)) {
+-		if (PTR_ERR(host->vcc) == -EPROBE_DEFER)
++	mmc->supply.vmmc = devm_regulator_get_optional(host->dev, "vmmc");
++	if (IS_ERR(mmc->supply.vmmc)) {
++		if (PTR_ERR(mmc->supply.vmmc) == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 		dev_dbg(host->dev, "unable to get vmmc regulator %ld\n",
+-			PTR_ERR(host->vcc));
+-		host->vcc = NULL;
++			PTR_ERR(mmc->supply.vmmc));
++		mmc->supply.vmmc = NULL;
+ 	} else {
+-		ocr_value = mmc_regulator_get_ocrmask(host->vcc);
++		ocr_value = mmc_regulator_get_ocrmask(mmc->supply.vmmc);
+ 		if (ocr_value > 0)
+ 			mmc_pdata(host)->ocr_mask = ocr_value;
+ 	}
+ 	mmc_pdata(host)->set_power = omap_hsmmc_set_power;
+ 
+ 	/* Allow an aux regulator */
+-	host->vcc_aux = devm_regulator_get_optional(host->dev, "vmmc_aux");
+-	if (IS_ERR(host->vcc_aux)) {
+-		if (PTR_ERR(host->vcc_aux) == -EPROBE_DEFER)
++	mmc->supply.vqmmc = devm_regulator_get_optional(host->dev, "vmmc_aux");
++	if (IS_ERR(mmc->supply.vqmmc)) {
++		if (PTR_ERR(mmc->supply.vqmmc) == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 		dev_dbg(host->dev, "unable to get vmmc_aux regulator %ld\n",
+-			PTR_ERR(host->vcc_aux));
+-		host->vcc_aux = NULL;
++			PTR_ERR(mmc->supply.vqmmc));
++		mmc->supply.vqmmc = NULL;
+ 	}
+ 
+ 	host->pbias = devm_regulator_get_optional(host->dev, "pbias");
+@@ -383,8 +376,8 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+ 	 * To disable boot_on regulator, enable regulator
+ 	 * to increase usecount and then disable it.
+ 	 */
+-	if ((host->vcc && regulator_is_enabled(host->vcc) > 0) ||
+-	    (host->vcc_aux && regulator_is_enabled(host->vcc_aux))) {
++	if ((mmc->supply.vmmc && regulator_is_enabled(mmc->supply.vmmc) > 0) ||
++	    (mmc->supply.vqmmc && regulator_is_enabled(mmc->supply.vqmmc))) {
+ 		int vdd = ffs(mmc_pdata(host)->ocr_mask) - 1;
+ 
+ 		mmc_pdata(host)->set_power(host->dev, 1, vdd);
 -- 
 1.7.9.5
