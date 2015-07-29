@@ -1,55 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 29 Jul 2015 17:25:11 +0100
-Subject: [PATCH v3 2/2] PCI: generic: add arm64 support
-In-Reply-To: <1438183681-30519-2-git-send-email-jchandra@broadcom.com>
-References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
- <1438183681-30519-2-git-send-email-jchandra@broadcom.com>
-Message-ID: <20150729162510.GA29159@red-moon>
+From: rjui@broadcom.com (Ray Jui)
+Date: Wed, 29 Jul 2015 10:12:53 -0700
+Subject: [PATCH v2] PCI: iproc: Fix BCMA dependency in Kconfig
+Message-ID: <1438189973-5712-1-git-send-email-rjui@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 04:28:01PM +0100, Jayachandran C wrote:
-> Enable pci-host-generic driver available in arm64. This needs
-> drivers/pci/setup-irq.o as well.
+The current iProc BCMA front-end driver can only work on ARM32 based
+platforms; therefore its config option in Kconfig should be changed to
+reflect that. This fixes arm64 allmodconfig build failure when compiling
+the the iProc BCMA driver that contains struct pci_sys_data that is
+arm32 specific
 
-You should move the Kconfig change to the previous patch,
-and create another a stand-alone patch (that you will send as
-first in the patch sequence) to compile setup-irq.c on ARM64.
+Signed-off-by: Ray Jui <rjui@broadcom.com>
+---
+ drivers/pci/host/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Thanks,
-Lorenzo
-
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  drivers/pci/Makefile     | 1 +
->  drivers/pci/host/Kconfig | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
-> index 73e4af4..be3f631 100644
-> --- a/drivers/pci/Makefile
-> +++ b/drivers/pci/Makefile
-> @@ -33,6 +33,7 @@ obj-$(CONFIG_PCI_IOV) += iov.o
->  #
->  obj-$(CONFIG_ALPHA) += setup-irq.o
->  obj-$(CONFIG_ARM) += setup-irq.o
-> +obj-$(CONFIG_ARM64) += setup-irq.o
->  obj-$(CONFIG_UNICORE32) += setup-irq.o
->  obj-$(CONFIG_SUPERH) += setup-irq.o
->  obj-$(CONFIG_MIPS) += setup-irq.o
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index c132bdd..675c2d1 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -53,7 +53,7 @@ config PCI_RCAR_GEN2_PCIE
->  
->  config PCI_HOST_GENERIC
->  	bool "Generic PCI host controller"
-> -	depends on ARM && OF
-> +	depends on (ARM || ARM64) && OF
->  	help
->  	  Say Y here if you want to support a simple generic PCI host
->  	  controller, such as the one emulated by kvmtool.
-> -- 
-> 1.9.1
-> 
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index d2c6144..48b5b30 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -136,7 +136,7 @@ config PCIE_IPROC_PLATFORM
+ 
+ config PCIE_IPROC_BCMA
+ 	bool "Broadcom iProc PCIe BCMA bus driver"
+-	depends on ARCH_BCM_IPROC || (ARM && COMPILE_TEST)
++	depends on ARM && (ARCH_BCM_IPROC || COMPILE_TEST)
+ 	select PCIE_IPROC
+ 	select BCMA
+ 	select PCI_DOMAINS
+-- 
+1.7.9.5
