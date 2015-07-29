@@ -1,42 +1,63 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 29 Jul 2015 10:42:12 +0800
-Subject: [PATCH 08/10] Doc: usb: ci-hdrc-usb2: add tx(rx)-burst-config-dword
- for binding doc
-In-Reply-To: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
-References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <1438137734-27311-9-git-send-email-peter.chen@freescale.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 29 Jul 2015 10:07:04 +0530
+Subject: [PATCH v6 04/13] clk: qcom: gdsc: Manage clocks with !CONFIG_PM
+In-Reply-To: <55B826B0.2090705@codeaurora.org>
+References: <1437549069-29655-1-git-send-email-rnayak@codeaurora.org>
+ <1437549069-29655-5-git-send-email-rnayak@codeaurora.org>
+ <55B03D65.8040207@codeaurora.org> <55B0A764.6010708@codeaurora.org>
+ <55B826B0.2090705@codeaurora.org>
+Message-ID: <55B85870.7060900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is used to override the default setting for burst size, changing
-burst size takes effect only when the SBUSCFG.AHBBRST = 0.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
----
- Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+On 07/29/2015 06:34 AM, Stephen Boyd wrote:
+> On 07/23/2015 01:35 AM, Rajendra Nayak wrote:
+>> []..
+>>
+>>>> +
+>>>> +#ifndef CONFIG_PM
+>>>> +static void enable_clock(struct device *dev, const char *con_id)
+>>>> +{
+>>>> +    struct clk *clk;
+>>>> +
+>>>> +    clk = clk_get(dev, con_id);
+>>>> +    if (!IS_ERR(clk)) {
+>>>> +        clk_prepare_enable(clk);
+>>>> +        clk_put(clk);
+>>>> +    }
+>>>> +}
+>>>> +
+>>>> +static void disable_clock(struct device *dev, const char *con_id)
+>>>> +{
+>>>> +    struct clk *clk;
+>>>> +
+>>>> +    clk = clk_get(dev, con_id);
+>>>> +    if (!IS_ERR(clk)) {
+>>>> +        clk_disable_unprepare(clk);
+>>>> +        clk_put(clk);
+>>>> +    }
+>>>> +}
+>>>
+>>> Is there a reason why this whole patch isn't generic code? I recall some
+>>> discussion but I forgot now and there isn't any mention of why this
+>>> isn't generic code in the commit text.
+>>
+>> If by generic code, you mean using PM clocks, then this thread should
+>> give some context..
+>> http://www.spinics.net/lists/arm-kernel/msg414072.html
+>
+> Sorry, I read the thread and I tried to understand what was going on but
+> I'm still lost. Can you clarify further in the commit text somehow?
 
-diff --git a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-index 3c377a3..0f0929c 100644
---- a/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-+++ b/Documentation/devicetree/bindings/usb/ci-hdrc-usb2.txt
-@@ -34,6 +34,10 @@ Optional properties:
-   should be aligned with ITC bits at register USBCMD.
- - ahb-burst-config: it is vendor dependent, the required value should be
-   aligned with AHBBRST at SBUSCFG, the range is from 0x0 to 0x7.
-+- tx-burst-size-dword: it is vendor dependent, the tx burst size in dword
-+  (4 bytes).
-+- rx-burst-size-dword: it is vendor dependent, the rx burst size in dword
-+  (4 bytes).
- 
- Example:
- 
-@@ -48,4 +52,6 @@ Example:
- 		gadget-itc-setting = <0x4>; /* 4 micro-frames */
- 		 /* Incremental burst of unspecified length */
- 		ahb-burst-config = <0x0>;
-+		tx-burst-size-dword = <0x10>; /* 64 bytes */
-+		rx-burst-size-dword = <0x10>;
- 	};
+So I can add this in the commit text, if it seems fine
+
+"The use of pm_clk_add_notifier() isn't appropriate here since we need
+to only manage clocks with valid power domain associations done via
+DT, instead of what pm_clk_add_notifier() does, which is manage clocks
+for all on SoC/off SoC devices associating all of them to a dummy power 
+domain instead"
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
