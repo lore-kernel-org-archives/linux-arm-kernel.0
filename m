@@ -1,73 +1,39 @@
-From: aleksey.makarov@caviumnetworks.com (Aleksey Makarov)
-Date: Wed, 29 Jul 2015 16:49:38 +0300
-Subject: [PATCH net 03/11] net: thunderx: Fix RQ_DROP miscalculation
-In-Reply-To: <1438177787-20940-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-References: <1438177787-20940-1-git-send-email-aleksey.makarov@caviumnetworks.com>
-Message-ID: <1438177787-20940-4-git-send-email-aleksey.makarov@caviumnetworks.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 Jul 2015 15:00:46 +0100
+Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
+ controller-data
+In-Reply-To: <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
+References: <cover.1438170519.git.hramrach@gmail.com>
+ <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
+Message-ID: <20150729140046.GB11082@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Wed, Jul 29, 2015 at 12:19:57PM +0200, Michal Suchanek wrote:
 
-With earlier configured value sufficient number of CQEs are not
-being reserved for transmitted packets. Hence under heavy incoming
-traffic load, receive notifications will take away most of the CQ
-thus transmit notifications will be lost resulting in tx skbs not
-being freed.
+Please use subject lines matching the style for the subsytsem so people
+can spot that the patch is in some way relevant.
 
-Finally SQ will be full and it will be stopped, watchdog timer
-will kick in. After this fix receive notifications will not take
-morethan half of CQ reserving the rest for transmit notifications.
+> The controller-data subnode has no compatible. This can lead to other
+> drivers getting confused by it. Add a compatible to make devicetreee
+> unambiguous.
 
-Also changed CQ & SQ sizes from 16k to 4k.
-This is also due to the receive notifications taking first half of
-CQ under heavy load and time taken by NAPI to clear transmit notifications
-will increase with higher queue sizes. Again results in SQ being stopped.
+I can't tell from this commit message what the issue you're trying to
+fix is, sorry.  Nodes without compatible strings are entirely normal and
+don't need compatible strings.  It sounds like a bug in whatever other
+driver is becoming confused.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@caviumnetworks.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_queues.h | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+> +	if (!of_get_property(data_np, "compatible", NULL) ||
+> +	    strcmp(of_get_property(data_np, "compatible", NULL),
+> +		   "samsung,s3c-controller-data"))
+> +		dev_err(&spi->dev, "child node 'controller-data' does not have correct compatible\n");
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-index 8341bdf..f0937b7 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.h
-@@ -62,7 +62,7 @@
- #define SND_QUEUE_CNT		8
- #define CMP_QUEUE_CNT		8 /* Max of RCV and SND qcount */
- 
--#define SND_QSIZE		SND_QUEUE_SIZE4
-+#define SND_QSIZE		SND_QUEUE_SIZE2
- #define SND_QUEUE_LEN		(1ULL << (SND_QSIZE + 10))
- #define MAX_SND_QUEUE_LEN	(1ULL << (SND_QUEUE_SIZE6 + 10))
- #define SND_QUEUE_THRESH	2ULL
-@@ -70,7 +70,10 @@
- /* Since timestamp not enabled, otherwise 2 */
- #define MAX_CQE_PER_PKT_XMIT		1
- 
--#define CMP_QSIZE		CMP_QUEUE_SIZE4
-+/* Keep CQ and SQ sizes same, if timestamping
-+ * is enabled this equation will change.
-+ */
-+#define CMP_QSIZE		CMP_QUEUE_SIZE2
- #define CMP_QUEUE_LEN		(1ULL << (CMP_QSIZE + 10))
- #define CMP_QUEUE_CQE_THRESH	0
- #define CMP_QUEUE_TIMER_THRESH	220 /* 10usec */
-@@ -87,7 +90,12 @@
- 
- #define MAX_CQES_FOR_TX		((SND_QUEUE_LEN / MIN_SQ_DESC_PER_PKT_XMIT) * \
- 				 MAX_CQE_PER_PKT_XMIT)
--#define RQ_CQ_DROP		((CMP_QUEUE_LEN - MAX_CQES_FOR_TX) / 256)
-+/* Calculate number of CQEs to reserve for all SQEs.
-+ * Its 1/256th level of CQ size.
-+ * '+ 1' to account for pipelining
-+ */
-+#define RQ_CQ_DROP		((256 / (CMP_QUEUE_LEN / \
-+				 (CMP_QUEUE_LEN - MAX_CQES_FOR_TX))) + 1)
- 
- /* Descriptor size in bytes */
- #define SND_QUEUE_DESC_SIZE	16
--- 
-2.4.6
+This will break all existing users which is not acceptable for
+mainline, we need to preserve compatibility with existing device trees.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/e4a79567/attachment.sig>
