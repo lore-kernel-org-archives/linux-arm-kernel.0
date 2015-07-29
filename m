@@ -1,187 +1,145 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Wed, 29 Jul 2015 15:48:47 +0800
-Subject: [PATCH v13 0/6] drm/layerscape: Add Freescale DCU DRM driver
-In-Reply-To: <20150729072156.GO16722@phenom.ffwll.local>
-References: <1438152892-11256-1-git-send-email-jianwei.wang.chn@gmail.com>
- <20150729072156.GO16722@phenom.ffwll.local>
-Message-ID: <CANk3uyDOKKYHKUu-6cOWm09Wu0=qwuyfq65T_gKq-vsFOL1Jwg@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 Jul 2015 09:14:03 +0100
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150728225510.GB3159@codeaurora.org>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux>
+ <20150728225510.GB3159@codeaurora.org>
+Message-ID: <20150729081403.GH2284@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 3:21 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
-> On Wed, Jul 29, 2015 at 02:54:46PM +0800, Jianwei Wang wrote:
->> Changed in v13
->> -set regmap_config.cache_type to REGCACHE_RBTREE
->> -add call drm_modeset_lock_all before drm_mode_config_reset
->
-> This was a bug in one of my recently merged patches, please don't call
-> drm_modeset_lock_all before config_reset. Instead please test "drm: Fixup
-> locking WARNINGs in drm_mode_config_reset" which should address this
-> problem too.
->
+On Tue, 28 Jul 2015, Stephen Boyd wrote:
 
-I have test that patch, It's okay. I'll remove drm_modeset_lock_all.
+> On 07/28, Viresh Kumar wrote:
+> > Cc'ing few people (whom I cc'd last time as well :)).
+> > 
+> > On 27-07-15, 16:20, Lee Jones wrote:
+> > > These OPPs are used in ST's CPUFreq implementation.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > > 
+> > > Changelog:
+> > >  - None, new patch
+> > > 
+> > >  Documentation/devicetree/bindings/power/opp-st.txt | 76 ++++++++++++++++++++++
+> > >  1 file changed, 76 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/power/opp-st.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/power/opp-st.txt b/Documentation/devicetree/bindings/power/opp-st.txt
+> > > new file mode 100644
+> > > index 0000000..6eb2a91
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/power/opp-st.txt
+> > > @@ -0,0 +1,76 @@
+> > > +STMicroelectronics OPP (Operating Performance Points) Bindings
+> > > +--------------------------------------------------------------
+> > > +
+> > > +Frequency Scaling only
+> > > +----------------------
+> > > +
+> > > +Located in CPU's node:
+> > > +
+> > > +- operating-points	: [See: ./opp.txt]
+> > > +
+> > > +Example [safe]
+> > > +--------------
+> > > +
+> > > +cpus {
+> > > +	cpu at 0 {
+> > > +				 /* kHz     uV   */
+> > > +		operating-points = <1500000 0
+> > > +				    1200000 0
+> > > +				    800000  0
+> > > +				    500000  0>;
+> > > +	};
+> > > +};
+> > > +
+> > > +Dynamic Voltage and Frequency Scaling (DVFS)
+> > > +--------------------------------------------
+> > > +
+> > > +Located in 'cpu0-opp-list' node [to be provided ONLY by the bootloader]:
+> > > +
+> > > +- compatible		: Should be "operating-points-v2-sti"
+> > > +- opp{1..N} 		: Each 'oppX' subnode will contain the following properties:
+> > 
+> > Or should we mention:
+> > - opp{1..N} 		: Each 'oppX' subnode shall contain below properties,
+> >                           over what ./opp.txt defines:
+> > 
+> > ?
+> > 
+> > 
+> > > + - opp-hz		: CPU frequency [Hz] for this OPP [See: ./opp.txt]
+> > > + - st,avs		: List of available voltages [uV] indexed by process code
+> > > + - st,cuts		: Cut version this OPP is suitable for [0xFF means ALL]
+> > > + - st,substrate		: Substrate version this OPP is suitable for [0xFF means ALL]
+> > > +- st,syscfg		: Phandle to Major number register
+> > > +				First cell: offset to major number
+> > > +- st,syscfg-eng		: Phandle to Minor number and Pcode registers
+> > > +				First cell: offset to process code
+> > > +				Second cell: offset to minor number
+> > > +
+> > > +WARNING: The opp{1..N} nodes will be provided by the bootloader.  Do not attempt to
+> > > +	 artificially synthesise the opp{1..N} nodes or any of their descendants.
+> > > +	 They are very platform specific and may damage the hardware if created
+> > > +	 incorrectly.
+> > > +
+> > > +Example [unsafe]
+> > > +----------------
+> > > +
+> > > +cpus {
+> > > +	cpu at 0 {
+> > > +		operating-points-v2	= <&cpu0_opp_list>;
+> > > +	};
+> > > +};
+> > > +
+> > > +/* ############################################################ */
+> > > +/* # WARNING: Do not attempt to copy/replicate this node,     # */
+> > > +/* #          it is only to be supplied by the bootloader !!! # */
+> > > +/* ############################################################ */
+> > > +cpu0-opp-list {
+> > > +	compatible	= "operating-points-v2-sti";
+> > > +	st,syscfg	= <&syscfg [major_offset]>;
+> > > +	st,syscfg-eng   = <&syscfg_eng [pcode_offset] [minor_offset]>;
+> > > +
+> > > +	opp0 {
+> > > +		opp-hz		= <1200000000>;
+> > > +		st,avs		= <1110 1150 1100 1080 1040 1020 980 930>;
+> > > +		st,substrate	= <0xff>;
+> > > +		st,cuts		= <0xff>;
+> > > +	};
+> > > +	opp1 {
+> > > +		opp-hz		= <1500000000>;
+> > > +		st,avs		= <1200 1200 1200 1200 1170 1140 1100 1070>;
+> > > +		st,substrate	= <0xff>;
+> > > +		st,cuts		= <0x2>;
+> > > +	};
+> > > +};
+> > 
+> > I don't see more problems here, unless we can move some of this to the
+> > generic bindings.
+> > 
+> > @Rob/Stephen: Please respond before it is late :)
+> 
+> It's interesting to have vendor specific properties like avs,
+> cuts, and substrate. That could replace our planned usage of the
+> opp-names property where we encode similar information (speed
+> bin, revision, etc.) into a string that we look for.
+> 
+> So I wonder why the avs/cut/substrate information can't be
+> encoded into the opp name? That would make these properties
+> obsolete, given that all they're used for is to pick out the
+> correct OPP?
 
-Thanks
-Jianwei
+You could hack the substrate and cut version into a string, but that's
+exactly what it would be, a hack.  I'm struggling how you would do the
+same for 'st,avs', which is an array of u32s.
 
-> Thanks, Daniel
->
->> -adjust patch order for creating pull request
->>
->> Changed in v12
->>
->> -Add one patch for MAINTAINER entry for drm/layerscape
->> Adviced by Daniel Vetter
->> -Add #include <drm/drm_crtc_helper.h>
->>
->> Changed in V11
->> -set regmap_config.cache_type to REGCACHE_FLAT
->> Advanced by Alexander Stein
->>
->> Changed in V10
->> -adjust commit log, remove meaningless statement
->> -cleanup code for it's format and style.
->> -remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
->> -remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
->> -add vendor prefix for panel pandle
->> -make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
->> -introduce per-SoC capability structure to avoid check on the OF node's compatible string
->> -Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
->> -move DCU config sentence to the right place
->> -move get resources functions to  ->probe()
->> -move fsl,dcu.txt to video/ folder
->> -add big-endian describe
->> All advaced by Thierry Reding
->>
->> Changed in V9
->>
->> put node after calling of_drm_find_panel
->> split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
->> check regmap_write/regmap_read return return value
->> remove useless ".owner    = THIS_MODULE,"
->> All advanced by Mark Yao
->>
->> Changed in V8
->>
->> - Remove useless code
->> #define DRIVER_NAME     "fsl-dcu-drm"
->> MODULE_ALIAS("platform:fsl-dcu-drm");
->> Adviced by Paul Bolle
->>
->> Changed in V7
->>
->> - Remove redundant functions and replace deprecated hook
->> Adviced by Daniel Vetter
->> - Replace drm_platform_init with drm_dev_alloc/register
->> Adviced by Daniel Vetter
->>
->> Changed in V6
->>
->> - Add NEC nl4827hc19_05b panel to panel-simple.c
->> Adviced by Mark Yao
->> - Add DRIVER_ATOMIC for driver_features
->> Adviced by Mark Yao
->> - check fsl_dev if it's NULL at PM suspend/resume
->> Adviced by Mark Yao
->>
->> Changed in V5
->>
->> - Update commit message
->> - Add layer registers initialization
->> - Remove unused functions
->> - Rename driver folder
->> Adviced by Stefan Agner
->> - Move pixel clock control functions to fsl_dcu_drm_drv.c
->> - remove redundant enable the clock implicitly using regmap
->> - Add maintainer message
->>
->> Changed in V4:
->>
->> -This version doesn't have functionality changed
->> Just a minor adjustment.
->>
->> Changed in V3:
->>
->> - Test driver on Vybrid board and add compatible string
->> - Remove unused functions
->> - set default crtc for encoder
->> - replace legacy functions with atomic help functions
->> Adviced by Daniel Vetter
->> - Set the unique name of the DRM device
->> - Implement irq handle function for vblank interrupt
->>
->> Changed in v2:
->> - Add atomic support
->> Adviced by Daniel Vetter
->> - Modify bindings file
->> - Rename node for compatibility
->> - Move platform related code out for compatibility
->> Adviced by Stefan Agner
->>
->> This patch add support for Two Dimensional Animation and Compositing
->> Engine (2D-ACE) on the Freescale SoCs.
->>
->> 2D-ACE is a Freescale display controller. 2D-ACE describes
->> the functionality of the module extremely well its name is a value
->> that cannot be used as a token in programming languages.
->> Instead the valid token "DCU" is used to tag the register names and
->> function names.
->>
->> The Display Controller Unit (DCU) module is a system master that
->> fetches graphics stored in internal or external memory and displays
->> them on a TFT LCD panel. A wide range of panel sizes is supported
->> and the timing of the interface signals is highly configurable.
->> Graphics are read directly from memory and then blended in real-time,
->> which allows for dynamic content creation with minimal CPU
->> intervention.
->>
->> The features:
->> (1) Full RGB888 output to TFT LCD panel.
->> (2) Blending of each pixel using up to 4 source layers
->> dependent
->> on size of panel.
->> (3) Each graphic layer can be placed with one pixel resolution
->> in either axis.
->> (4) Each graphic layer support RGB565 and RGB888 direct colors
->> without alpha channel and BGRA8888 BGRA4444 ARGB1555 direct
->> colors
->> with an alpha channel and YUV422 format.
->> (5) Each graphic layer support alpha blending with 8-bit
->> resolution.
->>
->> .../devicetree/bindings/video/fsl,dcu.txt          |  22 ++
->> drivers/gpu/drm/Kconfig                            |   2 +
->> drivers/gpu/drm/Makefile                           |   1 +
->> drivers/gpu/drm/fsl-dcu/Kconfig                    |  18 +
->> drivers/gpu/drm/fsl-dcu/Makefile                   |   7 +
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         | 208 +++++++++++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h         |  19 +
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          | 404 +++++++++++++++++++++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          | 197 ++++++++++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c        |  23 ++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  45 +++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  33 ++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c        | 261 +++++++++++++
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h        |  17 +
->> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          | 182 ++++++++++
->> 15 files changed, 1439 insertions(+)
->> create mode 100644 Documentation/devicetree/bindings/video/fsl,dcu.txt
->> create mode 100644 drivers/gpu/drm/fsl-dcu/Kconfig
->> create mode 100644 drivers/gpu/drm/fsl-dcu/Makefile
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h
->> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
->>
->
-> --
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
