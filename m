@@ -1,57 +1,60 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 29 Jul 2015 19:46:07 +0100
-Subject: [PATCH v2 4/9] iommu/arm-smmu-v3: Clean up DMA API usage
+Date: Wed, 29 Jul 2015 19:46:12 +0100
+Subject: [PATCH v2 9/9] iommu/io-pgtable: Remove flush_pgtable callback
 In-Reply-To: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
 References: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
-Message-ID: <c2cb4e3b6e7a30738e4d017e8640f08d930d5a82.1438195011.git.robin.murphy@arm.com>
+Message-ID: <7c5584d3efa61ee6b0b87efb72f24f32852aafb7.1438195011.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the correct DMA API calls now integrated into the io-pgtable code,
-let that handle the flushing of non-coherent page table updates.
+With the users fully converted to DMA API operations, it's dead, Jim.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 18 +++---------------
- 1 file changed, 3 insertions(+), 15 deletions(-)
+ drivers/iommu/io-pgtable-arm.c | 6 ------
+ drivers/iommu/io-pgtable.h     | 2 --
+ 2 files changed, 8 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 8e9ec81..ac29d24 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1304,23 +1304,10 @@ static void arm_smmu_tlb_inv_range_nosync(unsigned long iova, size_t size,
- static void arm_smmu_flush_pgtable(void *addr, size_t size, void *cookie)
- {
- 	struct arm_smmu_domain *smmu_domain = cookie;
--	struct arm_smmu_device *smmu = smmu_domain->smmu;
--	unsigned long offset = (unsigned long)addr & ~PAGE_MASK;
- 
--	if (smmu->features & ARM_SMMU_FEAT_COHERENCY) {
-+	/* The page table code handles flushing in the non-coherent case */
-+	if (smmu_domain->smmu->features & ARM_SMMU_FEAT_COHERENCY)
- 		dsb(ishst);
--	} else {
--		dma_addr_t dma_addr;
--		struct device *dev = smmu->dev;
--
--		dma_addr = dma_map_page(dev, virt_to_page(addr), offset, size,
--					DMA_TO_DEVICE);
--
--		if (dma_mapping_error(dev, dma_addr))
--			dev_err(dev, "failed to flush pgtable at %p\n", addr);
--		else
--			dma_unmap_page(dev, dma_addr, size, DMA_TO_DEVICE);
--	}
+diff --git a/drivers/iommu/io-pgtable-arm.c b/drivers/iommu/io-pgtable-arm.c
+index 0617687..e4bc2b2 100644
+--- a/drivers/iommu/io-pgtable-arm.c
++++ b/drivers/iommu/io-pgtable-arm.c
+@@ -884,16 +884,10 @@ static void dummy_tlb_sync(void *cookie)
+ 	WARN_ON(cookie != cfg_cookie);
  }
  
- static struct iommu_gather_ops arm_smmu_gather_ops = {
-@@ -1502,6 +1489,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 		.ias		= ias,
- 		.oas		= oas,
- 		.tlb		= &arm_smmu_gather_ops,
-+		.iommu_dev	= smmu->dev,
- 	};
+-static void dummy_flush_pgtable(void *ptr, size_t size, void *cookie)
+-{
+-	WARN_ON(cookie != cfg_cookie);
+-}
+-
+ static struct iommu_gather_ops dummy_tlb_ops __initdata = {
+ 	.tlb_flush_all	= dummy_tlb_flush_all,
+ 	.tlb_add_flush	= dummy_tlb_add_flush,
+ 	.tlb_sync	= dummy_tlb_sync,
+-	.flush_pgtable	= dummy_flush_pgtable,
+ };
  
- 	pgtbl_ops = alloc_io_pgtable_ops(fmt, &pgtbl_cfg, smmu_domain);
+ static void __init arm_lpae_dump_ops(struct io_pgtable_ops *ops)
+diff --git a/drivers/iommu/io-pgtable.h b/drivers/iommu/io-pgtable.h
+index 8f61286..68c63d9 100644
+--- a/drivers/iommu/io-pgtable.h
++++ b/drivers/iommu/io-pgtable.h
+@@ -19,7 +19,6 @@ enum io_pgtable_fmt {
+  * @tlb_add_flush: Queue up a TLB invalidation for a virtual address range.
+  * @tlb_sync:      Ensure any queued TLB invalidation has taken effect, and
+  *                 any corresponding page table updates are visible.
+- * @flush_pgtable: Ensure page table updates are visible to the IOMMU.
+  *
+  * Note that these can all be called in atomic context and must therefore
+  * not block.
+@@ -29,7 +28,6 @@ struct iommu_gather_ops {
+ 	void (*tlb_add_flush)(unsigned long iova, size_t size, bool leaf,
+ 			      void *cookie);
+ 	void (*tlb_sync)(void *cookie);
+-	void (*flush_pgtable)(void *ptr, size_t size, void *cookie);
+ };
+ 
+ /**
 -- 
 1.9.1
