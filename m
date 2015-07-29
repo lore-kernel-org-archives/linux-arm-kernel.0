@@ -1,49 +1,32 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 29 Jul 2015 10:51:18 -0400
-Subject: [PATCH 4/8] xen: Use the correctly the Xen memory terminologies
-In-Reply-To: <55B8E1C7.6070608@citrix.com>
-References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
- <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
- <55B7D40B.5080903@oracle.com> <55B8B846.2060103@citrix.com>
- <55B8DFD7.6070107@oracle.com> <55B8E1C7.6070608@citrix.com>
-Message-ID: <55B8E866.60308@oracle.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 29 Jul 2015 17:02:18 +0200
+Subject: [PATCH v2 2/3] ARM: at91/dt: add basic dtsi for sama5d2 SoC
+In-Reply-To: <1438079151-29653-3-git-send-email-nicolas.ferre@atmel.com>
+References: <1438079151-29653-1-git-send-email-nicolas.ferre@atmel.com>
+ <1438079151-29653-3-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20150729150218.GA6073@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/2015 10:23 AM, Julien Grall wrote:
-> On 29/07/15 15:14, Boris Ostrovsky wrote:
->>> static inline unsigned long pfn_to_gfn(unsigned long pfn)
->>> {
->>>      if (xen_feature(XENFEAT_autotranslated_physmap))
->>>          return pfn;
->>>      else
->>>          return pfn_to_mfn(pfn);
->>> }
->>
->> But you'd still say 'op.arg1.mfn = pfn_to_gfn(pfn);' in xen_do_pin()
->> i.e. assign GFN to MFN, right? That's what I was referring to.
-> Well no. I would use op.arg1.mfn = pfn_to_mfn(pfn) given that the code,
-> if I'm right, is only executed for PV.
->
-> mfn = pfn_to_gfn(...) was valid too because on PV is always an MFN. The
-> suggestion of pfn_to_mfn was just for more readability,
+Hi,
 
-Right, and my comments were also not about correctness.
+On 28/07/2015 at 12:25:50 +0200, Nicolas Ferre wrote :
+> +
+> +		sdmmc0: sdio-host at a0000000 {
+> +			compatible = "atmel,sama5d2-sdhci";
+> +			reg = <0xa0000000 0x300>;
+> +			interrupts = <31 IRQ_TYPE_LEVEL_HIGH 0>;
+> +			clocks = <&sdmmc0_hclk>, <&sdmmc0_gclk>, <&main>;
+> +			clock-names = "hclock", "multclk", "baseclk";
 
+Those bindings have not been taken yet. Are you confident enough this
+will go in as-is?
 
->
->> (In general, I am not sure a guest should ever use 'mfn' as it is purely
->> a hypervisor construct. Including p2m, which I think should really be
->> p2g as this is what we use to figure out what to stick into page tables)
-> I think avoid to use mfn in the hypervisor interface is out-of-scope for
-> this series. If we ever want to modify the Xen API in Linux, we should
-> do in sync with Xen to avoid inconsistency on naming.
->
-> Anyway, the oddity of mfn = pfn_to_gfn(...) is mostly contained in the
-> x86 specific code. I don't mind to either add pfn_to_mfn and use it or
-> add a comment /* PV-specific so mfn == gfn */ for every use of mfn =
-> pfn_to_gfn(...).
+> +			status = "disabled";
+> +		};
+> +
 
-I think the former is better (even thought it adds a test)
-
--boris
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
