@@ -1,91 +1,60 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 29 Jul 2015 19:46:05 +0100
-Subject: [PATCH v2 2/9] iommu/arm-smmu: Sort out coherency
+Date: Wed, 29 Jul 2015 19:46:08 +0100
+Subject: [PATCH v2 5/9] iommu/ipmmu-vmsa: Clean up DMA API usage
 In-Reply-To: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
 References: <6999933bfa9b3d50853fd023d455c837a0d7ff23.1438195011.git.robin.murphy@arm.com>
-Message-ID: <85e468665bc36f94d95950f78fc6ceb35818dc5f.1438195011.git.robin.murphy@arm.com>
+Message-ID: <0631e49d68bba0c46833bc3a6a4666170b213206.1438195011.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, we detect whether the SMMU has coherent page table walk
-capability from the IDR0.CTTW field, and base our cache maintenance
-decisions on that. In preparation for fixing the bogus DMA API usage,
-however, we need to ensure that the DMA API agrees about this, which
-necessitates deferring to the dma-coherent property in the device tree
-for the final say.
-
-As an added bonus, since systems exist where an external CTTW signal
-has been tied off incorrectly at integration, allowing DT to override
-it offers a neat workaround for coherency issues with such SMMUs.
+With the correct DMA API calls now integrated into the io-pgtable code,
+let that handle the flushing of non-coherent page table updates.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu.txt |  6 ++++++
- drivers/iommu/arm-smmu.c                             | 20 +++++++++++++++++---
- 2 files changed, 23 insertions(+), 3 deletions(-)
+ drivers/iommu/ipmmu-vmsa.c | 19 +++++--------------
+ 1 file changed, 5 insertions(+), 14 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 0676050..7180745 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -43,6 +43,12 @@ conditions.
+diff --git a/drivers/iommu/ipmmu-vmsa.c b/drivers/iommu/ipmmu-vmsa.c
+index 1a67c53..8cf605f 100644
+--- a/drivers/iommu/ipmmu-vmsa.c
++++ b/drivers/iommu/ipmmu-vmsa.c
+@@ -283,24 +283,10 @@ static void ipmmu_tlb_add_flush(unsigned long iova, size_t size, bool leaf,
+ 	/* The hardware doesn't support selective TLB flush. */
+ }
  
- ** System MMU optional properties:
+-static void ipmmu_flush_pgtable(void *ptr, size_t size, void *cookie)
+-{
+-	unsigned long offset = (unsigned long)ptr & ~PAGE_MASK;
+-	struct ipmmu_vmsa_domain *domain = cookie;
+-
+-	/*
+-	 * TODO: Add support for coherent walk through CCI with DVM and remove
+-	 * cache handling.
+-	 */
+-	dma_map_page(domain->mmu->dev, virt_to_page(ptr), offset, size,
+-		     DMA_TO_DEVICE);
+-}
+-
+ static struct iommu_gather_ops ipmmu_gather_ops = {
+ 	.tlb_flush_all = ipmmu_tlb_flush_all,
+ 	.tlb_add_flush = ipmmu_tlb_add_flush,
+ 	.tlb_sync = ipmmu_tlb_flush_all,
+-	.flush_pgtable = ipmmu_flush_pgtable,
+ };
  
-+- dma-coherent  : Present if page table walks made by the SMMU are
-+                  cache coherent with the CPU.
-+
-+                  NOTE: this only applies to the SMMU itself, not
-+                  masters connected upstream of the SMMU.
-+
- - calxeda,smmu-secure-config-access : Enable proper handling of buggy
-                   implementations that always use secure access to
-                   SMMU configuration registers. In this case non-secure
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 4cd0c29..0583ed2 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -37,6 +37,7 @@
- #include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/pci.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-@@ -1532,6 +1533,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 	unsigned long size;
- 	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
- 	u32 id;
-+	bool cttw_dt, cttw_reg;
- 
- 	dev_notice(smmu->dev, "probing hardware configuration...\n");
- 	dev_notice(smmu->dev, "SMMUv%d with:\n", smmu->version);
-@@ -1571,10 +1573,22 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
- 		dev_notice(smmu->dev, "\taddress translation ops\n");
- 	}
- 
--	if (id & ID0_CTTW) {
+ /* -----------------------------------------------------------------------------
+@@ -327,6 +313,11 @@ static int ipmmu_domain_init_context(struct ipmmu_vmsa_domain *domain)
+ 	domain->cfg.ias = 32;
+ 	domain->cfg.oas = 40;
+ 	domain->cfg.tlb = &ipmmu_gather_ops;
 +	/*
-+	 * In order for DMA API calls to work properly, we must defer to what
-+	 * the DT says about coherency, regardless of what the hardware claims.
-+	 * Fortunately, this also opens up a workaround for systems where the
-+	 * ID register value has ended up configured incorrectly.
++	 * TODO: Add support for coherent walk through CCI with DVM and remove
++	 * cache handling. For now, delegate it to the io-pgtable code.
 +	 */
-+	cttw_dt = of_dma_is_coherent(smmu->dev->of_node);
-+	cttw_reg = !!(id & ID0_CTTW);
-+	if (cttw_dt)
- 		smmu->features |= ARM_SMMU_FEAT_COHERENT_WALK;
--		dev_notice(smmu->dev, "\tcoherent table walk\n");
--	}
-+	if (cttw_dt || cttw_reg)
-+		dev_notice(smmu->dev, "\t%scoherent table walk\n",
-+			   cttw_dt ? "" : "non-");
-+	if (cttw_dt != cttw_reg)
-+		dev_notice(smmu->dev,
-+			   "\t(IDR0.CTTW overridden by dma-coherent property)\n");
++	domain->cfg.iommu_dev = domain->mmu->dev;
  
- 	if (id & ID0_SMS) {
- 		u32 smr, sid, mask;
+ 	domain->iop = alloc_io_pgtable_ops(ARM_32_LPAE_S1, &domain->cfg,
+ 					   domain);
 -- 
 1.9.1
