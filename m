@@ -1,87 +1,52 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Wed, 29 Jul 2015 09:02:07 +0200
-Subject: [PATCH 8/9] gpiolib-sysfs: Show gpio-name in
- /sys/class/gpio/gpio*/name
-In-Reply-To: <20150728095337.GN28535@localhost>
-References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
- <1437125570-28623-9-git-send-email-mpa@pengutronix.de>
- <20150728095337.GN28535@localhost>
-Message-ID: <20150729070207.GF30895@pengutronix.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 29 Jul 2015 09:05:52 +0200
+Subject: [PATCH v5 01/10] clk: mediatek: Removed unused dpi_ck clock from
+ MT8173
+In-Reply-To: <1438152754-11970-2-git-send-email-jamesjj.liao@mediatek.com>
+References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
+ <1438152754-11970-2-git-send-email-jamesjj.liao@mediatek.com>
+Message-ID: <6282882.pftQBj38E3@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jul 28, 2015 at 11:53:37AM +0200, Johan Hovold wrote:
-> On Fri, Jul 17, 2015 at 11:32:49AM +0200, Markus Pargmann wrote:
-> > This patch adds a sysfs attribute 'name' to gpios that were exported. It
-> > exposes the newly added name property of gpio descriptors.
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> >  drivers/gpio/gpiolib-sysfs.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> > 
-> > diff --git a/drivers/gpio/gpiolib-sysfs.c b/drivers/gpio/gpiolib-sysfs.c
-> > index c3b74440ca67..058019879bab 100644
-> > --- a/drivers/gpio/gpiolib-sysfs.c
-> > +++ b/drivers/gpio/gpiolib-sysfs.c
-> > @@ -139,6 +139,25 @@ static ssize_t value_store(struct device *dev,
-> >  }
-> >  static DEVICE_ATTR_RW(value);
-> >  
-> > +static ssize_t gpio_name_show(struct device *dev,
-> > +		struct device_attribute *attr, char *buf)
-> > +{
-> > +	struct gpio_desc	*desc = dev_get_drvdata(dev);
-> > +	ssize_t			status;
-> > +
-> > +	mutex_lock(&sysfs_lock);
-> > +
-> > +	if (!test_bit(FLAG_EXPORT, &desc->flags))
+Am Mittwoch, 29. Juli 2015, 14:52:25 schrieb James Liao:
+> The dpi_ck clock can be removed because it not actually used
+> in topckgen and subsystems.
 > 
-> No need to check flag export, and no need for the mutex either.
-> 
-> > +		status = -EIO;
-> > +	else
-> > +		status = sprintf(buf, "%s\n", desc->name);
-> 
-> Depending on sprintfs representation of NULL is not a good idea here.
-> 
-> > +
-> > +	mutex_unlock(&sysfs_lock);
-> > +	return status;
-> > +}
-> > +
-> > +static DEVICE_ATTR(name, 0444, gpio_name_show, NULL);
-> 
-> DEVICE_ATTR_RO
-> 
-> > +
-> >  static irqreturn_t gpio_sysfs_irq(int irq, void *priv)
-> >  {
-> >  	struct gpiod_data *data = priv;
-> > @@ -377,6 +396,7 @@ static struct attribute *gpio_attrs[] = {
-> >  	&dev_attr_edge.attr,
-> >  	&dev_attr_value.attr,
-> >  	&dev_attr_active_low.attr,
-> > +	&dev_attr_name.attr,
-> >  	NULL,
-> >  };
+> Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
 
-Thanks, will fix all of them.
+>From our past discussions this change looks about right, and should still 
+become _part of 4.2_, to not have the CLK_TOP_DPI become part of the 
+devicetree CLK_TOP_DPI.
 
-Best regards,
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-Markus
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/f7122bb0/attachment-0001.sig>
+> ---
+>  drivers/clk/mediatek/clk-mt8173.c      | 1 -
+>  include/dt-bindings/clock/mt8173-clk.h | 1 -
+>  2 files changed, 2 deletions(-)
+> 
+> diff --git a/drivers/clk/mediatek/clk-mt8173.c
+> b/drivers/clk/mediatek/clk-mt8173.c index 4b9e04c..4486f8f 100644
+> --- a/drivers/clk/mediatek/clk-mt8173.c
+> +++ b/drivers/clk/mediatek/clk-mt8173.c
+> @@ -26,7 +26,6 @@ static DEFINE_SPINLOCK(mt8173_clk_lock);
+> 
+>  static const struct mtk_fixed_factor root_clk_alias[] __initconst = {
+>  	FACTOR(CLK_TOP_CLKPH_MCK_O, "clkph_mck_o", "clk_null", 1, 1),
+> -	FACTOR(CLK_TOP_DPI, "dpi_ck", "clk_null", 1, 1),
+>  	FACTOR(CLK_TOP_USB_SYSPLL_125M, "usb_syspll_125m", "clk_null", 1, 1),
+>  	FACTOR(CLK_TOP_HDMITX_DIG_CTS, "hdmitx_dig_cts", "clk_null", 1, 1),
+>  };
+> diff --git a/include/dt-bindings/clock/mt8173-clk.h
+> b/include/dt-bindings/clock/mt8173-clk.h index 4ad76ed..7230c38 100644
+> --- a/include/dt-bindings/clock/mt8173-clk.h
+> +++ b/include/dt-bindings/clock/mt8173-clk.h
+> @@ -18,7 +18,6 @@
+>  /* TOPCKGEN */
+> 
+>  #define CLK_TOP_CLKPH_MCK_O		1
+> -#define CLK_TOP_DPI			2
+>  #define CLK_TOP_USB_SYSPLL_125M		3
+>  #define CLK_TOP_HDMITX_DIG_CTS		4
+>  #define CLK_TOP_ARMCA7PLL_754M		5
