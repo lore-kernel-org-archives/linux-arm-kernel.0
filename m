@@ -1,37 +1,26 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 29 Jul 2015 11:57:52 +0300
-Subject: [PATCH 0/4] omap: Fix broken pbias device creation
-In-Reply-To: <1437999401-3519-1-git-send-email-kishon@ti.com>
-References: <1437999401-3519-1-git-send-email-kishon@ti.com>
-Message-ID: <55B89590.6000109@ti.com>
+From: haibo.chen@freescale.com (Haibo Chen)
+Date: Wed, 29 Jul 2015 17:03:51 +0800
+Subject: [PATCH v3 0/6] mmc: imx: a few fixes and new feature
+Message-ID: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/27/2015 03:16 PM, Kishon Vijay Abraham I wrote:
-> pbias device creation got broken once SCM cleanup got merged.
-> This patch series re-enables device creation by adding
-> "simple-bus" in the compatible property of the syscon
-> dt node.
->
-> validated this series in DRA72, OMAP4 PANDA and OMAP5 UEVM
-> boards.
->
-> Kishon Vijay Abraham I (4):
->    ARM: dts: omap24xx: Fix broken pbias device creation
->    ARM: dts: OMAP4: Fix broken pbias device creation
->    ARM: dts: OMAP5: Fix broken pbias device creation
->    ARM: dts: dra7: Fix broken pbias device creation
->
->   arch/arm/boot/dts/dra7.dtsi     |    2 +-
->   arch/arm/boot/dts/omap2430.dtsi |    3 ++-
->   arch/arm/boot/dts/omap4.dtsi    |    3 ++-
->   arch/arm/boot/dts/omap5.dtsi    |    3 ++-
->   4 files changed, 7 insertions(+), 4 deletions(-)
->
+Changes for v3:
+-Add property describe in binding doc.
 
-For dra7-evm:
-Tested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+Haibo Chen (6):
+  mmc: sdhci-esdhc-imx: add imx7d support and support HS400
+  mmc: sdhci-esdhc-imx: add tuning-step seting support
+  ARM: dts: imx7d-sdb: add eMMC5.0 support
+  mmc: sdhci-esdhc-imx: add compatible string in bingding doc
+  mmc: sdhci-esdhc-imx: config watermark level and burst length
+  mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
+
+ .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |  2 +
+ arch/arm/boot/dts/imx7d-sdb.dts                    | 13 +++
+ drivers/mmc/host/sdhci-esdhc-imx.c                 | 97 +++++++++++++++++++++-
+ include/linux/platform_data/mmc-esdhc-imx.h        |  1 +
+ 4 files changed, 112 insertions(+), 1 deletion(-)
 
 -- 
-regards,
--grygorii
+1.9.1
