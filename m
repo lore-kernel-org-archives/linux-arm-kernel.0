@@ -1,43 +1,23 @@
-From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Wed, 29 Jul 2015 16:30:05 +0800
-Subject: [PATCH v14 6/6] arm:dts:ls1021a: Add a TFT LCD panel dts node
-In-Reply-To: <1438158605-28248-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1438158605-28248-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1438158605-28248-7-git-send-email-jianwei.wang.chn@gmail.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Wed, 29 Jul 2015 14:19:43 +0530
+Subject: [PATCH v9 0/9] Add simple NVMEM Framework via regmap.
+In-Reply-To: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1437995567-11203-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <55B893A7.2030206@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a TFT LCD panel. the TFT LCD panel is WQVGA "480x272",
-and the bpp is 24.
+On 07/27/2015 04:42 PM, Srinivas Kandagatla wrote:
+> Hi Greg/Kevin,
+>
+> This patchset adds a new simple NVMEM framework to kernel, and it is tested
+> with various drivers like "QCOM thermal sensors", "QCOM cpr driver",
+> "begal bone cape manager" and few more on the way.
+>
+> Can you please consider this as 4.3 material, AFAIK there are more than 3 drivers
+> depending on this framework which are wating since last 2 merge windows.
 
-Signed-off-by: Alison Wang <b18965@freescale.com>
-Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
-Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+I have been testing these with the qcom tsens driver, and did test v9
+as well, so feel free to add my tested by for the entire series,
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a2c591e..2443329 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -56,6 +56,17 @@
- 		enet0_sgmii_phy = &sgmii_phy2;
- 		enet1_sgmii_phy = &sgmii_phy0;
- 	};
-+
-+	panel: panel {
-+		compatible = "nec,nl4827hc19_05b";
-+	};
-+
-+};
-+
-+&dcu {
-+	fsl,panel = <&panel>;
-+	status = "okay";
-+
- };
- 
- &dspi1 {
--- 
-2.1.0.27.g96db324
+Tested-by: Rajendra Nayak <rnayak@codeaurora.org>
