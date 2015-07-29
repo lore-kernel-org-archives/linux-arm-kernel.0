@@ -1,126 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jul 2015 12:04:18 +0200
-Subject: [PATCH 1/2] efi: add 'offset' param to efi_low_alloc()
-In-Reply-To: <1438164259-14470-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1438164259-14470-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1438164259-14470-2-git-send-email-ard.biesheuvel@linaro.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Wed, 29 Jul 2015 18:08:49 +0800
+Subject: [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+Message-ID: <1438164539-29256-1-git-send-email-hanjun.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases, e.g., when allocating memory for the arm64 kernel,
-we need memory at a certain offset from an aligned boundary. So add
-an offset parameter to efi_low_alloc(), and update the existing
-callers to pass zero by default.
+When ACPI core patches were merged into mainline, there were two TODOs for
+ACPI based GIC init, one is the Self-probing for GIC, the other one is to
+support stacked irq domain, also the feature of GICv2m and GICv3 is missing
+in that patch set.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi-stub.c                   |  2 +-
- arch/x86/boot/compressed/eboot.c               |  4 ++--
- drivers/firmware/efi/libstub/efi-stub-helper.c | 20 +++++++++++++++-----
- include/linux/efi.h                            |  2 +-
- 4 files changed, 19 insertions(+), 9 deletions(-)
+For ACPI Self-probing for GIC, thanks to the GIC version which is introduced
+in ACPI 6.0, we can match the GIC version and GIC driver, based on that,
+we introduce the self-probe infrastructure similar as IRQCHIP_DECLARE(),
+please see patch 1~3.
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index f5374065ad53..d85a0b2098b3 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -29,7 +29,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table,
- 	if (*image_addr != (dram_base + TEXT_OFFSET)) {
- 		kernel_memsize = kernel_size + (_end - _edata);
- 		status = efi_low_alloc(sys_table, kernel_memsize + TEXT_OFFSET,
--				       SZ_2M, reserve_addr);
-+				       SZ_2M, 0, reserve_addr);
- 		if (status != EFI_SUCCESS) {
- 			pr_efi_err(sys_table, "Failed to relocate kernel\n");
- 			return status;
-diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
-index 2c82bd150d43..33d1a72f4266 100644
---- a/arch/x86/boot/compressed/eboot.c
-+++ b/arch/x86/boot/compressed/eboot.c
-@@ -1077,7 +1077,7 @@ struct boot_params *make_boot_params(struct efi_config *c)
- 		return NULL;
- 	}
- 
--	status = efi_low_alloc(sys_table, 0x4000, 1,
-+	status = efi_low_alloc(sys_table, 0x4000, 1, 0,
- 			       (unsigned long *)&boot_params);
- 	if (status != EFI_SUCCESS) {
- 		efi_printk(sys_table, "Failed to alloc lowmem for boot params\n");
-@@ -1424,7 +1424,7 @@ struct boot_params *efi_main(struct efi_config *c,
- 	}
- 
- 	gdt->size = 0x800;
--	status = efi_low_alloc(sys_table, gdt->size, 8,
-+	status = efi_low_alloc(sys_table, gdt->size, 8, 0,
- 			   (unsigned long *)&gdt->address);
- 	if (status != EFI_SUCCESS) {
- 		efi_printk(sys_table, "Failed to alloc mem for gdt\n");
-diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
-index f07d4a67fa76..67d1759781c5 100644
---- a/drivers/firmware/efi/libstub/efi-stub-helper.c
-+++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
-@@ -226,7 +226,7 @@ fail:
-  */
- efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 			   unsigned long size, unsigned long align,
--			   unsigned long *addr)
-+			   unsigned long offset, unsigned long *addr)
- {
- 	unsigned long map_size, desc_size;
- 	efi_memory_desc_t *map;
-@@ -269,10 +269,19 @@ efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 		 * checks pointers against NULL. Skip the first 8
- 		 * bytes so we start at a nice even number.
- 		 */
--		if (start == 0x0)
-+		if (start + offset == 0x0)
- 			start += 8;
- 
--		start = round_up(start, align);
-+		/*
-+		 * Check if the offset exceeds the misalignment of this region.
-+		 * In that case, we can round down instead of up, and the
-+		 * resulting start value will be correctly aligned and still
-+		 * point past the start of the region.
-+		 */
-+		if (offset >= (start & (align - 1)))
-+			start = round_down(start, align) + offset;
-+		else
-+			start = round_up(start, align) + offset;
- 		if ((start + size) > end)
- 			continue;
- 
-@@ -580,7 +589,7 @@ efi_status_t efi_relocate_kernel(efi_system_table_t *sys_table_arg,
- 	 * possible.
- 	 */
- 	if (status != EFI_SUCCESS) {
--		status = efi_low_alloc(sys_table_arg, alloc_size, alignment,
-+		status = efi_low_alloc(sys_table_arg, alloc_size, alignment, 0,
- 				       &new_addr);
- 	}
- 	if (status != EFI_SUCCESS) {
-@@ -684,7 +693,8 @@ char *efi_convert_cmdline(efi_system_table_t *sys_table_arg,
- 
- 	options_bytes++;	/* NUL termination */
- 
--	status = efi_low_alloc(sys_table_arg, options_bytes, 0, &cmdline_addr);
-+	status = efi_low_alloc(sys_table_arg, options_bytes, 0, 0,
-+			       &cmdline_addr);
- 	if (status != EFI_SUCCESS)
- 		return NULL;
- 
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index faafa1ad6ea7..e738e97632ba 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1245,7 +1245,7 @@ efi_status_t efi_get_memory_map(efi_system_table_t *sys_table_arg,
- 
- efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
- 			   unsigned long size, unsigned long align,
--			   unsigned long *addr);
-+			   unsigned long offset, unsigned long *addr);
- 
- efi_status_t efi_high_alloc(efi_system_table_t *sys_table_arg,
- 			    unsigned long size, unsigned long align,
+The stacked domain thing is more complicated, Marc introduced a patchset
+to slove this problem (great thanks!) - Making the generic ACPI GSI layer
+irqdomain aware, which is avaiable at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gsi-irq-domain-v2
+
+so we reworked the GICv2m and GICv3 support on top of it, and combined
+them as a single patch set for review.
+
+Note: this patchset has no ITS support for GICv3/4, it will be implmented
+in the IORT patchset, which had a draft version but needs to rework it
+on top of Marc's Per-device MSI domain & platform MSI patchset.
+
+Tested on GICv2 based FVP base model and AMD Seattle platform, both wired
+interrupt and MSI (with some PCI patches) work fine.
+
+Patches are on top of Marc's branch irq/gsi-irq-domain-v2, and available
+at:
+
+git://git.linaro.org/leg/acpi/acpi.git gsi-irqdomain
+
+Comments are warmly welcomed.
+
+>From v3:
+  - Rework GICv3 patches on top of Marc's tree
+  - Add gicV2m support
+
+Hanjun Guo (5):
+  irqchip / GIC: Add GIC version support in ACPI MADT
+  ACPI / irqchip: Add self-probe infrastructure to initialize IRQ
+    controller
+  irqchip / GIC / ACPI: Use IRQCHIP_ACPI_DECLARE to simplify GICv2 init
+    code
+  irqchip / GICv3: remove the useless comparision of device node in
+    xlate
+  irqchip / GICv3 / ACPI: Add GICR support via GICC structures
+
+Suravee Suthikulpanit (3):
+  ACPI: GIC: Add ACPI helper functions to query irq-domain tokens for
+    for GIC MSI and ITS
+  PCI: ACPI: Bind GIC MSI frame to PCI host bridge
+  irqchip / gicv2m: Introducing gicv2m_acpi_init()
+
+Tomasz Nowicki (2):
+  irqchip / GICv3: Refactor gic_of_init() for GICv3 driver
+  irqchip / GICv3: Add ACPI support for GICv3+ initialization
+
+ arch/arm64/Kconfig                   |   1 +
+ arch/arm64/include/asm/irq.h         |  13 --
+ arch/arm64/kernel/acpi.c             |  25 --
+ drivers/acpi/Makefile                |   1 +
+ drivers/acpi/acpi_gic.c              | 234 +++++++++++++++++++
+ drivers/irqchip/Kconfig              |   3 +
+ drivers/irqchip/Makefile             |   1 +
+ drivers/irqchip/irq-gic-acpi.c       | 175 ++++++++++++++
+ drivers/irqchip/irq-gic-v2m.c        | 111 +++++++--
+ drivers/irqchip/irq-gic-v3.c         | 438 +++++++++++++++++++++++++++++++----
+ drivers/irqchip/irq-gic.c            |   6 +-
+ drivers/pci/pci-acpi.c               |  18 ++
+ drivers/pci/probe.c                  |   3 +
+ include/acpi/acpi_gic.h              |  23 ++
+ include/asm-generic/vmlinux.lds.h    |  13 ++
+ include/linux/acpi.h                 |  17 ++
+ include/linux/acpi_irq.h             |   4 +-
+ include/linux/irqchip.h              |  13 ++
+ include/linux/irqchip/arm-gic-acpi.h |  10 +-
+ include/linux/irqchip/arm-gic.h      |   7 +
+ include/linux/mod_devicetable.h      |   8 +
+ include/linux/pci-acpi.h             |   4 +
+ 22 files changed, 1009 insertions(+), 119 deletions(-)
+ create mode 100644 drivers/acpi/acpi_gic.c
+ create mode 100644 drivers/irqchip/irq-gic-acpi.c
+ create mode 100644 include/acpi/acpi_gic.h
+
 -- 
 1.9.1
