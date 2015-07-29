@@ -1,149 +1,73 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 29 Jul 2015 15:35:00 +0900
-Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <559C6C8E.2070309@samsung.com>
-References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
- <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
- <5594E57C.2010300@samsung.com>
- <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
- <092101d0b8c2$e2b39310$a81ab930$@kernel.org> <559C6C8E.2070309@samsung.com>
-Message-ID: <55B87414.10800@samsung.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Wed, 29 Jul 2015 08:46:54 +0200
+Subject: [PATCH 1/9] gpiolib: Fix possible use of wrong name
+In-Reply-To: <20150728090331.GI28535@localhost>
+References: <1437125570-28623-1-git-send-email-mpa@pengutronix.de>
+ <1437125570-28623-2-git-send-email-mpa@pengutronix.de>
+ <20150728090331.GI28535@localhost>
+Message-ID: <20150729064654.GB30895@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Kukjin,
-
-Please pick this patch because exynos3250-cpufreq patch-set
-was already merged on linux-samsung.git.
-
-Thanks,
-Chanwoo Choi
-
-On 07/08/2015 09:19 AM, Krzysztof Kozlowski wrote:
-> On 07.07.2015 23:40, Kukjin Kim wrote:
->> Krzysztof Kozlowski wrote:
->>>
->>> 2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>>> On 02.07.2015 15:11, Chanwoo Choi wrote:
->>>>> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
->>>>>> On 02.07.2015 14:37, Chanwoo Choi wrote:
->>>>>>> This patch add the cooling device to control the overheating issue on
->>>>>>> Exynos3250-based Rinato/Monk board.
->>>>>>>
->>>>>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>>>>> ---
->>>>>>> Depends on:
->>>>>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
->>>>>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
->>>>>>> [1] https://lkml.org/lkml/2015/7/1/696
->>>>>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
->>>>>>>
->>>>>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
->>>>>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
->>>>>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
->>>>>>>  3 files changed, 31 insertions(+)
->>>>>>>
->>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>> index 7863265d4868..540a0adf2be6 100644
->>>>>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>> @@ -116,6 +116,21 @@
->>>>>>>             min-microvolt = <1100000>;
->>>>>>>             max-microvolt = <2700000>;
->>>>>>>     };
->>>>>>> +
->>>>>>> +   thermal-zones {
->>>>>>> +           cpu_thermal: cpu-thermal {
->>>>>>> +                   cooling-maps {
->>>>>>> +                           map0 {
->>>>>>> +                                   /* Correspond to 500MHz at freq_table */
->>>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>>> +                           };
->>>>>>> +                           map1 {
->>>>>>> +                                   /* Correspond to 200MHz at freq_table */
->>>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>>> +                           };
->>>>>>> +                   };
->>>>>>> +           };
->>>>>>> +   };
->>>>>>>  };
->>>>>>>
->>>>>>>  &adc {
->>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>> index ddd7ac283045..0e62a6435e07 100644
->>>>>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>> @@ -107,6 +107,21 @@
->>>>>>>             min-microvolt = <1100000>;
->>>>>>>             max-microvolt = <2700000>;
->>>>>>>     };
->>>>>>> +
->>>>>>> +   thermal-zones {
->>>>>>> +           cpu_thermal: cpu-thermal {
->>>>>>> +                   cooling-maps {
->>>>>>> +                           map0 {
->>>>>>> +                                   /* Corresponds to 500MHz */
->>>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>>> +                           };
->>>>>>> +                           map1 {
->>>>>>> +                                   /* Corresponds to 200MHz */
->>>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>>> +                           };
->>>>>>> +                   };
->>>>>>> +           };
->>>>>>> +   };
->>>>>>>  };
->>>>>>>
->>>>>>>  &adc {
->>>>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>> index e0f3b2ed41a3..a4931b660ddb 100644
->>>>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>> @@ -55,6 +55,7 @@
->>>>>>>                     clock-frequency = <1000000000>;
->>>>>>>                     clocks = <&cmu CLK_ARM_CLK>;
->>>>>>>                     clock-names = "cpu";
->>>>>>> +                   #cooling-cells = <2>;
->>>>>>>
->>>>>>
->>>>>> Don't you need also cooling-{min,max}-state properties?
->>>>>
->>>>> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
->>>>>
->>>>> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
->>>>> in drivers/thermal/*. But, there are no any code to parse it.
->>>>>
->>>>> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-
->>> state.
->>>>>
->>>>> I think that there are mismatch between document and thermal core driver.
->>>>
->>>> Thanks for explanation, looks good.
->>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>
->>>> Best regards,
->>>> Krzysztof
->>>
->>> Dear Kukjin,
->>>
->>> Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
->>> cpufreq-dt 3250, this patch) are actually an one continuous chain.
->>> Dependencies are already in mainline. Are you gonna to pick up
->>> everything?
->>>
->> Yes, I want and I will. BTW maybe clk change is required together? If so, as you
->> know we need to get ack from clk guy. Is my understanding right?
+On Tue, Jul 28, 2015 at 11:03:31AM +0200, Johan Hovold wrote:
+> On Fri, Jul 17, 2015 at 11:32:42AM +0200, Markus Pargmann wrote:
+> > The name is set optionally from DT. Therefore we need to reset the name
+> > variable for every loop iteration. Otherwise we could use a wrong or
+> > uninitialized name.
 > 
-> Right. I think the samsung clock and cpufreq patches still need acks.
+> This doesn't make sense. of_get_gpio_hog falls back to using the node
+> name so name will always be updated (unless there's an error).
 > 
-> Best regards,
-> Krzysztof
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Could be better documented, though.
+
+Thanks, just got the two lines wrong. Yes the name is always set
+correctly.
+Will fix it.
+
+Best regards,
+
+Markus
+
 > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> >  drivers/gpio/gpiolib-of.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
+> > index 9a0ec48a4737..60aebe4d7c26 100644
+> > --- a/drivers/gpio/gpiolib-of.c
+> > +++ b/drivers/gpio/gpiolib-of.c
+> > @@ -209,11 +209,11 @@ static void of_gpiochip_scan_hogs(struct gpio_chip *chip)
+> >  {
+> >  	struct gpio_desc *desc = NULL;
+> >  	struct device_node *np;
+> > -	const char *name;
+> >  	enum gpio_lookup_flags lflags;
+> >  	enum gpiod_flags dflags;
+> >  
+> >  	for_each_child_of_node(chip->of_node, np) {
+> > +		const char *name = NULL;
+> >  		if (!of_property_read_bool(np, "gpio-hog"))
+> >  			continue;
+> 
+> Johan
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/d49f77bb/attachment.sig>
