@@ -1,62 +1,55 @@
-From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Wed, 29 Jul 2015 19:04:32 +0800
-Subject: [PATCH v4 1/3] dt-binding: spi: Mediatek: Document devicetree
- bindings for spi bus
-In-Reply-To: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
-References: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1438167874-1305-2-git-send-email-leilk.liu@mediatek.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 29 Jul 2015 12:06:02 +0100
+Subject: [Xen-devel] [PATCH 4/8] xen: Use the correctly the Xen memory
+ terminologies
+In-Reply-To: <55B7B8D2.5060107@citrix.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+ <55B7B8D2.5060107@citrix.com>
+Message-ID: <55B8B39A.5020308@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
----
- .../devicetree/bindings/spi/spi-mt65xx.txt         | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+On 28/07/15 18:16, David Vrabel wrote:
+> On 28/07/15 16:02, Julien Grall wrote:
+>> Based on include/xen/mm.h [1], Linux is mistakenly using MFN when GFN
+>> is meant, I suspect this is because the first support for Xen was for
+>> PV. This brough some misimplementation of helpers on ARM and make the
+>> developper confused the expected behavior.
+> 
+> For the benefit of other subsystem maintainers, this is a purely
+> mechanical change in Xen-specific terminology.  It doesn't need reviews
+> or acks from non-Xen people (IMO).
+> 
+>> For instance, with pfn_to_mfn, we expect to get an MFN based on the name.
+>> Although, if we look at the implementation on x86, it's returning a GFN.
+>>
+>> For clarity and avoid new confusion, replace any reference of mfn into
+>> gnf in any helpers used by PV drivers.
+>>
+>> Take also the opportunity to simplify simple construction such
+>> as pfn_to_mfn(page_to_pfn(page)) into page_to_gfn. More complex clean up
+>> will come in follow-up patches.
+>>
+>> I think it may be possible to do further clean up in the x86 code to
+>> ensure that helpers returning machine address (such as virt_address) is
+>> not used by no auto-translated guests. I will let x86 xen expert doing
+>> it.
+> 
+> Reviewed-by: David Vrabel <david.vrabel@citrix.com>
+> 
+> It looks a bit odd to use GFN in some of the PV code where the
+> hypervisor API uses MFN but overall I think using the correct
+> terminology where possible is best.  But I'd like to have Boris's or
+> Konrad's opinion on this.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-new file mode 100644
-index 0000000..f8005d6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -0,0 +1,38 @@
-+MTK SPI device
-+
-+Required properties:
-+- compatible: should be one of the following.
-+    - mediatek,mt8173-spi: for mt8173 platforms
-+    - mediatek,mt8135-spi: for mt8135 platforms
-+    - mediatek,mt6589-spi: for mt6589 platforms
-+
-+- #address-cells: should be 1.
-+
-+- #size-cells: should be 0.
-+
-+- reg: Address and length of the register set for the device
-+
-+- interrupts: Should contain spi interrupt
-+
-+- clocks: phandles to input clocks.
-+
-+- clock-names: tuple listing input clock names.
-+	Required elements: "main"
-+
-+- pad-select: should specify spi pad used, only required for MT8173.
-+        This value should be 0~3.
-+
-+Example:
-+
-+- SoC Specific Portion:
-+spi: spi at 1100a000 {
-+	compatible = "mediatek,mt8173-spi";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	reg = <0 0x1100a000 0 0x1000>;
-+	interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_LOW>;
-+	clocks = <&pericfg CLK_PERI_SPI0>;
-+	clock-names = "main";
-+	pad-select = <0>;
-+	status = "disabled";
-+};
+I was thinking to introduce mfn_to_pfn & co which would be used only for
+PV-guest (a BUG_ON would be here to ensure it) and hypercall related.
+
+I didn't do it as I haven't much knowledge on x86 Xen and was able to
+decide where I have to use pfn_to_mfn.
+
+Regards,
+
 -- 
-1.8.1.1.dirty
+Julien Grall
