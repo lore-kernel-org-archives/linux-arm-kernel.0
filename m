@@ -1,149 +1,138 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 29 Jul 2015 08:14:22 +0200
-Subject: [PATCH v2 04/22] of/platform: add of_platform_device_find()
-In-Reply-To: <CAL_Jsq+RqGAxHE5-ocD-htddBHckG24oZNqfgmMF3Jak6wDXBQ@mail.gmail.com>
-References: <1438089593-7696-1-git-send-email-tomeu.vizoso@collabora.com>
- <1438089593-7696-5-git-send-email-tomeu.vizoso@collabora.com>
- <CAL_JsqJGhFXDKuayuKc2E58X5A7ZGN=uYCVDLnXw_t3_auBg+w@mail.gmail.com>
- <CAAObsKBfRLdPc0gs55ARfa+qZJAOEyEgRyTf8krZnQMb6-j03g@mail.gmail.com>
- <CAL_Jsq+RqGAxHE5-ocD-htddBHckG24oZNqfgmMF3Jak6wDXBQ@mail.gmail.com>
-Message-ID: <CAAObsKA+vMsgiC52jReJckeDjXhdd=_NBocFbMapdwFReiY1SQ@mail.gmail.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 28 Jul 2015 23:14:58 -0700
+Subject: [RFCv2 1/3] docs: dts: Added documentation for Xilinx Zynq Reset
+ Controller bindings.
+In-Reply-To: <20150728225337.GF2650@xsjsorenbubuntu>
+References: <1437783682-13632-1-git-send-email-moritz.fischer@ettus.com>
+ <1437783682-13632-2-git-send-email-moritz.fischer@ettus.com>
+ <20150728025833.GQ2650@xsjsorenbubuntu>
+ <CAAtXAHejK2vL2qSdhqrtHmkV_RBfkLzQNM8ZbDvREvienNqzXw@mail.gmail.com>
+ <20150728225337.GF2650@xsjsorenbubuntu>
+Message-ID: <CAAtXAHd8kG_FtKTW-2T2KToXesWgsgxkZ3vpXZ_oRjGCSfpFgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 July 2015 at 17:31, Rob Herring <robherring2@gmail.com> wrote:
-> On Tue, Jul 28, 2015 at 8:54 AM, Tomeu Vizoso
-> <tomeu.vizoso@collabora.com> wrote:
->> On 28 July 2015 at 15:39, Rob Herring <robherring2@gmail.com> wrote:
->>> On Tue, Jul 28, 2015 at 8:19 AM, Tomeu Vizoso
->>> <tomeu.vizoso@collabora.com> wrote:
->>>> From an arbitrary node in the tree, find the enclosing node that
->>>> corresponds to a platform device, as registered by
->>>> of_platform_populate().
->>>>
->>>> This can be used to find out what device needs to be probed so the
->>>> dependency described by a given node is made available.
->>>>
->>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->>>> ---
->>>>
->>>> Changes in v2:
->>>> - Move the logic for finding a platform device from its firmware node to
->>>>   of/platform.c as it's not needed for ACPI nodes.
->>>>
->>>>  drivers/of/platform.c       | 60 +++++++++++++++++++++++++++++++++++++++++++++
->>>>  include/linux/of_platform.h |  1 +
->>>>  2 files changed, 61 insertions(+)
->>>>
->>>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
->>>> index ff27494cda8c..89c5cd513027 100644
->>>> --- a/drivers/of/platform.c
->>>> +++ b/drivers/of/platform.c
->>>> @@ -501,6 +501,66 @@ void of_platform_depopulate(struct device *parent)
->>>>  }
->>>>  EXPORT_SYMBOL_GPL(of_platform_depopulate);
->>>>
->>>> +static bool of_is_platform(struct device_node *np)
->>>> +{
->>>> +       int count;
->>>> +
->>>> +       count = of_property_count_strings(np, "compatible");
->>>> +
->>>> +       /* The node has to have a compatible string */
->>>> +       if (!count)
->>>> +               return false;
->>>> +
->>>> +       /* But it cannot be just a simple memory-mapped bus */
->>>> +       if (count == 1 && of_match_node(of_default_bus_match_table, np))
->>>> +               return false;
->>>> +
->>>> +       /* But AMBA devices aren't platform devices */
->>>> +       if (of_device_is_compatible(np, "arm,primecell"))
->>>> +               return false;
->>>> +
->>>> +       /* Node is immediately below root */
->>>> +       if (!np->parent || !np->parent->parent)
->>>> +               return true;
->>>> +
->>>> +       /* If it's a node in a simple memory-mapped bus */
->>>> +       if (of_match_node(of_default_bus_match_table, np->parent))
->>>> +               return true;
->>>
->>> This seems really fragile.
+Hi S?ren,
+
+On Tue, Jul 28, 2015 at 3:53 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Mon, 2015-07-27 at 09:52PM -0700, Moritz Fischer wrote:
+>> Hi S?ren,
 >>
->> I think this finding logic matches the logic for registering platform
->> devices in of_platform_populate and also what is documented in
->> Documentation/devicetree/usage-model.txt.
+>> thanks for your feedback.
+>>
+>> On Mon, Jul 27, 2015 at 7:58 PM, S?ren Brinkmann
+>> <soren.brinkmann@xilinx.com> wrote:
+>> > Hi Moritz,
+>> >
+>> > On Fri, 2015-07-24 at 05:21PM -0700, Moritz Fischer wrote:
+>> >> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+>> >> ---
+>> >>  Documentation/devicetree/bindings/reset/zynq-reset-pl.txt | 13 +++++++++++++
+>> >>  1 file changed, 13 insertions(+)
+>> >>  create mode 100644 Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>> >>
+>> >> diff --git a/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>> >> new file mode 100644
+>> >> index 0000000..ac4499e
+>> >> --- /dev/null
+>> >> +++ b/Documentation/devicetree/bindings/reset/zynq-reset-pl.txt
+>> >> @@ -0,0 +1,13 @@
+>> >> +Xilinx Zynq PL Reset Manager
+>> >> +
+>> >> +Required properties:
+>> >> +- compatible: "xlnx,zynq-reset-pl"
+>> >> +- syscon <&slcr>;
+>> >> +- #reset-cells: 1
+>> >> +
+>> >> +Example:
+>> >> +     rstc: rstc at 240 {
+>> >> +             #reset-cells = <1>;
+>> >> +             compatible = "xlnx,zynq-reset-pl";
+>> >> +             syscon = <&slcr>;
+>> >> +     };
+>> >
+>> > I think you also have to add the outputs and make them part of the
+>> > binding. Otherwise you'd have to read the implementation to find
+>> > out what device should be hooked up to which output of the reset-controller.
+>>
+>> Is something like this what you had in mind? I had that prepared for
+>> the next round of patches:
+>>
+>> Reset outputs:
+>>  0  : soft reset
+>>  32 : ddr reset
+>>  64 : topsw reset
+>>  96 : dmac reset
+>>  128: usb0 reset
+>>  129: usb1 reset
+>>  160: gem0 reset
+>>  161: gem1 reset
+>>  164: gem0 rx reset
+>>  165: gem1 rx reset
+>>  166: gem0 ref reset
+>>  167: gem1 ref reset
+>>  192: sdio0 reset
+>>  193: sdio1 reset
+>>  196: sdio0 ref reset
+>>  197: sdio1 ref reset
+>>  224: spi0 reset
+>>  225: spi1 reset
+>>  226: spi0 ref reset
+>>  227: spi1 ref reset
+>>  256: can0 reset
+>>  257: can1 reset
+>>  258: can0 ref reset
+>>  259: can1 ref reset
+>>  288: i2c0 reset
+>>  289: i2c1 reset
+>>  320: uart0 reset
+>>  321: uart1 reset
+>>  322: uart0 ref reset
+>>  323: uart1 ref reset
+>>  352: gpio reset
+>>  384: lqspi reset
+>>  385: qspi ref reset
+>>  416: smc reset
+>>  417: smc ref reset
+>>  448: ocm reset
+>>  512: fpga0 out reset
+>>  513: fpga1 out reset
+>>  514: fpga2 out reset
+>>  515: fpga3 out reset
+>>  544: a9 reset 0
+>>  545: a9 reset 1
+>>  552: peri reset
 >
-> Right. So now we have that logic in 2 places. One is descending from
-> the root and one is walking up from the child. That's an opportunity
-> for some mismatch.
+> Basically, yes. I guess the gaps are due to directly mapping this number
+> to bank and bit instead of doing some more complex mapping in between?
+> I'm not sure whether I like this :) I guess if a number is off the
+> driver would still toggle the addressed bit?
 
-Definitely.
+My assumption was that people would use a #include
+<dt-bindings/xlnx,zynq-reset.h> in their dts. Assuming I got the
+numbers in there right this makes it hard to misuse by accident.
+I'm not saying it's perfect ...
 
->>> What about platform devices which are
->>> children of MFDs but are not "simple-mfd"?
->>
->> This code should deal fine with those (the boards I tested with do
->> have them). It probes the mfd master, and that in turn will call
->> mfd_add_devices causing the target device to be probed.
+> I'm not sure, is it worth
+> to do some explicit mapping from logical outputs to a physical reset? It
+> seems it would be a little safer since it would be easy to check that
+> the addressed reset is valid and there wouldn't be any reserved/invalid
+> bits be toggled. Also, it would make the outputs in here a continuous
+> series of numbers without these gaps. Not sure though whether
+> it's worth the additional complexity in the implementation.
+
+So your suggestion is to have a large switch case kind of thingy? I
+thought about it and it seemed complex as there's quite a bunch of
+resets with gaps. Do you know of a driver that does something similar?
+When I wrote this I looked at the other reset drivers and figured they
+all had this kind of bank mapping of sorts so I assumed that's how
+people usually do it.
+
 >
-> I don't see how this function would ever return true in this case
-> unless you put the MFD at the root level. The only other way to return
-> true is matching on of_default_bus_match_table for the parent (i.e.
-> the MFD).
+>         Thanks,
+>         S?ren
 
-Oops, you are right.
+Thanks again for your input,
 
->>> Does of_find_device_by_node not work for you?
->>
->> Well, the dependencies aren't always platform devices, that's why I
->> need to go up the tree until I find a node that corresponds to a
->> platform device that I can query and probe.
->>
->> If I had a way to get, say, a i2c device from its fwnode then I would
->> just need to make sure that a device's parent is probed before probing
->> it and everything would be cleaner in the OF case.
->
-> If you have the struct device from the device_node, then you should be
-> able to do this, right?
-
-Yes, if I could go back from the device_node to the struct device that
-was registered from it, for all buses, then all this would be much
-simpler and more robust. It would basically work like in the ACPI
-case.
-
-I will play with this idea.
-
->>> That is probably not the
->>> most efficient search, but we could fix that. We could add struct
->>> device ptr to struct device_node and check without searching for
->>> example.
->>
->> That would be great, but I thought there was an issue with a OF node
->> being able to be related to more than one struct device (but I haven't
->> found this myself yet).
->
-> I think it pretty much should be one to one. I'm not aware of any
-> examples where that is not the case. This function would already be
-> broken if you could have more than one struct device.
-
-Well, for platform devices we currently know that there can only be
-one struct device for a given device_node, but that's not so clear for
-other devices.
-
-> There is an issue where you could have 2 drivers match the same node,
-> but on different compatible strings. But that's a different issue.
-
-Yup.
-
-Thanks,
-
-Tomeu
-
-> Rob
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Moritz
