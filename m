@@ -1,95 +1,187 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 29 Jul 2015 09:47:10 +0200
-Subject: bug in identity map for 4KB pages?
-In-Reply-To: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <CAKv+Gu_PMvbeKRnx8t3P+44q1pt-NiUcCMTq6vK-8yUMRjQPdA@mail.gmail.com>
+From: jianwei.wang.chn@gmail.com (Jianwei Wang)
+Date: Wed, 29 Jul 2015 15:48:47 +0800
+Subject: [PATCH v13 0/6] drm/layerscape: Add Freescale DCU DRM driver
+In-Reply-To: <20150729072156.GO16722@phenom.ffwll.local>
+References: <1438152892-11256-1-git-send-email-jianwei.wang.chn@gmail.com>
+ <20150729072156.GO16722@phenom.ffwll.local>
+Message-ID: <CANk3uyDOKKYHKUu-6cOWm09Wu0=qwuyfq65T_gKq-vsFOL1Jwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 July 2015 at 04:37, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> Our system has RAM at a high address, and previously required using 48-bit VA
-> in order to have an idmap that covered all of RAM.
+On Wed, Jul 29, 2015 at 3:21 PM, Daniel Vetter <daniel@ffwll.ch> wrote:
+> On Wed, Jul 29, 2015 at 02:54:46PM +0800, Jianwei Wang wrote:
+>> Changed in v13
+>> -set regmap_config.cache_type to REGCACHE_RBTREE
+>> -add call drm_modeset_lock_all before drm_mode_config_reset
 >
-> In testing on 4.2-rc4, which now contains support for the increased VA range
-> of the idmap without using 48-bit VA, I'm finding that things work for
-> 64KB pages, but do not for 4KB pages.
->
-> Is there any known limitation here with 4KB pages?  Any ideas?
+> This was a bug in one of my recently merged patches, please don't call
+> drm_modeset_lock_all before config_reset. Instead please test "drm: Fixup
+> locking WARNINGs in drm_mode_config_reset" which should address this
+> problem too.
 >
 
-You probably have memory at 0x8000_0000 and at 0x80_8000_0000, right?
-So the physical arrangement still requires more than the 39 bits of
-virtual address space you get with 3 levels, even if the ID map can
-cope now. That is why you get the 0x40_0000_0000 virtual address:
-__phys_to_virt() just wraps to a positive number.
+I have test that patch, It's okay. I'll remove drm_modeset_lock_all.
 
--- 
-Ard.
+Thanks
+Jianwei
 
-
-> ------------------------------------------------------------------------------
+> Thanks, Daniel
 >
-> Booting Linux on physical CPU 0x0
-> Initializing cgroup subsys cpu
-> Linux version 4.2.0-rc4+ (b08248 at right) (gcc version 4.8.3 20131202 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC 2013.11) ) #180 SMP PREEMPT Tue Jul 28 20:51:47 CDT 2015
-> CPU: AArch64 Processor [411fd071] revision 1
-> Detected PIPT I-cache on CPU0
-> alternatives: enabling workaround for ARM erratum 832075
-> alternatives: detected feature GIC system register CPU interface
-> earlycon: Early serial console at MMIO 0x21c0600 (options '115200')
-> bootconsole [uart0] enabled
-> efi: Getting EFI parameters from FDT:
-> efi: UEFI not found.
-> cma: Reserved 16 MiB at 0x00000000fec00000
-> BUG: not creating mapping for 0x0000008080000000 at 0x0000004000000000 - outside kernel range
-> Unable to handle kernel paging request at virtual address 435ffff000
-> pgd = ffffffc000924000
-> [435ffff000] *pgd=0000000000000000, *pud=0000000000000000
-> Internal error: Oops: 96000045 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper Not tainted 4.2.0-rc4+ #180
-> Hardware name: Freescale Layerscape 2085a software Simulator model (DT)
-> task: ffffffc00088cc70 ti: ffffffc000880000 task.ti: ffffffc000880000
-> PC is at memset+0x16c/0x1c0
-> LR is at early_alloc+0x70/0x80
-> pc : [<ffffffc0003250ac>] lr : [<ffffffc00080de50>] pstate: 400002c5
-> sp : ffffffc000883ea0
-> x29: ffffffc000883ea0 x28: 00000000a00000dc
-> x27: ffffffc000081198 x26: 00000083e0000000
-> x25: ffffffc000000000 x24: ffffffc00089a000
-> x23: 0000000000000018 x22: 00000000c0000000
-> x21: 0000008080000000 x20: 000000435ffff000
-> x19: 0000000000001000 x18: 0000000000000000
-> x17: 0000000000000006 x16: 00000083e0000000
-> x15: 0000000000000018 x14: 0000008080000000
-> x13: ffffffc000900dd0 x12: 0000000000000578
-> x11: 0000000600000000 x10: 00000083dffff000
-> x9 : 0000000000000000 x8 : 000000435ffff000
-> x7 : 0000000000000000 x6 : 000000000000003f
-> x5 : 0000000000000040 x4 : 0000000000000000
-> x3 : 0000000000000004 x2 : 0000000000000fc0
-> x1 : 0000000000000000 x0 : 000000435ffff000
+>> -adjust patch order for creating pull request
+>>
+>> Changed in v12
+>>
+>> -Add one patch for MAINTAINER entry for drm/layerscape
+>> Adviced by Daniel Vetter
+>> -Add #include <drm/drm_crtc_helper.h>
+>>
+>> Changed in V11
+>> -set regmap_config.cache_type to REGCACHE_FLAT
+>> Advanced by Alexander Stein
+>>
+>> Changed in V10
+>> -adjust commit log, remove meaningless statement
+>> -cleanup code for it's format and style.
+>> -remove platform related code out, including of tcon(vf610) and scfg(ls1021a)
+>> -remove useless sentences: encoder->crtc = crtc; and connector->encoder = encoder; and so on
+>> -add vendor prefix for panel pandle
+>> -make a DCU_CTRLDESCLN(x, y)  to avoid high repetition
+>> -introduce per-SoC capability structure to avoid check on the OF node's compatible string
+>> -Implement some functions: crtc enable and disable, enable and disable VBLANK, plane atomic_disable and atomic_enable -atomic_check and so on
+>> -move DCU config sentence to the right place
+>> -move get resources functions to  ->probe()
+>> -move fsl,dcu.txt to video/ folder
+>> -add big-endian describe
+>> All advaced by Thierry Reding
+>>
+>> Changed in V9
+>>
+>> put node after calling of_drm_find_panel
+>> split clk_prepare_enable() to clk_prepare() and clk_enable(), just call clk_prepare once, and check return value
+>> check regmap_write/regmap_read return return value
+>> remove useless ".owner    = THIS_MODULE,"
+>> All advanced by Mark Yao
+>>
+>> Changed in V8
+>>
+>> - Remove useless code
+>> #define DRIVER_NAME     "fsl-dcu-drm"
+>> MODULE_ALIAS("platform:fsl-dcu-drm");
+>> Adviced by Paul Bolle
+>>
+>> Changed in V7
+>>
+>> - Remove redundant functions and replace deprecated hook
+>> Adviced by Daniel Vetter
+>> - Replace drm_platform_init with drm_dev_alloc/register
+>> Adviced by Daniel Vetter
+>>
+>> Changed in V6
+>>
+>> - Add NEC nl4827hc19_05b panel to panel-simple.c
+>> Adviced by Mark Yao
+>> - Add DRIVER_ATOMIC for driver_features
+>> Adviced by Mark Yao
+>> - check fsl_dev if it's NULL at PM suspend/resume
+>> Adviced by Mark Yao
+>>
+>> Changed in V5
+>>
+>> - Update commit message
+>> - Add layer registers initialization
+>> - Remove unused functions
+>> - Rename driver folder
+>> Adviced by Stefan Agner
+>> - Move pixel clock control functions to fsl_dcu_drm_drv.c
+>> - remove redundant enable the clock implicitly using regmap
+>> - Add maintainer message
+>>
+>> Changed in V4:
+>>
+>> -This version doesn't have functionality changed
+>> Just a minor adjustment.
+>>
+>> Changed in V3:
+>>
+>> - Test driver on Vybrid board and add compatible string
+>> - Remove unused functions
+>> - set default crtc for encoder
+>> - replace legacy functions with atomic help functions
+>> Adviced by Daniel Vetter
+>> - Set the unique name of the DRM device
+>> - Implement irq handle function for vblank interrupt
+>>
+>> Changed in v2:
+>> - Add atomic support
+>> Adviced by Daniel Vetter
+>> - Modify bindings file
+>> - Rename node for compatibility
+>> - Move platform related code out for compatibility
+>> Adviced by Stefan Agner
+>>
+>> This patch add support for Two Dimensional Animation and Compositing
+>> Engine (2D-ACE) on the Freescale SoCs.
+>>
+>> 2D-ACE is a Freescale display controller. 2D-ACE describes
+>> the functionality of the module extremely well its name is a value
+>> that cannot be used as a token in programming languages.
+>> Instead the valid token "DCU" is used to tag the register names and
+>> function names.
+>>
+>> The Display Controller Unit (DCU) module is a system master that
+>> fetches graphics stored in internal or external memory and displays
+>> them on a TFT LCD panel. A wide range of panel sizes is supported
+>> and the timing of the interface signals is highly configurable.
+>> Graphics are read directly from memory and then blended in real-time,
+>> which allows for dynamic content creation with minimal CPU
+>> intervention.
+>>
+>> The features:
+>> (1) Full RGB888 output to TFT LCD panel.
+>> (2) Blending of each pixel using up to 4 source layers
+>> dependent
+>> on size of panel.
+>> (3) Each graphic layer can be placed with one pixel resolution
+>> in either axis.
+>> (4) Each graphic layer support RGB565 and RGB888 direct colors
+>> without alpha channel and BGRA8888 BGRA4444 ARGB1555 direct
+>> colors
+>> with an alpha channel and YUV422 format.
+>> (5) Each graphic layer support alpha blending with 8-bit
+>> resolution.
+>>
+>> .../devicetree/bindings/video/fsl,dcu.txt          |  22 ++
+>> drivers/gpu/drm/Kconfig                            |   2 +
+>> drivers/gpu/drm/Makefile                           |   1 +
+>> drivers/gpu/drm/fsl-dcu/Kconfig                    |  18 +
+>> drivers/gpu/drm/fsl-dcu/Makefile                   |   7 +
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c         | 208 +++++++++++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h         |  19 +
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c          | 404 +++++++++++++++++++++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h          | 197 ++++++++++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c        |  23 ++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c          |  45 +++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h       |  33 ++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c        | 261 +++++++++++++
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h        |  17 +
+>> drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          | 182 ++++++++++
+>> 15 files changed, 1439 insertions(+)
+>> create mode 100644 Documentation/devicetree/bindings/video/fsl,dcu.txt
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/Kconfig
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/Makefile
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.c
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_crtc.h
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.c
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_drv.h
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_fbdev.c
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_kms.c
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_output.h
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.h
+>> create mode 100644 drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c
+>>
 >
-> Process swapper (pid: 0, stack limit = 0xffffffc000880020)
-> Stack: (0xffffffc000883ea0 to 0xffffffc000884000)
-> 3ea0: 00883ec0 ffffffc0 0080df60 ffffffc0 00900200 ffffffc0 00886000 ffffffc0
-> 3ec0: 00883f20 ffffffc0 0080b7ac ffffffc0 00080000 ffffffc0 fa9fa000 ffffffbf
-> 3ee0: 00000040 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
-> 3f00: 80921000 00000000 80924000 00000000 00000040 00000000 fa9fa000 ffffffbf
-> 3f20: 00883fa0 ffffffc0 00809690 ffffffc0 00000001 00000000 0083c120 ffffffc0
-> 3f40: 9fffa000 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
-> 3f60: 80921000 00000000 80924000 00000000 00000001 00000000 9fffa000 00000000
-> 3f80: 00000000 00000000 00000000 80000000 00000080 00000000 64667467 ff616b73
-> 3fa0: 00000000 00000000 805d3000 00000000 fff9fa40 00000000 00000e12 00000000
-> 3fc0: 9fffa000 00000000 00000000 00000000 00000000 00000000 80000000 00000000
-> 3fe0: 00000000 00000000 0083c948 ffffffc0 00000000 00000000 00000000 00000000
-> Call trace:
-> [<ffffffc0003250ac>] memset+0x16c/0x1c0
-> [<ffffffc00080df5c>] paging_init+0xd0/0x174
-> [<ffffffc00080b7a8>] setup_arch+0x28c/0x5c4
-> [<ffffffc00080968c>] start_kernel+0x94/0x3d0
-> Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
-> ---[ end trace cb88537fdc8fa200 ]---
-> Kernel panic - not syncing: Attempted to kill the idle task!
-> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+> --
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
