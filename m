@@ -1,39 +1,18 @@
-From: b29396@freescale.com (Dong Aisheng)
-Date: Wed, 29 Jul 2015 17:10:28 +0800
-Subject: [PATCH v3 0/6] mmc: imx: a few fixes and new feature
-In-Reply-To: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <20150729091027.GC16916@shlinux1.ap.freescale.net>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 29 Jul 2015 10:20:38 +0100
+Subject: [PATCH 0/2] arm64: support initrd outside of mapped RAM
+In-Reply-To: <1438093961-15536-1-git-send-email-msalter@redhat.com>
+References: <1438093961-15536-1-git-send-email-msalter@redhat.com>
+Message-ID: <1438161638.3129.4.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 05:03:51PM +0800, Haibo Chen wrote:
-> Changes for v3:
-> -Add property describe in binding doc.
-> 
-> Haibo Chen (6):
->   mmc: sdhci-esdhc-imx: add imx7d support and support HS400
->   mmc: sdhci-esdhc-imx: add tuning-step seting support
->   ARM: dts: imx7d-sdb: add eMMC5.0 support
->   mmc: sdhci-esdhc-imx: add compatible string in bingding doc
->   mmc: sdhci-esdhc-imx: config watermark level and burst length
->   mmc: sdhci-esdhc-imx: set back the burst_length_enable bit to 1
-> 
+On Tue, 2015-07-28 at 10:32 -0400, Mark Salter wrote:
+> When booting an arm64 kernel w/initrd using UEFI/grub, use of mem= will likely
+> cut off part or all of the initrd. This leaves it outside the kernel linear
+> map which leads to failure when unpacking.
 
-Hi Haibo,
+Have we got a similar issue for the device-tree blob?
 
-I'm a little busy these days.
-Will help review it ASAP, maybe can do it tomorrow.
-
-Regards
-Dong Aisheng
-
->  .../devicetree/bindings/mmc/fsl-imx-esdhc.txt      |  2 +
->  arch/arm/boot/dts/imx7d-sdb.dts                    | 13 +++
->  drivers/mmc/host/sdhci-esdhc-imx.c                 | 97 +++++++++++++++++++++-
->  include/linux/platform_data/mmc-esdhc-imx.h        |  1 +
->  4 files changed, 112 insertions(+), 1 deletion(-)
-> 
-> -- 
-> 1.9.1
-> 
+-- 
+Tixy
