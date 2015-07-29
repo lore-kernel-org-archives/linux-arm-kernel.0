@@ -1,22 +1,37 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 29 Jul 2015 22:10:14 +0200
-Subject: [PATCH v2] PCI: iproc: Fix BCMA dependency in Kconfig
-In-Reply-To: <1438189973-5712-1-git-send-email-rjui@broadcom.com>
-References: <1438189973-5712-1-git-send-email-rjui@broadcom.com>
-Message-ID: <20150729201014.GA28206@localhost>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Wed, 29 Jul 2015 23:15:13 +0300
+Subject: [PATCH] ARM: EXYNOS: pd: fix resource deallocation on error path
+Message-ID: <1438200913-10532-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 10:12:53AM -0700, Ray Jui wrote:
-> The current iProc BCMA front-end driver can only work on ARM32 based
-> platforms; therefore its config option in Kconfig should be changed to
-> reflect that. This fixes arm64 allmodconfig build failure when compiling
-> the the iProc BCMA driver that contains struct pci_sys_data that is
-> arm32 specific
-> 
-> Signed-off-by: Ray Jui <rjui@broadcom.com>
+The change fixes a bug introduced by 2be2a3ff42a5, memory allocated
+by kstrdup_const() must be always deallocated with kfree_const(),
+otherwise there is a risk of kfree'ing ro memory.
 
-Applied to next/arm64 together with the original series.
+Also remove unneeded of_node_put(), if for_each_compatible_node() body
+execution is not terminated, this prevents from double kfree() in
+OF_DYNAMIC build.
 
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ arch/arm/mach-exynos/pm_domains.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
--Olof
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index 6001f1c..4a87e86 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -146,9 +146,8 @@ static __init int exynos4_pm_init_power_domain(void)
+ 		pd->base = of_iomap(np, 0);
+ 		if (!pd->base) {
+ 			pr_warn("%s: failed to map memory\n", __func__);
+-			kfree(pd->pd.name);
++			kfree_const(pd->pd.name);
+ 			kfree(pd);
+-			of_node_put(np);
+ 			continue;
+ 		}
+ 
+-- 
+2.1.4
