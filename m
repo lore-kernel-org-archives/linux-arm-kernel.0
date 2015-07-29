@@ -1,24 +1,40 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 29 Jul 2015 12:02:50 +0100
-Subject: [PATCH 0/8] Use correctly the Xen memory terminologies in Linux
-In-Reply-To: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
-References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
-Message-ID: <55B8B2DA.8090900@citrix.com>
+From: leilk.liu@mediatek.com (Leilk Liu)
+Date: Wed, 29 Jul 2015 19:04:31 +0800
+Subject: [PATCH v4 0/3] Add Mediatek SPI bus driver
+Message-ID: <1438167874-1305-1-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/07/15 16:02, Julien Grall wrote:
-> Hi all,
-> 
-> This patch series aims to use the memory terminologies described in
-> include/linux/mm.h [1] for Linux xen code.
+Change in v4:
+1. fix Mark Brown review comment.
 
-I mistakenly wrote the wrong include here. It should be include/xen/mm.h
-from the Xen tree:
+Change in v3:
+1. support fifo mode function.
+2. support any non-prime length transfer in dma mode.
+3. use interrupt to handle scatterlist.
+4. fix review comment.
 
-http://xenbits.xen.org/gitweb/?p=xen.git;a=commitdiff;h=e758ed14f390342513405dd766e874934573e6cb
 
-Regards,
+Change in v2:
+1. Remove spi bitbang framwork, use can_dma() and transfer_one().
+2. Add PM functions.
+3. Fix Mark Brown review comment.
 
--- 
-Julien Grall
+Leilk Liu (3):
+  dt-binding: spi: Mediatek: Document devicetree bindings for spi bus
+  spi: mediatek: Add spi bus for Mediatek MT8173
+  arm64: dts: Add spi bus dts
+
+ .../devicetree/bindings/spi/spi-mt65xx.txt         |  38 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  23 +
+ drivers/spi/Kconfig                                |   9 +
+ drivers/spi/Makefile                               |   1 +
+ drivers/spi/spi-mt65xx.c                           | 732 +++++++++++++++++++++
+ include/linux/platform_data/spi-mt65xx.h           |  22 +
+ 6 files changed, 825 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+ create mode 100644 drivers/spi/spi-mt65xx.c
+ create mode 100644 include/linux/platform_data/spi-mt65xx.h
+
+--
+1.8.1.1.dirty
