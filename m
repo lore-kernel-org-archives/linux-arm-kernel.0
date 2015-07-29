@@ -1,97 +1,71 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jul 2015 12:38:44 -0500
-Subject: [PATCH] arm64: override early_init_dt_add_memory_arch()
-In-Reply-To: <1438186495-18126-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1438186495-18126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAL_JsqKMyOwfNVV5nfAGO0vVgTR7dpPAxMfdeW9mjMd1WfMs3w@mail.gmail.com>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Thu, 30 Jul 2015 01:43:13 +0800
+Subject: [PATCH 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1438158927.5106.20.camel@tiscali.nl>
+References: <1438080345-7233-1-git-send-email-lftan@altera.com>
+ <1438080345-7233-4-git-send-email-lftan@altera.com>
+ <1438158927.5106.20.camel@tiscali.nl>
+Message-ID: <CAFiDJ5_yXoXJ+UUROX1aiNeTyxt6wDZ+h8DW=c4EdUiS5OkkJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 11:14 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> Override the __weak early_init_dt_add_memory_arch() with our own
-> version. This allows us to relax the imposed restrictions at memory
-> discovery time, and clip the memory we will not able to address in
-> a single go at mapping time.
+On Wed, Jul 29, 2015 at 4:35 PM, Paul Bolle <pebolle@tiscali.nl> wrote:
+> On di, 2015-07-28 at 18:45 +0800, Ley Foon Tan wrote:
+>> --- a/drivers/pci/host/Kconfig
+>> +++ b/drivers/pci/host/Kconfig
+>
+>> +config PCIE_ALTERA
+>> +     bool "Altera PCIe controller"
+>> +     depends on ARCH_SOCFPGA
+>> +     depends on OF
+>> +     select PCI_MSI_IRQ_DOMAIN if PCI_MSI
+>> +     help
+>> +       Say Y here if you want to enable PCIe controller support for Altera
+>> +       SoCFPGA family of SoCs.
+>
+>> --- a/drivers/pci/host/Makefile
+>> +++ b/drivers/pci/host/Makefile
+>
+>> +obj-$(CONFIG_PCIE_ALTERA) += pcie-altera.o
+>
+>> --- /dev/null
+>> +++ b/drivers/pci/host/pcie-altera.c
+>
+>> +#include <linux/module.h>
+>
+>> +static const struct of_device_id altera_pcie_of_match[] = {
+>> +     { .compatible = "altr,pcie-root-port-1.0", },
+>> +     {},
+>> +};
+>> +MODULE_DEVICE_TABLE(of, altera_pcie_of_match);
+>
+>
+>> +static struct platform_driver altera_pcie_driver = {
+>> +     [...]
+>> +             .owner  = THIS_MODULE,
+>> +     ]...]
+>> +};
+>> +
+>> +module_platform_driver(altera_pcie_driver);
+>> +
+>> +MODULE_AUTHOR("Ley Foon Tan <lftan@altera.com>");
+>> +MODULE_DESCRIPTION("Altera PCIe host controller driver");
+>> +MODULE_LICENSE("GPL v2");
+>
+> PCIE_ALTERA is a bool symbol. So pcie-altera.o is built-in only. Yet
+> pcie-altera.c uses a number of module-specific constructs. Should
+> PCIE_ALTERA perhaps be tristate?
+Yes, PCIE_ALTERA can be changed to tristate after we remove call to
+pci_common_init_dev to now.
+pci_common_init_dev is not a exported symbol.
 
-This doesn't really explain what is the problem you are solving.
 
-> So copy the generic original, but only retain the check against
-> regions whose sizes become zero when clipped to page alignment.
->
-> The clipping against the maximum size of the linear region has been
-> moved to arm64_memblock_init().
+> Likewise for PCIE_ALTERA_MSI in 4/6.
+PCIE_ALTERA_MSI can only be built-in only. It depends on quite a
+number of non-exported symbols.
+Eg: pci_msi_mask_irq, pci_msi_create_irq_domain, irq_domain_set_info and etc..
 
-IIRC, the checks in early_init_dt_add_memory_arch came from the arm64
-version of it. If you now want to remove them, then I'm okay removing
-them from the weak function (assuming my memory is correct). None of
-this seems architecture specific to me. Perhaps memblock needs handle
-the clipping itself. The arch sets the limits, DT provides the raw
-memory ranges, and then memblock sorts out the actual memory blocks.
+Thanks.
 
-Rob
-
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/mm/init.c | 35 +++++++++++++++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index ad87ce826cce..76a624611939 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -158,6 +158,25 @@ early_param("mem", early_mem);
->
->  void __init arm64_memblock_init(void)
->  {
-> +       /*
-> +        * Remove the memory that we will not be able to cover
-> +        * with the linear mapping.
-> +        */
-> +       const s64 linear_region_size = -(s64)PAGE_OFFSET;
-> +
-> +       if (memblock_start_of_DRAM() < memstart_addr) {
-> +               pr_warn("Ignoring memory below PHYS_OFFSET (0x%012llx - 0x%012llx)\n",
-> +                       (u64)memblock_start_of_DRAM(), memstart_addr - 1);
-> +               memblock_remove(0, memstart_addr);
-> +       }
-> +
-> +       if (memstart_addr + linear_region_size < memblock_end_of_DRAM()) {
-> +               pr_warn("Ignoring memory outside of linear range (0x%012llx - 0x%012llx)\n",
-> +                       memstart_addr + linear_region_size,
-> +                       (u64)memblock_end_of_DRAM() - 1);
-> +               memblock_remove(memstart_addr + linear_region_size, ULLONG_MAX);
-> +       }
-> +
->         memblock_enforce_memory_limit(memory_limit);
->
->         /*
-> @@ -374,3 +393,19 @@ static int __init keepinitrd_setup(char *__unused)
->
->  __setup("keepinitrd", keepinitrd_setup);
->  #endif
-> +
-> +void __init early_init_dt_add_memory_arch(u64 base, u64 size)
-> +{
-> +       if (!PAGE_ALIGNED(base)) {
-> +               if (size < PAGE_SIZE - (base & ~PAGE_MASK)) {
-> +                       pr_warn("Ignoring memory block 0x%llx - 0x%llx\n",
-> +                               base, base + size);
-> +                       return;
-> +               }
-> +               size -= PAGE_SIZE - (base & ~PAGE_MASK);
-> +               base = PAGE_ALIGN(base);
-> +       }
-> +       size &= PAGE_MASK;
-> +
-> +       memblock_add(base, size);
-> +}
-> --
-> 1.9.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Regards
+Ley Foon
