@@ -1,103 +1,68 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:46 +0530
-Subject: [PATCH 16/17] mmc: host: omap_hsmmc: remove CONFIG_REGULATOR check
+Date: Wed, 29 Jul 2015 16:39:47 +0530
+Subject: [PATCH 17/17] mmc: host: omap_hsmmc: use "mmc_of_parse_voltage" to
+ get ocr_avail
 In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
 References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-17-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-18-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that support for platforms which have optional regulator is added,
-remove CONFIG_REGULATOR check in omap_hsmmc.
+From: Roger Quadros <rogerq@ti.com>
 
+For platforms that doesn't have explicit regulator control in MMC,
+populate voltage-ranges in MMC device tree node and use
+mmc_of_parse_voltage to get ocr_avail
+
+Signed-off-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   35 +++--------------------------------
- 1 file changed, 3 insertions(+), 32 deletions(-)
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    2 ++
+ drivers/mmc/host/omap_hsmmc.c                      |    9 ++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
+diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+index 76bf087..2408e87 100644
+--- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
++++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
+@@ -22,6 +22,8 @@ ti,dual-volt: boolean, supports dual voltage cards
+ ti,non-removable: non-removable slot (like eMMC)
+ ti,needs-special-reset: Requires a special softreset sequence
+ ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
++voltage-ranges: Specify the voltage range supported if regulator framework
++isn't enabled.
+ dmas: List of DMA specifiers with the controller specific format
+ as described in the generic DMA client binding. A tx and rx
+ specifier is required.
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 5116c42..aa4ba28 100644
+index aa4ba28..6d52873 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -203,7 +203,6 @@ struct omap_hsmmc_host {
- 	int			context_loss;
- 	int			protect_card;
- 	int			reqs_blocked;
--	int			use_reg;
- 	int			req_in_progress;
- 	unsigned long		clk_rate;
- 	unsigned int		flags;
-@@ -244,8 +243,6 @@ static int omap_hsmmc_get_cover_state(struct device *dev)
- 	return mmc_gpio_get_cd(host->mmc);
- }
- 
--#ifdef CONFIG_REGULATOR
--
- static int omap_hsmmc_enable_supply(struct mmc_host *mmc)
- {
- 	int ret;
-@@ -513,29 +510,6 @@ static void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
- 	mmc_pdata(host)->set_power = NULL;
- }
- 
--static inline int omap_hsmmc_have_reg(void)
--{
--	return 1;
--}
--
--#else
--
--static inline int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
--{
--	return -EINVAL;
--}
--
--static inline void omap_hsmmc_reg_put(struct omap_hsmmc_host *host)
--{
--}
--
--static inline int omap_hsmmc_have_reg(void)
--{
--	return 0;
--}
--
--#endif
--
- static irqreturn_t omap_hsmmc_cover_irq(int irq, void *dev_id);
- 
- static int omap_hsmmc_gpio_init(struct mmc_host *mmc,
-@@ -2195,11 +2169,10 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 		goto err_irq;
- 	}
- 
--	if (omap_hsmmc_have_reg() && !mmc_pdata(host)->set_power) {
-+	if (!mmc_pdata(host)->set_power) {
- 		ret = omap_hsmmc_reg_get(host);
- 		if (ret)
+@@ -2175,7 +2175,13 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
  			goto err_irq;
--		host->use_reg = 1;
  	}
  
- 	mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
-@@ -2242,8 +2215,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+-	mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
++	if (!mmc_pdata(host)->ocr_mask) {
++		ret = mmc_of_parse_voltage(pdev->dev.of_node, &mmc->ocr_avail);
++		if (ret)
++			goto err_parse_voltage;
++	} else {
++		mmc->ocr_avail = mmc_pdata(host)->ocr_mask;
++	}
+ 
+ 	omap_hsmmc_disable_irq(host);
+ 
+@@ -2215,6 +2221,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
  
  err_slot_name:
  	mmc_remove_host(mmc);
--	if (host->use_reg)
--		omap_hsmmc_reg_put(host);
-+	omap_hsmmc_reg_put(host);
++err_parse_voltage:
+ 	omap_hsmmc_reg_put(host);
  err_irq:
  	device_init_wakeup(&pdev->dev, false);
- 	if (host->tx_chan)
-@@ -2267,8 +2239,7 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
- 
- 	pm_runtime_get_sync(host->dev);
- 	mmc_remove_host(host->mmc);
--	if (host->use_reg)
--		omap_hsmmc_reg_put(host);
-+	omap_hsmmc_reg_put(host);
- 
- 	if (host->tx_chan)
- 		dma_release_channel(host->tx_chan);
 -- 
 1.7.9.5
