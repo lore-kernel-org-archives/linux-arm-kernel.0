@@ -1,91 +1,65 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Wed, 29 Jul 2015 01:50:25 +0000
-Subject: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new feature
- support
-In-Reply-To: <55B82AE1.2050906@roeck-us.net>
-References: <1438066825-21923-1-git-send-email-wenyou.yang@atmel.com>
- <1438066825-21923-2-git-send-email-wenyou.yang@atmel.com>
- <55B72BC0.8070206@roeck-us.net>
- <B256D81BAE5131468A838E5D7A243641C9F820CB@penmbx01>
- <55B82AE1.2050906@roeck-us.net>
-Message-ID: <B256D81BAE5131468A838E5D7A243641C9F82110@penmbx01>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 29 Jul 2015 11:23:48 +0900
+Subject: Possible regression due to "tick: broadcast: Prevent livelock
+ from event handler"
+In-Reply-To: <alpine.DEB.2.11.1507031640060.3916@nanos>
+References: <20150703024044.GB24695@verge.net.au>
+ <20150703105441.GF1521@katana>
+ <alpine.DEB.2.11.1507031511180.3916@nanos>
+ <20150703133245.GA19284@katana>
+ <alpine.DEB.2.11.1507031612410.3916@nanos>
+ <20150703143703.GB19284@katana>
+ <alpine.DEB.2.11.1507031640060.3916@nanos>
+Message-ID: <20150729022348.GA13360@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Thomas,
 
-Thank you for your prompt answer.
-
-> -----Original Message-----
-> From: Guenter Roeck [mailto:linux at roeck-us.net]
-> Sent: 2015?7?29? 9:23
-> To: Yang, Wenyou; wim at iguana.be; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk; galak at codeaurora.org
-> Cc: sylvain.rochet at finsecur.com; Ferre, Nicolas; boris.brezillon at free-
-> electrons.com; devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-
-> watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new feature
-> support
+On Fri, Jul 03, 2015 at 04:53:49PM +0200, Thomas Gleixner wrote:
+> On Fri, 3 Jul 2015, Wolfram Sang wrote:
+> > > So this is a single core machine and uses the em_sti timer w/o the
+> > > broadcast nonsense. In Simons case it looks like em_sti is used as
+> > > broadcast device.
+> > 
+> > We use the same board. Just my kernel has SMP=n.
+> > 
+> > > Though the issues you see in the highres=n case might be the same as
+> > > the ones Simon is observing.
+> > 
+> > I hope so. One good thing about the issue I see is that it is 100%
+> > reproducable.
+> > 
+> > > So in that nohz=y highres=n case, does adding idle=poll on the command
+> > > line fix the issue?
+> > 
+> > Nope, still hangs.
 > 
-> On 07/28/2015 05:38 PM, Yang, Wenyou wrote:
-> > Hi Guenter,
-> >
-> > Thank you very much for your review.
-> >
-> >> -----Original Message-----
-> >> From: Guenter Roeck [mailto:linux at roeck-us.net]
-> >> Sent: 2015?7?28? 15:14
-> >> To: Yang, Wenyou; wim at iguana.be; robh+dt at kernel.org;
-> >> pawel.moll at arm.com; mark.rutland at arm.com;
-> >> ijc+devicetree at hellion.org.uk; galak at codeaurora.org
-> >> Cc: sylvain.rochet at finsecur.com; Ferre, Nicolas;
-> >> boris.brezillon at free- electrons.com; devicetree at vger.kernel.org;
-> >> linux-kernel at vger.kernel.org; linux- watchdog at vger.kernel.org;
-> >> linux-arm-kernel at lists.infradead.org
-> >> Subject: Re: [PATCH 1/2] drivers: watchdog: at91sam9_wdt: add new
-> >> feature support
-> >>
-> >> On 07/28/2015 12:00 AM, Wenyou Yang wrote:
-> >>> In the datasheet, the new feature is describled as "WDT_MR can be
-> >>> written until a LOCKMR command is issued in WDT_CR".
-> >>> That is to say, as long as the bootstrap and u-boot don't issue a
-> >>> LOCKMR command, WDT_MR can be written in kernel.
-> >>>
-> >>> So the driver can enable/disable the watchdog timer hardware, set
-> >>> WDV(Watchdog Counter Value) and WDD(Watchdog Delta Value) fields of
-> >>> WDT_MR register to set the watchdog timer timeout.
-> >>>
-> >>> The timer is not necessary that regularly sends a keepalive ping to
-> >>> the watchdog timer hardware.
-> >>>
-> >>> It is introduced from sama5d4 SoCs.
-> >>>
-> >> Since there are so many changes, I wonder is a separate driver would
-> >> make more sense.
-> > Yes, a bit many changes.
-> > I thought reuse the driver code.
-> > If a separate driver, I am afraid it includes much duplicated code.
-> > After all, it is for the same device with different feature.
-> >
-> > I don't think it is necessary to have multiple drivers for the same peripheral with
-> different feature.
-> >
-> 
-> The concept for the two mechanisms is all different: In one, the watchdog
-> keepalive is triggered from timer code. In the other, the watchdog timeout is
-> triggered directly from the heartbeat function. One assumes that the watchdog is
-> always running, and that it must be pinged even if closed. The other disables the
-> watchdog on close.
-> 
-> What I _can_ see is that the driver is becoming an unmaintainable mess, with lots
-> of if/else in pretty much every function. I consider this much less desirable than a
-> bit of code duplication - if there is any. Seriously, most of the added code might as
-> well be for a completely different chip.
+> Ok. So it's unrelated to deep idle states. Any chance of poking with
+> JTAG at the frozen box? If not, are there GPIOs which you could use to
+> monitor certain state?
 
-You are right, I accepted your advice. I will rewrite it. Thanks.
+Sorry for the delay, it has taken me a while to secure a JTAG.
 
-> 
-> Guenter
+I now have one hooked up to my emev2/kzm9d board; though I must
+confess I am not at all experienced in driving it.
 
-Best Regards,
-Wenyou Yang
+As far as I can tell, and to be quite honest I would not be at all
+surprised if I am mistaken, the CPUs are sitting here:
+
+pc: 0xC001F7E8, which corresponds to cpu_v7_do_idle
+
+Hooking up GDB I see:
+
+#0  cpu_v7_do_idle () at arch/arm/mm/proc-v7.S:74
+#1  0xc0010734 in arch_cpu_idle () at arch/arm/kernel/process.c:72
+#2  0xc04c406c in schedule_preempt_disabled () at kernel/sched/core.c:3115
+#3  0xc0055130 in cpu_idle_loop () at kernel/sched/idle.c:279
+#4  cpu_startup_entry (state=CPUHP_OFFLINE) at kernel/sched/idle.c:301
+#5  0xc04bf440 in rest_init () at init/main.c:412
+#6  0xc061bc6c in start_kernel () at init/main.c:683
+#7  0x4000807c in ?? ()
+
+
+I am using the renesas-devel-20150729-v4.2-rc4 tag of the my renesas tree
+which, as the name suggests, is based on v4.2-rc4.
