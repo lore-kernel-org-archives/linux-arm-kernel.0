@@ -1,66 +1,42 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 Jul 2015 16:39:44 +0530
-Subject: [PATCH 14/17] mmc: host: omap_hsmmc: use regulator_is_enabled to find
- pbias status
+Date: Wed, 29 Jul 2015 16:39:43 +0530
+Subject: [PATCH 13/17] mmc: host: omap_hsmmc: enable/disable vmmc_aux
+ regulator based on prior state
 In-Reply-To: <1438168187-1614-1-git-send-email-kishon@ti.com>
 References: <1438168187-1614-1-git-send-email-kishon@ti.com>
-Message-ID: <1438168187-1614-15-git-send-email-kishon@ti.com>
+Message-ID: <1438168187-1614-14-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use regulator_is_enabled of pbias regulator to find pbias regulator
-status instead of maintaining a custom bookkeeping
-pbias_enabled variable.
+enable vmmc_aux regulator only if it is in disabled state and disable
+vmmc_aux regulator only if it is in enabled state.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    8 ++------
- 1 file changed, 2 insertions(+), 6 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 001f8a0..a50edbc 100644
+index 58bda42..001f8a0 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -182,7 +182,6 @@ struct omap_hsmmc_host {
- 	struct	clk		*fclk;
- 	struct	clk		*dbclk;
- 	struct	regulator	*pbias;
--	bool			pbias_enabled;
- 	void	__iomem		*base;
- 	resource_size_t		mapbase;
- 	spinlock_t		irq_lock; /* Prevent races with irq handler */
-@@ -326,22 +325,20 @@ static int omap_hsmmc_set_pbias(struct omap_hsmmc_host *host, bool power_on,
- 			return ret;
- 		}
- 
--		if (host->pbias_enabled == 0) {
-+		if (!regulator_is_enabled(host->pbias)) {
- 			ret = regulator_enable(host->pbias);
- 			if (ret) {
- 				dev_err(host->dev, "pbias reg enable fail\n");
- 				return ret;
- 			}
--			host->pbias_enabled = 1;
- 		}
- 	} else {
--		if (host->pbias_enabled == 1) {
-+		if (regulator_is_enabled(host->pbias)) {
- 			ret = regulator_disable(host->pbias);
- 			if (ret) {
- 				dev_err(host->dev, "pbias reg disable fail\n");
- 				return ret;
- 			}
--			host->pbias_enabled = 0;
- 		}
+@@ -258,7 +258,7 @@ static int omap_hsmmc_enable_supply(struct mmc_host *mmc, int vdd)
  	}
  
-@@ -2073,7 +2070,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	host->base	= base + pdata->reg_offset;
- 	host->power_mode = MMC_POWER_OFF;
- 	host->next_data.cookie = 1;
--	host->pbias_enabled = 0;
+ 	/* Enable interface voltage rail, if needed */
+-	if (mmc->supply.vqmmc) {
++	if (mmc->supply.vqmmc && !regulator_is_enabled(mmc->supply.vqmmc)) {
+ 		ret = regulator_enable(mmc->supply.vqmmc);
+ 		if (ret) {
+ 			dev_err(mmc_dev(mmc), "vmmc_aux reg enable failed\n");
+@@ -280,7 +280,7 @@ static int omap_hsmmc_disable_supply(struct mmc_host *mmc)
+ 	int ret;
+ 	int status;
  
- 	ret = omap_hsmmc_gpio_init(mmc, host, pdata);
- 	if (ret)
+-	if (mmc->supply.vqmmc) {
++	if (mmc->supply.vqmmc && regulator_is_enabled(mmc->supply.vqmmc)) {
+ 		ret = regulator_disable(mmc->supply.vqmmc);
+ 		if (ret) {
+ 			dev_err(mmc_dev(mmc), "vmmc_aux reg disable failed\n");
 -- 
 1.7.9.5
