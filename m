@@ -1,68 +1,51 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Wed, 29 Jul 2015 11:01:21 +0800
-Subject: [PATCH v6 0/3] Add MediaTek display PWM driver
-In-Reply-To: <1437729058.11386.4.camel@mtksdaap41>
-References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
- <2181696.fQcvS98Cqx@ubix> <1437729058.11386.4.camel@mtksdaap41>
-Message-ID: <1438138881.16608.6.camel@mtksdaap41>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Wed, 29 Jul 2015 11:03:55 +0800
+Subject: [PATCH 2/6] arm: mach-socfpga: enable pci support
+In-Reply-To: <CAL_JsqK8HbYMbQf+8vFuDiTe3j9THus+YwLZDdJpQM5faQTY3g@mail.gmail.com>
+References: <1438080345-7233-1-git-send-email-lftan@altera.com>
+ <1438080345-7233-3-git-send-email-lftan@altera.com>
+ <CAL_JsqK8HbYMbQf+8vFuDiTe3j9THus+YwLZDdJpQM5faQTY3g@mail.gmail.com>
+Message-ID: <CAFiDJ584tv9od635_+AVObFAuwu7OZHeBDZ2DRdwCzDz40RjHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-07-24 at 17:10 +0800, YH Huang wrote:
-> On Fri, 2015-07-24 at 10:42 +0200, Matthias Brugger wrote:
-> > On Monday, July 20, 2015 04:17:14 PM YH Huang wrote:
-> > > This patch series add the use of display PWM driver, documentation
-> > > and device tree for Mediatek SoCs. The driver is used to support
-> > > the backlight of the panel. This is based on v4.2-rc1.
-> > > 
-> > > The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
-> > > clk: mediatek: Add subsystem clocks of MT8173
-> > > 
-> > > Change in v6:
-> > > 1. Enable clocks in the pwm_enable function
-> > > 2. Remove suspend/resume code since pwm-backlight driver has done the same
-> > > things 3. Revise some code to make it easier to read
-> > > 
-> > 
-> > Can you please provide the whole change log for all versions the next time.
-> > It's easier this way to understand the evolution of the series.
-> 
-> Change in v6:
-> 1. Enable clocks in the pwm_enable function.
-> 2. Remove suspend/resume code since pwm-backlight driver has done the
-> same things.
-> 3. Revise some code to make it easier to read.
-> 
-> Change in v5:
-> 1. Configure PWM output via pinctrl.
-> 2. Fix the parameter name in dtsi.
-> 
-> Change in v4:
-> 1. Codebase is on v4.2-rc1.
-> 2. Add the PWM node in dtsi.
-> 3. Change the dependency in Kconfig.
-> 4. Rewrite some code for readability.
-> 
-> Change in v3:
-> 1. Add suspend/resume function.
-> 2. Fix the formula for high_width calculation.
-> 3. Rewrite some code to make it easier to read.
-> 4. Add more information in the commit message.
-> 
-> Change in v2:
-> 1. Rewrite descriptions for driver in kconfig to make it much clear.
-> 2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
-> 3. Disable clocks in the error path.
-> 4. Change the shift values in decimal instead of hex.
-> 5. Rename and add some variables or function name for consistency and
-> readability.
-> 6. Drop unnecessary parentheses, spaces, variables and add newlines to
-> make the code easiler to read.
+On Tue, Jul 28, 2015 at 9:26 PM, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Jul 28, 2015 at 5:45 AM, Ley Foon Tan <lftan@altera.com> wrote:
+>> Enable CONFIG_ARCH_SUPPORT_MSI and CONFIG_PCI in SOCFPGA platform.
+>>
+>> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+>> ---
+>>  arch/arm/mach-socfpga/Kconfig | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+>> index 90efdeb..7ff4576 100644
+>> --- a/arch/arm/mach-socfpga/Kconfig
+>> +++ b/arch/arm/mach-socfpga/Kconfig
+>> @@ -1,6 +1,7 @@
+>>  menuconfig ARCH_SOCFPGA
+>>         bool "Altera SOCFPGA family" if ARCH_MULTI_V7
+>>         select ARCH_SUPPORTS_BIG_ENDIAN
+>> +       select ARCH_SUPPORTS_MSI
+>
+> This doesn't exist in mainline having been removed in 3.12.
+Will removed this.
+>
+>>         select ARM_AMBA
+>>         select ARM_GIC
+>>         select CACHE_L2X0
+>> @@ -9,6 +10,7 @@ menuconfig ARCH_SOCFPGA
+>>         select HAVE_ARM_SCU
+>>         select HAVE_ARM_TWD if SMP
+>>         select MFD_SYSCON
+>> +       select PCI
+>
+> This should not be selected by the platform, but be user selectable
+> unless perhaps you require PCI to boot.
 
-Hi all,
+Will removed this as well.
 
-If you have any suggestions, please let me know.
-Perhaps we can apply the patch?
+Thanks for reviewing.
 
-Regards,
-YH Huang
+Regards
+Ley Foon
