@@ -1,53 +1,32 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Wed, 29 Jul 2015 17:03:57 +0800
-Subject: [PATCH v3 6/6] mmc: sdhci-esdhc-imx: set back the burst_length_enable
- bit to 1
-In-Reply-To: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-References: <1438160637-28061-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1438160637-28061-7-git-send-email-haibo.chen@freescale.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 29 Jul 2015 15:57:29 +0800
+Subject: [PATCH 07/10] usb: chipidea: usbmisc_imx: add unburst setting
+ for imx6
+In-Reply-To: <20150729103022.7cfe0466@ipc1.ka-ro>
+References: <1438137734-27311-1-git-send-email-peter.chen@freescale.com>
+ <1438137734-27311-8-git-send-email-peter.chen@freescale.com>
+ <20150729103022.7cfe0466@ipc1.ka-ro>
+Message-ID: <20150729075728.GC27605@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently we find that if a usdhc is choosed to boot system, then ROM
-code will set the burst length enable bit of this usdhc as 0.
+On Wed, Jul 29, 2015 at 10:30:22AM +0200, Lothar Wa?mann wrote:
+> Hi,
+> 
+> > With this setting and AHBBRST at SBUSCFG as "Incremental burst of
+> > unspecified length", each unburst size can be taken as one single transfer.
+> > It is benefit for unburst size transfer.
+> > 
+> What is an 'unburst'?
+> 
 
-This will make performance drop a lot if this usdhc's burst length is
-16. So this patch set back the burst_length_enable bit as 1, which is
-the default value, and means burst length is enabled for INCR.
+Assume burst size is 8 dword, unburst size 't' < 8.
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- drivers/mmc/host/sdhci-esdhc-imx.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+With this feature, 't' length payload can be taken
+as one burst transfer, otherwise, the single transfer
+(1 dword) will be used.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 37d0095..dd945e5 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -32,6 +32,7 @@
- #include "sdhci-esdhc.h"
- 
- #define	ESDHC_CTRL_D3CD			0x08
-+#define ESDHC_BURST_LEN_EN_INCR		(1 << 27)
- /* VENDOR SPEC register */
- #define ESDHC_VENDOR_SPEC		0xc0
- #define  ESDHC_VENDOR_SPEC_SDIO_QUIRK	(1 << 1)
-@@ -1158,6 +1159,16 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
- 		host->mmc->caps |= MMC_CAP_1_8V_DDR;
- 
-+		/*
-+		 * ROM code will change the burst_length_enable setting to
-+		 * zero if this usdhc is choosed to boot system. Change it
-+		 * back here, otherwise it will impact the performance a
-+		 * lot if the burst length is 16.
-+		 */
-+		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
-+			| ESDHC_BURST_LEN_EN_INCR,
-+			host->ioaddr + SDHCI_HOST_CONTROL);
-+
- 		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
- 			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
- 
 -- 
-1.9.1
+
+Best Regards,
+Peter Chen
