@@ -1,40 +1,42 @@
 From: jianwei.wang.chn@gmail.com (Jianwei Wang)
-Date: Wed, 29 Jul 2015 14:54:50 +0800
-Subject: [PATCH v13 4/6] MAINTAINERS: add Freescale DCU DRM driver maintainer
+Date: Wed, 29 Jul 2015 14:54:51 +0800
+Subject: [PATCH v13 5/6] arm:dts:ls1021a: Add DCU dts node
 In-Reply-To: <1438152892-11256-1-git-send-email-jianwei.wang.chn@gmail.com>
 References: <1438152892-11256-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <1438152892-11256-5-git-send-email-jianwei.wang.chn@gmail.com>
+Message-ID: <1438152892-11256-6-git-send-email-jianwei.wang.chn@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Alison and myself as maintainers of the Freescale DCU DRM driver.
+Add DCU node, DCU is a display controller of Freescale
+named 2D-ACE.
 
 Signed-off-by: Alison Wang <b18965@freescale.com>
 Signed-off-by: Xiubo Li <lixiubo@cmss.chinamobile.com>
 Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 9c9dd5f..66746e4 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3555,6 +3555,15 @@ F:	drivers/gpu/drm/exynos/
- F:	include/drm/exynos*
- F:	include/uapi/drm/exynos*
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index c70bb27..6d6e3e2 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -383,6 +383,16 @@
+ 				 <&platform_clk 1>;
+ 		};
  
-+DRM DRIVERS FOR FREESCALE DCU
-+M:	Jianwei Wang <jianwei.wang.chn@gmail.com>
-+M:	Alison Wang <alison.wang@freescale.com>
-+L:	dri-devel at lists.freedesktop.org
-+S:	Supported
-+F:	drivers/gpu/drm/fsl-dcu/
-+F:	Documentation/devicetree/bindings/video/fsl,dcu.txt
-+F:	Documentation/devicetree/bindings/panel/nec,nl4827hc19_05b.txt
++		dcu: dcu at 2ce0000 {
++			compatible = "fsl,ls1021a-dcu";
++			reg = <0x0 0x2ce0000 0x0 0x10000>;
++			interrupts = <GIC_SPI 172 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&platform_clk 0>;
++			clock-names = "dcu";
++			big-endian;
++			status = "disabled";
++		};
 +
- DRM DRIVERS FOR FREESCALE IMX
- M:	Philipp Zabel <p.zabel@pengutronix.de>
- L:	dri-devel at lists.freedesktop.org
+ 		mdio0: mdio at 2d24000 {
+ 			compatible = "gianfar";
+ 			device_type = "mdio";
 -- 
 2.1.0.27.g96db324
