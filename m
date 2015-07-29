@@ -1,24 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 29 Jul 2015 10:25:37 +0100
-Subject: [PATCH 0/2] arm64: support initrd outside of mapped RAM
-In-Reply-To: <1438161638.3129.4.camel@linaro.org>
-References: <1438093961-15536-1-git-send-email-msalter@redhat.com>
- <1438161638.3129.4.camel@linaro.org>
-Message-ID: <20150729092536.GI15213@leverpostej>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 29 Jul 2015 11:34:05 +0200
+Subject: [PATCHv4 2/6] dmaengine: mv_xor: add suspend/resume support
+In-Reply-To: <20150722051011.GQ23525@localhost>
+References: <1436365699-6862-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1436365699-6862-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20150722051011.GQ23525@localhost>
+Message-ID: <20150729113405.2b337ae0@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 10:20:38AM +0100, Jon Medhurst (Tixy) wrote:
-> On Tue, 2015-07-28 at 10:32 -0400, Mark Salter wrote:
-> > When booting an arm64 kernel w/initrd using UEFI/grub, use of mem= will likely
-> > cut off part or all of the initrd. This leaves it outside the kernel linear
-> > map which leads to failure when unpacking.
-> 
-> Have we got a similar issue for the device-tree blob?
+Vinod,
 
-Commit 61bd93ce801bb6df ("arm64: use fixmap region for permanent FDT
-mapping") [1] solved that for the DTB in v4.2-rc1.
+On Wed, 22 Jul 2015 10:40:11 +0530, Vinod Koul wrote:
 
-Mark.
+> > +static int mv_xor_suspend(struct platform_device *pdev, pm_message_t state)
+> > +{
+> > +	struct mv_xor_device *xordev = platform_get_drvdata(pdev);
+> > +	int i;
+> > +
+> > +	for (i = 0; i < MV_XOR_MAX_CHANNELS; i++) {
+> > +		struct mv_xor_chan *mv_chan = xordev->channels[i];
+> > +
+> > +		if (!mv_chan)
+> > +			continue;
+> > +
+> > +		mv_chan->saved_config_reg =
+> > +			readl_relaxed(XOR_CONFIG(mv_chan));
+> > +		mv_chan->saved_int_mask_reg =
+> > +			readl_relaxed(XOR_INTR_MASK(mv_chan));
+> this sound fine, but I am missing the suspension of the channel. If a
+> transfer was active while suspend was invoked then how would this work?
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=61bd93ce801bb6df36eda257a9d2d16c02863cdd
+There are indeed no provisions to handle this problem. Does the
+dmaengine framework provide any helpers to ease with this? I have
+quickly looked at other dmaengine drivers, and I haven't seen any of
+them taking care of this problem. Do you have a pointer to a driver
+handling this problem?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
