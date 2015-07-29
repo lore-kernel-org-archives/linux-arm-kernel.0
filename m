@@ -1,39 +1,62 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Jul 2015 15:00:46 +0100
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
- controller-data
-In-Reply-To: <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
-References: <cover.1438170519.git.hramrach@gmail.com>
- <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
-Message-ID: <20150729140046.GB11082@sirena.org.uk>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 29 Jul 2015 15:02:00 +0100
+Subject: [PATCH v1 3/7] ARM: dts: apq8064-ifc6410: add heart-beat led
+ support.
+In-Reply-To: <55B7BDB8.7090103@suse.de>
+References: <1438087956-17307-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1438088040-17437-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <55B7BDB8.7090103@suse.de>
+Message-ID: <55B8DCD8.9050404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 29, 2015 at 12:19:57PM +0200, Michal Suchanek wrote:
 
-Please use subject lines matching the style for the subsytsem so people
-can spot that the patch is in some way relevant.
 
-> The controller-data subnode has no compatible. This can lead to other
-> drivers getting confused by it. Add a compatible to make devicetreee
-> unambiguous.
+On 28/07/15 18:36, Andreas F?rber wrote:
+> Am 28.07.2015 um 14:54 schrieb Srinivas Kandagatla:
+>> This patch adds heart-beat led support on IFC6410.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/qcom-apq8064-ifc6410.dts | 22 ++++++++++++++++++++++
+>>   1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> index df560cf..1fc2ea5 100644
+>> --- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> +++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+>> @@ -207,6 +207,19 @@
+>>   			status = "okay";
+>>   		};
+>>
+>> +		leds {
+>> +			compatible = "gpio-leds";
+>> +			pinctrl-names = "default";
+>> +			pinctrl-0 = <&notify_led>;
+>> +
+>> +			led at 1 {
+>> +				label = "apq8064:green:user1";
+>> +				gpios = <&pm8921_gpio 18 GPIO_ACTIVE_HIGH>;
+>> +				linux,default-trigger = "heartbeat";
+>
+> Can we please drop the heartbeat default? While that's nice as proof of
+> concept, it's annoying to deliver it that way in Linux distros. Users
+> can enable that trigger with a simple boot script writing to /sys.
+>
+Thanks for the input, I will change to be none, Let the users decide the 
+trigger.
 
-I can't tell from this commit message what the issue you're trying to
-fix is, sorry.  Nodes without compatible strings are entirely normal and
-don't need compatible strings.  It sounds like a bug in whatever other
-driver is becoming confused.
-
-> +	if (!of_get_property(data_np, "compatible", NULL) ||
-> +	    strcmp(of_get_property(data_np, "compatible", NULL),
-> +		   "samsung,s3c-controller-data"))
-> +		dev_err(&spi->dev, "child node 'controller-data' does not have correct compatible\n");
-
-This will break all existing users which is not acceptable for
-mainline, we need to preserve compatibility with existing device trees.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20150729/e4a79567/attachment.sig>
+thanks,
+srini
+> Thanks,
+> Andreas
+>
+>> +				default-state = "on";
+>> +			};
+>> +		};
+>> +
+>>   		qcom,ssbi at 500000 {
+>>   			pmicintc: pmic at 0 {
+>>   				pm8921_gpio: gpio at 150 {
+> [snip]
+>
