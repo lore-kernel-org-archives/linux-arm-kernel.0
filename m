@@ -1,86 +1,68 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Wed, 29 Jul 2015 02:37:35 +0000
-Subject: bug in identity map for 4KB pages?
-Message-ID: <CY1PR0301MB0748B85327B6501BE7987B03878C0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 29 Jul 2015 11:01:21 +0800
+Subject: [PATCH v6 0/3] Add MediaTek display PWM driver
+In-Reply-To: <1437729058.11386.4.camel@mtksdaap41>
+References: <1437380237-28961-1-git-send-email-yh.huang@mediatek.com>
+ <2181696.fQcvS98Cqx@ubix> <1437729058.11386.4.camel@mtksdaap41>
+Message-ID: <1438138881.16608.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our system has RAM at a high address, and previously required using 48-bit VA
-in order to have an idmap that covered all of RAM.
+On Fri, 2015-07-24 at 17:10 +0800, YH Huang wrote:
+> On Fri, 2015-07-24 at 10:42 +0200, Matthias Brugger wrote:
+> > On Monday, July 20, 2015 04:17:14 PM YH Huang wrote:
+> > > This patch series add the use of display PWM driver, documentation
+> > > and device tree for Mediatek SoCs. The driver is used to support
+> > > the backlight of the panel. This is based on v4.2-rc1.
+> > > 
+> > > The clock definitions (CLK_MM_DISP_PWM*) are added by James Liao's patch:
+> > > clk: mediatek: Add subsystem clocks of MT8173
+> > > 
+> > > Change in v6:
+> > > 1. Enable clocks in the pwm_enable function
+> > > 2. Remove suspend/resume code since pwm-backlight driver has done the same
+> > > things 3. Revise some code to make it easier to read
+> > > 
+> > 
+> > Can you please provide the whole change log for all versions the next time.
+> > It's easier this way to understand the evolution of the series.
+> 
+> Change in v6:
+> 1. Enable clocks in the pwm_enable function.
+> 2. Remove suspend/resume code since pwm-backlight driver has done the
+> same things.
+> 3. Revise some code to make it easier to read.
+> 
+> Change in v5:
+> 1. Configure PWM output via pinctrl.
+> 2. Fix the parameter name in dtsi.
+> 
+> Change in v4:
+> 1. Codebase is on v4.2-rc1.
+> 2. Add the PWM node in dtsi.
+> 3. Change the dependency in Kconfig.
+> 4. Rewrite some code for readability.
+> 
+> Change in v3:
+> 1. Add suspend/resume function.
+> 2. Fix the formula for high_width calculation.
+> 3. Rewrite some code to make it easier to read.
+> 4. Add more information in the commit message.
+> 
+> Change in v2:
+> 1. Rewrite descriptions for driver in kconfig to make it much clear.
+> 2. Rename the driver from "pwm-mediatek-disp" to "pwm-mtk-disp".
+> 3. Disable clocks in the error path.
+> 4. Change the shift values in decimal instead of hex.
+> 5. Rename and add some variables or function name for consistency and
+> readability.
+> 6. Drop unnecessary parentheses, spaces, variables and add newlines to
+> make the code easiler to read.
 
-In testing on 4.2-rc4, which now contains support for the increased VA range
-of the idmap without using 48-bit VA, I'm finding that things work for
-64KB pages, but do not for 4KB pages.
+Hi all,
 
-Is there any known limitation here with 4KB pages?  Any ideas?
+If you have any suggestions, please let me know.
+Perhaps we can apply the patch?
 
-Kernel crash dump I'm getting is below.
-
-Thanks,
-Stuart
-
-------------------------------------------------------------------------------
-
-Booting Linux on physical CPU 0x0
-Initializing cgroup subsys cpu
-Linux version 4.2.0-rc4+ (b08248 at right) (gcc version 4.8.3 20131202 (prerelease) (crosstool-NG linaro-1.13.1-4.8-2013.12 - Linaro GCC 2013.11) ) #180 SMP PREEMPT Tue Jul 28 20:51:47 CDT 2015
-CPU: AArch64 Processor [411fd071] revision 1
-Detected PIPT I-cache on CPU0
-alternatives: enabling workaround for ARM erratum 832075
-alternatives: detected feature GIC system register CPU interface
-earlycon: Early serial console at MMIO 0x21c0600 (options '115200')
-bootconsole [uart0] enabled
-efi: Getting EFI parameters from FDT:
-efi: UEFI not found.
-cma: Reserved 16 MiB at 0x00000000fec00000
-BUG: not creating mapping for 0x0000008080000000 at 0x0000004000000000 - outside kernel range
-Unable to handle kernel paging request at virtual address 435ffff000
-pgd = ffffffc000924000
-[435ffff000] *pgd=0000000000000000, *pud=0000000000000000
-Internal error: Oops: 96000045 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.2.0-rc4+ #180
-Hardware name: Freescale Layerscape 2085a software Simulator model (DT)
-task: ffffffc00088cc70 ti: ffffffc000880000 task.ti: ffffffc000880000
-PC is at memset+0x16c/0x1c0
-LR is at early_alloc+0x70/0x80
-pc : [<ffffffc0003250ac>] lr : [<ffffffc00080de50>] pstate: 400002c5
-sp : ffffffc000883ea0
-x29: ffffffc000883ea0 x28: 00000000a00000dc
-x27: ffffffc000081198 x26: 00000083e0000000
-x25: ffffffc000000000 x24: ffffffc00089a000
-x23: 0000000000000018 x22: 00000000c0000000
-x21: 0000008080000000 x20: 000000435ffff000
-x19: 0000000000001000 x18: 0000000000000000
-x17: 0000000000000006 x16: 00000083e0000000
-x15: 0000000000000018 x14: 0000008080000000
-x13: ffffffc000900dd0 x12: 0000000000000578
-x11: 0000000600000000 x10: 00000083dffff000
-x9 : 0000000000000000 x8 : 000000435ffff000
-x7 : 0000000000000000 x6 : 000000000000003f
-x5 : 0000000000000040 x4 : 0000000000000000
-x3 : 0000000000000004 x2 : 0000000000000fc0
-x1 : 0000000000000000 x0 : 000000435ffff000
-
-Process swapper (pid: 0, stack limit = 0xffffffc000880020)
-Stack: (0xffffffc000883ea0 to 0xffffffc000884000)
-3ea0: 00883ec0 ffffffc0 0080df60 ffffffc0 00900200 ffffffc0 00886000 ffffffc0
-3ec0: 00883f20 ffffffc0 0080b7ac ffffffc0 00080000 ffffffc0 fa9fa000 ffffffbf
-3ee0: 00000040 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
-3f00: 80921000 00000000 80924000 00000000 00000040 00000000 fa9fa000 ffffffbf
-3f20: 00883fa0 ffffffc0 00809690 ffffffc0 00000001 00000000 0083c120 ffffffc0
-3f40: 9fffa000 00000000 00000000 00000000 00886000 ffffffc0 80000000 00000000
-3f60: 80921000 00000000 80924000 00000000 00000001 00000000 9fffa000 00000000
-3f80: 00000000 00000000 00000000 80000000 00000080 00000000 64667467 ff616b73
-3fa0: 00000000 00000000 805d3000 00000000 fff9fa40 00000000 00000e12 00000000
-3fc0: 9fffa000 00000000 00000000 00000000 00000000 00000000 80000000 00000000
-3fe0: 00000000 00000000 0083c948 ffffffc0 00000000 00000000 00000000 00000000
-Call trace:
-[<ffffffc0003250ac>] memset+0x16c/0x1c0
-[<ffffffc00080df5c>] paging_init+0xd0/0x174
-[<ffffffc00080b7a8>] setup_arch+0x28c/0x5c4
-[<ffffffc00080968c>] start_kernel+0x94/0x3d0
-Code: 91010108 54ffff4a 8b040108 cb050042 (d50b7428)
----[ end trace cb88537fdc8fa200 ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
----[ end Kernel panic - not syncing: Attempted to kill the idle task!
+Regards,
+YH Huang
