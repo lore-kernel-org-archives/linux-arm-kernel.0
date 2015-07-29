@@ -1,60 +1,68 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 29 Jul 2015 12:19:57 +0200
-Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to controller-data
-In-Reply-To: <cover.1438170519.git.hramrach@gmail.com>
-References: <cover.1438170519.git.hramrach@gmail.com>
-Message-ID: <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
+Date: Wed, 29 Jul 2015 13:14:44 +0200
+Subject: [RFC PATCH 0/2] disambiguate s3c64xx controller-data and ofpart
+ partition nodes
+Message-ID: <cover.1438168484.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The controller-data subnode has no compatible. This can lead to other
-drivers getting confused by it. Add a compatible to make devicetreee
-unambiguous.
+Hello,
 
-Signed-off-by: Michal Suchanek <hramrach@gmail.com>
----
- Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 +++
- drivers/spi/spi-s3c64xx.c                             | 4 ++++
- 2 files changed, 7 insertions(+)
+the ofpart partition nodes and s3c64xx controller-data nodes are both subnodes
+of MTD SPI slaves such as spi-nor.
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-index 6dbdeb3..b1e98d1 100644
---- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
-@@ -92,16 +92,19 @@ Example:
- 			spi-max-frequency = <10000>;
- 
- 			controller-data {
-+				compatible = "samsung,s3c-controller-data";
- 				samsung,spi-feedback-delay = <0>;
- 			};
- 
- 			partition at 0 {
-+				compatible = "linux,ofpart-partition";
- 				label = "U-Boot";
- 				reg = <0x0 0x40000>;
- 				read-only;
- 			};
- 
- 			partition at 40000 {
-+				compatible = "linux,ofpart-partition";
- 				label = "Kernel";
- 				reg = <0x40000 0xc0000>;
- 			};
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 2a8c513..9964db3 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -760,6 +760,10 @@ static struct s3c64xx_spi_csinfo *s3c64xx_get_slave_ctrldata(
- 		dev_err(&spi->dev, "child node 'controller-data' not found\n");
- 		return ERR_PTR(-EINVAL);
- 	}
-+	if (!of_get_property(data_np, "compatible", NULL) ||
-+	    strcmp(of_get_property(data_np, "compatible", NULL),
-+		   "samsung,s3c-controller-data"))
-+		dev_err(&spi->dev, "child node 'controller-data' does not have correct compatible\n");
- 
- 	cs = kzalloc(sizeof(*cs), GFP_KERNEL);
- 	if (!cs) {
+When ofpart is compiled-in and no partitions are defined on a MTD SPI slave
+ofpart tries to parse the controller-data node, gets confused, mtd probe fails,
+and the mtd device is inaccessible.
+
+ofpart claims all subnodes of mtd devices which have no compatible and when
+there is a subnode but no partitions are found it reports error which is then
+propagated to mtd probe.
+
+A simple fix that turns the error into a warning was rejected on the basis that
+the ofpart parser could then accept invalid devicetree as fallback.
+
+https://www.mail-archive.com/linux-kernel%40vger.kernel.org/msg941351.html
+
+Firstly, the ofpart parser already does accept 'invalid' trees as fallback.
+Looking at the code it only requires that there is one mtd subnode that parses
+as partition and there can be arbitrary number of other nodes which were not
+understood. It only singles out the case when there are subnodes but none is
+understood as partition.
+
+Secondly, the fact that a devicetree node is not understood by a particular
+driver does not make it 'invalid'.
+
+In my view either it is acceptable that nodes without compatible property exist
+and then drivers using such nodes should be ready to gracefully handle nodes
+that do not have compatible property but are meant for another driver. The
+s3c64xx driver already does this but ofpart does not.
+
+On the other hand, if not using a compatible property is not acceptable then
+both drivers should use a compatible property to reserve their subnodes for
+themselves and avoid any conflict.
+
+Either way I would like the maintainers of the conflicting drivers to agree on
+where compatible property should be and where not so that compiling-in ofpart
+does not make valid MTD devices inaccessible.
+
+The patches are only for illustration and are not meant to be included
+anywhere. They are not tested and miss adding the properties to tens of binding
+docs and dts files.
+
+Thanks
+
+Michal
+
+Michal Suchanek (2):
+  dt: mtd: ofpart: use compatible for partitions
+  dt: spi: s3c64xx: add compatible to controller-data
+
+ .../devicetree/bindings/mtd/partition.txt          |  7 +++++-
+ .../devicetree/bindings/spi/spi-samsung.txt        |  3 +++
+ drivers/mtd/ofpart.c                               | 26 +++++++++++++---------
+ drivers/spi/spi-s3c64xx.c                          |  4 ++++
+ 4 files changed, 29 insertions(+), 11 deletions(-)
+
 -- 
 2.1.4
