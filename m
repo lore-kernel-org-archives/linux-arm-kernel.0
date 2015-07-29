@@ -1,50 +1,48 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 29 Jul 2015 16:19:34 +0200
-Subject: [PATCH v2] ARM64: zynqmp: Add eeprom memories on i2c bus
-Message-ID: <827fe968a448dd25e133ce3509d91fd2482bd850.1438179569.git.michal.simek@xilinx.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 29 Jul 2015 15:23:03 +0100
+Subject: [PATCH 4/8] xen: Use the correctly the Xen memory terminologies
+In-Reply-To: <55B8DFD7.6070107@oracle.com>
+References: <1438095769-2560-1-git-send-email-julien.grall@citrix.com>
+ <1438095769-2560-5-git-send-email-julien.grall@citrix.com>
+ <55B7D40B.5080903@oracle.com> <55B8B846.2060103@citrix.com>
+ <55B8DFD7.6070107@oracle.com>
+Message-ID: <55B8E1C7.6070608@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add i2c eeprom memories on i2c bus.
+On 29/07/15 15:14, Boris Ostrovsky wrote:
+>> static inline unsigned long pfn_to_gfn(unsigned long pfn)
+>> {
+>>     if (xen_feature(XENFEAT_autotranslated_physmap))
+>>         return pfn;
+>>     else
+>>         return pfn_to_mfn(pfn);
+>> }
+> 
+> 
+> But you'd still say 'op.arg1.mfn = pfn_to_gfn(pfn);' in xen_do_pin()
+> i.e. assign GFN to MFN, right? That's what I was referring to.
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Well no. I would use op.arg1.mfn = pfn_to_mfn(pfn) given that the code,
+if I'm right, is only executed for PV.
 
-Changes in v2:
-- Change eeprom max freq from 100k to 400k
+mfn = pfn_to_gfn(...) was valid too because on PV is always an MFN. The
+suggestion of pfn_to_mfn was just for more readability,
 
----
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> (In general, I am not sure a guest should ever use 'mfn' as it is purely
+> a hypervisor construct. Including p2m, which I think should really be
+> p2g as this is what we use to figure out what to stick into page tables)
 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index c5cc8dbd0968..3b1011169756 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -50,6 +50,24 @@
- 	status = "okay";
- };
- 
-+&i2c0 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+	eeprom at 54 {
-+		compatible = "at,24c64";
-+		reg = <0x54>;
-+	};
-+};
-+
-+&i2c1 {
-+	status = "okay";
-+	clock-frequency = <400000>;
-+	eeprom at 55 {
-+		compatible = "at,24c64";
-+		reg = <0x55>;
-+	};
-+};
-+
- &sata {
- 	status = "okay";
- 	ceva,broken-gen2;
+I think avoid to use mfn in the hypervisor interface is out-of-scope for
+this series. If we ever want to modify the Xen API in Linux, we should
+do in sync with Xen to avoid inconsistency on naming.
+
+Anyway, the oddity of mfn = pfn_to_gfn(...) is mostly contained in the
+x86 specific code. I don't mind to either add pfn_to_mfn and use it or
+add a comment /* PV-specific so mfn == gfn */ for every use of mfn =
+pfn_to_gfn(...).
+
+Regards,
+
 -- 
-2.3.5
+Julien Grall
