@@ -1,105 +1,32 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 18:09:00 +0100
-Subject: [PATCH v2 10/11] [media] c8sectpfe: Add Kconfig and Makefile for the
- driver.
+Date: Thu, 30 Jul 2015 18:09:01 +0100
+Subject: [PATCH v2 11/11] MAINTAINERS: Add c8sectpfe driver directory to STi
+ section
 In-Reply-To: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
 References: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1438276141-16902-11-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1438276141-16902-12-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the Kconfig and Makefile for the c8sectpfe driver
-so it will be built. It also selects additional demodulator and tuners
-which are required by the supported NIM cards.
+Add the new c8sectpfe demux driver to the STi section of the
+MAINTAINERS file.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/media/platform/Kconfig                |  4 +++-
- drivers/media/platform/Makefile               |  1 +
- drivers/media/platform/sti/c8sectpfe/Kconfig  | 28 +++++++++++++++++++++++++++
- drivers/media/platform/sti/c8sectpfe/Makefile |  9 +++++++++
- 4 files changed, 41 insertions(+), 1 deletion(-)
- create mode 100644 drivers/media/platform/sti/c8sectpfe/Kconfig
- create mode 100644 drivers/media/platform/sti/c8sectpfe/Makefile
+ MAINTAINERS | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
-index f6bed19..68d7ed1 100644
---- a/drivers/media/platform/Kconfig
-+++ b/drivers/media/platform/Kconfig
-@@ -1,6 +1,6 @@
- #
- # Platform drivers
--#	All drivers here are currently for webcam support
-+#	Most drivers here are currently for webcam support
- 
- menuconfig V4L_PLATFORM_DRIVERS
- 	bool "V4L platform devices"
-@@ -280,3 +280,5 @@ config VIDEO_VIM2M
- 	  This is a virtual test device for the memory-to-memory driver
- 	  framework.
- endif #V4L_TEST_DRIVERS
-+
-+source "drivers/media/platform/sti/c8sectpfe/Kconfig"
-diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
-index 114f9ab..301bc1d 100644
---- a/drivers/media/platform/Makefile
-+++ b/drivers/media/platform/Makefile
-@@ -35,6 +35,7 @@ obj-$(CONFIG_VIDEO_SAMSUNG_S5P_G2D)	+= s5p-g2d/
- obj-$(CONFIG_VIDEO_SAMSUNG_EXYNOS_GSC)	+= exynos-gsc/
- 
- obj-$(CONFIG_VIDEO_STI_BDISP)		+= sti/bdisp/
-+obj-$(CONFIG_DVB_C8SECTPFE)		+= sti/c8sectpfe/
- 
- obj-$(CONFIG_BLACKFIN)                  += blackfin/
- 
-diff --git a/drivers/media/platform/sti/c8sectpfe/Kconfig b/drivers/media/platform/sti/c8sectpfe/Kconfig
-new file mode 100644
-index 0000000..d1bfd4c
---- /dev/null
-+++ b/drivers/media/platform/sti/c8sectpfe/Kconfig
-@@ -0,0 +1,28 @@
-+config DVB_C8SECTPFE
-+	tristate "STMicroelectronics C8SECTPFE DVB support"
-+	depends on DVB_CORE && I2C && (ARCH_STI || ARCH_MULTIPLATFORM)
-+	select LIBELF_32
-+	select FW_LOADER
-+	select FW_LOADER_USER_HELPER_FALLBACK
-+	select DEBUG_FS
-+	select DVB_LNBP21 if MEDIA_SUBDRV_AUTOSELECT
-+	select DVB_STV090x if MEDIA_SUBDRV_AUTOSELECT
-+	select DVB_STB6100 if MEDIA_SUBDRV_AUTOSELECT
-+	select DVB_STV6110 if MEDIA_SUBDRV_AUTOSELECT
-+	select DVB_STV0900 if MEDIA_SUBDRV_AUTOSELECT
-+	select DVB_STV0367 if MEDIA_SUBDRV_AUTOSELECT
-+	select MEDIA_TUNER_TDA18212 if MEDIA_SUBDRV_AUTOSELECT
-+
-+	---help---
-+	  This adds support for DVB front-end cards connected
-+	  to TS inputs of STiH407/410 SoC.
-+
-+	  The driver currently supports C8SECTPFE's TS input block,
-+	  memdma engine, and HW PID filtering.
-+
-+	  Supported DVB front-end cards are:
-+	  - STMicroelectronics DVB-T B2100A (STV0367 + TDA18212)
-+	  - STMicroelectronics DVB-S/S2 STV0903 + STV6110 + LNBP24 board
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called c8sectpfe.
-diff --git a/drivers/media/platform/sti/c8sectpfe/Makefile b/drivers/media/platform/sti/c8sectpfe/Makefile
-new file mode 100644
-index 0000000..b578c7c
---- /dev/null
-+++ b/drivers/media/platform/sti/c8sectpfe/Makefile
-@@ -0,0 +1,9 @@
-+c8sectpfe-y += c8sectpfe-core.o c8sectpfe-common.o c8sectpfe-dvb.o \
-+		c8sectpfe-debugfs.o
-+
-+obj-$(CONFIG_DVB_C8SECTPFE) += c8sectpfe.o
-+
-+ccflags-y += -Idrivers/media/i2c
-+ccflags-y += -Idrivers/media/common
-+ccflags-y += -Idrivers/media/dvb-core/ -Idrivers/media/dvb-frontends/ \
-+		-Idrivers/media/tuners/
+diff --git a/MAINTAINERS b/MAINTAINERS
+index a226416..a9f2f37 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1506,6 +1506,7 @@ F:	arch/arm/boot/dts/sti*
+ F:	drivers/clocksource/arm_global_timer.c
+ F:	drivers/i2c/busses/i2c-st.c
+ F:	drivers/media/rc/st_rc.c
++F:	drivers/media/platform/sti/c8sectpfe/
+ F:	drivers/mmc/host/sdhci-st.c
+ F:	drivers/phy/phy-miphy28lp.c
+ F:	drivers/phy/phy-miphy365x.c
 -- 
 1.9.1
