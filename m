@@ -1,35 +1,41 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 30 Jul 2015 11:23:20 +0200
-Subject: [PATCH v2 4/5] ARM: berlin: add a PWM node on the BG2
+Date: Thu, 30 Jul 2015 11:23:18 +0200
+Subject: [PATCH v2 2/5] Documentation: bindings: document the Berlin PWM driver
 In-Reply-To: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1438248201-29222-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1438248201-29222-5-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1438248201-29222-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a PWM node in the Berlin BG2 device tree, using the
-newly added Berlin PWM driver.
+Following the addition of a Berlin PWM driver, this patch adds the
+corresponding documentation.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ Documentation/devicetree/bindings/pwm/pwm-berlin.txt | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-berlin.txt
 
-diff --git a/arch/arm/boot/dts/berlin2.dtsi b/arch/arm/boot/dts/berlin2.dtsi
-index ef811de09908..e17bd5faed27 100644
---- a/arch/arm/boot/dts/berlin2.dtsi
-+++ b/arch/arm/boot/dts/berlin2.dtsi
-@@ -512,5 +512,11 @@
- 				interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>;
- 			};
- 		};
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-berlin.txt b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+new file mode 100644
+index 000000000000..3d7ab7bfbf54
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pwm/pwm-berlin.txt
+@@ -0,0 +1,15 @@
++Berlin PWM controller
 +
-+		pwm: pwm at f20000 {
-+			compatible = "marvell,berlin-pwm";
-+			reg = <0xf20000 0x40>;
-+			#pwm-cells = <3>;
-+		};
- 	};
- };
++Required properties:
++- compatible: should be "marvell,berlin-pwm"
++- reg: physical base address and length of the controller's registers
++- #pwm-cells: should be 3. See pwm.txt in this directory for a description of
++  the cells format.
++
++Example:
++
++pwm: pwm at f7f20000 {
++	compatible = "marvell,berlin-pwm";
++	reg = <0xf7f20000 0x40>;
++	#pwm-cells = <3>;
++}
 -- 
 2.5.0
