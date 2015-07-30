@@ -1,71 +1,98 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 30 Jul 2015 11:28:52 +0200
-Subject: [PATCH 1/5] rtc: at91sam9: properly handle error case
-In-Reply-To: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20150730112852.79dcb30a@bbrezillon>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 30 Jul 2015 10:30:15 +0100
+Subject: [PATCH] irqchip: gic: Add a cpu map for each GIC instance
+In-Reply-To: <55B9E89E.5050905@arm.com>
+References: <1438180984-18219-1-git-send-email-jonathanh@nvidia.com>
+ <20150729183321.GP7557@n2100.arm.linux.org.uk> <55B92939.5040101@nvidia.com>
+ <55B9DE44.1010102@arm.com> <55B9E145.9050202@nvidia.com>
+ <55B9E89E.5050905@arm.com>
+Message-ID: <55B9EEA7.4090903@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jul 2015 02:24:28 +0200
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
 
-> In case of a probe error, it is possible to abort after issuing
-> clk_prepare_enable(). Ensure the clock is disabled and unprepared in that
-> case.
+On 30/07/15 10:04, Marc Zyngier wrote:
+> On 30/07/15 09:33, Jon Hunter wrote:
+>>
+>> On 30/07/15 09:20, Marc Zyngier wrote:
+>>> On 29/07/15 20:27, Jon Hunter wrote:
+>>>>
+>>>> On 29/07/15 19:33, Russell King - ARM Linux wrote:
+>>>>> On Wed, Jul 29, 2015 at 03:43:04PM +0100, Jon Hunter wrote:
+>>>>>> The gic_init_bases() function initialises an array that stores the mapping
+>>>>>> between the GIC and CPUs. This array is a global array that is
+>>>>>> unconditionally initialised on every call to gic_init_bases(). Although,
+>>>>>> it is not common for there to be more than one GIC instance, there are
+>>>>>> some devices that do support nested GIC controllers and gic_init_bases()
+>>>>>> can be called more than once.
+>>>>>>
+>>>>>> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
+>>>>>> will only setup the mapping again for CPU0. This is because for child GIC
+>>>>>> controllers there is most likely only one recipient of the interrupt.
+>>>>>>
+>>>>>> Fix this by moving the CPU mapping array to the GIC chip data structure
+>>>>>> so that it is initialised for each GIC instance separately. It is assumed
+>>>>>> that the bL switcher code is only interested in the root or primary GIC
+>>>>>> instance.
+>>>>>
+>>>>> Does it make sense to expose the per-CPU-ness of the non-primary GIC?
+>>>>> If they are chained off a primary GIC SPI interrupt, then all IRQs on
+>>>>> the secondary GIC are routed to the same CPU that the SPI on the primary
+>>>>> GIC is routed to.
+>>>>
+>>>> I am looking at a use-case where there is a secondary GIC and the secondary
+>>>> GIC is used as a interrupt router between the main CPU cluster and another
+>>>> CPU. So in this case the mapping of a secondary is still of interest. This
+>>>> patch does not address setting up the secondary mapping, but avoids a
+>>>> secondary GIC overwriting the primary map (which we don't want).
+>>>>  
+>>>>> Other features like the PPIs and SGIs in the secondary CPU should also
+>>>>> be ignored - they probably aren't used anyway.
+>>>>
+>>>> Yes, agree.
+>>>>  
+>>>>> I have to say though... are the 1020 IRQs that the primary GIC provides
+>>>>> really not enough?  What insane hardware needs more than 1020 IRQs?
+>>>>
+>>>> Ha. I guess some realview boards for a start ...
+>>>>
+>>>> # grep -r "gic_init(1" arch/arm/
+>>>> arch/arm/mach-realview/realview_pb1176.c:	gic_init(1, IRQ_PB1176_GIC_START,
+>>>> arch/arm/mach-realview/realview_eb.c:		gic_init(1, 96, __io_address(REALVIEW_EB_GIC_DIST_BASE),
+>>>> arch/arm/mach-realview/realview_pb11mp.c:	gic_init(1, IRQ_PB11MP_GIC_START,
+>>>
+>>> Different use case. These are development boards with a relatively
+>>> modular design, where the SoC may or may not have a GIC by itself. When
+>>> it has one, you end up with the on-board GIC being a secondary one.
+>>
+>> Yes, I understand that the use-case may be different, but I highlighted
+>> this as a use where the primary map would be overwritten as the driver
+>> is today.
+>>
+>>> I never thought someone would quote these designs as an example to
+>>> follow... ;-)
+>>
+>> I can't say if this example was followed, but nevertheless hardware
+>> designers certainly do get creative ;-)
+>>
+>> So we need to ensure the primary cpu map does not get overwritten by a
+>> secondary and I have a case where the secondary map is of interest. So
+>> are ok with this?
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> My point is that there is no secondary map. That map should only be
+> written for the primary GIC, because that's the only place it makes
+> sense. Your "other CPU" is not under the control of Linux (at least, not
+> as a CPU), so this map is not the right data structure.
 
-To the whole series:
+Yes the "other CPU" may not run Linux, but it is certainly under the
+control of Linux as a slave CPU. Linux will decide whether it wants to
+receive the interrupts from this GIC or route them to the other CPU.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Yes, I see that this may not be technically a cpu map and may be that is
+a mis-use. Following that I assume that using set_affinity here would
+also not be correct and a custom API should be employed?
 
-> ---
->  drivers/rtc/rtc-at91sam9.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-> index 5ccaee32df72..152cd816cc43 100644
-> --- a/drivers/rtc/rtc-at91sam9.c
-> +++ b/drivers/rtc/rtc-at91sam9.c
-> @@ -451,8 +451,10 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  
->  	rtc->rtcdev = devm_rtc_device_register(&pdev->dev, pdev->name,
->  					&at91_rtc_ops, THIS_MODULE);
-> -	if (IS_ERR(rtc->rtcdev))
-> -		return PTR_ERR(rtc->rtcdev);
-> +	if (IS_ERR(rtc->rtcdev)) {
-> +		ret = PTR_ERR(rtc->rtcdev);
-> +		goto err_clk;
-> +	}
->  
->  	/* register irq handler after we know what name we'll use */
->  	ret = devm_request_irq(&pdev->dev, rtc->irq, at91_rtc_interrupt,
-> @@ -460,7 +462,7 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  			       dev_name(&rtc->rtcdev->dev), rtc);
->  	if (ret) {
->  		dev_dbg(&pdev->dev, "can't share IRQ %d?\n", rtc->irq);
-> -		return ret;
-> +		goto err_clk;
->  	}
->  
->  	/* NOTE:  sam9260 rev A silicon has a ROM bug which resets the
-> @@ -474,6 +476,11 @@ static int at91_rtc_probe(struct platform_device *pdev)
->  				dev_name(&rtc->rtcdev->dev));
->  
->  	return 0;
-> +
-> +err_clk:
-> +	clk_disable_unprepare(rtc->sclk);
-> +
-> +	return ret;
->  }
->  
->  /*
+If that is the case, then may be I should just fix up the irq-gic driver
+to only set the cpu map for the primary?
 
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Cheers Jon
