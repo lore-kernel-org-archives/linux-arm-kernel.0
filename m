@@ -1,67 +1,63 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 30 Jul 2015 14:49:46 +0100
-Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
-In-Reply-To: <20150730101351.GA31408@jayachandranc.netlogicmicro.com>
-References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
- <20150730092808.GA4685@red-moon>
- <20150730101351.GA31408@jayachandranc.netlogicmicro.com>
-Message-ID: <20150730134946.GB12999@red-moon>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Thu, 30 Jul 2015 19:19:59 +0530
+Subject: [PATCH V3 02/16] PM / OPP: Create a directory for opp bindings
+In-Reply-To: <CAL_Jsq+J41c7qx11L13-g0UyD+hY9W36Wu9P+6O3cnDv7ysY6Q@mail.gmail.com>
+References: <cover.1438166099.git.viresh.kumar@linaro.org>
+ <4dfe565ff17766b7df127d475d84958e96fdab1b.1438166099.git.viresh.kumar@linaro.org>
+ <CAL_Jsq+J41c7qx11L13-g0UyD+hY9W36Wu9P+6O3cnDv7ysY6Q@mail.gmail.com>
+Message-ID: <20150730134959.GB17794@linux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 11:13:52AM +0100, Jayachandran C. wrote:
-> On Thu, Jul 30, 2015 at 10:28:08AM +0100, Lorenzo Pieralisi wrote:
-> > On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
-> > > The current code in pci-host-generic.c uses pci_common_init_dev()
-> > > from ARM platform to do some of the PCI initializations, and this
-> > > prevents it from being used in ARM64.
-> > > 
-> > > The initialization done by pci_common_init_dev() that is needed
-> > > by pci-host-generic.c is really limited, and can be done easily
-> > > in the same file without using hw_pci API. The ARM platform
-> > > requires a pci_sys_data as sysdata for the PCI bus, this can be
-> > > handled by setting up gen_pci to have a pci_sys_data variable as
-> > > the first element.
-> > 
-> > Ok, I still do not like leaving pci_sys_data there, and to remove
-> > it there is only one snag (+ one patch to prevent
-> > resources enablement on ARM64 PROBE_ONLY systems to have a
-> > consolidated ARM/ARM64 host generic), which consists in removing the
-> > align_resource pointer from pci_sys_data. A proposed solution (maybe
-> > not ideal, we can consider it a temporary step to make progress)
-> > here:
-> > 
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359273.html
-> > 
-> > Comments very appreciated on the patch above, I do not have major
-> > concerns with this patch other than the pci_sys_data hack, because
-> > that's what it is.
+On 30-07-15, 08:18, Rob Herring wrote:
+> On Wed, Jul 29, 2015 at 5:52 AM, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+> > More platform specific extended opp bindings will follow and it would be
+> > easy to manage them with a directory for opp. Lets create that and move
+> > the existing opp bindings into it.
+> >
+> > Cc: Rob Herring <rob.herring@linaro.org>
 > 
-> In may opinion, we have to leave ->sysdata on ARM pointing to a valid
-> pci_sys_data. Leaving it pointing to random stuff and hoping that it
-> will not be used is pretty bad - so I don't see why such a patch would
-> make it upstream.
+> Use get_maintainers.pl please so you send to right people and right email.
 
-I really can't follow what you mean here, if we remove pci_sys_data
-dependency pci_sys_data will be an internal data structure for
-drivers still depending on bios32 to initialize hosts, it won't extend
-to all ARM PCI host controllers, so I struggle to see your point.
+Already done, you were just cc'd as an extra guy :)
 
-> The second issue I have is adding dependencies between patches that
-> enable basic functionality on arm64 with arm infrastructure cleanup
-> patches. Given the number of kernel releases the cleanups take [and
-> factoring in the amount of mess arm has :)], we will end up waiting
-> a long time for arm64.
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/power/{ => opp}/opp.txt | 0
+> >  1 file changed, 0 insertions(+), 0 deletions(-)
+> >  rename Documentation/devicetree/bindings/power/{ => opp}/opp.txt (100%)
+> >
+> > diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/power/opp/opp.txt
+> > similarity index 100%
+> > rename from Documentation/devicetree/bindings/power/opp.txt
+> > rename to Documentation/devicetree/bindings/power/opp/opp.txt
+> 
+> "power" seems to be a random collection of things. I'd prefer you move
+> this to .../bindings/opp/opp.txt.
 
-I agree, that's the reason why I think it is time to merge your changes,
-but this does not mean that the consolidation stops here, I made
-an exception since this patch has been hanging in the balance for
-a while, but the clean-up has to be completed anyway and I will take
-care of that.
+Hmm, sure. That would be better I think.
 
-> BTW, I am not sure why there is a pushback on wrapping a structure in
-> another, container_of() is the linux way of doing things :)
+--------------8<-------------------
 
-I think you are aware of my opinion by now, no point stating it again.
+Message-Id: <29597667e2c8afdbf396c5fcc9269fb27794131c.1438264123.git.viresh.kumar@linaro.org>
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Mon, 27 Jul 2015 10:04:21 +0530
+Subject: [PATCH] PM / OPP: Create a directory for opp bindings
 
-Lorenzo
+More platform specific extended opp bindings will follow and it would be
+easy to manage them with a directory for opp. Lets create that and move
+the existing opp bindings into it.
+
+Cc: Rob Herring <rob.herring@linaro.org>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ Documentation/devicetree/bindings/{power => opp}/opp.txt | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{power => opp}/opp.txt (100%)
+
+diff --git a/Documentation/devicetree/bindings/power/opp.txt b/Documentation/devicetree/bindings/opp/opp.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/power/opp.txt
+rename to Documentation/devicetree/bindings/opp/opp.txt
