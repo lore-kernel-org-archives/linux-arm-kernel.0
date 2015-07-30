@@ -1,80 +1,39 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:16:25 +0530
-Subject: [PATCH 02/11] mmc: host: omap_hsmmc: separate setting voltage
- capabilities from bus power
+Date: Thu, 30 Jul 2015 13:16:28 +0530
+Subject: [PATCH 05/11] mmc: host: omap_hsmmc: set clk rate to the max frequency
 In-Reply-To: <1438242394-25599-1-git-send-email-kishon@ti.com>
 References: <1438242394-25599-1-git-send-email-kishon@ti.com>
-Message-ID: <1438242394-25599-3-git-send-email-kishon@ti.com>
+Message-ID: <1438242394-25599-6-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added a separate function to set the voltage capabilities of the host
-controller. Voltage capabilities should be set only once during
-controller initialization but bus power can be changed every time there
-is a voltage switch and whenever a different card is inserted.
-This allows omap_hsmmc_conf_bus_power to be invoked every time there
-is a voltage switch.
+Set the clock rate of the functional clock to the max frequency
+that is passed to the driver either using pdata or dt.
+
+Also remove unnecessary setting of host->fclk to NULL.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   28 +++++++++++++++++++---------
- 1 file changed, 19 insertions(+), 9 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |    7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 09e949f..2dfef11 100644
+index e960b5c..0452a8b 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1812,25 +1812,34 @@ err:
- 	return ret;
- }
- 
-+static void omap_hsmmc_set_capabilities(struct omap_hsmmc_host *host)
-+{
-+	u32 val;
+@@ -2219,7 +2219,12 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	host->fclk = devm_clk_get(&pdev->dev, "fck");
+ 	if (IS_ERR(host->fclk)) {
+ 		ret = PTR_ERR(host->fclk);
+-		host->fclk = NULL;
++		goto err1;
++	}
 +
-+	val = OMAP_HSMMC_READ(host->base, CAPA);
-+
-+	/* Only MMC1 supports 3.0V */
-+	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
-+		val |= (VS30 | VS18);
-+	else
-+		val |= VS18;
-+
-+	OMAP_HSMMC_WRITE(host->base, CAPA, val);
-+}
-+
- static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
- {
--	u32 hctl, capa, value;
-+	u32 hctl, value;
++	ret = clk_set_rate(host->fclk, mmc->f_max);
++	if (ret) {
++		dev_err(&pdev->dev, "failed to set clock to %d\n", mmc->f_max);
+ 		goto err1;
+ 	}
  
- 	/* Only MMC1 supports 3.0V */
--	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
-+	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT)
- 		hctl = SDVS30;
--		capa = VS30 | VS18;
--	} else {
-+	else
- 		hctl = SDVS18;
--		capa = VS18;
--	}
- 
- 	value = OMAP_HSMMC_READ(host->base, HCTL) & ~SDVS_MASK;
- 	OMAP_HSMMC_WRITE(host->base, HCTL, value | hctl);
- 
--	value = OMAP_HSMMC_READ(host->base, CAPA);
--	OMAP_HSMMC_WRITE(host->base, CAPA, value | capa);
--
- 	/* Set SD bus power bit */
- 	set_sd_bus_power(host);
- }
-@@ -2133,6 +2142,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 
- 	mmc->pm_caps |= mmc_pdata(host)->pm_caps;
- 
-+	omap_hsmmc_set_capabilities(host);
- 	omap_hsmmc_conf_bus_power(host);
- 
- 	if (!pdev->dev.of_node) {
 -- 
 1.7.9.5
