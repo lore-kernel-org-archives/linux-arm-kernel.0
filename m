@@ -1,123 +1,126 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 30 Jul 2015 16:05:13 +0100
-Subject: [PATCH] irqchip/gic: Only allow the primary GIC to set the CPU map
-In-Reply-To: <55BA35D2.5040307@arm.com>
-References: <1438265479-15427-1-git-send-email-jonathanh@nvidia.com>
- <55BA35D2.5040307@arm.com>
-Message-ID: <55BA3D29.1000204@nvidia.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Thu, 30 Jul 2015 23:07:26 +0800
+Subject: [PATCH] mfd: mt6397: Implement wake handler and suspend/resume for
+ mt6397-core.c
+Message-ID: <1438268846-22451-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Register mt6393_irq as wake up source to pinctrl by flag "IRQF_NO_SUSPEND".
+Implement .irq_set_wake() function of pmic to keep who is wakeup source,
+and enable irq on .suspend()and restore irq on .resume().
 
-On 30/07/15 15:33, Marc Zyngier wrote:
-> On 30/07/15 15:11, Jon Hunter wrote:
->> The gic_init_bases() function initialises an array that stores the mapping
->> between the GIC and CPUs. This array is a global array that is
->> unconditionally initialised on every call to gic_init_bases(). Although,
->> it is not common for there to be more than one GIC instance, there are
->> some devices that do support nested GIC controllers and gic_init_bases()
->> can be called more than once.
->>
->> A 2nd call to gic_init_bases() will clear the previous CPU mapping and
->> will only setup the mapping again for the CPU calling gic_init_bases().
->> Fix this by only allowing the CPU map to be configured for the primary GIC.
->>
->> For secondary GICs the CPU map is not relevant because these GICs do not
->> directly route the interrupts to the main CPU(s) but to other GICs or
->> devices.
->>
->> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
->> ---
->> This is a follow-up to the patch titled "irqchip: gic: Add a cpu map for
->> each GIC instance" and discussed here [1]. Based upon the discussion I have
->> re-worked and re-titled it approriately.
->>
->> [1] http://www.spinics.net/lists/kernel/msg2044421.html
->>
->>  drivers/irqchip/irq-gic.c | 43 +++++++++++++++++++++++++------------------
->>  1 file changed, 25 insertions(+), 18 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
->> index a530d9a9b810..7566fe259d27 100644
->> --- a/drivers/irqchip/irq-gic.c
->> +++ b/drivers/irqchip/irq-gic.c
->> @@ -416,19 +416,26 @@ static void gic_cpu_init(struct gic_chip_data *gic)
->>  	int i;
->>  
->>  	/*
->> -	 * Get what the GIC says our CPU mask is.
->> +	 * Setting up the CPU map is only relevant for the primary GIC
->> +	 * because any nested/secondary GICs do not directly interface
->> +	 * with the CPU(s).
->>  	 */
->> -	BUG_ON(cpu >= NR_GIC_CPU_IF);
->> -	cpu_mask = gic_get_cpumask(gic);
->> -	gic_cpu_map[cpu] = cpu_mask;
->> +	if (gic == &gic_data[0]) {
->> +		/*
->> +		 * Get what the GIC says our CPU mask is.
->> +		 */
->> +		BUG_ON(cpu >= NR_GIC_CPU_IF);
->> +		cpu_mask = gic_get_cpumask(gic);
->> +		gic_cpu_map[cpu] = cpu_mask;
->>  
->> -	/*
->> -	 * Clear our mask from the other map entries in case they're
->> -	 * still undefined.
->> -	 */
->> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
->> -		if (i != cpu)
->> -			gic_cpu_map[i] &= ~cpu_mask;
->> +		/*
->> +		 * Clear our mask from the other map entries in case they're
->> +		 * still undefined.
->> +		 */
->> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
->> +			if (i != cpu)
->> +				gic_cpu_map[i] &= ~cpu_mask;
->> +	}
->>  
->>  	gic_cpu_config(dist_base, NULL);
->>  
->> @@ -977,13 +984,6 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  	}
->>  
->>  	/*
->> -	 * Initialize the CPU interface map to all CPUs.
->> -	 * It will be refined as each CPU probes its ID.
->> -	 */
->> -	for (i = 0; i < NR_GIC_CPU_IF; i++)
->> -		gic_cpu_map[i] = 0xff;
->> -
->> -	/*
->>  	 * Find out how many interrupts are supported.
->>  	 * The GIC only supports up to 1020 interrupt sources.
->>  	 */
->> @@ -1028,6 +1028,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
->>  		return;
->>  
->>  	if (gic_nr == 0) {
->> +		/*
->> +		 * Initialize the CPU interface map to all CPUs.
->> +		 * It will be refined as each CPU probes its ID.
->> +		 * This is only necessary for the primary GIC.
->> +		 */
->> +		for (i = 0; i < NR_GIC_CPU_IF; i++)
->> +			gic_cpu_map[i] = 0xff;
->>  #ifdef CONFIG_SMP
->>  		set_smp_cross_call(gic_raise_softirq);
->>  		register_cpu_notifier(&gic_cpu_notifier);
->>
-> 
-> Looks good.
-> 
-> I think there is a another bug caused by 322895062 ("irqchip: gic:
-> Preserve gic V2 bypass bits in cpu ctrl register"), where
-> gic_cpu_if_up() only acts on the primary GIC. In the secondary GIC case,
-> it will stay disabled.
-> 
-> Mind fixing this while you're at it?
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/mfd/mt6397-core.c       | 49 ++++++++++++++++++++++++++++++++++++++++-
+ include/linux/mfd/mt6397/core.h |  1 +
+ 2 files changed, 49 insertions(+), 1 deletion(-)
 
-Ah yes, I see. Ok, I will resend this with the other fix as a series.
-
-Jon
+diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+index 03929a6..aebdee5 100644
+--- a/drivers/mfd/mt6397-core.c
++++ b/drivers/mfd/mt6397-core.c
+@@ -93,12 +93,31 @@ static void mt6397_irq_enable(struct irq_data *data)
+ 	mt6397->irq_masks_cur[reg] |= BIT(shift);
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int mt6397_irq_set_wake(struct irq_data *irq_data, unsigned int on)
++{
++	struct mt6397_chip *mt6397 = irq_data_get_irq_chip_data(irq_data);
++	int shift = irq_data->hwirq & 0xf;
++	int reg = irq_data->hwirq >> 4;
++
++	if (on)
++		mt6397->wake_mask[reg] |= BIT(shift);
++	else
++		mt6397->wake_mask[reg] &= ~BIT(shift);
++
++	return 0;
++}
++#else
++#define mt6397_irq_set_wake NULL
++#endif
++
+ static struct irq_chip mt6397_irq_chip = {
+ 	.name = "mt6397-irq",
+ 	.irq_bus_lock = mt6397_irq_lock,
+ 	.irq_bus_sync_unlock = mt6397_irq_sync_unlock,
+ 	.irq_enable = mt6397_irq_enable,
+ 	.irq_disable = mt6397_irq_disable,
++	.irq_set_wake = mt6397_irq_set_wake,
+ };
+ 
+ static void mt6397_irq_handle_reg(struct mt6397_chip *mt6397, int reg,
+@@ -142,6 +161,7 @@ static int mt6397_irq_domain_map(struct irq_domain *d, unsigned int irq,
+ 	irq_set_chip_data(irq, mt6397);
+ 	irq_set_chip_and_handler(irq, &mt6397_irq_chip, handle_level_irq);
+ 	irq_set_nested_thread(irq, 1);
++
+ #ifdef CONFIG_ARM
+ 	set_irq_flags(irq, IRQF_VALID);
+ #else
+@@ -173,7 +193,8 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
+ 	}
+ 
+ 	ret = devm_request_threaded_irq(mt6397->dev, mt6397->irq, NULL,
+-		mt6397_irq_thread, IRQF_ONESHOT, "mt6397-pmic", mt6397);
++		mt6397_irq_thread, IRQF_ONESHOT | IRQF_NO_SUSPEND,
++		"mt6397-pmic", mt6397);
+ 	if (ret) {
+ 		dev_err(mt6397->dev, "failed to register irq=%d; err: %d\n",
+ 			mt6397->irq, ret);
+@@ -183,6 +204,31 @@ static int mt6397_irq_init(struct mt6397_chip *mt6397)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM_SLEEP
++static int mt6397_irq_suspend(struct device *dev)
++{
++	struct mt6397_chip *chip = dev_get_drvdata(dev);
++
++	regmap_write(chip->regmap, MT6397_INT_CON0, chip->wake_mask[0]);
++	regmap_write(chip->regmap, MT6397_INT_CON1, chip->wake_mask[1]);
++
++	return 0;
++}
++
++static int mt6397_irq_resume(struct device *dev)
++{
++	struct mt6397_chip *chip = dev_get_drvdata(dev);
++
++	regmap_write(chip->regmap, MT6397_INT_CON0, chip->irq_masks_cur[0]);
++	regmap_write(chip->regmap, MT6397_INT_CON1, chip->irq_masks_cur[1]);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_irq_suspend,
++			mt6397_irq_resume);
++
+ static int mt6397_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -237,6 +283,7 @@ static struct platform_driver mt6397_driver = {
+ 	.driver = {
+ 		.name = "mt6397",
+ 		.of_match_table = of_match_ptr(mt6397_of_match),
++		.pm = &mt6397_pm_ops,
+ 	},
+ };
+ 
+diff --git a/include/linux/mfd/mt6397/core.h b/include/linux/mfd/mt6397/core.h
+index cf5265b..45b8e8a 100644
+--- a/include/linux/mfd/mt6397/core.h
++++ b/include/linux/mfd/mt6397/core.h
+@@ -57,6 +57,7 @@ struct mt6397_chip {
+ 	int irq;
+ 	struct irq_domain *irq_domain;
+ 	struct mutex irqlock;
++	u16 wake_mask[2];
+ 	u16 irq_masks_cur[2];
+ 	u16 irq_masks_cache[2];
+ };
+-- 
+1.8.1.1.dirty
