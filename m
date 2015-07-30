@@ -1,150 +1,73 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 30 Jul 2015 23:03:46 +0900
-Subject: [PATCH] ARM: dts: Add CPU cooling binding for Exynos3250-based
- Rinato/Monk board
-In-Reply-To: <55B87414.10800@samsung.com>
-References: <1435815465-501-1-git-send-email-cw00.choi@samsung.com>
- <5594D22C.4040206@samsung.com> <5594D5F4.3060508@samsung.com>
- <5594E57C.2010300@samsung.com>
- <CAJKOXPfknRZ0ewSv=awo1ay4uWHAXM_kCiLPN4MpxN2-bSNq0g@mail.gmail.com>
- <092101d0b8c2$e2b39310$a81ab930$@kernel.org> <559C6C8E.2070309@samsung.com>
- <55B87414.10800@samsung.com>
-Message-ID: <55BA2EC2.8050906@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 30 Jul 2015 16:06:51 +0200
+Subject: [PATCH 1/2] efi: add 'offset' param to efi_low_alloc()
+In-Reply-To: <20150730140144.GH2725@codeblueprint.co.uk>
+References: <1438164259-14470-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1438164259-14470-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20150730140144.GH2725@codeblueprint.co.uk>
+Message-ID: <CAKv+Gu9Lrfr594rUYdv-5QngiBf3FcNJ447U7Nnb07aW5kTgwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/15 15:35, Chanwoo Choi wrote:
-> Dear Kukjin,
-> 
-> Please pick this patch because exynos3250-cpufreq patch-set
-> was already merged on linux-samsung.git.
-> 
-Applied, thanks.
-
-- Kukjin
-
-> Thanks,
-> Chanwoo Choi
-> 
-> On 07/08/2015 09:19 AM, Krzysztof Kozlowski wrote:
->> On 07.07.2015 23:40, Kukjin Kim wrote:
->>> Krzysztof Kozlowski wrote:
->>>>
->>>> 2015-07-02 16:17 GMT+09:00 Krzysztof Kozlowski <k.kozlowski@samsung.com>:
->>>>> On 02.07.2015 15:11, Chanwoo Choi wrote:
->>>>>> On 07/02/2015 02:54 PM, Krzysztof Kozlowski wrote:
->>>>>>> On 02.07.2015 14:37, Chanwoo Choi wrote:
->>>>>>>> This patch add the cooling device to control the overheating issue on
->>>>>>>> Exynos3250-based Rinato/Monk board.
->>>>>>>>
->>>>>>>> Cc: Kukjin Kim <kgene@kernel.org>
->>>>>>>> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>>>> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
->>>>>>>> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
->>>>>>>> ---
->>>>>>>> Depends on:
->>>>>>>> This patch needs the cpufreq support of Exynos3250 SoC. So, this patch has the
->>>>>>>> dependency on patch[1] which support the generic cpufreq for Exynos3250 SoC.
->>>>>>>> [1] https://lkml.org/lkml/2015/7/1/696
->>>>>>>>     : [PATCH v6 0/3] cpufreq: Use cpufreq-dt driver for Exynos3250
->>>>>>>>
->>>>>>>>  arch/arm/boot/dts/exynos3250-monk.dts   | 15 +++++++++++++++
->>>>>>>>  arch/arm/boot/dts/exynos3250-rinato.dts | 15 +++++++++++++++
->>>>>>>>  arch/arm/boot/dts/exynos3250.dtsi       |  1 +
->>>>>>>>  3 files changed, 31 insertions(+)
->>>>>>>>
->>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-monk.dts b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>>> index 7863265d4868..540a0adf2be6 100644
->>>>>>>> --- a/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>>> +++ b/arch/arm/boot/dts/exynos3250-monk.dts
->>>>>>>> @@ -116,6 +116,21 @@
->>>>>>>>             min-microvolt = <1100000>;
->>>>>>>>             max-microvolt = <2700000>;
->>>>>>>>     };
->>>>>>>> +
->>>>>>>> +   thermal-zones {
->>>>>>>> +           cpu_thermal: cpu-thermal {
->>>>>>>> +                   cooling-maps {
->>>>>>>> +                           map0 {
->>>>>>>> +                                   /* Correspond to 500MHz at freq_table */
->>>>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>>>> +                           };
->>>>>>>> +                           map1 {
->>>>>>>> +                                   /* Correspond to 200MHz at freq_table */
->>>>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>>>> +                           };
->>>>>>>> +                   };
->>>>>>>> +           };
->>>>>>>> +   };
->>>>>>>>  };
->>>>>>>>
->>>>>>>>  &adc {
->>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250-rinato.dts b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>>> index ddd7ac283045..0e62a6435e07 100644
->>>>>>>> --- a/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>>> +++ b/arch/arm/boot/dts/exynos3250-rinato.dts
->>>>>>>> @@ -107,6 +107,21 @@
->>>>>>>>             min-microvolt = <1100000>;
->>>>>>>>             max-microvolt = <2700000>;
->>>>>>>>     };
->>>>>>>> +
->>>>>>>> +   thermal-zones {
->>>>>>>> +           cpu_thermal: cpu-thermal {
->>>>>>>> +                   cooling-maps {
->>>>>>>> +                           map0 {
->>>>>>>> +                                   /* Corresponds to 500MHz */
->>>>>>>> +                                   cooling-device = <&cpu0 5 5>;
->>>>>>>> +                           };
->>>>>>>> +                           map1 {
->>>>>>>> +                                   /* Corresponds to 200MHz */
->>>>>>>> +                                   cooling-device = <&cpu0 8 8>;
->>>>>>>> +                           };
->>>>>>>> +                   };
->>>>>>>> +           };
->>>>>>>> +   };
->>>>>>>>  };
->>>>>>>>
->>>>>>>>  &adc {
->>>>>>>> diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>>> index e0f3b2ed41a3..a4931b660ddb 100644
->>>>>>>> --- a/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>>> +++ b/arch/arm/boot/dts/exynos3250.dtsi
->>>>>>>> @@ -55,6 +55,7 @@
->>>>>>>>                     clock-frequency = <1000000000>;
->>>>>>>>                     clocks = <&cmu CLK_ARM_CLK>;
->>>>>>>>                     clock-names = "cpu";
->>>>>>>> +                   #cooling-cells = <2>;
->>>>>>>>
->>>>>>>
->>>>>>> Don't you need also cooling-{min,max}-state properties?
->>>>>>
->>>>>> Yes, it is well working without cooling-{min,max}-state or cooling-{min,max}-level.
->>>>>>
->>>>>> I look for the some code to parse "cooling-{min,max}-state or cooling-{min,max}-level"
->>>>>> in drivers/thermal/*. But, there are no any code to parse it.
->>>>>>
->>>>>> But, Documentation/devicetree/bindings/thermal/thermal.txt contains just the 'cooling-{min,max}-
->>>> state.
->>>>>>
->>>>>> I think that there are mismatch between document and thermal core driver.
->>>>>
->>>>> Thanks for explanation, looks good.
->>>>> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>>>
->>>>> Best regards,
->>>>> Krzysztof
->>>>
->>>> Dear Kukjin,
->>>>
->>>> Recent four patchsets (4210 CPU OPP in DTS, cpufreq-dt 5250,
->>>> cpufreq-dt 3250, this patch) are actually an one continuous chain.
->>>> Dependencies are already in mainline. Are you gonna to pick up
->>>> everything?
->>>>
->>> Yes, I want and I will. BTW maybe clk change is required together? If so, as you
->>> know we need to get ack from clk guy. Is my understanding right?
+On 30 July 2015 at 16:01, Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> On Wed, 29 Jul, at 12:04:18PM, Ard Biesheuvel wrote:
+>> In some cases, e.g., when allocating memory for the arm64 kernel,
+>> we need memory at a certain offset from an aligned boundary. So add
+>> an offset parameter to efi_low_alloc(), and update the existing
+>> callers to pass zero by default.
 >>
->> Right. I think the samsung clock and cpufreq patches still need acks.
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi-stub.c                   |  2 +-
+>>  arch/x86/boot/compressed/eboot.c               |  4 ++--
+>>  drivers/firmware/efi/libstub/efi-stub-helper.c | 20 +++++++++++++++-----
+>>  include/linux/efi.h                            |  2 +-
+>>  4 files changed, 19 insertions(+), 9 deletions(-)
+>
+> [...]
+>
+>> @@ -269,10 +269,19 @@ efi_status_t efi_low_alloc(efi_system_table_t *sys_table_arg,
+>>                * checks pointers against NULL. Skip the first 8
+>>                * bytes so we start at a nice even number.
+>>                */
+>> -             if (start == 0x0)
+>> +             if (start + offset == 0x0)
+>>                       start += 8;
 >>
->> Best regards,
->> Krzysztof
+>> -             start = round_up(start, align);
+>> +             /*
+>> +              * Check if the offset exceeds the misalignment of this region.
+>> +              * In that case, we can round down instead of up, and the
+>> +              * resulting start value will be correctly aligned and still
+>> +              * point past the start of the region.
+>> +              */
+>> +             if (offset >= (start & (align - 1)))
+>> +                     start = round_down(start, align) + offset;
+>> +             else
+>> +                     start = round_up(start, align) + offset;
+>>               if ((start + size) > end)
+>>                       continue;
+>
+> Aha, now I see what you mean. Thanks for doing this Ard, these are much
+> more polished than what I was expecting.
+>
+> I'm gonna have to NAK this because it's just too much of a special case
+> to support directly in efi_low_alloc(), which I think was the exact
+> point that you made originally, and which I was too tired/dumb to
+> understand. Sorry.
+>
+
+No worries. Will has already queued the original patch, which solves
+all know issues regarding the placement of the kernel image by the EFI
+stub.
+
+> In particular, the fact that you can use the offset argument to violate
+> the requested alignment seems like it would trip up most users.
+>
+
+Yes. We could always rename this enhanced efi_low_alloc() to
+efi_low_alloc_with_offset() and introduce a new efi_low_alloc() which
+calls it using an offset of zero. But only if you insist.
+
+-- 
+Ard.
