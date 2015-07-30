@@ -1,980 +1,165 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 14:25:00 +0200
-Subject: [PATCH v3 2/3] ARM: at91/dt: add basic dtsi for sama5d2 SoC
-In-Reply-To: <1438257306-12517-3-git-send-email-nicolas.ferre@atmel.com>
-References: <1438257306-12517-1-git-send-email-nicolas.ferre@atmel.com>
- <1438257306-12517-3-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <55BA179C.4070805@atmel.com>
+From: marex@denx.de (Marek Vasut)
+Date: Thu, 30 Jul 2015 14:33:44 +0200
+Subject: [PATCH 08/11] MTD: m25p80: Add option to limit SPI transfer size.
+In-Reply-To: <CAOMqctTQ906nu4_VjXWDRZ23uRbxEHMTKs6TpYy+g9EBAd1M7Q@mail.gmail.com>
+References: <cover.1433364398.git.hramrach@gmail.com>
+ <201507301324.05721.marex@denx.de>
+ <CAOMqctTQ906nu4_VjXWDRZ23uRbxEHMTKs6TpYy+g9EBAd1M7Q@mail.gmail.com>
+Message-ID: <201507301433.45008.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/07/2015 13:55, Nicolas Ferre a ?crit :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Thursday, July 30, 2015 at 02:18:09 PM, Michal Suchanek wrote:
+> On 30 July 2015 at 13:24, Marek Vasut <marex@denx.de> wrote:
+> > On Monday, July 27, 2015 at 10:43:05 PM, Michal Suchanek wrote:
+> >> On 27 July 2015 at 19:43, Marek Vasut <marex@denx.de> wrote:
+> >> > On Monday, July 27, 2015 at 11:46:25 AM, Michal Suchanek wrote:
+> >> >> On 24 July 2015 at 10:34, Marek Vasut <marex@denx.de> wrote:
+> >> >> > On Thursday, July 23, 2015 at 07:03:47 PM, Michal Suchanek wrote:
+> >> >> Ok, so here is some summary.
+> >> >> 
+> >> >> I have a NOR flash attached to a s3c64xx SPI controller with 64byte
+> >> >> fifo and a pl330 dma controller.
+> >> >> 
+> >> >> Normally DMA controller is used for transfers that do not fit into
+> >> >> the FIFO.
+> >> >> 
+> >> >> I tried adding the flash memory ID to the spi-nor driver table and
+> >> >> adding a DT node for it.
+> >> >> 
+> >> >> The flash is rated at 120MHz so I used that speed but the ID was
+> >> >> bit-shifted and identification failed. There is DT property
+> >> >> samsung,spi-feedback-delay for addressing this and at 120MHz it must
+> >> >> be 2 or 3 on this board. 40MHz works with default value 0.
+> >> >> 
+> >> >> The next step after identification worked was to try reading the
+> >> >> flash content. For this the DMA controller is used because data is
+> >> >> transferred in blocks larger than 64 bytes. When reading the whole
+> >> >> 4MB flash the transfer failed silently. I got a 4MB file of all ones
+> >> >> or all zeroes.
+> >> >> 
+> >> >> It turns out that
+> >> >> 
+> >> >>  - the pl330 locks up when transfering large amount of data.
+> >> >> 
+> >> >> Specifically, the maximum power of 2 sized transfer at 120MHz is 128
+> >> >> bytes and 64k at 40MHz. Transferring more than this results in the
+> >> >> pl330 locking up and never signalling completion of the transfer.
+> >> > 
+> >> > Hypothesis:
+> >> > I think this might just be that the controller didn't catch all the
+> >> > inbound clock ticks and thus counted less inbound data than it was
+> >> > set up to receive. The controller thus waits for more data.
+> >> 
+> >> The flash chip can transfer data as long as you keep the clock going,
+> >> especially when you transfer 64k off a 4M flash.
+> >> 
+> >> The read command is bound just by stopping the clock. There is always
+> >> more data to be had.
+> > 
+> > Sure, if you keep clocking the chip, the data will keep going. Is the
+> > chip being clocked ?
 > 
-> Only the basic support for this new Atmel Cortex-A5 SoC. A subset of the
-> peripherals is setup to allow booting.
-> IRQ, clocks, USB, crypto, timers, rtc, ethernet, spi/i2c and
-> uart/usart peripheral nodes are added.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> 
-> Changes in v3:
-> - remove sd/mmc nodes
-> - remove generated clock nodes
+> There is always data. Like in whenever you want to read SPI data you
+> sample the input pin and watever you sample is data so far as SPI bus
+> is concerned.
 
-Oh I forgot about this:
-- corrected the DMA HW handler interfaces for SHA and AES thanks to Leilei!
+Aren't you forgetting that the data are synchronous to the clock which you
+(your SPI block) generate ?
 
-Bye,
+> > Doesn't the PL330 have some kind of a counter register where you can
+> > check how much data were received so far ? That should be sufficient to
+> > verify this hypothesis of mine.
+> 
+> Could check that, yes. Maybe I could read the counter in a function
+> which dmaengine client uses to tear down the dma transfer.
 
-> 
-> Changes in v2:
-> - fix sdmmc clocks and memory range
-> - add flexcom and audio Class D amplifier peripheral clock definitions
-> - add qspi peripheral clock definitions
-> - add more generated clock definitions
-> - fix DMA definitions for crypto peripherals
-> - add spi, i2c and rtc nodes
-> 
->  arch/arm/boot/dts/sama5d2.dtsi | 925 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 925 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sama5d2.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> new file mode 100644
-> index 000000000000..f39258fa3815
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -0,0 +1,925 @@
-> +/*
-> + * sama5d2.dtsi - Device Tree Include file for SAMA5D2 family SoC
-> + *
-> + *  Copyright (C) 2015 Atmel,
-> + *                2015 Ludovic Desroches <ludovic.desroches@atmel.com>
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + */
-> +
-> +#include "skeleton.dtsi"
-> +#include <dt-bindings/dma/at91.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/clock/at91.h>
-> +
-> +/ {
-> +	model = "Atmel SAMA5D2 family SoC";
-> +	compatible = "atmel,sama5d2";
-> +	interrupt-parent = <&aic>;
-> +
-> +	aliases {
-> +		serial0 = &uart1;
-> +		serial1 = &uart3;
-> +		tcb0 = &tcb0;
-> +		tcb1 = &tcb1;
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a5";
-> +			reg = <0>;
-> +			next-level-cache = <&L2>;
-> +		};
-> +	};
-> +
-> +	memory {
-> +		reg = <0x20000000 0x20000000>;
-> +	};
-> +
-> +	clocks {
-> +		slow_xtal: slow_xtal {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <0>;
-> +		};
-> +
-> +		main_xtal: main_xtal {
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <0>;
-> +		};
-> +
-> +		adc_op_clk: adc_op_clk{
-> +			compatible = "fixed-clock";
-> +			#clock-cells = <0>;
-> +			clock-frequency = <1000000>;
-> +		};
-> +	};
-> +
-> +	ns_sram: sram at 00200000 {
-> +		compatible = "mmio-sram";
-> +		reg = <0x00200000 0x20000>;
-> +	};
-> +
-> +	ahb {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		usb0: gadget at 00300000 {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			compatible = "atmel,sama5d3-udc";
-> +			reg = <0x00300000 0x100000
-> +			       0xfc02c000 0x400>;
-> +			interrupts = <42 IRQ_TYPE_LEVEL_HIGH 2>;
-> +			clocks = <&udphs_clk>, <&utmi>;
-> +			clock-names = "pclk", "hclk";
-> +			status = "disabled";
-> +
-> +			ep0 {
-> +				reg = <0>;
-> +				atmel,fifo-size = <64>;
-> +				atmel,nb-banks = <1>;
-> +			};
-> +
-> +			ep1 {
-> +				reg = <1>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <3>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep2 {
-> +				reg = <2>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <3>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep3 {
-> +				reg = <3>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep4 {
-> +				reg = <4>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep5 {
-> +				reg = <5>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep6 {
-> +				reg = <6>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep7 {
-> +				reg = <7>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-dma;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep8 {
-> +				reg = <8>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep9 {
-> +				reg = <9>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep10 {
-> +				reg = <10>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep11 {
-> +				reg = <11>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep12 {
-> +				reg = <12>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep13 {
-> +				reg = <13>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep14 {
-> +				reg = <14>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +
-> +			ep15 {
-> +				reg = <15>;
-> +				atmel,fifo-size = <1024>;
-> +				atmel,nb-banks = <2>;
-> +				atmel,can-isoc;
-> +			};
-> +		};
-> +
-> +		usb1: ohci at 00400000 {
-> +			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-> +			reg = <0x00400000 0x100000>;
-> +			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
-> +			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-> +			clock-names = "ohci_clk", "hclk", "uhpck";
-> +			status = "disabled";
-> +		};
-> +
-> +		usb2: ehci at 00500000 {
-> +			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
-> +			reg = <0x00500000 0x100000>;
-> +			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
-> +			clocks = <&utmi>, <&uhphs_clk>;
-> +			clock-names = "usb_clk", "ehci_clk";
-> +			status = "disabled";
-> +		};
-> +
-> +		L2: cache-controller at 00a00000 {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0x00a00000 0x1000>;
-> +			interrupts = <63 IRQ_TYPE_LEVEL_HIGH 4>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
-> +
-> +		apb {
-> +			compatible = "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			ramc0: ramc at f000c000 {
-> +				compatible = "atmel,sama5d3-ddramc";
-> +				reg = <0xf000c000 0x200>;
-> +				clocks = <&ddrck>, <&mpddr_clk>;
-> +				clock-names = "ddrck", "mpddr";
-> +			};
-> +
-> +			dma0: dma-controller at f0010000 {
-> +				compatible = "atmel,sama5d4-dma";
-> +				reg = <0xf0010000 0x1000>;
-> +				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				#dma-cells = <1>;
-> +				clocks = <&dma0_clk>;
-> +				clock-names = "dma_clk";
-> +			};
-> +
-> +			pmc: pmc at f0014000 {
-> +				compatible = "atmel,sama5d2-pmc";
-> +				reg = <0xf0014000 0x160>;
-> +				interrupts = <74 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				interrupt-controller;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				#interrupt-cells = <1>;
-> +
-> +				main_rc_osc: main_rc_osc {
-> +					compatible = "atmel,at91sam9x5-clk-main-rc-osc";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_MOSCRCS>;
-> +					clock-frequency = <12000000>;
-> +					clock-accuracy = <100000000>;
-> +				};
-> +
-> +				main_osc: main_osc {
-> +					compatible = "atmel,at91rm9200-clk-main-osc";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_MOSCS>;
-> +					clocks = <&main_xtal>;
-> +				};
-> +
-> +				main: mainck {
-> +					compatible = "atmel,at91sam9x5-clk-main";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_MOSCSELS>;
-> +					clocks = <&main_rc_osc &main_osc>;
-> +				};
-> +
-> +				plla: pllack {
-> +					compatible = "atmel,sama5d3-clk-pll";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_LOCKA>;
-> +					clocks = <&main>;
-> +					reg = <0>;
-> +					atmel,clk-input-range = <12000000 12000000>;
-> +					#atmel,pll-clk-output-range-cells = <4>;
-> +					atmel,pll-clk-output-ranges = <600000000 1200000000 0 0>;
-> +				};
-> +
-> +				plladiv: plladivck {
-> +					compatible = "atmel,at91sam9x5-clk-plldiv";
-> +					#clock-cells = <0>;
-> +					clocks = <&plla>;
-> +				};
-> +
-> +				utmi: utmick {
-> +					compatible = "atmel,at91sam9x5-clk-utmi";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_LOCKU>;
-> +					clocks = <&main>;
-> +				};
-> +
-> +				mck: masterck {
-> +					compatible = "atmel,at91sam9x5-clk-master";
-> +					#clock-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					interrupts = <AT91_PMC_MCKRDY>;
-> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
-> +					atmel,clk-output-range = <124000000 166000000>;
-> +					atmel,clk-divisors = <1 2 4 3>;
-> +				};
-> +
-> +				h32ck: h32mxck {
-> +					#clock-cells = <0>;
-> +					compatible = "atmel,sama5d4-clk-h32mx";
-> +					clocks = <&mck>;
-> +				};
-> +
-> +				usb: usbck {
-> +					compatible = "atmel,at91sam9x5-clk-usb";
-> +					#clock-cells = <0>;
-> +					clocks = <&plladiv>, <&utmi>;
-> +				};
-> +
-> +				prog: progck {
-> +					compatible = "atmel,at91sam9x5-clk-programmable";
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					interrupt-parent = <&pmc>;
-> +					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
-> +
-> +					prog0: prog0 {
-> +						#clock-cells = <0>;
-> +						reg = <0>;
-> +						interrupts = <AT91_PMC_PCKRDY(0)>;
-> +					};
-> +
-> +					prog1: prog1 {
-> +						#clock-cells = <0>;
-> +						reg = <1>;
-> +						interrupts = <AT91_PMC_PCKRDY(1)>;
-> +					};
-> +
-> +					prog2: prog2 {
-> +						#clock-cells = <0>;
-> +						reg = <2>;
-> +						interrupts = <AT91_PMC_PCKRDY(2)>;
-> +					};
-> +				};
-> +
-> +				systemck {
-> +					compatible = "atmel,at91rm9200-clk-system";
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +
-> +					ddrck: ddrck {
-> +						#clock-cells = <0>;
-> +						reg = <2>;
-> +						clocks = <&mck>;
-> +					};
-> +
-> +					lcdck: lcdck {
-> +						#clock-cells = <0>;
-> +						reg = <3>;
-> +						clocks = <&mck>;
-> +					};
-> +
-> +					uhpck: uhpck {
-> +						#clock-cells = <0>;
-> +						reg = <6>;
-> +						clocks = <&usb>;
-> +					};
-> +
-> +					udpck: udpck {
-> +						#clock-cells = <0>;
-> +						reg = <7>;
-> +						clocks = <&usb>;
-> +					};
-> +
-> +					pck0: pck0 {
-> +						#clock-cells = <0>;
-> +						reg = <8>;
-> +						clocks = <&prog0>;
-> +					};
-> +
-> +					pck1: pck1 {
-> +						#clock-cells = <0>;
-> +						reg = <9>;
-> +						clocks = <&prog1>;
-> +					};
-> +
-> +					pck2: pck2 {
-> +						#clock-cells = <0>;
-> +						reg = <10>;
-> +						clocks = <&prog2>;
-> +					};
-> +
-> +					iscck: iscck {
-> +						#clock-cells = <0>;
-> +						reg = <18>;
-> +						clocks = <&mck>;
-> +					};
-> +				};
-> +
-> +				periph32ck {
-> +					compatible = "atmel,at91sam9x5-clk-peripheral";
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					clocks = <&h32ck>;
-> +
-> +					macb0_clk: macb0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <5>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					tdes_clk: tdes_clk {
-> +						#clock-cells = <0>;
-> +						reg = <11>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					matrix1_clk: matrix1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <14>;
-> +					};
-> +
-> +					hsmc_clk: hsmc_clk {
-> +						#clock-cells = <0>;
-> +						reg = <17>;
-> +					};
-> +
-> +					pioA_clk: pioA_clk {
-> +						#clock-cells = <0>;
-> +						reg = <18>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					flx0_clk: flx0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <19>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					flx1_clk: flx1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <20>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					flx2_clk: flx2_clk {
-> +						#clock-cells = <0>;
-> +						reg = <21>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					flx3_clk: flx3_clk {
-> +						#clock-cells = <0>;
-> +						reg = <22>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					flx4_clk: flx4_clk {
-> +						#clock-cells = <0>;
-> +						reg = <23>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uart0_clk: uart0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <24>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uart1_clk: uart1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <25>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uart2_clk: uart2_clk {
-> +						#clock-cells = <0>;
-> +						reg = <26>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uart3_clk: uart3_clk {
-> +						#clock-cells = <0>;
-> +						reg = <27>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uart4_clk: uart4_clk {
-> +						#clock-cells = <0>;
-> +						reg = <28>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					twi0_clk: twi0_clk {
-> +						reg = <29>;
-> +						#clock-cells = <0>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					twi1_clk: twi1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <30>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					spi0_clk: spi0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <33>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					spi1_clk: spi1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <34>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					tcb0_clk: tcb0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <35>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					tcb1_clk: tcb1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <36>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					pwm_clk: pwm_clk {
-> +						#clock-cells = <0>;
-> +						reg = <38>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					adc_clk: adc_clk {
-> +						#clock-cells = <0>;
-> +						reg = <40>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					uhphs_clk: uhphs_clk {
-> +						#clock-cells = <0>;
-> +						reg = <41>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					udphs_clk: udphs_clk {
-> +						#clock-cells = <0>;
-> +						reg = <42>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					ssc0_clk: ssc0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <43>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					ssc1_clk: ssc1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <44>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					trng_clk: trng_clk {
-> +						#clock-cells = <0>;
-> +						reg = <47>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +
-> +					classd_clk: classd_clk {
-> +						#clock-cells = <0>;
-> +						reg = <59>;
-> +						atmel,clk-output-range = <0 83000000>;
-> +					};
-> +				};
-> +
-> +				periph64ck {
-> +					compatible = "atmel,at91sam9x5-clk-peripheral";
-> +					#address-cells = <1>;
-> +					#size-cells = <0>;
-> +					clocks = <&mck>;
-> +
-> +					dma0_clk: dma0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <6>;
-> +					};
-> +
-> +					dma1_clk: dma1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <7>;
-> +					};
-> +
-> +					aes_clk: aes_clk {
-> +						#clock-cells = <0>;
-> +						reg = <9>;
-> +					};
-> +
-> +					aesb_clk: aesb_clk {
-> +						#clock-cells = <0>;
-> +						reg = <10>;
-> +					};
-> +
-> +					sha_clk: sha_clk {
-> +						#clock-cells = <0>;
-> +						reg = <12>;
-> +					};
-> +
-> +					mpddr_clk: mpddr_clk {
-> +						#clock-cells = <0>;
-> +						reg = <13>;
-> +					};
-> +
-> +					matrix0_clk: matrix0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <15>;
-> +					};
-> +
-> +					sdmmc0_hclk: sdmmc0_hclk {
-> +						#clock-cells = <0>;
-> +						reg = <31>;
-> +					};
-> +
-> +					sdmmc1_hclk: sdmmc1_hclk {
-> +						#clock-cells = <0>;
-> +						reg = <32>;
-> +					};
-> +
-> +					lcdc_clk: lcdc_clk {
-> +						#clock-cells = <0>;
-> +						reg = <45>;
-> +					};
-> +
-> +					isc_clk: isc_clk {
-> +						#clock-cells = <0>;
-> +						reg = <46>;
-> +					};
-> +
-> +					qspi0_clk: qspi0_clk {
-> +						#clock-cells = <0>;
-> +						reg = <52>;
-> +					};
-> +
-> +					qspi1_clk: qspi1_clk {
-> +						#clock-cells = <0>;
-> +						reg = <53>;
-> +					};
-> +				};
-> +			};
-> +
-> +			sha at f0028000 {
-> +				compatible = "atmel,at91sam9g46-sha";
-> +				reg = <0xf0028000 0x100>;
-> +				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(30))>;
-> +				dma-names = "tx";
-> +				clocks = <&sha_clk>;
-> +				clock-names = "sha_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			aes at f002c000 {
-> +				compatible = "atmel,at91sam9g46-aes";
-> +				reg = <0xf002c000 0x100>;
-> +				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(26))>,
-> +				       <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(27))>;
-> +				dma-names = "tx", "rx";
-> +				clocks = <&aes_clk>;
-> +				clock-names = "aes_clk";
-> +				status = "disabled";
-> +			};
-> +
-> +			spi0: spi at f8000000 {
-> +				compatible = "atmel,at91rm9200-spi";
-> +				reg = <0xf8000000 0x100>;
-> +				interrupts = <33 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(6))>,
-> +				       <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(7))>;
-> +				dma-names = "tx", "rx";
-> +				clocks = <&spi0_clk>;
-> +				clock-names = "spi_clk";
-> +				atmel,fifo-size = <16>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			macb0: ethernet at f8008000 {
-> +				compatible = "atmel,sama5d2-gem";
-> +				reg = <0xf8008000 0x1000>;
-> +				interrupts = <5  IRQ_TYPE_LEVEL_HIGH 3		/* Queue 0 */
-> +					      66 IRQ_TYPE_LEVEL_HIGH 3          /* Queue 1 */
-> +					      67 IRQ_TYPE_LEVEL_HIGH 3>;        /* Queue 2 */
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				clocks = <&macb0_clk>, <&macb0_clk>;
-> +				clock-names = "hclk", "pclk";
-> +				status = "disabled";
-> +			};
-> +
-> +			tcb0: timer at f800c000 {
-> +				compatible = "atmel,at91sam9x5-tcb";
-> +				reg = <0xf800c000 0x100>;
-> +				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				clocks = <&tcb0_clk>;
-> +				clock-names = "t0_clk";
-> +			};
-> +
-> +			tcb1: timer at f8010000 {
-> +				compatible = "atmel,at91sam9x5-tcb";
-> +				reg = <0xf8010000 0x100>;
-> +				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-> +				clocks = <&tcb1_clk>;
-> +				clock-names = "t0_clk";
-> +			};
-> +
-> +			uart0: serial at f801c000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf801c000 0x100>;
-> +				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&uart0_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart1: serial at f8020000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf8020000 0x100>;
-> +				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&uart1_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart2: serial at f8024000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xf8024000 0x100>;
-> +				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&uart2_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			i2c0: i2c at f8028000 {
-> +				compatible = "atmel,sama5d2-i2c";
-> +				reg = <0xf8028000 0x100>;
-> +				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(0))>,
-> +				       <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(1))>;
-> +				dma-names = "tx", "rx";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				clocks = <&twi0_clk>;
-> +				status = "disabled";
-> +			};
-> +
-> +			pit: timer at f8048030 {
-> +				compatible = "atmel,at91sam9260-pit";
-> +				reg = <0xf8048030 0x10>;
-> +				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
-> +				clocks = <&h32ck>;
-> +			};
-> +
-> +			sckc at f8048050 {
-> +				compatible = "atmel,at91sam9x5-sckc";
-> +				reg = <0xf8048050 0x4>;
-> +
-> +				slow_rc_osc: slow_rc_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
-> +					#clock-cells = <0>;
-> +					clock-frequency = <32768>;
-> +					clock-accuracy = <250000000>;
-> +					atmel,startup-time-usec = <75>;
-> +				};
-> +
-> +				slow_osc: slow_osc {
-> +					compatible = "atmel,at91sam9x5-clk-slow-osc";
-> +					#clock-cells = <0>;
-> +					clocks = <&slow_xtal>;
-> +					atmel,startup-time-usec = <1200000>;
-> +				};
-> +
-> +				clk32k: slowck {
-> +					compatible = "atmel,at91sam9x5-clk-slow";
-> +					#clock-cells = <0>;
-> +					clocks = <&slow_rc_osc &slow_osc>;
-> +				};
-> +			};
-> +
-> +			rtc at f80480b0 {
-> +				compatible = "atmel,at91rm9200-rtc";
-> +				reg = <0xf80480b0 0x30>;
-> +				interrupts = <74 IRQ_TYPE_LEVEL_HIGH 7>;
-> +			};
-> +
-> +			spi1: spi at fc000000 {
-> +				compatible = "atmel,at91rm9200-spi";
-> +				reg = <0xfc000000 0x100>;
-> +				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(8))>,
-> +				       <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(9))>;
-> +				dma-names = "tx", "rx";
-> +				clocks = <&spi1_clk>;
-> +				clock-names = "spi_clk";
-> +				atmel,fifo-size = <16>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				status = "disabled";
-> +			};
-> +
-> +			uart3: serial at fc008000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfc008000 0x100>;
-> +				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&uart3_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			uart4: serial at fc00c000 {
-> +				compatible = "atmel,at91sam9260-usart";
-> +				reg = <0xfc00c000 0x100>;
-> +				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				clocks = <&uart4_clk>;
-> +				clock-names = "usart";
-> +				status = "disabled";
-> +			};
-> +
-> +			aic: interrupt-controller at fc020000 {
-> +				#interrupt-cells = <3>;
-> +				compatible = "atmel,sama5d2-aic";
-> +				interrupt-controller;
-> +				reg = <0xfc020000 0x200>;
-> +				atmel,external-irqs = <49>;
-> +			};
-> +
-> +			i2c1: i2c at fc028000 {
-> +				compatible = "atmel,sama5d2-i2c";
-> +				reg = <0xfc028000 0x100>;
-> +				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 7>;
-> +				dmas = <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(2))>,
-> +				       <&dma0
-> +					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> +					 AT91_XDMAC_DT_PERID(3))>;
-> +				dma-names = "tx", "rx";
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				clocks = <&twi1_clk>;
-> +				status = "disabled";
-> +			};
-> +		};
-> +	};
-> +};
-> 
+Might be a good idea. Check if the register is stuck for too long and
+then zap the transfer.
 
+> On a related note I enabled more prints on the spidev test program.
+> 
+> I have code that tests maximum transfer size up to the 4k spidev limit
+> and it can transfer full 4k buffer of NOPs at 80MHz.
+> 
+> The recieved data is all ones except a 00 at the start. So it looks
+> like read-only transfers fail but full-duplex sort of work. And it
+> reproduces the 00 prefix that was seen in the dma-only setup in
+> otherwise working setup :-S
+> 
+> An attempt to read a page of data using the fast-read command fails
+> with timeout.
 
--- 
-Nicolas Ferre
+It would be a good idea to detail what your program exactly does on
+the bus (like, "my program sends 3 bytes of data 0xf0 0x0b 0xar and
+then receives 60 bytes of data").  Maybe I'm lost, but your test is
+really not clear.
+
+> >> >> Data
+> >> >> is left in FIFO which causes subsequent commands to fail since
+> >> >> garbage is returned instead of command reply. Also subsequent read
+> >> >> may cause I/O error or or return an empty page depending on the
+> >> >> garbage around.
+> >> > 
+> >> > So the driver for the DMA controller might need to be augmented to
+> >> > handle this case -- add a timeout and in case DMA times out, drain
+> >> > the FIFO to make sure subsequent transfers do not fail.
+> >> 
+> >> There is no way to add timeout in the DMA driver since it does not
+> >> know the SPI clock.
+> >> 
+> >> The timeout is handled by the SPI driver and it should be possible to
+> >> augment it to drain the FIFO when DMA fails so long as FIFO level is
+> >> readable somewhere.
+> > 
+> > If the DMA doesn't complete in certain amount of time, it should time out
+> > I'd say. Don't you think ?
+> 
+> No. The DMA  driver has no idea if the transfer is at 133MHz, 40MHz,
+> 1MHz, 1kHz, whatever.
+
+That's not really important, is it ? If the transfer doesn't finish in, say,
+1 second, and it is a 4096b transfer, then it is most likely timeout.
+
+> On the other hand, adding a flush_fifo in the SPI driver after DMA
+> failure allows probing the chip reliably by realoding the driver even
+> just after a failed transfer.
+
+OK
+
+> >> >> - the I/O errors are not checked in spi-nor at all which leads to
+> >> >> silent data corruption.
+> >> >> 
+> >> >> On a suggestion that this may improve reliability I changed the
+> >> >> s3c64xx driver to use DMA for all transfers. This caused
+> >> >> identification to fail in spin-nor because the ID was prefixed with
+> >> >> extra 00  byte. Testing with spidev confirmed that everything is
+> >> >> prefixed with extra 00.
+> >> > 
+> >> > The determinism of this is in fact excellent news.
+> >> > 
+> >> >> Also when the DMA controller locked up no
+> >> >> transfers were possible anymore. When DMA was not used for sending
+> >> >> commands the controller would recover on next command. I made the
+> >> >> option to always use DMA configurable and it turns out that the
+> >> >> returned data is prefixed with 00 only when no transfer without DMA
+> >> >> was ever made. Loading the spi-nor driver with the dma-only option
+> >> >> off and then with dma-only option on results in correct operation.
+> >> >> Only loading the dma-only driver first causes the 00 prefix.
+> >> > 
+> >> > Can we conclude that the PIO codepath somehow programs a register
+> >> > somewhere which gets rid of this 0x00 prefix ? If so, this should then
+> >> > also be part of the DMA codepath, or even better, this should be set
+> >> > in probe() somewhere.
+> >> 
+> >> Yes, it looks like it.
+> > 
+> > Did you find what this could be please ?
+> 
+> The suspicious function is enable_datapath in the s3c64xx driver.
+> There is even a comment about keeping the clock going on half-duplex
+> transfers.
+> 
+> I did not get to dissecting it so far.
+
+Good luck!
