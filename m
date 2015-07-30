@@ -1,230 +1,161 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Thu, 30 Jul 2015 11:14:47 -0500
-Subject: [PATCH v6] PCI: Store PCIe bus address in struct of_pci_range
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
-References: <1438010223-124422-1-git-send-email-gabriele.paoloni@huawei.com>
- <20150729172053.GE31170@google.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F350@lhreml503-mbs>
- <CAL_JsqKs11-sXQTdBD+ZjbVYFWUHBARTW9q5MF1hCXUhZ+nWLQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E01D6F94A@lhreml503-mbs>
-Message-ID: <20150730161447.GG9640@google.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 30 Jul 2015 11:16:41 -0500
+Subject: [PATCH v4 2/2] dt: power: st: Provide bindings for ST's OPPs
+In-Reply-To: <20150730084634.GD9319@x1>
+References: <1438010430-5802-1-git-send-email-lee.jones@linaro.org>
+ <1438010430-5802-2-git-send-email-lee.jones@linaro.org>
+ <20150728022936.GB1229@linux>
+ <20150728225510.GB3159@codeaurora.org> <20150729081403.GH2284@x1>
+ <20150729221526.GE3159@codeaurora.org> <20150730084634.GD9319@x1>
+Message-ID: <CAL_JsqKQLQ15qSt95zBZykzzPhcUrtZzhk29a76n+r_3719AiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jul 30, 2015 at 01:52:13PM +0000, Gabriele Paoloni wrote:
-> 
-> 
-> > -----Original Message-----
-> > From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> > owner at vger.kernel.org] On Behalf Of Rob Herring
-> > Sent: Thursday, July 30, 2015 2:43 PM
-> > To: Gabriele Paoloni
-> > Cc: Bjorn Helgaas; arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou
-> > (B); robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com;
-> > linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> > qiuzhenfa; Liguozhu (Kenneth)
-> > Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> > of_pci_range
-> > 
-> > On Wed, Jul 29, 2015 at 2:44 PM, Gabriele Paoloni
-> > <gabriele.paoloni@huawei.com> wrote:
-> > > Hi Bjorn
-> > >
-> > > Many Thanks for your reply
-> > >
-> > > I have commented back inline with resolutions from my side.
-> > >
-> > > If you're ok with them I'll send it out a new version in the
-> > appropriate patchset
-> > >
-> > > Cheers
-> > >
-> > > Gab
-> > >
-> > >> -----Original Message-----
-> > >> From: Bjorn Helgaas [mailto:bhelgaas at google.com]
-> > >> Sent: Wednesday, July 29, 2015 6:21 PM
-> > >> To: Gabriele Paoloni
-> > >> Cc: arnd at arndb.de; lorenzo.pieralisi at arm.com; Wangzhou (B);
-> > >> robh+dt at kernel.org; james.morse at arm.com; Liviu.Dudau at arm.com; linux-
-> > >> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> > >> devicetree at vger.kernel.org; Yuanzhichang; Zhudacai; zhangjukuo;
-> > >> qiuzhenfa; Liguozhu (Kenneth)
-> > >> Subject: Re: [PATCH v6] PCI: Store PCIe bus address in struct
-> > >> of_pci_range
-> > >>
-> > >> Hi Gabriele,
-> > >>
-> > >> As far as I can tell, this is not specific to PCIe, so please use
-> > "PCI"
-> > >> in
-> > >> the subject as a generic term that includes both PCI and PCIe.
-> > >
-> > > sure agreed
-> > >
-> > >>
-> > >> On Mon, Jul 27, 2015 at 11:17:03PM +0800, Gabriele Paoloni wrote:
-> > >> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> > >> >
-> > >> >     This patch is needed port PCIe designware to new DT parsing
-> > API
-> > >> >     As discussed in
-> > >> >     http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
-> > >> January/317743.html
-> > >> >     in designware we have a problem as the PCI addresses in the
-> > PCIe
-> > >> controller
-> > >> >     address space are required in order to perform correct HW
-> > >> operation.
-> > >> >
-> > >> >     In order to solve this problem commit f4c55c5a3 "PCI:
-> > designware:
-> > >> >     Program ATU with untranslated address" added code to read the
-> > >> PCIe
-> > >>
-> > >> Conventional reference is 12-char SHA1, like this:
-> > >>
-> > >>   f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
-> > >> address")
-> > >
-> > > Agreed, will change this
-> > >
-> > >>
-> > >> >     controller start address directly from the DT ranges.
-> > >> >
-> > >> >     In the new DT parsing API of_pci_get_host_bridge_resources()
-> > >> hides the
-> > >> >     DT parser from the host controller drivers, so it is not
-> > possible
-> > >> >     for drivers to parse values directly from the DT.
-> > >> >
-> > >> >     In http://www.spinics.net/lists/linux-pci/msg42540.html we
-> > >> already tried
-> > >> >     to use the new DT parsing API but there is a bug (obviously)
-> > in
-> > >> setting
-> > >> >     the <*>_mod_base addresses
-> > >> >     Applying this patch we can easily set "<*>_mod_base = win-
-> > >> >__res.start"
-> > >>
-> > >> By itself, this patch adds something.  It would help me understand
-> > it
-> > >> if
-> > >> the *user* of this new something were in the same patch series.
-> > >
-> > > the user is: "[PATCH v5 2/5] PCI: designware: Add ARM64 support"
-> > > I will ask Zhou Wang to include this patch in his patchset
-> > >
-> > >
-> > >>
-> > >> >     This patch adds a new field in "struct of_pci_range" to store
-> > the
-> > >> >     pci bus start address; it fills the field in
-> > >> of_pci_range_parser_one();
-> > >> >     in of_pci_get_host_bridge_resources() it retrieves the
-> > resource
-> > >> entry
-> > >> >     after it is created and added to the resource list and uses
-> > >> >     entry->__res.start to store the pci controller address
-> > >>
-> > >> struct of_pci_range is starting to get confusing to non-OF folks
-> > like
-> > >> me.
-> > >> It now contains:
-> > >>
-> > >>   u32 pci_space;
-> > >>   u64 pci_addr;
-> > >>   u64 cpu_addr;
-> > >>   u64 bus_addr;
-> > >>
-> > >> Can you explain what all these things mean, and maybe even add one-
-> > line
-> > >> comments to the structure?
-> > >
-> > > sure I can add comments inline in the code
-> > >
-> > >>
-> > >> pci_space: The only uses I see are to determine whether to print
-> > >> "Prefetch".  I don't see any real functionality that uses this.
-> > >
-> > > Looking at the code I agree. it's seems to be used only in powerpc
-> > > and microblaze to print out.
-> > > However from my understanding pci_space is the phys.hi field of the
-> > > ranges property: it defines the properties of the address space
-> > associated
-> > > to the PCI address. if you're curious you can find a nice and quick
-> > to read
-> > > "guide" in http://devicetree.org/MPC5200:PCI
-> > >
-> > >>
-> > >> pci_addr: I assume this is a PCI bus address, like what you would
-> > see
-> > >> if
-> > >> you put an analyzer on the bus/link.  This address could go in a BAR.
-> > >
-> > > Yes, this is the PCI start address of the range: phys.mid + phys.low
-> > in the
-> > > guide mentioned above
-> > >
-> > >>
-> > >> cpu_addr: I assume this is a CPU physical address, like what you
-> > would
-> > >> see
-> > >> in /proc/iomem and what you would pass to ioremap().
-> > >
-> > > Yes correct
-> > >
-> > >>
-> > >> bus_addr: ?
-> > >>
-> > >
-> > > According to the guide above, this is the address into which the
-> > pci_address
-> > > get translated to and that is passed to the root complex. Between the
-> > root
-> > > complex and the CPU there can be intermediate translation layers: see
-> > that to
-> > > get pci_address we call "of_translate_address"; this will apply all
-> > the
-> > > translation layers (ranges in the DT) that it finds till it comes to
-> > the root
-> > > node of the DT (thus retrieving the CPU address).
-> > > Now said that, for designware we need the first translated PCI
-> > address, that we call
-> > 
-> > I think you mean "translated CPU address." The flow of addresses looks
-> > like this:
-> > 
-> > CPU -> CPU bus address -> bus fabric address decoding -> bus address
-> > -> DW PCI -> PCI address
-> > 
-> > This is quite common that an IP block does not see the full address.
-> > It is unusual that the IP block needs to know its full address on the
-> > slave side. It is quite common for the master side and the kernel
-> > deals with that all the time with DMA mapping
-> > 
-> > > here bus_addr after Rob Herring suggested the name...honestly I
-> > cannot think of a
-> > > different name
-> > 
-> > Thinking about this some more, is this really a translation versus
-> > just a stripping of high bits? Does the DW IP have less than 32-bits
-> > address? If so, we could express differently and just mask the CPU
-> > address within the driver instead.
-> 
-> I don?t think we should rely on [CPU] addresses...what if the intermediate 
-> translation layer changes the lower significant bits of the "bus address"
-> to translate into a cpu address?
+On Thu, Jul 30, 2015 at 3:46 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 29 Jul 2015, Stephen Boyd wrote:
+>
+>> On 07/29, Lee Jones wrote:
+>> > On Tue, 28 Jul 2015, Stephen Boyd wrote:
+>> >
+>> > > On 07/28, Viresh Kumar wrote:
+>> > > > Cc'ing few people (whom I cc'd last time as well :)).
+>> > > >
+>> > > > On 27-07-15, 16:20, Lee Jones wrote:
+>> > > > > + - opp-hz            : CPU frequency [Hz] for this OPP [See: ./opp.txt]
+>> > > > > + - st,avs            : List of available voltages [uV] indexed by process code
+>> > > > > + - st,cuts           : Cut version this OPP is suitable for [0xFF means ALL]
+>> > > > > + - st,substrate              : Substrate version this OPP is suitable for [0xFF means ALL]
+>> [...]
+>> > > > > +cpu0-opp-list {
+>> > > > > +     compatible      = "operating-points-v2-sti";
+>> > > > > +     st,syscfg       = <&syscfg [major_offset]>;
+>> > > > > +     st,syscfg-eng   = <&syscfg_eng [pcode_offset] [minor_offset]>;
+>> > > > > +
+>> > > > > +     opp0 {
+>> > > > > +             opp-hz          = <1200000000>;
+>> > > > > +             st,avs          = <1110 1150 1100 1080 1040 1020 980 930>;
+>> > > > > +             st,substrate    = <0xff>;
+>> > > > > +             st,cuts         = <0xff>;
+>> > > > > +     };
+>> > > > > +     opp1 {
+>> > > > > +             opp-hz          = <1500000000>;
+>> > > > > +             st,avs          = <1200 1200 1200 1200 1170 1140 1100 1070>;
+>> > > > > +             st,substrate    = <0xff>;
+>> > > > > +             st,cuts         = <0x2>;
+>> > > > > +     };
+>> > > > > +};
+>> > > >
+>> > > > I don't see more problems here, unless we can move some of this to the
+>> > > > generic bindings.
+>> > > >
+>> > > > @Rob/Stephen: Please respond before it is late :)
+>> > >
+>> > > It's interesting to have vendor specific properties like avs,
+>> > > cuts, and substrate. That could replace our planned usage of the
+>> > > opp-names property where we encode similar information (speed
+>> > > bin, revision, etc.) into a string that we look for.
+>> > >
+>> > > So I wonder why the avs/cut/substrate information can't be
+>> > > encoded into the opp name? That would make these properties
+>> > > obsolete, given that all they're used for is to pick out the
+>> > > correct OPP?
+>> >
+>> > You could hack the substrate and cut version into a string, but that's
+>> > exactly what it would be, a hack.  I'm struggling how you would do the
+>> > same for 'st,avs', which is an array of u32s.
+>> >
+>>
+>>
+>> (I don't understand the st,avs property to begin with, so feel
+>> free to ignore the rest of this mail.)
+>>
+>> For qcom platforms we have the pvs bin and speed bin, and
+>> sometimes a revision number. Each one of these properties
+>> corresponds to a different set of OPPs (opp table). So we might
+>> have speed1-pvs2-v0 for speed bin 1, pvs bin 2 and version 0. We
+>> fill out an opp table for this and then point the opps property
+>> at the table and have a corresponding opp-name "speed1-pvs2-v0"
+>> in the "consumer" node.
+>>
+>>       operating-points-v2 = <&speed1_pvs2_v0>;
+>>       operating-points-names = "speed1-pvs2-v0";
+>>
+>> We have quite a few of these tables because the values are
+>> always different. If the values were the same then we could use
+>> the same table with different names I suppose, but we're not
+>> doing that.
+>>
+>> From a quick read of the st properties (that I admit I don't
+>> understand), it looks like we're trying to compress the OPP
+>> tables by listing all the voltages that could be used for a
+>> particular frequency depending on which avs is present on the
+>> device? And then limiting the frequency voltage pairs depending
+>> on which cut and substrate is present?
+>>
+>> So we'd probably have to expand out the tables to be unique per
+>> avs/cut/substrate parameter. Something like:
+>>
+>> avs0-cut2 {
+>>       compatible = "operating-points-v2";
+>>
+>>       opp0 {
+>>               opp-hz = <1200000000>;
+>>               opp-microvolt = <1100>;
+>>       };
+>>
+>>       opp1 {
+>>               opp-hz = <1500000000>;
+>>               opp-microvolt = <1200>;
+>>       };
+>> };
+>>
+>> avs1-cut2 {
+>>       compatible = "operating-points-v2";
+>>
+>>       opp0 {
+>>               opp-hz = <1200000000>;
+>>               opp-microvolt = <1150>;
+>>       };
+>>
+>>       opp1 {
+>>               opp-hz = <1500000000>;
+>>               opp-microvolt = <1200>;
+>>       };
+>> };
+>>
+>> And then another copy of these for the devices without cuts != 2
+>> where the top frequency is gone?
+>
+> There is nothing stopping us from representing the data in this way.
+> On the plus side, it would mean that we wouldn't need any vendor
+> specific properties.  However, far outweighing the positives are the
+> fact that, even in our very simple example provided, where we only
+> have 2 frequencies, differ between only 1 cut and support all
+> substrates, we would still need 16 OPP tables.  When any one of those
+> variables increase (and they will), we would then have a large number
+> of permutations and subsequently and unruly amount of OPP tables.
+>
+> (... and we haven't even provided the body-biasing information yet.)
+>
+> The way we've chosen to represent our circumstance is the least
+> intrusive and the most succinct way we can think of.  Which IMHO
+> outweighs the fact that we have to introduce a couple of vendor
+> properties by a country mile.
 
-Is it really a possiblity that the lower bits could be changed?
+Regardless of which is better or worse, you are both doing essentially
+the same thing. You are selecting OPPs based on some Si parameters. We
+should not really be doing this 2 different ways. I'd be fine with 2
+ways if it was 2 for all SOCs, but right now it is 2 for 2 SOCs.
+Really, I'd like to see most if not all the selection or fixup of OPPs
+be done in the bootloader and the kernel just deals with the correct
+OPP table.
 
-I think we're talking about MMIO here, and a bridge has an MMIO
-window.  A window is a range of CPU physical addresses that the
-bridge forwards to PCI.  The PCI core assumes that a CPU physical
-address range is linearly mapped to PCI bus addresses, i.e., if the
-window base is X and maps to PCI address Y, then as long as X+n is
-inside the window, it must map to Y+n.
+Where are you storing the data that gets selected to fill into these
+properties? Is it just look-up tables or is there some kind of
+algorithm to generate the values? If the former, then DT is as good a
+data struct as any to store the tables. There is a lot of duplication
+though with only a single property varying in each set. If you both
+have that problem, then perhaps we can come up with a generic way to
+list all possible values more concisely.
 
-That means the low-order bits (the ones that are the offset into the
-window) cannot change.
+Rob
