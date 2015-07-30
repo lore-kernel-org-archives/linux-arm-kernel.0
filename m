@@ -1,87 +1,147 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 15:33:04 +0100
-Subject: [PATCH 02/12] [media] dvb-pll: Add support for THOMSON DTT7546X
- tuner.
-In-Reply-To: <CAOcJUbzhL2LXro9cwazZxtH=-=FndNARi7TSsFi+DGCPP3uEdA@mail.gmail.com>
-References: <1435158670-7195-1-git-send-email-peter.griffin@linaro.org>
- <1435158670-7195-3-git-send-email-peter.griffin@linaro.org>
- <1435195057.9377.18.camel@perches.com>
- <20150722185811.2d718baa@recife.lan>
- <20150730094738.GD488@griffinp-ThinkPad-X1-Carbon-2nd>
- <1438250928.2677.10.camel@perches.com>
- <CAOcJUbw5hSmPdrz6rPPYU6iMBHnvOZc1p3f+4WhEYq2-XmAPVw@mail.gmail.com>
- <CAOcJUbzhL2LXro9cwazZxtH=-=FndNARi7TSsFi+DGCPP3uEdA@mail.gmail.com>
-Message-ID: <20150730143304.GA22196@griffinp-ThinkPad-X1-Carbon-2nd>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 30 Jul 2015 16:33:38 +0200
+Subject: [PATCH linux-next 1/1] tty/serial: at91: fix I/O accesses on RHR and
+ THR for AVR32
+Message-ID: <b950edd352e715d7f1f0d5ca4856ae4fec56890f.1438260564.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+This patch fixes I/O accesses on the Receiver Holding Register and on the
+Transmitter Holding Register. Indeed AVR32 can only perform 32bit I/O
+accesses on registers: using 8bit I/O accesses would read or write garbage
+data.
 
-On Thu, 30 Jul 2015, Michael Ira Krufky wrote:
+Fixes: commit b5199d468177 ("tty/serial: at91: add support to FIFOs")
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+Hi all,
 
-> On Thu, Jul 30, 2015 at 7:14 AM, Michael Ira Krufky <mkrufky@linuxtv.org> wrote:
-> > On Thu, Jul 30, 2015 at 6:08 AM, Joe Perches <joe@perches.com> wrote:
-> >> On Thu, 2015-07-30 at 10:47 +0100, Peter Griffin wrote:
-> >>> Hi Mauro / Joe,
-> >>>
-> >>> On Wed, 22 Jul 2015, Mauro Carvalho Chehab wrote:
-> >>>
-> >>> > Em Wed, 24 Jun 2015 18:17:37 -0700
-> >>> > Joe Perches <joe@perches.com> escreveu:
-> >>> >
-> >>> > > On Wed, 2015-06-24 at 16:11 +0100, Peter Griffin wrote:
-> >>> > > > This is used in conjunction with the STV0367 demodulator on
-> >>> > > > the STV0367-NIM-V1.0 NIM card which can be used with the STi
-> >>> > > > STB SoC's.
-> >>> > >
-> >>> > > Barely associated to this specific patch, but for
-> >>> > > dvb-pll.c, another thing that seems possible is to
-> >>> > > convert the struct dvb_pll_desc uses to const and
-> >>> > > change the "entries" fixed array size from 12 to []
-> >>> > >
-> >>> > > It'd save a couple KB overall and remove ~5KB of data.
-> >>> > >
-> >>> > > $ size drivers/media/dvb-frontends/dvb-pll.o*
-> >>> > >    text      data     bss     dec     hex filename
-> >>> > >    8520      1552    2120   12192    2fa0 drivers/media/dvb-frontends/dvb-pll.o.new
-> >>> > >    5624      6363    2120   14107    371b drivers/media/dvb-frontends/dvb-pll.o.old
-> >>> >
-> >>> > Peter,
-> >>> >
-> >>> > Please add this patch on the next patch series you submit.
-> >>>
-> >>> Ok will do, I've added this patch with a slightly updated commit message
-> >>> to my series.
-> >>>
-> >>> Joe - Can I add your signed-off-by?
-> >>
-> >> Signed-off-by: Joe Perches <joe@perches.com>
-> >
-> > Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
-> >
-> > Joe, nice optimization - thanks for that.
-> >
-> > With regards to Peter's patch, is this a digital-only tuner, or is it
-> > a hybrid tuner?
-> >
-> > The 5th byte that you send to the THOMSON DTT7546X seems to resemble
-> > the 'auxiliary byte' that gets set in tuner-simple.c
-> >
-> > I'm not sure that dvb-pll is the right place for this tuner
-> > definition, if this is the case.  Maybe this definition belongs in
-> > tuner-simple instead, if the pattern matches better there.
-> >
-> > Mauro, can we hold off on merging Peter's patch until we resolve this?
-> >
-> > -Michael Ira Krufky
-> 
-> eek!  I mispelled my own email address.
-> 
-> 
-> With regards to Joe's patch - I'd like to see that merged.  ...and
-> here is my correctly spelled email address:
-> 
-> 
-> Reviewed-by: Michael Ira Krufky <m.krufky@samsung.com>
+this patch fixes a bug on AVR32 introduced by the support of FIFOs for
+AT91. Indeed when FIFOs are enabled they work in Multiple Data mode.
+The Multiple Data mode allows to read up to 4 data from the Receiver
+Holding Register (RHR) or write up to 4 data into the Transmitter Holding
+Register (THR) in a single I/O access. Hence when only one data is to be
+read from the RHR or written into the THR, the driver cannot use 32bit I/O
+access anymore but must use 8bit I/O access instead.
 
-Ok I will add your reviewed-by and include it in my v2.
+For ARM-base AT91 SoCs, 8bit I/O accesses can always be used even when
+FIFOs are not available. However AV32 can only use 32bit I/O accesses.
+
+Since atmel_uart_readb(), resp. atmel_uart_writeb(), was created by the
+FIFO support patch to access the RHR, resp. the THR, this patch replaces
+it by atmel_uart_read_char(), resp. atmel_uart_write_char(). Hence the
+actual width of the I/O access now depends only on the architecture.
+
+All registers but RHR and THR use 32bit I/O accesses.
+
+This patch was tested on a at91sam9260ek board.
+
+Best Regards,
+
+Cyrille
+
+ChangeLog:
+
+v1: initial version
+
+ drivers/tty/serial/atmel_serial.c | 37 +++++++++++++++++++++++++++----------
+ 1 file changed, 27 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index e91b3b2f0590..5ca5cf3e9359 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -204,16 +204,33 @@ static inline void atmel_uart_writel(struct uart_port *port, u32 reg, u32 value)
+ 	__raw_writel(value, port->membase + reg);
+ }
+ 
+-static inline u8 atmel_uart_readb(struct uart_port *port, u32 reg)
++#ifdef CONFIG_AVR32
++
++/* AVR32 cannot handle 8 or 16bit I/O accesses but only 32bit I/O accesses */
++static inline u8 atmel_uart_read_char(struct uart_port *port)
++{
++	return __raw_readl(port->membase + ATMEL_US_RHR);
++}
++
++static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
+ {
+-	return __raw_readb(port->membase + reg);
++	__raw_writel(value, port->membase + ATMEL_US_THR);
+ }
+ 
+-static inline void atmel_uart_writeb(struct uart_port *port, u32 reg, u8 value)
++#else
++
++static inline u8 atmel_uart_read_char(struct uart_port *port)
+ {
+-	__raw_writeb(value, port->membase + reg);
++	return __raw_readb(port->membase + ATMEL_US_RHR);
+ }
+ 
++static inline void atmel_uart_write_char(struct uart_port *port, u8 value)
++{
++	__raw_writeb(value, port->membase + ATMEL_US_THR);
++}
++
++#endif
++
+ #ifdef CONFIG_SERIAL_ATMEL_PDC
+ static bool atmel_use_pdc_rx(struct uart_port *port)
+ {
+@@ -658,7 +675,7 @@ static void atmel_rx_chars(struct uart_port *port)
+ 
+ 	status = atmel_uart_readl(port, ATMEL_US_CSR);
+ 	while (status & ATMEL_US_RXRDY) {
+-		ch = atmel_uart_readb(port, ATMEL_US_RHR);
++		ch = atmel_uart_read_char(port);
+ 
+ 		/*
+ 		 * note that the error handling code is
+@@ -709,7 +726,7 @@ static void atmel_tx_chars(struct uart_port *port)
+ 
+ 	if (port->x_char &&
+ 	    (atmel_uart_readl(port, ATMEL_US_CSR) & atmel_port->tx_done_mask)) {
+-		atmel_uart_writeb(port, ATMEL_US_THR, port->x_char);
++		atmel_uart_write_char(port, port->x_char);
+ 		port->icount.tx++;
+ 		port->x_char = 0;
+ 	}
+@@ -718,7 +735,7 @@ static void atmel_tx_chars(struct uart_port *port)
+ 
+ 	while (atmel_uart_readl(port, ATMEL_US_CSR) &
+ 	       atmel_port->tx_done_mask) {
+-		atmel_uart_writeb(port, ATMEL_US_THR, xmit->buf[xmit->tail]);
++		atmel_uart_write_char(port, xmit->buf[xmit->tail]);
+ 		xmit->tail = (xmit->tail + 1) & (UART_XMIT_SIZE - 1);
+ 		port->icount.tx++;
+ 		if (uart_circ_empty(xmit))
+@@ -2294,7 +2311,7 @@ static int atmel_poll_get_char(struct uart_port *port)
+ 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_RXRDY))
+ 		cpu_relax();
+ 
+-	return atmel_uart_readb(port, ATMEL_US_RHR);
++	return atmel_uart_read_char(port);
+ }
+ 
+ static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+@@ -2302,7 +2319,7 @@ static void atmel_poll_put_char(struct uart_port *port, unsigned char ch)
+ 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+ 		cpu_relax();
+ 
+-	atmel_uart_writeb(port, ATMEL_US_THR, ch);
++	atmel_uart_write_char(port, ch);
+ }
+ #endif
+ 
+@@ -2409,7 +2426,7 @@ static void atmel_console_putchar(struct uart_port *port, int ch)
+ {
+ 	while (!(atmel_uart_readl(port, ATMEL_US_CSR) & ATMEL_US_TXRDY))
+ 		cpu_relax();
+-	atmel_uart_writeb(port, ATMEL_US_THR, ch);
++	atmel_uart_write_char(port, ch);
+ }
+ 
+ /*
+-- 
+1.8.2.2
