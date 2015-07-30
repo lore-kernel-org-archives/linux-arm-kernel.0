@@ -1,51 +1,40 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Jul 2015 02:24:30 +0200
-Subject: [PATCH 3/5] rtc: at91sam9: sort headers alphabetically
-In-Reply-To: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1438215872-27794-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1438215872-27794-3-git-send-email-alexandre.belloni@free-electrons.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 30 Jul 2015 09:23:50 +0900
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Defconfig Updates
+ for v4.3
+Message-ID: <cover.1438215768.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort included headers alphabetically.
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/rtc/rtc-at91sam9.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Please consider these second round of Renesas ARM based SoC defconfig updates for v4.3.
 
-diff --git a/drivers/rtc/rtc-at91sam9.c b/drivers/rtc/rtc-at91sam9.c
-index 0a8485ac3864..23f721d049b2 100644
---- a/drivers/rtc/rtc-at91sam9.c
-+++ b/drivers/rtc/rtc-at91sam9.c
-@@ -11,20 +11,20 @@
-  * 2 of the License, or (at your option) any later version.
-  */
- 
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/platform_device.h>
--#include <linux/time.h>
--#include <linux/rtc.h>
-+#include <linux/clk.h>
- #include <linux/interrupt.h>
- #include <linux/ioctl.h>
--#include <linux/slab.h>
--#include <linux/platform_data/atmel.h>
- #include <linux/io.h>
-+#include <linux/kernel.h>
- #include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/platform_data/atmel.h>
-+#include <linux/platform_device.h>
- #include <linux/regmap.h>
-+#include <linux/rtc.h>
-+#include <linux/slab.h>
- #include <linux/suspend.h>
--#include <linux/clk.h>
-+#include <linux/time.h>
- 
- /*
-  * This driver uses two configurable hardware resources that live in the
--- 
-2.1.4
+This pull request is based on the previous round of
+such requests, tagged as renesas-defconfig-for-v4.3,
+which I have already sent a pull-request for.
+
+
+The following changes since commit 821e79cb5686695f0adaef61587a184e953a937e:
+
+  ARM: shmobile: Remove marzen_defconfig (2015-07-17 08:29:45 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v4.3
+
+for you to fetch changes up to 4055a722d260ca30610fc52238d0aa49ff5bffa9:
+
+  ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig (2015-07-28 09:27:00 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Defconfig Updates for v4.3
+
+* Enable fixed voltage regulator in shmobile_defconfig
+
+----------------------------------------------------------------
+Simon Horman (1):
+      ARM: shmobile: Enable fixed voltage regulator in shmobile_defconfig
+
+ arch/arm/configs/shmobile_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
