@@ -1,299 +1,55 @@
 From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Thu, 30 Jul 2015 17:41:07 +0530
-Subject: [PATCH v1 3/4] Crypto: Add support for APM X-Gene SoC CRC32C h/w
- accelerator driver
+Date: Thu, 30 Jul 2015 17:41:08 +0530
+Subject: [PATCH v1 4/4] Crypto: tcrypt: Add test case for APM X-Gene SoC
+ CRC32C algo
 In-Reply-To: <1438258268-3099-1-git-send-email-rsahu@apm.com>
 References: <1438258268-3099-1-git-send-email-rsahu@apm.com>
-Message-ID: <1438258268-3099-4-git-send-email-rsahu@apm.com>
+Message-ID: <1438258268-3099-5-git-send-email-rsahu@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch implements support for APM X-Gene SoC CRC32C h/w accelerator.
-DMA engine in APM X-Gene SoC is capable of doing CRC32C calculations.
+This patch adds test case for APM X-Gene SoC CRC32C algorithm.
 
 Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
 ---
- drivers/crypto/Kconfig        |   8 ++
- drivers/crypto/Makefile       |   1 +
- drivers/crypto/xgene-crc32c.c | 244 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 253 insertions(+)
- create mode 100755 drivers/crypto/xgene-crc32c.c
+ crypto/tcrypt.c  | 4 ++++
+ crypto/testmgr.c | 9 +++++++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
-index 4044125..bd6eff5 100644
---- a/drivers/crypto/Kconfig
-+++ b/drivers/crypto/Kconfig
-@@ -480,4 +480,12 @@ config CRYPTO_DEV_IMGTEC_HASH
- 	  hardware hash accelerator. Supporting MD5/SHA1/SHA224/SHA256
- 	  hashing algorithms.
+diff --git a/crypto/tcrypt.c b/crypto/tcrypt.c
+index 9f6f10b..0bbb1e2 100644
+--- a/crypto/tcrypt.c
++++ b/crypto/tcrypt.c
+@@ -1465,6 +1465,10 @@ static int do_test(const char *alg, u32 type, u32 mask, int m)
+ 		ret += tcrypt_test("crct10dif");
+ 		break;
 
-+config CRYPTO_DEV_XGENE_CRC32C
-+	tristate "Support for APM SoC X-Gene CRC32C HW accelerator"
-+	depends on XGENE_DMA
-+	select CRYPTO_HASH
-+	help
-+	  This option enables support for CRC32C offload by using
-+	  APM X-Gene SoC DMA engine.
++	case 48:
++		ret += tcrypt_test("xgene(crc32c)");
++		break;
 +
- endif # CRYPTO_HW
-diff --git a/drivers/crypto/Makefile b/drivers/crypto/Makefile
-index e35c07a..2cc3f4f 100644
---- a/drivers/crypto/Makefile
-+++ b/drivers/crypto/Makefile
-@@ -28,3 +28,4 @@ obj-$(CONFIG_CRYPTO_DEV_UX500) += ux500/
- obj-$(CONFIG_CRYPTO_DEV_QAT) += qat/
- obj-$(CONFIG_CRYPTO_DEV_QCE) += qce/
- obj-$(CONFIG_CRYPTO_DEV_VMX) += vmx/
-+obj-$(CONFIG_CRYPTO_DEV_XGENE_CRC32C) += xgene-crc32c.o
-diff --git a/drivers/crypto/xgene-crc32c.c b/drivers/crypto/xgene-crc32c.c
-new file mode 100755
-index 0000000..c0a483b
---- /dev/null
-+++ b/drivers/crypto/xgene-crc32c.c
-@@ -0,0 +1,244 @@
-+/*
-+ * Applied Micro X-Gene SoC CRC32C HW acceleration by using DMA engine
-+ *
-+ * Copyright (c) 2015, Applied Micro Circuits Corporation
-+ * Authors: Rameshwar Prasad Sahu <rsahu@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/dmaengine.h>
-+#include <linux/init.h>
-+#include <crypto/internal/hash.h>
-+#include <linux/interrupt.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/string.h>
-+
-+#define CRC32C_DIGEST_SIZE		4
-+#define CRC32C_BLOCK_SIZE		1
-+#define XGENE_DMA_MAX_FLYBY_SRC_CNT	5
-+#define XGENE_DMA_MAX_FLYBY_BYTE_CNT	0x7FFF	/* (32 KB - 1) */
-+
-+struct xgene_crc32c_session_ctx {
-+	struct dma_chan *dchan;
-+	u32 key;
-+};
-+
-+struct xgene_crc32c_reqctx {
-+	struct device *dev;
-+	u32 nents;
-+	u32 seed;
-+};
-+
-+static void xgene_crc32c_callback(void *ctx)
-+{
-+	struct ahash_request *req = ctx;
-+	struct xgene_crc32c_reqctx *reqctx = ahash_request_ctx(req);
-+
-+	if (req->base.complete)
-+		req->base.complete(&req->base, 0);
-+
-+	dma_unmap_sg(reqctx->dev, req->src,
-+		     reqctx->nents, DMA_TO_DEVICE);
-+}
-+
-+static int xgene_crc32c_handle_req(struct ahash_request *req,
-+				   struct dma_chan *dchan)
-+{
-+	struct xgene_crc32c_reqctx *reqctx = ahash_request_ctx(req);
-+	struct device *dev = dchan->device->dev;
-+	struct dma_async_tx_descriptor *tx;
-+	enum dma_ctrl_flags flags;
-+	u32 nents, sg_count;
-+	dma_cookie_t cookie;
-+
-+	if (req->nbytes > XGENE_DMA_MAX_FLYBY_BYTE_CNT) {
-+		dev_err(dev, "Src len is too long 0x%X\n", req->nbytes);
-+		return -EINVAL;
-+	}
-+
-+	nents = sg_nents(req->src);
-+	sg_count = dma_map_sg(dev, req->src, nents, DMA_TO_DEVICE);
-+	if (!sg_count) {
-+		dev_err(dev, "Failed to map src sg");
-+		return -ENOMEM;
-+	}
-+
-+	if (sg_count > XGENE_DMA_MAX_FLYBY_SRC_CNT) {
-+		dev_err(dev, "Unsupported src sg len\n");
-+		goto err;
-+	}
-+
-+	flags = DMA_CTRL_ACK;
-+
-+	tx = dchan->device->device_prep_dma_crc32c(dchan, req->src,
-+						   req->nbytes,
-+						   reqctx->seed,
-+						   req->result,
-+						   flags);
-+	if (!tx)
-+		goto err;
-+
-+	/* Set callback parameters */
-+	reqctx->dev = dev;
-+	reqctx->nents = nents;
-+	tx->callback_param = req;
-+	tx->callback = xgene_crc32c_callback;
-+
-+	cookie = tx->tx_submit(tx);
-+	if (dma_submit_error(cookie)) {
-+		dev_err(dev, "Failed to submit descriptor\n");
-+		goto err;
-+	}
-+
-+	dma_async_issue_pending(dchan);
-+
-+	return -EINPROGRESS;
-+
-+err:
-+	dma_unmap_sg(dev, req->src, nents, DMA_TO_DEVICE);
-+	return -EINVAL;
-+}
-+
-+static int xgene_crc32c_init(struct ahash_request *req)
-+{
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct xgene_crc32c_session_ctx *session = crypto_ahash_ctx(tfm);
-+
-+	*(__le32 *)req->result = cpu_to_le32(session->key);
-+
-+	return 0;
-+}
-+
-+static int xgene_crc32c_update(struct ahash_request *req)
-+{
-+	struct xgene_crc32c_reqctx *reqctx = ahash_request_ctx(req);
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct xgene_crc32c_session_ctx *session = crypto_ahash_ctx(tfm);
-+
-+	reqctx->seed = le32_to_cpu(*(__le32 *)req->result);
-+
-+	return xgene_crc32c_handle_req(req, session->dchan);
-+}
-+
-+static int xgene_crc32c_final(struct ahash_request *req)
-+{
-+	return 0;
-+}
-+
-+static int xgene_crc32c_finup(struct ahash_request *req)
-+{
-+	struct xgene_crc32c_reqctx *reqctx = ahash_request_ctx(req);
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct xgene_crc32c_session_ctx *session = crypto_ahash_ctx(tfm);
-+
-+	reqctx->seed = le32_to_cpu(*(__le32 *)req->result);
-+
-+	return xgene_crc32c_handle_req(req, session->dchan);
-+}
-+
-+static int xgene_crc32c_digest(struct ahash_request *req)
-+{
-+	struct xgene_crc32c_reqctx *reqctx = ahash_request_ctx(req);
-+	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
-+	struct xgene_crc32c_session_ctx *session = crypto_ahash_ctx(tfm);
-+
-+	reqctx->seed = session->key;
-+
-+	return xgene_crc32c_handle_req(req, session->dchan);
-+}
-+
-+static int xgene_crc32c_setkey(struct crypto_ahash *tfm, const u8 *key,
-+			       unsigned int keylen)
-+{
-+	struct xgene_crc32c_session_ctx *session = crypto_ahash_ctx(tfm);
-+
-+	if (keylen != CRC32C_DIGEST_SIZE) {
-+		crypto_ahash_set_flags(tfm, CRYPTO_TFM_RES_BAD_KEY_LEN);
-+		return -EINVAL;
-+	}
-+
-+	session->key = le32_to_cpu(*(__le32 *)key);
-+
-+	return 0;
-+}
-+
-+static int xgene_crc32c_cra_init(struct crypto_tfm *tfm)
-+{
-+	struct xgene_crc32c_session_ctx *session = crypto_tfm_ctx(tfm);
-+	dma_cap_mask_t mask;
-+
-+	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
-+				 sizeof(struct xgene_crc32c_reqctx));
-+	session->key = ~0;
-+
-+	dma_cap_zero(mask);
-+	dma_cap_set(DMA_CRC32C, mask);
-+
-+	session->dchan = dma_request_channel(mask, NULL, NULL);
-+	if (!session->dchan) {
-+		pr_err("Failed to request CRC32C DMA channel\n");
-+		return -ENXIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static void xgene_crc32c_cra_exit(struct crypto_tfm *tfm)
-+{
-+	struct xgene_crc32c_session_ctx *session = crypto_tfm_ctx(tfm);
-+
-+	if (session->dchan)
-+		dma_release_channel(session->dchan);
-+}
-+
-+static struct ahash_alg xgene_crc32c_alg = {
-+	.init		= xgene_crc32c_init,
-+	.update		= xgene_crc32c_update,
-+	.final		= xgene_crc32c_final,
-+	.finup		= xgene_crc32c_finup,
-+	.digest		= xgene_crc32c_digest,
-+	.setkey		= xgene_crc32c_setkey,
-+	.halg.digestsize = CRC32C_DIGEST_SIZE,
-+	.halg.base	= {
-+		.cra_name		= "xgene(crc32c)",
-+		.cra_driver_name	= "crc32c-xgene",
-+		.cra_flags		= (CRYPTO_ALG_TYPE_AHASH |
-+					   CRYPTO_ALG_ASYNC),
-+		.cra_blocksize		= CRC32C_BLOCK_SIZE,
-+		.cra_ctxsize		= sizeof(
-+					  struct xgene_crc32c_session_ctx),
-+		.cra_init		= xgene_crc32c_cra_init,
-+		.cra_exit		= xgene_crc32c_cra_exit,
-+		.cra_module		= THIS_MODULE,
-+	},
-+};
-+
-+static int __init xgene_crc32c_mod_init(void)
-+{
-+	return crypto_register_ahash(&xgene_crc32c_alg);
-+}
-+late_initcall(xgene_crc32c_mod_init);
-+
-+static void __exit xgene_crc32c_mod_exit(void)
-+{
-+	crypto_unregister_ahash(&xgene_crc32c_alg);
-+}
-+module_exit(xgene_crc32c_mod_exit);
-+
-+MODULE_DESCRIPTION("APM X-Gene SoC CRC32C HW accelerator driver");
-+MODULE_AUTHOR("Rameshwar Prasad Sahu <rsahu@apm.com>");
-+MODULE_LICENSE("GPL");
-+MODULE_VERSION("1.0");
+ 	case 100:
+ 		ret += tcrypt_test("hmac(md5)");
+ 		break;
+diff --git a/crypto/testmgr.c b/crypto/testmgr.c
+index d0a42bd..a65860e 100644
+--- a/crypto/testmgr.c
++++ b/crypto/testmgr.c
+@@ -3748,6 +3748,15 @@ static const struct alg_test_desc alg_test_descs[] = {
+ 			}
+ 		}
+ 	}, {
++		.alg = "xgene(crc32c)",
++		.test = alg_test_hash,
++		.suite = {
++			.hash = {
++				.vecs = crc32c_tv_template,
++				.count = CRC32C_TEST_VECTORS
++			}
++		}
++	}, {
+ 		.alg = "xts(aes)",
+ 		.test = alg_test_skcipher,
+ 		.fips_allowed = 1,
 --
 1.8.2.1
