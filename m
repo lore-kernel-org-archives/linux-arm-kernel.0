@@ -1,86 +1,175 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 Jul 2015 10:23:41 +0100
-Subject: [PATCH v7 5/5] clk: dt: Introduce binding for critical clock
- support
-In-Reply-To: <20150728093222.GV2564@lukather>
-References: <1437570255-21049-1-git-send-email-lee.jones@linaro.org>
- <1437570255-21049-6-git-send-email-lee.jones@linaro.org>
- <20150727071013.GO2564@lukather> <20150727073149.GV3436@x1>
- <20150728093222.GV2564@lukather>
-Message-ID: <20150730092341.GC14642@x1>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 30 Jul 2015 10:28:08 +0100
+Subject: [PATCH v3 1/2] PCI: generic: remove dependency on hw_pci
+In-Reply-To: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+References: <1438183681-30519-1-git-send-email-jchandra@broadcom.com>
+Message-ID: <20150730092808.GA4685@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jul 2015, Maxime Ripard wrote:
+On Wed, Jul 29, 2015 at 04:28:00PM +0100, Jayachandran C wrote:
+> The current code in pci-host-generic.c uses pci_common_init_dev()
+> from ARM platform to do some of the PCI initializations, and this
+> prevents it from being used in ARM64.
+> 
+> The initialization done by pci_common_init_dev() that is needed
+> by pci-host-generic.c is really limited, and can be done easily
+> in the same file without using hw_pci API. The ARM platform
+> requires a pci_sys_data as sysdata for the PCI bus, this can be
+> handled by setting up gen_pci to have a pci_sys_data variable as
+> the first element.
 
-> On Mon, Jul 27, 2015 at 08:31:49AM +0100, Lee Jones wrote:
-> > On Mon, 27 Jul 2015, Maxime Ripard wrote:
-> > 
-> > > Hi Lee,
-> > > 
-> > > On Wed, Jul 22, 2015 at 02:04:15PM +0100, Lee Jones wrote:
-> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > > ---
-> > > >  .../devicetree/bindings/clock/clock-bindings.txt   | 39 ++++++++++++++++++++++
-> > > >  1 file changed, 39 insertions(+)
-> > > > 
-> > > > diff --git a/Documentation/devicetree/bindings/clock/clock-bindings.txt b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > > > index 06fc6d5..4137034 100644
-> > > > --- a/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > > > +++ b/Documentation/devicetree/bindings/clock/clock-bindings.txt
-> > > > @@ -44,6 +44,45 @@ For example:
-> > > >    clocks by index. The names should reflect the clock output signal
-> > > >    names for the device.
-> > > >  
-> > > > +critical-clock:	Some hardware contains bunches of clocks which, in normal
-> > > > +		circumstances, must never be turned off.  If drivers a) fail to
-> > > > +		obtain a reference to any of these or b) give up a previously
-> > > > +		obtained reference during suspend, it is possible that some
-> > > > +		Operating Systems might attempt to disable them to save power.
-> > > > +		If this happens a platform can fail irrecoverably as a result.
-> > > > +		Usually the only way to recover from these failures is to
-> > > > +		reboot.
-> > > > +
-> > > > +		To avoid either of these two scenarios from catastrophically
-> > > > +		disabling an otherwise perfectly healthy running system,
-> > > > +		clocks can be identified as 'critical' using this property from
-> > > > +		inside a clocksource's node.
-> > > > +
-> > > > +		This property is not to be abused.  It is only to be used to
-> > > > +		protect platforms from being crippled by gated clocks, NOT as a
-> > > > +		convenience function to avoid using the framework correctly
-> > > > +		inside device drivers.
-> > > > +
-> > > > +		Expected values are hardware clock indices.  If the
-> > > > +		clock-indices property (see below) is used, then supplied
-> > > > +		values must correspond to one of the listed identifiers.
-> > > > +		Using the clock-indices example below, hardware clock <2>
-> > > > +		is missing, therefore it is considered invalid to then
-> > > > +		list clock <2> as a critical clock.
-> > > 
-> > > I think we should also consider having it simply as a boolean. Using
-> > > indices for clocks that don't have any (for example because it only
-> > > provides a single clock) seem to not really make much sense.
-> > 
-> > Then how would you distinguish between the clocks if the provider
-> > provides more than a single clock?
-> 
-> What I had in mind was that, you would have three cases:
-> 
->   - critical-clocks is not there: no clocks are made critical
-> 
->   - critical-clocks is there, but doesn't have any values: all the
->     clocks provided are marked critical
-> 
->   - critical-clocks is there and it has a list of values: only the
->     clocks listed are marked critical.
-> 
-> Does that make sense to you?
+Ok, I still do not like leaving pci_sys_data there, and to remove
+it there is only one snag (+ one patch to prevent
+resources enablement on ARM64 PROBE_ONLY systems to have a
+consolidated ARM/ARM64 host generic), which consists in removing the
+align_resource pointer from pci_sys_data. A proposed solution (maybe
+not ideal, we can consider it a temporary step to make progress)
+here:
 
-Yep, sounds good.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359273.html
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Comments very appreciated on the patch above, I do not have major
+concerns with this patch other than the pci_sys_data hack, because
+that's what it is.
+
+Thanks,
+Lorenzo
+
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+> Here's v3 of the patchset.
+> 
+> v2-v3
+>  - rebase to 4.2-rc
+>  - fix PCI_PROBE_ONLY check before calling pcie configure
+>  - added a comment above sysdata
+>  - updated the commit message
+> 
+> v1->v2
+>  - Address comments from Arnd Bergmann and Lorenzo Pieralisi
+>     - move contents of gen_pci_init to gen_pci_probe
+>     - assign resources only when !probe_only
+>  - tested on ARM32 with qemu option -M virt
+> 
+> Notes:
+>  - passing a zeroed out pci_sys_data for ARM looks ok, but I haven't
+>    tested it on ARM.
+>  - tested it on ARM64 fast model
+>  - Any information on how this can be tested on arm is welcome.
+>  - There is only one ifdef, and that can be removed when arm64 gets
+>    a sysdata, or when arm loses its sysdata.
+> 
+>  drivers/pci/host/pci-host-generic.c | 55 ++++++++++++++++++++++++-------------
+>  1 file changed, 36 insertions(+), 19 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+> index ba46e58..e9d9c80 100644
+> --- a/drivers/pci/host/pci-host-generic.c
+> +++ b/drivers/pci/host/pci-host-generic.c
+> @@ -38,7 +38,15 @@ struct gen_pci_cfg_windows {
+>  	const struct gen_pci_cfg_bus_ops	*ops;
+>  };
+>  
+> +/*
+> + * ARM needs platform specific pci_sys_data as the sysdata for PCI.
+> + * We add the sys as the first field below to handle this. sys will
+> + * set to 0, so that the pci functions in do the right thing.
+> + */
+>  struct gen_pci {
+> +#ifdef CONFIG_ARM
+> +	struct pci_sys_data			sys;
+> +#endif
+>  	struct pci_host_bridge			host;
+>  	struct gen_pci_cfg_windows		cfg;
+>  	struct list_head			resources;
+> @@ -48,8 +56,7 @@ static void __iomem *gen_pci_map_cfg_bus_cam(struct pci_bus *bus,
+>  					     unsigned int devfn,
+>  					     int where)
+>  {
+> -	struct pci_sys_data *sys = bus->sysdata;
+> -	struct gen_pci *pci = sys->private_data;
+> +	struct gen_pci *pci = bus->sysdata;
+>  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+>  
+>  	return pci->cfg.win[idx] + ((devfn << 8) | where);
+> @@ -64,8 +71,7 @@ static void __iomem *gen_pci_map_cfg_bus_ecam(struct pci_bus *bus,
+>  					      unsigned int devfn,
+>  					      int where)
+>  {
+> -	struct pci_sys_data *sys = bus->sysdata;
+> -	struct gen_pci *pci = sys->private_data;
+> +	struct gen_pci *pci = bus->sysdata;
+>  	resource_size_t idx = bus->number - pci->cfg.bus_range->start;
+>  
+>  	return pci->cfg.win[idx] + ((devfn << 12) | where);
+> @@ -198,13 +204,6 @@ static int gen_pci_parse_map_cfg_windows(struct gen_pci *pci)
+>  	return 0;
+>  }
+>  
+> -static int gen_pci_setup(int nr, struct pci_sys_data *sys)
+> -{
+> -	struct gen_pci *pci = sys->private_data;
+> -	list_splice_init(&pci->resources, &sys->resources);
+> -	return 1;
+> -}
+> -
+>  static int gen_pci_probe(struct platform_device *pdev)
+>  {
+>  	int err;
+> @@ -214,13 +213,7 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *np = dev->of_node;
+>  	struct gen_pci *pci = devm_kzalloc(dev, sizeof(*pci), GFP_KERNEL);
+> -	struct hw_pci hw = {
+> -		.nr_controllers	= 1,
+> -		.private_data	= (void **)&pci,
+> -		.setup		= gen_pci_setup,
+> -		.map_irq	= of_irq_parse_and_map_pci,
+> -		.ops		= &gen_pci_ops,
+> -	};
+> +	struct pci_bus *bus;
+>  
+>  	if (!pci)
+>  		return -ENOMEM;
+> @@ -258,7 +251,31 @@ static int gen_pci_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
+>  
+> -	pci_common_init_dev(dev, &hw);
+> +	/* do not reassign resource if probe only */
+> +	if (!pci_has_flag(PCI_PROBE_ONLY))
+> +		pci_add_flags(PCI_REASSIGN_ALL_RSRC);
+> +
+> +	bus = pci_scan_root_bus(dev, 0, &gen_pci_ops, pci, &pci->resources);
+> +	if (!bus) {
+> +		dev_err(dev, "Scanning rootbus failed");
+> +		return -ENODEV;
+> +	}
+> +
+> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +
+> +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +		pci_bus_size_bridges(bus);
+> +		pci_bus_assign_resources(bus);
+> +	}
+> +	pci_bus_add_devices(bus);
+> +
+> +	/* Configure PCI Express settings */
+> +	if (!pci_has_flag(PCI_PROBE_ONLY)) {
+> +		struct pci_bus *child;
+> +
+> +		list_for_each_entry(child, &bus->children, node)
+> +			pcie_bus_configure_settings(child);
+> +	}
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
