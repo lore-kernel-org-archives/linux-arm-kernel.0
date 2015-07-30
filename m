@@ -1,50 +1,50 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 30 Jul 2015 17:35:22 +0800
-Subject: [PATCH v5 2/2] arm64: Enable Marvell Berlin SoC family in Kconfig and
- defconfig
-In-Reply-To: <1438248922-2919-1-git-send-email-jszhang@marvell.com>
-References: <1438248922-2919-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1438248922-2919-3-git-send-email-jszhang@marvell.com>
+Date: Thu, 30 Jul 2015 17:35:20 +0800
+Subject: [PATCH v5 0/2] arm64: Add basic support for Marvell Berlin4CT SoC
+Message-ID: <1438248922-2919-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces ARCH_BERLIN to enable Marvell Berlin SoC family in
-Kconfig and defconfig.
+Marvell Berlin4CT is a SoC based on 64bit ARMv8 architecture. It contains
+quad CA53 cores.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/Kconfig.platforms | 6 ++++++
- arch/arm64/configs/defconfig | 1 +
- 2 files changed, 7 insertions(+)
+This SoC shares many HW IP with BG2Q and other berlin series. This patchset
+was tested on Berlin4CT DMP board, and boot to shell ok.
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index e2deb18..23800a1 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -5,6 +5,12 @@ config ARCH_BCM_IPROC
- 	help
- 	  This enables support for Broadcom iProc based SoCs
- 
-+config ARCH_BERLIN
-+	bool "Marvell Berlin SoC Family"
-+	select DW_APB_ICTL
-+	help
-+	  This enables support for Marvell Berlin SoC Family
-+
- config ARCH_EXYNOS
- 	bool
- 	help
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 913f121..34d71dd 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -32,6 +32,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_BCM_IPROC=y
-+CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS7=y
- CONFIG_ARCH_FSL_LS2085A=y
- CONFIG_ARCH_HISI=y
+Since v4:
+ - rebased on the latest next tree
+ - adopt Sebastian suggestions such as: move osc out of "/soc" node, use
+   "Marvell BG4CT DMP board" as model, etc.
+ - use correct memory size for BG4CT DMP. The total DDR size is 2GB, we start
+   from 0x01000000, so the avaiable linux memory should be 0x7f000000.
+
+Since v3:
+ - remove bootargs. follow the same behavior as other arm64 SoCs.
+
+Since v2:
+ - remove the memreserve which isn't removed by mistake
+ - add earlycon to enable earlyconsole, inspired by Sudeep
+
+Since v1:
+ - remove "earlyprintk" bootargs which doesn't work on arm64
+ - fix GICC_DIR size as pointed out by Mark
+ - define memory start address instead of memory reservation as suggested by Mark
+ - add interrupt-affinity to pmu node as pointed out by Sudeep
+
+Jisheng Zhang (2):
+  arm64: dts: Add dts files for Marvell Berlin4CT SoC
+  arm64: Enable Marvell Berlin SoC family in Kconfig and defconfig
+
+ arch/arm64/Kconfig.platforms                  |   6 +
+ arch/arm64/boot/dts/Makefile                  |   1 +
+ arch/arm64/boot/dts/marvell/Makefile          |   5 +
+ arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts |  66 +++++++++++
+ arch/arm64/boot/dts/marvell/berlin4ct.dtsi    | 164 ++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                  |   1 +
+ 6 files changed, 243 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/marvell/Makefile
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct-dmp.dts
+ create mode 100644 arch/arm64/boot/dts/marvell/berlin4ct.dtsi
+
 -- 
 2.5.0
