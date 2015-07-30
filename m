@@ -1,50 +1,57 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jul 2015 13:55:05 +0200
-Subject: [PATCH v3 2/3] ARM: at91/dt: add basic dtsi for sama5d2 SoC
+Date: Thu, 30 Jul 2015 13:55:06 +0200
+Subject: [PATCH v3 3/3] ARM: at91/dt: add minimal sama5d2 Xplained board
 In-Reply-To: <1438257306-12517-1-git-send-email-nicolas.ferre@atmel.com>
 References: <1438257306-12517-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1438257306-12517-3-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1438257306-12517-4-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Add minimal support for the new sama5d2 Xplained board. Only USB,
+spi/i2c, ethernet and uart/usart peripherals added.
+With this DTS file you can boot the board and begin to play with it.
+Rootfs on NFS and sd card have successfully been tested.
 
-Only the basic support for this new Atmel Cortex-A5 SoC. A subset of the
-peripherals is setup to allow booting.
-IRQ, clocks, USB, crypto, timers, rtc, ethernet, spi/i2c and
-uart/usart peripheral nodes are added.
-
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
 
 Changes in v3:
 - remove sd/mmc nodes
-- remove generated clock nodes
 
 Changes in v2:
-- fix sdmmc clocks and memory range
-- add flexcom and audio Class D amplifier peripheral clock definitions
-- add qspi peripheral clock definitions
-- add more generated clock definitions
-- fix DMA definitions for crypto peripherals
-- add spi, i2c and rtc nodes
+- enable spi and i2c nodes
+- enable sdmmc0
+- move to stdout-path for console
 
- arch/arm/boot/dts/sama5d2.dtsi | 925 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 925 insertions(+)
- create mode 100644 arch/arm/boot/dts/sama5d2.dtsi
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 134 ++++++++++++++++++++++++++++
+ 2 files changed, 135 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d2_xplained.dts
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 63e90c5ff679..db25557fa8b1 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -41,6 +41,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+ 	at91sam9x35ek.dtb
+ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	at91-kizbox2.dtb \
++	at91-sama5d2_xplained.dtb \
+ 	at91-sama5d3_xplained.dtb \
+ 	sama5d31ek.dtb \
+ 	sama5d33ek.dtb \
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
 new file mode 100644
-index 000000000000..f39258fa3815
+index 000000000000..e8d63afdb135
 --- /dev/null
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -0,0 +1,925 @@
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -0,0 +1,134 @@
 +/*
-+ * sama5d2.dtsi - Device Tree Include file for SAMA5D2 family SoC
++ * at91-sama5d2_xplained.dts - Device Tree file for SAMA5D2 Xplained board
 + *
 + *  Copyright (C) 2015 Atmel,
-+ *                2015 Ludovic Desroches <ludovic.desroches@atmel.com>
++ *                2015 Nicolas Ferre <nicolas.ferre@atmel.com>
 + *
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
@@ -84,883 +91,92 @@ index 000000000000..f39258fa3815
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/dma/at91.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/clock/at91.h>
++/dts-v1/;
++#include "sama5d2.dtsi"
 +
 +/ {
-+	model = "Atmel SAMA5D2 family SoC";
-+	compatible = "atmel,sama5d2";
-+	interrupt-parent = <&aic>;
++	model = "Atmel SAMA5D2 Xplained";
++	compatible = "atmel,sama5d2-xplained", "atmel,sama5d2", "atmel,sama5";
 +
-+	aliases {
-+		serial0 = &uart1;
-+		serial1 = &uart3;
-+		tcb0 = &tcb0;
-+		tcb1 = &tcb1;
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			reg = <0>;
-+			next-level-cache = <&L2>;
-+		};
++	chosen {
++		stdout-path = "serial0:115200n8";
 +	};
 +
 +	memory {
-+		reg = <0x20000000 0x20000000>;
++		reg = <0x20000000 0x80000>;
 +	};
 +
 +	clocks {
-+		slow_xtal: slow_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
-+
-+		main_xtal: main_xtal {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <0>;
-+		};
-+
-+		adc_op_clk: adc_op_clk{
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <1000000>;
-+		};
-+	};
-+
-+	ns_sram: sram at 00200000 {
-+		compatible = "mmio-sram";
-+		reg = <0x00200000 0x20000>;
-+	};
-+
-+	ahb {
-+		compatible = "simple-bus";
 +		#address-cells = <1>;
 +		#size-cells = <1>;
 +		ranges;
 +
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <12000000>;
++		};
++	};
++
++	ahb {
 +		usb0: gadget at 00300000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "atmel,sama5d3-udc";
-+			reg = <0x00300000 0x100000
-+			       0xfc02c000 0x400>;
-+			interrupts = <42 IRQ_TYPE_LEVEL_HIGH 2>;
-+			clocks = <&udphs_clk>, <&utmi>;
-+			clock-names = "pclk", "hclk";
-+			status = "disabled";
-+
-+			ep0 {
-+				reg = <0>;
-+				atmel,fifo-size = <64>;
-+				atmel,nb-banks = <1>;
-+			};
-+
-+			ep1 {
-+				reg = <1>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <3>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep2 {
-+				reg = <2>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <3>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep3 {
-+				reg = <3>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep4 {
-+				reg = <4>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep5 {
-+				reg = <5>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep6 {
-+				reg = <6>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep7 {
-+				reg = <7>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-dma;
-+				atmel,can-isoc;
-+			};
-+
-+			ep8 {
-+				reg = <8>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep9 {
-+				reg = <9>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep10 {
-+				reg = <10>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep11 {
-+				reg = <11>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep12 {
-+				reg = <12>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep13 {
-+				reg = <13>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep14 {
-+				reg = <14>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
-+
-+			ep15 {
-+				reg = <15>;
-+				atmel,fifo-size = <1024>;
-+				atmel,nb-banks = <2>;
-+				atmel,can-isoc;
-+			};
++			status = "okay";
 +		};
 +
 +		usb1: ohci at 00400000 {
-+			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
-+			reg = <0x00400000 0x100000>;
-+			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
-+			clocks = <&uhphs_clk>, <&uhphs_clk>, <&uhpck>;
-+			clock-names = "ohci_clk", "hclk", "uhpck";
-+			status = "disabled";
++			num-ports = <3>;
++			status = "okay";
 +		};
 +
 +		usb2: ehci at 00500000 {
-+			compatible = "atmel,at91sam9g45-ehci", "usb-ehci";
-+			reg = <0x00500000 0x100000>;
-+			interrupts = <41 IRQ_TYPE_LEVEL_HIGH 2>;
-+			clocks = <&utmi>, <&uhphs_clk>;
-+			clock-names = "usb_clk", "ehci_clk";
-+			status = "disabled";
-+		};
-+
-+		L2: cache-controller at 00a00000 {
-+			compatible = "arm,pl310-cache";
-+			reg = <0x00a00000 0x1000>;
-+			interrupts = <63 IRQ_TYPE_LEVEL_HIGH 4>;
-+			cache-unified;
-+			cache-level = <2>;
++			status = "okay";
 +		};
 +
 +		apb {
-+			compatible = "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			ramc0: ramc at f000c000 {
-+				compatible = "atmel,sama5d3-ddramc";
-+				reg = <0xf000c000 0x200>;
-+				clocks = <&ddrck>, <&mpddr_clk>;
-+				clock-names = "ddrck", "mpddr";
-+			};
-+
-+			dma0: dma-controller at f0010000 {
-+				compatible = "atmel,sama5d4-dma";
-+				reg = <0xf0010000 0x1000>;
-+				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 0>;
-+				#dma-cells = <1>;
-+				clocks = <&dma0_clk>;
-+				clock-names = "dma_clk";
-+			};
-+
-+			pmc: pmc at f0014000 {
-+				compatible = "atmel,sama5d2-pmc";
-+				reg = <0xf0014000 0x160>;
-+				interrupts = <74 IRQ_TYPE_LEVEL_HIGH 7>;
-+				interrupt-controller;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				#interrupt-cells = <1>;
-+
-+				main_rc_osc: main_rc_osc {
-+					compatible = "atmel,at91sam9x5-clk-main-rc-osc";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_MOSCRCS>;
-+					clock-frequency = <12000000>;
-+					clock-accuracy = <100000000>;
-+				};
-+
-+				main_osc: main_osc {
-+					compatible = "atmel,at91rm9200-clk-main-osc";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_MOSCS>;
-+					clocks = <&main_xtal>;
-+				};
-+
-+				main: mainck {
-+					compatible = "atmel,at91sam9x5-clk-main";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_MOSCSELS>;
-+					clocks = <&main_rc_osc &main_osc>;
-+				};
-+
-+				plla: pllack {
-+					compatible = "atmel,sama5d3-clk-pll";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_LOCKA>;
-+					clocks = <&main>;
-+					reg = <0>;
-+					atmel,clk-input-range = <12000000 12000000>;
-+					#atmel,pll-clk-output-range-cells = <4>;
-+					atmel,pll-clk-output-ranges = <600000000 1200000000 0 0>;
-+				};
-+
-+				plladiv: plladivck {
-+					compatible = "atmel,at91sam9x5-clk-plldiv";
-+					#clock-cells = <0>;
-+					clocks = <&plla>;
-+				};
-+
-+				utmi: utmick {
-+					compatible = "atmel,at91sam9x5-clk-utmi";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_LOCKU>;
-+					clocks = <&main>;
-+				};
-+
-+				mck: masterck {
-+					compatible = "atmel,at91sam9x5-clk-master";
-+					#clock-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					interrupts = <AT91_PMC_MCKRDY>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>;
-+					atmel,clk-output-range = <124000000 166000000>;
-+					atmel,clk-divisors = <1 2 4 3>;
-+				};
-+
-+				h32ck: h32mxck {
-+					#clock-cells = <0>;
-+					compatible = "atmel,sama5d4-clk-h32mx";
-+					clocks = <&mck>;
-+				};
-+
-+				usb: usbck {
-+					compatible = "atmel,at91sam9x5-clk-usb";
-+					#clock-cells = <0>;
-+					clocks = <&plladiv>, <&utmi>;
-+				};
-+
-+				prog: progck {
-+					compatible = "atmel,at91sam9x5-clk-programmable";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					interrupt-parent = <&pmc>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
-+
-+					prog0: prog0 {
-+						#clock-cells = <0>;
-+						reg = <0>;
-+						interrupts = <AT91_PMC_PCKRDY(0)>;
-+					};
-+
-+					prog1: prog1 {
-+						#clock-cells = <0>;
-+						reg = <1>;
-+						interrupts = <AT91_PMC_PCKRDY(1)>;
-+					};
-+
-+					prog2: prog2 {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+						interrupts = <AT91_PMC_PCKRDY(2)>;
-+					};
-+				};
-+
-+				systemck {
-+					compatible = "atmel,at91rm9200-clk-system";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+
-+					ddrck: ddrck {
-+						#clock-cells = <0>;
-+						reg = <2>;
-+						clocks = <&mck>;
-+					};
-+
-+					lcdck: lcdck {
-+						#clock-cells = <0>;
-+						reg = <3>;
-+						clocks = <&mck>;
-+					};
-+
-+					uhpck: uhpck {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+						clocks = <&usb>;
-+					};
-+
-+					udpck: udpck {
-+						#clock-cells = <0>;
-+						reg = <7>;
-+						clocks = <&usb>;
-+					};
-+
-+					pck0: pck0 {
-+						#clock-cells = <0>;
-+						reg = <8>;
-+						clocks = <&prog0>;
-+					};
-+
-+					pck1: pck1 {
-+						#clock-cells = <0>;
-+						reg = <9>;
-+						clocks = <&prog1>;
-+					};
-+
-+					pck2: pck2 {
-+						#clock-cells = <0>;
-+						reg = <10>;
-+						clocks = <&prog2>;
-+					};
-+
-+					iscck: iscck {
-+						#clock-cells = <0>;
-+						reg = <18>;
-+						clocks = <&mck>;
-+					};
-+				};
-+
-+				periph32ck {
-+					compatible = "atmel,at91sam9x5-clk-peripheral";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&h32ck>;
-+
-+					macb0_clk: macb0_clk {
-+						#clock-cells = <0>;
-+						reg = <5>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					tdes_clk: tdes_clk {
-+						#clock-cells = <0>;
-+						reg = <11>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					matrix1_clk: matrix1_clk {
-+						#clock-cells = <0>;
-+						reg = <14>;
-+					};
-+
-+					hsmc_clk: hsmc_clk {
-+						#clock-cells = <0>;
-+						reg = <17>;
-+					};
-+
-+					pioA_clk: pioA_clk {
-+						#clock-cells = <0>;
-+						reg = <18>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					flx0_clk: flx0_clk {
-+						#clock-cells = <0>;
-+						reg = <19>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					flx1_clk: flx1_clk {
-+						#clock-cells = <0>;
-+						reg = <20>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					flx2_clk: flx2_clk {
-+						#clock-cells = <0>;
-+						reg = <21>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					flx3_clk: flx3_clk {
-+						#clock-cells = <0>;
-+						reg = <22>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					flx4_clk: flx4_clk {
-+						#clock-cells = <0>;
-+						reg = <23>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uart0_clk: uart0_clk {
-+						#clock-cells = <0>;
-+						reg = <24>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uart1_clk: uart1_clk {
-+						#clock-cells = <0>;
-+						reg = <25>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uart2_clk: uart2_clk {
-+						#clock-cells = <0>;
-+						reg = <26>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uart3_clk: uart3_clk {
-+						#clock-cells = <0>;
-+						reg = <27>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uart4_clk: uart4_clk {
-+						#clock-cells = <0>;
-+						reg = <28>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					twi0_clk: twi0_clk {
-+						reg = <29>;
-+						#clock-cells = <0>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					twi1_clk: twi1_clk {
-+						#clock-cells = <0>;
-+						reg = <30>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					spi0_clk: spi0_clk {
-+						#clock-cells = <0>;
-+						reg = <33>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					spi1_clk: spi1_clk {
-+						#clock-cells = <0>;
-+						reg = <34>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					tcb0_clk: tcb0_clk {
-+						#clock-cells = <0>;
-+						reg = <35>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					tcb1_clk: tcb1_clk {
-+						#clock-cells = <0>;
-+						reg = <36>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					pwm_clk: pwm_clk {
-+						#clock-cells = <0>;
-+						reg = <38>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					adc_clk: adc_clk {
-+						#clock-cells = <0>;
-+						reg = <40>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					uhphs_clk: uhphs_clk {
-+						#clock-cells = <0>;
-+						reg = <41>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					udphs_clk: udphs_clk {
-+						#clock-cells = <0>;
-+						reg = <42>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					ssc0_clk: ssc0_clk {
-+						#clock-cells = <0>;
-+						reg = <43>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					ssc1_clk: ssc1_clk {
-+						#clock-cells = <0>;
-+						reg = <44>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					trng_clk: trng_clk {
-+						#clock-cells = <0>;
-+						reg = <47>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+
-+					classd_clk: classd_clk {
-+						#clock-cells = <0>;
-+						reg = <59>;
-+						atmel,clk-output-range = <0 83000000>;
-+					};
-+				};
-+
-+				periph64ck {
-+					compatible = "atmel,at91sam9x5-clk-peripheral";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&mck>;
-+
-+					dma0_clk: dma0_clk {
-+						#clock-cells = <0>;
-+						reg = <6>;
-+					};
-+
-+					dma1_clk: dma1_clk {
-+						#clock-cells = <0>;
-+						reg = <7>;
-+					};
-+
-+					aes_clk: aes_clk {
-+						#clock-cells = <0>;
-+						reg = <9>;
-+					};
-+
-+					aesb_clk: aesb_clk {
-+						#clock-cells = <0>;
-+						reg = <10>;
-+					};
-+
-+					sha_clk: sha_clk {
-+						#clock-cells = <0>;
-+						reg = <12>;
-+					};
-+
-+					mpddr_clk: mpddr_clk {
-+						#clock-cells = <0>;
-+						reg = <13>;
-+					};
-+
-+					matrix0_clk: matrix0_clk {
-+						#clock-cells = <0>;
-+						reg = <15>;
-+					};
-+
-+					sdmmc0_hclk: sdmmc0_hclk {
-+						#clock-cells = <0>;
-+						reg = <31>;
-+					};
-+
-+					sdmmc1_hclk: sdmmc1_hclk {
-+						#clock-cells = <0>;
-+						reg = <32>;
-+					};
-+
-+					lcdc_clk: lcdc_clk {
-+						#clock-cells = <0>;
-+						reg = <45>;
-+					};
-+
-+					isc_clk: isc_clk {
-+						#clock-cells = <0>;
-+						reg = <46>;
-+					};
-+
-+					qspi0_clk: qspi0_clk {
-+						#clock-cells = <0>;
-+						reg = <52>;
-+					};
-+
-+					qspi1_clk: qspi1_clk {
-+						#clock-cells = <0>;
-+						reg = <53>;
-+					};
-+				};
-+			};
-+
-+			sha at f0028000 {
-+				compatible = "atmel,at91sam9g46-sha";
-+				reg = <0xf0028000 0x100>;
-+				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(30))>;
-+				dma-names = "tx";
-+				clocks = <&sha_clk>;
-+				clock-names = "sha_clk";
-+				status = "disabled";
-+			};
-+
-+			aes at f002c000 {
-+				compatible = "atmel,at91sam9g46-aes";
-+				reg = <0xf002c000 0x100>;
-+				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(26))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(27))>;
-+				dma-names = "tx", "rx";
-+				clocks = <&aes_clk>;
-+				clock-names = "aes_clk";
-+				status = "disabled";
-+			};
-+
 +			spi0: spi at f8000000 {
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xf8000000 0x100>;
-+				interrupts = <33 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(6))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(7))>;
-+				dma-names = "tx", "rx";
-+				clocks = <&spi0_clk>;
-+				clock-names = "spi_clk";
-+				atmel,fifo-size = <16>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
++				status = "okay";
++
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					reg = <0>;
++					spi-max-frequency = <50000000>;
++				};
 +			};
 +
 +			macb0: ethernet at f8008000 {
-+				compatible = "atmel,sama5d2-gem";
-+				reg = <0xf8008000 0x1000>;
-+				interrupts = <5  IRQ_TYPE_LEVEL_HIGH 3		/* Queue 0 */
-+					      66 IRQ_TYPE_LEVEL_HIGH 3          /* Queue 1 */
-+					      67 IRQ_TYPE_LEVEL_HIGH 3>;        /* Queue 2 */
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				clocks = <&macb0_clk>, <&macb0_clk>;
-+				clock-names = "hclk", "pclk";
-+				status = "disabled";
-+			};
-+
-+			tcb0: timer at f800c000 {
-+				compatible = "atmel,at91sam9x5-tcb";
-+				reg = <0xf800c000 0x100>;
-+				interrupts = <35 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb0_clk>;
-+				clock-names = "t0_clk";
-+			};
-+
-+			tcb1: timer at f8010000 {
-+				compatible = "atmel,at91sam9x5-tcb";
-+				reg = <0xf8010000 0x100>;
-+				interrupts = <36 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&tcb1_clk>;
-+				clock-names = "t0_clk";
-+			};
-+
-+			uart0: serial at f801c000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf801c000 0x100>;
-+				interrupts = <24 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&uart0_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
++				phy-mode = "rmii";
++				status = "okay";
 +			};
 +
 +			uart1: serial at f8020000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8020000 0x100>;
-+				interrupts = <25 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&uart1_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
-+			};
-+
-+			uart2: serial at f8024000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xf8024000 0x100>;
-+				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&uart2_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
++				status = "okay";
 +			};
 +
 +			i2c0: i2c at f8028000 {
-+				compatible = "atmel,sama5d2-i2c";
-+				reg = <0xf8028000 0x100>;
-+				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(0))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(1))>;
-+				dma-names = "tx", "rx";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				clocks = <&twi0_clk>;
-+				status = "disabled";
-+			};
-+
-+			pit: timer at f8048030 {
-+				compatible = "atmel,at91sam9260-pit";
-+				reg = <0xf8048030 0x10>;
-+				interrupts = <3 IRQ_TYPE_LEVEL_HIGH 5>;
-+				clocks = <&h32ck>;
-+			};
-+
-+			sckc at f8048050 {
-+				compatible = "atmel,at91sam9x5-sckc";
-+				reg = <0xf8048050 0x4>;
-+
-+				slow_rc_osc: slow_rc_osc {
-+					compatible = "atmel,at91sam9x5-clk-slow-rc-osc";
-+					#clock-cells = <0>;
-+					clock-frequency = <32768>;
-+					clock-accuracy = <250000000>;
-+					atmel,startup-time-usec = <75>;
-+				};
-+
-+				slow_osc: slow_osc {
-+					compatible = "atmel,at91sam9x5-clk-slow-osc";
-+					#clock-cells = <0>;
-+					clocks = <&slow_xtal>;
-+					atmel,startup-time-usec = <1200000>;
-+				};
-+
-+				clk32k: slowck {
-+					compatible = "atmel,at91sam9x5-clk-slow";
-+					#clock-cells = <0>;
-+					clocks = <&slow_rc_osc &slow_osc>;
-+				};
-+			};
-+
-+			rtc at f80480b0 {
-+				compatible = "atmel,at91rm9200-rtc";
-+				reg = <0xf80480b0 0x30>;
-+				interrupts = <74 IRQ_TYPE_LEVEL_HIGH 7>;
-+			};
-+
-+			spi1: spi at fc000000 {
-+				compatible = "atmel,at91rm9200-spi";
-+				reg = <0xfc000000 0x100>;
-+				interrupts = <34 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(8))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(9))>;
-+				dma-names = "tx", "rx";
-+				clocks = <&spi1_clk>;
-+				clock-names = "spi_clk";
-+				atmel,fifo-size = <16>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "disabled";
++				dmas = <0>, <0>;
++				status = "okay";
 +			};
 +
 +			uart3: serial at fc008000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfc008000 0x100>;
-+				interrupts = <27 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&uart3_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
-+			};
-+
-+			uart4: serial at fc00c000 {
-+				compatible = "atmel,at91sam9260-usart";
-+				reg = <0xfc00c000 0x100>;
-+				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&uart4_clk>;
-+				clock-names = "usart";
-+				status = "disabled";
-+			};
-+
-+			aic: interrupt-controller at fc020000 {
-+				#interrupt-cells = <3>;
-+				compatible = "atmel,sama5d2-aic";
-+				interrupt-controller;
-+				reg = <0xfc020000 0x200>;
-+				atmel,external-irqs = <49>;
++				status = "okay";
 +			};
 +
 +			i2c1: i2c at fc028000 {
-+				compatible = "atmel,sama5d2-i2c";
-+				reg = <0xfc028000 0x100>;
-+				interrupts = <30 IRQ_TYPE_LEVEL_HIGH 7>;
-+				dmas = <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(2))>,
-+				       <&dma0
-+					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-+					 AT91_XDMAC_DT_PERID(3))>;
-+				dma-names = "tx", "rx";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				clocks = <&twi1_clk>;
-+				status = "disabled";
++				dmas = <0>, <0>;
++				status = "okay";
++
++				at24 at 54 {
++					compatible = "atmel,24c02";
++					reg = <0x54>;
++					pagesize = <16>;
++				};
 +			};
 +		};
 +	};
