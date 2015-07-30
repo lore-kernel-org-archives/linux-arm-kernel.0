@@ -1,55 +1,77 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Thu, 30 Jul 2015 10:53:57 -0700
-Subject: [PATCHv2 4/4] ARM: dts: qcom-pm8941: Add charger node
-In-Reply-To: <1438278837-29967-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1438278837-29967-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1438278837-29967-5-git-send-email-bjorn.andersson@sonymobile.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 30 Jul 2015 18:56:08 +0100
+Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
+ correct GIC instance
+In-Reply-To: <55BA55F4.2060001@arm.com>
+References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
+ <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+ <55BA55F4.2060001@arm.com>
+Message-ID: <55BA6538.2050606@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Courtney Cavin <courtney.cavin@sonymobile.com>
 
-Signed-off-by: Courtney Cavin <courtney.cavin@sonymobile.com>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
----
+On 30/07/15 17:51, Marc Zyngier wrote:
+> On 30/07/15 17:26, Jon Hunter wrote:
+>> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
+>> ctrl register") added a new function, gic_cpu_if_up(), to program the
+>> GIC CPU_CTRL register. This function assumes that there is only one GIC
+>> instance present and hence always uses the chip data for the primary GIC
+>> controller. Although it is not common for there to be a secondary, some
+>> devices do support a secondary. Therefore, fix this by passing
+>> gic_cpu_if_up() a pointer to the appropriate chip data structure.
+>>
+>> Similarly, the function gic_cpu_if_down() only assumes that there is a
+>> single GIC instance present. Update this function so that an instance
+>> number is passed for the appropriate GIC. The vexpress TC2 (which has
+>> a single GIC) is currently the only user of this function and so update
+>> it accordingly.
+>>
+>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>> ---
+>> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
+>> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
+>> from all the places called without making more changes. However, given
+>> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
+>> may be it does not matter too much.
+>>
+>>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
+>>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
+>>  include/linux/irqchip/arm-gic.h |  2 +-
+>>  3 files changed, 9 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+>> index b3328cd46c33..1aa4ccece69f 100644
+>> --- a/arch/arm/mach-vexpress/tc2_pm.c
+>> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+>> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
+>>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+>>  	 * from completing execution behind power controller back
+>>  	 */
+>> -	gic_cpu_if_down();
+>> +	gic_cpu_if_down(0);
+>>  }
+>>  
+>>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
+>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>> index 7566fe259d27..cf9aca22120f 100644
+>> --- a/drivers/irqchip/irq-gic.c
+>> +++ b/drivers/irqchip/irq-gic.c
+>> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>>  	return mask;
+>>  }
+>>  
+>> -static void gic_cpu_if_up(void)
+>> +static void gic_cpu_if_up(struct gic_chip_data *gic)
+>>  {
+>> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+>> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
+>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+>> +	void __iomem *dist_base = gic_data_dist_base(gic);
+> 
+> Which tree is that against? I don't have a dist_base in mainline...
 
-Changes since v1:
-- Corrected authorship
+It is based upon linux-next. I can rebase on the current mainline if you
+want them for v4.2.
 
- arch/arm/boot/dts/qcom-pm8941.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
-
-diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
-index aa774e685018..6063c7ddda0f 100644
---- a/arch/arm/boot/dts/qcom-pm8941.dtsi
-+++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
-@@ -26,6 +26,27 @@
- 			bias-pull-up;
- 		};
- 
-+		charger at 1000 {
-+			compatible = "qcom,pm8941-charger";
-+			reg = <0x1000 0x700>;
-+			interrupts = <0x0 0x10 7 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x10 5 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x10 4 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x12 1 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x12 0 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x13 2 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x13 1 IRQ_TYPE_EDGE_BOTH>,
-+				     <0x0 0x14 1 IRQ_TYPE_EDGE_BOTH>;
-+			interrupt-names = "chg-done",
-+					  "chg-fast",
-+					  "chg-trkl",
-+					  "bat-temp-ok",
-+					  "bat-present",
-+					  "chg-gone",
-+					  "usb-valid",
-+					  "dc-valid";
-+		};
-+
- 		pm8941_gpios: gpios at c000 {
- 			compatible = "qcom,pm8941-gpio";
- 			reg = <0xc000 0x2400>;
--- 
-1.8.2.2
+Jon
