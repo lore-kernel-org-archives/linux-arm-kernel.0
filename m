@@ -1,303 +1,498 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Thu, 30 Jul 2015 18:08:58 +0100
-Subject: [PATCH v2 08/11] [media] c8sectpfe: Add support for various ST NIM
- cards.
-In-Reply-To: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
-References: <1438276141-16902-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1438276141-16902-9-git-send-email-peter.griffin@linaro.org>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 30 Jul 2015 12:55:47 -0400
+Subject: [PATCH v3 23/24] arch: remove ioremap_wt,
+ optionally replace with arch_memremap
+In-Reply-To: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20150730165155.33962.64121.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <20150730165547.33962.57434.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the following 2 NIM cards: -
-1) B2100A (2x stv0367 demods & 2x NXP tda18212 tuners)
-2) STV0903-6110NIM (stv0903 demod + 6110 tuner, lnb24)
+Now that all call sites for ioremap_wt() have been converted to
+memremap(MEMREMAP_WT) we can now proceed with removing the
+implementation in the archs.  This amounts to replacing the per-arch
+ioremap_wt() implementation with arch_memremap in the case where
+ioremap_wt() was actually providing "writethrough" semantics.
+Otherwise, ioremap_wt() support that falls back to ioremap() is simply
+removed.
 
-A NIM card is a cold plugable expansion card which usually
-features a demodulator / tuner combination.
-
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Tony Luck <tony.luck@intel.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: Borislav Petkov <bp@alien8.de>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
- .../media/platform/sti/c8sectpfe/c8sectpfe-dvb.c   | 244 +++++++++++++++++++++
- .../media/platform/sti/c8sectpfe/c8sectpfe-dvb.h   |  20 ++
- 2 files changed, 264 insertions(+)
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
- create mode 100644 drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.h
+ Documentation/x86/pat.txt        |    2 +-
+ arch/arc/include/asm/io.h        |    1 -
+ arch/arm/include/asm/io.h        |    2 --
+ arch/arm64/include/asm/io.h      |    1 -
+ arch/avr32/include/asm/io.h      |    1 -
+ arch/frv/include/asm/io.h        |    7 -------
+ arch/m32r/include/asm/io.h       |    1 -
+ arch/m68k/Kconfig                |    1 +
+ arch/m68k/include/asm/io_mm.h    |    8 +-------
+ arch/m68k/include/asm/io_no.h    |    6 ------
+ arch/m68k/include/asm/raw_io.h   |    1 -
+ arch/m68k/mm/kmap.c              |   17 ++++++++++++++++-
+ arch/m68k/mm/sun3kmap.c          |    6 ++++++
+ arch/metag/include/asm/io.h      |    3 ---
+ arch/microblaze/include/asm/io.h |    1 -
+ arch/mn10300/include/asm/io.h    |    1 -
+ arch/nios2/include/asm/io.h      |    1 -
+ arch/s390/include/asm/io.h       |    1 -
+ arch/sparc/include/asm/io_32.h   |    1 -
+ arch/sparc/include/asm/io_64.h   |    1 -
+ arch/tile/include/asm/io.h       |    1 -
+ arch/x86/include/asm/io.h        |    2 --
+ arch/x86/mm/ioremap.c            |   17 -----------------
+ arch/xtensa/include/asm/io.h     |    1 -
+ drivers/video/fbdev/Kconfig      |    2 +-
+ include/asm-generic/io.h         |    8 --------
+ include/asm-generic/iomap.h      |    4 ----
+ 27 files changed, 26 insertions(+), 72 deletions(-)
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-new file mode 100644
-index 0000000..69d7fe4
---- /dev/null
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.c
-@@ -0,0 +1,244 @@
-+/*
-+ *  c8sectpfe-dvb.c - C8SECTPFE STi DVB driver
-+ *
-+ * Copyright (c) STMicroelectronics 2015
-+ *
-+ *  Author Peter Griffin <peter.griffin@linaro.org>
-+ *
-+ *  This program is free software; you can redistribute it and/or modify
-+ *  it under the terms of the GNU General Public License as published by
-+ *  the Free Software Foundation; either version 2 of the License, or
-+ *  (at your option) any later version.
-+ *
-+ *  This program is distributed in the hope that it will be useful,
-+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *
-+ *  GNU General Public License for more details.
-+ */
-+#include <linux/completion.h>
-+#include <linux/delay.h>
-+#include <linux/i2c.h>
-+#include <linux/interrupt.h>
-+#include <linux/version.h>
+diff --git a/Documentation/x86/pat.txt b/Documentation/x86/pat.txt
+index 73d3635f6a3f..7e0e43c648f7 100644
+--- a/Documentation/x86/pat.txt
++++ b/Documentation/x86/pat.txt
+@@ -40,7 +40,7 @@ ioremap_wc             |    --    |    --      |       WC         |
+                        |          |            |                  |
+ memremap(MEMREMAP_WB)  |    WB    |    WB      |       WB         |
+                        |          |            |                  |
+-ioremap_wt             |    --    |    --      |       WT         |
++memremap(MEMREMAP_WT)  |    --    |    --      |       WT         |
+                        |          |            |                  |
+ set_memory_uc          |    UC-   |    --      |       --         |
+  set_memory_wb         |          |            |                  |
+diff --git a/arch/arc/include/asm/io.h b/arch/arc/include/asm/io.h
+index 694ece8a0243..00f97a2f5fa6 100644
+--- a/arch/arc/include/asm/io.h
++++ b/arch/arc/include/asm/io.h
+@@ -20,7 +20,6 @@ extern void iounmap(const void __iomem *addr);
+ 
+ #define ioremap_nocache(phy, sz)	ioremap(phy, sz)
+ #define ioremap_wc(phy, sz)		ioremap(phy, sz)
+-#define ioremap_wt(phy, sz)		ioremap(phy, sz)
+ 
+ /* Change struct page to physical address */
+ #define page_to_phys(page)		(page_to_pfn(page) << PAGE_SHIFT)
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index 191d0f6eeead..5616c4f4304d 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -357,7 +357,6 @@ static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+  * ioremap_nocache()	Device		n/a		n/a
+  * memremap(WB)		Normal		Writeback	Read allocate
+  * ioremap_wc()		Normal		Non-cacheable	n/a
+- * ioremap_wt()		Normal		Non-cacheable	n/a
+  *
+  * All device mappings have the following properties:
+  * - no access speculation
+@@ -394,7 +393,6 @@ void __iomem *ioremap(resource_size_t res_cookie, size_t size);
+ 
+ void __iomem *ioremap_wc(resource_size_t res_cookie, size_t size);
+ #define ioremap_wc ioremap_wc
+-#define ioremap_wt ioremap_wc
+ 
+ void iounmap(volatile void __iomem *iomem_cookie);
+ #define iounmap iounmap
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 51376353a722..054fb4def2c9 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -169,7 +169,6 @@ extern void __iounmap(volatile void __iomem *addr);
+ #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
+-#define ioremap_wt(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+ #define iounmap				__iounmap
+ 
+ /*
+diff --git a/arch/avr32/include/asm/io.h b/arch/avr32/include/asm/io.h
+index e998ff5d8e1a..4f5ec2bb7172 100644
+--- a/arch/avr32/include/asm/io.h
++++ b/arch/avr32/include/asm/io.h
+@@ -296,7 +296,6 @@ extern void __iounmap(void __iomem *addr);
+ 	__iounmap(addr)
+ 
+ #define ioremap_wc ioremap_nocache
+-#define ioremap_wt ioremap_nocache
+ 
+ #define cached(addr) P1SEGADDR(addr)
+ #define uncached(addr) P2SEGADDR(addr)
+diff --git a/arch/frv/include/asm/io.h b/arch/frv/include/asm/io.h
+index 15a49a268754..2177a164cc67 100644
+--- a/arch/frv/include/asm/io.h
++++ b/arch/frv/include/asm/io.h
+@@ -17,8 +17,6 @@
+ 
+ #ifdef __KERNEL__
+ 
+-#define ARCH_HAS_IOREMAP_WT
+-
+ #include <linux/types.h>
+ #include <asm/virtconvert.h>
+ #include <asm/string.h>
+@@ -267,11 +265,6 @@ static inline void __iomem *ioremap_nocache(unsigned long physaddr, unsigned lon
+ 	return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
+ }
+ 
+-static inline void __iomem *ioremap_wt(unsigned long physaddr, unsigned long size)
+-{
+-	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
+-}
+-
+ #define ioremap_wc ioremap_nocache
+ 
+ extern void iounmap(void volatile __iomem *addr);
+diff --git a/arch/m32r/include/asm/io.h b/arch/m32r/include/asm/io.h
+index f8de767ce2bc..d7a034d8c671 100644
+--- a/arch/m32r/include/asm/io.h
++++ b/arch/m32r/include/asm/io.h
+@@ -68,7 +68,6 @@ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ extern void iounmap(volatile void __iomem *addr);
+ #define ioremap_nocache(off,size) ioremap(off,size)
+ #define ioremap_wc ioremap_nocache
+-#define ioremap_wt ioremap_nocache
+ 
+ /*
+  * IO bus memory addresses are also 1:1 with the physical address
+diff --git a/arch/m68k/Kconfig b/arch/m68k/Kconfig
+index 2dd8f63bfbbb..693d06dc0a40 100644
+--- a/arch/m68k/Kconfig
++++ b/arch/m68k/Kconfig
+@@ -9,6 +9,7 @@ config M68K
+ 	select GENERIC_ATOMIC64
+ 	select HAVE_UID16
+ 	select VIRT_TO_BUS
++	select ARCH_HAS_MEMREMAP
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG if RMW_INSNS
+ 	select GENERIC_CPU_DEVICES
+ 	select GENERIC_IOMAP
+diff --git a/arch/m68k/include/asm/io_mm.h b/arch/m68k/include/asm/io_mm.h
+index 910e90770eb2..fce53a1be7e3 100644
+--- a/arch/m68k/include/asm/io_mm.h
++++ b/arch/m68k/include/asm/io_mm.h
+@@ -20,8 +20,6 @@
+ 
+ #ifdef __KERNEL__
+ 
+-#define ARCH_HAS_IOREMAP_WT
+-
+ #include <linux/compiler.h>
+ #include <asm/raw_io.h>
+ #include <asm/virtconvert.h>
+@@ -468,11 +466,7 @@ static inline void __iomem *ioremap_nocache(unsigned long physaddr, unsigned lon
+ {
+ 	return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
+ }
+-static inline void __iomem *ioremap_wt(unsigned long physaddr,
+-					 unsigned long size)
+-{
+-	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
+-}
 +
-+#include <dt-bindings/media/c8sectpfe.h>
-+
-+#include "c8sectpfe-common.h"
-+#include "c8sectpfe-core.h"
-+#include "c8sectpfe-dvb.h"
-+
-+#include "dvb-pll.h"
-+#include "lnbh24.h"
-+#include "stv0367.h"
-+#include "stv0367_priv.h"
-+#include "stv6110x.h"
-+#include "stv090x.h"
-+#include "tda18212.h"
-+
-+static inline const char *dvb_card_str(unsigned int c)
+ static inline void memset_io(volatile void __iomem *addr, unsigned char val, int count)
+ {
+ 	__builtin_memset((void __force *) addr, val, count);
+diff --git a/arch/m68k/include/asm/io_no.h b/arch/m68k/include/asm/io_no.h
+index 2690fa99dc56..b5890e593961 100644
+--- a/arch/m68k/include/asm/io_no.h
++++ b/arch/m68k/include/asm/io_no.h
+@@ -3,8 +3,6 @@
+ 
+ #ifdef __KERNEL__
+ 
+-#define ARCH_HAS_IOREMAP_WT
+-
+ #include <asm/virtconvert.h>
+ #include <asm-generic/iomap.h>
+ 
+@@ -155,10 +153,6 @@ static inline void *ioremap_nocache(unsigned long physaddr, unsigned long size)
+ {
+ 	return __ioremap(physaddr, size, IOMAP_NOCACHE_SER);
+ }
+-static inline void *ioremap_wt(unsigned long physaddr, unsigned long size)
+-{
+-	return __ioremap(physaddr, size, IOMAP_WRITETHROUGH);
+-}
+ #define	iounmap(addr)	do { } while(0)
+ 
+ /*
+diff --git a/arch/m68k/include/asm/raw_io.h b/arch/m68k/include/asm/raw_io.h
+index 932faa35655b..9f6e5a4e531b 100644
+--- a/arch/m68k/include/asm/raw_io.h
++++ b/arch/m68k/include/asm/raw_io.h
+@@ -25,7 +25,6 @@ extern void __iomem *__ioremap(unsigned long physaddr, unsigned long size,
+ 		       int cacheflag);
+ extern void __iounmap(void *addr, unsigned long size);
+ 
+-
+ /* ++roman: The assignments to temp. vars avoid that gcc sometimes generates
+  * two accesses to memory, which may be undesirable for some devices.
+  */
+diff --git a/arch/m68k/mm/kmap.c b/arch/m68k/mm/kmap.c
+index 6e4955bc542b..519c45865127 100644
+--- a/arch/m68k/mm/kmap.c
++++ b/arch/m68k/mm/kmap.c
+@@ -14,12 +14,12 @@
+ #include <linux/types.h>
+ #include <linux/slab.h>
+ #include <linux/vmalloc.h>
++#include <linux/io.h>
+ 
+ #include <asm/setup.h>
+ #include <asm/segment.h>
+ #include <asm/page.h>
+ #include <asm/pgalloc.h>
+-#include <asm/io.h>
+ 
+ #undef DEBUG
+ 
+@@ -223,6 +223,21 @@ void __iomem *__ioremap(unsigned long physaddr, unsigned long size, int cachefla
+ }
+ EXPORT_SYMBOL(__ioremap);
+ 
++void *arch_memremap(resource_size_t offset, size_t size, unsigned long flags)
 +{
-+	switch (c) {
-+	case STV0367_TDA18212_NIMA_1:	return "STV0367_TDA18212_NIMA_1";
-+	case STV0367_TDA18212_NIMA_2:	return "STV0367_TDA18212_NIMA_2";
-+	case STV0367_TDA18212_NIMB_1:	return "STV0367_TDA18212_NIMB_1";
-+	case STV0367_TDA18212_NIMB_2:	return "STV0367_TDA18212_NIMB_2";
-+	case STV0903_6110_LNB24_NIMA:	return "STV0903_6110_LNB24_NIMA";
-+	case STV0903_6110_LNB24_NIMB:	return "STV0903_6110_LNB24_NIMB";
-+	default:			return "unknown dvb frontend card";
-+	}
++	int mode;
++
++	if (flags & MEMREMAP_WB)
++		mode = IOMAP_FULL_CACHING;
++	else if (flags & MEMREMAP_WT)
++		mode = IOMAP_WRITETHROUGH;
++	else
++		return NULL;
++
++	return (void __force *) __ioremap(offset, size, mode);
 +}
++EXPORT_SYMBOL(arch_memremap);
 +
-+static struct stv090x_config stv090x_config = {
-+	.device                 = STV0903,
-+	.demod_mode             = STV090x_SINGLE,
-+	.clk_mode               = STV090x_CLK_EXT,
-+	.xtal                   = 16000000,
-+	.address                = 0x69,
-+
-+	.ts1_mode               = STV090x_TSMODE_SERIAL_CONTINUOUS,
-+	.ts2_mode               = STV090x_TSMODE_SERIAL_CONTINUOUS,
-+
-+	.repeater_level         = STV090x_RPTLEVEL_64,
-+
-+	.tuner_init             = NULL,
-+	.tuner_set_mode         = NULL,
-+	.tuner_set_frequency    = NULL,
-+	.tuner_get_frequency    = NULL,
-+	.tuner_set_bandwidth    = NULL,
-+	.tuner_get_bandwidth    = NULL,
-+	.tuner_set_bbgain       = NULL,
-+	.tuner_get_bbgain       = NULL,
-+	.tuner_set_refclk       = NULL,
-+	.tuner_get_status       = NULL,
-+};
-+
-+static struct stv6110x_config stv6110x_config = {
-+	.addr                   = 0x60,
-+	.refclk                 = 16000000,
-+};
-+
-+#define NIMA 0
-+#define NIMB 1
-+
-+static struct stv0367_config stv0367_tda18212_config[] = {
-+	{
-+		.demod_address = 0x1c,
-+		.xtal = 16000000,
-+		.if_khz = 4500,
-+		.if_iq_mode = FE_TER_NORMAL_IF_TUNER,
-+		.ts_mode = STV0367_SERIAL_PUNCT_CLOCK,
-+		.clk_pol = STV0367_CLOCKPOLARITY_DEFAULT,
-+	}, {
-+		.demod_address = 0x1d,
-+		.xtal = 16000000,
-+		.if_khz = 4500,
-+		.if_iq_mode = FE_TER_NORMAL_IF_TUNER,
-+		.ts_mode = STV0367_SERIAL_PUNCT_CLOCK,
-+		.clk_pol = STV0367_CLOCKPOLARITY_DEFAULT,
-+	}, {
-+		.demod_address = 0x1e,
-+		.xtal = 16000000,
-+		.if_khz = 4500,
-+		.if_iq_mode = FE_TER_NORMAL_IF_TUNER,
-+		.ts_mode = STV0367_SERIAL_PUNCT_CLOCK,
-+		.clk_pol = STV0367_CLOCKPOLARITY_DEFAULT,
-+	},
-+};
-+
-+static struct tda18212_config tda18212_conf = {
-+	.if_dvbt_6 = 4150,
-+	.if_dvbt_7 = 4150,
-+	.if_dvbt_8 = 4500,
-+	.if_dvbc = 5000,
-+};
-+
-+int c8sectpfe_frontend_attach(struct dvb_frontend **fe,
-+		struct c8sectpfe *c8sectpfe,
-+		struct channel_info *tsin, int chan_num)
+ /*
+  * Unmap an ioremap()ed region again
+  */
+diff --git a/arch/m68k/mm/sun3kmap.c b/arch/m68k/mm/sun3kmap.c
+index 3dc41158c05e..46af60b7f0c7 100644
+--- a/arch/m68k/mm/sun3kmap.c
++++ b/arch/m68k/mm/sun3kmap.c
+@@ -116,6 +116,12 @@ void __iomem *__ioremap(unsigned long phys, unsigned long size, int cache)
+ }
+ EXPORT_SYMBOL(__ioremap);
+ 
++void *arch_memremap(resource_size_t offset, size_t size, unsigned long flags)
 +{
-+	struct tda18212_config *tda18212;
-+	struct stv6110x_devctl *fe2;
-+	struct i2c_client *client;
-+	struct i2c_board_info tda18212_info = {
-+		.type = "tda18212",
-+		.addr = 0x60,
-+	};
-+
-+	if (!tsin)
-+		return -EINVAL;
-+
-+	switch (tsin->dvb_card) {
-+
-+	case STV0367_TDA18212_NIMA_1:
-+	case STV0367_TDA18212_NIMA_2:
-+	case STV0367_TDA18212_NIMB_1:
-+	case STV0367_TDA18212_NIMB_2:
-+		if (tsin->dvb_card == STV0367_TDA18212_NIMA_1)
-+			*fe = dvb_attach(stv0367ter_attach,
-+				 &stv0367_tda18212_config[0],
-+					tsin->i2c_adapter);
-+		else if (tsin->dvb_card == STV0367_TDA18212_NIMB_1)
-+			*fe = dvb_attach(stv0367ter_attach,
-+				 &stv0367_tda18212_config[1],
-+					tsin->i2c_adapter);
-+		else
-+			*fe = dvb_attach(stv0367ter_attach,
-+				 &stv0367_tda18212_config[2],
-+					tsin->i2c_adapter);
-+
-+		if (!*fe) {
-+			dev_err(c8sectpfe->device,
-+				"%s: stv0367ter_attach failed for NIM card %s\n"
-+				, __func__, dvb_card_str(tsin->dvb_card));
-+			return -ENODEV;
-+		};
-+
-+		/*
-+		 * init the demod so that i2c gate_ctrl
-+		 * to the tuner works correctly
-+		 */
-+		(*fe)->ops.init(*fe);
-+
-+		/* Allocate the tda18212 structure */
-+		tda18212 = devm_kzalloc(c8sectpfe->device,
-+					sizeof(struct tda18212_config),
-+					GFP_KERNEL);
-+		if (!tda18212) {
-+			dev_err(c8sectpfe->device,
-+				"%s: devm_kzalloc failed\n", __func__);
-+			return -ENOMEM;
-+		}
-+
-+		memcpy(tda18212, &tda18212_conf,
-+			sizeof(struct tda18212_config));
-+
-+		tda18212->fe = (*fe);
-+
-+		tda18212_info.platform_data = tda18212;
-+
-+		/* attach tuner */
-+		request_module("tda18212");
-+		client = i2c_new_device(tsin->i2c_adapter, &tda18212_info);
-+		if (!client || !client->dev.driver) {
-+			dvb_frontend_detach(*fe);
-+			return -ENODEV;
-+		}
-+
-+		if (!try_module_get(client->dev.driver->owner)) {
-+			i2c_unregister_device(client);
-+			dvb_frontend_detach(*fe);
-+			return -ENODEV;
-+		}
-+
-+		tsin->i2c_client = client;
-+
-+		break;
-+
-+	case STV0903_6110_LNB24_NIMA:
-+		*fe = dvb_attach(stv090x_attach,	&stv090x_config,
-+				tsin->i2c_adapter, STV090x_DEMODULATOR_0);
-+		if (!*fe) {
-+			dev_err(c8sectpfe->device, "%s: stv090x_attach failed\n"
-+				"\tfor NIM card %s\n",
-+				__func__, dvb_card_str(tsin->dvb_card));
-+			return -ENODEV;
-+		}
-+
-+		fe2 = dvb_attach(stv6110x_attach, *fe,
-+					&stv6110x_config, tsin->i2c_adapter);
-+		if (!fe2) {
-+			dev_err(c8sectpfe->device,
-+				"%s: stv6110x_attach failed for NIM card %s\n"
-+				, __func__, dvb_card_str(tsin->dvb_card));
-+			return -ENODEV;
-+		};
-+
-+		stv090x_config.tuner_init = fe2->tuner_init;
-+		stv090x_config.tuner_set_mode = fe2->tuner_set_mode;
-+		stv090x_config.tuner_set_frequency = fe2->tuner_set_frequency;
-+		stv090x_config.tuner_get_frequency = fe2->tuner_get_frequency;
-+		stv090x_config.tuner_set_bandwidth = fe2->tuner_set_bandwidth;
-+		stv090x_config.tuner_get_bandwidth = fe2->tuner_get_bandwidth;
-+		stv090x_config.tuner_set_bbgain = fe2->tuner_set_bbgain;
-+		stv090x_config.tuner_get_bbgain = fe2->tuner_get_bbgain;
-+		stv090x_config.tuner_set_refclk = fe2->tuner_set_refclk;
-+		stv090x_config.tuner_get_status = fe2->tuner_get_status;
-+
-+		dvb_attach(lnbh24_attach, *fe, tsin->i2c_adapter, 0, 0, 0x9);
-+		break;
-+
-+	default:
-+		dev_err(c8sectpfe->device,
-+			"%s: DVB frontend card %s not yet supported\n",
-+			__func__, dvb_card_str(tsin->dvb_card));
-+		return -ENODEV;
-+	}
-+
-+	(*fe)->id = chan_num;
-+
-+	dev_info(c8sectpfe->device,
-+			"DVB frontend card %s successfully attached",
-+			dvb_card_str(tsin->dvb_card));
-+	return 0;
++	return (void __force *) sun3_ioremap(offset, size, SUN3_PAGE_TYPE_IO);
 +}
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.h b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.h
-new file mode 100644
-index 0000000..bd366db
---- /dev/null
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-dvb.h
-@@ -0,0 +1,20 @@
-+/*
-+ * c8sectpfe-common.h - C8SECTPFE STi DVB driver
-+ *
-+ * Copyright (c) STMicroelectronics 2015
-+ *
-+ *   Author: Peter Griffin <peter.griffin@linaro.org>
-+ *
-+ *      This program is free software; you can redistribute it and/or
-+ *      modify it under the terms of the GNU General Public License as
-+ *      published by the Free Software Foundation; either version 2 of
-+ *      the License, or (at your option) any later version.
-+ */
-+#ifndef _C8SECTPFE_DVB_H_
-+#define _C8SECTPFE_DVB_H_
++EXPORT_SYMBOL(arch_memremap);
 +
-+int c8sectpfe_frontend_attach(struct dvb_frontend **fe,
-+			struct c8sectpfe *c8sectpfe, struct channel_info *tsin,
-+			int chan_num);
-+
-+#endif
--- 
-1.9.1
+ void iounmap(void __iomem *addr)
+ {
+ 	vfree((void *)(PAGE_MASK & (unsigned long)addr));
+diff --git a/arch/metag/include/asm/io.h b/arch/metag/include/asm/io.h
+index 5432949e627e..482ef3b5f5ba 100644
+--- a/arch/metag/include/asm/io.h
++++ b/arch/metag/include/asm/io.h
+@@ -157,9 +157,6 @@ extern void __iounmap(void __iomem *addr);
+ #define ioremap_wc(offset, size)                \
+ 	__ioremap((offset), (size), _PAGE_WR_COMBINE)
+ 
+-#define ioremap_wt(offset, size)                \
+-	__ioremap((offset), (size), 0)
+-
+ #define iounmap(addr)                           \
+ 	__iounmap(addr)
+ 
+diff --git a/arch/microblaze/include/asm/io.h b/arch/microblaze/include/asm/io.h
+index 5e0cbf4e4204..df7ffb3d9898 100644
+--- a/arch/microblaze/include/asm/io.h
++++ b/arch/microblaze/include/asm/io.h
+@@ -41,7 +41,6 @@ extern void iounmap(void __iomem *addr);
+ extern void __iomem *ioremap(phys_addr_t address, unsigned long size);
+ #define ioremap_nocache(addr, size)		ioremap((addr), (size))
+ #define ioremap_wc(addr, size)			ioremap((addr), (size))
+-#define ioremap_wt(addr, size)			ioremap((addr), (size))
+ 
+ #endif /* CONFIG_MMU */
+ 
+diff --git a/arch/mn10300/include/asm/io.h b/arch/mn10300/include/asm/io.h
+index 07c5b4a3903b..cc4a2ba9e228 100644
+--- a/arch/mn10300/include/asm/io.h
++++ b/arch/mn10300/include/asm/io.h
+@@ -282,7 +282,6 @@ static inline void __iomem *ioremap_nocache(unsigned long offset, unsigned long
+ }
+ 
+ #define ioremap_wc ioremap_nocache
+-#define ioremap_wt ioremap_nocache
+ 
+ static inline void iounmap(void __iomem *addr)
+ {
+diff --git a/arch/nios2/include/asm/io.h b/arch/nios2/include/asm/io.h
+index c5a62da22cd2..6e24d7cceb0c 100644
+--- a/arch/nios2/include/asm/io.h
++++ b/arch/nios2/include/asm/io.h
+@@ -46,7 +46,6 @@ static inline void iounmap(void __iomem *addr)
+ }
+ 
+ #define ioremap_wc ioremap_nocache
+-#define ioremap_wt ioremap_nocache
+ 
+ /* Pages to physical address... */
+ #define page_to_phys(page)	virt_to_phys(page_to_virt(page))
+diff --git a/arch/s390/include/asm/io.h b/arch/s390/include/asm/io.h
+index cb5fdf3a78fc..30fd5c84680e 100644
+--- a/arch/s390/include/asm/io.h
++++ b/arch/s390/include/asm/io.h
+@@ -29,7 +29,6 @@ void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
+ 
+ #define ioremap_nocache(addr, size)	ioremap(addr, size)
+ #define ioremap_wc			ioremap_nocache
+-#define ioremap_wt			ioremap_nocache
+ 
+ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ {
+diff --git a/arch/sparc/include/asm/io_32.h b/arch/sparc/include/asm/io_32.h
+index 57f26c398dc9..407ac14295f4 100644
+--- a/arch/sparc/include/asm/io_32.h
++++ b/arch/sparc/include/asm/io_32.h
+@@ -129,7 +129,6 @@ static inline void sbus_memcpy_toio(volatile void __iomem *dst,
+ void __iomem *ioremap(unsigned long offset, unsigned long size);
+ #define ioremap_nocache(X,Y)	ioremap((X),(Y))
+ #define ioremap_wc(X,Y)		ioremap((X),(Y))
+-#define ioremap_wt(X,Y)		ioremap((X),(Y))
+ void iounmap(volatile void __iomem *addr);
+ 
+ /* Create a virtual mapping cookie for an IO port range */
+diff --git a/arch/sparc/include/asm/io_64.h b/arch/sparc/include/asm/io_64.h
+index c32fa3f752c8..50d4840d9aeb 100644
+--- a/arch/sparc/include/asm/io_64.h
++++ b/arch/sparc/include/asm/io_64.h
+@@ -402,7 +402,6 @@ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ 
+ #define ioremap_nocache(X,Y)		ioremap((X),(Y))
+ #define ioremap_wc(X,Y)			ioremap((X),(Y))
+-#define ioremap_wt(X,Y)			ioremap((X),(Y))
+ 
+ static inline void iounmap(volatile void __iomem *addr)
+ {
+diff --git a/arch/tile/include/asm/io.h b/arch/tile/include/asm/io.h
+index e2867d235170..549ca9548928 100644
+--- a/arch/tile/include/asm/io.h
++++ b/arch/tile/include/asm/io.h
+@@ -54,7 +54,6 @@ extern void iounmap(volatile void __iomem *addr);
+ 
+ #define ioremap_nocache(physaddr, size)		ioremap(physaddr, size)
+ #define ioremap_wc(physaddr, size)		ioremap(physaddr, size)
+-#define ioremap_wt(physaddr, size)		ioremap(physaddr, size)
+ 
+ #define mmiowb()
+ 
+diff --git a/arch/x86/include/asm/io.h b/arch/x86/include/asm/io.h
+index 349027c2943d..1a9d44ee9ed0 100644
+--- a/arch/x86/include/asm/io.h
++++ b/arch/x86/include/asm/io.h
+@@ -35,7 +35,6 @@
+   */
+ 
+ #define ARCH_HAS_IOREMAP_WC
+-#define ARCH_HAS_IOREMAP_WT
+ 
+ #include <linux/string.h>
+ #include <linux/compiler.h>
+@@ -320,7 +319,6 @@ extern void unxlate_dev_mem_ptr(phys_addr_t phys, void *addr);
+ extern int ioremap_change_attr(unsigned long vaddr, unsigned long size,
+ 				enum page_cache_mode pcm);
+ extern void __iomem *ioremap_wc(resource_size_t offset, unsigned long size);
+-extern void __iomem *ioremap_wt(resource_size_t offset, unsigned long size);
+ 
+ extern bool is_early_ioremap_ptep(pte_t *ptep);
+ 
+diff --git a/arch/x86/mm/ioremap.c b/arch/x86/mm/ioremap.c
+index 4516974f3bad..ffbfcf2e701b 100644
+--- a/arch/x86/mm/ioremap.c
++++ b/arch/x86/mm/ioremap.c
+@@ -293,23 +293,6 @@ void __iomem *ioremap_wc(resource_size_t phys_addr, unsigned long size)
+ }
+ EXPORT_SYMBOL(ioremap_wc);
+ 
+-/**
+- * ioremap_wt	-	map memory into CPU space write through
+- * @phys_addr:	bus address of the memory
+- * @size:	size of the resource to map
+- *
+- * This version of ioremap ensures that the memory is marked write through.
+- * Write through stores data into memory while keeping the cache up-to-date.
+- *
+- * Must be freed with iounmap.
+- */
+-void __iomem *ioremap_wt(resource_size_t phys_addr, unsigned long size)
+-{
+-	return __ioremap_caller(phys_addr, size, _PAGE_CACHE_MODE_WT,
+-					__builtin_return_address(0));
+-}
+-EXPORT_SYMBOL(ioremap_wt);
+-
+ void *arch_memremap(resource_size_t phys_addr, size_t size,
+ 		unsigned long flags)
+ {
+diff --git a/arch/xtensa/include/asm/io.h b/arch/xtensa/include/asm/io.h
+index 9bfbecc0fc99..aaafd90c70db 100644
+--- a/arch/xtensa/include/asm/io.h
++++ b/arch/xtensa/include/asm/io.h
+@@ -49,7 +49,6 @@ static inline void __iomem *ioremap_nocache(unsigned long offset,
+ }
+ 
+ #define ioremap_wc ioremap_nocache
+-#define ioremap_wt ioremap_nocache
+ 
+ static inline void __iomem *ioremap(unsigned long offset, unsigned long size)
+ {
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 2d98de535e0f..b76ec47c6810 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -699,7 +699,7 @@ config FB_MAC
+ 
+ config FB_HP300
+ 	bool
+-	depends on (FB = y) && DIO
++	depends on (FB = y) && DIO && ARCH_HAS_MEMREMAP
+ 	select FB_CFB_IMAGEBLIT
+ 	default y
+ 
+diff --git a/include/asm-generic/io.h b/include/asm-generic/io.h
+index f56094cfdeff..f5abd5540249 100644
+--- a/include/asm-generic/io.h
++++ b/include/asm-generic/io.h
+@@ -785,14 +785,6 @@ static inline void __iomem *ioremap_wc(phys_addr_t offset, size_t size)
+ }
+ #endif
+ 
+-#ifndef ioremap_wt
+-#define ioremap_wt ioremap_wt
+-static inline void __iomem *ioremap_wt(phys_addr_t offset, size_t size)
+-{
+-	return ioremap_nocache(offset, size);
+-}
+-#endif
+-
+ #ifndef iounmap
+ #define iounmap iounmap
+ 
+diff --git a/include/asm-generic/iomap.h b/include/asm-generic/iomap.h
+index d8f8622fa044..1b41011643a5 100644
+--- a/include/asm-generic/iomap.h
++++ b/include/asm-generic/iomap.h
+@@ -66,10 +66,6 @@ extern void ioport_unmap(void __iomem *);
+ #define ioremap_wc ioremap_nocache
+ #endif
+ 
+-#ifndef ARCH_HAS_IOREMAP_WT
+-#define ioremap_wt ioremap_nocache
+-#endif
+-
+ #ifdef CONFIG_PCI
+ /* Destroy a virtual mapping cookie for a PCI BAR (memory or IO) */
+ struct pci_dev;
