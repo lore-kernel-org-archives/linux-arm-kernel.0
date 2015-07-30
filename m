@@ -1,96 +1,61 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Thu, 30 Jul 2015 14:52:40 +0000
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
-Message-ID: <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Thu, 30 Jul 2015 22:53:14 +0800
+Subject: [PATCH] rtc: mt6397: implement suspend/resume function in rtc-mt6397
+ driver
+Message-ID: <1438267994-13934-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Implement the suspend/resume function in order to control rtc's irq_wake flag and handle as wakeup source.
 
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/rtc/rtc-mt6397.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> >
-[cut]
-> > Yes, our physical memory layout for RAM looks like this:
-> > 2 GB at 0x8000_0000
-> > 510 GB at 0x80_8000_0000
-> 
-> So your platform currently only has 16GB of RAM. Shouldn't the last 14GB
-> be placed at 34GB offset (according to the "Principles of ARM Memory
-> Maps")?
-
-Yes, but it looks like our hardware designer didn't follow it exactly.  And
-instead created a variant by dropping the middle region.  The reasoning
-seems to be that our SoC architecture is 40-bit PA only and thus it seemed
-unnecessary to have the middle region at 34GB offset.  Plus, they wanted
-that middle region for other I/O.
-
-> > > To be honest, I think this is poorly designed, and I am not sure we
-> > > should cater for such configurations in the defconfig.
-> >
-> > Agree, if this is a one-off weird platform then we shouldn't.
-> >
-> > But, the 'Principles of ARM Memory Maps' doc proposes this:
-> > 2 GB at 0x8000_0000
-> > 30 GB at 0x8_8000_0000
-> > 480 GB at 0x88_0000_0000
-> 
-> I'm not particularly recommending this layout, at least not without some
-> clarifications on DRAM aliases (I'll ping people internally about it
-> again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
-> and all the memory beyond 32-bit was highmem anyway. It was later
-> updated for AArch64 but only to allow 44/48-bit PA (a few sections
-> added).
-
-Published guidance from ARM I think is important here.  If the aarch64
-kernel maintainers have issues with the proposed map in the 'Principles' doc,
-I consider that's a problem.
-
-> How I understood it at the time is that in hardware you place the large
-> DRAM (chip select) at high addresses, e.g. 64GB would be at a 512GB
-> offset, but lower 2GB+30GB aliased in the lower space with the
-> corresponding high address remaining a hole (that produces external
-> aborts if accessed). The first alias at 2GB was meant for 32-bit
-> initialisation code before the MMU is enabled. With AArch64, you don't
-> really need this low alias (assuming your EL3/EL2/secure-EL1 code is
-> 64-bit) since PC can use >32-bit addresses.
-
-I think the intent with our SoC was to do that, but ommitting the
-middle alias, because there was no obivous reason why it was needed.
+diff --git a/drivers/rtc/rtc-mt6397.c b/drivers/rtc/rtc-mt6397.c
+index c0090b6..9f6c9f8 100644
+--- a/drivers/rtc/rtc-mt6397.c
++++ b/drivers/rtc/rtc-mt6397.c
+@@ -373,6 +373,31 @@ static int mtk_rtc_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
-> > ...i.e. if you have > 32 GB then your RAM regions are split into 3
-> > chunks.  The aarch64 kernel will support > than 32GB right?  A
-> > basic server will have that much or more.
-> >
-> > How will we deal with systems with > 32GB of memory that follow that
-> > map?
-> 
-> My recommendation would be to avoid the lower alias (in hardware or some
-> EL3 configuration change) and keep all the RAM at 0x80_0000_0000, just
-> boot the system in AArch64 mode.
-
-Unfortunately, for our existing armv8 silicon I am not aware any mechanism to
-change the aliasing and keeping all RAM at 512GB offset.  So, we're stuck
-for now with 2 discontiguous regions.  And things are ok as long as we
-turn on 48-bit VA or 64K pages, but that's not the case with the default
-defconfig.
-
-My interest in the default defconfig is related to distro support.  When
-a distro (Fedora, Debian, Ubuntu,etc) has a binary kernel image we want
-it to run on our hardware.  I don't know to what degree the upstream
-defconfig informs distros on what defconfig options are enabled in their
-kernels...but we want to be as compatible as possible with the default
-defconfig.
-
-(BTW, Fedora 22 for aarch64 appears to have 64KB pages enabled, which
-is good for our memory map)
-
-Thanks,
-Stuart
++#ifdef CONFIG_PM_SLEEP
++static int mt6397_rtc_suspend(struct device *dev)
++{
++	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
++
++	if (device_may_wakeup(dev))
++		enable_irq_wake(rtc->irq);
++
++	return 0;
++}
++
++static int mt6397_rtc_resume(struct device *dev)
++{
++	struct mt6397_rtc *rtc = dev_get_drvdata(dev);
++
++	if (device_may_wakeup(dev))
++		disable_irq_wake(rtc->irq);
++
++	return 0;
++}
++#endif
++
++static SIMPLE_DEV_PM_OPS(mt6397_pm_ops, mt6397_rtc_suspend,
++			mt6397_rtc_resume);
++
+ static const struct of_device_id mt6397_rtc_of_match[] = {
+ 	{ .compatible = "mediatek,mt6397-rtc", },
+ 	{ }
+@@ -382,6 +407,7 @@ static struct platform_driver mtk_rtc_driver = {
+ 	.driver = {
+ 		.name = "mt6397-rtc",
+ 		.of_match_table = mt6397_rtc_of_match,
++		.pm = &mt6397_pm_ops,
+ 	},
+ 	.probe	= mtk_rtc_probe,
+ 	.remove = mtk_rtc_remove,
+-- 
+1.8.1.1.dirty
