@@ -1,41 +1,53 @@
 From: antoine.tenart@free-electrons.com (Antoine Tenart)
-Date: Thu, 30 Jul 2015 14:35:52 +0200
-Subject: [PATCH 3/3] ARM: berlin: dts: add the cpufreq-dt bindings on the BG2Q
+Date: Thu, 30 Jul 2015 14:35:51 +0200
+Subject: [PATCH 2/3] ARM: berlin: register cpufreq-dt for the BG2Q
 In-Reply-To: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
 References: <1438259752-16320-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <1438259752-16320-4-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <1438259752-16320-3-git-send-email-antoine.tenart@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BG2Q uses cpugreq-dt. Add the corresponding bindings. The operating
-points can be updated by the bootloader.
+The BG2Q SoC uses cpufreq-dt for cpufreq. Register a platform device for
+this.
 
 Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 ---
- arch/arm/boot/dts/berlin2q.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/mach-berlin/berlin.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/berlin2q.dtsi b/arch/arm/boot/dts/berlin2q.dtsi
-index 63a48490e2f9..58f6792c0d77 100644
---- a/arch/arm/boot/dts/berlin2q.dtsi
-+++ b/arch/arm/boot/dts/berlin2q.dtsi
-@@ -53,6 +53,17 @@
- 			device_type = "cpu";
- 			next-level-cache = <&l2>;
- 			reg = <0>;
-+
-+			clocks = <&chip_clk CLKID_CPU>;
-+			clock-latency = <100000>;
-+			/* Can be modified by the bootloader */
-+			operating-points = <
-+				/* kHz    uV */
-+				1200000 1200000
-+				1000000 1200000
-+				800000  1200000
-+				600000  1200000
-+			>;
- 		};
+diff --git a/arch/arm/mach-berlin/berlin.c b/arch/arm/mach-berlin/berlin.c
+index ac181c6797ee..0de906374994 100644
+--- a/arch/arm/mach-berlin/berlin.c
++++ b/arch/arm/mach-berlin/berlin.c
+@@ -15,9 +15,21 @@
+ #include <linux/io.h>
+ #include <linux/kernel.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_device.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
  
- 		cpu at 1 {
++static const struct of_device_id berlin2q_match[] = {
++	{ .compatible = "marvell,berlin2q" },
++	{ },
++};
++
++static void __init berlin_init_late(void)
++{
++	if (of_find_matching_node(NULL, berlin2q_match))
++		platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
++}
++
+ static const char * const berlin_dt_compat[] = {
+ 	"marvell,berlin",
+ 	NULL,
+@@ -25,6 +37,7 @@ static const char * const berlin_dt_compat[] = {
+ 
+ DT_MACHINE_START(BERLIN_DT, "Marvell Berlin")
+ 	.dt_compat	= berlin_dt_compat,
++	.init_late	= berlin_init_late,
+ 	/*
+ 	 * with DT probing for L2CCs, berlin_init_machine can be removed.
+ 	 * Note: 88DE3005 (Armada 1500-mini) uses pl310 l2cc
 -- 
 2.5.0
