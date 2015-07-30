@@ -1,56 +1,77 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 30 Jul 2015 20:04:57 +0200
-Subject: [PATCH v5 01/10] clk: mediatek: Removed unused dpi_ck clock from
- MT8173
-In-Reply-To: <20150730173643.GH3159@codeaurora.org>
-References: <1438152754-11970-1-git-send-email-jamesjj.liao@mediatek.com>
- <1438154233.17770.39.camel@mtksdaap41> <20150730173643.GH3159@codeaurora.org>
-Message-ID: <1450634.BBmUdb8ZLk@diego>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Thu, 30 Jul 2015 18:10:33 +0000
+Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
+In-Reply-To: <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
+References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <55B0E1AD.60409@arm.com>
+ <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
+ <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
+ <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <20150730161210.GE407@e104818-lin.cambridge.arm.com>
+ <CY1PR0301MB0748FA3A10AFA9BFC1AB0A39878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
+Message-ID: <CY1PR0301MB0748CE5ADA1D0A41D78C592F878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 30. Juli 2015, 10:36:43 schrieb Stephen Boyd:
-> On 07/29, James Liao wrote:
-> > Hi Stephen,
-> > 
-> > Could you help to apply this patch into 4.2?
-> > 
-> > 
-> > Best regards,
-> > 
-> > James
-> > 
-> > On Wed, 2015-07-29 at 09:05 +0200, Heiko St?bner wrote:
-> > > Am Mittwoch, 29. Juli 2015, 14:52:25 schrieb James Liao:
-> > > > The dpi_ck clock can be removed because it not actually used
-> > > > in topckgen and subsystems.
-> > > > 
-> > > > Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
-> > > 
-> > > From our past discussions this change looks about right, and should
-> > > still
-> > > become _part of 4.2_, to not have the CLK_TOP_DPI become part of the
-> > > devicetree CLK_TOP_DPI.
+
+
+> -----Original Message-----
+> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> Sent: Thursday, July 30, 2015 12:46 PM
+> To: Yoder Stuart-B08248
+> Cc: Catalin Marinas; Mark Rutland; Marc Zyngier; Will Deacon; Newton Peter-RA3823; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
 > 
-> Did you mean ABI?
-
-yep, sorry
-
+> On 30 July 2015 at 18:32, Stuart Yoder <stuart.yoder@freescale.com> wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> >>
+> >> For the time being, I would keep defconfig to 39-bit VA. If we start
+> >> seeing systems with lots of RAM (over 256GB), we'll probably change the
+> >> defconfig.
+> >
+> > Somone who follows the "Principles" doc "correctly" will hit an issue
+> > with the linear memory map after 32GB of RAM, right?   2 GB in 1st alias,
+> > 30 GB in 2nd alias, and rest at the 544 GB offset.
+> >
+> > But, I guess it still remains to be seen who else will hit that
+> > and when.
+> >
 > 
-> > > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Hi Stuart,
 > 
-> Is it being used in DT right now and causing regressions on
-> v4.2-rcX? Sorry, I'm trying to understand why this patch matters
-> for the 4.2 release.
+> I think you may be overestimating the significance of defconfig.
 
-it's not been used in an actual devicetree file, but as far as I understand it, 
-the dt-binding headers themself are also part of the ABI.
+I might be, it's just a paranoia point...which led to wondering
+about what to expect with respect 48-bit VA and 64K pages going
+forward.
 
-And it is new in 4.2, so has not been part of an official release yet.
+> As you pointed out, distros have their own configs (and many out of tree
+> patches) for the binary kernels they ship. Fedora currently ships with
+> 64k pages because it was the only way to support Seattle before the
+> 4-level 4kb pages implementation was introduced. They will likely keep
+> doing that, or switch to 4-level 4 kB pages since, as you pointed out,
+> it is fairly likely that servers have more than 32 GB DRAM, which
+> means that they need more than 256 GB of virtual address space in the
+> linear region if they follow the ARM recommendation.
+> 
+> Whether defconfig supports your platform optimally has nothing to do
+> with that. Of course, we should deal with the unexpected memory layout
+> gracefully, which is why Mark Rutland and myself proposed patches to
+> fix the panic you reported. But in a development context, I think it
+> is perfectly acceptable to simply load the kernel at 0x80_8000_0000,
+> and be able to run defconfig fine while losing just 2 GB of your 16 GB
+> at the low end. Of course, you would never ship a system like that,
+> but that is not what defconfig is meant to cater for.
 
-The reason for the removal from what I understand is that the removed clock is 
-not documented at all (it's source, what it does), which got it the "clk_null" 
-parent in the first place.
+Thanks for the patch and all your input, the picture and options are
+quite a bit clearer to me now.
 
-
-Heiko
+Thanks,
+Stuart
