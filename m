@@ -1,195 +1,93 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:16:34 +0530
-Subject: [PATCH 11/11] mmc: host: omap_hsmmc: add software timer when timeout
- greater than hardware capablility
-In-Reply-To: <1438242394-25599-1-git-send-email-kishon@ti.com>
-References: <1438242394-25599-1-git-send-email-kishon@ti.com>
-Message-ID: <1438242394-25599-12-git-send-email-kishon@ti.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 30 Jul 2015 09:50:51 +0200
+Subject: [RFC PATCH 2/2] dt: spi: s3c64xx: add compatible to
+ controller-data
+In-Reply-To: <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
+References: <cover.1438170519.git.hramrach@gmail.com>
+ <557c1962448393b2a8736f26bfa2a3a5ba4aeb7a.1438170519.git.hramrach@gmail.com>
+Message-ID: <20150730095051.06eff8b1@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mugunthan V N <mugunthanvnm@ti.com>
+Hi Michal,
 
-DRA7 Errata No i834: When using high speed HS200 and SDR104
-cards, the functional clock for MMC module will be 192MHz.
-At this frequency, the maximum obtainable timeout (DTO =0xE)
-in hardware is (1/192MHz)*2^27 = 700ms. Commands taking longer
-than 700ms will be affected by this small window frame and
-will be timing out frequently even without a genune timeout
-from the card. Workarround for this errata is use a software
-timer instead of hardware timer to provide the delay requested
-by the upper layer
+On Wed, 29 Jul 2015 12:19:57 +0200
+Michal Suchanek <hramrach@gmail.com> wrote:
 
-So adding a software timer as a work around for the errata.
-Instead of using software timeout only for larger delays requested
-when using HS200/SDR104 cards which results in hardware and
-software timer race conditions, so move all the timeout request
-to use software timer when HS200/SDR104 card is connected and
-use hardware timer when other type cards are connected.
+> The controller-data subnode has no compatible. This can lead to other
+> drivers getting confused by it. Add a compatible to make devicetreee
+> unambiguous.
+> 
+> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-samsung.txt | 3 +++
+>  drivers/spi/spi-s3c64xx.c                             | 4 ++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/spi-samsung.txt b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> index 6dbdeb3..b1e98d1 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-samsung.txt
+> @@ -92,16 +92,19 @@ Example:
+>  			spi-max-frequency = <10000>;
+>  
+>  			controller-data {
+> +				compatible = "samsung,s3c-controller-data";
 
-Also start the software timer after queueing to DMA to ensure
-we are more likely to expire within correct limits. To be ever
-more sure that we won't expire this soft timer too early, we're
-adding a 1000000ns slack to the data timeout requested by the
-upper layer.
+AFAIK compatible should (as much as possible :-)) only be used to encode
+HW type, and here you're using it to expose what you want to do with
+your data in Linux.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>  				samsung,spi-feedback-delay = <0>;
+>  			};
+>  
+>  			partition at 0 {
+> +				compatible = "linux,ofpart-partition";
+
+Ditto.
+
+Since you have to patch your DTs anyway, how about putting your
+partitions in a subnode and patch the ofpart code to parse this subnode
+if it is present (see the following patch).
+
+Best Regards,
+
+Boris
+
+--- >8 ---
+
+>From e342860932bda3a6354a0a6e17540db5c85a14e0 Mon Sep 17 00:00:00 2001
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Thu, 30 Jul 2015 09:44:07 +0200
+Subject: [PATCH] mtd: ofpart: search for a partitions node
+
+The DT partition parser currently assumes the parition definitions are
+directly stored in the MTD device node, but sometime this device node
+contains other child nodes used to store device specific information.
+
+Search for a partitions subnode containing the partition definitions,
+if it is not there, parse the definitions in the device node.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   71 +++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 69 insertions(+), 2 deletions(-)
+ drivers/mtd/ofpart.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 6b02c7c..3a02f86 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -168,6 +168,7 @@
- #define ACNE	(1 << 0)
+diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
+index 8a06cfb..ba52b88 100644
+--- a/drivers/mtd/ofpart.c
++++ b/drivers/mtd/ofpart.c
+@@ -38,7 +38,10 @@ static int parse_ofpart_partitions(struct mtd_info *master,
+ 	if (!data)
+ 		return 0;
  
- #define MMC_AUTOSUSPEND_DELAY	100
-+#define MMC_SOFT_TIMER_SLACK	1000000		/* ns */
- #define MMC_TIMEOUT_MS		20		/* 20 mSec */
- #define MMC_TIMEOUT_US		20000		/* 20000 micro Sec */
- #define OMAP_MMC_MIN_CLOCK	400000
-@@ -245,6 +246,10 @@ struct omap_hsmmc_host {
- 	struct omap_hsmmc_next	next_data;
- 	struct	omap_hsmmc_platform_data	*pdata;
- 
-+	struct timer_list	timer;
-+	unsigned long		data_timeout;
-+	unsigned int		need_i834_errata:1;
+-	node = data->of_node;
++	node = of_get_child_by_name(data->of_node, "partitions");
++	if (!node)
++		node = data->of_node;
 +
- 	u32			*tuning_data;
- 	int			tuning_size;
+ 	if (!node)
+ 		return 0;
  
-@@ -661,8 +666,8 @@ static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
- 		irq_mask &= ~(BRR_EN | BWR_EN);
- 	}
- 
--	/* Disable timeout for erases */
--	if (cmd->opcode == MMC_ERASE)
-+	/* Disable timeout for erases or when using software timeout */
-+	if (cmd->opcode == MMC_ERASE || host->need_i834_errata)
- 		irq_mask &= ~DTO_EN;
- 
- 	spin_lock_irqsave(&host->irq_lock, flags);
-@@ -752,6 +757,22 @@ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
- 		OMAP_HSMMC_WRITE(host->base, HCTL, regval);
- 	}
- 
-+	/*
-+	 * DRA7 Errata No i834: When using high speed HS200 and SDR104
-+	 * cards, the functional clock for MMC module will be 192MHz.
-+	 * At this frequency, the maximum obtainable timeout (DTO =0xE)
-+	 * in hardware is (1/192MHz)*2^27 = 700ms. Commands taking longer
-+	 * than 700ms will be affected by this small window frame and
-+	 * will be timing out frequently even without a genune timeout
-+	 * from the card. Workarround for this errata is use a software
-+	 * timer instead of hardware timer to provide the delay requested
-+	 * by the upper layer
-+	 */
-+	if (ios->clock == 192000000)
-+		host->need_i834_errata = true;
-+	else
-+		host->need_i834_errata = false;
-+
- 	omap_hsmmc_start_clock(host);
- }
- 
-@@ -1298,6 +1319,16 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
- 	int status;
- 
- 	status = OMAP_HSMMC_READ(host->base, STAT);
-+
-+	/*
-+	 * During a successful bulk data transfer command-completion
-+	 * interrupt and transfer-completion interrupt will be generated,
-+	 * but software-timeout timer should be deleted only on non-CC
-+	 * interrupts (transfer complete or error)
-+	 */
-+	if (host->need_i834_errata && (status & (~CC_EN)))
-+		del_timer(&host->timer);
-+
- 	while (status & (INT_EN_MASK | CIRQ_EN)) {
- 		if (host->req_in_progress)
- 			omap_hsmmc_do_irq(host, status);
-@@ -1312,6 +1343,13 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static void omap_hsmmc_soft_timeout(unsigned long data)
-+{
-+	struct omap_hsmmc_host *host = (struct omap_hsmmc_host *)data;
-+
-+	hsmmc_command_incomplete(host, -ETIMEDOUT, 0);
-+}
-+
- static void set_sd_bus_power(struct omap_hsmmc_host *host)
- {
- 	unsigned long i;
-@@ -1513,6 +1551,22 @@ static void set_data_timeout(struct omap_hsmmc_host *host,
- 	if (clkd == 0)
- 		clkd = 1;
- 
-+	if (host->need_i834_errata) {
-+		unsigned long delta;
-+
-+		delta = (timeout_clks / (host->clk_rate / clkd));
-+
-+		/*
-+		 * We should really be using just timeout_ns + delta,
-+		 * however we have no control over when DMA will
-+		 * actually start transferring; due to that we will add
-+		 * an extra slack to make sure we don't expire too
-+		 * early.
-+		 */
-+		host->data_timeout = timeout_ns + delta + MMC_SOFT_TIMER_SLACK;
-+		return;
-+	}
-+
- 	cycle_ns = 1000000000 / (host->clk_rate / clkd);
- 	timeout = timeout_ns / cycle_ns;
- 	timeout += timeout_clks;
-@@ -1551,6 +1605,13 @@ static void omap_hsmmc_start_dma_transfer(struct omap_hsmmc_host *host)
- 				req->data->timeout_clks);
- 	chan = omap_hsmmc_get_dma_chan(host, req->data);
- 	dma_async_issue_pending(chan);
-+
-+	if (host->need_i834_errata) {
-+		unsigned long timeout;
-+
-+		timeout = jiffies + nsecs_to_jiffies(host->data_timeout);
-+		mod_timer(&host->timer, timeout);
-+	}
- }
- 
- /*
-@@ -2415,6 +2476,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 
- 	spin_lock_init(&host->irq_lock);
- 	init_completion(&host->buf_ready);
-+	setup_timer(&host->timer, omap_hsmmc_soft_timeout,
-+		    (unsigned long)host);
- 
- 	host->fclk = devm_clk_get(&pdev->dev, "fck");
- 	if (IS_ERR(host->fclk)) {
-@@ -2608,6 +2671,8 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
- 	if (host->rx_chan)
- 		dma_release_channel(host->rx_chan);
- 
-+	del_timer_sync(&host->timer);
-+
- 	pm_runtime_put_sync(host->dev);
- 	pm_runtime_disable(host->dev);
- 	device_init_wakeup(&pdev->dev, false);
-@@ -2640,6 +2705,8 @@ static int omap_hsmmc_suspend(struct device *dev)
- 	if (host->dbclk)
- 		clk_disable_unprepare(host->dbclk);
- 
-+	del_timer_sync(&host->timer);
-+
- 	pm_runtime_put_sync(host->dev);
- 	return 0;
- }
 -- 
-1.7.9.5
+1.9.1
