@@ -1,77 +1,86 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Thu, 30 Jul 2015 18:10:33 +0000
-Subject: [RFC] arm64: defconfig: enable 48-bit VA by default
-In-Reply-To: <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
-References: <CY1PR0301MB07488D6DC5F0B171D6B290E187830@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <55B0E1AD.60409@arm.com>
- <BY2PR0301MB0743CBCFC5476E39A5D1EC0B878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <CAKv+Gu9LHBd7wM6P4H0X5WigzDETtpr2++_Ebo=adg5QtTOW2w@mail.gmail.com>
- <BY2PR0301MB074300C5F31701D9211827F0878C0@BY2PR0301MB0743.namprd03.prod.outlook.com>
- <20150730101358.GA30796@e104818-lin.cambridge.arm.com>
- <CY1PR0301MB074850E27D5D298D1B8495D2878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <20150730161210.GE407@e104818-lin.cambridge.arm.com>
- <CY1PR0301MB0748FA3A10AFA9BFC1AB0A39878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <CAKv+Gu-Wbv3J9-2KbXrz_3W_=VXChrD+REo1-q1Ns_=RUM1BFw@mail.gmail.com>
-Message-ID: <CY1PR0301MB0748CE5ADA1D0A41D78C592F878B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Jul 2015 19:11:14 +0100
+Subject: [PATCH 2/2] irqchip/gic: Ensure gic_cpu_if_up/down() programs
+ correct GIC instance
+In-Reply-To: <55BA6538.2050606@nvidia.com>
+References: <1438273573-27958-1-git-send-email-jonathanh@nvidia.com>
+ <1438273573-27958-2-git-send-email-jonathanh@nvidia.com>
+ <55BA55F4.2060001@arm.com> <55BA6538.2050606@nvidia.com>
+Message-ID: <55BA68C2.9040209@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> Sent: Thursday, July 30, 2015 12:46 PM
-> To: Yoder Stuart-B08248
-> Cc: Catalin Marinas; Mark Rutland; Marc Zyngier; Will Deacon; Newton Peter-RA3823; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+On 30/07/15 18:56, Jon Hunter wrote:
 > 
-> On 30 July 2015 at 18:32, Stuart Yoder <stuart.yoder@freescale.com> wrote:
-> >
-> >
-> >> -----Original Message-----
-> >> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> >>
-> >> For the time being, I would keep defconfig to 39-bit VA. If we start
-> >> seeing systems with lots of RAM (over 256GB), we'll probably change the
-> >> defconfig.
-> >
-> > Somone who follows the "Principles" doc "correctly" will hit an issue
-> > with the linear memory map after 32GB of RAM, right?   2 GB in 1st alias,
-> > 30 GB in 2nd alias, and rest at the 544 GB offset.
-> >
-> > But, I guess it still remains to be seen who else will hit that
-> > and when.
-> >
+> On 30/07/15 17:51, Marc Zyngier wrote:
+>> On 30/07/15 17:26, Jon Hunter wrote:
+>>> Commit 3228950621d9 ("irqchip: gic: Preserve gic V2 bypass bits in cpu
+>>> ctrl register") added a new function, gic_cpu_if_up(), to program the
+>>> GIC CPU_CTRL register. This function assumes that there is only one GIC
+>>> instance present and hence always uses the chip data for the primary GIC
+>>> controller. Although it is not common for there to be a secondary, some
+>>> devices do support a secondary. Therefore, fix this by passing
+>>> gic_cpu_if_up() a pointer to the appropriate chip data structure.
+>>>
+>>> Similarly, the function gic_cpu_if_down() only assumes that there is a
+>>> single GIC instance present. Update this function so that an instance
+>>> number is passed for the appropriate GIC. The vexpress TC2 (which has
+>>> a single GIC) is currently the only user of this function and so update
+>>> it accordingly.
+>>>
+>>> Signed-off-by: Jon Hunter <jonathanh@nvidia.com>
+>>> ---
+>>> I was hoping to make the gic_cpu_if_up/down function more symmetric as we
+>>> discussed but it is not possible to pass the gic_nr to gic_cpu_if_up()
+>>> from all the places called without making more changes. However, given
+>>> that gic_cpu_if_up() is a local function and gic_cpu_if_down() is public,
+>>> may be it does not matter too much.
+>>>
+>>>  arch/arm/mach-vexpress/tc2_pm.c |  2 +-
+>>>  drivers/irqchip/irq-gic.c       | 14 +++++++-------
+>>>  include/linux/irqchip/arm-gic.h |  2 +-
+>>>  3 files changed, 9 insertions(+), 9 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+>>> index b3328cd46c33..1aa4ccece69f 100644
+>>> --- a/arch/arm/mach-vexpress/tc2_pm.c
+>>> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+>>> @@ -80,7 +80,7 @@ static void tc2_pm_cpu_powerdown_prepare(unsigned int cpu, unsigned int cluster)
+>>>  	 * to the CPU by disabling the GIC CPU IF to prevent wfi
+>>>  	 * from completing execution behind power controller back
+>>>  	 */
+>>> -	gic_cpu_if_down();
+>>> +	gic_cpu_if_down(0);
+>>>  }
+>>>  
+>>>  static void tc2_pm_cluster_powerdown_prepare(unsigned int cluster)
+>>> diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+>>> index 7566fe259d27..cf9aca22120f 100644
+>>> --- a/drivers/irqchip/irq-gic.c
+>>> +++ b/drivers/irqchip/irq-gic.c
+>>> @@ -356,10 +356,10 @@ static u8 gic_get_cpumask(struct gic_chip_data *gic)
+>>>  	return mask;
+>>>  }
+>>>  
+>>> -static void gic_cpu_if_up(void)
+>>> +static void gic_cpu_if_up(struct gic_chip_data *gic)
+>>>  {
+>>> -	void __iomem *cpu_base = gic_data_cpu_base(&gic_data[0]);
+>>> -	void __iomem *dist_base = gic_data_dist_base(&gic_data[0]);
+>>> +	void __iomem *cpu_base = gic_data_cpu_base(gic);
+>>> +	void __iomem *dist_base = gic_data_dist_base(gic);
+>>
+>> Which tree is that against? I don't have a dist_base in mainline...
 > 
-> Hi Stuart,
-> 
-> I think you may be overestimating the significance of defconfig.
+> It is based upon linux-next. I can rebase on the current mainline if you
+> want them for v4.2.
 
-I might be, it's just a paranoia point...which led to wondering
-about what to expect with respect 48-bit VA and 64K pages going
-forward.
-
-> As you pointed out, distros have their own configs (and many out of tree
-> patches) for the binary kernels they ship. Fedora currently ships with
-> 64k pages because it was the only way to support Seattle before the
-> 4-level 4kb pages implementation was introduced. They will likely keep
-> doing that, or switch to 4-level 4 kB pages since, as you pointed out,
-> it is fairly likely that servers have more than 32 GB DRAM, which
-> means that they need more than 256 GB of virtual address space in the
-> linear region if they follow the ARM recommendation.
-> 
-> Whether defconfig supports your platform optimally has nothing to do
-> with that. Of course, we should deal with the unexpected memory layout
-> gracefully, which is why Mark Rutland and myself proposed patches to
-> fix the panic you reported. But in a development context, I think it
-> is perfectly acceptable to simply load the kernel at 0x80_8000_0000,
-> and be able to run defconfig fine while losing just 2 GB of your 16 GB
-> at the low end. Of course, you would never ship a system like that,
-> but that is not what defconfig is meant to cater for.
-
-Thanks for the patch and all your input, the picture and options are
-quite a bit clearer to me now.
+It'd be good to fix it in mainline ASAP, as the Realview platforms are a
+tiny bit dead at the moment, so a 4.2-rc would be good. The conflict
+with Russell's FIQ work won't be hard to solve anyway.
 
 Thanks,
-Stuart
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
