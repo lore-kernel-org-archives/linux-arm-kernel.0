@@ -1,186 +1,109 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 30 Jul 2015 13:16:27 +0530
-Subject: [PATCH 04/11] mmc: host: omap_hsmmc: add voltage switch support for
- UHS SD card
+Date: Thu, 30 Jul 2015 13:16:29 +0530
+Subject: [PATCH 06/11] mmc: host: omap_hsmmc: set timing in the UHSMS field
 In-Reply-To: <1438242394-25599-1-git-send-email-kishon@ti.com>
 References: <1438242394-25599-1-git-send-email-kishon@ti.com>
-Message-ID: <1438242394-25599-5-git-send-email-kishon@ti.com>
+Message-ID: <1438242394-25599-7-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Balaji T K <balajitk@ti.com>
+Add a separate function to set the UHSMS field to one
+of SDR104, SDR50, DDR50, SDR25 or SDR12 depending on the
+inserted SD card. This is required for
+tuning to succeed in the case of SDR104/HS200 or SDR50.
 
-UHS sd card i/o data line can operate at 3V and 1.8V on UHS speed
-modes. Add support for signal voltage switch and check for card_busy.
-
-Signed-off-by: Balaji T K <balajitk@ti.com>
-Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
-[kishon at ti.com : cleanup the voltage switch sequence]
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |  129 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 129 insertions(+)
+ drivers/mmc/host/omap_hsmmc.c |   49 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 49 insertions(+)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 306e5c0..e960b5c 100644
+index 0452a8b..e0bd8df 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -112,6 +112,9 @@
- /* PSTATE */
- #define DLEV_DAT(x)		(1 << (20 + (x)))
+@@ -114,6 +114,13 @@
  
-+/* AC12 */
-+#define AC12_V1V8_SIGEN		(1 << 19)
-+
+ /* AC12 */
+ #define AC12_V1V8_SIGEN		(1 << 19)
++#define AC12_UHSMC_MASK		(7 << 16)
++#define AC12_UHSMC_SDR12	(0 << 16)
++#define AC12_UHSMC_SDR25	(1 << 16)
++#define AC12_UHSMC_SDR50	(2 << 16)
++#define AC12_UHSMC_SDR104	(3 << 16)
++#define AC12_UHSMC_DDR50	(4 << 16)
++#define AC12_UHSMC_RES		(0x7 << 16)
+ 
  /* Interrupt masks for IE and ISE register */
  #define CC_EN			(1 << 0)
- #define TC_EN			(1 << 1)
-@@ -151,6 +154,12 @@
- #define VDD_1V8			1800000		/* 180000 uV */
- #define VDD_3V0			3000000		/* 300000 uV */
- #define VDD_165_195		(ffs(MMC_VDD_165_195) - 1)
-+#define VDD_30_31		(ffs(MMC_VDD_30_31) - 1)
-+
-+#define CON_CLKEXTFREE		(1 << 16)
-+#define CON_PADEN		(1 << 15)
-+#define PSTATE_CLEV		(1 << 24)
-+#define PSTATE_DLEV		(0xF << 20)
- 
- /*
-  * One controller can have multiple slots, like on some omap boards using
-@@ -1851,6 +1860,124 @@ static int omap_hsmmc_multi_io_quirk(struct mmc_card *card,
- 	return blk_size;
+@@ -198,6 +205,7 @@ struct omap_hsmmc_host {
+ 	unsigned int		dma_sg_idx;
+ 	unsigned char		bus_mode;
+ 	unsigned char		power_mode;
++	unsigned char		timing;
+ 	int			suspended;
+ 	u32			con;
+ 	u32			hctl;
+@@ -1658,6 +1666,41 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 	omap_hsmmc_start_command(host, req->cmd, req->data);
  }
  
-+static int omap_hsmmc_start_signal_voltage_switch(struct mmc_host *mmc,
-+						  struct mmc_ios *ios)
-+{
-+	struct omap_hsmmc_host *host;
-+	u32 val = 0;
-+	int ret = 0;
-+
-+	host  = mmc_priv(mmc);
-+
-+	if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330) {
-+		val = OMAP_HSMMC_READ(host->base, CAPA);
-+		if (!(val & VS30))
-+			return -EOPNOTSUPP;
-+
-+		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
-+
-+		val = OMAP_HSMMC_READ(host->base, AC12);
-+		val &= ~AC12_V1V8_SIGEN;
-+		OMAP_HSMMC_WRITE(host->base, AC12, val);
-+
-+		ret = mmc_pdata(host)->set_power(host->dev, 1, VDD_30_31);
-+		if (ret) {
-+			dev_dbg(mmc_dev(host->mmc), "failed to switch to 3v\n");
-+			return ret;
-+		}
-+
-+		dev_dbg(mmc_dev(host->mmc), " i/o voltage switch to 3V\n");
-+	} else if (ios->signal_voltage == MMC_SIGNAL_VOLTAGE_180) {
-+		val = OMAP_HSMMC_READ(host->base, CAPA);
-+		if (!(val & VS18))
-+			return -EOPNOTSUPP;
-+
-+		omap_hsmmc_conf_bus_power(host, ios->signal_voltage);
-+
-+		val = OMAP_HSMMC_READ(host->base, AC12);
-+		val |= AC12_V1V8_SIGEN;
-+		OMAP_HSMMC_WRITE(host->base, AC12, val);
-+
-+		ret = mmc_pdata(host)->set_power(host->dev, 1, VDD_165_195);
-+		if (ret < 0) {
-+			dev_dbg(mmc_dev(host->mmc), "failed to switch 1.8v\n");
-+			return ret;
-+		}
-+	} else {
-+		return -EOPNOTSUPP;
-+	}
-+
-+	return 0;
-+}
-+
-+static int omap_hsmmc_card_busy_low(struct omap_hsmmc_host *host)
++static void omap_hsmmc_set_timing(struct omap_hsmmc_host *host)
 +{
 +	u32 val;
-+	unsigned long timeout;
++	struct mmc_ios *ios = &host->mmc->ios;
 +
-+	val = OMAP_HSMMC_READ(host->base, CON);
-+	val &= ~CON_CLKEXTFREE;
-+	val |= CON_PADEN;
-+	OMAP_HSMMC_WRITE(host->base, CON, val);
-+
-+	timeout = jiffies + msecs_to_jiffies(1);
-+	do {
-+		val = OMAP_HSMMC_READ(host->base, PSTATE);
-+		if (!(val & (PSTATE_CLEV | PSTATE_DLEV)))
-+			return true;
-+
-+		usleep_range(100, 200);
-+	} while (!time_after(jiffies, timeout));
-+
-+	dev_err(mmc_dev(host->mmc), "timeout : i/o low 0x%x\n", val);
-+
-+	return false;
-+}
-+
-+static int omap_hsmmc_card_busy_high(struct omap_hsmmc_host *host)
-+{
-+	u32 val;
-+	unsigned long timeout;
-+
-+	val = OMAP_HSMMC_READ(host->base, CON);
-+	val |= CLKEXTFREE;
-+	OMAP_HSMMC_WRITE(host->base, CON, val);
-+
-+	timeout = jiffies + msecs_to_jiffies(1);
-+	do {
-+		val = OMAP_HSMMC_READ(host->base, PSTATE);
-+		if ((val & PSTATE_CLEV) && (val & PSTATE_DLEV)) {
-+			val = OMAP_HSMMC_READ(host->base, CON);
-+			val &= ~(CON_CLKEXTFREE | CON_PADEN);
-+			OMAP_HSMMC_WRITE(host->base, CON, val);
-+			return false;
-+		}
-+
-+		usleep_range(100, 200);
-+	} while (!time_after(jiffies, timeout));
-+
-+	dev_err(mmc_dev(host->mmc), "timeout : i/o high 0x%x\n", val);
-+
-+	return true;
-+}
-+
-+static int omap_hsmmc_card_busy(struct mmc_host *mmc)
-+{
-+	struct omap_hsmmc_host *host;
-+	u32 val;
-+	int ret;
-+
-+	host  = mmc_priv(mmc);
++	omap_hsmmc_stop_clock(host);
 +
 +	val = OMAP_HSMMC_READ(host->base, AC12);
-+	if (val & AC12_V1V8_SIGEN)
-+		ret = omap_hsmmc_card_busy_high(host);
-+	else
-+		ret = omap_hsmmc_card_busy_low(host);
++	val &= ~AC12_UHSMC_MASK;
++	switch (ios->timing) {
++	case MMC_TIMING_UHS_SDR104:
++	case MMC_TIMING_MMC_HS200:
++		val |= AC12_UHSMC_SDR104;
++		break;
++	case MMC_TIMING_UHS_DDR50:
++		val |= AC12_UHSMC_DDR50;
++		break;
++	case MMC_TIMING_UHS_SDR50:
++		val |= AC12_UHSMC_SDR50;
++		break;
++	case MMC_TIMING_UHS_SDR25:
++		val |= AC12_UHSMC_SDR25;
++		break;
++	case MMC_TIMING_UHS_SDR12:
++		val |= AC12_UHSMC_SDR12;
++		break;
++	default:
++		val |= AC12_UHSMC_RES;
++		break;
++	}
++	OMAP_HSMMC_WRITE(host->base, AC12, val);
 +
-+	return ret;
++	omap_hsmmc_start_clock(host);
 +}
 +
- static struct mmc_host_ops omap_hsmmc_ops = {
- 	.post_req = omap_hsmmc_post_req,
- 	.pre_req = omap_hsmmc_pre_req,
-@@ -1860,6 +1987,8 @@ static struct mmc_host_ops omap_hsmmc_ops = {
- 	.get_ro = mmc_gpio_get_ro,
- 	.init_card = omap_hsmmc_init_card,
- 	.enable_sdio_irq = omap_hsmmc_enable_sdio_irq,
-+	.start_signal_voltage_switch = omap_hsmmc_start_signal_voltage_switch,
-+	.card_busy = omap_hsmmc_card_busy,
- };
+ /* Routine to configure clock values. Exposed API to core */
+ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+@@ -1706,6 +1749,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  
- #ifdef CONFIG_DEBUG_FS
+ 	omap_hsmmc_set_clock(host);
+ 
++	if (ios->timing != host->timing) {
++		omap_hsmmc_set_timing(host);
++		host->timing = ios->timing;
++	}
++
+ 	if (do_send_init_stream)
+ 		send_init_stream(host);
+ 
+@@ -2194,6 +2242,7 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
+ 	host->mapbase	= res->start + pdata->reg_offset;
+ 	host->base	= base + pdata->reg_offset;
+ 	host->power_mode = MMC_POWER_OFF;
++	host->timing	= 0;
+ 	host->next_data.cookie = 1;
+ 
+ 	ret = omap_hsmmc_gpio_init(mmc, host, pdata);
 -- 
 1.7.9.5
