@@ -1,88 +1,204 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Thu, 30 Jul 2015 23:25:12 +0900
-Subject: [RFC PATCH 0/3] clocksource: exynos_mct: allow mct to use 64-bit
- counter from coprocessor
-In-Reply-To: <CAD=FV=VMEGrS7XdVDLTM89WHVd_zQtjs0aM2CaWCecE3WqG9Uw@mail.gmail.com>
-References: <1438032507.17734.46.camel@gmail.com>	<CAD=FV=W0PM57UJBQ1Vw4PNTapnPDvU1xtKP=9gdX6GBy+6yh1A@mail.gmail.com>	<CALW4P+LqjhQ+Puadz4W-n_v=KEnwvQiUkk5jkDLRxhjVQGwFyw@mail.gmail.com>
- <CAD=FV=VMEGrS7XdVDLTM89WHVd_zQtjs0aM2CaWCecE3WqG9Uw@mail.gmail.com>
-Message-ID: <55BA33C8.30502@kernel.org>
+From: shenwei.wang@freescale.com (Shenwei Wang)
+Date: Thu, 30 Jul 2015 09:32:42 -0500
+Subject: [PATCH v4 1/1] Serial: imx: add dev_pm_ops to support suspend to
+ ram/disk
+Message-ID: <1438266762-4397-1-git-send-email-shenwei.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/29/15 08:29, Doug Anderson wrote:
-> Hi,
-> 
-Hi,
+When system goes into low power states like SUSPEND_MEM and
+HIBERNATION, the hardware IP block may be powered off to reduce
+the power consumption. This power down may cause problems on
+some imx platforms, because the hardware settings are reset to
+its power on default values which may differ from the ones when
+it power off. This patch added the dev_pm_ops and implemented
+two callbacks: suspend_noirq and resume_noirq, which will save
+the necessory hardware parameters right before power down and
+recover them before system uses the hardware.
 
-> On Tue, Jul 28, 2015 at 9:20 AM, Alexey Klimov <klimov.linux@gmail.com> wrote:
->> Hi Doug,
->>
->> On Tue, Jul 28, 2015 at 6:24 PM, Doug Anderson <dianders@chromium.org> wrote:
->>> Alexey,
->>>
->>> On Mon, Jul 27, 2015 at 2:28 PM, Alexey Klimov <klimov.linux@gmail.com> wrote:
->>>> Hi all,
->>>>
->>>> year(s) ago it was discovered that MCT timer and ARM architectured
->>>> timer
->>>> are the same hardware with different interface. Here [1].
->>>>
->>>> I followed mail-list discussions about removing MCT and using arch
->>>> timer for Exynos5-based SoCs but things aren't moving at least latest
->>>> upstream kernel on odroid-xu3 will use MCT as default timers.
->>>> Maybe the reason are some power-management related things that very
->>>> specific to Samsung. I don't know.
->>>>
->>>>
->>>> Idea of this draft patchset comes from Doug patches when he tried to
->>>> optimize read of 64-bit counter located in mmio. [2]
->>>> Why not using cp15 counter instead if possible?
->>>
->>> I hate to burst your bubble here, but...
->>>
->>> ...I think it would be a bad idea to use the cp15 counter on exynos
->>> 5422.  According to Samsung, there are issues where using cp15 could
->>> sometimes return the wrong value, especially if you happen to read it
->>> while on an A7 instead of an A15.  It will tend to work pretty well,
->>> but Samsung claimed that it might not work right on some CPUs or at
->>> some temperatures.
->>
->> I think this is right time when I can say "If only I had known about
->> it before!".
-> 
-> Yeah, we spent a whole lot of time on this too before giving up after
-> we found out it was not possible to use.
-> 
-> 
->> That's quite interesting especially about temperature issues.
->> Maybe it's worth to insert comments in driver/docs about this.
-> 
-> Maybe not a bad idea.  Depends if you think someone else will try to
-> do this...  ...and if they do, will they check mailing list traffic.
-> 
-> 
->>> Generally I'd say that if the arch timer works for you: use the arch
->>> timer.  If the arch timer doesn't work for you, use the MCT.
->>>
-One more thing, if you change it for your own private platform, it's up
-to you but if not, i.e., for mass product, please don't change it.
-Because it's not guaranteed even you haven't seen its failure...
+Because added the dev_pm_ops, the old suspend/resume callbacks
+under platform_driver will not be called any more. Changed their
+prototypes and moved those two callbacks into dev_pm_ops too.
 
->>> -Doug
->>
->> I possess no knowledge if there're any different hw revisions of
->> odroid-xu3 on the field
->> but looks like arch timer works fine for me on odroid-xu3 Exynos5422
->> SoC with upstream kernel.
-> 
-> Well, it looked like it worked for us too.  In fact, I never saw a
-> failure.  All I know is that Samsung said: don't do this, it's not a
-> good idea.  The performance gain wasn't enough to go against that...
-> That's when I started trying to optimize the MCT a little bit.  ;)
-> 
-Yeah and it was tough time for me when I discussed about that with
-hardware designer at that time ... haha...
+Signed-off-by: Shenwei Wang <shenwei.wang@freescale.com>
+---
+Change log:
 
-Thanks, Doug.
+PATCH v4
+	Added the return value check for clk_enable.
+	Replace the number 0x1 with UCR2_SRST.
 
-- Kukjin
+PATCH v3
+	After added the dev_pm_ops, the old suspend/resume callbacks
+	under platform_driver will not be called. Changed their
+	prototypes and moved them into dev_pm_ops too.
+
+PATCH v2
+	Change pr_debug to dev_dbg per GregK's review feedback.
+
+ drivers/tty/serial/imx.c | 128 +++++++++++++++++++++++++++++++++++------------
+ 1 file changed, 96 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 2c90dc3..a935c8e 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -216,6 +216,7 @@ struct imx_port {
+ 	unsigned int		tx_bytes;
+ 	unsigned int		dma_tx_nents;
+ 	wait_queue_head_t	dma_wait;
++	unsigned int            saved_reg[10];
+ };
+
+ struct imx_port_ucrs {
+@@ -1811,36 +1812,6 @@ static struct uart_driver imx_reg = {
+ 	.cons           = IMX_CONSOLE,
+ };
+
+-static int serial_imx_suspend(struct platform_device *dev, pm_message_t state)
+-{
+-	struct imx_port *sport = platform_get_drvdata(dev);
+-	unsigned int val;
+-
+-	/* enable wakeup from i.MX UART */
+-	val = readl(sport->port.membase + UCR3);
+-	val |= UCR3_AWAKEN;
+-	writel(val, sport->port.membase + UCR3);
+-
+-	uart_suspend_port(&imx_reg, &sport->port);
+-
+-	return 0;
+-}
+-
+-static int serial_imx_resume(struct platform_device *dev)
+-{
+-	struct imx_port *sport = platform_get_drvdata(dev);
+-	unsigned int val;
+-
+-	/* disable wakeup from i.MX UART */
+-	val = readl(sport->port.membase + UCR3);
+-	val &= ~UCR3_AWAKEN;
+-	writel(val, sport->port.membase + UCR3);
+-
+-	uart_resume_port(&imx_reg, &sport->port);
+-
+-	return 0;
+-}
+-
+ #ifdef CONFIG_OF
+ /*
+  * This function returns 1 iff pdev isn't a device instatiated by dt, 0 iff it
+@@ -1992,16 +1963,109 @@ static int serial_imx_remove(struct platform_device *pdev)
+ 	return uart_remove_one_port(&imx_reg, &sport->port);
+ }
+
++static int imx_serial_port_suspend_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	int ret;
++
++	ret = clk_enable(sport->clk_ipg);
++	if (ret)
++		dev_err(dev, "UART%d suspend error!\r\n", sport->port.line);
++
++	/* Save necessary regs */
++	sport->saved_reg[0] = readl(sport->port.membase + UCR1);
++	sport->saved_reg[1] = readl(sport->port.membase + UCR2);
++	sport->saved_reg[2] = readl(sport->port.membase + UCR3);
++	sport->saved_reg[3] = readl(sport->port.membase + UCR4);
++	sport->saved_reg[4] = readl(sport->port.membase + UFCR);
++	sport->saved_reg[5] = readl(sport->port.membase + UESC);
++	sport->saved_reg[6] = readl(sport->port.membase + UTIM);
++	sport->saved_reg[7] = readl(sport->port.membase + UBIR);
++	sport->saved_reg[8] = readl(sport->port.membase + UBMR);
++	sport->saved_reg[9] = readl(sport->port.membase + IMX21_UTS);
++
++	if (ret == 0)
++		clk_disable(sport->clk_ipg);
++
++	return 0;
++}
++
++static int imx_serial_port_resume_noirq(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	int ret;
++
++	ret = clk_enable(sport->clk_ipg);
++	if (ret)
++		dev_err(dev, "UART%d resume error!\r\n", sport->port.line);
++
++	writel(sport->saved_reg[4], sport->port.membase + UFCR);
++	writel(sport->saved_reg[5], sport->port.membase + UESC);
++	writel(sport->saved_reg[6], sport->port.membase + UTIM);
++	writel(sport->saved_reg[7], sport->port.membase + UBIR);
++	writel(sport->saved_reg[8], sport->port.membase + UBMR);
++	writel(sport->saved_reg[9], sport->port.membase + IMX21_UTS);
++	writel(sport->saved_reg[0], sport->port.membase + UCR1);
++	writel(sport->saved_reg[1] | UCR2_SRST, sport->port.membase + UCR2);
++	writel(sport->saved_reg[2], sport->port.membase + UCR3);
++	writel(sport->saved_reg[3], sport->port.membase + UCR4);
++
++	if (ret == 0)
++		clk_disable(sport->clk_ipg);
++
++	return 0;
++}
++
++static int imx_serial_port_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	unsigned int val;
++
++	/* enable wakeup from i.MX UART */
++	val = readl(sport->port.membase + UCR3);
++	val |= UCR3_AWAKEN;
++	writel(val, sport->port.membase + UCR3);
++
++	uart_suspend_port(&imx_reg, &sport->port);
++
++	return 0;
++}
++
++static int imx_serial_port_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct imx_port *sport = platform_get_drvdata(pdev);
++	unsigned int val;
++
++	/* disable wakeup from i.MX UART */
++	val = readl(sport->port.membase + UCR3);
++	val &= ~UCR3_AWAKEN;
++	writel(val, sport->port.membase + UCR3);
++
++	uart_resume_port(&imx_reg, &sport->port);
++
++	return 0;
++}
++
++static const struct dev_pm_ops imx_serial_port_pm_ops = {
++	.suspend_noirq = imx_serial_port_suspend_noirq,
++	.resume_noirq = imx_serial_port_resume_noirq,
++	.suspend = imx_serial_port_suspend,
++	.resume = imx_serial_port_resume,
++};
++
+ static struct platform_driver serial_imx_driver = {
+ 	.probe		= serial_imx_probe,
+ 	.remove		= serial_imx_remove,
+
+-	.suspend	= serial_imx_suspend,
+-	.resume		= serial_imx_resume,
+ 	.id_table	= imx_uart_devtype,
+ 	.driver		= {
+ 		.name	= "imx-uart",
+ 		.of_match_table = imx_uart_dt_ids,
++		.pm	= &imx_serial_port_pm_ops,
+ 	},
+ };
+
+--
+2.5.0.rc2
